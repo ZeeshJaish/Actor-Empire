@@ -1,20 +1,70 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Actor Empire
 
-# Run and deploy your AI Studio app
+Actor Empire is a Hollywood life-sim and career strategy game built by Zeesh. You start as a young aspiring actor and try to build a full entertainment empire through acting jobs, networking, relationships, money management, business expansion, and long-term family legacy.
 
-This contains everything you need to run your app locally.
+## What the game includes
 
-View your app in AI Studio: https://ai.studio/apps/41fde4c3-7150-4d21-a401-25a234993c66
+- Career progression with auditions, gigs, press tours, awards, and fame growth
+- Social systems with partners, marriage, children, and family relationships
+- Legacy gameplay where you can continue as your child and carry the bloodline forward
+- Lifestyle systems for homes, cars, luxury assets, and personal upgrades
+- Business and studio management
+- In-game phone apps for social media, stocks, dating, messages, and more
 
-## Run Locally
+## Tech Stack
 
-**Prerequisites:**  Node.js
+- React
+- TypeScript
+- Vite
+- Lucide React
 
+## Run locally
+
+### Prerequisites
+
+- Node.js
+
+### Setup
 
 1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+
+```bash
+npm install
+```
+
+2. Start the development server:
+
+```bash
+npm run dev
+```
+
+3. Open the local URL shown by Vite, usually:
+
+```text
+http://localhost:5173
+```
+
+## Optional local environment variables
+
+If you want to customize local-only behavior, you can use an `.env.local` file.
+
+- `VITE_DEV_TOOLS_PASSCODE` sets a custom developer tools passcode
+- `GEMINI_API_KEY` is available if you wire up Gemini-powered features locally
+
+These env files are ignored by git and are not committed to the repository.
+
+## Build
+
+```bash
+npm run build
+```
+
+## Type check
+
+```bash
+npm run lint
+```
+
+## Project vision
+
+The goal of Actor Empire is to blend career simulation, celebrity life, wealth building, and dynasty gameplay into one long-form progression game where each generation can shape the future of the family empire.
