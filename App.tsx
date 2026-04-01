@@ -32,6 +32,21 @@ import { createBloodlineSnapshot, getAbsoluteWeek, getLegacyInheritancePreview, 
 
 type GameStatus = 'START_MENU' | 'CREATION' | 'PLAYING' | 'DEATH_SCREEN';
 
+const dedupeAwards = <T extends { type: string; year: number; category: string; projectId: string; outcome: 'WON' | 'NOMINATED' }>(awards: T[] = []): T[] => {
+  const byKey = new Map<string, T>();
+
+  awards.forEach(award => {
+      const key = `${award.type}::${award.year}::${award.category}::${award.projectId}`;
+      const existing = byKey.get(key);
+
+      if (!existing || (existing.outcome !== 'WON' && award.outcome === 'WON')) {
+          byKey.set(key, award);
+      }
+  });
+
+  return Array.from(byKey.values());
+};
+
 export const App: React.FC = () => {
   const [player, setPlayer] = useState<Player>(INITIAL_PLAYER);
   const [activePage, setActivePage] = useState<Page>(Page.HOME);
@@ -236,11 +251,18 @@ export const App: React.FC = () => {
           if (safePlayer.instagram.feed.length === 0) safePlayer.instagram.feed = generateWeeklyFeed(safePlayer);
           
           if (!safePlayer.awards) safePlayer.awards = [];
+          safePlayer.awards = dedupeAwards(safePlayer.awards);
           if (!safePlayer.scheduledEvents) safePlayer.scheduledEvents = [];
           if (!safePlayer.dating) safePlayer.dating = { isTinderActive: false, isLuxeActive: false, preferences: { gender: 'ALL', minAge: 18, maxAge: 35 }, matches: [] };
           if (!safePlayer.flags) safePlayer.flags = {};
 
           if (!safePlayer.businesses) safePlayer.businesses = [];
+          if (safePlayer.pastProjects) {
+              safePlayer.pastProjects = safePlayer.pastProjects.map((project: any) => ({
+                  ...project,
+                  awards: dedupeAwards(project.awards || [])
+              }));
+          }
           if (safePlayer.business) {
               const indMap: Record<string, any> = { 'Cafe': { type: 'CAFE', subtype: 'COFFEE_SHOP', emoji: '☕' }, 'Online Brand': { type: 'FASHION', subtype: 'STREETWEAR', emoji: '👕' }, 'Production House': { type: 'MERCH', subtype: 'ONLINE_STORE', emoji: '📦' } };
               const mapped = indMap[safePlayer.business.type] || { type: 'RESTAURANT', subtype: 'CASUAL_DINING', emoji: '🍽️' };

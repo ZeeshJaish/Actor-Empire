@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Player, PendingEvent, ClothingItem, PressInteraction, ClothingCategory, Stats, Vehicle } from '../types';
+import { Player, PendingEvent, ClothingItem, PressInteraction, ClothingCategory, Stats, Vehicle, Award } from '../types';
 import { CLOTHING_CATALOG, CAR_CATALOG, MOTORCYCLE_CATALOG, BOAT_CATALOG, AIRCRAFT_CATALOG } from '../services/lifestyleLogic';
 import { generatePressInteractions, determineWinners, Nomination } from '../services/awardLogic';
 import { RED_CARPET_INTERVIEWS } from '../services/premiereLogic';
@@ -24,6 +24,25 @@ interface CeremonyStep {
     isPlayerWinner?: boolean;
     data?: any; // For player results
 }
+
+const upsertAwardRecord = (awards: Award[], nextAward: Award): Award[] => {
+    const existingIndex = awards.findIndex(award =>
+        award.type === nextAward.type &&
+        award.year === nextAward.year &&
+        award.category === nextAward.category &&
+        award.projectId === nextAward.projectId
+    );
+
+    if (existingIndex === -1) {
+        return [...awards, nextAward];
+    }
+
+    return awards.map((award, index) =>
+        index === existingIndex
+            ? { ...award, ...nextAward, id: award.id, outcome: nextAward.outcome === 'WON' ? 'WON' : award.outcome }
+            : award
+    );
+};
 
 // --- VISUAL ASSETS ---
 
@@ -467,12 +486,12 @@ export const RedCarpetEvent: React.FC<RedCarpetEventProps> = ({ player, event, o
             updatedPlayer.stats.fame = Math.min(100, updatedPlayer.stats.fame + 2);
             updatedPlayer.stats.followers += 10000;
         } else if (event.type === 'AWARD_CEREMONY') {
-            const awardsToAdd: any[] = [];
             const pastProjectsUpdate = [...player.pastProjects];
             let newsToAdd: any = null;
+            let updatedAwards = [...updatedPlayer.awards];
 
             currentResults.forEach(res => {
-                const awardEntry = {
+                const awardEntry: Award = {
                     id: `award_${Date.now()}_${Math.random()}`,
                     name: event.title,
                     category: res.nomination.category,
@@ -482,12 +501,12 @@ export const RedCarpetEvent: React.FC<RedCarpetEventProps> = ({ player, event, o
                     projectName: res.nomination.project.name,
                     type: event.data.awardDef.type
                 };
-                awardsToAdd.push(awardEntry);
+                updatedAwards = upsertAwardRecord(updatedAwards, awardEntry);
 
                 const projIndex = pastProjectsUpdate.findIndex(p => p.id === res.nomination.project.id);
                 if (projIndex >= 0) {
                     const proj = pastProjectsUpdate[projIndex];
-                    const newAwards = proj.awards ? [...proj.awards, awardEntry] : [awardEntry];
+                    const newAwards = upsertAwardRecord((proj.awards || []) as Award[], awardEntry);
                     pastProjectsUpdate[projIndex] = { ...proj, awards: newAwards as any };
                 }
 
@@ -503,7 +522,7 @@ export const RedCarpetEvent: React.FC<RedCarpetEventProps> = ({ player, event, o
                 }
             });
 
-            updatedPlayer.awards = [...updatedPlayer.awards, ...awardsToAdd];
+            updatedPlayer.awards = updatedAwards;
             updatedPlayer.pastProjects = pastProjectsUpdate;
             if (newsToAdd) updatedPlayer.news = [newsToAdd, ...updatedPlayer.news];
         }

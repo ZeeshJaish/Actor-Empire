@@ -1,166 +1,143 @@
-
 import { AdType } from '../types';
 
-// ==========================================
-// 🚨 PRODUCTION CONFIGURATION 🚨
-// ==========================================
-// 1. REPLACE THESE IDs WITH YOUR REAL ADMOB IDs FROM GOOGLE ADMOB CONSOLE
-// 2. ENSURE @capacitor-community/admob IS INSTALLED
-// ==========================================
-
 const ADMOB_IDS = {
-    android: {
-        appId: 'ca-app-pub-XXXXXXXXXXXXXXXX~XXXXXXXXXX', // REPLACE WITH YOUR ANDROID APP ID
-        interstitial: 'ca-app-pub-XXXXXXXXXXXXXXXX/XXXXXXXXXX', // REPLACE WITH YOUR ANDROID INTERSTITIAL ID
-        rewarded: 'ca-app-pub-XXXXXXXXXXXXXXXX/XXXXXXXXXX' // REPLACE WITH YOUR ANDROID REWARDED ID
-    },
     ios: {
-        appId: 'ca-app-pub-XXXXXXXXXXXXXXXX~XXXXXXXXXX', // REPLACE WITH YOUR IOS APP ID
-        interstitial: 'ca-app-pub-XXXXXXXXXXXXXXXX/XXXXXXXXXX', // REPLACE WITH YOUR IOS INTERSTITIAL ID
-        rewarded: 'ca-app-pub-XXXXXXXXXXXXXXXX/XXXXXXXXXX' // REPLACE WITH YOUR IOS REWARDED ID
-    }
-};
-
-// Toggle this to TRUE if you want to force test ads, FALSE for production
-const IS_DEVELOPMENT = false; 
-
-// Google's Official Test IDs (Used if IS_DEVELOPMENT is true)
-const TEST_IDS = {
-    android: {
-        appId: 'ca-app-pub-3940256099942544~3347511713',
-        interstitial: 'ca-app-pub-3940256099942544/1033173712',
-        rewarded: 'ca-app-pub-3940256099942544/5224354917'
+        rewarded: 'ca-app-pub-1351550313263506/9092996465',
+        interstitial: 'ca-app-pub-1351550313263506/1369584962',
     },
-    ios: {
-        appId: 'ca-app-pub-3940256099942544~1458002511',
-        interstitial: 'ca-app-pub-3940256099942544/4411468910',
-        rewarded: 'ca-app-pub-3940256099942544/1712485313'
-    }
+    android: {
+        rewarded: 'ca-app-pub-1351550313263506/5856820425',
+        interstitial: 'ca-app-pub-1351550313263506/1162896946',
+    },
 };
 
 export interface AdResult {
     success: boolean;
-    rewardType?: string;
-    amount?: number;
 }
 
 declare global {
     interface Window {
-        Capacitor?: any;
+        Capacitor?: {
+            isNativePlatform?: () => boolean;
+            getPlatform?: () => string;
+            Plugins?: {
+                AdMob?: any;
+            };
+        };
+        AdMob?: any;
         adBreak?: any;
         adConfig?: any;
-        AdMob?: any; 
     }
 }
 
-let isAdMobInitialized = false;
+let initialized = false;
 
-// --- 1. INITIALIZATION ---
-export const initAds = async () => {
-    const isNative = window.Capacitor?.isNativePlatform();
+const getAdMob = () => window.AdMob || window.Capacitor?.Plugins?.AdMob;
+const isRewardedType = (type: AdType) => type !== 'INTERSTITIAL';
 
-    if (isNative) {
-        console.log("📱 Native Platform Detected: Initializing AdMob...");
-        try {
-            // Access AdMob via global or Capacitor Plugins
-            const AdMob = window.AdMob || (window as any).Capacitor?.Plugins?.AdMob;
+const requestConsent = async () => {
+    const AdMob = getAdMob();
+    if (!AdMob?.requestConsentInfo) return;
 
-            if (AdMob) {
-                await AdMob.initialize({
-                    requestTrackingAuthorization: true,
-                    // testingDevices: ['YOUR_DEVICE_ID'], // Uncomment and add device ID for real ads in dev
-                    initializeForTesting: IS_DEVELOPMENT, 
-                });
-                isAdMobInitialized = true;
-                console.log("✅ AdMob Initialized (Native)");
-            } else {
-                console.warn("⚠️ AdMob Plugin not found. Run: npm install @capacitor-community/admob");
-            }
-        } catch (e) {
-            console.error("❌ AdMob Init Error:", e);
+    try {
+        const info = await AdMob.requestConsentInfo();
+        console.log('Consent status:', info?.status);
+
+        if (info?.isConsentFormAvailable && info?.status === 'REQUIRED' && AdMob.showConsentForm) {
+            await AdMob.showConsentForm();
+            console.log('AdMob consent form shown');
         }
-    } else {
-        // Web H5 Setup (AdSense/GameDistribution)
-        console.log("🌐 Web Platform: Using H5 fallback");
+    } catch (err) {
+        console.error('AdMob consent error:', err);
+    }
+};
+
+export const initAds = async () => {
+    const isNative = window.Capacitor?.isNativePlatform?.();
+
+    if (!isNative) {
         if (window.adConfig) {
             window.adConfig({
                 preloadAdBreaks: 'on',
                 sound: 'on',
             });
         }
+        return;
+    }
+
+    if (initialized) return;
+
+    const AdMob = getAdMob();
+    if (!AdMob?.initialize) {
+        console.warn('AdMob plugin not found. Native ads are unavailable.');
+        return;
+    }
+
+    await requestConsent();
+
+    try {
+        await AdMob.initialize({
+            requestTrackingAuthorization: true,
+        });
+        initialized = true;
+        console.log('AdMob initialized after consent');
+    } catch (err) {
+        console.error('AdMob init failed:', err);
     }
 };
 
-// --- 2. SHOW AD LOGIC ---
 export const showAd = async (type: AdType): Promise<AdResult> => {
-    const isNative = window.Capacitor?.isNativePlatform();
-    const isReward = type !== 'INTERSTITIAL';
+    const isNative = window.Capacitor?.isNativePlatform?.();
+    const wantsReward = isRewardedType(type);
 
-    // === NATIVE MOBILE (ADMOB) ===
     if (isNative) {
-        if (!isAdMobInitialized) await initAds();
+        await initAds();
 
-        const AdMob = window.AdMob || (window as any).Capacitor?.Plugins?.AdMob;
+        const AdMob = getAdMob();
         if (!AdMob) return { success: false };
 
-        const platform = (window.Capacitor.getPlatform() === 'ios') ? 'ios' : 'android';
-        // Use Test IDs if in development mode, otherwise use real IDs
-        const ids = IS_DEVELOPMENT ? TEST_IDS[platform] : ADMOB_IDS[platform];
+        const platform = (window.Capacitor?.getPlatform?.() === 'ios' ? 'ios' : 'android') as 'ios' | 'android';
+        const ids = ADMOB_IDS[platform];
 
         try {
-            if (isReward) {
-                // REWARDED VIDEO
-                await AdMob.prepareRewardVideoAd({
-                    adId: ids.rewarded,
-                    isTesting: IS_DEVELOPMENT
-                });
-                
-                const rewardItem = await AdMob.showRewardVideoAd();
-                console.log("💰 AdMob Reward Earned:", rewardItem);
-                
-                return { success: true, rewardType: type };
-            } else {
-                // INTERSTITIAL
+            if (!wantsReward) {
                 await AdMob.prepareInterstitial({
                     adId: ids.interstitial,
-                    isTesting: IS_DEVELOPMENT
                 });
-
                 await AdMob.showInterstitial();
                 return { success: true };
             }
-        } catch (e) {
-            console.error("❌ AdMob Show Error:", e);
+
+            await AdMob.prepareRewardVideoAd({
+                adId: ids.rewarded,
+            });
+
+            const reward = await AdMob.showRewardVideoAd();
+            if (!reward) return { success: false };
+
+            return { success: true };
+        } catch (err) {
+            console.error('Ad failed:', err);
             return { success: false };
         }
     }
 
-    // === WEB FALLBACK (AdSense H5 / Simulation) ===
     if (typeof window.adBreak === 'function') {
-        return new Promise((resolve) => {
-            window.adBreak!({
-                type: isReward ? 'reward' : 'next',
+        return new Promise(resolve => {
+            window.adBreak({
+                type: wantsReward ? 'reward' : 'next',
                 name: type,
-                beforeAd: () => console.log("Web Ad starting..."),
-                afterAd: () => console.log("Web Ad finished."),
+                beforeAd: () => console.log('Web ad starting...'),
+                afterAd: () => console.log('Web ad finished.'),
                 adBreakDone: (placementInfo: any) => {
-                    if (placementInfo.breakStatus === 'viewed') {
-                        resolve({ success: true, rewardType: type });
-                    } else {
-                        resolve({ success: false });
-                    }
-                }
+                    resolve({ success: placementInfo?.breakStatus === 'viewed' });
+                },
             });
         });
-    } else {
-        // DEV/LOCALHOST SIMULATION (No AdBlock)
-        console.log(`[DEV SIMULATION] Showing ${type} Ad...`);
-        return new Promise((resolve) => {
-            setTimeout(() => {
-                const success = true; 
-                console.log(`[DEV SIMULATION] Ad Complete: ${success}`);
-                resolve({ success, rewardType: type });
-            }, 1000);
-        });
     }
+
+    console.log(`[DEV SIMULATION] Showing ${type} ad...`);
+    return new Promise(resolve => {
+        setTimeout(() => resolve({ success: true }), 1000);
+    });
 };

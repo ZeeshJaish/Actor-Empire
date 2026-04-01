@@ -1072,10 +1072,28 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
             const noms = checkAwardEligibility(nextPlayer, def.inviteWeek);
             const fullBallot = generateFullBallot(nextPlayer, def.type, noms);
             if (noms.length > 0) {
-                const awardEntries = noms.map(n => ({ id: `award_nom_${Date.now()}_${Math.random()}`, name: def.name, category: n.category, year: nextPlayer.age, outcome: 'NOMINATED' as const, projectId: n.project.id, projectName: n.project.name, type: def.type }));
-                nextPlayer.awards.push(...awardEntries);
-                nextPlayer.inbox.unshift({ id: `msg_award_invite_${def.type}_${Date.now()}`, sender: 'The Academy', subject: `NOMINATION: ${def.name}`, text: `Congratulations! You have been nominated for ${noms.length} awards.`, type: 'OFFER_EVENT', data: null, isRead: false, weekSent: nextPlayer.currentWeek, expiresIn: 4 });
-                logsToAdd.push({ msg: `🏆 You have been nominated for the ${def.name}!`, type: 'positive' });
+                const awardEntries = noms
+                    .filter(n => !nextPlayer.awards.some(a =>
+                        a.type === def.type &&
+                        a.year === nextPlayer.age &&
+                        a.projectId === n.project.id &&
+                        a.category === n.category
+                    ))
+                    .map(n => ({
+                        id: `award_nom_${Date.now()}_${Math.random()}`,
+                        name: def.name,
+                        category: n.category,
+                        year: nextPlayer.age,
+                        outcome: 'NOMINATED' as const,
+                        projectId: n.project.id,
+                        projectName: n.project.name,
+                        type: def.type
+                    }));
+                if (awardEntries.length > 0) {
+                    nextPlayer.awards.push(...awardEntries);
+                    nextPlayer.inbox.unshift({ id: `msg_award_invite_${def.type}_${Date.now()}`, sender: 'The Academy', subject: `NOMINATION: ${def.name}`, text: `Congratulations! You have been nominated for ${awardEntries.length} awards.`, type: 'OFFER_EVENT', data: null, isRead: false, weekSent: nextPlayer.currentWeek, expiresIn: 4 });
+                    logsToAdd.push({ msg: `🏆 You have been nominated for the ${def.name}!`, type: 'positive' });
+                }
             }
             nextPlayer.scheduledEvents.push({ id: `evt_award_${def.type}_${nextPlayer.age}`, week: parseInt(weekStr), type: 'AWARD_CEREMONY', title: def.name, description: "Award Ceremony", data: { awardDef: def, nominations: noms, fullBallot: fullBallot } });
             nextPlayer.news.unshift({ id: `news_noms_${def.type}_${Date.now()}`, headline: `${def.name} Nominations Announced!`, category: 'TOP_STORY', week: nextPlayer.currentWeek, year: nextPlayer.age, impactLevel: 'HIGH' });
