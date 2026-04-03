@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Player, Business } from '../../../types';
 import { BUSINESS_BLUEPRINTS, checkAndRefreshHiringPool, hireCandidate, expandBusiness, restockProduct, updateProductPrice, createProduct, BUSINESS_THEMES, BUSINESS_AMENITIES, BUSINESS_PRODUCTION_TYPES, PRODUCT_CATALOG, PRODUCT_DEV_OPTIONS, injectCapital, withdrawCapital, sellBusiness, liquidateBusiness } from '../../../services/businessLogic';
 import { formatMoney } from '../../../services/formatUtils';
+import { spendPlayerEnergy } from '../../../services/premiumLogic';
 import { ArrowLeft, Activity, Store, Megaphone, DollarSign, TrendingUp, Target, Settings, Shield, Globe, Plus, Minus, UserPlus, Briefcase, User, ShoppingBag, X, Zap, Beaker, RefreshCw, BarChart2, Users, Tv, Package, AlertTriangle, LogOut, Star, AlertCircle, ArrowRight } from 'lucide-react';
 
 interface BusinessDashboardProps {
@@ -186,7 +187,9 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ business, 
         const res = createProduct(business, newProdName, newProdType, newProdQty, def.baseCost, finalPrice, devOptions);
         if (res.success) {
             const businesses = player.businesses.map(b => b.id === business.id ? res.updated : b);
-            onUpdatePlayer({ ...player, businesses, energy: { ...player.energy, current: player.energy.current - (res.energyCost || 0) } });
+            const nextPlayer = { ...player, businesses };
+            spendPlayerEnergy(nextPlayer, res.energyCost || 0);
+            onUpdatePlayer(nextPlayer);
             setShowProductCreator(false); setProdCreatorStep(1); setNewProdName(''); setNewProdQty(100); setNewProdType(''); setCustomSellingPrice('');
             setDevOptions({ material: 'mat_standard', process: 'proc_mass', packaging: 'pack_basic' });
         } else {

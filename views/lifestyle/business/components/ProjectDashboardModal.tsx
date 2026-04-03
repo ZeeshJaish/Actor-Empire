@@ -344,10 +344,10 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
             }
         }
 
-        if (!updated) {
-            const libraryIndex = updatedStudio.library.findIndex(p => p.id === project.id);
+        if (!updated && Array.isArray((updatedStudio as any).library)) {
+            const libraryIndex = (updatedStudio as any).library.findIndex((p: any) => p.id === project.id);
             if (libraryIndex !== -1) {
-                updatedStudio.library[libraryIndex].customPoster = customPoster;
+                (updatedStudio as any).library[libraryIndex].customPoster = customPoster;
                 updated = true;
             }
         }

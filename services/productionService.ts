@@ -1,5 +1,6 @@
 import { Player, Commitment, NPCActor, ActorTrait, ScheduledEvent, ProductionCrisis } from '../types';
 import { NPC_DATABASE } from './npcLogic';
+import { spendPlayerEnergy } from './premiumLogic';
 
 const CRISIS_TEMPLATES: Record<ActorTrait, (npc: NPCActor) => ProductionCrisis> = {
     DIVA: (npc) => ({
@@ -83,7 +84,8 @@ const CRISIS_TEMPLATES: Record<ActorTrait, (npc: NPCActor) => ProductionCrisis> 
             {
                 label: "Keep Filming (Energy -20)",
                 impact: (p, c) => {
-                    const updatedPlayer = { ...p, energy: { ...p.energy, current: Math.max(0, p.energy.current - 20) } };
+                    const updatedPlayer = { ...p };
+                    spendPlayerEnergy(updatedPlayer, 20);
                     const updatedProject = { ...c, productionPerformance: Math.min(100, (c.productionPerformance || 50) + 15) };
                     return { updatedPlayer, updatedProject, log: `You stayed until 4 AM. You're dead tired, but that scene was a masterpiece.` };
                 }
@@ -175,7 +177,8 @@ export const applyCrisisImpact = (player: Player, event: ScheduledEvent, choiceI
                         }
                         return { updatedPlayer: p, updatedProject, log: "The movie looks clean and accessible." };
                     } else if (opt.label.includes("Go for it")) {
-                        const updatedPlayer = { ...p, energy: { ...p.energy, current: Math.max(0, p.energy.current - 30) } };
+                        const updatedPlayer = { ...p };
+                        spendPlayerEnergy(updatedPlayer, 30);
                         const updatedProject = { ...c, productionPerformance: Math.min(100, (c.productionPerformance || 50) + 15) };
                         return { updatedPlayer, updatedProject, log: "You got the long take!" };
                     } else {

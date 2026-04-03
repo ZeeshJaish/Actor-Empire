@@ -5,6 +5,7 @@ import { motion } from 'motion/react';
 import { getWriterTalent } from '../../../services/roleLogic';
 import { generateWriters, generateIPMarket, generateProceduralLogline } from '../../../src/data/generators';
 import { SCRIPT_TEMPLATES } from '../../../src/data/scriptTemplates';
+import { normalizeStudioState } from '../../../services/businessLogic';
 
 interface DevelopmentLabProps {
     player: Player;
@@ -31,14 +32,9 @@ export const DevelopmentLab: React.FC<DevelopmentLabProps> = ({ player, studio, 
     const [activeTab, setActiveTab] = useState<DevTab>('VAULT');
     
     // Initialize Studio State if missing
-    const studioState = {
-        scripts: [],
-        writers: generateWriters(10),
-        ipMarket: generateIPMarket(6),
-        lastMarketRefreshWeek: player.currentWeek,
-        lastWriterRefreshWeek: player.currentWeek,
-        purchasedIPTitles: [],
-        ...(studio.studioState || {})
+    const studioState = normalizeStudioState(studio.studioState, player.currentWeek) as typeof studio.studioState & {
+        universes?: Universe[];
+        activeReleases?: any[];
     };
 
     // Make sure we update the player if we just initialized the state
@@ -228,7 +224,10 @@ export const DevelopmentLab: React.FC<DevelopmentLabProps> = ({ player, studio, 
                         let updatedPlayer = { ...player };
                         
                         if (costType === 'ENERGY' && costAmount) {
-                            updatedPlayer.energy -= costAmount;
+                            updatedPlayer.energy = {
+                                ...updatedPlayer.energy,
+                                current: Math.max(0, updatedPlayer.energy.current - costAmount)
+                            };
                         } else if (costType === 'MONEY' && costAmount) {
                             updatedStudio.balance -= costAmount;
                         }
@@ -241,7 +240,13 @@ export const DevelopmentLab: React.FC<DevelopmentLabProps> = ({ player, studio, 
                         handleUpdateStudioState({ scripts: updatedScripts });
                     }}
                     onDeductEnergy={(amount) => {
-                        onUpdatePlayer({ ...player, energy: player.energy - amount });
+                        onUpdatePlayer({
+                            ...player,
+                            energy: {
+                                ...player.energy,
+                                current: Math.max(0, player.energy.current - amount)
+                            }
+                        });
                     }}
                     onDeductMoney={(amount) => {
                         const updatedStudio = { ...studio, balance: studio.balance - amount };
@@ -721,7 +726,7 @@ const ScriptDoctorPanel: React.FC<{
     const attrs = script.attributes || { plot: 50, characters: 50, pacing: 50, dialogue: 50, action: 50, originality: 50 };
 
     const handleImprove = (stat: keyof ScriptAttributes, costType: 'ENERGY' | 'MONEY', costAmount: number, boost: number) => {
-        if (costType === 'ENERGY' && player.energy < costAmount) return;
+        if (costType === 'ENERGY' && player.energy.current < costAmount) return;
         if (costType === 'MONEY' && studioBalance < costAmount) return;
 
         const newAttrs = { ...attrs, [stat]: Math.min(100, (attrs[stat] || 50) + boost) };
@@ -774,7 +779,7 @@ const ScriptDoctorPanel: React.FC<{
                 
                 <button 
                     onClick={() => handleImprove('dialogue', 'ENERGY', 15, 10)}
-                    disabled={player.energy < 15 || (attrs.dialogue || 50) >= 100}
+                    disabled={player.energy.current < 15 || (attrs.dialogue || 50) >= 100}
                     className="w-full bg-zinc-900 border border-zinc-800 p-4 rounded-xl hover:border-amber-500/50 transition-colors flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     <div className="text-left">
@@ -802,7 +807,7 @@ const ScriptDoctorPanel: React.FC<{
 
                 <button 
                     onClick={() => handleImprove('characters', 'ENERGY', 20, 10)}
-                    disabled={player.energy < 20 || (attrs.characters || 50) >= 100}
+                    disabled={player.energy.current < 20 || (attrs.characters || 50) >= 100}
                     className="w-full bg-zinc-900 border border-zinc-800 p-4 rounded-xl hover:border-amber-500/50 transition-colors flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     <div className="text-left">
@@ -1602,7 +1607,7 @@ const UniverseMerchView: React.FC<{
             balance: studio.balance - blueprint.cost,
             studioState: {
                 ...studio.studioState,
-                universes: studio.studioState.universes.map(u => u.id === universe.id ? updatedUniverse : u)
+                universes: (studio.studioState?.universes || []).map(u => u.id === universe.id ? updatedUniverse : u)
             }
         };
 
@@ -1778,7 +1783,7 @@ const UniverseDashboard: React.FC<{
                 ...studio,
                 studioState: {
                     ...studio.studioState,
-                    universes: studio.studioState.universes.map(u => u.id === universe.id ? {
+                    universes: (studio.studioState?.universes || []).map(u => u.id === universe.id ? {
                         ...u,
                         currentPhase: `Phase ${nextPhaseNum}`,
                         currentPhaseName: `Phase ${nextPhaseNum}`
@@ -1829,7 +1834,7 @@ const UniverseDashboard: React.FC<{
                 ...studio,
                 studioState: {
                     ...studio.studioState,
-                    universes: studio.studioState.universes.map(u => u.id === universe.id ? {
+                    universes: (studio.studioState?.universes || []).map(u => u.id === universe.id ? {
                         ...u,
                         saga: nextSagaNum,
                         currentSagaName: `Saga ${nextSagaNum}`,
@@ -2056,11 +2061,12 @@ const UniverseManager: React.FC<{
     const [description, setDescription] = useState('');
     const [selectedUniverseId, setSelectedUniverseId] = useState<string | null>(null);
 
-    const studioUniverses = (Object.values(player.world.universes) as Universe[]).filter(u => u.studioId === studio.id);
-    const rivalUniverses = (Object.values(player.world.universes) as Universe[]).filter(u => u.studioId !== studio.id);
+    const worldUniverses = player.world?.universes || {};
+    const studioUniverses = (Object.values(worldUniverses) as Universe[]).filter(u => u.studioId === studio.id);
+    const rivalUniverses = (Object.values(worldUniverses) as Universe[]).filter(u => u.studioId !== studio.id);
 
     // Dynamic Market Share Calculation
-    const allUniverses = Object.values(player.world.universes) as Universe[];
+    const allUniverses = Object.values(worldUniverses) as Universe[];
     const totalPower = allUniverses.reduce((acc, u) => acc + (u.brandPower * 0.7 + u.momentum * 0.3), 0);
     
     const universesWithShare = allUniverses.map(u => ({
@@ -2101,7 +2107,7 @@ const UniverseManager: React.FC<{
             world: {
                 ...player.world,
                 universes: {
-                    ...player.world.universes,
+                    ...worldUniverses,
                     [newUniverseId]: newUniverse
                 }
             }
@@ -2114,7 +2120,7 @@ const UniverseManager: React.FC<{
     };
 
     if (selectedUniverseId) {
-        const universe = player.world.universes[selectedUniverseId];
+        const universe = worldUniverses[selectedUniverseId];
         if (universe) {
             return <UniverseDashboard universe={universe} player={player} studio={studio} onUpdatePlayer={onUpdatePlayer} onBack={() => setSelectedUniverseId(null)} />;
         }
@@ -2269,6 +2275,3 @@ const UniverseManager: React.FC<{
         </div>
     );
 };
-
-
-

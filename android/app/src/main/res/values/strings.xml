@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Actor Empire</string>
+    <string name="title_activity_main">Actor Empire</string>
+    <string name="package_name">com.zeeshapps.actorempire</string>
+    <string name="custom_url_scheme">com.zeeshapps.actorempire</string>
+</resources>

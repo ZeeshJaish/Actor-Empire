@@ -22,7 +22,8 @@ import {
     generateReviews,
     calculateAuditionGain,
     calculateProductionGain,
-    calculatePassiveGain
+    calculatePassiveGain,
+    getBoxOfficeCaps
 } from './roleLogic';
 import { 
     determineStreamingAcquisition, 
@@ -53,8 +54,12 @@ import { processYoutubeChannel } from './youtubeLogic';
 import { checkForProductionCrisis } from './productionService';
 import { processBusinessWeek } from './businessLogic';
 import { getRelationshipAge } from './legacyLogic';
+import { hasNoAds, resetWeeklyEnergy } from './premiumLogic';
 
 // --- CONSTANTS ---
+const ANNUAL_TAX_FREE_ALLOWANCE = 25000;
+const ANNUAL_INCOME_TAX_RATE = 0.15;
+
 const ESTRANGEMENT_TEMPLATES = [
     "Sources claim {Name} hasn't spoken to their {Rel} in months.",
     "{Rel} of {Name} sells story to tabloids: 'Fame changed them.'",
@@ -355,8 +360,8 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
     // Business Drain Removed
     const totalDrain = commitmentDrain;
     
-    nextPlayer.energy.max = 100; 
-    nextPlayer.energy.current = Math.max(0, 100 - totalDrain);
+    resetWeeklyEnergy(nextPlayer);
+    nextPlayer.energy.current = Math.max(0, nextPlayer.energy.current - totalDrain);
 
     // --- UPDATED STAT DECAY & LIFESTYLE BONUSES ---
     // DIFFICULTY SCALING: Reduce decay for new players to make early game easier.
@@ -383,7 +388,7 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
 
     const BASE_DECAY = 1.0 * difficultyMult; 
     const HEALTH_DECAY = 0.5 * difficultyMult;
-    const FAME_DECAY = 0.25; // Fame decay stays constant or scales differently? Kept constant for now.
+    const FAME_DECAY = 0.18; // Middle ground: fame still grows, but weekly momentum no longer snowballs too quickly.
 
     const bodyBonus = getBonusGain(trainer);
     nextPlayer.stats.body = Math.max(0, Math.min(100, nextPlayer.stats.body - BASE_DECAY + bodyBonus));
@@ -909,12 +914,34 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
 
         if (rel.distributionPhase === 'THEATRICAL') {
             const prevGross = rel.weeklyGross.length > 0 ? rel.weeklyGross[rel.weeklyGross.length - 1] : 0;
-            const revenue = calculateWeeklyBoxOffice(rel.weekNum, rel.budget, rel.projectDetails.hiddenStats, prevGross, rel.weekNum === 1 ? rel.promotionalBuzz : undefined, rel.projectDetails.budgetTier);
+            const uncappedRevenue = calculateWeeklyBoxOffice(
+                rel.weekNum,
+                rel.budget,
+                rel.projectDetails.hiddenStats,
+                prevGross,
+                rel.weekNum === 1 ? rel.promotionalBuzz : undefined,
+                rel.projectDetails.budgetTier,
+                rel.projectDetails.genre
+            );
+            const boxOfficeCaps = getBoxOfficeCaps(rel.projectDetails.budgetTier);
+            const remainingHeadroom = Math.max(0, boxOfficeCaps.total - rel.totalGross);
+            const revenue = Math.min(uncappedRevenue, remainingHeadroom);
             const newTotal = rel.totalGross + revenue;
             const newWeeklyGross = [...rel.weeklyGross, revenue];
             const maxWeeks = rel.maxTheatricalWeeks || 12; 
             const isPulledRevenue = rel.weekNum >= 3 && revenue < (rel.budget * 0.05); 
             const isPulledTime = rel.weekNum >= maxWeeks; 
+            const roleVisibility = rel.roleType === 'LEAD' ? 1 : rel.roleType === 'SUPPORTING' ? 0.7 : 0.35;
+            const theatricalFamePulse = revenue >= rel.budget * 0.35
+                ? 0.45 * roleVisibility
+                : revenue >= rel.budget * 0.18
+                    ? 0.25 * roleVisibility
+                    : revenue >= rel.budget * 0.08
+                        ? 0.1 * roleVisibility
+                        : 0;
+            if (theatricalFamePulse > 0) {
+                nextPlayer.stats.fame = Math.max(0, Math.min(100, nextPlayer.stats.fame + theatricalFamePulse));
+            }
             
             // Add revenue to player's studio if they own it
             const studioId = rel.projectDetails.studioId;
@@ -958,24 +985,30 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                             if (!platformState) return;
 
                             // Base interest on quality, genre match, and platform's desperation (recentHits)
-                            const isGenreMatch = platformProfile.genreBias.includes(rel.projectDetails.genre) ? 1.5 : 1.0;
+                            const isGenreMatch = platformProfile.genreBias.some(g => g.toUpperCase().replace('-', '_') === rel.projectDetails.genre) ? 1.15 : 0.95;
                             const desperation = Math.max(0.5, 1.5 - (platformState.recentHits * 0.1));
-                            
-                            const interest = (rel.projectDetails.hiddenStats.qualityScore * 0.6) + 
-                                             ((rel.promotionalBuzz || 50) * 0.4) * isGenreMatch * desperation;
+                            const qualityScore = rel.projectDetails.hiddenStats.qualityScore || 50;
+                            const scriptQuality = rel.projectDetails.hiddenStats.scriptQuality || 50;
+                            const directorQuality = rel.projectDetails.hiddenStats.directorQuality || 50;
+                            const castingStrength = rel.projectDetails.hiddenStats.castingStrength || 50;
+                            const packageStrength = (qualityScore * 0.45) + (scriptQuality * 0.2) + (directorQuality * 0.15) + (castingStrength * 0.2);
+                            const runStrength = Math.max(0.5, Math.min(3, newTotal / Math.max(rel.budget, 1)));
+                            const interest = (packageStrength * isGenreMatch * desperation) + ((rel.promotionalBuzz || 50) * 0.15) + (runStrength * 12);
                             
                             if (interest > 60 || Math.random() > 0.7) {
-                                // Platform makes a bid
-                                // Base offer depends on project budget, platform payout multiplier, and platform's cash reserve
-                                // We want this to be a safe revenue stream, so we offer a significant portion of the budget
-                                let baseOffer = (rel.budget * (0.7 + Math.random() * 0.4)) * platformProfile.payoutMult * desperation;
+                                const qualityFactor = 0.7 + (packageStrength / 200);
+                                const runFactor = 0.14 + (runStrength * 0.08);
+                                let baseOffer = rel.budget * runFactor * qualityFactor * platformProfile.payoutMult * desperation * isGenreMatch;
                                 
-                                // Cap offer based on cash reserve (they won't offer more than 50% of their cash for a single hit)
-                                const maxOffer = platformState.cashReserve * 0.5;
+                                // Cap offer based on cash reserve and overall sanity.
+                                const maxOffer = Math.min(
+                                    platformState.cashReserve * 0.28,
+                                    rel.budget * (0.35 + (runStrength * 0.2))
+                                );
                                 if (baseOffer > maxOffer) baseOffer = maxOffer;
 
                                 const upfront = Math.floor(baseOffer * (0.9 + Math.random() * 0.3));
-                                const royalty = Math.floor(Math.random() * 10) + 10; // 10-20%
+                                const royalty = Math.floor(Math.random() * 8) + 5; // 5-12%
                                 
                                 if (upfront > 0) {
                                     bids.push({ platformId: pId, upfront, royalty, duration: 52 }); // 1 year contract
@@ -985,7 +1018,7 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                         
                         if (bids.length === 0) {
                             // Fallback bid if no one is interested
-                            bids.push({ platformId: 'NETFLIX', upfront: Math.floor(rel.budget * 0.1), royalty: 5, duration: 52 });
+                            bids.push({ platformId: 'NETFLIX', upfront: Math.floor(rel.budget * 0.05), royalty: 5, duration: 52 });
                         }
 
                         processedReleases.push({ ...rel, distributionPhase: 'STREAMING_BIDDING', totalGross: newTotal, weeklyGross: newWeeklyGross, status: 'FINISHED', bids });
@@ -1024,6 +1057,17 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
             const totalViews = rel.streaming.totalViews + newViews;
             const newWeeklyViews = [...rel.streaming.weeklyViews, newViews];
             const shouldExit = checkStreamingExit(rel.streaming.platformId, newViews, rel.streaming.weekOnPlatform);
+            const roleVisibility = rel.roleType === 'LEAD' ? 1 : rel.roleType === 'SUPPORTING' ? 0.7 : 0.35;
+            const streamingFamePulse = newViews >= 5_000_000
+                ? 0.35 * roleVisibility
+                : newViews >= 2_000_000
+                    ? 0.18 * roleVisibility
+                    : newViews >= 750_000
+                        ? 0.06 * roleVisibility
+                        : 0;
+            if (streamingFamePulse > 0) {
+                nextPlayer.stats.fame = Math.max(0, Math.min(100, nextPlayer.stats.fame + streamingFamePulse));
+            }
 
             let weeklyStreamingRevenue = 0;
             if (rel.studioRoyaltyPercentage) {
@@ -1113,7 +1157,8 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
 
     // --- 11. END OF WEEK UPDATES ---
     nextPlayer.currentWeek += 1;
-    if (nextPlayer.currentWeek % 12 === 0) triggerAd = true;
+    if (!hasNoAds(nextPlayer) && nextPlayer.currentWeek % 12 === 0) triggerAd = true;
+    nextPlayer.flags.bailoutAdsUsedThisWeek = 0;
 
     // --- 11.5 ATMOSPHERIC LOGS (Paranoia & Tension) ---
     const heat = nextPlayer.flags.heat || 0;
@@ -1282,13 +1327,29 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
             }
         }
 
-        // Yearly Finance
+        // Year-end finance and taxes
         const yearTransactions = nextPlayer.finance.history.filter(t => t.year === nextPlayer.age - 1);
         const income = yearTransactions.filter(t => t.amount > 0).reduce((sum, t) => sum + t.amount, 0);
         const expense = yearTransactions.filter(t => t.amount < 0).reduce((sum, t) => sum + Math.abs(t.amount), 0);
+        const netIncome = Math.max(0, income - expense);
+        const taxableIncome = Math.max(0, netIncome - ANNUAL_TAX_FREE_ALLOWANCE);
+        const annualTaxDue = Math.floor(taxableIncome * ANNUAL_INCOME_TAX_RATE);
         const breakdown: Record<TransactionCategory, number> = { SALARY: 0, ROYALTY: 0, SPONSORSHIP: 0, DIVIDEND: 0, EXPENSE: 0, ASSET: 0, BUSINESS: 0, OTHER: 0, AD_REVENUE: 0 };
         yearTransactions.filter(t => t.amount > 0).forEach(t => breakdown[t.category] = (breakdown[t.category] || 0) + t.amount);
         nextPlayer.finance.yearly.push({ year: nextPlayer.age - 1, totalIncome: income, totalExpenses: expense, incomeByCategory: breakdown });
+
+        if (annualTaxDue > 0) {
+            addTransaction(-annualTaxDue, 'EXPENSE', `Annual Income Tax (${nextPlayer.age - 1})`);
+            logsToAdd.push({
+                msg: `🏛️ Annual tax bill paid: $${annualTaxDue.toLocaleString()} on $${taxableIncome.toLocaleString()} taxable income.`,
+                type: 'negative'
+            });
+        } else if (netIncome > 0) {
+            logsToAdd.push({
+                msg: `🏛️ No income tax due this year. Your net income stayed within the $${ANNUAL_TAX_FREE_ALLOWANCE.toLocaleString()} allowance.`,
+                type: 'neutral'
+            });
+        }
     }
 
     if (nextPlayer.relationships) {

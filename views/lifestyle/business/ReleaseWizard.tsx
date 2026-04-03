@@ -30,11 +30,11 @@ const SCREENING_STRATEGIES = [
 ];
 
 const PLATFORMS = [
-    { id: 'NETFLIX', name: 'Netflix', baseBid: 15000000, qualityReq: 75, color: '#E50914', maxBudget: 150000000 },
-    { id: 'APPLE_TV', name: 'Apple TV+', baseBid: 20000000, qualityReq: 85, color: '#FFFFFF', maxBudget: 200000000 },
-    { id: 'DISNEY_PLUS', name: 'Disney+', baseBid: 12000000, qualityReq: 70, color: '#113CCF', maxBudget: 120000000 },
-    { id: 'HULU', name: 'Hulu', baseBid: 8000000, qualityReq: 60, color: '#1CE783', maxBudget: 80000000 },
-    { id: 'YOUTUBE', name: 'YouTube Premium', baseBid: 3000000, qualityReq: 40, color: '#FF0000', maxBudget: 30000000 }
+    { id: 'NETFLIX', name: 'Netflix', baseBid: 10000000, qualityReq: 72, color: '#E50914', maxBudget: 90000000 },
+    { id: 'APPLE_TV', name: 'Apple TV+', baseBid: 14000000, qualityReq: 82, color: '#FFFFFF', maxBudget: 110000000 },
+    { id: 'DISNEY_PLUS', name: 'Disney+', baseBid: 9000000, qualityReq: 70, color: '#113CCF', maxBudget: 85000000 },
+    { id: 'HULU', name: 'Hulu', baseBid: 6000000, qualityReq: 58, color: '#1CE783', maxBudget: 55000000 },
+    { id: 'YOUTUBE', name: 'YouTube Premium', baseBid: 2000000, qualityReq: 38, color: '#FF0000', maxBudget: 20000000 }
 ];
 
 type BidType = 'UPFRONT_ONLY' | 'GREENLIGHT_DEAL' | 'BACKEND_POINTS';
@@ -106,12 +106,16 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                     
                     // Fallback bid if no one bid
                     if (!highestBid) {
+                        const fallbackBase = Math.max(
+                            5000000,
+                            Math.floor((project.projectDetails?.estimatedBudget || 0) * (isPostTheatricalBidding ? 0.05 : 0.22))
+                        );
                         const fallbackBid: Bid = {
                             id: Math.random().toString(),
                             platformId: 'YOUTUBE',
-                            amount: 1000000,
+                            amount: fallbackBase,
                             type: 'UPFRONT_ONLY',
-                            bidValue: 1000000,
+                            bidValue: fallbackBase,
                             timestamp: Date.now()
                         };
                         setHighestBid(fallbackBid);
@@ -124,8 +128,14 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
             });
 
             // AI Bidding Logic
-            const estQuality = project.projectDetails?.hiddenStats?.qualityScore || 50;
-            const eligiblePlatforms = PLATFORMS.filter(p => estQuality >= p.qualityReq && activePlatforms.includes(p.id));
+            const hiddenStats = project.projectDetails?.hiddenStats || {};
+            const estQuality = hiddenStats.qualityScore || 50;
+            const scriptQuality = hiddenStats.scriptQuality || 50;
+            const directorQuality = hiddenStats.directorQuality || 50;
+            const castingStrength = hiddenStats.castingStrength || 50;
+            const rawHype = hiddenStats.rawHype || 50;
+            const packageScore = (estQuality * 0.4) + (scriptQuality * 0.2) + (directorQuality * 0.15) + (castingStrength * 0.15) + (rawHype * 0.1);
+            const eligiblePlatforms = PLATFORMS.filter(p => packageScore >= p.qualityReq && activePlatforms.includes(p.id));
 
             if (eligiblePlatforms.length > 0 && Math.random() > 0.8) { // 20% chance per tick to bid
                 const platform = eligiblePlatforms[Math.floor(Math.random() * eligiblePlatforms.length)];
@@ -136,8 +146,15 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                     return;
                 }
                 
-                // Max offer is based on quality and platform's max budget
-                let maxOffer = Math.min(platform.maxBudget, platform.baseBid * (estQuality / 50) * (1 + Math.random() * 0.5));
+                const projectBudget = project.projectDetails?.estimatedBudget || 0;
+                const streamingOnlyFloor = isPostTheatricalBidding ? 0.12 : 0.48;
+                const streamingOnlyCeiling = isPostTheatricalBidding ? 0.4 : 1.28;
+                const safetyPremium = isPostTheatricalBidding ? 1.0 : 1.55;
+                let maxOffer = Math.min(
+                    platform.maxBudget,
+                    platform.baseBid * (packageScore / 55) * (1 + Math.random() * 0.25) * safetyPremium,
+                    projectBudget > 0 ? projectBudget * Math.min(streamingOnlyCeiling, streamingOnlyFloor + (packageScore / 100)) : Number.MAX_SAFE_INTEGER
+                );
                 
                 // RE-BIDDING PENALTY: If they already auctioned, most bids will be lower.
                 // 5% chance to be higher, otherwise 70-90% of previous best.
@@ -151,7 +168,12 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                 
                 if (maxOffer > currentHighest * 1.05) {
                     // They can outbid!
-                    const newAmount = currentHighest === 0 ? platform.baseBid : Math.floor(currentHighest * (1.05 + Math.random() * 0.1));
+                    const minimumOpeningBid = projectBudget > 0
+                        ? Math.floor(projectBudget * (isPostTheatricalBidding ? 0.12 : 0.45))
+                        : platform.baseBid;
+                    const newAmount = currentHighest === 0
+                        ? Math.floor(Math.min(maxOffer, Math.max(minimumOpeningBid, platform.baseBid * (0.9 + Math.random() * 0.2) * safetyPremium)))
+                        : Math.floor(currentHighest * (1.05 + Math.random() * 0.08));
                     
                     const rand = Math.random();
                     let type: BidType = 'UPFRONT_ONLY';
@@ -167,8 +189,8 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                     } else if (rand > 0.6) {
                         type = 'BACKEND_POINTS';
                         // Lower upfront for backend points
-                        upfrontAmount = Math.floor(newAmount * 0.7);
-                        backendPct = Math.floor(Math.random() * 10) + 5; // 5-15%
+                        upfrontAmount = Math.floor(newAmount * (isPostTheatricalBidding ? 0.7 : 0.8));
+                        backendPct = Math.floor(Math.random() * (isPostTheatricalBidding ? 6 : 8)) + (isPostTheatricalBidding ? 4 : 6);
                     }
                     
                     const newBid: Bid = {

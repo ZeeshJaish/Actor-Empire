@@ -1,4 +1,5 @@
 import { Player, LifeEvent, LifeEventOption, LegalCase, ScheduledEvent } from '../types';
+import { spendPlayerEnergy } from './premiumLogic';
 
 // --- HELPERS ---
 const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
@@ -9,6 +10,9 @@ export const generateLifeEvent = (player: Player): LifeEvent | null => {
     const roll = Math.random();
     const fame = player.stats.fame;
     const heat = player.flags.heat || 0;
+    const partner = player.relationships.find(r => r.relation === 'Spouse' || r.relation === 'Partner');
+    const closeFamily = player.relationships.find(r => r.relation === 'Parent' || r.relation === 'Sibling' || r.relation === 'Child');
+    const hasBusiness = (player.businesses?.length || 0) > 0;
 
     // 1. UNDERWORLD / CRIME (Shady Deals)
     if (roll < 0.15 && fame > 20) {
@@ -203,6 +207,135 @@ export const generateLifeEvent = (player: Player): LifeEvent | null => {
         };
     }
 
+    // 5.5 RELATIONSHIP / IMAGE CONFLICT
+    if (partner && roll < 0.83 && fame > 18) {
+        return {
+            id: `relationship_press_${Date.now()}`,
+            type: 'CONFLICT',
+            title: "Private Life, Public Feed",
+            description: `${partner.name} is upset that every dinner, vacation, and minor disagreement somehow becomes content for the internet. They ask for stricter boundaries.`,
+            options: [
+                {
+                    label: "Choose Privacy",
+                    impact: (p) => {
+                        p.stats.happiness += 8;
+                        p.stats.followers = Math.max(0, p.stats.followers - 3000);
+                        const rel = p.relationships.find(r => r.id === partner.id);
+                        if (rel) rel.closeness += 12;
+                        return { updatedPlayer: p, log: "You pulled back from the spotlight and your relationship immediately felt safer." };
+                    }
+                },
+                {
+                    label: "Stay Public",
+                    impact: (p) => {
+                        p.stats.fame += 4;
+                        const rel = p.relationships.find(r => r.id === partner.id);
+                        if (rel) rel.closeness -= 10;
+                        return { updatedPlayer: p, log: "The engagement stayed high, but so did the tension at home." };
+                    }
+                },
+                {
+                    label: "Curate It Better (Watch Ad)",
+                    isGolden: true,
+                    description: "Share less, control more, and make it look effortless.",
+                    impact: (p) => {
+                        p.stats.fame += 3;
+                        p.stats.reputation += 4;
+                        const rel = p.relationships.find(r => r.id === partner.id);
+                        if (rel) rel.closeness += 6;
+                        return { updatedPlayer: p, log: "You found a balance between mystery and visibility. Rare win." };
+                    }
+                }
+            ]
+        };
+    }
+
+    // 5.6 BUSINESS OWNER DECISION
+    if (hasBusiness && roll < 0.88) {
+        const business = pick(player.businesses);
+        const investment = Math.max(25000, Math.floor((business.stats.valuation || 100000) * 0.03));
+        return {
+            id: `business_push_${Date.now()}`,
+            type: 'LIFE',
+            title: "Growth Opportunity",
+            description: `${business.name} has an opportunity to upgrade operations and sharpen its image. It will cost ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(investment)}.`,
+            options: [
+                {
+                    label: "Reinvest in the Business",
+                    impact: (p) => {
+                        p.money -= investment;
+                        const target = p.businesses.find(b => b.id === business.id);
+                        if (target) {
+                            target.stats.brandHealth = Math.min(100, target.stats.brandHealth + 8);
+                            target.stats.customerSatisfaction = Math.min(100, target.stats.customerSatisfaction + 6);
+                            target.stats.hype = Math.min(100, target.stats.hype + 10);
+                            target.balance += Math.floor(investment * 0.5);
+                        }
+                        return { updatedPlayer: p, log: `You doubled down on ${business.name}. The team feels momentum building.` };
+                    }
+                },
+                {
+                    label: "Save the Cash",
+                    impact: (p) => ({ updatedPlayer: p, log: `You passed on the upgrade and kept ${business.name} stable for now.` })
+                },
+                {
+                    label: "Find a Sponsor (Watch Ad)",
+                    isGolden: true,
+                    description: "Bring in outside support and reduce your personal risk.",
+                    impact: (p) => {
+                        const target = p.businesses.find(b => b.id === business.id);
+                        if (target) {
+                            target.stats.brandHealth = Math.min(100, target.stats.brandHealth + 10);
+                            target.stats.hype = Math.min(100, target.stats.hype + 14);
+                            target.balance += Math.floor(investment * 0.75);
+                        }
+                        p.stats.reputation += 3;
+                        return { updatedPlayer: p, log: `A sponsor came in at the perfect time. ${business.name} just got a clean boost.` };
+                    }
+                }
+            ]
+        };
+    }
+
+    // 5.7 LUXURY / IMAGE TEMPTATION
+    if (roll < 0.92 && fame > 22) {
+        return {
+            id: `luxury_image_${Date.now()}`,
+            type: 'LIFE',
+            title: "Luxury Temptation",
+            description: "A showroom offers you a flashy limited-edition purchase before it goes public. It's expensive, unnecessary, and almost impossible to resist.",
+            options: [
+                {
+                    label: "Buy It",
+                    impact: (p) => {
+                        p.money -= 75000;
+                        p.stats.fame += 3;
+                        p.stats.happiness += 5;
+                        return { updatedPlayer: p, log: "You bought the ridiculous luxury item and immediately posted a suspiciously casual photo with it." };
+                    }
+                },
+                {
+                    label: "Walk Away",
+                    impact: (p) => {
+                        p.stats.happiness += 1;
+                        p.stats.reputation += 2;
+                        return { updatedPlayer: p, log: "You resisted the flex. Financial maturity is deeply unglamorous." };
+                    }
+                },
+                {
+                    label: "Borrow It for a Shoot (Watch Ad)",
+                    isGolden: true,
+                    description: "Get the image without eating the full cost.",
+                    impact: (p) => {
+                        p.stats.fame += 4;
+                        p.stats.reputation += 2;
+                        return { updatedPlayer: p, log: "You captured the status hit without swallowing the full bill. Elite move." };
+                    }
+                }
+            ]
+        };
+    }
+
     // 6. EARLY_LIFE (Starting Out)
     if (fame < 15 && roll < 0.9) {
         const subRoll = Math.random();
@@ -217,7 +350,7 @@ export const generateLifeEvent = (player: Player): LifeEvent | null => {
                         label: "Take the Job ($2k)",
                         impact: (p) => {
                             p.money += 2000;
-                            p.energy.current = Math.max(0, p.energy.current - 10);
+                            spendPlayerEnergy(p, 10);
                             return { updatedPlayer: p, log: "You're working as an usher. It's tiring, but the bills are paid." };
                         }
                     },
@@ -352,6 +485,45 @@ export const generateLifeEvent = (player: Player): LifeEvent | null => {
                 ]
             };
         }
+    }
+
+    // 8. FAMILY / LEGACY PRESSURE
+    if (closeFamily) {
+        return {
+            id: `life_family_pressure_${Date.now()}`,
+            type: 'LIFE',
+            title: "Family Pressure",
+            description: `${closeFamily.name} says you've changed and only show up when cameras or awards are involved. The accusation lands harder than expected.`,
+            options: [
+                {
+                    label: "Make Time Immediately",
+                    impact: (p) => {
+                        p.stats.happiness += 6;
+                        const rel = p.relationships.find(r => r.id === closeFamily.id);
+                        if (rel) rel.closeness += 10;
+                        return { updatedPlayer: p, log: "You cleared the schedule and showed up in person. It mattered." };
+                    }
+                },
+                {
+                    label: "Send Money Instead",
+                    impact: (p) => {
+                        p.money -= 25000;
+                        const rel = p.relationships.find(r => r.id === closeFamily.id);
+                        if (rel) rel.closeness += 2;
+                        return { updatedPlayer: p, log: "The gesture helped, but everyone knew it wasn't the same as being there." };
+                    }
+                },
+                {
+                    label: "Ignore the Guilt",
+                    impact: (p) => {
+                        p.stats.reputation -= 2;
+                        const rel = p.relationships.find(r => r.id === closeFamily.id);
+                        if (rel) rel.closeness -= 10;
+                        return { updatedPlayer: p, log: "You told yourself they would understand. They did not." };
+                    }
+                }
+            ]
+        };
     }
 
     return null;

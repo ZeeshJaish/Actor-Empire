@@ -225,9 +225,11 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
             updatedPlayer.activeReleases = [...updatedPlayer.activeReleases, newActiveRelease];
             updatedPlayer.pastProjects = updatedPlayer.pastProjects.filter(p => p.id !== project.id);
             
-            // Update studio library too
-            const updatedStudio = { ...studio };
-            updatedStudio.library = updatedStudio.library.filter(p => p.id !== project.id);
+            // Remove the project from any legacy in-studio library list if present.
+            const updatedStudio = { ...studio } as any;
+            if (Array.isArray(updatedStudio.library)) {
+                updatedStudio.library = updatedStudio.library.filter((p: any) => p.id !== project.id);
+            }
             updatedPlayer.businesses = updatedPlayer.businesses.map(b => b.id === studio.id ? updatedStudio : b);
 
             onUpdatePlayer(updatedPlayer);

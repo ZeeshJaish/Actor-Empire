@@ -289,11 +289,15 @@ export const GENERAL_CRISIS_TEMPLATES: ((project: Commitment) => ProductionCrisi
         options: [
             {
                 label: "Rewrite the Ending",
-                impact: (p, c) => ({
-                    updatedPlayer: { ...p, energy: { ...p.energy, current: Math.max(0, p.energy.current - 30) } },
-                    updatedProject: { ...c, productionPerformance: (c.productionPerformance || 50) + 5 },
-                    log: "All-nighter to rewrite. The new ending is even better, but you're exhausted."
-                })
+                impact: (p, c) => {
+                    const updatedPlayer = { ...p };
+                    spendPlayerEnergy(updatedPlayer, 30);
+                    return {
+                        updatedPlayer,
+                        updatedProject: { ...c, productionPerformance: (c.productionPerformance || 50) + 5 },
+                        log: "All-nighter to rewrite. The new ending is even better, but you're exhausted."
+                    };
+                }
             },
             {
                 label: "Ignore It",
@@ -306,3 +310,4 @@ export const GENERAL_CRISIS_TEMPLATES: ((project: Commitment) => ProductionCrisi
         ]
     })
 ];
+import { spendPlayerEnergy } from './premiumLogic';

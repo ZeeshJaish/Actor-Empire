@@ -653,6 +653,10 @@ const BOX_OFFICE_CAPS: Record<BudgetTier, { opening: number, total: number }> = 
     'BLOCKBUSTER': { opening: 600000000, total: 3000000000 }
 };
 
+export const getBoxOfficeCaps = (budgetTier: BudgetTier): { opening: number, total: number } => {
+    return BOX_OFFICE_CAPS[budgetTier] || BOX_OFFICE_CAPS.HIGH;
+};
+
 // Adjusted: Superhero/Sci-Fi are the "Money Makers"
 const GENRE_MULTIPLIERS: Record<Genre, number> = {
     'ACTION': 1.1, 
@@ -671,31 +675,54 @@ export const calculateWeeklyBoxOffice = (
 ): number => {
     const caps = BOX_OFFICE_CAPS[budgetTier];
     const genreMod = GENRE_MULTIPLIERS[genre];
+    const scriptQuality = stats.scriptQuality || 50;
+    const directorQuality = stats.directorQuality || 50;
+    const castingStrength = stats.castingStrength || 50;
+    const qualityScore = stats.qualityScore || 50;
+    const fameMultiplier = stats.fameMultiplier || 1.0;
+    const packageStrength = (scriptQuality * 0.35) + (directorQuality * 0.25) + (castingStrength * 0.4);
+    const audienceStrength = (qualityScore * 0.55) + (scriptQuality * 0.25) + (directorQuality * 0.2);
+    const genreOpeningMod = 0.85 + ((genreMod - 1) * 0.6);
 
     // --- OPENING WEEKEND ---
     if (week === 1) {
-        // Base: 50% to 150% of budget based on Hype
-        const baseMultiplier = 0.5 + (stats.rawHype / 100); 
+        // Opening is mostly stars, hype, distribution, and event-feel.
+        const baseMultiplier = 0.18 + (stats.rawHype / 140);
         const distMod = Math.pow(stats.distributionPower / 50, 1.2); 
         const buzzMod = buzzScore ? (1 + (buzzScore / 100)) : 1.0;
-        const fameMod = stats.fameMultiplier || 1.0;
-        
-        let rawOpening = budget * baseMultiplier * distMod * buzzMod * fameMod;
+        const packageMod = 0.75 + ((packageStrength - 50) / 100) * 0.8;
+        const qualityMod = 0.85 + ((qualityScore - 50) / 100) * 0.45;
+        const fameMod = 0.85 + ((fameMultiplier - 1) * 0.7);
+
+        let rawOpening = budget * baseMultiplier * distMod * buzzMod * packageMod * qualityMod * fameMod;
         rawOpening *= (0.8 + Math.random() * 0.4); // Variance
 
         // Genre Adjustment
-        if (genreMod < 1.0) rawOpening *= genreMod;
+        rawOpening *= genreOpeningMod;
+
+        // Sleeper hits are possible when craft is excellent even without massive star power.
+        const isSleeperCandidate =
+            ['LOW', 'MID'].includes(budgetTier) &&
+            audienceStrength > 82 &&
+            (scriptQuality > 85 || directorQuality > 85);
+        if (isSleeperCandidate) {
+            rawOpening *= 1.08 + (Math.random() * 0.12);
+        }
 
         // "The Avenger Factor": Can we break the cap?
-        // Only High Budget, Sci-Fi/Superhero/Adventure, with MASSIVE hype (90+)
-        const isMegaEvent = budgetTier === 'HIGH' && ['SUPERHERO', 'SCI_FI', 'ADVENTURE'].includes(genre) && stats.rawHype > 90;
+        // Only top-end event films with stars, hype, and distribution get to stretch the opening cap.
+        const isMegaEvent =
+            ['HIGH', 'BLOCKBUSTER'].includes(budgetTier) &&
+            ['SUPERHERO', 'SCI_FI', 'ADVENTURE', 'ACTION'].includes(genre) &&
+            stats.rawHype > 92 &&
+            castingStrength > 82 &&
+            stats.distributionPower > 82 &&
+            fameMultiplier > 1.2;
         
         if (isMegaEvent) {
-            // Uncapped potential (up to 2.5x base cap)
-            const breakoutMult = 1.0 + (Math.random() * 0.5); // 1.0 to 1.5 bonus
-            rawOpening = Math.min(rawOpening, caps.opening * 1.5 * breakoutMult);
+            const breakoutMult = 1.0 + (Math.random() * 0.2);
+            rawOpening = Math.min(rawOpening, caps.opening * 1.2 * breakoutMult);
         } else {
-            // Standard Hard Cap
             rawOpening = Math.min(rawOpening, caps.opening);
         }
 
@@ -707,15 +734,20 @@ export const calculateWeeklyBoxOffice = (
     // Only masterpieces (Quality > 90) get 25-35% drops.
     let dropRate = 0.55; 
     
-    if (stats.qualityScore > 90) dropRate = 0.30; // Amazing legs
-    else if (stats.qualityScore > 80) dropRate = 0.40; // Good legs
-    else if (stats.qualityScore > 60) dropRate = 0.50; // Standard
-    else if (stats.qualityScore < 30) dropRate = 0.70; // Terrible
-    else if (stats.qualityScore < 50) dropRate = 0.65; 
+    if (qualityScore > 90) dropRate = 0.30; // Amazing legs
+    else if (qualityScore > 80) dropRate = 0.40; // Good legs
+    else if (qualityScore > 60) dropRate = 0.50; // Standard
+    else if (qualityScore < 30) dropRate = 0.70; // Terrible
+    else if (qualityScore < 50) dropRate = 0.65; 
 
     // Genre tweaks for legs
     if (genre === 'HORROR') dropRate += 0.1; // Front-loaded
     if (genre === 'DRAMA' || genre === 'ROMANCE') dropRate -= 0.05; // Long tail
+
+    // Good script and direction improve legs. Star-heavy weak movies drop faster after the opening.
+    if (scriptQuality > 85) dropRate -= 0.05;
+    if (directorQuality > 82) dropRate -= 0.03;
+    if (week === 2 && castingStrength - audienceStrength > 18) dropRate += 0.08;
 
     const variance = (Math.random() * 0.1) - 0.05; 
     dropRate += variance;
@@ -747,14 +779,14 @@ export const getConsequences = (outcome: OutcomeTier, role: RoleType, perf: numb
     const scaleFactor = Math.max(1, budget / 10000000); 
 
     if (outcome === 'MASSIVE_SUCCESS') {
-        fameDelta = 10 * roleMod * famousMod; repDelta = 5 * famousMod; followerDelta = 50000 * roleMod * scaleFactor; 
+        fameDelta = 9 * roleMod * famousMod; repDelta = 5 * famousMod; followerDelta = 50000 * roleMod * scaleFactor; 
         if (isFamous) followerDelta *= 2; 
     } else if (outcome === 'SUCCESS') {
-        fameDelta = 5 * roleMod; repDelta = 2 * famousMod; followerDelta = 10000 * roleMod * scaleFactor;
+        fameDelta = 4 * roleMod; repDelta = 2 * famousMod; followerDelta = 10000 * roleMod * scaleFactor;
     } else if (outcome === 'FAILURE') {
-        fameDelta = 1 * roleMod; repDelta = -2 * roleMod * famousMod; followerDelta = 500;
+        fameDelta = 0; repDelta = -2 * roleMod * famousMod; followerDelta = 500;
     } else if (outcome === 'MAJOR_FAILURE') {
-        fameDelta = -2 * roleMod; repDelta = -5 * roleMod * famousMod; followerDelta = -1000 * roleMod;
+        fameDelta = -1 * roleMod; repDelta = -5 * roleMod * famousMod; followerDelta = -1000 * roleMod;
     }
     
     if (perf > 90) { repDelta += 2; followerDelta += 5000 * scaleFactor; }

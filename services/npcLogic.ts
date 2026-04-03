@@ -400,11 +400,66 @@ export const getAvailableTalent = (currentWeek: number, occupation: 'ACTOR' | 'D
 // --- FEED GENERATION ---
 
 const CAPTIONS = {
-    'ANNOUNCEMENT': ["Excited to announce my next project!", "Script reading day. 🤐", "Something big is coming.", "Contract signed. Let's go.", "New character, new world."],
-    'BTS': ["Set life. 🎬", "Waiting for lighting...", "Night shoots are brutal but worth it.", "My trailer is my home now.", "The crew on this film is legendary."],
-    'CELEBRATION': ["Thank you for the award nomination! 🙏", "Box office #1! You guys are amazing.", "It's a wrap! What a journey.", "Premiere night. Feeling grateful.", "Season 2 is a GO!"],
-    'LIFESTYLE': ["Sunday reset.", "Gym time.", "Coffee first.", "Views.", "Family time."],
-    'SELFIE': ["Feeling cute.", "Selfie time.", "Good hair day.", "Just me.", "Mood.", "Golden hour.", "Hi."],
+    'ANNOUNCEMENT': [
+        "Excited to announce my next project!",
+        "Script reading day. 🤐",
+        "Something big is coming.",
+        "Contract signed. Let's go.",
+        "New character, new world.",
+        "Back in the chair. Back in the game.",
+        "This one means a lot to me.",
+        "Told myself I would wait to share this, but I can't.",
+        "Officially booked and still processing it.",
+        "See you all sooner than you think."
+    ],
+    'BTS': [
+        "Set life. 🎬",
+        "Waiting for lighting...",
+        "Night shoots are brutal but worth it.",
+        "My trailer is my home now.",
+        "The crew on this film is legendary.",
+        "Running on cold brew and adrenaline.",
+        "Wardrobe test today and the character finally clicked.",
+        "Nobody warns you how much standing around acting involves.",
+        "Covered in fake dust, fake blood, and real gratitude.",
+        "We got the shot. Barely."
+    ],
+    'CELEBRATION': [
+        "Thank you for the award nomination! 🙏",
+        "Box office #1! You guys are amazing.",
+        "It's a wrap! What a journey.",
+        "Premiere night. Feeling grateful.",
+        "Season 2 is a GO!",
+        "Trying to act normal about this and failing.",
+        "Dreams look loud when they come true.",
+        "Tonight was bigger than I imagined.",
+        "Still hugging everybody.",
+        "One of those nights you never forget."
+    ],
+    'LIFESTYLE': [
+        "Sunday reset.",
+        "Gym time.",
+        "Coffee first.",
+        "Views.",
+        "Family time.",
+        "No glam team. No schedule. Just peace.",
+        "Trying to become the kind of person who answers texts on time.",
+        "Tiny luxury: disappearing for a few hours.",
+        "Resetting the brain, not just the feed.",
+        "A quiet day is still a flex."
+    ],
+    'SELFIE': [
+        "Feeling cute.",
+        "Selfie time.",
+        "Good hair day.",
+        "Just me.",
+        "Mood.",
+        "Golden hour.",
+        "Hi.",
+        "No filter, just expensive sleep.",
+        "Proof I left the house.",
+        "Face card still employed."
+    ],
     'INDUSTRY_NEWS': [
         "Can't wait for everyone to see the next phase of the universe.",
         "Just saw the concept art for the new franchise. Mind blown.",
@@ -413,7 +468,14 @@ const CAPTIONS = {
         "Reading the script for the sequel... you guys are not ready.",
         "So proud to be part of this cinematic universe.",
         "The lore is getting deep. Who's caught up on the timeline?",
-        "Suiting up again soon. 🦸‍♂️🦸‍♀️"
+        "Suiting up again soon. 🦸‍♂️🦸‍♀️",
+        "Streaming executives are panicking and honestly it's kind of fascinating.",
+        "This town loves a rumor almost as much as it loves a franchise.",
+        "Everyone is suddenly a box office expert on Mondays.",
+        "The sequel conversations are getting very real.",
+        "A casting board somewhere in town is causing chaos right now.",
+        "If the trades knew half of what I know...",
+        "One leaked photo and the whole internet becomes a detective."
     ]
 };
 

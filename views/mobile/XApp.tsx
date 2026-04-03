@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Player, XPost, NPCActor, NPCState } from '../../types';
 import { generateXFeed, generateTrendingTopics } from '../../services/xLogic';
 import { NPC_DATABASE } from '../../services/npcLogic';
+import { spendPlayerEnergy } from '../../services/premiumLogic';
 import { ArrowLeft, Home, Search, PenTool, Heart, Repeat, MessageCircle, MoreHorizontal, Check, User, Mail, Calendar, MapPin, Link as LinkIcon, Bell, Star } from 'lucide-react';
 
 interface XAppProps {
@@ -105,10 +106,8 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
         const updatedPosts = [newPost, ...player.x.posts];
         const updatedFeed = [newPost, ...feed];
         
-        onUpdatePlayer({
+        const nextPlayer = {
             ...player,
-            // Energy cost for tweeting is small
-            energy: { ...player.energy, current: Math.max(0, player.energy.current - 5) },
             x: {
                 ...player.x,
                 posts: updatedPosts,
@@ -116,7 +115,9 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
                 followers: newXFollowers,
                 lastPostWeek: player.currentWeek
             }
-        });
+        };
+        spendPlayerEnergy(nextPlayer, 5);
+        onUpdatePlayer(nextPlayer);
         
         setFeed(updatedFeed);
         setTweetContent('');

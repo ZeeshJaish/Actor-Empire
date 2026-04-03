@@ -1,4 +1,5 @@
 import { Player, Commitment, ProductionCrisis } from '../types';
+import { spendPlayerEnergy } from './premiumLogic';
 
 export interface DirectorDecision extends ProductionCrisis {}
 
@@ -85,7 +86,8 @@ const DECISION_TEMPLATES: DirectorDecision[] = [
             {
                 label: "Go for it (Energy -30)",
                 impact: (p, c) => {
-                    const updatedPlayer = { ...p, energy: { ...p.energy, current: Math.max(0, p.energy.current - 30) } };
+                    const updatedPlayer = { ...p };
+                    spendPlayerEnergy(updatedPlayer, 30);
                     const updatedProject = { ...c, productionPerformance: Math.min(100, (c.productionPerformance || 50) + 15) };
                     return { updatedPlayer, updatedProject, log: "It took 24 tries, but you got it. It's going to be the talk of the industry." };
                 }

@@ -6,6 +6,7 @@ import { calculateInteraction, getGenderedAvatar } from '../services/npcLogic';
 import { SOCIAL_EVENTS_DB, FLAVOR_TEXTS } from '../services/socialEvents';
 import { createBusiness } from '../services/businessLogic';
 import { getAbsoluteWeek } from '../services/legacyLogic';
+import { spendPlayerEnergy } from '../services/premiumLogic';
 
 interface GameActionsProps {
     player: Player;
@@ -55,11 +56,11 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
                 const newLog: LogEntry = { week: prev.currentWeek, year: prev.age, message: msg, type: 'neutral' };
                 const newState = { 
                     ...prev, 
-                    energy: { ...prev.energy, current: prev.energy.current - 10 }, 
                     stats: { ...prev.stats, experience: prev.stats.experience + 1 },
                     commitments: newCommitments, 
                     logs: [...prev.logs, newLog].slice(-50)
                 };
+                spendPlayerEnergy(newState, 10);
                 return newState;
             }
 
@@ -73,7 +74,8 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
                
                const newCommitments = [...prev.commitments]; newCommitments[cIndex] = updatedC;
                const newLog: LogEntry = { week: prev.currentWeek, year: prev.age, message: msg, type: 'neutral' };
-               const newState = { ...prev, energy: { ...prev.energy, current: prev.energy.current - 20 }, commitments: newCommitments, logs: [...prev.logs, newLog].slice(-50)};
+               const newState = { ...prev, commitments: newCommitments, logs: [...prev.logs, newLog].slice(-50)};
+               spendPlayerEnergy(newState, 20);
                return newState;
 
             } else if (c.projectPhase === 'PRODUCTION') {
@@ -87,7 +89,8 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
                
                const newCommitments = [...prev.commitments]; newCommitments[cIndex] = updatedC;
                const newLog: LogEntry = { week: prev.currentWeek, year: prev.age, message: msg, type: 'neutral' };
-               const newState = { ...prev, energy: { ...prev.energy, current: prev.energy.current - 20 }, commitments: newCommitments, logs: [...prev.logs, newLog].slice(-50)};
+               const newState = { ...prev, commitments: newCommitments, logs: [...prev.logs, newLog].slice(-50)};
+               spendPlayerEnergy(newState, 20);
                return newState;
             }
             
@@ -109,7 +112,11 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
 
             setPlayer(prev => ({
                 ...prev,
-                energy: { ...prev.energy, current: prev.energy.current - energyCost }
+                ...(() => {
+                    const next = JSON.parse(JSON.stringify(prev)) as Player;
+                    spendPlayerEnergy(next, energyCost);
+                    return { energy: next.energy, flags: next.flags };
+                })()
             }));
 
             const questions = generateReleasePressQuestions(3);
@@ -183,12 +190,12 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
 
             const newState = {
                 ...prev,
-                energy: { ...prev.energy, current: prev.energy.current - energyCost },
                 commitments: newCommitments,
                 logs: [...prev.logs, { week: prev.currentWeek, year: prev.age, message: logMsg, type: 'positive' as const }].slice(-50),
                 instagram: { ...prev.instagram, posts: newInstaPosts, feed: newInstaFeed },
                 x: { ...prev.x, posts: newXPosts, feed: newXFeed }
             };
+            spendPlayerEnergy(newState, energyCost);
             return newState;
         });
     };
@@ -203,7 +210,7 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
                 const energy = option.energyCost;
                 const newPlayer = JSON.parse(JSON.stringify(prev)) as Player;
                 newPlayer.money -= cost;
-                newPlayer.energy.current -= energy;
+                spendPlayerEnergy(newPlayer, energy);
                 rewardGenreExperience(newPlayer, genre, 1);
                 newPlayer.logs.push({
                     week: prev.currentWeek, year: prev.age, 
@@ -273,11 +280,11 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
             const newState = {
                 ...prev,
                 money: prev.money - option.moneyCost,
-                energy: { ...prev.energy, current: prev.energy.current - option.energyCost },
                 stats: newStats,
                 writerStats: newWriterStats,
                 logs: [...prev.logs, { week: prev.currentWeek, year: prev.age, message: msg, type: 'neutral' as const }].slice(-50)
             };
+            spendPlayerEnergy(newState, option.energyCost);
             
             setToastMessage({ title: toastType, subtext: msg });
             return newState;
@@ -387,15 +394,17 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
 
           newRelationships[idx] = { ...partner, closeness: newCloseness, relation: newRelation, lastInteractionWeek: prev.currentWeek, lastInteractionAbsolute: getAbsoluteWeek(prev.age, prev.currentWeek) };
 
-          return {
+          const nextState = {
               ...prev,
-              energy: { ...prev.energy, current: prev.energy.current - energyCost },
               money: prev.money - moneyCost,
               stats: newPlayerStats,
               relationships: newRelationships,
               news: newsUpdate,
               logs: [...prev.logs, { week: prev.currentWeek, year: prev.age, message: logMsg, type: 'positive' as const }].slice(-50)
           };
+          spendPlayerEnergy(nextState, energyCost);
+          return nextState;
+          
       });
     };
 
@@ -461,13 +470,14 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
 
           newRels[idx] = { ...partner, closeness: newCloseness, lastInteractionWeek: prev.currentWeek, lastInteractionAbsolute: getAbsoluteWeek(prev.age, prev.currentWeek) };
 
-          return {
+          const nextState = {
               ...prev,
-              energy: { ...prev.energy, current: prev.energy.current - energyCost },
               relationships: newRels,
               news: newsUpdate,
               logs: [...prev.logs, { week: prev.currentWeek, year: prev.age, message: logMsg, type: 'positive' as const }].slice(-50)
           };
+          spendPlayerEnergy(nextState, energyCost);
+          return nextState;
       });
     };
 
@@ -537,9 +547,8 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
                 setToastMessage({ title: "Relationship Improved", subtext: `Your bond with ${npc.name} increased! (+${res.relationshipDelta})` });
             }
 
-            return { 
+            const nextState = { 
                 ...prev, 
-                energy: { ...prev.energy, current: prev.energy.current - res.energyCost },
                 instagram: {
                     ...prev.instagram,
                     followers: prev.instagram.followers + followerGain,
@@ -549,7 +558,9 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
                     }
                 },
                 relationships: updatedRelationships
-            }; 
+            };
+            spendPlayerEnergy(nextState, res.energyCost);
+            return nextState; 
         });
     };
 

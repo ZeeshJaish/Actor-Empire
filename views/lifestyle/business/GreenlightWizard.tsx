@@ -6,6 +6,7 @@ import { NPC_DATABASE, getAvailableTalent, calculateProjectFameMultiplier } from
 import { getDirectorTalent } from '../../../services/roleLogic';
 import { getEquipmentStageName } from './FacilitiesView';
 import { showAd } from '../../../services/adLogic';
+import { hasNoAds } from '../../../services/premiumLogic';
 
 
 export const formatMoney = (val: number) => {
@@ -15,6 +16,8 @@ export const formatMoney = (val: number) => {
     if (val >= 1_000) return `${(val/1_000).toFixed(0)}k`;
     return `${val}`;
 };
+
+const clampStat = (value: number, min = 0, max = 100) => Math.max(min, Math.min(max, value));
 
 export const GEAR_TIERS: Record<string, { name: string, desc: string, cost: number, quality: number }> = {
     'TIER_1': { name: 'Indie Kit', desc: 'Basic DSLR and mirrorless setup.', cost: 10000, quality: 2 },
@@ -1241,13 +1244,15 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         if (!canGreenlight) return;
 
         // --- SHOW INTERSTITIAL AD BEFORE GREENLIGHT ---
-        setIsProcessingAd(true);
-        try {
-            await showAd('INTERSTITIAL');
-        } catch (e) {
-            console.error("Ad failed", e);
-        } finally {
-            setIsProcessingAd(false);
+        if (!hasNoAds(player)) {
+            setIsProcessingAd(true);
+            try {
+                await showAd('INTERSTITIAL');
+            } catch (e) {
+                console.error("Ad failed", e);
+            } finally {
+                setIsProcessingAd(false);
+            }
         }
 
         const directorData = getCrewData('director');
@@ -1392,7 +1397,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                 hiddenStats: {
                     scriptQuality: selectedScript.quality,
                     directorQuality: directorData.quality,
-                    castingStrength: 50, // TODO: Calculate from castList
+                    castingStrength: currentCastingStrength,
                     distributionPower: 50,
                     rawHype: currentEstimatedBuzz,
                     qualityScore: actualQuality, // Store the ACTUAL quality here for future reference
@@ -1410,7 +1415,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                 directorId: selectedCrew.director || undefined,
                 visibleDirectorTier: directorData.tier,
                 visibleScriptBuzz: 'High',
-                visibleCastStrength: 'Pending',
+                visibleCastStrength: currentCastingStrength > 80 ? 'Star-Studded' : currentCastingStrength > 62 ? 'Solid' : 'Thin',
                 castList: castList.map(c => ({
                     roleId: c.id,
                     roleName: c.role,
@@ -1660,6 +1665,48 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         return Math.min(100, Math.max(0, Math.floor(buzz || 0)));
     }, [selectedScript, selectedCrew, castList, player, availableActors]);
 
+    const currentCastingStrength = useMemo(() => {
+        const assignedCast = castList.filter(c => c.actorId);
+        if (assignedCast.length === 0) return 35;
+
+        const weightedScores = assignedCast.map(c => {
+            let talent = 50;
+            let fame = 10;
+
+            if (c.actorId === 'PLAYER_SELF') {
+                talent = player.stats.talent || 50;
+                fame = player.stats.fame || 0;
+            } else if (c.actorId === 'STUDIO_STAFF') {
+                talent = getInHouseQuality('ACTOR') || 40;
+                fame = getInHouseFame('ACTOR') || 10;
+            } else {
+                const actor = availableActors.find(a => a.id === c.actorId);
+                talent = actor?.stats?.talent || 50;
+                fame = actor?.stats?.fame || 10;
+            }
+
+            const roleWeight = c.roleType === 'LEAD' ? 1.2 : c.roleType === 'SUPPORTING' ? 0.8 : c.roleType === 'CAMEO' ? 0.35 : 0.15;
+            return { score: (talent * 0.72) + (fame * 0.28), weight: roleWeight };
+        });
+
+        const totalWeight = weightedScores.reduce((sum, item) => sum + item.weight, 0) || 1;
+        const weightedAverage = weightedScores.reduce((sum, item) => sum + (item.score * item.weight), 0) / totalWeight;
+
+        const requiredCastCount = selectedScript?.projectType === 'SERIES'
+            ? 4
+            : currentEstimatedBudget > 100000000
+                ? 6
+                : currentEstimatedBudget > 25000000
+                    ? 4
+                    : 3;
+
+        const completenessRatio = Math.min(1, assignedCast.length / requiredCastCount);
+        const completenessPenalty = (1 - completenessRatio) * 18;
+        const ensembleBonus = assignedCast.length >= requiredCastCount ? Math.min(6, (assignedCast.length - requiredCastCount) * 1.5) : 0;
+
+        return Math.round(clampStat(weightedAverage - completenessPenalty + ensembleBonus, 20, 98));
+    }, [castList, availableActors, player, selectedScript, currentEstimatedBudget, studio]);
+
     const currentEstimatedQuality = useMemo(() => {
         let score = 50;
         // Script
@@ -1668,17 +1715,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         const dirData = getCrewData('director');
         score += ((dirData.quality || 50) - 50) * 0.4;
         // Cast
-        const castQualities = castList.map(c => {
-            if (!c.actorId) return 0;
-            if (c.actorId === 'PLAYER_SELF') return player.actingStats?.talent || 50;
-            if (c.actorId === 'STUDIO_STAFF') return getInHouseQuality('ACTOR') || 50;
-            const actor = availableActors.find(a => a.id === c.actorId);
-            return actor?.stats?.talent || 50;
-        }).filter(q => q > 0);
-        if (castQualities.length > 0) {
-            const avgCast = castQualities.reduce((a,b) => a+b, 0) / castQualities.length;
-            score += (avgCast - 50) * 0.3;
-        }
+        score += (currentCastingStrength - 50) * 0.3;
         // Crew
         const crewRoles = ['cinematographer', 'composer', 'lineProducer', 'vfx'] as const;
         const crewQualities = crewRoles.map(r => getCrewData(r).quality || 50);
@@ -1708,9 +1745,8 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
              });
              score += locScore / selectedLocations.length;
         }
-
         return Math.max(1, Math.min(100, Math.round(score || 50)));
-    }, [selectedScript, selectedCrew, castList, selectedLocations, availableDirectors, availableActors, mockLocations, player, crewModes, equipmentChoices, studio, mockCrew]);
+    }, [selectedScript, selectedCrew, selectedLocations, availableDirectors, mockLocations, crewModes, equipmentChoices, studio, mockCrew, currentCastingStrength]);
 
     return (
         <div className="fixed inset-0 z-[70] bg-[#020a05] text-white flex flex-col font-sans overflow-hidden">
@@ -2593,7 +2629,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                 </div>
                                 
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    {(Object.values(player.world.universes) as Universe[]).filter(u => u.studioId === studio.id).map((universe) => (
+                                    {(Object.values(player.world.universes || {}) as Universe[]).filter(u => u.studioId === studio.id).map((universe) => (
                                         <button
                                             key={universe.id}
                                             onClick={() => setSelectedUniverseId(universe.id)}

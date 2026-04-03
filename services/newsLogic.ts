@@ -14,7 +14,20 @@ const INDUSTRY_TEMPLATES = [
     "Critics declare the 'Age of the Movie Star' is returning.",
     "Horror genre continues to offer highest ROI for studios.",
     "Romantic Comedies making a surprise comeback this season.",
-    "VFX artists protest over tight deadlines on major tentpoles."
+    "VFX artists protest over tight deadlines on major tentpoles.",
+    "Luxury brands increase investment in celebrity-led campaigns.",
+    "Studios quietly shift more projects toward mid-budget thrillers.",
+    "Executives say test-screening data now drives more endings than ever.",
+    "Industry insiders warn that inflated salaries are squeezing production slates.",
+    "A wave of first-look deals signals a renewed fight over top talent.",
+    "Celebrity-founded production companies are taking a bigger share of the market.",
+    "Awards strategists say authenticity is now the most valuable campaign asset.",
+    "Analysts credit social chatter for saving several weak opening weekends.",
+    "Studios debate whether star power or IP is the safer bet in 2026.",
+    "Private equity money continues to reshape independent film financing.",
+    "Prestige distributors are paying more for breakout festival titles.",
+    "Global streamers are chasing regional hits with crossover potential.",
+    "Merchandising revenue is becoming a deciding factor in sequel greenlights."
 ];
 
 const NPC_HEADLINES = [
@@ -23,7 +36,16 @@ const NPC_HEADLINES = [
     "{Name} signs first-look deal with Warner Bros.",
     "Rumors swirl around {Name} casting in superhero franchise.",
     "{Name} spotted scouting locations in Italy.",
-    "Critics praise {Name}'s transformation in latest role."
+    "Critics praise {Name}'s transformation in latest role.",
+    "{Name} reportedly circling an expensive streaming thriller.",
+    "{Name} linked to prestige limited series from major platform.",
+    "{Name} sparks awards chatter after private industry screening.",
+    "{Name} seen leaving studio offices after 'very long' meeting.",
+    "{Name} fuels romance rumors after late-night dinner in West Hollywood.",
+    "{Name} quietly assembling a new production banner.",
+    "{Name} lands brand deal said to be worth eight figures.",
+    "{Name} rumored to be in talks for surprise franchise cameo.",
+    "{Name} becomes the subject of intense recasting speculation."
 ];
 
 const HIT_HEADLINES = [
@@ -31,7 +53,12 @@ const HIT_HEADLINES = [
     "Audiences flock to '{Title}', defying analyst predictions.",
     "'{Title}' becomes a cultural phenomenon.",
     "Global box office ignited by '{Title}'.",
-    "'{Title}' set to break quarterly records."
+    "'{Title}' set to break quarterly records.",
+    "'{Title}' posts monster holds and shocks weekend projections.",
+    "'{Title}' turns strong buzz into undeniable box office power.",
+    "'{Title}' proves word of mouth still matters in a crowded market.",
+    "'{Title}' now looks like the breakout hit studios were waiting for.",
+    "'{Title}' pulls in repeat viewers at an unusually high rate."
 ];
 
 const UNIVERSE_HIT_HEADLINES = [
@@ -46,7 +73,12 @@ const FLOP_HEADLINES = [
     "Budget concerns loom as '{Title}' underperforms.",
     "'{Title}' struggles to connect with core demographic.",
     "Marketing misfire blamed for '{Title}' disappointment.",
-    "The fall of '{Title}': What went wrong?"
+    "The fall of '{Title}': What went wrong?",
+    "'{Title}' posts a soft debut despite aggressive promotion.",
+    "Tracking miss: '{Title}' opens below even cautious expectations.",
+    "Audience indifference leaves '{Title}' in dangerous territory.",
+    "'{Title}' may face a steep second-week drop after shaky debut.",
+    "Studio optimism fades as '{Title}' fails to catch fire."
 ];
 
 const UNIVERSE_FLOP_HEADLINES = [
@@ -60,7 +92,12 @@ const CRITIC_LOVED_HEADLINES = [
     "Critics hail '{Title}' as a modern masterpiece.",
     "'{Title}' generates early Oscar buzz.",
     "A stunning achievement: '{Title}' wins over skeptics.",
-    "'{Title}' is the critical darling of the season."
+    "'{Title}' is the critical darling of the season.",
+    "'{Title}' earns raves for confidence, style, and emotional weight.",
+    "Reviewers say '{Title}' overdelivers on nearly every front.",
+    "'{Title}' is already being called a breakout awards contender.",
+    "Critics praise '{Title}' for giving audiences something rare: surprise.",
+    "'{Title}' lands with both reviewers and tastemakers."
 ];
 
 const UNIVERSE_CRITIC_LOVED_HEADLINES = [
@@ -74,7 +111,12 @@ const CRITIC_HATED_HEADLINES = [
     "Critics tear apart '{Title}' for weak script.",
     "'{Title}' branded a 'confused mess' by top reviewers.",
     "Style over substance: '{Title}' fails to impress.",
-    "Reviewers call '{Title}' a missed opportunity."
+    "Reviewers call '{Title}' a missed opportunity.",
+    "'{Title}' gets slammed for tonal chaos and thin characters.",
+    "Critical reaction to '{Title}' turns sharply negative.",
+    "'{Title}' sparks frustration rather than excitement among reviewers.",
+    "Early write-ups suggest '{Title}' never finds its footing.",
+    "'{Title}' is being called overproduced, underwritten, and forgettable."
 ];
 
 const UNIVERSE_CRITIC_HATED_HEADLINES = [
@@ -91,7 +133,11 @@ const SEQUEL_HYPE_HEADLINES = [
     "Audiences want more from the '{Title}' world.",
     "Is '{Title}' the start of a new franchise? Fans think so.",
     "Hashtag #WeWant{Title}2 trending worldwide.",
-    "Speculation mounts over '{Title}' follow-up."
+    "Speculation mounts over '{Title}' follow-up.",
+    "Merch sales and online chatter point to strong sequel potential for '{Title}'.",
+    "Studio insiders reportedly studying franchise options for '{Title}'.",
+    "The ending of '{Title}' has fans convinced a second chapter is coming.",
+    "Trade analysts say '{Title}' is exactly the kind of hit that becomes a series."
 ];
 
 const SEQUEL_CONFIRMED_HEADLINES = [
@@ -108,7 +154,12 @@ const SCANDAL_HEADLINES = [
     "Brands distance themselves from {Name} after recent events.",
     "Exclusive: The shocking truth behind {Name}'s latest scandal.",
     "Public opinion of {Name} takes a sharp dive.",
-    "Fans divided as {Name} faces intense scrutiny."
+    "Fans divided as {Name} faces intense scrutiny.",
+    "{Name}'s team scrambles to contain a fast-moving PR disaster.",
+    "Leaked screenshots thrust {Name} into an ugly online storm.",
+    "{Name} loses control of the narrative after a chaotic 24 hours.",
+    "The backlash against {Name} is spreading beyond social media.",
+    "Insiders say brands are in wait-and-see mode over {Name}."
 ];
 
 const LEGAL_HEADLINES = [
@@ -118,7 +169,11 @@ const LEGAL_HEADLINES = [
     "A blow to {Name}'s career as legal troubles mount.",
     "The verdict is in: How {Name}'s case will change everything.",
     "Government audit targets {Name}'s financial dealings.",
-    "Underworld connections? Rumors swirl around {Name}'s latest case."
+    "Underworld connections? Rumors swirl around {Name}'s latest case.",
+    "{Name}'s legal team signals an aggressive defense strategy.",
+    "Court filings add a dramatic new layer to {Name}'s ongoing dispute.",
+    "{Name} may be facing months of expensive legal fallout.",
+    "Insiders say the case surrounding {Name} is getting messier by the week."
 ];
 
 const SEQUEL_CANCELLED_HEADLINES = [
@@ -139,7 +194,10 @@ const FAN_BACKLASH_HEADLINES = [
     "Fans outraged over '{Title}' casting rumors.",
     "Social media campaign demands original star return for '{Title} 2'.",
     "Studio facing backlash after failed '{Title}' negotiations.",
-    "Boycott threats loom over '{Title}' sequel without original lead."
+    "Boycott threats loom over '{Title}' sequel without original lead.",
+    "Fan forums revolt over the latest '{Title}' sequel rumor.",
+    "Recasting chatter around '{Title}' turns toxic online.",
+    "The internet has chosen sides in the '{Title}' franchise standoff."
 ];
 
 // --- TV RENEWAL HEADLINES ---
@@ -147,14 +205,20 @@ const TV_RENEWAL_HEADLINES = [
     "'{Title}' renewed for another season!",
     "Network gives green light to '{Title}' Season {Season}.",
     "Fans rejoice: '{Title}' will return.",
-    "'{Title}' secures renewal after strong ratings."
+    "'{Title}' secures renewal after strong ratings.",
+    "'{Title}' survives a crowded slate and earns another year.",
+    "Platform doubles down on '{Title}' after strong engagement numbers.",
+    "Awards chatter and loyal fans keep '{Title}' alive for Season {Season}."
 ];
 
 const TV_CANCELLATION_HEADLINES = [
     "'{Title}' cancelled after {Season} season(s).",
     "Network pulls the plug on '{Title}'.",
     "'{Title}' will not return for another season.",
-    "Shock cancellation: '{Title}' ends."
+    "Shock cancellation: '{Title}' ends.",
+    "Sources say costs climbed too high for '{Title}' to continue.",
+    "Despite a loyal fan base, '{Title}' fails to survive lineup cuts.",
+    "'{Title}' becomes the latest casualty of the streaming reset."
 ];
 
 // --- FORBES TEMPLATES ---
@@ -194,7 +258,10 @@ const FORBES_INDUSTRY_HEADLINES = [
     "Forbes releases annual 'State of Cinema' wealth report.",
     "Tech investments driving actor wealth, says Forbes.",
     "The gap between A-List pay and working actors widens.",
-    "Streaming residuals shaking up this year's Rich List."
+    "Streaming residuals shaking up this year's Rich List.",
+    "Forbes says celebrity-owned brands are outperforming traditional endorsements.",
+    "Private holdings and equity stakes now separate the rich from the ultra-rich.",
+    "Film salaries matter less than ownership, according to the new Forbes report."
 ];
 
 const UNIVERSE_NEWS_TEMPLATES = [
@@ -205,7 +272,10 @@ const UNIVERSE_NEWS_TEMPLATES = [
     "The internet breaks down the latest Easter eggs found in {Universe} projects.",
     "Studio executives promise the next {Universe} saga will 'change everything'.",
     "Leaked set photos from the upcoming {Universe} project have fans divided.",
-    "Can {Universe} maintain its momentum? Analysts weigh in on the franchise's future."
+    "Can {Universe} maintain its momentum? Analysts weigh in on the franchise's future.",
+    "{Universe} fans are convinced a major character return is being teased.",
+    "The next {Universe} entry is already inspiring intense theory threads.",
+    "{Universe} merchandise strategy hints at bigger long-term plans."
 ];
 
 const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
@@ -497,7 +567,7 @@ const generateUniverseNews = (player: Player): NewsItem[] => {
     // Find if player has a studio with universes
     const studio = player.businesses?.find(b => b.type === 'PRODUCTION_HOUSE');
     if (studio && player.world?.universes) {
-        const universes = Object.values(player.world.universes).filter(u => u.studioId === studio.id);
+        const universes = Object.values(player.world.universes || {}).filter(u => u.studioId === studio.id);
         if (universes.length > 0 && Math.random() < 0.4) { // 40% chance per week if they have a universe
             const randomUniverse = pick(universes);
             const headline = pick(UNIVERSE_NEWS_TEMPLATES).replace(/{Universe}/g, randomUniverse.name);

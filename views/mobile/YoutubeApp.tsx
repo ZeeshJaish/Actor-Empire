@@ -2,6 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { Player, YoutubeVideo, YoutubeVideoType } from '../../types';
 import { generateYoutubeFeed } from '../../services/youtubeLogic';
+import { spendPlayerEnergy } from '../../services/premiumLogic';
 import { ArrowLeft, Play, TrendingUp, DollarSign, Users, Plus, Lock, Home, Layout, Search, Bell, MonitorPlay } from 'lucide-react';
 
 interface YoutubeAppProps {
@@ -87,13 +88,14 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
             videos: [newVideo, ...channel.videos]
         };
 
-        onUpdatePlayer({
+        const nextPlayer = {
             ...player,
             money: player.money - typeConfig.cost,
-            energy: { ...player.energy, current: player.energy.current - typeConfig.energy },
             youtube: updatedChannel,
             logs: [...player.logs, { week: player.currentWeek, year: player.age, message: `Uploaded video: ${title}`, type: 'neutral' }]
-        });
+        };
+        spendPlayerEnergy(nextPlayer, typeConfig.energy);
+        onUpdatePlayer(nextPlayer);
 
         setView('MAIN');
         setTitle('');

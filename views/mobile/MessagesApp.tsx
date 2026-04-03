@@ -199,7 +199,7 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                                 </div>
 
                                 <div className="mt-10 pt-6 border-t border-zinc-800 flex justify-between items-end">
-                                    <div className="text-xs text-zinc-600 font-mono">v1.0</div>
+                                    <div className="text-xs text-zinc-600 font-mono">v1.0.9</div>
                                     <div className="text-right">
                                         <div className="font-bold text-white text-sm">Zeesh</div>
                                         <div className="text-xs text-amber-500 font-bold uppercase tracking-widest">Zeesh Apps</div>

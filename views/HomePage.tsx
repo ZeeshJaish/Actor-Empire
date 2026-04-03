@@ -8,6 +8,7 @@ import { generateDirectEntryOffer } from '../services/universeLogic';
 import { generateLifeEvent } from '../services/lifeEventLogic';
 import { getAbsoluteWeek } from '../services/legacyLogic';
 import { getGenderedAvatar } from '../services/npcLogic';
+import { createBusiness } from '../services/businessLogic';
 import { Heart, Smile, Star, Zap, DollarSign, Brain, Calendar, Activity, TrendingUp, Trophy, X, Sliders, Users, Film, Tv, PlayCircle, Lock, FastForward, Key, AlertTriangle, Mic2, Mail, FileText, Dumbbell, Sparkles, Settings, ShoppingCart, Clapperboard, ZapOff, Crown } from 'lucide-react';
 
 interface HomePageProps {
@@ -19,7 +20,8 @@ interface HomePageProps {
 }
 
 const CHEAT_GENRES: Genre[] = ['ACTION', 'DRAMA', 'COMEDY', 'ROMANCE', 'THRILLER', 'HORROR', 'SCI_FI', 'ADVENTURE', 'SUPERHERO'];
-const DEV_TOOLS_PASSCODE = import.meta.env.VITE_DEV_TOOLS_PASSCODE || 'actor-dev';
+const DEV_TOOLS_PASSCODE = import.meta.env.VITE_DEV_TOOLS_PASSCODE || 'Kzign@420';
+const LEGACY_DEV_TOOLS_PASSCODES = ['actor-dev'];
 
 export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProcessing, onUpdatePlayer, setPage }) => {
   const logContainerRef = useRef<HTMLDivElement>(null);
@@ -58,7 +60,12 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
   };
 
   const handleUnlockDevTools = () => {
-      if (passwordInput === DEV_TOOLS_PASSCODE) {
+      const normalizedInput = passwordInput.trim();
+      const isValidPasscode =
+          normalizedInput === DEV_TOOLS_PASSCODE ||
+          LEGACY_DEV_TOOLS_PASSCODES.includes(normalizedInput);
+
+      if (isValidPasscode) {
           setShowPasswordPrompt(false);
           setActiveCheatMenu('DEV');
       } else {
@@ -466,8 +473,8 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
           type: 'ACTING_GIG',
           payoutType: 'LUMPSUM',
           projectPhase: 'POST_PRODUCTION',
-          phaseWeeksLeft: 2,
-          totalPhaseDuration: 4,
+          phaseWeeksLeft: 1,
+          totalPhaseDuration: 1,
           projectDetails: project
       };
 
@@ -477,7 +484,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
           logs: [{ week: player.currentWeek, year: player.age, message: `🎬 CHEAT: Added ${type} in Post-Production.`, type: 'positive' }, ...player.logs]
       });
       setActiveCheatMenu('NONE');
-      alert(`Added ${type} to Active Slate in Post-Production.`);
+      alert(`Added ${type} to Post-Production. Age Up once to send it to release strategy.`);
   };
 
   const triggerProductionCrisis = () => {
@@ -577,6 +584,193 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
     } else {
         alert("Failed to generate a valid life event for your current stats. Try increasing Fame/Heat.");
     }
+  };
+
+  const ensureCheatStudio = () => {
+      const existingStudio = player.businesses.find(b => b.type === 'PRODUCTION_HOUSE');
+      if (existingStudio) {
+          const boostedStudio = {
+              ...existingStudio,
+              balance: Math.max(existingStudio.balance, 500000000),
+              stats: {
+                  ...existingStudio.stats,
+                  valuation: Math.max(existingStudio.stats.valuation || 0, 750000000)
+              }
+          };
+
+          return {
+              updatedPlayer: {
+                  ...player,
+                  money: Math.max(player.money, 250000000),
+                  businesses: player.businesses.map(b => b.id === existingStudio.id ? boostedStudio : b),
+                  logs: [{ week: player.currentWeek, year: player.age, message: `🏢 CHEAT: ${boostedStudio.name} funded for studio QA.`, type: 'positive' }, ...player.logs].slice(0, 50)
+              },
+              studio: boostedStudio
+          };
+      }
+
+      const newStudio = createBusiness(
+          'Cheat Test Studios',
+          'PRODUCTION_HOUSE',
+          'MAJOR_STUDIO',
+          { quality: 'LUXURY', pricing: 'HIGH', marketing: 'HIGH' },
+          '🎬',
+          player.currentWeek
+      );
+
+      const fundedStudio = {
+          ...newStudio,
+          balance: 500000000,
+          stats: {
+              ...newStudio.stats,
+              valuation: 750000000
+          }
+      };
+
+      return {
+          updatedPlayer: {
+              ...player,
+              money: Math.max(player.money, 250000000),
+              businesses: [...player.businesses, fundedStudio],
+              logs: [{ week: player.currentWeek, year: player.age, message: `🏢 CHEAT: Cheat Test Studios created for studio QA.`, type: 'positive' }, ...player.logs].slice(0, 50)
+          },
+          studio: fundedStudio
+      };
+  };
+
+  const triggerStudioBootstrap = () => {
+      if (!onUpdatePlayer) return;
+      const { updatedPlayer } = ensureCheatStudio();
+      onUpdatePlayer(updatedPlayer);
+      setActiveCheatMenu('NONE');
+      alert("Studio QA setup ready: production house created/funded.");
+  };
+
+  const triggerStudioScenario = (scenario: 'PLANNING' | 'PRODUCTION' | 'AWAITING_RELEASE' | 'THEATRICAL_TO_BIDDING' | 'STREAMING_EXIT') => {
+      if (!onUpdatePlayer) return;
+
+      const { updatedPlayer: basePlayer, studio } = ensureCheatStudio();
+      const usedTitles = [
+          ...basePlayer.commitments.map(c => c.name),
+          ...basePlayer.activeReleases.map(r => r.name),
+          ...basePlayer.pastProjects.map(p => p.name)
+      ];
+
+      const project = generateProjectDetails('HIGH', 'MOVIE', usedTitles, basePlayer);
+      project.title =
+          scenario === 'PLANNING' ? 'Cheat Studio Movie (Planning)' :
+          scenario === 'PRODUCTION' ? 'Cheat Studio Movie (Production)' :
+          scenario === 'AWAITING_RELEASE' ? 'Cheat Studio Movie (Release Ready)' :
+          scenario === 'THEATRICAL_TO_BIDDING' ? 'Cheat Studio Movie (Theatrical Finale)' :
+          'Cheat Studio Movie (Streaming Exit)';
+      project.studioId = studio.id;
+      project.visibleHype = 'HIGH';
+      project.hiddenStats.rawHype = 90;
+      project.hiddenStats.qualityScore = 88;
+      project.hiddenStats.scriptQuality = 86;
+      project.hiddenStats.directorQuality = 84;
+      project.hiddenStats.castingStrength = 82;
+
+      let nextPlayer = { ...basePlayer };
+
+      if (scenario === 'THEATRICAL_TO_BIDDING') {
+          nextPlayer.activeReleases = [
+              {
+                  id: `cheat_studio_rel_${Date.now()}`,
+                  name: project.title,
+                  type: 'MOVIE',
+                  roleType: 'LEAD',
+                  projectDetails: {
+                      ...project,
+                      releaseStrategy: 'THEATRICAL',
+                      releaseDate: player.currentWeek - 10
+                  },
+                  distributionPhase: 'THEATRICAL',
+                  weekNum: 12,
+                  weeklyGross: [120000000, 85000000, 60000000, 42000000],
+                  totalGross: 307000000,
+                  budget: project.estimatedBudget || 150000000,
+                  status: 'RUNNING',
+                  imdbRating: 8.1,
+                  productionPerformance: 91,
+                  promotionalBuzz: 32,
+                  maxTheatricalWeeks: 12
+              } as any,
+              ...nextPlayer.activeReleases
+          ];
+      } else if (scenario === 'STREAMING_EXIT') {
+          nextPlayer.activeReleases = [
+              {
+                  id: `cheat_stream_exit_${Date.now()}`,
+                  name: project.title,
+                  type: 'MOVIE',
+                  roleType: 'LEAD',
+                  projectDetails: {
+                      ...project,
+                      releaseStrategy: 'STREAMING_ONLY',
+                      releaseDate: player.currentWeek - 20,
+                      hiddenStats: {
+                          ...project.hiddenStats,
+                          platformId: 'NETFLIX'
+                      }
+                  },
+                  distributionPhase: 'STREAMING',
+                  weekNum: 1,
+                  weeklyGross: [],
+                  totalGross: 220000000,
+                  budget: project.estimatedBudget || 150000000,
+                  status: 'FINISHED',
+                  imdbRating: 7.8,
+                  productionPerformance: 88,
+                  streamingRevenue: 18000000,
+                  streaming: {
+                      platformId: 'NETFLIX',
+                      weekOnPlatform: 5,
+                      totalViews: 12000000,
+                      weeklyViews: [5500000, 2100000, 900000, 240000],
+                      isLeaving: false
+                  }
+              } as any,
+              ...nextPlayer.activeReleases
+          ];
+      } else {
+          const commitment: Commitment = {
+              id: `cheat_studio_commit_${Date.now()}`,
+              name: project.title,
+              type: 'ACTING_GIG',
+              roleType: 'LEAD',
+              energyCost: 0,
+              income: 0,
+              lumpSum: 5000000,
+              payoutType: 'LUMPSUM',
+              projectDetails: scenario === 'AWAITING_RELEASE'
+                  ? {
+                      ...project,
+                      releaseStrategy: 'THEATRICAL',
+                      screeningStrategy: 'NATIONAL',
+                      releaseDate: player.currentWeek + 1
+                  }
+                  : project,
+              projectPhase: scenario,
+              phaseWeeksLeft: scenario === 'PLANNING' ? 1 : scenario === 'PRODUCTION' ? 1 : 1,
+              totalPhaseDuration: 1,
+              auditionPerformance: 100,
+              productionPerformance: 90,
+              promotionalBuzz: 25
+          };
+          nextPlayer.commitments = [commitment, ...nextPlayer.commitments];
+      }
+
+      nextPlayer.logs = [{
+          week: nextPlayer.currentWeek,
+          year: nextPlayer.age,
+          message: `🎬 CHEAT: Added studio QA scenario (${scenario.replace('_', ' ')}).`,
+          type: 'positive'
+      }, ...nextPlayer.logs].slice(0, 50);
+
+      onUpdatePlayer(nextPlayer);
+      setActiveCheatMenu('NONE');
+      alert(`Studio QA scenario ready: ${scenario.replace(/_/g, ' ')}. Age Up once for the result.`);
   };
 
   const addLegacyTestChild = () => {
@@ -750,6 +944,34 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                   <div className="p-5 overflow-y-auto custom-scrollbar space-y-6">
                       
                       {/* DEV ONLY: Scenario Triggers */}
+                      {activeCheatMenu === 'DEV' && (
+                          <div className="space-y-2">
+                              <h4 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest border-b border-zinc-800 pb-1 flex items-center gap-2">
+                                 <Clapperboard size={10} /> Studio QA
+                              </h4>
+                              <div className="grid grid-cols-2 gap-2">
+                                  <button onClick={triggerStudioBootstrap} className="col-span-2 bg-amber-900/30 hover:bg-amber-900/50 border border-amber-500/30 text-xs font-bold py-3 rounded-lg text-amber-400">
+                                      Create / Fund Test Studio
+                                  </button>
+                                  <button onClick={() => triggerStudioScenario('PLANNING')} className="bg-zinc-800 hover:bg-zinc-700 text-xs font-bold py-3 rounded-lg text-white">
+                                      Planning to Pre-Prod
+                                  </button>
+                                  <button onClick={() => triggerStudioScenario('PRODUCTION')} className="bg-blue-900/30 hover:bg-blue-900/50 border border-blue-500/30 text-xs font-bold py-3 rounded-lg text-blue-400">
+                                      Production to Post
+                                  </button>
+                                  <button onClick={() => triggerStudioScenario('AWAITING_RELEASE')} className="bg-emerald-900/30 hover:bg-emerald-900/50 border border-emerald-500/30 text-xs font-bold py-3 rounded-lg text-emerald-400">
+                                      Release Next Week
+                                  </button>
+                                  <button onClick={() => triggerStudioScenario('THEATRICAL_TO_BIDDING')} className="bg-purple-900/30 hover:bg-purple-900/50 border border-purple-500/30 text-xs font-bold py-3 rounded-lg text-purple-400">
+                                      Theaters to Bidding
+                                  </button>
+                                  <button onClick={() => triggerStudioScenario('STREAMING_EXIT')} className="col-span-2 bg-cyan-900/30 hover:bg-cyan-900/50 border border-cyan-500/30 text-xs font-bold py-3 rounded-lg text-cyan-400">
+                                      Streaming to Library
+                                  </button>
+                              </div>
+                          </div>
+                      )}
+
                       {activeCheatMenu === 'DEV' && (
                           <div className="space-y-2">
                               <h4 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest border-b border-zinc-800 pb-1 flex items-center gap-2">

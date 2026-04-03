@@ -1,5 +1,5 @@
 
-import { Business, BusinessType, BusinessSubtype, BusinessConfig, BusinessStaff, BusinessProduct, Player, EmployeeCandidate } from '../types';
+import { Business, BusinessType, BusinessSubtype, BusinessConfig, BusinessStaff, BusinessProduct, Player, EmployeeCandidate, StudioState } from '../types';
 import { generateWriters, generateIPMarket } from '../src/data/generators';
 
 export interface BusinessBlueprint {
@@ -174,6 +174,62 @@ const FIRST_NAMES = ['Kai', 'Luna', 'Nova', 'Ezra', 'Milo', 'Ayla', 'Finn', 'Ivy
 const LAST_NAMES = ['Rivers', 'Stone', 'Wilder', 'Frost', 'Knight', 'Woods', 'Black', 'Steel', 'Moon', 'Storm'];
 const generateName = () => `${FIRST_NAMES[Math.floor(Math.random() * FIRST_NAMES.length)]} ${LAST_NAMES[Math.floor(Math.random() * LAST_NAMES.length)]}`;
 
+const getServiceBaseRevenuePerLocation = (subtype: BusinessSubtype): number => {
+    switch (subtype) {
+        case 'FAST_FOOD':
+            return 7000;
+        case 'CASUAL_DINING':
+            return 10500;
+        case 'FINE_DINING':
+            return 18000;
+        case 'COFFEE_SHOP':
+            return 5500;
+        case 'ARTISAN_BAKERY':
+            return 7000;
+        case 'LOCAL_GYM':
+            return 9000;
+        case 'WELLNESS_STUDIO':
+            return 13000;
+        default:
+            return 8000;
+    }
+};
+
+const getProductPriceSweetSpot = (business: Business, product: BusinessProduct): { min: number; max: number } => {
+    const baseCost = Math.max(1, product.productionCost || 1);
+    const isPremium = business.config.quality === 'PREMIUM';
+    const isLuxury = business.config.quality === 'LUXURY' || business.subtype === 'LUXURY_BRAND';
+    const isBudget = business.config.quality === 'BUDGET';
+
+    if (business.type === 'MERCH') {
+        return {
+            min: Math.max(5, Math.floor(baseCost * 1.8)),
+            max: Math.max(20, Math.floor(baseCost * 5.5))
+        };
+    }
+
+    if (business.type === 'FASHION') {
+        const minMult = isLuxury ? 3.0 : isPremium ? 2.2 : isBudget ? 1.6 : 1.8;
+        const maxMult = isLuxury ? 10.0 : isPremium ? 7.5 : isBudget ? 4.5 : 6.0;
+        return {
+            min: Math.max(15, Math.floor(baseCost * minMult)),
+            max: Math.max(80, Math.floor(baseCost * maxMult))
+        };
+    }
+
+    if (business.type === 'PRODUCTION_HOUSE') {
+        return {
+            min: Math.max(100, Math.floor(baseCost * 2.5)),
+            max: Math.max(500, Math.floor(baseCost * 8))
+        };
+    }
+
+    return {
+        min: Math.max(10, Math.floor(baseCost * 2)),
+        max: Math.max(50, Math.floor(baseCost * 6))
+    };
+};
+
 
 // ... (Keep setup costs, hiring logic) ...
 export const calculateSetupCost = (type: BusinessType, subtype: BusinessSubtype, config: BusinessConfig): number => {
@@ -253,7 +309,60 @@ export const createBusiness = (
             weeklyRevenue: 0, weeklyExpenses: 0, weeklyProfit: 0, lifetimeRevenue: 0, valuation: cost, brandHealth: 50, customerSatisfaction: 50, riskLevel: 10, hype: 20, 
             capacity: capacity, inventory: blueprint.model === 'PRODUCT' ? 0 : undefined, locations: 1
         },
-        staff: [], products: [], history: [], hiringPool: generateCandidates(), lastHiringRefreshWeek: currentWeek
+        staff: [], products: [], history: [], hiringPool: generateCandidates(), lastHiringRefreshWeek: currentWeek,
+        ...(type === 'PRODUCTION_HOUSE' ? { studioState: createDefaultStudioState(currentWeek) } : {})
+    };
+};
+
+export const createDefaultStudioState = (currentWeek: number): StudioState => ({
+    scripts: [],
+    concepts: [],
+    writers: generateWriters(10),
+    ipMarket: generateIPMarket(5, []),
+    lastMarketRefreshWeek: currentWeek,
+    lastWriterRefreshWeek: currentWeek,
+    lastTalentRefreshWeek: currentWeek,
+    departments: {
+        writing: 1,
+        directing: 1,
+        casting: 1,
+        production: 1,
+        postProduction: 1,
+    },
+    equipment: {
+        cameras: 1,
+        lighting: 1,
+        sound: 1,
+        practicalEffects: 0,
+    },
+    talentRoster: [],
+    purchasedIPTitles: [],
+    productionFund: 0,
+});
+
+export const normalizeStudioState = (studioState: Partial<StudioState> | undefined, currentWeek: number): StudioState => {
+    const defaults = createDefaultStudioState(currentWeek);
+    return {
+        ...defaults,
+        ...studioState,
+        scripts: Array.isArray(studioState?.scripts) ? studioState!.scripts : defaults.scripts,
+        concepts: Array.isArray(studioState?.concepts) ? studioState!.concepts : defaults.concepts,
+        writers: Array.isArray(studioState?.writers) ? studioState!.writers : defaults.writers,
+        ipMarket: Array.isArray(studioState?.ipMarket) ? studioState!.ipMarket : defaults.ipMarket,
+        talentRoster: Array.isArray(studioState?.talentRoster) ? studioState!.talentRoster : defaults.talentRoster,
+        purchasedIPTitles: Array.isArray(studioState?.purchasedIPTitles) ? studioState!.purchasedIPTitles : defaults.purchasedIPTitles,
+        departments: {
+            ...defaults.departments,
+            ...(studioState?.departments || {}),
+        },
+        equipment: {
+            ...defaults.equipment,
+            ...(studioState?.equipment || {}),
+        },
+        lastMarketRefreshWeek: typeof studioState?.lastMarketRefreshWeek === 'number' ? studioState.lastMarketRefreshWeek : defaults.lastMarketRefreshWeek,
+        lastWriterRefreshWeek: typeof studioState?.lastWriterRefreshWeek === 'number' ? studioState.lastWriterRefreshWeek : defaults.lastWriterRefreshWeek,
+        lastTalentRefreshWeek: typeof studioState?.lastTalentRefreshWeek === 'number' ? studioState.lastTalentRefreshWeek : defaults.lastTalentRefreshWeek,
+        productionFund: typeof studioState?.productionFund === 'number' ? studioState.productionFund : defaults.productionFund,
     };
 };
 
@@ -283,6 +392,17 @@ export const processBusinessWeek = (business: Business, playerFame: number, week
     const alerts: string[] = [];
 
     const locations = b.stats.locations || 1;
+    const theme = b.config.theme ? BUSINESS_THEMES.find(t => t.id === b.config.theme) : null;
+    const amenityMods = (b.config.amenities || []).reduce((acc, amenityId) => {
+        const amenity = BUSINESS_AMENITIES.find(a => a.id === amenityId);
+        if (!amenity) return acc;
+
+        return {
+            traffic: acc.traffic * (amenity.trafficMod || 1),
+            price: acc.price * (amenity.priceMod || 1),
+            capacity: acc.capacity * (amenity.capacityMod || 1),
+        };
+    }, { traffic: 1, price: 1, capacity: 1 });
 
     // 1. MARKETING & HYPE
     const marketingBudget = b.config.marketingBudget || { social: 0, influencer: 0, billboard: 0, tv: 0 };
@@ -290,7 +410,20 @@ export const processBusinessWeek = (business: Business, playerFame: number, week
 
     let hypeGain = 0;
     if (totalMarketingSpend > 0) {
-        hypeGain = Math.sqrt(totalMarketingSpend) * 0.5;
+        const earlySpend = Math.min(totalMarketingSpend, 25000);
+        const midSpend = Math.min(Math.max(0, totalMarketingSpend - 25000), 75000);
+        const lateSpend = Math.max(0, totalMarketingSpend - 100000);
+        const businessMarketingWeight =
+            b.type === 'FASHION' ? 1.2 :
+            b.type === 'MERCH' ? 1.1 :
+            b.type === 'RESTAURANT' || b.type === 'CAFE' ? 0.95 :
+            1.0;
+
+        hypeGain = (
+            Math.sqrt(earlySpend) * 0.02 +
+            Math.sqrt(midSpend) * 0.012 +
+            Math.sqrt(lateSpend) * 0.006
+        ) * businessMarketingWeight;
     }
 
     // HYPE DECAY: Heavily reliant on Brand Health
@@ -306,19 +439,31 @@ export const processBusinessWeek = (business: Business, playerFame: number, week
     if (['FAST_FOOD', 'ONLINE_STORE'].includes(b.subtype)) baseFootfall = 100;
     if (['FINE_DINING', 'LUXURY_BRAND'].includes(b.subtype)) baseFootfall = 10;
 
-    const hypeMod = 1 + (b.stats.hype / 20); 
+    const hypeDemandWeight =
+        b.type === 'FASHION' ? 0.07 :
+        b.type === 'MERCH' ? 0.06 :
+        b.type === 'RESTAURANT' ? 0.05 :
+        0.045;
+    const hypeMod = 1 + (b.stats.hype * hypeDemandWeight); 
     const fameMod = 1 + (playerFame / 200); 
     
     // Quality directly impacts demand too
     let qualityMod = 1.0;
     if (blueprint.model === 'PRODUCT') {
         const avgQual = b.products.length > 0 ? b.products.reduce((s,p)=>s+p.quality,0)/b.products.length : 50;
-        qualityMod = 0.5 + (avgQual / 100);
+        if (b.type === 'FASHION') {
+            qualityMod = Math.max(0.75, Math.min(1.45, 0.65 + (avgQual / 100) * 0.8));
+        } else if (b.type === 'MERCH') {
+            qualityMod = Math.max(0.8, Math.min(1.3, 0.72 + (avgQual / 100) * 0.65));
+        } else {
+            qualityMod = 0.5 + (avgQual / 100);
+        }
     } else {
         qualityMod = 0.5 + (b.stats.customerSatisfaction / 100);
     }
 
-    const totalDemand = Math.floor(baseFootfall * hypeMod * fameMod * qualityMod * locations);
+    const appealMod = theme?.appealMod || 1;
+    const totalDemand = Math.floor(baseFootfall * hypeMod * fameMod * qualityMod * locations * appealMod * amenityMods.traffic);
 
     if (totalDemand < 10 && totalMarketingSpend === 0 && b.stats.brandHealth < 50) {
          alerts.push(`📉 Low traffic at ${b.name}. Boost Marketing!`);
@@ -331,62 +476,73 @@ export const processBusinessWeek = (business: Business, playerFame: number, week
     if (blueprint.model === 'SERVICE') {
         const managers = b.staff.filter(s => s.role === 'MANAGER');
         const workers = b.staff.filter(s => s.role !== 'MANAGER');
-        
-        // Staff Efficiency
-        // No workers = 0 capacity. 
-        if (workers.length === 0) {
-            revenue = 0;
-            alerts.push(`⛔ ${b.name} has no staff! 0 Revenue.`);
-        } else {
-            // Calculate Effective Capacity
-            // 1 Worker can handle ~15 customers efficiently per week in this sim time scale
-            // Skill adds bonus
-            const avgSkill = workers.reduce((acc, s) => acc + s.skill, 0) / workers.length;
-            const staffCapacity = workers.length * 20 * (1 + (avgSkill/100));
-            
-            // Physical Capacity
-            const physicalCapacity = (b.stats.capacity || 50) * locations;
-            
-            // Actual Capacity is strictly limited by STAFF first, then PHYSICAL space
-            const effectiveCapacity = Math.min(staffCapacity, physicalCapacity);
-            
-            // Served
-            const servedCount = Math.min(totalDemand, Math.floor(effectiveCapacity));
-            
-            // Ticket Price
-            let avgTicket = 20;
-            if (b.config.quality === 'BUDGET') avgTicket = 15;
-            if (b.config.quality === 'PREMIUM') avgTicket = 60;
-            if (b.config.quality === 'LUXURY') avgTicket = 150;
-            
-            revenue = servedCount * avgTicket;
 
-            // Brand Health Impacts
-            // If demand was way higher than what we served, people are annoyed (long wait times)
-            if (totalDemand > effectiveCapacity * 1.5) {
-                b.stats.customerSatisfaction = Math.max(0, b.stats.customerSatisfaction - 2);
-                b.stats.brandHealth = Math.max(0, b.stats.brandHealth - 1);
-                alerts.push(`📉 ${b.name} is understaffed! Turning away customers.`);
-            } else if (avgSkill > 70) {
-                // Good service bonus
-                b.stats.customerSatisfaction = Math.min(100, b.stats.customerSatisfaction + 1);
-                b.stats.brandHealth = Math.min(100, b.stats.brandHealth + 0.5);
-            } else if (avgSkill < 30) {
-                b.stats.customerSatisfaction = Math.max(0, b.stats.customerSatisfaction - 1);
-            }
+        const avgSkill = workers.length > 0
+            ? workers.reduce((acc, s) => acc + s.skill, 0) / workers.length
+            : 0;
+        const staffCapacity = workers.length > 0
+            ? workers.length * 35 * (1 + (avgSkill / 120))
+            : 0;
+        const physicalCapacity = Math.floor((b.stats.capacity || 50) * locations * amenityMods.capacity);
+        const effectiveCapacity = Math.max(0, Math.min(staffCapacity, physicalCapacity));
+        const demandCoverage = totalDemand > 0
+            ? Math.min(1.1, effectiveCapacity / Math.max(1, totalDemand))
+            : 1;
+
+        let qualityRevenueMod = 1;
+        if (b.config.quality === 'BUDGET') qualityRevenueMod = 0.8;
+        if (b.config.quality === 'PREMIUM') qualityRevenueMod = 1.2;
+        if (b.config.quality === 'LUXURY') qualityRevenueMod = 1.5;
+
+        const satisfactionMod = 0.75 + (b.stats.customerSatisfaction / 200);
+        const brandMod = 0.8 + (b.stats.brandHealth / 250);
+        const hypeRevenueMod = 0.9 + (b.stats.hype / 200);
+        const managementMod = managers.length > 0 ? 1.08 : 1;
+        const occupancyMod = totalDemand > 0 ? Math.min(1.15, 0.75 + (totalDemand / Math.max(1, physicalCapacity * 2))) : 0.85;
+
+        const basePassiveIncome = getServiceBaseRevenuePerLocation(b.subtype) * locations;
+
+        let operationalStability = 0.45;
+        if (workers.length === 0) {
+            operationalStability = managers.length > 0 ? 0.4 : 0.25;
+            alerts.push(`⛔ ${b.name} is understaffed. Income is reduced until you hire staff.`);
+        } else {
+            operationalStability = Math.max(0.65, Math.min(1.15, 0.55 + (demandCoverage * 0.45) + (avgSkill / 250)));
+        }
+
+        revenue = Math.floor(
+            basePassiveIncome
+            * qualityRevenueMod
+            * satisfactionMod
+            * brandMod
+            * hypeRevenueMod
+            * managementMod
+            * occupancyMod
+            * amenityMods.price
+            * operationalStability
+        );
+
+        if (workers.length > 0 && totalDemand > effectiveCapacity * 1.4) {
+            b.stats.customerSatisfaction = Math.max(0, b.stats.customerSatisfaction - 2);
+            b.stats.brandHealth = Math.max(0, b.stats.brandHealth - 1);
+            alerts.push(`📉 ${b.name} is understaffed! Turning away customers hurts reviews.`);
+        } else if (avgSkill > 70 || managers.length > 0) {
+            b.stats.customerSatisfaction = Math.min(100, b.stats.customerSatisfaction + 1);
+            b.stats.brandHealth = Math.min(100, b.stats.brandHealth + 0.5);
+        } else if (avgSkill > 0 && avgSkill < 30) {
+            b.stats.customerSatisfaction = Math.max(0, b.stats.customerSatisfaction - 1);
         }
     } 
     // --- PRODUCT MODEL (ACTIVE & INVENTORY LIMITED) ---
     else if (blueprint.model === 'PRODUCT') {
         const managers = b.staff.filter(s => s.role === 'MANAGER');
         const salesStaff = b.staff.filter(s => s.role === 'SALESPERSON');
-        
-        // Sales staff boost conversion rate, but aren't strictly required for online sales (auto)
-        // However, we simulate "fulfillment" capacity via staff or automated systems
-        let salesCapacity = 1000; // Base auto fulfillment
+
+        let salesCapacity = 35 + (locations * 35);
+        if (managers.length > 0) salesCapacity += 30;
         if (salesStaff.length > 0) {
             const avgSkill = salesStaff.reduce((acc, s) => acc + s.skill, 0) / salesStaff.length;
-            salesCapacity += (salesStaff.length * 500 * (1 + avgSkill/100));
+            salesCapacity += (salesStaff.length * 75 * (1 + avgSkill / 115));
         }
 
         const activeProducts = b.products.filter(p => p.active);
@@ -399,6 +555,41 @@ export const processBusinessWeek = (business: Business, playerFame: number, week
              const demandPerProduct = Math.floor(totalDemand / activeProducts.length);
              
              activeProducts.forEach(prod => {
+                 const priceSweetSpot = getProductPriceSweetSpot(b, prod);
+                 const price = Math.max(1, prod.sellingPrice || prod.productionCost || 1);
+                 const markupRatio = price / Math.max(1, prod.productionCost || 1);
+                 const avgDemandQuality = prod.quality || 50;
+                 const qualityTierTolerance =
+                    b.type === 'FASHION'
+                        ? avgDemandQuality >= 90 ? 1.18
+                            : avgDemandQuality >= 80 ? 1.12
+                            : avgDemandQuality >= 60 ? 1.04
+                            : avgDemandQuality < 40 ? 0.88
+                            : 1
+                        : avgDemandQuality >= 85 ? 1.06
+                            : avgDemandQuality < 35 ? 0.92
+                            : 1;
+                 const toleratedMaxPrice = priceSweetSpot.max * qualityTierTolerance * (b.subtype === 'LUXURY_BRAND' ? 1.12 : 1);
+                 const overpricingPenalty = price > toleratedMaxPrice
+                    ? Math.max(
+                        b.subtype === 'LUXURY_BRAND' ? 0.22 : 0.16,
+                        1 - ((price - toleratedMaxPrice) / Math.max(toleratedMaxPrice * (b.subtype === 'LUXURY_BRAND' ? 1.8 : 1.2), 1))
+                    )
+                    : 1;
+                 const underpricingPenalty = price < priceSweetSpot.min
+                    ? Math.max(0.45, price / Math.max(1, priceSweetSpot.min))
+                    : 1;
+                 const qualityDemandBoost =
+                    b.type === 'FASHION'
+                        ? Math.max(0.75, Math.min(1.45, 0.72 + (prod.quality / 100) * 0.75))
+                        : Math.max(0.8, Math.min(1.3, 0.78 + (prod.quality / 100) * 0.55));
+                 const luxuryTolerance = b.subtype === 'LUXURY_BRAND' || b.config.quality === 'LUXURY' ? 1.08 : 1;
+                 const subtypeDemandMod =
+                    b.subtype === 'LUXURY_BRAND' ? 0.72 :
+                    b.subtype === 'STREETWEAR' ? 1.18 :
+                    b.type === 'MERCH' ? 1.08 :
+                    1;
+
                  // Check inventory
                  const available = prod.inventory || 0;
                  if (available <= 0) {
@@ -408,7 +599,15 @@ export const processBusinessWeek = (business: Business, playerFame: number, week
                  
                  // Cap sales by inventory and fulfillment capacity
                  // Note: Fulfillment is shared, simplifying here by assuming per product
-                 const potentialSales = Math.min(demandPerProduct, available);
+                 const adjustedDemand = Math.floor(
+                    demandPerProduct
+                    * subtypeDemandMod
+                    * overpricingPenalty
+                    * underpricingPenalty
+                    * qualityDemandBoost
+                    * luxuryTolerance
+                 );
+                 const potentialSales = Math.min(adjustedDemand, available);
                  const actualSales = Math.min(potentialSales, Math.floor(salesCapacity / activeProducts.length));
                  
                  revenue += actualSales * prod.sellingPrice;
@@ -418,6 +617,12 @@ export const processBusinessWeek = (business: Business, playerFame: number, week
                  // Quality impacts brand health on sale
                  if (prod.quality > 80) b.stats.brandHealth = Math.min(100, b.stats.brandHealth + 0.2);
                  if (prod.quality < 40) b.stats.brandHealth = Math.max(0, b.stats.brandHealth - 0.5);
+
+                 if (markupRatio > (b.subtype === 'LUXURY_BRAND' ? 8.5 : 6.5) && actualSales < Math.max(5, demandPerProduct * 0.25)) {
+                    alerts.push(`💸 ${prod.name} is overpriced for the current demand. Lower the price or improve quality.`);
+                 } else if (markupRatio < 1.5 && actualSales > 0) {
+                    alerts.push(`🧾 ${prod.name} is moving fast, but margins are thin. You can raise the price a little.`);
+                 }
              });
         }
         b.stats.inventory = b.products.reduce((acc, p) => acc + (p.inventory || 0), 0);
@@ -431,7 +636,7 @@ export const processBusinessWeek = (business: Business, playerFame: number, week
     const staffWages = b.staff.reduce((acc, s) => acc + s.salary, 0);
     
     let cogs = 0;
-    if (blueprint.model === 'SERVICE') cogs = Math.floor(revenue * 0.20); // 20% Food/Service Cost
+    if (blueprint.model === 'SERVICE') cogs = Math.floor(revenue * 0.18);
     
     const totalExpenses = totalOpEx + staffWages + cogs + totalMarketingSpend;
     const profit = revenue - totalExpenses;
@@ -448,6 +653,7 @@ export const processBusinessWeek = (business: Business, playerFame: number, week
     
     // 5. PRODUCTION HOUSE SPECIFIC: SCRIPT DEVELOPMENT
     if (b.type === 'PRODUCTION_HOUSE' && b.studioState) {
+        b.studioState = normalizeStudioState(b.studioState, week);
         b.studioState.scripts = b.studioState.scripts.map(script => {
             if (script.status === 'IN_DEVELOPMENT') {
                 const updatedWeeks = script.weeksInDevelopment + 1;
@@ -603,7 +809,20 @@ export const createProduct = (
     const variance = (Math.random() * 35) - 15; 
     let finalQuality = 50 + qualityBonus + variance;
     finalQuality = Math.max(10, Math.min(100, Math.floor(finalQuality)));
-    const sellingPrice = customPrice || Math.floor(finalUnitCost * 2.5);
+    const priceGuide = getProductPriceSweetSpot(b, {
+        id: 'draft',
+        name,
+        catalogId,
+        quality: finalQuality,
+        productionCost: finalUnitCost,
+        sellingPrice: finalUnitCost,
+        appeal: 50 + (qualityBonus / 2),
+        unitsSold: 0,
+        active: true,
+        inventory: quantity
+    });
+    const requestedPrice = customPrice || Math.floor(finalUnitCost * 2.5);
+    const sellingPrice = Math.max(priceGuide.min, Math.min(requestedPrice, priceGuide.max));
 
     b.products.push({
         id: `prod_${Date.now()}`, name, catalogId: catalogId, quality: finalQuality, productionCost: finalUnitCost, sellingPrice: sellingPrice, appeal: 50 + (qualityBonus / 2), unitsSold: 0, active: true, inventory: quantity 
@@ -632,17 +851,28 @@ export const updateProductPrice = (business: Business, productId: string, newPri
     const b = { ...business };
     const prod = b.products.find(p => p.id === productId);
     if (prod) {
-        const maxPrice = Math.max(20000, prod.productionCost * 20); 
-        prod.sellingPrice = Math.min(newPrice, maxPrice);
+        const priceGuide = getProductPriceSweetSpot(b, prod);
+        prod.sellingPrice = Math.max(priceGuide.min, Math.min(newPrice, priceGuide.max));
     }
     return b;
 };
 
 export const expandBusiness = (business: Business): { updated: Business, success: boolean, msg: string } => {
     const b = { ...business };
-    const blueprint = BUSINESS_BLUEPRINTS[b.type];
     const currentLocs = b.stats.locations || 1;
-    const expansionCost = Math.floor(blueprint.baseCost * 0.8 * currentLocs); 
+    const expansionBase =
+        currentLocs === 1 ? 150000 :
+        currentLocs === 2 ? 350000 :
+        currentLocs === 3 ? 700000 :
+        1200000 + ((currentLocs - 4) * 750000);
+    const typeMultiplier =
+        b.type === 'RESTAURANT' ? 1.2 :
+        b.type === 'CAFE' ? 0.9 :
+        b.type === 'FASHION' ? 1.05 :
+        b.type === 'FITNESS' ? 1.15 :
+        b.type === 'MERCH' ? 0.75 :
+        1.6;
+    const expansionCost = Math.floor(expansionBase * typeMultiplier); 
     
     if (b.balance < expansionCost) return { updated: b, success: false, msg: `Need $${expansionCost.toLocaleString()} to expand.` };
 

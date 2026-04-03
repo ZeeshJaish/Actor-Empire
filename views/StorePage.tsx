@@ -2,20 +2,75 @@
 import React, { useState } from 'react';
 import { Player, ActorSkills, Genre, Stats } from '../types';
 import { formatMoney } from '../services/formatUtils';
-import { ArrowLeft, Zap, DollarSign, Heart, Brain, Clapperboard, PlayCircle, ShieldAlert } from 'lucide-react';
+import { ArrowLeft, Zap, DollarSign, Heart, Brain, Clapperboard, PlayCircle, ShieldAlert, Crown, Gem, Home, CarFront, Plane, CheckCircle2 } from 'lucide-react';
+import { hasPremiumProduct, PREMIUM_PRODUCTS, PremiumProductId } from '../services/premiumLogic';
+
+const PREMIUM_STORE_ENABLED = false;
 
 interface StorePageProps {
     player: Player;
     onBack: () => void;
     onWatchAd: (type: 'REWARDED_CASH' | 'REWARDED_ENERGY' | 'REWARDED_STATS' | 'REWARDED_SKILL' | 'REWARDED_GENRE', data?: any) => void;
+    onPremiumPurchase: (productId: PremiumProductId) => void;
+    onRestorePurchases: () => void;
 }
 
-export const StorePage: React.FC<StorePageProps> = ({ player, onBack, onWatchAd }) => {
+export const StorePage: React.FC<StorePageProps> = ({ player, onBack, onWatchAd, onPremiumPurchase, onRestorePurchases }) => {
     const [selectedSkill, setSelectedSkill] = useState<keyof ActorSkills>('delivery');
     const [selectedGenre, setSelectedGenre] = useState<Genre>('ACTION');
+    const [activeTab, setActiveTab] = useState<'REWARDS' | 'PREMIUM'>('REWARDS');
+    const [pendingProduct, setPendingProduct] = useState<PremiumProductId | null>(null);
+    const isIOSDevice = typeof navigator !== 'undefined' && (
+        /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+    );
+    const showPremiumStore = PREMIUM_STORE_ENABLED && (isIOSDevice || import.meta.env.DEV);
 
     const GENRES: Genre[] = ['ACTION', 'DRAMA', 'COMEDY', 'ROMANCE', 'THRILLER', 'HORROR', 'SCI_FI', 'ADVENTURE', 'SUPERHERO'];
     const SKILLS: (keyof ActorSkills)[] = ['delivery', 'memorization', 'expression', 'improvisation', 'discipline', 'presence', 'charisma'];
+    const bonusEnergy = player.flags?.bonusEnergyBank || 0;
+    const premiumSections = [
+        {
+            title: 'Ad-Free',
+            icon: ShieldAlert,
+            products: PREMIUM_PRODUCTS.filter(product => product.category === 'ad_free')
+        },
+        {
+            title: 'Energy Boosts',
+            icon: Zap,
+            products: PREMIUM_PRODUCTS.filter(product => product.category === 'energy')
+        },
+        {
+            title: 'Cash Boosts',
+            icon: DollarSign,
+            products: PREMIUM_PRODUCTS.filter(product => product.category === 'cash')
+        },
+        {
+            title: 'Collections',
+            icon: Crown,
+            products: PREMIUM_PRODUCTS.filter(product => product.category === 'collection')
+        }
+    ];
+
+    const getProductAccent = (productId: PremiumProductId) => {
+        if (productId.includes('energy')) return 'border-amber-500/30 bg-amber-500/10 text-amber-300';
+        if (productId.includes('cash')) return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300';
+        if (productId === 'no_ads') return 'border-sky-500/30 bg-sky-500/10 text-sky-300';
+        if (productId.includes('home')) return 'border-purple-500/30 bg-purple-500/10 text-purple-300';
+        if (productId.includes('vehicle')) return 'border-fuchsia-500/30 bg-fuchsia-500/10 text-fuchsia-300';
+        if (productId.includes('sky') || productId.includes('vault') || productId.includes('ultimate')) return 'border-amber-400/30 bg-amber-400/10 text-amber-200';
+        return 'border-zinc-700 bg-zinc-900 text-zinc-300';
+    };
+
+    const getProductIcon = (productId: PremiumProductId) => {
+        if (productId === 'no_ads') return ShieldAlert;
+        if (productId.includes('energy')) return Zap;
+        if (productId.includes('cash')) return DollarSign;
+        if (productId.includes('home')) return Home;
+        if (productId.includes('vehicle')) return CarFront;
+        if (productId.includes('sky')) return Plane;
+        return Gem;
+    };
 
 
     return (
@@ -31,6 +86,111 @@ export const StorePage: React.FC<StorePageProps> = ({ player, onBack, onWatchAd 
                 </div>
             </div>
 
+            <div className="glass-card p-4 rounded-2xl border border-zinc-800 flex items-center justify-between">
+                <div>
+                    <div className="text-xs font-bold uppercase tracking-widest text-zinc-500">Energy Reserve</div>
+                    <div className="text-sm text-white font-semibold">Bonus Bank: {bonusEnergy}</div>
+                    <div className="text-[11px] text-zinc-500 mt-1">Bought energy carries over week to week until fully used.</div>
+                </div>
+                <div className="px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 font-black text-sm">
+                    {player.energy.current} Ready
+                </div>
+            </div>
+
+            {showPremiumStore && (
+                <div className="grid grid-cols-2 gap-2 p-1 rounded-2xl bg-zinc-900 border border-zinc-800">
+                    <button
+                        onClick={() => setActiveTab('REWARDS')}
+                        className={`py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'REWARDS' ? 'bg-white text-black' : 'text-zinc-400 hover:text-white'}`}
+                    >
+                        Rewards
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('PREMIUM')}
+                        className={`py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'PREMIUM' ? 'bg-white text-black' : 'text-zinc-400 hover:text-white'}`}
+                    >
+                        Premium
+                    </button>
+                </div>
+            )}
+
+            {showPremiumStore && activeTab === 'PREMIUM' && (
+                <div className="space-y-4">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-gradient-to-br from-amber-500/20 to-orange-500/20 rounded-xl text-amber-300">
+                            <Crown size={20}/>
+                        </div>
+                        <div>
+                            <h3 className="font-bold text-white text-lg">Premium</h3>
+                            <p className="text-xs text-zinc-500">
+                                {isIOSDevice ? 'iOS-only purchase catalog.' : 'Developer preview of the iOS purchase catalog.'}
+                            </p>
+                        </div>
+                        <button
+                            onClick={onRestorePurchases}
+                            className="ml-auto px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-xs font-bold text-zinc-300 hover:text-white hover:bg-zinc-800 transition-colors"
+                        >
+                            Restore
+                        </button>
+                    </div>
+
+                    {premiumSections.map(section => {
+                        const SectionIcon = section.icon;
+                        return (
+                            <div key={section.title} className="glass-card p-5 rounded-2xl border border-zinc-800 space-y-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-white/5 rounded-xl text-zinc-300"><SectionIcon size={18}/></div>
+                                    <div className="font-bold text-white">{section.title}</div>
+                                </div>
+
+                                <div className="space-y-3">
+                                    {section.products.map(product => {
+                                        const owned = hasPremiumProduct(player, product.id);
+                                        const ProductIcon = getProductIcon(product.id);
+                                        return (
+                                            <div key={product.id} className="rounded-2xl border border-zinc-800 bg-black/20 p-4">
+                                                <div className="flex items-start gap-4">
+                                                    <div className={`p-3 rounded-xl border ${getProductAccent(product.id)}`}>
+                                                        <ProductIcon size={18}/>
+                                                    </div>
+                                                    <div className="flex-1">
+                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                            <div className="font-bold text-white">{product.title}</div>
+                                                            {product.kind === 'non_consumable' && owned && (
+                                                                <div className="inline-flex items-center gap-1 text-[10px] font-bold uppercase px-2 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-300">
+                                                                    <CheckCircle2 size={12}/> Owned
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        <div className="text-xs text-zinc-400 mt-1 leading-relaxed">{product.description}</div>
+                                                    </div>
+                                                    <div className="text-right shrink-0">
+                                                        <div className="text-white font-black">{product.priceLabel}</div>
+                                                        <button
+                                                            onClick={() => setPendingProduct(product.id)}
+                                                            disabled={product.kind === 'non_consumable' && owned}
+                                                            className={`mt-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                                                                product.kind === 'non_consumable' && owned
+                                                                    ? 'bg-zinc-900 text-zinc-500 cursor-not-allowed border border-zinc-800'
+                                                                    : 'bg-white text-black hover:bg-zinc-200'
+                                                            }`}
+                                                        >
+                                                            {product.kind === 'consumable' ? 'Add' : owned ? 'Unlocked' : 'Unlock'}
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+
+            {(!showPremiumStore || activeTab === 'REWARDS') && (
+            <>
             {/* Quick Actions */}
             <div className="grid grid-cols-2 gap-4">
                 {/* Cash Ad */}
@@ -42,8 +202,8 @@ export const StorePage: React.FC<StorePageProps> = ({ player, onBack, onWatchAd 
                         <div className="p-2 bg-emerald-500/20 rounded-lg text-emerald-400 group-hover:scale-110 transition-transform"><DollarSign size={24}/></div>
                         <div className="bg-white/10 px-2 py-0.5 rounded text-[10px] font-bold uppercase">Ad</div>
                     </div>
-                    <div className="font-bold text-lg text-white">Get $10,000</div>
-                    <div className="text-xs text-zinc-400">Instant cash injection</div>
+                    <div className="font-bold text-lg text-white">Get $5,000</div>
+                    <div className="text-xs text-zinc-400">Small instant cash injection</div>
                 </button>
 
                 {/* Energy Ad */}
@@ -132,6 +292,37 @@ export const StorePage: React.FC<StorePageProps> = ({ player, onBack, onWatchAd 
             <div className="text-center text-xs text-zinc-600 mt-4">
                 Watch ads to support the game and get rewards.
             </div>
+            </>
+            )}
+
+            {pendingProduct && (
+                <div className="fixed inset-0 z-[160] bg-black/80 backdrop-blur-md flex items-center justify-center p-6">
+                    <div className="w-full max-w-sm rounded-3xl border border-zinc-800 bg-zinc-950 p-6 space-y-4 shadow-2xl">
+                        <div className="text-xl font-black text-white">Confirm Purchase</div>
+                        <div className="text-sm text-zinc-400 leading-relaxed">
+                            Buy <span className="text-white font-bold">{PREMIUM_PRODUCTS.find(product => product.id === pendingProduct)?.title}</span>?
+                            Your reward will only be granted after iOS confirms the purchase.
+                        </div>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setPendingProduct(null)}
+                                className="flex-1 py-3 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-300 font-bold hover:bg-zinc-800"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={() => {
+                                    onPremiumPurchase(pendingProduct);
+                                    setPendingProduct(null);
+                                }}
+                                className="flex-1 py-3 rounded-xl bg-white text-black font-bold hover:bg-zinc-200"
+                            >
+                                Continue
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

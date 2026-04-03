@@ -22,6 +22,7 @@ declare global {
             getPlatform?: () => string;
             Plugins?: {
                 AdMob?: any;
+                Purchases?: any;
             };
         };
         AdMob?: any;

@@ -23,6 +23,7 @@ import { XApp } from './XApp';
 import { YoutubeApp } from './YoutubeApp';
 import { GuideView } from '../../components/GuideView'; // Imported GuideView
 import { getAbsoluteWeek } from '../../services/legacyLogic';
+import { spendPlayerEnergy } from '../../services/premiumLogic';
 
 // Helper Component for App Icon
 const AppIcon = ({ icon, color, label, onClick, badge, customContent, customBg }: any) => (
@@ -231,9 +232,9 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
 
       const updatedPlayer = {
           ...props.player!,
-          activeSponsorships: updatedSponsorships,
-          energy: { ...props.player!.energy, current: props.player!.energy.current - spon.requirements.energyCost }
+          activeSponsorships: updatedSponsorships
       };
+      spendPlayerEnergy(updatedPlayer, spon.requirements.energyCost);
 
       handleUpdatePlayer(updatedPlayer);
       showToast(`${action === 'POST' ? 'Post' : 'Shoot'} Complete!`, 'bg-blue-500');
