@@ -230,6 +230,60 @@ const getProductPriceSweetSpot = (business: Business, product: BusinessProduct):
     };
 };
 
+const getBusinessValuation = (business: Business): number => {
+    const blueprint = BUSINESS_BLUEPRINTS[business.type];
+    const locations = business.stats.locations || 1;
+    const weeksTracked = Math.min(12, Math.max(0, business.history?.length || 0));
+    const recentProfits = [business.stats.weeklyProfit || 0, ...(business.history || []).map(h => h.profit)].slice(0, 8);
+    const avgProfit = recentProfits.length > 0
+        ? recentProfits.reduce((sum, value) => sum + value, 0) / recentProfits.length
+        : 0;
+    const positiveWeeks = recentProfits.filter(value => value > 0).length;
+    const consistency = recentProfits.length > 0 ? positiveWeeks / recentProfits.length : 0;
+    const maturity = Math.min(1, weeksTracked / (business.type === 'PRODUCTION_HOUSE' ? 12 : 8));
+
+    const inventoryAssetValue = (business.products || []).reduce(
+        (sum, product) => sum + ((product.inventory || 0) * (product.productionCost || 0) * 0.65),
+        0
+    );
+
+    const baseAssetMultiplier =
+        business.type === 'PRODUCTION_HOUSE' ? 0.42 :
+        blueprint.model === 'SERVICE' ? 0.6 :
+        0.45;
+
+    const assetBase = (blueprint.baseCost * locations * baseAssetMultiplier) + inventoryAssetValue;
+
+    const earningsMultiple =
+        business.type === 'PRODUCTION_HOUSE' ? 9 :
+        business.type === 'FASHION' ? 10 :
+        business.type === 'MERCH' ? 8 :
+        blueprint.model === 'SERVICE' ? 12 :
+        10;
+
+    const earningsValue = Math.max(0, avgProfit) * earningsMultiple * maturity * (0.45 + consistency * 0.55);
+
+    const brandScore = ((business.stats.brandHealth || 0) * 0.45) + ((business.stats.customerSatisfaction || 0) * 0.35) + ((business.stats.hype || 0) * 0.2);
+    const brandValue = blueprint.baseCost * 0.3 * (brandScore / 100) * (0.4 + maturity * 0.6);
+
+    const studioState = business.studioState;
+    const studioAssetValue = business.type === 'PRODUCTION_HOUSE' && studioState
+        ? (
+            (studioState.scripts?.length || 0) * 1200000 +
+            (studioState.concepts?.length || 0) * 500000 +
+            ((studioState.departments ? Object.values(studioState.departments).reduce((sum, level) => sum + level, 0) : 0) * 350000) +
+            ((studioState.equipment ? Object.values(studioState.equipment).reduce((sum, level) => sum + level, 0) : 0) * 600000)
+        )
+        : 0;
+
+    const downsidePressure =
+        avgProfit < 0 ? Math.min(0.35, Math.abs(avgProfit) / Math.max(blueprint.baseCost, 1)) : 0;
+    const riskMultiplier = Math.max(0.65, Math.min(1.15, 0.9 + (consistency * 0.18) - downsidePressure));
+
+    const valuation = Math.floor((assetBase + earningsValue + brandValue + studioAssetValue) * riskMultiplier);
+    return Math.max(Math.floor(assetBase), valuation);
+};
+
 
 // ... (Keep setup costs, hiring logic) ...
 export const calculateSetupCost = (type: BusinessType, subtype: BusinessSubtype, config: BusinessConfig): number => {
@@ -471,6 +525,7 @@ export const processBusinessWeek = (business: Business, playerFame: number, week
 
     // 3. REVENUE LOGIC
     let revenue = 0;
+    let productCogs = 0;
 
     // --- SERVICE MODEL (PASSIVE BUT STAFF LIMITED) ---
     if (blueprint.model === 'SERVICE') {
@@ -572,8 +627,8 @@ export const processBusinessWeek = (business: Business, playerFame: number, week
                  const toleratedMaxPrice = priceSweetSpot.max * qualityTierTolerance * (b.subtype === 'LUXURY_BRAND' ? 1.12 : 1);
                  const overpricingPenalty = price > toleratedMaxPrice
                     ? Math.max(
-                        b.subtype === 'LUXURY_BRAND' ? 0.22 : 0.16,
-                        1 - ((price - toleratedMaxPrice) / Math.max(toleratedMaxPrice * (b.subtype === 'LUXURY_BRAND' ? 1.8 : 1.2), 1))
+                        b.subtype === 'LUXURY_BRAND' ? 0.18 : 0.08,
+                        1 - ((price - toleratedMaxPrice) / Math.max(toleratedMaxPrice * (b.subtype === 'LUXURY_BRAND' ? 1.35 : 0.85), 1))
                     )
                     : 1;
                  const underpricingPenalty = price < priceSweetSpot.min
@@ -611,6 +666,7 @@ export const processBusinessWeek = (business: Business, playerFame: number, week
                  const actualSales = Math.min(potentialSales, Math.floor(salesCapacity / activeProducts.length));
                  
                  revenue += actualSales * prod.sellingPrice;
+                 productCogs += actualSales * Math.max(1, prod.productionCost || 1);
                  prod.inventory -= actualSales;
                  prod.unitsSold += actualSales;
                  
@@ -637,6 +693,7 @@ export const processBusinessWeek = (business: Business, playerFame: number, week
     
     let cogs = 0;
     if (blueprint.model === 'SERVICE') cogs = Math.floor(revenue * 0.18);
+    if (blueprint.model === 'PRODUCT') cogs = productCogs;
     
     const totalExpenses = totalOpEx + staffWages + cogs + totalMarketingSpend;
     const profit = revenue - totalExpenses;
@@ -647,9 +704,7 @@ export const processBusinessWeek = (business: Business, playerFame: number, week
     b.stats.weeklyProfit = profit;
     b.stats.lifetimeRevenue += revenue;
     
-    // Valuation update (Balance + 1x Yearly Profit approx)
-    const annualProfit = Math.max(0, profit * 52);
-    b.stats.valuation = Math.max(b.stats.valuation, b.balance + annualProfit);
+    b.stats.valuation = getBusinessValuation(b);
     
     // 5. PRODUCTION HOUSE SPECIFIC: SCRIPT DEVELOPMENT
     if (b.type === 'PRODUCTION_HOUSE' && b.studioState) {
@@ -767,7 +822,13 @@ export const sellBusiness = (business: Business): { success: boolean, payout: nu
     if (stats.valuation <= assetValue && avgProfit <= 0) {
          return { success: false, payout: 0, msg: "Investors are not interested. The business is not profitable enough to sell." };
     }
-    const payout = Math.floor(stats.valuation + (business.balance || 0));
+    const maturityTarget =
+        business.type === 'PRODUCTION_HOUSE' ? 12 :
+        blueprint.model === 'PRODUCT' ? 8 :
+        6;
+    const maturityFactor = Math.min(1, (business.history?.length || 0) / maturityTarget);
+    const strategicValue = stats.valuation * (0.35 + (maturityFactor * 0.65));
+    const payout = Math.floor(strategicValue + Math.max(0, business.balance || 0));
     return { success: true, payout, msg: `Sold ${business.name} for $${payout.toLocaleString()}.` };
 };
 

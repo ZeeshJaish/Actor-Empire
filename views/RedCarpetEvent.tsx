@@ -4,6 +4,7 @@ import { Player, PendingEvent, ClothingItem, PressInteraction, ClothingCategory,
 import { CLOTHING_CATALOG, CAR_CATALOG, MOTORCYCLE_CATALOG, BOAT_CATALOG, AIRCRAFT_CATALOG } from '../services/lifestyleLogic';
 import { generatePressInteractions, determineWinners, Nomination } from '../services/awardLogic';
 import { RED_CARPET_INTERVIEWS } from '../services/premiereLogic';
+import { NPC_DATABASE } from '../services/npcLogic';
 import { Camera, Star, Mic2, Shirt, ArrowRight, Trophy, Zap, X, MapPin, Watch, Footprints, Layers, Check, Car, Barcode, Users, Tv, Sparkles, Music, Video, Clapperboard, Globe, FastForward, Glasses, ShoppingBag, Gem } from 'lucide-react';
 
 interface RedCarpetEventProps {
@@ -42,6 +43,35 @@ const upsertAwardRecord = (awards: Award[], nextAward: Award): Award[] => {
             ? { ...award, ...nextAward, id: award.id, outcome: nextAward.outcome === 'WON' ? 'WON' : award.outcome }
             : award
     );
+};
+
+const buildFallbackOpponentNames = (category: string, playerName: string): string[] => {
+    const isActress = category.includes('Actress');
+    const isActor = category.includes('Actor') && !category.includes('Actress');
+    const isDirector = category.includes('Director');
+    const isProjectAward = (category.includes('Picture') || category.includes('Series') || category.includes('Musical') || category.includes('Film')) && !isActor && !isActress && !isDirector;
+
+    if (isProjectAward) {
+        return ['Midnight Echo', 'Glass Kingdom', 'Neon Harbor'];
+    }
+
+    if (isDirector) {
+        return ['Ava Laurent', 'Marcus Vale', 'Elena Cross'];
+    }
+
+    const pool = NPC_DATABASE
+        .filter(npc => {
+            if (isActress) return npc.gender === 'FEMALE';
+            if (isActor) return npc.gender === 'MALE';
+            return true;
+        })
+        .map(npc => npc.name)
+        .filter(name => !!name && name !== playerName);
+
+    const uniqueNames = Array.from(new Set(pool));
+    const shuffled = uniqueNames.sort(() => 0.5 - Math.random());
+
+    return shuffled.slice(0, 3).length > 0 ? shuffled.slice(0, 3) : ['Alex Mercer', 'Jordan Vale', 'Taylor Quinn'];
 };
 
 // --- VISUAL ASSETS ---
@@ -254,9 +284,14 @@ export const RedCarpetEvent: React.FC<RedCarpetEventProps> = ({ player, event, o
                 if (fullBallot && fullBallot[result.nomination.category]) {
                     opponentNames = fullBallot[result.nomination.category]
                         .filter((n: any) => !n.isPlayer)
-                        .map((n: any) => n.nomineeName || n.project.name);
+                        .map((n: any) => n.nomineeName || n.project.name)
+                        .filter((name: string) => !!name && name.trim().length > 0);
                 } else {
-                    opponentNames = ["Rival A", "Rival B", "Rival C"];
+                    opponentNames = buildFallbackOpponentNames(result.nomination.category, player.name);
+                }
+
+                if (opponentNames.length === 0) {
+                    opponentNames = buildFallbackOpponentNames(result.nomination.category, player.name);
                 }
                 
                 // Ensure unique set of names including player
@@ -535,7 +570,7 @@ export const RedCarpetEvent: React.FC<RedCarpetEventProps> = ({ player, event, o
 
     if (phase === 'OUTFIT') {
         return (
-            <div className="fixed inset-0 z-50 bg-[#050505] flex flex-col font-sans">
+            <div className="fixed inset-0 z-50 bg-[#050505] flex flex-col font-sans pt-safe-top">
                 {/* Background Effects */}
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-amber-900/20 via-black to-black pointer-events-none"></div>
                 
@@ -552,7 +587,7 @@ export const RedCarpetEvent: React.FC<RedCarpetEventProps> = ({ player, event, o
                 </div>
 
                 {/* Main Content Area */}
-                <div className="flex-1 relative z-10 flex flex-col px-6 pb-24 overflow-y-auto custom-scrollbar">
+                <div className="flex-1 relative z-10 flex flex-col px-6 pb-safe-xl overflow-y-auto custom-scrollbar">
                     
                     {/* 1. Avatar Preview (The "Mirror") */}
                     <div className="flex justify-center mb-8 relative">
@@ -686,7 +721,7 @@ export const RedCarpetEvent: React.FC<RedCarpetEventProps> = ({ player, event, o
                 </div>
 
                 {/* 3. Footer / Action */}
-                <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black via-black to-transparent z-20">
+                <div className="absolute bottom-0 left-0 right-0 p-6 pb-safe-lg bg-gradient-to-t from-black via-black to-transparent z-20">
                      <button 
                         onClick={handleConfirmOutfit}
                         className={`w-full py-4 rounded-2xl font-bold text-sm shadow-2xl flex items-center justify-center gap-2 transition-all ${

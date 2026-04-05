@@ -251,6 +251,7 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
         const project = sequelSetupProject.project;
         const updatedStudio = { ...studio };
         if (!updatedStudio.studioState) return;
+        const isInternallyControlledTalent = (id: string) => id === 'PLAYER_SELF' || id === 'STUDIO_STAFF';
 
         // Deduct writer fee
         if (writer) {
@@ -271,9 +272,9 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
                 id: details.directorId,
                 originalSalary: dirSalary,
                 newDemand: dirSalary * 1.2, // 20% bump
-                negotiated: false,
-                accepted: false,
-                attemptsLeft: 3
+                negotiated: isInternallyControlledTalent(details.directorId),
+                accepted: isInternallyControlledTalent(details.directorId),
+                attemptsLeft: isInternallyControlledTalent(details.directorId) ? 0 : 3
             });
         }
         
@@ -287,9 +288,9 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
                         id: c.actorId,
                         originalSalary: originalSalary,
                         newDemand: originalSalary * 1.2, // 20% bump
-                        negotiated: false,
-                        accepted: false,
-                        attemptsLeft: 3
+                        negotiated: isInternallyControlledTalent(c.actorId),
+                        accepted: isInternallyControlledTalent(c.actorId),
+                        attemptsLeft: isInternallyControlledTalent(c.actorId) ? 0 : 3
                     });
                 }
             });
@@ -772,10 +773,18 @@ const FinanceModal: React.FC<{
     onUpdatePlayer: (p: Player) => void;
 }> = ({ player, studio, onClose, onUpdatePlayer }) => {
     const [amountStr, setAmountStr] = useState('');
-    const amount = parseInt(amountStr.replace(/,/g, '')) || 0;
+    const [errorMsg, setErrorMsg] = useState('');
+    const amount = parseInt(amountStr.replace(/[^\d]/g, ''), 10) || 0;
 
     const handleInject = () => {
-        if (amount <= 0 || amount > player.money) return;
+        if (amount <= 0) {
+            setErrorMsg('Enter a valid amount to inject.');
+            return;
+        }
+        if (amount > player.money) {
+            setErrorMsg('Not enough personal cash to inject that amount.');
+            return;
+        }
         const updatedStudio = { ...studio, balance: studio.balance + amount };
         const updatedBusinesses = player.businesses.map(b => b.id === studio.id ? updatedStudio : b);
         onUpdatePlayer({
@@ -783,11 +792,19 @@ const FinanceModal: React.FC<{
             money: player.money - amount,
             businesses: updatedBusinesses
         });
+        setErrorMsg('');
         setAmountStr('');
     };
 
     const handleWithdraw = () => {
-        if (amount <= 0 || amount > studio.balance) return;
+        if (amount <= 0) {
+            setErrorMsg('Enter a valid amount to withdraw.');
+            return;
+        }
+        if (amount > studio.balance) {
+            setErrorMsg('Studio capital is lower than that withdrawal amount.');
+            return;
+        }
         const updatedStudio = { ...studio, balance: studio.balance - amount };
         const updatedBusinesses = player.businesses.map(b => b.id === studio.id ? updatedStudio : b);
         onUpdatePlayer({
@@ -795,6 +812,7 @@ const FinanceModal: React.FC<{
             money: player.money + amount,
             businesses: updatedBusinesses
         });
+        setErrorMsg('');
         setAmountStr('');
     };
 
@@ -841,13 +859,23 @@ const FinanceModal: React.FC<{
                                 type="text" 
                                 value={amountStr} 
                                 onChange={(e) => {
-                                    const val = e.target.value.replace(/[^0-9]/g, '');
+                                    const val = e.target.value.replace(/[^\d]/g, '');
+                                    setErrorMsg('');
                                     setAmountStr(val ? parseInt(val).toLocaleString() : '');
                                 }}
                                 placeholder="0"
                                 className="w-full bg-zinc-900 border border-zinc-800 rounded-xl py-4 pl-8 pr-4 text-white font-mono font-bold text-lg focus:border-amber-500 focus:outline-none transition-colors"
                             />
                         </div>
+                        <div className="mt-2 flex items-center justify-between text-[10px] font-bold uppercase tracking-widest">
+                            <span className="text-zinc-500">Available: {formatMoney(player.money)} personal / {formatMoney(studio.balance)} studio</span>
+                            {amount > 0 && <span className="text-zinc-600">Parsed: {formatMoney(amount)}</span>}
+                        </div>
+                        {errorMsg && (
+                            <div className="mt-3 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs font-medium text-rose-300">
+                                {errorMsg}
+                            </div>
+                        )}
                     </div>
 
                     <div className="grid grid-cols-2 gap-3">

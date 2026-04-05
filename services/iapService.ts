@@ -1,3 +1,4 @@
+import { registerPlugin } from '@capacitor/core';
 import { PremiumProductId } from './premiumLogic';
 
 export const IOS_PRODUCT_IDS: Record<PremiumProductId, string> = {
@@ -29,12 +30,60 @@ interface RestoreResult {
     message: string;
 }
 
+interface NativeStoreProduct {
+    productId: string;
+    title: string;
+    description: string;
+    price: number;
+    priceLabel: string;
+    type: string;
+}
+
+interface PurchasesPlugin {
+    getProducts(options: { productIds: string[] }): Promise<{ products?: NativeStoreProduct[] }>;
+    purchaseProduct(options: { productId: string }): Promise<{ cancelled?: boolean; pending?: boolean; productId?: string; transactionId?: string }>;
+    restorePurchases(): Promise<{ productIds?: string[] }>;
+}
+
+export interface PremiumCatalogProduct {
+    premiumProductId: PremiumProductId;
+    storeProductId: string;
+    title: string;
+    description: string;
+    priceLabel: string;
+}
+
 const isCapacitorIOS = () => {
-    const capacitor = window.Capacitor;
-    return capacitor?.isNativePlatform?.() && capacitor?.getPlatform?.() === 'ios';
+    return window.Capacitor?.isNativePlatform?.() && window.Capacitor?.getPlatform?.() === 'ios';
 };
 
-const getPurchasesPlugin = () => window.Capacitor?.Plugins?.Purchases;
+const Purchases = registerPlugin<PurchasesPlugin>('Purchases');
+const getPurchasesPlugin = () => Purchases;
+
+export const getPremiumCatalogProducts = async (): Promise<PremiumCatalogProduct[]> => {
+    if (import.meta.env.DEV || !isCapacitorIOS()) {
+        return [];
+    }
+
+    try {
+        const purchases = getPurchasesPlugin();
+        const result = await purchases.getProducts({ productIds: Object.values(IOS_PRODUCT_IDS) });
+        const products = result?.products || [];
+
+        return Object.entries(IOS_PRODUCT_IDS).map(([premiumProductId, storeProductId]) => {
+            const match = products.find(product => product.productId === storeProductId);
+            return {
+                premiumProductId: premiumProductId as PremiumProductId,
+                storeProductId,
+                title: match?.title || '',
+                description: match?.description || '',
+                priceLabel: match?.priceLabel || ''
+            };
+        }).filter(product => !!product.priceLabel);
+    } catch {
+        return [];
+    }
+};
 
 export const purchasePremiumProduct = async (productId: PremiumProductId): Promise<PurchaseResult> => {
     if (import.meta.env.DEV) {
@@ -55,6 +104,9 @@ export const purchasePremiumProduct = async (productId: PremiumProductId): Promi
         const result = await purchases.purchaseProduct({ productId: storeProductId });
         if (result?.cancelled) {
             return { success: false, cancelled: true, message: 'Purchase cancelled.' };
+        }
+        if (result?.pending) {
+            return { success: false, message: 'Purchase is pending approval.' };
         }
         return { success: true, message: 'Purchase confirmed.' };
     } catch (error: any) {
@@ -80,7 +132,7 @@ export const restorePremiumPurchases = async (): Promise<RestoreResult> => {
 
     try {
         const result = await purchases.restorePurchases();
-        const rawIds = result?.productIds || result?.products || [];
+        const rawIds = result?.productIds || [];
         const restoredProductIds = Object.entries(IOS_PRODUCT_IDS)
             .filter(([, storeId]) => rawIds.includes(storeId))
             .map(([premiumId]) => premiumId as PremiumProductId);

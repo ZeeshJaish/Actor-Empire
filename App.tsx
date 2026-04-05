@@ -31,6 +31,7 @@ import { saveGameData, loadGameData, deleteGameData } from './services/storage';
 import { createBloodlineSnapshot, getAbsoluteWeek, getLegacyInheritancePreview, getRelationshipAge, inheritActorSkills, LEGACY_MIN_PLAYABLE_AGE } from './services/legacyLogic';
 import { applyPremiumPurchase, hasNoAds, PremiumProductId, restoreWeeklyEnergy, spendPlayerEnergy, syncEnergyDisplay } from './services/premiumLogic';
 import { purchasePremiumProduct, restorePremiumPurchases } from './services/iapService';
+import { RoleType } from './types';
 
 type GameStatus = 'START_MENU' | 'CREATION' | 'PLAYING' | 'DEATH_SCREEN';
 
@@ -92,6 +93,16 @@ const normalizeStreamingState = (streaming: Partial<StreamingState> | undefined,
     ...(typeof streaming?.startWeek === 'number' ? { startWeek: streaming.startWeek } : {}),
 });
 
+const derivePlayerRoleType = (
+    roleType: string | undefined,
+    details?: Partial<ProjectDetails>,
+    castList?: any[]
+): RoleType => {
+    const playerCastEntry = (castList || details?.castList || []).find((member: any) => member?.actorId === 'PLAYER_SELF');
+    if (playerCastEntry?.roleType) return playerCastEntry.roleType as RoleType;
+    return (roleType as RoleType) || 'LEAD';
+};
+
 const normalizeActiveRelease = (release: Partial<ActiveRelease>): ActiveRelease => {
     const projectDetails = normalizeProjectDetails(release.projectDetails);
     const distributionPhase = release.distributionPhase || 'THEATRICAL';
@@ -100,7 +111,7 @@ const normalizeActiveRelease = (release: Partial<ActiveRelease>): ActiveRelease 
         id: release.id || `release_${Date.now()}`,
         name: release.name || projectDetails.title,
         type: release.type || projectDetails.type,
-        roleType: release.roleType || 'LEAD',
+        roleType: derivePlayerRoleType(release.roleType, projectDetails),
         projectDetails,
         distributionPhase,
         weekNum: typeof release.weekNum === 'number' ? release.weekNum : 1,
@@ -128,7 +139,7 @@ const normalizePastProject = (project: Partial<PastProject>): PastProject => ({
     id: project.id || `past_${Date.now()}`,
     name: project.name || 'Untitled Project',
     type: 'ACTING_GIG',
-    roleType: project.roleType || 'LEAD',
+    roleType: derivePlayerRoleType(project.roleType, undefined, project.castList as any[] | undefined),
     year: typeof project.year === 'number' ? project.year : 1,
     earnings: typeof project.earnings === 'number' ? project.earnings : 0,
     rating: typeof project.rating === 'number' ? project.rating : 0,
@@ -439,10 +450,10 @@ export const App: React.FC = () => {
           // Ensure Pools
           if (!safePlayer.team.availableAgents?.length) safePlayer.team.availableAgents = getRandomAgents(3);
           if (!safePlayer.team.availableManagers?.length) safePlayer.team.availableManagers = getRandomManagers(2);
-          if (!safePlayer.team.availableTrainers) safePlayer.team.availableTrainers = getRandomTrainers(2);
-          if (!safePlayer.team.availableStylists) safePlayer.team.availableStylists = getRandomStylists(2);
-          if (!safePlayer.team.availableTherapists) safePlayer.team.availableTherapists = getRandomTherapists(2);
-          if (!safePlayer.team.availablePublicists) safePlayer.team.availablePublicists = getRandomPublicists(2);
+          if (!Array.isArray(safePlayer.team.availableTrainers) || safePlayer.team.availableTrainers.length === 0) safePlayer.team.availableTrainers = getRandomTrainers(2);
+          if (!Array.isArray(safePlayer.team.availableStylists) || safePlayer.team.availableStylists.length === 0) safePlayer.team.availableStylists = getRandomStylists(2);
+          if (!Array.isArray(safePlayer.team.availableTherapists) || safePlayer.team.availableTherapists.length === 0) safePlayer.team.availableTherapists = getRandomTherapists(2);
+          if (!Array.isArray(safePlayer.team.availablePublicists) || safePlayer.team.availablePublicists.length === 0) safePlayer.team.availablePublicists = getRandomPublicists(2);
 
           // Ensure Arrays
           if (!Array.isArray(safePlayer.commitments)) safePlayer.commitments = [];
@@ -451,9 +462,10 @@ export const App: React.FC = () => {
           safePlayer.activeReleases = safePlayer.activeReleases.map((release: any) => normalizeActiveRelease(release));
           if (!Array.isArray(safePlayer.pastProjects)) safePlayer.pastProjects = [];
           safePlayer.pastProjects = safePlayer.pastProjects.map((project: any) => normalizePastProject(project));
-          if (!safePlayer.news) safePlayer.news = [];
-          if (!safePlayer.inbox) safePlayer.inbox = [];
-          if (!safePlayer.activeSponsorships) safePlayer.activeSponsorships = [];
+          if (!Array.isArray(safePlayer.news)) safePlayer.news = [];
+          if (!Array.isArray(safePlayer.inbox)) safePlayer.inbox = [];
+          if (!Array.isArray(safePlayer.activeSponsorships)) safePlayer.activeSponsorships = [];
+          if (!Array.isArray(safePlayer.applications)) safePlayer.applications = [];
           if (!safePlayer.studioMemory) safePlayer.studioMemory = {} as any;
           if (!Array.isArray(safePlayer.pendingEvents)) safePlayer.pendingEvents = [];
           if (!Array.isArray(safePlayer.logs)) safePlayer.logs = [];
@@ -464,17 +476,35 @@ export const App: React.FC = () => {
           const fallbackHandle = `@${safePlayer.name.replace(/\s+/g, '_').toLowerCase()}`;
 
           if (!safePlayer.instagram) safePlayer.instagram = { ...INITIAL_PLAYER.instagram, handle: fallbackHandle };
-          if (!safePlayer.instagram.feed) safePlayer.instagram.feed = [];
+          if (!Array.isArray(safePlayer.instagram.feed)) safePlayer.instagram.feed = [];
+          if (!Array.isArray(safePlayer.instagram.posts)) safePlayer.instagram.posts = [];
           if (!safePlayer.instagram.npcStates) safePlayer.instagram.npcStates = {};
+          if (typeof safePlayer.instagram.weeklyPostCount !== 'number') safePlayer.instagram.weeklyPostCount = 0;
+          if (typeof safePlayer.instagram.lastPostWeek !== 'number') safePlayer.instagram.lastPostWeek = 0;
 
           if (!safePlayer.x) safePlayer.x = { handle: safePlayer.instagram.handle, followers: 0, posts: [], feed: [], lastPostWeek: 0 };
           // HYDRATION FIX: If loading old save without x.followers, init it based on existing fame
           if (typeof safePlayer.x.followers !== 'number') {
               safePlayer.x.followers = Math.floor(safePlayer.stats.followers * 0.1) || 20;
           }
+          if (!Array.isArray(safePlayer.x.posts)) safePlayer.x.posts = [];
+          if (!Array.isArray(safePlayer.x.feed)) safePlayer.x.feed = [];
+          if (typeof safePlayer.x.lastPostWeek !== 'number') safePlayer.x.lastPostWeek = 0;
 
           if (!safePlayer.youtube) safePlayer.youtube = { ...INITIAL_PLAYER.youtube, handle: safePlayer.instagram.handle };
+          if (!Array.isArray(safePlayer.youtube.videos)) safePlayer.youtube.videos = [];
           if (!safePlayer.youtube.bannerColor) safePlayer.youtube.bannerColor = 'bg-gradient-to-r from-red-900 to-zinc-900';
+          if (typeof safePlayer.youtube.subscribers !== 'number') safePlayer.youtube.subscribers = 0;
+          if (typeof safePlayer.youtube.lifetimeEarnings !== 'number') safePlayer.youtube.lifetimeEarnings = 0;
+          if (typeof safePlayer.youtube.totalChannelViews !== 'number') safePlayer.youtube.totalChannelViews = 0;
+          if (typeof safePlayer.youtube.isMonetized !== 'boolean') safePlayer.youtube.isMonetized = false;
+
+          if (!safePlayer.finance || typeof safePlayer.finance !== 'object') {
+              safePlayer.finance = { history: [], yearly: [] };
+          } else {
+              if (!Array.isArray(safePlayer.finance.history)) safePlayer.finance.history = [];
+              if (!Array.isArray(safePlayer.finance.yearly)) safePlayer.finance.yearly = [];
+          }
 
           if (!safePlayer.relationships || safePlayer.relationships.length === 0) safePlayer.relationships = [...INITIAL_PLAYER.relationships];
           
@@ -518,9 +548,9 @@ export const App: React.FC = () => {
 
           if (safePlayer.instagram.feed.length === 0) safePlayer.instagram.feed = generateWeeklyFeed(safePlayer);
           
-          if (!safePlayer.awards) safePlayer.awards = [];
+          if (!Array.isArray(safePlayer.awards)) safePlayer.awards = [];
           safePlayer.awards = dedupeAwards(safePlayer.awards);
-          if (!safePlayer.scheduledEvents) safePlayer.scheduledEvents = [];
+          if (!Array.isArray(safePlayer.scheduledEvents)) safePlayer.scheduledEvents = [];
           if (!safePlayer.dating) safePlayer.dating = { isTinderActive: false, isLuxeActive: false, preferences: { gender: 'ALL', minAge: 18, maxAge: 35 }, matches: [] };
           if (!safePlayer.flags) safePlayer.flags = {};
           if (typeof safePlayer.flags.weeklyBaseEnergyRemaining !== 'number') {
@@ -569,26 +599,36 @@ export const App: React.FC = () => {
   };
 
   const handleNextWeek = async () => {
+    if (isProcessing) return;
     setIsProcessing(true);
-    const { player: newPlayerState, triggerAd } = await processGameWeek(player);
-    handleUpdatePlayer(newPlayerState);
-    setIsProcessing(false);
+    try {
+        const { player: newPlayerState, triggerAd } = await processGameWeek(player);
+        handleUpdatePlayer(newPlayerState);
 
-    if (newPlayerState.flags?.isDead) {
-        setGameStatus('DEATH_SCREEN');
-        return;
-    }
+        if (newPlayerState.flags?.isDead) {
+            setGameStatus('DEATH_SCREEN');
+            return;
+        }
 
-    // Debt Check
-    if (newPlayerState.money < 0) {
-        setShowDebtModal(true);
-    }
+        // Debt Check
+        if (newPlayerState.money < 0) {
+            setShowDebtModal(true);
+        }
 
-    // INTERSTITIAL AD TRIGGER (Every 12 Weeks)
-    if (triggerAd && !hasNoAds(newPlayerState)) {
-        setTimeout(async () => {
-            await showAd('INTERSTITIAL');
-        }, 800);
+        // INTERSTITIAL AD TRIGGER (Every 12 Weeks)
+        if (triggerAd && !hasNoAds(newPlayerState)) {
+            setTimeout(async () => {
+                await showAd('INTERSTITIAL');
+            }, 800);
+        }
+    } catch (error) {
+        console.error('Week processing failed:', error);
+        setToastMessage({
+            title: "Week Processing Failed",
+            subtext: "The week could not finish. Please try again."
+        });
+    } finally {
+        setIsProcessing(false);
     }
   };
 
@@ -1175,12 +1215,12 @@ export const App: React.FC = () => {
         {gameStatus === 'CREATION' && <CreationMenu onStartGame={handleStartGame} />}
         {gameStatus === 'PLAYING' && (
             <>
-                <div className={`flex-1 p-5 overflow-y-auto custom-scrollbar ${player.money < 0 ? 'pt-8' : ''}`}>
+                <div className={`flex-1 px-5 pt-5 pb-28 overflow-y-auto custom-scrollbar ${player.money < 0 ? 'pt-8' : ''}`}>
                     {activePage === Page.HOME && (<HomePage player={player} onNextWeek={handleNextWeek} isProcessing={isProcessing} onUpdatePlayer={handleUpdatePlayer} setPage={setActivePage} />)}
                     {activePage === Page.CAREER && (<CareerPage player={player} onQuitJob={handleQuitJob} onRehearse={handleRehearse} />)}
                     {activePage === Page.IMPROVE && (<ImprovePage player={player} onTrain={()=>{}} onEnroll={(c)=>handleGenericUpdate(p=>({ ...p, money: p.money- (c.upfrontCost||0), commitments: [...p.commitments, {...c, id: `c_${Date.now()}`, weeksCompleted:0}] }))} onCancel={(id)=>handleGenericUpdate(p=>({ ...p, commitments: p.commitments.filter(c=>c.id!==id)}))} onPerformAction={handleImproveAction} />)}
                     {activePage === Page.SOCIAL && (<SocialPage player={player} onInteract={handleSocialInteract} onContinueAsChild={handleContinueAsChild} />)}
-                    {activePage === Page.LIFESTYLE && (<LifestylePage player={player} onBuyItem={(i)=>handleGenericUpdate(p=>({ ...p, money: p.money-i.price, assets: [...p.assets, i.id], customItems: i.id.includes('_cust_') ? [...p.customItems, i as any] : p.customItems }))} onSellItem={(id)=>handleGenericUpdate(p=>{ const it = [...PROPERTY_CATALOG, ...CAR_CATALOG, ...CLOTHING_CATALOG].find(x=>x.id===id); return { ...p, money: p.money + (it ? it.price*0.5 : 0), assets: p.assets.filter(a=>a!==id) }; })} onSetResidence={(id)=>handleGenericUpdate(p=>({ ...p, residenceId: id }))} onSetActiveStyle={(s)=>handleGenericUpdate(p=>({ ...p, activeClothingStyle: s }))} onStartBusiness={()=>{}} onShutdownBusiness={()=>{}} onUpdatePlayer={handleUpdatePlayer} />)}
+                    {activePage === Page.LIFESTYLE && (<LifestylePage player={player} onBuyItem={(i)=>handleGenericUpdate(p=>({ ...p, money: p.money-i.price, assets: [...p.assets, i.id], customItems: i.id.includes('_cust_') ? [...p.customItems, i as any] : p.customItems }))} onSellItem={(id)=>handleGenericUpdate(p=>{ const it = [...PROPERTY_CATALOG, ...CAR_CATALOG, ...CLOTHING_CATALOG].find(x=>x.id===id); return { ...p, money: p.money + (it ? it.price*0.5 : 0), assets: p.assets.filter(a=>a!==id) }; })} onSetResidence={(id)=>handleGenericUpdate(p=>({ ...p, residenceId: id }))} onSetActiveStyle={(s)=>handleGenericUpdate(p=>({ ...p, activeClothingStyle: s }))} onStartBusiness={()=>{}} onShutdownBusiness={()=>{}} onUpdatePlayer={handleUpdatePlayer} onPremiumPurchase={handlePremiumPurchase} />)}
                     {activePage === Page.MOBILE && (
                         <MobilePage 
                             player={player} 

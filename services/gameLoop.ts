@@ -1,5 +1,5 @@
 
-import { Player, Commitment, ActiveRelease, StreamingState, LogEntry, NegotiationData, ActorSkills, Application, AuditionOpportunity, ProjectDetails, ScheduledEvent, TransactionCategory, Transaction, YearlyFinance, Message, IndustryProject, TeamMember, Business, InstaPost, XPost, WriterStats, DirectorStats, PlatformId, LegalCase, LifeEvent } from '../types';
+import { Player, Commitment, ActiveRelease, StreamingState, LogEntry, NegotiationData, ActorSkills, Application, AuditionOpportunity, ProjectDetails, ScheduledEvent, TransactionCategory, Transaction, YearlyFinance, Message, IndustryProject, TeamMember, Business, InstaPost, XPost, WriterStats, DirectorStats, PlatformId, LegalCase, LifeEvent, RoleType } from '../types';
 import { PROPERTY_CATALOG, BUSINESS_CATALOG, CAR_CATALOG, MOTORCYCLE_CATALOG, BOAT_CATALOG, AIRCRAFT_CATALOG, CLOTHING_CATALOG } from './lifestyleLogic';
 import { 
     calculateGlobalTalent, 
@@ -76,6 +76,32 @@ const getWeeksSince = (postWeek: number, postYear: number, currentWeek: number, 
     return ((currentYear - postYear) * 52) + (currentWeek - postWeek);
 };
 
+const withTimeout = async <T,>(promise: Promise<T>, timeoutMs: number, fallback: T): Promise<T> => {
+    try {
+        const result = await Promise.race<T>([
+            promise,
+            new Promise<T>(resolve => setTimeout(() => resolve(fallback), timeoutMs))
+        ]);
+        return result;
+    } catch {
+        return fallback;
+    }
+};
+
+const ensureFiniteNumber = (value: any, fallback = 0): number => {
+    return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+};
+
+const ensureObjectArray = <T extends Record<string, any>>(value: any): T[] => {
+    return Array.isArray(value) ? value.filter(item => item && typeof item === 'object') as T[] : [];
+};
+
+const getPlayerProjectRoleType = (roleType: string | undefined, castList?: any[]): RoleType => {
+    const playerCastEntry = castList?.find((member: any) => member?.actorId === 'PLAYER_SELF');
+    if (playerCastEntry?.roleType) return playerCastEntry.roleType as RoleType;
+    return (roleType as RoleType) || 'MINOR';
+};
+
 // Returns updated player AND a flag if an ad should be triggered
 export const processGameWeek = async (player: Player): Promise<{ player: Player, triggerAd: boolean }> => {
     let nextPlayer = JSON.parse(JSON.stringify(player)) as Player;
@@ -89,6 +115,8 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
     if (!nextPlayer.finance) {
         nextPlayer.finance = { history: [], yearly: [] };
     }
+    if (!Array.isArray(nextPlayer.finance.history)) nextPlayer.finance.history = [];
+    if (!Array.isArray(nextPlayer.finance.yearly)) nextPlayer.finance.yearly = [];
     if (!nextPlayer.world) {
         nextPlayer.world = { 
             projects: [], 
@@ -99,6 +127,11 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
             upcomingRivals: []
         };
     }
+    if (!Array.isArray(nextPlayer.world.projects)) nextPlayer.world.projects = [];
+    if (!nextPlayer.world.universes || typeof nextPlayer.world.universes !== 'object') nextPlayer.world.universes = {} as any;
+    if (!Array.isArray(nextPlayer.world.famousMoviesReleased)) nextPlayer.world.famousMoviesReleased = [];
+    if (!Array.isArray(nextPlayer.world.awardHistory)) nextPlayer.world.awardHistory = [];
+    if (!Array.isArray(nextPlayer.world.upcomingRivals)) nextPlayer.world.upcomingRivals = [];
     if (!nextPlayer.studio) {
         nextPlayer.studio = {
             isUnlocked: false,
@@ -107,16 +140,185 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
             lastTalentRefreshWeek: 0
         };
     }
-    if (!nextPlayer.studio.talentRoster) nextPlayer.studio.talentRoster = [];
-    if (!nextPlayer.flags.extraNPCs) nextPlayer.flags.extraNPCs = [];
-    if (!nextPlayer.world.famousMoviesReleased) nextPlayer.world.famousMoviesReleased = []; 
-    if (!nextPlayer.world.awardHistory) nextPlayer.world.awardHistory = []; 
-    
+    if (!Array.isArray(nextPlayer.studio.talentRoster)) nextPlayer.studio.talentRoster = [];
+    if (!nextPlayer.flags) nextPlayer.flags = {};
+    if (!Array.isArray(nextPlayer.flags.extraNPCs)) nextPlayer.flags.extraNPCs = [];
+    if (!nextPlayer.team) nextPlayer.team = { availableAgents: [], availableManagers: [], availableTrainers: [], availableStylists: [], availableTherapists: [], availablePublicists: [] } as any;
+    if (!Array.isArray(nextPlayer.team.availableAgents)) nextPlayer.team.availableAgents = [];
+    if (!Array.isArray(nextPlayer.team.availableManagers)) nextPlayer.team.availableManagers = [];
+    if (!Array.isArray(nextPlayer.team.availableTrainers)) nextPlayer.team.availableTrainers = [];
+    if (!Array.isArray(nextPlayer.team.availableStylists)) nextPlayer.team.availableStylists = [];
+    if (!Array.isArray(nextPlayer.team.availableTherapists)) nextPlayer.team.availableTherapists = [];
+    if (!Array.isArray(nextPlayer.team.availablePublicists)) nextPlayer.team.availablePublicists = [];
+    nextPlayer.commitments = ensureObjectArray<Commitment>(nextPlayer.commitments).map(commitment => ({
+        ...commitment,
+        energyCost: ensureFiniteNumber(commitment.energyCost),
+        income: ensureFiniteNumber(commitment.income),
+        weeklyCost: ensureFiniteNumber(commitment.weeklyCost),
+        lumpSum: commitment.lumpSum === undefined ? undefined : ensureFiniteNumber(commitment.lumpSum),
+        agentCommission: commitment.agentCommission === undefined ? undefined : ensureFiniteNumber(commitment.agentCommission),
+        royaltyPercentage: commitment.royaltyPercentage === undefined ? undefined : ensureFiniteNumber(commitment.royaltyPercentage),
+        phaseWeeksLeft: commitment.phaseWeeksLeft === undefined ? undefined : ensureFiniteNumber(commitment.phaseWeeksLeft, 1),
+        totalPhaseDuration: commitment.totalPhaseDuration === undefined ? undefined : ensureFiniteNumber(commitment.totalPhaseDuration),
+        weeksCompleted: commitment.weeksCompleted === undefined ? undefined : ensureFiniteNumber(commitment.weeksCompleted),
+        totalDuration: commitment.totalDuration === undefined ? undefined : ensureFiniteNumber(commitment.totalDuration),
+        durationLeft: commitment.durationLeft === undefined ? undefined : ensureFiniteNumber(commitment.durationLeft),
+        projectDetails: commitment.projectDetails && typeof commitment.projectDetails === 'object'
+            ? {
+                ...commitment.projectDetails,
+                hiddenStats: {
+                    ...(commitment.projectDetails.hiddenStats || {})
+                },
+                castList: ensureObjectArray(commitment.projectDetails.castList),
+                reviews: ensureObjectArray(commitment.projectDetails.reviews)
+            }
+            : commitment.projectDetails
+    }) as Commitment);
+    nextPlayer.activeReleases = ensureObjectArray<ActiveRelease>(nextPlayer.activeReleases).map(release => ({
+        ...release,
+        roleType: getPlayerProjectRoleType(release.roleType, release.projectDetails?.castList),
+        weekNum: ensureFiniteNumber(release.weekNum, 1),
+        weeklyGross: Array.isArray(release.weeklyGross) ? release.weeklyGross.map(gross => ensureFiniteNumber(gross)).filter(gross => gross >= 0) : [],
+        totalGross: ensureFiniteNumber(release.totalGross),
+        budget: ensureFiniteNumber(release.budget),
+        imdbRating: release.imdbRating === undefined ? undefined : ensureFiniteNumber(release.imdbRating),
+        productionPerformance: ensureFiniteNumber(release.productionPerformance, 50),
+        sequelDecisionWeek: release.sequelDecisionWeek === undefined ? undefined : ensureFiniteNumber(release.sequelDecisionWeek),
+        promotionalBuzz: ensureFiniteNumber(release.promotionalBuzz),
+        streamingRevenue: ensureFiniteNumber(release.streamingRevenue),
+        royaltyPercentage: release.royaltyPercentage === undefined ? undefined : ensureFiniteNumber(release.royaltyPercentage),
+        studioRoyaltyPercentage: release.studioRoyaltyPercentage === undefined ? undefined : ensureFiniteNumber(release.studioRoyaltyPercentage),
+        maxTheatricalWeeks: release.maxTheatricalWeeks === undefined ? undefined : ensureFiniteNumber(release.maxTheatricalWeeks),
+        projectDetails: release.projectDetails && typeof release.projectDetails === 'object'
+            ? {
+                ...release.projectDetails,
+                hiddenStats: {
+                    ...(release.projectDetails.hiddenStats || {})
+                },
+                castList: ensureObjectArray(release.projectDetails.castList),
+                reviews: ensureObjectArray(release.projectDetails.reviews)
+            }
+            : {
+                hiddenStats: {},
+                castList: [],
+                reviews: []
+            } as any,
+        streaming: release.streaming && typeof release.streaming === 'object'
+            ? {
+                ...release.streaming,
+                weekOnPlatform: ensureFiniteNumber(release.streaming.weekOnPlatform, 1),
+                totalViews: ensureFiniteNumber(release.streaming.totalViews),
+                weeklyViews: Array.isArray(release.streaming.weeklyViews) ? release.streaming.weeklyViews.map(views => ensureFiniteNumber(views)).filter(views => views >= 0) : []
+            }
+            : release.streaming,
+        bids: ensureObjectArray(release.bids).map(bid => ({
+            ...bid,
+            platformId: bid.platformId,
+            upfront: ensureFiniteNumber(bid.upfront),
+            royalty: ensureFiniteNumber(bid.royalty),
+            duration: ensureFiniteNumber(bid.duration, 52)
+        }))
+    }) as ActiveRelease);
+    nextPlayer.pastProjects = ensureObjectArray(nextPlayer.pastProjects);
+    nextPlayer.applications = ensureObjectArray<Application>(nextPlayer.applications).map(app => ({
+        ...app,
+        weeksRemaining: ensureFiniteNumber(app.weeksRemaining, 1)
+    }));
+    nextPlayer.activeSponsorships = ensureObjectArray(nextPlayer.activeSponsorships).map((spon: any) => ({
+        ...spon,
+        weeklyPay: ensureFiniteNumber(spon.weeklyPay),
+        durationWeeks: ensureFiniteNumber(spon.durationWeeks),
+        weeksCompleted: ensureFiniteNumber(spon.weeksCompleted),
+        penalty: ensureFiniteNumber(spon.penalty),
+        requirements: {
+            ...(spon.requirements || {}),
+            progress: ensureFiniteNumber(spon.requirements?.progress),
+            totalRequired: ensureFiniteNumber(spon.requirements?.totalRequired, 1),
+            energyCost: ensureFiniteNumber(spon.requirements?.energyCost)
+        }
+    }));
+    nextPlayer.inbox = ensureObjectArray<Message>(nextPlayer.inbox);
+    nextPlayer.news = ensureObjectArray(nextPlayer.news);
+    nextPlayer.relationships = ensureObjectArray(nextPlayer.relationships);
+    nextPlayer.scheduledEvents = ensureObjectArray<ScheduledEvent>(nextPlayer.scheduledEvents).map(event => ({
+        ...event,
+        week: ensureFiniteNumber(event.week, nextPlayer.currentWeek),
+        data: event.data && typeof event.data === 'object' ? event.data : {}
+    }));
+    nextPlayer.awards = ensureObjectArray(nextPlayer.awards);
+    nextPlayer.logs = ensureObjectArray(nextPlayer.logs);
+    nextPlayer.pendingEvents = ensureObjectArray(nextPlayer.pendingEvents);
+    nextPlayer.portfolio = ensureObjectArray(nextPlayer.portfolio).map((holding: any) => ({
+        ...holding,
+        shares: ensureFiniteNumber(holding.shares)
+    })).filter((holding: any) => typeof holding.stockId === 'string' && holding.shares > 0);
+    nextPlayer.businesses = ensureObjectArray<Business>(nextPlayer.businesses).map(business => ({
+        ...business,
+        balance: ensureFiniteNumber((business as any).balance),
+        stats: {
+            ...((business as any).stats || {}),
+            weeklyRevenue: ensureFiniteNumber((business as any).stats?.weeklyRevenue),
+            weeklyExpenses: ensureFiniteNumber((business as any).stats?.weeklyExpenses),
+            weeklyProfit: ensureFiniteNumber((business as any).stats?.weeklyProfit),
+            lifetimeRevenue: ensureFiniteNumber((business as any).stats?.lifetimeRevenue),
+            valuation: ensureFiniteNumber((business as any).stats?.valuation)
+        },
+        studioState: business.type === 'PRODUCTION_HOUSE' && business.studioState && typeof business.studioState === 'object'
+            ? {
+                ...business.studioState,
+                talentRoster: ensureObjectArray(business.studioState.talentRoster),
+                activeProjects: ensureObjectArray((business.studioState as any).activeProjects),
+                library: ensureObjectArray((business.studioState as any).library),
+                bids: ensureObjectArray((business.studioState as any).bids)
+            }
+            : business.studioState
+    }));
+    if (!nextPlayer.studioMemory || typeof nextPlayer.studioMemory !== 'object') nextPlayer.studioMemory = {} as any;
+    if (!nextPlayer.weeklyOpportunities || typeof nextPlayer.weeklyOpportunities !== 'object') nextPlayer.weeklyOpportunities = { auditions: [], jobs: [] };
+    if (!Array.isArray(nextPlayer.weeklyOpportunities.auditions)) nextPlayer.weeklyOpportunities.auditions = [];
+    if (!Array.isArray(nextPlayer.weeklyOpportunities.jobs)) nextPlayer.weeklyOpportunities.jobs = [];
+    if (!nextPlayer.instagram || typeof nextPlayer.instagram !== 'object') nextPlayer.instagram = { handle: '@player', followers: 0, posts: [], feed: [], npcStates: {}, weeklyPostCount: 0, lastPostWeek: 0 } as any;
+    if (!Array.isArray(nextPlayer.instagram.posts)) nextPlayer.instagram.posts = [];
+    if (!Array.isArray(nextPlayer.instagram.feed)) nextPlayer.instagram.feed = [];
+    if (!nextPlayer.instagram.npcStates || typeof nextPlayer.instagram.npcStates !== 'object') nextPlayer.instagram.npcStates = {};
+    if (typeof nextPlayer.instagram.weeklyPostCount !== 'number') nextPlayer.instagram.weeklyPostCount = 0;
+    if (typeof nextPlayer.instagram.lastPostWeek !== 'number') nextPlayer.instagram.lastPostWeek = 0;
+    if (!nextPlayer.x || typeof nextPlayer.x !== 'object') nextPlayer.x = { handle: nextPlayer.instagram.handle || '@player', followers: 0, posts: [], feed: [], lastPostWeek: 0 } as any;
+    if (!Array.isArray(nextPlayer.x.posts)) nextPlayer.x.posts = [];
+    if (!Array.isArray(nextPlayer.x.feed)) nextPlayer.x.feed = [];
+    if (typeof nextPlayer.x.followers !== 'number') nextPlayer.x.followers = 0;
+    if (typeof nextPlayer.x.lastPostWeek !== 'number') nextPlayer.x.lastPostWeek = 0;
+    if (!nextPlayer.youtube || typeof nextPlayer.youtube !== 'object') nextPlayer.youtube = { handle: nextPlayer.instagram.handle || '@player', subscribers: 0, videos: [], lifetimeEarnings: 0, isMonetized: false, bannerColor: 'bg-gradient-to-r from-red-900 to-zinc-900', totalChannelViews: 0 } as any;
+    nextPlayer.youtube.videos = ensureObjectArray(nextPlayer.youtube.videos).map((video: any) => ({
+        ...video,
+        views: ensureFiniteNumber(video.views),
+        likes: ensureFiniteNumber(video.likes),
+        earnings: ensureFiniteNumber(video.earnings),
+        weekUploaded: ensureFiniteNumber(video.weekUploaded, nextPlayer.currentWeek),
+        yearUploaded: ensureFiniteNumber(video.yearUploaded, nextPlayer.age),
+        qualityScore: ensureFiniteNumber(video.qualityScore, 50),
+        weeklyHistory: Array.isArray(video.weeklyHistory) ? video.weeklyHistory.map((value: any) => ensureFiniteNumber(value)) : [],
+        comments: ensureObjectArray(video.comments)
+    }));
+    if (typeof nextPlayer.youtube.subscribers !== 'number') nextPlayer.youtube.subscribers = 0;
+    if (typeof nextPlayer.youtube.lifetimeEarnings !== 'number') nextPlayer.youtube.lifetimeEarnings = 0;
+    if (typeof nextPlayer.youtube.isMonetized !== 'boolean') nextPlayer.youtube.isMonetized = false;
+    if (typeof nextPlayer.youtube.totalChannelViews !== 'number') nextPlayer.youtube.totalChannelViews = 0;
+    if (!nextPlayer.youtube.bannerColor) nextPlayer.youtube.bannerColor = 'bg-gradient-to-r from-red-900 to-zinc-900';
+    nextPlayer.instagram.posts = ensureObjectArray(nextPlayer.instagram.posts);
+    nextPlayer.instagram.feed = ensureObjectArray(nextPlayer.instagram.feed);
+    nextPlayer.x.posts = ensureObjectArray(nextPlayer.x.posts);
+    nextPlayer.x.feed = ensureObjectArray(nextPlayer.x.feed);
+    if (!nextPlayer.world.platforms || typeof nextPlayer.world.platforms !== 'object') nextPlayer.world.platforms = {} as any;
+    if (!Array.isArray(nextPlayer.flags.pendingFeedback)) nextPlayer.flags.pendingFeedback = [];
+    nextPlayer.flags.pendingFeedback = ensureObjectArray(nextPlayer.flags.pendingFeedback);
+    if (!Array.isArray(nextPlayer.flags.activeCases)) nextPlayer.flags.activeCases = [];
+    nextPlayer.flags.activeCases = ensureObjectArray(nextPlayer.flags.activeCases);
+
     // Ensure Youtube Init
     if (!nextPlayer.youtube.totalChannelViews) nextPlayer.youtube.totalChannelViews = nextPlayer.youtube.videos.reduce((a,b) => a + b.views, 0);
 
     // RESET TEAM CHANGE FLAGS
-    if (!nextPlayer.flags) nextPlayer.flags = {};
     nextPlayer.flags.teamChangeLocked = false; 
 
     // --- DEBT CHECK ---
@@ -143,13 +345,14 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
     
     // Transaction Helper
     const addTransaction = (amount: number, category: TransactionCategory, description: string) => {
-        if (amount === 0) return;
-        nextPlayer.money += amount;
+        const safeAmount = Math.trunc(ensureFiniteNumber(amount));
+        if (safeAmount === 0) return;
+        nextPlayer.money = ensureFiniteNumber(nextPlayer.money) + safeAmount;
         nextPlayer.finance.history.unshift({
             id: `tx_${Date.now()}_${Math.random()}`,
             week: nextPlayer.currentWeek,
             year: nextPlayer.age,
-            amount,
+            amount: safeAmount,
             category,
             description
         });
@@ -181,9 +384,27 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
     }
 
     // --- 1. WORLD & INDUSTRY UPDATE ---
-    const worldResult = processWorldTurn(nextPlayer);
-    nextPlayer.world = worldResult.world;
-    nextPlayer.news = [...worldResult.news, ...nextPlayer.news].slice(0, 50); 
+    try {
+        const worldResult = processWorldTurn(nextPlayer);
+        nextPlayer.world = worldResult.world;
+        nextPlayer.news = [...worldResult.news, ...nextPlayer.news].slice(0, 50);
+
+        Object.values(nextPlayer.world.universes || {}).forEach((universe: any) => {
+            if (!universe?.studioId) return;
+            const weeklyUniverseRevenue = ensureFiniteNumber(universe.stats?.weeklyRevenue);
+            if (weeklyUniverseRevenue <= 0) return;
+
+            const ownerStudio = nextPlayer.businesses?.find(b => b.id === universe.studioId);
+            if (!ownerStudio) return;
+
+            ownerStudio.balance += weeklyUniverseRevenue;
+            ownerStudio.stats.weeklyRevenue += weeklyUniverseRevenue;
+            ownerStudio.stats.weeklyProfit += weeklyUniverseRevenue;
+            ownerStudio.stats.lifetimeRevenue += weeklyUniverseRevenue;
+        });
+    } catch (error) {
+        console.error('World turn failed during week processing:', error);
+    }
 
     // --- 2. STOCK MARKET UPDATE ---
     const marketUpdate = processStockMarket(nextPlayer.stocks, nextPlayer.currentWeek);
@@ -197,16 +418,20 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
     }
 
     // --- 3. YOUTUBE & TALENT SIMULATION ---
-    const ytResult = processYoutubeChannel(nextPlayer);
-    nextPlayer.youtube = ytResult.channel;
-    
-    if (ytResult.weeklyRevenue > 0) {
-        addTransaction(Math.floor(ytResult.weeklyRevenue), 'BUSINESS', 'YouTube Ad Revenue');
-        if (ytResult.weeklyRevenue > 100) {
-            logsToAdd.push({ msg: `▶️ YouTube Earnings: $${Math.floor(ytResult.weeklyRevenue).toLocaleString()}`, type: 'positive' });
+    try {
+        const ytResult = processYoutubeChannel(nextPlayer);
+        nextPlayer.youtube = ytResult.channel;
+        
+        if (ytResult.weeklyRevenue > 0) {
+            addTransaction(Math.floor(ytResult.weeklyRevenue), 'BUSINESS', 'YouTube Ad Revenue');
+            if (ytResult.weeklyRevenue > 100) {
+                logsToAdd.push({ msg: `▶️ YouTube Earnings: $${Math.floor(ytResult.weeklyRevenue).toLocaleString()}`, type: 'positive' });
+            }
         }
+        ytResult.notifications.forEach(note => logsToAdd.push({ msg: note, type: 'positive' }));
+    } catch (error) {
+        console.error('YouTube processing failed during week processing:', error);
     }
-    ytResult.notifications.forEach(note => logsToAdd.push({ msg: note, type: 'positive' }));
 
     // NPC Life Updates
     const allNPCs = [...NPC_DATABASE, ...(nextPlayer.flags.extraNPCs || [])];
@@ -281,12 +506,14 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
 
     // Annual Fees
     if (nextPlayer.team.agent && nextPlayer.currentWeek === 1) {
-        addTransaction(-nextPlayer.team.agent.annualFee, 'EXPENSE', `Agent Fee (${nextPlayer.team.agent.name})`);
-        logsToAdd.push({msg: `Paid annual agent fee: $${nextPlayer.team.agent.annualFee.toLocaleString()}`, type: 'neutral'});
+        const annualFee = ensureFiniteNumber(nextPlayer.team.agent.annualFee);
+        addTransaction(-annualFee, 'EXPENSE', `Agent Fee (${nextPlayer.team.agent.name})`);
+        logsToAdd.push({msg: `Paid annual agent fee: $${annualFee.toLocaleString()}`, type: 'neutral'});
     }
     if (nextPlayer.team.manager && nextPlayer.currentWeek === 1) {
-        addTransaction(-nextPlayer.team.manager.annualFee, 'EXPENSE', `Manager Fee (${nextPlayer.team.manager.name})`);
-        logsToAdd.push({msg: `Paid annual manager fee: $${nextPlayer.team.manager.annualFee.toLocaleString()}`, type: 'neutral'});
+        const annualFee = ensureFiniteNumber(nextPlayer.team.manager.annualFee);
+        addTransaction(-annualFee, 'EXPENSE', `Manager Fee (${nextPlayer.team.manager.name})`);
+        logsToAdd.push({msg: `Paid annual manager fee: $${annualFee.toLocaleString()}`, type: 'neutral'});
     }
 
     // Weekly Lifestyle Team Fees
@@ -302,27 +529,32 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
     if (nextPlayer.businesses && nextPlayer.businesses.length > 0) {
         const updatedBusinesses: Business[] = [];
         nextPlayer.businesses.forEach(biz => {
-            const res = processBusinessWeek(biz, nextPlayer.stats.fame, nextPlayer.currentWeek);
-            updatedBusinesses.push(res.updated);
-            
-            // Color-code alerts based on content
-            res.alerts.forEach(a => {
-                let type: 'neutral' | 'positive' | 'negative' = 'neutral';
-                if (
-                    a.includes('REFUSE') || 
-                    a.includes('CRITICAL') || 
-                    a.includes('overwhelmed') || 
-                    a.includes('burning') || 
-                    a.includes('Complaints') || 
-                    a.includes('No one') || 
-                    a.includes('Bad reviews')
-                ) {
-                    type = 'negative';
-                } else if (a.includes('sold out')) {
-                    type = 'positive';
-                }
-                logsToAdd.push({ msg: a, type });
-            });
+            try {
+                const res = processBusinessWeek(biz, nextPlayer.stats.fame, nextPlayer.currentWeek);
+                updatedBusinesses.push(res.updated);
+                
+                // Color-code alerts based on content
+                res.alerts.forEach(a => {
+                    let type: 'neutral' | 'positive' | 'negative' = 'neutral';
+                    if (
+                        a.includes('REFUSE') || 
+                        a.includes('CRITICAL') || 
+                        a.includes('overwhelmed') || 
+                        a.includes('burning') || 
+                        a.includes('Complaints') || 
+                        a.includes('No one') || 
+                        a.includes('Bad reviews')
+                    ) {
+                        type = 'negative';
+                    } else if (a.includes('sold out')) {
+                        type = 'positive';
+                    }
+                    logsToAdd.push({ msg: a, type });
+                });
+            } catch (error) {
+                console.error('Business week failed during week processing:', error, biz);
+                updatedBusinesses.push(biz);
+            }
         });
         nextPlayer.businesses = updatedBusinesses;
     } 
@@ -835,7 +1067,7 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                     const maxTheatricalWeeks = Math.floor(Math.random() * (maxW - minW + 1)) + minW;
 
                     const newRelease: ActiveRelease = {
-                        id: updatedC.id, name: updatedC.name, type: updatedC.projectDetails.type, roleType: updatedC.roleType || 'MINOR',
+                        id: updatedC.id, name: updatedC.name, type: updatedC.projectDetails.type, roleType: getPlayerProjectRoleType(updatedC.roleType, updatedC.projectDetails.castList),
                         projectDetails: updatedC.projectDetails, weekNum: 1, weeklyGross: [], totalGross: 0, budget: budget,
                         status: 'RUNNING', imdbRating: imdb, productionPerformance: updatedC.productionPerformance || 50,
                         distributionPhase: isStreamingOnly ? 'STREAMING' : 'THEATRICAL',
@@ -950,6 +1182,7 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                 const studioShare = Math.floor(revenue * 0.5); // 50% to studio
                 playerStudio.balance += studioShare;
                 playerStudio.stats.weeklyRevenue += studioShare;
+                playerStudio.stats.weeklyProfit += studioShare;
                 playerStudio.stats.lifetimeRevenue += studioShare;
             }
 
@@ -1078,6 +1311,7 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                 if (playerStudio && weeklyStreamingRevenue > 0) {
                     playerStudio.balance += weeklyStreamingRevenue;
                     playerStudio.stats.weeklyRevenue += weeklyStreamingRevenue;
+                    playerStudio.stats.weeklyProfit += weeklyStreamingRevenue;
                     playerStudio.stats.lifetimeRevenue += weeklyStreamingRevenue;
                 }
             }
@@ -1097,7 +1331,7 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                     }
                 }
                 nextPlayer.pastProjects.push({
-                    id: rel.id, name: rel.name, type: 'ACTING_GIG', roleType: rel.roleType, year: nextPlayer.age,
+                    id: rel.id, name: rel.name, type: 'ACTING_GIG', roleType: getPlayerProjectRoleType(rel.roleType, rel.projectDetails.castList), year: nextPlayer.age,
                     earnings: 0, rating: rel.imdbRating || 0, reception: rel.status, projectQuality: rel.projectDetails.hiddenStats.qualityScore, imdbRating: rel.imdbRating, boxOfficeResult: `$${(rel.totalGross/1000000).toFixed(1)}M`, outcomeTier: calculateRunOutcome(rel.totalGross + newStreamingRevenue, rel.budget, rel.imdbRating || 5).tier, subtype: rel.projectDetails.subtype, futurePotential: { sequelChance: 0, franchiseChance: 0, rebootChance: 0, renewalChance: 0, isFranchiseStarter: false, isSequelGreenlit: false, isRenewed: false, seriesStatus: 'N/A' }, studioId: rel.projectDetails.studioId, streamingPlatform: rel.streaming.platformId, totalViews, streamingRevenue: newStreamingRevenue, castList: rel.projectDetails.castList, reviews: rel.projectDetails.reviews, budget: rel.budget, gross: rel.totalGross, genre: rel.projectDetails.genre, description: rel.projectDetails.description, projectType: rel.type, royaltyPercentage: rel.royaltyPercentage, franchiseId: rel.projectDetails.franchiseId, universeId: rel.projectDetails.universeId, installmentNumber: rel.projectDetails.installmentNumber, directorId: rel.projectDetails.directorId
                 });
             } else {
@@ -1362,15 +1596,27 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
     }
 
     // --- 12. GENERATE EVENTS ---
-    const eventText = await generateWeeklyEvent(nextPlayer.age, "Actor", nextPlayer.stats.fame);
+    const eventText = await withTimeout(
+        generateWeeklyEvent(nextPlayer.age, "Actor", nextPlayer.stats.fame),
+        1500,
+        "You kept your head down and stayed busy."
+    );
     logsToAdd.push({ msg: eventText, type: 'neutral' });
 
-    const weeklyNews = generateWeeklyNews(nextPlayer);
-    nextPlayer.news = [...weeklyNews, ...nextPlayer.news].slice(0, 50);
+    try {
+        const weeklyNews = generateWeeklyNews(nextPlayer);
+        nextPlayer.news = [...weeklyNews, ...nextPlayer.news].slice(0, 50);
+    } catch (error) {
+        console.error('Weekly news generation failed during week processing:', error);
+    }
 
-    const weeklyInsta = generateWeeklyFeed(nextPlayer);
-    // CRITICAL FIX: Limit Instagram Feed History to prevent overflow
-    nextPlayer.instagram.feed = [...weeklyInsta, ...nextPlayer.instagram.feed].slice(0, 50);
+    try {
+        const weeklyInsta = generateWeeklyFeed(nextPlayer);
+        // CRITICAL FIX: Limit Instagram Feed History to prevent overflow
+        nextPlayer.instagram.feed = [...weeklyInsta, ...nextPlayer.instagram.feed].slice(0, 50);
+    } catch (error) {
+        console.error('Weekly social feed generation failed during week processing:', error);
+    }
 
     // Limit social history (User Posts) to prevent bloat (e.g. 200 posts)
     if (nextPlayer.instagram?.posts && nextPlayer.instagram.posts.length > 200) {
@@ -1381,8 +1627,12 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
     }
 
     if (nextPlayer.team.agent) {
-        const agentOffer = generateAgentOffers(nextPlayer);
-        if (agentOffer) nextPlayer.inbox.unshift({ id: `offer_${Date.now()}`, sender: nextPlayer.team.agent.name, subject: `Audition: ${agentOffer.projectName}`, text: "New role for you.", type: 'OFFER_ROLE', data: agentOffer, isRead: false, weekSent: nextPlayer.currentWeek, expiresIn: 2 });
+        try {
+            const agentOffer = generateAgentOffers(nextPlayer);
+            if (agentOffer) nextPlayer.inbox.unshift({ id: `offer_${Date.now()}`, sender: nextPlayer.team.agent.name, subject: `Audition: ${agentOffer.projectName}`, text: "New role for you.", type: 'OFFER_ROLE', data: agentOffer, isRead: false, weekSent: nextPlayer.currentWeek, expiresIn: 2 });
+        } catch (error) {
+            console.error('Agent offer generation failed during week processing:', error);
+        }
     }
     
     if (nextPlayer.team.manager) {
@@ -1395,23 +1645,31 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
         if (managerTier === 'ELITE') minCooldown = 2;
         
         if (nextPlayer.currentWeek - lastOfferWeek >= minCooldown + Math.floor(Math.random() * 3)) {
-            const sponOffer = generateManagerOffer(nextPlayer);
-            if (sponOffer) {
-                nextPlayer.inbox.unshift({ id: `spon_${Date.now()}`, sender: nextPlayer.team.manager.name, subject: `Sponsorship: ${sponOffer.brandName}`, text: "Brand deal offer.", type: 'OFFER_SPONSORSHIP', data: sponOffer, isRead: false, weekSent: nextPlayer.currentWeek, expiresIn: 3 });
-                nextPlayer.flags.lastSponsorshipOfferWeek = nextPlayer.currentWeek;
-                nextPlayer.flags.sponsorshipPity = 0; // Reset pity
-                logsToAdd.push({ msg: `🤝 Brand Deal: ${sponOffer.brandName} wants to work with you!`, type: 'positive' });
-            } else {
-                // Increment pity if no offer was generated
-                nextPlayer.flags.sponsorshipPity = (nextPlayer.flags.sponsorshipPity || 0) + 1;
+            try {
+                const sponOffer = generateManagerOffer(nextPlayer);
+                if (sponOffer) {
+                    nextPlayer.inbox.unshift({ id: `spon_${Date.now()}`, sender: nextPlayer.team.manager.name, subject: `Sponsorship: ${sponOffer.brandName}`, text: "Brand deal offer.", type: 'OFFER_SPONSORSHIP', data: sponOffer, isRead: false, weekSent: nextPlayer.currentWeek, expiresIn: 3 });
+                    nextPlayer.flags.lastSponsorshipOfferWeek = nextPlayer.currentWeek;
+                    nextPlayer.flags.sponsorshipPity = 0; // Reset pity
+                    logsToAdd.push({ msg: `🤝 Brand Deal: ${sponOffer.brandName} wants to work with you!`, type: 'positive' });
+                } else {
+                    // Increment pity if no offer was generated
+                    nextPlayer.flags.sponsorshipPity = (nextPlayer.flags.sponsorshipPity || 0) + 1;
+                }
+            } catch (error) {
+                console.error('Manager offer generation failed during week processing:', error);
             }
         }
     }
 
-    const directOffer = generateDirectOffer(nextPlayer);
-    if (directOffer) {
-        nextPlayer.inbox.unshift({ id: `direct_${Date.now()}`, sender: "Studio Casting", subject: `Direct Offer: ${directOffer.projectName}`, text: `We want you for the lead.`, type: 'OFFER_ROLE', data: directOffer, isRead: false, weekSent: nextPlayer.currentWeek, expiresIn: 4 });
-        logsToAdd.push({ msg: `⭐ You received a direct offer for "${directOffer.projectName}"!`, type: 'positive' });
+    try {
+        const directOffer = generateDirectOffer(nextPlayer);
+        if (directOffer) {
+            nextPlayer.inbox.unshift({ id: `direct_${Date.now()}`, sender: "Studio Casting", subject: `Direct Offer: ${directOffer.projectName}`, text: `We want you for the lead.`, type: 'OFFER_ROLE', data: directOffer, isRead: false, weekSent: nextPlayer.currentWeek, expiresIn: 4 });
+            logsToAdd.push({ msg: `⭐ You received a direct offer for "${directOffer.projectName}"!`, type: 'positive' });
+        }
+    } catch (error) {
+        console.error('Direct offer generation failed during week processing:', error);
     }
     
     if (nextPlayer.currentWeek % 3 === 0) {

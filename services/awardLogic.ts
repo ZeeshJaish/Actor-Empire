@@ -109,6 +109,11 @@ export interface Nomination {
     nomineeName?: string; // For NPCs
 }
 
+const getAwardTypeForInviteWeek = (week: number): AwardType | null => {
+    const match = Object.values(AWARD_CALENDAR).find(def => def.inviteWeek === week);
+    return match?.type || null;
+};
+
 export const checkAwardEligibility = (player: Player, week: number): Nomination[] => {
     // 1. GATHER ALL CANDIDATES (Player + World)
     const candidates: any[] = [];
@@ -148,10 +153,18 @@ export const checkAwardEligibility = (player: Player, week: number): Nomination[
     const nominations: Nomination[] = [];
     const isFemale = player.gender === 'FEMALE';
     const actorTerm = isFemale ? 'Actress' : 'Actor';
+    const awardType = getAwardTypeForInviteWeek(week);
 
     // 2. EVALUATE CANDIDATES
     candidates.forEach(project => {
         if ((project.rating || 0) < 7.0) return; // Minimum 7.0 to be considered
+
+        const normalizedRole = project.roleType || 'MINOR';
+        const isLeadRole = normalizedRole === 'LEAD';
+        const isSupportingRole = normalizedRole === 'SUPPORTING';
+
+        // Minor, cameo, and ensemble roles should not be treated as supporting award contenders.
+        if (!isLeadRole && !isSupportingRole) return;
 
         // REVISED SCORE FORMULA
         // 50% Quality (Hidden) + 50% Rating (Visible)
@@ -178,11 +191,11 @@ export const checkAwardEligibility = (player: Player, week: number): Nomination[
             // Map to specific award show categories with gender
             if (week === 38) { // EMMY
                 if (project.mediaType !== 'SERIES') return; // Emmys are strictly TV
-                cat = project.roleType === 'LEAD' ? `Outstanding Lead ${actorTerm}` : `Outstanding Supporting ${actorTerm}`; 
+                cat = isLeadRole ? `Outstanding Lead ${actorTerm}` : `Outstanding Supporting ${actorTerm}`; 
             }
             else if (week === 4) { // BAFTA
                if (project.mediaType !== 'MOVIE') return; // BAFTA Film Awards
-               cat = project.roleType === 'LEAD' ? `Best ${actorTerm}` : `Best Supporting ${actorTerm}`;
+               cat = isLeadRole ? `Best ${actorTerm}` : `Best Supporting ${actorTerm}`;
             }
             else if (week === 2) { // GOLDEN GLOBES
                 // Globes split Movie and TV
@@ -193,12 +206,17 @@ export const checkAwardEligibility = (player: Player, week: number): Nomination[
                 }
             } else { // OSCARS (Week 10)
                 if (project.mediaType !== 'MOVIE') return; // Oscars are strictly Movie
-                cat = project.roleType === 'LEAD' ? `Best ${actorTerm}` : `Best Supporting ${actorTerm}`;
+                cat = isLeadRole ? `Best ${actorTerm}` : `Best Supporting ${actorTerm}`;
             }
 
             if (project.isPlayer) {
                 // Check if already nominated for this project/category to avoid duplicates
-                const exists = player.awards.some(a => a.projectId === project.id && a.category === cat);
+                const exists = player.awards.some(a =>
+                    a.projectId === project.id &&
+                    a.category === cat &&
+                    (!awardType || a.type === awardType) &&
+                    a.year === player.age
+                );
                 const alreadyQueued = nominations.some(n => n.project.id === project.id && n.category === cat);
 
                 if (!exists && !alreadyQueued) {
@@ -271,9 +289,10 @@ export const generateFullBallot = (player: Player, awardType: AwardType, playerN
             
             candidates.forEach(p => {
                 // Determine nominee name based on category
-                let nomineeName = p.leadActorName;
-                if (isActor || isActress) nomineeName = p.leadActorName;
-                else if (isDirector) nomineeName = p.directorName;
+                const linkedActor = p.leadActorId ? NPC_DATABASE.find(n => n.id === p.leadActorId) : null;
+                let nomineeName = p.leadActorName || linkedActor?.name || p.directorName || p.title;
+                if (isActor || isActress) nomineeName = p.leadActorName || linkedActor?.name || "Industry Nominee";
+                else if (isDirector) nomineeName = p.directorName || "Guest Director";
                 else if (reallyIsProjectAward) nomineeName = "Producers";
 
                 categoryNoms.push({

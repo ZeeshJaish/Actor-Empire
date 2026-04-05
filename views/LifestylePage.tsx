@@ -7,6 +7,7 @@ import { LifestyleBusiness } from './lifestyle/LifestyleBusiness';
 import { ProductionWizard } from './lifestyle/business/ProductionWizard';
 import { ProductionHouseGame } from './lifestyle/business/ProductionHouseGame';
 import { PROPERTY_CUSTOMIZATIONS, VEHICLE_CUSTOMIZATIONS } from '../services/lifestyleLogic';
+import { PremiumProductId } from '../services/premiumLogic';
 
 interface LifestylePageProps {
   player: Player;
@@ -17,9 +18,10 @@ interface LifestylePageProps {
   onStartBusiness: (type: any) => void; 
   onShutdownBusiness: () => void; 
   onUpdatePlayer?: (player: Player) => void; 
+  onPremiumPurchase: (productId: PremiumProductId) => void;
 }
 
-export const LifestylePage: React.FC<LifestylePageProps> = ({ player, onBuyItem, onSellItem, onSetResidence, onSetActiveStyle, onUpdatePlayer }) => {
+export const LifestylePage: React.FC<LifestylePageProps> = ({ player, onBuyItem, onSellItem, onSetResidence, onSetActiveStyle, onUpdatePlayer, onPremiumPurchase }) => {
   const [view, setView] = useState<'MAIN' | 'ASSETS' | 'BUSINESS' | 'PRODUCTION_WIZARD' | 'PRODUCTION_GAME'>('MAIN');
   const [customizationItem, setCustomizationItem] = useState<Property | Vehicle | null>(null);
   const [selectedCustomizations, setSelectedCustomizations] = useState<any[]>([]);
@@ -126,7 +128,7 @@ export const LifestylePage: React.FC<LifestylePageProps> = ({ player, onBuyItem,
       );
   }
 
-  if (view === 'ASSETS') return <LifestyleAssets player={player} onBack={() => setView('MAIN')} onBuy={onBuyItem} onSell={onSellItem} onSetResidence={onSetResidence} onInitiateCustomization={handleInitiateCustomization} />;
+  if (view === 'ASSETS') return <LifestyleAssets player={player} onBack={() => setView('MAIN')} onBuy={onBuyItem} onSell={onSellItem} onSetResidence={onSetResidence} onInitiateCustomization={handleInitiateCustomization} onPremiumPurchase={onPremiumPurchase} />;
   
   if (view === 'BUSINESS') return <LifestyleBusiness player={player} onBack={() => setView('MAIN')} onUpdatePlayer={onUpdatePlayer!} />;
   

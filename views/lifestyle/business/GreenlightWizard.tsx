@@ -19,6 +19,16 @@ export const formatMoney = (val: number) => {
 
 const clampStat = (value: number, min = 0, max = 100) => Math.max(min, Math.min(max, value));
 
+const getUniversePhaseLabel = (phase?: Universe['currentPhase']) => {
+    if (typeof phase === 'number') return `Phase ${phase}`;
+    if (typeof phase === 'string') {
+        const phaseNumber = phase.match(/(\d+)/)?.[1];
+        if (phaseNumber) return `Phase ${phaseNumber}`;
+        return phase.replace(/_/g, ' ');
+    }
+    return 'Phase 1';
+};
+
 export const GEAR_TIERS: Record<string, { name: string, desc: string, cost: number, quality: number }> = {
     'TIER_1': { name: 'Indie Kit', desc: 'Basic DSLR and mirrorless setup.', cost: 10000, quality: 2 },
     'TIER_2': { name: 'Prosumer Setup', desc: 'Mid-tier professional equipment.', cost: 100000, quality: 5 },
@@ -454,6 +464,7 @@ const LocationSelector: React.FC<{
 export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, studio, initialConcept, onBack, onUpdatePlayer, onComplete }) => {
     const [selectedScriptId, setSelectedScriptId] = useState<string | null>(initialConcept?.scriptId || null);
     const [step, setStep] = useState<'SELECT_SCRIPT' | 'DIRECTOR' | 'CAST' | 'CREW' | 'EQUIPMENT' | 'LOCATION' | 'TONE' | 'CONFIRM' | 'BUZZ'>(initialConcept?.lastStep || (initialConcept ? 'DIRECTOR' : 'SELECT_SCRIPT'));
+    const isInternallyControlledTalent = (id?: string | null) => id === 'PLAYER_SELF' || id === 'STUDIO_STAFF';
     
     // Setup State
     const [tone, setTone] = useState(initialConcept?.tone || 50); // 0 = Practical, 100 = CGI
@@ -503,12 +514,43 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         practicalEffects: 'TIER_3'
     });
 
+    const contractedTalentIds = useMemo(() => {
+        const roster = [
+            ...((player.studio?.talentRoster as any[]) || []),
+            ...((studio.studioState?.talentRoster as any[]) || [])
+        ];
+        return new Set(
+            roster
+                .filter(contract => contract?.status === 'ACTIVE' && contract?.type === 'MOVIE_DEAL' && (contract?.moviesRemaining ?? 0) > 0 && contract?.npcId)
+                .map(contract => contract.npcId)
+        );
+    }, [player.studio?.talentRoster, studio.studioState?.talentRoster]);
+
+    const normalizeReturningTalentEntries = (script: any) => {
+        if (!script?.returningTalent || !Array.isArray(script.returningTalent)) return script;
+        return {
+            ...script,
+            returningTalent: script.returningTalent.map((talent: any) => {
+                const isContractedReturningActor = talent && talent.role !== 'DIRECTOR' && contractedTalentIds.has(talent.id);
+                const isInternalReturnee = isInternallyControlledTalent(talent?.id);
+                return {
+                    ...talent,
+                    attemptsLeft: isInternalReturnee ? 0 : (typeof talent?.attemptsLeft === 'number' ? talent.attemptsLeft : 3),
+                    accepted: isContractedReturningActor || isInternalReturnee ? true : !!talent?.accepted,
+                    negotiated: isInternalReturnee ? true : !!talent?.negotiated
+                };
+            })
+        };
+    };
+
     // Save Draft Helper
     const saveDraft = () => {
         if (!selectedScriptId) return;
 
+        const existingConcept = studio.studioState?.concepts?.find(c => c.scriptId === selectedScriptId);
+
         const draft: any = { // Use ProjectConcept type if imported, else any
-            id: initialConcept?.id || `concept_${selectedScriptId}`, // Deterministic ID per script
+            id: initialConcept?.id || existingConcept?.id || `concept_${selectedScriptId}`, // Deterministic ID per script
             scriptId: selectedScriptId,
             lastUpdated: Date.now(),
             crewModes,
@@ -562,14 +604,34 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         onBack();
     };
 
-    // Filter scripts that are already in active concepts (unless it's the current one being edited)
-    const existingConceptScriptIds = studio.studioState?.concepts?.map(c => c.scriptId) || [];
-    const scripts = studio.studioState?.scripts.filter(s => 
-        s.status === 'READY' && 
-        (!existingConceptScriptIds.includes(s.id) || s.id === initialConcept?.scriptId || s.id === selectedScriptId)
-    ) || [];
+    const conceptByScriptId = useMemo(() => {
+        const map = new Map<string, any>();
+        (studio.studioState?.concepts || []).forEach((concept: any) => {
+            if (concept?.scriptId) {
+                map.set(concept.scriptId, concept);
+            }
+        });
+        return map;
+    }, [studio.studioState?.concepts]);
 
-    const selectedScript = scripts.find(s => s.id === selectedScriptId) || (initialConcept ? studio.studioState?.scripts.find(s => s.id === initialConcept.scriptId) : null);
+    // Filter scripts that are already in active concepts (unless it's the current one being edited)
+    const scripts = useMemo(() => {
+        const existingConceptScriptIds = new Set((studio.studioState?.concepts || []).map((c: any) => c.scriptId));
+        return (studio.studioState?.scripts || [])
+            .map(script => normalizeReturningTalentEntries(script))
+            .filter((s: any) => {
+                if (s.status !== 'READY') return false;
+                const hasExistingConcept = existingConceptScriptIds.has(s.id);
+                const isResumableScript = s.sourceMaterial === 'SEQUEL' || s.sourceMaterial === 'SPINOFF';
+                return !hasExistingConcept || isResumableScript || s.id === initialConcept?.scriptId || s.id === selectedScriptId;
+            });
+    }, [studio.studioState?.scripts, studio.studioState?.concepts, initialConcept?.scriptId, selectedScriptId, contractedTalentIds]);
+
+    const selectedScript = useMemo(() => {
+        return scripts.find(s => s.id === selectedScriptId)
+            || (selectedScriptId ? normalizeReturningTalentEntries(studio.studioState?.scripts?.find(s => s.id === selectedScriptId)) : null)
+            || (initialConcept ? normalizeReturningTalentEntries(studio.studioState?.scripts?.find(s => s.id === initialConcept.scriptId)) : null);
+    }, [scripts, selectedScriptId, studio.studioState?.scripts, initialConcept?.scriptId, contractedTalentIds]);
     
     // Identify studio franchises (for selection)
     const studioFranchises = useMemo(() => {
@@ -631,39 +693,75 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
     // Reset state when script changes
     useEffect(() => {
         if (selectedScriptId && (!initialConcept || selectedScriptId !== initialConcept.scriptId)) {
-            // Reset to default
-            setCrewModes({
-                director: 'HIRE',
-                cinematographer: 'HIRE',
-                composer: 'HIRE',
-                lineProducer: 'HIRE',
-                vfx: 'HIRE'
-            });
-            setSelectedCrew({
-                director: null,
-                cinematographer: null,
-                composer: null,
-                lineProducer: null,
-                vfx: null
-            });
-            setCastList([
-                { id: 'lead_1', role: 'Lead Actor', roleType: 'LEAD', actorId: null },
-                { id: 'supp_1', role: 'Supporting Actor', roleType: 'SUPPORTING', actorId: null }
-            ]);
-            setSelectedLocations([]);
-            setEquipmentChoices({
-                cameras: 'TIER_3',
-                lighting: 'TIER_3',
-                sound: 'TIER_3',
-                practicalEffects: 'TIER_3'
-            });
-            setSelectedUniverseId(selectedScript.universeId || null);
-            setSelectedFranchiseId(selectedScript.franchiseId || null);
-            setTone(50);
-            setVisualStyle('REALISTIC');
-            setPacing('MODERATE');
+            const existingConcept = conceptByScriptId.get(selectedScriptId);
+            if (existingConcept) {
+                setCrewModes(existingConcept.crewModes || {
+                    director: 'HIRE',
+                    cinematographer: 'HIRE',
+                    composer: 'HIRE',
+                    lineProducer: 'HIRE',
+                    vfx: 'HIRE'
+                });
+                setSelectedCrew(existingConcept.selectedCrew || {
+                    director: null,
+                    cinematographer: null,
+                    composer: null,
+                    lineProducer: null,
+                    vfx: null
+                });
+                setCastList(existingConcept.castList || [
+                    { id: 'lead_1', role: 'Lead Actor', roleType: 'LEAD', actorId: null },
+                    { id: 'supp_1', role: 'Supporting Actor', roleType: 'SUPPORTING', actorId: null }
+                ]);
+                setSelectedLocations(existingConcept.selectedLocations || []);
+                setEquipmentChoices(existingConcept.equipmentChoices || {
+                    cameras: 'TIER_3',
+                    lighting: 'TIER_3',
+                    sound: 'TIER_3',
+                    practicalEffects: 'TIER_3'
+                });
+                setSelectedUniverseId(existingConcept.universeId || selectedScript?.universeId || null);
+                setNewUniverseName(existingConcept.newUniverseName || "");
+                setSelectedFranchiseId(existingConcept.franchiseId || selectedScript?.franchiseId || null);
+                setTone(existingConcept.tone ?? 50);
+                setVisualStyle(existingConcept.visualStyle || 'REALISTIC');
+                setPacing(existingConcept.pacing || 'MODERATE');
+            } else {
+                // Reset to default
+                setCrewModes({
+                    director: 'HIRE',
+                    cinematographer: 'HIRE',
+                    composer: 'HIRE',
+                    lineProducer: 'HIRE',
+                    vfx: 'HIRE'
+                });
+                setSelectedCrew({
+                    director: null,
+                    cinematographer: null,
+                    composer: null,
+                    lineProducer: null,
+                    vfx: null
+                });
+                setCastList([
+                    { id: 'lead_1', role: 'Lead Actor', roleType: 'LEAD', actorId: null },
+                    { id: 'supp_1', role: 'Supporting Actor', roleType: 'SUPPORTING', actorId: null }
+                ]);
+                setSelectedLocations([]);
+                setEquipmentChoices({
+                    cameras: 'TIER_3',
+                    lighting: 'TIER_3',
+                    sound: 'TIER_3',
+                    practicalEffects: 'TIER_3'
+                });
+                setSelectedUniverseId(selectedScript?.universeId || null);
+                setNewUniverseName("");
+                setSelectedFranchiseId(selectedScript?.franchiseId || null);
+                setTone(50);
+                setVisualStyle('REALISTIC');
+                setPacing('MODERATE');
+            }
         }
-    }, [selectedScriptId]);
+    }, [selectedScriptId, conceptByScriptId, initialConcept?.scriptId]);
 
     // Pre-fill sequel cast and crew
     useEffect(() => {
@@ -677,7 +775,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                 const returningDirector = selectedScript.returningTalent?.find(t => t.role === 'DIRECTOR');
                 if (returningDirector) {
                     directorToSet = returningDirector.id;
-                    directorModeToSet = 'HIRE';
+                    directorModeToSet = returningDirector.id === 'PLAYER_SELF' ? 'SELF' : (returningDirector.id === 'STUDIO_STAFF' ? 'IN_HOUSE' : 'HIRE');
                 }
             }
 
@@ -839,11 +937,17 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
     }, [Math.floor(player.currentWeek / 3), castList, player.studio?.talentRoster, player.flags.extraNPCs]);
 
     const contractedActors = useMemo(() => {
-        const contracts = player.studio?.talentRoster?.filter(c => c.type === 'MOVIE_DEAL' && c.moviesRemaining > 0) || [];
-        return contracts.map(c => {
-            return availableActors.find(a => a.id === c.npcId);
-        }).filter(Boolean) as any[];
-    }, [player.studio?.talentRoster, availableActors]);
+        return Array.from(contractedTalentIds)
+            .map(id => availableActors.find(actor => actor.id === id))
+            .filter(Boolean) as any[];
+    }, [contractedTalentIds, availableActors]);
+
+    const requiresReturningTalentNegotiation = (talent: any) => {
+        if (!talent || talent.accepted || (talent.attemptsLeft ?? 0) <= 0) return false;
+        if (isInternallyControlledTalent(talent.id)) return false;
+        if (talent.role === 'DIRECTOR') return true;
+        return !contractedTalentIds.has(talent.id);
+    };
 
     // Mock Data Generators (Refreshes every 3 weeks)
     const mockCrew = useMemo(() => {
@@ -1196,6 +1300,28 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         };
     }, [selectedCrew, crewModes, castList, selectedLocations, availableActors, availableDirectors, player, equipmentChoices, studio, mockLocations, mockCrew]);
 
+    const unresolvedReturningTalent = useMemo(() => {
+        if (!selectedScript?.returningTalent) return [];
+
+        return selectedScript.returningTalent.filter(talent => {
+            if (!requiresReturningTalentNegotiation(talent)) return false;
+
+            if (talent.role === 'DIRECTOR') {
+                return selectedCrew.director === talent.id;
+            }
+
+            if (talent.role === 'LEAD_ACTOR') {
+                return castList.some(role => role.actorId === talent.id && role.roleType === 'LEAD');
+            }
+
+            if (talent.role === 'SUPPORTING_ACTOR') {
+                return castList.some(role => role.actorId === talent.id && role.roleType === 'SUPPORTING');
+            }
+
+            return castList.some(role => role.actorId === talent.id);
+        });
+    }, [selectedScript?.returningTalent, selectedCrew.director, castList, contractedActors]);
+
     // Buzz State
     const [buzzItems, setBuzzItems] = useState<any[]>([]);
 
@@ -1217,7 +1343,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             errors.push("At least one lead actor is required");
         }
         
-        if (selectedScript.returningTalent?.some(t => !t.accepted && t.attemptsLeft! > 0)) {
+        if (unresolvedReturningTalent.length > 0) {
             errors.push("Returning talent negotiations pending");
         }
 
@@ -1227,7 +1353,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         }
 
         return { can: errors.length === 0, errors };
-    }, [selectedScript, selectedLocations, crewModes, selectedCrew, castList, studio.balance, studio.studioState?.productionFund, budgetBreakdown.total]);
+    }, [selectedScript, selectedLocations, crewModes, selectedCrew, castList, studio.balance, studio.studioState?.productionFund, budgetBreakdown.total, unresolvedReturningTalent]);
 
     const canGreenlight = greenlightStatus.can;
 
@@ -1307,6 +1433,10 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
 
         // Random Pre-Production Duration (4-10 weeks)
         const preProdDuration = Math.floor(Math.random() * 7) + 4;
+        const isCreatingNewUniverse = selectedUniverseId === 'NEW' && !!newUniverseName.trim();
+        const finalUniverseId = isCreatingNewUniverse ? `universe_${Date.now()}` : (selectedUniverseId || undefined);
+        const universeColors = ['#e11d48', '#2563eb', '#16a34a', '#d97706', '#7c3aed', '#db2777'];
+        const randomUniverseColor = universeColors[Math.floor(Math.random() * universeColors.length)];
 
         // --- CHECK RECASTING ---
         let isRecast = false;
@@ -1370,6 +1500,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             id: `proj_${Date.now()}`,
             name: selectedScript.title,
             type: 'JOB',
+            roleType: castList.find(c => c.actorId === 'PLAYER_SELF')?.roleType as any,
             energyCost: 0,
             income: 0,
             payoutType: 'LUMPSUM',
@@ -1383,10 +1514,14 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                 description: `A ${selectedScript.genres.join('/')} ${selectedScript.projectType === 'SERIES' ? 'series' : 'film'} produced by ${studio.name}.`,
                 studioId: studio.id as any,
                 subtype: selectedScript.sourceMaterial === 'SEQUEL' ? 'SEQUEL' : 'STANDALONE',
-                universeId: selectedUniverseId === 'NEW' ? undefined : (selectedUniverseId || undefined),
-                universeSagaName: (selectedUniverseId && selectedUniverseId !== 'NEW') ? String(player.world.universes[selectedUniverseId]?.currentSagaName || player.world.universes[selectedUniverseId]?.saga || 'Saga 1') : undefined,
-                universePhaseName: (selectedUniverseId && selectedUniverseId !== 'NEW') ? String(player.world.universes[selectedUniverseId]?.currentPhaseName || player.world.universes[selectedUniverseId]?.currentPhase || 'Phase 1') : undefined,
-                newUniverseName: selectedUniverseId === 'NEW' ? newUniverseName : undefined,
+                universeId: finalUniverseId,
+                universeSagaName: isCreatingNewUniverse
+                    ? 'Saga 1'
+                    : (selectedUniverseId && selectedUniverseId !== 'NEW') ? String(player.world.universes[selectedUniverseId]?.currentSagaName || player.world.universes[selectedUniverseId]?.saga || 'Saga 1') : undefined,
+                universePhaseName: isCreatingNewUniverse
+                    ? 'Phase 1'
+                    : (selectedUniverseId && selectedUniverseId !== 'NEW') ? String(player.world.universes[selectedUniverseId]?.currentPhaseName || player.world.universes[selectedUniverseId]?.currentPhase || 'Phase 1') : undefined,
+                newUniverseName: isCreatingNewUniverse ? newUniverseName.trim() : undefined,
                 franchiseId: selectedFranchiseId === 'NEW' ? `fran_${Date.now()}` : (selectedFranchiseId || undefined),
                 installmentNumber: (selectedFranchiseId && selectedFranchiseId !== 'NEW') ? (studioFranchises.find(f => f.id === selectedFranchiseId)?.lastInstallment || 0) + 1 : 1,
                 genre: selectedScript.genres[0],
@@ -1610,12 +1745,39 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         }
 
         const newStudioBalance = studio.balance - remainingBudgetToPay;
+        const updatedWorldUniverses = isCreatingNewUniverse
+            ? {
+                ...(player.world?.universes || {}),
+                [finalUniverseId!]: {
+                    id: finalUniverseId!,
+                    name: newUniverseName.trim(),
+                    description: `${studio.name}'s new cinematic universe.`,
+                    studioId: studio.id,
+                    currentPhase: 'PHASE_1_ORIGINS',
+                    saga: 1,
+                    currentSagaName: 'Saga 1',
+                    currentPhaseName: 'Phase 1',
+                    sagas: [],
+                    momentum: 5,
+                    brandPower: 5,
+                    marketShare: 0,
+                    color: randomUniverseColor,
+                    roster: [],
+                    slate: [newCommitment.projectDetails],
+                    weeksUntilNextPhase: 104
+                }
+            }
+            : player.world.universes;
 
         onUpdatePlayer({
             ...player,
             news: newNews,
             x: { ...player.x, feed: newXFeed },
             commitments: [...player.commitments, newCommitment],
+            world: {
+                ...player.world,
+                universes: updatedWorldUniverses
+            },
             studio: {
                 ...player.studio,
                 talentRoster: updatedPlayerTalentRoster
@@ -1769,7 +1931,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
 
             {/* NEW GAMIFIED HEADER */}
             <div className="relative shrink-0 z-20 bg-emerald-950/40 backdrop-blur-2xl border-b border-emerald-500/20 shadow-2xl">
-                <div className="max-w-5xl mx-auto w-full px-4 pt-10 pb-6">
+                <div className="max-w-5xl mx-auto w-full px-4 pt-safe-top pb-6">
                     <div className="flex items-center justify-between gap-2 sm:gap-4 mb-6">
                         {/* Left: Back */}
                         <button onClick={onBack} className="p-2 sm:p-2.5 bg-zinc-900/80 hover:bg-zinc-800 rounded-xl text-zinc-400 hover:text-white transition-all border border-zinc-800 shadow-lg group shrink-0">
@@ -1898,7 +2060,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
 
             <div className="flex-1 overflow-y-auto custom-scrollbar relative z-10">
                 {step === 'SELECT_SCRIPT' && (
-                    <div className="space-y-6 max-w-5xl mx-auto px-4 pt-6 pb-32">
+                    <div className="space-y-6 max-w-5xl mx-auto px-4 pt-6 pb-safe-xl">
                         {scripts.length === 0 ? (
                             <div className="flex flex-col items-center justify-center h-[60vh] text-zinc-500 animate-in fade-in zoom-in duration-500">
                                 <div className="w-24 h-24 bg-zinc-900 rounded-full flex items-center justify-center mb-6 shadow-inner">
@@ -1973,7 +2135,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                         )}
 
                         {/* Fixed Action Bar */}
-                        <div className="fixed bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-[#020a05] via-[#020a05]/90 to-transparent pointer-events-none flex justify-center z-30">
+                        <div className="fixed bottom-0 left-0 right-0 p-6 pb-safe-lg bg-gradient-to-t from-[#020a05] via-[#020a05]/90 to-transparent pointer-events-none flex justify-center z-30">
                             <div className="pointer-events-auto flex gap-4 w-full max-w-md">
                                 <button 
                                     onClick={onBack} 
@@ -1999,7 +2161,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
 
                 {/* DIRECTOR STEP */}
                 {step === 'DIRECTOR' && (
-                    <div className="space-y-6 animate-in slide-in-from-right-4 duration-300 max-w-2xl mx-auto px-4 pt-6 pb-32">
+                    <div className="space-y-6 animate-in slide-in-from-right-4 duration-300 max-w-2xl mx-auto px-4 pt-6 pb-safe-xl">
                         <div className="bg-zinc-900/80 backdrop-blur-md border border-zinc-800 rounded-xl p-6 mb-6 shadow-lg">
                             <h2 className="text-xl font-bold text-white mb-2">Hire a Director</h2>
                             <p className="text-zinc-400 text-sm">The visionary who will lead your project. Choose wisely—their style affects the movie's outcome.</p>
@@ -2028,7 +2190,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                             />
 
                         {/* Fixed Action Bar */}
-                        <div className="fixed bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-[#020a05] via-[#020a05]/90 to-transparent pointer-events-none flex justify-center z-30">
+                        <div className="fixed bottom-0 left-0 right-0 p-6 pb-safe-lg bg-gradient-to-t from-[#020a05] via-[#020a05]/90 to-transparent pointer-events-none flex justify-center z-30">
                             <div className="pointer-events-auto flex gap-4 w-full max-w-md">
                                 <button 
                                     onClick={() => initialConcept ? onBack() : setStep('SELECT_SCRIPT')} 
@@ -2058,7 +2220,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
 
                 {/* CAST STEP */}
                 {step === 'CAST' && (
-                    <div className="space-y-6 animate-in slide-in-from-right-4 duration-300 max-w-4xl mx-auto px-4 pt-6 pb-32">
+                    <div className="space-y-6 animate-in slide-in-from-right-4 duration-300 max-w-4xl mx-auto px-4 pt-6 pb-safe-xl">
                         <div className="bg-zinc-900/80 backdrop-blur-md border border-zinc-800 rounded-xl p-6 mb-6 shadow-lg">
                             <h2 className="text-xl font-bold text-white mb-2">Assemble The Cast</h2>
                             <p className="text-zinc-400 text-sm">Star power drives box office, but talent drives reviews. Balance your budget.</p>
@@ -2153,10 +2315,11 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                                         <div className="flex flex-col">
                                                             <span className="text-[8px] sm:text-[9px] font-black text-amber-500/70 uppercase tracking-tighter">Fee:</span>
                                                             <span className="text-[10px] sm:text-xs font-mono text-amber-400 font-bold">
-                                                                {isSelf || isStudio || (role.actorId && contractedActors.some(a => a.id === role.actorId)) ? 'Free' :
+                                                                {isSelf || isStudio ? 'Free' :
+                                                                 (role.actorId && contractedActors.some(a => a.id === role.actorId)) ? 'Contracted' :
                                                                  (() => {
                                                                      const returningData = selectedScript?.returningTalent?.find(t => t.id === role.actorId && (t.role === 'LEAD_ACTOR' || t.role === 'SUPPORTING_ACTOR'));
-                                                                     if (returningData && !returningData.accepted && returningData.attemptsLeft > 0) {
+                                                                     if (returningData && requiresReturningTalentNegotiation(returningData)) {
                                                                          return (
                                                                              <button 
                                                                                  onClick={(e) => {
@@ -2169,7 +2332,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                                                              </button>
                                                                          );
                                                                      }
-                                                                     if (returningData && !returningData.accepted && returningData.attemptsLeft === 0) {
+                                                                     if (returningData && !returningData.accepted && (returningData.attemptsLeft ?? 0) === 0) {
                                                                          return <span className="text-red-500 text-[9px]">Walked Away</span>;
                                                                      }
                                                                      return formatMoney(role.salary || 0);
@@ -2213,7 +2376,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                         </div>
 
                         {/* Fixed Action Bar */}
-                        <div className="fixed bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-[#020a05] via-[#020a05]/90 to-transparent pointer-events-none flex justify-center z-30">
+                        <div className="fixed bottom-0 left-0 right-0 p-6 pb-safe-lg bg-gradient-to-t from-[#020a05] via-[#020a05]/90 to-transparent pointer-events-none flex justify-center z-30">
                             <div className="pointer-events-auto flex gap-4 w-full max-w-md">
                                 <button 
                                     onClick={() => setStep('DIRECTOR')} 
@@ -2243,7 +2406,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
 
                 {/* CREW STEP */}
                 {step === 'CREW' && (
-                    <div className="space-y-6 animate-in slide-in-from-right-4 duration-300 max-w-4xl mx-auto px-4 pt-6 pb-32">
+                    <div className="space-y-6 animate-in slide-in-from-right-4 duration-300 max-w-4xl mx-auto px-4 pt-6 pb-safe-xl">
                         <div className="bg-zinc-900/80 backdrop-blur-md border border-zinc-800 rounded-xl p-6 mb-6 shadow-lg">
                             <h2 className="text-xl font-bold text-white mb-2">Build Your Team</h2>
                             <p className="text-zinc-400 text-sm">Great movies are made by great teams. Hire the best or save money with in-house staff.</p>
@@ -2313,7 +2476,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                         </div>
 
                         {/* Fixed Action Bar */}
-                        <div className="fixed bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-[#020a05] via-[#020a05]/90 to-transparent pointer-events-none flex justify-center z-30">
+                        <div className="fixed bottom-0 left-0 right-0 p-6 pb-safe-lg bg-gradient-to-t from-[#020a05] via-[#020a05]/90 to-transparent pointer-events-none flex justify-center z-30">
                             <div className="pointer-events-auto flex gap-4 w-full max-w-md">
                                 <button 
                                     onClick={() => setStep('CAST')} 
@@ -2334,7 +2497,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
 
                 {/* EQUIPMENT STEP */}
                 {step === 'EQUIPMENT' && (
-                    <div className="space-y-6 animate-in slide-in-from-right-4 duration-300 max-w-4xl mx-auto px-4 pt-6 pb-32">
+                    <div className="space-y-6 animate-in slide-in-from-right-4 duration-300 max-w-4xl mx-auto px-4 pt-6 pb-safe-xl">
                         <div className="bg-zinc-900/80 backdrop-blur-md border border-zinc-800 rounded-xl p-6 mb-6 shadow-lg">
                             <h2 className="text-xl font-bold text-white mb-2">Equipment & Gear</h2>
                             <p className="text-zinc-400 text-sm">Rent gear or use your studio's owned equipment to boost quality.</p>
@@ -2453,7 +2616,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                         </div>
 
                         {/* Fixed Action Bar */}
-                        <div className="fixed bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-[#020a05] via-[#020a05]/90 to-transparent pointer-events-none flex justify-center z-30">
+                        <div className="fixed bottom-0 left-0 right-0 p-6 pb-safe-lg bg-gradient-to-t from-[#020a05] via-[#020a05]/90 to-transparent pointer-events-none flex justify-center z-30">
                             <div className="pointer-events-auto flex gap-4 w-full max-w-md">
                                 <button 
                                     onClick={() => setStep('CREW')} 
@@ -2474,7 +2637,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
 
                 {/* LOCATION STEP */}
                 {step === 'LOCATION' && (
-                    <div className="space-y-6 animate-in slide-in-from-right-4 duration-300 flex flex-col h-full max-w-4xl mx-auto px-4 pt-6 pb-32">
+                    <div className="space-y-6 animate-in slide-in-from-right-4 duration-300 flex flex-col h-full max-w-4xl mx-auto px-4 pt-6 pb-safe-xl">
                         <div className="bg-zinc-900/80 backdrop-blur-md border border-zinc-800 rounded-xl p-6 mb-2 shrink-0 shadow-lg">
                             <h2 className="text-xl font-bold text-white mb-2">Scout Location</h2>
                             <p className="text-zinc-400 text-sm">Where will your story be told? Locations affect budget and visual quality.</p>
@@ -2494,7 +2657,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                         </div>
 
                         {/* Fixed Action Bar */}
-                        <div className="fixed bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-[#020a05] via-[#020a05]/90 to-transparent pointer-events-none flex justify-center z-30">
+                        <div className="fixed bottom-0 left-0 right-0 p-6 pb-safe-lg bg-gradient-to-t from-[#020a05] via-[#020a05]/90 to-transparent pointer-events-none flex justify-center z-30">
                             <div className="pointer-events-auto flex gap-4 w-full max-w-md">
                                 <button 
                                     onClick={() => setStep('EQUIPMENT')} 
@@ -2524,7 +2687,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
 
                 {/* TONE STEP */}
                 {step === 'TONE' && (
-                    <div className="space-y-8 animate-in slide-in-from-right-4 duration-300 flex flex-col h-full max-w-4xl mx-auto px-4 pt-6 pb-40 overflow-y-auto custom-scrollbar">
+                    <div className="space-y-8 animate-in slide-in-from-right-4 duration-300 flex flex-col h-full max-w-4xl mx-auto px-4 pt-6 pb-safe-xl overflow-y-auto custom-scrollbar">
                         <div className="bg-zinc-900/80 backdrop-blur-md border border-zinc-800 rounded-xl p-6 mb-2 shrink-0 shadow-lg">
                             <h2 className="text-xl font-bold text-white mb-2">Tone & Style</h2>
                             <p className="text-zinc-400 text-sm">Define the artistic vision for your project.</p>
@@ -2652,7 +2815,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                             </div>
                                             <div className="text-[10px] opacity-60 leading-tight mb-3 line-clamp-2">{universe.description}</div>
                                             <div className="flex justify-between items-center mt-auto">
-                                                <div className="text-[9px] font-bold text-blue-400 uppercase">Phase {universe.currentPhase.split('_')[1]}</div>
+                                                <div className="text-[9px] font-bold text-blue-400 uppercase">{getUniversePhaseLabel(universe.currentPhase)}</div>
                                                 <div className="text-[9px] font-mono text-zinc-500">MOM: {universe.momentum}%</div>
                                             </div>
                                         </button>
@@ -2767,7 +2930,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                         </div>
 
                         {/* Fixed Action Bar */}
-                        <div className="fixed bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-[#020a05] via-[#020a05]/90 to-transparent pointer-events-none flex justify-center z-30">
+                        <div className="fixed bottom-0 left-0 right-0 p-6 pb-safe-lg bg-gradient-to-t from-[#020a05] via-[#020a05]/90 to-transparent pointer-events-none flex justify-center z-30">
                             <div className="pointer-events-auto flex gap-4 w-full max-w-md">
                                 <button 
                                     onClick={() => setStep('LOCATION')} 
@@ -2791,7 +2954,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
 
                 {/* CONFIRM STEP */}
                 {step === 'CONFIRM' && selectedScript && (
-                    <div className="max-w-2xl mx-auto px-4 pt-10 pb-32 animate-in slide-in-from-bottom-4 duration-500 space-y-8">
+                    <div className="max-w-2xl mx-auto px-4 pt-10 pb-safe-xl animate-in slide-in-from-bottom-4 duration-500 space-y-8">
                         {/* Production Budget Approval Document */}
                         <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-2xl">
                             {/* Header */}
@@ -2969,7 +3132,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
 
                 {/* BUZZ STEP (Post-Greenlight) */}
                 {step === 'BUZZ' && (
-                    <div className="max-w-2xl mx-auto px-4 pt-10 pb-32 animate-in slide-in-from-bottom-4 duration-500 space-y-6">
+                    <div className="max-w-2xl mx-auto px-4 pt-10 pb-safe-xl animate-in slide-in-from-bottom-4 duration-500 space-y-6">
                         <div className="text-center mb-8">
                             <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-emerald-500/20 text-emerald-400 mb-4 animate-bounce">
                                 <Sparkles size={32} />

@@ -979,6 +979,11 @@ export interface Universe {
     color: string;
     roster: UniverseCharacter[];
     slate: ProjectDetails[];
+    products?: BusinessProduct[];
+    stats?: {
+        weeklyRevenue: number;
+        lifetimeRevenue: number;
+    };
     weeksUntilNextPhase: number;
 }
 

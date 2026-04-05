@@ -110,7 +110,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onBack, onMainMenu }
       </div>
       
       <div className="text-center text-xs text-zinc-600 font-mono mt-8">
-          v1.0.9
+          v1.0.11
       </div>
     </div>
   );

@@ -295,7 +295,7 @@ export const ProductionWizard: React.FC<ProductionWizardProps> = ({ player, onCa
                 )}
 
                 {/* Header */}
-                <div className="relative z-10 p-6 pt-12 flex justify-between items-center shrink-0">
+                <div className="relative z-10 p-6 pt-safe-top flex justify-between items-center shrink-0">
                     <button onClick={onCancel} className="text-zinc-500 hover:text-white transition-colors p-2 bg-black/50 rounded-full backdrop-blur-md"><ArrowLeft size={20}/></button>
                     <div className="flex items-center gap-2 text-[10px] text-amber-400 font-black uppercase tracking-[0.2em] border border-amber-500/30 px-3 py-1 rounded-full bg-amber-950/40 backdrop-blur-md">
                         <Crown size={12} fill="currentColor" /> Elite Tier
@@ -303,7 +303,7 @@ export const ProductionWizard: React.FC<ProductionWizardProps> = ({ player, onCa
                 </div>
 
                 <div className="relative z-10 flex-1 overflow-y-auto custom-scrollbar">
-                    <div className="min-h-full flex flex-col items-center justify-center p-8 text-center space-y-10">
+                    <div className="min-h-full flex flex-col items-center justify-center p-8 pb-safe-xl text-center space-y-10">
                         
                         {/* HERO SECTION */}
                         <div className="space-y-6 relative">
@@ -391,7 +391,7 @@ export const ProductionWizard: React.FC<ProductionWizardProps> = ({ player, onCa
                 </div>
 
                 {/* Footer Action */}
-                <div className="p-6 bg-gradient-to-t from-black via-black to-transparent relative z-20 shrink-0">
+                <div className="p-6 pb-safe-lg bg-gradient-to-t from-black via-black to-transparent relative z-20 shrink-0">
                     <button 
                         onClick={() => canAfford && setShowConfirm(true)}
                         disabled={!canAfford}
@@ -414,9 +414,9 @@ export const ProductionWizard: React.FC<ProductionWizardProps> = ({ player, onCa
 
     // --- STEP 1 & 2: THE LEGAL DOCUMENT ---
     return (
-        <div className="fixed inset-0 z-[60] bg-zinc-950 flex flex-col animate-in slide-in-from-right duration-300">
+        <div className="fixed inset-0 z-[60] bg-zinc-950 flex flex-col animate-in slide-in-from-right duration-300 pt-safe-top">
             {/* Header */}
-            <div className="p-6 pt-12 border-b border-zinc-800 flex justify-between items-center bg-black/50 backdrop-blur-md shrink-0">
+            <div className="p-6 border-b border-zinc-800 flex justify-between items-center bg-black/50 backdrop-blur-md shrink-0">
                 <button onClick={onCancel} className="text-zinc-500 hover:text-white"><ArrowLeft size={24}/></button>
                 <div className="flex flex-col items-center">
                     <div className="text-[10px] text-amber-500 font-bold uppercase tracking-widest">Premium Setup</div>
@@ -425,7 +425,7 @@ export const ProductionWizard: React.FC<ProductionWizardProps> = ({ player, onCa
                 <div className="w-6"></div>
             </div>
 
-            <div className="flex-1 overflow-y-auto custom-scrollbar p-6 bg-[#050505] flex flex-col">
+            <div className="flex-1 overflow-y-auto custom-scrollbar p-6 pb-safe-xl bg-[#050505] flex flex-col">
                 
                 <div className="flex-1 flex flex-col items-center justify-center p-6 relative z-10 animate-in fade-in slide-in-from-bottom duration-500">
                    

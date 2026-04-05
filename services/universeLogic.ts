@@ -293,6 +293,11 @@ export const initUniverses = (): Record<UniverseId, Universe> => {
             color: tmpl.studioId === 'MARVEL' ? '#E23636' : tmpl.studioId === 'DC' ? '#0476F2' : '#FFE81F',
             roster,
             slate: [],
+            products: [],
+            stats: {
+                weeklyRevenue: 0,
+                lifetimeRevenue: 0
+            },
             weeksUntilNextPhase: 100 + Math.floor(Math.random() * 52)
         };
     });
@@ -437,6 +442,32 @@ export const processUniverseTurn = (player: Player, universe: Universe): { unive
     const updated = { ...universe };
     const news: NewsItem[] = [];
     let generatedProject: IndustryProject | undefined;
+
+    if (!Array.isArray(updated.products)) updated.products = [];
+    if (!updated.stats) {
+        updated.stats = {
+            weeklyRevenue: 0,
+            lifetimeRevenue: 0
+        };
+    }
+
+    // Universe licensing income is intentionally conservative so these assets feel rewarding
+    // without becoming a passive-money exploit.
+    const activeProducts = updated.products.filter((product: any) => product?.active !== false);
+    const weeklyLicensingRevenue = activeProducts.reduce((sum, product: any) => {
+        const baseRevenue = typeof product?.sellingPrice === 'number' ? product.sellingPrice : 0;
+        const appeal = typeof product?.appeal === 'number' ? product.appeal : 0;
+        const brandFactor = 0.55 + Math.min(0.35, updated.brandPower / 250);
+        const appealFactor = 0.75 + Math.min(0.25, appeal / 200);
+        const momentumFactor = 0.85 + Math.min(0.2, Math.max(0, updated.momentum) / 250);
+        const productRevenue = Math.floor(baseRevenue * brandFactor * appealFactor * momentumFactor);
+
+        product.unitsSold = (typeof product.unitsSold === 'number' ? product.unitsSold : 0) + Math.max(1, Math.floor(productRevenue / Math.max(baseRevenue, 1)));
+        return sum + Math.max(0, productRevenue);
+    }, 0);
+
+    updated.stats.weeklyRevenue = weeklyLicensingRevenue;
+    updated.stats.lifetimeRevenue = (updated.stats.lifetimeRevenue || 0) + weeklyLicensingRevenue;
 
     // 1. Advance Phase Timer
     updated.weeksUntilNextPhase--;

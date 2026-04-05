@@ -1,8 +1,9 @@
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Player, Property, Vehicle, ClothingItem } from '../../types';
 import { PROPERTY_CATALOG, CAR_CATALOG, MOTORCYCLE_CATALOG, BOAT_CATALOG, AIRCRAFT_CATALOG, CLOTHING_CATALOG } from '../../services/lifestyleLogic';
-import { ShoppingBag, ArrowLeft, ChevronRight, Home, Car, Shirt, MapPin } from 'lucide-react';
+import { ShoppingBag, ArrowLeft, ChevronRight, Home, Car, Shirt, MapPin, Crown, Lock } from 'lucide-react';
+import { getPremiumCollectionGateForAsset, getPremiumProduct, hasPremiumAccessForAsset, PremiumProductId } from '../../services/premiumLogic';
 
 interface LifestyleAssetsProps {
     player: Player;
@@ -11,12 +12,17 @@ interface LifestyleAssetsProps {
     onSell: (id: string) => void;
     onSetResidence: (id: string) => void;
     onInitiateCustomization: (item: Property | Vehicle) => void;
+    onPremiumPurchase: (productId: PremiumProductId) => void;
 }
 
-export const LifestyleAssets: React.FC<LifestyleAssetsProps> = ({ player, onBack, onBuy, onSell, onSetResidence, onInitiateCustomization }) => {
+export const LifestyleAssets: React.FC<LifestyleAssetsProps> = ({ player, onBack, onBuy, onSell, onSetResidence, onInitiateCustomization, onPremiumPurchase }) => {
     const [mode, setMode] = useState<'HUB' | 'DETAILS' | 'MARKET'>('HUB');
     const [category, setCategory] = useState<'PROPERTY' | 'VEHICLE' | 'CLOTHING'>('PROPERTY');
     const [filter, setFilter] = useState<string>('ALL');
+    const [pendingPremiumAssetId, setPendingPremiumAssetId] = useState<string | null>(null);
+
+    const pendingPremiumGate = useMemo(() => pendingPremiumAssetId ? getPremiumCollectionGateForAsset(pendingPremiumAssetId) : null, [pendingPremiumAssetId]);
+    const pendingPremiumProduct = pendingPremiumGate ? getPremiumProduct(pendingPremiumGate.productId) : null;
 
     const getItemIcon = (item: any) => {
         if (item.type === 'Vehicle') {
@@ -49,14 +55,26 @@ export const LifestyleAssets: React.FC<LifestyleAssetsProps> = ({ player, onBack
         return '🏠'; // Property
     };
 
-    const renderCard = (item: any, isOwned: boolean) => (
+    const renderCard = (item: any, isOwned: boolean) => {
+        const premiumGate = getPremiumCollectionGateForAsset(item.id);
+        const hasPremiumAccess = hasPremiumAccessForAsset(player, item.id);
+        const isLockedPremium = !isOwned && !!premiumGate && !hasPremiumAccess;
+
+        return (
         <div key={item.id} className="bg-zinc-900 border border-zinc-800 p-4 rounded-2xl flex items-center justify-between">
             <div className="flex items-center gap-4">
                 <div className="text-2xl bg-black/40 w-12 h-12 rounded-xl flex items-center justify-center shrink-0">
                     {getItemIcon(item)}
                 </div>
                 <div>
-                    <div className="font-bold text-white text-sm leading-tight">{item.name}</div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <div className="font-bold text-white text-sm leading-tight">{item.name}</div>
+                        {premiumGate && (
+                            <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${hasPremiumAccess ? 'border-amber-500/30 bg-amber-500/10 text-amber-300' : 'border-fuchsia-500/30 bg-fuchsia-500/10 text-fuchsia-300'}`}>
+                                <Crown size={10} /> Premium
+                            </div>
+                        )}
+                    </div>
                     
                     {/* Property Specific Location Info */}
                     {item.type === 'Property' && (
@@ -74,6 +92,11 @@ export const LifestyleAssets: React.FC<LifestyleAssetsProps> = ({ player, onBack
                     <div className="text-[10px] text-zinc-500 uppercase tracking-wide mt-1">
                         {item.type === 'Clothing' ? item.style : item.type === 'Vehicle' ? `+${item.reputationBonus} Rep` : `+${item.moodBonus} Mood`}
                     </div>
+                    {isLockedPremium && premiumGate && (
+                        <div className="text-[10px] text-amber-300 mt-1 font-semibold">
+                            Requires {premiumGate.title}
+                        </div>
+                    )}
                 </div>
             </div>
             <div className="text-right">
@@ -90,17 +113,23 @@ export const LifestyleAssets: React.FC<LifestyleAssetsProps> = ({ player, onBack
                     <>
                         <div className="font-mono text-emerald-400 font-bold text-sm">${item.price.toLocaleString()}</div>
                         <button 
-                            onClick={() => item.type === 'Clothing' ? onBuy(item) : onInitiateCustomization(item)}
-                            disabled={player.money < item.price}
-                            className="mt-1 bg-white text-black px-3 py-1 rounded text-[10px] font-bold disabled:opacity-50"
+                            onClick={() => {
+                                if (isLockedPremium) {
+                                    setPendingPremiumAssetId(item.id);
+                                    return;
+                                }
+                                item.type === 'Clothing' ? onBuy(item) : onInitiateCustomization(item);
+                            }}
+                            disabled={!isLockedPremium && player.money < item.price}
+                            className={`mt-1 px-3 py-1 rounded text-[10px] font-bold disabled:opacity-50 ${isLockedPremium ? 'bg-fuchsia-500 text-white' : 'bg-white text-black'}`}
                         >
-                            {item.type === 'Clothing' ? 'Buy' : 'Customize'}
+                            {isLockedPremium ? 'Unlock Collection' : item.type === 'Clothing' ? 'Buy' : 'Customize'}
                         </button>
                     </>
                 )}
             </div>
         </div>
-    );
+    )};
 
     const getItems = (isMarket: boolean) => {
         let items: any[] = [];
@@ -167,6 +196,49 @@ export const LifestyleAssets: React.FC<LifestyleAssetsProps> = ({ player, onBack
                 {getItems(mode === 'MARKET').map(item => renderCard(item, mode === 'DETAILS'))}
                 {getItems(mode === 'MARKET').length === 0 && <div className="text-center text-zinc-500 text-sm py-10">No items found.</div>}
             </div>
+
+            {pendingPremiumGate && pendingPremiumProduct && (
+                <div className="fixed inset-0 z-[120] bg-black/80 backdrop-blur-sm flex items-end justify-center p-4">
+                    <div className="w-full max-w-md rounded-3xl border border-zinc-800 bg-zinc-950 p-6 space-y-4 animate-in slide-in-from-bottom duration-200">
+                        <div className="flex items-start gap-3">
+                            <div className="p-3 rounded-2xl bg-fuchsia-500/10 text-fuchsia-300 border border-fuchsia-500/20">
+                                <Lock size={20} />
+                            </div>
+                            <div>
+                                <div className="text-white font-black text-xl">Premium Asset</div>
+                                <div className="text-sm text-zinc-400 leading-relaxed">
+                                    This item is visible in the market for everyone, but it needs <span className="text-white font-semibold">{pendingPremiumGate.title}</span> before you can buy it with in-game cash.
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4">
+                            <div className="text-xs font-black uppercase tracking-[0.2em] text-amber-300">Unlock Perk</div>
+                            <div className="text-white font-bold mt-1">{pendingPremiumGate.title}</div>
+                            <div className="text-sm text-zinc-400 mt-1">{pendingPremiumGate.teaser}</div>
+                            <div className="text-amber-200 font-black mt-3">{pendingPremiumProduct.priceLabel}</div>
+                        </div>
+
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setPendingPremiumAssetId(null)}
+                                className="flex-1 py-3 rounded-2xl border border-zinc-800 bg-zinc-900 text-zinc-300 font-bold"
+                            >
+                                Maybe Later
+                            </button>
+                            <button
+                                onClick={() => {
+                                    onPremiumPurchase(pendingPremiumGate.productId);
+                                    setPendingPremiumAssetId(null);
+                                }}
+                                className="flex-1 py-3 rounded-2xl bg-white text-black font-black"
+                            >
+                                Unlock Now
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

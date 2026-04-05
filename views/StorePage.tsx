@@ -1,11 +1,12 @@
 
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Player, ActorSkills, Genre, Stats } from '../types';
 import { formatMoney } from '../services/formatUtils';
 import { ArrowLeft, Zap, DollarSign, Heart, Brain, Clapperboard, PlayCircle, ShieldAlert, Crown, Gem, Home, CarFront, Plane, CheckCircle2 } from 'lucide-react';
 import { hasPremiumProduct, PREMIUM_PRODUCTS, PremiumProductId } from '../services/premiumLogic';
+import { getPremiumCatalogProducts } from '../services/iapService';
 
-const PREMIUM_STORE_ENABLED = false;
+const PREMIUM_STORE_ENABLED = true;
 
 interface StorePageProps {
     player: Player;
@@ -20,6 +21,7 @@ export const StorePage: React.FC<StorePageProps> = ({ player, onBack, onWatchAd,
     const [selectedGenre, setSelectedGenre] = useState<Genre>('ACTION');
     const [activeTab, setActiveTab] = useState<'REWARDS' | 'PREMIUM'>('REWARDS');
     const [pendingProduct, setPendingProduct] = useState<PremiumProductId | null>(null);
+    const [catalogPrices, setCatalogPrices] = useState<Record<PremiumProductId, string>>({} as Record<PremiumProductId, string>);
     const isIOSDevice = typeof navigator !== 'undefined' && (
         /iPad|iPhone|iPod/.test(navigator.userAgent) ||
         (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
@@ -29,6 +31,27 @@ export const StorePage: React.FC<StorePageProps> = ({ player, onBack, onWatchAd,
     const GENRES: Genre[] = ['ACTION', 'DRAMA', 'COMEDY', 'ROMANCE', 'THRILLER', 'HORROR', 'SCI_FI', 'ADVENTURE', 'SUPERHERO'];
     const SKILLS: (keyof ActorSkills)[] = ['delivery', 'memorization', 'expression', 'improvisation', 'discipline', 'presence', 'charisma'];
     const bonusEnergy = player.flags?.bonusEnergyBank || 0;
+    useEffect(() => {
+        if (!showPremiumStore) return;
+
+        getPremiumCatalogProducts().then(products => {
+            if (products.length === 0) return;
+            const nextPrices = {} as Record<PremiumProductId, string>;
+            products.forEach(product => {
+                nextPrices[product.premiumProductId] = product.priceLabel;
+            });
+            setCatalogPrices(nextPrices);
+        });
+    }, [showPremiumStore]);
+
+    const premiumProductsById = useMemo(() => {
+        const map = new Map<PremiumProductId, typeof PREMIUM_PRODUCTS[number]>();
+        PREMIUM_PRODUCTS.forEach(product => {
+            map.set(product.id, product);
+        });
+        return map;
+    }, []);
+
     const premiumSections = [
         {
             title: 'Ad-Free',
@@ -155,7 +178,7 @@ export const StorePage: React.FC<StorePageProps> = ({ player, onBack, onWatchAd,
                                                     </div>
                                                     <div className="flex-1">
                                                         <div className="flex items-center gap-2 flex-wrap">
-                                                            <div className="font-bold text-white">{product.title}</div>
+                                                        <div className="font-bold text-white">{product.title}</div>
                                                             {product.kind === 'non_consumable' && owned && (
                                                                 <div className="inline-flex items-center gap-1 text-[10px] font-bold uppercase px-2 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-300">
                                                                     <CheckCircle2 size={12}/> Owned
@@ -165,7 +188,7 @@ export const StorePage: React.FC<StorePageProps> = ({ player, onBack, onWatchAd,
                                                         <div className="text-xs text-zinc-400 mt-1 leading-relaxed">{product.description}</div>
                                                     </div>
                                                     <div className="text-right shrink-0">
-                                                        <div className="text-white font-black">{product.priceLabel}</div>
+                                                        <div className="text-white font-black">{catalogPrices[product.id] || product.priceLabel}</div>
                                                         <button
                                                             onClick={() => setPendingProduct(product.id)}
                                                             disabled={product.kind === 'non_consumable' && owned}
@@ -301,6 +324,9 @@ export const StorePage: React.FC<StorePageProps> = ({ player, onBack, onWatchAd,
                         <div className="text-xl font-black text-white">Confirm Purchase</div>
                         <div className="text-sm text-zinc-400 leading-relaxed">
                             Buy <span className="text-white font-bold">{PREMIUM_PRODUCTS.find(product => product.id === pendingProduct)?.title}</span>?
+                            {(pendingProduct && (catalogPrices[pendingProduct] || premiumProductsById.get(pendingProduct)?.priceLabel)) ? (
+                                <> Apple will charge <span className="text-white font-bold">{catalogPrices[pendingProduct] || premiumProductsById.get(pendingProduct)?.priceLabel}</span> if the purchase is approved.</>
+                            ) : null}
                             Your reward will only be granted after iOS confirms the purchase.
                         </div>
                         <div className="flex gap-3">

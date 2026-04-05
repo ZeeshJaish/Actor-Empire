@@ -26,6 +26,12 @@ export interface PremiumProduct {
     amount?: number;
 }
 
+export interface PremiumCollectionGate {
+    productId: PremiumProductId;
+    title: string;
+    teaser: string;
+}
+
 const ENERGY_BASELINE = 100;
 
 export const PREMIUM_PRODUCTS: PremiumProduct[] = [
@@ -44,6 +50,45 @@ export const PREMIUM_PRODUCTS: PremiumProduct[] = [
     { id: 'bundle_sky_sea', title: 'Sky & Sea Collection', priceLabel: '$6.99', kind: 'non_consumable', category: 'collection', description: 'Unlocks prestige transport like yachts and jets.' },
     { id: 'bundle_ultimate_lifestyle', title: 'Ultimate Lifestyle Collection', priceLabel: '$12.99', kind: 'non_consumable', category: 'collection', description: 'Unlocks every premium collection entitlement in one bundle.' }
 ];
+
+const PREMIUM_ASSET_COLLECTIONS: Record<string, PremiumProductId> = {
+    prop_beverly_hills_mansion: 'bundle_luxury_homes',
+    prop_malibu_beach_house: 'bundle_luxury_homes',
+    prop_the_one: 'bundle_luxury_homes',
+    prop_nyc_billionaire: 'bundle_luxury_homes',
+    prop_chateau_france: 'bundle_luxury_homes',
+    prop_london_townhouse: 'bundle_luxury_homes',
+    prop_dubai_royal: 'bundle_luxury_homes',
+    prop_private_island: 'bundle_luxury_homes',
+    prop_monaco_penthouse: 'bundle_luxury_homes',
+    veh_car_bugatti: 'bundle_elite_vehicles',
+    veh_car_koenigsegg: 'bundle_elite_vehicles',
+    veh_car_vintage_ferrari: 'bundle_elite_vehicles',
+    veh_car_pagani: 'bundle_elite_vehicles',
+    veh_car_rr_cullinan: 'bundle_elite_vehicles',
+    veh_boat_yacht: 'bundle_sky_sea',
+    veh_boat_superyacht: 'bundle_sky_sea',
+    veh_plane_cirrus: 'bundle_sky_sea',
+    veh_plane_gulfstream: 'bundle_sky_sea',
+    veh_plane_bbj: 'bundle_sky_sea',
+};
+
+const PREMIUM_COLLECTION_COPY: Record<PremiumProductId, PremiumCollectionGate> = {
+    no_ads: { productId: 'no_ads', title: 'No Ads', teaser: 'Remove forced ads permanently.' },
+    energy_100: { productId: 'energy_100', title: '100 Energy', teaser: 'Add a small premium energy refill.' },
+    energy_250: { productId: 'energy_250', title: '250 Energy', teaser: 'Add a medium premium energy refill.' },
+    energy_500: { productId: 'energy_500', title: '500 Energy', teaser: 'Add a strong premium energy refill.' },
+    energy_1000: { productId: 'energy_1000', title: '1000 Energy', teaser: 'Add a huge premium energy refill.' },
+    cash_25000: { productId: 'cash_25000', title: '$25,000 Cash', teaser: 'Instant cash boost.' },
+    cash_75000: { productId: 'cash_75000', title: '$75,000 Cash', teaser: 'Instant cash boost.' },
+    cash_200000: { productId: 'cash_200000', title: '$200,000 Cash', teaser: 'Instant cash boost.' },
+    cash_500000: { productId: 'cash_500000', title: '$500,000 Cash', teaser: 'Instant cash boost.' },
+    cash_1250000: { productId: 'cash_1250000', title: '$1,250,000 Cash', teaser: 'Instant cash boost.' },
+    bundle_luxury_homes: { productId: 'bundle_luxury_homes', title: 'Luxury Homes Collection', teaser: 'Unlock celebrity estates, penthouses, and island-tier addresses.' },
+    bundle_elite_vehicles: { productId: 'bundle_elite_vehicles', title: 'Elite Vehicles Collection', teaser: 'Unlock hypercars and icon-status rides inside the normal market.' },
+    bundle_sky_sea: { productId: 'bundle_sky_sea', title: 'Sky & Sea Collection', teaser: 'Unlock yachts and private aviation for the prestige lifestyle lane.' },
+    bundle_ultimate_lifestyle: { productId: 'bundle_ultimate_lifestyle', title: 'Ultimate Lifestyle Collection', teaser: 'Unlock every premium lifestyle collection permanently.' },
+};
 
 const getOwnedPurchases = (player: Player): PremiumProductId[] => {
     if (!Array.isArray(player.flags?.premiumPurchases)) {
@@ -118,6 +163,23 @@ export const hasNoAds = (player: Player): boolean => getOwnedPurchases(player).i
 
 export const hasPremiumProduct = (player: Player, productId: PremiumProductId): boolean =>
     getOwnedPurchases(player).includes(productId);
+
+export const getPremiumProduct = (productId: PremiumProductId): PremiumProduct | undefined =>
+    PREMIUM_PRODUCTS.find(item => item.id === productId);
+
+export const getRequiredPremiumProductForAsset = (assetId: string): PremiumProductId | null =>
+    PREMIUM_ASSET_COLLECTIONS[assetId] || null;
+
+export const getPremiumCollectionGateForAsset = (assetId: string): PremiumCollectionGate | null => {
+    const productId = getRequiredPremiumProductForAsset(assetId);
+    return productId ? PREMIUM_COLLECTION_COPY[productId] : null;
+};
+
+export const hasPremiumAccessForAsset = (player: Player, assetId: string): boolean => {
+    const requiredProduct = getRequiredPremiumProductForAsset(assetId);
+    if (!requiredProduct) return true;
+    return hasPremiumProduct(player, requiredProduct);
+};
 
 export const applyPremiumPurchase = (player: Player, productId: PremiumProductId): string => {
     const ownedPurchases = getOwnedPurchases(player);
