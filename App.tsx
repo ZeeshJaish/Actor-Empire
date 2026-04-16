@@ -20,34 +20,36 @@ import { RedCarpetEvent } from './views/RedCarpetEvent';
 import { PressConferenceEvent } from './views/PressConferenceEvent';
 import { processGameWeek } from './services/gameLoop';
 import { generateAuditions, generatePartTimeJobs, rewardGenreExperience } from './services/roleLogic';
-import { generateWeeklyFeed, calculateInteraction } from './services/npcLogic';
+import { generateWeeklyFeed, calculateInteraction, getGenderedAvatar } from './services/npcLogic';
 import { getRandomAgents, getRandomManagers, getRandomTrainers, getRandomStylists, getRandomTherapists, getRandomPublicists } from './services/teamLogic';
 import { createBusiness, normalizeStudioState } from './services/businessLogic';
-import { CheckCircle, Heart, ShieldAlert, AlertTriangle, PlayCircle, Loader2, Skull, Briefcase } from 'lucide-react'; 
+import { CheckCircle, Heart, ShieldAlert, AlertTriangle, PlayCircle, Loader2, Skull, Briefcase, Baby } from 'lucide-react'; 
 import { useGameActions } from './hooks/useGameActions';
 import { PROPERTY_CATALOG, CAR_CATALOG, CLOTHING_CATALOG } from './services/lifestyleLogic';
 import { showAd, initAds } from './services/adLogic';
+import { ensureTrackingPermission } from './services/trackingService';
 import { saveGameData, loadGameData, deleteGameData } from './services/storage';
 import { createBloodlineSnapshot, getAbsoluteWeek, getLegacyInheritancePreview, getRelationshipAge, inheritActorSkills, LEGACY_MIN_PLAYABLE_AGE } from './services/legacyLogic';
 import { applyPremiumPurchase, hasNoAds, PremiumProductId, restoreWeeklyEnergy, spendPlayerEnergy, syncEnergyDisplay } from './services/premiumLogic';
 import { purchasePremiumProduct, restorePremiumPurchases } from './services/iapService';
+import { sanitizeAwardRecords } from './services/awardLogic';
 import { RoleType } from './types';
+import { applyParenthoodAbandonment } from './services/familyLogic';
 
 type GameStatus = 'START_MENU' | 'CREATION' | 'PLAYING' | 'DEATH_SCREEN';
+type PendingBabyNaming = {
+  partnerId: string;
+  partnerName: string;
+  babyGender: 'MALE' | 'FEMALE';
+  suggestedFirstName: string;
+  birthWeekAbsolute: number;
+  eventWeek: number;
+  eventYear: number;
+  shouldCreateScandalNews: boolean;
+};
 
 const dedupeAwards = <T extends { type: string; year: number; category: string; projectId: string; outcome: 'WON' | 'NOMINATED' }>(awards: T[] = []): T[] => {
-  const byKey = new Map<string, T>();
-
-  awards.forEach(award => {
-      const key = `${award.type}::${award.year}::${award.category}::${award.projectId}`;
-      const existing = byKey.get(key);
-
-      if (!existing || (existing.outcome !== 'WON' && award.outcome === 'WON')) {
-          byKey.set(key, award);
-      }
-  });
-
-  return Array.from(byKey.values());
+  return sanitizeAwardRecords(awards);
 };
 
 const normalizeProjectDetails = (details: Partial<ProjectDetails> | undefined): ProjectDetails => {
@@ -245,6 +247,7 @@ class GameErrorBoundary extends React.Component<GameErrorBoundaryProps, GameErro
 export const App: React.FC = () => {
   const [player, setPlayer] = useState<Player>(INITIAL_PLAYER);
   const [activePage, setActivePage] = useState<Page>(Page.HOME);
+  const [lifestyleInitialView, setLifestyleInitialView] = useState<'MAIN' | 'ASSETS' | 'BUSINESS' | 'PRODUCTION_WIZARD' | 'PRODUCTION_GAME' | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [gameStatus, setGameStatus] = useState<GameStatus>('START_MENU');
   const [saveSlots, setSaveSlots] = useState<Record<number, Player | null>>({ 1: null, 2: null, 3: null });
@@ -255,7 +258,12 @@ export const App: React.FC = () => {
   const [toastMessage, setToastMessage] = useState<{title: string, subtext: string} | null>(null);
   const [activePressEvent, setActivePressEvent] = useState<{ project: Commitment, questions: PressInteraction[] } | null>(null);
   const [showProtectionPrompt, setShowProtectionPrompt] = useState<{ partnerId: string, partnerName: string } | null>(null);
+  const [isBottomNavVisible, setIsBottomNavVisible] = useState(true);
   const [activeSocialEvent, setActiveSocialEvent] = useState<{ event: SocialEvent, partnerId: string } | null>(null);
+  const [pendingBabyNaming, setPendingBabyNaming] = useState<PendingBabyNaming | null>(null);
+  const [babyFirstNameInput, setBabyFirstNameInput] = useState('');
+  const [babySurnameChoice, setBabySurnameChoice] = useState('');
+  const [deathScreenPreviewPlayer, setDeathScreenPreviewPlayer] = useState<Player | null>(null);
   
   // DEBT / AD STATES
   const [showDebtModal, setShowDebtModal] = useState(false);
@@ -264,6 +272,26 @@ export const App: React.FC = () => {
   const [adTotalSteps, setAdTotalSteps] = useState(1);
 
   const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
+  const getSurname = (fullName: string) => {
+      const parts = (fullName || '').trim().split(/\s+/).filter(Boolean);
+      if (parts.length === 0) return 'Legacy';
+      return parts[parts.length - 1];
+  };
+  const getGivenName = (fullName: string) => {
+      const parts = (fullName || '').trim().split(/\s+/).filter(Boolean);
+      return parts[0] || fullName || 'Partner';
+  };
+  const getBabySurnameOptions = (partnerName: string) => {
+      const playerSurname = getSurname(player.name);
+      const partnerSurname = getSurname(partnerName);
+      const options = [
+          { id: 'PLAYER', label: `Your surname`, value: playerSurname },
+          { id: 'PARTNER', label: `${getGivenName(partnerName)}'s surname`, value: partnerSurname },
+          { id: 'BOTH', label: 'Both surnames', value: playerSurname === partnerSurname ? playerSurname : `${playerSurname}-${partnerSurname}` }
+      ];
+
+      return options.filter((option, index, arr) => arr.findIndex(other => other.value === option.value) === index);
+  };
   const persistSlotSave = (slot: number, nextPlayer: Player) => {
       saveGameData(`actorEmpireSave_${slot}`, nextPlayer);
       try {
@@ -282,19 +310,109 @@ export const App: React.FC = () => {
       persistSlotSave(currentSlot, nextPlayer);
   };
 
+  useEffect(() => {
+    if (activePage !== Page.LIFESTYLE) {
+      setIsBottomNavVisible(true);
+    }
+  }, [activePage]);
+
   // --- LOGIC HOOK ---
   const { 
       handleGenericUpdate, handleRehearse, handleImproveAction, 
       handlePartnerAction, handleSocialInteract, handleIntimacyChoice, 
       handlePromotionAction, handleNPCInteract
   } = useGameActions({ 
-      player, setPlayer, setToastMessage, setActivePressEvent, setShowProtectionPrompt, setActiveSocialEvent 
+      player, setPlayer, setToastMessage, setActivePressEvent, setShowProtectionPrompt, setActiveSocialEvent, setPendingBabyNaming
   });
+
+  useEffect(() => {
+    if (!pendingBabyNaming) return;
+    setBabyFirstNameInput(pendingBabyNaming.suggestedFirstName);
+    const surnameOptions = getBabySurnameOptions(pendingBabyNaming.partnerName);
+    setBabySurnameChoice(surnameOptions[0]?.value || getSurname(player.name));
+  }, [pendingBabyNaming]);
+
+  const handleConfirmBabyName = () => {
+      if (!pendingBabyNaming) return;
+      const trimmedFirstName = babyFirstNameInput.trim();
+      if (!trimmedFirstName) return;
+
+      const finalName = `${trimmedFirstName} ${babySurnameChoice}`.trim();
+      const babyBirthAbsolute = pendingBabyNaming.birthWeekAbsolute;
+      const partnerName = pendingBabyNaming.partnerName;
+      const babyGender = pendingBabyNaming.babyGender;
+      const shouldCreateScandalNews = pendingBabyNaming.shouldCreateScandalNews;
+      const eventWeek = pendingBabyNaming.eventWeek;
+      const eventYear = pendingBabyNaming.eventYear;
+
+      setPlayer(prev => {
+          const newRelationships = [...prev.relationships, {
+              id: `child_${Date.now()}`,
+              name: finalName,
+              relation: 'Child',
+              closeness: 100,
+              image: getGenderedAvatar(babyGender, trimmedFirstName),
+              lastInteractionWeek: eventWeek,
+              lastInteractionAbsolute: babyBirthAbsolute,
+              age: 0,
+              gender: babyGender,
+              birthWeekAbsolute: babyBirthAbsolute,
+          } satisfies Relationship];
+
+          const newNews = [...prev.news];
+          if (shouldCreateScandalNews) {
+              newNews.unshift({
+                  id: `news_scandal_baby_${Date.now()}`,
+                  headline: `SCANDAL: ${prev.name} Welcomes Secret Love Child!`,
+                  subtext: `Fans shocked by sudden baby announcement with partner ${partnerName}.`,
+                  category: 'TOP_STORY',
+                  week: eventWeek,
+                  year: eventYear,
+                  impactLevel: 'HIGH'
+              });
+          }
+
+          return {
+              ...prev,
+              relationships: newRelationships,
+              news: newNews,
+              logs: [{ week: eventWeek, year: eventYear, message: `🍼 ${finalName} was welcomed into your family with ${partnerName}.`, type: 'positive' }, ...prev.logs].slice(0, 50)
+          };
+      });
+
+      setToastMessage({ title: 'Baby Named', subtext: `Welcome, ${finalName}.` });
+      setPendingBabyNaming(null);
+      setBabyFirstNameInput('');
+      setBabySurnameChoice('');
+  };
+
+  const handleAbandonBaby = () => {
+      if (!pendingBabyNaming) return;
+
+      setPlayer(prev =>
+          applyParenthoodAbandonment(prev, {
+              partnerId: pendingBabyNaming.partnerId,
+              partnerName: pendingBabyNaming.partnerName,
+              babyGender: pendingBabyNaming.babyGender,
+              childName: `${pendingBabyNaming.suggestedFirstName} ${getSurname(pendingBabyNaming.partnerName)}`.trim(),
+              birthWeekAbsolute: pendingBabyNaming.birthWeekAbsolute,
+          })
+      );
+
+      setToastMessage({
+          title: 'Parenthood Rejected',
+          subtext: `You walked away. The fallout will follow you.`,
+      });
+      setPendingBabyNaming(null);
+      setBabyFirstNameInput('');
+      setBabySurnameChoice('');
+  };
 
   // Check for saved game on initial mount & Init Ads
   useEffect(() => {
     const init = async () => {
         try {
+            await ensureTrackingPermission();
             await initAds();
             
             const slots: Record<number, Player | null> = { 1: null, 2: null, 3: null };
@@ -500,10 +618,19 @@ export const App: React.FC = () => {
           if (typeof safePlayer.youtube.isMonetized !== 'boolean') safePlayer.youtube.isMonetized = false;
 
           if (!safePlayer.finance || typeof safePlayer.finance !== 'object') {
-              safePlayer.finance = { history: [], yearly: [] };
+              safePlayer.finance = {
+                  history: [],
+                  yearly: [],
+                  loans: [],
+                  credit: { successfulPayments: 0, missedPayments: 0, defaults: 0, totalBorrowed: 0, totalRepaid: 0 }
+              };
           } else {
               if (!Array.isArray(safePlayer.finance.history)) safePlayer.finance.history = [];
               if (!Array.isArray(safePlayer.finance.yearly)) safePlayer.finance.yearly = [];
+              if (!Array.isArray((safePlayer.finance as any).loans)) (safePlayer.finance as any).loans = [];
+              if (!(safePlayer.finance as any).credit || typeof (safePlayer.finance as any).credit !== 'object') {
+                  (safePlayer.finance as any).credit = { successfulPayments: 0, missedPayments: 0, defaults: 0, totalBorrowed: 0, totalRepaid: 0 };
+              }
           }
 
           if (!safePlayer.relationships || safePlayer.relationships.length === 0) safePlayer.relationships = [...INITIAL_PLAYER.relationships];
@@ -576,6 +703,7 @@ export const App: React.FC = () => {
               ...project,
               awards: dedupeAwards(project.awards || [])
           }));
+          safePlayer.awards = dedupeAwards(safePlayer.awards || []);
           if (safePlayer.business) {
               const indMap: Record<string, any> = { 'Cafe': { type: 'CAFE', subtype: 'COFFEE_SHOP', emoji: '☕' }, 'Online Brand': { type: 'FASHION', subtype: 'STREETWEAR', emoji: '👕' }, 'Production House': { type: 'MERCH', subtype: 'ONLINE_STORE', emoji: '📦' } };
               const mapped = indMap[safePlayer.business.type] || { type: 'RESTAURANT', subtype: 'CASUAL_DINING', emoji: '🍽️' };
@@ -595,7 +723,27 @@ export const App: React.FC = () => {
   }, [toastMessage]);
 
   const handleUpdatePlayer = (updatedPlayer: Player) => { 
-      setPlayer(updatedPlayer); 
+      setPlayer({
+          ...updatedPlayer,
+          awards: dedupeAwards(updatedPlayer.awards || []),
+          pastProjects: (updatedPlayer.pastProjects || []).map((project: any) => ({
+              ...project,
+              awards: dedupeAwards(project.awards || [])
+          }))
+      }); 
+  };
+
+  const handleQueueBabyNamingCheat = () => {
+      const nextPlayer = {
+          ...player,
+          flags: {
+              ...player.flags,
+              qaBabyNamingNextWeek: true,
+          },
+          logs: [{ week: player.currentWeek, year: player.age, message: '🍼 CHEAT: Baby naming test queued for next week.', type: 'positive' }, ...player.logs].slice(0, 50)
+      };
+      handleUpdatePlayer(nextPlayer);
+      setToastMessage({ title: 'Baby QA Queued', subtext: 'Press Age Up once to open the naming flow.' });
   };
 
   const handleNextWeek = async () => {
@@ -603,20 +751,43 @@ export const App: React.FC = () => {
     setIsProcessing(true);
     try {
         const { player: newPlayerState, triggerAd } = await processGameWeek(player);
-        handleUpdatePlayer(newPlayerState);
+        const shouldTriggerBabyQa = !!newPlayerState.flags?.qaBabyNamingNextWeek;
+        const syncedPlayerState = shouldTriggerBabyQa
+            ? {
+                ...newPlayerState,
+                flags: {
+                    ...newPlayerState.flags,
+                    qaBabyNamingNextWeek: false,
+                }
+            }
+            : newPlayerState;
+        handleUpdatePlayer(syncedPlayerState);
 
-        if (newPlayerState.flags?.isDead) {
+        if (shouldTriggerBabyQa) {
+            setPendingBabyNaming({
+                partnerId: 'cheat_partner',
+                partnerName: 'Jordan Vale',
+                babyGender: Math.random() > 0.5 ? 'MALE' : 'FEMALE',
+                suggestedFirstName: Math.random() > 0.5 ? 'Leo' : 'Mia',
+                birthWeekAbsolute: getAbsoluteWeek(syncedPlayerState.age, syncedPlayerState.currentWeek),
+                eventWeek: syncedPlayerState.currentWeek,
+                eventYear: syncedPlayerState.age,
+                shouldCreateScandalNews: false,
+            });
+        }
+
+        if (syncedPlayerState.flags?.isDead) {
             setGameStatus('DEATH_SCREEN');
             return;
         }
 
         // Debt Check
-        if (newPlayerState.money < 0) {
+        if (syncedPlayerState.money < 0) {
             setShowDebtModal(true);
         }
 
         // INTERSTITIAL AD TRIGGER (Every 12 Weeks)
-        if (triggerAd && !hasNoAds(newPlayerState)) {
+        if (triggerAd && !hasNoAds(syncedPlayerState)) {
             setTimeout(async () => {
                 await showAd('INTERSTITIAL');
             }, 800);
@@ -824,6 +995,10 @@ export const App: React.FC = () => {
       setGameStatus('PLAYING'); 
   };
 
+  const handleOpenDeathSummaryPreview = () => {
+      setDeathScreenPreviewPlayer(clone(player));
+  };
+
   const handleContinueAsChild = (child: any) => {
       const inheritancePreview = getLegacyInheritancePreview(player);
       const inheritedRelationships: Relationship[] = [];
@@ -1008,6 +1183,18 @@ export const App: React.FC = () => {
       );
   }
 
+  if (deathScreenPreviewPlayer) {
+      return (
+          <DeathScreen
+              player={deathScreenPreviewPlayer}
+              onContinueAsChild={() => setDeathScreenPreviewPlayer(null)}
+              onStartNewGame={() => setDeathScreenPreviewPlayer(null)}
+              isPreview
+              onClosePreview={() => setDeathScreenPreviewPlayer(null)}
+          />
+      );
+  }
+
   return (
     <GameErrorBoundary onRecover={handleRecoverToMenu}>
     <div className="h-screen bg-black text-white font-sans selection:bg-amber-500 selection:text-black">
@@ -1165,14 +1352,91 @@ export const App: React.FC = () => {
                   <div className="w-12 h-12 bg-rose-500/20 text-rose-500 rounded-full flex items-center justify-center mb-4"><Heart size={24} fill="currentColor" /></div>
                   <h3 className="text-white font-bold text-lg mb-1">Intimacy with {showProtectionPrompt.partnerName}</h3>
                   <div className="grid grid-cols-1 gap-3 w-full mt-6">
-                      <button onClick={() => handleIntimacyChoice('PROTECTED', showProtectionPrompt.partnerId)} className="py-4 px-4 rounded-xl bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 flex items-center justify-between group">
+                      <button onClick={() => { setShowProtectionPrompt(null); handleIntimacyChoice('PROTECTED', showProtectionPrompt.partnerId); }} className="py-4 px-4 rounded-xl bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 flex items-center justify-between group">
                           <div className="text-left"><div className="font-bold text-white text-sm">Use Protection</div></div><CheckCircle size={18} className="text-emerald-500"/>
                       </button>
-                      <button onClick={() => handleIntimacyChoice('UNPROTECTED', showProtectionPrompt.partnerId)} className="py-4 px-4 rounded-xl bg-zinc-800 border border-rose-900/30 hover:bg-rose-900/10 flex items-center justify-between group">
+                      <button onClick={() => { setShowProtectionPrompt(null); handleIntimacyChoice('UNPROTECTED', showProtectionPrompt.partnerId); }} className="py-4 px-4 rounded-xl bg-zinc-800 border border-rose-900/30 hover:bg-rose-900/10 flex items-center justify-between group">
                           <div className="text-left"><div className="font-bold text-rose-400 text-sm">Unprotected</div></div><ShieldAlert size={18} className="text-rose-500"/>
                       </button>
                   </div>
                   <button onClick={() => setShowProtectionPrompt(null)} className="mt-4 text-xs text-zinc-500 hover:text-white underline">Cancel</button>
+              </div>
+          </div>
+      )}
+
+      {pendingBabyNaming && (
+          <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-200">
+              <div className="bg-zinc-900 border border-zinc-800 rounded-3xl w-full max-w-sm p-6 shadow-2xl">
+                  <div className="flex flex-col items-center text-center mb-6">
+                      <div className="w-14 h-14 bg-amber-500/15 text-amber-400 rounded-full flex items-center justify-center mb-4">
+                          <Baby size={28} />
+                      </div>
+                      <h3 className="text-white font-bold text-xl mb-1">Name Your Baby</h3>
+                      <p className="text-sm text-zinc-400">Choose your child&apos;s first name and family surname.</p>
+                  </div>
+
+                  <div className="space-y-5">
+                      <div>
+                          <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 mb-2 block">First Name</label>
+                          <input
+                              value={babyFirstNameInput}
+                              onChange={(e) => setBabyFirstNameInput(e.target.value)}
+                              placeholder={pendingBabyNaming.suggestedFirstName}
+                              maxLength={18}
+                              className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl px-4 py-3 text-white outline-none focus:border-amber-500/60"
+                          />
+                      </div>
+
+                      <div>
+                          <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 mb-2 block">Last Name</label>
+                          <div className="grid grid-cols-1 gap-2">
+                              {getBabySurnameOptions(pendingBabyNaming.partnerName).map(option => (
+                                  <button
+                                      key={option.id}
+                                      onClick={() => setBabySurnameChoice(option.value)}
+                                      className={`p-3 rounded-2xl border text-left transition-colors ${
+                                          babySurnameChoice === option.value
+                                              ? 'bg-amber-500/10 border-amber-500/50 text-white'
+                                              : 'bg-zinc-950 border-zinc-800 text-zinc-300 hover:bg-zinc-900'
+                                      }`}
+                                  >
+                                      <div className="font-bold text-sm">{option.label}</div>
+                                      <div className="text-xs text-zinc-500 mt-0.5">{option.value}</div>
+                                  </button>
+                              ))}
+                          </div>
+                      </div>
+
+                      <div className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3">
+                          <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 mb-1">Full Name Preview</div>
+                          <div className="text-lg font-bold text-white">
+                              {`${babyFirstNameInput.trim() || pendingBabyNaming.suggestedFirstName} ${babySurnameChoice}`.trim()}
+                          </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                          <button
+                              onClick={handleAbandonBaby}
+                              className="w-full py-4 rounded-2xl font-black uppercase tracking-wider transition-all bg-rose-500/10 hover:bg-rose-500/20 text-rose-200 border border-rose-500/30"
+                          >
+                              Walk Away
+                          </button>
+                          <button
+                              onClick={handleConfirmBabyName}
+                              disabled={!babyFirstNameInput.trim() || !babySurnameChoice}
+                              className={`w-full py-4 rounded-2xl font-black uppercase tracking-wider transition-all ${
+                                  !babyFirstNameInput.trim() || !babySurnameChoice
+                                      ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed'
+                                      : 'bg-amber-500 hover:bg-amber-400 text-black shadow-[0_0_25px_rgba(245,158,11,0.35)]'
+                              }`}
+                          >
+                              Welcome Baby
+                          </button>
+                      </div>
+                      <p className="text-center text-[11px] text-zinc-500">
+                          Walking away can trigger custody fallout, divorce, child support, alimony, scandal news, and dynasty damage.
+                      </p>
+                  </div>
               </div>
           </div>
       )}
@@ -1215,12 +1479,12 @@ export const App: React.FC = () => {
         {gameStatus === 'CREATION' && <CreationMenu onStartGame={handleStartGame} />}
         {gameStatus === 'PLAYING' && (
             <>
-                <div className={`flex-1 px-5 pt-5 pb-28 overflow-y-auto custom-scrollbar ${player.money < 0 ? 'pt-8' : ''}`}>
-                    {activePage === Page.HOME && (<HomePage player={player} onNextWeek={handleNextWeek} isProcessing={isProcessing} onUpdatePlayer={handleUpdatePlayer} setPage={setActivePage} />)}
+                <div className={`flex-1 px-5 pt-5 pb-nav-safe overflow-y-auto custom-scrollbar ${player.money < 0 ? 'pt-8' : ''}`}>
+                    {activePage === Page.HOME && (<HomePage player={player} onNextWeek={handleNextWeek} isProcessing={isProcessing} onUpdatePlayer={handleUpdatePlayer} setPage={setActivePage} onOpenProductionHouseCheat={() => { setLifestyleInitialView('PRODUCTION_GAME'); setActivePage(Page.LIFESTYLE); }} onQueueBabyNamingCheat={handleQueueBabyNamingCheat} onOpenDeathSummaryPreview={handleOpenDeathSummaryPreview} />)}
                     {activePage === Page.CAREER && (<CareerPage player={player} onQuitJob={handleQuitJob} onRehearse={handleRehearse} />)}
                     {activePage === Page.IMPROVE && (<ImprovePage player={player} onTrain={()=>{}} onEnroll={(c)=>handleGenericUpdate(p=>({ ...p, money: p.money- (c.upfrontCost||0), commitments: [...p.commitments, {...c, id: `c_${Date.now()}`, weeksCompleted:0}] }))} onCancel={(id)=>handleGenericUpdate(p=>({ ...p, commitments: p.commitments.filter(c=>c.id!==id)}))} onPerformAction={handleImproveAction} />)}
                     {activePage === Page.SOCIAL && (<SocialPage player={player} onInteract={handleSocialInteract} onContinueAsChild={handleContinueAsChild} />)}
-                    {activePage === Page.LIFESTYLE && (<LifestylePage player={player} onBuyItem={(i)=>handleGenericUpdate(p=>({ ...p, money: p.money-i.price, assets: [...p.assets, i.id], customItems: i.id.includes('_cust_') ? [...p.customItems, i as any] : p.customItems }))} onSellItem={(id)=>handleGenericUpdate(p=>{ const it = [...PROPERTY_CATALOG, ...CAR_CATALOG, ...CLOTHING_CATALOG].find(x=>x.id===id); return { ...p, money: p.money + (it ? it.price*0.5 : 0), assets: p.assets.filter(a=>a!==id) }; })} onSetResidence={(id)=>handleGenericUpdate(p=>({ ...p, residenceId: id }))} onSetActiveStyle={(s)=>handleGenericUpdate(p=>({ ...p, activeClothingStyle: s }))} onStartBusiness={()=>{}} onShutdownBusiness={()=>{}} onUpdatePlayer={handleUpdatePlayer} onPremiumPurchase={handlePremiumPurchase} />)}
+                    {activePage === Page.LIFESTYLE && (<LifestylePage player={player} onBuyItem={(i)=>handleGenericUpdate(p=>({ ...p, money: p.money-i.price, assets: [...p.assets, i.id], customItems: i.id.includes('_cust_') ? [...p.customItems, i as any] : p.customItems }))} onSellItem={(id)=>handleGenericUpdate(p=>{ const it = [...PROPERTY_CATALOG, ...CAR_CATALOG, ...CLOTHING_CATALOG].find(x=>x.id===id); return { ...p, money: p.money + (it ? it.price*0.5 : 0), assets: p.assets.filter(a=>a!==id) }; })} onSetResidence={(id)=>handleGenericUpdate(p=>({ ...p, residenceId: id }))} onSetActiveStyle={(s)=>handleGenericUpdate(p=>({ ...p, activeClothingStyle: s }))} onStartBusiness={()=>{}} onShutdownBusiness={()=>{}} onUpdatePlayer={handleUpdatePlayer} onPremiumPurchase={handlePremiumPurchase} onNavVisibilityChange={setIsBottomNavVisible} initialView={lifestyleInitialView ?? undefined} onInitialViewConsumed={() => setLifestyleInitialView(null)} />)}
                     {activePage === Page.MOBILE && (
                         <MobilePage 
                             player={player} 
@@ -1393,7 +1657,7 @@ export const App: React.FC = () => {
                         />
                     )}
                 </div>
-                <BottomNav activePage={activePage} setPage={setActivePage} />
+                {isBottomNavVisible && <BottomNav activePage={activePage} setPage={setActivePage} />}
             </>
         )}
       </div>

@@ -74,6 +74,13 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
       setTimeout(() => setToast(null), 3000);
   };
 
+  const handleMarkMessageRead = (id: string) => {
+      const updatedInbox = props.player!.inbox.map(message =>
+          message.id === id ? { ...message, isRead: true } : message
+      );
+      handleUpdatePlayer({ ...props.player!, inbox: updatedInbox });
+  };
+
   // --- HANDLER: Accept Offers (Modified for Multi-Film) ---
   const handleAcceptMessage = (msg: Message) => {
       // 1. Remove message from inbox
@@ -88,10 +95,20 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
 
           if (msg.type === 'OFFER_NEGOTIATION') {
               const data = msg.data as NegotiationData;
+              if (!data?.opportunity) {
+                  showToast("This offer is missing contract details.", "bg-rose-500");
+                  handleUpdatePlayer(updatedPlayer);
+                  return;
+              }
               opp = data.opportunity;
               salary = data.currentOffer;
               royalty = data.royaltyPercentage || 0;
           } else {
+              if (!msg.data) {
+                  showToast("This offer is missing project details.", "bg-rose-500");
+                  handleUpdatePlayer(updatedPlayer);
+                  return;
+              }
               opp = msg.data as AuditionOpportunity;
               salary = opp.estimatedIncome;
               royalty = opp.royaltyPercentage || 0;
@@ -99,6 +116,12 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
 
           // FIX: Register Famous Movie to prevent duplicate offers
           if (opp.project.isFamous) {
+              if (!updatedPlayer.world) {
+                  updatedPlayer.world = { projects: [], trendingGenre: 'ACTION', universes: {}, famousMoviesReleased: [], awardHistory: [], upcomingRivals: [] };
+              }
+              if (!Array.isArray(updatedPlayer.world.famousMoviesReleased)) {
+                  updatedPlayer.world.famousMoviesReleased = [];
+              }
               if (!updatedPlayer.world.famousMoviesReleased.includes(opp.projectName)) {
                   updatedPlayer.world.famousMoviesReleased.push(opp.projectName);
               }
@@ -197,6 +220,11 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
       } 
       else if (msg.type === 'OFFER_SPONSORSHIP') {
           const offer = msg.data as SponsorshipOffer;
+          if (!offer) {
+              showToast("This deal is missing sponsor details.", "bg-rose-500");
+              handleUpdatePlayer(updatedPlayer);
+              return;
+          }
           // Add to active sponsorships
           updatedPlayer.activeSponsorships = [...updatedPlayer.activeSponsorships, { ...offer, weeksCompleted: 0 }];
           updatedPlayer.logs.push({ week: updatedPlayer.currentWeek, year: updatedPlayer.age, message: `Signed sponsorship deal with ${offer.brandName}.`, type: 'positive' });
@@ -475,6 +503,7 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
                         onBack={() => setAppMode('HOME')} 
                         onAccept={handleAcceptMessage} // Use local smart handler
                         onDelete={props.onDeleteMessage!} 
+                        onMarkRead={handleMarkMessageRead}
                     />
                 )}
                 {appMode === 'TEAM' && (
@@ -503,7 +532,7 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
                     <StocksApp player={props.player} onBack={() => setAppMode('HOME')} onTrade={props.onTradeStock!} />
                 )}
                 {appMode === 'BANK' && (
-                    <BankApp player={props.player} onBack={() => setAppMode('HOME')} />
+                    <BankApp player={props.player} onBack={() => setAppMode('HOME')} onUpdatePlayer={handleUpdatePlayer} />
                 )}
                 
                 {/* DATING GROUP */}

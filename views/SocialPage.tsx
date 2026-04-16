@@ -2,10 +2,11 @@ import React, { useMemo, useState } from 'react';
 import { Player, Relationship, BloodlineMember } from '../types';
 import { MessageCircle, Phone, Coffee, Gift, Users, X, Zap, Heart, Baby, Gem, Crown, Flame, Music, Plane, Briefcase, Trophy, Film, DollarSign, Skull, Sparkles } from 'lucide-react';
 import { calculateLegacyScore, getGenerationNumber, getInteractionAgeInWeeks, getLegacyInheritancePreview, getRelationshipAge, LEGACY_INHERITANCE_TAX_RATE, LEGACY_MIN_PLAYABLE_AGE } from '../services/legacyLogic';
+import { getDivorceLawyerCost, isChildAbandoned } from '../services/familyLogic';
 
 interface SocialPageProps {
   player: Player;
-  onInteract: (id: string, type: 'CALL' | 'HANGOUT' | 'GIFT' | 'NETWORK' | 'DATE' | 'PROPOSE' | 'INTIMACY' | 'CLUBBING' | 'TRIP') => void;
+  onInteract: (id: string, type: 'CALL' | 'HANGOUT' | 'GIFT' | 'NETWORK' | 'DATE' | 'PROPOSE' | 'INTIMACY' | 'CLUBBING' | 'TRIP' | 'ABANDON_CHILD' | 'RECONNECT_CHILD' | 'BREAK_UP' | 'DIVORCE_SETTLE' | 'DIVORCE_FIGHT_BUDGET' | 'DIVORCE_FIGHT_ESTABLISHED' | 'DIVORCE_FIGHT_ELITE') => void;
   onContinueAsChild: (child: Relationship) => void;
 }
 
@@ -22,6 +23,7 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
   const [selectedContact, setSelectedContact] = useState<Relationship | null>(null);
   const [activeTab, setActiveTab] = useState<SocialTab>('connections');
   const [legacyCandidate, setLegacyCandidate] = useState<Relationship | null>(null);
+  const [showDivorceOptions, setShowDivorceOptions] = useState(false);
 
   const getHangoutCost = () => {
       if (player.stats.fame > 75) return 500;
@@ -34,9 +36,10 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
       return 250;
   };
 
-  const handleInteraction = (type: 'CALL' | 'HANGOUT' | 'GIFT' | 'NETWORK' | 'DATE' | 'PROPOSE' | 'INTIMACY' | 'CLUBBING' | 'TRIP') => {
+  const handleInteraction = (type: 'CALL' | 'HANGOUT' | 'GIFT' | 'NETWORK' | 'DATE' | 'PROPOSE' | 'INTIMACY' | 'CLUBBING' | 'TRIP' | 'ABANDON_CHILD' | 'RECONNECT_CHILD' | 'BREAK_UP' | 'DIVORCE_SETTLE' | 'DIVORCE_FIGHT_BUDGET' | 'DIVORCE_FIGHT_ESTABLISHED' | 'DIVORCE_FIGHT_ELITE') => {
       if (selectedContact) {
           onInteract(selectedContact.id, type);
+          setShowDivorceOptions(false);
           setSelectedContact(null);
       }
   };
@@ -44,7 +47,7 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
   const sortedRelationships = useMemo(() => {
       return [...player.relationships].sort((a, b) => {
           const getPriority = (rel: Relationship) => {
-              if (['Parent', 'Deceased Parent', 'Sibling', 'Partner', 'Spouse', 'Child'].includes(rel.relation)) return 3;
+              if (['Parent', 'Deceased Parent', 'Sibling', 'Partner', 'Spouse', 'Ex-Partner', 'Ex-Spouse', 'Child'].includes(rel.relation)) return 3;
               if (rel.relation === 'Connection') return 1;
               return 2;
           };
@@ -56,7 +59,7 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
   }, [player.relationships]);
 
   const innerCircle = sortedRelationships.filter(rel =>
-      ['Parent', 'Deceased Parent', 'Partner', 'Spouse', 'Child', 'Friend', 'Sibling'].includes(rel.relation)
+      ['Parent', 'Deceased Parent', 'Partner', 'Spouse', 'Ex-Partner', 'Ex-Spouse', 'Child', 'Friend', 'Sibling'].includes(rel.relation)
   );
 
   const professionalNetwork = sortedRelationships.filter(rel =>
@@ -162,12 +165,16 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
       return rows;
   }, [children, currentGeneration, currentLegacyScore, legacyHistory, player, siblings]);
 
+  React.useEffect(() => {
+      setShowDivorceOptions(false);
+  }, [selectedContact?.id]);
+
   const renderRelationshipCard = (rel: Relationship) => {
       const weeksSince = getInteractionAgeInWeeks(rel, player.age, player.currentWeek);
       const isCritical = weeksSince >= 8;
       
       return (
-          <div key={rel.id} onClick={() => setSelectedContact(rel)} className={`glass-card p-4 rounded-3xl flex items-center gap-4 group cursor-pointer transition-transform active:scale-[0.98] ${rel.relation === 'Partner' || rel.relation === 'Spouse' ? 'border-pink-500/30 bg-pink-900/5' : ''}`}>
+          <div key={rel.id} onClick={() => setSelectedContact(rel)} className={`glass-card p-4 rounded-3xl flex items-center gap-4 group cursor-pointer transition-transform active:scale-[0.98] ${rel.relation === 'Partner' || rel.relation === 'Spouse' ? 'border-pink-500/30 bg-pink-900/5' : ''} ${rel.relation === 'Ex-Partner' || rel.relation === 'Ex-Spouse' ? 'border-rose-500/20 bg-rose-900/5' : ''}`}>
               <div className="relative">
                   <img
                       src={rel.image}
@@ -176,6 +183,7 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
                   />
                   <div className="absolute -bottom-1 -right-1 bg-zinc-900 rounded-full p-1 border border-zinc-800 shadow-md">
                       {rel.relation === 'Partner' || rel.relation === 'Spouse' ? <Heart size={10} className="text-rose-500 fill-rose-500"/> :
+                      rel.relation === 'Ex-Partner' || rel.relation === 'Ex-Spouse' ? <Heart size={10} className="text-rose-300"/> :
                       rel.relation === 'Parent' ? <span className="text-blue-500 text-[10px]">🏠</span> :
                       rel.relation === 'Deceased Parent' ? <Skull size={12} className="text-zinc-500"/> :
                       rel.relation === 'Child' ? <Baby size={12} className="text-yellow-400"/> :
@@ -375,7 +383,7 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
       {selectedContact && (
           <div className="fixed inset-0 z-[200] bg-black/90 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200">
               <div className="bg-black w-full max-w-sm h-[85vh] sm:h-auto sm:rounded-3xl border-t sm:border border-zinc-800 overflow-hidden flex flex-col shadow-2xl animate-in slide-in-from-bottom duration-300 relative">
-                  <button onClick={() => setSelectedContact(null)} className="absolute top-4 right-4 z-20 p-2 bg-zinc-900/80 rounded-full text-zinc-400 hover:text-white transition-colors backdrop-blur-md"><X size={18} /></button>
+                  <button onClick={() => { setShowDivorceOptions(false); setSelectedContact(null); }} className="absolute top-4 right-4 z-20 p-2 bg-zinc-900/80 rounded-full text-zinc-400 hover:text-white transition-colors backdrop-blur-md"><X size={18} /></button>
 
                   <div className="relative pt-12 pb-6 px-6 bg-zinc-900 border-b border-zinc-800 flex flex-col items-center shrink-0">
                       <div className="w-24 h-24 rounded-full p-1 bg-gradient-to-tr from-zinc-700 to-zinc-900 shadow-xl mb-3">
@@ -416,6 +424,74 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
                                       <Gem size={16}/> Propose Marriage <span className="opacity-60 text-xs font-normal">($5k Ring)</span>
                                   </button>
                               )}
+
+                              <div className="mt-4 rounded-2xl border border-rose-500/20 bg-rose-500/5 p-4">
+                                  <div className="mb-2 text-[10px] font-bold uppercase tracking-widest text-rose-300">Relationship Exit</div>
+                                  {selectedContact.relation === 'Partner' ? (
+                                      <>
+                                          <p className="mb-3 text-xs text-zinc-400">
+                                              A breakup can still trigger child support and public fallout if your life together is messy enough.
+                                          </p>
+                                          <button
+                                              onClick={() => handleInteraction('BREAK_UP')}
+                                              className="w-full rounded-2xl border border-rose-500/30 bg-rose-500/10 py-4 text-sm font-bold text-rose-200 hover:bg-rose-500/20"
+                                          >
+                                              Break Up
+                                          </button>
+                                      </>
+                                  ) : (
+                                      <>
+                                          <p className="mb-3 text-xs text-zinc-400">
+                                              Divorce can become a full wealth event. Settle quietly or fight in court and risk a brutal split.
+                                          </p>
+                                          {!showDivorceOptions ? (
+                                              <button
+                                                  onClick={() => setShowDivorceOptions(true)}
+                                                  className="w-full rounded-2xl border border-rose-500/30 bg-rose-500/10 py-4 text-sm font-bold text-rose-200 hover:bg-rose-500/20"
+                                              >
+                                                  Start Divorce
+                                              </button>
+                                          ) : (
+                                              <div className="space-y-3">
+                                                  <button
+                                                      onClick={() => handleInteraction('DIVORCE_SETTLE')}
+                                                      className="w-full rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-left hover:bg-amber-500/20"
+                                                  >
+                                                      <div className="text-sm font-bold text-amber-200">Peaceful Settlement</div>
+                                                      <div className="mt-1 text-xs text-zinc-400">Lower legal burn, but you still concede cash and ongoing support.</div>
+                                                  </button>
+                                                  <button
+                                                      onClick={() => handleInteraction('DIVORCE_FIGHT_BUDGET')}
+                                                      className="w-full rounded-2xl border border-zinc-700 bg-zinc-950 p-4 text-left hover:bg-zinc-900"
+                                                  >
+                                                      <div className="text-sm font-bold text-white">Fight With Budget Lawyer</div>
+                                                      <div className="mt-1 text-xs text-zinc-400">Fee: {formatWealth(getDivorceLawyerCost('BUDGET'))} • cheap, volatile, dangerous.</div>
+                                                  </button>
+                                                  <button
+                                                      onClick={() => handleInteraction('DIVORCE_FIGHT_ESTABLISHED')}
+                                                      className="w-full rounded-2xl border border-blue-500/20 bg-blue-500/10 p-4 text-left hover:bg-blue-500/15"
+                                                  >
+                                                      <div className="text-sm font-bold text-blue-200">Fight With Established Counsel</div>
+                                                      <div className="mt-1 text-xs text-zinc-400">Fee: {formatWealth(getDivorceLawyerCost('ESTABLISHED'))} • balanced protection.</div>
+                                                  </button>
+                                                  <button
+                                                      onClick={() => handleInteraction('DIVORCE_FIGHT_ELITE')}
+                                                      className="w-full rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4 text-left hover:bg-emerald-500/15"
+                                                  >
+                                                      <div className="text-sm font-bold text-emerald-200">Fight With Elite Counsel</div>
+                                                      <div className="mt-1 text-xs text-zinc-400">Fee: {formatWealth(getDivorceLawyerCost('ELITE'))} • best odds, still no guarantees.</div>
+                                                  </button>
+                                                  <button
+                                                      onClick={() => setShowDivorceOptions(false)}
+                                                      className="w-full rounded-2xl border border-zinc-800 bg-zinc-900/40 py-3 text-xs font-bold uppercase tracking-widest text-zinc-400"
+                                                  >
+                                                      Cancel
+                                                  </button>
+                                              </div>
+                                          )}
+                                      </>
+                                  )}
+                              </div>
                           </div>
                       )}
 
@@ -444,6 +520,41 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
 
                       {selectedContact.relation === 'Child' && (
                           <div className="px-4 pb-6">
+                              {isChildAbandoned(player, selectedContact.id) ? (
+                                  <div className="mb-3 rounded-2xl border border-rose-500/20 bg-rose-500/10 p-3 text-center text-xs text-rose-200">
+                                      You are currently an absent parent here. Weekly child support can still drag you into debt until you rebuild this relationship.
+                                  </div>
+                              ) : (
+                                  <div className="mb-3 rounded-2xl border border-amber-500/20 bg-amber-500/10 p-3 text-center text-xs text-amber-200">
+                                      Walking away from this child can trigger custody fallout, scandal news, and weekly support pressure.
+                                  </div>
+                              )}
+                              <div className="grid grid-cols-2 gap-3 mb-3">
+                                  <button
+                                      onClick={() => handleInteraction(isChildAbandoned(player, selectedContact.id) ? 'RECONNECT_CHILD' : 'ABANDON_CHILD')}
+                                      className={`w-full py-4 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 transition-all ${
+                                          isChildAbandoned(player, selectedContact.id)
+                                              ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20'
+                                              : 'bg-rose-500/10 border border-rose-500/30 text-rose-300 hover:bg-rose-500/20'
+                                      }`}
+                                  >
+                                      {isChildAbandoned(player, selectedContact.id) ? (
+                                          <>
+                                              <Heart size={16} /> Reconnect
+                                          </>
+                                      ) : (
+                                          <>
+                                              <Skull size={16} /> Abandon Child
+                                          </>
+                                      )}
+                                  </button>
+                                  <div className="rounded-2xl border border-zinc-800 bg-zinc-900/30 px-3 py-4 text-center">
+                                      <div className="text-[10px] uppercase tracking-wider text-zinc-500">Status</div>
+                                      <div className={`mt-1 text-xs font-bold ${isChildAbandoned(player, selectedContact.id) ? 'text-rose-300' : 'text-emerald-300'}`}>
+                                          {isChildAbandoned(player, selectedContact.id) ? 'Absent Parent' : 'Active Parent'}
+                                      </div>
+                                  </div>
+                              </div>
                               {getRelationshipAge(selectedContact, player.age, player.currentWeek) < LEGACY_MIN_PLAYABLE_AGE && (
                                   <div className="mb-3 rounded-2xl border border-blue-500/20 bg-blue-500/5 p-3 text-center text-xs text-blue-300">
                                       This heir is still too young. If you continue, the game will safely skip forward until they turn {LEGACY_MIN_PLAYABLE_AGE}.

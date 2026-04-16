@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Player, PendingEvent, ClothingItem, PressInteraction, ClothingCategory, Stats, Vehicle, Award } from '../types';
 import { CLOTHING_CATALOG, CAR_CATALOG, MOTORCYCLE_CATALOG, BOAT_CATALOG, AIRCRAFT_CATALOG } from '../services/lifestyleLogic';
-import { generatePressInteractions, determineWinners, Nomination } from '../services/awardLogic';
+import { generatePressInteractions, determineWinners, Nomination, sanitizeAwardRecords } from '../services/awardLogic';
 import { RED_CARPET_INTERVIEWS } from '../services/premiereLogic';
 import { NPC_DATABASE } from '../services/npcLogic';
 import { Camera, Star, Mic2, Shirt, ArrowRight, Trophy, Zap, X, MapPin, Watch, Footprints, Layers, Check, Car, Barcode, Users, Tv, Sparkles, Music, Video, Clapperboard, Globe, FastForward, Glasses, ShoppingBag, Gem } from 'lucide-react';
@@ -210,12 +210,12 @@ export const RedCarpetEvent: React.FC<RedCarpetEventProps> = ({ player, event, o
     const ownedVehicles = useMemo(() => {
         const allVehiclesCatalog = [...CAR_CATALOG, ...MOTORCYCLE_CATALOG, ...BOAT_CATALOG, ...AIRCRAFT_CATALOG];
         const allItems = player.assets
-            .map(id => allVehiclesCatalog.find(v => v.id === id))
+            .map(id => player.customItems.find(item => item.id === id) || allVehiclesCatalog.find(v => v.id === id))
             .filter(v => v !== undefined) as Vehicle[];
         const uniqueVehicles = new Map<string, Vehicle>();
         allItems.forEach(item => uniqueVehicles.set(item.id, item));
         return Array.from(uniqueVehicles.values());
-    }, [player.assets]);
+    }, [player.assets, player.customItems]);
 
     const nominations = event.data?.nominations || [];
     const fullBallot = event.data?.fullBallot as Record<string, Nomination[]>;
@@ -359,7 +359,7 @@ export const RedCarpetEvent: React.FC<RedCarpetEventProps> = ({ player, event, o
             setPressQuestions([mappedQuestions[Math.floor(Math.random() * mappedQuestions.length)]]);
         } else {
             const questions = generatePressInteractions(1);
-            const outcomes = determineWinners(nominations);
+            const outcomes = determineWinners(nominations, fullBallot);
             setPressQuestions(questions);
             setCurrentResults(outcomes);
         }
@@ -369,7 +369,7 @@ export const RedCarpetEvent: React.FC<RedCarpetEventProps> = ({ player, event, o
     const handleSkipCeremony = () => {
         // Calculate results immediately if skipping from Outfit/Intro
         if (currentResults.length === 0) {
-            const outcomes = determineWinners(nominations);
+            const outcomes = determineWinners(nominations, fullBallot);
             setCurrentResults(outcomes);
         }
         setPhase('SUMMARY');
@@ -541,7 +541,7 @@ export const RedCarpetEvent: React.FC<RedCarpetEventProps> = ({ player, event, o
                 const projIndex = pastProjectsUpdate.findIndex(p => p.id === res.nomination.project.id);
                 if (projIndex >= 0) {
                     const proj = pastProjectsUpdate[projIndex];
-                    const newAwards = upsertAwardRecord((proj.awards || []) as Award[], awardEntry);
+                    const newAwards = sanitizeAwardRecords(upsertAwardRecord((proj.awards || []) as Award[], awardEntry));
                     pastProjectsUpdate[projIndex] = { ...proj, awards: newAwards as any };
                 }
 
@@ -557,7 +557,7 @@ export const RedCarpetEvent: React.FC<RedCarpetEventProps> = ({ player, event, o
                 }
             });
 
-            updatedPlayer.awards = updatedAwards;
+            updatedPlayer.awards = sanitizeAwardRecords(updatedAwards);
             updatedPlayer.pastProjects = pastProjectsUpdate;
             if (newsToAdd) updatedPlayer.news = [newsToAdd, ...updatedPlayer.news];
         }

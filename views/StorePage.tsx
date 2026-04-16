@@ -121,18 +121,28 @@ export const StorePage: React.FC<StorePageProps> = ({ player, onBack, onWatchAd,
             </div>
 
             {showPremiumStore && (
-                <div className="grid grid-cols-2 gap-2 p-1 rounded-2xl bg-zinc-900 border border-zinc-800">
+                <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-2 p-1 rounded-2xl bg-zinc-900 border border-zinc-800">
+                        <button
+                            onClick={() => setActiveTab('REWARDS')}
+                            className={`py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'REWARDS' ? 'bg-white text-black' : 'text-zinc-400 hover:text-white'}`}
+                        >
+                            Rewards
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('PREMIUM')}
+                            className={`py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'PREMIUM' ? 'bg-white text-black' : 'text-zinc-400 hover:text-white'}`}
+                        >
+                            Premium
+                        </button>
+                    </div>
+
                     <button
-                        onClick={() => setActiveTab('REWARDS')}
-                        className={`py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'REWARDS' ? 'bg-white text-black' : 'text-zinc-400 hover:text-white'}`}
+                        onClick={onRestorePurchases}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-zinc-900 border border-zinc-700 text-sm font-bold text-white hover:bg-zinc-800 transition-colors"
                     >
-                        Rewards
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('PREMIUM')}
-                        className={`py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'PREMIUM' ? 'bg-white text-black' : 'text-zinc-400 hover:text-white'}`}
-                    >
-                        Premium
+                        <CheckCircle2 size={16}/>
+                        Restore Purchases
                     </button>
                 </div>
             )}
@@ -153,7 +163,7 @@ export const StorePage: React.FC<StorePageProps> = ({ player, onBack, onWatchAd,
                             onClick={onRestorePurchases}
                             className="ml-auto px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-xs font-bold text-zinc-300 hover:text-white hover:bg-zinc-800 transition-colors"
                         >
-                            Restore
+                            Restore Purchases
                         </button>
                     </div>
 

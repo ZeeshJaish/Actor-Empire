@@ -22,7 +22,7 @@ export type UniverseId = 'MCU' | 'DCU' | 'SW' | string;
 export type AwardType = 'OSCAR' | 'GOLDEN_GLOBE' | 'EMMY' | 'BAFTA';
 export type ClothingCategory = 'OUTFIT' | 'TOP' | 'BOTTOM' | 'SHOES' | 'ACCESSORY';
 export type SettableClothingStyle = 'Casual' | 'Premium' | 'Luxury';
-export type TransactionCategory = 'SALARY' | 'EXPENSE' | 'ASSET' | 'BUSINESS' | 'DIVIDEND' | 'ROYALTY' | 'SPONSORSHIP' | 'OTHER' | 'AD_REVENUE';
+export type TransactionCategory = 'SALARY' | 'EXPENSE' | 'ASSET' | 'BUSINESS' | 'DIVIDEND' | 'ROYALTY' | 'SPONSORSHIP' | 'OTHER' | 'AD_REVENUE' | 'LOAN';
 export type NewsCategory = 'TOP_STORY' | 'INDUSTRY' | 'YOU' | 'UNIVERSE';
 export type SponsorshipCategory = 'FASHION' | 'FITNESS' | 'TECH' | 'BEVERAGE' | 'LUXURY' | 'AUTOMOTIVE';
 export type SponsorshipActionType = 'POST' | 'SHOOT';
@@ -208,7 +208,7 @@ export interface Script {
     createdAtWeek?: number;
     producedAtWeek?: number;
     returningTalent?: {
-        role: 'DIRECTOR' | 'LEAD_ACTOR' | 'SUPPORTING_ACTOR';
+        role: 'DIRECTOR' | 'LEAD_ACTOR' | 'SUPPORTING_ACTOR' | 'CINEMATOGRAPHER' | 'COMPOSER' | 'LINE_PRODUCER' | 'VFX_SUPERVISOR';
         id: string;
         originalSalary: number;
         newDemand: number;
@@ -236,7 +236,16 @@ export interface ProjectConcept {
     lastUpdated: number;
     crewModes: Record<string, 'HIRE' | 'SELF' | 'IN_HOUSE'>;
     selectedCrew: Record<string, string | null>;
-    castList: {id: string, role: string, actorId: string | null}[];
+    castList: {
+        id: string,
+        role: string,
+        actorId: string | null,
+        actorName?: string,
+        roleType?: RoleType,
+        salary?: number,
+        characterId?: string,
+        characterName?: string
+    }[];
     selectedLocations: string[]; // Changed from selectedLocation: string | null
     tone: number;
     equipmentChoices?: Record<string, string>;
@@ -275,6 +284,17 @@ export interface StudioState {
     talentRoster?: StudioContract[];
     purchasedIPTitles?: string[];
     productionFund?: number; // NEW: Funds provided by a streaming platform for the next project
+    financeLedger?: StudioFinanceEntry[];
+}
+
+export interface StudioFinanceEntry {
+    id: string;
+    week: number;
+    year: number;
+    amount: number;
+    type: 'THEATRICAL' | 'STREAMING_DEAL' | 'STREAMING_ROYALTY' | 'UNIVERSE' | 'CAPITAL_INJECTION' | 'CAPITAL_WITHDRAWAL' | 'PRODUCTION_SPEND';
+    label: string;
+    projectId?: string;
 }
 
 export interface ProjectHiddenStats {
@@ -304,6 +324,14 @@ export interface CastMember {
     npcId?: string;
     isReturning?: boolean;
     salary?: number;
+    roleId?: string;
+    roleName?: string;
+    roleType?: RoleType;
+    actorId?: string;
+    actorName?: string;
+    status?: 'PENDING' | 'CONFIRMED' | 'REJECTED';
+    characterId?: string;
+    characterName?: string;
 }
 
 export interface Review {
@@ -515,6 +543,8 @@ export interface PastProject {
     awards?: Award[]; 
     franchiseId?: string;
     universeId?: UniverseId;
+    universeSagaName?: string;
+    universePhaseName?: string;
     installmentNumber?: number;
     directorId?: string;
     customPoster?: CustomPoster;
@@ -919,6 +949,32 @@ export interface Transaction {
     description: string;
 }
 
+export interface PlayerLoan {
+    id: string;
+    lenderName: string;
+    principal: number;
+    originalPrincipal: number;
+    annualInterestRate: number;
+    weeklyPayment: number;
+    termWeeks: number;
+    weeksRemaining: number;
+    takenWeek: number;
+    takenYear: number;
+    takenAbsoluteWeek: number;
+    missedPayments: number;
+    successfulPayments: number;
+    status: 'ACTIVE' | 'PAID' | 'DEFAULTED';
+}
+
+export interface CreditHistory {
+    successfulPayments: number;
+    missedPayments: number;
+    defaults: number;
+    totalBorrowed: number;
+    totalRepaid: number;
+    lastLoanAbsoluteWeek?: number;
+}
+
 export interface YearlyFinance {
     year: number;
     totalIncome: number;
@@ -946,11 +1002,21 @@ export interface IndustryProject {
 }
 
 export interface UniverseCharacter {
+    id?: string;
     name: string;
     actorId: string;
     actorName: string;
     status: 'ACTIVE' | 'RECAST' | 'RETIRED';
     fanApproval: number;
+    characterId?: string;
+    roleType?: RoleType;
+    firstAppearanceTitle?: string;
+    latestAppearanceTitle?: string;
+    appearances?: number;
+    description?: string;
+    fame?: number;
+    appeal?: number;
+    type?: string;
 }
 
 export interface UniverseSaga {
@@ -1117,7 +1183,7 @@ export interface Studio {
 export interface Relationship {
     id: string;
     name: string;
-    relation: 'Parent' | 'Friend' | 'Partner' | 'Spouse' | 'Child' | 'Connection' | 'Agent' | 'Director' | 'Manager' | 'Colleague' | 'Networking' | 'Deceased Parent' | 'Sibling';
+    relation: 'Parent' | 'Friend' | 'Partner' | 'Spouse' | 'Ex-Partner' | 'Ex-Spouse' | 'Child' | 'Connection' | 'Agent' | 'Director' | 'Manager' | 'Colleague' | 'Networking' | 'Deceased Parent' | 'Sibling';
     closeness: number;
     image: string;
     lastInteractionWeek: number;
@@ -1159,6 +1225,19 @@ export interface BloodlineMember {
     peakFame?: number;
     businessCount?: number;
     legacyScore?: number;
+}
+
+export interface FamilyObligation {
+    id: string;
+    type: 'CHILD_SUPPORT' | 'ALIMONY';
+    targetId: string;
+    targetName: string;
+    weeklyAmount: number;
+    active: boolean;
+    startedWeek: number;
+    startedYear: number;
+    startedAbsoluteWeek: number;
+    reason: 'ABANDONMENT' | 'DIVORCE';
 }
 
 export interface Player {
@@ -1227,6 +1306,8 @@ export interface Player {
     finance: {
         history: Transaction[];
         yearly: YearlyFinance[];
+        loans: PlayerLoan[];
+        credit: CreditHistory;
     };
     businesses: Business[];
     activeSponsorships: SponsorshipOffer[];
@@ -1312,7 +1393,18 @@ export const INITIAL_PLAYER: Player = {
     x: { handle: '@player', followers: 0, posts: [], feed: [], lastPostWeek: 0 }, // Starts at 0
     youtube: { handle: '@player', subscribers: 0, videos: [], lifetimeEarnings: 0, isMonetized: false, bannerColor: 'bg-gradient-to-r from-red-900 to-zinc-900', totalChannelViews: 0 },
     dating: { isTinderActive: false, isLuxeActive: false, preferences: { gender: 'ALL', minAge: 18, maxAge: 35 }, matches: [] },
-    finance: { history: [], yearly: [] },
+    finance: {
+        history: [],
+        yearly: [],
+        loans: [],
+        credit: {
+            successfulPayments: 0,
+            missedPayments: 0,
+            defaults: 0,
+            totalBorrowed: 0,
+            totalRepaid: 0
+        }
+    },
     businesses: [],
     activeSponsorships: [],
     stocks: [],

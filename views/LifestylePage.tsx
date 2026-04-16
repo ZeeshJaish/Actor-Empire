@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Player, Property, Vehicle, ClothingItem, SettableClothingStyle } from '../types';
 import { CreditCard, Store, Briefcase, ChevronRight, Lock, Clapperboard, Tv, Star } from 'lucide-react';
 import { LifestyleAssets } from './lifestyle/LifestyleAssets';
@@ -19,12 +19,27 @@ interface LifestylePageProps {
   onShutdownBusiness: () => void; 
   onUpdatePlayer?: (player: Player) => void; 
   onPremiumPurchase: (productId: PremiumProductId) => void;
+  onNavVisibilityChange?: (visible: boolean) => void;
+  initialView?: 'MAIN' | 'ASSETS' | 'BUSINESS' | 'PRODUCTION_WIZARD' | 'PRODUCTION_GAME';
+  onInitialViewConsumed?: () => void;
 }
 
-export const LifestylePage: React.FC<LifestylePageProps> = ({ player, onBuyItem, onSellItem, onSetResidence, onSetActiveStyle, onUpdatePlayer, onPremiumPurchase }) => {
+export const LifestylePage: React.FC<LifestylePageProps> = ({ player, onBuyItem, onSellItem, onSetResidence, onSetActiveStyle, onUpdatePlayer, onPremiumPurchase, onNavVisibilityChange, initialView, onInitialViewConsumed }) => {
   const [view, setView] = useState<'MAIN' | 'ASSETS' | 'BUSINESS' | 'PRODUCTION_WIZARD' | 'PRODUCTION_GAME'>('MAIN');
   const [customizationItem, setCustomizationItem] = useState<Property | Vehicle | null>(null);
   const [selectedCustomizations, setSelectedCustomizations] = useState<any[]>([]);
+
+  useEffect(() => {
+      onNavVisibilityChange?.(view === 'MAIN' && !customizationItem);
+      return () => onNavVisibilityChange?.(true);
+  }, [view, customizationItem, onNavVisibilityChange]);
+
+  useEffect(() => {
+      if (initialView && initialView !== view) {
+          setView(initialView);
+          onInitialViewConsumed?.();
+      }
+  }, [initialView, view, onInitialViewConsumed]);
 
   // Check if player owns a Production House
   const productionStudio = player.businesses.find(b => b.type === 'PRODUCTION_HOUSE');

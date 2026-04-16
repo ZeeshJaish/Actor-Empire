@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Play, Plus, Trash2, Clapperboard, Star, User, Calendar, Award } from 'lucide-react';
 import { Player } from '../types';
+import { APP_DISPLAY_VERSION } from '../services/appVersion';
 
 interface StartMenuProps {
   saveSlots: Record<number, Player | null>;
@@ -169,7 +170,7 @@ export const StartMenu: React.FC<StartMenuProps> = ({ saveSlots, onSelectSlot, o
                 
                 <div className="flex items-center gap-4 text-[10px] font-bold text-zinc-500 uppercase tracking-[0.3em]">
                     <span className="w-8 h-[1px] bg-zinc-800"></span>
-                    <span>Version 1.0.11</span>
+                    <span>Version {APP_DISPLAY_VERSION}</span>
                     <span className="w-8 h-[1px] bg-zinc-800"></span>
                 </div>
             </div>

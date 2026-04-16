@@ -303,7 +303,7 @@ export const ProductionWizard: React.FC<ProductionWizardProps> = ({ player, onCa
                 </div>
 
                 <div className="relative z-10 flex-1 overflow-y-auto custom-scrollbar">
-                    <div className="min-h-full flex flex-col items-center justify-center p-8 pb-safe-xl text-center space-y-10">
+                    <div className="min-h-full flex flex-col items-center justify-center p-8 pb-40 text-center space-y-10">
                         
                         {/* HERO SECTION */}
                         <div className="space-y-6 relative">
@@ -391,7 +391,8 @@ export const ProductionWizard: React.FC<ProductionWizardProps> = ({ player, onCa
                 </div>
 
                 {/* Footer Action */}
-                <div className="p-6 pb-safe-lg bg-gradient-to-t from-black via-black to-transparent relative z-20 shrink-0">
+                <div className="fixed left-0 right-0 bottom-0 z-30 max-w-md mx-auto px-6">
+                    <div className="bg-gradient-to-t from-black via-black to-transparent pt-8 pb-2">
                     <button 
                         onClick={() => canAfford && setShowConfirm(true)}
                         disabled={!canAfford}
@@ -407,6 +408,7 @@ export const ProductionWizard: React.FC<ProductionWizardProps> = ({ player, onCa
                             <><Lock size={16}/> Insufficient Funds</>
                         )}
                     </button>
+                    </div>
                 </div>
             </div>
         );
@@ -425,7 +427,7 @@ export const ProductionWizard: React.FC<ProductionWizardProps> = ({ player, onCa
                 <div className="w-6"></div>
             </div>
 
-            <div className="flex-1 overflow-y-auto custom-scrollbar p-6 pb-safe-xl bg-[#050505] flex flex-col">
+            <div className="flex-1 overflow-y-auto custom-scrollbar p-6 pb-nav-safe-lg bg-[#050505] flex flex-col">
                 
                 <div className="flex-1 flex flex-col items-center justify-center p-6 relative z-10 animate-in fade-in slide-in-from-bottom duration-500">
                    

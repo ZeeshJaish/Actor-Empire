@@ -78,6 +78,94 @@ export const createBloodlineSnapshot = (player: Player): BloodlineMember => {
     return snapshot;
 };
 
+export const calculateDynastyScore = (player: Player): number => {
+    const bloodlineScore = (player.bloodline || []).reduce(
+        (sum, member) => sum + (member.legacyScore || calculateLegacyScore(member)),
+        0
+    );
+    return bloodlineScore + calculateLegacyScore({
+        netWorth: player.money,
+        awards: player.awards?.length || 0,
+        moviesMade: player.pastProjects.length,
+        peakFame: player.stats.fame,
+        businessCount: player.businesses?.length || 0,
+    });
+};
+
+export const getLegacyArchetype = (player: Player): string => {
+    const awards = player.awards?.length || 0;
+    const projects = player.pastProjects.length;
+    const businesses = player.businesses?.length || 0;
+    const fame = player.stats.fame || 0;
+    const reputation = player.stats.reputation || 0;
+    const abandonedChildren = player.flags?.abandonedChildIds?.length || 0;
+    const debtPressure = (player.flags?.weeksInDebt || 0) >= 4 || player.money < 0;
+
+    if (debtPressure && reputation < 35) return 'Debt-Ridden Tragedy';
+    if (businesses >= 4 && player.money >= 200_000_000) return 'Empire Builder';
+    if (awards >= 12 && fame >= 75) return 'Prestige Immortal';
+    if (projects >= 20 && fame >= 85) return 'Screen Legend';
+    if (businesses >= 2 && fame >= 70) return 'Industry Mogul';
+    if (abandonedChildren > 0 || reputation < 25) return 'Scandal-Plagued Icon';
+    if (fame >= 70) return 'Beloved Superstar';
+    if (projects >= 10) return 'Working Screen Veteran';
+    return 'Forgotten Talent';
+};
+
+export const getLegacyObituary = (player: Player): string => {
+    const archetype = getLegacyArchetype(player).toLowerCase();
+    const awards = player.awards?.length || 0;
+    const businesses = player.businesses?.length || 0;
+    const projects = player.pastProjects.length;
+    const dynasty = calculateDynastyScore(player);
+    const abandonedChildren = player.flags?.abandonedChildIds?.length || 0;
+
+    const parts = [
+        `${player.name} leaves behind the memory of a ${archetype} whose career stretched across ${projects} released project${projects === 1 ? '' : 's'}.`,
+    ];
+
+    if (awards > 0) {
+        parts.push(`Their shelf held ${awards} major award${awards === 1 ? '' : 's'}, cementing their place in industry history.`);
+    }
+
+    if (businesses > 0) {
+        parts.push(`Beyond the spotlight, they built ${businesses} business${businesses === 1 ? '' : 'es'} and turned fame into a larger empire.`);
+    }
+
+    if (abandonedChildren > 0) {
+        parts.push(`But their personal life remained controversial, and family wounds shaped how the public remembers them.`);
+    } else if ((player.relationships || []).some(rel => rel.relation === 'Child')) {
+        parts.push(`Their family story became part of the legacy they passed on to the next generation.`);
+    }
+
+    if (dynasty > 0) {
+        parts.push(`Their bloodline now carries a dynasty score of ${dynasty}, a measure of the mark they left on the world.`);
+    }
+
+    return parts.join(' ');
+};
+
+export const getLegacyTributes = (player: Player): string[] => {
+    const fame = player.stats.fame || 0;
+    const reputation = player.stats.reputation || 0;
+    const awards = player.awards?.length || 0;
+    const businesses = player.businesses?.length || 0;
+    const debtPressure = (player.flags?.weeksInDebt || 0) >= 4 || player.money < 0;
+    const tributes: string[] = [];
+
+    if (awards >= 8) tributes.push('“A once-in-a-generation talent whose work will outlive the era that made them.”');
+    if (businesses >= 3) tributes.push('“They didn’t just star in the game, they learned how to own the whole board.”');
+    if (fame >= 85 && reputation >= 60) tributes.push('“Fans loved them, critics respected them, and rivals feared them.”');
+    if (reputation < 35) tributes.push('“Brilliant, chaotic, and impossible to ignore right until the end.”');
+    if (debtPressure) tributes.push('“The empire cracked late, but people will still remember how high they climbed.”');
+    if ((player.flags?.abandonedChildIds?.length || 0) > 0) tributes.push('“Their legacy is powerful, but so are the scars they left behind.”');
+
+    if (tributes.length < 3) tributes.push('“However messy the life was, the story they left behind still belongs to the ages.”');
+    if (tributes.length < 4) tributes.push('“People will argue about the choices. They won’t argue about the impact.”');
+
+    return tributes.slice(0, 4);
+};
+
 export const inheritActorSkills = (skills: ActorSkills, ratio: number): ActorSkills => {
     return {
         delivery: Math.floor(skills.delivery * ratio),

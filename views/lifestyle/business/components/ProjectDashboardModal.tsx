@@ -138,8 +138,11 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
     }) || [];
 
     // Generate dynamic buzz based on phase if no real news exists
-        const budget = project.budget || project.projectDetails?.estimatedBudget || 0;
+    const budget = project.budget || project.projectDetails?.estimatedBudget || 0;
     const actualGross = project.gross || project.totalGross || 0;
+    const streamingRevenue = project.streamingRevenue || project.projectDetails?.streamingRevenue || 0;
+    const projectRevenue = actualGross + streamingRevenue;
+    const studioReceipts = Math.floor(actualGross * 0.5) + streamingRevenue;
 
     const getDynamicBuzz = () => {
         if (relatedNews.length > 0) return relatedNews;
@@ -584,9 +587,9 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                     {['RELEASED', 'STREAMING', 'IN THEATERS', 'BIDDING'].includes(project.phase) && (
                                         <>
                                             <div className="p-5 sm:p-6 bg-emerald-500/5 rounded-3xl border border-emerald-500/10 backdrop-blur-sm flex flex-col justify-center h-[120px] relative overflow-hidden group">
-                                                <div className="text-[10px] font-black uppercase tracking-widest text-emerald-500/60 mb-2 relative z-10">Total Revenue</div>
+                                                <div className="text-[10px] font-black uppercase tracking-widest text-emerald-500/60 mb-2 relative z-10">Project Revenue</div>
                                                 <div className="text-2xl sm:text-3xl font-bold text-white tracking-tight truncate relative z-10">
-                                                    {formatMoney(actualGross + (project.streamingRevenue || project.projectDetails?.streamingRevenue || 0))}
+                                                    {formatMoney(projectRevenue)}
                                                 </div>
                                                 
                                                 {/* Revenue Breakdown on Hover */}
@@ -597,14 +600,20 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                                     </div>
                                                     <div className="flex justify-between items-center text-xs">
                                                         <span className="text-zinc-400">Streaming:</span>
-                                                        <span className="text-white font-mono">{formatMoney(project.streamingRevenue || project.projectDetails?.streamingRevenue || 0)}</span>
+                                                        <span className="text-white font-mono">{formatMoney(streamingRevenue)}</span>
                                                     </div>
+                                                </div>
+                                            </div>
+                                            <div className="p-5 sm:p-6 bg-blue-500/5 rounded-3xl border border-blue-500/10 backdrop-blur-sm flex flex-col justify-center h-[120px]">
+                                                <div className="text-[10px] font-black uppercase tracking-widest text-blue-400/70 mb-2">Studio Receipts</div>
+                                                <div className="text-2xl sm:text-3xl font-bold tracking-tight text-blue-300">
+                                                    {formatMoney(studioReceipts)}
                                                 </div>
                                             </div>
                                             <div className="p-5 sm:p-6 bg-amber-500/5 rounded-3xl border border-amber-500/10 backdrop-blur-sm flex flex-col justify-center h-[120px]">
                                                 <div className="text-[10px] font-black uppercase tracking-widest text-amber-500/60 mb-2">ROI</div>
-                                                <div className={`text-2xl sm:text-3xl font-bold tracking-tight ${((actualGross + (project.streamingRevenue || project.projectDetails?.streamingRevenue || 0)) - budget) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                                    {budget ? (((actualGross + (project.streamingRevenue || project.projectDetails?.streamingRevenue || 0)) - budget) / budget * 100).toFixed(0) : 0}%
+                                                <div className={`text-2xl sm:text-3xl font-bold tracking-tight ${(projectRevenue - budget) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                                    {budget ? (((projectRevenue - budget) / budget) * 100).toFixed(0) : 0}%
                                                 </div>
                                             </div>
                                         </>

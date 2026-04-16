@@ -1,7 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Player, BudgetTier, Genre, ProjectDetails, ActiveRelease, Commitment, Business, LocationDetails, NewsItem, XPost, StudioEquipment, Script, Writer } from '../../../types';
-import { ArrowLeft, Film, DollarSign, Users, TrendingUp, Calendar, Check, Plus, Star, Award, Zap, Briefcase, LayoutGrid, MapPin, PenTool, Globe, Camera, Clapperboard, ChevronRight, Lock, Building2, BarChart3, ShieldAlert, Crown, LogOut, AlertTriangle, Sparkles, BookOpen, Video, X, Clock, Palette, Lightbulb, Mic, Box, Tv } from 'lucide-react';
+import { ArrowLeft, Film, DollarSign, Users, TrendingUp, Calendar, Check, Plus, Star, Award, Zap, Briefcase, LayoutGrid, MapPin, PenTool, Globe, Camera, Clapperboard, ChevronRight, Lock, Building2, BarChart3, ShieldAlert, Crown, LogOut, AlertTriangle, Sparkles, BookOpen, Video, X, Clock, Palette, Lightbulb, Mic, Box, Tv, ArrowDownLeft, ArrowUpRight, WalletCards } from 'lucide-react';
 import { NPC_DATABASE, getAvailableTalent, calculateProjectFameMultiplier } from '../../../services/npcLogic';
 import { sellBusiness, liquidateBusiness } from '../../../services/businessLogic';
 import { NPCActor, NPCTier } from '../../../types';
@@ -275,6 +275,24 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
                 negotiated: isInternallyControlledTalent(details.directorId),
                 accepted: isInternallyControlledTalent(details.directorId),
                 attemptsLeft: isInternallyControlledTalent(details.directorId) ? 0 : 3
+            });
+        }
+
+        if (details.crewList) {
+            details.crewList.forEach((crewMember: any) => {
+                if (!crewMember?.id || crewMember.role === 'DIRECTOR') return;
+                if (!['CINEMATOGRAPHER', 'COMPOSER', 'LINE_PRODUCER', 'VFX_SUPERVISOR'].includes(crewMember.role)) return;
+
+                const originalSalary = crewMember.salary || project.budget * 0.02;
+                returningTalent.push({
+                    role: crewMember.role,
+                    id: crewMember.id,
+                    originalSalary,
+                    newDemand: originalSalary * 1.18,
+                    negotiated: isInternallyControlledTalent(crewMember.id),
+                    accepted: isInternallyControlledTalent(crewMember.id),
+                    attemptsLeft: isInternallyControlledTalent(crewMember.id) ? 0 : 3
+                });
             });
         }
         
@@ -785,7 +803,21 @@ const FinanceModal: React.FC<{
             setErrorMsg('Not enough personal cash to inject that amount.');
             return;
         }
-        const updatedStudio = { ...studio, balance: studio.balance + amount };
+        const updatedStudio = { 
+            ...studio, 
+            balance: studio.balance + amount,
+            studioState: {
+                ...studio.studioState,
+                financeLedger: [{
+                    id: `studio_ledger_inject_${player.age}_${player.currentWeek}_${Date.now()}`,
+                    week: player.currentWeek,
+                    year: player.age,
+                    amount,
+                    type: 'CAPITAL_INJECTION',
+                    label: 'Owner capital injection'
+                }, ...((studio.studioState?.financeLedger || []))].slice(0, 200)
+            }
+        };
         const updatedBusinesses = player.businesses.map(b => b.id === studio.id ? updatedStudio : b);
         onUpdatePlayer({
             ...player,
@@ -805,7 +837,21 @@ const FinanceModal: React.FC<{
             setErrorMsg('Studio capital is lower than that withdrawal amount.');
             return;
         }
-        const updatedStudio = { ...studio, balance: studio.balance - amount };
+        const updatedStudio = { 
+            ...studio, 
+            balance: studio.balance - amount,
+            studioState: {
+                ...studio.studioState,
+                financeLedger: [{
+                    id: `studio_ledger_withdraw_${player.age}_${player.currentWeek}_${Date.now()}`,
+                    week: player.currentWeek,
+                    year: player.age,
+                    amount: -amount,
+                    type: 'CAPITAL_WITHDRAWAL',
+                    label: 'Owner withdrawal'
+                }, ...((studio.studioState?.financeLedger || []))].slice(0, 200)
+            }
+        };
         const updatedBusinesses = player.businesses.map(b => b.id === studio.id ? updatedStudio : b);
         onUpdatePlayer({
             ...player,
@@ -909,6 +955,77 @@ const StudioFinanceView: React.FC<{
 }> = ({ player, studio, onBack, onUpdatePlayer, onExit }) => {
     const [showFinanceModal, setShowFinanceModal] = useState(false);
     const [showExitModal, setShowExitModal] = useState<'SELL' | 'LIQUIDATE' | null>(null);
+    const [ledgerRange, setLedgerRange] = useState<'12W' | '52W' | 'ALL'>('12W');
+    const [visibleLedgerEntries, setVisibleLedgerEntries] = useState(12);
+    const studioActiveReleases = useMemo(() => player.activeReleases.filter(r => r.projectDetails?.studioId === studio.id), [player.activeReleases, studio.id]);
+    const studioLibrary = useMemo(() => player.pastProjects.filter(p => p.studioId === studio.id), [player.pastProjects, studio.id]);
+    const totalProjectGross = useMemo(() => studioActiveReleases.reduce((sum, r) => sum + (r.totalGross || 0), 0) + studioLibrary.reduce((sum, p) => sum + (p.gross || 0), 0), [studioActiveReleases, studioLibrary]);
+    const totalStreamingRevenue = useMemo(() => studioActiveReleases.reduce((sum, r) => sum + (r.streamingRevenue || 0), 0) + studioLibrary.reduce((sum, p) => sum + (p.streamingRevenue || 0), 0), [studioActiveReleases, studioLibrary]);
+    const estimatedStudioReceipts = useMemo(() => Math.floor(totalProjectGross * 0.5) + totalStreamingRevenue, [totalProjectGross, totalStreamingRevenue]);
+    const totalProductionBudget = useMemo(() => studioLibrary.reduce((sum, p) => sum + (p.budget || 0), 0), [studioLibrary]);
+    const financeLedger = useMemo(() => {
+        const stored = Array.isArray(studio.studioState?.financeLedger) ? studio.studioState.financeLedger : [];
+        if (stored.length > 0) return stored;
+
+        return [...studioLibrary]
+            .sort((a, b) => (b.year || 0) - (a.year || 0))
+            .slice(0, 8)
+            .map(project => ({
+                id: `derived_receipt_${project.id}`,
+                week: 0,
+                year: project.year || player.age,
+                amount: Math.floor((project.gross || 0) * 0.5) + (project.streamingRevenue || 0),
+                type: 'THEATRICAL' as const,
+                label: `${project.name} studio receipts`,
+                projectId: project.id
+            }))
+            .filter(entry => entry.amount !== 0);
+    }, [studio.studioState?.financeLedger, studioLibrary, player.age]);
+
+    useEffect(() => {
+        setVisibleLedgerEntries(12);
+    }, [ledgerRange]);
+
+    const currentAbsoluteWeek = useMemo(() => ((player.age || 1) * 52) + (player.currentWeek || 1), [player.age, player.currentWeek]);
+    const getEntryAbsoluteWeek = (entry: any) => ((entry.year || 1) * 52) + (entry.week || 52);
+
+    const filteredLedger = useMemo(() => {
+        const sorted = [...financeLedger].sort((a: any, b: any) => getEntryAbsoluteWeek(b) - getEntryAbsoluteWeek(a));
+        if (ledgerRange === 'ALL') return sorted;
+        const maxAgeInWeeks = ledgerRange === '12W' ? 12 : 52;
+        return sorted.filter((entry: any) => currentAbsoluteWeek - getEntryAbsoluteWeek(entry) <= maxAgeInWeeks);
+    }, [financeLedger, ledgerRange, currentAbsoluteWeek]);
+
+    const visibleLedger = useMemo(() => filteredLedger.slice(0, visibleLedgerEntries), [filteredLedger, visibleLedgerEntries]);
+    const ledgerInflows = useMemo(() => filteredLedger.filter((entry: any) => entry.amount > 0).reduce((sum: number, entry: any) => sum + entry.amount, 0), [filteredLedger]);
+    const ledgerOutflows = useMemo(() => Math.abs(filteredLedger.filter((entry: any) => entry.amount < 0).reduce((sum: number, entry: any) => sum + entry.amount, 0)), [filteredLedger]);
+    const ledgerNet = ledgerInflows - ledgerOutflows;
+
+    const getLedgerTypeLabel = (type: string) => {
+        switch (type) {
+            case 'THEATRICAL': return 'Theatrical';
+            case 'STREAMING': return 'Streaming';
+            case 'STREAMING_DEAL': return 'Platform Deal';
+            case 'MERCH': return 'Universe';
+            case 'CAPITAL_INJECTION': return 'Injection';
+            case 'CAPITAL_WITHDRAWAL': return 'Withdrawal';
+            case 'PRODUCTION_SPEND': return 'Production';
+            default: return 'Studio';
+        }
+    };
+
+    const getLedgerTypeTone = (entry: any) => {
+        if (entry.amount >= 0) return 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300';
+        if (entry.type === 'PRODUCTION_SPEND') return 'border-amber-500/20 bg-amber-500/10 text-amber-300';
+        return 'border-rose-500/20 bg-rose-500/10 text-rose-300';
+    };
+
+    const formatLedgerDate = (entry: any) => {
+        const year = entry.year || player.age;
+        const week = entry.week || 0;
+        if (week > 0) return `Y${year} • W${week}`;
+        return `Y${year} • Archive`;
+    };
 
     const formatMoney = (val: number | undefined | null) => {
         if (val === undefined || val === null || isNaN(val)) return '$0';
@@ -984,7 +1101,7 @@ const StudioFinanceView: React.FC<{
             </div>
 
             {/* CONTENT */}
-            <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-6 pb-24">
+            <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-6 pb-nav-safe-lg">
                 
                 {/* P&L Statement */}
                 <div className="bg-zinc-900 border border-zinc-800 rounded-[2rem] overflow-hidden">
@@ -994,11 +1111,11 @@ const StudioFinanceView: React.FC<{
                     </div>
                     <div className="p-6 space-y-4">
                         <div className="flex justify-between items-center">
-                            <div className="text-xs text-zinc-400 font-bold uppercase">Revenue</div>
+                            <div className="text-xs text-zinc-400 font-bold uppercase">Studio Receipts</div>
                             <div className="font-mono font-bold text-emerald-400">{formatMoney(studio.stats?.weeklyRevenue || 0)}</div>
                         </div>
                         <div className="flex justify-between items-center">
-                            <div className="text-xs text-zinc-400 font-bold uppercase">Expenses</div>
+                            <div className="text-xs text-zinc-400 font-bold uppercase">Operating Costs</div>
                             <div className="font-mono font-bold text-rose-500">-{formatMoney(studio.stats?.weeklyExpenses || 0)}</div>
                         </div>
                         <div className="h-px bg-zinc-800 w-full"></div>
@@ -1006,6 +1123,34 @@ const StudioFinanceView: React.FC<{
                             <div className="text-sm text-white font-bold uppercase">Net Profit</div>
                             <div className={`font-mono font-bold text-lg ${(studio.stats?.weeklyProfit || 0) >= 0 ? 'text-emerald-400' : 'text-rose-500'}`}>
                                 {formatMoney(studio.stats?.weeklyProfit || 0)}
+                            </div>
+                        </div>
+                        <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-[11px] text-zinc-300 leading-relaxed">
+                            Project tiles show <span className="text-white font-semibold">project revenue</span>. Detailed studio receipts and cash movement live in the ledger and project detail views.
+                        </div>
+                    </div>
+                </div>
+
+                {/* Revenue Breakdown */}
+                <div className="bg-zinc-900 border border-zinc-800 rounded-[2rem] p-6">
+                    <h3 className="font-bold text-white text-sm uppercase tracking-wide mb-4">Revenue Breakdown</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="bg-black/40 p-4 rounded-xl border border-zinc-800">
+                            <div className="text-[10px] text-zinc-500 font-bold uppercase mb-1">Project Gross</div>
+                            <div className="font-mono font-bold text-white">{formatMoney(totalProjectGross)}</div>
+                        </div>
+                        <div className="bg-black/40 p-4 rounded-xl border border-zinc-800">
+                            <div className="text-[10px] text-zinc-500 font-bold uppercase mb-1">Streaming Revenue</div>
+                            <div className="font-mono font-bold text-emerald-400">{formatMoney(totalStreamingRevenue)}</div>
+                        </div>
+                        <div className="bg-black/40 p-4 rounded-xl border border-zinc-800">
+                            <div className="text-[10px] text-zinc-500 font-bold uppercase mb-1">Estimated Studio Receipts</div>
+                            <div className="font-mono font-bold text-amber-300">{formatMoney(estimatedStudioReceipts)}</div>
+                        </div>
+                        <div className="bg-black/40 p-4 rounded-xl border border-zinc-800">
+                            <div className="text-[10px] text-zinc-500 font-bold uppercase mb-1">Library ROI</div>
+                            <div className={`font-mono font-bold ${totalProductionBudget > 0 && estimatedStudioReceipts >= totalProductionBudget ? 'text-emerald-400' : 'text-zinc-300'}`}>
+                                {totalProductionBudget > 0 ? `${(((estimatedStudioReceipts - totalProductionBudget) / Math.max(1, totalProductionBudget)) * 100).toFixed(0)}%` : 'N/A'}
                             </div>
                         </div>
                     </div>
@@ -1023,6 +1168,102 @@ const StudioFinanceView: React.FC<{
                             <div className="text-[10px] text-zinc-500 font-bold uppercase mb-1">Total Valuation</div>
                             <div className="font-mono font-bold text-white">{formatMoney(studio.stats?.valuation || 0)}</div>
                         </div>
+                        <div className="bg-black/40 p-4 rounded-xl border border-zinc-800">
+                            <div className="text-[10px] text-zinc-500 font-bold uppercase mb-1">Production Fund</div>
+                            <div className="font-mono font-bold text-white">{formatMoney(studio.studioState?.productionFund || 0)}</div>
+                        </div>
+                        <div className="bg-black/40 p-4 rounded-xl border border-zinc-800">
+                            <div className="text-[10px] text-zinc-500 font-bold uppercase mb-1">Lifetime Revenue</div>
+                            <div className="font-mono font-bold text-white">{formatMoney(studio.stats?.lifetimeRevenue || 0)}</div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Ledger */}
+                <div className="bg-zinc-900 border border-zinc-800 rounded-[2rem] overflow-hidden">
+                    <div className="border-b border-zinc-800 bg-gradient-to-r from-zinc-900 via-zinc-950 to-zinc-900 px-6 py-5">
+                        <div className="flex items-start justify-between gap-4">
+                            <div>
+                                <div className="flex items-center gap-2 mb-1">
+                                    <WalletCards size={16} className="text-amber-400" />
+                                    <h3 className="font-bold text-white text-sm uppercase tracking-wide">Studio Passbook</h3>
+                                </div>
+                                <div className="text-[11px] text-zinc-500">Cash movement by period. Tap through newer and older receipts like a bank ledger.</div>
+                            </div>
+                            <div className="flex rounded-full border border-zinc-800 bg-black/30 p-1 shrink-0">
+                                {[
+                                    { id: '12W', label: '3 Mo' },
+                                    { id: '52W', label: '1 Yr' },
+                                    { id: 'ALL', label: 'All' }
+                                ].map(option => (
+                                    <button
+                                        key={option.id}
+                                        onClick={() => setLedgerRange(option.id as '12W' | '52W' | 'ALL')}
+                                        className={`px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest transition-colors ${
+                                            ledgerRange === option.id ? 'bg-amber-500 text-black' : 'text-zinc-500 hover:text-white'
+                                        }`}
+                                    >
+                                        {option.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-3 gap-3 mt-4">
+                            <div className="rounded-2xl border border-zinc-800 bg-black/30 px-4 py-3">
+                                <div className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-1">Money In</div>
+                                <div className="font-mono font-bold text-emerald-400">{formatMoney(ledgerInflows)}</div>
+                            </div>
+                            <div className="rounded-2xl border border-zinc-800 bg-black/30 px-4 py-3">
+                                <div className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-1">Money Out</div>
+                                <div className="font-mono font-bold text-rose-400">{formatMoney(ledgerOutflows)}</div>
+                            </div>
+                            <div className="rounded-2xl border border-zinc-800 bg-black/30 px-4 py-3">
+                                <div className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-1">Net Flow</div>
+                                <div className={`font-mono font-bold ${ledgerNet >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{ledgerNet >= 0 ? '+' : '-'}{formatMoney(Math.abs(ledgerNet))}</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="p-4 space-y-3">
+                        {visibleLedger.length > 0 ? visibleLedger.map((entry: any) => (
+                            <div key={entry.id} className="rounded-[1.4rem] border border-zinc-800 bg-black/25 px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
+                                <div className="flex items-start justify-between gap-3">
+                                    <div className="min-w-0 flex-1">
+                                        <div className="flex items-center gap-2 mb-2 flex-wrap">
+                                            <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[9px] font-black uppercase tracking-widest ${getLedgerTypeTone(entry)}`}>
+                                                {entry.amount >= 0 ? <ArrowDownLeft size={10} /> : <ArrowUpRight size={10} />}
+                                                {getLedgerTypeLabel(entry.type)}
+                                            </span>
+                                            <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">{formatLedgerDate(entry)}</span>
+                                        </div>
+                                        <div className="text-sm font-bold text-white leading-tight">{entry.label}</div>
+                                        <div className="mt-1 text-[11px] text-zinc-500">
+                                            {entry.projectId ? `Project Ref • ${entry.projectId}` : 'Studio cash entry'}
+                                        </div>
+                                    </div>
+                                    <div className="text-right shrink-0">
+                                        <div className={`font-mono font-bold text-base ${entry.amount >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                            {entry.amount >= 0 ? '+' : '-'}{formatMoney(Math.abs(entry.amount))}
+                                        </div>
+                                        <div className="text-[10px] font-bold uppercase tracking-widest text-zinc-600">
+                                            {entry.amount >= 0 ? 'Credit' : 'Debit'}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )) : (
+                            <div className="rounded-[1.4rem] border border-zinc-800 bg-black/30 px-4 py-6 text-center">
+                                <div className="text-sm font-bold text-zinc-400 mb-1">No ledger entries in this period</div>
+                                <div className="text-[11px] text-zinc-600">Try switching to a wider range to view older studio activity.</div>
+                            </div>
+                        )}
+                        {visibleLedgerEntries < filteredLedger.length && (
+                            <button
+                                onClick={() => setVisibleLedgerEntries(prev => prev + 12)}
+                                className="w-full rounded-[1.2rem] border border-zinc-800 bg-zinc-950/60 px-4 py-3 text-xs font-bold uppercase tracking-widest text-zinc-300 hover:bg-zinc-900 transition-colors"
+                            >
+                                Load Older Entries
+                            </button>
+                        )}
                     </div>
                 </div>
                 
@@ -1268,14 +1509,14 @@ const ArchiveProjectCard: React.FC<{ project: any, isLatestInstallment?: boolean
 
     let outcomeLabel = null;
     let outcomeColor = "";
-    const totalEarnings = (project.gross || 0) + (project.streamingRevenue || project.projectDetails?.streamingRevenue || 0);
-    if (totalEarnings > (project.budget || 0) * 5) {
+    const projectRevenue = (project.gross || 0) + (project.streamingRevenue || project.projectDetails?.streamingRevenue || 0);
+    if (projectRevenue > (project.budget || 0) * 5) {
         outcomeLabel = "BLOCKBUSTER";
         outcomeColor = "bg-purple-500 text-white";
-    } else if (totalEarnings > (project.budget || 0) * 2) {
+    } else if (projectRevenue > (project.budget || 0) * 2) {
         outcomeLabel = "HIT";
         outcomeColor = "bg-emerald-500 text-white";
-    } else if (totalEarnings < (project.budget || 0)) {
+    } else if (projectRevenue < (project.budget || 0)) {
         outcomeLabel = "FLOP";
         outcomeColor = "bg-rose-500 text-white";
     } else {
@@ -1355,9 +1596,9 @@ const ArchiveProjectCard: React.FC<{ project: any, isLatestInstallment?: boolean
                             <div className="text-[10px] font-mono font-bold text-zinc-300">{formatMoney(project.budget || 0)}</div>
                         </div>
                         <div className="text-right">
-                            <div className="text-[8px] text-zinc-400 uppercase font-bold">Total Earnings</div>
+                            <div className="text-[8px] text-zinc-400 uppercase font-bold">Project Revenue</div>
                             <div className="text-[10px] font-mono font-bold text-emerald-400">
-                                {formatMoney(totalEarnings)}
+                                {formatMoney(projectRevenue)}
                             </div>
                             {project.views && (
                                 <div className="text-[7px] text-zinc-500 font-bold">

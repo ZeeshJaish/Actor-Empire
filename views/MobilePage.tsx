@@ -255,7 +255,7 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
                     <StocksApp player={props.player} onBack={() => setAppMode('HOME')} onTrade={props.onTradeStock!} />
                 )}
                 {appMode === 'BANK' && (
-                    <BankApp player={props.player} onBack={() => setAppMode('HOME')} />
+                    <BankApp player={props.player} onBack={() => setAppMode('HOME')} onUpdatePlayer={handleUpdatePlayer} />
                 )}
                 
                 {/* DATING GROUP */}

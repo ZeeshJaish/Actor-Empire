@@ -109,6 +109,51 @@ export interface Nomination {
     nomineeName?: string; // For NPCs
 }
 
+type AwardLike = {
+    type: string;
+    year: number;
+    category: string;
+    projectId: string;
+    outcome: 'WON' | 'NOMINATED';
+};
+
+export const sanitizeAwardRecords = <T extends AwardLike>(awards: T[] = []): T[] => {
+    const byProject = new Map<string, T>();
+
+    awards.forEach(award => {
+        const projectKey = `${award.type}::${award.year}::${award.category}::${award.projectId}`;
+        const existing = byProject.get(projectKey);
+        if (!existing || (existing.outcome !== 'WON' && award.outcome === 'WON')) {
+            byProject.set(projectKey, award);
+        }
+    });
+
+    const byCategory = new Map<string, T[]>();
+    Array.from(byProject.values()).forEach(award => {
+        const categoryKey = `${award.type}::${award.year}::${award.category}`;
+        if (!byCategory.has(categoryKey)) byCategory.set(categoryKey, []);
+        byCategory.get(categoryKey)!.push(award);
+    });
+
+    return Array.from(byCategory.values()).flatMap(categoryAwards => {
+        const wins = categoryAwards.filter(award => award.outcome === 'WON');
+        if (wins.length <= 1) return categoryAwards;
+
+        let keepWon = wins[0];
+        categoryAwards.forEach(award => {
+            if (award.outcome === 'WON' && award.projectId < keepWon.projectId) {
+                keepWon = award;
+            }
+        });
+
+        return categoryAwards.map(award =>
+            award.projectId === keepWon.projectId
+                ? award
+                : { ...award, outcome: 'NOMINATED' as const }
+        );
+    });
+};
+
 const getAwardTypeForInviteWeek = (week: number): AwardType | null => {
     const match = Object.values(AWARD_CALENDAR).find(def => def.inviteWeek === week);
     return match?.type || null;
@@ -244,7 +289,9 @@ export const generateFullBallot = (player: Player, awardType: AwardType, playerN
         const categoryNoms: Nomination[] = [];
         
         // 1. Add Player if they are nominated in this category
-        const pNom = playerNoms.find(n => n.category === cat);
+        const pNom = playerNoms
+            .filter(n => n.category === cat)
+            .sort((a, b) => b.score - a.score)[0];
         if (pNom) {
             categoryNoms.push(pNom);
         }
@@ -335,8 +382,32 @@ export const generateFullBallot = (player: Player, awardType: AwardType, playerN
     return ballot;
 };
 
-export const determineWinners = (nominations: Nomination[]): { won: boolean, nomination: Nomination }[] => {
+export const determineWinners = (
+    nominations: Nomination[],
+    fullBallot?: Record<string, Nomination[]>
+): { won: boolean, nomination: Nomination }[] => {
+    const playerBestByCategory = new Map<string, Nomination>();
+
+    nominations.forEach(nom => {
+        const existing = playerBestByCategory.get(nom.category);
+        if (!existing || nom.score > existing.score) {
+            playerBestByCategory.set(nom.category, nom);
+        }
+    });
+
     return nominations.map(nom => {
+        const playerContender = playerBestByCategory.get(nom.category);
+        if (!playerContender || playerContender.project.id !== nom.project.id) {
+            return { won: false, nomination: nom };
+        }
+
+        if (fullBallot && fullBallot[nom.category]?.length) {
+            const sortedBallot = [...fullBallot[nom.category]].sort((a, b) => b.score - a.score);
+            const topNominee = sortedBallot[0];
+            const playerWins = topNominee.isPlayer && topNominee.project.id === nom.project.id;
+            return { won: playerWins, nomination: nom };
+        }
+
         const worldWinnerScore = 90 + Math.random() * 15;
         return {
             won: nom.score > worldWinnerScore,
@@ -367,7 +438,7 @@ export const generateSeasonWinners = (player: Player, awardType: AwardType): Awa
             a.type === awardType && 
             a.category === cat && 
             a.outcome === 'WON' &&
-            Math.abs(a.year - year) <= 1
+            a.year === year
         );
 
         if (playerWin) {

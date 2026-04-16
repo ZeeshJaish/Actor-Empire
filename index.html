@@ -12,6 +12,7 @@
         :root {
             --glass-border: rgba(255, 255, 255, 0.08);
             --glass-bg: rgba(20, 20, 23, 0.6);
+            --bottom-nav-clearance: 5.75rem;
         }
         body {
             font-family: 'Outfit', sans-serif;
@@ -26,6 +27,15 @@
         }
         .pb-safe-xl {
             padding-bottom: calc(env(safe-area-inset-bottom) + 7rem);
+        }
+        .pb-nav-safe {
+            padding-bottom: calc(env(safe-area-inset-bottom) + var(--bottom-nav-clearance));
+        }
+        .pb-nav-safe-lg {
+            padding-bottom: calc(env(safe-area-inset-bottom) + var(--bottom-nav-clearance) + 2rem);
+        }
+        .bottom-nav-safe {
+            bottom: calc(env(safe-area-inset-bottom) + var(--bottom-nav-clearance));
         }
         .pt-safe-top {
             padding-top: max(35px, env(safe-area-inset-top));

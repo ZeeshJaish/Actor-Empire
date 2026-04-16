@@ -1,5 +1,5 @@
 
-import { Universe, UniverseId, UniverseContract, Player, ProjectDetails, NewsItem, StudioId, Genre, IndustryProject, NPCActor, UniversePhase, RoleType, ProjectSubtype, ContractFilm, AuditionOpportunity, Gender } from '../types';
+import { Universe, UniverseId, UniverseContract, Player, ProjectDetails, NewsItem, StudioId, Genre, IndustryProject, NPCActor, UniversePhase, RoleType, ProjectSubtype, ContractFilm, AuditionOpportunity, Gender, ActiveRelease, CastMember, UniverseCharacter } from '../types';
 import { STUDIO_CATALOG } from './studioLogic';
 import { NPC_DATABASE } from './npcLogic';
 import { generateProjectTitle, getEstimatedBudget, generateProjectDetails } from './roleLogic';
@@ -257,6 +257,189 @@ const UNIVERSE_TEMPLATES: Record<UniverseId, { name: string, studioId: StudioId,
 };
 
 const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
+
+const normalizeUniverseCharacterKey = (value: string) =>
+    value
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, '') || 'character';
+
+const getUniverseCharacterName = (member: any, projectTitle: string) => {
+    const explicitName = typeof member?.characterName === 'string' ? member.characterName.trim() : '';
+    if (explicitName) return explicitName;
+
+    const roleName = typeof member?.roleName === 'string' ? member.roleName.trim() : typeof member?.role === 'string' ? member.role.trim() : '';
+    if (roleName) return roleName;
+
+    const actorName = typeof member?.name === 'string' ? member.name.trim() : typeof member?.actorName === 'string' ? member.actorName.trim() : '';
+    if (actorName) return actorName;
+
+    return projectTitle || 'Unknown Character';
+};
+
+const normalizeUniverseCastEntries = (castList: CastMember[] | undefined, projectTitle: string, playerName: string): UniverseCharacter[] => {
+    if (!Array.isArray(castList)) return [];
+
+    return castList
+        .filter(member => member && typeof member === 'object')
+        .filter(member => member.actorId && member.actorId !== 'UNKNOWN')
+        .filter(member => String(member.roleType || 'SUPPORTING') !== 'EXTRA')
+        .map(member => {
+            const actorId = member.actorId || member.npcId || 'UNKNOWN';
+            const actorName = actorId === 'PLAYER_SELF'
+                ? playerName
+                : (member.name || member.actorName || 'Unknown Actor');
+            const name = getUniverseCharacterName(member, projectTitle);
+            const characterId = member.characterId || `${normalizeUniverseCharacterKey(name)}`;
+
+            return {
+                id: characterId,
+                characterId,
+                name,
+                actorId,
+                actorName,
+                status: 'ACTIVE' as const,
+                fanApproval: 50,
+                roleType: member.roleType,
+                appearances: 1,
+                firstAppearanceTitle: projectTitle,
+                latestAppearanceTitle: projectTitle,
+                description: `Played by ${actorId === 'PLAYER_SELF' ? 'you' : actorName}.`
+            };
+        });
+};
+
+export interface UniverseDashboardProject {
+    id: string;
+    title: string;
+    type: 'MOVIE' | 'SERIES';
+    genre?: string;
+    budgetTier?: string;
+    year: number;
+    universeSagaName?: string;
+    universePhaseName?: string;
+    castList: CastMember[];
+    source: 'PAST' | 'ACTIVE';
+}
+
+export const getUniverseDashboardProjects = (
+    player: Player,
+    universeId: UniverseId,
+    activeReleases: ActiveRelease[] = []
+): UniverseDashboardProject[] => {
+    const pastProjects = (player.pastProjects || [])
+        .filter(project => project && ((project.universeId === universeId) || ((project as any).projectDetails?.universeId === universeId)))
+        .map(project => ({
+            id: project.id,
+            title: project.name,
+            type: project.projectType,
+            genre: project.genre,
+            budgetTier: project.budget >= 50_000_000 ? 'BLOCKBUSTER' : project.budget >= 10_000_000 ? 'HIGH' : project.budget >= 3_000_000 ? 'MID' : 'LOW',
+            year: project.year || player.age,
+            universeSagaName: (project as any).universeSagaName || (project as any).projectDetails?.universeSagaName,
+            universePhaseName: (project as any).universePhaseName || (project as any).projectDetails?.universePhaseName,
+            castList: Array.isArray(project.castList) ? project.castList : [],
+            source: 'PAST' as const
+        }));
+
+    const activeUniverseProjects = (activeReleases || [])
+        .filter(project => project?.projectDetails?.universeId === universeId)
+        .map(project => ({
+            id: project.id,
+            title: project.name,
+            type: project.type,
+            genre: project.projectDetails?.genre,
+            budgetTier: project.projectDetails?.budgetTier,
+            year: player.age,
+            universeSagaName: project.projectDetails?.universeSagaName,
+            universePhaseName: project.projectDetails?.universePhaseName,
+            castList: Array.isArray(project.projectDetails?.castList) ? project.projectDetails.castList : [],
+            source: 'ACTIVE' as const
+        }));
+
+    return [...pastProjects, ...activeUniverseProjects].sort((a, b) => a.year - b.year);
+};
+
+export const buildUniverseRoster = (
+    universe: Universe,
+    projects: UniverseDashboardProject[],
+    playerName: string
+): UniverseCharacter[] => {
+    const rosterMap = new Map<string, UniverseCharacter>();
+
+    const existingRoster = Array.isArray(universe.roster) ? universe.roster : [];
+    existingRoster.forEach(entry => {
+        if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return;
+        if (typeof entry.name !== 'string' || typeof entry.actorId !== 'string') return;
+
+        const characterId = entry.characterId || entry.id || normalizeUniverseCharacterKey(entry.name);
+        rosterMap.set(characterId, {
+            id: entry.id || characterId,
+            characterId,
+            name: entry.name,
+            actorId: entry.actorId,
+            actorName: entry.actorName || (entry.actorId === 'PLAYER_SELF' ? playerName : 'Unknown Actor'),
+            status: entry.status || 'ACTIVE',
+            fanApproval: typeof entry.fanApproval === 'number' ? entry.fanApproval : typeof entry.appeal === 'number' ? entry.appeal : 50,
+            roleType: entry.roleType,
+            firstAppearanceTitle: entry.firstAppearanceTitle,
+            latestAppearanceTitle: entry.latestAppearanceTitle,
+            appearances: typeof entry.appearances === 'number' ? entry.appearances : 0,
+            description: entry.description,
+            fame: entry.fame,
+            appeal: entry.appeal,
+            type: entry.type
+        });
+    });
+
+    projects.forEach(project => {
+        normalizeUniverseCastEntries(project.castList, project.title, playerName).forEach(character => {
+            const existing = rosterMap.get(character.characterId || character.name);
+            rosterMap.set(character.characterId || character.name, {
+                ...(existing || {}),
+                ...character,
+                id: character.id || existing?.id || character.characterId,
+                characterId: character.characterId || existing?.characterId,
+                fanApproval: Math.max(existing?.fanApproval || 50, character.fanApproval || 50),
+                appearances: (existing?.appearances || 0) + 1,
+                firstAppearanceTitle: existing?.firstAppearanceTitle || project.title,
+                latestAppearanceTitle: project.title,
+                description: `Played by ${character.actorId === 'PLAYER_SELF' ? 'you' : character.actorName}.`
+            });
+        });
+    });
+
+    return Array.from(rosterMap.values()).sort((a, b) => {
+        const appearanceDelta = (b.appearances || 0) - (a.appearances || 0);
+        if (appearanceDelta !== 0) return appearanceDelta;
+        return a.name.localeCompare(b.name);
+    });
+};
+
+export const mergeUniverseRosterWithProject = (
+    universe: Universe,
+    projectTitle: string,
+    castList: CastMember[] | undefined,
+    playerName: string
+): Universe => {
+    const mergedRoster = buildUniverseRoster(
+        universe,
+        [{
+            id: `pending_${projectTitle}`,
+            title: projectTitle,
+            type: 'MOVIE',
+            year: 0,
+            castList: Array.isArray(castList) ? castList : [],
+            source: 'ACTIVE'
+        }],
+        playerName
+    );
+
+    return {
+        ...universe,
+        roster: mergedRoster
+    };
+};
 
 // --- FACTORY ---
 

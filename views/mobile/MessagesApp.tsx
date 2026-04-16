@@ -3,15 +3,17 @@ import React, { useState } from 'react';
 import { Player, Message, AuditionOpportunity, SponsorshipOffer, NegotiationData, ScheduledEvent } from '../../types';
 import { ArrowLeft, Star, DollarSign, Calendar, CheckCircle, Lock, Trash2, Mail, Heart } from 'lucide-react';
 import { ProjectDetailView } from '../../components/ProjectDetailView';
+import { APP_DISPLAY_VERSION } from '../../services/appVersion';
 
 interface MessagesAppProps {
   player: Player;
   onBack: () => void;
   onAccept: (msg: Message) => void;
   onDelete: (id: string) => void;
+  onMarkRead: (id: string) => void;
 }
 
-export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAccept, onDelete }) => {
+export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAccept, onDelete, onMarkRead }) => {
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   
@@ -25,7 +27,9 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
   const messages = player.inbox || [];
 
   const handleOpenMessage = (msg: Message) => {
-      setSelectedMessage(msg);
+      const openedMessage = msg.isRead ? msg : { ...msg, isRead: true };
+      if (!msg.isRead) onMarkRead(msg.id);
+      setSelectedMessage(openedMessage);
       setContractViewData(null);
   };
 
@@ -34,6 +38,7 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
 
       if (selectedMessage.type === 'OFFER_NEGOTIATION') {
           const data = selectedMessage.data as NegotiationData;
+          if (!data?.opportunity) return;
           setContractViewData({
               type: 'NEGOTIATION',
               opportunity: data.opportunity,
@@ -41,6 +46,7 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
           });
       } else if (selectedMessage.type === 'OFFER_ROLE') {
           const data = selectedMessage.data as AuditionOpportunity;
+          if (!data) return;
           setContractViewData({
               type: 'ROLE',
               opportunity: data
@@ -155,7 +161,14 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                                     <div className="flex-1 min-w-0">
                                         <div className="flex justify-between items-baseline mb-1">
                                             <div className="font-bold text-slate-900 truncate pr-2">{msg.sender}</div>
-                                            <div className="text-[10px] text-slate-400 font-mono">Wk {msg.weekSent}</div>
+                                            <div className="text-right">
+                                                <div className="text-[10px] text-slate-400 font-mono">Wk {msg.weekSent}</div>
+                                                {typeof msg.expiresIn === 'number' && (
+                                                    <div className={`text-[10px] font-semibold ${msg.expiresIn <= 1 ? 'text-rose-500' : 'text-amber-500'}`}>
+                                                        {msg.expiresIn}w left
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                         <div className={`text-sm mb-0.5 truncate ${!msg.isRead ? 'font-bold text-slate-800' : 'text-slate-600'}`}>
                                             {msg.subject}
@@ -199,7 +212,7 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                                 </div>
 
                                 <div className="mt-10 pt-6 border-t border-zinc-800 flex justify-between items-end">
-                                    <div className="text-xs text-zinc-600 font-mono">v1.0.11</div>
+                                    <div className="text-xs text-zinc-600 font-mono">v{APP_DISPLAY_VERSION}</div>
                                     <div className="text-right">
                                         <div className="font-bold text-white text-sm">Zeesh</div>
                                         <div className="text-xs text-amber-500 font-bold uppercase tracking-widest">Zeesh Apps</div>
@@ -243,18 +256,22 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                                             const pay = selectedMessage.type === 'OFFER_NEGOTIATION'
                                                 ? (selectedMessage.data as NegotiationData).currentOffer
                                                 : (selectedMessage.data as AuditionOpportunity).estimatedIncome;
+                                            const safePay = typeof pay === 'number' && Number.isFinite(pay) ? pay : 0;
+                                            const hasValidContract = !!opp;
 
                                             return (
                                                 <>
-                                                    <h3 className="text-2xl font-bold mb-1 leading-tight">{opp.projectName}</h3>
-                                                    <p className="text-sm text-slate-400 mb-6">{opp.roleType} Role • {opp.genre}</p>
+                                                    <h3 className="text-2xl font-bold mb-1 leading-tight">{opp?.projectName || 'Offer details unavailable'}</h3>
+                                                    <p className="text-sm text-slate-400 mb-6">
+                                                        {opp ? `${opp.roleType} Role • ${opp.genre}` : 'This contract is missing some data.'}
+                                                    </p>
                                                     
                                                     <div className="flex items-end justify-between mb-6 border-t border-white/10 pt-4">
                                                         <div>
                                                             <div className="text-[10px] text-slate-500 uppercase font-bold">Salary</div>
-                                                            <div className="text-xl font-mono font-bold text-emerald-400">${pay.toLocaleString()}</div>
+                                                            <div className="text-xl font-mono font-bold text-emerald-400">${safePay.toLocaleString()}</div>
                                                         </div>
-                                                        {opp.royaltyPercentage && opp.royaltyPercentage > 0 && (
+                                                        {opp?.royaltyPercentage && opp.royaltyPercentage > 0 && (
                                                             <div className="text-right">
                                                                 <div className="text-[10px] text-slate-500 uppercase font-bold">Points</div>
                                                                 <div className="text-xl font-mono font-bold text-amber-400">{opp.royaltyPercentage}%</div>
@@ -264,7 +281,8 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
 
                                                     <button 
                                                         onClick={handleOpenContract}
-                                                        className="w-full py-4 bg-white text-slate-900 rounded-xl font-bold text-sm hover:bg-slate-100 transition-colors shadow-lg flex items-center justify-center gap-2"
+                                                        disabled={!hasValidContract}
+                                                        className="w-full py-4 bg-white text-slate-900 rounded-xl font-bold text-sm hover:bg-slate-100 transition-colors shadow-lg flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
                                                     >
                                                         <CheckCircle size={18}/> Review Contract
                                                     </button>

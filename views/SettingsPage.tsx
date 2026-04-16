@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { ArrowLeft, Twitter, Send, Star, Globe, MessageCircle, X, LogOut, Coffee } from 'lucide-react';
 import { Page } from '../types';
+import { APP_DISPLAY_VERSION } from '../services/appVersion';
 
 interface SettingsPageProps {
   onBack: () => void;
@@ -110,7 +111,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onBack, onMainMenu }
       </div>
       
       <div className="text-center text-xs text-zinc-600 font-mono mt-8">
-          v1.0.11
+          v{APP_DISPLAY_VERSION}
       </div>
     </div>
   );

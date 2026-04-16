@@ -3,8 +3,9 @@
 import React, { useState } from 'react';
 import { Player, PastProject, ActiveRelease, CastMember, Review, Award, Universe, UniverseId, IndustryProject, CustomPoster } from '../../types';
 import { formatMoney } from '../../services/formatUtils';
-import { AWARD_CALENDAR, AWARD_SHOW_DB, AwardShowLore, AwardDefinition, Nomination } from '../../services/awardLogic';
+import { AWARD_CALENDAR, AWARD_SHOW_DB, AwardShowLore, AwardDefinition, Nomination, sanitizeAwardRecords } from '../../services/awardLogic';
 import { ArrowLeft, Star, Film, ChevronRight, User, TrendingUp, DollarSign, Eye, Award as AwardIcon, Calendar, BookOpen, Clock, List, MessageSquare, Users, Globe, Zap, LayoutGrid, Shield, ArrowRight, Tv } from 'lucide-react';
+import { buildUniverseRoster, getUniverseDashboardProjects } from '../../services/universeLogic';
 
 interface ImdbAppProps {
   player: Player;
@@ -100,8 +101,9 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
 
   const knownFor = [...fullList].filter(p => p.role === 'LEAD' || p.role === 'SUPPORTING').sort((a, b) => b.rating - a.rating)[0] || fullList[0];
   const totalBoxOffice = fullList.reduce((acc, p) => acc + (p.gross || 0), 0);
-  const awardsWon = player.awards ? player.awards.filter(a => a.outcome === 'WON') : [];
-  const awardsNom = player.awards ? player.awards.filter(a => a.outcome === 'NOMINATED') : [];
+  const cleanedAwards: Award[] = sanitizeAwardRecords(player.awards || []);
+  const awardsWon = cleanedAwards.filter(a => a.outcome === 'WON');
+  const awardsNom = cleanedAwards.filter(a => a.outcome === 'NOMINATED');
 
   const filteredCredits = fullList.filter(p => {
       if (creditFilter === 'ALL') return true;
@@ -363,7 +365,7 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
 
   const renderMyAwards = () => {
       const grouped: Record<string, Award[]> = {};
-      player.awards.forEach(a => {
+      cleanedAwards.forEach(a => {
           if (!grouped[a.name]) grouped[a.name] = [];
           grouped[a.name].push(a);
       });
@@ -448,6 +450,8 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
       const worldMovies = player.world.projects.filter(p => p.universeId === selectedUniverse.id);
       const playerPastMovies = player.pastProjects.filter(p => p.universeId === selectedUniverse.id);
       const playerActiveMovies = player.activeReleases.filter(p => p.projectDetails.universeId === selectedUniverse.id);
+      const playerUniverseProjects = getUniverseDashboardProjects(player, selectedUniverse.id, player.activeReleases);
+      const normalizedRoster = buildUniverseRoster(selectedUniverse, playerUniverseProjects, player.name);
 
       const recentMovies = [
           ...worldMovies.map(m => ({ id: m.id, title: m.title, year: m.year, genre: m.genre, boxOffice: m.boxOffice, isPlayer: false })),
@@ -464,7 +468,7 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
                   <div className={`text-xs font-bold uppercase tracking-widest ${theme.color} mb-6`}>{selectedUniverse.currentPhase.replace(/_/g, ' ')}</div>
                   <div className="grid grid-cols-2 gap-4"><div className="bg-black/40 p-3 rounded-xl border border-zinc-800"><div className="text-[10px] text-zinc-500 uppercase tracking-widest mb-1">Momentum</div><div className="text-xl font-mono font-bold text-white">{selectedUniverse.momentum}/100</div></div><div className="bg-black/40 p-3 rounded-xl border border-zinc-800"><div className="text-[10px] text-zinc-500 uppercase tracking-widest mb-1">Next Phase</div><div className="text-xl font-mono font-bold text-zinc-400">{Math.ceil(selectedUniverse.weeksUntilNextPhase || 0)}w</div></div></div>
               </div>
-              <div><h3 className="text-zinc-500 text-xs font-bold uppercase tracking-widest mb-3 pl-2">Active Roster</h3><div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden divide-y divide-zinc-800">{selectedUniverse.roster.map((char) => (<div key={char.id || char.name} className="p-4 flex justify-between items-center"><div><div className="font-bold text-white text-sm">{char.name}</div><div className="text-xs text-zinc-500">Played by <span className={char.actorId === player.id ? 'text-amber-400 font-bold' : 'text-zinc-300'}>{char.actorId === player.id ? 'YOU' : char.actorName}</span></div></div><div className={`text-[10px] font-bold px-2 py-1 rounded uppercase ${char.status === 'ACTIVE' ? 'bg-emerald-900/30 text-emerald-500' : 'bg-zinc-800 text-zinc-500'}`}>{char.status}</div></div>))}</div></div>
+              <div><h3 className="text-zinc-500 text-xs font-bold uppercase tracking-widest mb-3 pl-2">Active Roster</h3><div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden divide-y divide-zinc-800">{normalizedRoster.map((char) => (<div key={char.id || char.name} className="p-4 flex justify-between items-center"><div><div className="font-bold text-white text-sm">{char.name}</div><div className="text-xs text-zinc-500">Played by <span className={char.actorId === player.id || char.actorId === 'PLAYER_SELF' ? 'text-amber-400 font-bold' : 'text-zinc-300'}>{char.actorId === player.id || char.actorId === 'PLAYER_SELF' ? 'YOU' : char.actorName}</span></div></div><div className={`text-[10px] font-bold px-2 py-1 rounded uppercase ${char.status === 'ACTIVE' ? 'bg-emerald-900/30 text-emerald-500' : 'bg-zinc-800 text-zinc-500'}`}>{char.status}</div></div>))}</div></div>
               <div><h3 className="text-zinc-500 text-xs font-bold uppercase tracking-widest mb-3 pl-2">Recent Releases</h3><div className="space-y-3">{recentMovies.length === 0 ? (<div className="text-center py-8 text-zinc-600 text-xs italic">No recent releases recorded.</div>) : (recentMovies.map(movie => (<div key={movie.id} className="bg-zinc-900 p-4 rounded-xl border border-zinc-800 flex justify-between items-center"><div><div className="font-bold text-white text-sm flex items-center gap-2">{movie.title} {movie.isPlayer && <span className="bg-amber-500/20 text-amber-500 text-[8px] px-1 rounded">YOU</span>}</div><div className="text-xs text-zinc-500">{movie.year} • {movie.genre}</div></div><div className={`font-mono text-xs font-bold ${movie.boxOffice > 500000000 ? 'text-emerald-400' : 'text-zinc-400'}`}>${(movie.boxOffice / 1000000).toFixed(0)}M</div></div>)))}</div></div>
           </div>
       );

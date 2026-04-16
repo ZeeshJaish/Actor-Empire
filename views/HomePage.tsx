@@ -9,7 +9,7 @@ import { generateLifeEvent } from '../services/lifeEventLogic';
 import { getAbsoluteWeek } from '../services/legacyLogic';
 import { getGenderedAvatar } from '../services/npcLogic';
 import { createBusiness } from '../services/businessLogic';
-import { Heart, Smile, Star, Zap, DollarSign, Brain, Calendar, Activity, TrendingUp, Trophy, X, Sliders, Users, Film, Tv, PlayCircle, Lock, FastForward, Key, AlertTriangle, Mic2, Mail, FileText, Dumbbell, Sparkles, Settings, ShoppingCart, Clapperboard, ZapOff, Crown } from 'lucide-react';
+import { Heart, Smile, Star, Zap, DollarSign, Brain, Calendar, Activity, TrendingUp, Trophy, X, Sliders, Users, Film, Tv, PlayCircle, Lock, FastForward, Key, AlertTriangle, Mic2, Mail, FileText, Dumbbell, Sparkles, Settings, ShoppingCart, Clapperboard, ZapOff, Crown, Skull } from 'lucide-react';
 
 interface HomePageProps {
   player: Player;
@@ -17,13 +17,16 @@ interface HomePageProps {
   isProcessing: boolean;
   onUpdatePlayer?: (player: Player) => void;
   setPage?: (page: Page) => void;
+  onOpenProductionHouseCheat?: () => void;
+  onQueueBabyNamingCheat?: () => void;
+  onOpenDeathSummaryPreview?: () => void;
 }
 
 const CHEAT_GENRES: Genre[] = ['ACTION', 'DRAMA', 'COMEDY', 'ROMANCE', 'THRILLER', 'HORROR', 'SCI_FI', 'ADVENTURE', 'SUPERHERO'];
 const DEV_TOOLS_PASSCODE = import.meta.env.VITE_DEV_TOOLS_PASSCODE || 'Kzign@420';
 const LEGACY_DEV_TOOLS_PASSCODES = ['actor-dev'];
 
-export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProcessing, onUpdatePlayer, setPage }) => {
+export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProcessing, onUpdatePlayer, setPage, onOpenProductionHouseCheat, onQueueBabyNamingCheat, onOpenDeathSummaryPreview }) => {
   const logContainerRef = useRef<HTMLDivElement>(null);
   
   // Cheat Menu State
@@ -646,6 +649,14 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
       alert("Studio QA setup ready: production house created/funded.");
   };
 
+  const triggerStudioBootstrapAndOpen = () => {
+      if (!onUpdatePlayer) return;
+      const { updatedPlayer } = ensureCheatStudio();
+      onUpdatePlayer(updatedPlayer);
+      setActiveCheatMenu('NONE');
+      onOpenProductionHouseCheat?.();
+  };
+
   const triggerStudioScenario = (scenario: 'PLANNING' | 'PRODUCTION' | 'AWAITING_RELEASE' | 'THEATRICAL_TO_BIDDING' | 'STREAMING_EXIT') => {
       if (!onUpdatePlayer) return;
 
@@ -953,6 +964,9 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                                   <button onClick={triggerStudioBootstrap} className="col-span-2 bg-amber-900/30 hover:bg-amber-900/50 border border-amber-500/30 text-xs font-bold py-3 rounded-lg text-amber-400">
                                       Create / Fund Test Studio
                                   </button>
+                                  <button onClick={triggerStudioBootstrapAndOpen} className="col-span-2 bg-yellow-500/10 hover:bg-yellow-500/20 border border-yellow-400/40 text-xs font-bold py-3 rounded-lg text-yellow-300">
+                                      Open Production House Now
+                                  </button>
                                   <button onClick={() => triggerStudioScenario('PLANNING')} className="bg-zinc-800 hover:bg-zinc-700 text-xs font-bold py-3 rounded-lg text-white">
                                       Planning to Pre-Prod
                                   </button>
@@ -1014,11 +1028,17 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                                   <button onClick={addLegacyTestChild} className="bg-amber-900/30 hover:bg-amber-900/50 border border-amber-500/30 text-xs font-bold py-3 rounded-lg text-amber-400 flex items-center justify-center gap-2">
                                       <Users size={14}/> Add Test Child
                                   </button>
+                                  <button onClick={onQueueBabyNamingCheat} className="bg-pink-900/30 hover:bg-pink-900/50 border border-pink-500/30 text-xs font-bold py-3 rounded-lg text-pink-400 flex items-center justify-center gap-2">
+                                      <Heart size={14}/> Baby Naming Next Week
+                                  </button>
                                   <button onClick={ageOldestChildToPlayable} className="bg-blue-900/30 hover:bg-blue-900/50 border border-blue-500/30 text-xs font-bold py-3 rounded-lg text-blue-400 flex items-center justify-center gap-2">
                                       <FastForward size={14}/> Make Oldest Child 18
                                   </button>
                                   <button onClick={setupLegacyDeathScenario} className="bg-rose-900/30 hover:bg-rose-900/50 border border-rose-500/30 text-xs font-bold py-3 rounded-lg text-rose-400 flex items-center justify-center gap-2">
                                       <Crown size={14}/> Setup Legacy Death Test
+                                  </button>
+                                  <button onClick={onOpenDeathSummaryPreview} className="bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-xs font-bold py-3 rounded-lg text-white flex items-center justify-center gap-2">
+                                      <Skull size={14}/> Preview Death Summary
                                   </button>
                               </div>
                           </div>

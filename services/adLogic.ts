@@ -77,9 +77,7 @@ export const initAds = async () => {
     await requestConsent();
 
     try {
-        await AdMob.initialize({
-            requestTrackingAuthorization: true,
-        });
+        await AdMob.initialize();
         initialized = true;
         console.log('AdMob initialized after consent');
     } catch (err) {

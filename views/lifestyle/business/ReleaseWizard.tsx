@@ -3,6 +3,7 @@ import { Player, PendingEvent, ScreeningStrategy, CampaignItem } from '../../../
 import { motion, AnimatePresence } from 'motion/react';
 import { ArrowLeft, Film, Tv, Calendar, TrendingUp, CheckCircle2, Camera, Star, Globe, Youtube, Share2 } from 'lucide-react';
 import { FESTIVALS, CALENDAR_EVENTS } from '../../../services/worldLogic';
+import { mergeUniverseRosterWithProject } from '../../../services/universeLogic';
 
 interface ReleaseWizardProps {
     player: Player;
@@ -30,11 +31,11 @@ const SCREENING_STRATEGIES = [
 ];
 
 const PLATFORMS = [
-    { id: 'NETFLIX', name: 'Netflix', baseBid: 10000000, qualityReq: 72, color: '#E50914', maxBudget: 90000000 },
-    { id: 'APPLE_TV', name: 'Apple TV+', baseBid: 14000000, qualityReq: 82, color: '#FFFFFF', maxBudget: 110000000 },
-    { id: 'DISNEY_PLUS', name: 'Disney+', baseBid: 9000000, qualityReq: 70, color: '#113CCF', maxBudget: 85000000 },
-    { id: 'HULU', name: 'Hulu', baseBid: 6000000, qualityReq: 58, color: '#1CE783', maxBudget: 55000000 },
-    { id: 'YOUTUBE', name: 'YouTube Premium', baseBid: 2000000, qualityReq: 38, color: '#FF0000', maxBudget: 20000000 }
+    { id: 'NETFLIX', name: 'Netflix', baseBid: 12000000, qualityReq: 72, color: '#E50914', maxBudget: 140000000 },
+    { id: 'APPLE_TV', name: 'Apple TV+', baseBid: 17000000, qualityReq: 82, color: '#FFFFFF', maxBudget: 180000000 },
+    { id: 'DISNEY_PLUS', name: 'Disney+', baseBid: 11000000, qualityReq: 70, color: '#113CCF', maxBudget: 130000000 },
+    { id: 'HULU', name: 'Hulu', baseBid: 7500000, qualityReq: 58, color: '#1CE783', maxBudget: 90000000 },
+    { id: 'YOUTUBE', name: 'YouTube Premium', baseBid: 3000000, qualityReq: 38, color: '#FF0000', maxBudget: 35000000 }
 ];
 
 type BidType = 'UPFRONT_ONLY' | 'GREENLIGHT_DEAL' | 'BACKEND_POINTS';
@@ -106,13 +107,18 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                     
                     // Fallback bid if no one bid
                     if (!highestBid) {
+                        const projectBudget = project.projectDetails?.estimatedBudget || 0;
                         const fallbackBase = Math.max(
                             5000000,
-                            Math.floor((project.projectDetails?.estimatedBudget || 0) * (isPostTheatricalBidding ? 0.05 : 0.22))
+                            Math.floor(projectBudget * (
+                                isSeries
+                                    ? (isPostTheatricalBidding ? 1.08 : 1.15)
+                                    : (isPostTheatricalBidding ? 1.0 : 1.08)
+                            ))
                         );
                         const fallbackBid: Bid = {
                             id: Math.random().toString(),
-                            platformId: 'YOUTUBE',
+                            platformId: 'NETFLIX',
                             amount: fallbackBase,
                             type: 'UPFRONT_ONLY',
                             bidValue: fallbackBase,
@@ -147,13 +153,20 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                 }
                 
                 const projectBudget = project.projectDetails?.estimatedBudget || 0;
-                const streamingOnlyFloor = isPostTheatricalBidding ? 0.12 : 0.48;
-                const streamingOnlyCeiling = isPostTheatricalBidding ? 0.4 : 1.28;
-                const safetyPremium = isPostTheatricalBidding ? 1.0 : 1.55;
+                const streamingOnlyFloor = isSeries
+                    ? (isPostTheatricalBidding ? 1.08 : 1.15)
+                    : (isPostTheatricalBidding ? 1.0 : 1.08);
+                const streamingOnlyCeiling = isSeries
+                    ? (isPostTheatricalBidding ? 2.45 : 2.8)
+                    : (isPostTheatricalBidding ? 1.8 : 2.15);
+                const safetyPremium = isSeries
+                    ? (isPostTheatricalBidding ? 1.65 : 2.0)
+                    : (isPostTheatricalBidding ? 1.28 : 1.65);
+                const qualityEscalator = Math.max(0.92, 0.95 + ((packageScore - 55) / 140));
                 let maxOffer = Math.min(
                     platform.maxBudget,
-                    platform.baseBid * (packageScore / 55) * (1 + Math.random() * 0.25) * safetyPremium,
-                    projectBudget > 0 ? projectBudget * Math.min(streamingOnlyCeiling, streamingOnlyFloor + (packageScore / 100)) : Number.MAX_SAFE_INTEGER
+                    platform.baseBid * (packageScore / 52) * (1 + Math.random() * 0.32) * safetyPremium * qualityEscalator,
+                    projectBudget > 0 ? projectBudget * Math.min(streamingOnlyCeiling, streamingOnlyFloor + (packageScore / 82)) : Number.MAX_SAFE_INTEGER
                 );
                 
                 // RE-BIDDING PENALTY: If they already auctioned, most bids will be lower.
@@ -169,11 +182,11 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                 if (maxOffer > currentHighest * 1.05) {
                     // They can outbid!
                     const minimumOpeningBid = projectBudget > 0
-                        ? Math.floor(projectBudget * (isPostTheatricalBidding ? 0.12 : 0.45))
+                        ? Math.floor(projectBudget * (isSeries ? (isPostTheatricalBidding ? 1.06 : 1.14) : (isPostTheatricalBidding ? 0.98 : 1.05)))
                         : platform.baseBid;
                     const newAmount = currentHighest === 0
-                        ? Math.floor(Math.min(maxOffer, Math.max(minimumOpeningBid, platform.baseBid * (0.9 + Math.random() * 0.2) * safetyPremium)))
-                        : Math.floor(currentHighest * (1.05 + Math.random() * 0.08));
+                        ? Math.floor(Math.min(maxOffer, Math.max(minimumOpeningBid, platform.baseBid * (0.95 + Math.random() * 0.3) * safetyPremium)))
+                        : Math.floor(Math.min(maxOffer, currentHighest * (1.08 + Math.random() * 0.12)));
                     
                     const rand = Math.random();
                     let type: BidType = 'UPFRONT_ONLY';
@@ -229,10 +242,20 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
             if (b) {
                 b.balance += bid.amount;
                 b.stats.lifetimeRevenue += bid.amount;
+                if (!b.studioState) b.studioState = {} as any;
+                const ledger = Array.isArray(b.studioState.financeLedger) ? b.studioState.financeLedger : [];
+                b.studioState.financeLedger = [{
+                    id: `studio_ledger_bid_${project.id}_${player.age}_${player.currentWeek}`,
+                    week: player.currentWeek,
+                    year: player.age,
+                    amount: bid.amount,
+                    type: 'STREAMING_DEAL',
+                    label: `${project.name} ${PLATFORMS.find(p => p.id === bid.platformId)?.name || 'platform'} deal`,
+                    projectId: project.id
+                }, ...ledger].slice(0, 40);
                 
                 // Add funding to studio production fund
                 if (bid.fundingAmount) {
-                    if (!b.studioState) b.studioState = {};
                     b.studioState.productionFund = (b.studioState.productionFund || 0) + bid.fundingAmount;
                 }
             }
@@ -332,6 +355,37 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
     }, [selectedCampaigns]);
 
     const getWeekOfYear = (week: number) => ((week - 1) % 52) + 1;
+    const getFestivalTimingMeta = (festivalWeeks: number[], targetWeekOfYear: number) => {
+        const sortedWeeks = [...festivalWeeks].sort((a, b) => a - b);
+        const firstWeek = sortedWeeks[0];
+        const lastWeek = sortedWeeks[sortedWeeks.length - 1];
+        const isLive = sortedWeeks.includes(targetWeekOfYear);
+
+        if (isLive) {
+            return {
+                isTimingRight: true,
+                statusLabel: 'Available This Week',
+                statusTone: 'text-emerald-400',
+                weekLabel: sortedWeeks.length > 1 ? `Weeks ${firstWeek}-${lastWeek}` : `Week ${firstWeek}`
+            };
+        }
+
+        const nextFestivalWeek = sortedWeeks.find(week => week > targetWeekOfYear) ?? firstWeek;
+        const weeksUntil = nextFestivalWeek > targetWeekOfYear
+            ? nextFestivalWeek - targetWeekOfYear
+            : (52 - targetWeekOfYear) + nextFestivalWeek;
+
+        const hasPassedThisSeason = targetWeekOfYear > lastWeek;
+
+        return {
+            isTimingRight: false,
+            statusLabel: hasPassedThisSeason
+                ? `Returns in ${weeksUntil} ${weeksUntil === 1 ? 'week' : 'weeks'}`
+                : `Opens in ${weeksUntil} ${weeksUntil === 1 ? 'week' : 'weeks'}`,
+            statusTone: hasPassedThisSeason ? 'text-amber-400' : 'text-sky-400',
+            weekLabel: sortedWeeks.length > 1 ? `Weeks ${firstWeek}-${lastWeek}` : `Week ${firstWeek}`
+        };
+    };
 
     const handleComplete = () => {
         const updatedPlayer = { ...player };
@@ -394,15 +448,17 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
             if (updatedPlayer.world.universes[universeId]) {
                 const universe = updatedPlayer.world.universes[universeId];
                 const quality = project.projectDetails.hiddenStats?.qualityScore || 50;
+                const updatedUniverse = mergeUniverseRosterWithProject(
+                    universe,
+                    project.name,
+                    project.projectDetails.castList,
+                    player.name
+                );
                 
                 // Increase Brand Power and Momentum
-                universe.brandPower += Math.floor(quality / 20);
-                universe.momentum += Math.floor(quality / 10);
-                
-                // Add to roster if not already there
-                if (!universe.roster.includes(project.id)) {
-                    universe.roster.push(project.id);
-                }
+                updatedUniverse.brandPower += Math.floor(quality / 20);
+                updatedUniverse.momentum += Math.floor(quality / 10);
+                updatedPlayer.world.universes[universeId] = updatedUniverse;
             }
         }
 
@@ -751,7 +807,8 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
 
                                     {FESTIVALS.map(fest => {
                                         const weekOfYear = getWeekOfYear(releaseWeek);
-                                        const isTimingRight = fest.weeks.includes(weekOfYear);
+                                        const timingMeta = getFestivalTimingMeta(fest.weeks, weekOfYear);
+                                        const isTimingRight = timingMeta.isTimingRight;
                                         const canAfford = player.money >= fest.cost;
                                         const hasPrestige = (project.projectDetails?.hiddenStats?.qualityScore || 0) >= fest.prestigeReq;
                                         const isEligible = canAfford && hasPrestige && isTimingRight;
@@ -767,6 +824,11 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                                                     <div>
                                                         <div className="font-serif text-xl text-white/90 mb-1">{fest.name}</div>
                                                         <p className="text-sm text-white/50 italic">{fest.description}</p>
+                                                        <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/30 px-3 py-1.5">
+                                                            <Calendar size={12} className="text-amber-400" />
+                                                            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/50">Festival Window</span>
+                                                            <span className="text-xs font-bold text-white/80">{timingMeta.weekLabel}</span>
+                                                        </div>
                                                     </div>
                                                     <span className="font-mono text-lg text-amber-500/80">${(fest.cost / 1000).toFixed(0)}k</span>
                                                 </div>
@@ -777,7 +839,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                                                     </div>
                                                     <div className="flex flex-col gap-1">
                                                         <span className="text-[9px] text-white/40 uppercase tracking-widest font-bold">Timing</span>
-                                                        <span className={`text-xs font-bold ${isTimingRight ? 'text-emerald-400' : 'text-rose-400'}`}>{isTimingRight ? 'Perfect' : 'Wrong Season'}</span>
+                                                        <span className={`text-xs font-bold ${timingMeta.statusTone}`}>{timingMeta.statusLabel}</span>
                                                     </div>
                                                 </div>
                                             </button>

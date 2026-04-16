@@ -7,6 +7,7 @@ import { SOCIAL_EVENTS_DB, FLAVOR_TEXTS } from '../services/socialEvents';
 import { createBusiness } from '../services/businessLogic';
 import { getAbsoluteWeek } from '../services/legacyLogic';
 import { spendPlayerEnergy } from '../services/premiumLogic';
+import { applyParenthoodAbandonment, applyPartnerBreakup, applyDivorceOutcome, reconnectWithChild } from '../services/familyLogic';
 
 interface GameActionsProps {
     player: Player;
@@ -15,9 +16,21 @@ interface GameActionsProps {
     setActivePressEvent: (evt: { project: Commitment, questions: PressInteraction[] } | null) => void;
     setShowProtectionPrompt: (prompt: { partnerId: string, partnerName: string } | null) => void;
     setActiveSocialEvent: (evt: { event: SocialEvent, partnerId: string } | null) => void;
+    setPendingBabyNaming: (pending: {
+        partnerId: string;
+        partnerName: string;
+        babyGender: 'MALE' | 'FEMALE';
+        suggestedFirstName: string;
+        birthWeekAbsolute: number;
+        eventWeek: number;
+        eventYear: number;
+        shouldCreateScandalNews: boolean;
+    } | null) => void;
 }
 
-export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePressEvent, setShowProtectionPrompt, setActiveSocialEvent }: GameActionsProps) => {
+export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePressEvent, setShowProtectionPrompt, setActiveSocialEvent, setPendingBabyNaming }: GameActionsProps) => {
+    const familyRelations: Relationship['relation'][] = ['Parent', 'Deceased Parent', 'Sibling', 'Child'];
+    const isFamilyRelation = (relation?: Relationship['relation']) => !!relation && familyRelations.includes(relation);
     
     // Helper for updating player and saving asynchronously
     const handleGenericUpdate = (updater: (prev: Player) => Player, logMessage?: string) => {
@@ -296,6 +309,10 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
           const idx = prev.relationships.findIndex(r => r.id === relId);
           if (idx === -1) return prev;
           const partner = prev.relationships[idx];
+          if (['DATE', 'PROPOSE', 'INTIMACY', 'CLUBBING', 'TRIP'].includes(action) && isFamilyRelation(partner.relation)) {
+              setToastMessage({ title: "Blocked", subtext: "Family members cannot be used for romantic actions." });
+              return prev;
+          }
           
           let logMsg = "";
           let newCloseness = partner.closeness;
@@ -351,18 +368,17 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
                   if (Math.random() < 0.15) {
                       const babyGender = Math.random() > 0.5 ? 'MALE' : 'FEMALE';
                       const babyName = babyGender === 'MALE' ? 'Leo' : 'Mia';
-                      const babyRel: Relationship = {
-                          id: `child_${Date.now()}`, name: `Baby ${babyName}`, relation: 'Child', closeness: 100,
-                          image: getGenderedAvatar(babyGender, babyName),
-                          lastInteractionWeek: prev.currentWeek,
-                          lastInteractionAbsolute: getAbsoluteWeek(prev.age, prev.currentWeek),
-                          age: 0,
-                          gender: babyGender,
+                      setPendingBabyNaming({
+                          partnerId: partner.id,
+                          partnerName: partner.name,
+                          babyGender,
+                          suggestedFirstName: babyName,
                           birthWeekAbsolute: getAbsoluteWeek(prev.age, prev.currentWeek),
-                      };
-                      newRelationships.push(babyRel);
-                      logMsg += ` 🍼 A new baby is joining your family.`;
-                      setToastMessage({ title: "It's a Baby!", subtext: `Welcome, ${babyName}.` });
+                          eventWeek: prev.currentWeek,
+                          eventYear: prev.age,
+                          shouldCreateScandalNews: false,
+                      });
+                      logMsg += ` 🍼 A new baby is on the way.`;
                   }
               }
               else if (['CALL', 'GIFT', 'NETWORK'].includes(action)) {
@@ -408,9 +424,39 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
       });
     };
 
-    const handleSocialInteract = (id: string, type: 'CALL' | 'HANGOUT' | 'GIFT' | 'NETWORK' | 'DATE' | 'PROPOSE' | 'INTIMACY' | 'CLUBBING' | 'TRIP') => {
+    const handleSocialInteract = (id: string, type: 'CALL' | 'HANGOUT' | 'GIFT' | 'NETWORK' | 'DATE' | 'PROPOSE' | 'INTIMACY' | 'CLUBBING' | 'TRIP' | 'ABANDON_CHILD' | 'RECONNECT_CHILD' | 'BREAK_UP' | 'DIVORCE_SETTLE' | 'DIVORCE_FIGHT_BUDGET' | 'DIVORCE_FIGHT_ESTABLISHED' | 'DIVORCE_FIGHT_ELITE') => {
+        const partner = player.relationships.find(r => r.id === id);
+        if (type === 'BREAK_UP') {
+            setPlayer(prev => applyPartnerBreakup(prev, id));
+            setToastMessage({ title: "Breakup Finalized", subtext: "The relationship is over, and any family fallout now follows you." });
+            return;
+        }
+        if (type === 'DIVORCE_SETTLE') {
+            setPlayer(prev => applyDivorceOutcome(prev, id, 'SETTLE'));
+            setToastMessage({ title: "Divorce Settled", subtext: "The split is done. The financial aftermath starts now." });
+            return;
+        }
+        if (type === 'DIVORCE_FIGHT_BUDGET' || type === 'DIVORCE_FIGHT_ESTABLISHED' || type === 'DIVORCE_FIGHT_ELITE') {
+            const lawyerTier = type === 'DIVORCE_FIGHT_ELITE' ? 'ELITE' : type === 'DIVORCE_FIGHT_ESTABLISHED' ? 'ESTABLISHED' : 'BUDGET';
+            setPlayer(prev => applyDivorceOutcome(prev, id, 'FIGHT', lawyerTier));
+            setToastMessage({ title: "Court Fight Resolved", subtext: `The divorce battle is over. ${lawyerTier.toLowerCase()} counsel changed the stakes.` });
+            return;
+        }
+        if (type === 'ABANDON_CHILD') {
+            setPlayer(prev => applyParenthoodAbandonment(prev, { childId: id }));
+            setToastMessage({ title: "Child Abandoned", subtext: "Your choice will carry financial and social consequences." });
+            return;
+        }
+        if (type === 'RECONNECT_CHILD') {
+            setPlayer(prev => reconnectWithChild(prev, id));
+            setToastMessage({ title: "Reconnection Started", subtext: "Repairing family damage will take time, but the first step is made." });
+            return;
+        }
+        if (partner && ['DATE', 'PROPOSE', 'INTIMACY', 'CLUBBING', 'TRIP'].includes(type) && isFamilyRelation(partner.relation)) {
+            setToastMessage({ title: "Blocked", subtext: "Family members cannot be used for romantic actions." });
+            return;
+        }
         if (type === 'INTIMACY') {
-            const partner = player.relationships.find(r => r.id === id);
             if (partner && partner.relation !== 'Spouse') {
                 setShowProtectionPrompt({ partnerId: id, partnerName: partner.name });
                 return;
@@ -447,26 +493,18 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
           if (Math.random() < chance) {
               const babyGender = Math.random() > 0.5 ? 'MALE' : 'FEMALE';
               const babyName = babyGender === 'MALE' ? 'Leo' : 'Mia';
-              const babyRel: Relationship = {
-                          id: `child_${Date.now()}`, name: `Baby ${babyName}`, relation: 'Child', closeness: 100,
-                          image: getGenderedAvatar(babyGender, babyName),
-                          lastInteractionWeek: prev.currentWeek,
-                          lastInteractionAbsolute: getAbsoluteWeek(prev.age, prev.currentWeek),
-                          age: 0,
-                          gender: babyGender,
-                          birthWeekAbsolute: getAbsoluteWeek(prev.age, prev.currentWeek),
-                      };
-                      newRels.push(babyRel);
-                      logMsg += ` 🍼 You and ${partner.name} welcomed a new baby!`;
-                      setToastMessage({ title: "It's a Baby!", subtext: `Welcome to the world, ${babyName}.` });
-
-                      if (partner.relation !== 'Spouse' && prev.stats.fame > 20) {
-                          newsUpdate.unshift({
-                              id: `news_scandal_baby_${Date.now()}`, headline: `SCANDAL: ${prev.name} Welcomes Secret Love Child!`, subtext: `Fans shocked by sudden baby announcement with partner ${partner.name}.`,
-                              category: 'TOP_STORY', week: prev.currentWeek, year: prev.age, impactLevel: 'HIGH'
-                          });
-                      }
-                  }
+              setPendingBabyNaming({
+                  partnerId: partner.id,
+                  partnerName: partner.name,
+                  babyGender,
+                  suggestedFirstName: babyName,
+                  birthWeekAbsolute: getAbsoluteWeek(prev.age, prev.currentWeek),
+                  eventWeek: prev.currentWeek,
+                  eventYear: prev.age,
+                  shouldCreateScandalNews: partner.relation !== 'Spouse' && prev.stats.fame > 20,
+              });
+              logMsg += ` 🍼 You and ${partner.name} welcomed a new baby.`;
+          }
 
           newRels[idx] = { ...partner, closeness: newCloseness, lastInteractionWeek: prev.currentWeek, lastInteractionAbsolute: getAbsoluteWeek(prev.age, prev.currentWeek) };
 

@@ -6,6 +6,7 @@ import { getWriterTalent } from '../../../services/roleLogic';
 import { generateWriters, generateIPMarket, generateProceduralLogline } from '../../../src/data/generators';
 import { SCRIPT_TEMPLATES } from '../../../src/data/scriptTemplates';
 import { normalizeStudioState } from '../../../services/businessLogic';
+import { buildUniverseRoster, getUniverseDashboardProjects } from '../../../services/universeLogic';
 
 interface DevelopmentLabProps {
     player: Player;
@@ -180,7 +181,7 @@ export const DevelopmentLab: React.FC<DevelopmentLabProps> = ({ player, studio, 
             </div>
 
             {/* Content Area */}
-            <div className="flex-1 overflow-y-auto p-4">
+            <div className="flex-1 overflow-y-auto p-4 pb-nav-safe-lg">
                 {activeTab === 'VAULT' && <ScriptVault 
                     scripts={studioState.scripts} 
                     writers={studioState.writers}
@@ -879,7 +880,7 @@ const ScriptWizard: React.FC<{ onComplete: (script: Script) => void, initialScri
 
     if (step === 1) {
         return (
-            <div className="space-y-6">
+            <div className="space-y-6 pb-nav-safe">
                 <div>
                     <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Working Title</label>
                     <input 
@@ -995,7 +996,7 @@ const ScriptWizard: React.FC<{ onComplete: (script: Script) => void, initialScri
     const questions = SCRIPT_TEMPLATES[primaryGenre as Genre] || [];
 
     return (
-        <div className="space-y-8 pb-20">
+        <div className="space-y-8 pb-nav-safe">
             <div className="mb-6">
                 <h2 className="text-xl font-black">{title}</h2>
                 <p className="text-zinc-400 text-sm">Define the core DNA of your {primaryGenre.toLowerCase()} script.</p>
@@ -1851,10 +1852,8 @@ const UniverseDashboard: React.FC<{
         setPhaseName(`Phase 1`);
     };
 
-    // Group projects by Saga and Phase
-    const universeProjects = [...player.pastProjects, ...(studio.studioState?.activeReleases || [])]
-        .filter(p => p.projectDetails?.universeId === universe.id)
-        .map(p => p.projectDetails);
+    const universeProjects = getUniverseDashboardProjects(player, universe.id, player.activeReleases || []);
+    const normalizedRoster = buildUniverseRoster(universe, universeProjects, player.name);
 
     const timeline = universeProjects.reduce((acc, p) => {
         const sName = p?.universeSagaName || 'Saga 1';
@@ -1863,7 +1862,7 @@ const UniverseDashboard: React.FC<{
         if (!acc[sName][pName]) acc[sName][pName] = [];
         acc[sName][pName].push(p);
         return acc;
-    }, {} as Record<string, Record<string, any[]>>);
+    }, {} as Record<string, Record<string, typeof universeProjects>>);
 
     return (
         <div className="space-y-6 animate-in slide-in-from-right-4 duration-300 pb-20">
@@ -1997,38 +1996,43 @@ const UniverseDashboard: React.FC<{
             {activeTab === 'ROSTER' && (
                 <div className="space-y-6">
                     <h3 className="text-xs font-black text-zinc-500 uppercase tracking-widest px-2">Character Roster</h3>
-                    {universe.roster.length === 0 ? (
+                    {normalizedRoster.length === 0 ? (
                         <div className="bg-zinc-900/30 border border-zinc-800 rounded-2xl p-8 text-center">
                             <p className="text-zinc-500 text-sm">No characters in this universe yet.</p>
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                            {universe.roster.map((char, idx) => (
+                            {normalizedRoster.map((char, idx) => (
                                 <div key={idx} className="bg-zinc-900 border border-zinc-800 p-4 rounded-2xl space-y-2">
                                     <div className="flex justify-between items-start">
                                         <p className="text-lg font-black text-white">{char.name}</p>
                                         <div className="bg-amber-500/10 text-amber-500 text-[9px] font-black px-2 py-1 rounded uppercase tracking-widest">
-                                            {char.type}
+                                            {char.roleType || 'ACTIVE'}
                                         </div>
                                     </div>
-                                    <p className="text-xs text-zinc-500">{char.description}</p>
+                                    <p className="text-xs text-zinc-500">
+                                        Played by <span className="text-zinc-300">{char.actorId === 'PLAYER_SELF' ? 'You' : char.actorName}</span>
+                                    </p>
+                                    <p className="text-[10px] text-zinc-600 uppercase tracking-widest">
+                                        First: {char.firstAppearanceTitle || 'Unknown'} • Latest: {char.latestAppearanceTitle || 'Unknown'}
+                                    </p>
                                     <div className="flex items-center gap-4 pt-2">
                                         <div className="flex-1">
                                             <div className="flex justify-between text-[8px] font-black text-zinc-500 uppercase tracking-widest mb-1">
-                                                <span>Fame</span>
-                                                <span>{char.fame}%</span>
+                                                <span>Approval</span>
+                                                <span>{Math.round(char.fanApproval || 0)}%</span>
                                             </div>
                                             <div className="h-1 bg-zinc-800 rounded-full overflow-hidden">
-                                                <div className="h-full bg-amber-500" style={{ width: `${char.fame}%` }} />
+                                                <div className="h-full bg-amber-500" style={{ width: `${Math.round(char.fanApproval || 0)}%` }} />
                                             </div>
                                         </div>
                                         <div className="flex-1">
                                             <div className="flex justify-between text-[8px] font-black text-zinc-500 uppercase tracking-widest mb-1">
-                                                <span>Appeal</span>
-                                                <span>{char.appeal}%</span>
+                                                <span>Appearances</span>
+                                                <span>{char.appearances || 1}</span>
                                             </div>
                                             <div className="h-1 bg-zinc-800 rounded-full overflow-hidden">
-                                                <div className="h-full bg-blue-500" style={{ width: `${char.appeal}%` }} />
+                                                <div className="h-full bg-blue-500" style={{ width: `${Math.min(100, (char.appearances || 1) * 18)}%` }} />
                                             </div>
                                         </div>
                                     </div>

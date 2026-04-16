@@ -1,5 +1,5 @@
 
-import { Player, Commitment, ActiveRelease, StreamingState, LogEntry, NegotiationData, ActorSkills, Application, AuditionOpportunity, ProjectDetails, ScheduledEvent, TransactionCategory, Transaction, YearlyFinance, Message, IndustryProject, TeamMember, Business, InstaPost, XPost, WriterStats, DirectorStats, PlatformId, LegalCase, LifeEvent, RoleType } from '../types';
+import { Player, Commitment, ActiveRelease, StreamingState, LogEntry, NegotiationData, ActorSkills, Application, AuditionOpportunity, ProjectDetails, ScheduledEvent, TransactionCategory, Transaction, YearlyFinance, Message, IndustryProject, TeamMember, Business, InstaPost, XPost, WriterStats, DirectorStats, PlatformId, LegalCase, LifeEvent, RoleType, FamilyObligation } from '../types';
 import { PROPERTY_CATALOG, BUSINESS_CATALOG, CAR_CATALOG, MOTORCYCLE_CATALOG, BOAT_CATALOG, AIRCRAFT_CATALOG, CLOTHING_CATALOG } from './lifestyleLogic';
 import { 
     calculateGlobalTalent, 
@@ -96,6 +96,12 @@ const ensureObjectArray = <T extends Record<string, any>>(value: any): T[] => {
     return Array.isArray(value) ? value.filter(item => item && typeof item === 'object') as T[] : [];
 };
 
+const appendStudioLedgerEntry = (business: Business, entry: any) => {
+    if (!business.studioState) business.studioState = {} as any;
+    const ledger = Array.isArray(business.studioState.financeLedger) ? business.studioState.financeLedger : [];
+    business.studioState.financeLedger = [entry, ...ledger].slice(0, 200);
+};
+
 const getPlayerProjectRoleType = (roleType: string | undefined, castList?: any[]): RoleType => {
     const playerCastEntry = castList?.find((member: any) => member?.actorId === 'PLAYER_SELF');
     if (playerCastEntry?.roleType) return playerCastEntry.roleType as RoleType;
@@ -113,10 +119,19 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
         nextPlayer.portfolio = [];
     }
     if (!nextPlayer.finance) {
-        nextPlayer.finance = { history: [], yearly: [] };
+        nextPlayer.finance = {
+            history: [],
+            yearly: [],
+            loans: [],
+            credit: { successfulPayments: 0, missedPayments: 0, defaults: 0, totalBorrowed: 0, totalRepaid: 0 }
+        };
     }
     if (!Array.isArray(nextPlayer.finance.history)) nextPlayer.finance.history = [];
     if (!Array.isArray(nextPlayer.finance.yearly)) nextPlayer.finance.yearly = [];
+    if (!Array.isArray(nextPlayer.finance.loans)) nextPlayer.finance.loans = [];
+    if (!nextPlayer.finance.credit) {
+        nextPlayer.finance.credit = { successfulPayments: 0, missedPayments: 0, defaults: 0, totalBorrowed: 0, totalRepaid: 0 };
+    }
     if (!nextPlayer.world) {
         nextPlayer.world = { 
             projects: [], 
@@ -142,6 +157,8 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
     }
     if (!Array.isArray(nextPlayer.studio.talentRoster)) nextPlayer.studio.talentRoster = [];
     if (!nextPlayer.flags) nextPlayer.flags = {};
+    if (!Array.isArray(nextPlayer.flags.familyObligations)) nextPlayer.flags.familyObligations = [];
+    if (!Array.isArray(nextPlayer.flags.abandonedChildIds)) nextPlayer.flags.abandonedChildIds = [];
     if (!Array.isArray(nextPlayer.flags.extraNPCs)) nextPlayer.flags.extraNPCs = [];
     if (!nextPlayer.team) nextPlayer.team = { availableAgents: [], availableManagers: [], availableTrainers: [], availableStylists: [], availableTherapists: [], availablePublicists: [] } as any;
     if (!Array.isArray(nextPlayer.team.availableAgents)) nextPlayer.team.availableAgents = [];
@@ -269,7 +286,8 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                 talentRoster: ensureObjectArray(business.studioState.talentRoster),
                 activeProjects: ensureObjectArray((business.studioState as any).activeProjects),
                 library: ensureObjectArray((business.studioState as any).library),
-                bids: ensureObjectArray((business.studioState as any).bids)
+                bids: ensureObjectArray((business.studioState as any).bids),
+                financeLedger: ensureObjectArray((business.studioState as any).financeLedger)
             }
             : business.studioState
     }));
@@ -359,6 +377,103 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
         if (nextPlayer.finance.history.length > 200) nextPlayer.finance.history.pop();
     };
 
+    // --- 0.55 PERSONAL LOANS ---
+    nextPlayer.finance.loans = nextPlayer.finance.loans.map((loan) => {
+        if (loan.status !== 'ACTIVE') return loan;
+
+        const interestDue = Math.max(0, Math.round(loan.principal * (loan.annualInterestRate / 52)));
+        const scheduledPayment = Math.max(loan.weeklyPayment, interestDue + 1);
+
+        if (nextPlayer.money >= scheduledPayment) {
+            addTransaction(-scheduledPayment, 'LOAN', `${loan.lenderName} weekly loan payment`);
+            const principalPaid = Math.max(0, scheduledPayment - interestDue);
+            const newPrincipal = Math.max(0, loan.principal - principalPaid);
+            const weeksRemaining = Math.max(0, loan.weeksRemaining - 1);
+            nextPlayer.finance.credit.successfulPayments += 1;
+            nextPlayer.finance.credit.totalRepaid += scheduledPayment;
+
+            if (newPrincipal <= 0 || weeksRemaining === 0) {
+                logsToAdd.push({ msg: `🏦 Loan fully repaid with ${loan.lenderName}. Your credit standing improves.`, type: 'positive' });
+                return {
+                    ...loan,
+                    principal: 0,
+                    weeksRemaining: 0,
+                    successfulPayments: loan.successfulPayments + 1,
+                    status: 'PAID'
+                };
+            }
+
+            return {
+                ...loan,
+                principal: newPrincipal,
+                weeksRemaining,
+                successfulPayments: loan.successfulPayments + 1
+            };
+        }
+
+        const lateFee = Math.max(1000, Math.round(loan.originalPrincipal * 0.01));
+        const penalizedPrincipal = loan.principal + interestDue + lateFee;
+        const missedPayments = loan.missedPayments + 1;
+        nextPlayer.finance.credit.missedPayments += 1;
+        nextPlayer.stats.reputation = Math.max(0, nextPlayer.stats.reputation - 2);
+        nextPlayer.stats.happiness = Math.max(0, nextPlayer.stats.happiness - 3);
+        logsToAdd.push({ msg: `⚠️ Missed a loan payment to ${loan.lenderName}. Late fee added.`, type: 'negative' });
+
+        if (missedPayments >= 3) {
+            nextPlayer.finance.credit.defaults += 1;
+            nextPlayer.stats.reputation = Math.max(0, nextPlayer.stats.reputation - 8);
+            logsToAdd.push({ msg: `🚨 ${loan.lenderName} marked your loan in default. Future borrowing will be much harder.`, type: 'negative' });
+            return {
+                ...loan,
+                principal: penalizedPrincipal,
+                missedPayments,
+                status: 'DEFAULTED'
+            };
+        }
+
+        return {
+            ...loan,
+            principal: penalizedPrincipal,
+            missedPayments
+        };
+    });
+
+    // --- 0.56 FAMILY SUPPORT OBLIGATIONS ---
+    (nextPlayer.flags.familyObligations as FamilyObligation[]) = (nextPlayer.flags.familyObligations as FamilyObligation[]).map(obligation => {
+        if (!obligation.active) return obligation;
+
+        const couldCover = nextPlayer.money >= obligation.weeklyAmount;
+        const label = obligation.type === 'ALIMONY'
+            ? `Alimony payment to ${obligation.targetName}`
+            : `Child support for ${obligation.targetName}`;
+
+        addTransaction(-obligation.weeklyAmount, 'EXPENSE', label);
+
+        if (!couldCover) {
+            nextPlayer.stats.reputation = Math.max(0, nextPlayer.stats.reputation - 2);
+            nextPlayer.stats.happiness = Math.max(0, nextPlayer.stats.happiness - 2);
+            logsToAdd.push({
+                msg: `⚠️ ${label} pushed you deeper into the red this week.`,
+                type: 'negative'
+            });
+
+            if (nextPlayer.stats.fame > 35 && Math.random() < 0.3) {
+                nextPlayer.news.unshift({
+                    id: `news_support_missed_${Date.now()}_${Math.random()}`,
+                    headline: `${nextPlayer.name} under fire over missed family support`,
+                    subtext: `${obligation.targetName}'s situation is becoming a public scandal as support trouble deepens.`,
+                    category: 'TOP_STORY',
+                    week: nextPlayer.currentWeek,
+                    year: nextPlayer.age,
+                    impactLevel: 'MEDIUM'
+                });
+                nextPlayer.news = nextPlayer.news.slice(0, 50);
+            }
+        }
+
+        return obligation;
+    });
+
     // --- 0.6 CHECK FOR SCHEDULED EVENTS ---
     const eventsToday = nextPlayer.scheduledEvents.filter(e => e.week === nextPlayer.currentWeek);
     if (eventsToday.length > 0) {
@@ -401,6 +516,14 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
             ownerStudio.stats.weeklyRevenue += weeklyUniverseRevenue;
             ownerStudio.stats.weeklyProfit += weeklyUniverseRevenue;
             ownerStudio.stats.lifetimeRevenue += weeklyUniverseRevenue;
+            appendStudioLedgerEntry(ownerStudio, {
+                id: `studio_ledger_universe_${universe.id}_${nextPlayer.age}_${nextPlayer.currentWeek}`,
+                week: nextPlayer.currentWeek,
+                year: nextPlayer.age,
+                amount: weeklyUniverseRevenue,
+                type: 'UNIVERSE',
+                label: `${universe.name} merch & licensing`
+            });
         });
     } catch (error) {
         console.error('World turn failed during week processing:', error);
@@ -1184,6 +1307,17 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                 playerStudio.stats.weeklyRevenue += studioShare;
                 playerStudio.stats.weeklyProfit += studioShare;
                 playerStudio.stats.lifetimeRevenue += studioShare;
+                if (studioShare > 0) {
+                    appendStudioLedgerEntry(playerStudio, {
+                        id: `studio_ledger_theatrical_${rel.id}_${nextPlayer.age}_${nextPlayer.currentWeek}`,
+                        week: nextPlayer.currentWeek,
+                        year: nextPlayer.age,
+                        amount: studioShare,
+                        type: 'THEATRICAL',
+                        label: `${rel.name} theatrical receipts`,
+                        projectId: rel.id
+                    });
+                }
             }
 
             if (isPulledRevenue || isPulledTime) {
@@ -1210,6 +1344,7 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                         processedReleases.push({ ...rel, distributionPhase: 'STREAMING', totalGross: newTotal, weeklyGross: newWeeklyGross, status: 'FINISHED' });
                     } else {
                         const bids: { platformId: PlatformId, upfront: number, royalty: number, duration: number }[] = [];
+                        const isSeries = rel.type === 'SERIES';
                         const platforms = Object.keys(PLATFORMS) as PlatformId[];
                         platforms.forEach(pId => {
                             const platformProfile = PLATFORMS[pId];
@@ -1229,19 +1364,32 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                             const interest = (packageStrength * isGenreMatch * desperation) + ((rel.promotionalBuzz || 50) * 0.15) + (runStrength * 12);
                             
                             if (interest > 60 || Math.random() > 0.7) {
-                                const qualityFactor = 0.7 + (packageStrength / 200);
-                                const runFactor = 0.14 + (runStrength * 0.08);
+                                const qualityFactor = 0.92 + (packageStrength / 145);
+                                const runFactor = isSeries
+                                    ? 0.68 + (runStrength * 0.22)
+                                    : 0.38 + (runStrength * 0.18);
                                 let baseOffer = rel.budget * runFactor * qualityFactor * platformProfile.payoutMult * desperation * isGenreMatch;
-                                
-                                // Cap offer based on cash reserve and overall sanity.
+
+                                const floorBase = isSeries ? 1.12 : 1.0;
+                                const qualityFloorBonus = Math.max(-0.02, Math.min(0.3, (packageStrength - 55) / 200));
+                                const runFloorBonus = Math.max(-0.03, Math.min(0.24, (runStrength - 1) * 0.14));
+                                const platformFloorBias = 0.97 + ((platformProfile.payoutMult - 1) * 0.42);
+                                const safeFloor = rel.budget * Math.max(
+                                    isSeries ? 1.08 : 0.96,
+                                    floorBase + qualityFloorBonus + runFloorBonus
+                                ) * platformFloorBias;
+
+                                baseOffer = Math.max(baseOffer, safeFloor);
+
+                                // Cap offer based on cash reserve and overall sanity, but leave room for streaming-first safety.
                                 const maxOffer = Math.min(
-                                    platformState.cashReserve * 0.28,
-                                    rel.budget * (0.35 + (runStrength * 0.2))
+                                    platformState.cashReserve * (isSeries ? 0.62 : 0.5),
+                                    rel.budget * (isSeries ? (2.35 + (runStrength * 0.4)) : (1.85 + (runStrength * 0.34)))
                                 );
                                 if (baseOffer > maxOffer) baseOffer = maxOffer;
 
-                                const upfront = Math.floor(baseOffer * (0.9 + Math.random() * 0.3));
-                                const royalty = Math.floor(Math.random() * 8) + 5; // 5-12%
+                                const upfront = Math.floor(baseOffer * (0.96 + Math.random() * 0.28));
+                                const royalty = Math.floor(Math.random() * (isSeries ? 6 : 8)) + (isSeries ? 6 : 5); // series get slightly safer backend terms
                                 
                                 if (upfront > 0) {
                                     bids.push({ platformId: pId, upfront, royalty, duration: 52 }); // 1 year contract
@@ -1250,8 +1398,13 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                         });
                         
                         if (bids.length === 0) {
-                            // Fallback bid if no one is interested
-                            bids.push({ platformId: 'NETFLIX', upfront: Math.floor(rel.budget * 0.05), royalty: 5, duration: 52 });
+                            // Fallback bid should still preserve streaming as a safer release lane.
+                            bids.push({
+                                platformId: 'NETFLIX',
+                                upfront: Math.floor(rel.budget * (isSeries ? 1.12 : 1.0)),
+                                royalty: isSeries ? 6 : 5,
+                                duration: 52
+                            });
                         }
 
                         processedReleases.push({ ...rel, distributionPhase: 'STREAMING_BIDDING', totalGross: newTotal, weeklyGross: newWeeklyGross, status: 'FINISHED', bids });
@@ -1313,6 +1466,15 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                     playerStudio.stats.weeklyRevenue += weeklyStreamingRevenue;
                     playerStudio.stats.weeklyProfit += weeklyStreamingRevenue;
                     playerStudio.stats.lifetimeRevenue += weeklyStreamingRevenue;
+                    appendStudioLedgerEntry(playerStudio, {
+                        id: `studio_ledger_streaming_${rel.id}_${nextPlayer.age}_${nextPlayer.currentWeek}`,
+                        week: nextPlayer.currentWeek,
+                        year: nextPlayer.age,
+                        amount: weeklyStreamingRevenue,
+                        type: 'STREAMING_ROYALTY',
+                        label: `${rel.name} streaming royalties`,
+                        projectId: rel.id
+                    });
                 }
             }
             const newStreamingRevenue = (rel.streamingRevenue || 0) + weeklyStreamingRevenue;
@@ -1332,7 +1494,7 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                 }
                 nextPlayer.pastProjects.push({
                     id: rel.id, name: rel.name, type: 'ACTING_GIG', roleType: getPlayerProjectRoleType(rel.roleType, rel.projectDetails.castList), year: nextPlayer.age,
-                    earnings: 0, rating: rel.imdbRating || 0, reception: rel.status, projectQuality: rel.projectDetails.hiddenStats.qualityScore, imdbRating: rel.imdbRating, boxOfficeResult: `$${(rel.totalGross/1000000).toFixed(1)}M`, outcomeTier: calculateRunOutcome(rel.totalGross + newStreamingRevenue, rel.budget, rel.imdbRating || 5).tier, subtype: rel.projectDetails.subtype, futurePotential: { sequelChance: 0, franchiseChance: 0, rebootChance: 0, renewalChance: 0, isFranchiseStarter: false, isSequelGreenlit: false, isRenewed: false, seriesStatus: 'N/A' }, studioId: rel.projectDetails.studioId, streamingPlatform: rel.streaming.platformId, totalViews, streamingRevenue: newStreamingRevenue, castList: rel.projectDetails.castList, reviews: rel.projectDetails.reviews, budget: rel.budget, gross: rel.totalGross, genre: rel.projectDetails.genre, description: rel.projectDetails.description, projectType: rel.type, royaltyPercentage: rel.royaltyPercentage, franchiseId: rel.projectDetails.franchiseId, universeId: rel.projectDetails.universeId, installmentNumber: rel.projectDetails.installmentNumber, directorId: rel.projectDetails.directorId
+                    earnings: 0, rating: rel.imdbRating || 0, reception: rel.status, projectQuality: rel.projectDetails.hiddenStats.qualityScore, imdbRating: rel.imdbRating, boxOfficeResult: `$${(rel.totalGross/1000000).toFixed(1)}M`, outcomeTier: calculateRunOutcome(rel.totalGross + newStreamingRevenue, rel.budget, rel.imdbRating || 5).tier, subtype: rel.projectDetails.subtype, futurePotential: { sequelChance: 0, franchiseChance: 0, rebootChance: 0, renewalChance: 0, isFranchiseStarter: false, isSequelGreenlit: false, isRenewed: false, seriesStatus: 'N/A' }, studioId: rel.projectDetails.studioId, streamingPlatform: rel.streaming.platformId, totalViews, streamingRevenue: newStreamingRevenue, castList: rel.projectDetails.castList, reviews: rel.projectDetails.reviews, budget: rel.budget, gross: rel.totalGross, genre: rel.projectDetails.genre, description: rel.projectDetails.description, projectType: rel.type, royaltyPercentage: rel.royaltyPercentage, franchiseId: rel.projectDetails.franchiseId, universeId: rel.projectDetails.universeId, universeSagaName: rel.projectDetails.universeSagaName, universePhaseName: rel.projectDetails.universePhaseName, installmentNumber: rel.projectDetails.installmentNumber, directorId: rel.projectDetails.directorId
                 });
             } else {
                 processedReleases.push({ ...rel, streamingRevenue: newStreamingRevenue, streaming: { ...rel.streaming, totalViews, weeklyViews: newWeeklyViews, weekOnPlatform: rel.streaming.weekOnPlatform + 1, isLeaving: newWeeklyViews.length > 20 && newViews < 50000 } });
@@ -1563,12 +1725,12 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
 
         // Year-end finance and taxes
         const yearTransactions = nextPlayer.finance.history.filter(t => t.year === nextPlayer.age - 1);
-        const income = yearTransactions.filter(t => t.amount > 0).reduce((sum, t) => sum + t.amount, 0);
+        const income = yearTransactions.filter(t => t.amount > 0 && t.category !== 'LOAN').reduce((sum, t) => sum + t.amount, 0);
         const expense = yearTransactions.filter(t => t.amount < 0).reduce((sum, t) => sum + Math.abs(t.amount), 0);
         const netIncome = Math.max(0, income - expense);
         const taxableIncome = Math.max(0, netIncome - ANNUAL_TAX_FREE_ALLOWANCE);
         const annualTaxDue = Math.floor(taxableIncome * ANNUAL_INCOME_TAX_RATE);
-        const breakdown: Record<TransactionCategory, number> = { SALARY: 0, ROYALTY: 0, SPONSORSHIP: 0, DIVIDEND: 0, EXPENSE: 0, ASSET: 0, BUSINESS: 0, OTHER: 0, AD_REVENUE: 0 };
+        const breakdown: Record<TransactionCategory, number> = { SALARY: 0, ROYALTY: 0, SPONSORSHIP: 0, DIVIDEND: 0, EXPENSE: 0, ASSET: 0, BUSINESS: 0, OTHER: 0, AD_REVENUE: 0, LOAN: 0 };
         yearTransactions.filter(t => t.amount > 0).forEach(t => breakdown[t.category] = (breakdown[t.category] || 0) + t.amount);
         nextPlayer.finance.yearly.push({ year: nextPlayer.age - 1, totalIncome: income, totalExpenses: expense, incomeByCategory: breakdown });
 
