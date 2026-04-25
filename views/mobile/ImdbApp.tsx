@@ -62,6 +62,40 @@ const getPosterBg = (title: string = '') => {
     return colors[charCode % colors.length];
 };
 
+const getSafeUniversePhaseLabel = (phase: Universe['currentPhase']) => {
+    if (typeof phase === 'number') return `Phase ${phase}`;
+    if (typeof phase === 'string') {
+        const normalized = phase.replace(/_/g, ' ');
+        return normalized.replace('PHASE', 'Phase').replace(/\bORIGINS\b/g, 'Origins').replace(/\bEXPANSION\b/g, 'Expansion').replace(/\bWAR\b/g, 'War').replace(/\bMULTIVERSE\b/g, 'Multiverse');
+    }
+    return 'Phase 1';
+};
+
+const getReturnStatusMeta = (status?: 'RETURNING' | 'WRITTEN_OFF' | 'KILLED_OFF') => {
+    switch (status) {
+        case 'RETURNING':
+            return {
+                label: 'Returning',
+                tone: 'border-emerald-500/30 bg-emerald-950/30 text-emerald-300',
+                chip: 'bg-emerald-500/15 text-emerald-300'
+            };
+        case 'WRITTEN_OFF':
+            return {
+                label: 'Written Off',
+                tone: 'border-amber-500/30 bg-amber-950/30 text-amber-200',
+                chip: 'bg-amber-500/15 text-amber-200'
+            };
+        case 'KILLED_OFF':
+            return {
+                label: 'Killed Off',
+                tone: 'border-rose-500/30 bg-rose-950/30 text-rose-200',
+                chip: 'bg-rose-500/15 text-rose-200'
+            };
+        default:
+            return null;
+    }
+};
+
 export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
   const [activeTab, setActiveTab] = useState<Tab>('PROFILE');
   const [awardView, setAwardView] = useState<AwardView>('HOME');
@@ -447,9 +481,9 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
   const renderUniverseDetail = () => {
       if (!selectedUniverse) return null;
       const theme = UNIVERSE_THEMES[selectedUniverse.id] || { color: 'text-white', bg: 'bg-zinc-700', icon: Globe };
-      const worldMovies = player.world.projects.filter(p => p.universeId === selectedUniverse.id);
-      const playerPastMovies = player.pastProjects.filter(p => p.universeId === selectedUniverse.id);
-      const playerActiveMovies = player.activeReleases.filter(p => p.projectDetails.universeId === selectedUniverse.id);
+      const worldMovies = (player.world?.projects || []).filter(p => p?.universeId === selectedUniverse.id);
+      const playerPastMovies = (player.pastProjects || []).filter(p => p?.universeId === selectedUniverse.id);
+      const playerActiveMovies = (player.activeReleases || []).filter(p => p?.projectDetails?.universeId === selectedUniverse.id);
       const playerUniverseProjects = getUniverseDashboardProjects(player, selectedUniverse.id, player.activeReleases);
       const normalizedRoster = buildUniverseRoster(selectedUniverse, playerUniverseProjects, player.name);
 
@@ -465,7 +499,7 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
               <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 text-center relative overflow-hidden">
                   <div className={`absolute top-0 left-0 right-0 h-1 ${theme.bg}`}></div>
                   <h2 className="text-3xl font-black uppercase tracking-tighter text-white mb-1">{selectedUniverse.name}</h2>
-                  <div className={`text-xs font-bold uppercase tracking-widest ${theme.color} mb-6`}>{selectedUniverse.currentPhase.replace(/_/g, ' ')}</div>
+                  <div className={`text-xs font-bold uppercase tracking-widest ${theme.color} mb-6`}>{getSafeUniversePhaseLabel(selectedUniverse.currentPhase)}</div>
                   <div className="grid grid-cols-2 gap-4"><div className="bg-black/40 p-3 rounded-xl border border-zinc-800"><div className="text-[10px] text-zinc-500 uppercase tracking-widest mb-1">Momentum</div><div className="text-xl font-mono font-bold text-white">{selectedUniverse.momentum}/100</div></div><div className="bg-black/40 p-3 rounded-xl border border-zinc-800"><div className="text-[10px] text-zinc-500 uppercase tracking-widest mb-1">Next Phase</div><div className="text-xl font-mono font-bold text-zinc-400">{Math.ceil(selectedUniverse.weeksUntilNextPhase || 0)}w</div></div></div>
               </div>
               <div><h3 className="text-zinc-500 text-xs font-bold uppercase tracking-widest mb-3 pl-2">Active Roster</h3><div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden divide-y divide-zinc-800">{normalizedRoster.map((char) => (<div key={char.id || char.name} className="p-4 flex justify-between items-center"><div><div className="font-bold text-white text-sm">{char.name}</div><div className="text-xs text-zinc-500">Played by <span className={char.actorId === player.id || char.actorId === 'PLAYER_SELF' ? 'text-amber-400 font-bold' : 'text-zinc-300'}>{char.actorId === player.id || char.actorId === 'PLAYER_SELF' ? 'YOU' : char.actorName}</span></div></div><div className={`text-[10px] font-bold px-2 py-1 rounded uppercase ${char.status === 'ACTIVE' ? 'bg-emerald-900/30 text-emerald-500' : 'bg-zinc-800 text-zinc-500'}`}>{char.status}</div></div>))}</div></div>
@@ -476,6 +510,8 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
 
   // --- MAIN APP STRUCTURE ---
   if (selectedProject) {
+    const futurePotential = (selectedProject.originalObject as ActiveRelease | PastProject).futurePotential;
+    const returnStatusMeta = getReturnStatusMeta(futurePotential?.playerReturnStatus);
      return (
         <div className="absolute inset-0 bg-zinc-950 flex flex-col z-50 text-white animate-in slide-in-from-right duration-300">
             <div className="bg-zinc-900 p-4 pt-12 pb-3 shadow-lg flex items-center gap-3 border-b border-zinc-800">
@@ -572,6 +608,33 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
                         {selectedProject.description || "A captivating story about ambition, betrayal, and the cost of dreams in a world that never sleeps."}
                     </p>
                 </div>
+
+                {returnStatusMeta && (
+                    <div className="p-4 border-b border-zinc-800 bg-zinc-900/40">
+                        <h3 className="text-white font-bold text-sm mb-3 flex items-center gap-2">
+                            <Clock size={16} className="text-zinc-400"/> Franchise Status
+                        </h3>
+                        <div className={`rounded-2xl border p-4 ${returnStatusMeta.tone}`}>
+                            <div className="flex items-center justify-between gap-3 mb-2">
+                                <div className="text-[10px] uppercase tracking-[0.28em] text-zinc-400">
+                                    {selectedProject.mediaType === 'SERIES' ? 'Season Outcome' : 'Sequel Outcome'}
+                                </div>
+                                <div className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] ${returnStatusMeta.chip}`}>
+                                    {returnStatusMeta.label}
+                                </div>
+                            </div>
+                            <div className="text-sm leading-relaxed">
+                                {futurePotential?.returnStatusNote || (
+                                    futurePotential?.playerReturnStatus === 'RETURNING'
+                                        ? 'You are attached to the continuation.'
+                                        : futurePotential?.playerReturnStatus === 'KILLED_OFF'
+                                            ? 'The story continues after your character is killed off.'
+                                            : 'The story continues without your character.'
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* Cast */}
                 {selectedProject.cast && selectedProject.cast.length > 0 && (

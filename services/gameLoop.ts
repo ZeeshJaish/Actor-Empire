@@ -1,5 +1,5 @@
 
-import { Player, Commitment, ActiveRelease, StreamingState, LogEntry, NegotiationData, ActorSkills, Application, AuditionOpportunity, ProjectDetails, ScheduledEvent, TransactionCategory, Transaction, YearlyFinance, Message, IndustryProject, TeamMember, Business, InstaPost, XPost, WriterStats, DirectorStats, PlatformId, LegalCase, LifeEvent, RoleType, FamilyObligation } from '../types';
+import { Player, Commitment, ActiveRelease, StreamingState, LogEntry, NegotiationData, ActorSkills, Application, AuditionOpportunity, ProjectDetails, ScheduledEvent, TransactionCategory, Transaction, YearlyFinance, Message, IndustryProject, TeamMember, Business, InstaPost, XPost, WriterStats, DirectorStats, PlatformId, LegalCase, LifeEvent, RoleType, FamilyObligation, FuturePotential, PlayerReturnStatus } from '../types';
 import { PROPERTY_CATALOG, BUSINESS_CATALOG, CAR_CATALOG, MOTORCYCLE_CATALOG, BOAT_CATALOG, AIRCRAFT_CATALOG, CLOTHING_CATALOG } from './lifestyleLogic';
 import { 
     calculateGlobalTalent, 
@@ -43,7 +43,7 @@ import {
     generateCancellationNews
 } from './newsLogic';
 import { generateWeeklyEvent } from './geminiService';
-import { generateLifeEvent, generateLegalHearing } from './lifeEventLogic';
+import { generateLifeEvent, generateLegalHearing, generateLuxeLifeEvent, hasEligibleLuxeEventTarget } from './lifeEventLogic';
 import { generateWeeklyFeed, NPC_DATABASE, calculateProjectFameMultiplier, generateNewUnknowns, updateNPCLives } from './npcLogic';
 import { generateAgentOffers, generateManagerOffer, generateDirectOffer, getRandomAgents, getRandomManagers, getRandomTrainers, getRandomStylists, getRandomTherapists, getRandomPublicists } from './teamLogic';
 import { processStockMarket, calculatePortfolioValue, getDividendPayout, initializeStocks } from './stockLogic';
@@ -53,8 +53,9 @@ import { generateFamousMovieOpportunity, generateCameoOffer } from './famousMovi
 import { processYoutubeChannel } from './youtubeLogic';
 import { checkForProductionCrisis } from './productionService';
 import { processBusinessWeek } from './businessLogic';
-import { getRelationshipAge } from './legacyLogic';
+import { getAbsoluteWeek, getRelationshipAge, inferStreamingStartWeekAbsolute } from './legacyLogic';
 import { hasNoAds, resetWeeklyEnergy } from './premiumLogic';
+import { advanceLuxeConnections, advanceTinderConnections } from './datingLogic';
 
 // --- CONSTANTS ---
 const ANNUAL_TAX_FREE_ALLOWANCE = 25000;
@@ -74,6 +75,89 @@ const ESTRANGEMENT_TEMPLATES = [
 // Helper to calculate weeks between two points in time handling year wrap
 const getWeeksSince = (postWeek: number, postYear: number, currentWeek: number, currentYear: number): number => {
     return ((currentYear - postYear) * 52) + (currentWeek - postWeek);
+};
+
+const HIGH_FATALITY_GENRES = new Set(['ACTION', 'THRILLER', 'SCI_FI', 'SUPERHERO', 'ADVENTURE']);
+
+const getReturnStatusForContinuation = (
+    rel: ActiveRelease,
+    player: Player,
+    isPlayerProduction: boolean,
+    isUniverseContracted: boolean
+): { getsOffer: boolean; status: PlayerReturnStatus; note: string } => {
+    if (isPlayerProduction || isUniverseContracted) {
+        return {
+            getsOffer: true,
+            status: 'RETURNING',
+            note: rel.type === 'SERIES'
+                ? 'The continuation keeps your character in the center of the story.'
+                : 'The sequel keeps you on the call sheet.'
+        };
+    }
+
+    const baseReturnChanceByRole: Record<RoleType, number> = {
+        LEAD: 88,
+        SUPPORTING: 66,
+        ENSEMBLE: 54,
+        CAMEO: 34,
+        MINOR: 22,
+    };
+    const role = rel.roleType || 'SUPPORTING';
+    const performanceBonus = rel.productionPerformance >= 85 ? 10 : rel.productionPerformance >= 70 ? 5 : rel.productionPerformance <= 40 ? -10 : 0;
+    const ratingBonus = (rel.imdbRating || 5) >= 8 ? 8 : (rel.imdbRating || 5) >= 7 ? 4 : (rel.imdbRating || 5) < 5.8 ? -10 : 0;
+    const fameBonus = player.stats.fame >= 80 ? 6 : player.stats.fame >= 60 ? 3 : 0;
+    const returnChance = Math.max(8, Math.min(96, baseReturnChanceByRole[role] + performanceBonus + ratingBonus + fameBonus));
+    const getsOffer = Math.random() * 100 < returnChance;
+
+    if (getsOffer) {
+        return {
+            getsOffer: true,
+            status: 'RETURNING',
+            note: rel.type === 'SERIES'
+                ? 'The network wants your character back for the next season.'
+                : 'The studio wants your character back for the follow-up film.'
+        };
+    }
+
+    const lethalChance = HIGH_FATALITY_GENRES.has(rel.projectDetails.genre) ? 0.55 : 0.18;
+    const status: PlayerReturnStatus = Math.random() < lethalChance ? 'KILLED_OFF' : 'WRITTEN_OFF';
+    const note = status === 'KILLED_OFF'
+        ? (rel.type === 'SERIES'
+            ? 'The renewed season continues without your character after an off-screen death.'
+            : 'The sequel moves forward after your character is killed off.')
+        : (rel.type === 'SERIES'
+            ? 'The renewed season continues without your character.'
+            : 'The sequel moves forward after your character is written out.');
+
+    return { getsOffer: false, status, note };
+};
+
+const createReturnStatusNews = (
+    projectName: string,
+    status: PlayerReturnStatus,
+    week: number,
+    year: number,
+    isSeries: boolean
+) => {
+    if (status === 'RETURNING') return null;
+
+    return {
+        id: `news_return_status_${projectName}_${status}_${Date.now()}`,
+        headline: status === 'KILLED_OFF'
+            ? (isSeries
+                ? `${projectName} returns, but your character is reportedly killed off.`
+                : `${projectName} sequel locks in after your character is killed off.`)
+            : (isSeries
+                ? `${projectName} returns without your character in the new season.`
+                : `${projectName} sequel proceeds after writing your character out.`),
+        subtext: status === 'KILLED_OFF'
+            ? 'Industry chatter says the story is moving on in brutal fashion.'
+            : 'The continuation is moving ahead, but your role is no longer part of it.',
+        category: 'YOU' as const,
+        week,
+        year,
+        impactLevel: 'MEDIUM' as const
+    };
 };
 
 const withTimeout = async <T,>(promise: Promise<T>, timeoutMs: number, fallback: T): Promise<T> => {
@@ -225,7 +309,10 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                 ...release.streaming,
                 weekOnPlatform: ensureFiniteNumber(release.streaming.weekOnPlatform, 1),
                 totalViews: ensureFiniteNumber(release.streaming.totalViews),
-                weeklyViews: Array.isArray(release.streaming.weeklyViews) ? release.streaming.weeklyViews.map(views => ensureFiniteNumber(views)).filter(views => views >= 0) : []
+                weeklyViews: Array.isArray(release.streaming.weeklyViews) ? release.streaming.weeklyViews.map(views => ensureFiniteNumber(views)).filter(views => views >= 0) : [],
+                ...(typeof inferStreamingStartWeekAbsolute(release.streaming, nextPlayer.age, nextPlayer.currentWeek) === 'number'
+                    ? { startWeekAbsolute: inferStreamingStartWeekAbsolute(release.streaming, nextPlayer.age, nextPlayer.currentWeek) }
+                    : {})
             }
             : release.streaming,
         bids: ensureObjectArray(release.bids).map(bid => ({
@@ -1238,31 +1325,58 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
             const isPlayerProduction = nextPlayer.businesses?.some(b => b.id === rel.projectDetails.studioId && b.type === 'PRODUCTION_HOUSE');
 
             if (rel.type === 'SERIES') {
-                if (potential.isRenewed && !isPlayerProduction) {
-                    const offer = generateRenewalOffer(rel, nextPlayer);
-                    const seasonMatch = offer.opportunity.projectName.match(/Season (\d+)/);
-                    const nextSeasonNum = seasonMatch ? parseInt(seasonMatch[1]) : 2;
-                    newNews.unshift(generateRenewalNews(rel.name, nextSeasonNum, nextPlayer.currentWeek, nextPlayer.age));
-                    newInbox.unshift({
-                        id: `renew_offer_${Date.now()}`, sender: 'Network Exec', subject: `RENEWAL: ${offer.opportunity.projectName}`, text: "We are picking up the show for another season.", type: 'OFFER_NEGOTIATION', data: offer, isRead: false, weekSent: nextPlayer.currentWeek, expiresIn: 4
-                    });
-                } else if (potential.isRenewed && isPlayerProduction) {
-                    // Just show news for player production if it's "renewed" (successful)
-                    const seasonMatch = rel.name.match(/Season (\d+)/);
-                    const nextSeasonNum = seasonMatch ? parseInt(seasonMatch[1]) + 1 : 2;
-                    newNews.unshift(generateRenewalNews(rel.name, nextSeasonNum, nextPlayer.currentWeek, nextPlayer.age));
+                if (potential.isRenewed) {
+                    potential.seriesStatus = 'RUNNING';
+                    const returnDecision = getReturnStatusForContinuation(rel, nextPlayer, !!isPlayerProduction, false);
+                    potential.playerReturnStatus = returnDecision.status;
+                    potential.returnStatusNote = returnDecision.note;
+                    rel.futurePotential = potential;
+
+                    if (!isPlayerProduction && returnDecision.getsOffer) {
+                        const offer = generateRenewalOffer(rel, nextPlayer);
+                        const seasonMatch = offer.opportunity.projectName.match(/Season (\d+)/);
+                        const nextSeasonNum = seasonMatch ? parseInt(seasonMatch[1]) : 2;
+                        newNews.unshift(generateRenewalNews(rel.name, nextSeasonNum, nextPlayer.currentWeek, nextPlayer.age));
+                        newInbox.unshift({
+                            id: `renew_offer_${Date.now()}`, sender: 'Network Exec', subject: `RENEWAL: ${offer.opportunity.projectName}`, text: "We are picking up the show for another season.", type: 'OFFER_NEGOTIATION', data: offer, isRead: false, weekSent: nextPlayer.currentWeek, expiresIn: 4
+                        });
+                    } else if (isPlayerProduction || returnDecision.status === 'RETURNING') {
+                        // Just show news for player production if it's "renewed" (successful)
+                        const seasonMatch = rel.name.match(/Season (\d+)/);
+                        const nextSeasonNum = seasonMatch ? parseInt(seasonMatch[1]) + 1 : 2;
+                        newNews.unshift(generateRenewalNews(rel.name, nextSeasonNum, nextPlayer.currentWeek, nextPlayer.age));
+                    } else {
+                        const seasonMatch = rel.name.match(/Season (\d+)/);
+                        const nextSeasonNum = seasonMatch ? parseInt(seasonMatch[1]) + 1 : 2;
+                        newNews.unshift(generateRenewalNews(rel.name, nextSeasonNum, nextPlayer.currentWeek, nextPlayer.age));
+                        const returnStatusNews = createReturnStatusNews(rel.name, returnDecision.status, nextPlayer.currentWeek, nextPlayer.age, true);
+                        if (returnStatusNews) newNews.unshift(returnStatusNews);
+                    }
                 } else {
+                    potential.seriesStatus = 'CANCELLED';
+                    rel.futurePotential = potential;
                     newNews.unshift(generateCancellationNews(rel.name, 1, nextPlayer.currentWeek, nextPlayer.age));
                 }
             } else {
-                if (potential.isSequelGreenlit && !isUniverseContracted && !isPlayerProduction) {
-                    newNews.unshift(generateSequelConfirmedNews(rel.name, nextPlayer.currentWeek, nextPlayer.age));
-                    const offer = generateSequelOffer(rel, nextPlayer);
-                    newInbox.unshift({
-                        id: `negot_${Date.now()}`, sender: 'Studio Legal', subject: `Return Offer: ${offer.opportunity.projectName}`, text: `We offer you the role in the sequel.`, type: 'OFFER_NEGOTIATION', data: offer, isRead: false, weekSent: nextPlayer.currentWeek, expiresIn: 4
-                    });
-                } else if ((isUniverseContracted || isPlayerProduction) && potential.isSequelGreenlit) {
-                    newNews.unshift(generateSequelConfirmedNews(rel.name, nextPlayer.currentWeek, nextPlayer.age));
+                if (potential.isSequelGreenlit) {
+                    const returnDecision = getReturnStatusForContinuation(rel, nextPlayer, !!isPlayerProduction, isUniverseContracted);
+                    potential.playerReturnStatus = returnDecision.status;
+                    potential.returnStatusNote = returnDecision.note;
+                    rel.futurePotential = potential;
+
+                    if (!isUniverseContracted && !isPlayerProduction && returnDecision.getsOffer) {
+                        newNews.unshift(generateSequelConfirmedNews(rel.name, nextPlayer.currentWeek, nextPlayer.age));
+                        const offer = generateSequelOffer(rel, nextPlayer);
+                        newInbox.unshift({
+                            id: `negot_${Date.now()}`, sender: 'Studio Legal', subject: `Return Offer: ${offer.opportunity.projectName}`, text: `We offer you the role in the sequel.`, type: 'OFFER_NEGOTIATION', data: offer, isRead: false, weekSent: nextPlayer.currentWeek, expiresIn: 4
+                        });
+                    } else if ((isUniverseContracted || isPlayerProduction) || returnDecision.status === 'RETURNING') {
+                        newNews.unshift(generateSequelConfirmedNews(rel.name, nextPlayer.currentWeek, nextPlayer.age));
+                    } else {
+                        newNews.unshift(generateSequelConfirmedNews(rel.name, nextPlayer.currentWeek, nextPlayer.age));
+                        const returnStatusNews = createReturnStatusNews(rel.name, returnDecision.status, nextPlayer.currentWeek, nextPlayer.age, false);
+                        if (returnStatusNews) newNews.unshift(returnStatusNews);
+                    }
                 }
             }
         }
@@ -1434,8 +1548,12 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
             processedReleases.push(rel);
         }
         else if (rel.distributionPhase === 'STREAMING' && rel.streaming) {
-            // Handle delayed streaming release
-            if (rel.streaming.startWeek && nextPlayer.currentWeek < rel.streaming.startWeek) {
+            // Handle delayed streaming release, including year rollover.
+            const currentAbsoluteWeek = getAbsoluteWeek(nextPlayer.age, nextPlayer.currentWeek);
+            if (
+                (typeof rel.streaming.startWeekAbsolute === 'number' && currentAbsoluteWeek < rel.streaming.startWeekAbsolute) ||
+                (typeof rel.streaming.startWeekAbsolute !== 'number' && rel.streaming.startWeek && nextPlayer.currentWeek < rel.streaming.startWeek)
+            ) {
                 processedReleases.push(rel);
                 return;
             }
@@ -1494,7 +1612,7 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                 }
                 nextPlayer.pastProjects.push({
                     id: rel.id, name: rel.name, type: 'ACTING_GIG', roleType: getPlayerProjectRoleType(rel.roleType, rel.projectDetails.castList), year: nextPlayer.age,
-                    earnings: 0, rating: rel.imdbRating || 0, reception: rel.status, projectQuality: rel.projectDetails.hiddenStats.qualityScore, imdbRating: rel.imdbRating, boxOfficeResult: `$${(rel.totalGross/1000000).toFixed(1)}M`, outcomeTier: calculateRunOutcome(rel.totalGross + newStreamingRevenue, rel.budget, rel.imdbRating || 5).tier, subtype: rel.projectDetails.subtype, futurePotential: { sequelChance: 0, franchiseChance: 0, rebootChance: 0, renewalChance: 0, isFranchiseStarter: false, isSequelGreenlit: false, isRenewed: false, seriesStatus: 'N/A' }, studioId: rel.projectDetails.studioId, streamingPlatform: rel.streaming.platformId, totalViews, streamingRevenue: newStreamingRevenue, castList: rel.projectDetails.castList, reviews: rel.projectDetails.reviews, budget: rel.budget, gross: rel.totalGross, genre: rel.projectDetails.genre, description: rel.projectDetails.description, projectType: rel.type, royaltyPercentage: rel.royaltyPercentage, franchiseId: rel.projectDetails.franchiseId, universeId: rel.projectDetails.universeId, universeSagaName: rel.projectDetails.universeSagaName, universePhaseName: rel.projectDetails.universePhaseName, installmentNumber: rel.projectDetails.installmentNumber, directorId: rel.projectDetails.directorId
+                    earnings: 0, rating: rel.imdbRating || 0, reception: rel.status, projectQuality: rel.projectDetails.hiddenStats.qualityScore, imdbRating: rel.imdbRating, boxOfficeResult: `$${(rel.totalGross/1000000).toFixed(1)}M`, outcomeTier: calculateRunOutcome(rel.totalGross + newStreamingRevenue, rel.budget, rel.imdbRating || 5).tier, subtype: rel.projectDetails.subtype, futurePotential: rel.futurePotential || { sequelChance: 0, franchiseChance: 0, rebootChance: 0, renewalChance: 0, isFranchiseStarter: false, isSequelGreenlit: false, isRenewed: false, seriesStatus: 'N/A', playerReturnStatus: undefined, returnStatusNote: undefined }, studioId: rel.projectDetails.studioId, streamingPlatform: rel.streaming.platformId, totalViews, streamingRevenue: newStreamingRevenue, castList: rel.projectDetails.castList, reviews: rel.projectDetails.reviews, budget: rel.budget, gross: rel.totalGross, genre: rel.projectDetails.genre, description: rel.projectDetails.description, projectType: rel.type, royaltyPercentage: rel.royaltyPercentage, franchiseId: rel.projectDetails.franchiseId, universeId: rel.projectDetails.universeId, universeSagaName: rel.projectDetails.universeSagaName, universePhaseName: rel.projectDetails.universePhaseName, installmentNumber: rel.projectDetails.installmentNumber, directorId: rel.projectDetails.directorId
                 });
             } else {
                 processedReleases.push({ ...rel, streamingRevenue: newStreamingRevenue, streaming: { ...rel.streaming, totalViews, weeklyViews: newWeeklyViews, weekOnPlatform: rel.streaming.weekOnPlatform + 1, isLeaving: newWeeklyViews.length > 20 && newViews < 50000 } });
@@ -1555,6 +1673,8 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
     nextPlayer.currentWeek += 1;
     if (!hasNoAds(nextPlayer) && nextPlayer.currentWeek % 12 === 0) triggerAd = true;
     nextPlayer.flags.bailoutAdsUsedThisWeek = 0;
+    nextPlayer = advanceTinderConnections(nextPlayer);
+    nextPlayer = advanceLuxeConnections(nextPlayer);
 
     // --- 11.5 ATMOSPHERIC LOGS (Paranoia & Tension) ---
     const heat = nextPlayer.flags.heat || 0;
@@ -1662,7 +1782,31 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
     }
 
     // --- 11.8 RANDOM LIFE EVENTS (Not every year/week) ---
-    if (Math.random() < 0.08) { // 8% chance per week
+    const currentAbsoluteWeekForEvents = getAbsoluteWeek(nextPlayer.age, nextPlayer.currentWeek);
+    const lastLuxeLifeEventAbsoluteWeek = ensureFiniteNumber(nextPlayer.flags.lastLuxeLifeEventAbsoluteWeek, 0);
+    const weeksSinceLastLuxeEvent = currentAbsoluteWeekForEvents - lastLuxeLifeEventAbsoluteWeek;
+    let scheduledLuxeEventThisWeek = false;
+    if (
+        hasEligibleLuxeEventTarget(nextPlayer) &&
+        weeksSinceLastLuxeEvent >= 5 &&
+        Math.random() < 0.16
+    ) {
+        const luxeLifeEvent = generateLuxeLifeEvent(nextPlayer);
+        if (luxeLifeEvent) {
+            const scheduledLuxeLifeEvent: ScheduledEvent = {
+                id: luxeLifeEvent.id,
+                week: nextPlayer.currentWeek,
+                type: 'LIFE_EVENT',
+                title: luxeLifeEvent.title,
+                data: { lifeEvent: luxeLifeEvent }
+            };
+            nextPlayer.scheduledEvents.push(scheduledLuxeLifeEvent);
+            nextPlayer.flags.lastLuxeLifeEventAbsoluteWeek = currentAbsoluteWeekForEvents;
+            scheduledLuxeEventThisWeek = true;
+        }
+    }
+
+    if (!scheduledLuxeEventThisWeek && Math.random() < 0.08) { // 8% chance per week
         const lifeEvent = generateLifeEvent(nextPlayer);
         if (lifeEvent) {
             const scheduledLifeEvent: ScheduledEvent = {

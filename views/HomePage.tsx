@@ -1,5 +1,5 @@
 
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useMemo } from 'react';
 import { Player, ActorSkills, Commitment, ActiveRelease, ScheduledEvent, Message, AuditionOpportunity, NegotiationData, UniverseContract, UniverseId, Page, Genre, Relationship } from '../types';
 import { formatMoney } from '../services/formatUtils';
 import { StatsBar } from '../components/StatsBar';
@@ -7,9 +7,9 @@ import { generateProjectDetails } from '../services/roleLogic';
 import { generateDirectEntryOffer } from '../services/universeLogic'; 
 import { generateLifeEvent } from '../services/lifeEventLogic';
 import { getAbsoluteWeek } from '../services/legacyLogic';
-import { getGenderedAvatar } from '../services/npcLogic';
+import { getGenderedAvatar, MALE_AVATAR_SEEDS, FEMALE_AVATAR_SEEDS } from '../services/npcLogic';
 import { createBusiness } from '../services/businessLogic';
-import { Heart, Smile, Star, Zap, DollarSign, Brain, Calendar, Activity, TrendingUp, Trophy, X, Sliders, Users, Film, Tv, PlayCircle, Lock, FastForward, Key, AlertTriangle, Mic2, Mail, FileText, Dumbbell, Sparkles, Settings, ShoppingCart, Clapperboard, ZapOff, Crown, Skull } from 'lucide-react';
+import { Heart, Smile, Star, Zap, DollarSign, Brain, Calendar, Activity, TrendingUp, Trophy, X, Sliders, Users, Film, Tv, PlayCircle, Lock, FastForward, Key, AlertTriangle, Mic2, Mail, FileText, Dumbbell, Sparkles, Settings, ShoppingCart, Clapperboard, ZapOff, Crown, Skull, Camera, UploadCloud, Check } from 'lucide-react';
 
 interface HomePageProps {
   player: Player;
@@ -34,15 +34,43 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
   const [showPasswordPrompt, setShowPasswordPrompt] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
   const [passwordError, setPasswordError] = useState(false);
+  const [showAvatarEditor, setShowAvatarEditor] = useState(false);
+  const [selectedAvatar, setSelectedAvatar] = useState(player.avatar);
+  const [isCustomUpload, setIsCustomUpload] = useState(player.avatar.startsWith('data:image'));
+  const [isCompressing, setIsCompressing] = useState(false);
+  const [avatarError, setAvatarError] = useState('');
   
   const clickCountRef = useRef(0);
   const lastClickRef = useRef(0);
+  const avatarClickTimeoutRef = useRef<number | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (logContainerRef.current) {
       logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
     }
   }, [player.logs]);
+
+  useEffect(() => {
+    setSelectedAvatar(player.avatar);
+    setIsCustomUpload(player.avatar.startsWith('data:image'));
+  }, [player.avatar]);
+
+  useEffect(() => () => {
+      if (avatarClickTimeoutRef.current) {
+          window.clearTimeout(avatarClickTimeoutRef.current);
+      }
+  }, []);
+
+  const currentAvatarList = useMemo(() => {
+      const seeds =
+          player.gender === 'MALE'
+              ? MALE_AVATAR_SEEDS
+              : player.gender === 'FEMALE'
+                  ? FEMALE_AVATAR_SEEDS
+                  : [...MALE_AVATAR_SEEDS, ...FEMALE_AVATAR_SEEDS];
+      return seeds.slice(0, 30).map(seed => `https://api.dicebear.com/8.x/pixel-art/svg?seed=${seed}`);
+  }, [player.gender]);
 
   // Handle Avatar Triple Click
   const handleAvatarClick = () => {
@@ -55,11 +83,30 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
     lastClickRef.current = now;
 
     if (clickCountRef.current === 3) {
+        if (avatarClickTimeoutRef.current) {
+            window.clearTimeout(avatarClickTimeoutRef.current);
+            avatarClickTimeoutRef.current = null;
+        }
         setShowPasswordPrompt(true);
         setPasswordInput('');
         setPasswordError(false);
         clickCountRef.current = 0;
+        return;
     }
+
+    if (avatarClickTimeoutRef.current) {
+        window.clearTimeout(avatarClickTimeoutRef.current);
+    }
+    avatarClickTimeoutRef.current = window.setTimeout(() => {
+        if (clickCountRef.current < 3) {
+            setShowAvatarEditor(true);
+            setAvatarError('');
+            setSelectedAvatar(player.avatar);
+            setIsCustomUpload(player.avatar.startsWith('data:image'));
+        }
+        clickCountRef.current = 0;
+        avatarClickTimeoutRef.current = null;
+    }, 420);
   };
 
   const handleUnlockDevTools = () => {
@@ -76,6 +123,77 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
           setPasswordInput('');
           setTimeout(() => setPasswordError(false), 500);
       }
+  };
+
+  const compressImage = (file: File): Promise<string> => {
+      return new Promise((resolve, reject) => {
+          const blobUrl = URL.createObjectURL(file);
+          const img = new Image();
+
+          img.onload = () => {
+              URL.revokeObjectURL(blobUrl);
+              const canvas = document.createElement('canvas');
+              const MAX_SIZE = 300;
+              let width = img.width;
+              let height = img.height;
+
+              if (width > height) {
+                  if (width > MAX_SIZE) {
+                      height *= MAX_SIZE / width;
+                      width = MAX_SIZE;
+                  }
+              } else if (height > MAX_SIZE) {
+                  width *= MAX_SIZE / height;
+                  height = MAX_SIZE;
+              }
+
+              canvas.width = width;
+              canvas.height = height;
+              const ctx = canvas.getContext('2d');
+              if (!ctx) {
+                  reject(new Error('Canvas context failed'));
+                  return;
+              }
+              ctx.drawImage(img, 0, 0, width, height);
+              resolve(canvas.toDataURL('image/jpeg', 0.7));
+          };
+
+          img.onerror = (err) => {
+              URL.revokeObjectURL(blobUrl);
+              reject(err);
+          };
+
+          img.src = blobUrl;
+      });
+  };
+
+  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      if (!file.type.startsWith('image/')) {
+          setAvatarError('Please upload a valid image file.');
+          return;
+      }
+      setIsCompressing(true);
+      setAvatarError('');
+      try {
+          const compressed = await compressImage(file);
+          setSelectedAvatar(compressed);
+          setIsCustomUpload(true);
+      } catch (err) {
+          console.error('Avatar processing failed', err);
+          setAvatarError('Could not process that photo. Try a smaller image.');
+      } finally {
+          setIsCompressing(false);
+          if (fileInputRef.current) fileInputRef.current.value = '';
+      }
+  };
+
+  const handleSaveAvatar = () => {
+      if (!onUpdatePlayer || !selectedAvatar) return;
+      onUpdatePlayer({ ...player, avatar: selectedAvatar });
+      setShowAvatarEditor(false);
+      setAvatarError('');
   };
 
   // Cheat Update Helper
@@ -1215,6 +1333,100 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
           </div>
       )}
 
+      {showAvatarEditor && (
+          <div className="fixed inset-0 z-[220] bg-black/90 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200">
+              <div className="w-full max-w-md h-[82vh] sm:h-auto sm:max-h-[90vh] rounded-t-[2rem] sm:rounded-[2rem] border border-zinc-800 bg-black overflow-hidden flex flex-col">
+                  <div className="flex items-center justify-between gap-4 p-5 border-b border-zinc-800 bg-zinc-950/90">
+                      <div>
+                          <div className="text-[10px] uppercase tracking-[0.25em] text-amber-500 mb-1">Change Avatar</div>
+                          <h3 className="text-xl font-black text-white">{player.name}</h3>
+                      </div>
+                      <button onClick={() => setShowAvatarEditor(false)} className="p-2 rounded-full bg-zinc-900 text-zinc-400 hover:text-white transition-colors">
+                          <X size={18} />
+                      </button>
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto p-5 space-y-5">
+                      <div className="flex flex-col items-center">
+                          <button type="button" onClick={() => fileInputRef.current?.click()} className="relative group">
+                              <div className="w-28 h-28 rounded-full p-1 bg-gradient-to-tr from-amber-400 via-amber-500 to-amber-700 shadow-[0_0_30px_rgba(245,158,11,0.18)]">
+                                  {isCompressing ? (
+                                      <div className="w-full h-full rounded-full bg-zinc-950 flex items-center justify-center border-4 border-black">
+                                          <div className="w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
+                                      </div>
+                                  ) : (
+                                      <img src={selectedAvatar} alt={player.name} className="w-full h-full rounded-full object-cover border-4 border-black bg-zinc-900" />
+                                  )}
+                              </div>
+                              <div className="absolute bottom-0 right-0 rounded-full bg-white text-black border-4 border-black p-2 group-hover:bg-amber-100 transition-colors">
+                                  <Camera size={16} />
+                              </div>
+                          </button>
+
+                          <input
+                              ref={fileInputRef}
+                              type="file"
+                              accept="image/*"
+                              onChange={handleAvatarUpload}
+                              className="absolute opacity-0 w-1 h-1 -z-10 overflow-hidden"
+                          />
+
+                          <button onClick={() => fileInputRef.current?.click()} className="mt-3 inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 hover:text-white transition-colors">
+                              <UploadCloud size={12} /> Upload Custom Photo
+                          </button>
+                          {avatarError && <div className="mt-2 text-xs text-rose-300">{avatarError}</div>}
+                      </div>
+
+                      <div className="rounded-[1.75rem] border border-zinc-800 bg-zinc-950/80 p-4">
+                          <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] mb-3">Preset Looks</div>
+                          <div className="grid grid-cols-5 gap-3 max-h-56 overflow-y-auto custom-scrollbar pr-1">
+                              {currentAvatarList.map((avatarUrl, idx) => {
+                                  const isSelected = selectedAvatar === avatarUrl;
+                                  return (
+                                      <button
+                                          key={idx}
+                                          type="button"
+                                          onClick={() => { setSelectedAvatar(avatarUrl); setIsCustomUpload(false); }}
+                                          className={`relative aspect-square rounded-2xl overflow-hidden transition-all ${isSelected ? 'ring-2 ring-amber-500 scale-105 z-10' : 'opacity-70 hover:opacity-100 hover:scale-[1.03]'}`}
+                                      >
+                                          <img src={avatarUrl} alt="preset avatar" className="w-full h-full object-cover bg-zinc-900" />
+                                          {isSelected && (
+                                              <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+                                                  <Check size={16} className="text-white" strokeWidth={3} />
+                                              </div>
+                                          )}
+                                      </button>
+                                  );
+                              })}
+                          </div>
+                      </div>
+
+                      {isCustomUpload && (
+                          <div className="rounded-2xl border border-emerald-500/15 bg-emerald-500/5 p-3 text-xs text-emerald-200">
+                              Custom uploaded photo selected. This will become the active portrait for this playable character everywhere in the game.
+                          </div>
+                      )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 p-5 border-t border-zinc-800 bg-zinc-950/90">
+                      <button
+                          onClick={() => setShowAvatarEditor(false)}
+                          className="py-3 rounded-2xl border border-zinc-800 bg-zinc-900 text-zinc-300 font-bold text-sm hover:bg-zinc-800 transition-colors"
+                      >
+                          Cancel
+                      </button>
+                      <button
+                          onClick={handleSaveAvatar}
+                          disabled={!selectedAvatar || isCompressing || !onUpdatePlayer}
+                          className="py-3 rounded-2xl bg-amber-500 text-black font-black text-sm hover:bg-amber-400 transition-colors disabled:opacity-50"
+                      >
+                          Save Avatar
+                      </button>
+                  </div>
+              </div>
+          </div>
+      )}
+
       {/* Premium Profile Header */}
       <div className="relative glass-card p-6 rounded-3xl overflow-hidden group">
         <div className="absolute top-0 right-0 p-4 opacity-20 group-hover:opacity-40 transition-opacity">
@@ -1229,6 +1441,9 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                         alt="Avatar" 
                         className="w-full h-full rounded-full object-cover border-2 border-zinc-900"
                     />
+                </div>
+                <div className="absolute -top-1 -left-1 bg-zinc-900/95 text-zinc-200 p-1.5 rounded-full border border-zinc-700 shadow-lg">
+                    <Camera size={12} />
                 </div>
                 <div className="absolute -bottom-1 -right-1 bg-zinc-900 text-[10px] px-2 py-0.5 rounded-full border border-zinc-700 text-zinc-300 font-bold uppercase tracking-wider">
                     Lvl {Math.floor((player.stats?.fame || 0) / 10) + 1}

@@ -29,12 +29,13 @@ import { PROPERTY_CATALOG, CAR_CATALOG, CLOTHING_CATALOG } from './services/life
 import { showAd, initAds } from './services/adLogic';
 import { ensureTrackingPermission } from './services/trackingService';
 import { saveGameData, loadGameData, deleteGameData } from './services/storage';
-import { createBloodlineSnapshot, getAbsoluteWeek, getLegacyInheritancePreview, getRelationshipAge, inheritActorSkills, LEGACY_MIN_PLAYABLE_AGE } from './services/legacyLogic';
-import { applyPremiumPurchase, hasNoAds, PremiumProductId, restoreWeeklyEnergy, spendPlayerEnergy, syncEnergyDisplay } from './services/premiumLogic';
+import { createBloodlineSnapshot, getAbsoluteWeek, getLegacyInheritancePreview, getRelationshipAge, inferStreamingStartWeekAbsolute, inheritActorSkills, LEGACY_MIN_PLAYABLE_AGE } from './services/legacyLogic';
+import { applyPremiumPurchase, getRequiredPremiumProductForAsset, hasNoAds, PremiumProductId, restoreWeeklyEnergy, spendPlayerEnergy, syncEnergyDisplay } from './services/premiumLogic';
 import { purchasePremiumProduct, restorePremiumPurchases } from './services/iapService';
 import { sanitizeAwardRecords } from './services/awardLogic';
 import { RoleType } from './types';
 import { applyParenthoodAbandonment } from './services/familyLogic';
+import { APP_DISPLAY_VERSION } from './services/appVersion';
 
 type GameStatus = 'START_MENU' | 'CREATION' | 'PLAYING' | 'DEATH_SCREEN';
 type PendingBabyNaming = {
@@ -47,6 +48,8 @@ type PendingBabyNaming = {
   eventYear: number;
   shouldCreateScandalNews: boolean;
 };
+
+const WHATS_NEW_STORAGE_KEY = 'actorEmpireSeenWhatsNewVersion';
 
 const dedupeAwards = <T extends { type: string; year: number; category: string; projectId: string; outcome: 'WON' | 'NOMINATED' }>(awards: T[] = []): T[] => {
   return sanitizeAwardRecords(awards);
@@ -86,14 +89,28 @@ const normalizeProjectDetails = (details: Partial<ProjectDetails> | undefined): 
     });
 };
 
-const normalizeStreamingState = (streaming: Partial<StreamingState> | undefined, details: ProjectDetails): StreamingState => ({
-    platformId: streaming?.platformId || (details.hiddenStats.platformId as any) || 'NETFLIX',
-    weekOnPlatform: typeof streaming?.weekOnPlatform === 'number' ? streaming.weekOnPlatform : 1,
-    totalViews: typeof streaming?.totalViews === 'number' ? streaming.totalViews : 0,
-    weeklyViews: Array.isArray(streaming?.weeklyViews) ? streaming!.weeklyViews : [],
-    isLeaving: !!streaming?.isLeaving,
-    ...(typeof streaming?.startWeek === 'number' ? { startWeek: streaming.startWeek } : {}),
-});
+const normalizeStreamingState = (
+    streaming: Partial<StreamingState> | undefined,
+    details: ProjectDetails,
+    playerAge: number,
+    currentWeek: number
+): StreamingState => {
+    const normalizedStreaming: StreamingState = {
+        platformId: streaming?.platformId || (details.hiddenStats.platformId as any) || 'NETFLIX',
+        weekOnPlatform: typeof streaming?.weekOnPlatform === 'number' ? streaming.weekOnPlatform : 1,
+        totalViews: typeof streaming?.totalViews === 'number' ? streaming.totalViews : 0,
+        weeklyViews: Array.isArray(streaming?.weeklyViews) ? streaming!.weeklyViews : [],
+        isLeaving: !!streaming?.isLeaving,
+        ...(typeof streaming?.startWeek === 'number' ? { startWeek: streaming.startWeek } : {}),
+    };
+
+    const inferredStartWeekAbsolute = inferStreamingStartWeekAbsolute(streaming, playerAge, currentWeek);
+    if (typeof inferredStartWeekAbsolute === 'number') {
+        normalizedStreaming.startWeekAbsolute = inferredStartWeekAbsolute;
+    }
+
+    return normalizedStreaming;
+};
 
 const derivePlayerRoleType = (
     roleType: string | undefined,
@@ -105,7 +122,7 @@ const derivePlayerRoleType = (
     return (roleType as RoleType) || 'LEAD';
 };
 
-const normalizeActiveRelease = (release: Partial<ActiveRelease>): ActiveRelease => {
+const normalizeActiveRelease = (release: Partial<ActiveRelease>, playerAge: number, currentWeek: number): ActiveRelease => {
     const projectDetails = normalizeProjectDetails(release.projectDetails);
     const distributionPhase = release.distributionPhase || 'THEATRICAL';
 
@@ -130,10 +147,11 @@ const normalizeActiveRelease = (release: Partial<ActiveRelease>): ActiveRelease 
         ...(release.studioRoyaltyPercentage !== undefined ? { studioRoyaltyPercentage: release.studioRoyaltyPercentage } : {}),
         ...(release.sequelDecisionWeek !== undefined ? { sequelDecisionWeek: release.sequelDecisionWeek } : {}),
         ...(release.sequelDecisionMade !== undefined ? { sequelDecisionMade: release.sequelDecisionMade } : {}),
+        ...(release.futurePotential !== undefined ? { futurePotential: release.futurePotential } : {}),
         ...(release.promotionalBuzz !== undefined ? { promotionalBuzz: release.promotionalBuzz } : {}),
         ...(release.royaltyPercentage !== undefined ? { royaltyPercentage: release.royaltyPercentage } : {}),
         ...(release.previousBestBidValue !== undefined ? { previousBestBidValue: release.previousBestBidValue } : {}),
-        ...(distributionPhase === 'STREAMING' ? { streaming: normalizeStreamingState(release.streaming, projectDetails) } : {}),
+        ...(distributionPhase === 'STREAMING' ? { streaming: normalizeStreamingState(release.streaming, projectDetails, playerAge, currentWeek) } : {}),
     };
 };
 
@@ -159,6 +177,8 @@ const normalizePastProject = (project: Partial<PastProject>): PastProject => ({
         isSequelGreenlit: false,
         isRenewed: false,
         seriesStatus: 'N/A',
+        playerReturnStatus: undefined,
+        returnStatusNote: undefined,
     },
     studioId: project.studioId || 'INDEPENDENT',
     budget: typeof project.budget === 'number' ? project.budget : 0,
@@ -264,6 +284,7 @@ export const App: React.FC = () => {
   const [babyFirstNameInput, setBabyFirstNameInput] = useState('');
   const [babySurnameChoice, setBabySurnameChoice] = useState('');
   const [deathScreenPreviewPlayer, setDeathScreenPreviewPlayer] = useState<Player | null>(null);
+  const [showWhatsNewModal, setShowWhatsNewModal] = useState(false);
   
   // DEBT / AD STATES
   const [showDebtModal, setShowDebtModal] = useState(false);
@@ -331,6 +352,28 @@ export const App: React.FC = () => {
     const surnameOptions = getBabySurnameOptions(pendingBabyNaming.partnerName);
     setBabySurnameChoice(surnameOptions[0]?.value || getSurname(player.name));
   }, [pendingBabyNaming]);
+
+  useEffect(() => {
+    if (isInitializing || gameStatus !== 'PLAYING') return;
+    try {
+      const seenVersion = localStorage.getItem(WHATS_NEW_STORAGE_KEY);
+      if (seenVersion !== APP_DISPLAY_VERSION) {
+        setShowWhatsNewModal(true);
+      }
+    } catch (error) {
+      console.error('Failed to read What\'s New state', error);
+      setShowWhatsNewModal(true);
+    }
+  }, [gameStatus, isInitializing]);
+
+  const handleDismissWhatsNew = () => {
+    try {
+      localStorage.setItem(WHATS_NEW_STORAGE_KEY, APP_DISPLAY_VERSION);
+    } catch (error) {
+      console.error('Failed to persist What\'s New state', error);
+    }
+    setShowWhatsNewModal(false);
+  };
 
   const handleConfirmBabyName = () => {
       if (!pendingBabyNaming) return;
@@ -577,7 +620,7 @@ export const App: React.FC = () => {
           if (!Array.isArray(safePlayer.commitments)) safePlayer.commitments = [];
           safePlayer.commitments = safePlayer.commitments.map((commitment: any) => normalizeCommitment(commitment));
           if (!Array.isArray(safePlayer.activeReleases)) safePlayer.activeReleases = [];
-          safePlayer.activeReleases = safePlayer.activeReleases.map((release: any) => normalizeActiveRelease(release));
+          safePlayer.activeReleases = safePlayer.activeReleases.map((release: any) => normalizeActiveRelease(release, safePlayer.age, safePlayer.currentWeek));
           if (!Array.isArray(safePlayer.pastProjects)) safePlayer.pastProjects = [];
           safePlayer.pastProjects = safePlayer.pastProjects.map((project: any) => normalizePastProject(project));
           if (!Array.isArray(safePlayer.news)) safePlayer.news = [];
@@ -678,7 +721,9 @@ export const App: React.FC = () => {
           if (!Array.isArray(safePlayer.awards)) safePlayer.awards = [];
           safePlayer.awards = dedupeAwards(safePlayer.awards);
           if (!Array.isArray(safePlayer.scheduledEvents)) safePlayer.scheduledEvents = [];
-          if (!safePlayer.dating) safePlayer.dating = { isTinderActive: false, isLuxeActive: false, preferences: { gender: 'ALL', minAge: 18, maxAge: 35 }, matches: [] };
+          if (!safePlayer.dating) safePlayer.dating = { isTinderActive: false, isLuxeActive: false, preferences: { gender: 'ALL', minAge: 18, maxAge: 35 }, matches: [], luxeRefreshOffset: 0, luxeCycleStartAbsoluteWeek: 0 };
+          if (typeof safePlayer.dating.luxeRefreshOffset !== 'number') safePlayer.dating.luxeRefreshOffset = 0;
+          if (typeof safePlayer.dating.luxeCycleStartAbsoluteWeek !== 'number') safePlayer.dating.luxeCycleStartAbsoluteWeek = 0;
           if (!safePlayer.flags) safePlayer.flags = {};
           if (typeof safePlayer.flags.weeklyBaseEnergyRemaining !== 'number') {
               safePlayer.flags.weeklyBaseEnergyRemaining = Math.max(0, Math.min(100, safePlayer.energy.current));
@@ -945,6 +990,99 @@ export const App: React.FC = () => {
           const message = applyPremiumPurchase(p, productId);
           setToastMessage({ title: "Purchase Confirmed", subtext: message });
           return p;
+      });
+  };
+
+  const handleBuyLifestyleItem = (item: any) => {
+      handleGenericUpdate(p => {
+          const nextPlayer = {
+              ...p,
+              money: p.money - item.price,
+              assets: [...p.assets, item.id],
+              customItems: item.id.includes('_cust_') ? [...p.customItems, item as any] : p.customItems,
+          };
+
+          const premiumCollection = getRequiredPremiumProductForAsset(item.id);
+          let logMessage = `Added ${item.name} to your lifestyle collection.`;
+
+          if (premiumCollection === 'bundle_luxury_homes') {
+              nextPlayer.news = [{
+                  id: `news_home_buy_${Date.now()}`,
+                  headline: `${nextPlayer.name} upgrades their address with ${item.name}`,
+                  subtext: `The move is already being read as a statement about status, privacy, and how far the star lifestyle has expanded.`,
+                  category: 'TOP_STORY' as const,
+                  week: nextPlayer.currentWeek,
+                  year: nextPlayer.age,
+                  impactLevel: 'MEDIUM' as const,
+              }, ...nextPlayer.news].slice(0, 50);
+              nextPlayer.x.feed = [{
+                  id: `x_home_buy_${Date.now()}`,
+                  authorId: 'x_home_buy',
+                  authorName: 'RealEstateWire',
+                  authorHandle: '@realestatewire',
+                  authorAvatar: 'https://api.dicebear.com/8.x/pixel-art/svg?seed=RealEstateWire',
+                  content: `${nextPlayer.name} just picked up ${item.name}. Celebrity real-estate brain is fully activated now.`,
+                  timestamp: Date.now(),
+                  likes: 12000,
+                  retweets: 1800,
+                  replies: 400,
+                  isPlayer: false,
+                  isLiked: false,
+                  isRetweeted: false,
+                  isVerified: true,
+              }, ...nextPlayer.x.feed].slice(0, 50);
+              logMessage = `🏠 Bought ${item.name}. Your social circle is already treating the new address like a status move.`;
+          } else if (premiumCollection === 'bundle_elite_vehicles') {
+              nextPlayer.x.feed = [{
+                  id: `x_vehicle_buy_${Date.now()}`,
+                  authorId: 'x_vehicle_buy',
+                  authorName: 'GarageWatch',
+                  authorHandle: '@garagewatch',
+                  authorAvatar: 'https://api.dicebear.com/8.x/pixel-art/svg?seed=GarageWatch',
+                  content: `${nextPlayer.name} just added ${item.name} to the garage. That is not transport, that is messaging.`,
+                  timestamp: Date.now(),
+                  likes: 15000,
+                  retweets: 2300,
+                  replies: 520,
+                  isPlayer: false,
+                  isLiked: false,
+                  isRetweeted: false,
+                  isVerified: true,
+              }, ...nextPlayer.x.feed].slice(0, 50);
+              logMessage = `🚘 Bought ${item.name}. The garage just became part of your celebrity image.`;
+          } else if (premiumCollection === 'bundle_sky_sea') {
+              nextPlayer.news = [{
+                  id: `news_skysea_buy_${Date.now()}`,
+                  headline: `${nextPlayer.name} adds ${item.name} to a growing luxury fleet`,
+                  subtext: `The purchase pushes the star further into full jet-set fantasy, and people are absolutely noticing.`,
+                  category: 'TOP_STORY' as const,
+                  week: nextPlayer.currentWeek,
+                  year: nextPlayer.age,
+                  impactLevel: 'MEDIUM' as const,
+              }, ...nextPlayer.news].slice(0, 50);
+              logMessage = `🛥️ Bought ${item.name}. Your life now reads like a private-travel fantasy.`;
+          } else if (premiumCollection === 'bundle_ultimate_lifestyle') {
+              nextPlayer.x.feed = [{
+                  id: `x_lifestyle_buy_${Date.now()}`,
+                  authorId: 'x_lifestyle_buy',
+                  authorName: 'Style Radar',
+                  authorHandle: '@styleradar',
+                  authorAvatar: 'https://api.dicebear.com/8.x/pixel-art/svg?seed=StyleRadar',
+                  content: `${nextPlayer.name} just picked up ${item.name}. Luxury-watch and style accounts are going to have a field day.`,
+                  timestamp: Date.now(),
+                  likes: 18000,
+                  retweets: 2600,
+                  replies: 700,
+                  isPlayer: false,
+                  isLiked: false,
+                  isRetweeted: false,
+                  isVerified: true,
+              }, ...nextPlayer.x.feed].slice(0, 50);
+              logMessage = `💎 Bought ${item.name}. Style buzz around your image just got noticeably louder.`;
+          }
+
+          nextPlayer.logs = [...nextPlayer.logs, { week: nextPlayer.currentWeek, year: nextPlayer.age, message: logMessage, type: 'positive' as const }].slice(-50);
+          return nextPlayer;
       });
   };
 
@@ -1460,6 +1598,37 @@ export const App: React.FC = () => {
           </div>
       )}
 
+      {showWhatsNewModal && gameStatus === 'PLAYING' && (
+          <div className="fixed inset-0 z-[140] bg-black/80 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-200">
+              <div className="bg-zinc-900 border border-zinc-700 rounded-3xl w-full max-w-sm p-6 shadow-2xl flex flex-col relative overflow-hidden">
+                  <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-500 via-orange-500 to-pink-500"></div>
+                  <div className="mb-6">
+                      <div className="text-[10px] font-black uppercase tracking-[0.25em] text-amber-400 mb-3">What&apos;s New</div>
+                      <h3 className="text-2xl font-black text-white mb-2">Version {APP_DISPLAY_VERSION}</h3>
+                      <p className="text-sm text-zinc-400 leading-relaxed">
+                          Big update. Dating, relationships, business fixes, and premium lifestyle systems all got stronger.
+                      </p>
+                  </div>
+
+                  <div className="space-y-3 text-sm text-zinc-300">
+                      <div className="rounded-2xl border border-white/5 bg-zinc-950/70 px-4 py-3">Deeper Tinder and Luxe systems with more progression, intimacy, and fallout.</div>
+                      <div className="rounded-2xl border border-white/5 bg-zinc-950/70 px-4 py-3">Connections got cleaner family and relationship organization.</div>
+                      <div className="rounded-2xl border border-white/5 bg-zinc-950/70 px-4 py-3">Avatar editing is now easier directly from your profile.</div>
+                      <div className="rounded-2xl border border-white/5 bg-zinc-950/70 px-4 py-3">Streaming, sequel, and business hiring issues were fixed.</div>
+                      <div className="rounded-2xl border border-white/5 bg-zinc-950/70 px-4 py-3">Premium collections now add richer lifestyle actions, headlines, and social buzz.</div>
+                      <div className="rounded-2xl border border-white/5 bg-zinc-950/70 px-4 py-3">Bug reporting is now available directly in Settings.</div>
+                  </div>
+
+                  <button
+                      onClick={handleDismissWhatsNew}
+                      className="mt-6 w-full py-4 bg-white text-black font-bold rounded-2xl hover:bg-zinc-200 transition-colors"
+                  >
+                      Continue
+                  </button>
+              </div>
+          </div>
+      )}
+
       {/* Persistent Debt Warning Banner (When modal is closed but still in debt) */}
       {player.money < 0 && !showDebtModal && (gameStatus === 'PLAYING') && (
           <div className="fixed top-0 left-0 right-0 bg-red-600 text-white text-center py-1 text-xs font-bold z-[60] flex justify-between px-4 items-center shadow-lg cursor-pointer" onClick={() => setShowDebtModal(true)}>
@@ -1484,11 +1653,12 @@ export const App: React.FC = () => {
                     {activePage === Page.CAREER && (<CareerPage player={player} onQuitJob={handleQuitJob} onRehearse={handleRehearse} />)}
                     {activePage === Page.IMPROVE && (<ImprovePage player={player} onTrain={()=>{}} onEnroll={(c)=>handleGenericUpdate(p=>({ ...p, money: p.money- (c.upfrontCost||0), commitments: [...p.commitments, {...c, id: `c_${Date.now()}`, weeksCompleted:0}] }))} onCancel={(id)=>handleGenericUpdate(p=>({ ...p, commitments: p.commitments.filter(c=>c.id!==id)}))} onPerformAction={handleImproveAction} />)}
                     {activePage === Page.SOCIAL && (<SocialPage player={player} onInteract={handleSocialInteract} onContinueAsChild={handleContinueAsChild} />)}
-                    {activePage === Page.LIFESTYLE && (<LifestylePage player={player} onBuyItem={(i)=>handleGenericUpdate(p=>({ ...p, money: p.money-i.price, assets: [...p.assets, i.id], customItems: i.id.includes('_cust_') ? [...p.customItems, i as any] : p.customItems }))} onSellItem={(id)=>handleGenericUpdate(p=>{ const it = [...PROPERTY_CATALOG, ...CAR_CATALOG, ...CLOTHING_CATALOG].find(x=>x.id===id); return { ...p, money: p.money + (it ? it.price*0.5 : 0), assets: p.assets.filter(a=>a!==id) }; })} onSetResidence={(id)=>handleGenericUpdate(p=>({ ...p, residenceId: id }))} onSetActiveStyle={(s)=>handleGenericUpdate(p=>({ ...p, activeClothingStyle: s }))} onStartBusiness={()=>{}} onShutdownBusiness={()=>{}} onUpdatePlayer={handleUpdatePlayer} onPremiumPurchase={handlePremiumPurchase} onNavVisibilityChange={setIsBottomNavVisible} initialView={lifestyleInitialView ?? undefined} onInitialViewConsumed={() => setLifestyleInitialView(null)} />)}
+                    {activePage === Page.LIFESTYLE && (<LifestylePage player={player} onBuyItem={handleBuyLifestyleItem} onSellItem={(id)=>handleGenericUpdate(p=>{ const it = [...PROPERTY_CATALOG, ...CAR_CATALOG, ...CLOTHING_CATALOG].find(x=>x.id===id); return { ...p, money: p.money + (it ? it.price*0.5 : 0), assets: p.assets.filter(a=>a!==id) }; })} onSetResidence={(id)=>handleGenericUpdate(p=>({ ...p, residenceId: id }))} onSetActiveStyle={(s)=>handleGenericUpdate(p=>({ ...p, activeClothingStyle: s }))} onStartBusiness={()=>{}} onShutdownBusiness={()=>{}} onUpdatePlayer={handleUpdatePlayer} onPremiumPurchase={handlePremiumPurchase} onNavVisibilityChange={setIsBottomNavVisible} initialView={lifestyleInitialView ?? undefined} onInitialViewConsumed={() => setLifestyleInitialView(null)} />)}
                     {activePage === Page.MOBILE && (
                         <MobilePage 
                             player={player} 
                             onUpdatePlayer={handleUpdatePlayer}
+                            onTriggerBabyNaming={setPendingBabyNaming}
                             onAudition={(opp)=>handleGenericUpdate(p=>{ const next: Player = { ...p, applications: [...p.applications, { id: `app_${Date.now()}`, type: 'AUDITION' as const, name: opp.projectName, weeksRemaining: 1, data: opp }] }; spendPlayerEnergy(next, 25); return next; })}
                             onTakeJob={(job)=>handleGenericUpdate(p=>({ ...p, commitments: [...p.commitments, job] }))}
                             onQuitJob={handleQuitJob} 

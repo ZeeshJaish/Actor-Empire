@@ -432,7 +432,11 @@ export const hireCandidate = (business: Business, candidate: EmployeeCandidate):
 };
 
 export const checkAndRefreshHiringPool = (business: Business, currentWeek: number): Business => {
-    if ((currentWeek - business.lastHiringRefreshWeek) >= 3 || business.hiringPool.length === 0) {
+    const weeksSinceRefresh = currentWeek >= business.lastHiringRefreshWeek
+        ? currentWeek - business.lastHiringRefreshWeek
+        : (52 - business.lastHiringRefreshWeek) + currentWeek;
+
+    if (weeksSinceRefresh >= 3 || business.hiringPool.length === 0) {
         return { ...business, hiringPool: generateCandidates(), lastHiringRefreshWeek: currentWeek };
     }
     return business;

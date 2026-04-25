@@ -39,6 +39,11 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ business, 
     const [showExitModal, setShowExitModal] = useState<'SELL' | 'LIQUIDATE' | null>(null);
 
     const blueprint = BUSINESS_BLUEPRINTS[business.type];
+    const filteredHiringPool = business.hiringPool.filter(candidate => {
+        if (candidate.role === 'MANAGER' && business.staff.some(staff => staff.role === 'MANAGER')) return false;
+        if (blueprint.model === 'PRODUCT' && candidate.role === 'STAFF') return false;
+        return true;
+    });
 
     // --- HELPERS ---
 
@@ -727,13 +732,20 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ business, 
                     <div className="bg-zinc-900 w-full max-w-sm rounded-[2rem] border border-zinc-800 overflow-hidden shadow-2xl relative flex flex-col max-h-[70vh]">
                         <div className="p-6 border-b border-zinc-800 bg-zinc-900 flex justify-between items-center"><h3 className="font-black text-white text-lg uppercase tracking-tight">Hiring Pool</h3><button onClick={() => setShowRecruit(false)} className="text-zinc-500 hover:text-white"><X size={20}/></button></div>
                         <div className="p-6 space-y-3 overflow-y-auto custom-scrollbar">
-                            {business.hiringPool.filter(c => { if (c.role === 'MANAGER' && business.staff.some(s => s.role === 'MANAGER')) return false; if (blueprint.model === 'PRODUCT' && c.role === 'STAFF') return false; return true; }).map(c => (
+                            {filteredHiringPool.map(c => (
                                 <div key={c.id} className="bg-black border border-zinc-800 p-4 rounded-2xl flex justify-between items-center group hover:border-zinc-700 transition-colors">
                                     <div><div className="flex items-center gap-2 mb-1"><div className="font-bold text-white text-sm">{c.name}</div><span className={`text-[8px] font-bold px-1.5 py-0.5 rounded border uppercase ${getRoleColor(c.role)}`}>{c.role}</span></div><div className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Skill: {c.skill}</div></div>
                                     <button onClick={() => handleHire(c)} className="bg-white text-black px-4 py-2 rounded-lg text-xs font-bold hover:bg-zinc-200">Hire (${c.salary})</button>
                                 </div>
                             ))}
-                            {business.hiringPool.filter(c => blueprint.model === 'PRODUCT' ? c.role !== 'STAFF' : true).length === 0 && (<div className="text-center text-zinc-600 text-xs py-4">No suitable candidates available. Try again later.</div>)}
+                            {filteredHiringPool.length === 0 && (
+                                <div className="text-center text-zinc-600 text-xs py-4 space-y-2">
+                                    <div>No suitable candidates available right now.</div>
+                                    {blueprint.model === 'PRODUCT' && (
+                                        <div className="text-[10px] text-zinc-500">Product businesses recruit managers and sales staff. Refresh the pool in a few weeks for new candidates.</div>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>

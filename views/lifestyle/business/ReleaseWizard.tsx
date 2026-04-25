@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { ArrowLeft, Film, Tv, Calendar, TrendingUp, CheckCircle2, Camera, Star, Globe, Youtube, Share2 } from 'lucide-react';
 import { FESTIVALS, CALENDAR_EVENTS } from '../../../services/worldLogic';
 import { mergeUniverseRosterWithProject } from '../../../services/universeLogic';
+import { getAbsoluteWeek } from '../../../services/legacyLogic';
 
 interface ReleaseWizardProps {
     player: Player;
@@ -308,9 +309,12 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                 
                 // If still in theaters, calculate when it should start streaming (week after theatrical ends)
                 let startWeek = undefined;
+                let startWeekAbsolute = undefined;
                 if (isStillTheatrical) {
                     const weeksRemaining = (release.maxTheatricalWeeks || 8) - (release.weeksInTheaters || 0);
-                    startWeek = player.currentWeek + Math.max(1, weeksRemaining + 1);
+                    const waitWeeks = Math.max(1, weeksRemaining + 1);
+                    startWeekAbsolute = getAbsoluteWeek(player.age, player.currentWeek) + waitWeeks;
+                    startWeek = ((player.currentWeek + waitWeeks - 1) % 52) + 1;
                 }
 
                 updatedPlayer.activeReleases[releaseIndex] = {
@@ -324,7 +328,8 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                         totalViews: 0,
                         weeklyViews: [],
                         isLeaving: false,
-                        startWeek: startWeek
+                        startWeek: startWeek,
+                        startWeekAbsolute: startWeekAbsolute
                     },
                     studioRoyaltyPercentage: bid.backendPct || 0,
                     projectDetails: {

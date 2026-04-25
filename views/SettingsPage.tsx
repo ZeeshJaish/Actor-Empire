@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { ArrowLeft, Twitter, Send, Star, Globe, MessageCircle, X, LogOut, Coffee } from 'lucide-react';
+import { ArrowLeft, Twitter, Send, Star, Globe, MessageCircle, LogOut, Coffee, Bug } from 'lucide-react';
 import { Page } from '../types';
 import { APP_DISPLAY_VERSION } from '../services/appVersion';
 
@@ -52,6 +52,22 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onBack, onMainMenu }
                       <div className="text-xs text-zinc-500">Love the game? Let us know!</div>
                   </div>
               </div>
+          </a>
+
+          <a
+            href="https://forms.gle/zHNXbpjccSRqsUTv7"
+            target="_blank"
+            rel="noreferrer"
+            className="w-full flex items-center justify-between p-4 bg-rose-500/10 rounded-2xl hover:bg-rose-500/15 transition-colors border border-rose-500/20"
+          >
+              <div className="flex items-center gap-3">
+                  <div className="p-2 bg-rose-500 rounded-lg text-white"><Bug size={20}/></div>
+                  <div className="text-left">
+                      <div className="font-bold text-white">Report a Bug</div>
+                      <div className="text-xs text-zinc-400">Send us issue details and screen recordings</div>
+                  </div>
+              </div>
+              <div className="text-[10px] bg-rose-500/15 px-2 py-1 rounded text-rose-300 font-bold uppercase">Google Form</div>
           </a>
       </div>
 

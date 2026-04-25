@@ -51,6 +51,7 @@ export type OutcomeTier = 'MASSIVE_SUCCESS' | 'SUCCESS' | 'NEUTRAL' | 'FAILURE' 
 export type ProjectSubtype = 'STANDALONE' | 'SEQUEL' | 'SPINOFF' | 'UNIVERSE_ENTRY' | 'UNIVERSE_EVENT' | 'UNIVERSE_CROSSOVER';
 export type UniversePhase = 'PHASE_1_ORIGINS' | 'PHASE_2_EXPANSION' | 'PHASE_3_WAR' | 'PHASE_4_MULTIVERSE';
 export type SeriesStatus = 'N/A' | 'RUNNING' | 'CANCELLED' | 'ENDED';
+export type PlayerReturnStatus = 'RETURNING' | 'WRITTEN_OFF' | 'KILLED_OFF';
 export type NPCTier = 'A_LIST' | 'ESTABLISHED' | 'RISING' | 'INDIE' | 'ICON' | 'UNKNOWN';
 export type NPCPrestige = 'COMMERCIAL' | 'PRESTIGE' | 'MIXED';
 export type ActorTrait = 'DIVA' | 'METHOD' | 'WORKAHOLIC' | 'UNRELIABLE' | 'EASY_GOING' | 'BOX_OFFICE_POISON' | 'PROFESSIONAL' | 'AMBITIOUS';
@@ -462,6 +463,7 @@ export interface StreamingState {
     weeklyViews: number[];
     isLeaving: boolean;
     startWeek?: number;
+    startWeekAbsolute?: number;
 }
 
 export interface FuturePotential {
@@ -473,6 +475,8 @@ export interface FuturePotential {
     isSequelGreenlit: boolean;
     isRenewed: boolean;
     seriesStatus: SeriesStatus;
+    playerReturnStatus?: PlayerReturnStatus;
+    returnStatusNote?: string;
 }
 
 export interface ActiveRelease {
@@ -497,6 +501,7 @@ export interface ActiveRelease {
     bids?: { platformId: PlatformId, upfront: number, royalty: number, duration: number }[];
     sequelDecisionWeek?: number;
     sequelDecisionMade?: boolean;
+    futurePotential?: FuturePotential;
     promotionalBuzz?: number;
     royaltyPercentage?: number;
     previousBestBidValue?: number;
@@ -906,13 +911,35 @@ export interface DatingMatch {
     id: string;
     name: string;
     age: number;
+    gender?: Gender;
     job: string;
     image: string;
     type: 'RANDOM' | 'NPC';
     npcId?: string;
     chemistry: number;
     isPremium: boolean;
-    chatHistory?: { sender: 'PLAYER'|'MATCH', text: string }[]; 
+    chatHistory?: { sender: 'PLAYER'|'MATCH', text: string; tag?: string }[];
+    bio?: string;
+    handle?: string;
+    netWorth?: number;
+    followers?: number;
+    prestigeBias?: NPCPrestige;
+    prestigeTier?: 'Celebrity' | 'Power Player' | 'Old Money' | 'Industry Royalty' | 'Rising Elite';
+    luxeTraits?: string[];
+    relationshipIntent?: 'CASUAL' | 'PRIVATE_ROMANCE' | 'POWER_COUPLE' | 'LONG_TERM' | 'DISCREET';
+    privacyStyle?: 'LOW_KEY' | 'PUBLIC_FACING' | 'MEDIA_MAGNET';
+    compatibility?: number;
+    matchReason?: string;
+    lastActiveLabel?: string;
+    inviteHistory?: { kind: string; mode: 'PRIVATE' | 'PUBLIC'; outcome: 'SUCCESS' | 'REJECTED' }[];
+    hasGoneOnDate?: boolean;
+    officialStatus?: 'MATCHED' | 'SEEING' | 'COOLDOWN' | 'GHOSTED' | 'DATING';
+    officialSinceWeek?: number;
+    dateCount?: number;
+    intimacyCount?: number;
+    scandalHeat?: number;
+    lastInteractionAbsolute?: number;
+    tinderStage?: 'MATCHED' | 'TALKING' | 'CASUAL' | 'FWB' | 'GHOSTED' | 'DATING';
 }
 
 export interface DatingPreferences {
@@ -1302,6 +1329,8 @@ export interface Player {
         isLuxeActive: boolean;
         preferences: DatingPreferences;
         matches: DatingMatch[];
+        luxeRefreshOffset?: number;
+        luxeCycleStartAbsoluteWeek?: number;
     };
     finance: {
         history: Transaction[];
@@ -1392,7 +1421,7 @@ export const INITIAL_PLAYER: Player = {
     instagram: { handle: '@player', followers: 0, posts: [], feed: [], npcStates: {}, weeklyPostCount: 0, lastPostWeek: 0 },
     x: { handle: '@player', followers: 0, posts: [], feed: [], lastPostWeek: 0 }, // Starts at 0
     youtube: { handle: '@player', subscribers: 0, videos: [], lifetimeEarnings: 0, isMonetized: false, bannerColor: 'bg-gradient-to-r from-red-900 to-zinc-900', totalChannelViews: 0 },
-    dating: { isTinderActive: false, isLuxeActive: false, preferences: { gender: 'ALL', minAge: 18, maxAge: 35 }, matches: [] },
+    dating: { isTinderActive: false, isLuxeActive: false, preferences: { gender: 'ALL', minAge: 18, maxAge: 35 }, matches: [], luxeRefreshOffset: 0, luxeCycleStartAbsoluteWeek: 0 },
     finance: {
         history: [],
         yearly: [],

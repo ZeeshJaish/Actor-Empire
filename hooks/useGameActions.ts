@@ -6,7 +6,7 @@ import { calculateInteraction, getGenderedAvatar } from '../services/npcLogic';
 import { SOCIAL_EVENTS_DB, FLAVOR_TEXTS } from '../services/socialEvents';
 import { createBusiness } from '../services/businessLogic';
 import { getAbsoluteWeek } from '../services/legacyLogic';
-import { spendPlayerEnergy } from '../services/premiumLogic';
+import { hasOwnedPremiumAssetInCollection, spendPlayerEnergy } from '../services/premiumLogic';
 import { applyParenthoodAbandonment, applyPartnerBreakup, applyDivorceOutcome, reconnectWithChild } from '../services/familyLogic';
 
 interface GameActionsProps {
@@ -31,6 +31,40 @@ interface GameActionsProps {
 export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePressEvent, setShowProtectionPrompt, setActiveSocialEvent, setPendingBabyNaming }: GameActionsProps) => {
     const familyRelations: Relationship['relation'][] = ['Parent', 'Deceased Parent', 'Sibling', 'Child'];
     const isFamilyRelation = (relation?: Relationship['relation']) => !!relation && familyRelations.includes(relation);
+
+    const pushLifestyleHeadline = (nextState: Player, headline: string, subtext: string) => {
+        nextState.news = [
+            {
+                id: `news_lifestyle_${Date.now()}_${Math.random()}`,
+                headline,
+                subtext,
+                category: 'TOP_STORY' as const,
+                week: nextState.currentWeek,
+                year: nextState.age,
+                impactLevel: 'MEDIUM' as const,
+            },
+            ...nextState.news,
+        ].slice(0, 50);
+        nextState.x.feed = [
+            {
+                id: `x_lifestyle_${Date.now()}_${Math.random()}`,
+                authorId: `x_lifestyle_${Math.random()}`,
+                authorName: 'Style Signal',
+                authorHandle: '@stylesignal',
+                authorAvatar: 'https://api.dicebear.com/8.x/pixel-art/svg?seed=StyleSignal',
+                content: headline,
+                timestamp: Date.now(),
+                likes: 14000,
+                retweets: 2500,
+                replies: 480,
+                isPlayer: false,
+                isLiked: false,
+                isRetweeted: false,
+                isVerified: true,
+            },
+            ...nextState.x.feed,
+        ].slice(0, 50);
+    };
     
     // Helper for updating player and saving asynchronously
     const handleGenericUpdate = (updater: (prev: Player) => Player, logMessage?: string) => {
@@ -309,7 +343,7 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
           const idx = prev.relationships.findIndex(r => r.id === relId);
           if (idx === -1) return prev;
           const partner = prev.relationships[idx];
-          if (['DATE', 'PROPOSE', 'INTIMACY', 'CLUBBING', 'TRIP'].includes(action) && isFamilyRelation(partner.relation)) {
+          if (['DATE', 'PROPOSE', 'INTIMACY', 'CLUBBING', 'TRIP', 'ESTATE_DATE', 'YACHT_DATE', 'JET_ESCAPE', 'LUXURY_GIFT'].includes(action) && isFamilyRelation(partner.relation)) {
               setToastMessage({ title: "Blocked", subtext: "Family members cannot be used for romantic actions." });
               return prev;
           }
@@ -346,6 +380,22 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
               else if (action === 'TRIP') {
                   moneyCost = 5000; newCloseness = 100;
                   logMsg = `Luxury vacation with ${partner.name}. Pure bliss.`;
+              }
+              else if (action === 'ESTATE_DATE') {
+                  energyCost = 16; moneyCost = 1200; newCloseness = Math.min(100, newCloseness + 12);
+                  logMsg = `Hosted ${partner.name} for a private estate night. Candlelight, privacy, and impossible views shifted the whole mood.`;
+              }
+              else if (action === 'YACHT_DATE') {
+                  energyCost = 18; moneyCost = 2500; newCloseness = Math.min(100, newCloseness + 13);
+                  logMsg = `Took ${partner.name} out for a yacht sunset date. The water, the attention, and the luxury made everything feel larger.`;
+              }
+              else if (action === 'JET_ESCAPE') {
+                  energyCost = 10; moneyCost = 9000; newCloseness = Math.min(100, newCloseness + 16);
+                  logMsg = `Escaped with ${partner.name} on a private jet for a fast luxury getaway. The flex was obvious and the chemistry loved it.`;
+              }
+              else if (action === 'LUXURY_GIFT') {
+                  energyCost = 4; moneyCost = 8000; newCloseness = Math.min(100, newCloseness + 9);
+                  logMsg = `Dropped a serious luxury gift on ${partner.name}. It landed somewhere between romance and extravagant obsession.`;
               }
               else if (action === 'HANGOUT') {
                   energyCost = 15; moneyCost = 50; newCloseness = Math.min(100, newCloseness + 5);
@@ -418,13 +468,38 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
               news: newsUpdate,
               logs: [...prev.logs, { week: prev.currentWeek, year: prev.age, message: logMsg, type: 'positive' as const }].slice(-50)
           };
+          if (action === 'ESTATE_DATE') {
+              pushLifestyleHeadline(
+                  nextState,
+                  `${prev.name} is rumored to be hosting ultra-private nights at a luxury estate`,
+                  `${partner.name} is the latest name linked to the property, and insiders say the atmosphere is doing half the flirting.`
+              );
+          } else if (action === 'YACHT_DATE') {
+              pushLifestyleHeadline(
+                  nextState,
+                  `${prev.name} and ${partner.name} are spotted on open water`,
+                  `The yacht outing is already fueling romance talk across fan pages and celebrity watch accounts.`
+              );
+          } else if (action === 'JET_ESCAPE') {
+              pushLifestyleHeadline(
+                  nextState,
+                  `${prev.name} disappears for a jet-set escape with ${partner.name}`,
+                  `The private flight has people convinced this relationship is operating on a different level now.`
+              );
+          } else if (action === 'LUXURY_GIFT') {
+              pushLifestyleHeadline(
+                  nextState,
+                  `${prev.name}'s latest gift to ${partner.name} has luxury blogs guessing the price`,
+                  `Style accounts are already arguing over whether it was romantic, strategic, or both.`
+              );
+          }
           spendPlayerEnergy(nextState, energyCost);
           return nextState;
           
       });
     };
 
-    const handleSocialInteract = (id: string, type: 'CALL' | 'HANGOUT' | 'GIFT' | 'NETWORK' | 'DATE' | 'PROPOSE' | 'INTIMACY' | 'CLUBBING' | 'TRIP' | 'ABANDON_CHILD' | 'RECONNECT_CHILD' | 'BREAK_UP' | 'DIVORCE_SETTLE' | 'DIVORCE_FIGHT_BUDGET' | 'DIVORCE_FIGHT_ESTABLISHED' | 'DIVORCE_FIGHT_ELITE') => {
+    const handleSocialInteract = (id: string, type: 'CALL' | 'HANGOUT' | 'GIFT' | 'NETWORK' | 'DATE' | 'PROPOSE' | 'INTIMACY' | 'CLUBBING' | 'TRIP' | 'ESTATE_DATE' | 'YACHT_DATE' | 'JET_ESCAPE' | 'LUXURY_GIFT' | 'ABANDON_CHILD' | 'RECONNECT_CHILD' | 'BREAK_UP' | 'DIVORCE_SETTLE' | 'DIVORCE_FIGHT_BUDGET' | 'DIVORCE_FIGHT_ESTABLISHED' | 'DIVORCE_FIGHT_ELITE') => {
         const partner = player.relationships.find(r => r.id === id);
         if (type === 'BREAK_UP') {
             setPlayer(prev => applyPartnerBreakup(prev, id));
@@ -452,8 +527,20 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
             setToastMessage({ title: "Reconnection Started", subtext: "Repairing family damage will take time, but the first step is made." });
             return;
         }
-        if (partner && ['DATE', 'PROPOSE', 'INTIMACY', 'CLUBBING', 'TRIP'].includes(type) && isFamilyRelation(partner.relation)) {
+        if (partner && ['DATE', 'PROPOSE', 'INTIMACY', 'CLUBBING', 'TRIP', 'ESTATE_DATE', 'YACHT_DATE', 'JET_ESCAPE', 'LUXURY_GIFT'].includes(type) && isFamilyRelation(partner.relation)) {
             setToastMessage({ title: "Blocked", subtext: "Family members cannot be used for romantic actions." });
+            return;
+        }
+        if (type === 'ESTATE_DATE' && !hasOwnedPremiumAssetInCollection(player, 'bundle_luxury_homes')) {
+            setToastMessage({ title: "Locked", subtext: "Own a premium home first to host estate dates." });
+            return;
+        }
+        if ((type === 'YACHT_DATE' || type === 'JET_ESCAPE') && !hasOwnedPremiumAssetInCollection(player, 'bundle_sky_sea')) {
+            setToastMessage({ title: "Locked", subtext: "Own a Sky & Sea asset first to unlock that lifestyle move." });
+            return;
+        }
+        if (type === 'LUXURY_GIFT' && !hasOwnedPremiumAssetInCollection(player, 'bundle_ultimate_lifestyle')) {
+            setToastMessage({ title: "Locked", subtext: "Own an Ultimate Lifestyle item first to pull off that flex." });
             return;
         }
         if (type === 'INTIMACY') {

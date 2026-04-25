@@ -1,8 +1,245 @@
-import { Player, LifeEvent, LifeEventOption, LegalCase, ScheduledEvent } from '../types';
+import { Player, LifeEvent, LifeEventOption, LegalCase, ScheduledEvent, DatingMatch, NewsItem } from '../types';
 import { spendPlayerEnergy } from './premiumLogic';
+import { NPC_DATABASE } from './npcLogic';
+import { applyDivorceOutcome, applyPartnerBreakup } from './familyLogic';
 
 // --- HELPERS ---
 const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
+
+const isEliteNpc = (npcId?: string) => {
+    if (!npcId) return false;
+    const npc = NPC_DATABASE.find(entry => entry.id === npcId);
+    if (!npc) return false;
+    return npc.netWorth > 1000000 || npc.tier === 'A_LIST' || npc.tier === 'ESTABLISHED';
+};
+
+const pushRomanceCoverage = (
+    player: Player,
+    headline: string,
+    subtext: string,
+    tone: 'MESS' | 'SCANDAL' | 'BREAKUP' = 'MESS'
+) => {
+    const impactLevel: NewsItem['impactLevel'] = tone === 'SCANDAL' ? 'HIGH' : 'MEDIUM';
+    player.news.unshift({
+        id: `news_relationship_${Date.now()}_${Math.random()}`,
+        headline,
+        subtext,
+        category: 'TOP_STORY',
+        week: player.currentWeek,
+        year: player.age,
+        impactLevel,
+    });
+    player.news = player.news.slice(0, 50);
+
+    player.x.feed.unshift({
+        id: `x_relationship_${Date.now()}_${Math.random()}`,
+        authorId: `x_relationship_author_${Math.random()}`,
+        authorName: tone === 'BREAKUP' ? 'SplitWatch' : tone === 'SCANDAL' ? 'TabloidWire' : 'PopPulse',
+        authorHandle: tone === 'BREAKUP' ? '@splitwatch' : tone === 'SCANDAL' ? '@tabloidwire' : '@poppulse',
+        authorAvatar: `https://api.dicebear.com/8.x/pixel-art/svg?seed=${tone}`,
+        content:
+            tone === 'BREAKUP'
+                ? `${player.name}'s relationship update just turned painfully public.`
+                : tone === 'SCANDAL'
+                    ? `${player.name}'s romantic life is turning into scandal bait again.`
+                    : `${player.name}'s love life is suddenly the timeline's favorite mess.`,
+        timestamp: Date.now(),
+        likes: tone === 'SCANDAL' ? 38000 : 14000,
+        retweets: tone === 'SCANDAL' ? 9500 : 2600,
+        replies: tone === 'SCANDAL' ? 2100 : 650,
+        isPlayer: false,
+        isLiked: false,
+        isRetweeted: false,
+        isVerified: tone !== 'MESS',
+    });
+    player.x.feed = player.x.feed.slice(0, 50);
+};
+
+const getCurrentPartner = (player: Player) =>
+    player.relationships.find(rel => rel.relation === 'Spouse' || rel.relation === 'Partner');
+
+const getFormerPartners = (player: Player) =>
+    player.relationships.filter(rel => rel.relation === 'Ex-Partner' || rel.relation === 'Ex-Spouse');
+
+const getLuxeEventTargets = (player: Player) => {
+    const activePremiumMatches = player.dating.matches.filter(match => match.isPremium);
+    const eliteRelationships = player.relationships.filter(rel =>
+        (rel.relation === 'Partner' || rel.relation === 'Spouse') && isEliteNpc(rel.npcId)
+    );
+    return {
+        activePremiumMatches,
+        eliteRelationships,
+    };
+};
+
+export const hasEligibleLuxeEventTarget = (player: Player) => {
+    const { activePremiumMatches, eliteRelationships } = getLuxeEventTargets(player);
+    return activePremiumMatches.length > 0 || eliteRelationships.length > 0;
+};
+
+export const generateLuxeLifeEvent = (player: Player): LifeEvent | null => {
+    const { activePremiumMatches, eliteRelationships } = getLuxeEventTargets(player);
+    if (activePremiumMatches.length === 0 && eliteRelationships.length === 0) return null;
+
+    const focusMatch = activePremiumMatches.length > 0 ? pick(activePremiumMatches) : null;
+    const focusPartner = eliteRelationships.length > 0 ? pick(eliteRelationships) : null;
+    const roll = Math.random();
+
+    if (focusMatch && roll < 0.4) {
+        return {
+            id: `luxe_private_invite_${Date.now()}`,
+            type: 'LIFE',
+            title: 'Luxe After Hours',
+            description: `${focusMatch.name} sends a late-night message asking for an off-grid meetup. No cameras, no entourage, no explanation.`,
+            options: [
+                {
+                    label: 'Say yes and disappear for the night',
+                    description: 'Costs energy. Good for chemistry, risky for gossip if this connection is already hot.',
+                    impact: (p) => {
+                        spendPlayerEnergy(p, 8);
+                        p.dating.matches = p.dating.matches.map(match =>
+                            match.id === focusMatch.id
+                                ? {
+                                      ...match,
+                                      chemistry: Math.min(100, match.chemistry + 7),
+                                      officialStatus: match.officialStatus === 'MATCHED' ? 'SEEING' : match.officialStatus,
+                                      scandalHeat: Math.max(0, (match.scandalHeat || 0) + 8),
+                                  }
+                                : match
+                        );
+                        return { updatedPlayer: p, log: `${focusMatch.name} pulled you deeper into the Luxe orbit. The chemistry got louder.` };
+                    }
+                },
+                {
+                    label: 'Keep it warm, but decline',
+                    description: 'Protects your schedule, but risks cooling things off.',
+                    impact: (p) => {
+                        p.dating.matches = p.dating.matches.map(match =>
+                            match.id === focusMatch.id
+                                ? {
+                                      ...match,
+                                      chemistry: Math.max(10, match.chemistry - 3),
+                                      officialStatus: match.officialStatus === 'SEEING' ? 'COOLDOWN' : match.officialStatus,
+                                  }
+                                : match
+                        );
+                        return { updatedPlayer: p, log: `You kept boundaries with ${focusMatch.name}, but the connection cooled a little.` };
+                    }
+                }
+            ]
+        };
+    }
+
+    if (focusMatch && roll < 0.72) {
+        return {
+            id: `luxe_public_pressure_${Date.now()}`,
+            type: 'CONFLICT',
+            title: 'Public or Nothing',
+            description: `${focusMatch.name} is tired of the ambiguity and wants to know whether this stays quiet or gets seen properly.`,
+            options: [
+                {
+                    label: 'Go public together',
+                    description: 'Raises buzz and followers, but also raises rumor risk.',
+                    impact: (p) => {
+                        p.stats.followers += 6000;
+                        p.stats.reputation = Math.max(0, Math.min(100, p.stats.reputation + 1));
+                        p.dating.matches = p.dating.matches.map(match =>
+                            match.id === focusMatch.id
+                                ? { ...match, chemistry: Math.min(100, match.chemistry + 4), scandalHeat: Math.max(0, (match.scandalHeat || 0) + 18), officialStatus: 'SEEING' }
+                                : match
+                        );
+                        return { updatedPlayer: p, log: `You stepped into the light with ${focusMatch.name}. People noticed immediately.` };
+                    }
+                },
+                {
+                    label: 'Keep the walls up',
+                    description: 'Safer, but they may resent the secrecy.',
+                    impact: (p) => {
+                        p.dating.matches = p.dating.matches.map(match =>
+                            match.id === focusMatch.id
+                                ? { ...match, chemistry: Math.max(10, match.chemistry - 4), officialStatus: 'COOLDOWN' }
+                                : match
+                        );
+                        return { updatedPlayer: p, log: `${focusMatch.name} did not love being kept in the shadows.` };
+                    }
+                }
+            ]
+        };
+    }
+
+    if (focusMatch && roll < 0.9) {
+        const existingPartner = player.relationships.find(rel => rel.relation === 'Partner' || rel.relation === 'Spouse');
+        return {
+            id: `luxe_overlap_${Date.now()}`,
+            type: 'SCANDAL',
+            title: 'Crossed Signals',
+            description: existingPartner
+                ? `${focusMatch.name} notices you are emotionally split and wants clarity before this turns into public mess.`
+                : `${focusMatch.name} caught wind of another Luxe connection and is suddenly less patient with being one option among many.`,
+            options: [
+                {
+                    label: 'Prioritize this connection',
+                    description: 'Good for this match, risky for your wider life if you are already committed.',
+                    impact: (p) => {
+                        p.dating.matches = p.dating.matches.map(match =>
+                            match.id === focusMatch.id
+                                ? { ...match, chemistry: Math.min(100, match.chemistry + 5), scandalHeat: Math.max(0, (match.scandalHeat || 0) + 14), officialStatus: 'SEEING' }
+                                : match
+                        );
+                        if (existingPartner) {
+                            const rel = p.relationships.find(r => r.id === existingPartner.id);
+                            if (rel) rel.closeness = Math.max(0, rel.closeness - 8);
+                        }
+                        return { updatedPlayer: p, log: `You leaned toward ${focusMatch.name}. The chemistry sharpened, but so did the danger.` };
+                    }
+                },
+                {
+                    label: 'Back off and reduce the heat',
+                    description: 'Safer, but this connection loses some momentum.',
+                    impact: (p) => {
+                        p.dating.matches = p.dating.matches.map(match =>
+                            match.id === focusMatch.id
+                                ? { ...match, chemistry: Math.max(10, match.chemistry - 5), scandalHeat: Math.max(0, (match.scandalHeat || 0) - 8), officialStatus: 'COOLDOWN' }
+                                : match
+                        );
+                        return { updatedPlayer: p, log: `You created distance before this got uglier. ${focusMatch.name} felt it.` };
+                    }
+                }
+            ]
+        };
+    }
+
+    if (focusPartner) {
+        return {
+            id: `luxe_partner_access_${Date.now()}`,
+            type: 'NETWORKING',
+            title: 'Elite Plus-One',
+            description: `${focusPartner.name} offers to bring you into a private room full of producers, financiers, and prestige players. It could be powerful, or it could look transactional.`,
+            options: [
+                {
+                    label: 'Take the room',
+                    description: 'Boosts reputation and opens status optics.',
+                    impact: (p) => {
+                        p.stats.reputation = Math.min(100, p.stats.reputation + 4);
+                        p.stats.fame = Math.min(100, p.stats.fame + 2);
+                        return { updatedPlayer: p, log: `${focusPartner.name} opened a serious door for you. The room now sees you differently.` };
+                    }
+                },
+                {
+                    label: 'Keep the relationship separate',
+                    description: 'Protects the vibe, but leaves opportunity on the table.',
+                    impact: (p) => {
+                        const rel = p.relationships.find(r => r.id === focusPartner.id);
+                        if (rel) rel.closeness = Math.min(100, rel.closeness + 4);
+                        return { updatedPlayer: p, log: `You kept the relationship clean instead of turning it into leverage. ${focusPartner.name} respected that.` };
+                    }
+                }
+            ]
+        };
+    }
+
+    return null;
+};
 
 // --- EVENT GENERATORS ---
 
@@ -10,9 +247,282 @@ export const generateLifeEvent = (player: Player): LifeEvent | null => {
     const roll = Math.random();
     const fame = player.stats.fame;
     const heat = player.flags.heat || 0;
-    const partner = player.relationships.find(r => r.relation === 'Spouse' || r.relation === 'Partner');
+    const partner = getCurrentPartner(player);
     const closeFamily = player.relationships.find(r => r.relation === 'Parent' || r.relation === 'Sibling' || r.relation === 'Child');
+    const exPartner = getFormerPartners(player).length > 0 ? pick(getFormerPartners(player)) : null;
+    const activeDatingMatches = player.dating.matches.filter(match => {
+        if (match.isPremium) return (match.officialStatus || 'MATCHED') !== 'GHOSTED' && match.chemistry >= 28;
+        return (match.tinderStage || 'MATCHED') !== 'GHOSTED' && match.chemistry >= 25;
+    });
+    const hottestSideConnection = activeDatingMatches.length > 0
+        ? [...activeDatingMatches].sort((a, b) => (b.chemistry + (b.scandalHeat || 0)) - (a.chemistry + (a.scandalHeat || 0)))[0]
+        : null;
+    const multipleHotConnections = activeDatingMatches.filter(match => match.chemistry >= 45).length >= 2;
     const hasBusiness = (player.businesses?.length || 0) > 0;
+
+    // 0. ROMANCE CHAOS / JEALOUSY / BREAKUP EDGE CASES
+    if (partner && hottestSideConnection && roll < 0.11) {
+        return {
+            id: `relationship_jealousy_${Date.now()}`,
+            type: 'CONFLICT',
+            title: 'Read Receipts and Red Flags',
+            description: `${partner.name} catches enough of your phone to realize ${hottestSideConnection.name} is not just casual background noise. They want the truth right now.`,
+            options: [
+                {
+                    label: 'Cut off the side connection',
+                    description: 'Protect the real relationship and take the short-term hit.',
+                    impact: (p) => {
+                        const rel = p.relationships.find(r => r.id === partner.id);
+                        if (rel) rel.closeness = Math.min(100, rel.closeness + 8);
+                        p.dating.matches = p.dating.matches.map(match =>
+                            match.id === hottestSideConnection.id
+                                ? {
+                                      ...match,
+                                      chemistry: Math.max(8, match.chemistry - 20),
+                                      officialStatus: match.isPremium ? 'COOLDOWN' : match.officialStatus,
+                                      tinderStage: !match.isPremium ? 'GHOSTED' : match.tinderStage,
+                                      scandalHeat: Math.max(0, (match.scandalHeat || 0) - 8),
+                                  }
+                                : match
+                        );
+                        p.stats.happiness = Math.max(0, p.stats.happiness - 4);
+                        return { updatedPlayer: p, log: `You chose ${partner.name} over the chaos. ${hottestSideConnection.name} felt the door slam shut.` };
+                    }
+                },
+                {
+                    label: 'Admit it, but ask for time',
+                    description: 'Honest, messy, and not guaranteed to work.',
+                    impact: (p) => {
+                        const rel = p.relationships.find(r => r.id === partner.id);
+                        if (rel) rel.closeness = Math.max(0, rel.closeness - 6);
+                        p.dating.matches = p.dating.matches.map(match =>
+                            match.id === hottestSideConnection.id
+                                ? { ...match, chemistry: Math.min(100, match.chemistry + 4), scandalHeat: Math.max(0, (match.scandalHeat || 0) + 10) }
+                                : match
+                        );
+                        p.stats.reputation = Math.max(0, p.stats.reputation - 3);
+                        if (p.stats.fame > 35) {
+                            pushRomanceCoverage(
+                                p,
+                                `${p.name}'s love life turns into a two-name problem`,
+                                `Sources say ${partner.name} is furious after spotting signs that ${hottestSideConnection.name} was never as harmless as claimed.`,
+                                'MESS'
+                            );
+                        }
+                        return { updatedPlayer: p, log: `You asked for more time, which was honest... but did not make anything cleaner.` };
+                    }
+                },
+                {
+                    label: 'Lie and keep juggling',
+                    description: 'Highest drama. Highest fallout risk.',
+                    impact: (p) => {
+                        const rel = p.relationships.find(r => r.id === partner.id);
+                        if (rel) rel.closeness = Math.max(0, rel.closeness - 16);
+                        p.stats.reputation = Math.max(0, p.stats.reputation - 6);
+                        p.flags.heat = (p.flags.heat || 0) + 12;
+                        p.dating.matches = p.dating.matches.map(match =>
+                            match.id === hottestSideConnection.id
+                                ? { ...match, chemistry: Math.min(100, match.chemistry + 6), scandalHeat: Math.max(0, (match.scandalHeat || 0) + 16) }
+                                : match
+                        );
+                        pushRomanceCoverage(
+                            p,
+                            `${p.name} is accused of keeping multiple romances alive at once`,
+                            `${partner.name} and ${hottestSideConnection.name} are now both being discussed in the same whispers, which is never a good sign.`,
+                            'SCANDAL'
+                        );
+                        return { updatedPlayer: p, log: `You kept every thread alive. The mess got more exciting and much more dangerous.` };
+                    }
+                }
+            ]
+        };
+    }
+
+    if (partner && (heat > 20 || multipleHotConnections || (partner.closeness < 46 && fame > 20)) && roll < 0.18) {
+        const isMarriage = partner.relation === 'Spouse';
+        return {
+            id: `relationship_breaking_point_${Date.now()}`,
+            type: 'SCANDAL',
+            title: isMarriage ? 'The Marriage Is Cracking' : 'One Fight Too Many',
+            description: isMarriage
+                ? `${partner.name} is done pretending the relationship can survive endless stress, public heat, and half-truths. Lawyers are now a real possibility.`
+                : `${partner.name} says the relationship feels unstable, reactive, and embarrassing. They want one clear reason to stay.`,
+            options: [
+                {
+                    label: 'Fight hard for the relationship',
+                    description: 'Costs energy and money, but gives you one real shot to stabilize it.',
+                    impact: (p) => {
+                        spendPlayerEnergy(p, 18);
+                        p.money = Math.max(0, p.money - 15000);
+                        const rel = p.relationships.find(r => r.id === partner.id);
+                        if (rel) rel.closeness = Math.min(100, rel.closeness + 10);
+                        p.stats.happiness = Math.max(0, p.stats.happiness - 2);
+                        p.flags.heat = Math.max(0, (p.flags.heat || 0) - 6);
+                        return { updatedPlayer: p, log: `You showed up with effort, time, and money. ${partner.name} did not fully melt, but they stayed.` };
+                    }
+                },
+                {
+                    label: isMarriage ? 'Let it collapse into a settlement' : 'End it cleanly now',
+                    description: isMarriage ? 'This can trigger real divorce fallout.' : 'Painful, but cleaner than dragging it out.',
+                    impact: (p) => {
+                        const nextPlayer = isMarriage
+                            ? applyDivorceOutcome(p, partner.id, 'SETTLE')
+                            : applyPartnerBreakup(p, partner.id);
+                        return {
+                            updatedPlayer: nextPlayer,
+                            log: isMarriage
+                                ? `You stopped fighting the collapse. The marriage is over, and the settlement fallout begins immediately.`
+                                : `You ended it before it could turn uglier. The silence afterward still hurts.`,
+                        };
+                    }
+                },
+                {
+                    label: 'Turn it into a public war',
+                    description: 'Short-term buzz, long-term damage.',
+                    impact: (p) => {
+                        const nextPlayer = isMarriage
+                            ? applyDivorceOutcome(p, partner.id, 'FIGHT', 'BUDGET')
+                            : applyPartnerBreakup(p, partner.id);
+                        nextPlayer.stats.fame = Math.min(100, nextPlayer.stats.fame + 4);
+                        nextPlayer.stats.reputation = Math.max(0, nextPlayer.stats.reputation - 8);
+                        pushRomanceCoverage(
+                            nextPlayer,
+                            `${nextPlayer.name} turns a private split into public theater`,
+                            `${partner.name} and ${nextPlayer.name} are now locked in the kind of breakup coverage that stains everything around it.`,
+                            'BREAKUP'
+                        );
+                        return { updatedPlayer: nextPlayer, log: `You chose spectacle over peace. The internet is entertained. Your life is not.` };
+                    }
+                }
+            ]
+        };
+    }
+
+    if (partner && exPartner && roll < 0.23) {
+        return {
+            id: `relationship_ex_return_${Date.now()}`,
+            type: 'CONFLICT',
+            title: 'The Ex Resurfaces',
+            description: `${exPartner.name} reappears with one perfectly timed message just as things with ${partner.name} were finally steady. They want to "clear the air."`,
+            options: [
+                {
+                    label: 'Tell your current partner first',
+                    description: 'Cleaner optics, harder conversation.',
+                    impact: (p) => {
+                        const currentRel = p.relationships.find(r => r.id === partner.id);
+                        const exRel = p.relationships.find(r => r.id === exPartner.id);
+                        if (currentRel) currentRel.closeness = Math.min(100, currentRel.closeness + 5);
+                        if (exRel) exRel.closeness = Math.min(100, exRel.closeness + 2);
+                        p.stats.happiness = Math.max(0, p.stats.happiness - 1);
+                        return { updatedPlayer: p, log: `You got ahead of the story. ${partner.name} appreciated the honesty, even if it made the week awkward.` };
+                    }
+                },
+                {
+                    label: 'Meet the ex quietly',
+                    description: 'Could bring closure. Could blow up.',
+                    impact: (p) => {
+                        spendPlayerEnergy(p, 8);
+                        const currentRel = p.relationships.find(r => r.id === partner.id);
+                        const exRel = p.relationships.find(r => r.id === exPartner.id);
+                        if (currentRel) currentRel.closeness = Math.max(0, currentRel.closeness - 7);
+                        if (exRel) exRel.closeness = Math.min(100, exRel.closeness + 6);
+                        p.flags.heat = (p.flags.heat || 0) + 6;
+                        if (p.stats.fame > 28) {
+                            pushRomanceCoverage(
+                                p,
+                                `${p.name} is seen reconnecting with ex ${exPartner.name}`,
+                                `${partner.name} is now being dragged into fresh speculation after the private meetup was no longer private.`,
+                                'MESS'
+                            );
+                        }
+                        return { updatedPlayer: p, log: `You met ${exPartner.name} in secret. Even if it meant nothing, it does not look like nothing.` };
+                    }
+                },
+                {
+                    label: 'Block the number and move on',
+                    description: 'Least dramatic. Also least unresolved.',
+                    impact: (p) => {
+                        const exRel = p.relationships.find(r => r.id === exPartner.id);
+                        if (exRel) exRel.closeness = Math.max(0, exRel.closeness - 10);
+                        const currentRel = p.relationships.find(r => r.id === partner.id);
+                        if (currentRel) currentRel.closeness = Math.min(100, currentRel.closeness + 3);
+                        return { updatedPlayer: p, log: `You closed the old door instead of reopening it for nostalgia and damage.` };
+                    }
+                }
+            ]
+        };
+    }
+
+    if (activeDatingMatches.length > 0 && fame > 20 && roll < 0.28) {
+        const leakedMatch = hottestSideConnection || pick(activeDatingMatches);
+        return {
+            id: `relationship_screenshot_leak_${Date.now()}`,
+            type: 'SCANDAL',
+            title: 'Screenshot Culture',
+            description: `A private exchange connected to ${leakedMatch.name} starts bouncing through group chats. No one has hard proof yet, but the wording is specific enough to be dangerous.`,
+            options: [
+                {
+                    label: 'Own the flirtation',
+                    description: 'Can boost mystique, but it heats everything up.',
+                    impact: (p) => {
+                        p.stats.fame = Math.min(100, p.stats.fame + 3);
+                        p.stats.followers += 9000;
+                        p.flags.heat = (p.flags.heat || 0) + 8;
+                        p.dating.matches = p.dating.matches.map(match =>
+                            match.id === leakedMatch.id
+                                ? { ...match, scandalHeat: Math.max(0, (match.scandalHeat || 0) + 14), chemistry: Math.min(100, match.chemistry + 3) }
+                                : match
+                        );
+                        pushRomanceCoverage(
+                            p,
+                            `${p.name} leans into dating rumors instead of denying them`,
+                            `${leakedMatch.name} is now central to a fresh cycle of speculation, fan edits, and gossip accounts.`,
+                            'SCANDAL'
+                        );
+                        return { updatedPlayer: p, log: `You refused to act ashamed. The buzz went up. So did the risk.` };
+                    }
+                },
+                {
+                    label: 'Lock everything down',
+                    description: 'Hurts momentum, protects your image.',
+                    impact: (p) => {
+                        p.stats.reputation = Math.min(100, p.stats.reputation + 2);
+                        p.flags.heat = Math.max(0, (p.flags.heat || 0) - 4);
+                        p.dating.matches = p.dating.matches.map(match =>
+                            match.id === leakedMatch.id
+                                ? {
+                                      ...match,
+                                      chemistry: Math.max(8, match.chemistry - 4),
+                                      scandalHeat: Math.max(0, (match.scandalHeat || 0) - 10),
+                                      officialStatus: match.isPremium ? 'COOLDOWN' : match.officialStatus,
+                                  }
+                                : match
+                        );
+                        return { updatedPlayer: p, log: `You locked the whole situation down. Cleaner optics, colder energy.` };
+                    }
+                },
+                {
+                    label: 'Blame clout-chasing accounts',
+                    description: 'Might work, might make you look defensive.',
+                    impact: (p) => {
+                        p.stats.reputation = Math.max(0, p.stats.reputation - 2);
+                        p.flags.heat = (p.flags.heat || 0) + 5;
+                        if (Math.random() < 0.45) {
+                            p.stats.followers += 6000;
+                            return { updatedPlayer: p, log: `The denial bought you enough confusion to keep moving. Not clean, but effective.` };
+                        }
+                        pushRomanceCoverage(
+                            p,
+                            `${p.name}'s denial only fuels the dating leak harder`,
+                            `The attempt to wave off the screenshots made gossip pages treat the whole thing like open season.`,
+                            'SCANDAL'
+                        );
+                        return { updatedPlayer: p, log: `The denial backfired. Now people are looking harder, not less.` };
+                    }
+                }
+            ]
+        };
+    }
 
     // 1. UNDERWORLD / CRIME (Shady Deals)
     if (roll < 0.15 && fame > 20) {

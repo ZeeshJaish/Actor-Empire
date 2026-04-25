@@ -1,12 +1,13 @@
 import React, { useMemo, useState } from 'react';
 import { Player, Relationship, BloodlineMember } from '../types';
-import { MessageCircle, Phone, Coffee, Gift, Users, X, Zap, Heart, Baby, Gem, Crown, Flame, Music, Plane, Briefcase, Trophy, Film, DollarSign, Skull, Sparkles } from 'lucide-react';
+import { MessageCircle, Phone, Coffee, Gift, Users, X, Zap, Heart, Baby, Gem, Crown, Flame, Music, Plane, Briefcase, Trophy, Film, DollarSign, Skull, Sparkles, Home } from 'lucide-react';
 import { calculateLegacyScore, getGenerationNumber, getInteractionAgeInWeeks, getLegacyInheritancePreview, getRelationshipAge, LEGACY_INHERITANCE_TAX_RATE, LEGACY_MIN_PLAYABLE_AGE } from '../services/legacyLogic';
 import { getDivorceLawyerCost, isChildAbandoned } from '../services/familyLogic';
+import { hasOwnedPremiumAssetInCollection } from '../services/premiumLogic';
 
 interface SocialPageProps {
   player: Player;
-  onInteract: (id: string, type: 'CALL' | 'HANGOUT' | 'GIFT' | 'NETWORK' | 'DATE' | 'PROPOSE' | 'INTIMACY' | 'CLUBBING' | 'TRIP' | 'ABANDON_CHILD' | 'RECONNECT_CHILD' | 'BREAK_UP' | 'DIVORCE_SETTLE' | 'DIVORCE_FIGHT_BUDGET' | 'DIVORCE_FIGHT_ESTABLISHED' | 'DIVORCE_FIGHT_ELITE') => void;
+  onInteract: (id: string, type: 'CALL' | 'HANGOUT' | 'GIFT' | 'NETWORK' | 'DATE' | 'PROPOSE' | 'INTIMACY' | 'CLUBBING' | 'TRIP' | 'ESTATE_DATE' | 'YACHT_DATE' | 'JET_ESCAPE' | 'LUXURY_GIFT' | 'ABANDON_CHILD' | 'RECONNECT_CHILD' | 'BREAK_UP' | 'DIVORCE_SETTLE' | 'DIVORCE_FIGHT_BUDGET' | 'DIVORCE_FIGHT_ESTABLISHED' | 'DIVORCE_FIGHT_ELITE') => void;
   onContinueAsChild: (child: Relationship) => void;
 }
 
@@ -36,7 +37,7 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
       return 250;
   };
 
-  const handleInteraction = (type: 'CALL' | 'HANGOUT' | 'GIFT' | 'NETWORK' | 'DATE' | 'PROPOSE' | 'INTIMACY' | 'CLUBBING' | 'TRIP' | 'ABANDON_CHILD' | 'RECONNECT_CHILD' | 'BREAK_UP' | 'DIVORCE_SETTLE' | 'DIVORCE_FIGHT_BUDGET' | 'DIVORCE_FIGHT_ESTABLISHED' | 'DIVORCE_FIGHT_ELITE') => {
+  const handleInteraction = (type: 'CALL' | 'HANGOUT' | 'GIFT' | 'NETWORK' | 'DATE' | 'PROPOSE' | 'INTIMACY' | 'CLUBBING' | 'TRIP' | 'ESTATE_DATE' | 'YACHT_DATE' | 'JET_ESCAPE' | 'LUXURY_GIFT' | 'ABANDON_CHILD' | 'RECONNECT_CHILD' | 'BREAK_UP' | 'DIVORCE_SETTLE' | 'DIVORCE_FIGHT_BUDGET' | 'DIVORCE_FIGHT_ESTABLISHED' | 'DIVORCE_FIGHT_ELITE') => {
       if (selectedContact) {
           onInteract(selectedContact.id, type);
           setShowDivorceOptions(false);
@@ -59,11 +60,16 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
   }, [player.relationships]);
 
   const innerCircle = sortedRelationships.filter(rel =>
-      ['Parent', 'Deceased Parent', 'Partner', 'Spouse', 'Ex-Partner', 'Ex-Spouse', 'Child', 'Friend', 'Sibling'].includes(rel.relation)
+      ['Parent', 'Deceased Parent', 'Spouse', 'Child', 'Sibling'].includes(rel.relation)
+  );
+
+  const relationshipCircle = sortedRelationships.filter(rel =>
+      ['Partner', 'Ex-Partner', 'Ex-Spouse'].includes(rel.relation)
   );
 
   const professionalNetwork = sortedRelationships.filter(rel =>
-      ['Connection', 'Director', 'Agent', 'Manager', 'Colleague', 'Networking'].includes(rel.relation)
+      !innerCircle.some(entry => entry.id === rel.id) &&
+      !relationshipCircle.some(entry => entry.id === rel.id)
   );
 
   const children = useMemo(() => {
@@ -169,9 +175,45 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
       setShowDivorceOptions(false);
   }, [selectedContact?.id]);
 
+  const getRelationPill = (relation: Relationship['relation']) => {
+      switch (relation) {
+          case 'Spouse':
+              return 'bg-amber-500/12 text-amber-300 border-amber-500/25';
+          case 'Partner':
+              return 'bg-pink-500/12 text-pink-300 border-pink-500/25';
+          case 'Ex-Partner':
+          case 'Ex-Spouse':
+              return 'bg-rose-500/12 text-rose-300 border-rose-500/25';
+          case 'Parent':
+              return 'bg-sky-500/12 text-sky-300 border-sky-500/25';
+          case 'Deceased Parent':
+              return 'bg-zinc-500/12 text-zinc-300 border-zinc-500/20';
+          case 'Child':
+              return 'bg-yellow-500/12 text-yellow-300 border-yellow-500/25';
+          case 'Sibling':
+              return 'bg-cyan-500/12 text-cyan-300 border-cyan-500/25';
+          case 'Friend':
+              return 'bg-emerald-500/12 text-emerald-300 border-emerald-500/25';
+          case 'Director':
+              return 'bg-purple-500/12 text-purple-300 border-purple-500/25';
+          case 'Agent':
+              return 'bg-blue-500/12 text-blue-300 border-blue-500/25';
+          case 'Manager':
+              return 'bg-fuchsia-500/12 text-fuchsia-300 border-fuchsia-500/25';
+          case 'Colleague':
+              return 'bg-emerald-500/12 text-emerald-300 border-emerald-500/25';
+          case 'Networking':
+          case 'Connection':
+              return 'bg-zinc-500/12 text-zinc-300 border-zinc-500/20';
+          default:
+              return 'bg-zinc-500/12 text-zinc-300 border-zinc-500/20';
+      }
+  };
+
   const renderRelationshipCard = (rel: Relationship) => {
       const weeksSince = getInteractionAgeInWeeks(rel, player.age, player.currentWeek);
-      const isCritical = weeksSince >= 8;
+      const closeness = rel.closeness || 0;
+      const isCritical = weeksSince >= 8 && closeness < 45;
       
       return (
           <div key={rel.id} onClick={() => setSelectedContact(rel)} className={`glass-card p-4 rounded-3xl flex items-center gap-4 group cursor-pointer transition-transform active:scale-[0.98] ${rel.relation === 'Partner' || rel.relation === 'Spouse' ? 'border-pink-500/30 bg-pink-900/5' : ''} ${rel.relation === 'Ex-Partner' || rel.relation === 'Ex-Spouse' ? 'border-rose-500/20 bg-rose-900/5' : ''}`}>
@@ -205,7 +247,7 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
                   
                   <div className="space-y-1">
                       <div className="flex justify-between text-[10px] text-zinc-500 uppercase mb-0.5">
-                          <span>{rel.relation}</span>
+                          <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[9px] font-bold tracking-[0.18em] ${getRelationPill(rel.relation)}`}>{rel.relation}</span>
                           <span className={(rel.closeness || 0) > 80 ? 'text-emerald-400 font-bold' : ''}>{Math.round(rel.closeness || 0)}/100</span>
                       </div>
                       <div className="h-1.5 w-full bg-zinc-800 rounded-full overflow-hidden">
@@ -283,6 +325,15 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
                   <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">Inner Circle</h3>
                   <div className="space-y-3">
                       {innerCircle.map(renderRelationshipCard)}
+                  </div>
+              </div>
+          )}
+
+          {relationshipCircle.length > 0 && (
+              <div className="space-y-4">
+                  <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">Relationships</h3>
+                  <div className="space-y-3">
+                      {relationshipCircle.map(renderRelationshipCard)}
                   </div>
               </div>
           )}
@@ -390,7 +441,7 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
                           <img src={selectedContact.image} className="w-full h-full rounded-full object-cover border-4 border-black" />
                       </div>
                       <h3 className="text-2xl font-bold text-white mb-1">{selectedContact.name}</h3>
-                      <div className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-2">{selectedContact.relation}</div>
+                      <div className={`mb-2 inline-flex items-center rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] ${getRelationPill(selectedContact.relation)}`}>{selectedContact.relation}</div>
                       {(selectedContact.relation === 'Child' || selectedContact.relation === 'Sibling' || selectedContact.relation === 'Parent' || selectedContact.relation === 'Deceased Parent') && (
                         <div className="text-xs text-zinc-400 mb-4">Age {getRelationshipAge(selectedContact, player.age, player.currentWeek)}</div>
                       )}
@@ -424,6 +475,24 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
                                       <Gem size={16}/> Propose Marriage <span className="opacity-60 text-xs font-normal">($5k Ring)</span>
                                   </button>
                               )}
+
+                              <div className="mt-4 space-y-3">
+                                  <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">Luxury Moments</div>
+                                  <div className="grid grid-cols-2 gap-3">
+                                      {hasOwnedPremiumAssetInCollection(player, 'bundle_luxury_homes') ? (
+                                          <ActionCard label="Estate Night" icon={Home} color="bg-amber-500" costMoney={1200} costEnergy={16} subtext="Homes" disabled={player.money < 1200 || player.energy.current < 16} onClick={() => handleInteraction('ESTATE_DATE')} />
+                                      ) : null}
+                                      {hasOwnedPremiumAssetInCollection(player, 'bundle_sky_sea') ? (
+                                          <>
+                                              <ActionCard label="Yacht Date" icon={Plane} color="bg-sky-500" costMoney={2500} costEnergy={18} subtext="Sky & Sea" disabled={player.money < 2500 || player.energy.current < 18} onClick={() => handleInteraction('YACHT_DATE')} />
+                                              <ActionCard label="Jet Escape" icon={Plane} color="bg-blue-500" costMoney={9000} costEnergy={10} subtext="Jet-Set" disabled={player.money < 9000 || player.energy.current < 10} onClick={() => handleInteraction('JET_ESCAPE')} />
+                                          </>
+                                      ) : null}
+                                      {hasOwnedPremiumAssetInCollection(player, 'bundle_ultimate_lifestyle') ? (
+                                          <ActionCard label="Luxury Gift" icon={Gem} color="bg-fuchsia-500" costMoney={8000} costEnergy={4} subtext="Lifestyle" disabled={player.money < 8000 || player.energy.current < 4} onClick={() => handleInteraction('LUXURY_GIFT')} />
+                                      ) : null}
+                                  </div>
+                              </div>
 
                               <div className="mt-4 rounded-2xl border border-rose-500/20 bg-rose-500/5 p-4">
                                   <div className="mb-2 text-[10px] font-bold uppercase tracking-widest text-rose-300">Relationship Exit</div>

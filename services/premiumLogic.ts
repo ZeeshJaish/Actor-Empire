@@ -45,32 +45,68 @@ export const PREMIUM_PRODUCTS: PremiumProduct[] = [
     { id: 'cash_200000', title: 'Studio Booster Pack', priceLabel: '$3.99', kind: 'consumable', category: 'cash', description: 'Includes 200,000 in-game funds instantly.', amount: 200000 },
     { id: 'cash_500000', title: 'Empire Growth Pack', priceLabel: '$6.99', kind: 'consumable', category: 'cash', description: 'Includes 500,000 in-game funds instantly.', amount: 500000 },
     { id: 'cash_1250000', title: 'Legacy Vault Pack', priceLabel: '$12.99', kind: 'consumable', category: 'cash', description: 'Includes 1,250,000 in-game funds instantly.', amount: 1250000 },
-    { id: 'bundle_luxury_homes', title: 'Luxury Homes Collection', priceLabel: '$4.99', kind: 'non_consumable', category: 'collection', description: 'Unlocks the premium homes collection when the iOS catalog is wired to your asset store.' },
-    { id: 'bundle_elite_vehicles', title: 'Elite Vehicles Collection', priceLabel: '$4.99', kind: 'non_consumable', category: 'collection', description: 'Unlocks premium vehicles and status rides.' },
-    { id: 'bundle_sky_sea', title: 'Sky & Sea Collection', priceLabel: '$6.99', kind: 'non_consumable', category: 'collection', description: 'Unlocks prestige transport like yachts and jets.' },
-    { id: 'bundle_ultimate_lifestyle', title: 'Ultimate Lifestyle Collection', priceLabel: '$12.99', kind: 'non_consumable', category: 'collection', description: 'Unlocks every premium collection entitlement in one bundle.' }
+    { id: 'bundle_luxury_homes', title: 'Luxury Homes Collection', priceLabel: '$4.99', kind: 'non_consumable', category: 'collection', description: 'Unlocks a wider celebrity property ladder, from villas and penthouses to island-tier estates.' },
+    { id: 'bundle_elite_vehicles', title: 'Elite Vehicles Collection', priceLabel: '$4.99', kind: 'non_consumable', category: 'collection', description: 'Unlocks an elite garage of hypercars, status SUVs, and premium bikes.' },
+    { id: 'bundle_sky_sea', title: 'Sky & Sea Collection', priceLabel: '$6.99', kind: 'non_consumable', category: 'collection', description: 'Unlocks a full prestige transport lane across yachts, watercraft, and private aviation.' },
+    { id: 'bundle_ultimate_lifestyle', title: 'Ultimate Lifestyle Collection', priceLabel: '$12.99', kind: 'non_consumable', category: 'collection', description: 'Unlocks every premium collection plus the ultra-luxury fashion and accessories vault.' }
 ];
 
 const PREMIUM_ASSET_COLLECTIONS: Record<string, PremiumProductId> = {
+    prop_hollywood_hills_home: 'bundle_luxury_homes',
     prop_beverly_hills_mansion: 'bundle_luxury_homes',
+    prop_manhattan_penthouse: 'bundle_luxury_homes',
+    prop_miami_beachfront: 'bundle_luxury_homes',
+    prop_aspen_chalet: 'bundle_luxury_homes',
     prop_malibu_beach_house: 'bundle_luxury_homes',
     prop_the_one: 'bundle_luxury_homes',
+    prop_paris_eiffel: 'bundle_luxury_homes',
+    prop_dubai_palm: 'bundle_luxury_homes',
+    prop_tokyo_shibuya: 'bundle_luxury_homes',
     prop_nyc_billionaire: 'bundle_luxury_homes',
     prop_chateau_france: 'bundle_luxury_homes',
     prop_london_townhouse: 'bundle_luxury_homes',
     prop_dubai_royal: 'bundle_luxury_homes',
     prop_private_island: 'bundle_luxury_homes',
     prop_monaco_penthouse: 'bundle_luxury_homes',
+    veh_car_porsche911: 'bundle_elite_vehicles',
+    veh_car_teslas: 'bundle_elite_vehicles',
+    veh_car_gwagon: 'bundle_elite_vehicles',
+    veh_car_ferrari488: 'bundle_elite_vehicles',
     veh_car_bugatti: 'bundle_elite_vehicles',
     veh_car_koenigsegg: 'bundle_elite_vehicles',
     veh_car_vintage_ferrari: 'bundle_elite_vehicles',
     veh_car_pagani: 'bundle_elite_vehicles',
     veh_car_rr_cullinan: 'bundle_elite_vehicles',
+    veh_bike_ducati: 'bundle_elite_vehicles',
+    veh_bike_arch: 'bundle_elite_vehicles',
+    veh_boat_jetski: 'bundle_sky_sea',
+    veh_boat_mastercraft: 'bundle_sky_sea',
     veh_boat_yacht: 'bundle_sky_sea',
     veh_boat_superyacht: 'bundle_sky_sea',
+    veh_plane_cessna: 'bundle_sky_sea',
     veh_plane_cirrus: 'bundle_sky_sea',
     veh_plane_gulfstream: 'bundle_sky_sea',
     veh_plane_bbj: 'bundle_sky_sea',
+    cloth_outfit_marilyn: 'bundle_ultimate_lifestyle',
+    cloth_outfit_mj_jacket: 'bundle_ultimate_lifestyle',
+    cloth_shoe_mags: 'bundle_ultimate_lifestyle',
+    cloth_acc_rolex: 'bundle_ultimate_lifestyle',
+    cloth_acc_ap: 'bundle_ultimate_lifestyle',
+    cloth_acc_richard_mille: 'bundle_ultimate_lifestyle',
+    cloth_acc_patek: 'bundle_ultimate_lifestyle',
+    cloth_acc_jacob: 'bundle_ultimate_lifestyle',
+    cloth_acc_vintage_rolex: 'bundle_ultimate_lifestyle',
+    cloth_acc_birkin: 'bundle_ultimate_lifestyle',
+    cloth_acc_chanel_flap: 'bundle_ultimate_lifestyle',
+    cloth_acc_goyard: 'bundle_ultimate_lifestyle',
+    cloth_acc_cartier: 'bundle_ultimate_lifestyle',
+    cloth_acc_diamond_ring: 'bundle_ultimate_lifestyle',
+    cloth_acc_crown: 'bundle_ultimate_lifestyle',
+    cloth_acc_harry_winston: 'bundle_ultimate_lifestyle',
+    cloth_acc_bulgari: 'bundle_ultimate_lifestyle',
+    cloth_acc_cartier_glasses: 'bundle_ultimate_lifestyle',
+    cloth_acc_jacques: 'bundle_ultimate_lifestyle',
+    cloth_acc_chrome: 'bundle_ultimate_lifestyle',
 };
 
 const PREMIUM_COLLECTION_COPY: Record<PremiumProductId, PremiumCollectionGate> = {
@@ -84,10 +120,10 @@ const PREMIUM_COLLECTION_COPY: Record<PremiumProductId, PremiumCollectionGate> =
     cash_200000: { productId: 'cash_200000', title: 'Studio Booster Pack', teaser: 'Includes 200,000 in-game funds.' },
     cash_500000: { productId: 'cash_500000', title: 'Empire Growth Pack', teaser: 'Includes 500,000 in-game funds.' },
     cash_1250000: { productId: 'cash_1250000', title: 'Legacy Vault Pack', teaser: 'Includes 1,250,000 in-game funds.' },
-    bundle_luxury_homes: { productId: 'bundle_luxury_homes', title: 'Luxury Homes Collection', teaser: 'Unlock celebrity estates, penthouses, and island-tier addresses.' },
-    bundle_elite_vehicles: { productId: 'bundle_elite_vehicles', title: 'Elite Vehicles Collection', teaser: 'Unlock hypercars and icon-status rides inside the normal market.' },
-    bundle_sky_sea: { productId: 'bundle_sky_sea', title: 'Sky & Sea Collection', teaser: 'Unlock yachts and private aviation for the prestige lifestyle lane.' },
-    bundle_ultimate_lifestyle: { productId: 'bundle_ultimate_lifestyle', title: 'Ultimate Lifestyle Collection', teaser: 'Unlock every premium lifestyle collection permanently.' },
+    bundle_luxury_homes: { productId: 'bundle_luxury_homes', title: 'Luxury Homes Collection', teaser: 'Unlock a fuller celebrity property empire: villas, penthouses, ski homes, beachfront addresses, and island-tier estates.' },
+    bundle_elite_vehicles: { productId: 'bundle_elite_vehicles', title: 'Elite Vehicles Collection', teaser: 'Unlock a complete elite garage with hypercars, prestige SUVs, and premium bikes inside the normal market.' },
+    bundle_sky_sea: { productId: 'bundle_sky_sea', title: 'Sky & Sea Collection', teaser: 'Unlock the full prestige transport fantasy across jet skis, yachts, and private aviation.' },
+    bundle_ultimate_lifestyle: { productId: 'bundle_ultimate_lifestyle', title: 'Ultimate Lifestyle Collection', teaser: 'Unlock every premium collection plus the ultra-luxury vault of icon fashion, rare watches, jewelry, and trophy accessories.' },
 };
 
 const getOwnedPurchases = (player: Player): PremiumProductId[] => {
@@ -181,6 +217,19 @@ export const hasPremiumAccessForAsset = (player: Player, assetId: string): boole
     return hasPremiumProduct(player, requiredProduct);
 };
 
+export const getOwnedPremiumAssetsForCollection = (player: Player, productId: PremiumProductId): string[] =>
+    (player.assets || []).filter(assetId => PREMIUM_ASSET_COLLECTIONS[assetId] === productId);
+
+export const hasOwnedPremiumAssetInCollection = (player: Player, productId: PremiumProductId): boolean =>
+    getOwnedPremiumAssetsForCollection(player, productId).length > 0;
+
+export const getOwnedPremiumCollectionStatus = (player: Player) => ({
+    homes: hasOwnedPremiumAssetInCollection(player, 'bundle_luxury_homes'),
+    vehicles: hasOwnedPremiumAssetInCollection(player, 'bundle_elite_vehicles'),
+    skySea: hasOwnedPremiumAssetInCollection(player, 'bundle_sky_sea'),
+    lifestyle: hasOwnedPremiumAssetInCollection(player, 'bundle_ultimate_lifestyle'),
+});
+
 export const applyPremiumPurchase = (player: Player, productId: PremiumProductId): string => {
     const ownedPurchases = getOwnedPurchases(player);
     const unlockedCollections = getUnlockedCollections(player);
@@ -214,9 +263,14 @@ export const applyPremiumPurchase = (player: Player, productId: PremiumProductId
         case 'bundle_luxury_homes':
         case 'bundle_elite_vehicles':
         case 'bundle_sky_sea':
+            ownedPurchases.push(productId);
+            if (!unlockedCollections.includes(productId)) {
+                unlockedCollections.push(productId);
+            }
+            return `${product.title} unlocked permanently.`;
         case 'bundle_ultimate_lifestyle':
             ownedPurchases.push(productId);
-            ['bundle_luxury_homes', 'bundle_elite_vehicles', 'bundle_sky_sea'].forEach(bundleId => {
+            ['bundle_luxury_homes', 'bundle_elite_vehicles', 'bundle_sky_sea', 'bundle_ultimate_lifestyle'].forEach(bundleId => {
                 if (!ownedPurchases.includes(bundleId as PremiumProductId)) {
                     ownedPurchases.push(bundleId as PremiumProductId);
                 }

@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Film, Tv, Users, DollarSign, Star, TrendingUp, Calendar, Check, Activity, Layers, Zap, Info, ChevronRight, Play, Settings, Camera, Award, BarChart3, Globe, BookOpen, Edit3, Sparkles } from 'lucide-react';
 import { Player, Studio, CustomPoster, PlatformId } from '../../../../types';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
+import { getAbsoluteWeek } from '../../../../services/legacyLogic';
 
 const formatMoney = (val: number) => {
     if (val >= 1_000_000_000_000) return `$${(val/1_000_000_000_000).toFixed(2)}T`;
@@ -824,16 +825,28 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                             <Tv size={20} /> Bid to Platforms
                                         </button>
                                     )}
-                                    {project.streaming && project.streaming.startWeek && player.currentWeek < project.streaming.startWeek && (
+                                    {project.streaming && (() => {
+                                        const currentAbsoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
+                                        const weeksUntilStreaming =
+                                            typeof project.streaming.startWeekAbsolute === 'number'
+                                                ? project.streaming.startWeekAbsolute - currentAbsoluteWeek
+                                                : (project.streaming.startWeek && player.currentWeek < project.streaming.startWeek
+                                                    ? project.streaming.startWeek - player.currentWeek
+                                                    : 0);
+
+                                        if (weeksUntilStreaming <= 0) return null;
+
+                                        return (
                                         <div className="flex-1 p-5 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex flex-col justify-center items-center text-center">
                                             <div className="flex items-center gap-2 text-amber-500 font-black text-[10px] uppercase tracking-widest mb-1">
                                                 <Tv size={14} /> Streaming Deal Secured
                                             </div>
                                             <div className="text-white font-bold text-sm">
-                                                Live on {PLATFORMS.find(p => p.id === project.streaming.platformId)?.name || 'Platform'} in {project.streaming.startWeek - player.currentWeek} weeks
+                                                Live on {PLATFORMS.find(p => p.id === project.streaming.platformId)?.name || 'Platform'} in {weeksUntilStreaming} weeks
                                             </div>
                                         </div>
-                                    )}
+                                        );
+                                    })()}
                                     {['RELEASED', 'IN THEATERS', 'STREAMING'].includes(project.phase) && onMakeSequel && (
                                         <div className="flex-1 flex flex-col gap-1">
                                             <button 

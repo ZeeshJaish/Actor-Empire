@@ -58,6 +58,16 @@ interface MobilePageProps {
   onDeleteMessage?: (id: string) => void;
   onTradeStock?: (stockId: string, amount: number) => void;
   onUpdatePlayer?: (player: Player) => void; 
+  onTriggerBabyNaming?: (pending: {
+      partnerId: string;
+      partnerName: string;
+      babyGender: 'MALE' | 'FEMALE';
+      suggestedFirstName: string;
+      birthWeekAbsolute: number;
+      eventWeek: number;
+      eventYear: number;
+      shouldCreateScandalNews: boolean;
+  }) => void;
 }
 
 export const MobilePage: React.FC<MobilePageProps> = (props) => {
@@ -549,6 +559,7 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
                         onBack={() => setAppMode('DATING_FOLDER')} 
                         onUpdatePlayer={handleUpdatePlayer}
                         onDateSuccess={handleTinderDateSuccess}
+                        onTriggerBabyNaming={props.onTriggerBabyNaming}
                     />
                 )}
                 {appMode === 'LUXE' && (

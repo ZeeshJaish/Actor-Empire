@@ -29,6 +29,12 @@ const returningCrewRoleToStateKey = (role?: string): 'director' | 'cinematograph
     return null;
 };
 
+const normalizeCrewReturningRole = (role?: string) => {
+    if (!role) return role;
+    if (role === 'VFX') return 'VFX_SUPERVISOR';
+    return role;
+};
+
 const getUniversePhaseLabel = (phase?: Universe['currentPhase']) => {
     if (typeof phase === 'number') return `Phase ${phase}`;
     if (typeof phase === 'string') {
@@ -80,6 +86,7 @@ const CrewSelector: React.FC<{
     returningTalent?: any[];
     onNegotiate?: (talentId: string, returningData: any) => void;
 }> = ({ title, icon, role, candidates, selectedId, onSelect, mode, onModeChange, player, hiredIds, inHouseQuality, inHouseFame, inHouseLevel, returningTalent, onNegotiate }) => {
+    const canonicalRole = normalizeCrewReturningRole(role);
     return (
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 animate-in slide-in-from-bottom-2 duration-500">
             <h3 className="text-sm font-bold text-white mb-3 flex items-center gap-2">{icon} {title}</h3>
@@ -182,7 +189,7 @@ const CrewSelector: React.FC<{
                         let isReturning = false;
                         let returningData = null;
                         if (returningTalent) {
-                            returningData = returningTalent.find(t => t.id === c.id && t.role === role);
+                            returningData = returningTalent.find(t => t.id === c.id && t.role === canonicalRole);
                             if (returningData) {
                                 salary = returningData.newDemand;
                                 isReturning = true;
@@ -323,7 +330,7 @@ const CrewSelector: React.FC<{
                     </div>
                     <div className="text-amber-400 font-bold text-sm mb-1 uppercase tracking-wider">{player.name}</div>
                     <div className="text-[10px] font-mono text-zinc-500 flex gap-2 justify-center mb-2">
-                        <span className="text-emerald-400">Talent: {role === 'DIRECTOR' ? (player.directorStats?.talent || 50) : 50}</span>
+                        <span className="text-emerald-400">Talent: {role === 'DIRECTOR' ? Math.round(getDirectorTalent(player.directorStats || { vision: 0, technical: 0, leadership: 0, style: 0 })) : 50}</span>
                         <span className="text-rose-400">Fame: {player.stats?.fame || 0}</span>
                     </div>
                     <p className="text-xs text-zinc-400 max-w-[200px] mx-auto leading-relaxed">Take the helm yourself. Gain XP and creative control. Free.</p>
@@ -651,6 +658,12 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             || (selectedScriptId ? normalizeReturningTalentEntries(studio.studioState?.scripts?.find(s => s.id === selectedScriptId)) : null)
             || (initialConcept ? normalizeReturningTalentEntries(studio.studioState?.scripts?.find(s => s.id === initialConcept.scriptId)) : null);
     }, [scripts, selectedScriptId, studio.studioState?.scripts, initialConcept?.scriptId, contractedTalentIds]);
+
+    const [currentReturningTalent, setCurrentReturningTalent] = useState<any[]>([]);
+
+    useEffect(() => {
+        setCurrentReturningTalent(selectedScript?.returningTalent || []);
+    }, [selectedScript?.id, selectedScript?.returningTalent]);
     
     // Identify studio franchises (for selection)
     const studioFranchises = useMemo(() => {
@@ -791,7 +804,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             // Check if we need to pre-fill (no director selected yet)
             if (!directorToSet) {
                 // 1. Check returning talent list in the script itself (most direct source)
-                const returningDirector = selectedScript.returningTalent?.find(t => t.role === 'DIRECTOR');
+                const returningDirector = currentReturningTalent.find(t => t.role === 'DIRECTOR');
                 if (returningDirector) {
                     directorToSet = returningDirector.id;
                     directorModeToSet = returningDirector.id === 'PLAYER_SELF' ? 'SELF' : (returningDirector.id === 'STUDIO_STAFF' ? 'IN_HOUSE' : 'HIRE');
@@ -845,7 +858,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                     const newCastList = details.castList.map((c: any) => {
                         let salary = c.salary || 0;
                         // Check if this actor is in the returning talent list to get their new demand
-                        const returning = selectedScript.returningTalent?.find(t => t.id === c.actorId);
+                        const returning = currentReturningTalent.find(t => t.id === c.actorId);
                         if (returning) {
                             salary = returning.newDemand;
                         }
@@ -1126,6 +1139,38 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         });
     };
 
+    const updateReturningTalentState = (
+        talentId: string,
+        roleType: string,
+        updater: (talent: any) => any
+    ) => {
+        const talentIndex = currentReturningTalent.findIndex(t => t.id === talentId && t.role === roleType);
+        if (talentIndex === -1) return false;
+
+        const updatedReturningTalent = currentReturningTalent.map((talent, index) =>
+            index === talentIndex ? updater(talent) : talent
+        );
+        setCurrentReturningTalent(updatedReturningTalent);
+
+        const updatedScripts = (studio.studioState?.scripts || []).map(s =>
+            s.id === selectedScript?.id ? { ...s, returningTalent: updatedReturningTalent } : s
+        );
+
+        const updatedPlayer = { ...player };
+        const studioIndex = updatedPlayer.businesses.findIndex(b => b.id === studio.id);
+        if (studioIndex !== -1) {
+            updatedPlayer.businesses[studioIndex] = {
+                ...studio,
+                studioState: {
+                    ...studio.studioState!,
+                    scripts: updatedScripts
+                }
+            };
+        }
+        onUpdatePlayer(updatedPlayer);
+        return true;
+    };
+
     const assignNegotiatedTalent = (talentId: string, talentName: string, salary: number, roleType: string, roleId?: string) => {
         const crewStateKey = returningCrewRoleToStateKey(roleType);
         if (crewStateKey) {
@@ -1166,8 +1211,8 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
 
     
     const calculateActorSalary = (actor: any, roleType: string, closeness: number = 0) => {
-        if (selectedScript?.returningTalent) {
-            const returning = selectedScript.returningTalent.find(t => t.id === actor.id);
+        if (currentReturningTalent.length > 0) {
+            const returning = currentReturningTalent.find(t => t.id === actor.id);
             if (returning) {
                 return returning.newDemand;
             }
@@ -1253,8 +1298,8 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         // Estimate salary for NPCs if not present (simple logic based on tier)
         let cost = 0;
         if (candidate) {
-            if (selectedScript?.returningTalent) {
-                const returning = selectedScript.returningTalent.find(t => t.id === candidate.id && t.role === role.toUpperCase());
+            if (currentReturningTalent.length > 0) {
+                const returning = currentReturningTalent.find(t => t.id === candidate.id && t.role === role.toUpperCase());
                 if (returning && returning.newDemand) {
                     cost = returning.newDemand;
                 }
@@ -1364,9 +1409,9 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
     }, [selectedCrew, crewModes, castList, selectedLocations, availableActors, availableDirectors, player, equipmentChoices, studio, mockLocations, mockCrew]);
 
     const unresolvedReturningTalent = useMemo(() => {
-        if (!selectedScript?.returningTalent) return [];
+        if (currentReturningTalent.length === 0) return [];
 
-        return selectedScript.returningTalent.filter(talent => {
+        return currentReturningTalent.filter(talent => {
             if (!requiresReturningTalentNegotiation(talent)) return false;
 
             const crewStateKey = returningCrewRoleToStateKey(talent.role);
@@ -1384,7 +1429,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
 
             return castList.some(role => role.actorId === talent.id);
         });
-    }, [selectedScript?.returningTalent, selectedCrew, castList, contractedActors]);
+    }, [currentReturningTalent, selectedCrew, castList, contractedActors]);
 
     // Buzz State
     const [buzzItems, setBuzzItems] = useState<any[]>([]);
@@ -1625,7 +1670,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                     characterName: c.characterName?.trim() || undefined,
                     salary: c.salary,
                     status: 'CONFIRMED',
-                    isReturning: selectedScript.returningTalent?.some(t => t.id === c.actorId) || false
+                    isReturning: currentReturningTalent.some(t => t.id === c.actorId) || false
                 })),
                 crewList: fullCrewList,
                 location: selectedLocations.length > 0 ? { id: selectedLocations[0], name: locationName, region: 'Global', costModifier: 1, qualityBonus: locationQualityBonus, status: 'PENDING', description: `${selectedLocations.length} locations`, coordinates: {x:0,y:0} } : undefined,
@@ -2260,7 +2305,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                 inHouseQuality={getInHouseQuality('DIRECTOR')}
                                 inHouseFame={getInHouseFame('DIRECTOR')}
                                 inHouseLevel={getInHouseLevel('DIRECTOR')}
-                                returningTalent={selectedScript?.returningTalent}
+                                returningTalent={currentReturningTalent}
                                 onNegotiate={(talentId, returningData) => handleNegotiate(talentId, returningData)}
                             />
 
@@ -2362,7 +2407,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                                         <div className="text-base sm:text-xl font-black text-white tracking-tight truncate">
                                                             {role.actorName || 'Selected Actor'} 
                                                             {contractedActors.some(a => a.id === role.actorId) && <span className="text-[9px] sm:text-[10px] font-bold text-emerald-500 uppercase ml-1">(Contracted)</span>}
-                                                            {selectedScript?.returningTalent?.some(t => t.id === role.actorId) && <span className="text-[9px] sm:text-[10px] font-bold text-purple-400 uppercase ml-1">(Returning)</span>}
+                                                            {currentReturningTalent.some(t => t.id === role.actorId) && <span className="text-[9px] sm:text-[10px] font-bold text-purple-400 uppercase ml-1">(Returning)</span>}
                                                         </div>
                                                     ) : (
                                                         <div className="text-xs sm:text-sm text-zinc-600 italic font-medium">Pending Audition</div>
@@ -2415,7 +2460,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                                                 {isSelf || isStudio ? 'Free' :
                                                                  (role.actorId && contractedActors.some(a => a.id === role.actorId)) ? 'Contracted' :
                                                                  (() => {
-                                                                     const returningData = selectedScript?.returningTalent?.find(t => t.id === role.actorId && (t.role === 'LEAD_ACTOR' || t.role === 'SUPPORTING_ACTOR'));
+                                                                     const returningData = currentReturningTalent.find(t => t.id === role.actorId && (t.role === 'LEAD_ACTOR' || t.role === 'SUPPORTING_ACTOR'));
                                                                      if (returningData && requiresReturningTalentNegotiation(returningData)) {
                                                                          return (
                                                                              <button 
@@ -2525,7 +2570,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                 inHouseQuality={getInHouseQuality('CINEMATOGRAPHER')}
                                 inHouseFame={getInHouseFame('CINEMATOGRAPHER')}
                                 inHouseLevel={getInHouseLevel('CINEMATOGRAPHER')}
-                                returningTalent={selectedScript?.returningTalent}
+                                returningTalent={currentReturningTalent}
                                 onNegotiate={(talentId, returningData) => handleNegotiate(talentId, returningData)}
                             />
                             <CrewSelector
@@ -2542,7 +2587,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                 inHouseQuality={getInHouseQuality('COMPOSER')}
                                 inHouseFame={getInHouseFame('COMPOSER')}
                                 inHouseLevel={getInHouseLevel('COMPOSER')}
-                                returningTalent={selectedScript?.returningTalent}
+                                returningTalent={currentReturningTalent}
                                 onNegotiate={(talentId, returningData) => handleNegotiate(talentId, returningData)}
                             />
                             <CrewSelector
@@ -2559,7 +2604,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                 inHouseQuality={getInHouseQuality('LINE_PRODUCER')}
                                 inHouseFame={getInHouseFame('LINE_PRODUCER')}
                                 inHouseLevel={getInHouseLevel('LINE_PRODUCER')}
-                                returningTalent={selectedScript?.returningTalent}
+                                returningTalent={currentReturningTalent}
                                 onNegotiate={(talentId, returningData) => handleNegotiate(talentId, returningData)}
                             />
                             <CrewSelector
@@ -2576,7 +2621,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                 inHouseQuality={getInHouseQuality('VFX')}
                                 inHouseFame={getInHouseFame('VFX')}
                                 inHouseLevel={getInHouseLevel('VFX')}
-                                returningTalent={selectedScript?.returningTalent}
+                                returningTalent={currentReturningTalent}
                                 onNegotiate={(talentId, returningData) => handleNegotiate(talentId, returningData)}
                             />
                         </div>
@@ -3408,8 +3453,8 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                             
                                             let isReturning = false;
                                             let returningData = null;
-                                            if (selectedScript?.returningTalent) {
-                                                returningData = selectedScript.returningTalent.find(t => t.id === (rel.npcId || rel.id) && (t.role === 'LEAD_ACTOR' || t.role === 'SUPPORTING_ACTOR'));
+                                            if (currentReturningTalent.length > 0) {
+                                                returningData = currentReturningTalent.find(t => t.id === (rel.npcId || rel.id) && (t.role === 'LEAD_ACTOR' || t.role === 'SUPPORTING_ACTOR'));
                                                 if (returningData) {
                                                     isReturning = true;
                                                 }
@@ -3495,8 +3540,8 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                         
                                         let isReturning = false;
                                         let returningData = null;
-                                        if (selectedScript?.returningTalent) {
-                                            returningData = selectedScript.returningTalent.find(t => t.id === actor.id && (t.role === 'LEAD_ACTOR' || t.role === 'SUPPORTING_ACTOR'));
+                                        if (currentReturningTalent.length > 0) {
+                                            returningData = currentReturningTalent.find(t => t.id === actor.id && (t.role === 'LEAD_ACTOR' || t.role === 'SUPPORTING_ACTOR'));
                                             if (returningData) {
                                                 isReturning = true;
                                             }
@@ -3531,7 +3576,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                                     <div>
                                                         <div className="font-bold text-white group-hover:text-emerald-400 transition-colors flex items-center gap-2">
                                                             {actor.name}
-                                                            {selectedScript?.returningTalent?.some(t => t.id === actor.id) && (
+                                                            {currentReturningTalent.some(t => t.id === actor.id) && (
                                                                 <span className="text-[8px] px-1.5 py-0.5 bg-purple-500/20 text-purple-300 rounded-full border border-purple-500/30">
                                                                     Returning
                                                                 </span>
@@ -3641,38 +3686,16 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                         onClick={() => {
                                             // Accept Demand
                                             const finalDemand = negotiationModal.currentDemand;
-                                            if (selectedScript?.returningTalent) {
-                                                const talentIndex = selectedScript.returningTalent.findIndex(t => t.id === negotiationModal.talentId && t.role === negotiationModal.roleType);
-                                                if (talentIndex !== -1) {
-                                                    // Clone the script and talent to ensure React sees the change
-                                                    const updatedScripts = studio.studioState!.scripts!.map(s => {
-                                                        if (s.id === selectedScript.id) {
-                                                            const updatedTalent = [...s.returningTalent!];
-                                                            updatedTalent[talentIndex] = {
-                                                                ...updatedTalent[talentIndex],
-                                                                accepted: true,
-                                                                negotiated: true,
-                                                                newDemand: finalDemand
-                                                            };
-                                                            return { ...s, returningTalent: updatedTalent };
-                                                        }
-                                                        return s;
-                                                    });
-                                                    
-                                                    const updatedPlayer = { ...player };
-                                                    const studioIndex = updatedPlayer.businesses.findIndex(b => b.id === studio.id);
-                                                    if (studioIndex !== -1) {
-                                                        updatedPlayer.businesses[studioIndex] = {
-                                                            ...studio,
-                                                            studioState: {
-                                                                ...studio.studioState!,
-                                                                scripts: updatedScripts
-                                                            }
-                                                        };
-                                                    }
-                                                    onUpdatePlayer(updatedPlayer);
-                                                }
-                                            }
+                                            updateReturningTalentState(
+                                                negotiationModal.talentId,
+                                                negotiationModal.roleType,
+                                                talent => ({
+                                                    ...talent,
+                                                    accepted: true,
+                                                    negotiated: true,
+                                                    newDemand: finalDemand
+                                                })
+                                            );
 
                                             assignNegotiatedTalent(
                                                 negotiationModal.talentId,
@@ -3723,38 +3746,16 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                         const accepted = Math.random() < chance;
 
                                         if (accepted) {
-                                            if (selectedScript?.returningTalent) {
-                                                const talentIndex = selectedScript.returningTalent.findIndex(t => t.id === negotiationModal.talentId && t.role === negotiationModal.roleType);
-                                                if (talentIndex !== -1) {
-                                                    // Clone the script and talent to ensure React sees the change
-                                                    const updatedScripts = studio.studioState!.scripts!.map(s => {
-                                                        if (s.id === selectedScript.id) {
-                                                            const updatedTalent = [...s.returningTalent!];
-                                                            updatedTalent[talentIndex] = {
-                                                                ...updatedTalent[talentIndex],
-                                                                accepted: true,
-                                                                negotiated: true,
-                                                                newDemand: counterOffer
-                                                            };
-                                                            return { ...s, returningTalent: updatedTalent };
-                                                        }
-                                                        return s;
-                                                    });
-                                                    
-                                                    const updatedPlayer = { ...player };
-                                                    const studioIndex = updatedPlayer.businesses.findIndex(b => b.id === studio.id);
-                                                    if (studioIndex !== -1) {
-                                                        updatedPlayer.businesses[studioIndex] = {
-                                                            ...studio,
-                                                            studioState: {
-                                                                ...studio.studioState!,
-                                                                scripts: updatedScripts
-                                                            }
-                                                        };
-                                                    }
-                                                    onUpdatePlayer(updatedPlayer);
-                                                }
-                                            }
+                                            updateReturningTalentState(
+                                                negotiationModal.talentId,
+                                                negotiationModal.roleType,
+                                                talent => ({
+                                                    ...talent,
+                                                    accepted: true,
+                                                    negotiated: true,
+                                                    newDemand: counterOffer
+                                                })
+                                            );
 
                                             assignNegotiatedTalent(
                                                 negotiationModal.talentId,
@@ -3776,40 +3777,21 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                         } else {
                                             const newAttempts = negotiationModal.attemptsLeft - 1;
                                             
-                                            if (selectedScript?.returningTalent) {
-                                                const talentIndex = selectedScript.returningTalent.findIndex(t => t.id === negotiationModal.talentId && t.role === negotiationModal.roleType);
-                                                if (talentIndex !== -1) {
-                                                    // Clone the script and talent to ensure React sees the change
-                                                    const updatedScripts = studio.studioState!.scripts!.map(s => {
-                                                        if (s.id === selectedScript.id) {
-                                                            const updatedTalent = [...s.returningTalent!];
-                                                            updatedTalent[talentIndex] = {
-                                                                ...updatedTalent[talentIndex],
-                                                                attemptsLeft: newAttempts
-                                                            };
-                                                            if (newAttempts <= 0) {
-                                                                updatedTalent[talentIndex].negotiated = true;
-                                                                updatedTalent[talentIndex].accepted = false;
-                                                            }
-                                                            return { ...s, returningTalent: updatedTalent };
-                                                        }
-                                                        return s;
-                                                    });
-                                                    
-                                                    const updatedPlayer = { ...player };
-                                                    const studioIndex = updatedPlayer.businesses.findIndex(b => b.id === studio.id);
-                                                    if (studioIndex !== -1) {
-                                                        updatedPlayer.businesses[studioIndex] = {
-                                                            ...studio,
-                                                            studioState: {
-                                                                ...studio.studioState!,
-                                                                scripts: updatedScripts
-                                                            }
-                                                        };
+                                            updateReturningTalentState(
+                                                negotiationModal.talentId,
+                                                negotiationModal.roleType,
+                                                talent => {
+                                                    const updatedTalent = {
+                                                        ...talent,
+                                                        attemptsLeft: newAttempts
+                                                    };
+                                                    if (newAttempts <= 0) {
+                                                        updatedTalent.negotiated = true;
+                                                        updatedTalent.accepted = false;
                                                     }
-                                                    onUpdatePlayer(updatedPlayer);
+                                                    return updatedTalent;
                                                 }
-                                            }
+                                            );
 
                                             if (newAttempts <= 0) {
                                                 // Walked away
@@ -3851,38 +3833,16 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                 <button
                                     disabled={!!negotiationModal.feedback}
                                     onClick={() => {
-                                        if (selectedScript?.returningTalent) {
-                                            const talentIndex = selectedScript.returningTalent.findIndex(t => t.id === negotiationModal.talentId && t.role === negotiationModal.roleType);
-                                            if (talentIndex !== -1) {
-                                                // Clone the script and talent to ensure React sees the change
-                                                const updatedScripts = studio.studioState!.scripts!.map(s => {
-                                                    if (s.id === selectedScript.id) {
-                                                        const updatedTalent = [...s.returningTalent!];
-                                                        updatedTalent[talentIndex] = {
-                                                            ...updatedTalent[talentIndex],
-                                                            attemptsLeft: 0,
-                                                            negotiated: true,
-                                                            accepted: false
-                                                        };
-                                                        return { ...s, returningTalent: updatedTalent };
-                                                    }
-                                                    return s;
-                                                });
-                                                
-                                                const updatedPlayer = { ...player };
-                                                const studioIndex = updatedPlayer.businesses.findIndex(b => b.id === studio.id);
-                                                if (studioIndex !== -1) {
-                                                    updatedPlayer.businesses[studioIndex] = {
-                                                        ...studio,
-                                                        studioState: {
-                                                            ...studio.studioState!,
-                                                            scripts: updatedScripts
-                                                        }
-                                                    };
-                                                }
-                                                onUpdatePlayer(updatedPlayer);
-                                            }
-                                        }
+                                        updateReturningTalentState(
+                                            negotiationModal.talentId,
+                                            negotiationModal.roleType,
+                                            talent => ({
+                                                ...talent,
+                                                attemptsLeft: 0,
+                                                negotiated: true,
+                                                accepted: false
+                                            })
+                                        );
                                         clearNegotiatedTalent(
                                             negotiationModal.talentId,
                                             negotiationModal.roleType,

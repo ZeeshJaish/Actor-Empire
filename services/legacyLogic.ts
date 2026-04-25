@@ -1,4 +1,4 @@
-import { ActorSkills, BloodlineMember, Player, PortfolioItem, Relationship } from '../types';
+import { ActorSkills, BloodlineMember, Player, PortfolioItem, Relationship, StreamingState } from '../types';
 
 export const LEGACY_MIN_PLAYABLE_AGE = 18;
 export const LEGACY_INHERITANCE_TAX_RATE = 0.25;
@@ -39,6 +39,35 @@ export const getInteractionAgeInWeeks = (
         return Math.max(0, getAbsoluteWeek(playerAge, currentWeek) - relationship.lastInteractionAbsolute);
     }
     return Math.max(0, currentWeek - (relationship.lastInteractionWeek || currentWeek));
+};
+
+export const inferStreamingStartWeekAbsolute = (
+    streaming: Partial<StreamingState> | undefined,
+    playerAge: number,
+    currentWeek: number
+): number | undefined => {
+    if (!streaming) return undefined;
+    if (typeof streaming.startWeekAbsolute === 'number') return streaming.startWeekAbsolute;
+
+    const currentAbsoluteWeek = getAbsoluteWeek(playerAge, currentWeek);
+    const safeWeekOnPlatform = Math.max(1, Math.floor(streaming.weekOnPlatform ?? 1));
+    const hasStreamingHistory =
+        (typeof streaming.totalViews === 'number' && streaming.totalViews > 0) ||
+        (Array.isArray(streaming.weeklyViews) && streaming.weeklyViews.length > 0) ||
+        safeWeekOnPlatform > 1;
+
+    if (hasStreamingHistory) {
+        return Math.max(0, currentAbsoluteWeek - Math.max(0, safeWeekOnPlatform - 1));
+    }
+
+    if (typeof streaming.startWeek === 'number') {
+        if (currentWeek < streaming.startWeek) {
+            return currentAbsoluteWeek + (streaming.startWeek - currentWeek);
+        }
+        return currentAbsoluteWeek;
+    }
+
+    return currentAbsoluteWeek;
 };
 
 export const getGenerationNumber = (player: Player): number => {
