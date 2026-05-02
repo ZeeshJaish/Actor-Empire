@@ -39,6 +39,54 @@ const PLATFORMS = [
     { id: 'YOUTUBE', name: 'YouTube Premium', baseBid: 3000000, qualityReq: 38, color: '#FF0000', maxBudget: 35000000 }
 ];
 
+const getStreamingBidProfile = (packageScore: number, isSeries: boolean, isPostTheatricalBidding?: boolean) => {
+    let floor = 1.04;
+    let ceiling = 1.3;
+
+    if (packageScore < 35) {
+        floor = 0.82;
+        ceiling = 0.96;
+    } else if (packageScore < 45) {
+        floor = 0.9;
+        ceiling = 1.02;
+    } else if (packageScore < 60) {
+        floor = 1.01;
+        ceiling = 1.35;
+    } else if (packageScore < 72) {
+        floor = 1.12;
+        ceiling = 2.4;
+    } else if (packageScore < 84) {
+        floor = 1.35;
+        ceiling = 4.5;
+    } else if (packageScore < 92) {
+        floor = 1.75;
+        ceiling = 7;
+    } else {
+        floor = 2.25;
+        ceiling = 9;
+    }
+
+    if (isSeries) {
+        floor += packageScore < 45 ? 0.04 : 0.08;
+        ceiling += packageScore >= 60 ? 0.75 : 0.15;
+    }
+
+    if (isPostTheatricalBidding) {
+        floor *= packageScore < 45 ? 0.96 : 0.98;
+        ceiling *= packageScore >= 72 ? 0.9 : 0.84;
+    }
+
+    const capBoost = packageScore >= 92 ? 6 : packageScore >= 84 ? 4.4 : packageScore >= 72 ? 2.8 : packageScore >= 60 ? 1.7 : 1;
+    const safetyPremium = packageScore >= 84 ? 2.35 : packageScore >= 72 ? 1.95 : packageScore >= 60 ? 1.55 : packageScore < 45 ? 0.92 : 1.2;
+
+    return {
+        floor: Math.max(0.8, floor),
+        ceiling: Math.max(floor + 0.08, ceiling),
+        capBoost,
+        safetyPremium
+    };
+};
+
 type BidType = 'UPFRONT_ONLY' | 'GREENLIGHT_DEAL' | 'BACKEND_POINTS';
 
 interface Bid {
@@ -53,7 +101,7 @@ interface Bid {
 }
 
 export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, project, onBack, onUpdatePlayer, onComplete, isPostTheatricalBidding }) => {
-    const [step, setStep] = useState((isPostTheatricalBidding || project.projectDetails?.type === 'SERIES') ? 2 : 1);
+    const [step, setStep] = useState(isPostTheatricalBidding ? 2 : 1);
     const [releaseType, setReleaseType] = useState<'THEATRICAL' | 'STREAMING_ONLY' | null>(
         isPostTheatricalBidding ? 'STREAMING_ONLY' : (project.projectDetails?.type === 'SERIES' ? 'STREAMING_ONLY' : null)
     );
@@ -109,13 +157,12 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                     // Fallback bid if no one bid
                     if (!highestBid) {
                         const projectBudget = project.projectDetails?.estimatedBudget || 0;
+                        const hiddenStats = project.projectDetails?.hiddenStats || {};
+                        const packageScore = ((hiddenStats.qualityScore || 50) * 0.4) + ((hiddenStats.scriptQuality || 50) * 0.2) + ((hiddenStats.directorQuality || 50) * 0.15) + ((hiddenStats.castingStrength || 50) * 0.15) + ((hiddenStats.rawHype || 50) * 0.1);
+                        const bidProfile = getStreamingBidProfile(packageScore, isSeries, isPostTheatricalBidding);
                         const fallbackBase = Math.max(
                             5000000,
-                            Math.floor(projectBudget * (
-                                isSeries
-                                    ? (isPostTheatricalBidding ? 1.08 : 1.15)
-                                    : (isPostTheatricalBidding ? 1.0 : 1.08)
-                            ))
+                            Math.floor(projectBudget * bidProfile.floor)
                         );
                         const fallbackBid: Bid = {
                             id: Math.random().toString(),
@@ -154,20 +201,17 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                 }
                 
                 const projectBudget = project.projectDetails?.estimatedBudget || 0;
-                const streamingOnlyFloor = isSeries
-                    ? (isPostTheatricalBidding ? 1.08 : 1.15)
-                    : (isPostTheatricalBidding ? 1.0 : 1.08);
-                const streamingOnlyCeiling = isSeries
-                    ? (isPostTheatricalBidding ? 2.45 : 2.8)
-                    : (isPostTheatricalBidding ? 1.8 : 2.15);
-                const safetyPremium = isSeries
-                    ? (isPostTheatricalBidding ? 1.65 : 2.0)
-                    : (isPostTheatricalBidding ? 1.28 : 1.65);
-                const qualityEscalator = Math.max(0.92, 0.95 + ((packageScore - 55) / 140));
+                const bidProfile = getStreamingBidProfile(packageScore, isSeries, isPostTheatricalBidding);
+                const safetyPremium = bidProfile.safetyPremium;
+                const qualityEscalator = Math.max(0.85, 0.95 + ((packageScore - 55) / 105));
+                const floorOffer = projectBudget > 0 ? projectBudget * bidProfile.floor : platform.baseBid;
+                const qualityRange = projectBudget > 0
+                    ? projectBudget * (bidProfile.floor + ((bidProfile.ceiling - bidProfile.floor) * (0.2 + Math.random() * 0.58)))
+                    : platform.baseBid * (0.95 + Math.random() * 0.35) * safetyPremium;
                 let maxOffer = Math.min(
-                    platform.maxBudget,
-                    platform.baseBid * (packageScore / 52) * (1 + Math.random() * 0.32) * safetyPremium * qualityEscalator,
-                    projectBudget > 0 ? projectBudget * Math.min(streamingOnlyCeiling, streamingOnlyFloor + (packageScore / 82)) : Number.MAX_SAFE_INTEGER
+                    platform.maxBudget * bidProfile.capBoost,
+                    projectBudget > 0 ? projectBudget * bidProfile.ceiling : Number.MAX_SAFE_INTEGER,
+                    Math.max(floorOffer * (1.04 + Math.random() * 0.12), platform.baseBid * (packageScore / 52) * (1 + Math.random() * 0.32) * safetyPremium * qualityEscalator, qualityRange)
                 );
                 
                 // RE-BIDDING PENALTY: If they already auctioned, most bids will be lower.
@@ -182,11 +226,9 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                 
                 if (maxOffer > currentHighest * 1.05) {
                     // They can outbid!
-                    const minimumOpeningBid = projectBudget > 0
-                        ? Math.floor(projectBudget * (isSeries ? (isPostTheatricalBidding ? 1.06 : 1.14) : (isPostTheatricalBidding ? 0.98 : 1.05)))
-                        : platform.baseBid;
+                    const minimumOpeningBid = Math.floor(floorOffer);
                     const newAmount = currentHighest === 0
-                        ? Math.floor(Math.min(maxOffer, Math.max(minimumOpeningBid, platform.baseBid * (0.95 + Math.random() * 0.3) * safetyPremium)))
+                        ? Math.floor(Math.min(maxOffer, Math.max(minimumOpeningBid, floorOffer * (0.99 + Math.random() * 0.18), platform.baseBid * (0.95 + Math.random() * 0.3) * safetyPremium)))
                         : Math.floor(Math.min(maxOffer, currentHighest * (1.08 + Math.random() * 0.12)));
                     
                     const rand = Math.random();
@@ -198,12 +240,12 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                     if (rand > 0.8) {
                         type = 'GREENLIGHT_DEAL';
                         // Split the total offer: 40% upfront, 60% for next season
-                        upfrontAmount = Math.floor(newAmount * 0.4);
+                        upfrontAmount = Math.floor(Math.max(minimumOpeningBid, newAmount * 0.45));
                         fundingAmount = newAmount - upfrontAmount;
                     } else if (rand > 0.6) {
                         type = 'BACKEND_POINTS';
                         // Lower upfront for backend points
-                        upfrontAmount = Math.floor(newAmount * (isPostTheatricalBidding ? 0.7 : 0.8));
+                        upfrontAmount = Math.floor(Math.max(minimumOpeningBid, newAmount * (isPostTheatricalBidding ? 0.7 : 0.8)));
                         backendPct = Math.floor(Math.random() * (isPostTheatricalBidding ? 6 : 8)) + (isPostTheatricalBidding ? 4 : 6);
                     }
                     
@@ -473,7 +515,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
 
     const nextStep = () => setStep(step + 1);
     const prevStep = () => {
-        if (step === 2 && (isPostTheatricalBidding || project.projectDetails?.type === 'SERIES')) {
+        if (step === 2 && isPostTheatricalBidding) {
             onBack();
         } else {
             setStep(step - 1);
@@ -544,6 +586,15 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                                     <p className="text-lg text-white/50 font-light tracking-wide">How will the world experience your vision?</p>
                                 </div>
 
+                                {isSeries && (
+                                    <div className="rounded-[2rem] border border-blue-500/25 bg-blue-500/10 p-5 text-center shadow-[0_18px_55px_rgba(37,99,235,0.08)]">
+                                        <div className="text-[10px] font-black uppercase tracking-[0.28em] text-blue-300">Series Distribution</div>
+                                        <p className="mt-2 text-sm leading-relaxed text-blue-50/75">
+                                            This project is a series, so theatrical release is shown but locked. Series seasons premiere through streaming platforms.
+                                        </p>
+                                    </div>
+                                )}
+
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <button 
                                         disabled={isSeries}
@@ -556,7 +607,10 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                                                 <Film size={32} strokeWidth={1.5} />
                                             </div>
                                             <div>
-                                                <div className="font-serif text-2xl text-white/90 mb-2">Theatrical</div>
+                                                <div className="font-serif text-2xl text-white/90 mb-2 flex items-center justify-center gap-2">
+                                                    Theatrical
+                                                    {isSeries && <span className="rounded-full border border-amber-400/30 bg-amber-500/10 px-2 py-1 text-[8px] font-black uppercase tracking-[0.18em] text-amber-200">Locked</span>}
+                                                </div>
                                                 <div className="text-sm text-white/50 leading-relaxed">{isSeries ? 'Series cannot be released in theaters.' : 'Traditional cinema run. High risk, high reward box office potential.'}</div>
                                             </div>
                                         </div>

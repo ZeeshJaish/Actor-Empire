@@ -163,6 +163,27 @@ export const resetWeeklyEnergy = (player: Player) => {
     syncEnergyDisplay(player);
 };
 
+const getCommitmentEnergyDrain = (player: Pick<Player, 'commitments'>): number => {
+    return player.commitments.reduce((sum, commitment) => {
+        if (commitment.type === 'ACTING_GIG') return sum;
+        return sum + Math.max(0, commitment.energyCost || 0);
+    }, 0);
+};
+
+export const syncWeeklyEnergyForCommitments = (player: Player, previousCommitments = player.commitments) => {
+    ensureEnergyState(player);
+
+    const previousDrain = getCommitmentEnergyDrain({ commitments: previousCommitments } as Pick<Player, 'commitments'>);
+    const currentDrain = getCommitmentEnergyDrain(player);
+    const previousCap = Math.max(0, ENERGY_BASELINE - previousDrain);
+    const nextCap = Math.max(0, ENERGY_BASELINE - currentDrain);
+    const currentBase = Math.max(0, player.flags.weeklyBaseEnergyRemaining || 0);
+    const spentFromPreviousCap = Math.max(0, previousCap - currentBase);
+
+    player.flags.weeklyBaseEnergyRemaining = Math.max(0, nextCap - spentFromPreviousCap);
+    syncEnergyDisplay(player);
+};
+
 export const spendPlayerEnergy = (player: Player, amount: number) => {
     ensureEnergyState(player);
 

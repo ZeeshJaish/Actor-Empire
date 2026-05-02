@@ -2,6 +2,7 @@
 import { Player, XPost, NPCActor } from '../types';
 import { NPC_DATABASE } from './npcLogic';
 import { AWARD_GOSSIP_TEMPLATES } from './awardLogic';
+import { getEnabledGlobalCreatorProfiles } from './youtubeLogic';
 
 // --- TWEET TEMPLATES ---
 
@@ -52,7 +53,11 @@ const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
 
 export const generateXFeed = (player: Player): XPost[] => {
     const feed: XPost[] = [];
-    const npcMap = NPC_DATABASE;
+    const creatorProfiles = getEnabledGlobalCreatorProfiles(player).map(creator => ({
+        ...creator,
+        tier: 'A_LIST' as const
+    }));
+    const npcMap = [...NPC_DATABASE, ...(Array.isArray(player.flags?.extraNPCs) ? player.flags.extraNPCs : []), ...creatorProfiles];
 
     // 1. Add Player's recent posts (this week)
     const playerPosts = player.x.posts.filter(p => p.timestamp === player.currentWeek);
@@ -76,7 +81,7 @@ export const generateXFeed = (player: Player): XPost[] => {
         const isUniverseGossip = universes.length > 0 && Math.random() < 0.3;
 
         if (isAwardGossip && pendingCeremony) {
-             const rival = pick(NPC_DATABASE);
+             const rival = pick(npcMap);
              content = pick(AWARD_GOSSIP_TEMPLATES)
                 .replace('{Player}', player.name)
                 .replace('{Rival}', rival.name)
@@ -115,7 +120,21 @@ export const generateXFeed = (player: Player): XPost[] => {
             isPlayer: false,
             isLiked: false,
             isRetweeted: false,
-            isVerified: npc.tier === 'A_LIST' || npc.tier === 'ESTABLISHED'
+            isVerified: npc.tier === 'A_LIST' || npc.tier === 'ESTABLISHED',
+            postType: isNews ? 'CAREER' : isUniverseGossip ? 'FILM_OPINION' : 'GENERAL',
+            sentiment: isNews ? 'INDUSTRY' : 'NEUTRAL',
+            replyList: [
+                'The timeline needed this context.',
+                'Film Twitter is already debating this.',
+                'Someone in PR just opened the group chat.',
+                'This is going to age interestingly.'
+            ].sort(() => 0.5 - Math.random()).slice(0, 3),
+            quoteList: [
+                'This explains a lot.',
+                'People are not ready for this conversation.',
+                'Bookmarking this for later.',
+                'The industry is moving weird today.'
+            ].sort(() => 0.5 - Math.random()).slice(0, 2)
         });
     }
 

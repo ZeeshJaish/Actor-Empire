@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Player, ScheduledEvent, LifeEvent, LifeEventOption } from '../types';
-import { AlertTriangle, ShieldAlert, Scale, Gavel, User, DollarSign, Zap, ChevronRight, PlayCircle, Loader2, CheckCircle } from 'lucide-react';
+import { AlertTriangle, ShieldAlert, Scale, User, Zap, ChevronRight, PlayCircle, Loader2, CheckCircle, Activity, Newspaper } from 'lucide-react';
 import { motion } from 'motion/react';
 import { showAd } from '../services/adLogic';
 
@@ -12,7 +12,8 @@ interface LifeEventModalProps {
 
 export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, onChoice }) => {
     const [isProcessingAd, setIsProcessingAd] = useState(false);
-    const [feedback, setFeedback] = useState<{ updatedPlayer: Player, log: string } | null>(null);
+    const [feedback, setFeedback] = useState<{ updatedPlayer: Player, log: string, optionLabel: string, wasGolden: boolean } | null>(null);
+    const [isResolvingFeedback, setIsResolvingFeedback] = useState(false);
     
     // Extract the actual LifeEvent data
     const lifeEvent: LifeEvent = event.data?.lifeEvent;
@@ -79,7 +80,7 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
                 });
             }
             
-            setFeedback({ updatedPlayer, log });
+            setFeedback({ updatedPlayer, log, optionLabel: option.label, wasGolden: !!option.isGolden });
         }
     };
 
@@ -121,43 +122,124 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
                          themeColor === 'rose' ? 'from-rose-600 via-pink-500 to-purple-500' :
                          'from-emerald-600 via-teal-500 to-cyan-500';
 
+    const getOutcomeCopy = (log: string) => {
+        const lower = log.toLowerCase();
+        if (feedback?.wasGolden) {
+            return {
+                eyebrow: 'Golden Outcome',
+                title: 'Handled Like A Pro',
+                tone: 'The premium route turned the moment into controlled damage control and cleaner upside.'
+            };
+        }
+        if (lower.includes('legal') || lower.includes('case') || lower.includes('complaint') || lower.includes('backlash') || lower.includes('heat rose') || lower.includes('hit')) {
+            return {
+                eyebrow: 'Fallout',
+                title: 'The World Reacted',
+                tone: 'Your choice created visible consequences. Fans, press, and industry people are already reading the move.'
+            };
+        }
+        if (lower.includes('won') || lower.includes('boost') || lower.includes('gained') || lower.includes('hit collab') || lower.includes('praised') || lower.includes('win')) {
+            return {
+                eyebrow: 'Momentum',
+                title: 'The Move Landed',
+                tone: 'The decision created momentum, and the career machine is already absorbing the result.'
+            };
+        }
+        return {
+            eyebrow: 'Aftermath',
+            title: 'Choice Locked In',
+            tone: 'The story moved forward. This result will now feed into your reputation, money, relationships, or public image.'
+        };
+    };
+
+    const extractOutcomeSignals = (log: string) => {
+        const matches = log.match(/(?:[+-]\s*)?\$?\d[\d,.]*(?:\.\d+)?\s*(?:K|M|B|T|views|subs|followers|cash|money|reputation|trust|heat)?/gi) || [];
+        return matches
+            .map(item => item.replace(/\s+/g, ' ').trim())
+            .filter((item, index, arr) => item.length > 1 && arr.indexOf(item) === index)
+            .slice(0, 4);
+    };
+
+    const handleFeedbackContinue = () => {
+        if (!feedback || isResolvingFeedback) return;
+        setIsResolvingFeedback(true);
+        onChoice(feedback.updatedPlayer, feedback.log);
+    };
+
     if (feedback) {
+        const outcomeCopy = getOutcomeCopy(feedback.log);
+        const signals = extractOutcomeSignals(feedback.log);
+
         return (
-            <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="fixed inset-0 z-[200] bg-black/85 backdrop-blur-md flex items-end sm:items-center justify-center p-3 sm:p-4">
                 <motion.div 
                     initial={{ scale: 0.9, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
-                    className="w-full max-w-sm bg-zinc-900 border border-zinc-800 rounded-3xl p-6 shadow-2xl text-center relative overflow-hidden"
+                    className="w-full max-w-sm max-h-[calc(100dvh-1.5rem)] bg-zinc-900 border border-zinc-800 rounded-3xl shadow-2xl relative overflow-hidden flex flex-col"
                 >
                     <div className={`absolute top-0 left-0 w-full h-1 bg-gradient-to-r ${accentGradient}`} />
-                    
-                    <div className={`w-16 h-16 rounded-full bg-${themeColor}-500/20 flex items-center justify-center mx-auto mb-4 border border-${themeColor}-500/30`}>
-                        <CheckCircle size={32} className={`text-${themeColor}-500`} />
+                    <div className="absolute -right-10 -top-10 w-36 h-36 rounded-full bg-white/5 blur-3xl"></div>
+
+                    <div className="overflow-y-auto custom-scrollbar p-5 pb-4 text-left">
+                        <div className="flex items-start gap-4 mb-5">
+                            <div className={`w-14 h-14 rounded-2xl bg-black/40 flex items-center justify-center border border-white/10 shrink-0 shadow-lg`}>
+                                <CheckCircle size={28} className="text-white" />
+                            </div>
+                            <div className="min-w-0">
+                                <div className={`text-[10px] font-black uppercase tracking-[0.24em] text-${themeColor}-400 mb-1`}>
+                                    {outcomeCopy.eyebrow}
+                                </div>
+                                <h3 className="text-2xl font-black text-white leading-tight">{outcomeCopy.title}</h3>
+                                <div className="text-xs text-zinc-500 mt-1">Decision: {feedback.optionLabel.replace(' (Watch Ad)', '')}</div>
+                            </div>
+                        </div>
+
+                        <div className="rounded-3xl border border-white/10 bg-black/30 p-4 mb-4">
+                            <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-3">
+                                <Newspaper size={13} /> What Happened
+                            </div>
+                            <p className="text-base font-bold text-white leading-relaxed">{feedback.log}</p>
+                            <p className="text-sm text-zinc-400 leading-relaxed mt-3">{outcomeCopy.tone}</p>
+                        </div>
+
+                        {signals.length > 0 && (
+                            <div className="rounded-3xl border border-white/10 bg-zinc-950/70 p-4">
+                                <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-3">
+                                    <Activity size={13} /> Visible Impact
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                    {signals.map(signal => (
+                                        <span key={signal} className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-black text-zinc-200">
+                                            {signal}
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </div>
-                    
-                    <h3 className="text-xl font-bold text-white mb-2">Outcome</h3>
-                    <p className="text-zinc-400 text-sm mb-6 leading-relaxed">
-                        {feedback.log}
-                    </p>
-                    
-                    <button 
-                        onClick={() => onChoice(feedback.updatedPlayer, feedback.log)}
-                        className={`w-full py-4 bg-gradient-to-r ${accentGradient} text-white font-bold rounded-xl shadow-lg hover:opacity-90 transition-opacity flex items-center justify-center gap-2`}
-                    >
-                        Continue
-                    </button>
+
+                    <div className="shrink-0 border-t border-white/10 bg-zinc-950/95 p-4 pb-safe">
+                        <button
+                            type="button"
+                            onClick={handleFeedbackContinue}
+                            disabled={isResolvingFeedback}
+                            className={`w-full py-4 bg-gradient-to-r ${accentGradient} text-white font-bold rounded-2xl shadow-lg hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-60`}
+                        >
+                            {isResolvingFeedback ? 'Continuing...' : 'Continue'}
+                        </button>
+                    </div>
                 </motion.div>
             </div>
         );
     }
 
     return (
-        <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[200] bg-black/85 backdrop-blur-md flex items-end sm:items-center justify-center p-3 sm:p-4">
             <motion.div 
                 initial={{ scale: 0.9, opacity: 0, y: 20 }}
                 animate={{ scale: 1, opacity: 1, y: 0 }}
                 transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-                className={`w-full max-w-md bg-[#0a0a0a] rounded-3xl overflow-hidden border border-${themeColor}-900/50 shadow-[0_0_50px_rgba(255,255,255,0.05)] relative`}
+                className={`w-full max-w-md max-h-[calc(100dvh-1.5rem)] bg-[#0a0a0a] rounded-3xl overflow-hidden border border-${themeColor}-900/50 shadow-[0_0_50px_rgba(255,255,255,0.05)] relative flex flex-col`}
             >
                 {isProcessingAd && (
                     <div className="absolute inset-0 z-[210] bg-black/90 flex flex-col items-center justify-center p-6 text-center">
@@ -171,7 +253,7 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
                 <div className={`h-2 w-full bg-gradient-to-r ${accentGradient}`} />
                 
                 {/* Header */}
-                <div className="p-6 pb-4 border-b border-white/5 relative overflow-hidden">
+                <div className="p-5 pb-4 border-b border-white/5 relative overflow-hidden shrink-0">
                     <div className={`absolute -right-4 -top-4 text-${themeColor}-500/10`}>
                         {theme.bgIcon}
                     </div>
@@ -196,7 +278,7 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
                 </div>
 
                 {/* Body */}
-                <div className="p-6 pt-4">
+                <div className="p-5 pt-4 overflow-y-auto custom-scrollbar">
                     <div className={`bg-${themeColor}-950/20 border border-${themeColor}-900/30 rounded-2xl p-4 mb-6 relative`}>
                         {/* Decorative quotes */}
                         <div className={`absolute -top-3 -left-2 text-4xl text-${themeColor}-500/20 font-serif`}>"</div>

@@ -1043,6 +1043,42 @@ export const generateLegalHearing = (player: Player, caseId: string): LifeEvent 
     const activeCase = player.flags.activeCases?.find((c: LegalCase) => c.id === caseId);
     if (!activeCase) return null;
 
+    const advanceCase = (p: Player, c: LegalCase) => {
+        if (c.currentHearing >= c.totalHearings) {
+            const won = c.playerDefense >= c.evidenceStrength;
+            c.status = won ? 'WON' : 'LOST';
+            if (won) {
+                p.stats.reputation = Math.min(100, p.stats.reputation + 3);
+                p.news.unshift({
+                    id: `news_case_won_${Date.now()}`,
+                    headline: `${p.name} wins ${c.title}.`,
+                    subtext: 'The courtroom drama ends in their favor.',
+                    category: 'YOU',
+                    week: p.currentWeek,
+                    year: p.age,
+                    impactLevel: 'MEDIUM'
+                });
+            } else {
+                const penalty = Math.max(5000, Math.floor((c.evidenceStrength - c.playerDefense + 20) * 900));
+                p.money -= penalty;
+                p.stats.reputation = Math.max(0, p.stats.reputation - 8);
+                p.news.unshift({
+                    id: `news_case_lost_${Date.now()}`,
+                    headline: `${p.name} loses ${c.title}.`,
+                    subtext: `The judgment costs $${penalty.toLocaleString()} and serious reputation damage.`,
+                    category: 'YOU',
+                    week: p.currentWeek,
+                    year: p.age,
+                    impactLevel: 'HIGH'
+                });
+            }
+            p.news = p.news.slice(0, 50);
+        } else {
+            c.currentHearing += 1;
+            c.nextHearingWeek = p.currentWeek >= 52 ? 1 : p.currentWeek + 1;
+        }
+    };
+
     return {
         id: `hearing_${activeCase.id}_${activeCase.currentHearing}`,
         type: 'LEGAL',
@@ -1055,6 +1091,7 @@ export const generateLegalHearing = (player: Player, caseId: string): LifeEvent 
                     const c = p.flags.activeCases.find((ac: LegalCase) => ac.id === caseId);
                     c.playerDefense += 10;
                     c.history.push({ hearing: c.currentHearing, choice: 'TRUTH' });
+                    advanceCase(p, c);
                     return { updatedPlayer: p, log: "You told the truth. The jury seems to believe you." };
                 }
             },
@@ -1064,6 +1101,7 @@ export const generateLegalHearing = (player: Player, caseId: string): LifeEvent 
                     const c = p.flags.activeCases.find((ac: LegalCase) => ac.id === caseId);
                     c.evidenceStrength += 15;
                     c.history.push({ hearing: c.currentHearing, choice: 'LIE' });
+                    advanceCase(p, c);
                     return { updatedPlayer: p, log: "You lied. It felt risky, but it might work." };
                 }
             },
@@ -1075,6 +1113,7 @@ export const generateLegalHearing = (player: Player, caseId: string): LifeEvent 
                     const c = p.flags.activeCases.find((ac: LegalCase) => ac.id === caseId);
                     c.playerDefense += 30;
                     c.history.push({ hearing: c.currentHearing, choice: 'CHARM' });
+                    advanceCase(p, c);
                     return { updatedPlayer: p, log: "You charmed the courtroom. The judge is smiling at you." };
                 }
             }

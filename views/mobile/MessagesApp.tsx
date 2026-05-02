@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
-import { Player, Message, AuditionOpportunity, SponsorshipOffer, NegotiationData, ScheduledEvent } from '../../types';
-import { ArrowLeft, Star, DollarSign, Calendar, CheckCircle, Lock, Trash2, Mail, Heart } from 'lucide-react';
+import { Player, Message, AuditionOpportunity, SponsorshipOffer, NegotiationData, ScheduledEvent, YoutubeBrandDeal, YoutubeCollabOffer } from '../../types';
+import { ArrowLeft, Star, DollarSign, Calendar, CheckCircle, Lock, Trash2, Mail, Heart, Play, Users } from 'lucide-react';
 import { ProjectDetailView } from '../../components/ProjectDetailView';
 import { APP_DISPLAY_VERSION } from '../../services/appVersion';
 
@@ -301,6 +301,63 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                                         <h3 className="text-2xl font-bold mb-2">{(selectedMessage.data as any).brandName}</h3>
                                         <p className="text-sm text-emerald-200/80 mb-6">{(selectedMessage.data as any).description}</p>
                                         <button onClick={handleSignDeal} className="w-full py-4 bg-emerald-500 text-white rounded-xl font-bold text-sm">Accept Deal</button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {selectedMessage.type === 'OFFER_YOUTUBE_COLLAB' && selectedMessage.data && (
+                                <div className="bg-red-950 rounded-3xl p-5 text-white shadow-xl relative overflow-hidden">
+                                    <div className="absolute top-0 right-0 p-6 opacity-10"><Users size={120} /></div>
+                                    <div className="relative z-10">
+                                        {(() => {
+                                            const collab = selectedMessage.data as YoutubeCollabOffer;
+                                            return (
+                                                <>
+                                                    <div className="text-xs font-bold text-red-300 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                                        <Play size={14}/> Creator Collab
+                                                    </div>
+                                                    <h3 className="text-2xl font-bold mb-1">{collab.creatorName}</h3>
+                                                    <div className="text-sm text-red-200/80 mb-2">{collab.creatorHandle}</div>
+                                                    <div className="text-lg font-semibold mb-3">{collab.conceptTitle}</div>
+                                                    <p className="text-sm text-red-100/80 mb-5">{collab.description}</p>
+                                                    <div className="grid grid-cols-2 gap-3 text-xs mb-5">
+                                                        <div className="bg-white/5 rounded-xl p-3">Format: <strong>{collab.requiredType.replace(/_/g, ' ')}</strong></div>
+                                                        <div className="bg-white/5 rounded-xl p-3">Energy: <strong>{collab.energyCost}E</strong></div>
+                                                        <div className="bg-white/5 rounded-xl p-3">Potential Views: <strong>~{collab.bonusViews.toLocaleString()}</strong></div>
+                                                        <div className="bg-white/5 rounded-xl p-3">Potential Subs: <strong>~+{collab.bonusSubscribers.toLocaleString()}</strong></div>
+                                                    </div>
+                                                    <button onClick={handleSignDeal} className="w-full py-4 bg-red-500 text-white rounded-xl font-bold text-sm">Accept Collab</button>
+                                                </>
+                                            );
+                                        })()}
+                                    </div>
+                                </div>
+                            )}
+
+                            {selectedMessage.type === 'OFFER_YOUTUBE_BRAND' && selectedMessage.data && (
+                                <div className="bg-amber-950 rounded-3xl p-5 text-white shadow-xl relative overflow-hidden">
+                                    <div className="absolute top-0 right-0 p-6 opacity-10"><DollarSign size={120} /></div>
+                                    <div className="relative z-10">
+                                        {(() => {
+                                            const deal = selectedMessage.data as YoutubeBrandDeal;
+                                            return (
+                                                <>
+                                                    <div className="text-xs font-bold text-amber-300 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                                        <Play size={14}/> Channel Integration
+                                                    </div>
+                                                    <h3 className="text-2xl font-bold mb-1">{deal.brandName}</h3>
+                                                    <div className="text-sm text-amber-200/80 mb-2">{deal.category}</div>
+                                                    <p className="text-sm text-amber-100/80 mb-5">{deal.description}</p>
+                                                    <div className="grid grid-cols-2 gap-3 text-xs mb-5">
+                                                        <div className="bg-white/5 rounded-xl p-3">Format: <strong>{deal.requiredType.replace(/_/g, ' ')}</strong></div>
+                                                        <div className="bg-white/5 rounded-xl p-3">Energy: <strong>{deal.energyCost}E</strong></div>
+                                                        <div className="bg-white/5 rounded-xl p-3">Payout: <strong>${deal.payout.toLocaleString()}</strong></div>
+                                                        <div className="bg-white/5 rounded-xl p-3">Penalty: <strong>${deal.penalty.toLocaleString()}</strong></div>
+                                                    </div>
+                                                    <button onClick={handleSignDeal} className="w-full py-4 bg-amber-500 text-black rounded-xl font-bold text-sm">Accept Deal</button>
+                                                </>
+                                            );
+                                        })()}
                                     </div>
                                 </div>
                             )}

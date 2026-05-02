@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Player, Commitment, InstaPostType, NPCActor, InteractionType, Agent, Manager, Message, SponsorshipActionType, AuditionOpportunity, DatingMatch, InstaPost, Relationship, SponsorshipOffer, NegotiationData, ContractFilm } from '../../types';
+import { Player, Commitment, InstaPostType, NPCActor, InteractionType, Agent, Manager, Message, SponsorshipActionType, AuditionOpportunity, DatingMatch, InstaPost, Relationship, SponsorshipOffer, NegotiationData, ContractFilm, YoutubeBrandDeal, YoutubeCollabOffer } from '../../types';
 import { MessageSquare, Search, BarChart3, Camera, Users, Newspaper, TrendingUp, Activity, Heart, Folder, Flame, Gem, Landmark, X, CheckCircle, AlertCircle, BookOpen, Map } from 'lucide-react';
 import { getPhaseDuration } from '../../services/roleLogic';
 
@@ -46,6 +46,8 @@ interface MobilePageProps {
   onTakeJob?: (job: Commitment) => void;
   onQuitJob?: (id: string) => void;
   onPost?: (type: InstaPostType, caption: string, image?: string) => void;
+  onReactInstagramPost?: (postId: string, action: 'LIKE' | 'SAVE') => void;
+  onRespondInstagramDM?: (npc: NPCActor, actionId: string, accepted: boolean) => void;
   onFollowNPC?: (npc: NPCActor) => void;
   onInteractNPC?: (npc: NPCActor, type: InteractionType) => void;
   onBefriendNPC?: (npc: NPCActor) => void;
@@ -238,6 +240,30 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
           // Add to active sponsorships
           updatedPlayer.activeSponsorships = [...updatedPlayer.activeSponsorships, { ...offer, weeksCompleted: 0 }];
           updatedPlayer.logs.push({ week: updatedPlayer.currentWeek, year: updatedPlayer.age, message: `Signed sponsorship deal with ${offer.brandName}.`, type: 'positive' });
+      } else if (msg.type === 'OFFER_YOUTUBE_COLLAB') {
+          const offer = msg.data as YoutubeCollabOffer;
+          if (!offer) {
+              showToast("This collab offer is missing details.", "bg-rose-500");
+              handleUpdatePlayer(updatedPlayer);
+              return;
+          }
+          updatedPlayer.youtube = {
+              ...updatedPlayer.youtube,
+              activeCollabs: [...(updatedPlayer.youtube.activeCollabs || []), offer]
+          };
+          updatedPlayer.logs.push({ week: updatedPlayer.currentWeek, year: updatedPlayer.age, message: `Locked in a YouTube collab with ${offer.creatorName}.`, type: 'positive' });
+      } else if (msg.type === 'OFFER_YOUTUBE_BRAND') {
+          const offer = msg.data as YoutubeBrandDeal;
+          if (!offer) {
+              showToast("This YouTube deal is missing details.", "bg-rose-500");
+              handleUpdatePlayer(updatedPlayer);
+              return;
+          }
+          updatedPlayer.youtube = {
+              ...updatedPlayer.youtube,
+              activeBrandDeals: [...(updatedPlayer.youtube.activeBrandDeals || []), offer]
+          };
+          updatedPlayer.logs.push({ week: updatedPlayer.currentWeek, year: updatedPlayer.age, message: `Accepted a YouTube integration deal with ${offer.brandName}.`, type: 'positive' });
       }
 
       // 3. Update Player
@@ -477,6 +503,8 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
                         player={props.player} 
                         onBack={() => setAppMode('SOCIAL_FOLDER')} 
                         onPost={props.onPost!} 
+                        onReactPost={props.onReactInstagramPost!}
+                        onRespondDM={props.onRespondInstagramDM!}
                         onFollow={props.onFollowNPC!} 
                         onInteract={props.onInteractNPC!} 
                     />

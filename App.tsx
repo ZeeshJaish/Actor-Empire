@@ -30,12 +30,13 @@ import { showAd, initAds } from './services/adLogic';
 import { ensureTrackingPermission } from './services/trackingService';
 import { saveGameData, loadGameData, deleteGameData } from './services/storage';
 import { createBloodlineSnapshot, getAbsoluteWeek, getLegacyInheritancePreview, getRelationshipAge, inferStreamingStartWeekAbsolute, inheritActorSkills, LEGACY_MIN_PLAYABLE_AGE } from './services/legacyLogic';
-import { applyPremiumPurchase, getRequiredPremiumProductForAsset, hasNoAds, PremiumProductId, restoreWeeklyEnergy, spendPlayerEnergy, syncEnergyDisplay } from './services/premiumLogic';
+import { applyPremiumPurchase, getRequiredPremiumProductForAsset, hasNoAds, PremiumProductId, restoreWeeklyEnergy, spendPlayerEnergy, syncEnergyDisplay, syncWeeklyEnergyForCommitments } from './services/premiumLogic';
 import { purchasePremiumProduct, restorePremiumPurchases } from './services/iapService';
 import { sanitizeAwardRecords } from './services/awardLogic';
 import { RoleType } from './types';
 import { applyParenthoodAbandonment } from './services/familyLogic';
 import { APP_DISPLAY_VERSION } from './services/appVersion';
+import { calculateInstagramPostOutcome, clampInstagramStat, INSTAGRAM_POST_CONFIGS } from './services/instagramLogic';
 
 type GameStatus = 'START_MENU' | 'CREATION' | 'PLAYING' | 'DEATH_SCREEN';
 type PendingBabyNaming = {
@@ -642,6 +643,12 @@ export const App: React.FC = () => {
           if (!safePlayer.instagram.npcStates) safePlayer.instagram.npcStates = {};
           if (typeof safePlayer.instagram.weeklyPostCount !== 'number') safePlayer.instagram.weeklyPostCount = 0;
           if (typeof safePlayer.instagram.lastPostWeek !== 'number') safePlayer.instagram.lastPostWeek = 0;
+          if (typeof safePlayer.instagram.followers !== 'number') safePlayer.instagram.followers = safePlayer.stats.followers || 0;
+          if (typeof safePlayer.instagram.aesthetic !== 'number') safePlayer.instagram.aesthetic = 50;
+          if (typeof safePlayer.instagram.authenticity !== 'number') safePlayer.instagram.authenticity = 55;
+          if (typeof safePlayer.instagram.controversy !== 'number') safePlayer.instagram.controversy = 0;
+          if (typeof safePlayer.instagram.fashionInfluence !== 'number') safePlayer.instagram.fashionInfluence = 10;
+          if (typeof safePlayer.instagram.fanLoyalty !== 'number') safePlayer.instagram.fanLoyalty = 45;
 
           if (!safePlayer.x) safePlayer.x = { handle: safePlayer.instagram.handle, followers: 0, posts: [], feed: [], lastPostWeek: 0 };
           // HYDRATION FIX: If loading old save without x.followers, init it based on existing fame
@@ -654,11 +661,22 @@ export const App: React.FC = () => {
 
           if (!safePlayer.youtube) safePlayer.youtube = { ...INITIAL_PLAYER.youtube, handle: safePlayer.instagram.handle };
           if (!Array.isArray(safePlayer.youtube.videos)) safePlayer.youtube.videos = [];
+          if (!Array.isArray(safePlayer.youtube.activeCollabs)) safePlayer.youtube.activeCollabs = [];
+          if (!Array.isArray(safePlayer.youtube.activeBrandDeals)) safePlayer.youtube.activeBrandDeals = [];
           if (!safePlayer.youtube.bannerColor) safePlayer.youtube.bannerColor = 'bg-gradient-to-r from-red-900 to-zinc-900';
           if (typeof safePlayer.youtube.subscribers !== 'number') safePlayer.youtube.subscribers = 0;
           if (typeof safePlayer.youtube.lifetimeEarnings !== 'number') safePlayer.youtube.lifetimeEarnings = 0;
           if (typeof safePlayer.youtube.totalChannelViews !== 'number') safePlayer.youtube.totalChannelViews = 0;
           if (typeof safePlayer.youtube.isMonetized !== 'boolean') safePlayer.youtube.isMonetized = false;
+          if (typeof safePlayer.youtube.audienceTrust !== 'number') safePlayer.youtube.audienceTrust = 55;
+          if (typeof safePlayer.youtube.fanMood !== 'number') safePlayer.youtube.fanMood = 55;
+          if (typeof safePlayer.youtube.controversy !== 'number') safePlayer.youtube.controversy = 0;
+          if (typeof safePlayer.youtube.membershipsActive !== 'boolean') safePlayer.youtube.membershipsActive = false;
+          if (typeof safePlayer.youtube.members !== 'number') safePlayer.youtube.members = 0;
+          if (typeof safePlayer.youtube.lastLivestreamWeek !== 'number') safePlayer.youtube.lastLivestreamWeek = 0;
+          if (typeof safePlayer.youtube.lastMerchDropWeek !== 'number') safePlayer.youtube.lastMerchDropWeek = 0;
+          if (!safePlayer.youtube.creatorIdentity) safePlayer.youtube.creatorIdentity = 'ACTOR_VLOGGER';
+          if (typeof safePlayer.youtube.lastIdentityChangeWeek !== 'number') safePlayer.youtube.lastIdentityChangeWeek = 0;
 
           if (!safePlayer.finance || typeof safePlayer.finance !== 'object') {
               safePlayer.finance = {
@@ -1275,11 +1293,16 @@ export const App: React.FC = () => {
     }
   };
 
-  const handleQuitJob = (id: string) => handleGenericUpdate(p => ({ 
-      ...p, 
-      commitments: p.commitments.filter(c => c.id !== id),
-      logs: [...p.logs, { week: p.currentWeek, year: p.age, message: "Quit job.", type: 'neutral' }]
-  }));
+  const handleQuitJob = (id: string) => handleGenericUpdate(p => {
+      const previousCommitments = p.commitments;
+      const next: Player = {
+          ...p,
+          commitments: p.commitments.filter(c => c.id !== id),
+          logs: [...p.logs, { week: p.currentWeek, year: p.age, message: "Quit job.", type: 'neutral' }]
+      };
+      syncWeeklyEnergyForCommitments(next, previousCommitments);
+      return next;
+  });
 
   const handleTradeStock = (stockId: string, amount: number) => { 
       const msg = amount > 0 ? "Bought stock" : "Sold stock";
@@ -1450,13 +1473,13 @@ export const App: React.FC = () => {
                   const { updatedPlayer, log } = applyCrisisImpact(player, currentEvent, idx);
                   
                   // Remove the event from the queue
-                  const newPendingEvents = [...(updatedPlayer.pendingEvents || [])];
-                  newPendingEvents.shift();
+                  const newPendingEvents = (updatedPlayer.pendingEvents || player.pendingEvents || [])
+                      .filter(event => event.id !== currentEvent.id);
                   
                   handleUpdatePlayer({
                       ...updatedPlayer,
                       pendingEvents: newPendingEvents,
-                      logs: [{ week: player.currentWeek, year: player.age, message: log, type: 'neutral' }, ...player.logs].slice(0, 50)
+                      logs: [{ week: player.currentWeek, year: player.age, message: log, type: 'neutral' }, ...(updatedPlayer.logs || player.logs)].slice(0, 50)
                   });
               }} 
           />
@@ -1471,13 +1494,14 @@ export const App: React.FC = () => {
               player={player}
               event={player.pendingEvents[0]}
               onChoice={(updatedPlayer, log) => {
-                  const newPendingEvents = [...(updatedPlayer.pendingEvents || [])];
-                  newPendingEvents.shift();
+                  const resolvedEventId = player.pendingEvents?.[0]?.id;
+                  const newPendingEvents = (updatedPlayer.pendingEvents || player.pendingEvents || [])
+                      .filter(event => event.id !== resolvedEventId);
 
                   handleUpdatePlayer({
                       ...updatedPlayer,
                       pendingEvents: newPendingEvents,
-                      logs: [{ week: player.currentWeek, year: player.age, message: log, type: 'neutral' }, ...player.logs].slice(0, 50)
+                      logs: [{ week: player.currentWeek, year: player.age, message: log, type: 'neutral' }, ...(updatedPlayer.logs || player.logs)].slice(0, 50)
                   });
               }}
           />
@@ -1599,32 +1623,36 @@ export const App: React.FC = () => {
       )}
 
       {showWhatsNewModal && gameStatus === 'PLAYING' && (
-          <div className="fixed inset-0 z-[140] bg-black/80 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-200">
-              <div className="bg-zinc-900 border border-zinc-700 rounded-3xl w-full max-w-sm p-6 shadow-2xl flex flex-col relative overflow-hidden">
+          <div className="fixed inset-0 z-[140] bg-black/80 backdrop-blur-md overflow-y-auto custom-scrollbar px-4 py-8 sm:p-6 animate-in fade-in duration-200">
+              <div className="bg-zinc-900 border border-zinc-700 rounded-3xl w-full max-w-sm mx-auto min-h-0 shadow-2xl flex flex-col relative overflow-hidden">
                   <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-500 via-orange-500 to-pink-500"></div>
-                  <div className="mb-6">
-                      <div className="text-[10px] font-black uppercase tracking-[0.25em] text-amber-400 mb-3">What&apos;s New</div>
-                      <h3 className="text-2xl font-black text-white mb-2">Version {APP_DISPLAY_VERSION}</h3>
-                      <p className="text-sm text-zinc-400 leading-relaxed">
-                          Big update. Dating, relationships, business fixes, and premium lifestyle systems all got stronger.
-                      </p>
+                  <div className="max-h-[calc(100dvh-4rem)] overflow-y-auto custom-scrollbar p-6 pb-4">
+                      <div className="mb-6">
+                          <div className="text-[10px] font-black uppercase tracking-[0.25em] text-amber-400 mb-3">What&apos;s New</div>
+                          <h3 className="text-2xl font-black text-white mb-2">Version {APP_DISPLAY_VERSION}</h3>
+                          <p className="text-sm text-zinc-400 leading-relaxed">
+                              This update is rolling out early to fix iOS in-app purchases. The YouTube features were planned with the broader social update, but they are included now so the App Store build can be corrected faster.
+                          </p>
+                      </div>
+
+                      <div className="space-y-3 text-sm text-zinc-300">
+                          <div className="rounded-2xl border border-white/5 bg-zinc-950/70 px-4 py-3">Fixed the iOS purchase bridge so App Store in-app purchases can work correctly again.</div>
+                          <div className="rounded-2xl border border-white/5 bg-zinc-950/70 px-4 py-3">YouTube now has uploads, Studio progression, monetization, creator events, and small-channel growth.</div>
+                          <div className="rounded-2xl border border-white/5 bg-zinc-950/70 px-4 py-3">Custom YouTube thumbnails can be uploaded, fitted, and saved safely on-device.</div>
+                          <div className="rounded-2xl border border-white/5 bg-zinc-950/70 px-4 py-3">Uploaded videos now open into a watch page with stats, likes, dislikes, and video-specific comments.</div>
+                          <div className="rounded-2xl border border-white/5 bg-zinc-950/70 px-4 py-3">Global creator and talent mod packs were expanded with duplicate filtering.</div>
+                          <div className="rounded-2xl border border-white/5 bg-zinc-950/70 px-4 py-3">The broader social update is still coming later with more interaction and drama systems.</div>
+                      </div>
                   </div>
 
-                  <div className="space-y-3 text-sm text-zinc-300">
-                      <div className="rounded-2xl border border-white/5 bg-zinc-950/70 px-4 py-3">Deeper Tinder and Luxe systems with more progression, intimacy, and fallout.</div>
-                      <div className="rounded-2xl border border-white/5 bg-zinc-950/70 px-4 py-3">Connections got cleaner family and relationship organization.</div>
-                      <div className="rounded-2xl border border-white/5 bg-zinc-950/70 px-4 py-3">Avatar editing is now easier directly from your profile.</div>
-                      <div className="rounded-2xl border border-white/5 bg-zinc-950/70 px-4 py-3">Streaming, sequel, and business hiring issues were fixed.</div>
-                      <div className="rounded-2xl border border-white/5 bg-zinc-950/70 px-4 py-3">Premium collections now add richer lifestyle actions, headlines, and social buzz.</div>
-                      <div className="rounded-2xl border border-white/5 bg-zinc-950/70 px-4 py-3">Bug reporting is now available directly in Settings.</div>
+                  <div className="sticky bottom-0 bg-zinc-900/95 backdrop-blur px-6 pb-6 pt-3 border-t border-white/5">
+                      <button
+                          onClick={handleDismissWhatsNew}
+                          className="w-full py-4 bg-white text-black font-bold rounded-2xl hover:bg-zinc-200 transition-colors"
+                      >
+                          Continue
+                      </button>
                   </div>
-
-                  <button
-                      onClick={handleDismissWhatsNew}
-                      className="mt-6 w-full py-4 bg-white text-black font-bold rounded-2xl hover:bg-zinc-200 transition-colors"
-                  >
-                      Continue
-                  </button>
               </div>
           </div>
       )}
@@ -1651,7 +1679,7 @@ export const App: React.FC = () => {
                 <div className={`flex-1 px-5 pt-5 pb-nav-safe overflow-y-auto custom-scrollbar ${player.money < 0 ? 'pt-8' : ''}`}>
                     {activePage === Page.HOME && (<HomePage player={player} onNextWeek={handleNextWeek} isProcessing={isProcessing} onUpdatePlayer={handleUpdatePlayer} setPage={setActivePage} onOpenProductionHouseCheat={() => { setLifestyleInitialView('PRODUCTION_GAME'); setActivePage(Page.LIFESTYLE); }} onQueueBabyNamingCheat={handleQueueBabyNamingCheat} onOpenDeathSummaryPreview={handleOpenDeathSummaryPreview} />)}
                     {activePage === Page.CAREER && (<CareerPage player={player} onQuitJob={handleQuitJob} onRehearse={handleRehearse} />)}
-                    {activePage === Page.IMPROVE && (<ImprovePage player={player} onTrain={()=>{}} onEnroll={(c)=>handleGenericUpdate(p=>({ ...p, money: p.money- (c.upfrontCost||0), commitments: [...p.commitments, {...c, id: `c_${Date.now()}`, weeksCompleted:0}] }))} onCancel={(id)=>handleGenericUpdate(p=>({ ...p, commitments: p.commitments.filter(c=>c.id!==id)}))} onPerformAction={handleImproveAction} />)}
+                    {activePage === Page.IMPROVE && (<ImprovePage player={player} onTrain={()=>{}} onEnroll={(c)=>handleGenericUpdate(p=>{ const previousCommitments = p.commitments; const next: Player = { ...p, money: p.money- (c.upfrontCost||0), commitments: [...p.commitments, {...c, id: `c_${Date.now()}`, weeksCompleted:0}] }; syncWeeklyEnergyForCommitments(next, previousCommitments); return next; })} onCancel={(id)=>handleGenericUpdate(p=>{ const previousCommitments = p.commitments; const next: Player = { ...p, commitments: p.commitments.filter(c=>c.id!==id)}; syncWeeklyEnergyForCommitments(next, previousCommitments); return next; })} onPerformAction={handleImproveAction} />)}
                     {activePage === Page.SOCIAL && (<SocialPage player={player} onInteract={handleSocialInteract} onContinueAsChild={handleContinueAsChild} />)}
                     {activePage === Page.LIFESTYLE && (<LifestylePage player={player} onBuyItem={handleBuyLifestyleItem} onSellItem={(id)=>handleGenericUpdate(p=>{ const it = [...PROPERTY_CATALOG, ...CAR_CATALOG, ...CLOTHING_CATALOG].find(x=>x.id===id); return { ...p, money: p.money + (it ? it.price*0.5 : 0), assets: p.assets.filter(a=>a!==id) }; })} onSetResidence={(id)=>handleGenericUpdate(p=>({ ...p, residenceId: id }))} onSetActiveStyle={(s)=>handleGenericUpdate(p=>({ ...p, activeClothingStyle: s }))} onStartBusiness={()=>{}} onShutdownBusiness={()=>{}} onUpdatePlayer={handleUpdatePlayer} onPremiumPurchase={handlePremiumPurchase} onNavVisibilityChange={setIsBottomNavVisible} initialView={lifestyleInitialView ?? undefined} onInitialViewConsumed={() => setLifestyleInitialView(null)} />)}
                     {activePage === Page.MOBILE && (
@@ -1660,70 +1688,170 @@ export const App: React.FC = () => {
                             onUpdatePlayer={handleUpdatePlayer}
                             onTriggerBabyNaming={setPendingBabyNaming}
                             onAudition={(opp)=>handleGenericUpdate(p=>{ const next: Player = { ...p, applications: [...p.applications, { id: `app_${Date.now()}`, type: 'AUDITION' as const, name: opp.projectName, weeksRemaining: 1, data: opp }] }; spendPlayerEnergy(next, 25); return next; })}
-                            onTakeJob={(job)=>handleGenericUpdate(p=>({ ...p, commitments: [...p.commitments, job] }))}
+                            onTakeJob={(job)=>handleGenericUpdate(p=>{ const previousCommitments = p.commitments; const next: Player = { ...p, commitments: [...p.commitments, job] }; syncWeeklyEnergyForCommitments(next, previousCommitments); return next; })}
                             onQuitJob={handleQuitJob} 
                             onPost={(t,c,img)=>handleGenericUpdate(p=>{
-                                // --- REVISED INSTAGRAM POST LOGIC ---
-                                const fameFactor = Math.max(1, p.stats.fame);
-                                const currentFollowers = Math.max(0, p.stats.followers);
-                                
-                                // Diminishing returns for multiple posts/week
-                                const postsThisWeek = p.instagram.weeklyPostCount;
-                                const decay = postsThisWeek > 2 ? 0.4 : 1.0; 
-
-                                // Engagement Base: Followers + (Fame * Random Multiplier)
-                                const baseReach = 50 + (currentFollowers * 0.1) + (fameFactor * 50);
-                                
-                                // Engagement Rate: 5% to 15% normally
-                                const qualityRoll = 0.5 + Math.random(); // 0.5 to 1.5 multiplier
-                                const engageRate = (0.05 + (Math.random() * 0.10)) * decay;
-                                
-                                let likes = Math.floor(baseReach * engageRate * qualityRoll);
-                                // Ensure likes vary even if base params are identical
-                                likes = Math.floor(likes * (0.8 + Math.random() * 0.4));
-                                
-                                // Viral Spike Chance (5%)
-                                let viralMulti = 1;
-                                if (Math.random() < 0.05) {
-                                    viralMulti = 3 + Math.random() * 2; // 3x to 5x boost
-                                    likes = Math.floor(likes * viralMulti);
+                                if (p.instagram.lastPostWeek !== p.currentWeek) {
+                                    p.instagram.weeklyPostCount = 0;
+                                    p.instagram.lastPostWeek = p.currentWeek;
                                 }
 
-                                // Minimum likes so it's not 0
-                                if (likes <= 0) likes = Math.floor(Math.random() * 5) + 1;
-
-                                // Follower Gain Logic
-                                let conversionRate = 0.02 + (Math.random() * 0.03); // 2-5% conversion
-                                if (p.stats.followers < 1000) conversionRate += 0.05; // Boost for newbies
-
-                                let gain = Math.floor(likes * conversionRate);
-                                
-                                // Early game boost
-                                if (p.stats.fame < 10 && gain < 5) {
-                                    gain += Math.floor(Math.random() * 5) + 1;
-                                }
-                                
-                                // Cap excessive growth
-                                if (p.stats.followers > 1000 && viralMulti === 1 && gain > currentFollowers * 0.2) {
-                                    gain = Math.floor(currentFollowers * 0.2);
+                                if (p.instagram.weeklyPostCount >= 3) {
+                                    setToastMessage({ title: "Too Many Posts", subtext: "Posting more will feel spammy. Try again next week." });
+                                    return p;
                                 }
 
-                                const actualGain = Math.max(1, gain); 
-                                
+                                const config = INSTAGRAM_POST_CONFIGS[t];
+                                if (p.energy.current < config.energy) {
+                                    setToastMessage({ title: "Not Enough Energy", subtext: `You need ${config.energy} energy to post this.` });
+                                    return p;
+                                }
+
+                                const outcome = calculateInstagramPostOutcome(p, t, p.instagram.weeklyPostCount);
+                                const actualGain = outcome.followerGain;
                                 const avatarToSave = p.avatar.startsWith('data:') ? '' : p.avatar;
 
-                                const newPost = { id: `p_${Date.now()}`, authorId: 'PLAYER', authorName: p.name, authorHandle: p.instagram.handle, authorAvatar: avatarToSave, type: t, caption: c, week: p.currentWeek, year: p.age, likes: likes, comments: Math.floor(likes * 0.05), isPlayer: true, contentImage: img };
+                                const newPost = {
+                                    id: `p_${Date.now()}`,
+                                    authorId: 'PLAYER',
+                                    authorName: p.name,
+                                    authorHandle: p.instagram.handle,
+                                    authorAvatar: avatarToSave,
+                                    type: t,
+                                    caption: c,
+                                    week: p.currentWeek,
+                                    year: p.age,
+                                    likes: outcome.likes,
+                                    comments: outcome.comments,
+                                    shares: outcome.shares,
+                                    saves: outcome.saves,
+                                    commentList: outcome.commentList,
+                                    engagementScore: outcome.engagementScore,
+                                    isPlayer: true,
+                                    contentMediaId: img
+                                };
                                 
-                                const toastMsg = viralMulti > 1 ? `Viral! +${actualGain.toLocaleString()} Followers` : `+${actualGain.toLocaleString()} Followers`;
+                                const toastMsg = outcome.likes > 10000 ? `Viral! +${actualGain.toLocaleString()} Followers` : `+${actualGain.toLocaleString()} Followers`;
                                 setToastMessage({ title: "Posted", subtext: toastMsg });
                                 
                                 const nextState: Player = { 
                                     ...p, 
                                     stats: { ...p.stats, followers: p.stats.followers + actualGain },
-                                    instagram: { ...p.instagram, posts: [newPost, ...p.instagram.posts], weeklyPostCount: p.instagram.weeklyPostCount + 1 } 
+                                    instagram: {
+                                        ...p.instagram,
+                                        followers: Math.max(p.instagram.followers || 0, p.stats.followers) + actualGain,
+                                        posts: [newPost, ...p.instagram.posts],
+                                        weeklyPostCount: p.instagram.weeklyPostCount + 1,
+                                        aesthetic: clampInstagramStat((p.instagram.aesthetic ?? 50) + outcome.statDeltas.aesthetic),
+                                        authenticity: clampInstagramStat((p.instagram.authenticity ?? 55) + outcome.statDeltas.authenticity),
+                                        controversy: clampInstagramStat((p.instagram.controversy ?? 0) + outcome.statDeltas.controversy),
+                                        fashionInfluence: clampInstagramStat((p.instagram.fashionInfluence ?? 10) + outcome.statDeltas.fashionInfluence),
+                                        fanLoyalty: clampInstagramStat((p.instagram.fanLoyalty ?? 45) + outcome.statDeltas.fanLoyalty)
+                                    } 
                                 };
-                                spendPlayerEnergy(nextState, 10);
+                                spendPlayerEnergy(nextState, config.energy);
                                 return nextState;
+                            })}
+                            onReactInstagramPost={(postId, action)=>handleGenericUpdate(p=>{
+                                const applyReaction = (post: any) => {
+                                    if (post.id !== postId) return post;
+                                    if (action === 'LIKE') {
+                                        const wasLiked = !!post.hasLiked;
+                                        return { ...post, hasLiked: !wasLiked, likes: Math.max(0, (post.likes || 0) + (wasLiked ? -1 : 1)) };
+                                    }
+                                    const wasSaved = !!post.hasSaved;
+                                    return { ...post, hasSaved: !wasSaved, saves: Math.max(0, (post.saves || 0) + (wasSaved ? -1 : 1)) };
+                                };
+                                return {
+                                    ...p,
+                                    instagram: {
+                                        ...p.instagram,
+                                        posts: p.instagram.posts.map(applyReaction),
+                                        feed: p.instagram.feed.map(applyReaction)
+                                    }
+                                };
+                            })}
+                            onRespondInstagramDM={(npc, actionId, accepted)=>handleGenericUpdate(p=>{
+                                const state = p.instagram.npcStates[npc.id] || {
+                                    npcId: npc.id,
+                                    isFollowing: false,
+                                    isFollowedBy: false,
+                                    relationshipScore: 0,
+                                    relationshipLevel: 'STRANGER',
+                                    lastInteractionWeek: p.currentWeek,
+                                    hasMet: false,
+                                    chatHistory: []
+                                };
+                                let selectedAction: any = null;
+                                const updatedChat = (state.chatHistory || []).map(message => {
+                                    if (message.action?.id !== actionId) return message;
+                                    selectedAction = message.action;
+                                    return {
+                                        ...message,
+                                        action: { ...message.action, status: accepted ? 'ACCEPTED' as const : 'DECLINED' as const }
+                                    };
+                                });
+
+                                const replyText = accepted
+                                    ? (selectedAction?.kind === 'IG_REFERRAL'
+                                        ? "That means a lot. Keep the door open and I will take it seriously."
+                                        : selectedAction?.kind === 'IG_BRAND_OFFER'
+                                            ? "Sounds good. I will check the brief and handle it through my team."
+                                            : "I hear you. Let's not make this messier than it needs to be.")
+                                    : (selectedAction?.kind === 'IG_REFERRAL'
+                                        ? "I appreciate you thinking of me, but I can't chase this one right now."
+                                        : selectedAction?.kind === 'IG_BRAND_OFFER'
+                                            ? "Thanks for reaching out, but I'll pass on this campaign."
+                                            : "I'm not engaging with that. Wishing you well.");
+
+                                const npcReplyText = accepted
+                                    ? (selectedAction?.kind === 'IG_BRAND_OFFER'
+                                        ? "Perfect. Check your Team app, the contract is active there."
+                                        : selectedAction?.kind === 'IG_REFERRAL'
+                                            ? "Good. I will keep the door warm and let the right people know."
+                                            : "Got it. I'll keep you posted.")
+                                    : "Understood. No hard feelings.";
+
+                                const finalChat = [
+                                    ...updatedChat,
+                                    { sender: 'PLAYER' as const, text: replyText, timestamp: Date.now() },
+                                    { sender: 'NPC' as const, text: npcReplyText, timestamp: Date.now() + 1 }
+                                ];
+
+                                const nextPlayer: Player = {
+                                    ...p,
+                                    instagram: {
+                                        ...p.instagram,
+                                        npcStates: {
+                                            ...p.instagram.npcStates,
+                                            [npc.id]: {
+                                                ...state,
+                                                chatHistory: finalChat,
+                                                relationshipScore: Math.max(0, Math.min(100, state.relationshipScore + (accepted ? 3 : -1)))
+                                            }
+                                        }
+                                    }
+                                };
+
+                                if (accepted && selectedAction?.kind === 'IG_REFERRAL') {
+                                    const referrals = Array.isArray(nextPlayer.flags.pendingInstagramReferrals) ? nextPlayer.flags.pendingInstagramReferrals : [];
+                                    const weeksLeft = Math.max(1, Math.round(selectedAction.payload?.weeksLeft || 2 + Math.floor(Math.random() * 2)));
+                                    nextPlayer.flags.pendingInstagramReferrals = [
+                                        ...referrals,
+                                        { npcId: npc.id, npcName: npc.name, weeksLeft }
+                                    ];
+                                    nextPlayer.logs = [{ week: p.currentWeek, year: p.age, message: `📱 Instagram Referral Accepted: ${npc.name} may trigger a casting message in ${weeksLeft}-${weeksLeft + 1} weeks.`, type: 'positive' as const }, ...nextPlayer.logs].slice(0, 50);
+                                    setToastMessage({ title: 'DM Accepted', subtext: `Casting may reach out in ${weeksLeft}-${weeksLeft + 1} weeks.` });
+                                } else if (accepted && selectedAction?.kind === 'IG_BRAND_OFFER' && selectedAction.payload?.offer) {
+                                    nextPlayer.activeSponsorships = [...nextPlayer.activeSponsorships, selectedAction.payload.offer];
+                                    nextPlayer.logs = [{ week: p.currentWeek, year: p.age, message: `📱 Instagram Brand Deal: ${selectedAction.payload.offer.brandName} contract moved to your Team app.`, type: 'positive' as const }, ...nextPlayer.logs].slice(0, 50);
+                                    setToastMessage({ title: 'Brand Deal Accepted', subtext: 'Check Team app to complete the contract.' });
+                                } else {
+                                    nextPlayer.logs = [{ week: p.currentWeek, year: p.age, message: accepted ? `📱 Instagram DM Accepted: You replied to ${npc.name}.` : `📵 Instagram DM Declined: You passed on ${npc.name}'s message.`, type: (accepted ? 'positive' : 'neutral') as 'positive' | 'neutral' }, ...nextPlayer.logs].slice(0, 50);
+                                    setToastMessage({ title: accepted ? 'DM Accepted' : 'DM Declined', subtext: `${npc.name} saw your reply.` });
+                                }
+
+                                return nextPlayer;
                             })}
                             onFollowNPC={(npc)=>handleGenericUpdate(p=>({ ...p, instagram: { ...p.instagram, npcStates: { ...p.instagram.npcStates, [npc.id]: { ...p.instagram.npcStates[npc.id], isFollowing: !p.instagram.npcStates[npc.id]?.isFollowing } } } }))}
                             onInteractNPC={handleNPCInteract}
@@ -1810,6 +1938,8 @@ export const App: React.FC = () => {
                     )}
                     {activePage === Page.SETTINGS && (
                         <SettingsPage 
+                            player={player}
+                            onUpdatePlayer={handleGenericUpdate}
                             onBack={() => setActivePage(Page.HOME)} 
                             onMainMenu={() => {
                                 setGameStatus('START_MENU');

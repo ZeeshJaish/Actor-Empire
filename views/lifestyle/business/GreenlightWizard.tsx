@@ -894,12 +894,12 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
     const availableDirectors = useMemo(() => {
         // Refresh every 3 weeks
         const seedWeek = Math.floor(player.currentWeek / 3);
-        const talent = getAvailableTalent(player.currentWeek, 'DIRECTOR');
+        const talent = getAvailableTalent(player.currentWeek, 'DIRECTOR', player.flags.extraNPCs || []);
         
         // Ensure selected director is always in the list
         const selectedId = selectedCrew.director;
         if (selectedId && !talent.some(t => t.id === selectedId)) {
-            const selectedNPC = NPC_DATABASE.find(n => n.id === selectedId);
+            const selectedNPC = [...NPC_DATABASE, ...(player.flags.extraNPCs || [])].find(n => n.id === selectedId);
             if (selectedNPC) talent.unshift(selectedNPC);
         }
 
@@ -924,17 +924,17 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
 
             return { ...t, salary, stats: { ...t.stats, fame: currentFame, talent: currentTalent } };
         });
-    }, [Math.floor(player.currentWeek / 3)]);
+    }, [Math.floor(player.currentWeek / 3), player.flags.extraNPCs]);
 
     const availableActors = useMemo(() => {
         const seedWeek = Math.floor(player.currentWeek / 3);
-        const talent = getAvailableTalent(player.currentWeek, 'ACTOR');
+        const talent = getAvailableTalent(player.currentWeek, 'ACTOR', player.flags.extraNPCs || []);
 
         // Ensure all selected actors are in the list
         const selectedActorIds = castList.map(c => c.actorId).filter(id => id && id !== 'PLAYER_SELF');
         selectedActorIds.forEach(id => {
             if (!talent.some(t => t.id === id)) {
-                const selectedNPC = NPC_DATABASE.find(n => n.id === id);
+                const selectedNPC = [...NPC_DATABASE, ...(player.flags.extraNPCs || [])].find(n => n.id === id);
                 if (selectedNPC) talent.unshift(selectedNPC);
             }
         });

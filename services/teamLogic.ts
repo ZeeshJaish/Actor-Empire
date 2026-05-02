@@ -3,6 +3,7 @@ import { Agent, Manager, Player, SponsorshipOffer, SponsorshipCategory, Sponsors
 import { generateAudition } from './roleLogic'; // We will export this helper from roleLogic
 import { getNextFamousMovie, createFamousOpportunity } from './famousMovieLogic';
 import { generateRandomUniverseOpportunity } from './universeLogic';
+import { calculateYoutubeCreatorScore, getYoutubePublicImageLabel } from './youtubeLogic';
 
 // --- AGENT CATALOG ---
 export const AGENT_CATALOG: Agent[] = [
@@ -337,10 +338,13 @@ export const generateManagerOffer = (player: Player): SponsorshipOffer | null =>
     
     const managerPower = manager.sponsorshipPower; // 1-10
     const pityBonus = player.flags.sponsorshipPity || 0;
+    const creatorScore = calculateYoutubeCreatorScore(player);
+    const creatorImage = getYoutubePublicImageLabel(player);
+    const creatorPull = player.youtube?.subscribers >= 10000 ? Math.max(-8, Math.min(12, (creatorScore - 50) * 0.22)) : 0;
     
     // Base chance: Rookie (1) = ~18%, Elite (10) = 50%
     // Pity bonus adds 5% per week without an offer
-    const successChance = 15 + (managerPower * 3.5) + (pityBonus * 5);
+    const successChance = 15 + (managerPower * 3.5) + (pityBonus * 5) + creatorPull;
     
     if ((Math.random() * 100) > successChance) return null;
 
@@ -348,6 +352,8 @@ export const generateManagerOffer = (player: Player): SponsorshipOffer | null =>
     const categories: SponsorshipCategory[] = ['FASHION', 'FITNESS', 'BEVERAGE'];
     if (player.stats.fame > 40) categories.push('TECH', 'AUTOMOTIVE');
     if (player.stats.fame > 70) categories.push('LUXURY');
+    if (creatorScore > 65 || player.youtube?.creatorIdentity === 'LIFESTYLE_ICON') categories.push('TECH', 'LUXURY');
+    if (creatorImage === 'Volatile' || creatorImage === 'Risky Bet') categories.push('BEVERAGE');
 
     const cat = pick(categories);
     const brand = pick(BRAND_DB[cat]);
@@ -395,6 +401,10 @@ export const generateManagerOffer = (player: Player): SponsorshipOffer | null =>
     const followerBonus = Math.floor(player.stats.followers * 0.05); // $0.05 per follower per week
     
     let weeklyPay = baseWeekly + followerBonus;
+    if (player.youtube?.subscribers >= 10000) {
+        const creatorPayMultiplier = 0.88 + Math.min(0.34, creatorScore / 250);
+        weeklyPay = Math.floor(weeklyPay * creatorPayMultiplier);
+    }
 
     // Manager Multiplier (Power 1-10 -> 0.8x to 1.5x)
     const managerMult = 0.8 + (manager.sponsorshipPower * 0.07);
@@ -435,7 +445,10 @@ export const generateManagerOffer = (player: Player): SponsorshipOffer | null =>
 
 export const generateDirectOffer = (player: Player): AuditionOpportunity | null => {
     // Only for high fame/rep players
-    if (player.stats.fame < 50 && player.stats.reputation < 60) return null;
+    const creatorScore = calculateYoutubeCreatorScore(player);
+    const publicImage = getYoutubePublicImageLabel(player);
+    const creatorOpensDoors = creatorScore >= 76 && publicImage !== 'Volatile';
+    if (player.stats.fame < 50 && player.stats.reputation < 60 && !creatorOpensDoors) return null;
 
     // Cooldown Check (9 Weeks)
     const lastOffer = player.flags.lastDirectOfferWeek || 0;
@@ -451,7 +464,8 @@ export const generateDirectOffer = (player: Player): AuditionOpportunity | null 
     if (hasActiveBlockbuster && Math.random() < 0.8) return null; // 80% reduced chance if busy
 
     // Increased probability for direct offers (was 0.1)
-    if (Math.random() > 0.25) return null; 
+    const directOfferChance = Math.max(0.12, Math.min(0.42, 0.25 + ((creatorScore - 50) / 250) - (publicImage === 'Volatile' ? 0.12 : 0)));
+    if (Math.random() > directOfferChance) return null; 
 
     // --- PREMIUM DIRECT OFFERS ---
     // If superstar status, chance for direct Famous/Universe invite
@@ -473,7 +487,7 @@ export const generateDirectOffer = (player: Player): AuditionOpportunity | null 
     }
 
     // --- STANDARD DIRECT OFFER ---
-    const tier = player.stats.fame > 80 ? 'HIGH' : 'MID';
+    const tier = player.stats.fame > 80 || (creatorScore >= 82 && player.stats.reputation >= 45) ? 'HIGH' : 'MID';
     const usedTitles = [...player.commitments.map(c => c.name)];
     
     // Direct offers usually follow the player's trend or random

@@ -1,6 +1,8 @@
 
 // ... existing imports
 import { NPCActor, NPCTier, NPCPrestige, Player, InstaPost, InstaPostType, InteractionType, Genre, Gender, ActorTrait } from '../types';
+import { MOD_TALENT_ROWS, ModTalentRow } from './modTalentData';
+import { getInstagramPostComments, getInstagramPresetCaption } from './instagramLogic';
 
 const ACTOR_TRAITS: ActorTrait[] = ['DIVA', 'METHOD', 'WORKAHOLIC', 'UNRELIABLE', 'EASY_GOING', 'BOX_OFFICE_POISON', 'PROFESSIONAL', 'AMBITIOUS'];
 
@@ -45,12 +47,37 @@ interface RealCeleb {
     bias: NPCPrestige;
     gender: Gender; // Added
     bio?: string;
+    age?: number;
+    forbesCategory?: string;
     genres?: Genre[];
     talentBase?: number;
     traits?: ActorTrait[];
     potential?: number;
     isIndependent?: boolean;
+    country?: string;
 }
+
+const normalizeTalentName = (value: string): string =>
+    value
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '');
+
+const stableHash = (value: string): number => {
+    let hash = 0;
+    for (const char of value) hash = ((hash << 5) - hash + char.charCodeAt(0)) | 0;
+    return Math.abs(hash);
+};
+
+const estimateTalentAge = (celeb: Pick<RealCeleb, 'name' | 'tier' | 'occupation' | 'country'>): number => {
+    const hash = stableHash(`${celeb.country || 'base'}:${celeb.name}:${celeb.occupation}`);
+    if (celeb.tier === 'ICON') return 48 + (hash % 34);
+    if (celeb.tier === 'A_LIST') return 29 + (hash % 24);
+    if (celeb.tier === 'RISING') return 19 + (hash % 13);
+    if (celeb.occupation === 'DIRECTOR') return 35 + (hash % 31);
+    return 24 + (hash % 29);
+};
 
 const REAL_ACTORS: RealCeleb[] = [
     // A_LIST
@@ -114,6 +141,323 @@ const REAL_ACTORS: RealCeleb[] = [
     { name: "Yahya Abdul-Mateen II", handle: "@yahya", followers: 1 * M, netWorth: 5 * M, tier: 'RISING', occupation: 'ACTOR', bias: 'MIXED', gender: 'MALE', bio: "Aquaman.", genres: ['ACTION', 'DRAMA', 'THRILLER'], talentBase: 89 }
 ];
 
+const globalActor = (
+    name: string,
+    country: string,
+    gender: Gender,
+    tier: NPCTier,
+    followersM: number,
+    netWorthM: number,
+    bias: NPCPrestige,
+    genres: Genre[],
+    talentBase = tier === 'A_LIST' ? 90 : tier === 'ESTABLISHED' ? 84 : 78
+): RealCeleb => ({
+    name,
+    handle: `@${name.toLowerCase().replace(/[^a-z0-9]+/g, '')}`,
+    followers: followersM * M,
+    netWorth: netWorthM * M,
+    tier,
+    occupation: 'ACTOR',
+    bias,
+    gender,
+    bio: `${country} screen star.`,
+    country,
+    genres,
+    talentBase,
+    traits: ['PROFESSIONAL', 'AMBITIOUS'],
+    potential: tier === 'RISING' ? 88 : tier === 'ESTABLISHED' ? 84 : 90,
+    isIndependent: true
+});
+
+const inferGenresFromKnownFor = (knownFor: string, category: ModTalentRow['category']): Genre[] => {
+    const source = knownFor.toLowerCase();
+    const genres: Genre[] = [];
+    if (/action|martial|superhero|spy|thriller|crime|war|western|heist/.test(source)) genres.push('ACTION');
+    if (/comedy|comic|stand|sketch|vlog|challenge/.test(source)) genres.push('COMEDY');
+    if (/horror|gothic|supernatural|slasher|body horror/.test(source)) genres.push('HORROR');
+    if (/sci|space|fantasy|streaming|digital|tech/.test(source)) genres.push('SCI_FI');
+    if (/romance|romantic|love|period/.test(source)) genres.push('ROMANCE');
+    if (/adventure|travel|epic|fantasy/.test(source)) genres.push('ADVENTURE');
+    if (/drama|prestige|emotional|historical|indie|auteur/.test(source)) genres.push('DRAMA');
+    if (/mystery|psychological|noir/.test(source)) genres.push('THRILLER');
+    if (category === 'director' && genres.length === 0) genres.push('DRAMA');
+    return [...new Set(genres.length ? genres : ['DRAMA', 'COMEDY'])] as Genre[];
+};
+
+const modTalentToCeleb = (row: ModTalentRow): RealCeleb => ({
+    name: row.name,
+    handle: `@${row.name.toLowerCase().replace(/[^a-z0-9]+/g, '')}`,
+    followers: Math.max(0, Math.floor(row.followersM * M)),
+    netWorth: Math.max(250000, Math.floor(row.netWorthM * M)),
+    tier: row.tier,
+    occupation: row.category === 'director' ? 'DIRECTOR' : 'ACTOR',
+    bias: row.prestigeBias,
+    gender: row.gender,
+    bio: `${row.country} ${row.forbesCategory.toLowerCase()}. ${row.knownFor}.`,
+    country: row.country,
+    genres: inferGenresFromKnownFor(row.knownFor, row.category),
+    talentBase: row.tier === 'ICON' ? 94 : row.tier === 'A_LIST' ? 90 : row.tier === 'RISING' ? 78 : 84,
+    traits: ['PROFESSIONAL', 'AMBITIOUS'],
+    potential: row.tier === 'RISING' ? 88 : row.tier === 'INDIE' ? 82 : 86,
+    isIndependent: true,
+    age: row.age,
+    forbesCategory: row.forbesCategory
+});
+
+const GLOBAL_ACTOR_EXPANSION: RealCeleb[] = [
+    // United States
+    globalActor("Jennifer Lawrence", "United States", 'FEMALE', 'A_LIST', 10, 160, 'MIXED', ['DRAMA', 'ACTION', 'COMEDY'], 91),
+    globalActor("Joaquin Phoenix", "United States", 'MALE', 'A_LIST', 1, 80, 'PRESTIGE', ['DRAMA', 'THRILLER'], 97),
+    globalActor("Samuel L. Jackson", "United States", 'MALE', 'A_LIST', 8, 250, 'COMMERCIAL', ['ACTION', 'THRILLER', 'SUPERHERO'], 88),
+    globalActor("Anne Hathaway", "United States", 'FEMALE', 'ESTABLISHED', 32, 80, 'MIXED', ['DRAMA', 'COMEDY', 'ROMANCE'], 90),
+    globalActor("Mark Ruffalo", "United States", 'MALE', 'ESTABLISHED', 20, 35, 'MIXED', ['DRAMA', 'SUPERHERO'], 87),
+    globalActor("Jessica Chastain", "United States", 'FEMALE', 'ESTABLISHED', 6, 50, 'PRESTIGE', ['DRAMA', 'THRILLER'], 93),
+    globalActor("Mahershala Ali", "United States", 'MALE', 'ESTABLISHED', 1, 12, 'PRESTIGE', ['DRAMA', 'THRILLER'], 94),
+    globalActor("Amy Adams", "United States", 'FEMALE', 'ESTABLISHED', 1, 60, 'PRESTIGE', ['DRAMA', 'ROMANCE', 'COMEDY'], 92),
+    globalActor("Oscar Isaac", "United States", 'MALE', 'ESTABLISHED', 1, 12, 'MIXED', ['DRAMA', 'SCI_FI', 'SUPERHERO'], 91),
+    globalActor("Lupita Nyongo", "United States", 'FEMALE', 'ESTABLISHED', 11, 10, 'PRESTIGE', ['DRAMA', 'HORROR', 'SUPERHERO'], 92),
+
+    // United Kingdom
+    globalActor("Daniel Craig", "United Kingdom", 'MALE', 'A_LIST', 1, 160, 'COMMERCIAL', ['ACTION', 'THRILLER'], 88),
+    globalActor("Kate Winslet", "United Kingdom", 'FEMALE', 'A_LIST', 2, 65, 'PRESTIGE', ['DRAMA', 'ROMANCE'], 96),
+    globalActor("Benedict Cumberbatch", "United Kingdom", 'MALE', 'A_LIST', 4, 40, 'MIXED', ['DRAMA', 'SUPERHERO', 'THRILLER'], 92),
+    globalActor("Idris Elba", "United Kingdom", 'MALE', 'A_LIST', 7, 40, 'COMMERCIAL', ['ACTION', 'DRAMA', 'THRILLER'], 89),
+    globalActor("Tilda Swinton", "United Kingdom", 'FEMALE', 'ESTABLISHED', 1, 14, 'PRESTIGE', ['DRAMA', 'SCI_FI'], 95),
+    globalActor("Daniel Kaluuya", "United Kingdom", 'MALE', 'ESTABLISHED', 1, 15, 'PRESTIGE', ['DRAMA', 'HORROR', 'THRILLER'], 93),
+    globalActor("Olivia Colman", "United Kingdom", 'FEMALE', 'ESTABLISHED', 1, 12, 'PRESTIGE', ['DRAMA', 'COMEDY'], 95),
+    globalActor("Dev Patel", "United Kingdom", 'MALE', 'ESTABLISHED', 1, 10, 'PRESTIGE', ['DRAMA', 'ACTION'], 90),
+    globalActor("Emily Blunt", "United Kingdom", 'FEMALE', 'ESTABLISHED', 1, 80, 'MIXED', ['ACTION', 'COMEDY', 'THRILLER'], 89),
+    globalActor("John Boyega", "United Kingdom", 'MALE', 'ESTABLISHED', 2, 8, 'MIXED', ['SCI_FI', 'ACTION', 'DRAMA'], 85),
+
+    // Brazil
+    globalActor("Wagner Moura", "Brazil", 'MALE', 'ESTABLISHED', 3, 10, 'PRESTIGE', ['DRAMA', 'THRILLER'], 91),
+    globalActor("Alice Braga", "Brazil", 'FEMALE', 'ESTABLISHED', 1, 4, 'MIXED', ['ACTION', 'SCI_FI', 'DRAMA'], 86),
+    globalActor("Rodrigo Santoro", "Brazil", 'MALE', 'ESTABLISHED', 1, 10, 'MIXED', ['ACTION', 'DRAMA', 'ROMANCE'], 85),
+    globalActor("Sonia Braga", "Brazil", 'FEMALE', 'ESTABLISHED', 1, 60, 'PRESTIGE', ['DRAMA'], 93),
+    globalActor("Fernanda Torres", "Brazil", 'FEMALE', 'ESTABLISHED', 1, 8, 'PRESTIGE', ['DRAMA', 'COMEDY'], 91),
+    globalActor("Seu Jorge", "Brazil", 'MALE', 'ESTABLISHED', 2, 20, 'MIXED', ['DRAMA', 'COMEDY'], 82),
+    globalActor("Bruna Marquezine", "Brazil", 'FEMALE', 'RISING', 45, 3, 'COMMERCIAL', ['ROMANCE', 'DRAMA', 'SUPERHERO'], 82),
+    globalActor("Lazaro Ramos", "Brazil", 'MALE', 'ESTABLISHED', 6, 5, 'PRESTIGE', ['DRAMA', 'COMEDY'], 89),
+    globalActor("Tais Araujo", "Brazil", 'FEMALE', 'ESTABLISHED', 12, 5, 'MIXED', ['DRAMA', 'COMEDY'], 87),
+    globalActor("Selton Mello", "Brazil", 'MALE', 'ESTABLISHED', 2, 5, 'PRESTIGE', ['DRAMA', 'COMEDY'], 90),
+
+    // Germany
+    globalActor("Diane Kruger", "Germany", 'FEMALE', 'ESTABLISHED', 1, 24, 'MIXED', ['DRAMA', 'ACTION', 'THRILLER'], 87),
+    globalActor("Daniel Bruhl", "Germany", 'MALE', 'ESTABLISHED', 1, 8, 'MIXED', ['DRAMA', 'THRILLER', 'SUPERHERO'], 89),
+    globalActor("Matthias Schweighofer", "Germany", 'MALE', 'ESTABLISHED', 1, 10, 'COMMERCIAL', ['ACTION', 'COMEDY'], 82),
+    globalActor("Franka Potente", "Germany", 'FEMALE', 'ESTABLISHED', 1, 18, 'MIXED', ['ACTION', 'THRILLER'], 86),
+    globalActor("Moritz Bleibtreu", "Germany", 'MALE', 'ESTABLISHED', 1, 4, 'PRESTIGE', ['DRAMA', 'THRILLER'], 87),
+    globalActor("Nina Hoss", "Germany", 'FEMALE', 'ESTABLISHED', 1, 3, 'PRESTIGE', ['DRAMA'], 92),
+    globalActor("Jurgen Vogel", "Germany", 'MALE', 'ESTABLISHED', 1, 4, 'PRESTIGE', ['DRAMA', 'COMEDY'], 84),
+    globalActor("August Diehl", "Germany", 'MALE', 'ESTABLISHED', 1, 5, 'PRESTIGE', ['DRAMA', 'THRILLER'], 89),
+    globalActor("Karoline Herfurth", "Germany", 'FEMALE', 'ESTABLISHED', 1, 5, 'MIXED', ['COMEDY', 'ROMANCE'], 84),
+    globalActor("Sandra Huller", "Germany", 'FEMALE', 'ESTABLISHED', 1, 4, 'PRESTIGE', ['DRAMA', 'THRILLER'], 94),
+
+    // Canada
+    globalActor("Rachel McAdams", "Canada", 'FEMALE', 'A_LIST', 1, 25, 'MIXED', ['ROMANCE', 'COMEDY', 'DRAMA'], 88),
+    globalActor("Jim Carrey", "Canada", 'MALE', 'A_LIST', 1, 180, 'COMMERCIAL', ['COMEDY', 'DRAMA'], 90),
+    globalActor("Sandra Oh", "Canada", 'FEMALE', 'ESTABLISHED', 5, 25, 'PRESTIGE', ['DRAMA', 'COMEDY'], 91),
+    globalActor("Elliot Page", "Canada", 'MALE', 'ESTABLISHED', 6, 8, 'PRESTIGE', ['DRAMA', 'SCI_FI'], 86),
+    globalActor("Cobie Smulders", "Canada", 'FEMALE', 'ESTABLISHED', 2, 25, 'COMMERCIAL', ['COMEDY', 'ACTION', 'SUPERHERO'], 82),
+    globalActor("Hayden Christensen", "Canada", 'MALE', 'ESTABLISHED', 1, 12, 'COMMERCIAL', ['SCI_FI', 'DRAMA'], 80),
+    globalActor("Tatiana Maslany", "Canada", 'FEMALE', 'ESTABLISHED', 1, 3, 'PRESTIGE', ['SCI_FI', 'DRAMA', 'SUPERHERO'], 91),
+    globalActor("Donald Sutherland", "Canada", 'MALE', 'ICON', 1, 60, 'PRESTIGE', ['DRAMA', 'THRILLER'], 94),
+    globalActor("Evangeline Lilly", "Canada", 'FEMALE', 'ESTABLISHED', 2, 15, 'COMMERCIAL', ['ACTION', 'ADVENTURE', 'SUPERHERO'], 81),
+    globalActor("Finn Wolfhard", "Canada", 'MALE', 'RISING', 26, 7, 'COMMERCIAL', ['HORROR', 'SCI_FI', 'DRAMA'], 82),
+
+    // India
+    globalActor("Shah Rukh Khan", "India", 'MALE', 'A_LIST', 45, 750, 'COMMERCIAL', ['ROMANCE', 'ACTION', 'DRAMA'], 92),
+    globalActor("Deepika Padukone", "India", 'FEMALE', 'A_LIST', 80, 60, 'MIXED', ['ROMANCE', 'DRAMA', 'ACTION'], 90),
+    globalActor("Aamir Khan", "India", 'MALE', 'A_LIST', 4, 230, 'PRESTIGE', ['DRAMA', 'COMEDY', 'ACTION'], 93),
+    globalActor("Priyanka Chopra Jonas", "India", 'FEMALE', 'A_LIST', 90, 80, 'MIXED', ['DRAMA', 'ACTION', 'ROMANCE'], 88),
+    globalActor("Hrithik Roshan", "India", 'MALE', 'A_LIST', 48, 375, 'COMMERCIAL', ['ACTION', 'ROMANCE', 'THRILLER'], 88),
+    globalActor("Alia Bhatt", "India", 'FEMALE', 'A_LIST', 85, 25, 'MIXED', ['DRAMA', 'ROMANCE', 'COMEDY'], 90),
+    globalActor("Ranbir Kapoor", "India", 'MALE', 'ESTABLISHED', 1, 45, 'MIXED', ['DRAMA', 'ROMANCE', 'ACTION'], 88),
+    globalActor("Kareena Kapoor Khan", "India", 'FEMALE', 'ESTABLISHED', 12, 60, 'COMMERCIAL', ['COMEDY', 'ROMANCE', 'DRAMA'], 87),
+    globalActor("Vijay", "India", 'MALE', 'A_LIST', 12, 55, 'COMMERCIAL', ['ACTION', 'DRAMA'], 85),
+    globalActor("Nayanthara", "India", 'FEMALE', 'A_LIST', 8, 25, 'COMMERCIAL', ['DRAMA', 'ACTION', 'ROMANCE'], 86),
+
+    // Nigeria
+    globalActor("Genevieve Nnaji", "Nigeria", 'FEMALE', 'A_LIST', 8, 10, 'PRESTIGE', ['DRAMA', 'ROMANCE'], 90),
+    globalActor("Ramsey Nouah", "Nigeria", 'MALE', 'ESTABLISHED', 1, 5, 'MIXED', ['DRAMA', 'ROMANCE'], 86),
+    globalActor("Omotola Jalade Ekeinde", "Nigeria", 'FEMALE', 'A_LIST', 6, 7, 'MIXED', ['DRAMA', 'ROMANCE'], 88),
+    globalActor("Rita Dominic", "Nigeria", 'FEMALE', 'ESTABLISHED', 7, 5, 'PRESTIGE', ['DRAMA'], 88),
+    globalActor("Jim Iyke", "Nigeria", 'MALE', 'ESTABLISHED', 3, 5, 'COMMERCIAL', ['ACTION', 'DRAMA'], 82),
+    globalActor("Funke Akindele", "Nigeria", 'FEMALE', 'A_LIST', 17, 12, 'COMMERCIAL', ['COMEDY', 'DRAMA'], 87),
+    globalActor("Richard Mofe-Damijo", "Nigeria", 'MALE', 'ESTABLISHED', 3, 15, 'PRESTIGE', ['DRAMA'], 89),
+    globalActor("Adesua Etomi", "Nigeria", 'FEMALE', 'ESTABLISHED', 5, 3, 'PRESTIGE', ['DRAMA', 'ROMANCE'], 86),
+    globalActor("Kunle Remi", "Nigeria", 'MALE', 'RISING', 1, 2, 'MIXED', ['DRAMA', 'ROMANCE'], 81),
+    globalActor("Bimbo Ademoye", "Nigeria", 'FEMALE', 'RISING', 4, 2, 'COMMERCIAL', ['COMEDY', 'DRAMA'], 82),
+
+    // Italy
+    globalActor("Sophia Loren", "Italy", 'FEMALE', 'ICON', 1, 150, 'PRESTIGE', ['DRAMA', 'ROMANCE'], 96),
+    globalActor("Monica Bellucci", "Italy", 'FEMALE', 'A_LIST', 5, 45, 'MIXED', ['DRAMA', 'ACTION', 'ROMANCE'], 88),
+    globalActor("Toni Servillo", "Italy", 'MALE', 'ESTABLISHED', 1, 5, 'PRESTIGE', ['DRAMA'], 93),
+    globalActor("Pierfrancesco Favino", "Italy", 'MALE', 'ESTABLISHED', 1, 5, 'PRESTIGE', ['DRAMA', 'THRILLER'], 90),
+    globalActor("Alessandro Borghi", "Italy", 'MALE', 'ESTABLISHED', 1, 3, 'MIXED', ['DRAMA', 'THRILLER'], 86),
+    globalActor("Luca Marinelli", "Italy", 'MALE', 'ESTABLISHED', 1, 3, 'PRESTIGE', ['DRAMA', 'ACTION'], 89),
+    globalActor("Matilda De Angelis", "Italy", 'FEMALE', 'RISING', 1, 2, 'MIXED', ['DRAMA', 'THRILLER'], 83),
+    globalActor("Valeria Golino", "Italy", 'FEMALE', 'ESTABLISHED', 1, 10, 'PRESTIGE', ['DRAMA', 'ROMANCE'], 88),
+    globalActor("Riccardo Scamarcio", "Italy", 'MALE', 'ESTABLISHED', 1, 5, 'MIXED', ['ROMANCE', 'DRAMA'], 84),
+    globalActor("Michele Morrone", "Italy", 'MALE', 'RISING', 16, 4, 'COMMERCIAL', ['ROMANCE', 'DRAMA'], 78),
+
+    // France
+    globalActor("Marion Cotillard", "France", 'FEMALE', 'A_LIST', 2, 50, 'PRESTIGE', ['DRAMA', 'ROMANCE'], 95),
+    globalActor("Omar Sy", "France", 'MALE', 'A_LIST', 3, 10, 'COMMERCIAL', ['COMEDY', 'ACTION', 'DRAMA'], 87),
+    globalActor("Lea Seydoux", "France", 'FEMALE', 'ESTABLISHED', 1, 5, 'PRESTIGE', ['DRAMA', 'ACTION', 'ROMANCE'], 88),
+    globalActor("Vincent Cassel", "France", 'MALE', 'ESTABLISHED', 2, 40, 'MIXED', ['THRILLER', 'DRAMA', 'ACTION'], 89),
+    globalActor("Juliette Binoche", "France", 'FEMALE', 'A_LIST', 1, 20, 'PRESTIGE', ['DRAMA', 'ROMANCE'], 95),
+    globalActor("Jean Dujardin", "France", 'MALE', 'ESTABLISHED', 1, 16, 'MIXED', ['COMEDY', 'DRAMA'], 88),
+    globalActor("Eva Green", "France", 'FEMALE', 'ESTABLISHED', 1, 10, 'MIXED', ['THRILLER', 'HORROR', 'DRAMA'], 88),
+    globalActor("Adèle Exarchopoulos", "France", 'FEMALE', 'ESTABLISHED', 1, 3, 'PRESTIGE', ['DRAMA', 'ROMANCE'], 87),
+    globalActor("Louis Garrel", "France", 'MALE', 'ESTABLISHED', 1, 5, 'PRESTIGE', ['DRAMA', 'ROMANCE'], 86),
+    globalActor("Noemie Merlant", "France", 'FEMALE', 'RISING', 1, 2, 'PRESTIGE', ['DRAMA', 'ROMANCE'], 88),
+
+    // South Africa
+    globalActor("Charlize Theron", "South Africa", 'FEMALE', 'A_LIST', 7, 200, 'MIXED', ['ACTION', 'DRAMA', 'THRILLER'], 94),
+    globalActor("Sharlto Copley", "South Africa", 'MALE', 'ESTABLISHED', 1, 15, 'MIXED', ['SCI_FI', 'ACTION', 'THRILLER'], 84),
+    globalActor("Thuso Mbedu", "South Africa", 'FEMALE', 'RISING', 1, 2, 'PRESTIGE', ['DRAMA', 'ACTION'], 87),
+    globalActor("John Kani", "South Africa", 'MALE', 'ESTABLISHED', 1, 5, 'PRESTIGE', ['DRAMA', 'SUPERHERO'], 89),
+    globalActor("Pearl Thusi", "South Africa", 'FEMALE', 'ESTABLISHED', 4, 3, 'COMMERCIAL', ['ACTION', 'DRAMA'], 82),
+    globalActor("Terry Pheto", "South Africa", 'FEMALE', 'ESTABLISHED', 1, 2, 'PRESTIGE', ['DRAMA'], 86),
+    globalActor("Connie Ferguson", "South Africa", 'FEMALE', 'ESTABLISHED', 5, 4, 'COMMERCIAL', ['DRAMA'], 83),
+    globalActor("Sello Maake KaNcube", "South Africa", 'MALE', 'ESTABLISHED', 1, 3, 'PRESTIGE', ['DRAMA'], 88),
+    globalActor("Nomzamo Mbatha", "South Africa", 'FEMALE', 'RISING', 4, 3, 'MIXED', ['DRAMA', 'COMEDY'], 83),
+    globalActor("Trevor Noah", "South Africa", 'MALE', 'A_LIST', 9, 100, 'COMMERCIAL', ['COMEDY', 'DRAMA'], 82),
+
+    // Spain
+    globalActor("Penelope Cruz", "Spain", 'FEMALE', 'A_LIST', 7, 85, 'PRESTIGE', ['DRAMA', 'ROMANCE'], 94),
+    globalActor("Javier Bardem", "Spain", 'MALE', 'A_LIST', 1, 30, 'PRESTIGE', ['DRAMA', 'THRILLER'], 96),
+    globalActor("Antonio Banderas", "Spain", 'MALE', 'A_LIST', 4, 50, 'MIXED', ['ACTION', 'DRAMA', 'ROMANCE'], 89),
+    globalActor("Ester Exposito", "Spain", 'FEMALE', 'RISING', 25, 3, 'COMMERCIAL', ['DRAMA', 'THRILLER'], 80),
+    globalActor("Miguel Herran", "Spain", 'MALE', 'RISING', 13, 2, 'COMMERCIAL', ['THRILLER', 'DRAMA'], 81),
+    globalActor("Úrsula Corberó", "Spain", 'FEMALE', 'ESTABLISHED', 20, 3, 'COMMERCIAL', ['ACTION', 'THRILLER'], 83),
+    globalActor("Itziar Ituño", "Spain", 'FEMALE', 'ESTABLISHED', 6, 2, 'MIXED', ['THRILLER', 'DRAMA'], 83),
+    globalActor("Mario Casas", "Spain", 'MALE', 'ESTABLISHED', 8, 4, 'COMMERCIAL', ['ROMANCE', 'THRILLER'], 82),
+    globalActor("Paz Vega", "Spain", 'FEMALE', 'ESTABLISHED', 1, 10, 'MIXED', ['DRAMA', 'ROMANCE'], 84),
+    globalActor("Pedro Alonso", "Spain", 'MALE', 'ESTABLISHED', 8, 6, 'COMMERCIAL', ['THRILLER', 'DRAMA'], 83),
+
+    // Australia
+    globalActor("Nicole Kidman", "Australia", 'FEMALE', 'A_LIST', 10, 250, 'PRESTIGE', ['DRAMA', 'THRILLER', 'ROMANCE'], 94),
+    globalActor("Hugh Jackman", "Australia", 'MALE', 'A_LIST', 32, 180, 'COMMERCIAL', ['ACTION', 'DRAMA', 'SUPERHERO'], 90),
+    globalActor("Cate Blanchett", "Australia", 'FEMALE', 'A_LIST', 1, 95, 'PRESTIGE', ['DRAMA', 'ADVENTURE'], 97),
+    globalActor("Russell Crowe", "Australia", 'MALE', 'A_LIST', 1, 120, 'PRESTIGE', ['ACTION', 'DRAMA'], 92),
+    globalActor("Naomi Watts", "Australia", 'FEMALE', 'ESTABLISHED', 2, 35, 'PRESTIGE', ['DRAMA', 'HORROR', 'THRILLER'], 89),
+    globalActor("Sam Worthington", "Australia", 'MALE', 'ESTABLISHED', 1, 30, 'COMMERCIAL', ['SCI_FI', 'ACTION', 'ADVENTURE'], 80),
+    globalActor("Rebel Wilson", "Australia", 'FEMALE', 'ESTABLISHED', 11, 22, 'COMMERCIAL', ['COMEDY'], 79),
+    globalActor("Joel Edgerton", "Australia", 'MALE', 'ESTABLISHED', 1, 4, 'MIXED', ['DRAMA', 'THRILLER'], 86),
+    globalActor("Mia Wasikowska", "Australia", 'FEMALE', 'ESTABLISHED', 1, 8, 'PRESTIGE', ['DRAMA', 'ADVENTURE'], 86),
+    globalActor("Ben Mendelsohn", "Australia", 'MALE', 'ESTABLISHED', 1, 9, 'MIXED', ['DRAMA', 'THRILLER', 'SCI_FI'], 87),
+
+    // Philippines
+    globalActor("Dingdong Dantes", "Philippines", 'MALE', 'A_LIST', 7, 8, 'COMMERCIAL', ['DRAMA', 'ROMANCE', 'ACTION'], 84),
+    globalActor("Marian Rivera", "Philippines", 'FEMALE', 'A_LIST', 13, 6, 'COMMERCIAL', ['DRAMA', 'ROMANCE'], 84),
+    globalActor("Kathryn Bernardo", "Philippines", 'FEMALE', 'A_LIST', 20, 8, 'COMMERCIAL', ['ROMANCE', 'DRAMA'], 86),
+    globalActor("Daniel Padilla", "Philippines", 'MALE', 'A_LIST', 5, 6, 'COMMERCIAL', ['ROMANCE', 'DRAMA'], 82),
+    globalActor("Nadine Lustre", "Philippines", 'FEMALE', 'ESTABLISHED', 12, 4, 'MIXED', ['ROMANCE', 'DRAMA'], 83),
+    globalActor("Liza Soberano", "Philippines", 'FEMALE', 'ESTABLISHED', 18, 6, 'COMMERCIAL', ['ROMANCE', 'COMEDY'], 82),
+    globalActor("Anne Curtis", "Philippines", 'FEMALE', 'A_LIST', 19, 10, 'COMMERCIAL', ['ROMANCE', 'COMEDY', 'DRAMA'], 83),
+    globalActor("Alden Richards", "Philippines", 'MALE', 'ESTABLISHED', 4, 5, 'COMMERCIAL', ['ROMANCE', 'DRAMA'], 82),
+    globalActor("Jericho Rosales", "Philippines", 'MALE', 'ESTABLISHED', 2, 4, 'PRESTIGE', ['DRAMA', 'ROMANCE'], 84),
+    globalActor("Bea Alonzo", "Philippines", 'FEMALE', 'ESTABLISHED', 12, 6, 'MIXED', ['DRAMA', 'ROMANCE'], 85),
+
+    // Netherlands
+    globalActor("Carice van Houten", "Netherlands", 'FEMALE', 'ESTABLISHED', 2, 5, 'MIXED', ['DRAMA', 'SCI_FI', 'THRILLER'], 88),
+    globalActor("Famke Janssen", "Netherlands", 'FEMALE', 'ESTABLISHED', 1, 20, 'COMMERCIAL', ['ACTION', 'THRILLER', 'SUPERHERO'], 84),
+    globalActor("Rutger Hauer", "Netherlands", 'MALE', 'ICON', 1, 16, 'PRESTIGE', ['SCI_FI', 'THRILLER', 'DRAMA'], 92),
+    globalActor("Michiel Huisman", "Netherlands", 'MALE', 'ESTABLISHED', 1, 3, 'MIXED', ['DRAMA', 'ROMANCE'], 83),
+    globalActor("Thekla Reuten", "Netherlands", 'FEMALE', 'ESTABLISHED', 1, 3, 'PRESTIGE', ['DRAMA', 'THRILLER'], 85),
+    globalActor("Marwan Kenzari", "Netherlands", 'MALE', 'ESTABLISHED', 1, 3, 'MIXED', ['ACTION', 'ADVENTURE', 'DRAMA'], 84),
+    globalActor("Halina Reijn", "Netherlands", 'FEMALE', 'ESTABLISHED', 1, 2, 'PRESTIGE', ['DRAMA', 'THRILLER'], 84),
+    globalActor("Barry Atsma", "Netherlands", 'MALE', 'ESTABLISHED', 1, 3, 'MIXED', ['DRAMA', 'THRILLER'], 83),
+    globalActor("Abbey Hoes", "Netherlands", 'FEMALE', 'RISING', 1, 1, 'MIXED', ['DRAMA', 'ROMANCE'], 80),
+    globalActor("Jeroen Krabbe", "Netherlands", 'MALE', 'ESTABLISHED', 1, 4, 'PRESTIGE', ['DRAMA', 'THRILLER'], 86),
+
+    // Indonesia
+    globalActor("Iko Uwais", "Indonesia", 'MALE', 'A_LIST', 2, 4, 'COMMERCIAL', ['ACTION', 'THRILLER'], 88),
+    globalActor("Joe Taslim", "Indonesia", 'MALE', 'ESTABLISHED', 1, 3, 'COMMERCIAL', ['ACTION', 'THRILLER'], 86),
+    globalActor("Reza Rahadian", "Indonesia", 'MALE', 'A_LIST', 4, 5, 'PRESTIGE', ['DRAMA', 'ROMANCE'], 90),
+    globalActor("Chelsea Islan", "Indonesia", 'FEMALE', 'ESTABLISHED', 12, 2, 'MIXED', ['DRAMA', 'ROMANCE'], 83),
+    globalActor("Dian Sastrowardoyo", "Indonesia", 'FEMALE', 'A_LIST', 10, 4, 'PRESTIGE', ['DRAMA', 'ROMANCE'], 87),
+    globalActor("Nicholas Saputra", "Indonesia", 'MALE', 'ESTABLISHED', 1, 3, 'PRESTIGE', ['DRAMA', 'ROMANCE'], 85),
+    globalActor("Tara Basro", "Indonesia", 'FEMALE', 'ESTABLISHED', 1, 2, 'PRESTIGE', ['HORROR', 'DRAMA'], 85),
+    globalActor("Raline Shah", "Indonesia", 'FEMALE', 'ESTABLISHED', 9, 3, 'COMMERCIAL', ['DRAMA', 'ROMANCE'], 82),
+    globalActor("Vino G. Bastian", "Indonesia", 'MALE', 'ESTABLISHED', 5, 3, 'MIXED', ['DRAMA', 'ACTION'], 84),
+    globalActor("Julie Estelle", "Indonesia", 'FEMALE', 'ESTABLISHED', 1, 2, 'COMMERCIAL', ['ACTION', 'HORROR'], 83),
+
+    // Türkiye
+    globalActor("Kivanc Tatlitug", "Türkiye", 'MALE', 'A_LIST', 4, 15, 'COMMERCIAL', ['DRAMA', 'ROMANCE'], 85),
+    globalActor("Beren Saat", "Türkiye", 'FEMALE', 'A_LIST', 6, 10, 'PRESTIGE', ['DRAMA', 'ROMANCE'], 87),
+    globalActor("Tuba Buyukustun", "Türkiye", 'FEMALE', 'A_LIST', 6, 10, 'MIXED', ['DRAMA', 'ROMANCE'], 86),
+    globalActor("Engin Akyurek", "Türkiye", 'MALE', 'A_LIST', 2, 8, 'PRESTIGE', ['DRAMA', 'ROMANCE'], 87),
+    globalActor("Burak Ozcivit", "Türkiye", 'MALE', 'A_LIST', 25, 12, 'COMMERCIAL', ['ACTION', 'DRAMA', 'ROMANCE'], 84),
+    globalActor("Hande Ercel", "Türkiye", 'FEMALE', 'A_LIST', 31, 8, 'COMMERCIAL', ['ROMANCE', 'COMEDY'], 82),
+    globalActor("Can Yaman", "Türkiye", 'MALE', 'ESTABLISHED', 11, 8, 'COMMERCIAL', ['ROMANCE', 'COMEDY'], 81),
+    globalActor("Demet Ozdemir", "Türkiye", 'FEMALE', 'ESTABLISHED', 16, 6, 'COMMERCIAL', ['ROMANCE', 'COMEDY'], 82),
+    globalActor("Fahriye Evcen", "Türkiye", 'FEMALE', 'ESTABLISHED', 13, 10, 'MIXED', ['DRAMA', 'ROMANCE'], 82),
+    globalActor("Haluk Bilginer", "Türkiye", 'MALE', 'ESTABLISHED', 1, 5, 'PRESTIGE', ['DRAMA', 'THRILLER'], 91),
+
+    // Russia
+    globalActor("Danila Kozlovsky", "Russia", 'MALE', 'A_LIST', 1, 5, 'MIXED', ['ACTION', 'DRAMA'], 85),
+    globalActor("Svetlana Khodchenkova", "Russia", 'FEMALE', 'ESTABLISHED', 1, 3, 'MIXED', ['ACTION', 'DRAMA', 'THRILLER'], 84),
+    globalActor("Yuliya Snigir", "Russia", 'FEMALE', 'ESTABLISHED', 1, 2, 'PRESTIGE', ['DRAMA', 'ACTION'], 83),
+    globalActor("Konstantin Khabensky", "Russia", 'MALE', 'ESTABLISHED', 1, 5, 'PRESTIGE', ['DRAMA', 'THRILLER'], 90),
+    globalActor("Chulpan Khamatova", "Russia", 'FEMALE', 'ESTABLISHED', 1, 3, 'PRESTIGE', ['DRAMA'], 91),
+    globalActor("Oksana Akinshina", "Russia", 'FEMALE', 'ESTABLISHED', 1, 2, 'MIXED', ['DRAMA', 'THRILLER'], 84),
+    globalActor("Aleksei Serebryakov", "Russia", 'MALE', 'ESTABLISHED', 1, 4, 'PRESTIGE', ['DRAMA', 'THRILLER'], 88),
+    globalActor("Irina Starshenbaum", "Russia", 'FEMALE', 'RISING', 1, 1, 'MIXED', ['SCI_FI', 'DRAMA'], 80),
+    globalActor("Alexander Petrov", "Russia", 'MALE', 'ESTABLISHED', 1, 3, 'COMMERCIAL', ['DRAMA', 'ACTION'], 83),
+    globalActor("Viktoriya Isakova", "Russia", 'FEMALE', 'ESTABLISHED', 1, 2, 'PRESTIGE', ['DRAMA'], 86),
+
+    // Mexico
+    globalActor("Salma Hayek", "Mexico", 'FEMALE', 'A_LIST', 28, 200, 'MIXED', ['DRAMA', 'COMEDY', 'ACTION'], 89),
+    globalActor("Diego Luna", "Mexico", 'MALE', 'A_LIST', 3, 12, 'MIXED', ['DRAMA', 'SCI_FI', 'ACTION'], 88),
+    globalActor("Gael Garcia Bernal", "Mexico", 'MALE', 'A_LIST', 2, 12, 'PRESTIGE', ['DRAMA', 'ROMANCE'], 91),
+    globalActor("Eiza Gonzalez", "Mexico", 'FEMALE', 'ESTABLISHED', 8, 5, 'COMMERCIAL', ['ACTION', 'THRILLER'], 82),
+    globalActor("Karla Souza", "Mexico", 'FEMALE', 'ESTABLISHED', 5, 3, 'MIXED', ['COMEDY', 'DRAMA'], 82),
+    globalActor("Demián Bichir", "Mexico", 'MALE', 'ESTABLISHED', 1, 10, 'PRESTIGE', ['DRAMA', 'THRILLER'], 89),
+    globalActor("Yalitza Aparicio", "Mexico", 'FEMALE', 'RISING', 2, 1, 'PRESTIGE', ['DRAMA'], 84),
+    globalActor("Kate del Castillo", "Mexico", 'FEMALE', 'ESTABLISHED', 10, 10, 'COMMERCIAL', ['DRAMA', 'ACTION'], 83),
+    globalActor("Tenoch Huerta", "Mexico", 'MALE', 'ESTABLISHED', 1, 5, 'MIXED', ['DRAMA', 'SUPERHERO'], 85),
+    globalActor("Maite Perroni", "Mexico", 'FEMALE', 'ESTABLISHED', 13, 6, 'COMMERCIAL', ['ROMANCE', 'DRAMA'], 81),
+
+    // Poland
+    globalActor("Joanna Kulig", "Poland", 'FEMALE', 'ESTABLISHED', 1, 2, 'PRESTIGE', ['DRAMA', 'ROMANCE'], 87),
+    globalActor("Tomasz Kot", "Poland", 'MALE', 'ESTABLISHED', 1, 3, 'PRESTIGE', ['DRAMA'], 87),
+    globalActor("Agnieszka Grochowska", "Poland", 'FEMALE', 'ESTABLISHED', 1, 2, 'PRESTIGE', ['DRAMA', 'THRILLER'], 86),
+    globalActor("Marcin Dorocinski", "Poland", 'MALE', 'ESTABLISHED', 1, 3, 'MIXED', ['DRAMA', 'ACTION'], 85),
+    globalActor("Magdalena Cielecka", "Poland", 'FEMALE', 'ESTABLISHED', 1, 2, 'PRESTIGE', ['DRAMA'], 86),
+    globalActor("Maciej Stuhr", "Poland", 'MALE', 'ESTABLISHED', 1, 3, 'MIXED', ['DRAMA', 'COMEDY'], 84),
+    globalActor("Borys Szyc", "Poland", 'MALE', 'ESTABLISHED', 1, 3, 'COMMERCIAL', ['DRAMA', 'COMEDY'], 83),
+    globalActor("Maja Ostaszewska", "Poland", 'FEMALE', 'ESTABLISHED', 1, 2, 'PRESTIGE', ['DRAMA'], 87),
+    globalActor("Dawid Ogrodnik", "Poland", 'MALE', 'RISING', 1, 1, 'PRESTIGE', ['DRAMA'], 85),
+    globalActor("Weronika Rosati", "Poland", 'FEMALE', 'ESTABLISHED', 1, 3, 'MIXED', ['DRAMA', 'THRILLER'], 82),
+
+    // Ireland
+    globalActor("Saoirse Ronan", "Ireland", 'FEMALE', 'A_LIST', 1, 9, 'PRESTIGE', ['DRAMA', 'ROMANCE'], 95),
+    globalActor("Colin Farrell", "Ireland", 'MALE', 'A_LIST', 1, 80, 'MIXED', ['DRAMA', 'ACTION', 'THRILLER'], 91),
+    globalActor("Brendan Gleeson", "Ireland", 'MALE', 'ESTABLISHED', 1, 8, 'PRESTIGE', ['DRAMA', 'COMEDY'], 91),
+    globalActor("Domhnall Gleeson", "Ireland", 'MALE', 'ESTABLISHED', 1, 7, 'MIXED', ['DRAMA', 'SCI_FI', 'COMEDY'], 87),
+    globalActor("Caitriona Balfe", "Ireland", 'FEMALE', 'ESTABLISHED', 2, 4, 'MIXED', ['DRAMA', 'ROMANCE'], 85),
+    globalActor("Andrew Scott", "Ireland", 'MALE', 'ESTABLISHED', 1, 8, 'PRESTIGE', ['DRAMA', 'THRILLER'], 91),
+    globalActor("Aidan Turner", "Ireland", 'MALE', 'ESTABLISHED', 1, 5, 'MIXED', ['DRAMA', 'ROMANCE', 'ADVENTURE'], 84),
+    globalActor("Jamie Dornan", "Ireland", 'MALE', 'ESTABLISHED', 4, 14, 'MIXED', ['DRAMA', 'THRILLER', 'ROMANCE'], 85),
+    globalActor("Jessie Buckley", "Ireland", 'FEMALE', 'RISING', 1, 2, 'PRESTIGE', ['DRAMA', 'THRILLER'], 90),
+    globalActor("Ruth Negga", "Ireland", 'FEMALE', 'ESTABLISHED', 1, 4, 'PRESTIGE', ['DRAMA', 'ROMANCE'], 88),
+
+    // Sweden
+    globalActor("Alexander Skarsgard", "Sweden", 'MALE', 'A_LIST', 1, 14, 'MIXED', ['DRAMA', 'ACTION', 'THRILLER'], 87),
+    globalActor("Alicia Vikander", "Sweden", 'FEMALE', 'A_LIST', 1, 8, 'PRESTIGE', ['DRAMA', 'ACTION', 'ADVENTURE'], 91),
+    globalActor("Noomi Rapace", "Sweden", 'FEMALE', 'ESTABLISHED', 1, 20, 'MIXED', ['THRILLER', 'SCI_FI', 'DRAMA'], 88),
+    globalActor("Stellan Skarsgard", "Sweden", 'MALE', 'A_LIST', 1, 50, 'PRESTIGE', ['DRAMA', 'SCI_FI', 'SUPERHERO'], 92),
+    globalActor("Bill Skarsgard", "Sweden", 'MALE', 'ESTABLISHED', 1, 5, 'MIXED', ['HORROR', 'ACTION', 'DRAMA'], 86),
+    globalActor("Rebecca Ferguson", "Sweden", 'FEMALE', 'A_LIST', 1, 6, 'COMMERCIAL', ['ACTION', 'SCI_FI', 'THRILLER'], 87),
+    globalActor("Joel Kinnaman", "Sweden", 'MALE', 'ESTABLISHED', 1, 14, 'COMMERCIAL', ['ACTION', 'SCI_FI', 'THRILLER'], 84),
+    globalActor("Gustaf Skarsgard", "Sweden", 'MALE', 'ESTABLISHED', 1, 8, 'MIXED', ['DRAMA', 'ADVENTURE'], 84),
+    globalActor("Lena Olin", "Sweden", 'FEMALE', 'ESTABLISHED', 1, 5, 'PRESTIGE', ['DRAMA', 'THRILLER'], 87),
+    globalActor("Malin Akerman", "Sweden", 'FEMALE', 'ESTABLISHED', 1, 10, 'COMMERCIAL', ['COMEDY', 'ACTION', 'ROMANCE'], 81),
+];
+
 const REAL_DIRECTORS: RealCeleb[] = [
     // CUSTOM ELITE DIRECTOR
     { name: "Nyanika Mishra", handle: "@nyanikacinema", followers: 5 * M, netWorth: 500 * M, tier: 'A_LIST', occupation: 'DIRECTOR', bias: 'PRESTIGE', gender: 'FEMALE', bio: "Every frame is a masterpiece. The Midas Touch.", talentBase: 95 },
@@ -135,6 +479,22 @@ const REAL_DIRECTORS: RealCeleb[] = [
     { name: "Bong Joon-ho", handle: "@bongjoonho", followers: 100000, netWorth: 30 * M, tier: 'ESTABLISHED', occupation: 'DIRECTOR', bias: 'PRESTIGE', gender: 'MALE', bio: "Parasite.", talentBase: 96 }
 ];
 
+const existingModTalentNames = new Set([
+    ...REAL_ACTORS,
+    ...REAL_DIRECTORS,
+    ...GLOBAL_ACTOR_EXPANSION
+].map(celeb => normalizeTalentName(celeb.name)));
+
+const CSV_TALENT_EXPANSION: RealCeleb[] = MOD_TALENT_ROWS
+    .filter(row => row.category === 'actor' || row.category === 'director')
+    .filter(row => !existingModTalentNames.has(normalizeTalentName(row.name)))
+    .map(modTalentToCeleb);
+
+const GLOBAL_TALENT_EXPANSION: RealCeleb[] = [
+    ...GLOBAL_ACTOR_EXPANSION,
+    ...CSV_TALENT_EXPANSION
+];
+
 // --- RANDOM NPC GENERATOR (For low budget filler) ---
 const FIRST_NAMES = ['Kai', 'Luna', 'Nova', 'Ezra', 'Milo', 'Ayla', 'Finn', 'Ivy', 'Leo', 'Mia', 'Jax', 'Zoey', 'Ash', 'Sky', 'River', 'Sage', 'Jett', 'Piper', 'Zane', 'Remi', 'Atlas', 'Cleo', 'Hugo', 'Eden', 'Theo', 'Jade', 'Nash', 'Faye', 'Otis', 'Vera'];
 const LAST_NAMES = ['Rivers', 'Stone', 'Wilder', 'Frost', 'Knight', 'Woods', 'Black', 'Steel', 'Moon', 'Storm', 'Fox', 'Wolf', 'Hart', 'Drake', 'Cross', 'Banks', 'Reid', 'Cole', 'West', 'Gray', 'Brooks', 'Hayes', 'Price', 'Rice', 'Lane', 'Ford', 'King', 'Rose', 'Snow', 'Lake'];
@@ -147,6 +507,70 @@ const createGenreXP = (favored: Genre[]): Record<Genre, number> => {
         xp[g] = favored.includes(g) ? 80 + Math.floor(Math.random() * 20) : Math.floor(Math.random() * 20);
     });
     return xp;
+};
+
+const createNPCFromCeleb = (celeb: RealCeleb, id: string): NPCActor => {
+    let openness = 0;
+    if (celeb.tier === 'A_LIST' || celeb.tier === 'ICON') openness = 5 + Math.floor(Math.random() * 15);
+    else if (celeb.tier === 'ESTABLISHED') openness = 20 + Math.floor(Math.random() * 20);
+    else openness = 40 + Math.floor(Math.random() * 30);
+
+    let fame = 0;
+    if (celeb.tier === 'A_LIST' || celeb.tier === 'ICON') fame = 85 + Math.random() * 15;
+    else if (celeb.tier === 'ESTABLISHED') fame = 60 + Math.random() * 25;
+    else fame = 30 + Math.random() * 30;
+
+    return {
+        id,
+        name: celeb.name,
+        handle: celeb.handle,
+        gender: celeb.gender,
+        avatar: getGenderedAvatar(celeb.gender, celeb.name),
+        tier: celeb.tier,
+        prestigeBias: celeb.bias,
+        openness,
+        followers: celeb.followers,
+        netWorth: celeb.netWorth,
+        occupation: celeb.occupation,
+        bio: celeb.bio || "Hollywood Icon.",
+        stats: {
+            talent: celeb.talentBase || 80,
+            fame,
+            genreXP: createGenreXP(celeb.genres || ['DRAMA'])
+        },
+        traits: celeb.traits || ['PROFESSIONAL'],
+        potential: celeb.potential || 50,
+        isIndependent: celeb.isIndependent ?? true,
+        age: celeb.age ?? estimateTalentAge(celeb),
+        forbesCategory: celeb.forbesCategory
+    };
+};
+
+export const GLOBAL_ACTOR_PACKS = Array.from(
+    new Set(GLOBAL_TALENT_EXPANSION.map(actor => actor.country).filter(Boolean))
+).map(country => {
+    const id = country!.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+    const talent = GLOBAL_TALENT_EXPANSION.filter(actor => actor.country === country);
+    return {
+        id,
+        country: country!,
+        label: `${country} Talent`,
+        description: `Adds ${talent.length} ${country} actors/directors to casting, Forbes, and social discovery.`,
+        actorCount: talent.length
+    };
+});
+
+export const createGlobalActorPackNPCs = (packId: string): NPCActor[] => {
+    const pack = GLOBAL_ACTOR_PACKS.find(entry => entry.id === packId);
+    if (!pack) return [];
+    return GLOBAL_TALENT_EXPANSION
+        .filter(actor => actor.country === pack.country)
+        .map((actor, idx) => createNPCFromCeleb(actor, `mod_actor_${pack.id}_${idx}`));
+};
+
+export const getEnabledGlobalActorPackIds = (player?: Pick<Player, 'flags'>): string[] => {
+    const packIds = player?.flags?.enabledGlobalActorPacks;
+    return Array.isArray(packIds) ? packIds.filter(id => typeof id === 'string') : [];
 };
 
 const generateRandomNPC = (seed: number | string): NPCActor => {
@@ -214,42 +638,11 @@ export const generateNPCs = (): NPCActor[] => {
     const npcs: NPCActor[] = [];
     
     // 1. Add Real Actors
-    REAL_ACTORS.forEach((celeb, idx) => {
-        // Calculate dynamic openness based on tier (reusing logic but applying to real data)
-        let openness = 0;
-        if (celeb.tier === 'A_LIST') openness = 5 + Math.floor(Math.random() * 15);
-        else if (celeb.tier === 'ESTABLISHED') openness = 20 + Math.floor(Math.random() * 20);
-        else openness = 40 + Math.floor(Math.random() * 30);
+    const actorCatalog = [...REAL_ACTORS]
+        .filter((celeb, idx, arr) => arr.findIndex(existing => existing.name === celeb.name) === idx);
 
-        // Calc Fame from followers roughly (Log scaleish)
-        let fame = 0;
-        if (celeb.tier === 'A_LIST') fame = 85 + Math.random() * 15;
-        else if (celeb.tier === 'ESTABLISHED') fame = 60 + Math.random() * 25;
-        else fame = 30 + Math.random() * 30;
-
-        npcs.push({
-            id: `celeb_act_${idx}`,
-            name: celeb.name,
-            handle: celeb.handle,
-            gender: celeb.gender,
-            // UPDATED: Ignore name seed, use gendered curation to ensure Ryan looks like a male
-            avatar: getGenderedAvatar(celeb.gender, celeb.name), 
-            tier: celeb.tier,
-            prestigeBias: celeb.bias,
-            openness,
-            followers: celeb.followers,
-            netWorth: celeb.netWorth,
-            occupation: 'ACTOR',
-            bio: celeb.bio || "Hollywood Icon.",
-            stats: {
-                talent: celeb.talentBase || 80,
-                fame,
-                genreXP: createGenreXP(celeb.genres || ['DRAMA'])
-            },
-            traits: celeb.traits || ['PROFESSIONAL'],
-            potential: celeb.potential || 50,
-            isIndependent: celeb.isIndependent ?? true
-        });
+    actorCatalog.forEach((celeb, idx) => {
+        npcs.push(createNPCFromCeleb(celeb, `celeb_act_${idx}`));
     });
 
     // 2. Add Real Directors
@@ -481,6 +874,7 @@ const CAPTIONS = {
 
 export const generateWeeklyFeed = (player: Player): InstaPost[] => {
     const feed: InstaPost[] = [];
+    const npcPool = [...NPC_DATABASE, ...(Array.isArray(player.flags?.extraNPCs) ? player.flags.extraNPCs : [])];
     
     // 1. Add Player's posts from this week (Persist them in the new feed batch)
     const playerPosts = player.instagram.posts.filter(p => p.week === player.currentWeek);
@@ -494,17 +888,17 @@ export const generateWeeklyFeed = (player: Player): InstaPost[] => {
     const candidates: NPCActor[] = [];
     
     // A. Followed NPCs (High chance)
-    NPC_DATABASE.filter(n => player.instagram.npcStates[n.id]?.isFollowing).forEach(npc => {
+    npcPool.filter(n => player.instagram.npcStates[n.id]?.isFollowing).forEach(npc => {
         if (Math.random() < 0.6) candidates.push(npc);
     });
 
     // B. A-List / Established (Discovery - Medium chance)
-    const celebs = NPC_DATABASE.filter(n => !player.instagram.npcStates[n.id]?.isFollowing && (n.tier === 'A_LIST' || n.tier === 'ESTABLISHED'));
+    const celebs = npcPool.filter(n => !player.instagram.npcStates[n.id]?.isFollowing && (n.tier === 'A_LIST' || n.tier === 'ESTABLISHED'));
     // Pick 3-5 random celebs
     candidates.push(...celebs.sort(() => 0.5 - Math.random()).slice(0, 4));
 
     // C. Random Rising Stars (Low chance)
-    const rising = NPC_DATABASE.filter(n => n.tier === 'RISING');
+    const rising = npcPool.filter(n => n.tier === 'RISING');
     candidates.push(...rising.sort(() => 0.5 - Math.random()).slice(0, 1));
 
     // Deduplicate just in case
@@ -519,10 +913,12 @@ export const generateWeeklyFeed = (player: Player): InstaPost[] => {
         else if (typeRoll > 0.45) type = 'BTS';
         else if (typeRoll > 0.25) type = 'SELFIE';
 
-        const caption = CAPTIONS[type][Math.floor(Math.random() * CAPTIONS[type].length)];
+        const caption = getInstagramPresetCaption(type);
         // Variance in likes based on followers
         const likes = Math.floor(npc.followers * (0.02 + Math.random() * 0.08)); 
         const comments = Math.floor(likes * 0.01);
+        const shares = Math.floor(likes * 0.025);
+        const saves = Math.floor(likes * 0.02);
 
         feed.push({
             id: `post_${npc.id}_${player.currentWeek}_${Math.random().toString(36).substr(2, 5)}`,
@@ -534,6 +930,10 @@ export const generateWeeklyFeed = (player: Player): InstaPost[] => {
             caption,
             likes,
             comments,
+            shares,
+            saves,
+            commentList: getInstagramPostComments(type),
+            engagementScore: Math.min(100, Math.round((likes + comments * 2 + shares * 3 + saves * 2) / Math.max(1, npc.followers) * 100)),
             week: player.currentWeek,
             year: player.age,
             isPlayer: false,
@@ -552,6 +952,10 @@ export const generateWeeklyFeed = (player: Player): InstaPost[] => {
             caption: "BREAKING: " + (Math.random() > 0.5 ? "Major studio merger announced impacting upcoming slate." : "Box Office records shattered this weekend."),
             likes: 12000 + Math.floor(Math.random() * 5000),
             comments: 450,
+            shares: 700 + Math.floor(Math.random() * 400),
+            saves: 300 + Math.floor(Math.random() * 250),
+            commentList: getInstagramPostComments('INDUSTRY_NEWS', 6),
+            engagementScore: 72,
             week: player.currentWeek,
             year: player.age,
             isPlayer: false,

@@ -27,9 +27,13 @@ export type NewsCategory = 'TOP_STORY' | 'INDUSTRY' | 'YOU' | 'UNIVERSE';
 export type SponsorshipCategory = 'FASHION' | 'FITNESS' | 'TECH' | 'BEVERAGE' | 'LUXURY' | 'AUTOMOTIVE';
 export type SponsorshipActionType = 'POST' | 'SHOOT';
 export type SponsorshipFrequency = 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY';
-export type InstaPostType = 'ANNOUNCEMENT' | 'BTS' | 'CELEBRATION' | 'LIFESTYLE' | 'SELFIE' | 'INDUSTRY_NEWS';
+export type InstaPostType = 'ANNOUNCEMENT' | 'BTS' | 'CELEBRATION' | 'LIFESTYLE' | 'SELFIE' | 'INDUSTRY_NEWS' | 'REEL' | 'CAROUSEL' | 'RED_CARPET' | 'COUPLE_POST' | 'BRAND_FIT' | 'CONTROVERSIAL';
 export type InteractionType = 'GREET' | 'COMPLIMENT' | 'COFFEE' | 'COLLAB' | 'BEFRIEND';
 export type YoutubeVideoType = 'VLOG' | 'SKIT' | 'Q_AND_A' | 'TRAILER' | 'COVER' | 'STORYTIME';
+export type YoutubeMessageType = 'OFFER_YOUTUBE_COLLAB' | 'OFFER_YOUTUBE_BRAND';
+export type YoutubeUploadPlan = 'SAFE' | 'VIRAL_BAIT' | 'BTS' | 'PROJECT_PROMO' | 'SPONSOR_HEAVY';
+export type YoutubeMerchTier = 'BASIC' | 'PREMIUM' | 'LUXURY';
+export type YoutubeCreatorIdentity = 'ACTOR_VLOGGER' | 'CHAOS_CREATOR' | 'PRESTIGE_FILMMAKER' | 'LIFESTYLE_ICON' | 'CONTROVERSY_MAGNET';
 export type BusinessType = 'RESTAURANT' | 'CAFE' | 'FASHION' | 'FITNESS' | 'MERCH' | 'PRODUCTION_HOUSE';
 export type BusinessSubtype = 'FAST_FOOD' | 'CASUAL_DINING' | 'FINE_DINING' | 'COFFEE_SHOP' | 'ARTISAN_BAKERY' | 'STREETWEAR' | 'LUXURY_BRAND' | 'LOCAL_GYM' | 'WELLNESS_STUDIO' | 'ONLINE_STORE' | 'INDIE_STUDIO' | 'MAJOR_STUDIO';
 export type StudioArchetype = 'LEGACY' | 'PRESTIGE' | 'PLATFORM' | 'UNIVERSE_ARCHITECT';
@@ -647,6 +651,35 @@ export interface SponsorshipOffer {
     weeksCompleted?: number;
 }
 
+export interface YoutubeCollabOffer {
+    id: string;
+    creatorId?: string;
+    creatorName: string;
+    creatorHandle: string;
+    creatorAvatar: string;
+    conceptTitle: string;
+    requiredType: YoutubeVideoType;
+    energyCost: number;
+    qualityBonus: number;
+    bonusViews: number;
+    bonusSubscribers: number;
+    description: string;
+    expiresInWeeks: number;
+}
+
+export interface YoutubeBrandDeal {
+    id: string;
+    brandName: string;
+    category: SponsorshipCategory;
+    description: string;
+    payout: number;
+    requiredType: YoutubeVideoType;
+    energyCost: number;
+    bonusViews: number;
+    penalty: number;
+    expiresInWeeks: number;
+}
+
 export interface ProductionCrisis {
     id: string;
     title: string;
@@ -733,6 +766,7 @@ export interface YoutubeVideo {
     title: string;
     type: YoutubeVideoType;
     thumbnailColor: string;
+    thumbnailMediaId?: string;
     views: number;
     likes: number;
     earnings: number;
@@ -741,6 +775,9 @@ export interface YoutubeVideo {
     isPlayer: boolean;
     authorName: string;
     qualityScore: number;
+    uploadPlan?: YoutubeUploadPlan;
+    controversyScore?: number;
+    trustImpact?: number;
     weeklyHistory: number[];
     comments: string[];
 }
@@ -753,6 +790,18 @@ export interface YoutubeChannel {
     isMonetized: boolean;
     bannerColor: string;
     totalChannelViews: number;
+    activeCollabs: YoutubeCollabOffer[];
+    activeBrandDeals: YoutubeBrandDeal[];
+    audienceTrust: number;
+    fanMood: number;
+    controversy: number;
+    membershipsActive: boolean;
+    members: number;
+    lastLivestreamWeek: number;
+    lastMerchDropWeek: number;
+    lastMerchResult?: string;
+    creatorIdentity: YoutubeCreatorIdentity;
+    lastIdentityChangeWeek: number;
 }
 
 export interface NewsItem {
@@ -770,8 +819,8 @@ export interface Message {
     sender: string;
     subject: string;
     text: string;
-    type: 'OFFER_ROLE' | 'OFFER_SPONSORSHIP' | 'OFFER_NEGOTIATION' | 'OFFER_EVENT' | 'TEXT' | 'SYSTEM';
-    data?: AuditionOpportunity | SponsorshipOffer | NegotiationData | ScheduledEvent | any;
+    type: 'OFFER_ROLE' | 'OFFER_SPONSORSHIP' | 'OFFER_NEGOTIATION' | 'OFFER_EVENT' | YoutubeMessageType | 'TEXT' | 'SYSTEM';
+    data?: AuditionOpportunity | SponsorshipOffer | NegotiationData | ScheduledEvent | YoutubeCollabOffer | YoutubeBrandDeal | any;
     isRead: boolean;
     weekSent: number;
     expiresIn?: number;
@@ -840,6 +889,14 @@ export interface InstaPost {
     year: number;
     likes: number;
     comments: number;
+    shares?: number;
+    saves?: number;
+    commentList?: string[];
+    engagementScore?: number;
+    mood?: 'SUPPORTIVE' | 'MESSY' | 'FASHION' | 'INDUSTRY' | 'ROMANCE' | 'NEUTRAL';
+    contentMediaId?: string;
+    hasLiked?: boolean;
+    hasSaved?: boolean;
     isPlayer: boolean;
     contentImage?: string; 
 }
@@ -859,6 +916,12 @@ export interface XPost {
     isLiked: boolean;
     isRetweeted: boolean;
     isVerified: boolean;
+    postType?: 'CAREER' | 'HOT_TAKE' | 'JOKE' | 'FILM_OPINION' | 'PR_STATEMENT' | 'DRAMA_REPLY' | 'FAN_THANKS' | 'GENERAL';
+    replyList?: string[];
+    quoteList?: string[];
+    controversyScore?: number;
+    sentiment?: 'SUPPORTIVE' | 'MESSY' | 'FUNNY' | 'INDUSTRY' | 'NEUTRAL';
+    quoteOfId?: string;
 }
 
 export interface StudioContract {
@@ -889,6 +952,8 @@ export interface NPCActor {
     netWorth: number;
     occupation: 'ACTOR' | 'DIRECTOR';
     bio: string;
+    age?: number;
+    forbesCategory?: string;
     stats?: Partial<Stats>;
     traits?: ActorTrait[];
     potential?: number; // 0-100
@@ -904,7 +969,18 @@ export interface NPCState {
     relationshipLevel: string;
     lastInteractionWeek: number;
     hasMet: boolean;
-    chatHistory: { sender: 'PLAYER'|'NPC', text: string, timestamp: number }[];
+    chatHistory: {
+        sender: 'PLAYER'|'NPC';
+        text: string;
+        timestamp: number;
+        tag?: string;
+        action?: {
+            id: string;
+            kind: 'IG_REFERRAL' | 'IG_BRAND_OFFER' | 'IG_RIVALRY';
+            status: 'PENDING' | 'ACCEPTED' | 'DECLINED';
+            payload?: any;
+        };
+    }[];
 }
 
 export interface DatingMatch {
@@ -1315,6 +1391,12 @@ export interface Player {
         npcStates: Record<string, NPCState>;
         weeklyPostCount: number;
         lastPostWeek: number;
+        aesthetic: number;
+        authenticity: number;
+        controversy: number;
+        fashionInfluence: number;
+        fanLoyalty: number;
+        lastBrandOfferWeek?: number;
     };
     x: {
         handle: string;
@@ -1418,9 +1500,9 @@ export const INITIAL_PLAYER: Player = {
             expiresIn: 10
         }
     ],
-    instagram: { handle: '@player', followers: 0, posts: [], feed: [], npcStates: {}, weeklyPostCount: 0, lastPostWeek: 0 },
+    instagram: { handle: '@player', followers: 0, posts: [], feed: [], npcStates: {}, weeklyPostCount: 0, lastPostWeek: 0, aesthetic: 50, authenticity: 55, controversy: 0, fashionInfluence: 10, fanLoyalty: 45 },
     x: { handle: '@player', followers: 0, posts: [], feed: [], lastPostWeek: 0 }, // Starts at 0
-    youtube: { handle: '@player', subscribers: 0, videos: [], lifetimeEarnings: 0, isMonetized: false, bannerColor: 'bg-gradient-to-r from-red-900 to-zinc-900', totalChannelViews: 0 },
+    youtube: { handle: '@player', subscribers: 0, videos: [], lifetimeEarnings: 0, isMonetized: false, bannerColor: 'bg-gradient-to-r from-red-900 to-zinc-900', totalChannelViews: 0, activeCollabs: [], activeBrandDeals: [], audienceTrust: 55, fanMood: 55, controversy: 0, membershipsActive: false, members: 0, lastLivestreamWeek: 0, lastMerchDropWeek: 0, creatorIdentity: 'ACTOR_VLOGGER', lastIdentityChangeWeek: 0 },
     dating: { isTinderActive: false, isLuxeActive: false, preferences: { gender: 'ALL', minAge: 18, maxAge: 35 }, matches: [], luxeRefreshOffset: 0, luxeCycleStartAbsoluteWeek: 0 },
     finance: {
         history: [],

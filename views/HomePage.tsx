@@ -1,14 +1,15 @@
 
 import React, { useRef, useEffect, useState, useMemo } from 'react';
-import { Player, ActorSkills, Commitment, ActiveRelease, ScheduledEvent, Message, AuditionOpportunity, NegotiationData, UniverseContract, UniverseId, Page, Genre, Relationship } from '../types';
+import { Player, ActorSkills, Commitment, ActiveRelease, ScheduledEvent, Message, AuditionOpportunity, NegotiationData, UniverseContract, UniverseId, Page, Genre, Relationship, LifeEvent, SponsorshipOffer } from '../types';
 import { formatMoney } from '../services/formatUtils';
 import { StatsBar } from '../components/StatsBar';
 import { generateProjectDetails } from '../services/roleLogic';
 import { generateDirectEntryOffer } from '../services/universeLogic'; 
 import { generateLifeEvent } from '../services/lifeEventLogic';
 import { getAbsoluteWeek } from '../services/legacyLogic';
-import { getGenderedAvatar, MALE_AVATAR_SEEDS, FEMALE_AVATAR_SEEDS } from '../services/npcLogic';
+import { getGenderedAvatar, MALE_AVATAR_SEEDS, FEMALE_AVATAR_SEEDS, NPC_DATABASE } from '../services/npcLogic';
 import { createBusiness } from '../services/businessLogic';
+import { calculateYoutubeCreatorScore, generateYoutubeBrandDeal, generateYoutubeCollabOffer, getYoutubePublicImageLabel } from '../services/youtubeLogic';
 import { Heart, Smile, Star, Zap, DollarSign, Brain, Calendar, Activity, TrendingUp, Trophy, X, Sliders, Users, Film, Tv, PlayCircle, Lock, FastForward, Key, AlertTriangle, Mic2, Mail, FileText, Dumbbell, Sparkles, Settings, ShoppingCart, Clapperboard, ZapOff, Crown, Skull, Camera, UploadCloud, Check } from 'lucide-react';
 
 interface HomePageProps {
@@ -707,6 +708,458 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
     }
   };
 
+  const triggerYoutubeBootstrap = () => {
+      if (!onUpdatePlayer) return;
+
+      const boostedPlayer = {
+          ...player,
+          money: Math.max(player.money, 500000),
+          energy: { ...player.energy, current: player.energy.max || 100 },
+          stats: {
+              ...player.stats,
+              fame: Math.max(player.stats.fame, 72),
+              reputation: Math.max(player.stats.reputation, 65),
+              skills: {
+                  ...player.stats.skills,
+                  improvisation: Math.max(player.stats.skills.improvisation || 0, 78),
+                  charisma: Math.max(player.stats.skills.charisma || 0, 80)
+              }
+          },
+          youtube: {
+              ...player.youtube,
+              subscribers: Math.max(player.youtube.subscribers || 0, 125000),
+              totalChannelViews: Math.max(player.youtube.totalChannelViews || 0, 2400000),
+              lifetimeEarnings: Math.max(player.youtube.lifetimeEarnings || 0, 65000),
+              isMonetized: true,
+              audienceTrust: Math.max(player.youtube.audienceTrust ?? 55, 72),
+              fanMood: Math.max(player.youtube.fanMood ?? 55, 74),
+              controversy: Math.max(player.youtube.controversy ?? 0, 18),
+              membershipsActive: true,
+              members: Math.max(player.youtube.members || 0, 850),
+              creatorIdentity: player.youtube.creatorIdentity || 'ACTOR_VLOGGER',
+              lastLivestreamWeek: 0,
+              lastMerchDropWeek: 0,
+              lastIdentityChangeWeek: 0,
+              videos: player.youtube.videos.length > 0 ? player.youtube.videos : [
+                  {
+                      id: `cheat_yt_vid_${Date.now()}`,
+                      title: 'Cheat Channel Breakout',
+                      type: 'VLOG',
+                      thumbnailColor: 'bg-red-600',
+                      views: 1200000,
+                      likes: 84000,
+                      earnings: 4200,
+                      weekUploaded: player.currentWeek,
+                      yearUploaded: player.age,
+                      isPlayer: true,
+                      authorName: player.name,
+                      qualityScore: 88,
+                      uploadPlan: 'BTS',
+                      controversyScore: 4,
+                      trustImpact: 3,
+                      weeklyHistory: [1200000],
+                      comments: ['Cheat setup: this channel is ready for QA.', 'The creator arc is online.']
+                  }
+              ]
+          },
+          flags: {
+              ...player.flags,
+              lastYoutubeEventAbsWeek: 0,
+              lastYoutubeCreatorInviteAbsWeek: 0,
+              lastYoutubeImageRippleAbsWeek: 0,
+              lastYoutubeRivalryAbsWeek: 0,
+              lastYoutubeCollabOfferWeek: 0,
+              lastYoutubeBrandOfferWeek: 0
+          },
+          logs: [{ week: player.currentWeek, year: player.age, message: `▶️ CHEAT: YouTube creator QA channel boosted.`, type: 'positive' as const }, ...player.logs].slice(0, 50)
+      };
+
+      onUpdatePlayer(boostedPlayer);
+      setActiveCheatMenu('NONE');
+      alert('YouTube QA channel boosted. Open Phone > Social > YouTube Studio.');
+  };
+
+  const triggerYoutubeOffers = () => {
+      if (!onUpdatePlayer) return;
+
+      const basePlayer = {
+          ...player,
+          youtube: {
+              ...player.youtube,
+              subscribers: Math.max(player.youtube.subscribers || 0, 125000),
+              totalChannelViews: Math.max(player.youtube.totalChannelViews || 0, 2400000),
+              isMonetized: true,
+              videos: player.youtube.videos.length > 0 ? player.youtube.videos : [
+                  {
+                      id: `cheat_yt_vid_offer_${Date.now()}`,
+                      title: 'Cheat Offer Setup',
+                      type: 'VLOG' as const,
+                      thumbnailColor: 'bg-red-600',
+                      views: 450000,
+                      likes: 24000,
+                      earnings: 1800,
+                      weekUploaded: player.currentWeek,
+                      yearUploaded: player.age,
+                      isPlayer: true,
+                      authorName: player.name,
+                      qualityScore: 82,
+                      weeklyHistory: [450000],
+                      comments: []
+                  }
+              ]
+          }
+      };
+
+      const collab = generateYoutubeCollabOffer(basePlayer);
+      const brand = generateYoutubeBrandDeal(basePlayer);
+      const messages: Message[] = [];
+
+      if (collab) {
+          messages.push({
+              id: `cheat_yt_collab_${Date.now()}`,
+              sender: collab.creatorName,
+              subject: `YouTube Collab: ${collab.conceptTitle}`,
+              text: `${collab.creatorName} wants to collaborate on your channel.`,
+              type: 'OFFER_YOUTUBE_COLLAB',
+              data: collab,
+              isRead: false,
+              weekSent: player.currentWeek,
+              expiresIn: collab.expiresInWeeks
+          });
+      }
+
+      if (brand) {
+          messages.push({
+              id: `cheat_yt_brand_${Date.now()}`,
+              sender: `${brand.brandName} Creator Team`,
+              subject: `YouTube Deal: ${brand.brandName}`,
+              text: `${brand.brandName} sent a creator integration offer for your channel.`,
+              type: 'OFFER_YOUTUBE_BRAND',
+              data: brand,
+              isRead: false,
+              weekSent: player.currentWeek,
+              expiresIn: brand.expiresInWeeks
+          });
+      }
+
+      onUpdatePlayer({
+          ...basePlayer,
+          inbox: [...messages, ...player.inbox],
+          logs: [{ week: player.currentWeek, year: player.age, message: `📩 CHEAT: YouTube collab/brand offers sent to Messages.`, type: 'positive' }, ...player.logs].slice(0, 50)
+      });
+      setActiveCheatMenu('NONE');
+      alert('YouTube collab/brand test offers sent to Messages.');
+  };
+
+  const triggerYoutubeRivalry = () => {
+      if (!onUpdatePlayer) return;
+
+      const rivalName = 'Milo Vance';
+      const lifeEvent: LifeEvent = {
+          id: `cheat_yt_rivalry_life_${Date.now()}`,
+          type: 'SCANDAL',
+          title: `${rivalName} Starts Creator Drama`,
+          description: `${rivalName} accused your channel of copying their creator lane. Pick a response to test the rivalry flow.`,
+          options: [
+              {
+                  label: 'Ignore The Bait',
+                  description: 'Protect trust and lower heat.',
+                  impact: (p: Player) => {
+                      p.youtube.audienceTrust = Math.min(100, (p.youtube.audienceTrust ?? 55) + 3);
+                      p.youtube.controversy = Math.max(0, (p.youtube.controversy ?? 0) - 5);
+                      return { updatedPlayer: p, log: `You ignored ${rivalName}'s bait. The channel stayed cleaner.` };
+                  }
+              },
+              {
+                  label: 'Clap Back Publicly',
+                  description: 'Gain views and heat fast.',
+                  impact: (p: Player) => {
+                      const bonusViews = Math.floor(Math.max(30000, p.youtube.subscribers * 0.7));
+                      p.youtube.totalChannelViews += bonusViews;
+                      p.youtube.subscribers += Math.floor(bonusViews / 110);
+                      p.youtube.fanMood = Math.min(100, (p.youtube.fanMood ?? 55) + 5);
+                      p.youtube.audienceTrust = Math.max(0, (p.youtube.audienceTrust ?? 55) - 6);
+                      p.youtube.controversy = Math.min(100, (p.youtube.controversy ?? 0) + 16);
+                      p.stats.fame = Math.min(100, p.stats.fame + 2);
+                      p.stats.reputation = Math.max(0, p.stats.reputation - 2);
+                      return { updatedPlayer: p, log: `You clapped back at ${rivalName}: +${bonusViews.toLocaleString()} views, but heat rose.` };
+                  }
+              },
+              {
+                  label: 'Golden Mediated Collab (Watch Ad)',
+                  isGolden: true,
+                  description: 'Best path. Convert drama into a clean creator win.',
+                  impact: (p: Player) => {
+                      const bonusViews = Math.floor(Math.max(50000, p.youtube.subscribers * 0.9));
+                      p.youtube.totalChannelViews += bonusViews;
+                      p.youtube.subscribers += Math.floor(bonusViews / 90);
+                      p.youtube.audienceTrust = Math.min(100, (p.youtube.audienceTrust ?? 55) + 8);
+                      p.youtube.fanMood = Math.min(100, (p.youtube.fanMood ?? 55) + 8);
+                      p.youtube.controversy = Math.max(0, (p.youtube.controversy ?? 0) - 12);
+                      p.stats.reputation = Math.min(100, p.stats.reputation + 5);
+                      return { updatedPlayer: p, log: `You turned ${rivalName}'s feud into a controlled hit collab.` };
+                  }
+              }
+          ]
+      };
+
+      const rivalryEvent: ScheduledEvent = {
+          id: `cheat_yt_rivalry_${Date.now()}`,
+          week: player.currentWeek,
+          type: 'SCANDAL',
+          title: 'Creator Rivalry',
+          data: { lifeEvent }
+      };
+
+      onUpdatePlayer({
+          ...player,
+          youtube: {
+              ...player.youtube,
+              subscribers: Math.max(player.youtube.subscribers || 0, 125000),
+              totalChannelViews: Math.max(player.youtube.totalChannelViews || 0, 2400000),
+              isMonetized: true
+          },
+          pendingEvents: [...(player.pendingEvents || []), rivalryEvent],
+          logs: [{ week: player.currentWeek, year: player.age, message: `🥊 CHEAT: YouTube rivalry event queued.`, type: 'neutral' }, ...player.logs].slice(0, 50)
+      });
+      setActiveCheatMenu('NONE');
+  };
+
+  const triggerYoutubeCooldownReset = () => {
+      if (!onUpdatePlayer) return;
+      onUpdatePlayer({
+          ...player,
+          youtube: {
+              ...player.youtube,
+              lastLivestreamWeek: 0,
+              lastMerchDropWeek: 0,
+              lastIdentityChangeWeek: 0
+          },
+          flags: {
+              ...player.flags,
+              lastYoutubeEventAbsWeek: 0,
+              lastYoutubeCreatorInviteAbsWeek: 0,
+              lastYoutubeImageRippleAbsWeek: 0,
+              lastYoutubeRivalryAbsWeek: 0,
+              lastYoutubeCollabOfferWeek: 0,
+              lastYoutubeBrandOfferWeek: 0
+          },
+          logs: [{ week: player.currentWeek, year: player.age, message: `🔄 CHEAT: YouTube cooldowns reset.`, type: 'neutral' }, ...player.logs].slice(0, 50)
+      });
+      setActiveCheatMenu('NONE');
+      alert('YouTube cooldowns reset.');
+  };
+
+  const getInstagramCheatNpc = () => {
+      return NPC_DATABASE.find(npc => npc.handle === '@zendaya')
+          || NPC_DATABASE.find(npc => npc.tier === 'A_LIST')
+          || NPC_DATABASE[0];
+  };
+
+  const triggerInstagramBootstrap = () => {
+      if (!onUpdatePlayer) return;
+      const seededPosts = [
+          {
+              id: `cheat_ig_post_${Date.now()}_1`,
+              authorId: 'PLAYER',
+              authorName: player.name,
+              authorHandle: player.instagram.handle,
+              authorAvatar: '',
+              type: 'RED_CARPET' as const,
+              caption: 'Cheat setup: red carpet post ready for detail view QA.',
+              week: player.currentWeek,
+              year: player.age,
+              likes: 24800,
+              comments: 1800,
+              shares: 520,
+              saves: 940,
+              commentList: [
+                  'Stylist deserves a raise.',
+                  'This belongs on every best dressed page.',
+                  'The tailoring is doing cinema.',
+                  'A proper movie star entrance.'
+              ],
+              engagementScore: 82,
+              isPlayer: true
+          },
+          {
+              id: `cheat_ig_post_${Date.now()}_2`,
+              authorId: 'PLAYER',
+              authorName: player.name,
+              authorHandle: player.instagram.handle,
+              authorAvatar: '',
+              type: 'REEL' as const,
+              caption: 'Testing reels, comments, likes and saves.',
+              week: player.currentWeek,
+              year: player.age,
+              likes: 12600,
+              comments: 780,
+              shares: 410,
+              saves: 350,
+              commentList: [
+                  'The timing on this is perfect.',
+                  'Algorithm brought me here and I am staying.',
+                  'Short, chaotic, effective.',
+                  'Replay value is crazy.'
+              ],
+              engagementScore: 76,
+              isPlayer: true
+          }
+      ];
+
+      onUpdatePlayer({
+          ...player,
+          stats: {
+              ...player.stats,
+              fame: Math.max(player.stats.fame, 35),
+              reputation: Math.max(player.stats.reputation, 45),
+              followers: Math.max(player.stats.followers, 25000)
+          },
+          instagram: {
+              ...player.instagram,
+              followers: Math.max(player.instagram.followers || 0, 25000),
+              aesthetic: Math.max(player.instagram.aesthetic || 50, 72),
+              authenticity: Math.max(player.instagram.authenticity || 55, 64),
+              fashionInfluence: Math.max(player.instagram.fashionInfluence || 10, 58),
+              fanLoyalty: Math.max(player.instagram.fanLoyalty || 45, 68),
+              posts: [...seededPosts, ...player.instagram.posts],
+              feed: [...seededPosts, ...player.instagram.feed].slice(0, 50)
+          },
+          flags: {
+              ...player.flags,
+              lastInstagramMicroEventAbsWeek: 0,
+              lastInstagramDmOfferAbsWeek: 0
+          },
+          logs: [{ week: player.currentWeek, year: player.age, message: `📸 CHEAT: Instagram QA profile boosted with test posts.`, type: 'positive' }, ...player.logs].slice(0, 50)
+      });
+      setActiveCheatMenu('NONE');
+      alert('Instagram QA profile boosted. Open Phone > Social > Instagram.');
+  };
+
+  const triggerInstagramReferralDM = () => {
+      if (!onUpdatePlayer) return;
+      const npc = getInstagramCheatNpc();
+      const state = player.instagram.npcStates[npc.id] || {
+          npcId: npc.id,
+          isFollowing: true,
+          isFollowedBy: true,
+          relationshipScore: 30,
+          relationshipLevel: 'ACQUAINTANCE',
+          lastInteractionWeek: player.currentWeek,
+          hasMet: false,
+          chatHistory: []
+      };
+      const actionId = `cheat_ig_ref_${Date.now()}`;
+
+      onUpdatePlayer({
+          ...player,
+          stats: { ...player.stats, fame: Math.max(player.stats.fame, 18), followers: Math.max(player.stats.followers, 1200) },
+          instagram: {
+              ...player.instagram,
+              followers: Math.max(player.instagram.followers || 0, 1200),
+              npcStates: {
+                  ...player.instagram.npcStates,
+                  [npc.id]: {
+                      ...state,
+                      isFollowing: true,
+                      isFollowedBy: true,
+                      relationshipScore: Math.max(state.relationshipScore || 0, 30),
+                      chatHistory: [
+                          ...(state.chatHistory || []),
+                          {
+                              sender: 'NPC' as const,
+                              text: `Hey. I heard a casting director asking around for a solid fit on a studio project. I mentioned your name. If they reach out, take it seriously.`,
+                              timestamp: Date.now(),
+                              tag: 'CHEAT_IG_REFERRAL',
+                              action: { id: actionId, kind: 'IG_REFERRAL' as const, status: 'PENDING' as const, payload: { weeksLeft: 2 } }
+                          }
+                      ]
+                  }
+              }
+          },
+          logs: [{ week: player.currentWeek, year: player.age, message: `📱 CHEAT: Instagram referral DM sent by ${npc.name}.`, type: 'positive' }, ...player.logs].slice(0, 50)
+      });
+      setActiveCheatMenu('NONE');
+      alert(`Referral DM sent by ${npc.name}. Open Instagram > DM inbox.`);
+  };
+
+  const triggerInstagramBrandDM = () => {
+      if (!onUpdatePlayer) return;
+      const npc = getInstagramCheatNpc();
+      const state = player.instagram.npcStates[npc.id] || {
+          npcId: npc.id,
+          isFollowing: true,
+          isFollowedBy: true,
+          relationshipScore: 25,
+          relationshipLevel: 'ACQUAINTANCE',
+          lastInteractionWeek: player.currentWeek,
+          hasMet: false,
+          chatHistory: []
+      };
+      const offer: SponsorshipOffer = {
+          id: `cheat_ig_brand_${Date.now()}`,
+          brandName: 'FrameTheory',
+          category: 'FASHION',
+          weeklyPay: 750,
+          durationWeeks: 4,
+          requirements: { type: 'POST', energyCost: 8, totalRequired: 2, progress: 0 },
+          isExclusive: false,
+          penalty: 1200,
+          description: 'Cheat micro Instagram campaign for QA.',
+          expiresIn: 3,
+          weeksCompleted: 0
+      };
+      const actionId = `cheat_ig_brand_action_${Date.now()}`;
+
+      onUpdatePlayer({
+          ...player,
+          stats: { ...player.stats, fame: Math.max(player.stats.fame, 18), followers: Math.max(player.stats.followers, 2000) },
+          instagram: {
+              ...player.instagram,
+              followers: Math.max(player.instagram.followers || 0, 2000),
+              aesthetic: Math.max(player.instagram.aesthetic || 50, 65),
+              fashionInfluence: Math.max(player.instagram.fashionInfluence || 10, 45),
+              npcStates: {
+                  ...player.instagram.npcStates,
+                  [npc.id]: {
+                      ...state,
+                      isFollowing: true,
+                      isFollowedBy: true,
+                      chatHistory: [
+                          ...(state.chatHistory || []),
+                          {
+                              sender: 'NPC' as const,
+                              text: `Quick brand thing. FrameTheory likes your Instagram vibe and asked if I could connect you. Small campaign, clean brief. Interested?`,
+                              timestamp: Date.now(),
+                              tag: 'CHEAT_IG_BRAND',
+                              action: { id: actionId, kind: 'IG_BRAND_OFFER' as const, status: 'PENDING' as const, payload: { offer } }
+                          }
+                      ]
+                  }
+              }
+          },
+          logs: [{ week: player.currentWeek, year: player.age, message: `📱 CHEAT: Instagram brand DM sent by ${npc.name}.`, type: 'positive' }, ...player.logs].slice(0, 50)
+      });
+      setActiveCheatMenu('NONE');
+      alert(`Brand DM sent by ${npc.name}. Open Instagram > DM inbox.`);
+  };
+
+  const triggerInstagramCooldownReset = () => {
+      if (!onUpdatePlayer) return;
+      onUpdatePlayer({
+          ...player,
+          flags: {
+              ...player.flags,
+              lastInstagramMicroEventAbsWeek: 0,
+              lastInstagramDmOfferAbsWeek: 0,
+              pendingInstagramReferrals: []
+          },
+          logs: [{ week: player.currentWeek, year: player.age, message: `🔄 CHEAT: Instagram cooldowns reset.`, type: 'neutral' }, ...player.logs].slice(0, 50)
+      });
+      setActiveCheatMenu('NONE');
+      alert('Instagram cooldowns reset. Age up to test organic IG events/DMs.');
+  };
+
   const ensureCheatStudio = () => {
       const existingStudio = player.businesses.find(b => b.type === 'PRODUCTION_HOUSE');
       if (existingStudio) {
@@ -1140,6 +1593,62 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                       {activeCheatMenu === 'DEV' && (
                           <div className="space-y-2">
                               <h4 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest border-b border-zinc-800 pb-1 flex items-center gap-2">
+                                 <PlayCircle size={10} /> YouTube QA
+                              </h4>
+                              <div className="rounded-xl bg-zinc-950 border border-zinc-800 p-3 text-[10px] text-zinc-400">
+                                  Creator Score <span className="text-white font-black">{calculateYoutubeCreatorScore(player)}</span> • Image <span className="text-red-300 font-black">{getYoutubePublicImageLabel(player)}</span>
+                              </div>
+                              <div className="grid grid-cols-2 gap-2">
+                                  <button onClick={triggerYoutubeBootstrap} className="col-span-2 bg-red-900/30 hover:bg-red-900/50 border border-red-500/30 text-xs font-bold py-3 rounded-lg text-red-300 flex items-center justify-center gap-2">
+                                      <PlayCircle size={14}/> Boost Creator Channel
+                                  </button>
+                                  <button onClick={triggerYoutubeOffers} className="bg-amber-900/30 hover:bg-amber-900/50 border border-amber-500/30 text-[10px] font-bold py-3 rounded-lg text-amber-300">
+                                      Send Collab + Brand
+                                  </button>
+                                  <button onClick={triggerYoutubeRivalry} className="bg-rose-900/30 hover:bg-rose-900/50 border border-rose-500/30 text-[10px] font-bold py-3 rounded-lg text-rose-300">
+                                      Force Rivalry
+                                  </button>
+                                  <button onClick={triggerYoutubeCooldownReset} className="col-span-2 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-xs font-bold py-3 rounded-lg text-white">
+                                      Reset YouTube Cooldowns
+                                  </button>
+                                  <button onClick={() => { setActiveCheatMenu('NONE'); setPage?.(Page.MOBILE); }} className="col-span-2 bg-white text-black hover:bg-zinc-200 text-xs font-black py-3 rounded-lg">
+                                      Open Phone
+                                  </button>
+                              </div>
+                          </div>
+                      )}
+
+                      {activeCheatMenu === 'DEV' && (
+                          <div className="space-y-2">
+                              <h4 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest border-b border-zinc-800 pb-1 flex items-center gap-2">
+                                 <Camera size={10} /> Instagram QA
+                              </h4>
+                              <div className="rounded-xl bg-zinc-950 border border-zinc-800 p-3 text-[10px] text-zinc-400">
+                                  Followers <span className="text-white font-black">{Math.max(player.stats.followers || 0, player.instagram.followers || 0).toLocaleString()}</span> • Aesthetic <span className="text-pink-300 font-black">{player.instagram.aesthetic ?? 50}</span> • Fashion <span className="text-amber-300 font-black">{player.instagram.fashionInfluence ?? 10}</span>
+                              </div>
+                              <div className="grid grid-cols-2 gap-2">
+                                  <button onClick={triggerInstagramBootstrap} className="col-span-2 bg-pink-900/30 hover:bg-pink-900/50 border border-pink-500/30 text-xs font-bold py-3 rounded-lg text-pink-300 flex items-center justify-center gap-2">
+                                      <Camera size={14}/> Boost Instagram + Posts
+                                  </button>
+                                  <button onClick={triggerInstagramReferralDM} className="bg-cyan-900/30 hover:bg-cyan-900/50 border border-cyan-500/30 text-[10px] font-bold py-3 rounded-lg text-cyan-300">
+                                      Force Referral DM
+                                  </button>
+                                  <button onClick={triggerInstagramBrandDM} className="bg-emerald-900/30 hover:bg-emerald-900/50 border border-emerald-500/30 text-[10px] font-bold py-3 rounded-lg text-emerald-300">
+                                      Force Brand DM
+                                  </button>
+                                  <button onClick={triggerInstagramCooldownReset} className="col-span-2 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-xs font-bold py-3 rounded-lg text-white">
+                                      Reset Instagram Cooldowns
+                                  </button>
+                                  <button onClick={() => { setActiveCheatMenu('NONE'); setPage?.(Page.MOBILE); }} className="col-span-2 bg-white text-black hover:bg-zinc-200 text-xs font-black py-3 rounded-lg">
+                                      Open Phone
+                                  </button>
+                              </div>
+                          </div>
+                      )}
+
+                      {activeCheatMenu === 'DEV' && (
+                          <div className="space-y-2">
+                              <h4 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest border-b border-zinc-800 pb-1 flex items-center gap-2">
                                  <Crown size={10} /> Legacy Test Tools
                               </h4>
                               <div className="grid grid-cols-1 gap-2">
@@ -1334,19 +1843,35 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
       )}
 
       {showAvatarEditor && (
-          <div className="fixed inset-0 z-[220] bg-black/90 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200">
-              <div className="w-full max-w-md h-[82vh] sm:h-auto sm:max-h-[90vh] rounded-t-[2rem] sm:rounded-[2rem] border border-zinc-800 bg-black overflow-hidden flex flex-col">
-                  <div className="flex items-center justify-between gap-4 p-5 border-b border-zinc-800 bg-zinc-950/90">
-                      <div>
+          <div className="fixed inset-0 z-[500] bg-black/90 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200">
+              <div className="relative w-full max-w-md h-[100dvh] max-h-[100dvh] sm:h-auto sm:max-h-[90vh] rounded-none sm:rounded-[2rem] sm:border border-zinc-800 bg-black overflow-hidden flex flex-col">
+                  <div
+                      className="flex items-start justify-between gap-4 p-5 border-b border-zinc-800 bg-zinc-950/95"
+                      style={{ paddingTop: 'max(calc(env(safe-area-inset-top) + 2.5rem), 3.75rem)' }}
+                  >
+                      <div className="min-w-0">
                           <div className="text-[10px] uppercase tracking-[0.25em] text-amber-500 mb-1">Change Avatar</div>
                           <h3 className="text-xl font-black text-white">{player.name}</h3>
+                          <div className="text-xs text-zinc-500 mt-1">Choose a preset or upload a custom photo.</div>
                       </div>
-                      <button onClick={() => setShowAvatarEditor(false)} className="p-2 rounded-full bg-zinc-900 text-zinc-400 hover:text-white transition-colors">
-                          <X size={18} />
-                      </button>
+                      <div className="flex items-center gap-2 shrink-0">
+                          <button
+                              onClick={handleSaveAvatar}
+                              disabled={!selectedAvatar || isCompressing || !onUpdatePlayer}
+                              className="px-4 py-2 rounded-full bg-amber-500 text-black font-black text-xs uppercase tracking-[0.18em] hover:bg-amber-400 transition-colors disabled:opacity-50"
+                          >
+                              Save
+                          </button>
+                          <button onClick={() => setShowAvatarEditor(false)} className="p-2 rounded-full bg-zinc-900 text-zinc-400 hover:text-white transition-colors">
+                              <X size={18} />
+                          </button>
+                      </div>
                   </div>
 
-                  <div className="flex-1 overflow-y-auto p-5 space-y-5">
+                  <div
+                      className="min-h-0 flex-1 overflow-y-auto p-5 space-y-5"
+                      style={{ paddingBottom: 'max(calc(env(safe-area-inset-bottom) + 1rem), 1.5rem)' }}
+                  >
                       <div className="flex flex-col items-center">
                           <button type="button" onClick={() => fileInputRef.current?.click()} className="relative group">
                               <div className="w-28 h-28 rounded-full p-1 bg-gradient-to-tr from-amber-400 via-amber-500 to-amber-700 shadow-[0_0_30px_rgba(245,158,11,0.18)]">
@@ -1379,7 +1904,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
 
                       <div className="rounded-[1.75rem] border border-zinc-800 bg-zinc-950/80 p-4">
                           <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] mb-3">Preset Looks</div>
-                          <div className="grid grid-cols-5 gap-3 max-h-56 overflow-y-auto custom-scrollbar pr-1">
+                          <div className="grid grid-cols-5 gap-3 max-h-[48dvh] overflow-y-auto custom-scrollbar pr-1">
                               {currentAvatarList.map((avatarUrl, idx) => {
                                   const isSelected = selectedAvatar === avatarUrl;
                                   return (
@@ -1406,22 +1931,6 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                               Custom uploaded photo selected. This will become the active portrait for this playable character everywhere in the game.
                           </div>
                       )}
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3 p-5 border-t border-zinc-800 bg-zinc-950/90">
-                      <button
-                          onClick={() => setShowAvatarEditor(false)}
-                          className="py-3 rounded-2xl border border-zinc-800 bg-zinc-900 text-zinc-300 font-bold text-sm hover:bg-zinc-800 transition-colors"
-                      >
-                          Cancel
-                      </button>
-                      <button
-                          onClick={handleSaveAvatar}
-                          disabled={!selectedAvatar || isCompressing || !onUpdatePlayer}
-                          className="py-3 rounded-2xl bg-amber-500 text-black font-black text-sm hover:bg-amber-400 transition-colors disabled:opacity-50"
-                      >
-                          Save Avatar
-                      </button>
                   </div>
               </div>
           </div>

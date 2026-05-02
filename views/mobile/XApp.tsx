@@ -1,10 +1,11 @@
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Player, XPost, NPCActor, NPCState } from '../../types';
 import { generateXFeed, generateTrendingTopics } from '../../services/xLogic';
 import { NPC_DATABASE } from '../../services/npcLogic';
+import { getEnabledGlobalCreatorSocialProfiles } from '../../services/youtubeLogic';
 import { spendPlayerEnergy } from '../../services/premiumLogic';
-import { ArrowLeft, Home, Search, PenTool, Heart, Repeat, MessageCircle, MoreHorizontal, Check, User, Mail, Calendar, MapPin, Link as LinkIcon, Bell, Star } from 'lucide-react';
+import { ArrowLeft, Home, Search, PenTool, Heart, Repeat, MessageCircle, MoreHorizontal, Check, User, Mail, Calendar, MapPin, Link as LinkIcon, Bell, Star, XCircle, Flame, ShieldCheck, Laugh, Megaphone, Film, Users, MessageSquareQuote } from 'lucide-react';
 
 interface XAppProps {
     player: Player;
@@ -14,13 +15,58 @@ interface XAppProps {
 
 type XTab = 'HOME' | 'SEARCH' | 'NOTIFICATIONS' | 'PROFILE';
 type FeedTab = 'FOR_YOU' | 'FOLLOWING';
+type XView = 'MAIN' | 'POST_DETAIL';
+type XPostType = NonNullable<XPost['postType']>;
+type XReplyTone = 'SUPPORT' | 'JOKE' | 'CLAP_BACK' | 'CLARIFY' | 'APOLOGIZE';
+
+const X_POST_TYPES: Record<XPostType, {
+    label: string;
+    prompt: string;
+    icon: React.ElementType;
+    reach: number;
+    conversion: number;
+    controversy: number;
+    reputation: number;
+    placeholder: string;
+}> = {
+    CAREER: { label: 'Career', prompt: 'Career Update', icon: Megaphone, reach: 1.25, conversion: 0.026, controversy: 0, reputation: 1, placeholder: 'Share a career update...' },
+    HOT_TAKE: { label: 'Hot Take', prompt: 'Hot Take', icon: Flame, reach: 1.65, conversion: 0.018, controversy: 7, reputation: -1, placeholder: 'Say the thing Film Twitter will argue about...' },
+    JOKE: { label: 'Joke', prompt: 'Joke', icon: Laugh, reach: 1.35, conversion: 0.024, controversy: 2, reputation: 0, placeholder: 'Post something funny...' },
+    FILM_OPINION: { label: 'Film', prompt: 'Film Opinion', icon: Film, reach: 1.2, conversion: 0.02, controversy: 2, reputation: 1, placeholder: 'Share a film opinion...' },
+    PR_STATEMENT: { label: 'PR', prompt: 'PR Statement', icon: ShieldCheck, reach: 0.85, conversion: 0.012, controversy: -6, reputation: 2, placeholder: 'Make a clean public statement...' },
+    DRAMA_REPLY: { label: 'Drama', prompt: 'Drama Reply', icon: MessageSquareQuote, reach: 1.85, conversion: 0.016, controversy: 10, reputation: -2, placeholder: 'Reply to the discourse...' },
+    FAN_THANKS: { label: 'Fans', prompt: 'Fan Thank You', icon: Users, reach: 1.05, conversion: 0.032, controversy: -1, reputation: 1, placeholder: 'Thank the fans...' },
+    GENERAL: { label: 'General', prompt: 'General Post', icon: PenTool, reach: 1, conversion: 0.02, controversy: 0, reputation: 0, placeholder: 'What is happening?!' }
+};
+
+const X_REPLY_TONES: Record<XReplyTone, { label: string; text: string; controversy: number; reputation: number; reach: number }> = {
+    SUPPORT: { label: 'Support', text: 'This is fair. People should actually read the full context.', controversy: -1, reputation: 1, reach: 0.8 },
+    JOKE: { label: 'Joke', text: 'The timeline chose chaos today and somehow I respect it.', controversy: 2, reputation: 0, reach: 1.1 },
+    CLAP_BACK: { label: 'Clap Back', text: 'Wild take. Loud does not always mean right.', controversy: 8, reputation: -1, reach: 1.65 },
+    CLARIFY: { label: 'Clarify', text: 'Quick context before this turns into something it is not.', controversy: -4, reputation: 2, reach: 0.9 },
+    APOLOGIZE: { label: 'Apologize', text: 'I hear the criticism. That could have been said better.', controversy: -8, reputation: 2, reach: 0.65 }
+};
+
+const X_REPLY_BANK: Record<XPostType, string[]> = {
+    CAREER: ['Booked and busy era?', 'This sounds bigger than people realize.', 'Casting directors are watching.', 'The resume is moving.'],
+    HOT_TAKE: ['The quotes are about to be a war zone.', 'Honestly? Not completely wrong.', 'Delete this before brunch.', 'Film Twitter found its lunch today.'],
+    JOKE: ['Okay this one got me.', 'Rare good celebrity joke.', 'The timing is too clean.', 'I hate that I laughed.'],
+    FILM_OPINION: ['Cinema discourse is alive.', 'This is a brave ranking.', 'Respectfully disagree but I see it.', 'You can tell they actually watch movies.'],
+    PR_STATEMENT: ['This is the mature version.', 'PR team finally slept tonight.', 'Good clarification.', 'Clean statement, no notes.'],
+    DRAMA_REPLY: ['The timeline is awake.', 'This is getting screenshotted.', 'PR is sweating.', 'This reply changed the whole conversation.'],
+    FAN_THANKS: ['Day one fans are emotional.', 'This is why people root for you.', 'Simple and sweet.', 'The fanbase needed this.'],
+    GENERAL: ['Real.', 'The timeline gets it.', 'Mood.', 'This app is unserious.']
+};
 
 export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) => {
     const [tab, setTab] = useState<XTab>('HOME');
+    const [view, setView] = useState<XView>('MAIN');
     const [feedTab, setFeedTab] = useState<FeedTab>('FOR_YOU');
     const [composeOpen, setComposeOpen] = useState(false);
+    const [composeType, setComposeType] = useState<XPostType>('GENERAL');
     const [tweetContent, setTweetContent] = useState('');
     const [selectedProfile, setSelectedProfile] = useState<NPCActor | null>(null); // Null means viewing own profile
+    const [selectedPost, setSelectedPost] = useState<XPost | null>(null);
     
     // Initialize feed if empty or outdated
     const [feed, setFeed] = useState<XPost[]>(() => {
@@ -34,6 +80,52 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
 
     const trending = generateTrendingTopics(player);
     const npcStates = (player.instagram?.npcStates || {}) as Record<string, NPCState>;
+    const npcPool = useMemo(() => {
+        const creators = getEnabledGlobalCreatorSocialProfiles(player);
+        return [...NPC_DATABASE, ...(Array.isArray(player.flags?.extraNPCs) ? player.flags.extraNPCs : []), ...creators]
+            .filter((npc, index, arr) => arr.findIndex(entry => entry.id === npc.id) === index) as NPCActor[];
+    }, [player]);
+    const profilePosts = useMemo(() => {
+        if (!selectedProfile) return player.x.posts;
+        const realPosts = feed.filter(post => post.authorId === selectedProfile.id);
+        const syntheticPosts: XPost[] = Array.from({ length: 8 }).map((_, index) => {
+            const types: XPostType[] = selectedProfile.occupation === 'DIRECTOR'
+                ? ['FILM_OPINION', 'CAREER', 'GENERAL', 'PR_STATEMENT']
+                : ['CAREER', 'JOKE', 'FILM_OPINION', 'FAN_THANKS'];
+            const postType = types[(selectedProfile.id.charCodeAt(0) + index) % types.length];
+            const likes = Math.max(20, Math.floor((selectedProfile.followers || 1000) * (0.001 + ((index + 2) * 0.0007))));
+            return {
+                id: `x_profile_${selectedProfile.id}_${index}`,
+                authorId: selectedProfile.id,
+                authorName: selectedProfile.name,
+                authorHandle: selectedProfile.handle,
+                authorAvatar: selectedProfile.avatar,
+                content: [
+                    'Long day, good work.',
+                    'Every project teaches you something.',
+                    'The industry is quieter than people think until it suddenly is not.',
+                    'Reading a script that understands silence.',
+                    'Grateful for the people still showing up.',
+                    'Film discourse is better when people actually watch the film.',
+                    'Back on set soon.',
+                    'Some rumors are funnier than the truth.'
+                ][index],
+                timestamp: Math.max(1, player.currentWeek - index),
+                likes,
+                retweets: Math.floor(likes * 0.18),
+                replies: Math.floor(likes * 0.08),
+                isPlayer: false,
+                isLiked: false,
+                isRetweeted: false,
+                isVerified: selectedProfile.tier === 'A_LIST' || selectedProfile.tier === 'ESTABLISHED',
+                postType,
+                replyList: X_REPLY_BANK[postType].slice(0, 3),
+                quoteList: ['Interesting timing.', 'This has layers.', 'The replies are better than the trades.'],
+                sentiment: postType === 'JOKE' ? 'FUNNY' : postType === 'HOT_TAKE' ? 'MESSY' : 'NEUTRAL'
+            };
+        });
+        return [...realPosts, ...syntheticPosts].slice(0, 12);
+    }, [feed, player.currentWeek, player.x.posts, selectedProfile]);
 
     // --- ACTIONS ---
 
@@ -46,10 +138,11 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
         // CALCULATE ENGAGEMENT (Improved Randomized Logic for X)
         const currentXFollowers = Math.max(0, player.x.followers);
         const fameFactor = Math.max(1, player.stats.fame);
+        const typeConfig = X_POST_TYPES[composeType];
         
         // Base reach is followers + random fame boost (Twitter algorithm can be volatile)
         // Even with 0 followers, hashtags give reach
-        const baseReach = 30 + (currentXFollowers * 0.15) + (fameFactor * 40);
+        const baseReach = (30 + (currentXFollowers * 0.15) + (fameFactor * 40)) * typeConfig.reach;
         
         // Quality/Timing Roll (0.5x to 2.5x - Twitter is more volatile)
         const qualityMultiplier = 0.5 + (Math.random() * 2.0);
@@ -76,7 +169,7 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
         // CALCULATE GROWTH (Specific to X)
         // Gain ~1 follower per 20-30 likes usually, harder than IG
         // New user boost
-        let conversionRate = 0.01 + (Math.random() * 0.02);
+        let conversionRate = typeConfig.conversion + (Math.random() * 0.012);
         if (currentXFollowers < 500) conversionRate += 0.05;
 
         let organicGain = Math.floor(likes * conversionRate);
@@ -100,21 +193,44 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
             isPlayer: true,
             isLiked: false,
             isRetweeted: false,
-            isVerified: player.stats.fame > 50
+            isVerified: player.stats.fame > 50,
+            postType: composeType,
+            replyList: X_REPLY_BANK[composeType].sort(() => 0.5 - Math.random()).slice(0, 4),
+            quoteList: [
+                'This is spreading outside the fandom.',
+                'Someone in the industry definitely saw this.',
+                'The replies are doing the most.',
+                'This is the kind of post that changes the week.'
+            ].sort(() => 0.5 - Math.random()).slice(0, 2),
+            controversyScore: Math.max(0, typeConfig.controversy + Math.floor(Math.random() * 4)),
+            sentiment: typeConfig.controversy >= 7 ? 'MESSY' : composeType === 'JOKE' ? 'FUNNY' : composeType === 'CAREER' ? 'INDUSTRY' : 'NEUTRAL'
         };
 
         const updatedPosts = [newPost, ...player.x.posts];
         const updatedFeed = [newPost, ...feed];
+        const reputationDelta = typeConfig.reputation;
+        const controversyDelta = Math.max(-8, typeConfig.controversy);
+        const logType = controversyDelta >= 7 ? 'negative' as const : 'positive' as const;
         
         const nextPlayer = {
             ...player,
+            stats: {
+                ...player.stats,
+                reputation: Math.max(0, Math.min(100, player.stats.reputation + reputationDelta)),
+                fame: Math.max(0, Math.min(100, player.stats.fame + (likes >= 500 ? 1 : 0)))
+            },
             x: {
                 ...player.x,
                 posts: updatedPosts,
                 feed: updatedFeed,
                 followers: newXFollowers,
                 lastPostWeek: player.currentWeek
-            }
+            },
+            instagram: {
+                ...player.instagram,
+                controversy: Math.max(0, Math.min(100, (player.instagram.controversy || 0) + Math.max(0, controversyDelta)))
+            },
+            logs: [{ week: player.currentWeek, year: player.age, message: controversyDelta >= 7 ? `X heated up after your ${typeConfig.label.toLowerCase()} post.` : `Posted a ${typeConfig.label.toLowerCase()} update on X.`, type: logType }, ...player.logs].slice(0, 50)
         };
         spendPlayerEnergy(nextPlayer, 5);
         onUpdatePlayer(nextPlayer);
@@ -154,6 +270,75 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
         onUpdatePlayer({ ...player, x: { ...player.x, feed: updatedFeed } });
     };
 
+    const openPostDetail = (post: XPost) => {
+        setSelectedPost(post);
+        setView('POST_DETAIL');
+    };
+
+    const handleQuoteOrReply = (post: XPost, tone: XReplyTone, mode: 'QUOTE' | 'REPLY') => {
+        const toneConfig = X_REPLY_TONES[tone];
+        const sourceReach = Math.max(40, post.likes + post.retweets * 2 + post.replies * 4);
+        const reach = Math.floor(sourceReach * toneConfig.reach * (0.2 + Math.random() * 0.25));
+        const likes = Math.max(1, Math.floor(reach * (0.08 + Math.random() * 0.08)));
+        const retweets = Math.floor(likes * (mode === 'QUOTE' ? 0.35 : 0.18));
+        const replies = Math.floor(likes * (toneConfig.controversy > 4 ? 0.28 : 0.1));
+        const gainedFollowers = Math.max(0, Math.floor(likes * (toneConfig.controversy > 4 ? 0.012 : 0.018)));
+        const newPost: XPost = {
+            id: `x_${mode.toLowerCase()}_${Date.now()}`,
+            authorId: 'PLAYER',
+            authorName: player.name,
+            authorHandle: player.x.handle,
+            authorAvatar: player.avatar.startsWith('data:') ? '' : player.avatar,
+            content: mode === 'QUOTE' ? `${toneConfig.text}\n\nQuote: "${post.content}"` : toneConfig.text,
+            timestamp: player.currentWeek,
+            likes,
+            retweets,
+            replies,
+            isPlayer: true,
+            isLiked: false,
+            isRetweeted: false,
+            isVerified: player.stats.fame > 50,
+            postType: tone === 'CLAP_BACK' ? 'DRAMA_REPLY' : tone === 'JOKE' ? 'JOKE' : tone === 'CLARIFY' || tone === 'APOLOGIZE' ? 'PR_STATEMENT' : 'GENERAL',
+            quoteOfId: mode === 'QUOTE' ? post.id : undefined,
+            replyList: X_REPLY_BANK[tone === 'CLAP_BACK' ? 'DRAMA_REPLY' : tone === 'JOKE' ? 'JOKE' : 'PR_STATEMENT'].slice(0, 4),
+            quoteList: ['This reply changed the tone.', 'The timeline is watching.', 'Smart move.', 'Risky but effective.'],
+            controversyScore: Math.max(0, toneConfig.controversy),
+            sentiment: toneConfig.controversy >= 6 ? 'MESSY' : tone === 'JOKE' ? 'FUNNY' : 'NEUTRAL'
+        };
+        const updatedFeed = [newPost, ...feed].slice(0, 80);
+        const updatedPosts = [newPost, ...player.x.posts].slice(0, 80);
+        const nextPlayer = {
+            ...player,
+            stats: {
+                ...player.stats,
+                reputation: Math.max(0, Math.min(100, player.stats.reputation + toneConfig.reputation)),
+                fame: Math.max(0, Math.min(100, player.stats.fame + (likes >= 1000 ? 1 : 0)))
+            },
+            x: {
+                ...player.x,
+                posts: updatedPosts,
+                feed: updatedFeed,
+                followers: player.x.followers + gainedFollowers
+            },
+            instagram: {
+                ...player.instagram,
+                controversy: Math.max(0, Math.min(100, (player.instagram.controversy || 0) + Math.max(0, toneConfig.controversy)))
+            },
+            logs: [{
+                week: player.currentWeek,
+                year: player.age,
+                message: mode === 'QUOTE'
+                    ? `Quoted ${post.authorName} on X.`
+                    : `Replied to ${post.authorName} on X.`,
+                type: toneConfig.controversy >= 6 ? 'negative' as const : 'positive' as const
+            }, ...player.logs].slice(0, 50)
+        };
+        spendPlayerEnergy(nextPlayer, mode === 'QUOTE' ? 8 : 5);
+        setFeed(updatedFeed);
+        setSelectedPost(newPost);
+        onUpdatePlayer(nextPlayer);
+    };
+
     const handleFollowToggle = (npc: NPCActor) => {
         const currentState = npcStates[npc.id] || {
             npcId: npc.id,
@@ -183,7 +368,7 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
             setSelectedProfile(null);
             setTab('PROFILE');
         } else {
-            const npc = NPC_DATABASE.find(n => n.id === npcId);
+            const npc = npcPool.find(n => n.id === npcId);
             if (npc) {
                 setSelectedProfile(npc);
                 setTab('PROFILE');
@@ -213,7 +398,7 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
         const avatarSrc = post.isPlayer ? player.avatar : post.authorAvatar;
 
         return (
-            <div className="p-4 flex gap-3 border-b border-zinc-800 hover:bg-white/5 transition-colors cursor-pointer">
+            <div onClick={() => openPostDetail(post)} className="p-4 flex gap-3 border-b border-zinc-800 hover:bg-white/5 transition-colors cursor-pointer">
                 <div className="shrink-0" onClick={(e) => { e.stopPropagation(); handleProfileClick(post.authorId); }}>
                     <img src={avatarSrc} className="w-10 h-10 rounded-full object-cover bg-zinc-800 border border-zinc-800" />
                 </div>
@@ -226,6 +411,11 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
                     <div className="text-sm text-zinc-200 leading-normal mb-3 whitespace-pre-wrap">
                         {post.content}
                     </div>
+                    {post.quoteOfId && (
+                        <div className="mb-3 rounded-2xl border border-zinc-800 bg-zinc-950 p-3 text-xs text-zinc-400">
+                            Quoted post
+                        </div>
+                    )}
                     
                     {/* Action Bar */}
                     <div className="flex justify-between text-zinc-500 max-w-xs pr-2">
@@ -252,6 +442,87 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
 
     return (
         <div className="absolute inset-0 bg-black flex flex-col z-40 text-white animate-in slide-in-from-right duration-300 font-sans overflow-hidden">
+            {view === 'POST_DETAIL' && selectedPost && (
+                <div className="absolute inset-0 z-[60] bg-black flex flex-col animate-in slide-in-from-right duration-200">
+                    <div className="sticky top-0 z-20 bg-black/85 backdrop-blur-md px-4 pt-12 pb-3 border-b border-zinc-800 flex items-center gap-4">
+                        <button onClick={() => { setView('MAIN'); setSelectedPost(null); }} className="p-2 -ml-2 rounded-full hover:bg-white/10">
+                            <ArrowLeft size={20} />
+                        </button>
+                        <div>
+                            <div className="font-black text-lg leading-none">Post</div>
+                            <div className="text-[11px] text-zinc-500 uppercase tracking-widest">{X_POST_TYPES[selectedPost.postType || 'GENERAL'].label}</div>
+                        </div>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto custom-scrollbar pb-24">
+                        <div className="p-4 border-b border-zinc-800">
+                            <div className="flex gap-3">
+                                <img src={selectedPost.isPlayer ? player.avatar : selectedPost.authorAvatar} className="w-12 h-12 rounded-full object-cover bg-zinc-800" />
+                                <div className="min-w-0 flex-1">
+                                    <div className="flex items-center gap-1">
+                                        <div className="font-black text-white truncate">{selectedPost.authorName}</div>
+                                        {selectedPost.isVerified && <Check size={14} className="text-blue-400" />}
+                                    </div>
+                                    <div className="text-sm text-zinc-500">{selectedPost.authorHandle}</div>
+                                </div>
+                            </div>
+                            <div className="mt-4 whitespace-pre-wrap text-[17px] leading-relaxed text-white">{selectedPost.content}</div>
+                            <div className="mt-4 flex flex-wrap gap-2 text-[11px] font-black uppercase tracking-widest">
+                                <span className="rounded-full bg-zinc-900 px-3 py-1 text-zinc-400">{selectedPost.timestamp === player.currentWeek ? 'This week' : `Week ${selectedPost.timestamp}`}</span>
+                                {(selectedPost.controversyScore || 0) > 0 && <span className="rounded-full bg-red-500/10 px-3 py-1 text-red-300">Heat {selectedPost.controversyScore}</span>}
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-3 border-b border-zinc-800 text-center">
+                            <div className="p-3"><div className="font-black">{formatNumber(selectedPost.replies)}</div><div className="text-[10px] text-zinc-500 uppercase">Replies</div></div>
+                            <div className="p-3 border-x border-zinc-800"><div className="font-black">{formatNumber(selectedPost.retweets)}</div><div className="text-[10px] text-zinc-500 uppercase">Reposts</div></div>
+                            <div className="p-3"><div className="font-black">{formatNumber(selectedPost.likes)}</div><div className="text-[10px] text-zinc-500 uppercase">Likes</div></div>
+                        </div>
+
+                        {!selectedPost.isPlayer && (
+                            <div className="p-4 border-b border-zinc-800">
+                                <div className="text-xs font-black uppercase tracking-widest text-zinc-500 mb-3">Respond</div>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {(Object.keys(X_REPLY_TONES) as XReplyTone[]).map(tone => (
+                                        <button
+                                            key={tone}
+                                            onClick={() => handleQuoteOrReply(selectedPost, tone, tone === 'SUPPORT' || tone === 'CLARIFY' ? 'REPLY' : 'QUOTE')}
+                                            disabled={player.energy.current < 5}
+                                            className="rounded-2xl border border-zinc-800 bg-zinc-950 px-3 py-3 text-left disabled:opacity-40"
+                                        >
+                                            <div className="text-sm font-black text-white">{X_REPLY_TONES[tone].label}</div>
+                                            <div className="mt-1 text-[11px] leading-snug text-zinc-500">{tone === 'CLAP_BACK' ? 'High reach, risky.' : tone === 'APOLOGIZE' ? 'Cools backlash.' : 'Public reply.'}</div>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="p-4 space-y-4">
+                            <div>
+                                <div className="mb-3 text-xs font-black uppercase tracking-widest text-zinc-500">Replies</div>
+                                {(selectedPost.replyList && selectedPost.replyList.length > 0 ? selectedPost.replyList : X_REPLY_BANK[selectedPost.postType || 'GENERAL']).map((reply, index) => (
+                                    <div key={`${selectedPost.id}_reply_${index}`} className="flex gap-3 border-b border-zinc-900 py-3">
+                                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-xs font-black text-zinc-400">@</div>
+                                        <div className="min-w-0">
+                                            <div className="text-xs font-bold text-zinc-500">@timeline_{index + 1}</div>
+                                            <div className="text-sm leading-relaxed text-zinc-200">{reply}</div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                            <div>
+                                <div className="mb-3 text-xs font-black uppercase tracking-widest text-zinc-500">Quotes</div>
+                                {(selectedPost.quoteList && selectedPost.quoteList.length > 0 ? selectedPost.quoteList : ['People are watching this one.']).map((quote, index) => (
+                                    <div key={`${selectedPost.id}_quote_${index}`} className="rounded-2xl border border-zinc-800 bg-zinc-950 p-3 text-sm text-zinc-300 mb-2">
+                                        <span className="font-bold text-white">@quote_room_{index + 1}</span> {quote}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
             
             {/* --- HEADER --- */}
             {tab === 'HOME' ? (
@@ -332,7 +603,7 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
                         <div className="p-4 pb-20">
                             <h3 className="font-extrabold text-lg mb-4">Who to follow</h3>
                             <div className="space-y-4">
-                                {NPC_DATABASE.slice(0, 5).map(npc => {
+                                {npcPool.slice(0, 5).map(npc => {
                                     const isFollowing = npcStates[npc.id]?.isFollowing;
                                     return (
                                         <div key={npc.id} onClick={() => handleProfileClick(npc.id)} className="flex items-center gap-3">
@@ -427,10 +698,10 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
 
                         {/* Profile Feed */}
                         <div>
-                            {selectedProfile ? (
-                                <div className="p-8 text-center text-zinc-500 text-sm">NPC posts coming soon to profile view.</div>
+                            {profilePosts.length === 0 ? (
+                                <div className="p-8 text-center text-zinc-500 text-sm">No posts yet.</div>
                             ) : (
-                                player.x.posts.map(p => <TweetCard key={p.id} post={p} />)
+                                profilePosts.map(p => <TweetCard key={p.id} post={p} />)
                             )}
                         </div>
                     </div>
@@ -439,14 +710,22 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
                 {/* 4. NOTIFICATIONS */}
                 {tab === 'NOTIFICATIONS' && (
                     <div className="divide-y divide-zinc-800">
-                        <div className="p-4 flex gap-3 hover:bg-zinc-900">
-                            <Star size={24} className="text-purple-500 fill-purple-500" />
-                            <div>
-                                <div className="mb-1"><img src={NPC_DATABASE[0].avatar} className="w-8 h-8 rounded-full" /></div>
-                                <div className="text-sm text-zinc-300"><span className="font-bold text-white">{NPC_DATABASE[0].name}</span> liked your post</div>
-                                <div className="text-zinc-500 text-sm mt-1">"Just watched a masterpiece..."</div>
-                            </div>
-                        </div>
+                        {player.x.posts.length === 0 ? (
+                            <div className="p-8 text-center text-zinc-500 text-sm">Post on X to start getting notifications.</div>
+                        ) : player.x.posts.slice(0, 6).map((post, index) => {
+                            const npc = npcPool[(index * 3) % npcPool.length] || NPC_DATABASE[0];
+                            const action = index % 3 === 0 ? 'liked' : index % 3 === 1 ? 'reposted' : 'replied to';
+                            return (
+                                <button key={`${post.id}_note_${index}`} onClick={() => openPostDetail(post)} className="w-full p-4 flex gap-3 hover:bg-zinc-900 text-left">
+                                    {action === 'liked' ? <Star size={24} className="text-purple-500 fill-purple-500 shrink-0" /> : action === 'reposted' ? <Repeat size={24} className="text-green-500 shrink-0" /> : <MessageCircle size={24} className="text-blue-400 shrink-0" />}
+                                    <div className="min-w-0">
+                                        <div className="mb-1"><img src={npc.avatar} className="w-8 h-8 rounded-full object-cover" /></div>
+                                        <div className="text-sm text-zinc-300"><span className="font-bold text-white">{npc.name}</span> {action} your post</div>
+                                        <div className="truncate text-zinc-500 text-sm mt-1">"{post.content}"</div>
+                                    </div>
+                                </button>
+                            );
+                        })}
                     </div>
                 )}
 
@@ -454,7 +733,7 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
 
             {/* --- FLOATING ACTION BUTTON --- */}
             <button 
-                onClick={() => setComposeOpen(true)}
+                onClick={() => { setComposeType('GENERAL'); setComposeOpen(true); }}
                 className="absolute bottom-20 right-4 w-14 h-14 bg-blue-500 rounded-full flex items-center justify-center shadow-lg shadow-blue-900/20 active:scale-90 transition-transform z-30"
             >
                 <PenTool size={24} className="text-white" />
@@ -489,15 +768,40 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
                             Post
                         </button>
                     </div>
-                    <div className="flex gap-3 p-4">
+                    <div className="px-4 pb-2">
+                        <div className="flex gap-2 overflow-x-auto custom-scrollbar pb-2">
+                            {(Object.keys(X_POST_TYPES) as XPostType[]).filter(type => type !== 'GENERAL' && type !== 'DRAMA_REPLY').map(type => {
+                                const Icon = X_POST_TYPES[type].icon;
+                                return (
+                                    <button
+                                        key={type}
+                                        onClick={() => setComposeType(type)}
+                                        className={`flex shrink-0 items-center gap-2 rounded-full border px-3 py-2 text-xs font-black transition-colors ${composeType === type ? 'border-blue-400 bg-blue-500 text-white' : 'border-zinc-800 bg-zinc-950 text-zinc-400'}`}
+                                    >
+                                        <Icon size={14} />
+                                        {X_POST_TYPES[type].label}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                    <div className="flex gap-3 p-4 pt-2">
                         <img src={player.avatar} className="w-10 h-10 rounded-full object-cover border border-zinc-800" />
-                        <textarea 
-                            value={tweetContent}
-                            onChange={(e) => setTweetContent(e.target.value)}
-                            placeholder="What is happening?!"
-                            className="flex-1 bg-transparent text-lg text-white placeholder:text-zinc-500 resize-none focus:outline-none h-40"
-                            autoFocus
-                        />
+                        <div className="flex-1">
+                            <div className="mb-2 text-xs font-black uppercase tracking-widest text-blue-400">{X_POST_TYPES[composeType].prompt}</div>
+                            <textarea 
+                                value={tweetContent}
+                                onChange={(e) => setTweetContent(e.target.value)}
+                                placeholder={X_POST_TYPES[composeType].placeholder}
+                                className="w-full bg-transparent text-lg text-white placeholder:text-zinc-500 resize-none focus:outline-none h-40"
+                                autoFocus
+                            />
+                            <div className="mt-2 flex gap-2 text-[10px] font-black uppercase tracking-widest text-zinc-500">
+                                <span>Reach x{X_POST_TYPES[composeType].reach.toFixed(1)}</span>
+                                {X_POST_TYPES[composeType].controversy > 0 && <span className="text-red-400">Heat +{X_POST_TYPES[composeType].controversy}</span>}
+                                {X_POST_TYPES[composeType].controversy < 0 && <span className="text-emerald-400">Cools heat</span>}
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}

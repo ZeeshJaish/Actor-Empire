@@ -1,7 +1,7 @@
 {
   "name": "pr-6.6.3",
   "private": true,
-  "version": "1.0.15",
+  "version": "1.0.16",
   "type": "module",
   "scripts": {
     "dev": "vite",

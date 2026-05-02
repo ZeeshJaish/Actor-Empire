@@ -1053,7 +1053,9 @@ export const LuxeApp: React.FC<LuxeAppProps> = ({ player, onBack, onUpdatePlayer
                                 <div className="text-[11px] font-sans uppercase tracking-[0.2em] text-zinc-500">Curated This Cycle</div>
                                 <div className="mt-1 text-xl font-bold text-white">{candidates.length} Luxe Picks</div>
                                 <div className="mt-1 text-xs font-sans text-zinc-500">
-                                    {nextFreeRefreshInWeeks === 0
+                                    {candidates.length === 0
+                                        ? 'No eligible new picks right now.'
+                                        : nextFreeRefreshInWeeks === 0
                                         ? 'Free curation rotates this week.'
                                         : `Free refresh in ${nextFreeRefreshInWeeks} week${nextFreeRefreshInWeeks === 1 ? '' : 's'}.`}
                                 </div>
@@ -1066,6 +1068,22 @@ export const LuxeApp: React.FC<LuxeAppProps> = ({ player, onBack, onUpdatePlayer
                             </button>
                         </div>
                     </section>
+
+                    {!selectedCandidate && (
+                        <section className="rounded-[34px] border border-amber-500/20 bg-[radial-gradient(circle_at_top,rgba(245,158,11,0.14),rgba(24,24,27,0.92)_42%,rgba(5,5,7,0.98))] p-6 text-center shadow-[0_24px_70px_rgba(0,0,0,0.32)]">
+                            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-amber-400/25 bg-amber-500/10 text-amber-200">
+                                <Gem size={22} />
+                            </div>
+                            <div className="mt-4 text-[10px] font-black uppercase tracking-[0.24em] text-amber-300/80">No Fresh Matches</div>
+                            <h3 className="mt-2 text-2xl font-black text-white">Luxe has run out of eligible picks.</h3>
+                            <p className="mt-3 text-sm leading-relaxed text-zinc-400">
+                                This usually means your filters are narrow, you already matched the available celebrities, or existing Luxe connections need to cool down first.
+                            </p>
+                            <p className="mt-3 text-xs font-bold uppercase tracking-[0.18em] text-zinc-500">
+                                Widen preferences, resolve old matches, or wait for the next cycle.
+                            </p>
+                        </section>
+                    )}
 
                     {selectedCandidate && (
                         <section className="space-y-4">
