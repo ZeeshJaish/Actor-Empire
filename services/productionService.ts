@@ -228,7 +228,10 @@ export const applyCrisisImpact = (player: Player, event: ScheduledEvent, choiceI
 
     if (!crisis) return { updatedPlayer: player, log: "Crisis data incomplete." };
 
-    const option = crisis.options[choiceIndex];
+    const option = crisis.options[choiceIndex] || crisis.options[0];
+    if (!option || typeof option.impact !== 'function') {
+        return { updatedPlayer: player, log: 'The production issue was settled without major damage.' };
+    }
     const { updatedPlayer, updatedProject, log } = option.impact(player, project);
     
     // Update the project in the player object

@@ -1187,6 +1187,48 @@ export interface NPCStudioState {
     cashReserve: number; // in millions
     recentHits: number;
     archetype: string;
+    ownerNpcId?: string;
+    ownerName?: string;
+    isNpcVenture?: boolean;
+}
+
+export type NpcVentureArchetype = 'PRESTIGE_LABEL' | 'COMMERCIAL_STUDIO' | 'GENRE_HOUSE' | 'CREATOR_MEDIA' | 'AWARDS_BOUTIQUE';
+export type NpcVentureStatus = 'ACTIVE' | 'CLOSED';
+
+export interface NpcVentureProjectHistory {
+    id: string;
+    title: string;
+    week: number;
+    year: number;
+    budgetTier: BudgetTier;
+    quality: number;
+    revenue: number;
+    profit: number;
+    outcome: 'HIT' | 'SOLID' | 'FLOP';
+}
+
+export interface NpcVentureState {
+    id: string;
+    name: string;
+    ownerNpcId: string;
+    ownerName: string;
+    archetype: NpcVentureArchetype;
+    status: NpcVentureStatus;
+    valuation: number; // in billions
+    cashReserve: number; // in millions
+    hype: number;
+    reputation: number;
+    creativeQuality: number;
+    risk: number;
+    foundedWeek: number;
+    foundedYear: number;
+    lastProjectWeek: number;
+    nextProjectWeek: number;
+    projectsReleased: number;
+    hits: number;
+    flops: number;
+    history: NpcVentureProjectHistory[];
+    closureReason?: string;
 }
 
 export interface WorldState {
@@ -1198,6 +1240,7 @@ export interface WorldState {
     upcomingRivals: IndustryProject[];
     platforms?: Record<PlatformId, PlatformState>;
     studios?: Record<StudioId, NPCStudioState>;
+    npcVentures?: Record<string, NpcVentureState>;
 }
 
 export interface LogEntry {
@@ -1593,7 +1636,8 @@ export const INITIAL_PLAYER: Player = {
             MARVEL_STUDIOS: { id: 'MARVEL_STUDIOS', name: 'Marvel Studios', valuation: 50, reputation: 90, cashReserve: 6000, recentHits: 0, archetype: 'FRANCHISE' },
             DC_STUDIOS: { id: 'DC_STUDIOS', name: 'DC Studios', valuation: 30, reputation: 80, cashReserve: 4000, recentHits: 0, archetype: 'FRANCHISE' },
             LUCASFILM: { id: 'LUCASFILM', name: 'Lucasfilm', valuation: 40, reputation: 85, cashReserve: 5000, recentHits: 0, archetype: 'FRANCHISE' }
-        }
+        },
+        npcVentures: {}
     },
     flags: {},
     weeklyOpportunities: { auditions: [], jobs: [] },

@@ -1,6 +1,6 @@
 
 import React, { useRef, useEffect, useState, useMemo } from 'react';
-import { Player, ActorSkills, Commitment, ActiveRelease, ScheduledEvent, Message, AuditionOpportunity, NegotiationData, UniverseContract, UniverseId, Page, Genre, Relationship, LifeEvent, SponsorshipOffer } from '../types';
+import { Player, ActorSkills, Commitment, ActiveRelease, ScheduledEvent, Message, AuditionOpportunity, NegotiationData, UniverseContract, UniverseId, Page, Genre, Relationship, LifeEvent, SponsorshipOffer, XPost } from '../types';
 import { formatMoney } from '../services/formatUtils';
 import { StatsBar } from '../components/StatsBar';
 import { generateProjectDetails } from '../services/roleLogic';
@@ -10,7 +10,7 @@ import { getAbsoluteWeek } from '../services/legacyLogic';
 import { getGenderedAvatar, MALE_AVATAR_SEEDS, FEMALE_AVATAR_SEEDS, NPC_DATABASE } from '../services/npcLogic';
 import { createBusiness } from '../services/businessLogic';
 import { calculateYoutubeCreatorScore, generateYoutubeBrandDeal, generateYoutubeCollabOffer, getYoutubePublicImageLabel } from '../services/youtubeLogic';
-import { Heart, Smile, Star, Zap, DollarSign, Brain, Calendar, Activity, TrendingUp, Trophy, X, Sliders, Users, Film, Tv, PlayCircle, Lock, FastForward, Key, AlertTriangle, Mic2, Mail, FileText, Dumbbell, Sparkles, Settings, ShoppingCart, Clapperboard, ZapOff, Crown, Skull, Camera, UploadCloud, Check } from 'lucide-react';
+import { Heart, Smile, Star, Zap, DollarSign, Brain, Calendar, Activity, TrendingUp, Trophy, X, Sliders, Users, Film, Tv, PlayCircle, Lock, FastForward, Key, AlertTriangle, Mic2, Mail, FileText, Dumbbell, Sparkles, Settings, ShoppingCart, Clapperboard, ZapOff, Crown, Skull, Camera, UploadCloud, Check, MessageSquareQuote } from 'lucide-react';
 
 interface HomePageProps {
   player: Player;
@@ -708,6 +708,90 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
     }
   };
 
+  const queueEventQaCase = (caseType: 'SIMPLE_FEEDBACK' | 'BROKEN_IMPACT' | 'MISSING_STORY' | 'MISSING_PROJECT') => {
+      if (!onUpdatePlayer) return;
+
+      const now = Date.now();
+      let scheduledEvent: ScheduledEvent;
+      let logMessage = '';
+
+      if (caseType === 'MISSING_PROJECT') {
+          scheduledEvent = {
+              id: `qa_missing_project_${now}`,
+              week: player.currentWeek,
+              type: 'PRODUCTION_CRISIS',
+              title: 'QA Missing Project Recovery',
+              description: 'This QA event points to a project that does not exist.',
+              data: {
+                  crisisId: `qa_missing_project_crisis_${now}`,
+                  projectId: `missing_project_${now}`,
+                  isGenerative: true,
+                  options: [{ label: 'Continue Safely', index: 0 }]
+              }
+          };
+          logMessage = '🧯 QA: Missing project recovery event queued.';
+      } else if (caseType === 'MISSING_STORY') {
+          scheduledEvent = {
+              id: `qa_missing_story_${now}`,
+              week: player.currentWeek,
+              type: 'LIFE_EVENT',
+              title: 'QA Missing Story Recovery',
+              data: {}
+          };
+          logMessage = '🧯 QA: Missing story recovery event queued.';
+      } else {
+          const isBrokenImpact = caseType === 'BROKEN_IMPACT';
+          const lifeEvent: LifeEvent = {
+              id: `qa_feedback_${now}`,
+              type: isBrokenImpact ? 'SCANDAL' : 'NETWORKING',
+              title: isBrokenImpact ? 'QA Broken Impact Event' : 'QA Simple Feedback Event',
+              description: isBrokenImpact
+                  ? 'This event intentionally throws inside its impact function so fallback handling can be tested.'
+                  : 'This is a clean, simple event that should show feedback and close like a normal story result.',
+              options: [
+                  {
+                      label: isBrokenImpact ? 'Trigger Broken Impact' : 'Handle Simply',
+                      description: isBrokenImpact ? 'Should fall back instead of freezing.' : 'Should show a simple feedback result.',
+                      impact: (p: Player) => {
+                          if (isBrokenImpact) {
+                              throw new Error('QA broken impact test');
+                          }
+                          return {
+                              updatedPlayer: {
+                                  ...p,
+                                  stats: {
+                                      ...p.stats,
+                                      reputation: Math.min(100, p.stats.reputation + 1)
+                                  }
+                              },
+                              log: 'QA simple event resolved cleanly: +1 reputation.'
+                          };
+                      }
+                  }
+              ]
+          };
+
+          scheduledEvent = {
+              id: lifeEvent.id,
+              week: player.currentWeek,
+              type: isBrokenImpact ? 'SCANDAL' : 'LIFE_EVENT',
+              title: lifeEvent.title,
+              data: { lifeEvent }
+          };
+          logMessage = isBrokenImpact
+              ? '🧯 QA: Broken impact event queued.'
+              : '✅ QA: Simple feedback event queued.';
+      }
+
+      onUpdatePlayer({
+          ...player,
+          pendingEvents: [...(player.pendingEvents || []), scheduledEvent],
+          logs: [{ week: player.currentWeek, year: player.age, message: logMessage, type: 'neutral' }, ...player.logs].slice(0, 50)
+      });
+      setActiveCheatMenu('NONE');
+      alert('Event QA case queued. Close this menu and resolve the popup.');
+  };
+
   const triggerYoutubeBootstrap = () => {
       if (!onUpdatePlayer) return;
 
@@ -1160,6 +1244,228 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
       alert('Instagram cooldowns reset. Age up to test organic IG events/DMs.');
   };
 
+  const triggerInstagramUnlockComposer = () => {
+      if (!onUpdatePlayer) return;
+      const activeRelease = {
+          id: `cheat_ig_release_${Date.now()}`,
+          projectId: `cheat_ig_project_${Date.now()}`,
+          title: 'Cheat Premiere Night',
+          role: 'LEAD',
+          genre: 'DRAMA',
+          budget: 45000000,
+          marketingBudget: 15000000,
+          initialBuzz: 72,
+          currentBuzz: 72,
+          boxOffice: 125000000,
+          reviews: 82,
+          audienceScore: 88,
+          weeksInRelease: 2,
+          status: 'RUNNING',
+          studio: 'Cheat Pictures',
+          releaseStrategy: 'THEATRICAL',
+          maxTheatricalWeeks: 12
+      } as unknown as ActiveRelease;
+
+      const relationship = {
+          id: `cheat_ig_romance_${Date.now()}`,
+          name: 'Avery Stone',
+          age: player.age,
+          gender: 'FEMALE',
+          relation: 'Partner',
+          closeness: 72,
+          image: getGenderedAvatar('FEMALE', 'Avery Stone'),
+          lastInteractionWeek: player.currentWeek,
+          occupation: 'Actor',
+          status: 'DATING',
+          relationship: 72,
+          happiness: 70,
+          avatar: getGenderedAvatar('FEMALE', 'Avery Stone')
+      } as unknown as Relationship;
+
+      onUpdatePlayer({
+          ...player,
+          energy: { ...player.energy, current: Math.max(player.energy.current, 100) },
+          stats: {
+              ...player.stats,
+              fame: Math.max(player.stats.fame, 35),
+              followers: Math.max(player.stats.followers, 5000)
+          },
+          instagram: {
+              ...player.instagram,
+              followers: Math.max(player.instagram.followers || 0, 5000),
+              aesthetic: Math.max(player.instagram.aesthetic || 50, 70),
+              fashionInfluence: Math.max(player.instagram.fashionInfluence || 10, 55)
+          },
+          commitments: player.commitments.some(commitment => commitment.type === 'ACTING_GIG' && commitment.projectPhase === 'PRODUCTION')
+              ? player.commitments
+              : [
+                  {
+                      id: `cheat_ig_commit_${Date.now()}`,
+                      type: 'ACTING_GIG',
+                      title: 'Cheat On-Set Role',
+                      role: 'Lead',
+                      startWeek: player.currentWeek,
+                      endWeek: player.currentWeek + 8,
+                      projectPhase: 'PRODUCTION',
+                      salary: 250000,
+                      data: { genre: 'ACTION' }
+                  } as unknown as Commitment,
+                  ...player.commitments
+              ],
+          activeReleases: player.activeReleases.length > 0 ? player.activeReleases : [activeRelease],
+          relationships: player.relationships.some(rel => rel.status === 'DATING' || rel.status === 'MARRIED')
+              ? player.relationships
+              : [relationship, ...player.relationships],
+          logs: [{ week: player.currentWeek, year: player.age, message: `📸 CHEAT: Instagram composer unlock conditions enabled.`, type: 'positive' }, ...player.logs].slice(0, 50)
+      });
+      setActiveCheatMenu('NONE');
+      alert('Instagram composer test kit ready: BTS, Announcement, Red Carpet, Couple, Brand Fit, and Release posts should be unlocked.');
+  };
+
+  const triggerXBootstrap = () => {
+      if (!onUpdatePlayer) return;
+      const npc = getInstagramCheatNpc();
+      const now = Date.now();
+      const playerPosts: XPost[] = [
+          {
+              id: `cheat_x_player_${now}_1`,
+              authorId: 'PLAYER',
+              authorName: player.name,
+              authorHandle: player.x.handle,
+              authorAvatar: '',
+              content: 'Cheat setup: X Studio is ready for compose, post detail, replies, quotes, and timeline QA.',
+              timestamp: player.currentWeek,
+              likes: 18500,
+              retweets: 4200,
+              replies: 1300,
+              isPlayer: true,
+              isLiked: false,
+              isRetweeted: false,
+              isVerified: true,
+              postType: 'CAREER',
+              replyList: ['Booked and busy era?', 'This sounds bigger than people realize.', 'The resume is moving.'],
+              quoteList: ['Someone in casting definitely saw this.', 'The timeline likes a clean career update.'],
+              controversyScore: 0,
+              sentiment: 'INDUSTRY'
+          },
+          {
+              id: `cheat_x_player_${now}_2`,
+              authorId: 'PLAYER',
+              authorName: player.name,
+              authorHandle: player.x.handle,
+              authorAvatar: '',
+              content: 'Hot take: the best movie stars are built by weird career choices, not perfect PR.',
+              timestamp: player.currentWeek,
+              likes: 42000,
+              retweets: 9800,
+              replies: 6100,
+              isPlayer: true,
+              isLiked: false,
+              isRetweeted: false,
+              isVerified: true,
+              postType: 'HOT_TAKE',
+              replyList: ['The quotes are about to be a war zone.', 'Honestly? Not completely wrong.', 'Delete this before brunch.'],
+              quoteList: ['Film Twitter found its lunch today.', 'This is messy but the point is there.'],
+              controversyScore: 9,
+              sentiment: 'MESSY'
+          }
+      ];
+      const npcPost: XPost = {
+          id: `cheat_x_npc_${now}`,
+          authorId: npc.id,
+          authorName: npc.name,
+          authorHandle: npc.handle,
+          authorAvatar: npc.avatar,
+          content: `${player.name} is having one of those weeks where the timeline starts paying attention.`,
+          timestamp: player.currentWeek,
+          likes: 65000,
+          retweets: 15000,
+          replies: 3200,
+          isPlayer: false,
+          isLiked: false,
+          isRetweeted: false,
+          isVerified: true,
+          postType: 'CAREER',
+          replyList: ['The industry group chat is awake.', 'Interesting timing.', 'Casting directors are watching.'],
+          quoteList: ['This has layers.', 'The replies are doing analysis now.'],
+          controversyScore: 3,
+          sentiment: 'INDUSTRY'
+      };
+
+      onUpdatePlayer({
+          ...player,
+          stats: { ...player.stats, fame: Math.max(player.stats.fame, 45), reputation: Math.max(player.stats.reputation, 55) },
+          x: {
+              ...player.x,
+              followers: Math.max(player.x.followers || 0, 45000),
+              posts: [...playerPosts, ...player.x.posts].slice(0, 80),
+              feed: [npcPost, ...playerPosts, ...player.x.feed].slice(0, 80),
+              lastPostWeek: player.currentWeek
+          },
+          logs: [{ week: player.currentWeek, year: player.age, message: `𝕏 CHEAT: X QA profile boosted with feed/detail posts.`, type: 'positive' }, ...player.logs].slice(0, 50)
+      });
+      setActiveCheatMenu('NONE');
+      alert('X QA profile boosted. Open Phone > X to test feed, profile, compose, and post detail.');
+  };
+
+  const triggerXDramaPost = () => {
+      if (!onUpdatePlayer) return;
+      const npc = NPC_DATABASE.find(entry => entry.tier === 'A_LIST') || getInstagramCheatNpc();
+      const dramaPost: XPost = {
+          id: `cheat_x_drama_${Date.now()}`,
+          authorId: npc.id,
+          authorName: npc.name,
+          authorHandle: npc.handle,
+          authorAvatar: npc.avatar,
+          content: `Not every viral actor needs to be in every franchise. Some timelines need to breathe.`,
+          timestamp: player.currentWeek,
+          likes: 128000,
+          retweets: 34000,
+          replies: 22000,
+          isPlayer: false,
+          isLiked: false,
+          isRetweeted: false,
+          isVerified: true,
+          postType: 'HOT_TAKE',
+          replyList: ['The quotes are about to be a war zone.', 'This is absolutely about someone.', 'PR teams just stood up.'],
+          quoteList: ['The timeline decoded this instantly.', 'This is why X is dangerous.'],
+          controversyScore: 12,
+          sentiment: 'MESSY'
+      };
+
+      onUpdatePlayer({
+          ...player,
+          energy: { ...player.energy, current: Math.max(player.energy.current, 50) },
+          x: {
+              ...player.x,
+              followers: Math.max(player.x.followers || 0, 2500),
+              feed: [dramaPost, ...player.x.feed].slice(0, 80),
+              lastPostWeek: player.currentWeek
+          },
+          logs: [{ week: player.currentWeek, year: player.age, message: `🔥 CHEAT: X drama post added for reply/quote testing.`, type: 'neutral' }, ...player.logs].slice(0, 50)
+      });
+      setActiveCheatMenu('NONE');
+      alert('X drama post added. Open X, tap the post, then test reply/quote tones.');
+  };
+
+  const triggerXSmallCreatorReset = () => {
+      if (!onUpdatePlayer) return;
+      onUpdatePlayer({
+          ...player,
+          stats: { ...player.stats, fame: Math.min(player.stats.fame, 12) },
+          x: {
+              ...player.x,
+              followers: 25,
+              posts: [],
+              feed: [],
+              lastPostWeek: 0
+          },
+          logs: [{ week: player.currentWeek, year: player.age, message: `𝕏 CHEAT: X reset to small-account grind state.`, type: 'neutral' }, ...player.logs].slice(0, 50)
+      });
+      setActiveCheatMenu('NONE');
+      alert('X reset to small-account test state.');
+  };
+
   const ensureCheatStudio = () => {
       const existingStudio = player.businesses.find(b => b.type === 'PRODUCTION_HOUSE');
       if (existingStudio) {
@@ -1593,6 +1899,31 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                       {activeCheatMenu === 'DEV' && (
                           <div className="space-y-2">
                               <h4 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest border-b border-zinc-800 pb-1 flex items-center gap-2">
+                                 <AlertTriangle size={10} /> Event Recovery QA
+                              </h4>
+                              <div className="rounded-xl bg-zinc-950 border border-zinc-800 p-3 text-[10px] text-zinc-400">
+                                  Tests Continue, fallback feedback, and safe recovery paths for corrupted queued events.
+                              </div>
+                              <div className="grid grid-cols-2 gap-2">
+                                  <button onClick={() => queueEventQaCase('SIMPLE_FEEDBACK')} className="bg-emerald-900/30 hover:bg-emerald-900/50 border border-emerald-500/30 text-[10px] font-bold py-3 rounded-lg text-emerald-300 flex items-center justify-center gap-2">
+                                      <Check size={12}/> Simple Feedback
+                                  </button>
+                                  <button onClick={() => queueEventQaCase('BROKEN_IMPACT')} className="bg-orange-900/30 hover:bg-orange-900/50 border border-orange-500/30 text-[10px] font-bold py-3 rounded-lg text-orange-300 flex items-center justify-center gap-2">
+                                      <ZapOff size={12}/> Broken Impact
+                                  </button>
+                                  <button onClick={() => queueEventQaCase('MISSING_STORY')} className="bg-amber-900/30 hover:bg-amber-900/50 border border-amber-500/30 text-[10px] font-bold py-3 rounded-lg text-amber-300 flex items-center justify-center gap-2">
+                                      <FileText size={12}/> Missing Story
+                                  </button>
+                                  <button onClick={() => queueEventQaCase('MISSING_PROJECT')} className="bg-red-900/30 hover:bg-red-900/50 border border-red-500/30 text-[10px] font-bold py-3 rounded-lg text-red-300 flex items-center justify-center gap-2">
+                                      <Clapperboard size={12}/> Missing Project
+                                  </button>
+                              </div>
+                          </div>
+                      )}
+
+                      {activeCheatMenu === 'DEV' && (
+                          <div className="space-y-2">
+                              <h4 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest border-b border-zinc-800 pb-1 flex items-center gap-2">
                                  <PlayCircle size={10} /> YouTube QA
                               </h4>
                               <div className="rounded-xl bg-zinc-950 border border-zinc-800 p-3 text-[10px] text-zinc-400">
@@ -1630,6 +1961,9 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                                   <button onClick={triggerInstagramBootstrap} className="col-span-2 bg-pink-900/30 hover:bg-pink-900/50 border border-pink-500/30 text-xs font-bold py-3 rounded-lg text-pink-300 flex items-center justify-center gap-2">
                                       <Camera size={14}/> Boost Instagram + Posts
                                   </button>
+                                  <button onClick={triggerInstagramUnlockComposer} className="col-span-2 bg-fuchsia-900/30 hover:bg-fuchsia-900/50 border border-fuchsia-500/30 text-xs font-bold py-3 rounded-lg text-fuchsia-300 flex items-center justify-center gap-2">
+                                      <Sparkles size={14}/> Unlock IG Composer Types
+                                  </button>
                                   <button onClick={triggerInstagramReferralDM} className="bg-cyan-900/30 hover:bg-cyan-900/50 border border-cyan-500/30 text-[10px] font-bold py-3 rounded-lg text-cyan-300">
                                       Force Referral DM
                                   </button>
@@ -1638,6 +1972,31 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                                   </button>
                                   <button onClick={triggerInstagramCooldownReset} className="col-span-2 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-xs font-bold py-3 rounded-lg text-white">
                                       Reset Instagram Cooldowns
+                                  </button>
+                                  <button onClick={() => { setActiveCheatMenu('NONE'); setPage?.(Page.MOBILE); }} className="col-span-2 bg-white text-black hover:bg-zinc-200 text-xs font-black py-3 rounded-lg">
+                                      Open Phone
+                                  </button>
+                              </div>
+                          </div>
+                      )}
+
+                      {activeCheatMenu === 'DEV' && (
+                          <div className="space-y-2">
+                              <h4 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest border-b border-zinc-800 pb-1 flex items-center gap-2">
+                                 <MessageSquareQuote size={10} /> X QA
+                              </h4>
+                              <div className="rounded-xl bg-zinc-950 border border-zinc-800 p-3 text-[10px] text-zinc-400">
+                                  Followers <span className="text-white font-black">{(player.x.followers || 0).toLocaleString()}</span> • Posts <span className="text-blue-300 font-black">{player.x.posts.length}</span> • Feed <span className="text-sky-300 font-black">{player.x.feed.length}</span>
+                              </div>
+                              <div className="grid grid-cols-2 gap-2">
+                                  <button onClick={triggerXBootstrap} className="col-span-2 bg-blue-900/30 hover:bg-blue-900/50 border border-blue-500/30 text-xs font-bold py-3 rounded-lg text-blue-300 flex items-center justify-center gap-2">
+                                      <MessageSquareQuote size={14}/> Boost X + Seed Posts
+                                  </button>
+                                  <button onClick={triggerXDramaPost} className="bg-rose-900/30 hover:bg-rose-900/50 border border-rose-500/30 text-[10px] font-bold py-3 rounded-lg text-rose-300">
+                                      Force Drama Post
+                                  </button>
+                                  <button onClick={triggerXSmallCreatorReset} className="bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-[10px] font-bold py-3 rounded-lg text-white">
+                                      Small Account Reset
                                   </button>
                                   <button onClick={() => { setActiveCheatMenu('NONE'); setPage?.(Page.MOBILE); }} className="col-span-2 bg-white text-black hover:bg-zinc-200 text-xs font-black py-3 rounded-lg">
                                       Open Phone

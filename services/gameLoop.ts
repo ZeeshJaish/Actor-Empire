@@ -52,11 +52,12 @@ import { processWorldTurn, generateIndustryProject } from './worldLogic';
 import { generateFamousMovieOpportunity, generateCameoOffer } from './famousMovieLogic'; 
 import { calculateYoutubeCreatorScore, generateYoutubeBrandDeal, generateYoutubeCollabOffer, getYoutubePublicImageLabel, processYoutubeChannel } from './youtubeLogic';
 import { getInstagramPostComments, pickInstagramMicroBrand } from './instagramLogic';
-import { checkForProductionCrisis } from './productionService';
+import { checkForDirectorDecision, checkForProductionCrisis } from './productionService';
 import { processBusinessWeek } from './businessLogic';
 import { getAbsoluteWeek, getRelationshipAge, inferStreamingStartWeekAbsolute } from './legacyLogic';
 import { hasNoAds, resetWeeklyEnergy, spendPlayerEnergy } from './premiumLogic';
 import { advanceLuxeConnections, advanceTinderConnections } from './datingLogic';
+import { generateNpcVentureRoleOffer, getNpcVentureOfferText } from './npcVentureLogic';
 
 // --- CONSTANTS ---
 const ANNUAL_TAX_FREE_ALLOWANCE = 25000;
@@ -273,7 +274,7 @@ const createYoutubeLegalCase = (
     history: []
 });
 
-const createYoutubeCopyrightEvent = (
+export const createYoutubeCopyrightEvent = (
     videoTitle: string,
     claimAmount: number,
     evidenceStrength: number
@@ -356,7 +357,7 @@ const createYoutubeCopyrightEvent = (
     }
 });
 
-const createYoutubeBacklashEvent = (
+export const createYoutubeBacklashEvent = (
     videoTitle: string,
     severity: number
 ): ScheduledEvent => ({
@@ -439,7 +440,7 @@ const createYoutubeBacklashEvent = (
     }
 });
 
-const createYoutubeCreatorInviteEvent = (
+export const createYoutubeCreatorInviteEvent = (
     player: Player,
     kind: 'PODCAST' | 'CREATOR_GALA' | 'PLATFORM_SUMMIT'
 ): ScheduledEvent => {
@@ -550,7 +551,7 @@ const createCreatorRivalPost = (content: string, reach: number, rivalName: strin
     isVerified: true
 });
 
-const createYoutubeRivalryEvent = (player: Player): ScheduledEvent => {
+export const createYoutubeRivalryEvent = (player: Player): ScheduledEvent => {
     const rivalName = YOUTUBE_RIVAL_NAMES[Math.floor(Math.random() * YOUTUBE_RIVAL_NAMES.length)];
     const creatorScore = calculateYoutubeCreatorScore(player);
     const publicImage = getYoutubePublicImageLabel(player);
@@ -802,7 +803,13 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
     }));
     nextPlayer.awards = ensureObjectArray(nextPlayer.awards);
     nextPlayer.logs = ensureObjectArray(nextPlayer.logs);
-    nextPlayer.pendingEvents = ensureObjectArray(nextPlayer.pendingEvents);
+    nextPlayer.pendingEvents = ensureObjectArray<ScheduledEvent>(nextPlayer.pendingEvents)
+        .map(event => ({
+            ...event,
+            week: ensureFiniteNumber(event.week, nextPlayer.currentWeek),
+            data: event.data && typeof event.data === 'object' ? event.data : {}
+        }))
+        .filter(event => typeof event.id === 'string' && typeof event.type === 'string');
     nextPlayer.portfolio = ensureObjectArray(nextPlayer.portfolio).map((holding: any) => ({
         ...holding,
         shares: ensureFiniteNumber(holding.shares)
@@ -1060,6 +1067,9 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
         const worldResult = processWorldTurn(nextPlayer);
         nextPlayer.world = worldResult.world;
         nextPlayer.news = [...worldResult.news, ...nextPlayer.news].slice(0, 50);
+        if (worldResult.logs?.length) {
+            worldResult.logs.forEach(message => logsToAdd.push({ msg: `🏢 ${message}`, type: 'neutral' }));
+        }
 
         Object.values(nextPlayer.world.universes || {}).forEach((universe: any) => {
             if (!universe?.studioId) return;
@@ -2411,25 +2421,23 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
             }
 
             // Check for Director Decision
-            import('./productionService').then(({ checkForDirectorDecision }) => {
-                const decision = checkForDirectorDecision(nextPlayer, updatedC);
-                if (decision) {
-                    if (!nextPlayer.pendingEvents) nextPlayer.pendingEvents = [];
-                    nextPlayer.pendingEvents.push({
-                        id: decision.id,
-                        week: nextPlayer.currentWeek,
-                        type: 'DIRECTOR_DECISION',
-                        title: decision.title,
-                        description: decision.description,
-                        data: {
-                            crisisId: decision.id,
-                            projectId: updatedC.id,
-                            options: decision.options.map((o, i) => ({ label: o.label, index: i }))
-                        }
-                    });
-                    logsToAdd.push({ msg: `🎬 Creative Decision needed for "${updatedC.name}"!`, type: 'neutral' });
-                }
-            });
+            const decision = checkForDirectorDecision(nextPlayer, updatedC);
+            if (decision) {
+                if (!nextPlayer.pendingEvents) nextPlayer.pendingEvents = [];
+                nextPlayer.pendingEvents.push({
+                    id: decision.id,
+                    week: nextPlayer.currentWeek,
+                    type: 'DIRECTOR_DECISION',
+                    title: decision.title,
+                    description: decision.description,
+                    data: {
+                        crisisId: decision.id,
+                        projectId: updatedC.id,
+                        options: decision.options.map((o, i) => ({ label: o.label, index: i }))
+                    }
+                });
+                logsToAdd.push({ msg: `🎬 Creative Decision needed for "${updatedC.name}"!`, type: 'neutral' });
+            }
 
             if (weeksLeft <= 0) {
                 const duration = getPhaseDuration('POST_PRODUCTION');
@@ -3291,6 +3299,30 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
         }
     } catch (error) {
         console.error('Direct offer generation failed during week processing:', error);
+    }
+
+    const lastNpcVentureOfferWeek = nextPlayer.flags.lastNpcVentureOfferWeek || 0;
+    if (nextPlayer.currentWeek - lastNpcVentureOfferWeek >= 7 + Math.floor(Math.random() * 4)) {
+        try {
+            const ventureOffer = generateNpcVentureRoleOffer(nextPlayer);
+            if (ventureOffer) {
+                nextPlayer.inbox.unshift({
+                    id: `npc_venture_offer_${Date.now()}`,
+                    sender: `${ventureOffer.venture.name} Casting`,
+                    subject: `Offer: ${ventureOffer.opportunity.projectName}`,
+                    text: getNpcVentureOfferText(ventureOffer.venture, ventureOffer.opportunity),
+                    type: 'OFFER_ROLE',
+                    data: ventureOffer.opportunity,
+                    isRead: false,
+                    weekSent: nextPlayer.currentWeek,
+                    expiresIn: 4
+                });
+                nextPlayer.flags.lastNpcVentureOfferWeek = nextPlayer.currentWeek;
+                logsToAdd.push({ msg: `📩 ${ventureOffer.venture.name} sent you a role offer.`, type: 'positive' });
+            }
+        } catch (error) {
+            console.error('NPC venture offer generation failed during week processing:', error);
+        }
     }
     
     if (nextPlayer.currentWeek % 3 === 0) {

@@ -431,6 +431,47 @@ export const InstagramApp: React.FC<InstagramAppProps> = ({ player, onBack, onPo
       closeCreator();
   };
 
+  const postTypeOptions: Array<{
+      type: InstaPostType;
+      title: string;
+      subtitle: string;
+      icon: React.ReactNode;
+      tint: string;
+      lockReason?: string;
+  }> = [
+      { type: 'LIFESTYLE', title: 'Lifestyle', subtitle: 'Daily life, soft growth.', icon: <Camera size={17} />, tint: 'emerald' },
+      { type: 'SELFIE', title: 'Selfie', subtitle: 'Personal and fan-friendly.', icon: <Smile size={17} />, tint: 'pink' },
+      { type: 'REEL', title: 'Reel', subtitle: 'More reach, short-form vibe.', icon: <Clapperboard size={17} />, tint: 'fuchsia' },
+      { type: 'CAROUSEL', title: 'Photo Dump', subtitle: 'Authentic multi-photo post.', icon: <Images size={17} />, tint: 'cyan' },
+      { type: 'BTS', title: 'On Set BTS', subtitle: 'Behind the scenes from filming.', icon: <Video size={17} />, tint: 'blue', lockReason: hasFilmingRole ? undefined : 'Start filming a role' },
+      { type: 'ANNOUNCEMENT', title: 'Announcement', subtitle: 'Project or casting news.', icon: <Sparkles size={17} />, tint: 'purple', lockReason: hasActiveRole ? undefined : 'Need an active role' },
+      { type: 'RED_CARPET', title: 'Red Carpet', subtitle: 'Prestige and fashion moment.', icon: <Sparkles size={17} />, tint: 'rose', lockReason: hasReleasedMovie || player.stats.fame >= 20 ? undefined : 'Need release or 20 fame' },
+      { type: 'COUPLE_POST', title: 'Couple Post', subtitle: 'Relationship content.', icon: <Heart size={17} />, tint: 'red', lockReason: hasRomance ? undefined : 'Need a public romance' },
+      { type: 'BRAND_FIT', title: 'Brand Fit', subtitle: 'Influence and style signal.', icon: <Shirt size={17} />, tint: 'lime', lockReason: publicFollowers >= 1000 || player.stats.fame >= 15 ? undefined : 'Need 1k followers or 15 fame' },
+      { type: 'CELEBRATION', title: 'Celebrate Release', subtitle: 'Turn a release into momentum.', icon: <Popcorn size={17} />, tint: 'amber', lockReason: hasReleasedMovie ? undefined : 'Need an active release' },
+      { type: 'CONTROVERSIAL', title: 'Hot Take', subtitle: 'High reach, backlash risk.', icon: <Flame size={17} />, tint: 'red' }
+  ];
+
+  const getTypeTintClasses = (tint: string, selected: boolean, locked?: boolean) => {
+      if (locked) return 'bg-zinc-950/80 border-zinc-900 text-zinc-600';
+      if (selected) {
+          const selectedClasses: Record<string, string> = {
+              emerald: 'bg-emerald-500/15 border-emerald-400/70 text-white shadow-[0_0_24px_rgba(16,185,129,0.12)]',
+              pink: 'bg-pink-500/15 border-pink-400/70 text-white shadow-[0_0_24px_rgba(236,72,153,0.12)]',
+              fuchsia: 'bg-fuchsia-500/15 border-fuchsia-400/70 text-white shadow-[0_0_24px_rgba(217,70,239,0.12)]',
+              cyan: 'bg-cyan-500/15 border-cyan-400/70 text-white shadow-[0_0_24px_rgba(34,211,238,0.12)]',
+              blue: 'bg-blue-500/15 border-blue-400/70 text-white shadow-[0_0_24px_rgba(96,165,250,0.12)]',
+              purple: 'bg-purple-500/15 border-purple-400/70 text-white shadow-[0_0_24px_rgba(168,85,247,0.12)]',
+              rose: 'bg-rose-500/15 border-rose-400/70 text-white shadow-[0_0_24px_rgba(244,63,94,0.12)]',
+              red: 'bg-red-500/15 border-red-400/70 text-white shadow-[0_0_24px_rgba(248,113,113,0.12)]',
+              lime: 'bg-lime-500/15 border-lime-400/70 text-white shadow-[0_0_24px_rgba(132,204,22,0.12)]',
+              amber: 'bg-amber-500/15 border-amber-400/70 text-white shadow-[0_0_24px_rgba(245,158,11,0.12)]'
+          };
+          return selectedClasses[tint] || selectedClasses.emerald;
+      }
+      return 'bg-zinc-950 border-zinc-800 text-zinc-300 hover:border-zinc-700 hover:bg-zinc-900';
+  };
+
   return (
     <div className="absolute inset-0 bg-black flex flex-col z-40 text-white animate-in slide-in-from-right duration-300 overflow-hidden font-sans">
         
@@ -1005,221 +1046,189 @@ export const InstagramApp: React.FC<InstagramAppProps> = ({ player, onBack, onPo
         {/* --- POST CREATOR MODAL (REDESIGNED) --- */}
         {isCreatingPost && (
             <div className="absolute inset-0 bg-black z-50 flex flex-col animate-in slide-in-from-bottom duration-300">
-                <div className="flex justify-between items-center p-4 pt-12 bg-zinc-950 border-b border-zinc-800">
-                    <button onClick={closeCreator}><XCircle size={24} className="text-zinc-500"/></button>
-                    <h3 className="text-white font-bold text-lg">New Post</h3>
-                    <button onClick={handleCreatePost} disabled={isImageProcessing} className="text-blue-500 font-bold text-sm disabled:opacity-40">
-                        {isImageProcessing ? 'Saving...' : 'Share'}
+                <div className="flex justify-between items-center px-4 pt-12 pb-3 bg-zinc-950/95 border-b border-zinc-800 shrink-0">
+                    <button onClick={closeCreator} className="rounded-full bg-zinc-900 border border-zinc-800 p-2 active:scale-95 transition-transform">
+                        <XCircle size={21} className="text-zinc-400"/>
                     </button>
-                </div>
-                
-                <div className="flex-1 overflow-y-auto custom-scrollbar p-4 bg-black">
-                    {/* Visual Preview (Preset based) */}
-                    <div className="mb-4">
-                        <div className={`w-full aspect-square bg-zinc-900 rounded-xl relative overflow-hidden flex items-center justify-center border border-zinc-800 ${getPostStyle(selectedPresetType)}`}>
-                            {imageSourceUrl ? (
-                                <img
-                                    src={imageSourceUrl}
-                                    alt="Selected Instagram post"
-                                    className={imageImageClass(imageFitMode)}
-                                    style={imageImageStyle(imageZoom, imageOffsetX, imageOffsetY)}
-                                />
-                            ) : (
-                                <div className="text-center">
-                                    <div className="text-white/80 font-black text-4xl uppercase tracking-tighter transform -rotate-6">
-                                        {selectedPresetType.replace(/_/g, ' ')}
-                                    </div>
-                                    <div className="text-[10px] text-white/50 mt-2 font-bold uppercase tracking-widest">Preview</div>
-                                </div>
-                            )}
-                            <button
-                                onClick={() => imageInputRef.current?.click()}
-                                className="absolute right-3 top-3 rounded-full bg-black/70 border border-white/10 px-3 py-2 text-[10px] font-black uppercase tracking-widest flex items-center gap-1"
-                            >
-                                <ImagePlus size={13} /> {imageSourceUrl ? 'Change' : 'Image'}
-                            </button>
-                        </div>
-                        <input
-                            ref={imageInputRef}
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={handleImageSelected}
-                        />
+                    <div className="text-center">
+                        <h3 className="text-white font-black text-lg leading-tight">Create Post</h3>
+                        <div className="text-[9px] text-zinc-500 font-black uppercase tracking-[0.25em]">Instagram Studio</div>
                     </div>
+                    <div className="w-10" />
+                </div>
 
-                    {imageSourceUrl && (
-                        <div className="mb-6 rounded-2xl border border-zinc-800 bg-zinc-950 p-3 space-y-4">
-                            <div className="grid grid-cols-2 gap-2">
+                <div className="flex-1 overflow-y-auto custom-scrollbar bg-black pb-36">
+                    <div className="p-4 space-y-4">
+                        <div className="rounded-[2rem] border border-zinc-800 bg-gradient-to-b from-zinc-950 to-black p-3 shadow-2xl">
+                            <div className={`aspect-square rounded-[1.45rem] relative overflow-hidden flex items-center justify-center border border-white/10 ${getPostStyle(selectedPresetType)}`}>
+                                {imageSourceUrl ? (
+                                    <img
+                                        src={imageSourceUrl}
+                                        alt="Selected Instagram post"
+                                        className={imageImageClass(imageFitMode)}
+                                        style={imageImageStyle(imageZoom, imageOffsetX, imageOffsetY)}
+                                    />
+                                ) : (
+                                    <>
+                                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_25%_20%,rgba(255,255,255,0.2),transparent_28%),radial-gradient(circle_at_80%_75%,rgba(0,0,0,0.25),transparent_32%)]" />
+                                        <div className="relative z-10 text-center px-6">
+                                            <div className="text-white/90 font-black text-4xl uppercase tracking-tighter transform -rotate-6 drop-shadow-xl">
+                                                {selectedConfig.shortLabel}
+                                            </div>
+                                            <div className="text-[10px] text-white/60 mt-3 font-black uppercase tracking-[0.25em]">
+                                                Generated visual
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
                                 <button
-                                    onClick={() => setImageFitMode('cover')}
-                                    className={`rounded-xl p-3 text-left border ${imageFitMode === 'cover' ? 'bg-white text-black border-white' : 'bg-zinc-900 border-zinc-800 text-white'}`}
+                                    onClick={() => imageInputRef.current?.click()}
+                                    className="absolute right-3 top-3 rounded-full bg-black/75 backdrop-blur border border-white/15 px-3 py-2 text-[10px] font-black uppercase tracking-widest flex items-center gap-1 active:scale-95 transition-transform"
                                 >
-                                    <div className="font-black text-xs uppercase tracking-widest">Cover</div>
-                                    <div className="text-[10px] opacity-70 mt-1">Fill square, crop edges.</div>
-                                </button>
-                                <button
-                                    onClick={() => setImageFitMode('contain')}
-                                    className={`rounded-xl p-3 text-left border ${imageFitMode === 'contain' ? 'bg-white text-black border-white' : 'bg-zinc-900 border-zinc-800 text-white'}`}
-                                >
-                                    <div className="font-black text-xs uppercase tracking-widest">Fit Full</div>
-                                    <div className="text-[10px] opacity-70 mt-1">Show whole image.</div>
+                                    <ImagePlus size={13} /> {imageSourceUrl ? 'Change' : 'Upload'}
                                 </button>
                             </div>
-
-                            <label className="block">
-                                <div className="text-[10px] text-zinc-500 font-black uppercase tracking-widest mb-2">Zoom</div>
-                                <input type="range" min="1" max="2.4" step="0.05" value={imageZoom} onChange={(e) => setImageZoom(Number(e.target.value))} className="w-full accent-pink-500" />
-                            </label>
-                            <label className="block">
-                                <div className="text-[10px] text-zinc-500 font-black uppercase tracking-widest mb-2">Move Left / Right</div>
-                                <input type="range" min="-320" max="320" step="5" value={imageOffsetX} onChange={(e) => setImageOffsetX(Number(e.target.value))} className="w-full accent-pink-500" />
-                            </label>
-                            <label className="block">
-                                <div className="text-[10px] text-zinc-500 font-black uppercase tracking-widest mb-2">Move Up / Down</div>
-                                <input type="range" min="-320" max="320" step="5" value={imageOffsetY} onChange={(e) => setImageOffsetY(Number(e.target.value))} className="w-full accent-pink-500" />
-                            </label>
-                            <button onClick={resetImageDraft} className="w-full rounded-xl border border-zinc-800 bg-zinc-900 py-3 text-xs font-black uppercase tracking-widest text-zinc-300">
-                                Remove Image
-                            </button>
+                            <input
+                                ref={imageInputRef}
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={handleImageSelected}
+                            />
+                            <div className="mt-3 flex items-center justify-between gap-3">
+                                <div className="min-w-0">
+                                    <div className="text-[10px] text-zinc-500 font-black uppercase tracking-widest">Selected style</div>
+                                    <div className={`font-black text-lg truncate ${selectedConfig.accentClass}`}>{selectedConfig.label}</div>
+                                </div>
+                                <div className="text-right shrink-0">
+                                    <div className="text-[10px] text-zinc-500 font-black uppercase tracking-widest">Cost</div>
+                                    <div className="text-white font-black flex items-center gap-1 justify-end"><Zap size={13} className="text-amber-400" /> {selectedConfig.energy}E</div>
+                                </div>
+                            </div>
                         </div>
-                    )}
 
-                    {imageError && <div className="mb-4 rounded-2xl border border-rose-500/20 bg-rose-500/10 p-3 text-xs text-rose-200">{imageError}</div>}
+                        {imageSourceUrl && (
+                            <div className="rounded-[1.5rem] border border-zinc-800 bg-zinc-950 p-3 space-y-4">
+                                <div className="flex items-center justify-between gap-3">
+                                    <div>
+                                        <div className="text-white font-black text-sm">Image Fit</div>
+                                        <div className="text-[11px] text-zinc-500">Crop, fit, and position before posting.</div>
+                                    </div>
+                                    <button onClick={resetImageDraft} className="rounded-full border border-zinc-800 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-zinc-300">
+                                        Remove
+                                    </button>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <button
+                                        onClick={() => setImageFitMode('cover')}
+                                        className={`rounded-2xl p-3 text-left border ${imageFitMode === 'cover' ? 'bg-white text-black border-white' : 'bg-zinc-900 border-zinc-800 text-white'}`}
+                                    >
+                                        <div className="font-black text-xs uppercase tracking-widest">Cover</div>
+                                        <div className="text-[10px] opacity-70 mt-1">Fill square.</div>
+                                    </button>
+                                    <button
+                                        onClick={() => setImageFitMode('contain')}
+                                        className={`rounded-2xl p-3 text-left border ${imageFitMode === 'contain' ? 'bg-white text-black border-white' : 'bg-zinc-900 border-zinc-800 text-white'}`}
+                                    >
+                                        <div className="font-black text-xs uppercase tracking-widest">Fit Full</div>
+                                        <div className="text-[10px] opacity-70 mt-1">Show all.</div>
+                                    </button>
+                                </div>
 
-                    {/* Caption Input */}
-                    <div className="mb-6">
-                        <textarea 
-                            value={postCaption}
-                            onChange={(e) => setPostCaption(e.target.value)}
-                            placeholder="Write a caption (optional)..."
-                            className="w-full bg-zinc-900 text-white p-4 rounded-xl border border-zinc-800 focus:outline-none focus:border-zinc-700 min-h-[100px] text-sm"
-                        />
-                        <div className="text-[10px] text-zinc-500 mt-2 italic px-1">
-                            *If left blank, a caption will be auto-generated based on the post type.
+                                {[
+                                    { label: 'Zoom', value: imageZoom, min: 1, max: 2.4, step: 0.05, onChange: setImageZoom },
+                                    { label: 'Move Left / Right', value: imageOffsetX, min: -320, max: 320, step: 5, onChange: setImageOffsetX },
+                                    { label: 'Move Up / Down', value: imageOffsetY, min: -320, max: 320, step: 5, onChange: setImageOffsetY }
+                                ].map(control => (
+                                    <label key={control.label} className="block">
+                                        <div className="text-[10px] text-zinc-500 font-black uppercase tracking-widest mb-2">{control.label}</div>
+                                        <input
+                                            type="range"
+                                            min={control.min}
+                                            max={control.max}
+                                            step={control.step}
+                                            value={control.value}
+                                            onChange={(e) => control.onChange(Number(e.target.value))}
+                                            className="w-full accent-pink-500"
+                                        />
+                                    </label>
+                                ))}
+                            </div>
+                        )}
+
+                        {imageError && <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 p-3 text-xs text-rose-200">{imageError}</div>}
+
+                        <div className="rounded-[1.5rem] border border-zinc-800 bg-zinc-950 p-3">
+                            <div className="flex items-center justify-between mb-2">
+                                <div className="text-[10px] text-zinc-500 font-black uppercase tracking-widest">Caption</div>
+                                <div className="text-[10px] text-zinc-600 font-bold">Optional</div>
+                            </div>
+                            <textarea
+                                value={postCaption}
+                                onChange={(e) => setPostCaption(e.target.value)}
+                                placeholder="Write a caption, or leave blank for an auto caption..."
+                                className="w-full bg-black text-white p-3 rounded-2xl border border-zinc-800 focus:outline-none focus:border-zinc-600 min-h-[86px] text-sm resize-none"
+                            />
                         </div>
-                    </div>
 
-                    {/* Preset Types */}
-                    <div className="space-y-3">
-                        <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-widest pl-1">Post Type (Visual Theme)</h4>
-                        <div className="grid grid-cols-2 gap-2">
-                            {/* LIFESTYLE */}
-                            <button 
-                                onClick={() => setSelectedPresetType('LIFESTYLE')}
-                                className={`p-3 rounded-xl text-left border transition-all ${selectedPresetType === 'LIFESTYLE' ? 'bg-emerald-900/30 border-emerald-500/50' : 'bg-zinc-900 border-transparent opacity-60'}`}
-                            >
-                                <div className="text-emerald-400 mb-1"><Camera size={18}/></div>
-                                <div className="font-bold text-xs">Lifestyle</div>
-                            </button>
+                        <div className="space-y-3">
+                            <div className="flex items-end justify-between gap-3 px-1">
+                                <div>
+                                    <h4 className="text-xs font-black text-zinc-400 uppercase tracking-[0.22em]">Choose Post Style</h4>
+                                    <div className="text-[11px] text-zinc-600 mt-1">Style affects reach, fan reaction, and event chances.</div>
+                                </div>
+                                <div className="text-[10px] text-zinc-500 font-black uppercase tracking-widest shrink-0">
+                                    {player.instagram.weeklyPostCount}/3 week
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-1 gap-2">
+                                {postTypeOptions.map(option => {
+                                    const isSelected = selectedPresetType === option.type;
+                                    const isLocked = Boolean(option.lockReason);
+                                    return (
+                                        <button
+                                            key={option.type}
+                                            onClick={() => {
+                                                if (!isLocked) setSelectedPresetType(option.type);
+                                            }}
+                                            disabled={isLocked}
+                                            className={`w-full rounded-2xl border p-3 text-left transition-all active:scale-[0.99] ${getTypeTintClasses(option.tint, isSelected, isLocked)}`}
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <div className={`h-10 w-10 rounded-2xl flex items-center justify-center border ${isSelected ? 'bg-white text-black border-white' : 'bg-black/35 border-white/10'}`}>
+                                                    {isLocked ? <Lock size={16} /> : option.icon}
+                                                </div>
+                                                <div className="min-w-0 flex-1">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="font-black text-sm truncate">{option.title}</div>
+                                                        {isSelected && <span className="rounded-full bg-white text-black px-2 py-0.5 text-[8px] font-black uppercase tracking-widest">Selected</span>}
+                                                    </div>
+                                                    <div className={`text-[11px] mt-0.5 ${isLocked ? 'text-zinc-600' : 'text-zinc-400'}`}>
+                                                        {option.lockReason || option.subtitle}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
 
-                            {/* SELFIE */}
-                            <button 
-                                onClick={() => setSelectedPresetType('SELFIE')}
-                                className={`p-3 rounded-xl text-left border transition-all ${selectedPresetType === 'SELFIE' ? 'bg-pink-900/30 border-pink-500/50' : 'bg-zinc-900 border-transparent opacity-60'}`}
-                            >
-                                <div className="text-pink-400 mb-1"><Smile size={18}/></div>
-                                <div className="font-bold text-xs">Selfie</div>
-                            </button>
-
-                            <button 
-                                onClick={() => setSelectedPresetType('REEL')}
-                                className={`p-3 rounded-xl text-left border transition-all ${selectedPresetType === 'REEL' ? 'bg-fuchsia-900/30 border-fuchsia-500/50' : 'bg-zinc-900 border-transparent opacity-60'}`}
-                            >
-                                <div className="text-fuchsia-400 mb-1"><Clapperboard size={18}/></div>
-                                <div className="font-bold text-xs">Reel</div>
-                            </button>
-
-                            <button 
-                                onClick={() => setSelectedPresetType('CAROUSEL')}
-                                className={`p-3 rounded-xl text-left border transition-all ${selectedPresetType === 'CAROUSEL' ? 'bg-cyan-900/30 border-cyan-500/50' : 'bg-zinc-900 border-transparent opacity-60'}`}
-                            >
-                                <div className="text-cyan-400 mb-1"><Images size={18}/></div>
-                                <div className="font-bold text-xs">Photo Dump</div>
-                            </button>
-
-                            {/* BTS */}
-                            <button 
-                                onClick={() => { if(hasFilmingRole) setSelectedPresetType('BTS'); }}
-                                disabled={!hasFilmingRole}
-                                className={`p-3 rounded-xl text-left border transition-all relative ${selectedPresetType === 'BTS' ? 'bg-blue-900/30 border-blue-500/50' : !hasFilmingRole ? 'bg-zinc-950 border-zinc-900 opacity-30 cursor-not-allowed' : 'bg-zinc-900 border-transparent opacity-60'}`}
-                            >
-                                <div className="text-blue-400 mb-1"><Video size={18}/></div>
-                                <div className="font-bold text-xs">On Set (BTS)</div>
-                                {!hasFilmingRole && <div className="absolute top-2 right-2 text-zinc-600"><Lock size={12}/></div>}
-                            </button>
-
-                            {/* ANNOUNCEMENT */}
-                            <button 
-                                onClick={() => { if(hasActiveRole) setSelectedPresetType('ANNOUNCEMENT'); }}
-                                disabled={!hasActiveRole}
-                                className={`p-3 rounded-xl text-left border transition-all relative ${selectedPresetType === 'ANNOUNCEMENT' ? 'bg-purple-900/30 border-purple-500/50' : !hasActiveRole ? 'bg-zinc-950 border-zinc-900 opacity-30 cursor-not-allowed' : 'bg-zinc-900 border-transparent opacity-60'}`}
-                            >
-                                <div className="text-purple-400 mb-1"><Sparkles size={18}/></div>
-                                <div className="font-bold text-xs">Announcement</div>
-                                {!hasActiveRole && <div className="absolute top-2 right-2 text-zinc-600"><Lock size={12}/></div>}
-                            </button>
-
-                            <button 
-                                onClick={() => { if(hasReleasedMovie || player.stats.fame >= 20) setSelectedPresetType('RED_CARPET'); }}
-                                disabled={!hasReleasedMovie && player.stats.fame < 20}
-                                className={`p-3 rounded-xl text-left border transition-all relative ${selectedPresetType === 'RED_CARPET' ? 'bg-rose-900/30 border-rose-500/50' : (!hasReleasedMovie && player.stats.fame < 20) ? 'bg-zinc-950 border-zinc-900 opacity-30 cursor-not-allowed' : 'bg-zinc-900 border-transparent opacity-60'}`}
-                            >
-                                <div className="text-rose-400 mb-1"><Sparkles size={18}/></div>
-                                <div className="font-bold text-xs">Red Carpet</div>
-                                {!hasReleasedMovie && player.stats.fame < 20 && <div className="absolute top-2 right-2 text-zinc-600"><Lock size={12}/></div>}
-                            </button>
-
-                            <button 
-                                onClick={() => { if(hasRomance) setSelectedPresetType('COUPLE_POST'); }}
-                                disabled={!hasRomance}
-                                className={`p-3 rounded-xl text-left border transition-all relative ${selectedPresetType === 'COUPLE_POST' ? 'bg-red-900/30 border-red-500/50' : !hasRomance ? 'bg-zinc-950 border-zinc-900 opacity-30 cursor-not-allowed' : 'bg-zinc-900 border-transparent opacity-60'}`}
-                            >
-                                <div className="text-red-400 mb-1"><Heart size={18}/></div>
-                                <div className="font-bold text-xs">Couple Post</div>
-                                {!hasRomance && <div className="absolute top-2 right-2 text-zinc-600"><Lock size={12}/></div>}
-                            </button>
-
-                            <button 
-                                onClick={() => { if(publicFollowers >= 1000 || player.stats.fame >= 15) setSelectedPresetType('BRAND_FIT'); }}
-                                disabled={publicFollowers < 1000 && player.stats.fame < 15}
-                                className={`p-3 rounded-xl text-left border transition-all relative ${selectedPresetType === 'BRAND_FIT' ? 'bg-lime-900/30 border-lime-500/50' : (publicFollowers < 1000 && player.stats.fame < 15) ? 'bg-zinc-950 border-zinc-900 opacity-30 cursor-not-allowed' : 'bg-zinc-900 border-transparent opacity-60'}`}
-                            >
-                                <div className="text-lime-400 mb-1"><Shirt size={18}/></div>
-                                <div className="font-bold text-xs">Brand Fit</div>
-                                {publicFollowers < 1000 && player.stats.fame < 15 && <div className="absolute top-2 right-2 text-zinc-600"><Lock size={12}/></div>}
-                            </button>
-
-                            {/* CELEBRATION */}
-                            <button 
-                                onClick={() => { if(hasReleasedMovie) setSelectedPresetType('CELEBRATION'); }}
-                                disabled={!hasReleasedMovie}
-                                className={`p-3 rounded-xl text-left border transition-all relative col-span-2 ${selectedPresetType === 'CELEBRATION' ? 'bg-amber-900/30 border-amber-500/50' : !hasReleasedMovie ? 'bg-zinc-950 border-zinc-900 opacity-30 cursor-not-allowed' : 'bg-zinc-900 border-transparent opacity-60'}`}
-                            >
-                                <div className="text-amber-400 mb-1"><Popcorn size={18}/></div>
-                                <div className="font-bold text-xs">Celebrate Release</div>
-                                {!hasReleasedMovie && <div className="absolute top-2 right-2 text-zinc-600"><Lock size={12}/></div>}
-                            </button>
-
-                            <button 
-                                onClick={() => setSelectedPresetType('CONTROVERSIAL')}
-                                className={`p-3 rounded-xl text-left border transition-all relative col-span-2 ${selectedPresetType === 'CONTROVERSIAL' ? 'bg-red-950/50 border-red-500/60' : 'bg-zinc-900 border-transparent opacity-60'}`}
-                            >
-                                <div className="text-red-400 mb-1"><Flame size={18}/></div>
-                                <div className="font-bold text-xs">Hot Take</div>
-                                <div className="text-[10px] text-zinc-500 mt-1">High reach, backlash risk.</div>
-                            </button>
+                        <div className="text-[11px] text-zinc-400 bg-zinc-950 border border-zinc-900 p-3 rounded-2xl leading-relaxed">
+                            <span className={`font-black ${selectedConfig.accentClass}`}>{selectedConfig.label}: </span>
+                            {selectedConfig.description}
                         </div>
                     </div>
+                </div>
 
-                    <div className="mt-6 flex items-center justify-between text-xs text-zinc-500 bg-zinc-900 p-3 rounded-lg border border-zinc-800">
-                        <span className="flex items-center gap-1"><Zap size={12} className="text-amber-500"/> Cost: {selectedConfig.energy} Energy</span>
-                        <span>{player.instagram.weeklyPostCount}/3 Weekly</span>
-                    </div>
-                    <div className="mt-3 text-[11px] text-zinc-400 bg-zinc-950 border border-zinc-900 p-3 rounded-xl leading-relaxed">
-                        <span className={`font-black ${selectedConfig.accentClass}`}>{selectedConfig.label}: </span>
-                        {selectedConfig.description}
-                    </div>
+                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black via-black to-transparent px-4 pt-8 pb-6">
+                    <button
+                        onClick={handleCreatePost}
+                        disabled={isImageProcessing}
+                        className="w-full rounded-[1.4rem] bg-gradient-to-r from-pink-600 via-red-500 to-orange-400 py-4 text-white font-black tracking-wide shadow-[0_18px_45px_rgba(244,63,94,0.28)] disabled:opacity-50 active:scale-[0.99] transition-transform"
+                    >
+                        {isImageProcessing ? 'Saving Post...' : 'Share Post'}
+                    </button>
                 </div>
             </div>
         )}

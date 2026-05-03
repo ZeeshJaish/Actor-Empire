@@ -39,7 +39,7 @@ const PLATFORMS = [
     { id: 'YOUTUBE', name: 'YouTube Premium', baseBid: 3000000, qualityReq: 38, color: '#FF0000', maxBudget: 35000000 }
 ];
 
-const getStreamingBidProfile = (packageScore: number, isSeries: boolean, isPostTheatricalBidding?: boolean) => {
+export const getStreamingBidProfile = (packageScore: number, isSeries: boolean, isPostTheatricalBidding?: boolean) => {
     let floor = 1.04;
     let ceiling = 1.3;
 
@@ -99,6 +99,83 @@ interface Bid {
     bidValue: number;
     timestamp: number;
 }
+
+export const calculateStreamingAuctionOffer = (
+    platform: typeof PLATFORMS[number],
+    projectBudget: number,
+    packageScore: number,
+    isSeries: boolean,
+    currentHighestBidValue: number,
+    previousBestBidValue?: number,
+    isPostTheatricalBidding?: boolean
+): Bid | null => {
+    const bidProfile = getStreamingBidProfile(packageScore, isSeries, isPostTheatricalBidding);
+    const safetyPremium = bidProfile.safetyPremium;
+    const qualityEscalator = Math.max(0.85, 0.95 + ((packageScore - 55) / 105));
+    const floorOffer = projectBudget > 0 ? projectBudget * bidProfile.floor : platform.baseBid;
+    const qualityRange = projectBudget > 0
+        ? projectBudget * (bidProfile.floor + ((bidProfile.ceiling - bidProfile.floor) * (0.2 + Math.random() * 0.58)))
+        : platform.baseBid * (0.95 + Math.random() * 0.35) * safetyPremium;
+    const platformAppetite = platform.baseBid * (packageScore / 52) * (1 + Math.random() * 0.32) * safetyPremium * qualityEscalator;
+    const hardCeiling = projectBudget > 0 ? projectBudget * bidProfile.ceiling : Number.MAX_SAFE_INTEGER;
+    const platformSoftCap = Math.max(floorOffer, platform.maxBudget * bidProfile.capBoost);
+    let maxOffer = Math.max(
+        floorOffer,
+        Math.min(
+            hardCeiling,
+            platformSoftCap,
+            Math.max(floorOffer * (1.04 + Math.random() * 0.12), platformAppetite, qualityRange)
+        )
+    );
+    
+    // Re-bidding should discourage fishing for better bids, but never break the safe-floor rule.
+    if (previousBestBidValue) {
+        if (Math.random() > 0.05) {
+            maxOffer = Math.max(floorOffer, Math.min(maxOffer, previousBestBidValue * (0.7 + Math.random() * 0.25)));
+        }
+    }
+
+    if (maxOffer <= currentHighestBidValue * 1.05) return null;
+
+    const newAmount = currentHighestBidValue === 0
+        ? Math.floor(Math.max(
+            floorOffer,
+            Math.min(
+                maxOffer,
+                Math.max(floorOffer * (0.99 + Math.random() * 0.18), platform.baseBid * (0.95 + Math.random() * 0.3) * safetyPremium)
+            )
+        ))
+        : Math.floor(Math.max(floorOffer, Math.min(maxOffer, currentHighestBidValue * (1.08 + Math.random() * 0.12))));
+    
+    const rand = Math.random();
+    let type: BidType = 'UPFRONT_ONLY';
+    let fundingAmount = 0;
+    let backendPct = 0;
+    let upfrontAmount = newAmount;
+    
+    if (rand > 0.8) {
+        type = 'GREENLIGHT_DEAL';
+        upfrontAmount = Math.min(newAmount, Math.floor(Math.max(floorOffer, newAmount * 0.45)));
+        fundingAmount = Math.max(0, newAmount - upfrontAmount);
+    } else if (rand > 0.6) {
+        type = 'BACKEND_POINTS';
+        upfrontAmount = Math.min(newAmount, Math.floor(Math.max(floorOffer, newAmount * (isPostTheatricalBidding ? 0.7 : 0.8))));
+        backendPct = Math.floor(Math.random() * (isPostTheatricalBidding ? 6 : 8)) + (isPostTheatricalBidding ? 4 : 6);
+    }
+
+    const bidValue = type === 'GREENLIGHT_DEAL' ? upfrontAmount + fundingAmount : upfrontAmount;
+    
+    return {
+        id: Math.random().toString(),
+        platformId: platform.id,
+        amount: upfrontAmount,
+        type,
+        fundingAmount,
+        backendPct,
+        bidValue,
+        timestamp: Date.now()
+    };
+};
 
 export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, project, onBack, onUpdatePlayer, onComplete, isPostTheatricalBidding }) => {
     const [step, setStep] = useState(isPostTheatricalBidding ? 2 : 1);
@@ -200,66 +277,19 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                     return;
                 }
                 
+                const currentHighest = highestBid ? highestBid.bidValue : 0;
                 const projectBudget = project.projectDetails?.estimatedBudget || 0;
-                const bidProfile = getStreamingBidProfile(packageScore, isSeries, isPostTheatricalBidding);
-                const safetyPremium = bidProfile.safetyPremium;
-                const qualityEscalator = Math.max(0.85, 0.95 + ((packageScore - 55) / 105));
-                const floorOffer = projectBudget > 0 ? projectBudget * bidProfile.floor : platform.baseBid;
-                const qualityRange = projectBudget > 0
-                    ? projectBudget * (bidProfile.floor + ((bidProfile.ceiling - bidProfile.floor) * (0.2 + Math.random() * 0.58)))
-                    : platform.baseBid * (0.95 + Math.random() * 0.35) * safetyPremium;
-                let maxOffer = Math.min(
-                    platform.maxBudget * bidProfile.capBoost,
-                    projectBudget > 0 ? projectBudget * bidProfile.ceiling : Number.MAX_SAFE_INTEGER,
-                    Math.max(floorOffer * (1.04 + Math.random() * 0.12), platform.baseBid * (packageScore / 52) * (1 + Math.random() * 0.32) * safetyPremium * qualityEscalator, qualityRange)
+                const newBid = calculateStreamingAuctionOffer(
+                    platform,
+                    projectBudget,
+                    packageScore,
+                    isSeries,
+                    currentHighest,
+                    project.previousBestBidValue,
+                    isPostTheatricalBidding
                 );
                 
-                // RE-BIDDING PENALTY: If they already auctioned, most bids will be lower.
-                // 5% chance to be higher, otherwise 70-90% of previous best.
-                if (project.previousBestBidValue) {
-                    if (Math.random() > 0.05) {
-                        maxOffer = Math.min(maxOffer, project.previousBestBidValue * (0.7 + Math.random() * 0.25));
-                    }
-                }
-
-                const currentHighest = highestBid ? highestBid.bidValue : 0;
-                
-                if (maxOffer > currentHighest * 1.05) {
-                    // They can outbid!
-                    const minimumOpeningBid = Math.floor(floorOffer);
-                    const newAmount = currentHighest === 0
-                        ? Math.floor(Math.min(maxOffer, Math.max(minimumOpeningBid, floorOffer * (0.99 + Math.random() * 0.18), platform.baseBid * (0.95 + Math.random() * 0.3) * safetyPremium)))
-                        : Math.floor(Math.min(maxOffer, currentHighest * (1.08 + Math.random() * 0.12)));
-                    
-                    const rand = Math.random();
-                    let type: BidType = 'UPFRONT_ONLY';
-                    let fundingAmount = 0;
-                    let backendPct = 0;
-                    let upfrontAmount = newAmount;
-                    
-                    if (rand > 0.8) {
-                        type = 'GREENLIGHT_DEAL';
-                        // Split the total offer: 40% upfront, 60% for next season
-                        upfrontAmount = Math.floor(Math.max(minimumOpeningBid, newAmount * 0.45));
-                        fundingAmount = newAmount - upfrontAmount;
-                    } else if (rand > 0.6) {
-                        type = 'BACKEND_POINTS';
-                        // Lower upfront for backend points
-                        upfrontAmount = Math.floor(Math.max(minimumOpeningBid, newAmount * (isPostTheatricalBidding ? 0.7 : 0.8)));
-                        backendPct = Math.floor(Math.random() * (isPostTheatricalBidding ? 6 : 8)) + (isPostTheatricalBidding ? 4 : 6);
-                    }
-                    
-                    const newBid: Bid = {
-                        id: Math.random().toString(),
-                        platformId: platform.id,
-                        amount: upfrontAmount,
-                        type,
-                        fundingAmount,
-                        backendPct,
-                        bidValue: newAmount,
-                        timestamp: Date.now()
-                    };
-                    
+                if (newBid) {
                     setCurrentBids(prev => [newBid, ...prev].slice(0, 10));
                     setHighestBid(newBid);
                     setTimeLeft(100); // Reset timer

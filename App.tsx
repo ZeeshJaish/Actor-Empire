@@ -629,6 +629,9 @@ export const App: React.FC = () => {
           if (!Array.isArray(safePlayer.activeSponsorships)) safePlayer.activeSponsorships = [];
           if (!Array.isArray(safePlayer.applications)) safePlayer.applications = [];
           if (!safePlayer.studioMemory) safePlayer.studioMemory = {} as any;
+          if (!safePlayer.world) safePlayer.world = { ...INITIAL_PLAYER.world };
+          if (!safePlayer.world.npcVentures || typeof safePlayer.world.npcVentures !== 'object') safePlayer.world.npcVentures = {};
+          if (!safePlayer.world.studios || typeof safePlayer.world.studios !== 'object') safePlayer.world.studios = { ...INITIAL_PLAYER.world.studios };
           if (!Array.isArray(safePlayer.pendingEvents)) safePlayer.pendingEvents = [];
           if (!Array.isArray(safePlayer.logs)) safePlayer.logs = [];
           if (!safePlayer.weeklyOpportunities || !Array.isArray(safePlayer.weeklyOpportunities.auditions) || !Array.isArray(safePlayer.weeklyOpportunities.jobs)) {
@@ -1282,6 +1285,45 @@ export const App: React.FC = () => {
   const handleEventComplete = (updatedPlayer: Player) => { 
       setPlayer({ ...updatedPlayer, pendingEvent: null }); 
   };
+
+  const resolveQueuedEventSafely = (
+      sourcePlayer: Player,
+      updatedPlayer: Player,
+      resolvedEventId: string | undefined,
+      log: string,
+      logType: 'positive' | 'negative' | 'neutral' = 'neutral'
+  ) => {
+      try {
+          const sourceQueue = Array.isArray(sourcePlayer.pendingEvents) ? sourcePlayer.pendingEvents : [];
+          const updatedQueue = Array.isArray(updatedPlayer.pendingEvents) ? updatedPlayer.pendingEvents : sourceQueue;
+          const queueToFilter = sourceQueue.length > 0 ? sourceQueue : updatedQueue;
+          const newPendingEvents = resolvedEventId
+              ? queueToFilter.filter(event => event?.id !== resolvedEventId)
+              : queueToFilter.slice(1);
+          const nextLogs = [
+              {
+                  week: updatedPlayer.currentWeek ?? sourcePlayer.currentWeek,
+                  year: updatedPlayer.age ?? sourcePlayer.age,
+                  message: log || 'Event resolved.',
+                  type: logType
+              },
+              ...(updatedPlayer.logs || sourcePlayer.logs || [])
+          ].slice(0, 50);
+
+          handleUpdatePlayer({
+              ...updatedPlayer,
+              pendingEvents: newPendingEvents,
+              logs: nextLogs
+          });
+      } catch (error) {
+          console.error('Queued event resolution failed:', error);
+          setToastMessage({
+              title: 'Event Recovery',
+              subtext: 'That event could not close. Please tap Continue again.'
+          });
+          throw error;
+      }
+  };
   
   const handleRestartCareer = async () => {
     if (currentSlot) {
@@ -1466,21 +1508,13 @@ export const App: React.FC = () => {
       {player.pendingEvent && (player.pendingEvent.type === 'AWARD_CEREMONY' || player.pendingEvent.type === 'PREMIERE') && (<RedCarpetEvent player={player} event={player.pendingEvent} onComplete={handleEventComplete} />)}
       {player.pendingEvents && player.pendingEvents.length > 0 && (player.pendingEvents[0].type === 'PRODUCTION_CRISIS' || player.pendingEvents[0].type === 'DIRECTOR_DECISION') && (
           <ProductionCrisisModal 
+              key={player.pendingEvents[0].id}
               player={player} 
               event={player.pendingEvents[0]} 
               onChoice={(idx) => {
                   const currentEvent = player.pendingEvents![0];
                   const { updatedPlayer, log } = applyCrisisImpact(player, currentEvent, idx);
-                  
-                  // Remove the event from the queue
-                  const newPendingEvents = (updatedPlayer.pendingEvents || player.pendingEvents || [])
-                      .filter(event => event.id !== currentEvent.id);
-                  
-                  handleUpdatePlayer({
-                      ...updatedPlayer,
-                      pendingEvents: newPendingEvents,
-                      logs: [{ week: player.currentWeek, year: player.age, message: log, type: 'neutral' }, ...(updatedPlayer.logs || player.logs)].slice(0, 50)
-                  });
+                  resolveQueuedEventSafely(player, updatedPlayer, currentEvent.id, log);
               }} 
           />
       )}
@@ -1491,18 +1525,12 @@ export const App: React.FC = () => {
          player.pendingEvents[0].type === 'SCANDAL' || 
          player.pendingEvents[0].type === 'UNDERWORLD_OFFER') && (
           <LifeEventModal 
+              key={player.pendingEvents[0].id}
               player={player}
               event={player.pendingEvents[0]}
               onChoice={(updatedPlayer, log) => {
                   const resolvedEventId = player.pendingEvents?.[0]?.id;
-                  const newPendingEvents = (updatedPlayer.pendingEvents || player.pendingEvents || [])
-                      .filter(event => event.id !== resolvedEventId);
-
-                  handleUpdatePlayer({
-                      ...updatedPlayer,
-                      pendingEvents: newPendingEvents,
-                      logs: [{ week: player.currentWeek, year: player.age, message: log, type: 'neutral' }, ...(updatedPlayer.logs || player.logs)].slice(0, 50)
-                  });
+                  resolveQueuedEventSafely(player, updatedPlayer, resolvedEventId, log);
               }}
           />
       )}

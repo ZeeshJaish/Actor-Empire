@@ -390,6 +390,13 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
             if (p.isPlayer) return true;
             return npcStates[p.authorId]?.isFollowing;
         });
+    const activeComposeConfig = X_POST_TYPES[composeType];
+    const composeImpact = [
+        { label: 'Reach', value: `x${activeComposeConfig.reach.toFixed(1)}`, color: 'text-blue-300' },
+        { label: 'Followers', value: activeComposeConfig.conversion >= 0.028 ? 'High' : activeComposeConfig.conversion >= 0.02 ? 'Medium' : 'Low', color: 'text-emerald-300' },
+        { label: 'Heat', value: activeComposeConfig.controversy > 6 ? 'Risky' : activeComposeConfig.controversy > 0 ? `+${activeComposeConfig.controversy}` : activeComposeConfig.controversy < 0 ? 'Cools' : 'Low', color: activeComposeConfig.controversy > 0 ? 'text-red-300' : activeComposeConfig.controversy < 0 ? 'text-emerald-300' : 'text-zinc-300' },
+        { label: 'Rep', value: activeComposeConfig.reputation > 0 ? `+${activeComposeConfig.reputation}` : activeComposeConfig.reputation < 0 ? `${activeComposeConfig.reputation}` : '0', color: activeComposeConfig.reputation >= 0 ? 'text-emerald-300' : 'text-rose-300' }
+    ];
 
     // --- SUB-COMPONENTS ---
 
@@ -758,50 +765,122 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
             {/* --- COMPOSE MODAL --- */}
             {composeOpen && (
                 <div className="absolute inset-0 bg-black z-50 flex flex-col animate-in slide-in-from-bottom duration-200">
-                    <div className="flex justify-between items-center p-4 pt-12">
-                        <button onClick={() => setComposeOpen(false)} className="text-white text-sm">Cancel</button>
-                        <button 
-                            onClick={handlePost} 
-                            disabled={!tweetContent.trim()}
-                            className="bg-blue-500 text-white px-4 py-1.5 rounded-full text-sm font-bold disabled:opacity-50"
+                    <div className="px-4 pt-12 pb-3 border-b border-zinc-900 flex items-center justify-between bg-black/95 shrink-0">
+                        <button
+                            onClick={() => setComposeOpen(false)}
+                            className="rounded-full bg-zinc-950 border border-zinc-800 px-4 py-2 text-xs font-black uppercase tracking-widest text-zinc-300 active:scale-95 transition-transform"
                         >
-                            Post
+                            Cancel
                         </button>
-                    </div>
-                    <div className="px-4 pb-2">
-                        <div className="flex gap-2 overflow-x-auto custom-scrollbar pb-2">
-                            {(Object.keys(X_POST_TYPES) as XPostType[]).filter(type => type !== 'GENERAL' && type !== 'DRAMA_REPLY').map(type => {
-                                const Icon = X_POST_TYPES[type].icon;
-                                return (
-                                    <button
-                                        key={type}
-                                        onClick={() => setComposeType(type)}
-                                        className={`flex shrink-0 items-center gap-2 rounded-full border px-3 py-2 text-xs font-black transition-colors ${composeType === type ? 'border-blue-400 bg-blue-500 text-white' : 'border-zinc-800 bg-zinc-950 text-zinc-400'}`}
-                                    >
-                                        <Icon size={14} />
-                                        {X_POST_TYPES[type].label}
-                                    </button>
-                                );
-                            })}
+                        <div className="text-center">
+                            <div className="font-black text-lg leading-tight">X Studio</div>
+                            <div className="text-[9px] text-blue-400 font-black uppercase tracking-[0.25em]">Create Post</div>
                         </div>
+                        <div className="w-[76px]" />
                     </div>
-                    <div className="flex gap-3 p-4 pt-2">
-                        <img src={player.avatar} className="w-10 h-10 rounded-full object-cover border border-zinc-800" />
-                        <div className="flex-1">
-                            <div className="mb-2 text-xs font-black uppercase tracking-widest text-blue-400">{X_POST_TYPES[composeType].prompt}</div>
-                            <textarea 
-                                value={tweetContent}
-                                onChange={(e) => setTweetContent(e.target.value)}
-                                placeholder={X_POST_TYPES[composeType].placeholder}
-                                className="w-full bg-transparent text-lg text-white placeholder:text-zinc-500 resize-none focus:outline-none h-40"
-                                autoFocus
-                            />
-                            <div className="mt-2 flex gap-2 text-[10px] font-black uppercase tracking-widest text-zinc-500">
-                                <span>Reach x{X_POST_TYPES[composeType].reach.toFixed(1)}</span>
-                                {X_POST_TYPES[composeType].controversy > 0 && <span className="text-red-400">Heat +{X_POST_TYPES[composeType].controversy}</span>}
-                                {X_POST_TYPES[composeType].controversy < 0 && <span className="text-emerald-400">Cools heat</span>}
+
+                    <div className="flex-1 overflow-y-auto custom-scrollbar pb-36">
+                        <div className="p-4 space-y-4">
+                            <div className="rounded-[1.75rem] border border-zinc-800 bg-gradient-to-b from-zinc-950 to-black p-4 shadow-2xl">
+                                <div className="flex gap-3">
+                                    <img src={player.avatar} className="w-11 h-11 rounded-full object-cover border border-zinc-800 shrink-0" />
+                                    <div className="min-w-0 flex-1">
+                                        <div className="flex items-center gap-1">
+                                            <div className="font-black text-white truncate">{player.name}</div>
+                                            {player.stats.fame > 50 && <Check size={14} className="text-blue-400" />}
+                                            <div className="text-zinc-500 text-sm truncate">{player.x.handle}</div>
+                                        </div>
+                                        <div className="mt-2 min-h-[76px] whitespace-pre-wrap text-[17px] leading-relaxed text-white">
+                                            {tweetContent || <span className="text-zinc-600">{activeComposeConfig.placeholder}</span>}
+                                        </div>
+                                        <div className="mt-3 flex flex-wrap gap-2">
+                                            <span className="rounded-full bg-blue-500/10 border border-blue-500/20 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-blue-300">
+                                                {activeComposeConfig.label}
+                                            </span>
+                                            {activeComposeConfig.controversy > 0 && (
+                                                <span className="rounded-full bg-red-500/10 border border-red-500/20 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-red-300">
+                                                    Heat +{activeComposeConfig.controversy}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="rounded-[1.5rem] border border-zinc-800 bg-zinc-950 p-3">
+                                <div className="flex items-center justify-between mb-2">
+                                    <div className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">{activeComposeConfig.prompt}</div>
+                                    <div className={`text-[10px] font-black uppercase tracking-widest ${tweetContent.trim() ? 'text-emerald-400' : 'text-zinc-600'}`}>
+                                        {tweetContent.trim() ? 'Ready' : 'Required'}
+                                    </div>
+                                </div>
+                                <textarea
+                                    value={tweetContent}
+                                    onChange={(e) => setTweetContent(e.target.value)}
+                                    placeholder={activeComposeConfig.placeholder}
+                                    className="w-full bg-black text-lg text-white placeholder:text-zinc-600 resize-none focus:outline-none min-h-[132px] rounded-2xl border border-zinc-800 focus:border-blue-500 p-4"
+                                    autoFocus
+                                />
+                            </div>
+
+                            <div className="space-y-3">
+                                <div className="px-1">
+                                    <div className="text-xs font-black text-zinc-400 uppercase tracking-[0.22em]">Public Voice</div>
+                                    <div className="text-[11px] text-zinc-600 mt-1">Choose how the timeline reads this post.</div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {(Object.keys(X_POST_TYPES) as XPostType[]).filter(type => type !== 'DRAMA_REPLY').map(type => {
+                                        const config = X_POST_TYPES[type];
+                                        const Icon = config.icon;
+                                        const isSelected = composeType === type;
+                                        return (
+                                            <button
+                                                key={type}
+                                                onClick={() => setComposeType(type)}
+                                                className={`rounded-2xl border p-3 text-left transition-all active:scale-[0.99] ${isSelected ? 'bg-white text-black border-white shadow-[0_0_28px_rgba(255,255,255,0.08)]' : 'bg-zinc-950 border-zinc-800 text-zinc-300 hover:bg-zinc-900'}`}
+                                            >
+                                                <div className="flex items-center gap-2">
+                                                    <div className={`h-8 w-8 rounded-xl flex items-center justify-center ${isSelected ? 'bg-black text-white' : 'bg-black border border-zinc-800 text-blue-300'}`}>
+                                                        <Icon size={15} />
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <div className="font-black text-xs uppercase tracking-wide truncate">{config.label}</div>
+                                                        <div className={`text-[9px] font-mono mt-0.5 ${isSelected ? 'text-zinc-500' : 'text-zinc-600'}`}>
+                                                            x{config.reach.toFixed(1)} reach
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            <div className="rounded-[1.5rem] border border-zinc-800 bg-gradient-to-br from-zinc-950 to-black p-4">
+                                <div className="text-sm font-black text-white">Timeline Forecast</div>
+                                <div className="text-[11px] text-zinc-500 mt-1 leading-relaxed">
+                                    X is volatile. Small accounts can still get discovered, but heat can spill into reputation and future events.
+                                </div>
+                                <div className="grid grid-cols-4 gap-2 mt-4">
+                                    {composeImpact.map(item => (
+                                        <div key={item.label} className="rounded-2xl bg-black border border-zinc-900 p-2">
+                                            <div className="text-[8px] text-zinc-600 font-black uppercase tracking-widest">{item.label}</div>
+                                            <div className={`text-xs font-black mt-1 ${item.color}`}>{item.value}</div>
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
                         </div>
+                    </div>
+
+                    <div className="pointer-events-none absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black via-black to-transparent px-4 pt-10 pb-8">
+                        <button
+                            onClick={handlePost}
+                            disabled={!tweetContent.trim()}
+                            className="pointer-events-auto w-full rounded-[1.4rem] bg-gradient-to-r from-blue-600 to-sky-400 py-4 text-white font-black tracking-wide shadow-[0_18px_45px_rgba(37,99,235,0.28)] disabled:opacity-50 disabled:from-zinc-800 disabled:to-zinc-800 disabled:text-zinc-500 active:scale-[0.99] transition-transform"
+                        >
+                            Post to X
+                        </button>
                     </div>
                 </div>
             )}

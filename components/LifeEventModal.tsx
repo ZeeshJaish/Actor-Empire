@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Player, ScheduledEvent, LifeEvent, LifeEventOption } from '../types';
 import { AlertTriangle, ShieldAlert, Scale, User, Zap, ChevronRight, PlayCircle, Loader2, CheckCircle, Activity, Newspaper } from 'lucide-react';
 import { motion } from 'motion/react';
@@ -14,10 +14,17 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
     const [isProcessingAd, setIsProcessingAd] = useState(false);
     const [feedback, setFeedback] = useState<{ updatedPlayer: Player, log: string, optionLabel: string, wasGolden: boolean } | null>(null);
     const [isResolvingFeedback, setIsResolvingFeedback] = useState(false);
+    const [resolveError, setResolveError] = useState('');
+    const mountedRef = useRef(true);
+
+    useEffect(() => {
+        return () => {
+            mountedRef.current = false;
+        };
+    }, []);
     
     // Extract the actual LifeEvent data
     const lifeEvent: LifeEvent = event.data?.lifeEvent;
-    if (!lifeEvent) return null;
 
     const handleOptionClick = async (option: LifeEventOption, idx: number) => {
         let impactResult;
@@ -36,10 +43,15 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
 
                     // Fallback for missing impact function (e.g. after a reload from localStorage)
                     if (typeof option.impact === 'function') {
-                        impactResult = option.impact(pCopy);
+                        try {
+                            impactResult = option.impact(pCopy);
+                        } catch (error) {
+                            console.error('LifeEvent impact failed. Using fallback logic.', error);
+                            impactResult = getFallbackImpact(lifeEvent, idx, pCopy, option);
+                        }
                     } else {
                         console.warn("LifeEvent impact function missing. Using fallback logic.");
-                        impactResult = getFallbackImpact(lifeEvent, idx, pCopy);
+                        impactResult = getFallbackImpact(lifeEvent, idx, pCopy, option);
                     }
                 } else {
                     return; // Ad failed or cancelled
@@ -60,10 +72,15 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
 
             // Fallback for missing impact function
             if (typeof option.impact === 'function') {
-                impactResult = option.impact(pCopy);
+                try {
+                    impactResult = option.impact(pCopy);
+                } catch (error) {
+                    console.error('LifeEvent impact failed. Using fallback logic.', error);
+                    impactResult = getFallbackImpact(lifeEvent, idx, pCopy, option);
+                }
             } else {
                 console.warn("LifeEvent impact function missing. Using fallback logic.");
-                impactResult = getFallbackImpact(lifeEvent, idx, pCopy);
+                impactResult = getFallbackImpact(lifeEvent, idx, pCopy, option);
             }
         }
 
@@ -85,11 +102,15 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
     };
 
     // Fallback logic for when functions are stripped by JSON serialization
-    const getFallbackImpact = (event: LifeEvent, optionIdx: number, p: Player) => {
-        const log = `Processed event: ${event.title}`;
+    const getFallbackImpact = (event: LifeEvent, optionIdx: number, p: Player, option?: LifeEventOption) => {
+        const optionText = `${option?.label || ''} ${option?.description || ''}`.toLowerCase();
+        const isGolden = !!option?.isGolden;
+        const isRisky = event.type === 'SCANDAL' || event.type === 'CRIME' || event.type === 'LEGAL' || optionText.includes('double') || optionText.includes('clap') || optionText.includes('refuse') || optionText.includes('ignore') || optionText.includes('risk');
+        const isPositive = isGolden || optionText.includes('apolog') || optionText.includes('help') || optionText.includes('honest') || optionText.includes('professional') || optionText.includes('settle') || optionText.includes('accept');
+        const eventTitle = event.title || 'The Moment';
         
         // Specific fallbacks for common events to ensure game balance isn't broken
-        if (event.title === "The Side Hustle") {
+        if (eventTitle === "The Side Hustle") {
             if (optionIdx === 0) {
                 p.money += 2000;
                 p.energy.current = Math.max(0, p.energy.current - 10);
@@ -100,12 +121,40 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
             }
         }
 
-        // Generic fallback
-        return { updatedPlayer: p, log };
+        if (isGolden) {
+            p.stats.reputation = Math.min(100, (p.stats.reputation || 0) + 3);
+            p.stats.fame = Math.min(100, (p.stats.fame || 0) + 1);
+            return {
+                updatedPlayer: p,
+                log: `${eventTitle} was handled cleanly. Your team turned the moment into a controlled win: +3 reputation, +1 fame.`
+            };
+        }
+
+        if (isRisky && !isPositive) {
+            p.stats.reputation = Math.max(0, (p.stats.reputation || 0) - 2);
+            p.stats.fame = Math.min(100, (p.stats.fame || 0) + 1);
+            return {
+                updatedPlayer: p,
+                log: `${eventTitle} created visible fallout. People noticed the choice: +1 fame, -2 reputation.`
+            };
+        }
+
+        if (isPositive) {
+            p.stats.reputation = Math.min(100, (p.stats.reputation || 0) + 1);
+            return {
+                updatedPlayer: p,
+                log: `${eventTitle} landed well enough. The choice kept things steady: +1 reputation.`
+            };
+        }
+
+        return {
+            updatedPlayer: p,
+            log: `${eventTitle} moved forward without major damage. The result was neutral, but the story continued.`
+        };
     };
 
     const getTypeTheme = () => {
-        switch (lifeEvent.type) {
+        switch (lifeEvent?.type) {
             case 'CRIME': return { color: 'red', icon: <ShieldAlert size={20} className="text-red-500" />, bgIcon: <ShieldAlert size={120} /> };
             case 'POLITICS': return { color: 'blue', icon: <Zap size={20} className="text-blue-500" />, bgIcon: <Zap size={120} /> };
             case 'LEGAL': return { color: 'amber', icon: <Scale size={20} className="text-amber-500" />, bgIcon: <Scale size={120} /> };
@@ -162,9 +211,62 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
 
     const handleFeedbackContinue = () => {
         if (!feedback || isResolvingFeedback) return;
+        setResolveError('');
         setIsResolvingFeedback(true);
-        onChoice(feedback.updatedPlayer, feedback.log);
+        try {
+            onChoice(feedback.updatedPlayer, feedback.log);
+            window.setTimeout(() => {
+                if (!mountedRef.current) return;
+                setIsResolvingFeedback(false);
+                setResolveError('Still here? Tap Continue again. The event will safely retry.');
+            }, 1800);
+        } catch (error) {
+            console.error('LifeEvent continue failed:', error);
+            setIsResolvingFeedback(false);
+            setResolveError('Could not close this event. Tap Continue again.');
+        }
     };
+
+    if (!lifeEvent) {
+        const handleDismissInvalidEvent = () => {
+            if (isResolvingFeedback) return;
+            setResolveError('');
+            setIsResolvingFeedback(true);
+            try {
+                onChoice(player, 'The moment passed without major damage. Your team kept the story moving and the career stayed on track.');
+                window.setTimeout(() => {
+                    if (!mountedRef.current) return;
+                    setIsResolvingFeedback(false);
+                    setResolveError('Still here? Tap Continue again. The event will safely retry.');
+                }, 1800);
+            } catch (error) {
+                console.error('Invalid life event dismiss failed:', error);
+                setIsResolvingFeedback(false);
+                setResolveError('Could not skip this event. Tap Continue again.');
+            }
+        };
+
+        return (
+            <div className="fixed inset-0 z-[200] bg-black/85 backdrop-blur-md flex items-end sm:items-center justify-center p-3 sm:p-4">
+                <div className="w-full max-w-sm bg-zinc-900 border border-zinc-800 rounded-3xl shadow-2xl p-5">
+                    <div className="text-[10px] font-black uppercase tracking-[0.24em] text-amber-400 mb-2">Aftermath</div>
+                    <h3 className="text-2xl font-black text-white leading-tight mb-3">Moment Handled</h3>
+                    <p className="text-sm text-zinc-400 leading-relaxed mb-5">
+                        The details were unclear, so your team handled it quietly and kept the career moving.
+                    </p>
+                    {resolveError && <div className="mb-3 text-xs font-bold text-amber-300">{resolveError}</div>}
+                    <button
+                        type="button"
+                        onClick={handleDismissInvalidEvent}
+                        disabled={isResolvingFeedback}
+                        className="w-full py-4 bg-amber-500 text-black font-black rounded-2xl disabled:opacity-60"
+                    >
+                        {isResolvingFeedback ? 'Continuing...' : 'Continue'}
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     if (feedback) {
         const outcomeCopy = getOutcomeCopy(feedback.log);
@@ -219,13 +321,18 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
                     </div>
 
                     <div className="shrink-0 border-t border-white/10 bg-zinc-950/95 p-4 pb-safe">
+                        {resolveError && (
+                            <div className="mb-3 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs font-bold text-amber-200">
+                                {resolveError}
+                            </div>
+                        )}
                         <button
                             type="button"
                             onClick={handleFeedbackContinue}
                             disabled={isResolvingFeedback}
                             className={`w-full py-4 bg-gradient-to-r ${accentGradient} text-white font-bold rounded-2xl shadow-lg hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-60`}
                         >
-                            {isResolvingFeedback ? 'Continuing...' : 'Continue'}
+                            {isResolvingFeedback ? 'Continuing...' : resolveError ? 'Retry Continue' : 'Continue'}
                         </button>
                     </div>
                 </motion.div>

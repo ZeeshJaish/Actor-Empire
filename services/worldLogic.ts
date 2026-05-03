@@ -4,6 +4,7 @@ import { STUDIO_CATALOG } from './studioLogic';
 import { NPC_DATABASE, calculateProjectFameMultiplier } from './npcLogic';
 import { generateProjectTitle, getEstimatedBudget, generateProjectDetails } from './roleLogic';
 import { initUniverses, processUniverseTurn } from './universeLogic';
+import { processNpcVentures, syncNpcVenturesToStudios } from './npcVentureLogic';
 
 // Helpers
 const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
@@ -111,6 +112,8 @@ export const processWorldTurn = (player: Player): { world: WorldState, news: New
     let newWorld = { ...player.world };
     const news: NewsItem[] = [];
     const logs: string[] = [];
+    if (!newWorld.npcVentures) newWorld.npcVentures = {};
+    newWorld = syncNpcVenturesToStudios(newWorld);
 
     // --- A. MAINTAIN RIVAL SCHEDULE ---
     // Ensure we have at least 12 weeks of upcoming rivals
@@ -222,6 +225,7 @@ export const processWorldTurn = (player: Player): { world: WorldState, news: New
 
     if (newWorld.studios) {
         Object.values(newWorld.studios).forEach(studio => {
+            if (studio.isNpcVenture) return;
             // Valuation fluctuates
             const valChange = studio.valuation * (Math.random() * 0.02 - 0.009); // -0.9% to +1.1%
             studio.valuation = Math.max(1, studio.valuation + valChange);
@@ -235,6 +239,11 @@ export const processWorldTurn = (player: Player): { world: WorldState, news: New
             }
         });
     }
+
+    const ventureResult = processNpcVentures(player, newWorld);
+    newWorld = ventureResult.world;
+    news.push(...ventureResult.news);
+    logs.push(...ventureResult.logs);
 
     if (!newWorld.universes || Object.keys(newWorld.universes).length === 0) {
         newWorld.universes = initUniverses();

@@ -12,18 +12,55 @@ interface ProductionCrisisModalProps {
 
 export const ProductionCrisisModal: React.FC<ProductionCrisisModalProps> = ({ player, event, onChoice }) => {
     const [isProcessingAd, setIsProcessingAd] = useState(false);
-    const { options, projectId } = event.data;
+    const [resolveError, setResolveError] = useState('');
+    const { options = [], projectId } = event.data || {};
     const project = player.commitments.find(c => c.id === projectId);
 
-    if (!project) return null;
+    if (!project) {
+        const handleDismissMissingProject = () => {
+            setResolveError('');
+            try {
+                onChoice(0);
+            } catch (error) {
+                console.error('Production event recovery failed:', error);
+                setResolveError('Could not skip this event. Tap Continue again.');
+            }
+        };
+
+        return (
+            <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+                <div className="w-full max-w-sm bg-zinc-900 border border-zinc-800 rounded-3xl shadow-2xl p-5">
+                    <div className="text-[10px] font-black uppercase tracking-[0.24em] text-amber-400 mb-2">Production Update</div>
+                    <h3 className="text-2xl font-black text-white leading-tight mb-3">Issue Settled</h3>
+                    <p className="text-sm text-zinc-400 leading-relaxed mb-5">
+                        The production issue was handled off-screen. No major damage, no extra delay.
+                    </p>
+                    {resolveError && <div className="mb-3 text-xs font-bold text-amber-300">{resolveError}</div>}
+                    <button
+                        type="button"
+                        onClick={handleDismissMissingProject}
+                        className="w-full py-4 bg-amber-500 text-black font-black rounded-2xl"
+                    >
+                        Continue
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     const handleChoice = async (opt: any) => {
+        setResolveError('');
         if (opt.isGolden) {
             setIsProcessingAd(true);
             try {
                 const success = await showAd('REWARDED_BAILOUT');
                 if (success) {
-                    onChoice(opt.index);
+                    try {
+                        onChoice(opt.index);
+                    } catch (error) {
+                        console.error('Production event choice failed:', error);
+                        setResolveError('Could not close this event. Try again.');
+                    }
                 }
             } catch (error) {
                 console.error("Ad failed:", error);
@@ -31,7 +68,12 @@ export const ProductionCrisisModal: React.FC<ProductionCrisisModalProps> = ({ pl
                 setIsProcessingAd(false);
             }
         } else {
-            onChoice(opt.index);
+            try {
+                onChoice(opt.index);
+            } catch (error) {
+                console.error('Production event choice failed:', error);
+                setResolveError('Could not close this event. Try again.');
+            }
         }
     };
 
@@ -99,6 +141,21 @@ export const ProductionCrisisModal: React.FC<ProductionCrisisModalProps> = ({ pl
                         <div className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold mb-2 px-2">
                             {isDirectorDecision ? 'Creative Choice' : 'Select Action'}
                         </div>
+                        {resolveError && (
+                            <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs font-bold text-amber-200">
+                                {resolveError}
+                            </div>
+                        )}
+                        {options.length === 0 && (
+                            <button
+                                type="button"
+                                onClick={() => handleChoice({ index: 0 })}
+                                className="w-full p-4 bg-zinc-900/80 border border-white/5 hover:bg-zinc-800 text-white rounded-2xl transition-all flex items-center justify-between group relative overflow-hidden"
+                            >
+                                <span className="text-sm font-bold tracking-wide">Continue Safely</span>
+                                <ChevronRight size={16} className="text-zinc-500" />
+                            </button>
+                        )}
                         {options.map((opt: any) => (
                             <motion.button 
                                 key={opt.index}

@@ -135,6 +135,7 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
 
   const knownFor = [...fullList].filter(p => p.role === 'LEAD' || p.role === 'SUPPORTING').sort((a, b) => b.rating - a.rating)[0] || fullList[0];
   const totalBoxOffice = fullList.reduce((acc, p) => acc + (p.gross || 0), 0);
+  const imdbRank = Math.max(1, Math.round(101 - Math.min(100, Math.max(0, player.stats.fame || 0))));
   const cleanedAwards: Award[] = sanitizeAwardRecords(player.awards || []);
   const awardsWon = cleanedAwards.filter(a => a.outcome === 'WON');
   const awardsNom = cleanedAwards.filter(a => a.outcome === 'NOMINATED');
@@ -720,7 +721,7 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
                         <div className="flex gap-4">
                             <div className="relative">
                                 <img src={player.avatar} className="w-20 h-20 rounded-full object-cover border-2 border-yellow-400" />
-                                <div className="absolute -bottom-2 -right-2 bg-black text-white text-[10px] font-bold px-2 py-0.5 rounded-full border border-zinc-700">#{101 - Math.min(100, player.stats.fame)}</div>
+                                <div className="absolute -bottom-2 -right-2 bg-black text-white text-[10px] font-bold px-2 py-0.5 rounded-full border border-zinc-700">#{imdbRank}</div>
                             </div>
                             <div>
                                 <h2 className="text-2xl font-bold">{player.name}</h2>

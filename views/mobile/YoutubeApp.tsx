@@ -1128,6 +1128,23 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
         </button>
     );
 
+    const selectedVideoType = VIDEO_TYPES.find(type => type.type === selectedType) || VIDEO_TYPES[0];
+    const selectedUploadPlan = UPLOAD_PLANS[selectedPlan];
+    const thumbnailThemeByType: Record<YoutubeVideoType, string> = {
+        VLOG: 'bg-[radial-gradient(circle_at_18%_18%,rgba(255,255,255,0.22),transparent_24%),linear-gradient(135deg,#dc2626,#f97316,#451a03)]',
+        SKIT: 'bg-[radial-gradient(circle_at_22%_18%,rgba(255,255,255,0.2),transparent_24%),linear-gradient(135deg,#7c3aed,#ec4899,#111827)]',
+        Q_AND_A: 'bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.2),transparent_24%),linear-gradient(135deg,#2563eb,#06b6d4,#082f49)]',
+        TRAILER: 'bg-[radial-gradient(circle_at_18%_18%,rgba(255,255,255,0.18),transparent_24%),linear-gradient(135deg,#111827,#4f46e5,#b91c1c)]',
+        COVER: 'bg-[radial-gradient(circle_at_22%_18%,rgba(255,255,255,0.2),transparent_24%),linear-gradient(135deg,#0f766e,#22c55e,#052e16)]',
+        STORYTIME: 'bg-[radial-gradient(circle_at_18%_18%,rgba(255,255,255,0.2),transparent_24%),linear-gradient(135deg,#92400e,#f59e0b,#7f1d1d)]'
+    };
+    const selectedThumbnailTheme = thumbnailThemeByType[selectedType] || thumbnailThemeByType.VLOG;
+    const strategySignal = [
+        { label: 'Views', value: selectedUploadPlan.viewBoost > 600 ? 'High' : selectedUploadPlan.viewBoost > 0 ? 'Medium' : 'Steady', color: 'text-red-300' },
+        { label: 'Trust', value: `${selectedUploadPlan.trust >= 0 ? '+' : ''}${selectedUploadPlan.trust}`, color: selectedUploadPlan.trust >= 0 ? 'text-emerald-300' : 'text-rose-300' },
+        { label: 'Heat', value: selectedUploadPlan.controversy > 6 ? 'Risky' : selectedUploadPlan.controversy > 0 ? 'Warm' : 'Low', color: selectedUploadPlan.controversy > 0 ? 'text-orange-300' : 'text-blue-300' }
+    ];
+
     return (
         <div className="absolute inset-0 bg-zinc-950 flex flex-col z-40 text-white animate-in slide-in-from-right duration-300 font-sans">
             
@@ -1148,64 +1165,81 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
 
             {/* UPLOAD VIEW (Overlay) */}
             {view === 'UPLOAD' && (
-                <div className="absolute inset-0 flex flex-col bg-zinc-900 z-50 animate-in slide-in-from-bottom duration-300">
-                    <div className="p-4 pt-12 border-b border-zinc-800 flex items-center gap-4 bg-zinc-900 shrink-0">
-                        <button onClick={() => setView('MAIN')} className="p-2 -ml-2 hover:bg-zinc-800 rounded-full"><ArrowLeft size={20}/></button>
-                        <h2 className="font-bold text-lg">Upload Video</h2>
+                <div className="absolute inset-0 flex flex-col bg-black z-50 animate-in slide-in-from-bottom duration-300">
+                    <div className="px-4 pt-12 pb-3 border-b border-zinc-900 flex items-center justify-between bg-zinc-950/95 shrink-0">
+                        <button onClick={() => setView('MAIN')} className="rounded-full bg-zinc-900 border border-zinc-800 p-2 active:scale-95 transition-transform">
+                            <ArrowLeft size={20}/>
+                        </button>
+                        <div className="text-center">
+                            <h2 className="font-black text-lg leading-tight">Creator Studio</h2>
+                            <div className="text-[9px] text-red-400 font-black uppercase tracking-[0.25em]">Upload Video</div>
+                        </div>
+                        <div className="w-10" />
                     </div>
-                    
-                    <div className="flex-1 p-6 overflow-y-auto custom-scrollbar">
-                        
-                        {/* Preview Section */}
-                        <div className="mb-8">
-                            <label className="text-xs font-bold text-zinc-500 uppercase block mb-3">Preview</label>
-                            <button
-                                type="button"
-                                onClick={() => thumbnailInputRef.current?.click()}
-                                className="w-full aspect-video bg-zinc-800 rounded-xl flex items-center justify-center relative overflow-hidden shadow-lg border border-zinc-700 text-left group focus:outline-none focus:border-red-500 transition-all"
-                            >
-                                {thumbnailSourceUrl ? (
-                                    <img
-                                        src={thumbnailSourceUrl}
-                                        alt="Selected thumbnail preview"
-                                        className={thumbnailImageClass(thumbnailFitMode)}
-                                        style={thumbnailImageStyle(thumbnailZoom, thumbnailOffsetX, thumbnailOffsetY)}
-                                    />
-                                ) : (
-                                    <div className="absolute inset-0 bg-gradient-to-tr from-red-600 to-orange-600 opacity-80"></div>
-                                )}
-                                <div className="absolute inset-0 bg-black/10 group-hover:bg-black/20 transition-colors"></div>
-                                {!thumbnailSourceUrl && (
-                                    <div className="relative z-10 text-center">
-                                        <span className="block text-white font-black text-4xl uppercase tracking-tighter drop-shadow-xl scale-y-110">
-                                            {selectedType.replace(/_/g, ' ')}
-                                        </span>
+
+                    <div className="flex-1 overflow-y-auto custom-scrollbar pb-64">
+                        <div className="p-4 space-y-4">
+                            <div className="rounded-[2rem] border border-zinc-800 bg-gradient-to-b from-zinc-950 to-black p-3 shadow-2xl">
+                                <button
+                                    type="button"
+                                    onClick={() => thumbnailInputRef.current?.click()}
+                                    className="w-full aspect-video rounded-[1.35rem] flex items-center justify-center relative overflow-hidden border border-white/10 text-left group focus:outline-none focus:border-red-500 transition-all"
+                                >
+                                    {thumbnailSourceUrl ? (
+                                        <img
+                                            src={thumbnailSourceUrl}
+                                            alt="Selected thumbnail preview"
+                                            className={thumbnailImageClass(thumbnailFitMode)}
+                                            style={thumbnailImageStyle(thumbnailZoom, thumbnailOffsetX, thumbnailOffsetY)}
+                                        />
+                                    ) : (
+                                        <div className={`absolute inset-0 ${selectedThumbnailTheme}`}></div>
+                                    )}
+                                    <div className="absolute inset-0 bg-black/10 group-hover:bg-black/20 transition-colors"></div>
+                                    {!thumbnailSourceUrl && (
+                                        <div className="relative z-10 text-center px-6">
+                                            <span className="block text-white/95 font-black text-4xl uppercase tracking-tighter drop-shadow-xl scale-y-110">
+                                                {selectedVideoType.type.replace(/_/g, ' ')}
+                                            </span>
+                                            <span className="mt-2 inline-flex rounded-full bg-black/40 border border-white/10 px-3 py-1 text-[9px] font-black uppercase tracking-widest text-white/70">
+                                                Generated thumbnail
+                                            </span>
+                                        </div>
+                                    )}
+                                    <div className="absolute left-3 top-3 z-20 flex items-center gap-2 rounded-full bg-black/75 backdrop-blur px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white shadow-lg">
+                                        <ImagePlus size={14} />
+                                        {thumbnailSourceUrl ? 'Change' : 'Upload'}
                                     </div>
-                                )}
-                                <div className="absolute left-3 top-3 z-20 flex items-center gap-2 rounded-full bg-black/75 backdrop-blur px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white shadow-lg">
-                                    <ImagePlus size={14} />
-                                    {thumbnailSourceUrl ? 'Change' : 'Upload'}
-                                </div>
-                                <div className="absolute bottom-3 right-3 bg-black/80 text-white text-[10px] font-bold px-2 py-1 rounded">12:34</div>
-                            </button>
-                            <div className="mt-3 px-1">
-                                <div className="font-bold text-white text-base leading-tight">{title || "Your Video Title Here..."}</div>
-                                <div className="text-xs text-zinc-500 mt-1 flex items-center gap-1">
-                                    <div className="w-4 h-4 bg-indigo-500 rounded-full"></div> {player.name}
+                                    <div className="absolute bottom-3 right-3 bg-black/80 text-white text-[10px] font-bold px-2 py-1 rounded">12:34</div>
+                                </button>
+                                <div className="mt-3 flex gap-3">
+                                    <div className="w-10 h-10 rounded-full bg-indigo-500 overflow-hidden border border-white/10 shrink-0">
+                                        {player.avatar ? <img src={player.avatar} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center font-black">{player.name[0]}</div>}
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <div className="font-black text-white text-base leading-tight line-clamp-2">{title || 'Your Video Title Here...'}</div>
+                                        <div className="text-xs text-zinc-500 mt-1">
+                                            {player.name} • Draft • {selectedUploadPlan.label}
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
 
-                        <div className="mb-6">
-                            <label className="text-xs font-bold text-zinc-500 uppercase block mb-2">Video Title</label>
-                            <input 
-                                type="text" 
-                                value={title}
-                                onChange={(e) => setTitle(e.target.value)}
-                                placeholder="Enter a catchy title..."
-                                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-4 text-white focus:border-red-600 focus:outline-none text-lg font-bold placeholder:font-normal placeholder:text-zinc-700"
-                            />
-                        </div>
+                            <div className="rounded-[1.5rem] border border-zinc-800 bg-zinc-950 p-3">
+                                <div className="flex items-center justify-between mb-2">
+                                    <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Video Title</label>
+                                    <div className={`text-[10px] font-black uppercase tracking-widest ${title.trim() ? 'text-emerald-400' : 'text-zinc-600'}`}>
+                                        {title.trim() ? 'Ready' : 'Required'}
+                                    </div>
+                                </div>
+                                <input
+                                    type="text"
+                                    value={title}
+                                    onChange={(e) => setTitle(e.target.value)}
+                                    placeholder="Enter a catchy title..."
+                                    className="w-full bg-black border border-zinc-800 rounded-2xl p-4 text-white focus:border-red-500 focus:outline-none text-lg font-black placeholder:font-normal placeholder:text-zinc-700"
+                                />
+                            </div>
 
                         <input
                             ref={thumbnailInputRef}
@@ -1214,19 +1248,27 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
                             onChange={handleThumbnailUpload}
                             className="hidden"
                         />
-                        {thumbnailError && <div className="mb-6 rounded-2xl border border-rose-500/20 bg-rose-500/10 p-3 text-xs text-rose-200">{thumbnailError}</div>}
+                        {thumbnailError && <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 p-3 text-xs text-rose-200">{thumbnailError}</div>}
 
-                        <div className="mb-8">
-                            <label className="text-xs font-bold text-zinc-500 uppercase block mb-3">Content Format</label>
-                            <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-3">
+                            <div className="flex items-end justify-between gap-3 px-1">
+                                <div>
+                                    <label className="text-xs font-black text-zinc-400 uppercase tracking-[0.22em]">Video Type</label>
+                                    <div className="text-[11px] text-zinc-600 mt-1">Pick what kind of upload this is.</div>
+                                </div>
+                                <div className="text-[10px] text-zinc-500 font-black uppercase tracking-widest shrink-0">
+                                    -{selectedVideoType.energy}E • ${selectedVideoType.cost}
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
                                 {VIDEO_TYPES.map(vt => (
                                     <button 
                                         key={vt.type}
                                         onClick={() => setSelectedType(vt.type)}
-                                        className={`p-4 rounded-2xl border text-left transition-all relative overflow-hidden group ${selectedType === vt.type ? 'bg-white text-black border-white' : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:bg-zinc-900'}`}
+                                        className={`p-3 rounded-2xl border text-left transition-all relative overflow-hidden group active:scale-[0.99] ${selectedType === vt.type ? 'bg-white text-black border-white shadow-[0_0_28px_rgba(255,255,255,0.08)]' : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:bg-zinc-900'}`}
                                     >
                                         <div className="relative z-10">
-                                            <div className="font-black text-sm uppercase tracking-wide mb-1">{vt.label}</div>
+                                            <div className="font-black text-xs uppercase tracking-wide mb-1">{vt.label}</div>
                                             <div className={`text-[10px] font-mono ${selectedType === vt.type ? 'text-zinc-500' : 'opacity-50'}`}>-{vt.energy}E • ${vt.cost}</div>
                                         </div>
                                         {selectedType === vt.type && <div className="absolute right-3 top-3 text-emerald-500"><div className="w-2 h-2 bg-emerald-500 rounded-full"></div></div>}
@@ -1235,8 +1277,11 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
                             </div>
                         </div>
 
-                        <div className="mb-8">
-                            <label className="text-xs font-bold text-zinc-500 uppercase block mb-3">Upload Angle</label>
+                        <div className="space-y-3">
+                            <div className="px-1">
+                                <label className="text-xs font-black text-zinc-400 uppercase tracking-[0.22em]">Strategy</label>
+                                <div className="text-[11px] text-zinc-600 mt-1">Choose the tone: safe growth, hype, access, or risk.</div>
+                            </div>
                             <div className="space-y-2">
                                 {(Object.keys(UPLOAD_PLANS) as YoutubeUploadPlan[]).map(planKey => {
                                     const plan = UPLOAD_PLANS[planKey];
@@ -1245,10 +1290,10 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
                                         <button
                                             key={planKey}
                                             onClick={() => setSelectedPlan(planKey)}
-                                            className={`w-full p-4 rounded-2xl border text-left transition-all ${isSelected ? 'bg-red-600 text-white border-red-500 shadow-lg shadow-red-950/40' : 'bg-zinc-950 border-zinc-800 text-zinc-300'}`}
+                                            className={`w-full p-4 rounded-2xl border text-left transition-all active:scale-[0.99] ${isSelected ? 'bg-gradient-to-r from-red-600 to-orange-500 text-white border-red-400 shadow-lg shadow-red-950/40' : 'bg-zinc-950 border-zinc-800 text-zinc-300 hover:bg-zinc-900'}`}
                                         >
                                             <div className="flex items-center justify-between gap-3">
-                                                <div>
+                                                <div className="min-w-0">
                                                     <div className="font-black text-sm uppercase tracking-wide">{plan.label}</div>
                                                     <div className={`text-xs mt-1 ${isSelected ? 'text-red-100' : 'text-zinc-500'}`}>{plan.description}</div>
                                                 </div>
@@ -1262,20 +1307,33 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
                             </div>
                         </div>
 
-                        <div className="bg-zinc-950 p-4 rounded-xl border border-zinc-800 mb-6 flex items-start gap-3">
-                            <div className="p-2 bg-zinc-900 rounded-lg text-zinc-400"><TrendingUp size={16}/></div>
-                            <div>
-                                <div className="text-xs font-bold text-white mb-1">Projected Growth</div>
-                                <div className="text-[10px] text-zinc-500">Video performance scales with your <span className="text-indigo-400">Improv</span> & <span className="text-indigo-400">Charisma</span> skills. High quality videos gain more passive views over time.</div>
+                        <div className="rounded-[1.5rem] border border-zinc-800 bg-gradient-to-br from-zinc-950 to-black p-4">
+                            <div className="flex items-start gap-3">
+                                <div className="p-2 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-300"><TrendingUp size={17}/></div>
+                                <div className="min-w-0 flex-1">
+                                    <div className="text-sm font-black text-white">Upload Forecast</div>
+                                    <div className="text-[11px] text-zinc-500 mt-1 leading-relaxed">
+                                        {selectedUploadPlan.description} Performance scales with <span className="text-indigo-300">Improv</span>, <span className="text-indigo-300">Charisma</span>, channel trust, and video quality.
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-3 gap-2 mt-4">
+                                {strategySignal.map(signal => (
+                                    <div key={signal.label} className="rounded-2xl bg-black border border-zinc-900 p-3">
+                                        <div className="text-[9px] text-zinc-600 font-black uppercase tracking-widest">{signal.label}</div>
+                                        <div className={`text-sm font-black mt-1 ${signal.color}`}>{signal.value}</div>
+                                    </div>
+                                ))}
                             </div>
                         </div>
                     </div>
+                    </div>
 
-                    <div className="p-4 pb-8 border-t border-zinc-800 bg-zinc-950 shrink-0">
+                    <div className="pointer-events-none absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black via-black to-transparent px-4 pt-10 pb-8">
                         <button 
                             onClick={handleUpload}
                             disabled={!title.trim() || isThumbnailProcessing}
-                            className="w-full py-4 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl disabled:opacity-50 disabled:bg-zinc-800 disabled:text-zinc-500 transition-colors shadow-lg shadow-red-900/20 flex items-center justify-center gap-2"
+                            className="pointer-events-auto w-full py-4 bg-gradient-to-r from-red-600 to-orange-500 text-white font-black rounded-[1.4rem] disabled:opacity-50 disabled:from-zinc-800 disabled:to-zinc-800 disabled:text-zinc-500 transition-colors shadow-[0_18px_45px_rgba(220,38,38,0.28)] flex items-center justify-center gap-2 active:scale-[0.99]"
                         >
                             <MonitorPlay size={20} /> {isThumbnailProcessing ? 'Saving Thumbnail...' : 'Publish Video'}
                         </button>
