@@ -21,6 +21,7 @@ const source = `
 	import { generateTrendingTopics, generateXFeed } from '${root}services/xLogic.ts';
 	import { createYoutubeBacklashEvent, createYoutubeCopyrightEvent, createYoutubeCreatorInviteEvent, createYoutubeRivalryEvent, processGameWeek } from '${root}services/gameLoop.ts';
 	import { calculateStreamingAuctionOffer, getStreamingBidProfile } from '${root}views/lifestyle/business/ReleaseWizard.tsx';
+	import { AWARD_CALENDAR, checkAwardEligibility, generateSeasonWinners, getAwardCeremonyYear, sanitizeAwardRecords } from '${root}services/awardLogic.ts';
 
 type AuditFailure = { scope: string; item: string; error: string };
 const failures: AuditFailure[] = [];
@@ -221,6 +222,32 @@ const makeProject = (): Commitment => ({
     reviews: [],
   } as any,
 } as Commitment);
+
+const addAwardEligibleProject = (player: Player, mediaType: 'MOVIE' | 'SERIES' = 'MOVIE') => {
+  player.pastProjects = [{
+    id: \`award_project_\${mediaType}\`,
+    name: mediaType === 'SERIES' ? 'QA Prestige Series' : 'QA Prestige Film',
+    type: 'ACTING_GIG',
+    roleType: 'LEAD',
+    year: player.age,
+    earnings: 1000000,
+    rating: 9.3,
+    reception: 'SUCCESS',
+    projectQuality: 96,
+    imdbRating: 9.3,
+    boxOfficeResult: '$180.0M',
+    outcomeTier: 'SUCCESS',
+    subtype: 'STANDALONE',
+    futurePotential: { sequelChance: 0, franchiseChance: 0, rebootChance: 0, renewalChance: 0, isFranchiseStarter: false, isSequelGreenlit: false, isRenewed: false, seriesStatus: 'N/A' },
+    studioId: 'PARAMOUNT',
+    genre: 'DRAMA',
+    description: 'Audit awards project',
+    projectType: mediaType,
+    awards: [],
+  } as any];
+  player.activeReleases = [];
+  player.awards = [];
+};
 
 const assertEvent = (event: LifeEvent | null, scope: string, item: string) => {
   if (!event) throw new Error('No event returned');
@@ -442,6 +469,86 @@ await recordAsync('social:weekly_sim', 'instagram_referral_dm', async () => {
   if (!referralAction) throw new Error('No Instagram referral DM generated');
   if (!Number.isFinite(referralAction.action.payload?.weeksLeft) || referralAction.action.payload.weeksLeft <= 0) throw new Error('Bad Instagram referral payload');
   checks += 1;
+});
+
+record('awards:calendar', 'stable_year_helpers', () => {
+  const goldenGlobes = AWARD_CALENDAR[2];
+  const oscars = AWARD_CALENDAR[10];
+  if (getAwardCeremonyYear(goldenGlobes, 2, 17, 50) !== 18) throw new Error('Golden Globes should resolve to next age from week 50 invite');
+  if (getAwardCeremonyYear(goldenGlobes, 2, 18, 2) !== 18) throw new Error('Golden Globes ceremony week should keep current age');
+  if (getAwardCeremonyYear(oscars, 10, 17, 6) !== 17) throw new Error('Oscars same-year invite should keep current age');
+  checks += 3;
+});
+
+record('awards:eligibility', 'dedupe_by_award_year', () => {
+  const player = makePlayer('famous');
+  player.age = 17;
+  player.currentWeek = 50;
+  addAwardEligibleProject(player, 'MOVIE');
+  const noms = checkAwardEligibility(player, 50, 18);
+  if (noms.length === 0) throw new Error('Expected Golden Globe nomination');
+  player.awards.push({
+    id: 'award_existing',
+    name: 'Golden Globe Awards',
+    category: noms[0].category,
+    year: 18,
+    outcome: 'NOMINATED',
+    projectId: noms[0].project.id,
+    projectName: noms[0].project.name,
+    type: 'GOLDEN_GLOBE',
+  } as any);
+  const repeat = checkAwardEligibility(player, 50, 18);
+  if (repeat.some(n => n.project.id === noms[0].project.id && n.category === noms[0].category)) throw new Error('Duplicate nomination returned for same award year');
+  checks += 2;
+});
+
+record('awards:history', 'winner_history_uses_award_year', () => {
+  const player = makePlayer('famous');
+  player.age = 33;
+  player.awards = [{
+    id: 'award_win_stable',
+    name: 'The Oscars',
+    category: 'Best Actor',
+    year: 17,
+    outcome: 'WON',
+    projectId: 'award_project_old',
+    projectName: 'Old Win',
+    type: 'OSCAR',
+  } as any];
+  const history = generateSeasonWinners(player, 'OSCAR', 17);
+  const playerWinner = history.winners.find(w => w.category === 'Best Actor');
+  if (history.year !== 17) throw new Error('History year changed to current age');
+  if (!playerWinner?.isPlayer || playerWinner.projectName !== 'Old Win') throw new Error('Player win not preserved for old award year');
+  checks += 2;
+});
+
+record('awards:sanitize', 'does_not_mutate_record_years', () => {
+  const awards = sanitizeAwardRecords([
+    { id: 'a1', name: 'The Oscars', type: 'OSCAR', year: 17, category: 'Best Actor', projectId: 'p1', projectName: 'Old', outcome: 'NOMINATED' },
+    { id: 'a2', name: 'The Oscars', type: 'OSCAR', year: 17, category: 'Best Actor', projectId: 'p1', projectName: 'Old', outcome: 'WON' },
+    { id: 'a3', name: 'The Oscars', type: 'OSCAR', year: 18, category: 'Best Actor', projectId: 'p1', projectName: 'Old', outcome: 'NOMINATED' },
+  ] as any[]);
+  if (!awards.some((award: any) => award.year === 17 && award.outcome === 'WON')) throw new Error('Missing preserved old win');
+  if (!awards.some((award: any) => award.year === 18)) throw new Error('Sanitizer collapsed different award years');
+  checks += 2;
+});
+
+await recordAsync('awards:weekly_sim', 'golden_globe_cross_year_schedule', async () => {
+  const player = makePlayer('famous');
+  player.age = 17;
+  player.currentWeek = 50;
+  player.scheduledEvents = [];
+  player.news = [];
+  addAwardEligibleProject(player, 'MOVIE');
+  const result = await withMockedRandom(0.5, () => processGameWeek(player));
+  const event = result.player.scheduledEvents.find((scheduled: any) => scheduled.type === 'AWARD_CEREMONY' && scheduled.data?.awardDef?.type === 'GOLDEN_GLOBE');
+  if (!event) throw new Error('No Golden Globe ceremony scheduled');
+  if (event.data.awardYear !== 18) throw new Error(\`Bad Golden Globe award year \${event.data.awardYear}\`);
+  const nominationYears = result.player.awards.filter((award: any) => award.type === 'GOLDEN_GLOBE').map((award: any) => award.year);
+  if (nominationYears.length === 0 || !nominationYears.every((year: number) => year === 18)) throw new Error('Golden Globe nominations not stamped with ceremony year');
+  const newsCount = result.player.news.filter((news: any) => news.id === 'news_noms_GOLDEN_GLOBE_18').length;
+  if (newsCount !== 1) throw new Error('Golden Globe nomination news missing or duplicated');
+  checks += 3;
 });
 
 const auditPlatforms = [

@@ -47,7 +47,7 @@ import { generateLifeEvent, generateLegalHearing, generateLuxeLifeEvent, hasElig
 import { generateWeeklyFeed, NPC_DATABASE, calculateProjectFameMultiplier, generateNewUnknowns, updateNPCLives } from './npcLogic';
 import { generateAgentOffers, generateManagerOffer, generateDirectOffer, getRandomAgents, getRandomManagers, getRandomTrainers, getRandomStylists, getRandomTherapists, getRandomPublicists } from './teamLogic';
 import { processStockMarket, calculatePortfolioValue, getDividendPayout, initializeStocks } from './stockLogic';
-import { AWARD_CALENDAR, checkAwardEligibility, AwardDefinition, generateSeasonWinners, generateFullBallot } from './awardLogic';
+import { AWARD_CALENDAR, checkAwardEligibility, AwardDefinition, generateSeasonWinners, generateFullBallot, getAwardCeremonyYear } from './awardLogic';
 import { processWorldTurn, generateIndustryProject } from './worldLogic'; 
 import { generateFamousMovieOpportunity, generateCameoOffer } from './famousMovieLogic'; 
 import { calculateYoutubeCreatorScore, generateYoutubeBrandDeal, generateYoutubeCollabOffer, getYoutubePublicImageLabel, processYoutubeChannel } from './youtubeLogic';
@@ -2902,13 +2902,26 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
     // --- 10. AWARD SEASON LOGIC ---
     Object.entries(AWARD_CALENDAR).forEach(([weekStr, def]) => {
         if (nextPlayer.currentWeek === def.inviteWeek) {
-            const noms = checkAwardEligibility(nextPlayer, def.inviteWeek);
+            const ceremonyWeek = parseInt(weekStr);
+            const awardYear = getAwardCeremonyYear(def, ceremonyWeek, nextPlayer.age, nextPlayer.currentWeek);
+            const alreadyScheduled = nextPlayer.scheduledEvents.some(event =>
+                event.type === 'AWARD_CEREMONY' &&
+                event.data?.awardDef?.type === def.type &&
+                event.data?.awardYear === awardYear
+            );
+            const alreadyHasSeasonRecords = nextPlayer.awards.some(award => award.type === def.type && award.year === awardYear);
+            const alreadyHasHistory = nextPlayer.world.awardHistory.some(entry => entry.type === def.type && entry.year === awardYear);
+
+            if (alreadyScheduled || alreadyHasHistory) return;
+
+            const noms = checkAwardEligibility(nextPlayer, def.inviteWeek, awardYear);
             const fullBallot = generateFullBallot(nextPlayer, def.type, noms);
+            let addedNominationEntries = false;
             if (noms.length > 0) {
                 const awardEntries = noms
                     .filter(n => !nextPlayer.awards.some(a =>
                         a.type === def.type &&
-                        a.year === nextPlayer.age &&
+                        a.year === awardYear &&
                         a.projectId === n.project.id &&
                         a.category === n.category
                     ))
@@ -2916,28 +2929,32 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                         id: `award_nom_${Date.now()}_${Math.random()}`,
                         name: def.name,
                         category: n.category,
-                        year: nextPlayer.age,
+                        year: awardYear,
                         outcome: 'NOMINATED' as const,
                         projectId: n.project.id,
                         projectName: n.project.name,
                         type: def.type
                     }));
                 if (awardEntries.length > 0) {
+                    addedNominationEntries = true;
                     nextPlayer.awards.push(...awardEntries);
                     nextPlayer.inbox.unshift({ id: `msg_award_invite_${def.type}_${Date.now()}`, sender: 'The Academy', subject: `NOMINATION: ${def.name}`, text: `Congratulations! You have been nominated for ${awardEntries.length} awards.`, type: 'OFFER_EVENT', data: null, isRead: false, weekSent: nextPlayer.currentWeek, expiresIn: 4 });
                     logsToAdd.push({ msg: `🏆 You have been nominated for the ${def.name}!`, type: 'positive' });
                 }
             }
-            nextPlayer.scheduledEvents.push({ id: `evt_award_${def.type}_${nextPlayer.age}`, week: parseInt(weekStr), type: 'AWARD_CEREMONY', title: def.name, description: "Award Ceremony", data: { awardDef: def, nominations: noms, fullBallot: fullBallot } });
-            nextPlayer.news.unshift({ id: `news_noms_${def.type}_${Date.now()}`, headline: `${def.name} Nominations Announced!`, category: 'TOP_STORY', week: nextPlayer.currentWeek, year: nextPlayer.age, impactLevel: 'HIGH' });
+            nextPlayer.scheduledEvents.push({ id: `evt_award_${def.type}_${awardYear}`, week: ceremonyWeek, type: 'AWARD_CEREMONY', title: def.name, description: "Award Ceremony", data: { awardDef: def, awardYear, nominations: noms, fullBallot: fullBallot } });
+            if (addedNominationEntries && !alreadyHasSeasonRecords) {
+                nextPlayer.news.unshift({ id: `news_noms_${def.type}_${awardYear}`, headline: `${def.name} Nominations Announced!`, category: 'TOP_STORY', week: nextPlayer.currentWeek, year: nextPlayer.age, impactLevel: 'HIGH' });
+            }
         }
     });
 
     const awardShow = AWARD_CALENDAR[nextPlayer.currentWeek];
     if (awardShow) {
         const existingEntry = nextPlayer.world.awardHistory.find(h => h.year === nextPlayer.age && h.type === awardShow.type);
-        if (!existingEntry) {
-            const historyEntry = generateSeasonWinners(nextPlayer, awardShow.type);
+        const ceremonyPendingForPlayer = nextPlayer.pendingEvent?.type === 'AWARD_CEREMONY' && nextPlayer.pendingEvent.data?.awardDef?.type === awardShow.type;
+        if (!existingEntry && !ceremonyPendingForPlayer) {
+            const historyEntry = generateSeasonWinners(nextPlayer, awardShow.type, nextPlayer.age);
             nextPlayer.world.awardHistory.push(historyEntry);
             const bestPic = historyEntry.winners.find(w => w.category.includes('Picture') || w.category.includes('Series'));
             if (bestPic) { nextPlayer.news.unshift({ id: `news_award_${Date.now()}`, headline: `${bestPic.projectName} wins big at ${awardShow.name}!`, category: 'INDUSTRY', week: nextPlayer.currentWeek, year: nextPlayer.age, impactLevel: 'MEDIUM' }); }

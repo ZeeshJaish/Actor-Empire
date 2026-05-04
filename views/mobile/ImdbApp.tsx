@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { Player, PastProject, ActiveRelease, CastMember, Review, Award, Universe, UniverseId, IndustryProject, CustomPoster } from '../../types';
 import { formatMoney } from '../../services/formatUtils';
-import { AWARD_CALENDAR, AWARD_SHOW_DB, AwardShowLore, AwardDefinition, Nomination, sanitizeAwardRecords } from '../../services/awardLogic';
+import { AWARD_CALENDAR, AWARD_SHOW_DB, AwardShowLore, AwardDefinition, Nomination, sanitizeAwardRecords, getAwardCeremonyYear } from '../../services/awardLogic';
 import { ArrowLeft, Star, Film, ChevronRight, User, TrendingUp, DollarSign, Eye, Award as AwardIcon, Calendar, BookOpen, Clock, List, MessageSquare, Users, Globe, Zap, LayoutGrid, Shield, ArrowRight, Tv } from 'lucide-react';
 import { buildUniverseRoster, getUniverseDashboardProjects } from '../../services/universeLogic';
 
@@ -240,7 +240,7 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
       
       const isCompleted = selectedShow.hasPassed || !!historyEntry;
       
-      const pendingEvent = player.scheduledEvents.find(e => e.type === 'AWARD_CEREMONY' && e.title === selectedShow.name);
+      const pendingEvent = player.scheduledEvents.find(e => e.type === 'AWARD_CEREMONY' && e.title === selectedShow.name && e.data?.awardYear === selectedShow.year);
       const ballot = (pendingEvent && pendingEvent.data && pendingEvent.data.fullBallot) ? (pendingEvent.data.fullBallot as Record<string, Nomination[]>) : null;
 
       return (
@@ -345,6 +345,9 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
                   {Object.entries(AWARD_CALENDAR).map(([weekStr, def]) => {
                       const ceremonyWeek = parseInt(weekStr);
                       const isPending = pendingCeremony && pendingCeremony.title === def.name;
+                      const displayYear = isPending && pendingCeremony?.data?.awardYear
+                          ? pendingCeremony.data.awardYear
+                          : getAwardCeremonyYear(def, ceremonyWeek, player.age, player.currentWeek);
                       
                       // Robust check for passed events, handling year wrap
                       const isWrapAround = def.inviteWeek > ceremonyWeek; 
@@ -365,7 +368,7 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
                       }
                       
                       return (
-                          <div key={def.type} onClick={() => { setSelectedShow({ ...def, year: player.age, isCurrent: true, hasPassed }); setAwardView('SHOW_DETAIL'); }} className="bg-zinc-900 p-4 rounded-xl border border-zinc-800 flex items-center justify-between active:bg-zinc-800 transition-colors">
+                          <div key={def.type} onClick={() => { setSelectedShow({ ...def, year: displayYear, isCurrent: true, hasPassed }); setAwardView('SHOW_DETAIL'); }} className="bg-zinc-900 p-4 rounded-xl border border-zinc-800 flex items-center justify-between active:bg-zinc-800 transition-colors">
                               <div>
                                   <div className="font-bold text-white text-sm">{def.name}</div>
                                   <div className={`text-[10px] uppercase font-bold tracking-wider mt-1 ${isPending ? 'text-amber-400' : hasPassed ? 'text-zinc-500' : 'text-zinc-400'}`}>

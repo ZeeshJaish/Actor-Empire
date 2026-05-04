@@ -19,6 +19,16 @@ export const AWARD_CALENDAR: Record<number, AwardDefinition> = {
     38: { type: 'EMMY', name: 'Primetime Emmy Awards', prestige: 2.0, inviteWeek: 34 }, 
 };
 
+export const getAwardCeremonyYear = (
+    definition: AwardDefinition,
+    ceremonyWeek: number,
+    currentAge: number,
+    currentWeek: number
+): number => {
+    const crossesBirthday = definition.inviteWeek > ceremonyWeek;
+    return crossesBirthday && currentWeek >= definition.inviteWeek ? currentAge + 1 : currentAge;
+};
+
 // --- LORE DATABASE (IMDb Encyclopedia) ---
 export interface AwardShowLore {
     id: AwardType;
@@ -159,7 +169,7 @@ const getAwardTypeForInviteWeek = (week: number): AwardType | null => {
     return match?.type || null;
 };
 
-export const checkAwardEligibility = (player: Player, week: number): Nomination[] => {
+export const checkAwardEligibility = (player: Player, week: number, awardYear = player.age): Nomination[] => {
     // 1. GATHER ALL CANDIDATES (Player + World)
     const candidates: any[] = [];
     const processedIds = new Set<string>(); // Prevent duplicates between past/active/same-project
@@ -260,7 +270,7 @@ export const checkAwardEligibility = (player: Player, week: number): Nomination[
                     a.projectId === project.id &&
                     a.category === cat &&
                     (!awardType || a.type === awardType) &&
-                    a.year === player.age
+                    a.year === awardYear
                 );
                 const alreadyQueued = nominations.some(n => n.project.id === project.id && n.category === cat);
 
@@ -416,10 +426,10 @@ export const determineWinners = (
     });
 };
 
-export const generateSeasonWinners = (player: Player, awardType: AwardType): AwardHistoryEntry => {
+export const generateSeasonWinners = (player: Player, awardType: AwardType, awardYear = player.age): AwardHistoryEntry => {
     // This function creates the historical record AFTER the ceremony
     const lore = AWARD_SHOW_DB[awardType];
-    const year = player.age;
+    const year = awardYear;
     const historyEntry: AwardHistoryEntry = {
         year,
         type: awardType,

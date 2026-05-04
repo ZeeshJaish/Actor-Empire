@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Player, PendingEvent, ClothingItem, PressInteraction, ClothingCategory, Stats, Vehicle, Award } from '../types';
 import { CLOTHING_CATALOG, CAR_CATALOG, MOTORCYCLE_CATALOG, BOAT_CATALOG, AIRCRAFT_CATALOG } from '../services/lifestyleLogic';
-import { generatePressInteractions, determineWinners, Nomination, sanitizeAwardRecords } from '../services/awardLogic';
+import { generatePressInteractions, determineWinners, Nomination, sanitizeAwardRecords, generateSeasonWinners } from '../services/awardLogic';
 import { RED_CARPET_INTERVIEWS } from '../services/premiereLogic';
 import { NPC_DATABASE } from '../services/npcLogic';
 import { Camera, Star, Mic2, Shirt, ArrowRight, Trophy, Zap, X, MapPin, Watch, Footprints, Layers, Check, Car, Barcode, Users, Tv, Sparkles, Music, Video, Clapperboard, Globe, FastForward, Glasses, ShoppingBag, Gem } from 'lucide-react';
@@ -524,13 +524,14 @@ export const RedCarpetEvent: React.FC<RedCarpetEventProps> = ({ player, event, o
             const pastProjectsUpdate = [...player.pastProjects];
             let newsToAdd: any = null;
             let updatedAwards = [...updatedPlayer.awards];
+            const awardYear = event.data?.awardYear || player.age;
 
             currentResults.forEach(res => {
                 const awardEntry: Award = {
                     id: `award_${Date.now()}_${Math.random()}`,
                     name: event.title,
                     category: res.nomination.category,
-                    year: player.age,
+                    year: awardYear,
                     outcome: res.won ? 'WON' : 'NOMINATED',
                     projectId: res.nomination.project.id,
                     projectName: res.nomination.project.name,
@@ -559,6 +560,17 @@ export const RedCarpetEvent: React.FC<RedCarpetEventProps> = ({ player, event, o
 
             updatedPlayer.awards = sanitizeAwardRecords(updatedAwards);
             updatedPlayer.pastProjects = pastProjectsUpdate;
+            const awardType = event.data?.awardDef?.type;
+            if (['GOLDEN_GLOBE', 'BAFTA', 'OSCAR', 'EMMY'].includes(awardType)) {
+                const historyEntry = generateSeasonWinners(updatedPlayer, awardType, awardYear);
+                updatedPlayer.world = {
+                    ...updatedPlayer.world,
+                    awardHistory: [
+                        ...(updatedPlayer.world.awardHistory || []).filter(entry => !(entry.type === awardType && entry.year === awardYear)),
+                        historyEntry
+                    ]
+                };
+            }
             if (newsToAdd) updatedPlayer.news = [newsToAdd, ...updatedPlayer.news];
         }
 
