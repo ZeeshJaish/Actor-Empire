@@ -206,6 +206,9 @@ export interface Script {
     hype?: number;
     tags?: string[];
     franchiseId?: string;
+    universeId?: UniverseId;
+    universeSagaName?: string;
+    universePhaseName?: string;
     installmentNumber?: number;
     customPoster?: CustomPoster;
     developmentCost?: number;
@@ -1491,6 +1494,12 @@ export interface Player {
     logs: LogEntry[];
     activePregnancy?: {
         partnerId: string;
+        partnerName?: string;
+        babyGender?: 'MALE' | 'FEMALE';
+        suggestedFirstName?: string;
+        birthWeekAbsolute?: number;
+        conceptionWeekAbsolute?: number;
+        shouldCreateScandalNews?: boolean;
         weeksLeft: number;
     };
 }

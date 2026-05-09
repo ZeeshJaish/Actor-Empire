@@ -1,9 +1,9 @@
 import React, { useState, useMemo } from 'react';
-import { Player, PendingEvent, ScreeningStrategy, CampaignItem } from '../../../types';
+import { Player, PendingEvent, ScreeningStrategy, CampaignItem, ProjectHiddenStats } from '../../../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { ArrowLeft, Film, Tv, Calendar, TrendingUp, CheckCircle2, Camera, Star, Globe, Youtube, Share2 } from 'lucide-react';
 import { FESTIVALS, CALENDAR_EVENTS } from '../../../services/worldLogic';
-import { mergeUniverseRosterWithProject } from '../../../services/universeLogic';
+import { mergeUniverseRosterWithProject, normalizeUniverseMap } from '../../../services/universeLogic';
 import { getAbsoluteWeek } from '../../../services/legacyLogic';
 
 interface ReleaseWizardProps {
@@ -32,14 +32,14 @@ const SCREENING_STRATEGIES = [
 ];
 
 const PLATFORMS = [
-    { id: 'NETFLIX', name: 'Netflix', baseBid: 12000000, qualityReq: 72, color: '#E50914', maxBudget: 140000000 },
-    { id: 'APPLE_TV', name: 'Apple TV+', baseBid: 17000000, qualityReq: 82, color: '#FFFFFF', maxBudget: 180000000 },
-    { id: 'DISNEY_PLUS', name: 'Disney+', baseBid: 11000000, qualityReq: 70, color: '#113CCF', maxBudget: 130000000 },
-    { id: 'HULU', name: 'Hulu', baseBid: 7500000, qualityReq: 58, color: '#1CE783', maxBudget: 90000000 },
-    { id: 'YOUTUBE', name: 'YouTube Premium', baseBid: 3000000, qualityReq: 38, color: '#FF0000', maxBudget: 35000000 }
+    { id: 'NETFLIX', name: 'Netflix', baseBid: 12000000, qualityReq: 72, color: '#E50914', maxBudget: 420000000 },
+    { id: 'APPLE_TV', name: 'Apple TV+', baseBid: 17000000, qualityReq: 82, color: '#FFFFFF', maxBudget: 560000000 },
+    { id: 'DISNEY_PLUS', name: 'Disney+', baseBid: 11000000, qualityReq: 70, color: '#113CCF', maxBudget: 520000000 },
+    { id: 'HULU', name: 'Hulu', baseBid: 7500000, qualityReq: 58, color: '#1CE783', maxBudget: 180000000 },
+    { id: 'YOUTUBE', name: 'YouTube Premium', baseBid: 3000000, qualityReq: 38, color: '#FF0000', maxBudget: 80000000 }
 ];
 
-export const getStreamingBidProfile = (packageScore: number, isSeries: boolean, isPostTheatricalBidding?: boolean) => {
+export const getStreamingBidProfile = (packageScore: number, isSeries: boolean, isPostTheatricalBidding?: boolean, runStrength = 0) => {
     let floor = 1.04;
     let ceiling = 1.3;
 
@@ -53,17 +53,17 @@ export const getStreamingBidProfile = (packageScore: number, isSeries: boolean, 
         floor = 1.01;
         ceiling = 1.35;
     } else if (packageScore < 72) {
-        floor = 1.12;
-        ceiling = 2.4;
+        floor = 1.18;
+        ceiling = 2.8;
     } else if (packageScore < 84) {
-        floor = 1.35;
-        ceiling = 4.5;
+        floor = 1.55;
+        ceiling = 5.2;
     } else if (packageScore < 92) {
-        floor = 1.75;
-        ceiling = 7;
+        floor = 2.1;
+        ceiling = 8.6;
     } else {
-        floor = 2.25;
-        ceiling = 9;
+        floor = 2.9;
+        ceiling = 13.5;
     }
 
     if (isSeries) {
@@ -72,11 +72,17 @@ export const getStreamingBidProfile = (packageScore: number, isSeries: boolean, 
     }
 
     if (isPostTheatricalBidding) {
-        floor *= packageScore < 45 ? 0.96 : 0.98;
-        ceiling *= packageScore >= 72 ? 0.9 : 0.84;
+        if (runStrength < 0.8) {
+            floor *= packageScore < 45 ? 0.96 : 0.98;
+            ceiling *= 0.82;
+        } else if (runStrength >= 2) {
+            const validationBoost = Math.min(1.65, 1 + ((runStrength - 2) * 0.11));
+            floor *= Math.min(1.35, validationBoost);
+            ceiling *= validationBoost;
+        }
     }
 
-    const capBoost = packageScore >= 92 ? 6 : packageScore >= 84 ? 4.4 : packageScore >= 72 ? 2.8 : packageScore >= 60 ? 1.7 : 1;
+    const capBoost = packageScore >= 92 ? 8 : packageScore >= 84 ? 5.6 : packageScore >= 72 ? 3.6 : packageScore >= 60 ? 2.1 : 1.15;
     const safetyPremium = packageScore >= 84 ? 2.35 : packageScore >= 72 ? 1.95 : packageScore >= 60 ? 1.55 : packageScore < 45 ? 0.92 : 1.2;
 
     return {
@@ -85,6 +91,41 @@ export const getStreamingBidProfile = (packageScore: number, isSeries: boolean, 
         capBoost,
         safetyPremium
     };
+};
+
+const getStreamingMarketProofCap = (
+    projectBudget: number,
+    packageScore: number,
+    hiddenStats: Partial<ProjectHiddenStats> = {},
+    isSeries: boolean,
+    isPostTheatricalBidding?: boolean,
+    theatricalGross = 0,
+    hasProvenIp = false
+) => {
+    if (projectBudget <= 0) return Number.MAX_SAFE_INTEGER;
+
+    const castingStrength = hiddenStats.castingStrength ?? 50;
+    const fameMultiplier = hiddenStats.fameMultiplier ?? 1;
+    const rawHype = hiddenStats.rawHype ?? 50;
+
+    let capMultiplier = packageScore >= 92 ? 4.25 : packageScore >= 84 ? 3.45 : packageScore >= 72 ? 2.65 : packageScore >= 60 ? 1.85 : 1.22;
+    if (isSeries) capMultiplier += 0.35;
+    if (castingStrength >= 88) capMultiplier += 0.65;
+    else if (castingStrength >= 78) capMultiplier += 0.35;
+    else if (castingStrength < 62) capMultiplier -= 0.35;
+
+    if (fameMultiplier >= 7) capMultiplier += 2.2;
+    else if (fameMultiplier >= 5.25) capMultiplier += 1.15;
+    else if (fameMultiplier >= 3.6) capMultiplier += 0.55;
+
+    if (rawHype >= 92) capMultiplier += 0.45;
+    if (hasProvenIp) capMultiplier += 1.9;
+
+    const straightCap = projectBudget * Math.max(1.05, capMultiplier);
+    if (!isPostTheatricalBidding || theatricalGross <= 0) return straightCap;
+
+    const theatricalValidationCap = theatricalGross * (packageScore >= 90 || castingStrength >= 85 ? 0.92 : 0.72);
+    return Math.max(straightCap, theatricalValidationCap);
 };
 
 type BidType = 'UPFRONT_ONLY' | 'GREENLIGHT_DEAL' | 'BACKEND_POINTS';
@@ -107,24 +148,36 @@ export const calculateStreamingAuctionOffer = (
     isSeries: boolean,
     currentHighestBidValue: number,
     previousBestBidValue?: number,
-    isPostTheatricalBidding?: boolean
+    isPostTheatricalBidding?: boolean,
+    theatricalGross = 0,
+    hiddenStats: Partial<ProjectHiddenStats> = {},
+    hasProvenIp = false
 ): Bid | null => {
-    const bidProfile = getStreamingBidProfile(packageScore, isSeries, isPostTheatricalBidding);
+    const runStrength = projectBudget > 0 && theatricalGross > 0 ? theatricalGross / projectBudget : 0;
+    const bidProfile = getStreamingBidProfile(packageScore, isSeries, isPostTheatricalBidding, runStrength);
     const safetyPremium = bidProfile.safetyPremium;
     const qualityEscalator = Math.max(0.85, 0.95 + ((packageScore - 55) / 105));
     const floorOffer = projectBudget > 0 ? projectBudget * bidProfile.floor : platform.baseBid;
     const qualityRange = projectBudget > 0
-        ? projectBudget * (bidProfile.floor + ((bidProfile.ceiling - bidProfile.floor) * (0.2 + Math.random() * 0.58)))
+        ? projectBudget * (bidProfile.floor + ((bidProfile.ceiling - bidProfile.floor) * (0.24 + Math.random() * 0.62)))
         : platform.baseBid * (0.95 + Math.random() * 0.35) * safetyPremium;
     const platformAppetite = platform.baseBid * (packageScore / 52) * (1 + Math.random() * 0.32) * safetyPremium * qualityEscalator;
+    const theatricalProof = theatricalGross > 0
+        ? theatricalGross * (0.42 + Math.min(0.34, packageScore / 290) + Math.random() * 0.12)
+        : 0;
+    const straightToStreamingUpside = !isPostTheatricalBidding && projectBudget > 0
+        ? projectBudget * Math.pow(Math.max(0.35, packageScore / 100), 2.35) * (packageScore >= 92 ? 9.5 : packageScore >= 84 ? 6.6 : packageScore >= 72 ? 3.9 : 1.8) * (0.9 + Math.random() * 0.38)
+        : 0;
     const hardCeiling = projectBudget > 0 ? projectBudget * bidProfile.ceiling : Number.MAX_SAFE_INTEGER;
+    const marketProofCap = getStreamingMarketProofCap(projectBudget, packageScore, hiddenStats, isSeries, isPostTheatricalBidding, theatricalGross, hasProvenIp);
     const platformSoftCap = Math.max(floorOffer, platform.maxBudget * bidProfile.capBoost);
     let maxOffer = Math.max(
         floorOffer,
         Math.min(
             hardCeiling,
             platformSoftCap,
-            Math.max(floorOffer * (1.04 + Math.random() * 0.12), platformAppetite, qualityRange)
+            marketProofCap,
+            Math.max(floorOffer * (1.04 + Math.random() * 0.12), platformAppetite, qualityRange, theatricalProof, straightToStreamingUpside)
         )
     );
     
@@ -135,17 +188,21 @@ export const calculateStreamingAuctionOffer = (
         }
     }
 
-    if (maxOffer <= currentHighestBidValue * 1.05) return null;
+    if (maxOffer <= currentHighestBidValue * 1.025) return null;
 
     const newAmount = currentHighestBidValue === 0
         ? Math.floor(Math.max(
             floorOffer,
             Math.min(
                 maxOffer,
-                Math.max(floorOffer * (0.99 + Math.random() * 0.18), platform.baseBid * (0.95 + Math.random() * 0.3) * safetyPremium)
+                Math.max(
+                    floorOffer * (0.96 + Math.random() * 0.18),
+                    platform.baseBid * (0.95 + Math.random() * 0.3) * safetyPremium,
+                    maxOffer * (packageScore >= 84 ? 0.42 + Math.random() * 0.2 : 0.3 + Math.random() * 0.18)
+                )
             )
         ))
-        : Math.floor(Math.max(floorOffer, Math.min(maxOffer, currentHighestBidValue * (1.08 + Math.random() * 0.12))));
+        : Math.floor(Math.max(floorOffer, Math.min(maxOffer, currentHighestBidValue * (1.045 + Math.random() * 0.07))));
     
     const rand = Math.random();
     let type: BidType = 'UPFRONT_ONLY';
@@ -153,11 +210,11 @@ export const calculateStreamingAuctionOffer = (
     let backendPct = 0;
     let upfrontAmount = newAmount;
     
-    if (rand > 0.8) {
+    if (rand > 0.94) {
         type = 'GREENLIGHT_DEAL';
         upfrontAmount = Math.min(newAmount, Math.floor(Math.max(floorOffer, newAmount * 0.45)));
         fundingAmount = Math.max(0, newAmount - upfrontAmount);
-    } else if (rand > 0.6) {
+    } else if (rand > 0.84) {
         type = 'BACKEND_POINTS';
         upfrontAmount = Math.min(newAmount, Math.floor(Math.max(floorOffer, newAmount * (isPostTheatricalBidding ? 0.7 : 0.8))));
         backendPct = Math.floor(Math.random() * (isPostTheatricalBidding ? 6 : 8)) + (isPostTheatricalBidding ? 4 : 6);
@@ -194,8 +251,77 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
     const [currentBids, setCurrentBids] = useState<Bid[]>([]);
     const [highestBid, setHighestBid] = useState<Bid | null>(null);
     const [activePlatforms, setActivePlatforms] = useState<string[]>(PLATFORMS.map(p => p.id));
+    const lastAuctionBidAtRef = React.useRef(0);
+    const auctionTimeLeftRef = React.useRef(100);
 
     const isSeries = project.projectDetails?.type === 'SERIES';
+    const getProjectAuctionContext = () => {
+        const hiddenStats = project.projectDetails?.hiddenStats || {};
+        const estQuality = hiddenStats.qualityScore || 50;
+        const scriptQuality = hiddenStats.scriptQuality || 50;
+        const directorQuality = hiddenStats.directorQuality || 50;
+        const castingStrength = hiddenStats.castingStrength || 50;
+        const rawHype = hiddenStats.rawHype || 50;
+        const packageScore = (estQuality * 0.4) + (scriptQuality * 0.2) + (directorQuality * 0.15) + (castingStrength * 0.15) + (rawHype * 0.1);
+        const projectBudget = project.projectDetails?.estimatedBudget || 0;
+        const theatricalGross = project.totalGross || project.gross || 0;
+        const hasProvenIp = Boolean(project.projectDetails?.franchiseId || project.projectDetails?.universeId || project.projectDetails?.subtype === 'SEQUEL' || project.projectDetails?.subtype === 'SPINOFF' || project.projectDetails?.subtype === 'UNIVERSE_EVENT');
+        return { hiddenStats, packageScore, projectBudget, theatricalGross, hasProvenIp };
+    };
+
+    const createOpeningBids = () => {
+        const { hiddenStats, packageScore, projectBudget, theatricalGross, hasProvenIp } = getProjectAuctionContext();
+        const independentBids = PLATFORMS
+            .map(platform => {
+                const fitGap = Math.max(0, platform.qualityReq - packageScore);
+                const effectiveScore = Math.max(32, packageScore - (fitGap * 0.28));
+                return calculateStreamingAuctionOffer(
+                    platform,
+                    projectBudget,
+                    effectiveScore,
+                    isSeries,
+                    0,
+                    project.previousBestBidValue,
+                    isPostTheatricalBidding,
+                    theatricalGross,
+                    hiddenStats,
+                    hasProvenIp
+                );
+            })
+            .filter((bid): bid is Bid => !!bid)
+            .sort((a, b) => b.bidValue - a.bidValue);
+
+        if (independentBids.length === 0) return [];
+
+        const leaderValue = independentBids[0].bidValue;
+        const targetCount = Math.min(4, independentBids.length);
+        return independentBids.slice(0, targetCount).map((bid, index) => {
+            if (index === 0) return bid;
+            const competitiveFloor = leaderValue * (0.5 + (Math.random() * 0.22));
+            const adjustedAmount = Math.floor(Math.max(bid.amount, Math.min(leaderValue * 0.94, competitiveFloor)));
+            return {
+                ...bid,
+                amount: adjustedAmount,
+                bidValue: bid.type === 'GREENLIGHT_DEAL' ? adjustedAmount + (bid.fundingAmount || 0) : adjustedAmount,
+                id: Math.random().toString(),
+                timestamp: Date.now() + index,
+            };
+        }).sort((a, b) => b.bidValue - a.bidValue);
+    };
+
+    const startAuction = () => {
+        const openingBids = createOpeningBids();
+        if (openingBids.length > 0) {
+            const openingFloorBid = openingBids[openingBids.length - 1];
+            setCurrentBids([openingFloorBid]);
+            setHighestBid(openingFloorBid);
+            setActivePlatforms(PLATFORMS.map(p => p.id));
+        }
+        lastAuctionBidAtRef.current = Date.now();
+        auctionTimeLeftRef.current = 100;
+        setTimeLeft(100);
+        setAuctionState('ACTIVE');
+    };
 
     React.useEffect(() => {
         if (auctionState !== 'ACTIVE') return;
@@ -203,6 +329,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
         const interval = setInterval(() => {
             setTimeLeft(prev => {
                 if (prev <= 0) {
+                    auctionTimeLeftRef.current = 0;
                     setAuctionState('FINISHED');
                     
                     // Update player state with the best bid value to prevent re-bidding exploits
@@ -236,10 +363,12 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                         const projectBudget = project.projectDetails?.estimatedBudget || 0;
                         const hiddenStats = project.projectDetails?.hiddenStats || {};
                         const packageScore = ((hiddenStats.qualityScore || 50) * 0.4) + ((hiddenStats.scriptQuality || 50) * 0.2) + ((hiddenStats.directorQuality || 50) * 0.15) + ((hiddenStats.castingStrength || 50) * 0.15) + ((hiddenStats.rawHype || 50) * 0.1);
-                        const bidProfile = getStreamingBidProfile(packageScore, isSeries, isPostTheatricalBidding);
+                        const theatricalGross = project.totalGross || project.gross || 0;
+                        const runStrength = projectBudget > 0 && theatricalGross > 0 ? theatricalGross / projectBudget : 0;
+                        const bidProfile = getStreamingBidProfile(packageScore, isSeries, isPostTheatricalBidding, runStrength);
                         const fallbackBase = Math.max(
                             5000000,
-                            Math.floor(projectBudget * bidProfile.floor)
+                            Math.floor(Math.max(projectBudget * bidProfile.floor, theatricalGross * 0.48))
                         );
                         const fallbackBid: Bid = {
                             id: Math.random().toString(),
@@ -255,47 +384,61 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                     
                     return 0;
                 }
-                return prev - 1; // Decreases by 1% every tick
+                const nextTime = prev - 1;
+                auctionTimeLeftRef.current = nextTime;
+                return nextTime; // Decreases by 1% every tick
             });
 
             // AI Bidding Logic
-            const hiddenStats = project.projectDetails?.hiddenStats || {};
-            const estQuality = hiddenStats.qualityScore || 50;
-            const scriptQuality = hiddenStats.scriptQuality || 50;
-            const directorQuality = hiddenStats.directorQuality || 50;
-            const castingStrength = hiddenStats.castingStrength || 50;
-            const rawHype = hiddenStats.rawHype || 50;
-            const packageScore = (estQuality * 0.4) + (scriptQuality * 0.2) + (directorQuality * 0.15) + (castingStrength * 0.15) + (rawHype * 0.1);
-            const eligiblePlatforms = PLATFORMS.filter(p => packageScore >= p.qualityReq && activePlatforms.includes(p.id));
+            const { hiddenStats, packageScore, projectBudget, theatricalGross, hasProvenIp } = getProjectAuctionContext();
+            const eligiblePlatforms = PLATFORMS.filter(p => activePlatforms.includes(p.id));
 
-            if (eligiblePlatforms.length > 0 && Math.random() > 0.8) { // 20% chance per tick to bid
-                const platform = eligiblePlatforms[Math.floor(Math.random() * eligiblePlatforms.length)];
-                
-                // CRITICAL: Don't bid against yourself
-                const lastBidderId = currentBids.length > 0 ? currentBids[0].platformId : null;
-                if (highestBid?.platformId === platform.id || lastBidderId === platform.id) {
-                    return;
-                }
+            const lastBidderId = currentBids.length > 0 ? currentBids[0].platformId : null;
+            const biddingPool = eligiblePlatforms.filter(platform => platform.id !== highestBid?.platformId && platform.id !== lastBidderId);
+            const now = Date.now();
+            const liveTimeLeft = auctionTimeLeftRef.current;
+            const phaseConfig = liveTimeLeft > 82
+                ? { minGap: 1450, bidChance: 0.16 }
+                : liveTimeLeft > 45
+                    ? { minGap: 950, bidChance: 0.34 }
+                    : liveTimeLeft > 18
+                        ? { minGap: 700, bidChance: 0.5 }
+                        : { minGap: 380, bidChance: 0.78 };
+            const canBidAgain = now - lastAuctionBidAtRef.current >= phaseConfig.minGap;
+
+            if (biddingPool.length > 0 && canBidAgain && Math.random() < phaseConfig.bidChance) {
+                const platform = biddingPool[Math.floor(Math.random() * biddingPool.length)];
                 
                 const currentHighest = highestBid ? highestBid.bidValue : 0;
-                const projectBudget = project.projectDetails?.estimatedBudget || 0;
+                const fitGap = Math.max(0, platform.qualityReq - packageScore);
+                const effectivePackageScore = Math.max(32, packageScore - (fitGap * 0.28));
                 const newBid = calculateStreamingAuctionOffer(
                     platform,
                     projectBudget,
-                    packageScore,
+                    effectivePackageScore,
                     isSeries,
                     currentHighest,
                     project.previousBestBidValue,
-                    isPostTheatricalBidding
+                    isPostTheatricalBidding,
+                    theatricalGross,
+                    hiddenStats,
+                    hasProvenIp
                 );
                 
                 if (newBid) {
                     setCurrentBids(prev => [newBid, ...prev].slice(0, 10));
                     setHighestBid(newBid);
-                    setTimeLeft(100); // Reset timer
+                    lastAuctionBidAtRef.current = now;
+                    const bidCountAfterThis = currentBids.length + 1;
+                    setTimeLeft(prev => {
+                        const minimumTimeAfterBid = bidCountAfterThis < 3 ? 76 : bidCountAfterThis < 6 ? 48 : 18;
+                        const nextTime = Math.max(prev, minimumTimeAfterBid);
+                        auctionTimeLeftRef.current = nextTime;
+                        return nextTime;
+                    }); // early bids extend the room, later bids become last-minute snipes.
                 } else {
                     // Platform drops out
-                    if (Math.random() > 0.5) {
+                    if (activePlatforms.length > 3 && Math.random() > 0.72) {
                         setActivePlatforms(prev => prev.filter(id => id !== platform.id));
                     }
                 }
@@ -522,6 +665,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
         // Update Universe Stats if applicable
         if (project.projectDetails?.universeId) {
             const universeId = project.projectDetails.universeId;
+            updatedPlayer.world.universes = normalizeUniverseMap(updatedPlayer.world?.universes || {});
             if (updatedPlayer.world.universes[universeId]) {
                 const universe = updatedPlayer.world.universes[universeId];
                 const quality = project.projectDetails.hiddenStats?.qualityScore || 50;
@@ -533,8 +677,8 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                 );
                 
                 // Increase Brand Power and Momentum
-                updatedUniverse.brandPower += Math.floor(quality / 20);
-                updatedUniverse.momentum += Math.floor(quality / 10);
+                updatedUniverse.brandPower = Math.min(100, updatedUniverse.brandPower + Math.floor(quality / 20));
+                updatedUniverse.momentum = Math.min(100, updatedUniverse.momentum + Math.floor(quality / 10));
                 updatedPlayer.world.universes[universeId] = updatedUniverse;
             }
         }
@@ -726,7 +870,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                                     <div className="flex flex-col items-center justify-center py-20 space-y-8">
                                         <div className="text-center max-w-md">
                                             <p className="text-white/70 mb-6">Open the floor to streaming platforms. They will bid based on the estimated quality and genre of your project.</p>
-                                            <button onClick={() => setAuctionState('ACTIVE')} className="px-12 py-4 bg-blue-500 text-white rounded-full font-bold tracking-widest uppercase text-xs hover:scale-105 transition-all shadow-[0_0_30px_rgba(59,130,246,0.3)]">
+                                            <button onClick={startAuction} className="px-12 py-4 bg-blue-500 text-white rounded-full font-bold tracking-widest uppercase text-xs hover:scale-105 transition-all shadow-[0_0_30px_rgba(59,130,246,0.3)]">
                                                 Start Bidding War
                                             </button>
                                         </div>

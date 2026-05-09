@@ -21,6 +21,20 @@ interface ProjectDetailViewProps {
     actionIcon?: React.ReactNode;
 }
 
+const getProjectStudioDisplayName = (project: ProjectDetails): string => {
+    const catalogStudio = STUDIO_CATALOG[project.studioId];
+    if (catalogStudio?.name) return catalogStudio.name;
+
+    const leakedInternalId = typeof project.studioId === 'string' && /^(npc_venture|NPC_VENTURE)/i.test(project.studioId);
+    if (leakedInternalId && project.description) {
+        const ventureName = project.description.match(/^(.+?)\s+is producing\b/i)?.[1]?.trim();
+        if (ventureName) return ventureName;
+    }
+
+    if (!project.studioId) return 'Independent';
+    return String(project.studioId).replace(/^(npc_venture_|NPC_VENTURE_)/i, '').replace(/[_-]+/g, ' ').replace(/\b\w/g, char => char.toUpperCase());
+};
+
 export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
     opportunity,
     onBack,
@@ -49,7 +63,7 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
 
     // Data Extraction
     const project = opportunity.project || {} as ProjectDetails;
-    const studio = STUDIO_CATALOG[project.studioId] || { name: project.studioId || 'Independent', color: 'text-zinc-400' };
+    const studio = STUDIO_CATALOG[project.studioId] || { name: getProjectStudioDisplayName(project), color: 'text-zinc-400' };
     const universe = opportunity.universeContract;
     
     // Formatting

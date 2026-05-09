@@ -58,6 +58,7 @@ import { getAbsoluteWeek, getRelationshipAge, inferStreamingStartWeekAbsolute } 
 import { hasNoAds, resetWeeklyEnergy, spendPlayerEnergy } from './premiumLogic';
 import { advanceLuxeConnections, advanceTinderConnections } from './datingLogic';
 import { generateNpcVentureRoleOffer, getNpcVentureOfferText } from './npcVentureLogic';
+import { normalizeUniverseMap } from './universeLogic';
 
 // --- CONSTANTS ---
 const ANNUAL_TAX_FREE_ALLOWANCE = 25000;
@@ -196,17 +197,17 @@ const getStreamingBidProfile = (packageScore: number, isSeries: boolean, runStre
         floor = 1.01;
         ceiling = 1.35;
     } else if (packageScore < 72) {
-        floor = 1.12;
-        ceiling = 2.4;
+        floor = 1.18;
+        ceiling = 2.8;
     } else if (packageScore < 84) {
-        floor = 1.35;
-        ceiling = 4.5;
+        floor = 1.55;
+        ceiling = 5.2;
     } else if (packageScore < 92) {
-        floor = 1.75;
-        ceiling = 7;
+        floor = 2.1;
+        ceiling = 8.6;
     } else {
-        floor = 2.25;
-        ceiling = 9;
+        floor = 2.9;
+        ceiling = 13.5;
     }
 
     if (isSeries) {
@@ -218,14 +219,49 @@ const getStreamingBidProfile = (packageScore: number, isSeries: boolean, runStre
         floor *= packageScore < 45 ? 0.96 : 0.98;
         ceiling *= 0.84;
     } else if (runStrength > 1.25) {
-        floor *= 1 + Math.min(0.18, (runStrength - 1.25) * 0.08);
-        ceiling *= 1 + Math.min(0.45, (runStrength - 1.25) * 0.12);
+        floor *= 1 + Math.min(0.35, (runStrength - 1.25) * 0.08);
+        ceiling *= 1 + Math.min(1.65, (runStrength - 1.25) * 0.14);
     }
 
     return {
         floor: Math.max(0.8, floor),
         ceiling: Math.max(floor + 0.08, ceiling)
     };
+};
+
+const getStreamingMarketProofCap = (
+    projectBudget: number,
+    packageScore: number,
+    hiddenStats: Record<string, any> = {},
+    isSeries: boolean,
+    theatricalGross = 0,
+    hasProvenIp = false
+) => {
+    if (projectBudget <= 0) return Number.MAX_SAFE_INTEGER;
+
+    const castingStrength = Number.isFinite(hiddenStats.castingStrength) ? hiddenStats.castingStrength : 50;
+    const fameMultiplier = Number.isFinite(hiddenStats.fameMultiplier) ? hiddenStats.fameMultiplier : 1;
+    const rawHype = Number.isFinite(hiddenStats.rawHype) ? hiddenStats.rawHype : 50;
+
+    let capMultiplier = packageScore >= 92 ? 4.25 : packageScore >= 84 ? 3.45 : packageScore >= 72 ? 2.65 : packageScore >= 60 ? 1.85 : 1.22;
+    if (isSeries) capMultiplier += 0.35;
+    if (castingStrength >= 88) capMultiplier += 0.65;
+    else if (castingStrength >= 78) capMultiplier += 0.35;
+    else if (castingStrength < 62) capMultiplier -= 0.35;
+
+    if (fameMultiplier >= 7) capMultiplier += 2.2;
+    else if (fameMultiplier >= 5.25) capMultiplier += 1.15;
+    else if (fameMultiplier >= 3.6) capMultiplier += 0.55;
+
+    if (rawHype >= 92) capMultiplier += 0.45;
+    if (hasProvenIp) capMultiplier += 1.9;
+
+    const packageCap = projectBudget * Math.max(1.05, capMultiplier);
+    const theatricalValidationCap = theatricalGross > 0
+        ? theatricalGross * (packageScore >= 90 || castingStrength >= 85 ? 0.92 : 0.72)
+        : 0;
+
+    return Math.max(packageCap, theatricalValidationCap);
 };
 
 const getYoutubeEventCooldown = (player: Player): number => {
@@ -679,6 +715,7 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
     }
     if (!Array.isArray(nextPlayer.world.projects)) nextPlayer.world.projects = [];
     if (!nextPlayer.world.universes || typeof nextPlayer.world.universes !== 'object') nextPlayer.world.universes = {} as any;
+    nextPlayer.world.universes = normalizeUniverseMap(nextPlayer.world.universes);
     if (!Array.isArray(nextPlayer.world.famousMoviesReleased)) nextPlayer.world.famousMoviesReleased = [];
     if (!Array.isArray(nextPlayer.world.awardHistory)) nextPlayer.world.awardHistory = [];
     if (!Array.isArray(nextPlayer.world.upcomingRivals)) nextPlayer.world.upcomingRivals = [];
@@ -1062,6 +1099,8 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
         });
     }
 
+    const pendingUniversePayouts: { universeId: string; studioId: string; label: string; amount: number }[] = [];
+
     // --- 1. WORLD & INDUSTRY UPDATE ---
     try {
         const worldResult = processWorldTurn(nextPlayer);
@@ -1079,16 +1118,10 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
             const ownerStudio = nextPlayer.businesses?.find(b => b.id === universe.studioId);
             if (!ownerStudio) return;
 
-            ownerStudio.balance += weeklyUniverseRevenue;
-            ownerStudio.stats.weeklyRevenue += weeklyUniverseRevenue;
-            ownerStudio.stats.weeklyProfit += weeklyUniverseRevenue;
-            ownerStudio.stats.lifetimeRevenue += weeklyUniverseRevenue;
-            appendStudioLedgerEntry(ownerStudio, {
-                id: `studio_ledger_universe_${universe.id}_${nextPlayer.age}_${nextPlayer.currentWeek}`,
-                week: nextPlayer.currentWeek,
-                year: nextPlayer.age,
+            pendingUniversePayouts.push({
+                universeId: String(universe.id),
+                studioId: String(universe.studioId),
                 amount: weeklyUniverseRevenue,
-                type: 'UNIVERSE',
                 label: `${universe.name} merch & licensing`
             });
         });
@@ -2007,6 +2040,45 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
         nextPlayer.businesses = updatedBusinesses;
     } 
 
+    if (pendingUniversePayouts.length > 0 && nextPlayer.businesses?.length) {
+        let totalUniversePayout = 0;
+        nextPlayer.businesses = nextPlayer.businesses.map(business => {
+            const payouts = pendingUniversePayouts.filter(payout => payout.studioId === business.id);
+            if (payouts.length === 0) return business;
+
+            const payoutTotal = payouts.reduce((sum, payout) => sum + payout.amount, 0);
+            totalUniversePayout += payoutTotal;
+
+            const updatedBusiness: Business = {
+                ...business,
+                balance: business.balance + payoutTotal,
+                stats: {
+                    ...business.stats,
+                    weeklyRevenue: (business.stats.weeklyRevenue || 0) + payoutTotal,
+                    weeklyProfit: (business.stats.weeklyProfit || 0) + payoutTotal,
+                    lifetimeRevenue: (business.stats.lifetimeRevenue || 0) + payoutTotal
+                }
+            };
+
+            payouts.forEach(payout => {
+                appendStudioLedgerEntry(updatedBusiness, {
+                    id: `studio_ledger_universe_${payout.universeId}_${nextPlayer.age}_${nextPlayer.currentWeek}`,
+                    week: nextPlayer.currentWeek,
+                    year: nextPlayer.age,
+                    amount: payout.amount,
+                    type: 'UNIVERSE',
+                    label: payout.label
+                });
+            });
+
+            return updatedBusiness;
+        });
+
+        if (totalUniversePayout > 0) {
+            logsToAdd.push({ msg: `🌐 Universe licensing paid $${totalUniversePayout.toLocaleString()} into studio capital.`, type: 'positive' });
+        }
+    }
+
     addTransaction(-propertyUpkeep, 'EXPENSE', 'Property Upkeep');
 
     // Bankruptcy Check
@@ -2737,6 +2809,7 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                             const castingStrength = rel.projectDetails.hiddenStats.castingStrength || 50;
                             const packageStrength = (qualityScore * 0.45) + (scriptQuality * 0.2) + (directorQuality * 0.15) + (castingStrength * 0.2);
                             const runStrength = Math.max(0.5, Math.min(3, newTotal / Math.max(rel.budget, 1)));
+                            const hasProvenIp = Boolean(rel.projectDetails.franchiseId || rel.projectDetails.universeId || rel.projectDetails.subtype === 'SEQUEL' || rel.projectDetails.subtype === 'SPINOFF' || rel.projectDetails.subtype === 'UNIVERSE_EVENT');
                             const interest = (packageStrength * isGenreMatch * desperation) + ((rel.promotionalBuzz || 50) * 0.15) + (runStrength * 12);
                             
                             if (interest > 60 || Math.random() > 0.7) {
@@ -2746,8 +2819,13 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                                 const qualityRange = rel.budget * (
                                     bidProfile.floor + ((bidProfile.ceiling - bidProfile.floor) * (0.18 + Math.random() * 0.5))
                                 );
+                                const theatricalProofOffer = newTotal
+                                    * (0.42 + Math.min(0.34, packageStrength / 290) + Math.random() * 0.12)
+                                    * platformProfile.payoutMult
+                                    * isGenreMatch
+                                    * Math.max(0.82, desperation);
                                 const marketOffer = rel.budget
-                                    * (0.45 + (runStrength * 0.18))
+                                    * (0.65 + (runStrength * 0.24))
                                     * qualityFactor
                                     * platformProfile.payoutMult
                                     * desperation
@@ -2755,7 +2833,8 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                                 let baseOffer = Math.max(
                                     floorOffer * (1.02 + Math.random() * 0.12),
                                     qualityRange,
-                                    marketOffer
+                                    marketOffer,
+                                    theatricalProofOffer
                                 );
 
                                 // Streaming is meant to be the safest lane, so don't let platform cash quirks undercut viable projects.
@@ -2764,10 +2843,12 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                                     platformState.cashReserve * (isSeries ? 0.78 : 0.68),
                                     rel.budget * Math.min(
                                         bidProfile.ceiling,
-                                        packageStrength >= 84 ? 9 : packageStrength >= 72 ? 4.5 : packageStrength >= 60 ? 2.4 : 1.4
-                                    )
+                                        packageStrength >= 92 ? 16 : packageStrength >= 84 ? 12 : packageStrength >= 72 ? 7 : packageStrength >= 60 ? 3.5 : 1.4
+                                    ),
+                                    newTotal * (packageStrength >= 84 ? 0.92 : packageStrength >= 72 ? 0.72 : 0.55)
                                 );
-                                const maxOffer = Math.min(platformCashCap, rel.budget * bidProfile.ceiling);
+                                const marketProofCap = getStreamingMarketProofCap(rel.budget, packageStrength, rel.projectDetails.hiddenStats || {}, isSeries, newTotal, hasProvenIp);
+                                const maxOffer = Math.min(platformCashCap, rel.budget * bidProfile.ceiling, marketProofCap);
                                 baseOffer = Math.min(baseOffer, Math.max(floorOffer, maxOffer));
 
                                 const upfront = Math.floor(Math.max(floorOffer, baseOffer * (0.96 + Math.random() * 0.28)));
@@ -2778,6 +2859,52 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                                 }
                             }
                         });
+
+                        const minimumCompetitiveBids = Math.min(3, platforms.length);
+                        if (bids.length < minimumCompetitiveBids) {
+                            const hiddenStats = (rel.projectDetails.hiddenStats || {}) as Record<string, number>;
+                            const qualityScore = hiddenStats.qualityScore || 50;
+                            const scriptQuality = hiddenStats.scriptQuality || 50;
+                            const directorQuality = hiddenStats.directorQuality || 50;
+                            const castingStrength = hiddenStats.castingStrength || 50;
+                            const packageStrength = (qualityScore * 0.45) + (scriptQuality * 0.2) + (directorQuality * 0.15) + (castingStrength * 0.2);
+                            const runStrength = Math.max(0.5, Math.min(3, newTotal / Math.max(rel.budget, 1)));
+                            const bidProfile = getStreamingBidProfile(packageStrength, isSeries, runStrength);
+                            const hasProvenIp = Boolean(rel.projectDetails.franchiseId || rel.projectDetails.universeId || rel.projectDetails.subtype === 'SEQUEL' || rel.projectDetails.subtype === 'SPINOFF' || rel.projectDetails.subtype === 'UNIVERSE_EVENT');
+                            const marketProofCap = getStreamingMarketProofCap(rel.budget, packageStrength, rel.projectDetails.hiddenStats || {}, isSeries, newTotal, hasProvenIp);
+                            const bestExistingBid = bids.reduce((max, bid) => Math.max(max, bid.upfront), 0);
+                            const missingPlatforms = platforms.filter(pId => !bids.some(bid => bid.platformId === pId));
+
+                            missingPlatforms.some((pId, index) => {
+                                if (bids.length >= minimumCompetitiveBids) return true;
+
+                                const platformProfile = PLATFORMS[pId];
+                                const platformState = nextPlayer.world.platforms?.[pId];
+                                if (!platformState) return false;
+
+                                const floorOffer = Math.max(1_000_000, rel.budget * bidProfile.floor);
+                                const competitiveAnchor = bestExistingBid > 0
+                                    ? bestExistingBid * (0.52 + Math.random() * 0.36)
+                                    : floorOffer * (1.08 + Math.random() * 0.42);
+                                const platformCap = Math.max(
+                                    floorOffer,
+                                    platformState.cashReserve * (isSeries ? 0.72 : 0.62),
+                                    rel.budget * bidProfile.ceiling,
+                                    newTotal * (packageStrength >= 84 ? 0.82 : packageStrength >= 72 ? 0.65 : 0.48)
+                                );
+                                const cap = Math.max(floorOffer, Math.min(platformCap, marketProofCap));
+                                const upfront = Math.floor(Math.max(floorOffer, Math.min(cap, competitiveAnchor * platformProfile.payoutMult)));
+
+                                bids.push({
+                                    platformId: pId,
+                                    upfront,
+                                    royalty: Math.floor(Math.random() * (isSeries ? 5 : 7)) + (isSeries ? 5 : 4),
+                                    duration: 52,
+                                });
+
+                                return false;
+                            });
+                        }
                         
                         if (bids.length === 0) {
                             const hiddenStats = (rel.projectDetails.hiddenStats || {}) as Record<string, number>;

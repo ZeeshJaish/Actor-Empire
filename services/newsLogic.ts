@@ -3,6 +3,7 @@ import { Player, NewsItem, NewsCategory, ActiveRelease, Commitment, ProjectType,
 import { NPC_DATABASE } from './npcLogic';
 import { STUDIO_CATALOG } from './studioLogic';
 import { AWARD_GOSSIP_TEMPLATES, SNUB_TEMPLATES } from './awardLogic'; // Import templates
+import { normalizeUniverseMap } from './universeLogic';
 
 // ... (Keep existing TEMPLATES arrays like INDUSTRY_TEMPLATES, NPC_HEADLINES, etc.)
 const INDUSTRY_TEMPLATES = [
@@ -567,7 +568,7 @@ const generateUniverseNews = (player: Player): NewsItem[] => {
     // Find if player has a studio with universes
     const studio = player.businesses?.find(b => b.type === 'PRODUCTION_HOUSE');
     if (studio && player.world?.universes) {
-        const universes = Object.values(player.world.universes || {}).filter(u => u.studioId === studio.id);
+        const universes = Object.values(normalizeUniverseMap(player.world.universes || {})).filter(u => u.studioId === studio.id);
         if (universes.length > 0 && Math.random() < 0.4) { // 40% chance per week if they have a universe
             const randomUniverse = pick(universes);
             const headline = pick(UNIVERSE_NEWS_TEMPLATES).replace(/{Universe}/g, randomUniverse.name);

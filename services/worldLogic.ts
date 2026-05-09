@@ -3,7 +3,7 @@ import { WorldState, IndustryProject, StudioId, BudgetTier, Genre, Player, NPCAc
 import { STUDIO_CATALOG } from './studioLogic';
 import { NPC_DATABASE, calculateProjectFameMultiplier } from './npcLogic';
 import { generateProjectTitle, getEstimatedBudget, generateProjectDetails } from './roleLogic';
-import { initUniverses, processUniverseTurn } from './universeLogic';
+import { initUniverses, normalizeUniverseMap, processUniverseTurn } from './universeLogic';
 import { processNpcVentures, syncNpcVenturesToStudios } from './npcVentureLogic';
 
 // Helpers
@@ -114,6 +114,7 @@ export const processWorldTurn = (player: Player): { world: WorldState, news: New
     const logs: string[] = [];
     if (!newWorld.npcVentures) newWorld.npcVentures = {};
     newWorld = syncNpcVenturesToStudios(newWorld);
+    newWorld.universes = normalizeUniverseMap(newWorld.universes);
 
     // --- A. MAINTAIN RIVAL SCHEDULE ---
     // Ensure we have at least 12 weeks of upcoming rivals
@@ -244,6 +245,7 @@ export const processWorldTurn = (player: Player): { world: WorldState, news: New
     newWorld = ventureResult.world;
     news.push(...ventureResult.news);
     logs.push(...ventureResult.logs);
+    newWorld.universes = normalizeUniverseMap(newWorld.universes);
 
     if (!newWorld.universes || Object.keys(newWorld.universes).length === 0) {
         newWorld.universes = initUniverses();

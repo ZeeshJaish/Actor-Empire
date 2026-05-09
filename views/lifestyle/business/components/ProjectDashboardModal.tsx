@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Film, Tv, Users, DollarSign, Star, TrendingUp, Calendar, Check, Activity, Layers, Zap, Info, ChevronRight, Play, Settings, Camera, Award, BarChart3, Globe, BookOpen, Edit3, Sparkles } from 'lucide-react';
 import { Player, Studio, CustomPoster, PlatformId } from '../../../../types';
@@ -96,11 +96,18 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
             };
             reader.readAsDataURL(file);
         }
+        e.target.value = '';
     };
 
     const getCustomPoster = () => {
         return project.customPoster || project.projectDetails?.customPoster || project.concept?.customPoster;
     };
+
+    const [localPoster, setLocalPoster] = useState<CustomPoster | undefined>(() => getCustomPoster());
+
+    useEffect(() => {
+        setLocalPoster(getCustomPoster());
+    }, [project.id]);
 
     const getPosterBg = (title: string = '') => {
         const colors = [
@@ -119,7 +126,7 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
         return colors[Math.abs(hash) % colors.length];
     };
 
-    const initialPoster = getCustomPoster();
+    const activePoster = localPoster || getCustomPoster();
 
     const relatedNews = player.news?.filter(n => {
         const title = project.name || project.title;
@@ -326,6 +333,7 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
     const dynamicBuzz = getDynamicBuzz();
 
     const savePoster = (customPoster: CustomPoster) => {
+        setLocalPoster(customPoster);
         const updatedPlayer = { ...player };
         const updatedStudio = { ...studio };
         let updated = false;
@@ -334,6 +342,14 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
         if (activeReleaseIndex !== -1) {
             if (updatedPlayer.activeReleases[activeReleaseIndex].projectDetails) {
                 updatedPlayer.activeReleases[activeReleaseIndex].projectDetails!.customPoster = customPoster;
+                updated = true;
+            }
+        }
+
+        if (!updated) {
+            const pastProjectIndex = updatedPlayer.pastProjects.findIndex(p => p.id === project.id);
+            if (pastProjectIndex !== -1) {
+                updatedPlayer.pastProjects[pastProjectIndex].customPoster = customPoster;
                 updated = true;
             }
         }
@@ -381,16 +397,16 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
     };
 
     const renderPosterPreview = () => {
-        if (initialPoster?.imageData) {
+        if (activePoster?.imageData) {
             return (
                 <div className="w-full aspect-[2/3] bg-zinc-900 rounded-2xl overflow-hidden relative group shadow-2xl border border-white/10">
-                    <img src={initialPoster.imageData} alt="Custom Poster" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                    <img src={activePoster.imageData} alt="Custom Poster" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-60"></div>
                 </div>
             );
         }
 
-        const bgGradient = initialPoster?.bgGradient || getPosterBg(project.name);
+        const bgGradient = activePoster?.bgGradient || getPosterBg(project.name);
         return (
             <div className={`w-full aspect-[2/3] rounded-2xl overflow-hidden relative bg-gradient-to-br ${bgGradient} flex flex-col items-center justify-center p-6 text-center border border-white/10 shadow-2xl group`}>
                 <div className="absolute inset-0 opacity-[0.03] pointer-events-none bg-[url('https://grainy-gradients.vercel.app/noise.svg')]"></div>
@@ -451,10 +467,20 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
 
     return (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/95 backdrop-blur-2xl overflow-hidden">
+            <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif"
+                onChange={handleImageUpload}
+                className="hidden"
+                aria-hidden="true"
+                tabIndex={-1}
+            />
+
             {/* Atmospheric Background Layer */}
             <div className="absolute inset-0 z-0 opacity-20 pointer-events-none">
-                {initialPoster?.imageData ? (
-                    <img src={initialPoster.imageData} className="w-full h-full object-cover blur-[100px] scale-150" alt="" />
+                {activePoster?.imageData ? (
+                    <img src={activePoster.imageData} className="w-full h-full object-cover blur-[100px] scale-150" alt="" />
                 ) : (
                     <div className={`w-full h-full bg-gradient-to-br ${getPosterBg(project.name)} blur-[100px] scale-150`}></div>
                 )}

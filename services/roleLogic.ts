@@ -524,7 +524,10 @@ export const generateCastList = (player: Player, project: ProjectDetails, player
         role: playerRole === 'LEAD' ? 'Lead' : playerRole === 'SUPPORTING' ? 'Supporting' : 'Cast',
         isPlayer: true,
         image: player.avatar,
-        type: 'ACTOR'
+        type: 'ACTOR',
+        actorId: 'PLAYER_SELF',
+        actorName: player.name,
+        roleType: playerRole
     });
 
     let count = 2;
@@ -541,7 +544,10 @@ export const generateCastList = (player: Player, project: ProjectDetails, player
             isPlayer: false,
             image: npc.avatar,
             type: 'ACTOR',
-            npcId: npc.id
+            npcId: npc.id,
+            actorId: npc.id,
+            actorName: npc.name,
+            roleType: 'SUPPORTING'
         });
     });
 

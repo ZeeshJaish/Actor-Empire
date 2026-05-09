@@ -5,7 +5,7 @@ import { Player, PastProject, ActiveRelease, CastMember, Review, Award, Universe
 import { formatMoney } from '../../services/formatUtils';
 import { AWARD_CALENDAR, AWARD_SHOW_DB, AwardShowLore, AwardDefinition, Nomination, sanitizeAwardRecords, getAwardCeremonyYear } from '../../services/awardLogic';
 import { ArrowLeft, Star, Film, ChevronRight, User, TrendingUp, DollarSign, Eye, Award as AwardIcon, Calendar, BookOpen, Clock, List, MessageSquare, Users, Globe, Zap, LayoutGrid, Shield, ArrowRight, Tv } from 'lucide-react';
-import { buildUniverseRoster, getUniverseDashboardProjects } from '../../services/universeLogic';
+import { buildUniverseRoster, calculateUniverseProductWeeklyRevenue, getFallbackCharacterName, getUniverseDashboardProjects, normalizeUniverseForSave, normalizeUniverseMap } from '../../services/universeLogic';
 
 interface ImdbAppProps {
   player: Player;
@@ -69,6 +69,31 @@ const getSafeUniversePhaseLabel = (phase: Universe['currentPhase']) => {
         return normalized.replace('PHASE', 'Phase').replace(/\bORIGINS\b/g, 'Origins').replace(/\bEXPANSION\b/g, 'Expansion').replace(/\bWAR\b/g, 'War').replace(/\bMULTIVERSE\b/g, 'Multiverse');
     }
     return 'Phase 1';
+};
+
+const getCharacterTimelineText = (char: any) => {
+    const first = typeof char?.firstAppearanceTitle === 'string' && char.firstAppearanceTitle.trim()
+        ? char.firstAppearanceTitle.trim()
+        : '';
+    const latest = typeof char?.latestAppearanceTitle === 'string' && char.latestAppearanceTitle.trim()
+        ? char.latestAppearanceTitle.trim()
+        : '';
+    if (first && latest) return `First: ${first} • Latest: ${latest}`;
+    if (first) return `Introduced in ${first}`;
+    return 'Not introduced on-screen yet';
+};
+
+const getCharacterTimelineParts = (char: any) => {
+    const first = typeof char?.firstAppearanceTitle === 'string' && char.firstAppearanceTitle.trim()
+        ? char.firstAppearanceTitle.trim()
+        : '';
+    const latest = typeof char?.latestAppearanceTitle === 'string' && char.latestAppearanceTitle.trim()
+        ? char.latestAppearanceTitle.trim()
+        : '';
+    return {
+        first: first && !/^unknown$/i.test(first) ? first : '',
+        latest: latest && !/^unknown$/i.test(latest) ? latest : ''
+    };
 };
 
 const getReturnStatusMeta = (status?: 'RETURNING' | 'WRITTEN_OFF' | 'KILLED_OFF') => {
@@ -447,7 +472,7 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
   };
 
   const renderFranchiseList = () => {
-      const universes = Object.values(player.world.universes || {}) as Universe[];
+      const universes = Object.values(normalizeUniverseMap(player.world?.universes || {})) as Universe[];
       
       const allUniverses = [...universes].sort((a, b) => (b.brandPower || 0) - (a.brandPower || 0));
 
@@ -457,8 +482,13 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
               {allUniverses.map(uni => {
                   const theme = UNIVERSE_THEMES[uni.id] || { color: 'text-zinc-400', bg: 'bg-zinc-700', icon: Film };
                   const Icon = theme.icon;
+                  const rosterCount = buildUniverseRoster(
+                      uni,
+                      getUniverseDashboardProjects(player, uni.id, player.activeReleases),
+                      player.name
+                  ).filter(character => character.status !== 'RETIRED').length;
                   return (
-                      <div key={uni.id} onClick={() => setSelectedUniverse(uni)} className="bg-zinc-900 rounded-2xl overflow-hidden border border-zinc-800 relative group cursor-pointer">
+                      <div key={uni.id} onClick={() => setSelectedUniverse(normalizeUniverseForSave(uni, uni.id))} className="bg-zinc-900 rounded-2xl overflow-hidden border border-zinc-800 relative group cursor-pointer">
                           <div className={`h-24 ${theme.bg} opacity-20 relative`}><div className="absolute inset-0 bg-gradient-to-t from-zinc-900 to-transparent"></div></div>
                           <div className="p-5 relative -mt-10">
                               <div className={`w-14 h-14 rounded-xl ${theme.bg} flex items-center justify-center shadow-lg mb-3 text-white`}><Icon size={28} /></div>
@@ -473,7 +503,7 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
                                       {uni.currentSagaName || 'N/A'}
                                   </div>
                               </div>
-                              <div className="mt-4 pt-4 border-t border-zinc-800 flex justify-between items-center"><div className="text-xs text-zinc-500"><span className="text-white font-bold">{uni.roster.length}</span> Active Heroes</div><div className="flex items-center gap-1 text-xs font-bold text-zinc-300 group-hover:text-white transition-colors">View Dossier <ArrowRight size={14}/></div></div>
+                              <div className="mt-4 pt-4 border-t border-zinc-800 flex justify-between items-center"><div className="text-xs text-zinc-500"><span className="text-white font-bold">{rosterCount}</span> Active Heroes</div><div className="flex items-center gap-1 text-xs font-bold text-zinc-300 group-hover:text-white transition-colors">View Dossier <ArrowRight size={14}/></div></div>
                           </div>
                       </div>
                   );
@@ -484,30 +514,197 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
 
   const renderUniverseDetail = () => {
       if (!selectedUniverse) return null;
-      const theme = UNIVERSE_THEMES[selectedUniverse.id] || { color: 'text-white', bg: 'bg-zinc-700', icon: Globe };
-      const worldMovies = (player.world?.projects || []).filter(p => p?.universeId === selectedUniverse.id);
-      const playerPastMovies = (player.pastProjects || []).filter(p => p?.universeId === selectedUniverse.id);
-      const playerActiveMovies = (player.activeReleases || []).filter(p => p?.projectDetails?.universeId === selectedUniverse.id);
-      const playerUniverseProjects = getUniverseDashboardProjects(player, selectedUniverse.id, player.activeReleases);
-      const normalizedRoster = buildUniverseRoster(selectedUniverse, playerUniverseProjects, player.name);
+      const currentUniverse = normalizeUniverseForSave(player.world?.universes?.[selectedUniverse.id] || selectedUniverse, selectedUniverse.id);
+      const theme = UNIVERSE_THEMES[currentUniverse.id] || { color: 'text-white', bg: 'bg-zinc-700', icon: Globe };
+      const worldMovies = (Array.isArray(player.world?.projects) ? player.world.projects : []).filter(p => p?.universeId === currentUniverse.id);
+      const playerPastMovies = (Array.isArray(player.pastProjects) ? player.pastProjects : []).filter(p => p?.universeId === currentUniverse.id);
+      const playerActiveMovies = (Array.isArray(player.activeReleases) ? player.activeReleases : []).filter(p => p?.projectDetails?.universeId === currentUniverse.id);
+      const playerUniverseProjects = getUniverseDashboardProjects(player, currentUniverse.id, player.activeReleases || []);
+      const normalizedRoster = buildUniverseRoster(currentUniverse, playerUniverseProjects, player.name);
 
-      const recentMovies = [
-          ...worldMovies.map(m => ({ id: m.id, title: m.title, year: m.year, genre: m.genre, boxOffice: m.boxOffice, isPlayer: false })),
-          ...playerPastMovies.map(m => ({ id: m.id, title: m.name, year: m.year, genre: m.genre, boxOffice: m.gross, isPlayer: true })),
-          ...playerActiveMovies.map(m => ({ id: m.id, title: m.name, year: player.age, genre: m.projectDetails.genre, boxOffice: m.totalGross, isPlayer: true }))
-      ].sort((a, b) => b.year - a.year).slice(0, 10);
+      const canonProjects = [
+          ...worldMovies.map(m => ({
+              id: m.id,
+              title: m.title || 'Untitled Release',
+              year: Number.isFinite(Number(m.year)) ? Number(m.year) : player.age,
+              genre: m.genre || 'UNKNOWN',
+              boxOffice: Number.isFinite(Number(m.boxOffice)) ? Number(m.boxOffice) : 0,
+              rating: Number.isFinite(Number((m as any).imdbRating)) ? Number((m as any).imdbRating) : Number.isFinite(Number(m.quality)) ? Math.max(1, Math.min(10, Number(m.quality) / 10)) : 0,
+              isPlayer: false,
+              isReleased: true
+          })),
+          ...playerPastMovies.map(m => ({
+              id: m.id,
+              title: m.name || 'Untitled Release',
+              year: Number.isFinite(Number(m.year)) ? Number(m.year) : player.age,
+              genre: m.genre || 'UNKNOWN',
+              boxOffice: Number.isFinite(Number(m.gross)) ? Number(m.gross) : 0,
+              rating: Number.isFinite(Number(m.imdbRating)) ? Number(m.imdbRating) : 0,
+              isPlayer: true,
+              isReleased: true
+          })),
+          ...playerActiveMovies.map(m => ({
+              id: m.id,
+              title: m.name || 'Untitled Release',
+              year: player.age,
+              genre: m.projectDetails?.genre || 'UNKNOWN',
+              boxOffice: Number.isFinite(Number(m.totalGross)) ? Number(m.totalGross) : 0,
+              rating: Number.isFinite(Number(m.imdbRating)) ? Number(m.imdbRating) : 0,
+              isPlayer: true,
+              isReleased: false
+          }))
+      ].sort((a, b) => Number(b.year || 0) - Number(a.year || 0));
+      const recentMovies = canonProjects.slice(0, 10);
+      const totalGross = canonProjects.reduce((sum, movie) => sum + (movie.boxOffice || 0), 0);
+      const ratedCanonProjects = canonProjects.filter(project => project.isReleased && project.rating > 0);
+      const averageRating = ratedCanonProjects.length > 0
+          ? ratedCanonProjects.reduce((sum, project) => sum + (project.rating || 0), 0) / ratedCanonProjects.length
+          : 0;
+      const lifetimeLicensing = currentUniverse.stats?.lifetimeRevenue || 0;
+      const projectedLicensing = (currentUniverse.products || [])
+          .filter((product: any) => product?.active !== false)
+          .reduce((sum: number, product: any) => sum + calculateUniverseProductWeeklyRevenue(currentUniverse, product), 0);
+      const licensingValue = lifetimeLicensing > 0 ? formatMoney(lifetimeLicensing) : projectedLicensing > 0 ? `${formatMoney(projectedLicensing)}/wk` : 'No License';
+      const fanApproval = normalizedRoster.length > 0
+          ? normalizedRoster.reduce((sum, character) => sum + (character.fanApproval || 0), 0) / normalizedRoster.length
+          : 0;
+      const topCharacter = [...normalizedRoster].sort((a, b) => (b.fanApproval || 0) - (a.fanApproval || 0))[0];
+      const recastCount = normalizedRoster.filter(character => character.status === 'RECAST').length;
+      const timelineProjects = [
+          ...worldMovies.map(movie => ({
+              id: movie.id,
+              title: movie.title || 'Untitled Release',
+              year: Number.isFinite(Number(movie.year)) ? Number(movie.year) : player.age,
+              type: 'MOVIE' as const,
+              source: 'WORLD' as const,
+              universeSagaName: currentUniverse.currentSagaName || `Saga ${currentUniverse.saga || 1}`,
+              universePhaseName: currentUniverse.currentPhaseName || getSafeUniversePhaseLabel(currentUniverse.currentPhase)
+          })),
+          ...playerUniverseProjects
+      ].sort((a, b) => Number(a.year || 0) - Number(b.year || 0));
+      const timeline = timelineProjects.reduce((acc, project) => {
+          const sagaName = project.universeSagaName || currentUniverse.currentSagaName || 'Saga 1';
+          const phaseName = project.universePhaseName || currentUniverse.currentPhaseName || 'Phase 1';
+          if (!acc[sagaName]) acc[sagaName] = {};
+          if (!acc[sagaName][phaseName]) acc[sagaName][phaseName] = [];
+          acc[sagaName][phaseName].push(project);
+          return acc;
+      }, {} as Record<string, Record<string, typeof timelineProjects>>);
 
       return (
           <div className="space-y-6 pb-20">
               <div className="flex items-center justify-between mb-2"><button onClick={() => setSelectedUniverse(null)} className="flex items-center gap-1 text-xs text-zinc-500 font-bold uppercase tracking-wider hover:text-white"><ArrowLeft size={12}/> All Franchises</button></div>
-              <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 text-center relative overflow-hidden">
+              <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 relative overflow-hidden">
                   <div className={`absolute top-0 left-0 right-0 h-1 ${theme.bg}`}></div>
-                  <h2 className="text-3xl font-black uppercase tracking-tighter text-white mb-1">{selectedUniverse.name}</h2>
-                  <div className={`text-xs font-bold uppercase tracking-widest ${theme.color} mb-6`}>{getSafeUniversePhaseLabel(selectedUniverse.currentPhase)}</div>
-                  <div className="grid grid-cols-2 gap-4"><div className="bg-black/40 p-3 rounded-xl border border-zinc-800"><div className="text-[10px] text-zinc-500 uppercase tracking-widest mb-1">Momentum</div><div className="text-xl font-mono font-bold text-white">{selectedUniverse.momentum}/100</div></div><div className="bg-black/40 p-3 rounded-xl border border-zinc-800"><div className="text-[10px] text-zinc-500 uppercase tracking-widest mb-1">Next Phase</div><div className="text-xl font-mono font-bold text-zinc-400">{Math.ceil(selectedUniverse.weeksUntilNextPhase || 0)}w</div></div></div>
+                  <div className="text-center">
+                      <h2 className="text-3xl font-black uppercase tracking-tighter text-white mb-1">{currentUniverse.name}</h2>
+                      <div className={`text-xs font-bold uppercase tracking-widest ${theme.color} mb-2`}>{currentUniverse.currentSagaName || `Saga ${currentUniverse.saga}`}</div>
+                      <div className="text-[10px] text-zinc-500 uppercase tracking-widest mb-6">{getSafeUniversePhaseLabel(currentUniverse.currentPhase)}</div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                      {[
+                          ['Total Gross', formatMoney(totalGross)],
+                          ['Avg IMDb', averageRating > 0 ? averageRating.toFixed(1) : '-'],
+                          ['Characters', `${normalizedRoster.length}`],
+                          ['Licensing', licensingValue]
+                      ].map(([label, value]) => (
+                          <div key={label} className="bg-black/40 p-3 rounded-xl border border-zinc-800">
+                              <div className="text-[10px] text-zinc-500 uppercase tracking-widest mb-1">{label}</div>
+                              <div className="text-xl font-mono font-bold text-white">{value}</div>
+                          </div>
+                      ))}
+                  </div>
               </div>
-              <div><h3 className="text-zinc-500 text-xs font-bold uppercase tracking-widest mb-3 pl-2">Active Roster</h3><div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden divide-y divide-zinc-800">{normalizedRoster.map((char) => (<div key={char.id || char.name} className="p-4 flex justify-between items-center"><div><div className="font-bold text-white text-sm">{char.name}</div><div className="text-xs text-zinc-500">Played by <span className={char.actorId === player.id || char.actorId === 'PLAYER_SELF' ? 'text-amber-400 font-bold' : 'text-zinc-300'}>{char.actorId === player.id || char.actorId === 'PLAYER_SELF' ? 'YOU' : char.actorName}</span></div></div><div className={`text-[10px] font-bold px-2 py-1 rounded uppercase ${char.status === 'ACTIVE' ? 'bg-emerald-900/30 text-emerald-500' : 'bg-zinc-800 text-zinc-500'}`}>{char.status}</div></div>))}</div></div>
-              <div><h3 className="text-zinc-500 text-xs font-bold uppercase tracking-widest mb-3 pl-2">Recent Releases</h3><div className="space-y-3">{recentMovies.length === 0 ? (<div className="text-center py-8 text-zinc-600 text-xs italic">No recent releases recorded.</div>) : (recentMovies.map(movie => (<div key={movie.id} className="bg-zinc-900 p-4 rounded-xl border border-zinc-800 flex justify-between items-center"><div><div className="font-bold text-white text-sm flex items-center gap-2">{movie.title} {movie.isPlayer && <span className="bg-amber-500/20 text-amber-500 text-[8px] px-1 rounded">YOU</span>}</div><div className="text-xs text-zinc-500">{movie.year} • {movie.genre}</div></div><div className={`font-mono text-xs font-bold ${movie.boxOffice > 500000000 ? 'text-emerald-400' : 'text-zinc-400'}`}>${(movie.boxOffice / 1000000).toFixed(0)}M</div></div>)))}</div></div>
+              <div className="grid grid-cols-3 gap-2">
+                  <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-3">
+                      <p className="text-[9px] text-zinc-500 uppercase tracking-widest font-bold">Fan Score</p>
+                      <p className="text-lg font-black text-white">{fanApproval > 0 ? `${Math.round(fanApproval)}%` : '-'}</p>
+                  </div>
+                  <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-3">
+                      <p className="text-[9px] text-zinc-500 uppercase tracking-widest font-bold">Fan Favorite</p>
+                      <p className="text-sm font-black text-white truncate">{topCharacter?.name || '-'}</p>
+                  </div>
+                  <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-3">
+                      <p className="text-[9px] text-zinc-500 uppercase tracking-widest font-bold">Recasts</p>
+                      <p className={`text-lg font-black ${recastCount > 0 ? 'text-amber-400' : 'text-white'}`}>{recastCount}</p>
+                  </div>
+              </div>
+
+              <div>
+                  <h3 className="text-zinc-500 text-xs font-bold uppercase tracking-widest mb-3 pl-2">Canon Timeline</h3>
+                  {Object.keys(timeline).length === 0 ? (
+                      <div className="text-center py-8 text-zinc-600 text-xs italic">No canon timeline recorded.</div>
+                  ) : (
+                      <div className="space-y-4">
+                          {Object.entries(timeline).map(([sagaName, phases]) => (
+                              <div key={sagaName} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4">
+                                  <h4 className="text-sm font-black text-yellow-400 uppercase tracking-widest mb-3">{sagaName}</h4>
+                                  <div className="space-y-4">
+                                      {Object.entries(phases).map(([phaseName, projects]) => (
+                                          <div key={phaseName} className="border-l border-zinc-800 pl-3">
+                                              <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">{phaseName}</p>
+                                              <div className="space-y-2">
+                                                  {projects.map(project => (
+                                                      <div key={project.id} className="flex justify-between items-center bg-black/30 rounded-xl p-3">
+                                                          <div className="min-w-0">
+                                                              <p className="text-sm font-bold text-white truncate">{project.title}</p>
+                                                              <p className="text-[10px] text-zinc-500 uppercase tracking-widest">{project.year} • {project.type}</p>
+                                                          </div>
+                                                          {project.source === 'ACTIVE' && <span className="text-[8px] font-black bg-blue-500/15 text-blue-300 px-2 py-1 rounded uppercase">Filming</span>}
+                                                      </div>
+                                                  ))}
+                                              </div>
+                                          </div>
+                                      ))}
+                                  </div>
+                              </div>
+                          ))}
+                      </div>
+                  )}
+              </div>
+
+              <div>
+                  <h3 className="text-zinc-500 text-xs font-bold uppercase tracking-widest mb-3 pl-2">Character Dossiers</h3>
+                  <div className="grid grid-cols-1 gap-3">
+                      {normalizedRoster.map((char) => {
+                          const timeline = getCharacterTimelineParts(char);
+                          return (
+                              <div key={char.id || char.name} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4">
+                                  <div className="flex justify-between items-start gap-3">
+                                      <div className="min-w-0 flex-1">
+                                          <div className="font-bold text-white text-sm truncate">{char.name}</div>
+                                          <div className="text-xs text-zinc-500 truncate">
+                                              Played by <span className={char.actorId === player.id || char.actorId === 'PLAYER_SELF' ? 'text-amber-400 font-bold' : 'text-zinc-300'}>{char.actorId === player.id || char.actorId === 'PLAYER_SELF' ? 'YOU' : char.actorName}</span>
+                                          </div>
+                                      </div>
+                                      <div className={`shrink-0 text-[10px] font-bold px-2 py-1 rounded uppercase ${char.status === 'ACTIVE' ? 'bg-emerald-900/30 text-emerald-500' : char.status === 'RECAST' ? 'bg-amber-500/15 text-amber-300' : 'bg-zinc-800 text-zinc-500'}`}>{char.status}</div>
+                                  </div>
+                                  <div className="mt-3 grid grid-cols-1 gap-1.5 text-[10px] uppercase tracking-widest">
+                                      <div className="flex gap-2 min-w-0">
+                                          <span className="text-zinc-600 shrink-0">First</span>
+                                          <span className="text-zinc-400 truncate">{timeline.first || 'Not introduced yet'}</span>
+                                      </div>
+                                      <div className="flex gap-2 min-w-0">
+                                          <span className="text-zinc-600 shrink-0">Latest</span>
+                                          <span className="text-zinc-400 truncate">{timeline.latest || timeline.first || 'No release yet'}</span>
+                                      </div>
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-3 mt-3">
+                                      <div className="bg-black/30 rounded-xl p-2">
+                                          <p className="text-[9px] text-zinc-500 uppercase tracking-widest">Approval</p>
+                                          <p className="text-sm font-black text-white">{Math.round(char.fanApproval || 0)}%</p>
+                                      </div>
+                                      <div className="bg-black/30 rounded-xl p-2">
+                                          <p className="text-[9px] text-zinc-500 uppercase tracking-widest">Appearances</p>
+                                          <p className="text-sm font-black text-white">{Math.max(0, char.appearances || 0)}</p>
+                                      </div>
+                                  </div>
+                              </div>
+                          );
+                      })}
+                  </div>
+              </div>
+              <div><h3 className="text-zinc-500 text-xs font-bold uppercase tracking-widest mb-3 pl-2">Recent Releases</h3><div className="space-y-3">{recentMovies.length === 0 ? (<div className="text-center py-8 text-zinc-600 text-xs italic">No recent releases recorded.</div>) : (recentMovies.map(movie => (<div key={movie.id} className="bg-zinc-900 p-4 rounded-xl border border-zinc-800 flex justify-between items-center"><div><div className="font-bold text-white text-sm flex items-center gap-2">{movie.title} {movie.isPlayer && <span className="bg-amber-500/20 text-amber-500 text-[8px] px-1 rounded">YOU</span>}</div><div className="text-xs text-zinc-500">{movie.year} • {movie.genre}</div></div><div className={`font-mono text-xs font-bold ${movie.boxOffice > 500000000 ? 'text-emerald-400' : 'text-zinc-400'}`}>${(Math.max(0, movie.boxOffice) / 1000000).toFixed(0)}M</div></div>)))}</div></div>
           </div>
       );
   };
@@ -647,18 +844,25 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
                             <Users size={16} className="text-zinc-400"/> Top Cast
                         </h3>
                         <div className="space-y-3">
-                            {selectedProject.cast.slice(0, 5).map(member => (
-                                <div key={member.id} className="flex items-center justify-between">
+                            {selectedProject.cast.slice(0, 5).map((member, index) => {
+                                const actorName = member.name || member.actorName || 'Unknown Actor';
+                                const characterLabel = `as ${member.characterName || getFallbackCharacterName(member, selectedProject.name, index)}`;
+                                const actorImage = member.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(actorName)}&background=27272a&color=ffffff`;
+                                const isPlayerCast = member.isPlayer || member.actorId === 'PLAYER_SELF';
+
+                                return (
+                                <div key={member.id || member.roleId || `${actorName}_${index}`} className="flex items-center justify-between">
                                     <div className="flex items-center gap-3">
-                                        <img src={member.image} className="w-10 h-10 rounded-full object-cover border border-zinc-700 bg-zinc-800"/>
+                                        <img src={actorImage} className="w-10 h-10 rounded-full object-cover border border-zinc-700 bg-zinc-800"/>
                                         <div>
-                                            <div className="text-sm font-bold text-zinc-200">{member.name}</div>
-                                            <div className="text-xs text-zinc-500">{member.role}</div>
+                                            <div className="text-sm font-bold text-zinc-200">{actorName}</div>
+                                            <div className="text-xs text-zinc-500">{characterLabel}</div>
                                         </div>
                                     </div>
-                                    {member.isPlayer && <div className="text-[9px] font-bold bg-zinc-800 px-2 py-0.5 rounded text-zinc-400">YOU</div>}
+                                    {isPlayerCast && <div className="text-[9px] font-bold bg-zinc-800 px-2 py-0.5 rounded text-zinc-400">YOU</div>}
                                 </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     </div>
                 )}

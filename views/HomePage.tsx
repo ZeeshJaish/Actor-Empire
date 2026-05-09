@@ -10,7 +10,7 @@ import { getAbsoluteWeek } from '../services/legacyLogic';
 import { getGenderedAvatar, MALE_AVATAR_SEEDS, FEMALE_AVATAR_SEEDS, NPC_DATABASE } from '../services/npcLogic';
 import { createBusiness } from '../services/businessLogic';
 import { calculateYoutubeCreatorScore, generateYoutubeBrandDeal, generateYoutubeCollabOffer, getYoutubePublicImageLabel } from '../services/youtubeLogic';
-import { Heart, Smile, Star, Zap, DollarSign, Brain, Calendar, Activity, TrendingUp, Trophy, X, Sliders, Users, Film, Tv, PlayCircle, Lock, FastForward, Key, AlertTriangle, Mic2, Mail, FileText, Dumbbell, Sparkles, Settings, ShoppingCart, Clapperboard, ZapOff, Crown, Skull, Camera, UploadCloud, Check, MessageSquareQuote } from 'lucide-react';
+import { Heart, Smile, Star, Zap, DollarSign, Brain, Calendar, Activity, TrendingUp, Trophy, X, Sliders, Users, Film, Tv, PlayCircle, Lock, FastForward, Key, AlertTriangle, Mic2, Mail, FileText, Dumbbell, Sparkles, Settings, ShoppingCart, Clapperboard, ZapOff, Crown, Skull, Camera, UploadCloud, Check, MessageSquareQuote, Globe } from 'lucide-react';
 
 interface HomePageProps {
   player: Player;
@@ -1661,6 +1661,336 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
       alert(`Studio QA scenario ready: ${scenario.replace(/_/g, ' ')}. Age Up once for the result.`);
   };
 
+  const triggerFranchiseQaScenario = (scenario: 'HOT' | 'TIRED' | 'RECAST' | 'CANDIDATE') => {
+      if (!onUpdatePlayer) return;
+
+      const { updatedPlayer: basePlayer, studio } = ensureCheatStudio();
+      const now = Date.now();
+      const franchiseId = `cheat_franchise_${scenario.toLowerCase()}_${now}`;
+      const currentAge = Math.max(18, basePlayer.age);
+      const primaryNpc = NPC_DATABASE.find(n => n.tier === 'A_LIST') || NPC_DATABASE[0];
+      const secondNpc = NPC_DATABASE.find(n => n.id !== primaryNpc?.id && n.tier === 'A_LIST') || NPC_DATABASE[1] || primaryNpc;
+      const thirdNpc = NPC_DATABASE.find(n => n.id !== primaryNpc?.id && n.id !== secondNpc?.id) || NPC_DATABASE[2] || primaryNpc;
+
+      const buildCast = (title: string, characterName: string, actorOverride?: typeof primaryNpc) => {
+          const coStar = actorOverride || primaryNpc;
+          return [
+              {
+                  id: `cast_player_${title}`,
+                  name: basePlayer.name,
+                  actorName: basePlayer.name,
+                  role: 'Lead',
+                  roleType: 'LEAD',
+                  isPlayer: true,
+                  image: basePlayer.avatar,
+                  type: 'ACTOR',
+                  actorId: 'PLAYER_SELF',
+                  characterId: `${franchiseId}_${characterName.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`,
+                  characterName
+              },
+              {
+                  id: `cast_npc_${coStar?.id || 'a'}_${title}`,
+                  name: coStar?.name || 'Zendaya',
+                  actorName: coStar?.name || 'Zendaya',
+                  role: 'Co-Star',
+                  roleType: 'SUPPORTING',
+                  isPlayer: false,
+                  image: coStar?.image || getGenderedAvatar('FEMALE', 'Zendaya'),
+                  type: 'ACTOR',
+                  npcId: coStar?.id,
+                  actorId: coStar?.id,
+                  characterId: `${franchiseId}_rival`,
+                  characterName: 'Cipher Vale'
+              },
+              {
+                  id: `cast_npc_${thirdNpc?.id || 'b'}_${title}`,
+                  name: thirdNpc?.name || 'Chris Evans',
+                  actorName: thirdNpc?.name || 'Chris Evans',
+                  role: 'Antagonist',
+                  roleType: 'SUPPORTING',
+                  isPlayer: false,
+                  image: thirdNpc?.image || getGenderedAvatar('MALE', 'Chris Evans'),
+                  type: 'ACTOR',
+                  npcId: thirdNpc?.id,
+                  actorId: thirdNpc?.id,
+                  characterId: `${franchiseId}_villain`,
+                  characterName: 'Director Knox'
+              }
+          ];
+      };
+
+      const makePastProject = (
+          title: string,
+          installmentNumber: number,
+          ageOffset: number,
+          gross: number,
+          rating: number,
+          characterName: string,
+          actorOverride?: typeof primaryNpc
+      ) => ({
+          id: `cheat_franchise_project_${scenario}_${installmentNumber}_${now}`,
+          name: title,
+          type: 'ACTING_GIG',
+          roleType: 'LEAD',
+          year: Math.max(16, currentAge - ageOffset),
+          earnings: Math.round(gross * 0.04),
+          rating,
+          reception: rating >= 8 ? 'Universal acclaim' : rating >= 6.6 ? 'Commercial hit' : 'Mixed audience reaction',
+          projectQuality: Math.round(rating * 10),
+          imdbRating: rating,
+          boxOfficeResult: gross >= 500000000 ? 'BLOCKBUSTER' : gross >= 150000000 ? 'HIT' : 'MODEST',
+          outcomeTier: gross >= 500000000 ? 'BLOCKBUSTER' : gross >= 150000000 ? 'HIT' : 'AVERAGE',
+          subtype: 'BLOCKBUSTER',
+          futurePotential: {
+              sequelChance: rating >= 7 ? 90 : 55,
+              franchiseChance: rating >= 7 ? 95 : 60,
+              rebootChance: rating < 6 ? 75 : 25,
+              renewalChance: 0,
+              isFranchiseStarter: installmentNumber === 1,
+              isSequelGreenlit: false,
+              isRenewed: false,
+              seriesStatus: 'N/A'
+          },
+          studioId: studio.id,
+          castList: buildCast(title, characterName, actorOverride),
+          reviews: [],
+          budget: Math.round(gross * 0.32),
+          gross,
+          genre: 'SUPERHERO',
+          description: `Cheat QA franchise entry for ${title}.`,
+          projectType: 'MOVIE',
+          franchiseId: scenario === 'CANDIDATE' ? undefined : franchiseId,
+          installmentNumber,
+          directorId: 'cheat_director'
+      } as any);
+
+      const franchiseName =
+          scenario === 'HOT' ? 'Neon Falcon' :
+          scenario === 'TIRED' ? 'Shadow Circuit' :
+          scenario === 'RECAST' ? 'Iron Monarch' :
+          'Moon Runner';
+
+      let qaProjects: any[] = [];
+      if (scenario === 'CANDIDATE') {
+          qaProjects = [
+              makePastProject('Moon Runner', 1, 1, 780000000, 8.4, 'Luna Voss')
+          ];
+      } else if (scenario === 'TIRED') {
+          qaProjects = [
+              makePastProject('Shadow Circuit', 1, 5, 420000000, 8.0, 'Noah Shade'),
+              makePastProject('Shadow Circuit 2', 2, 4, 510000000, 7.4, 'Noah Shade'),
+              makePastProject('Shadow Circuit 3', 3, 3, 390000000, 6.6, 'Noah Shade'),
+              makePastProject('Shadow Circuit 4', 4, 2, 260000000, 5.8, 'Noah Shade'),
+              makePastProject('Shadow Circuit 5', 5, 1, 180000000, 5.2, 'Noah Shade')
+          ];
+      } else if (scenario === 'RECAST') {
+          qaProjects = [
+              makePastProject('Iron Monarch', 1, 4, 690000000, 8.2, 'Victor Steel', primaryNpc),
+              makePastProject('Iron Monarch 2', 2, 3, 720000000, 8.0, 'Victor Steel', primaryNpc),
+              makePastProject('Iron Monarch 3', 3, 1, 610000000, 7.1, 'Victor Steel', secondNpc)
+          ];
+      } else {
+          qaProjects = [
+              makePastProject('Neon Falcon', 1, 3, 640000000, 8.1, 'Kai Nova'),
+              makePastProject('Neon Falcon 2', 2, 2, 890000000, 8.5, 'Kai Nova'),
+              makePastProject('Neon Falcon 3', 3, 1, 940000000, 8.7, 'Kai Nova')
+          ];
+      }
+
+      const nextPlayer = {
+          ...basePlayer,
+          pastProjects: [
+              ...qaProjects,
+              ...basePlayer.pastProjects.filter(p => !String(p.id).startsWith(`cheat_franchise_project_${scenario}_`))
+          ],
+          logs: [{
+              week: basePlayer.currentWeek,
+              year: basePlayer.age,
+              message: `🎞️ CHEAT: ${franchiseName} franchise QA scenario added (${scenario}). Open Studio > Development Lab > Franchise.`,
+              type: 'positive'
+          }, ...basePlayer.logs].slice(0, 50)
+      };
+
+      onUpdatePlayer(nextPlayer);
+      setActiveCheatMenu('NONE');
+      onOpenProductionHouseCheat?.();
+      alert(`${franchiseName} QA loaded. Open Development Lab > Franchise to test pulse, history, characters, and next-move buttons.`);
+  };
+
+  const triggerUniverseQaScenario = (scenario: 'EVENT_READY' | 'FATIGUED' | 'MERCH') => {
+      if (!onUpdatePlayer) return;
+
+      const { updatedPlayer: basePlayer, studio } = ensureCheatStudio();
+      const now = Date.now();
+      const universeId = `cheat_universe_${scenario.toLowerCase()}_${now}`;
+      const universeName =
+          scenario === 'EVENT_READY' ? 'Celestial Order' :
+          scenario === 'FATIGUED' ? 'Dark Metroverse' :
+          'Toybox Titans';
+      const currentAge = Math.max(18, basePlayer.age);
+      const actors = NPC_DATABASE.filter(n => n.occupation === 'ACTOR');
+      const pickActor = (index: number) => actors[index % Math.max(actors.length, 1)] || NPC_DATABASE[index % NPC_DATABASE.length];
+      const characterNames =
+          scenario === 'FATIGUED'
+              ? ['Night Judge', 'Signal Fox', 'Oracle Vane', 'Glass Saint']
+              : scenario === 'MERCH'
+                  ? ['Captain Plush', 'Laser Kid', 'Princess Pixel', 'Mecha Mutt']
+                  : ['Nova King', 'Solar Wraith', 'Vega Storm', 'Atlas Prime'];
+
+      const makeCast = (title: string, leadIndex: number) => characterNames.map((characterName, index) => {
+          const actor = index === 0 ? null : pickActor(index + leadIndex);
+          return {
+              id: `cast_${universeId}_${index}_${title}`,
+              name: index === 0 ? basePlayer.name : actor?.name || `NPC ${index}`,
+              actorName: index === 0 ? basePlayer.name : actor?.name || `NPC ${index}`,
+              role: index === 0 ? 'Lead' : index === 1 ? 'Co-Lead' : 'Supporting',
+              roleType: index === 0 ? 'LEAD' : index === 1 ? 'SUPPORTING' : 'SUPPORTING',
+              isPlayer: index === 0,
+              image: index === 0 ? basePlayer.avatar : actor?.image || getGenderedAvatar(index % 2 === 0 ? 'FEMALE' : 'MALE', actor?.name || characterName),
+              type: 'ACTOR',
+              npcId: actor?.id,
+              actorId: index === 0 ? 'PLAYER_SELF' : actor?.id,
+              characterId: `${universeId}_${characterName.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`,
+              characterName
+          };
+      });
+
+      const makeProject = (title: string, index: number, gross: number, rating: number, subtype: string, phase: string) => ({
+          id: `cheat_universe_project_${scenario}_${index}_${now}`,
+          name: title,
+          type: 'ACTING_GIG',
+          roleType: 'LEAD',
+          year: Math.max(16, currentAge - (4 - index)),
+          earnings: Math.round(gross * 0.035),
+          rating,
+          reception: rating >= 8 ? 'Fan event' : rating >= 6.8 ? 'Crowd pleaser' : 'Mixed canon reaction',
+          projectQuality: Math.round(rating * 10),
+          imdbRating: rating,
+          boxOfficeResult: gross >= 500000000 ? 'BLOCKBUSTER' : gross >= 150000000 ? 'HIT' : 'MODEST',
+          outcomeTier: gross >= 500000000 ? 'BLOCKBUSTER' : gross >= 150000000 ? 'HIT' : 'AVERAGE',
+          subtype,
+          futurePotential: {
+              sequelChance: rating >= 7 ? 85 : 45,
+              franchiseChance: rating >= 7 ? 90 : 50,
+              rebootChance: rating < 6 ? 70 : 20,
+              renewalChance: 0,
+              isFranchiseStarter: index === 1,
+              isSequelGreenlit: false,
+              isRenewed: false,
+              seriesStatus: 'N/A'
+          },
+          studioId: studio.id,
+          castList: makeCast(title, index),
+          reviews: [],
+          budget: Math.round(gross * 0.3),
+          gross,
+          genre: 'SUPERHERO',
+          description: `Cheat QA universe entry for ${universeName}.`,
+          projectType: 'MOVIE',
+          universeId,
+          universeSagaName: 'Saga 1',
+          universePhaseName: phase,
+          directorId: 'cheat_universe_director'
+      } as any);
+
+      const projects = scenario === 'FATIGUED'
+          ? [
+              makeProject('Dark Metroverse: Dawn', 1, 480000000, 7.8, 'UNIVERSE_ENTRY', 'Phase 1'),
+              makeProject('Dark Metroverse: Civil Night', 2, 520000000, 6.8, 'UNIVERSE_CROSSOVER', 'Phase 1'),
+              makeProject('Dark Metroverse: Judgment', 3, 430000000, 5.9, 'UNIVERSE_EVENT', 'Phase 2'),
+              makeProject('Dark Metroverse: Aftershock', 4, 290000000, 5.3, 'UNIVERSE_EVENT', 'Phase 2')
+          ]
+          : scenario === 'MERCH'
+              ? [
+                  makeProject('Toybox Titans', 1, 610000000, 8.1, 'UNIVERSE_ENTRY', 'Phase 1'),
+                  makeProject('Toybox Titans: Playtime War', 2, 840000000, 8.4, 'UNIVERSE_EVENT', 'Phase 1')
+              ]
+              : [
+                  makeProject('Celestial Order', 1, 720000000, 8.2, 'UNIVERSE_ENTRY', 'Phase 1'),
+                  makeProject('Solar Wraith', 2, 540000000, 7.9, 'UNIVERSE_ENTRY', 'Phase 1'),
+                  makeProject('Celestial Order: Eclipse', 3, 1050000000, 8.6, 'UNIVERSE_EVENT', 'Phase 2')
+              ];
+
+      const rosterMap = new Map<string, any>();
+      projects.forEach(project => {
+          project.castList.forEach((cast: any) => {
+              const existing = rosterMap.get(cast.characterId);
+              rosterMap.set(cast.characterId, {
+                  id: cast.characterId,
+                  characterId: cast.characterId,
+                  name: cast.characterName,
+                  actorId: cast.actorId,
+                  actorName: cast.actorName,
+                  status: existing && existing.actorId !== cast.actorId ? 'RECAST' : 'ACTIVE',
+                  fanApproval: scenario === 'FATIGUED' ? 52 + rosterMap.size * 4 : 76 + rosterMap.size * 3,
+                  appearances: (existing?.appearances || 0) + 1,
+                  firstAppearanceTitle: existing?.firstAppearanceTitle || project.name,
+                  latestAppearanceTitle: project.name,
+                  description: `Cheat QA character from ${universeName}.`
+              });
+          });
+      });
+
+      const products = scenario === 'MERCH'
+          ? [
+              { id: `cheat_merch_apparel_${now}`, catalogId: 'merch_apparel', name: 'Apparel & Fashion', quality: 85, productionCost: 500000, sellingPrice: 50000, appeal: 82, unitsSold: 300, inventory: 0, active: true },
+              { id: `cheat_merch_toys_${now}`, catalogId: 'merch_toys', name: 'Action Figures & Toys', quality: 92, productionCost: 1000000, sellingPrice: 120000, appeal: 94, unitsSold: 900, inventory: 0, active: true },
+              { id: `cheat_park_land_${now}`, catalogId: 'park_land', name: 'Themed Land (Park)', quality: 88, productionCost: 50000000, sellingPrice: 6000000, appeal: 96, unitsSold: 1200, inventory: 0, active: true }
+          ]
+          : [];
+
+      const universe = {
+          id: universeId,
+          name: universeName,
+          description: `Cheat QA universe scenario: ${scenario}.`,
+          studioId: studio.id,
+          currentPhase: scenario === 'FATIGUED' ? 'Phase 3' : 'Phase 2',
+          currentPhaseName: scenario === 'FATIGUED' ? 'Phase 3' : 'Phase 2',
+          saga: scenario === 'FATIGUED' ? 2 : 1,
+          currentSagaName: scenario === 'FATIGUED' ? 'Saga 2' : 'Saga 1',
+          momentum: scenario === 'FATIGUED' ? 42 : scenario === 'MERCH' ? 82 : 88,
+          brandPower: scenario === 'FATIGUED' ? 58 : scenario === 'MERCH' ? 90 : 86,
+          marketShare: 0,
+          color: scenario === 'FATIGUED' ? '#7f1d1d' : scenario === 'MERCH' ? '#f59e0b' : '#22d3ee',
+          roster: Array.from(rosterMap.values()),
+          slate: [],
+          products,
+          stats: {
+              weeklyRevenue: products.reduce((sum, product) => sum + product.sellingPrice, 0),
+              lifetimeRevenue: scenario === 'MERCH' ? 248000000 : 0
+          },
+          weeksUntilNextPhase: scenario === 'FATIGUED' ? 18 : 64
+      };
+
+      const updatedStudio = { ...studio };
+      const nextPlayer = {
+          ...basePlayer,
+          businesses: basePlayer.businesses.map(b => b.id === studio.id ? updatedStudio : b),
+          pastProjects: [
+              ...projects,
+              ...basePlayer.pastProjects.filter(project => !String(project.id).startsWith(`cheat_universe_project_${scenario}_`))
+          ],
+          world: {
+              ...basePlayer.world,
+              universes: {
+                  ...(basePlayer.world?.universes || {}),
+                  [universeId]: universe
+              }
+          },
+          logs: [{
+              week: basePlayer.currentWeek,
+              year: basePlayer.age,
+              message: `🌐 CHEAT: ${universeName} universe QA scenario added (${scenario}). Open Development Lab > Universe or IMDb > Universe.`,
+              type: 'positive'
+          }, ...basePlayer.logs].slice(0, 50)
+      };
+
+      onUpdatePlayer(nextPlayer as Player);
+      setActiveCheatMenu('NONE');
+      onOpenProductionHouseCheat?.();
+      alert(`${universeName} QA loaded. Test it in Development Lab > Universe and IMDb > Universe.`);
+  };
+
   const addLegacyTestChild = () => {
       if (!onUpdatePlayer) return;
 
@@ -2051,6 +2381,49 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                                   </button>
                                   <button onClick={() => triggerCheatFranchiseContract('SW')} className="bg-yellow-900/30 hover:bg-yellow-900/50 border border-yellow-500/30 text-xs font-bold py-3 rounded-lg text-yellow-400">
                                       Trigger SW Contract
+                                  </button>
+                              </div>
+                          </div>
+                      )}
+
+                      {/* DEV ONLY: Franchise QA */}
+                      {activeCheatMenu === 'DEV' && (
+                          <div className="space-y-2">
+                              <h4 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest border-b border-zinc-800 pb-1 flex items-center gap-2">
+                                 <Clapperboard size={10} /> Franchise QA
+                              </h4>
+                              <div className="grid grid-cols-2 gap-2">
+                                  <button onClick={() => triggerFranchiseQaScenario('HOT')} className="bg-emerald-900/30 hover:bg-emerald-900/50 border border-emerald-500/30 text-xs font-bold py-3 rounded-lg text-emerald-400">
+                                      Hot Franchise
+                                  </button>
+                                  <button onClick={() => triggerFranchiseQaScenario('TIRED')} className="bg-rose-900/30 hover:bg-rose-900/50 border border-rose-500/30 text-xs font-bold py-3 rounded-lg text-rose-400">
+                                      Tired Franchise
+                                  </button>
+                                  <button onClick={() => triggerFranchiseQaScenario('RECAST')} className="bg-violet-900/30 hover:bg-violet-900/50 border border-violet-500/30 text-xs font-bold py-3 rounded-lg text-violet-300">
+                                      Recast History
+                                  </button>
+                                  <button onClick={() => triggerFranchiseQaScenario('CANDIDATE')} className="bg-amber-900/30 hover:bg-amber-900/50 border border-amber-500/30 text-xs font-bold py-3 rounded-lg text-amber-400">
+                                      Standalone Hit
+                                  </button>
+                              </div>
+                          </div>
+                      )}
+
+                      {/* DEV ONLY: Universe QA */}
+                      {activeCheatMenu === 'DEV' && (
+                          <div className="space-y-2">
+                              <h4 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest border-b border-zinc-800 pb-1 flex items-center gap-2">
+                                 <Globe size={10} /> Universe QA
+                              </h4>
+                              <div className="grid grid-cols-2 gap-2">
+                                  <button onClick={() => triggerUniverseQaScenario('EVENT_READY')} className="bg-cyan-900/30 hover:bg-cyan-900/50 border border-cyan-500/30 text-xs font-bold py-3 rounded-lg text-cyan-300">
+                                      Event Ready
+                                  </button>
+                                  <button onClick={() => triggerUniverseQaScenario('FATIGUED')} className="bg-red-900/30 hover:bg-red-900/50 border border-red-500/30 text-xs font-bold py-3 rounded-lg text-red-300">
+                                      Fatigued Universe
+                                  </button>
+                                  <button onClick={() => triggerUniverseQaScenario('MERCH')} className="col-span-2 bg-amber-900/30 hover:bg-amber-900/50 border border-amber-500/30 text-xs font-bold py-3 rounded-lg text-amber-300">
+                                      Merch Empire
                                   </button>
                               </div>
                           </div>

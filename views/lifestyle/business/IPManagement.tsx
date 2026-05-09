@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Player, Business, Universe, Script } from '../../../types';
 import { Globe, Layers, ShoppingCart, Sparkles, Star, ChevronRight, Check, TrendingUp, RefreshCw } from 'lucide-react';
 import { generateIPMarket } from '../../../src/data/generators';
+import { normalizeUniverseForSave, normalizeUniverseMap } from '../../../services/universeLogic';
 
 interface IPManagementProps {
     player: Player;
@@ -78,8 +79,9 @@ const UniverseManager: React.FC<{ player: Player; studio: Business; onUpdatePlay
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
 
-    const studioUniverses = (Object.values(player.world.universes || {}) as Universe[]).filter(u => u.studioId === studio.id);
-    const allUniverses = Object.values(player.world.universes || {}) as Universe[];
+    const worldUniverses = normalizeUniverseMap(player.world?.universes || {});
+    const studioUniverses = (Object.values(worldUniverses) as Universe[]).filter(u => u.studioId === studio.id);
+    const allUniverses = Object.values(worldUniverses) as Universe[];
     const totalPower = allUniverses.reduce((acc, u) => acc + (u.brandPower * 0.7 + u.momentum * 0.3), 0);
     
     const universesWithShare = allUniverses.map(u => ({
@@ -94,7 +96,7 @@ const UniverseManager: React.FC<{ player: Player; studio: Business; onUpdatePlay
         const colors = ['#e11d48', '#2563eb', '#16a34a', '#d97706', '#7c3aed', '#db2777'];
         const randomColor = colors[Math.floor(Math.random() * colors.length)];
 
-        const newUniverse: any = {
+        const newUniverse: any = normalizeUniverseForSave({
             id: newUniverseId,
             name,
             description,
@@ -108,7 +110,7 @@ const UniverseManager: React.FC<{ player: Player; studio: Business; onUpdatePlay
             roster: [],
             slate: [],
             weeksUntilNextPhase: 104
-        };
+        }, newUniverseId);
 
         const updatedStudio = { ...studio, balance: studio.balance - 5000000 };
         const updatedPlayer = {
@@ -117,7 +119,7 @@ const UniverseManager: React.FC<{ player: Player; studio: Business; onUpdatePlay
             world: {
                 ...player.world,
                 universes: {
-                    ...(player.world.universes || {}),
+                    ...worldUniverses,
                     [newUniverseId]: newUniverse
                 }
             }

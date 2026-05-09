@@ -3,6 +3,7 @@ import { Player, XPost, NPCActor } from '../types';
 import { NPC_DATABASE } from './npcLogic';
 import { AWARD_GOSSIP_TEMPLATES } from './awardLogic';
 import { getEnabledGlobalCreatorProfiles } from './youtubeLogic';
+import { normalizeUniverseMap } from './universeLogic';
 
 // --- TWEET TEMPLATES ---
 
@@ -77,7 +78,7 @@ export const generateXFeed = (player: Player): XPost[] => {
         const isAwardGossip = pendingCeremony && Math.random() < 0.4; // 40% chance of talking about awards if pending
 
         const studio = player.businesses?.find(b => b.type === 'PRODUCTION_HOUSE');
-        const universes = studio && player.world?.universes ? Object.values(player.world.universes).filter(u => u.studioId === studio.id) : [];
+        const universes = studio && player.world?.universes ? Object.values(normalizeUniverseMap(player.world.universes)).filter(u => u.studioId === studio.id) : [];
         const isUniverseGossip = universes.length > 0 && Math.random() < 0.3;
 
         if (isAwardGossip && pendingCeremony) {

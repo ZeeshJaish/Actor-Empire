@@ -31,6 +31,36 @@ interface GameActionsProps {
 export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePressEvent, setShowProtectionPrompt, setActiveSocialEvent, setPendingBabyNaming }: GameActionsProps) => {
     const familyRelations: Relationship['relation'][] = ['Parent', 'Deceased Parent', 'Sibling', 'Child'];
     const isFamilyRelation = (relation?: Relationship['relation']) => !!relation && familyRelations.includes(relation);
+    const PREGNANCY_TERM_WEEKS = 39;
+
+    const schedulePregnancy = (
+        prev: Player,
+        partner: Relationship,
+        shouldCreateScandalNews: boolean
+    ): { next: Player; scheduled: boolean } => {
+        if (prev.activePregnancy) {
+            return { next: prev, scheduled: false };
+        }
+
+        const babyGender = Math.random() > 0.5 ? 'MALE' : 'FEMALE';
+        const suggestedFirstName = babyGender === 'MALE' ? 'Leo' : 'Mia';
+        const conceptionWeekAbsolute = getAbsoluteWeek(prev.age, prev.currentWeek);
+        const next = {
+            ...prev,
+            activePregnancy: {
+                partnerId: partner.id,
+                partnerName: partner.name,
+                babyGender,
+                suggestedFirstName,
+                conceptionWeekAbsolute,
+                birthWeekAbsolute: conceptionWeekAbsolute + PREGNANCY_TERM_WEEKS,
+                weeksLeft: PREGNANCY_TERM_WEEKS,
+                shouldCreateScandalNews,
+            },
+        };
+
+        return { next, scheduled: true };
+    };
 
     const pushLifestyleHeadline = (nextState: Player, headline: string, subtext: string) => {
         nextState.news = [
@@ -356,6 +386,7 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
           let newRelationships = [...prev.relationships];
           let newsUpdate = [...prev.news];
           let statsUpdate: Partial<Stats> = {};
+          let scheduledActivePregnancy: Player['activePregnancy'] | undefined;
 
           if (action === 'EVENT_RESOLUTION' && eventOutcome) {
               logMsg = eventOutcome.logMessage;
@@ -415,20 +446,13 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
               else if (action === 'INTIMACY') {
                   energyCost = 30; newCloseness = Math.min(100, newCloseness + 5);
                   logMsg = `Intimacy with ${partner.name}.`;
-                  if (Math.random() < 0.15) {
-                      const babyGender = Math.random() > 0.5 ? 'MALE' : 'FEMALE';
-                      const babyName = babyGender === 'MALE' ? 'Leo' : 'Mia';
-                      setPendingBabyNaming({
-                          partnerId: partner.id,
-                          partnerName: partner.name,
-                          babyGender,
-                          suggestedFirstName: babyName,
-                          birthWeekAbsolute: getAbsoluteWeek(prev.age, prev.currentWeek),
-                          eventWeek: prev.currentWeek,
-                          eventYear: prev.age,
-                          shouldCreateScandalNews: false,
-                      });
-                      logMsg += ` 🍼 A new baby is on the way.`;
+                  if (!prev.activePregnancy && Math.random() < 0.15) {
+                      const scheduledPregnancy = schedulePregnancy(prev, partner, false);
+                      if (scheduledPregnancy.scheduled) {
+                          scheduledActivePregnancy = scheduledPregnancy.next.activePregnancy;
+                          setToastMessage({ title: 'Pregnancy Confirmed', subtext: `${partner.name} is pregnant. The baby is due in about 9 months.` });
+                          logMsg += ` 🍼 ${partner.name} is pregnant. Due in about 9 months.`;
+                      }
                   }
               }
               else if (['CALL', 'GIFT', 'NETWORK'].includes(action)) {
@@ -464,6 +488,7 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
               ...prev,
               money: prev.money - moneyCost,
               stats: newPlayerStats,
+              activePregnancy: scheduledActivePregnancy || prev.activePregnancy,
               relationships: newRelationships,
               news: newsUpdate,
               logs: [...prev.logs, { week: prev.currentWeek, year: prev.age, message: logMsg, type: 'positive' as const }].slice(-50)
@@ -574,29 +599,24 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
           let logMsg = `Spent intimate time with ${partner.name}.`;
           let newsUpdate: NewsItem[] = [...prev.news];
           let newRels: Relationship[] = [...prev.relationships];
+          let scheduledActivePregnancy: Player['activePregnancy'] | undefined;
 
           const chance = choice === 'UNPROTECTED' ? 0.3 : 0.01;
           
-          if (Math.random() < chance) {
-              const babyGender = Math.random() > 0.5 ? 'MALE' : 'FEMALE';
-              const babyName = babyGender === 'MALE' ? 'Leo' : 'Mia';
-              setPendingBabyNaming({
-                  partnerId: partner.id,
-                  partnerName: partner.name,
-                  babyGender,
-                  suggestedFirstName: babyName,
-                  birthWeekAbsolute: getAbsoluteWeek(prev.age, prev.currentWeek),
-                  eventWeek: prev.currentWeek,
-                  eventYear: prev.age,
-                  shouldCreateScandalNews: partner.relation !== 'Spouse' && prev.stats.fame > 20,
-              });
-              logMsg += ` 🍼 You and ${partner.name} welcomed a new baby.`;
+          if (!prev.activePregnancy && Math.random() < chance) {
+              const scheduledPregnancy = schedulePregnancy(prev, partner, partner.relation !== 'Spouse' && prev.stats.fame > 20);
+              if (scheduledPregnancy.scheduled) {
+                  scheduledActivePregnancy = scheduledPregnancy.next.activePregnancy;
+                  setToastMessage({ title: 'Pregnancy Confirmed', subtext: `${partner.name} is pregnant. The baby is due in about 9 months.` });
+                  logMsg += ` 🍼 ${partner.name} is pregnant. Due in about 9 months.`;
+              }
           }
 
           newRels[idx] = { ...partner, closeness: newCloseness, lastInteractionWeek: prev.currentWeek, lastInteractionAbsolute: getAbsoluteWeek(prev.age, prev.currentWeek) };
 
           const nextState = {
               ...prev,
+              activePregnancy: scheduledActivePregnancy || prev.activePregnancy,
               relationships: newRels,
               news: newsUpdate,
               logs: [...prev.logs, { week: prev.currentWeek, year: prev.age, message: logMsg, type: 'positive' as const }].slice(-50)

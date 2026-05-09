@@ -24,6 +24,7 @@ import { YoutubeApp } from './YoutubeApp';
 import { GuideView } from '../../components/GuideView'; // Imported GuideView
 import { getAbsoluteWeek } from '../../services/legacyLogic';
 import { spendPlayerEnergy } from '../../services/premiumLogic';
+import { normalizeUniverseMap } from '../../services/universeLogic';
 
 // Helper Component for App Icon
 const AppIcon = ({ icon, color, label, onClick, badge, customContent, customBg }: any) => (
@@ -158,7 +159,7 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
               // --- NEW: UPDATE ROSTER IN WORLD STATE ---
               if (updatedPlayer.world && updatedPlayer.world.universes) {
                   const uniId = contract.universeId;
-                  const newUniverses = { ...updatedPlayer.world.universes };
+                  const newUniverses = normalizeUniverseMap(updatedPlayer.world.universes);
                   if (newUniverses[uniId]) {
                       const newRoster = newUniverses[uniId].roster.map(char => {
                           if (char.name === contract.characterName) {

@@ -37,6 +37,7 @@ import { RoleType } from './types';
 import { applyParenthoodAbandonment } from './services/familyLogic';
 import { APP_DISPLAY_VERSION } from './services/appVersion';
 import { calculateInstagramPostOutcome, clampInstagramStat, INSTAGRAM_POST_CONFIGS } from './services/instagramLogic';
+import { normalizeUniverseMap } from './services/universeLogic';
 
 type GameStatus = 'START_MENU' | 'CREATION' | 'PLAYING' | 'DEATH_SCREEN';
 type PendingBabyNaming = {
@@ -50,6 +51,7 @@ type PendingBabyNaming = {
   shouldCreateScandalNews: boolean;
 };
 
+const PREGNANCY_TERM_WEEKS = 39;
 const WHATS_NEW_STORAGE_KEY = 'actorEmpireSeenWhatsNewVersion';
 
 const dedupeAwards = <T extends { type: string; year: number; category: string; projectId: string; outcome: 'WON' | 'NOMINATED' }>(awards: T[] = []): T[] => {
@@ -577,6 +579,7 @@ export const App: React.FC = () => {
                   }
               };
           }
+          safePlayer.world.universes = normalizeUniverseMap(safePlayer.world.universes);
 
           if (!safePlayer.energy || typeof safePlayer.energy !== 'object') {
               const fallbackEnergy = typeof safePlayer.energy === 'number' ? safePlayer.energy : 100;
@@ -760,9 +763,19 @@ export const App: React.FC = () => {
           if (!safePlayer.businesses) safePlayer.businesses = [];
           safePlayer.businesses = safePlayer.businesses.map((biz: any) => {
               if (biz.type !== 'PRODUCTION_HOUSE') return biz;
+              const normalizedStudioState = normalizeStudioState(biz.studioState, safePlayer.currentWeek || 1);
               return {
                   ...biz,
-                  studioState: normalizeStudioState(biz.studioState, safePlayer.currentWeek || 1),
+                  studioState: {
+                      ...normalizedStudioState,
+                      universes: Array.isArray(normalizedStudioState.universes)
+                          ? normalizedStudioState.universes.map((universe: any) => {
+                              const normalizedUniverse = normalizeUniverseMap({ [universe?.id || 'CUSTOM_UNIVERSE']: universe });
+                              const resolved = Object.values(normalizedUniverse).find((entry: any) => entry.id === universe?.id) || universe;
+                              return safePlayer.world.universes[resolved.id] || resolved;
+                          })
+                          : [],
+                  },
               };
           });
           safePlayer.pastProjects = safePlayer.pastProjects.map((project: any) => ({
@@ -789,8 +802,14 @@ export const App: React.FC = () => {
   }, [toastMessage]);
 
   const handleUpdatePlayer = (updatedPlayer: Player) => { 
+      const normalizedWorld = {
+          ...clone(INITIAL_PLAYER.world),
+          ...(updatedPlayer.world || {}),
+          universes: normalizeUniverseMap(updatedPlayer.world?.universes)
+      };
       setPlayer({
           ...updatedPlayer,
+          world: normalizedWorld,
           awards: dedupeAwards(updatedPlayer.awards || []),
           pastProjects: (updatedPlayer.pastProjects || []).map((project: any) => ({
               ...project,
@@ -812,13 +831,41 @@ export const App: React.FC = () => {
       setToastMessage({ title: 'Baby QA Queued', subtext: 'Press Age Up once to open the naming flow.' });
   };
 
+  const handleSchedulePregnancy = (request: PendingBabyNaming) => {
+      handleGenericUpdate(prev => {
+          if (prev.activePregnancy) {
+              setToastMessage({ title: 'Pregnancy Already Active', subtext: 'A baby is already on the way.' });
+              return prev;
+          }
+
+          const currentAbsoluteWeek = getAbsoluteWeek(prev.age, prev.currentWeek);
+          const birthWeekAbsolute = Math.max(request.birthWeekAbsolute || 0, currentAbsoluteWeek + PREGNANCY_TERM_WEEKS);
+          const weeksLeft = Math.max(1, birthWeekAbsolute - currentAbsoluteWeek);
+
+          return {
+              ...prev,
+              activePregnancy: {
+                  partnerId: request.partnerId,
+                  partnerName: request.partnerName,
+                  babyGender: request.babyGender,
+                  suggestedFirstName: request.suggestedFirstName,
+                  conceptionWeekAbsolute: currentAbsoluteWeek,
+                  birthWeekAbsolute,
+                  weeksLeft,
+                  shouldCreateScandalNews: request.shouldCreateScandalNews,
+              },
+          };
+      }, `🍼 ${request.partnerName} is pregnant. The baby is due in about 9 months.`);
+      setToastMessage({ title: 'Pregnancy Confirmed', subtext: `${request.partnerName} is pregnant. Naming comes when the baby is born.` });
+  };
+
   const handleNextWeek = async () => {
     if (isProcessing) return;
     setIsProcessing(true);
     try {
         const { player: newPlayerState, triggerAd } = await processGameWeek(player);
         const shouldTriggerBabyQa = !!newPlayerState.flags?.qaBabyNamingNextWeek;
-        const syncedPlayerState = shouldTriggerBabyQa
+        let syncedPlayerState = shouldTriggerBabyQa
             ? {
                 ...newPlayerState,
                 flags: {
@@ -827,6 +874,48 @@ export const App: React.FC = () => {
                 }
             }
             : newPlayerState;
+        let babyNamingDue: PendingBabyNaming | null = null;
+
+        if (syncedPlayerState.activePregnancy) {
+            const pregnancy = syncedPlayerState.activePregnancy;
+            const currentAbsoluteWeek = getAbsoluteWeek(syncedPlayerState.age, syncedPlayerState.currentWeek);
+            const weeksLeft = typeof pregnancy.birthWeekAbsolute === 'number'
+                ? pregnancy.birthWeekAbsolute - currentAbsoluteWeek
+                : (pregnancy.weeksLeft || 1) - 1;
+
+            if (weeksLeft <= 0) {
+                const partnerName = pregnancy.partnerName
+                    || syncedPlayerState.relationships.find(rel => rel.id === pregnancy.partnerId)?.name
+                    || 'Your partner';
+                babyNamingDue = {
+                    partnerId: pregnancy.partnerId,
+                    partnerName,
+                    babyGender: pregnancy.babyGender || (Math.random() > 0.5 ? 'MALE' : 'FEMALE'),
+                    suggestedFirstName: pregnancy.suggestedFirstName || (Math.random() > 0.5 ? 'Leo' : 'Mia'),
+                    birthWeekAbsolute: currentAbsoluteWeek,
+                    eventWeek: syncedPlayerState.currentWeek,
+                    eventYear: syncedPlayerState.age,
+                    shouldCreateScandalNews: !!pregnancy.shouldCreateScandalNews,
+                };
+                syncedPlayerState = {
+                    ...syncedPlayerState,
+                    activePregnancy: undefined,
+                    logs: [
+                        { week: syncedPlayerState.currentWeek, year: syncedPlayerState.age, message: `🍼 ${partnerName}'s baby is here. Time to choose a name.`, type: 'positive' as const },
+                        ...syncedPlayerState.logs,
+                    ].slice(0, 50),
+                };
+            } else {
+                syncedPlayerState = {
+                    ...syncedPlayerState,
+                    activePregnancy: {
+                        ...pregnancy,
+                        weeksLeft,
+                        birthWeekAbsolute: pregnancy.birthWeekAbsolute || currentAbsoluteWeek + weeksLeft,
+                    },
+                };
+            }
+        }
         handleUpdatePlayer(syncedPlayerState);
 
         if (shouldTriggerBabyQa) {
@@ -840,6 +929,9 @@ export const App: React.FC = () => {
                 eventYear: syncedPlayerState.age,
                 shouldCreateScandalNews: false,
             });
+        }
+        if (babyNamingDue) {
+            setPendingBabyNaming(babyNamingDue);
         }
 
         if (syncedPlayerState.flags?.isDead) {
@@ -1714,7 +1806,7 @@ export const App: React.FC = () => {
                         <MobilePage 
                             player={player} 
                             onUpdatePlayer={handleUpdatePlayer}
-                            onTriggerBabyNaming={setPendingBabyNaming}
+                            onTriggerBabyNaming={handleSchedulePregnancy}
                             onAudition={(opp)=>handleGenericUpdate(p=>{ const next: Player = { ...p, applications: [...p.applications, { id: `app_${Date.now()}`, type: 'AUDITION' as const, name: opp.projectName, weeksRemaining: 1, data: opp }] }; spendPlayerEnergy(next, 25); return next; })}
                             onTakeJob={(job)=>handleGenericUpdate(p=>{ const previousCommitments = p.commitments; const next: Player = { ...p, commitments: [...p.commitments, job] }; syncWeeklyEnergyForCommitments(next, previousCommitments); return next; })}
                             onQuitJob={handleQuitJob} 

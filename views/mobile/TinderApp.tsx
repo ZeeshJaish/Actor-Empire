@@ -297,7 +297,7 @@ export const TinderApp: React.FC<TinderAppProps> = ({ player, onBack, onUpdatePl
             partnerName: match.name,
             babyGender,
             suggestedFirstName,
-            birthWeekAbsolute: currentAbsoluteWeek,
+            birthWeekAbsolute: currentAbsoluteWeek + 39,
             eventWeek: player.currentWeek,
             eventYear: player.age,
             shouldCreateScandalNews: !!activePartner,
@@ -589,10 +589,10 @@ export const TinderApp: React.FC<TinderAppProps> = ({ player, onBack, onUpdatePl
 
         const pregnancyTriggered = success && onTriggerBabyNaming && canTriggerPregnancy(activeChatMatch) && Math.random() < 0.12;
         setResultModal({
-            title: success ? (pregnancyTriggered ? 'It Got Serious Fast' : 'Hookup Locked') : 'Killed The Mood',
+            title: success ? (pregnancyTriggered ? 'Pregnancy Confirmed' : 'Hookup Locked') : 'Killed The Mood',
             body: success
                 ? pregnancyTriggered
-                    ? `${activeChatMatch.name.split(' ')[0]} went for it, and the fallout may be bigger than just chemistry now.`
+                    ? `${activeChatMatch.name.split(' ')[0]} is pregnant. The baby is due in about 9 months, and naming will happen when the baby is born.`
                     : `${activeChatMatch.name.split(' ')[0]} went for it. This is now much messier and much more physical.`
                 : `${activeChatMatch.name.split(' ')[0]} pulled back hard. The vibe is shakier now.`,
             tone: success ? 'success' : 'neutral',

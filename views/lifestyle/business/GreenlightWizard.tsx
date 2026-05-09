@@ -4,6 +4,7 @@ import { Player, BudgetTier, Genre, ProjectDetails, ActiveRelease, Commitment, B
 import { ArrowLeft, Film, DollarSign, Users, TrendingUp, Calendar, Check, Plus, Star, Award, Zap, Briefcase, LayoutGrid, MapPin, PenTool, Globe, Camera, Clapperboard, ChevronRight, Lock, Building2, BarChart3, ShieldAlert, Crown, LogOut, AlertTriangle, Sparkles, BookOpen, Video, X, Clock, Palette, Lightbulb, Mic, Box, Info, CheckCircle, XCircle, Layers, Loader2 } from 'lucide-react';
 import { NPC_DATABASE, getAvailableTalent, calculateProjectFameMultiplier } from '../../../services/npcLogic';
 import { getDirectorTalent } from '../../../services/roleLogic';
+import { buildUniverseRoster, getFallbackCharacterName, getUniverseDashboardProjects, normalizeUniverseCharacterKey, normalizeUniverseForSave, normalizeUniverseMap } from '../../../services/universeLogic';
 import { getEquipmentStageName } from './FacilitiesView';
 import { showAd } from '../../../services/adLogic';
 import { hasNoAds } from '../../../services/premiumLogic';
@@ -48,7 +49,7 @@ const getUniversePhaseLabel = (phase?: Universe['currentPhase']) => {
 const toUniverseCharacterId = (universeId: UniverseId | 'NEW' | null, characterName?: string) => {
     const trimmed = characterName?.trim();
     if (!trimmed || !universeId || universeId === 'NEW') return undefined;
-    const slug = trimmed.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    const slug = normalizeUniverseCharacterKey(trimmed);
     return slug ? `${universeId}_${slug}` : undefined;
 };
 
@@ -664,6 +665,37 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
     useEffect(() => {
         setCurrentReturningTalent(selectedScript?.returningTalent || []);
     }, [selectedScript?.id, selectedScript?.returningTalent]);
+
+    const activeUniverseId = useMemo(() => {
+        const id = selectedUniverseId || selectedScript?.universeId || null;
+        return id && id !== 'NEW' ? id as UniverseId : null;
+    }, [selectedUniverseId, selectedScript?.universeId]);
+
+    const universeCharacterOptions = useMemo(() => {
+        if (!activeUniverseId) return [];
+        const universe = player.world?.universes?.[activeUniverseId];
+        if (!universe) return [];
+        const projects = getUniverseDashboardProjects(player, activeUniverseId, player.activeReleases || []);
+        return buildUniverseRoster(universe, projects, player.name)
+            .filter(character => character.status !== 'RETIRED')
+            .map(character => ({
+                ...character,
+                normalizedId: toUniverseCharacterId(activeUniverseId, character.name) || character.characterId || character.id
+            }));
+    }, [activeUniverseId, player]);
+
+    const getDefaultCharacterName = (role: any, index: number) => {
+        const projectTitle = selectedScript?.title || 'Project';
+        return getFallbackCharacterName(
+            {
+                ...role,
+                roleName: role.role,
+                characterName: role.characterName
+            },
+            projectTitle,
+            index
+        );
+    };
     
     // Identify studio franchises (for selection)
     const studioFranchises = useMemo(() => {
@@ -1544,6 +1576,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         const preProdDuration = Math.floor(Math.random() * 7) + 4;
         const isCreatingNewUniverse = selectedUniverseId === 'NEW' && !!newUniverseName.trim();
         const finalUniverseId = isCreatingNewUniverse ? `universe_${Date.now()}` : (selectedUniverseId || undefined);
+        const normalizedWorldUniverses = normalizeUniverseMap(player.world?.universes || {});
         const universeColors = ['#e11d48', '#2563eb', '#16a34a', '#d97706', '#7c3aed', '#db2777'];
         const randomUniverseColor = universeColors[Math.floor(Math.random() * universeColors.length)];
 
@@ -1605,6 +1638,26 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             });
         });
 
+        const finalizedCastList = castList.map((c, index) => {
+            const characterName = (c.characterName || '').trim() || getDefaultCharacterName(c, index);
+            const normalizedCharacterId = finalUniverseId
+                ? toUniverseCharacterId(finalUniverseId as any, characterName)
+                : c.characterId || normalizeUniverseCharacterKey(`${selectedScript.title}_${characterName}`);
+
+            return {
+                roleId: c.id,
+                roleName: c.role,
+                roleType: c.roleType,
+                actorId: c.actorId || 'UNKNOWN',
+                name: c.actorName || 'Unknown Actor',
+                characterId: normalizedCharacterId,
+                characterName,
+                salary: c.salary,
+                status: 'CONFIRMED' as const,
+                isReturning: currentReturningTalent.some(t => t.id === c.actorId) || false
+            };
+        });
+
         const newCommitment: Commitment = {
             id: `proj_${Date.now()}`,
             name: selectedScript.title,
@@ -1622,14 +1675,20 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                 episodes: selectedScript.episodes,
                 description: `A ${selectedScript.genres.join('/')} ${selectedScript.projectType === 'SERIES' ? 'series' : 'film'} produced by ${studio.name}.`,
                 studioId: studio.id as any,
-                subtype: selectedScript.sourceMaterial === 'SEQUEL' ? 'SEQUEL' : 'STANDALONE',
+                subtype: selectedScript.tags?.includes('UNIVERSE_EVENT')
+                    ? 'UNIVERSE_EVENT'
+                    : selectedScript.sourceMaterial === 'SEQUEL'
+                        ? 'SEQUEL'
+                        : selectedScript.sourceMaterial === 'SPINOFF'
+                            ? 'SPINOFF'
+                            : 'STANDALONE',
                 universeId: finalUniverseId,
                 universeSagaName: isCreatingNewUniverse
                     ? 'Saga 1'
-                    : (selectedUniverseId && selectedUniverseId !== 'NEW') ? String(player.world.universes[selectedUniverseId]?.currentSagaName || player.world.universes[selectedUniverseId]?.saga || 'Saga 1') : undefined,
+                    : selectedScript.universeSagaName || ((selectedUniverseId && selectedUniverseId !== 'NEW') ? String(normalizedWorldUniverses[selectedUniverseId]?.currentSagaName || normalizedWorldUniverses[selectedUniverseId]?.saga || 'Saga 1') : undefined),
                 universePhaseName: isCreatingNewUniverse
                     ? 'Phase 1'
-                    : (selectedUniverseId && selectedUniverseId !== 'NEW') ? String(player.world.universes[selectedUniverseId]?.currentPhaseName || player.world.universes[selectedUniverseId]?.currentPhase || 'Phase 1') : undefined,
+                    : selectedScript.universePhaseName || ((selectedUniverseId && selectedUniverseId !== 'NEW') ? String(normalizedWorldUniverses[selectedUniverseId]?.currentPhaseName || normalizedWorldUniverses[selectedUniverseId]?.currentPhase || 'Phase 1') : undefined),
                 newUniverseName: isCreatingNewUniverse ? newUniverseName.trim() : undefined,
                 franchiseId: selectedFranchiseId === 'NEW' ? `fran_${Date.now()}` : (selectedFranchiseId || undefined),
                 installmentNumber: (selectedFranchiseId && selectedFranchiseId !== 'NEW') ? (studioFranchises.find(f => f.id === selectedFranchiseId)?.lastInstallment || 0) + 1 : 1,
@@ -1660,18 +1719,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                 visibleDirectorTier: directorData.tier,
                 visibleScriptBuzz: 'High',
                 visibleCastStrength: currentCastingStrength > 80 ? 'Star-Studded' : currentCastingStrength > 62 ? 'Solid' : 'Thin',
-                castList: castList.map(c => ({
-                    roleId: c.id,
-                    roleName: c.role,
-                    roleType: c.roleType,
-                    actorId: c.actorId || 'UNKNOWN',
-                    name: c.actorName || 'Unknown Actor',
-                    characterId: toUniverseCharacterId(finalUniverseId || selectedUniverseId, c.characterName),
-                    characterName: c.characterName?.trim() || undefined,
-                    salary: c.salary,
-                    status: 'CONFIRMED',
-                    isReturning: currentReturningTalent.some(t => t.id === c.actorId) || false
-                })),
+                castList: finalizedCastList,
                 crewList: fullCrewList,
                 location: selectedLocations.length > 0 ? { id: selectedLocations[0], name: locationName, region: 'Global', costModifier: 1, qualityBonus: locationQualityBonus, status: 'PENDING', description: `${selectedLocations.length} locations`, coordinates: {x:0,y:0} } : undefined,
                 tone: tone,
@@ -1741,6 +1789,80 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             impactLevel: isHighQuality ? 'HIGH' : 'MEDIUM'
         };
         generatedBuzz.push({ type: 'HEADLINE', data: newsItem });
+
+        const characterNewsItems: NewsItem[] = [];
+        if (finalUniverseId && !isCreatingNewUniverse) {
+            const universe = normalizedWorldUniverses[finalUniverseId as UniverseId];
+            if (universe) {
+                const existingProjects = getUniverseDashboardProjects(player, finalUniverseId as UniverseId, player.activeReleases || []);
+                const existingRoster = buildUniverseRoster(universe, existingProjects, player.name);
+                const existingById = new Map(existingRoster.map(character => [
+                    character.characterId || character.id || normalizeUniverseCharacterKey(character.name),
+                    character
+                ]));
+
+                const returningCharacters = finalizedCastList
+                    .map(cast => {
+                        const existing = existingById.get(cast.characterId || normalizeUniverseCharacterKey(cast.characterName));
+                        if (!existing) return null;
+                        return {
+                            cast,
+                            existing,
+                            isRecast: existing.actorId !== cast.actorId
+                        };
+                    })
+                    .filter(Boolean) as { cast: typeof finalizedCastList[number], existing: any, isRecast: boolean }[];
+
+                const recast = returningCharacters.find(item => item.isRecast);
+                const returnee = returningCharacters.find(item => !item.isRecast);
+                const story = recast || returnee;
+
+                if (story) {
+                    const actorName = story.cast.name || 'Unknown Actor';
+                    const oldActorName = story.existing.actorId === 'PLAYER_SELF' ? player.name : (story.existing.actorName || 'Unknown Actor');
+                    const headline = story.isRecast
+                        ? `${actorName} takes over as ${story.cast.characterName} in "${selectedScript.title}"`
+                        : `${story.cast.characterName} returns in "${selectedScript.title}"`;
+                    const subtext = story.isRecast
+                        ? `The universe is keeping ${story.cast.characterName} alive, but fans will be watching the recast closely after ${oldActorName}'s run.`
+                        : `${actorName} is back as ${story.cast.characterName}, giving the universe another connected chapter.`;
+
+                    const characterNews: NewsItem = {
+                        id: `news_character_${Date.now()}`,
+                        headline,
+                        subtext,
+                        category: 'UNIVERSE',
+                        week: player.currentWeek,
+                        year: Math.floor(player.currentWeek / 52) + 2024,
+                        impactLevel: story.isRecast ? 'HIGH' : 'MEDIUM'
+                    };
+                    characterNewsItems.push(characterNews);
+                    generatedBuzz.push({ type: 'HEADLINE', data: characterNews });
+
+                    generatedBuzz.push({
+                        type: 'TWEET',
+                        data: {
+                            id: `x_character_${Date.now()}`,
+                            authorId: 'npc_fandom_wire',
+                            authorName: story.isRecast ? 'FandomWire' : 'Universe Updates',
+                            authorHandle: story.isRecast ? '@FandomWire' : '@UniverseUpdates',
+                            authorAvatar: `https://api.dicebear.com/8.x/avataaars/svg?seed=${story.isRecast ? 'FandomWire' : 'UniverseUpdates'}`,
+                            content: story.isRecast
+                                ? `Big swing. ${actorName} as ${story.cast.characterName} could either refresh the whole universe or split the fandom.`
+                                : `${story.cast.characterName} coming back in "${selectedScript.title}" is exactly the connected-universe energy fans wanted.`,
+                            timestamp: Date.now(),
+                            likes: story.isRecast ? 18000 : 12000,
+                            retweets: story.isRecast ? 4200 : 2600,
+                            replies: story.isRecast ? 1900 : 600,
+                            isPlayer: false,
+                            isLiked: false,
+                            isRetweeted: false,
+                            isVerified: true
+                        } as XPost
+                    });
+                }
+            }
+        }
 
         // 2. SOCIAL POSTS (Increased Count)
         // User request: "push not just one but more tweets"
@@ -1837,7 +1959,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         setBuzzItems(generatedBuzz);
 
         // --- UPDATE PLAYER STATE ---
-        const newNews = [newsItem, ...player.news];
+        const newNews = [newsItem, ...characterNewsItems, ...player.news];
         const newXFeed = generatedBuzz
             .filter(b => b.type === 'TWEET')
             .map(b => b.data)
@@ -1858,8 +1980,8 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         const newStudioBalance = studio.balance - remainingBudgetToPay;
         const updatedWorldUniverses = isCreatingNewUniverse
             ? {
-                ...(player.world?.universes || {}),
-                [finalUniverseId!]: {
+                ...normalizedWorldUniverses,
+                [finalUniverseId!]: normalizeUniverseForSave({
                     id: finalUniverseId!,
                     name: newUniverseName.trim(),
                     description: `${studio.name}'s new cinematic universe.`,
@@ -1876,9 +1998,9 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                     roster: [],
                     slate: [newCommitment.projectDetails],
                     weeksUntilNextPhase: 104
-                }
+                }, finalUniverseId!)
             }
-            : player.world.universes;
+            : normalizedWorldUniverses;
 
         onUpdatePlayer({
             ...player,
@@ -2343,7 +2465,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                     <div className="space-y-6 animate-in slide-in-from-right-4 duration-300 max-w-4xl mx-auto px-4 pt-6 pb-44">
                         <div className="bg-zinc-900/80 backdrop-blur-md border border-zinc-800 rounded-xl p-6 mb-6 shadow-lg">
                             <h2 className="text-xl font-bold text-white mb-2">Assemble The Cast</h2>
-                            <p className="text-zinc-400 text-sm">Star power drives box office, but talent drives reviews. Balance your budget.</p>
+                            <p className="text-zinc-400 text-sm">Star power drives box office, but talent drives reviews. Name the characters too, even for standalone projects.</p>
                         </div>
 
                         {/* Actor Selection Overlay moved to end of file */}
@@ -2414,29 +2536,65 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                                     )}
                                                 </div>
 
-                                                {role.actorId && (
-                                                    <>
-                                                    {(selectedUniverseId || selectedScript?.universeId) && (
-                                                        <div className="mt-2">
+                                                <div className="mt-2 grid grid-cols-1 sm:grid-cols-[0.8fr_1.2fr] gap-2">
+                                                    {activeUniverseId && universeCharacterOptions.length > 0 && (
+                                                        <div>
                                                             <label className="block text-[8px] sm:text-[9px] font-black text-zinc-500 uppercase tracking-widest mb-1">
-                                                                Universe Character Name
+                                                                Character Link
                                                             </label>
-                                                            <input
-                                                                value={role.characterName || ''}
+                                                            <select
+                                                                value={role.characterId || (role.characterName ? toUniverseCharacterId(activeUniverseId, role.characterName) : '') || ''}
                                                                 onChange={(e) => {
-                                                                    const value = e.target.value;
+                                                                    const selectedId = e.target.value;
+                                                                    const selectedCharacter = universeCharacterOptions.find(character => character.normalizedId === selectedId || character.characterId === selectedId || character.id === selectedId);
                                                                     setCastList(prev => prev.map(r => r.id === role.id ? {
                                                                         ...r,
-                                                                        characterName: value,
-                                                                        characterId: toUniverseCharacterId(selectedUniverseId || selectedScript?.universeId || null, value)
+                                                                        characterId: selectedCharacter ? selectedId : undefined,
+                                                                        characterName: selectedCharacter ? selectedCharacter.name : ''
                                                                     } : r));
                                                                 }}
                                                                 onClick={(e) => e.stopPropagation()}
-                                                                placeholder={role.roleType === 'LEAD' ? 'e.g. Tony Stark' : 'e.g. Pepper Potts'}
-                                                                className="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500"
-                                                            />
+                                                                className="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                                                            >
+                                                                <option value="">Create New</option>
+                                                                {universeCharacterOptions.map(character => (
+                                                                    <option key={character.normalizedId} value={character.normalizedId}>
+                                                                        {character.name} {character.actorName ? `(${character.actorName})` : ''}
+                                                                    </option>
+                                                                ))}
+                                                            </select>
                                                         </div>
                                                     )}
+                                                    <div className={activeUniverseId && universeCharacterOptions.length > 0 ? '' : 'sm:col-span-2'}>
+                                                        <label className="block text-[8px] sm:text-[9px] font-black text-zinc-500 uppercase tracking-widest mb-1">
+                                                            Character Name
+                                                        </label>
+                                                        <input
+                                                            value={role.characterName || ''}
+                                                            onChange={(e) => {
+                                                                const value = e.target.value;
+                                                                setCastList(prev => prev.map(r => r.id === role.id ? {
+                                                                    ...r,
+                                                                    characterName: value,
+                                                                    characterId: activeUniverseId ? toUniverseCharacterId(activeUniverseId, value) : undefined
+                                                                } : r));
+                                                            }}
+                                                            onBlur={() => {
+                                                                setCastList(prev => prev.map((r, roleIndex) => r.id === role.id && !r.characterName?.trim() ? {
+                                                                    ...r,
+                                                                    characterName: getDefaultCharacterName(r, roleIndex),
+                                                                    characterId: activeUniverseId ? toUniverseCharacterId(activeUniverseId, getDefaultCharacterName(r, roleIndex)) : undefined
+                                                                } : r));
+                                                            }}
+                                                            onClick={(e) => e.stopPropagation()}
+                                                            placeholder={role.roleType === 'LEAD' ? `e.g. ${selectedScript?.title || 'Iron Man'}` : getDefaultCharacterName(role, idx)}
+                                                            className="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500"
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                {role.actorId && (
+                                                    <>
                                                     <div className="flex gap-3 sm:gap-4 mt-1">
                                                         <div className="flex flex-col">
                                                             <span className="text-[8px] sm:text-[9px] font-black text-emerald-500/70 uppercase tracking-tighter">Talent:</span>
@@ -2943,7 +3101,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                 </div>
                                 
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    {(Object.values(player.world.universes || {}) as Universe[]).filter(u => u.studioId === studio.id).map((universe) => (
+                                    {(Object.values(normalizeUniverseMap(player.world?.universes || {})) as Universe[]).filter(u => u.studioId === studio.id).map((universe) => (
                                         <button
                                             key={universe.id}
                                             onClick={() => setSelectedUniverseId(universe.id)}
@@ -3128,7 +3286,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                             <Globe size={12} className="text-blue-400" />
                                             <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
                                                 Universe: <span className="text-white">
-                                                    {selectedUniverseId === 'NEW' ? newUniverseName : player.world.universes[selectedUniverseId]?.name}
+                                                    {selectedUniverseId === 'NEW' ? newUniverseName : normalizeUniverseMap(player.world?.universes || {})[selectedUniverseId]?.name}
                                                 </span>
                                             </span>
                                         </div>
