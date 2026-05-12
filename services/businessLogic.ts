@@ -392,6 +392,7 @@ export const createDefaultStudioState = (currentWeek: number): StudioState => ({
     talentRoster: [],
     purchasedIPTitles: [],
     productionFund: 0,
+    lockedStreamingFunds: [],
 });
 
 export const normalizeStudioState = (studioState: Partial<StudioState> | undefined, currentWeek: number): StudioState => {
@@ -405,6 +406,7 @@ export const normalizeStudioState = (studioState: Partial<StudioState> | undefin
         ipMarket: Array.isArray(studioState?.ipMarket) ? studioState!.ipMarket : defaults.ipMarket,
         talentRoster: Array.isArray(studioState?.talentRoster) ? studioState!.talentRoster : defaults.talentRoster,
         purchasedIPTitles: Array.isArray(studioState?.purchasedIPTitles) ? studioState!.purchasedIPTitles : defaults.purchasedIPTitles,
+        lockedStreamingFunds: Array.isArray(studioState?.lockedStreamingFunds) ? studioState!.lockedStreamingFunds : defaults.lockedStreamingFunds,
         departments: {
             ...defaults.departments,
             ...(studioState?.departments || {}),

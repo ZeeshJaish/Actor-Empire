@@ -5,7 +5,7 @@ import { Player, PastProject, ActiveRelease, CastMember, Review, Award, Universe
 import { formatMoney } from '../../services/formatUtils';
 import { AWARD_CALENDAR, AWARD_SHOW_DB, AwardShowLore, AwardDefinition, Nomination, sanitizeAwardRecords, getAwardCeremonyYear } from '../../services/awardLogic';
 import { ArrowLeft, Star, Film, ChevronRight, User, TrendingUp, DollarSign, Eye, Award as AwardIcon, Calendar, BookOpen, Clock, List, MessageSquare, Users, Globe, Zap, LayoutGrid, Shield, ArrowRight, Tv } from 'lucide-react';
-import { buildUniverseRoster, calculateUniverseProductWeeklyRevenue, getFallbackCharacterName, getUniverseDashboardProjects, normalizeUniverseForSave, normalizeUniverseMap } from '../../services/universeLogic';
+import { buildUniverseRoster, calculateUniverseProductWeeklyRevenue, getFallbackCharacterName, getUniverseDashboardProjects, getUniverseReleaseActivity, normalizeUniverseForSave, normalizeUniverseMap } from '../../services/universeLogic';
 
 interface ImdbAppProps {
   player: Player;
@@ -561,10 +561,18 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
           ? ratedCanonProjects.reduce((sum, project) => sum + (project.rating || 0), 0) / ratedCanonProjects.length
           : 0;
       const lifetimeLicensing = currentUniverse.stats?.lifetimeRevenue || 0;
+      const licensingActivity = getUniverseReleaseActivity(player, currentUniverse, player.activeReleases || []);
       const projectedLicensing = (currentUniverse.products || [])
           .filter((product: any) => product?.active !== false)
-          .reduce((sum: number, product: any) => sum + calculateUniverseProductWeeklyRevenue(currentUniverse, product), 0);
-      const licensingValue = lifetimeLicensing > 0 ? formatMoney(lifetimeLicensing) : projectedLicensing > 0 ? `${formatMoney(projectedLicensing)}/wk` : 'No License';
+          .reduce((sum: number, product: any) => sum + Math.floor(calculateUniverseProductWeeklyRevenue(currentUniverse, product) * licensingActivity.multiplier), 0);
+      const hasLicenses = (currentUniverse.products || []).some((product: any) => product?.active !== false);
+      const licensingValue = lifetimeLicensing > 0
+          ? formatMoney(lifetimeLicensing)
+          : projectedLicensing > 0
+              ? `${formatMoney(projectedLicensing)}/wk`
+              : hasLicenses
+                  ? 'Dormant'
+                  : 'No License';
       const fanApproval = normalizedRoster.length > 0
           ? normalizedRoster.reduce((sum, character) => sum + (character.fanApproval || 0), 0) / normalizedRoster.length
           : 0;

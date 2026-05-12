@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Player, BudgetTier, Genre, ProjectDetails, ActiveRelease, Commitment, Business, LocationDetails, NewsItem, XPost, StudioEquipment, CrewMember, Universe, UniverseId } from '../../../types';
 import { ArrowLeft, Film, DollarSign, Users, TrendingUp, Calendar, Check, Plus, Star, Award, Zap, Briefcase, LayoutGrid, MapPin, PenTool, Globe, Camera, Clapperboard, ChevronRight, Lock, Building2, BarChart3, ShieldAlert, Crown, LogOut, AlertTriangle, Sparkles, BookOpen, Video, X, Clock, Palette, Lightbulb, Mic, Box, Info, CheckCircle, XCircle, Layers, Loader2 } from 'lucide-react';
 import { NPC_DATABASE, getAvailableTalent, calculateProjectFameMultiplier } from '../../../services/npcLogic';
-import { getDirectorTalent } from '../../../services/roleLogic';
+import { calculateCastDepthScore, getDirectorTalent } from '../../../services/roleLogic';
 import { buildUniverseRoster, getFallbackCharacterName, getUniverseDashboardProjects, normalizeUniverseCharacterKey, normalizeUniverseForSave, normalizeUniverseMap } from '../../../services/universeLogic';
 import { getEquipmentStageName } from './FacilitiesView';
 import { showAd } from '../../../services/adLogic';
@@ -589,6 +589,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             visualStyle,
             pacing,
             universeId: selectedUniverseId,
+            lockedStreamingFunding: selectedScript?.lockedStreamingFunding || initialConcept?.lockedStreamingFunding,
             newUniverseName: selectedUniverseId === 'NEW' ? newUniverseName : undefined,
             franchiseId: selectedFranchiseId,
             lastStep: step
@@ -659,6 +660,14 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             || (selectedScriptId ? normalizeReturningTalentEntries(studio.studioState?.scripts?.find(s => s.id === selectedScriptId)) : null)
             || (initialConcept ? normalizeReturningTalentEntries(studio.studioState?.scripts?.find(s => s.id === initialConcept.scriptId)) : null);
     }, [scripts, selectedScriptId, studio.studioState?.scripts, initialConcept?.scriptId, contractedTalentIds]);
+
+    const lockedStreamingFunding = useMemo(() => {
+        return selectedScript?.lockedStreamingFunding || initialConcept?.lockedStreamingFunding || null;
+    }, [selectedScript?.lockedStreamingFunding, initialConcept?.lockedStreamingFunding]);
+
+    const lockedStreamingFundingAmount = useMemo(() => {
+        return Math.max(0, Math.floor(Number(lockedStreamingFunding?.amount || 0)));
+    }, [lockedStreamingFunding?.amount]);
 
     const [currentReturningTalent, setCurrentReturningTalent] = useState<any[]>([]);
 
@@ -731,6 +740,22 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                 genre: root.genre
             };
         });
+    }, [player.pastProjects, player.activeReleases, studio.id]);
+
+    const studioPrestigeScore = useMemo(() => {
+        const studioProjects = [
+            ...player.pastProjects.filter(p => p.studioId === studio.id),
+            ...player.activeReleases.filter(r => r.projectDetails.studioId === studio.id).map(r => ({
+                rating: r.imdbRating,
+                gross: r.totalGross + (r.streamingRevenue || 0),
+                awards: [],
+            }))
+        ];
+        if (studioProjects.length === 0) return 0;
+        const avgRating = studioProjects.reduce((sum, project: any) => sum + (project.rating || project.imdbRating || 0), 0) / studioProjects.length;
+        const awardsWon = studioProjects.reduce((sum, project: any) => sum + (project.awards?.filter((award: any) => award.outcome === 'WON').length || 0), 0);
+        const hitBonus = studioProjects.filter((project: any) => (project.gross || project.boxOffice || 0) > 200_000_000).length * 1.2;
+        return Math.min(100, Math.round((avgRating * 6) + (awardsWon * 2.5) + (studioProjects.length * 0.8) + hitBonus));
     }, [player.pastProjects, player.activeReleases, studio.id]);
 
     // Track previous installment cost for comparison
@@ -1489,12 +1514,12 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         }
 
         const productionFund = studio.studioState?.productionFund || 0;
-        if (studio.balance + productionFund < budgetBreakdown.total) {
+        if (studio.balance + productionFund + lockedStreamingFundingAmount < budgetBreakdown.total) {
             errors.push("Insufficient studio funds for production");
         }
 
         return { can: errors.length === 0, errors };
-    }, [selectedScript, selectedLocations, crewModes, selectedCrew, castList, studio.balance, studio.studioState?.productionFund, budgetBreakdown.total, unresolvedReturningTalent]);
+    }, [selectedScript, selectedLocations, crewModes, selectedCrew, castList, studio.balance, studio.studioState?.productionFund, lockedStreamingFundingAmount, budgetBreakdown.total, unresolvedReturningTalent]);
 
     const canGreenlight = greenlightStatus.can;
 
@@ -1563,6 +1588,8 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         }
         
         const fameMultiplier = calculateProjectFameMultiplier(castIds, directorData.name as string, player.stats.fame, player.stats.talent, extraFame);
+        const finalBudgetTier = estimatedBudget > 50000000 ? 'BLOCKBUSTER' : estimatedBudget > 10000000 ? 'HIGH' : 'MID';
+        const castDepth = calculateCastDepthScore(castList.length, selectedScript.genres[0], finalBudgetTier, currentCastingStrength);
 
         // Calculate Actual Quality (Hidden)
         // User request: "movie perfomed more good if movie quality is good as oer iuts est quaity but also its not neccesaary that what est quality its there movie actucal quality remain that"
@@ -1658,8 +1685,9 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             };
         });
 
+        const newCommitmentId = `proj_${Date.now()}`;
         const newCommitment: Commitment = {
-            id: `proj_${Date.now()}`,
+            id: newCommitmentId,
             name: selectedScript.title,
             type: 'JOB',
             roleType: castList.find(c => c.actorId === 'PLAYER_SELF')?.roleType as any,
@@ -1694,19 +1722,29 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                 installmentNumber: (selectedFranchiseId && selectedFranchiseId !== 'NEW') ? (studioFranchises.find(f => f.id === selectedFranchiseId)?.lastInstallment || 0) + 1 : 1,
                 genre: selectedScript.genres[0],
                 targetAudience: selectedScript.targetAudience || 'PG-13',
-                budgetTier: estimatedBudget > 50000000 ? 'BLOCKBUSTER' : estimatedBudget > 10000000 ? 'HIGH' : 'MID',
+                budgetTier: finalBudgetTier,
                 estimatedBudget: estimatedBudget,
                 visibleHype: 'LOW',
                 hiddenStats: {
                     scriptQuality: selectedScript.quality,
                     directorQuality: directorData.quality,
                     castingStrength: currentCastingStrength,
-                    distributionPower: 50,
+                    distributionPower: Math.min(100, 50 + Math.floor(studioPrestigeScore / 8)),
                     rawHype: currentEstimatedBuzz,
                     qualityScore: actualQuality, // Store the ACTUAL quality here for future reference
-                    prestigeBonus: tone < 30 ? 20 : 0,
+                    prestigeBonus: (tone < 30 ? 20 : 0) + Math.floor(studioPrestigeScore / 25),
                     fameMultiplier: fameMultiplier,
-                    isRecast: isRecast
+                    castDepthScore: castDepth.score,
+                    castDepthNote: castDepth.note,
+                    studioPrestigeScore,
+                    isRecast: isRecast,
+                    ...(lockedStreamingFunding ? {
+                        platformId: lockedStreamingFunding.platformId,
+                        nextSeasonFundingAmount: lockedStreamingFunding.amount,
+                        nextSeasonFundingPlatformId: lockedStreamingFunding.platformId,
+                        nextSeasonFundingSourceProjectId: lockedStreamingFunding.sourceProjectId,
+                        nextSeasonFundingUsedByProjectId: newCommitmentId
+                    } : {})
                 },
                 director: {
                     id: selectedCrew.director || (crewModes.director === 'SELF' ? 'PLAYER_SELF' : 'STUDIO_STAFF'),
@@ -1967,6 +2005,20 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
 
         // Deduct budget
         let remainingBudgetToPay = estimatedBudget;
+        let lockedFundApplied = 0;
+        let updatedLockedStreamingFunds = [...(studio.studioState?.lockedStreamingFunds || [])];
+
+        if (lockedStreamingFunding && lockedStreamingFundingAmount > 0) {
+            lockedFundApplied = Math.min(remainingBudgetToPay, lockedStreamingFundingAmount);
+            remainingBudgetToPay -= lockedFundApplied;
+
+            // A renewal cap is project-specific. Once the next season is greenlit,
+            // unused cap expires instead of becoming free studio money.
+            updatedLockedStreamingFunds = updatedLockedStreamingFunds
+                .map(fund => fund.id === lockedStreamingFunding.id ? { ...fund, usedByProjectId: newCommitment.id } : fund)
+                .filter(fund => fund.id !== lockedStreamingFunding.id);
+        }
+
         let newProductionFund = studio.studioState?.productionFund || 0;
         
         if (newProductionFund >= remainingBudgetToPay) {
@@ -2024,13 +2076,16 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                     concepts: updatedConcepts,
                     talentRoster: updatedStudioTalentRoster,
                     productionFund: newProductionFund,
+                    lockedStreamingFunds: updatedLockedStreamingFunds,
                     financeLedger: [{
                         id: `studio_ledger_greenlight_${newCommitment.id}_${player.age}_${player.currentWeek}`,
                         week: player.currentWeek,
                         year: player.age,
                         amount: -remainingBudgetToPay,
                         type: 'PRODUCTION_SPEND',
-                        label: `${newCommitment.name} greenlight spend`,
+                        label: lockedFundApplied > 0
+                            ? `${newCommitment.name} greenlight spend (${formatMoney(lockedFundApplied)} renewal cap used)`
+                            : `${newCommitment.name} greenlight spend`,
                         projectId: newCommitment.id
                     }, ...((studio.studioState?.financeLedger || []))].slice(0, 200)
                 }
@@ -2239,7 +2294,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                             </div>
                                         </div>
                                     </div>
-                                    <span className={`text-sm sm:text-xl font-mono font-black tracking-tighter ${currentEstimatedBudget > (studio.balance + (studio.studioState?.productionFund || 0)) ? 'text-rose-500' : 'text-emerald-400'}`}>
+                                    <span className={`text-sm sm:text-xl font-mono font-black tracking-tighter ${currentEstimatedBudget > (studio.balance + (studio.studioState?.productionFund || 0) + lockedStreamingFundingAmount) ? 'text-rose-500' : 'text-emerald-400'}`}>
                                         {formatMoney(currentEstimatedBudget)}
                                     </span>
                                 </div>
@@ -3360,7 +3415,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                         <div className="text-xs text-zinc-600">Subject to variance during production</div>
                                     </div>
                                     <div className="text-right">
-                                        <div className={`text-2xl font-black font-mono ${budgetBreakdown.total > (studio.balance + (studio.studioState?.productionFund || 0)) ? 'text-rose-500' : 'text-emerald-400'}`}>
+                                        <div className={`text-2xl font-black font-mono ${budgetBreakdown.total > (studio.balance + (studio.studioState?.productionFund || 0) + lockedStreamingFundingAmount) ? 'text-rose-500' : 'text-emerald-400'}`}>
                                             {formatMoney(budgetBreakdown.total)}
                                         </div>
                                         {previousInstallmentCost && (
@@ -3383,6 +3438,20 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                         </div>
                                         <div className="text-xl font-black font-mono text-emerald-400">
                                             - {formatMoney(studio.studioState!.productionFund!)}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {lockedStreamingFundingAmount > 0 && (
+                                    <div className="bg-sky-950/30 rounded-lg p-4 flex justify-between items-center border border-sky-500/30 mt-2">
+                                        <div>
+                                            <div className="text-[10px] font-bold text-sky-400 uppercase tracking-widest">Locked Next Season Cap</div>
+                                            <div className="text-xs text-sky-300/70">
+                                                {lockedStreamingFunding?.platformName || 'Streaming platform'} funds this season first. Unused cap expires.
+                                            </div>
+                                        </div>
+                                        <div className="text-xl font-black font-mono text-sky-300">
+                                            - {formatMoney(lockedStreamingFundingAmount)}
                                         </div>
                                     </div>
                                 )}

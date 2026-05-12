@@ -33,6 +33,75 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
     const isFamilyRelation = (relation?: Relationship['relation']) => !!relation && familyRelations.includes(relation);
     const PREGNANCY_TERM_WEEKS = 39;
 
+    const intimacyDeclines = [
+        'They are not in the mood tonight and want space.',
+        'The connection feels off right now, so they say no.',
+        'They are stressed and ask you to slow down.',
+        'They want the relationship to feel stronger before getting intimate.',
+        'They had a rough week and are not feeling it tonight.',
+    ];
+
+    const getWeeksSinceContact = (state: Player, partner: Relationship) => {
+        const currentAbsolute = getAbsoluteWeek(state.age, state.currentWeek);
+        if (typeof partner.lastInteractionAbsolute === 'number') {
+            return Math.max(0, currentAbsolute - partner.lastInteractionAbsolute);
+        }
+        return Math.max(0, state.currentWeek - (partner.lastInteractionWeek || 0));
+    };
+
+    const getIntimacyDeclineReason = (state: Player, partner: Relationship): string | null => {
+        if (partner.relation !== 'Partner' && partner.relation !== 'Spouse') {
+            return 'That kind of relationship is not romantic.';
+        }
+
+        const weeksSinceContact = getWeeksSinceContact(state, partner);
+        const relationshipBonus = partner.relation === 'Spouse' ? 14 : 6;
+        const moodScore = (state.stats.happiness * 0.22) + (state.stats.health * 0.12) + (state.stats.reputation * 0.04);
+        const recentPenalty = weeksSinceContact > 24 ? 14 : weeksSinceContact > 10 ? 8 : weeksSinceContact > 4 ? 3 : 0;
+        const readiness = (partner.closeness * 0.66) + moodScore + relationshipBonus - recentPenalty;
+        const declineChance = readiness >= 92 ? 0.06
+            : readiness >= 76 ? 0.14
+            : readiness >= 58 ? 0.28
+            : readiness >= 40 ? 0.48
+            : 0.72;
+
+        if (Math.random() >= declineChance) return null;
+        if (partner.closeness < 35) return `${partner.name} does not feel close enough to you right now.`;
+        if (weeksSinceContact > 10) return `${partner.name} feels distant because you have not been present lately.`;
+        return intimacyDeclines[Math.floor(Math.random() * intimacyDeclines.length)];
+    };
+
+    const recordIntimacyDecline = (partnerId: string, reason: string) => {
+        setPlayer(prev => {
+            const idx = prev.relationships.findIndex(rel => rel.id === partnerId);
+            if (idx === -1) return prev;
+            const partner = prev.relationships[idx];
+            const relationships = [...prev.relationships];
+            relationships[idx] = {
+                ...partner,
+                closeness: Math.max(0, partner.closeness - (partner.closeness < 45 ? 2 : 0)),
+                lastInteractionWeek: prev.currentWeek,
+                lastInteractionAbsolute: getAbsoluteWeek(prev.age, prev.currentWeek),
+            };
+            const nextState = {
+                ...prev,
+                relationships,
+                logs: [
+                    ...prev.logs,
+                    {
+                        week: prev.currentWeek,
+                        year: prev.age,
+                        message: `🌙 ${reason}`,
+                        type: 'neutral' as const,
+                    },
+                ].slice(-50),
+            };
+            spendPlayerEnergy(nextState, Math.min(8, prev.energy.current));
+            return nextState;
+        });
+        setToastMessage({ title: 'Not Tonight', subtext: reason });
+    };
+
     const schedulePregnancy = (
         prev: Player,
         partner: Relationship,
@@ -569,6 +638,13 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
             return;
         }
         if (type === 'INTIMACY') {
+            if (partner) {
+                const declineReason = getIntimacyDeclineReason(player, partner);
+                if (declineReason) {
+                    recordIntimacyDecline(id, declineReason);
+                    return;
+                }
+            }
             if (partner && partner.relation !== 'Spouse') {
                 setShowProtectionPrompt({ partnerId: id, partnerName: partner.name });
                 return;

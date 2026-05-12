@@ -211,6 +211,7 @@ export interface Script {
     universePhaseName?: string;
     installmentNumber?: number;
     customPoster?: CustomPoster;
+    lockedStreamingFunding?: LockedStreamingFunding;
     developmentCost?: number;
     purchaseCost?: number;
     createdAtWeek?: number;
@@ -259,6 +260,7 @@ export interface ProjectConcept {
     equipmentChoices?: Record<string, string>;
     lastStep?: 'SELECT_SCRIPT' | 'DIRECTOR' | 'CAST' | 'CREW' | 'EQUIPMENT' | 'LOCATION' | 'TONE' | 'CONFIRM';
     customPoster?: CustomPoster;
+    lockedStreamingFunding?: LockedStreamingFunding;
     universeId?: UniverseId;
     franchiseId?: string;
     installmentNumber?: number;
@@ -292,7 +294,23 @@ export interface StudioState {
     talentRoster?: StudioContract[];
     purchasedIPTitles?: string[];
     productionFund?: number; // NEW: Funds provided by a streaming platform for the next project
+    lockedStreamingFunds?: LockedStreamingFunding[];
     financeLedger?: StudioFinanceEntry[];
+}
+
+export interface LockedStreamingFunding {
+    id: string;
+    platformId: string;
+    platformName: string;
+    amount: number;
+    sourceProjectId: string;
+    sourceTitle: string;
+    franchiseId?: string;
+    installmentNumber?: number;
+    projectType?: ProjectType;
+    createdWeek?: number;
+    createdYear?: number;
+    usedByProjectId?: string;
 }
 
 export interface StudioFinanceEntry {
@@ -314,12 +332,19 @@ export interface ProjectHiddenStats {
     qualityScore: number;
     prestigeBonus: number;
     fameMultiplier?: number; // New: Multiplier for box office based on talent fame
+    castDepthScore?: number;
+    castDepthNote?: string;
+    studioPrestigeScore?: number;
     isRecast?: boolean;
     releaseWeek?: number;
     platformId?: string | null;
     festivalPremiere?: string | null;
     redCarpetHype?: number;
     backendPct?: number;
+    nextSeasonFundingAmount?: number;
+    nextSeasonFundingPlatformId?: string | null;
+    nextSeasonFundingSourceProjectId?: string;
+    nextSeasonFundingUsedByProjectId?: string;
 }
 
 export interface CastMember {
@@ -505,13 +530,14 @@ export interface ActiveRelease {
     streaming?: StreamingState;
     streamingRevenue?: number;
     studioRoyaltyPercentage?: number;
-    bids?: { platformId: PlatformId, upfront: number, royalty: number, duration: number }[];
+    bids?: { platformId: PlatformId, upfront: number, royalty: number, duration: number, fundingAmount?: number }[];
     sequelDecisionWeek?: number;
     sequelDecisionMade?: boolean;
     futurePotential?: FuturePotential;
     promotionalBuzz?: number;
     royaltyPercentage?: number;
     previousBestBidValue?: number;
+    generatedNewsKeys?: string[];
 }
 
 export interface Award {
@@ -873,7 +899,7 @@ export interface Manager {
 export interface TeamMember {
     id: string;
     name: string;
-    type: 'TRAINER' | 'STYLIST' | 'THERAPIST' | 'PUBLICIST';
+    type: 'TRAINER' | 'STYLIST' | 'THERAPIST' | 'PUBLICIST' | 'WELLNESS';
     tier: 'ROOKIE' | 'STANDARD' | 'ELITE' | 'LEGEND';
     weeklyCost: number;
     description: string;
@@ -1418,6 +1444,7 @@ export interface Player {
         stylist: TeamMember | null;
         therapist: TeamMember | null;
         publicist: TeamMember | null;
+        wellness: TeamMember | null;
         lastAgentFeePaidWeek: number;
         lastManagerFeePaidWeek: number;
         availableAgents: Agent[];
@@ -1426,6 +1453,7 @@ export interface Player {
         availableStylists: TeamMember[];
         availableTherapists: TeamMember[];
         availablePublicists: TeamMember[];
+        availableWellness: TeamMember[];
     };
     news: NewsItem[];
     inbox: Message[];
@@ -1536,8 +1564,8 @@ export const INITIAL_PLAYER: Player = {
     ],
     team: { 
         agent: null, manager: null, lastAgentFeePaidWeek: 0, lastManagerFeePaidWeek: 0, availableAgents: [], availableManagers: [],
-        personalTrainer: null, stylist: null, therapist: null, publicist: null,
-        availableTrainers: [], availableStylists: [], availableTherapists: [], availablePublicists: []
+        personalTrainer: null, stylist: null, therapist: null, publicist: null, wellness: null,
+        availableTrainers: [], availableStylists: [], availableTherapists: [], availablePublicists: [], availableWellness: []
     },
     news: [],
     inbox: [

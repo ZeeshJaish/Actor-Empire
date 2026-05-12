@@ -927,6 +927,59 @@ export const calculateUniverseProductWeeklyRevenue = (
     return Math.max(baseRevenue, Math.floor(baseRevenue * (1 + brandBonus + appealBonus + momentumBonus)));
 };
 
+const getGameAbsoluteWeek = (year: number, week: number = 26) => ((Math.max(1, year) - 1) * 52) + Math.max(1, Math.min(52, week));
+
+const getProjectUniverseId = (project: any): UniverseId | undefined => project?.universeId || project?.projectDetails?.universeId;
+
+export const getUniverseReleaseActivity = (
+    player: Player,
+    universe: Pick<Universe, 'id'>,
+    activeReleases: ActiveRelease[] = player.activeReleases || []
+): { weeksSinceLatestRelease: number | null; multiplier: number; label: string } => {
+    const universeId = universe?.id;
+    if (!universeId) return { weeksSinceLatestRelease: null, multiplier: 0, label: 'No release history' };
+
+    const currentAbsoluteWeek = getGameAbsoluteWeek(player.age, player.currentWeek);
+    const releaseWeeks: number[] = [];
+
+    (player.pastProjects || []).forEach((project: any) => {
+        if (getProjectUniverseId(project) !== universeId) return;
+        const releaseYear = Number(project.year || project.releaseYear || player.age);
+        const releaseWeek = Number(project.week || project.releaseWeek || project.completedWeek || 26);
+        releaseWeeks.push(getGameAbsoluteWeek(releaseYear, releaseWeek));
+    });
+
+    (activeReleases || []).forEach((release: any) => {
+        if (getProjectUniverseId(release) !== universeId) return;
+        releaseWeeks.push(currentAbsoluteWeek);
+    });
+
+    (player.world?.projects || []).forEach((project: any) => {
+        if (getProjectUniverseId(project) !== universeId) return;
+        const releaseYear = Number(project.year || player.age);
+        const releaseWeek = Number(project.week || project.releaseWeek || 26);
+        releaseWeeks.push(getGameAbsoluteWeek(releaseYear, releaseWeek));
+    });
+
+    if (releaseWeeks.length === 0) {
+        return { weeksSinceLatestRelease: null, multiplier: 0, label: 'No release history' };
+    }
+
+    const latestReleaseWeek = Math.max(...releaseWeeks);
+    const weeksSinceLatestRelease = Math.max(0, currentAbsoluteWeek - latestReleaseWeek);
+
+    if (weeksSinceLatestRelease <= 104) {
+        return { weeksSinceLatestRelease, multiplier: 1, label: 'Fresh releases' };
+    }
+    if (weeksSinceLatestRelease <= 156) {
+        return { weeksSinceLatestRelease, multiplier: 0.55, label: 'Cooling down' };
+    }
+    if (weeksSinceLatestRelease <= 208) {
+        return { weeksSinceLatestRelease, multiplier: 0.2, label: 'Dormant catalog' };
+    }
+    return { weeksSinceLatestRelease, multiplier: 0, label: 'No recent releases' };
+};
+
 // Main processing loop
 export const processUniverseTurn = (player: Player, universe: Universe): { universe: Universe, news: NewsItem[], project?: IndustryProject } => {
     const updated = normalizeUniverseForSave(universe, universe?.id);
@@ -942,11 +995,14 @@ export const processUniverseTurn = (player: Player, universe: Universe): { unive
     }
 
     const activeProducts = updated.products.filter((product: any) => product?.active !== false);
+    const releaseActivity = getUniverseReleaseActivity(player, updated);
     const weeklyLicensingRevenue = activeProducts.reduce((sum, product: any) => {
         const baseRevenue = typeof product?.sellingPrice === 'number' ? product.sellingPrice : 0;
-        const productRevenue = calculateUniverseProductWeeklyRevenue(updated, product);
+        const productRevenue = Math.floor(calculateUniverseProductWeeklyRevenue(updated, product) * releaseActivity.multiplier);
 
-        product.unitsSold = (typeof product.unitsSold === 'number' ? product.unitsSold : 0) + Math.max(1, Math.floor(productRevenue / Math.max(baseRevenue, 1)));
+        if (productRevenue > 0) {
+            product.unitsSold = (typeof product.unitsSold === 'number' ? product.unitsSold : 0) + Math.max(1, Math.floor(productRevenue / Math.max(baseRevenue, 1)));
+        }
         return sum + Math.max(0, productRevenue);
     }, 0);
 

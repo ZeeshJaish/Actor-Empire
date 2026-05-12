@@ -93,6 +93,22 @@ export const getStreamingBidProfile = (packageScore: number, isSeries: boolean, 
     };
 };
 
+const calculateNextSeasonFundingCap = (projectBudget: number, packageScore: number, currentOffer: number) => {
+    if (projectBudget <= 0) return 0;
+    let multiplier = 1.05;
+    if (packageScore < 45) multiplier = 0.88;
+    else if (packageScore < 60) multiplier = 1.08;
+    else if (packageScore < 72) multiplier = 1.24;
+    else if (packageScore < 84) multiplier = 1.45;
+    else if (packageScore < 92) multiplier = 1.75;
+    else multiplier = 2.15;
+
+    const platformConfidence = 0.94 + Math.random() * 0.18;
+    const budgetBased = projectBudget * multiplier * platformConfidence;
+    const offerBased = currentOffer * (0.72 + Math.random() * 0.22);
+    return Math.floor(Math.max(projectBudget * 0.82, Math.min(projectBudget * 2.6, Math.max(budgetBased, offerBased))));
+};
+
 const getStreamingMarketProofCap = (
     projectBudget: number,
     packageScore: number,
@@ -157,7 +173,14 @@ export const calculateStreamingAuctionOffer = (
     const bidProfile = getStreamingBidProfile(packageScore, isSeries, isPostTheatricalBidding, runStrength);
     const safetyPremium = bidProfile.safetyPremium;
     const qualityEscalator = Math.max(0.85, 0.95 + ((packageScore - 55) / 105));
-    const floorOffer = projectBudget > 0 ? projectBudget * bidProfile.floor : platform.baseBid;
+    const baseFloorOffer = projectBudget > 0 ? projectBudget * bidProfile.floor : platform.baseBid;
+    const topPlatformBudget = Math.max(...PLATFORMS.map(p => p.maxBudget));
+    const platformMuscle = topPlatformBudget > 0 ? platform.maxBudget / topPlatformBudget : 0.5;
+    const floorVariance = 0.96 + (Math.random() * 0.1) + (platformMuscle * 0.05);
+    const safeMinimum = projectBudget > 0 && packageScore >= 60
+        ? projectBudget * 1.02
+        : baseFloorOffer * 0.94;
+    const floorOffer = Math.floor(Math.max(safeMinimum, baseFloorOffer * floorVariance));
     const qualityRange = projectBudget > 0
         ? projectBudget * (bidProfile.floor + ((bidProfile.ceiling - bidProfile.floor) * (0.24 + Math.random() * 0.62)))
         : platform.baseBid * (0.95 + Math.random() * 0.35) * safetyPremium;
@@ -210,10 +233,16 @@ export const calculateStreamingAuctionOffer = (
     let backendPct = 0;
     let upfrontAmount = newAmount;
     
-    if (rand > 0.94) {
+    if (isSeries && rand > 0.66) {
+        type = 'GREENLIGHT_DEAL';
+        upfrontAmount = newAmount;
+        fundingAmount = calculateNextSeasonFundingCap(projectBudget, packageScore, newAmount);
+    } else if (rand > 0.94) {
         type = 'GREENLIGHT_DEAL';
         upfrontAmount = Math.min(newAmount, Math.floor(Math.max(floorOffer, newAmount * 0.45)));
-        fundingAmount = Math.max(0, newAmount - upfrontAmount);
+        fundingAmount = isSeries
+            ? calculateNextSeasonFundingCap(projectBudget, packageScore, newAmount)
+            : Math.max(0, newAmount - upfrontAmount);
     } else if (rand > 0.84) {
         type = 'BACKEND_POINTS';
         upfrontAmount = Math.min(newAmount, Math.floor(Math.max(floorOffer, newAmount * (isPostTheatricalBidding ? 0.7 : 0.8))));
@@ -244,6 +273,25 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
     const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
     const [festivalPremiere, setFestivalPremiere] = useState<string | null>(null);
     const [releaseWeek, setReleaseWeek] = useState<number>(player.currentWeek + 4); 
+    const projectHiddenStats = project.projectDetails?.hiddenStats || {};
+    const lockedPremierePlatformId = projectHiddenStats.nextSeasonFundingUsedByProjectId === project.id
+        ? (projectHiddenStats.nextSeasonFundingPlatformId || projectHiddenStats.platformId || null)
+        : null;
+    const lockedPremierePlatform = lockedPremierePlatformId
+        ? PLATFORMS.find(platform => platform.id === lockedPremierePlatformId)
+        : null;
+    const lockedPremiereBid: Bid | null = lockedPremierePlatform
+        ? {
+            id: `locked_premiere_${project.id}_${lockedPremierePlatform.id}`,
+            platformId: lockedPremierePlatform.id,
+            amount: 0,
+            type: 'UPFRONT_ONLY',
+            fundingAmount: 0,
+            backendPct: 0,
+            bidValue: 0,
+            timestamp: Date.now()
+        }
+        : null;
     
     // Bidding State
     const [auctionState, setAuctionState] = useState<'IDLE' | 'ACTIVE' | 'FINISHED'>('IDLE');
@@ -452,6 +500,23 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
         if (!bid) return;
 
         const updatedPlayer = { ...player };
+        const platformName = PLATFORMS.find(p => p.id === bid.platformId)?.name || 'Platform';
+        const isSeriesDeal = (project.projectDetails?.type || project.type) === 'SERIES';
+        const lockedFunding = isSeriesDeal && bid.fundingAmount
+            ? {
+                id: `stream_fund_${project.id}_${bid.platformId}_${Date.now()}`,
+                platformId: bid.platformId,
+                platformName,
+                amount: bid.fundingAmount,
+                sourceProjectId: project.id,
+                sourceTitle: project.name || project.title || 'Series',
+                franchiseId: project.projectDetails?.franchiseId || project.franchiseId || project.id,
+                installmentNumber: project.projectDetails?.installmentNumber || project.installmentNumber || 1,
+                projectType: 'SERIES' as const,
+                createdWeek: player.currentWeek,
+                createdYear: player.age
+            }
+            : null;
         
         if (studio) {
             const b = updatedPlayer.businesses.find(b => b.id === studio.id);
@@ -466,12 +531,14 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                     year: player.age,
                     amount: bid.amount,
                     type: 'STREAMING_DEAL',
-                    label: `${project.name} ${PLATFORMS.find(p => p.id === bid.platformId)?.name || 'platform'} deal`,
+                    label: `${project.name} ${platformName} deal`,
                     projectId: project.id
                 }, ...ledger].slice(0, 40);
                 
-                // Add funding to studio production fund
-                if (bid.fundingAmount) {
+                // Series renewal funding is locked to the next season. Other greenlight money remains a generic production fund.
+                if (lockedFunding) {
+                    b.studioState.lockedStreamingFunds = [lockedFunding, ...(b.studioState.lockedStreamingFunds || [])].slice(0, 20);
+                } else if (bid.fundingAmount) {
                     b.studioState.productionFund = (b.studioState.productionFund || 0) + bid.fundingAmount;
                 }
             }
@@ -484,7 +551,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                 year: updatedPlayer.age,
                 amount: bid.amount,
                 category: 'BUSINESS',
-                description: `Streaming Rights: ${project.name} (${PLATFORMS.find(p => p.id === bid.platformId)?.name})`
+                description: `Streaming Rights: ${project.name} (${platformName})`
             });
         }
 
@@ -511,7 +578,12 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                     hiddenStats: {
                         ...commitment.projectDetails.hiddenStats,
                         platformId: bid.platformId,
-                        backendPct: bid.backendPct || 0
+                        backendPct: bid.backendPct || 0,
+                        ...(lockedFunding ? {
+                            nextSeasonFundingAmount: lockedFunding.amount,
+                            nextSeasonFundingPlatformId: lockedFunding.platformId,
+                            nextSeasonFundingSourceProjectId: lockedFunding.sourceProjectId
+                        } : {})
                     }
                 } : undefined
             };
@@ -551,7 +623,13 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                         ...release.projectDetails,
                         hiddenStats: {
                             ...release.projectDetails.hiddenStats,
-                            platformId: bid.platformId
+                            platformId: bid.platformId,
+                            backendPct: bid.backendPct || release.projectDetails.hiddenStats.backendPct || 0,
+                            ...(lockedFunding ? {
+                                nextSeasonFundingAmount: lockedFunding.amount,
+                                nextSeasonFundingPlatformId: lockedFunding.platformId,
+                                nextSeasonFundingSourceProjectId: lockedFunding.sourceProjectId
+                            } : {})
                         }
                     }
                 };
@@ -863,21 +941,41 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                             <motion.div key="step2s" initial={{ opacity: 0, scale: 0.95, filter: 'blur(10px)' }} animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }} exit={{ opacity: 0, scale: 1.05, filter: 'blur(10px)' }} transition={{ duration: 0.4 }} className="space-y-8">
                                 <div className="text-center space-y-4">
                                     <h2 className="text-5xl md:text-7xl font-serif font-light tracking-tight text-white/90">The War Room</h2>
-                                    <p className="text-lg text-white/50 font-light tracking-wide">Streaming platforms are bidding for your project.</p>
+                                    <p className="text-lg text-white/50 font-light tracking-wide">
+                                        {lockedPremiereBid
+                                            ? `${lockedPremierePlatform?.name} already funded this season, so the premiere is locked.`
+                                            : 'Streaming platforms are bidding for your project.'}
+                                    </p>
                                 </div>
 
                                 {auctionState === 'IDLE' && (
                                     <div className="flex flex-col items-center justify-center py-20 space-y-8">
                                         <div className="text-center max-w-md">
-                                            <p className="text-white/70 mb-6">Open the floor to streaming platforms. They will bid based on the estimated quality and genre of your project.</p>
-                                            <button onClick={startAuction} className="px-12 py-4 bg-blue-500 text-white rounded-full font-bold tracking-widest uppercase text-xs hover:scale-105 transition-all shadow-[0_0_30px_rgba(59,130,246,0.3)]">
-                                                Start Bidding War
-                                            </button>
+                                            {lockedPremiereBid ? (
+                                                <>
+                                                    <div className="mb-6 rounded-3xl border border-sky-400/30 bg-sky-500/10 p-6">
+                                                        <div className="text-[10px] font-black uppercase tracking-[0.35em] text-sky-300 mb-3">Exclusive Renewal</div>
+                                                        <p className="text-white/75">
+                                                            This season was produced under a locked renewal cap. There is no second auction, no platform hopping, and no extra upfront check.
+                                                        </p>
+                                                    </div>
+                                                    <button onClick={() => handleAcceptBid(lockedPremiereBid)} className="px-12 py-4 bg-sky-400 text-black rounded-full font-bold tracking-widest uppercase text-xs hover:scale-105 transition-all shadow-[0_0_30px_rgba(56,189,248,0.3)]">
+                                                        Premiere on {lockedPremierePlatform?.name}
+                                                    </button>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <p className="text-white/70 mb-6">Open the floor to streaming platforms. They will bid based on the estimated quality and genre of your project.</p>
+                                                    <button onClick={startAuction} className="px-12 py-4 bg-blue-500 text-white rounded-full font-bold tracking-widest uppercase text-xs hover:scale-105 transition-all shadow-[0_0_30px_rgba(59,130,246,0.3)]">
+                                                        Start Bidding War
+                                                    </button>
+                                                </>
+                                            )}
                                         </div>
                                     </div>
                                 )}
 
-                                {auctionState !== 'IDLE' && (
+                                {!lockedPremiereBid && auctionState !== 'IDLE' && (
                                     <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                                         {/* Left: Platforms */}
                                         <div className="bg-white/5 border border-white/10 rounded-3xl p-6 backdrop-blur-md flex flex-col gap-4">
@@ -914,7 +1012,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                                                         
                                                         {highestBid.type === 'GREENLIGHT_DEAL' && (
                                                             <div className="inline-block mt-4 px-4 py-2 bg-emerald-500/20 border border-emerald-500/30 rounded-full text-emerald-300 text-[10px] font-bold uppercase tracking-widest">
-                                                                + ${(highestBid.fundingAmount! / 1000000).toFixed(1)}M Next Season Fund
+                                                                + ${(highestBid.fundingAmount! / 1000000).toFixed(1)}M {isSeries ? 'Locked Next Season Cap' : 'Production Fund'}
                                                             </div>
                                                         )}
                                                         {highestBid.type === 'BACKEND_POINTS' && (
@@ -1043,7 +1141,9 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                                         const timingMeta = getFestivalTimingMeta(fest.weeks, weekOfYear);
                                         const isTimingRight = timingMeta.isTimingRight;
                                         const canAfford = player.money >= fest.cost;
-                                        const hasPrestige = (project.projectDetails?.hiddenStats?.qualityScore || 0) >= fest.prestigeReq;
+                                        const projectQualityScore = project.projectDetails?.hiddenStats?.qualityScore || 0;
+                                        const displayQualityScore = Math.round(projectQualityScore);
+                                        const hasPrestige = projectQualityScore >= fest.prestigeReq;
                                         const isEligible = canAfford && hasPrestige && isTimingRight;
 
                                         return (
@@ -1068,7 +1168,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                                                 <div className="flex gap-6">
                                                     <div className="flex flex-col gap-1">
                                                         <span className="text-[9px] text-white/40 uppercase tracking-widest font-bold">Quality Req</span>
-                                                        <span className={`text-xs font-bold ${hasPrestige ? 'text-emerald-400' : 'text-rose-400'}`}>{fest.prestigeReq} (Yours: {project.projectDetails?.hiddenStats?.qualityScore || 0})</span>
+                                                        <span className={`text-xs font-bold ${hasPrestige ? 'text-emerald-400' : 'text-rose-400'}`}>{fest.prestigeReq} (Yours: {displayQualityScore})</span>
                                                     </div>
                                                     <div className="flex flex-col gap-1">
                                                         <span className="text-[9px] text-white/40 uppercase tracking-widest font-bold">Timing</span>

@@ -6,7 +6,7 @@ import { getWriterTalent } from '../../../services/roleLogic';
 import { generateWriters, generateIPMarket, generateProceduralLogline } from '../../../src/data/generators';
 import { SCRIPT_TEMPLATES } from '../../../src/data/scriptTemplates';
 import { normalizeStudioState } from '../../../services/businessLogic';
-import { buildUniverseRoster, calculateUniverseProductWeeklyRevenue, getUniverseDashboardProjects, normalizeUniverseForSave, normalizeUniverseMap } from '../../../services/universeLogic';
+import { buildUniverseRoster, calculateUniverseProductWeeklyRevenue, getUniverseDashboardProjects, getUniverseReleaseActivity, normalizeUniverseForSave, normalizeUniverseMap } from '../../../services/universeLogic';
 
 interface DevelopmentLabProps {
     player: Player;
@@ -1974,8 +1974,14 @@ const UniverseMerchView: React.FC<{
     onUpdatePlayer: (p: Player) => void;
 }> = ({ universe, player, studio, onUpdatePlayer }) => {
     const activeProducts = (universe.products || []).filter(product => product.active !== false);
+    const releaseActivity = getUniverseReleaseActivity(player, universe, player.activeReleases || []);
+    const activityNote = releaseActivity.weeksSinceLatestRelease === null
+        ? 'Release a canon project to activate licensing.'
+        : releaseActivity.multiplier <= 0
+            ? 'No recent canon release. Passive licensing is paused until this universe returns.'
+            : `${Math.max(0, Math.floor(releaseActivity.weeksSinceLatestRelease / 52))} years since the latest canon release.`;
     const projectedWeeklyRevenue = activeProducts.reduce(
-        (sum, product) => sum + calculateUniverseProductWeeklyRevenue(universe, product),
+        (sum, product) => sum + Math.floor(calculateUniverseProductWeeklyRevenue(universe, product) * releaseActivity.multiplier),
         0
     );
 
@@ -2038,8 +2044,22 @@ const UniverseMerchView: React.FC<{
             <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4">
                 <p className="text-[10px] font-black text-emerald-300 uppercase tracking-widest mb-1">Studio Capital Payout</p>
                 <p className="text-sm text-zinc-300 leading-relaxed">
-                    Merch and licensing revenue pays into your production house every week. Use the studio finance flow if you want to move that money elsewhere.
+                    Merch and licensing pays into your production house while the universe stays culturally active. If the catalog goes quiet too long, passive income pauses.
                 </p>
+            </div>
+
+            <div className={`border rounded-2xl p-4 ${releaseActivity.multiplier > 0 ? 'bg-amber-500/10 border-amber-500/20' : 'bg-rose-500/10 border-rose-500/20'}`}>
+                <div className="flex items-center justify-between gap-3">
+                    <div>
+                        <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-1">Catalog Heat</p>
+                        <p className="text-xl font-black text-white">{releaseActivity.label}</p>
+                    </div>
+                    <div className="text-right">
+                        <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-1">Payout Rate</p>
+                        <p className={`text-xl font-black ${releaseActivity.multiplier > 0 ? 'text-amber-300' : 'text-rose-300'}`}>{Math.round(releaseActivity.multiplier * 100)}%</p>
+                    </div>
+                </div>
+                <p className="text-xs text-zinc-400 mt-2">{activityNote}</p>
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -2070,7 +2090,7 @@ const UniverseMerchView: React.FC<{
                 ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         {universe.products.map((prod, idx) => {
-                            const projectedRevenue = calculateUniverseProductWeeklyRevenue(universe, prod);
+                            const projectedRevenue = Math.floor(calculateUniverseProductWeeklyRevenue(universe, prod) * releaseActivity.multiplier);
                             return (
                             <div key={idx} className="bg-zinc-900 border border-zinc-800 p-4 rounded-2xl flex justify-between items-center">
                                 <div className="flex items-center gap-3">
@@ -2283,7 +2303,8 @@ const UniverseDashboard: React.FC<{
         : 0;
     const totalGross = releasedProjects.reduce((sum, project) => sum + (project.gross || 0), 0);
     const activeProducts = (universe.products || []).filter(product => product.active !== false);
-    const projectedLicensing = activeProducts.reduce((sum, product) => sum + calculateUniverseProductWeeklyRevenue(universe, product), 0);
+    const releaseActivity = getUniverseReleaseActivity(player, universe, player.activeReleases || []);
+    const projectedLicensing = activeProducts.reduce((sum, product) => sum + Math.floor(calculateUniverseProductWeeklyRevenue(universe, product) * releaseActivity.multiplier), 0);
     const continuityScore = clamp(
         70
         + Math.min(20, normalizedRoster.filter(character => (character.appearances || 0) >= 2).length * 4)
@@ -2450,6 +2471,7 @@ const UniverseDashboard: React.FC<{
                     <div className="bg-black/25 border border-white/10 rounded-2xl p-3">
                         <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Licensing</p>
                         <p className="text-xl font-black text-amber-300">{formatCurrency(projectedLicensing)}</p>
+                        <p className="text-[9px] font-black uppercase tracking-widest text-zinc-600 mt-1">{releaseActivity.label}</p>
                     </div>
                 </div>
             </div>

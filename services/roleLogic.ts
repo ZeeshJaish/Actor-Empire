@@ -37,6 +37,57 @@ export const GENRE_SYNERGIES: Record<Genre, Genre[]> = {
 };
 
 const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
+const SPECTACLE_GENRES = new Set<Genre>(['ACTION', 'SCI_FI', 'SUPERHERO', 'ADVENTURE']);
+const INTIMATE_GENRES = new Set<Genre>(['DRAMA', 'ROMANCE', 'THRILLER', 'COMEDY', 'HORROR']);
+
+export const getRecommendedCastDepth = (genre: Genre, budgetTier: BudgetTier): number => {
+    if (SPECTACLE_GENRES.has(genre)) {
+        if (budgetTier === 'BLOCKBUSTER') return 7;
+        if (budgetTier === 'HIGH') return 6;
+        return 4;
+    }
+    if (INTIMATE_GENRES.has(genre)) {
+        if (budgetTier === 'BLOCKBUSTER') return 4;
+        if (budgetTier === 'HIGH') return 3;
+        return 2;
+    }
+    return budgetTier === 'BLOCKBUSTER' ? 5 : budgetTier === 'HIGH' ? 4 : 3;
+};
+
+export const calculateCastDepthScore = (
+    castSize: number,
+    genre: Genre,
+    budgetTier: BudgetTier,
+    leadStarPower: number = 50
+): { score: number; note: string } => {
+    const recommended = getRecommendedCastDepth(genre, budgetTier);
+    const depthRatio = Math.min(1.35, Math.max(0.2, castSize / Math.max(1, recommended)));
+    const starCover = Math.max(0, Math.min(18, (leadStarPower - 70) * 0.45));
+    const spectaclePenalty = SPECTACLE_GENRES.has(genre) && castSize < recommended ? 10 : 0;
+    const intimateForgiveness = INTIMATE_GENRES.has(genre) && castSize >= 2 ? 10 : 0;
+    const score = Math.max(10, Math.min(100, Math.round((depthRatio * 72) + starCover + intimateForgiveness - spectaclePenalty)));
+    const note = score >= 82 ? 'Deep ensemble'
+        : score >= 62 ? 'Healthy cast'
+        : score >= 42 ? 'Thin but workable'
+        : 'Too thin for scale';
+    return { score, note };
+};
+
+export const calculateProjectExperienceGain = (
+    role: RoleType,
+    rating: number,
+    budgetTier: BudgetTier,
+    isFamous?: boolean,
+    isPlayerStudio?: boolean
+): number => {
+    let gain = role === 'LEAD' ? 3 : role === 'SUPPORTING' || role === 'ENSEMBLE' ? 2 : 1;
+    if (rating >= 8.5) gain += 2;
+    else if (rating >= 7.4) gain += 1;
+    if (budgetTier === 'HIGH' || budgetTier === 'BLOCKBUSTER') gain += 1;
+    if (isFamous) gain += 1;
+    if (isPlayerStudio) gain += 1;
+    return Math.max(1, Math.min(7, gain));
+};
 
 // ... (Keep existing functions: rewardGenreExperience, calculateGenreFit, etc.) ...
 export const rewardGenreExperience = (player: Player, primaryGenre: Genre, baseAmount: number) => {
@@ -140,7 +191,8 @@ export const calculateAuditionGain = (player: Player, roleType: RoleType, curren
     // Reduced base from 7 to 4
     const gain = 4 + (intelligence * 0.10); 
     const diminishing = Math.max(0.1, 1 - (currentPrep / 100));
-    return Math.floor(gain * diminishing);
+    const minimumGain = currentPrep >= 70 ? 2 : 1;
+    return currentPrep >= 100 ? 0 : Math.max(minimumGain, Math.floor(gain * diminishing));
 };
 
 // NERFED: Reduced base gain for production rehearsals
@@ -160,7 +212,8 @@ export const calculateProductionGain = (player: Player, roleType: RoleType, curr
     let gain = 3 + (skill * 0.08); 
     if (isOverworked) gain *= 0.5;
     const diminishing = Math.max(0.1, 1 - (currentPerf / 100));
-    return Math.floor(gain * diminishing);
+    const minimumGain = currentPerf >= 70 ? 2 : 1;
+    return currentPerf >= 100 ? 0 : Math.max(minimumGain, Math.floor(gain * diminishing));
 };
 
 export const calculatePassiveGain = (talent: number): number => {
@@ -563,26 +616,62 @@ export const generateCastList = (player: Player, project: ProjectDetails, player
     return cast;
 };
 
-export const generateReviews = (quality: number, genre: string, playerName: string, isRecast?: boolean): Review[] => {
+export const generateReviews = (
+    quality: number,
+    genre: string,
+    playerName: string,
+    isRecast?: boolean,
+    castDepthScore: number = 70,
+    budgetTier: BudgetTier = 'MID'
+): Review[] => {
     const reviews: Review[] = [];
     const count = 3;
+    const isThinSpectacle = castDepthScore < 50 && SPECTACLE_GENRES.has(genre as Genre) && ['HIGH', 'BLOCKBUSTER'].includes(budgetTier);
+    const positiveLines = [
+        `A stunning entry in the ${genre} genre. ${playerName} shines.`,
+        `Confident, polished, and powered by a strong central performance from ${playerName}.`,
+        `The craft holds up, and the best moments feel genuinely cinematic.`,
+        `A crowd-pleaser with enough heart to survive beyond opening weekend.`,
+    ];
+    const mixedLines = [
+        'Has its moments, but fails to stick the landing.',
+        'Strong pieces are here, but the movie never fully becomes the event it wants to be.',
+        'The ambition is visible, even when the execution wobbles.',
+        'There is a good movie inside this, but it needed sharper structure.',
+    ];
+    const negativeLines = [
+        'A disappointing mess. Avoid.',
+        'Too loud, too thin, and not nearly as memorable as the budget suggests.',
+        'The spectacle is expensive, but the drama feels undercooked.',
+        'A glossy package with very little staying power.',
+    ];
+    const thinCastLines = [
+        'For a movie this big, the world feels strangely empty around the leads.',
+        'The lead pair works, but the missing ensemble makes the scale feel smaller than the budget.',
+        'A stronger supporting cast could have made this feel like a real event.',
+    ];
+
     for(let i=0; i<count; i++) {
         let sentiment: 'POSITIVE' | 'MIXED' | 'NEGATIVE' = 'MIXED';
         if (quality > 70) sentiment = 'POSITIVE';
         if (quality < 40) sentiment = 'NEGATIVE';
+        if (isThinSpectacle && sentiment === 'POSITIVE' && Math.random() < 0.55) sentiment = 'MIXED';
         if (Math.random() > 0.8) sentiment = sentiment === 'POSITIVE' ? 'MIXED' : 'POSITIVE';
 
         let text = "";
+        if (isThinSpectacle && i === 1) {
+            text = pick(thinCastLines);
+        }
         if (sentiment === 'POSITIVE') {
-            text = `A stunning entry in the ${genre} genre. ${playerName} shines.`;
+            text = text || pick(positiveLines);
             if (isRecast && Math.random() > 0.5) text = `The new cast breathes fresh life into the franchise! A stunning entry in the ${genre} genre.`;
         }
         else if (sentiment === 'MIXED') {
-            text = `Has its moments, but fails to stick the landing.`;
+            text = text || pick(mixedLines);
             if (isRecast && Math.random() > 0.5) text = `The recasting is jarring, but it has its moments.`;
         }
         else {
-            text = `A disappointing mess. Avoid.`;
+            text = text || pick(negativeLines);
             if (isRecast && Math.random() > 0.5) text = `A disastrous recast ruins whatever magic the original had. Avoid.`;
         }
 
@@ -686,9 +775,16 @@ export const calculateWeeklyBoxOffice = (
     const castingStrength = stats.castingStrength || 50;
     const qualityScore = stats.qualityScore || 50;
     const fameMultiplier = stats.fameMultiplier || 1.0;
+    const castDepthScore = stats.castDepthScore ?? 70;
+    const studioPrestigeScore = stats.studioPrestigeScore ?? 0;
     const packageStrength = (scriptQuality * 0.35) + (directorQuality * 0.25) + (castingStrength * 0.4);
     const audienceStrength = (qualityScore * 0.55) + (scriptQuality * 0.25) + (directorQuality * 0.2);
     const genreOpeningMod = 0.85 + ((genreMod - 1) * 0.6);
+    const castDepthMod = castDepthScore >= 85 ? 1.08
+        : castDepthScore >= 65 ? 1
+        : castDepthScore >= 45 ? 0.88
+        : 0.7;
+    const studioPrestigeMod = 1 + Math.min(0.14, studioPrestigeScore / 700);
 
     // --- OPENING WEEKEND ---
     if (week === 1) {
@@ -700,7 +796,7 @@ export const calculateWeeklyBoxOffice = (
         const qualityMod = 0.85 + ((qualityScore - 50) / 100) * 0.45;
         const fameMod = 0.85 + ((fameMultiplier - 1) * 0.7);
 
-        let rawOpening = budget * baseMultiplier * distMod * buzzMod * packageMod * qualityMod * fameMod;
+        let rawOpening = budget * baseMultiplier * distMod * buzzMod * packageMod * qualityMod * fameMod * castDepthMod * studioPrestigeMod;
         rawOpening *= (0.8 + Math.random() * 0.4); // Variance
 
         // Genre Adjustment
@@ -713,6 +809,10 @@ export const calculateWeeklyBoxOffice = (
             (scriptQuality > 85 || directorQuality > 85);
         if (isSleeperCandidate) {
             rawOpening *= 1.08 + (Math.random() * 0.12);
+        }
+
+        if (SPECTACLE_GENRES.has(genre) && ['HIGH', 'BLOCKBUSTER'].includes(budgetTier) && castDepthScore < 55) {
+            rawOpening *= 0.72 + (castDepthScore / 220);
         }
 
         // "The Avenger Factor": Can we break the cap?
@@ -754,6 +854,8 @@ export const calculateWeeklyBoxOffice = (
     if (scriptQuality > 85) dropRate -= 0.05;
     if (directorQuality > 82) dropRate -= 0.03;
     if (week === 2 && castingStrength - audienceStrength > 18) dropRate += 0.08;
+    if (SPECTACLE_GENRES.has(genre) && ['HIGH', 'BLOCKBUSTER'].includes(budgetTier) && castDepthScore < 55) dropRate += 0.1;
+    if (castDepthScore > 84 && qualityScore > 75) dropRate -= 0.03;
 
     const variance = (Math.random() * 0.1) - 0.05; 
     dropRate += variance;

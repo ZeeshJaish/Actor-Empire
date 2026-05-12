@@ -280,6 +280,8 @@ const UNIVERSE_NEWS_TEMPLATES = [
 ];
 
 const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
+const hasPublishedReleaseNews = (rel: ActiveRelease, key: string): boolean =>
+    Array.isArray(rel.generatedNewsKeys) && rel.generatedNewsKeys.includes(key);
 
 // ... (Generate Personal News, Top Stories, Industry News functions remain same)
 
@@ -314,26 +316,32 @@ const generateTopStories = (player: Player): NewsItem[] => {
             const gross = rel.weeklyGross[0];
             
             if (gross > budget * 0.5) {
+                const newsKey = `news_bo_hit_${rel.id}`;
+                if (hasPublishedReleaseNews(rel, newsKey)) return;
                 const isUniverse = rel.projectDetails.universeId != null;
                 const headlineArr = isUniverse ? [...HIT_HEADLINES, ...UNIVERSE_HIT_HEADLINES] : HIT_HEADLINES;
                 news.push({
-                    id: `news_bo_hit_${rel.id}`,
+                    id: newsKey,
                     headline: pick(headlineArr).replace('{Title}', rel.name),
                     subtext: `$${(gross/1000000).toFixed(1)}M opening weekend stuns Hollywood.`,
                     category: 'TOP_STORY', week, year, impactLevel: 'HIGH'
                 });
             } else if (gross < budget * 0.15 && rel.projectDetails.budgetTier !== 'LOW') {
+                const newsKey = `news_bo_flop_${rel.id}`;
+                if (hasPublishedReleaseNews(rel, newsKey)) return;
                 const isUniverse = rel.projectDetails.universeId != null;
                 const headlineArr = isUniverse ? [...FLOP_HEADLINES, ...UNIVERSE_FLOP_HEADLINES] : FLOP_HEADLINES;
                 news.push({
-                    id: `news_bo_flop_${rel.id}`,
+                    id: newsKey,
                     headline: pick(headlineArr).replace('{Title}', rel.name),
                     subtext: `Disastrous $${(gross/1000000).toFixed(1)}M opening raises questions.`,
                     category: 'TOP_STORY', week, year, impactLevel: 'HIGH'
                 });
             } else if (rel.projectDetails.budgetTier === 'HIGH') {
+                const newsKey = `news_bo_open_${rel.id}`;
+                if (hasPublishedReleaseNews(rel, newsKey)) return;
                 news.push({
-                    id: `news_bo_open_${rel.id}`,
+                    id: newsKey,
                     headline: `'${rel.name}' opens at #1.`,
                     subtext: `Solid performance for the ${rel.projectDetails.genre} blockbuster.`,
                     category: 'TOP_STORY', week, year, impactLevel: 'MEDIUM'
@@ -342,19 +350,23 @@ const generateTopStories = (player: Player): NewsItem[] => {
         }
         if (rel.weekNum === 2 && rel.imdbRating) {
             if (rel.imdbRating >= 8.5) {
+                const newsKey = `news_crit_high_${rel.id}`;
+                if (hasPublishedReleaseNews(rel, newsKey)) return;
                 const isUniverse = rel.projectDetails.universeId != null;
                 const headlineArr = isUniverse ? [...CRITIC_LOVED_HEADLINES, ...UNIVERSE_CRITIC_LOVED_HEADLINES] : CRITIC_LOVED_HEADLINES;
                 news.push({
-                    id: `news_crit_high_${rel.id}`,
+                    id: newsKey,
                     headline: pick(headlineArr).replace('{Title}', rel.name),
                     subtext: `With an ${rel.imdbRating} rating, word of mouth is electric.`,
                     category: 'TOP_STORY', week, year, impactLevel: 'MEDIUM'
                 });
             } else if (rel.imdbRating <= 4.0) {
+                const newsKey = `news_crit_low_${rel.id}`;
+                if (hasPublishedReleaseNews(rel, newsKey)) return;
                 const isUniverse = rel.projectDetails.universeId != null;
                 const headlineArr = isUniverse ? [...CRITIC_HATED_HEADLINES, ...UNIVERSE_CRITIC_HATED_HEADLINES] : CRITIC_HATED_HEADLINES;
                 news.push({
-                    id: `news_crit_low_${rel.id}`,
+                    id: newsKey,
                     headline: pick(headlineArr).replace('{Title}', rel.name),
                     subtext: "Audience scores are equally punishing.",
                     category: 'TOP_STORY', week, year, impactLevel: 'MEDIUM'

@@ -336,7 +336,11 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
       handleUpdatePlayer({
           ...props.player!,
           money: props.player!.money - agent.annualFee,
-          team: { ...props.player!.team, agent },
+          team: {
+              ...props.player!.team,
+              agent,
+              availableAgents: (props.player!.team.availableAgents || []).filter(candidate => candidate.id !== agent.id)
+          },
           logs: [...props.player!.logs, { 
               week: props.player!.currentWeek, 
               year: props.player!.age, 
@@ -355,7 +359,11 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
       handleUpdatePlayer({
           ...props.player!,
           money: props.player!.money - manager.annualFee,
-          team: { ...props.player!.team, manager },
+          team: {
+              ...props.player!.team,
+              manager,
+              availableManagers: (props.player!.team.availableManagers || []).filter(candidate => candidate.id !== manager.id)
+          },
           logs: [...props.player!.logs, { 
               week: props.player!.currentWeek, 
               year: props.player!.age, 

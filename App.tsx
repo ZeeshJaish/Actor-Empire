@@ -21,7 +21,7 @@ import { PressConferenceEvent } from './views/PressConferenceEvent';
 import { processGameWeek } from './services/gameLoop';
 import { generateAuditions, generatePartTimeJobs, rewardGenreExperience } from './services/roleLogic';
 import { generateWeeklyFeed, calculateInteraction, getGenderedAvatar } from './services/npcLogic';
-import { getRandomAgents, getRandomManagers, getRandomTrainers, getRandomStylists, getRandomTherapists, getRandomPublicists } from './services/teamLogic';
+import { getRandomAgents, getRandomManagers, getRandomTrainers, getRandomStylists, getRandomTherapists, getRandomPublicists, getRandomWellness, sanitizeTeamPools } from './services/teamLogic';
 import { createBusiness, normalizeStudioState } from './services/businessLogic';
 import { CheckCircle, Heart, ShieldAlert, AlertTriangle, PlayCircle, Loader2, Skull, Briefcase, Baby } from 'lucide-react'; 
 import { useGameActions } from './hooks/useGameActions';
@@ -442,6 +442,7 @@ export const App: React.FC = () => {
               babyGender: pendingBabyNaming.babyGender,
               childName: `${pendingBabyNaming.suggestedFirstName} ${getSurname(pendingBabyNaming.partnerName)}`.trim(),
               birthWeekAbsolute: pendingBabyNaming.birthWeekAbsolute,
+              hideFromConnections: true,
           })
       );
 
@@ -611,14 +612,26 @@ export const App: React.FC = () => {
           }
 
           if (!safePlayer.team) safePlayer.team = { ...INITIAL_PLAYER.team };
+          if (safePlayer.team.wellness === undefined) safePlayer.team.wellness = null;
+          const hiredTeamIds = [
+              safePlayer.team.agent?.id,
+              safePlayer.team.manager?.id,
+              safePlayer.team.personalTrainer?.id,
+              safePlayer.team.stylist?.id,
+              safePlayer.team.therapist?.id,
+              safePlayer.team.publicist?.id,
+              safePlayer.team.wellness?.id,
+          ].filter((id): id is string => Boolean(id));
           
           // Ensure Pools
-          if (!safePlayer.team.availableAgents?.length) safePlayer.team.availableAgents = getRandomAgents(3);
-          if (!safePlayer.team.availableManagers?.length) safePlayer.team.availableManagers = getRandomManagers(2);
-          if (!Array.isArray(safePlayer.team.availableTrainers) || safePlayer.team.availableTrainers.length === 0) safePlayer.team.availableTrainers = getRandomTrainers(2);
-          if (!Array.isArray(safePlayer.team.availableStylists) || safePlayer.team.availableStylists.length === 0) safePlayer.team.availableStylists = getRandomStylists(2);
-          if (!Array.isArray(safePlayer.team.availableTherapists) || safePlayer.team.availableTherapists.length === 0) safePlayer.team.availableTherapists = getRandomTherapists(2);
-          if (!Array.isArray(safePlayer.team.availablePublicists) || safePlayer.team.availablePublicists.length === 0) safePlayer.team.availablePublicists = getRandomPublicists(2);
+          if (!safePlayer.team.availableAgents?.length) safePlayer.team.availableAgents = getRandomAgents(3, hiredTeamIds);
+          if (!safePlayer.team.availableManagers?.length) safePlayer.team.availableManagers = getRandomManagers(2, hiredTeamIds);
+          if (!Array.isArray(safePlayer.team.availableTrainers) || safePlayer.team.availableTrainers.length === 0) safePlayer.team.availableTrainers = getRandomTrainers(2, hiredTeamIds);
+          if (!Array.isArray(safePlayer.team.availableStylists) || safePlayer.team.availableStylists.length === 0) safePlayer.team.availableStylists = getRandomStylists(2, hiredTeamIds);
+          if (!Array.isArray(safePlayer.team.availableTherapists) || safePlayer.team.availableTherapists.length === 0) safePlayer.team.availableTherapists = getRandomTherapists(2, hiredTeamIds);
+          if (!Array.isArray(safePlayer.team.availablePublicists) || safePlayer.team.availablePublicists.length === 0) safePlayer.team.availablePublicists = getRandomPublicists(2, hiredTeamIds);
+          if (!Array.isArray(safePlayer.team.availableWellness) || safePlayer.team.availableWellness.length === 0) safePlayer.team.availableWellness = getRandomWellness(2, hiredTeamIds);
+          safePlayer.team = sanitizeTeamPools(safePlayer);
 
           // Ensure Arrays
           if (!Array.isArray(safePlayer.commitments)) safePlayer.commitments = [];
@@ -1998,7 +2011,11 @@ export const App: React.FC = () => {
                                     return { 
                                         ...p, 
                                         money: p.money - agent.annualFee,
-                                        team: { ...p.team, agent: agent },
+                                        team: { 
+                                            ...p.team,
+                                            agent: agent,
+                                            availableAgents: (p.team.availableAgents || []).filter(a => a.id !== agent.id)
+                                        },
                                         relationships: newRels
                                     };
                                 });
@@ -2035,7 +2052,11 @@ export const App: React.FC = () => {
                                     return { 
                                         ...p, 
                                         money: p.money - manager.annualFee,
-                                        team: { ...p.team, manager: manager },
+                                        team: {
+                                            ...p.team,
+                                            manager: manager,
+                                            availableManagers: (p.team.availableManagers || []).filter(m => m.id !== manager.id)
+                                        },
                                         relationships: newRels
                                     };
                                 });

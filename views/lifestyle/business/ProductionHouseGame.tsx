@@ -83,8 +83,10 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
     // Calculate Awards Won
     const awardsWon = library.reduce((sum, p) => sum + (p.awards?.filter(a => a.outcome === 'WON').length || 0), 0);
     
-    // Prestige Score (0-100)
-    const prestigeScore = Math.min(100, Math.floor((avgRating * 5) + (awardsWon * 2) + (library.length * 0.5)));
+    const breakoutCount = library.filter(p => ((p.gross || 0) + (p.streamingRevenue || 0)) > 200_000_000).length;
+    const consistencyBonus = library.filter(p => (p.rating || 0) >= 7.5).length * 0.8;
+    // Prestige Score (0-100): rewards quality, awards, consistency, and credible hits.
+    const prestigeScore = Math.min(100, Math.floor((avgRating * 6) + (awardsWon * 2.5) + (library.length * 0.8) + (breakoutCount * 1.2) + consistencyBonus));
 
     // Active Slate List (Combined for the Netflix-style row)
     const activeSlate = [
@@ -324,6 +326,29 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
             `Building upon the events of ${project.title}, this sequel dives deeper into the lore and delivers shocking twists.`
         ];
         const randomLogline = loglines[Math.floor(Math.random() * loglines.length)];
+        const sourceHiddenStats = details.hiddenStats || {};
+        const sourceFundingAmount = sourceHiddenStats.nextSeasonFundingUsedByProjectId
+            ? 0
+            : Number(sourceHiddenStats.nextSeasonFundingAmount || 0);
+        const sourceFundingPlatformId = sourceHiddenStats.nextSeasonFundingPlatformId || null;
+        const lockedFundRecord = (studio.studioState?.lockedStreamingFunds || []).find((fund: any) =>
+            fund.sourceProjectId === project.id || fund.sourceProjectId === details.id || fund.sourceProjectId === sourceHiddenStats.nextSeasonFundingSourceProjectId
+        );
+        const lockedStreamingFunding = !isSpinoff && (project.type || details.type) === 'SERIES' && (sourceFundingAmount > 0 || lockedFundRecord)
+            ? {
+                id: lockedFundRecord?.id || `stream_fund_${project.id}_${Date.now()}`,
+                platformId: lockedFundRecord?.platformId || sourceFundingPlatformId || 'STREAMING_PLATFORM',
+                platformName: lockedFundRecord?.platformName || sourceFundingPlatformId || 'Streaming Platform',
+                amount: Math.floor(lockedFundRecord?.amount || sourceFundingAmount),
+                sourceProjectId: lockedFundRecord?.sourceProjectId || project.id,
+                sourceTitle: lockedFundRecord?.sourceTitle || project.title || project.name,
+                franchiseId: project.franchiseId || project.id,
+                installmentNumber: project.installmentNumber || 1,
+                projectType: 'SERIES' as const,
+                createdWeek: lockedFundRecord?.createdWeek || player.currentWeek,
+                createdYear: lockedFundRecord?.createdYear || player.age
+            }
+            : undefined;
 
         const newScript: Script = {
             id: newScriptId,
@@ -343,7 +368,8 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
             sourceMaterial: isSpinoff ? 'SPINOFF' : 'SEQUEL',
             franchiseId: project.franchiseId || project.id,
             installmentNumber: isSpinoff ? 1 : (project.installmentNumber || 1) + 1,
-            returningTalent
+            returningTalent,
+            lockedStreamingFunding
         };
 
         updatedStudio.studioState.scripts = [...(updatedStudio.studioState.scripts || []), newScript];
@@ -379,7 +405,8 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
                 practicalEffects: 'TIER_3'
             },
             tone: project.projectDetails?.tone || 50,
-            lastStep: 'SELECT_SCRIPT'
+            lastStep: 'SELECT_SCRIPT',
+            lockedStreamingFunding
         };
 
         // Pre-fill concept with previous project data

@@ -1,12 +1,22 @@
 export const formatMoney = (val: number) => {
-    if (isNaN(val)) return '$0';
+    if (!Number.isFinite(val)) return '$999T+';
     const absVal = Math.abs(val);
     const sign = val < 0 ? '-' : '';
-    let formatted = '';
-    if (absVal >= 1_000_000_000_000) formatted = `${(absVal/1_000_000_000_000).toFixed(1)}T`;
-    else if (absVal >= 1_000_000_000) formatted = `${(absVal/1_000_000_000).toFixed(1)}B`;
-    else if (absVal >= 1_000_000) formatted = `${(absVal/1_000_000).toFixed(1)}M`;
-    else if (absVal >= 1_000) formatted = `${(absVal/1_000).toFixed(0)}k`;
-    else formatted = absVal.toLocaleString();
+    const suffixes = [
+        { value: 1_000_000_000_000_000_000_000_000_000_000, label: 'No' },
+        { value: 1_000_000_000_000_000_000_000_000_000, label: 'Oc' },
+        { value: 1_000_000_000_000_000_000_000_000, label: 'Sp' },
+        { value: 1_000_000_000_000_000_000_000, label: 'Sx' },
+        { value: 1_000_000_000_000_000_000, label: 'Qi' },
+        { value: 1_000_000_000_000_000, label: 'Qa' },
+        { value: 1_000_000_000_000, label: 'T' },
+        { value: 1_000_000_000, label: 'B' },
+        { value: 1_000_000, label: 'M' },
+        { value: 1_000, label: 'k' },
+    ];
+    const tier = suffixes.find(item => absVal >= item.value);
+    const formatted = tier
+        ? `${(absVal / tier.value).toFixed(tier.value >= 1_000_000 ? 1 : 0)}${tier.label}`
+        : absVal.toLocaleString(undefined, { maximumFractionDigits: 0 });
     return `${sign}$${formatted}`;
 };

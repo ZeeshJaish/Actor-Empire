@@ -1,5 +1,5 @@
 import { FamilyObligation, NewsItem, Player, Relationship } from '../types';
-import { getAbsoluteWeek } from './legacyLogic';
+import { getAbsoluteWeek, getRelationshipAge } from './legacyLogic';
 import { getGenderedAvatar } from './npcLogic';
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
@@ -52,6 +52,21 @@ const SOCIAL_REACTION_POSTS = [
     'courtroom season just started and the mess is already legendary',
 ];
 
+type FamilyDramaSeed = {
+    id: string;
+    type: 'ABANDONED_CHILD';
+    childId: string;
+    childName: string;
+    partnerId?: string;
+    partnerName?: string;
+    createdAbsoluteWeek: number;
+    earliestAbsoluteWeek: number;
+    status: 'DORMANT' | 'TRIGGERED';
+    hiddenChild?: Relationship;
+};
+
+type FamilyDramaLog = { msg: string; type: 'positive' | 'negative' | 'neutral' };
+
 const getSurname = (fullName: string) => {
     const parts = (fullName || '').trim().split(/\s+/).filter(Boolean);
     if (parts.length === 0) return 'Legacy';
@@ -62,6 +77,9 @@ const ensureFamilyFlags = (player: Player) => {
     if (!player.flags) player.flags = {};
     if (!Array.isArray(player.flags.familyObligations)) player.flags.familyObligations = [] as FamilyObligation[];
     if (!Array.isArray(player.flags.abandonedChildIds)) player.flags.abandonedChildIds = [] as string[];
+    if (!Array.isArray(player.flags.hiddenChildren)) player.flags.hiddenChildren = [] as Relationship[];
+    if (!Array.isArray(player.flags.familyDramaSeeds)) player.flags.familyDramaSeeds = [] as FamilyDramaSeed[];
+    if (!Array.isArray(player.flags.familyClaimHistory)) player.flags.familyClaimHistory = [];
 };
 
 export const isChildAbandoned = (player: Player, childId: string) =>
@@ -147,6 +165,35 @@ const addObligation = (player: Player, obligation: FamilyObligation) => {
     (player.flags.familyObligations as FamilyObligation[]).push(obligation);
 };
 
+const scheduleAbandonedChildDrama = (
+    player: Player,
+    child: Relationship,
+    partner: Relationship | undefined,
+    absoluteWeek: number,
+    hiddenChild?: Relationship
+) => {
+    ensureFamilyFlags(player);
+    const seeds = player.flags.familyDramaSeeds as FamilyDramaSeed[];
+    if (seeds.some(seed => seed.childId === child.id && seed.status === 'DORMANT')) return;
+
+    const delay = hiddenChild
+        ? 52 + Math.floor(Math.random() * 156)
+        : 26 + Math.floor(Math.random() * 104);
+
+    seeds.push({
+        id: `family_drama_${child.id}_${absoluteWeek}`,
+        type: 'ABANDONED_CHILD',
+        childId: child.id,
+        childName: child.name,
+        partnerId: partner?.id,
+        partnerName: partner?.name,
+        createdAbsoluteWeek: absoluteWeek,
+        earliestAbsoluteWeek: absoluteWeek + delay,
+        status: 'DORMANT',
+        hiddenChild,
+    });
+};
+
 export const applyParenthoodAbandonment = (
     player: Player,
     config: {
@@ -157,6 +204,7 @@ export const applyParenthoodAbandonment = (
         partnerId?: string;
         partnerName?: string;
         birthWeekAbsolute?: number;
+        hideFromConnections?: boolean;
     }
 ): Player => {
     const nextPlayer = JSON.parse(JSON.stringify(player)) as Player;
@@ -171,6 +219,7 @@ export const applyParenthoodAbandonment = (
     const absoluteWeek = getAbsoluteWeek(nextPlayer.age, nextPlayer.currentWeek);
 
     let child = config.childId ? nextPlayer.relationships.find(rel => rel.id === config.childId) : undefined;
+    let hiddenChildForFutureClaim: Relationship | undefined;
     if (!child) {
         const fallbackName = config.childName || `${config.babyGender === 'FEMALE' ? 'Mia' : 'Leo'} ${getSurname(config.partnerName || nextPlayer.name)}`;
         child = {
@@ -185,7 +234,15 @@ export const applyParenthoodAbandonment = (
             gender: config.babyGender,
             birthWeekAbsolute: config.birthWeekAbsolute ?? absoluteWeek,
         };
-        nextPlayer.relationships.push(child);
+        if (config.hideFromConnections) {
+            hiddenChildForFutureClaim = child;
+            const hiddenChildren = nextPlayer.flags.hiddenChildren as Relationship[];
+            if (!hiddenChildren.some(item => item.id === child!.id)) {
+                hiddenChildren.push(child);
+            }
+        } else {
+            nextPlayer.relationships.push(child);
+        }
     } else {
         child.closeness = Math.min(child.closeness, 5);
         child.lastInteractionWeek = nextPlayer.currentWeek;
@@ -232,6 +289,8 @@ export const applyParenthoodAbandonment = (
         }
     }
 
+    scheduleAbandonedChildDrama(nextPlayer, child, partner, absoluteWeek, hiddenChildForFutureClaim);
+
     nextPlayer.stats.happiness = Math.max(0, nextPlayer.stats.happiness - 14);
     nextPlayer.stats.reputation = Math.max(0, nextPlayer.stats.reputation - (nextPlayer.stats.fame > 50 ? 16 : 10));
     nextPlayer.stats.followers = Math.max(0, nextPlayer.stats.followers - Math.floor(nextPlayer.stats.followers * (nextPlayer.stats.fame > 40 ? 0.06 : 0.02)));
@@ -259,6 +318,106 @@ export const applyParenthoodAbandonment = (
     ].slice(0, 50);
 
     return nextPlayer;
+};
+
+export const processFamilyDramaWeek = (player: Player): { player: Player; logs: FamilyDramaLog[] } => {
+    ensureFamilyFlags(player);
+    const logs: FamilyDramaLog[] = [];
+    const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
+    const seeds = player.flags.familyDramaSeeds as FamilyDramaSeed[];
+    if (seeds.length === 0) return { player, logs };
+
+    const activeObligations = player.flags.familyObligations as FamilyObligation[];
+
+    player.flags.familyDramaSeeds = seeds.map(seed => {
+        if (seed.status !== 'DORMANT' || absoluteWeek < seed.earliestAbsoluteWeek) return seed;
+
+        const famePressure = clamp(player.stats.fame / 1400, 0, 0.05);
+        const wealthPressure = player.money > 1_000_000 ? 0.025 : player.money > 100_000 ? 0.012 : 0;
+        const triggerChance = clamp(0.018 + famePressure + wealthPressure, 0.018, 0.09);
+        if (Math.random() > triggerChance) return seed;
+
+        const revealedChild = seed.hiddenChild;
+        if (revealedChild && !player.relationships.some(rel => rel.id === revealedChild.id)) {
+            player.relationships.push({
+                ...revealedChild,
+                age: getRelationshipAge(revealedChild, player.age, player.currentWeek),
+                closeness: Math.min(revealedChild.closeness ?? 0, 5),
+                lastInteractionWeek: player.currentWeek,
+                lastInteractionAbsolute: absoluteWeek,
+            });
+        }
+
+        const support = activeObligations.find(item => item.active && item.type === 'CHILD_SUPPORT' && item.targetId === seed.childId);
+        if (support) {
+            support.weeklyAmount = Math.round(support.weeklyAmount * (1.15 + Math.random() * 0.25));
+        } else {
+            addObligation(player, {
+                id: `support_child_claim_${seed.childId}_${absoluteWeek}`,
+                type: 'CHILD_SUPPORT',
+                targetId: seed.childId,
+                targetName: seed.childName,
+                weeklyAmount: Math.round(estimateChildSupport(player) * 1.1),
+                active: true,
+                startedWeek: player.currentWeek,
+                startedYear: player.age,
+                startedAbsoluteWeek: absoluteWeek,
+                reason: 'ABANDONMENT',
+            });
+        }
+
+        const baseDemand = 12_000 + (player.stats.fame * 2_200) + (player.stats.reputation * 850) + Math.max(0, player.money) * 0.012;
+        const settlementDemand = Math.round(clamp(baseDemand, 7_500, 2_000_000));
+        const paidAmount = Math.min(Math.max(0, player.money), settlementDemand);
+        player.money = Math.max(0, player.money - paidAmount);
+        player.stats.reputation = Math.max(0, player.stats.reputation - (paidAmount < settlementDemand ? 12 : 7));
+        player.stats.happiness = Math.max(0, player.stats.happiness - 9);
+
+        player.inbox.unshift({
+            id: `msg_family_claim_${seed.childId}_${absoluteWeek}`,
+            sender: seed.partnerName || 'Family Attorney',
+            subject: `${seed.childName} is now part of your story`,
+            text: `${seed.partnerName || 'A family lawyer'} contacted your team about ${seed.childName}. The case forced a $${paidAmount.toLocaleString()} settlement${paidAmount < settlementDemand ? ` against a $${settlementDemand.toLocaleString()} demand` : ''}, and weekly support has been revised.`,
+            type: 'TEXT',
+            isRead: false,
+            weekSent: player.currentWeek,
+        });
+        player.inbox = player.inbox.slice(0, 80);
+
+        if (player.stats.fame > 25) {
+            player.news.unshift(createFamilyBacklashNews(
+                player,
+                `${seed.childName} family claim puts ${player.name} back under scrutiny`,
+                `${seed.partnerName || 'Family lawyers'} pushed the old parenting decision into public view, and the settlement is already making headlines.`
+            ));
+            pushFamilyReactionPosts(player, 'DIVORCE', seed.partnerName || seed.childName);
+            player.news = player.news.slice(0, 50);
+        }
+
+        player.flags.familyClaimHistory.unshift({
+            id: `claim_${seed.childId}_${absoluteWeek}`,
+            childId: seed.childId,
+            childName: seed.childName,
+            partnerName: seed.partnerName,
+            week: player.currentWeek,
+            year: player.age,
+            settlementDemand,
+            paidAmount,
+        });
+        player.flags.familyClaimHistory = player.flags.familyClaimHistory.slice(0, 20);
+
+        logs.push({
+            msg: `⚖️ Family claim: ${seed.childName}'s situation resurfaced. Settlement paid: $${paidAmount.toLocaleString()}. Weekly support was revised.`,
+            type: 'negative',
+        });
+
+        return {
+            ...seed,
+            status: 'TRIGGERED' as const,
+        };
+    });
+
+    return { player, logs };
 };
 
 export const reconnectWithChild = (player: Player, childId: string): Player => {

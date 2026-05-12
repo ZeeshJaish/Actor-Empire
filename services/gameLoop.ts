@@ -20,6 +20,8 @@ import {
     generatePartTimeJobs,
     generateCastList,
     generateReviews,
+    calculateCastDepthScore,
+    calculateProjectExperienceGain,
     calculateAuditionGain,
     calculateProductionGain,
     calculatePassiveGain,
@@ -45,7 +47,7 @@ import {
 import { generateWeeklyEvent } from './geminiService';
 import { generateLifeEvent, generateLegalHearing, generateLuxeLifeEvent, hasEligibleLuxeEventTarget } from './lifeEventLogic';
 import { generateWeeklyFeed, NPC_DATABASE, calculateProjectFameMultiplier, generateNewUnknowns, updateNPCLives } from './npcLogic';
-import { generateAgentOffers, generateManagerOffer, generateDirectOffer, getRandomAgents, getRandomManagers, getRandomTrainers, getRandomStylists, getRandomTherapists, getRandomPublicists } from './teamLogic';
+import { generateAgentOffers, generateManagerOffer, generateDirectOffer, getRandomAgents, getRandomManagers, getRandomTrainers, getRandomStylists, getRandomTherapists, getRandomPublicists, getRandomWellness, sanitizeTeamPools } from './teamLogic';
 import { processStockMarket, calculatePortfolioValue, getDividendPayout, initializeStocks } from './stockLogic';
 import { AWARD_CALENDAR, checkAwardEligibility, AwardDefinition, generateSeasonWinners, generateFullBallot, getAwardCeremonyYear } from './awardLogic';
 import { processWorldTurn, generateIndustryProject } from './worldLogic'; 
@@ -58,7 +60,8 @@ import { getAbsoluteWeek, getRelationshipAge, inferStreamingStartWeekAbsolute } 
 import { hasNoAds, resetWeeklyEnergy, spendPlayerEnergy } from './premiumLogic';
 import { advanceLuxeConnections, advanceTinderConnections } from './datingLogic';
 import { generateNpcVentureRoleOffer, getNpcVentureOfferText } from './npcVentureLogic';
-import { normalizeUniverseMap } from './universeLogic';
+import { getUniverseReleaseActivity, normalizeUniverseMap } from './universeLogic';
+import { processFamilyDramaWeek } from './familyLogic';
 
 // --- CONSTANTS ---
 const ANNUAL_TAX_FREE_ALLOWANCE = 25000;
@@ -731,15 +734,21 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
     if (!nextPlayer.flags) nextPlayer.flags = {};
     if (!Array.isArray(nextPlayer.flags.familyObligations)) nextPlayer.flags.familyObligations = [];
     if (!Array.isArray(nextPlayer.flags.abandonedChildIds)) nextPlayer.flags.abandonedChildIds = [];
+    if (!Array.isArray(nextPlayer.flags.hiddenChildren)) nextPlayer.flags.hiddenChildren = [];
+    if (!Array.isArray(nextPlayer.flags.familyDramaSeeds)) nextPlayer.flags.familyDramaSeeds = [];
+    if (!Array.isArray(nextPlayer.flags.familyClaimHistory)) nextPlayer.flags.familyClaimHistory = [];
     if (!Array.isArray(nextPlayer.flags.extraNPCs)) nextPlayer.flags.extraNPCs = [];
     if (!Array.isArray(nextPlayer.flags.youtubeMilestonesUnlocked)) nextPlayer.flags.youtubeMilestonesUnlocked = [];
-    if (!nextPlayer.team) nextPlayer.team = { availableAgents: [], availableManagers: [], availableTrainers: [], availableStylists: [], availableTherapists: [], availablePublicists: [] } as any;
+    if (!nextPlayer.team) nextPlayer.team = { availableAgents: [], availableManagers: [], availableTrainers: [], availableStylists: [], availableTherapists: [], availablePublicists: [], availableWellness: [] } as any;
     if (!Array.isArray(nextPlayer.team.availableAgents)) nextPlayer.team.availableAgents = [];
     if (!Array.isArray(nextPlayer.team.availableManagers)) nextPlayer.team.availableManagers = [];
     if (!Array.isArray(nextPlayer.team.availableTrainers)) nextPlayer.team.availableTrainers = [];
     if (!Array.isArray(nextPlayer.team.availableStylists)) nextPlayer.team.availableStylists = [];
     if (!Array.isArray(nextPlayer.team.availableTherapists)) nextPlayer.team.availableTherapists = [];
     if (!Array.isArray(nextPlayer.team.availablePublicists)) nextPlayer.team.availablePublicists = [];
+    if (!Array.isArray(nextPlayer.team.availableWellness)) nextPlayer.team.availableWellness = [];
+    if (nextPlayer.team.wellness === undefined) nextPlayer.team.wellness = null;
+    nextPlayer.team = sanitizeTeamPools(nextPlayer);
     nextPlayer.commitments = ensureObjectArray<Commitment>(nextPlayer.commitments).map(commitment => ({
         ...commitment,
         energyCost: ensureFiniteNumber(commitment.energyCost),
@@ -779,6 +788,7 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
         royaltyPercentage: release.royaltyPercentage === undefined ? undefined : ensureFiniteNumber(release.royaltyPercentage),
         studioRoyaltyPercentage: release.studioRoyaltyPercentage === undefined ? undefined : ensureFiniteNumber(release.studioRoyaltyPercentage),
         maxTheatricalWeeks: release.maxTheatricalWeeks === undefined ? undefined : ensureFiniteNumber(release.maxTheatricalWeeks),
+        generatedNewsKeys: Array.isArray(release.generatedNewsKeys) ? release.generatedNewsKeys.filter(key => typeof key === 'string') : [],
         projectDetails: release.projectDetails && typeof release.projectDetails === 'object'
             ? {
                 ...release.projectDetails,
@@ -808,6 +818,7 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
             ...bid,
             platformId: bid.platformId,
             upfront: ensureFiniteNumber(bid.upfront),
+            fundingAmount: bid.fundingAmount === undefined ? undefined : ensureFiniteNumber(bid.fundingAmount),
             royalty: ensureFiniteNumber(bid.royalty),
             duration: ensureFiniteNumber(bid.duration, 52)
         }))
@@ -869,6 +880,7 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                 activeProjects: ensureObjectArray((business.studioState as any).activeProjects),
                 library: ensureObjectArray((business.studioState as any).library),
                 bids: ensureObjectArray((business.studioState as any).bids),
+                lockedStreamingFunds: ensureObjectArray((business.studioState as any).lockedStreamingFunds),
                 financeLedger: ensureObjectArray((business.studioState as any).financeLedger)
             }
             : business.studioState
@@ -1075,6 +1087,10 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
         return obligation;
     });
 
+    const familyDramaResult = processFamilyDramaWeek(nextPlayer);
+    nextPlayer = familyDramaResult.player;
+    familyDramaResult.logs.forEach(log => logsToAdd.push(log));
+
     // --- 0.6 CHECK FOR SCHEDULED EVENTS ---
     const eventsToday = nextPlayer.scheduledEvents.filter(e => e.week === nextPlayer.currentWeek);
     if (eventsToday.length > 0) {
@@ -1112,6 +1128,8 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
 
         Object.values(nextPlayer.world.universes || {}).forEach((universe: any) => {
             if (!universe?.studioId) return;
+            const releaseActivity = getUniverseReleaseActivity(nextPlayer, universe, nextPlayer.activeReleases || []);
+            if (releaseActivity.multiplier <= 0) return;
             const weeklyUniverseRevenue = ensureFiniteNumber(universe.stats?.weeklyRevenue);
             if (weeklyUniverseRevenue <= 0) return;
 
@@ -1971,12 +1989,24 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
 
     // --- 2B. TEAM ROTATION ---
     if ((nextPlayer.currentWeek + 1) % 3 === 0) {
-        nextPlayer.team.availableAgents = getRandomAgents(3);
-        nextPlayer.team.availableManagers = getRandomManagers(2);
-        nextPlayer.team.availableTrainers = getRandomTrainers(2);
-        nextPlayer.team.availableTherapists = getRandomTherapists(2);
-        nextPlayer.team.availableStylists = getRandomStylists(2);
-        nextPlayer.team.availablePublicists = getRandomPublicists(2);
+        const hiredTeamIds = [
+            nextPlayer.team.agent?.id,
+            nextPlayer.team.manager?.id,
+            nextPlayer.team.personalTrainer?.id,
+            nextPlayer.team.therapist?.id,
+            nextPlayer.team.stylist?.id,
+            nextPlayer.team.publicist?.id,
+            nextPlayer.team.wellness?.id,
+        ].filter((id): id is string => Boolean(id));
+
+        nextPlayer.team.availableAgents = getRandomAgents(3, hiredTeamIds);
+        nextPlayer.team.availableManagers = getRandomManagers(2, hiredTeamIds);
+        nextPlayer.team.availableTrainers = getRandomTrainers(2, hiredTeamIds);
+        nextPlayer.team.availableTherapists = getRandomTherapists(2, hiredTeamIds);
+        nextPlayer.team.availableStylists = getRandomStylists(2, hiredTeamIds);
+        nextPlayer.team.availablePublicists = getRandomPublicists(2, hiredTeamIds);
+        nextPlayer.team.availableWellness = getRandomWellness(2, hiredTeamIds);
+        nextPlayer.team = sanitizeTeamPools(nextPlayer);
         
         logsToAdd.push({ msg: "The hiring pool for Agents & Managers has refreshed.", type: 'neutral' });
     }
@@ -1998,7 +2028,7 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
     }
 
     // Weekly Lifestyle Team Fees
-    const lifestyleMembers: (keyof typeof nextPlayer.team)[] = ['personalTrainer', 'therapist', 'stylist', 'publicist'];
+    const lifestyleMembers: (keyof typeof nextPlayer.team)[] = ['personalTrainer', 'therapist', 'stylist', 'publicist', 'wellness'];
     lifestyleMembers.forEach(role => {
         const member = nextPlayer.team[role] as TeamMember | null;
         if (member) {
@@ -2129,6 +2159,7 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
     const therapist = nextPlayer.team.therapist;
     const stylist = nextPlayer.team.stylist;
     const publicist = nextPlayer.team.publicist;
+    const wellness = nextPlayer.team.wellness;
 
     const getBonusGain = (member: TeamMember | null) => {
         if (!member) return 0;
@@ -2145,7 +2176,8 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
     const bodyBonus = getBonusGain(trainer);
     nextPlayer.stats.body = Math.max(0, Math.min(100, nextPlayer.stats.body - BASE_DECAY + bodyBonus));
 
-    nextPlayer.stats.health = Math.max(0, Math.min(100, nextPlayer.stats.health - HEALTH_DECAY));
+    const wellnessBonus = getBonusGain(wellness);
+    nextPlayer.stats.health = Math.max(0, Math.min(100, nextPlayer.stats.health - HEALTH_DECAY + wellnessBonus));
 
     const happinessBonus = getBonusGain(therapist);
     nextPlayer.stats.happiness = Math.max(0, Math.min(100, nextPlayer.stats.happiness - BASE_DECAY + happinessBonus));
@@ -2156,6 +2188,120 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
     const fameBonus = getBonusGain(publicist);
     if (nextPlayer.stats.fame > 0) {
         nextPlayer.stats.fame = Math.max(0, Math.min(100, nextPlayer.stats.fame - FAME_DECAY + fameBonus));
+    }
+
+    // --- CRITICAL WELLBEING SAFETY NET ---
+    // Low wellbeing should matter at any age, but early players should get recoverable scares before harsh outcomes.
+    const absoluteWeekForWellbeing = getAbsoluteWeek(nextPlayer.age, nextPlayer.currentWeek);
+    const lastWellbeingAlertWeek = ensureFiniteNumber(nextPlayer.flags.lastWellbeingAlertAbsoluteWeek, 0);
+    const currentHealth = ensureFiniteNumber(nextPlayer.stats.health, 50);
+    const currentMood = ensureFiniteNumber(nextPlayer.stats.happiness, 50);
+    const currentBody = ensureFiniteNumber(nextPlayer.stats.body, 50);
+    const currentLooks = ensureFiniteNumber(nextPlayer.stats.looks, 50);
+    const criticalHealthWeeks = ensureFiniteNumber(nextPlayer.flags.criticalHealthWeeks, 0);
+    const trainerCare = trainer ? getBonusGain(trainer) : 0;
+    const therapistCare = therapist ? getBonusGain(therapist) : 0;
+    const wellnessCare = wellness ? getBonusGain(wellness) : 0;
+    const totalCareSupport = trainerCare + therapistCare + wellnessCare;
+    const lastHealthCrisisWeek = ensureFiniteNumber(nextPlayer.flags.lastHealthCrisisAbsoluteWeek, -999);
+    const recentHealthCrises = absoluteWeekForWellbeing - lastHealthCrisisWeek <= 26
+        ? ensureFiniteNumber(nextPlayer.flags.recentHealthCrises, 0)
+        : Math.max(0, ensureFiniteNumber(nextPlayer.flags.recentHealthCrises, 0) - 1);
+    const careDiscount = Math.min(0.45, (trainerCare + therapistCare) * 0.06 + wellnessCare * 0.14);
+
+    if (currentHealth <= 0) {
+        const newCriticalWeeks = criticalHealthWeeks + 1;
+        nextPlayer.flags.criticalHealthWeeks = newCriticalWeeks;
+        const newRecentHealthCrises = recentHealthCrises + 1;
+        nextPlayer.flags.recentHealthCrises = newRecentHealthCrises;
+        nextPlayer.flags.lastHealthCrisisAbsoluteWeek = absoluteWeekForWellbeing;
+
+        const wealthBuffer = Math.max(0, Math.min(2500, Math.floor(ensureFiniteNumber(nextPlayer.money) * 0.015)));
+        const famePremium = Math.floor(ensureFiniteNumber(nextPlayer.stats.fame) * 35);
+        const relapsePremium = Math.min(5000, Math.max(0, newRecentHealthCrises - 1) * 900);
+        const emergencyBill = Math.max(350, Math.min(12000, Math.floor((450 + wealthBuffer + famePremium + relapsePremium) * (1 - careDiscount))));
+        addTransaction(-emergencyBill, 'EXPENSE', 'Emergency hospital visit');
+
+        const recoveryBoost = 18 + Math.floor(trainerCare * 4) + Math.floor(therapistCare * 2) + Math.floor(wellnessCare * 6);
+        nextPlayer.stats.health = Math.max(nextPlayer.stats.health, recoveryBoost);
+        nextPlayer.stats.happiness = Math.max(0, Math.min(100, nextPlayer.stats.happiness + 4 + Math.floor(therapistCare * 2)));
+        nextPlayer.stats.body = Math.max(0, Math.min(100, nextPlayer.stats.body + 2 + Math.floor(trainerCare)));
+        if (newRecentHealthCrises >= 2) {
+            nextPlayer.stats.fame = Math.max(0, nextPlayer.stats.fame - Math.min(4, newRecentHealthCrises));
+            nextPlayer.stats.reputation = Math.max(0, nextPlayer.stats.reputation - Math.min(3, newRecentHealthCrises - 1));
+        }
+
+        logsToAdd.push({
+            msg: `🚑 Health crisis: you were taken to hospital, paid $${emergencyBill.toLocaleString()}, and were forced to recover.${totalCareSupport > 0 ? ' Your team softened the damage.' : ' Without a trainer or therapist, recovery was rough.'}`,
+            type: 'negative'
+        });
+        if (newRecentHealthCrises >= 2) {
+            logsToAdd.push({ msg: `⚠️ Repeated health scares are hurting your reliability. A trainer or therapist now matters more than quick fixes.`, type: 'negative' });
+        }
+
+        if (nextPlayer.stats.fame >= 35) {
+            nextPlayer.news = [{
+                id: `news_health_scare_${Date.now()}`,
+                headline: `${nextPlayer.name} hospitalized after exhaustion scare`,
+                subtext: 'Insiders say the schedule caught up with them, but recovery is underway.',
+                category: 'YOU',
+                week: nextPlayer.currentWeek,
+                year: nextPlayer.age,
+                impactLevel: 'MEDIUM'
+            }, ...nextPlayer.news].slice(0, 50);
+        }
+
+        const ageRisk = nextPlayer.age < 30 ? 0.003 : nextPlayer.age < 45 ? 0.008 : nextPlayer.age < 65 ? 0.025 : 0.08;
+        const repeatRisk = newRecentHealthCrises >= 4 ? 0.06 : newRecentHealthCrises >= 2 ? 0.02 : 0;
+        const moodRisk = currentMood <= 5 ? 0.01 : 0;
+        if (Math.random() < ageRisk + repeatRisk + moodRisk) {
+            nextPlayer.flags.isDead = true;
+            logsToAdd.push({ msg: `🕊️ Your health collapsed after repeated medical emergencies.`, type: 'negative' });
+        }
+    } else if (currentHealth < 10) {
+        nextPlayer.flags.criticalHealthWeeks = criticalHealthWeeks + 1;
+        const newRecentHealthCrises = recentHealthCrises + 1;
+        nextPlayer.flags.recentHealthCrises = newRecentHealthCrises;
+        nextPlayer.flags.lastHealthCrisisAbsoluteWeek = absoluteWeekForWellbeing;
+        const urgentRelapsePremium = Math.min(1600, Math.max(0, newRecentHealthCrises - 1) * 350);
+        const urgentCareBill = Math.max(120, Math.min(3600, Math.floor((180 + Math.floor(nextPlayer.stats.fame * 15) + Math.floor(Math.max(0, nextPlayer.money) * 0.006) + urgentRelapsePremium) * (1 - careDiscount))));
+        addTransaction(-urgentCareBill, 'EXPENSE', 'Urgent care recovery');
+        nextPlayer.stats.health = Math.max(nextPlayer.stats.health, 14 + Math.floor(trainerCare * 3) + Math.floor(therapistCare) + Math.floor(wellnessCare * 5));
+        nextPlayer.stats.happiness = Math.max(0, Math.min(100, nextPlayer.stats.happiness + 2 + Math.floor(therapistCare)));
+        if (newRecentHealthCrises >= 3) {
+            nextPlayer.stats.reputation = Math.max(0, nextPlayer.stats.reputation - 1);
+        }
+        logsToAdd.push({
+            msg: `🏥 Urgent care stepped in before things got worse. You paid $${urgentCareBill.toLocaleString()} and recovered enough to keep going.${totalCareSupport > 0 ? ' Team support improved the recovery.' : ''}`,
+            type: 'negative'
+        });
+    } else {
+        nextPlayer.flags.criticalHealthWeeks = 0;
+        nextPlayer.flags.recentHealthCrises = recentHealthCrises;
+        if (currentHealth < 25 && absoluteWeekForWellbeing - lastWellbeingAlertWeek >= 4) {
+            nextPlayer.flags.lastWellbeingAlertAbsoluteWeek = absoluteWeekForWellbeing;
+            logsToAdd.push({ msg: `⚠️ Your health is dangerously low. Medical care, rest, or a trainer can prevent a hospital scare.`, type: 'negative' });
+        }
+    }
+
+    if (currentMood <= 0) {
+        const burnoutWeeks = ensureFiniteNumber(nextPlayer.flags.burnoutWeeks, 0) + 1;
+        nextPlayer.flags.burnoutWeeks = burnoutWeeks;
+        const supportCost = therapist ? Math.max(0, Math.floor(therapist.weeklyCost * 0.5)) : 90;
+        addTransaction(-supportCost, 'EXPENSE', therapist ? 'Therapy crisis session' : 'Mental health support');
+        nextPlayer.stats.happiness = Math.max(nextPlayer.stats.happiness, 12 + Math.floor(therapistCare * 4));
+        nextPlayer.stats.health = Math.max(0, Math.min(100, nextPlayer.stats.health + 2));
+        logsToAdd.push({ msg: `🧠 Burnout hit hard. You took a recovery session and got enough headspace to continue.`, type: 'negative' });
+    } else {
+        nextPlayer.flags.burnoutWeeks = 0;
+    }
+
+    if ((currentBody <= 0 || currentLooks <= 0) && absoluteWeekForWellbeing - ensureFiniteNumber(nextPlayer.flags.lastConditionAlertAbsoluteWeek, 0) >= 6) {
+        nextPlayer.flags.lastConditionAlertAbsoluteWeek = absoluteWeekForWellbeing;
+        logsToAdd.push({
+            msg: `⚠️ Your condition is slipping. Physique and looks won't kill you, but they can hurt dating, roles, and public image.`,
+            type: 'negative'
+        });
     }
     
     // --- ORGANIC FOLLOWER GROWTH ---
@@ -2549,9 +2695,25 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                         talentValue
                     );
 
+                    const castDepth = calculateCastDepthScore(
+                        updatedC.projectDetails.castList.length,
+                        updatedC.projectDetails.genre,
+                        updatedC.projectDetails.budgetTier,
+                        updatedC.projectDetails.hiddenStats.castingStrength
+                    );
+                    updatedC.projectDetails.hiddenStats.castDepthScore = updatedC.projectDetails.hiddenStats.castDepthScore ?? castDepth.score;
+                    updatedC.projectDetails.hiddenStats.castDepthNote = updatedC.projectDetails.hiddenStats.castDepthNote ?? castDepth.note;
+
                     const quality = updatedC.projectDetails.hiddenStats.qualityScore;
                     const isRecast = updatedC.projectDetails.hiddenStats.isRecast;
-                    updatedC.projectDetails.reviews = generateReviews(quality, updatedC.projectDetails.genre, nextPlayer.name, isRecast);
+                    updatedC.projectDetails.reviews = generateReviews(
+                        quality,
+                        updatedC.projectDetails.genre,
+                        nextPlayer.name,
+                        isRecast,
+                        updatedC.projectDetails.hiddenStats.castDepthScore,
+                        updatedC.projectDetails.budgetTier
+                    );
                 }
 
                 let streamingState: StreamingState | undefined = undefined;
@@ -2585,6 +2747,18 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                 }
                 
                 if (updatedC.projectDetails) {
+                    const releaseExperienceGain = calculateProjectExperienceGain(
+                        getPlayerProjectRoleType(updatedC.roleType, updatedC.projectDetails.castList),
+                        imdb,
+                        updatedC.projectDetails.budgetTier,
+                        updatedC.projectDetails.isFamous,
+                        isStudioProject
+                    );
+                    nextPlayer.stats.experience = Math.min(100, nextPlayer.stats.experience + releaseExperienceGain);
+                    if (releaseExperienceGain > 1) {
+                        logsToAdd.push({ msg: `🎭 Career XP: "${updatedC.name}" added ${releaseExperienceGain} experience from a meaningful credit.`, type: 'positive' });
+                    }
+
                     let accumulatedBuzz = updatedC.promotionalBuzz || 0;
                     
                     // Add Red Carpet Hype
@@ -2727,7 +2901,14 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                 rel.projectDetails.genre
             );
             const boxOfficeCaps = getBoxOfficeCaps(rel.projectDetails.budgetTier);
-            const remainingHeadroom = Math.max(0, boxOfficeCaps.total - rel.totalGross);
+            const thinSpectaclePenalty =
+                ['ACTION', 'SCI_FI', 'SUPERHERO', 'ADVENTURE'].includes(rel.projectDetails.genre) &&
+                ['HIGH', 'BLOCKBUSTER'].includes(rel.projectDetails.budgetTier) &&
+                (rel.projectDetails.hiddenStats.castDepthScore ?? 70) < 55;
+            const effectiveTotalCap = thinSpectaclePenalty
+                ? Math.floor(boxOfficeCaps.total * (0.54 + ((rel.projectDetails.hiddenStats.castDepthScore ?? 45) / 180)))
+                : boxOfficeCaps.total;
+            const remainingHeadroom = Math.max(0, effectiveTotalCap - rel.totalGross);
             const revenue = Math.min(uncappedRevenue, remainingHeadroom);
             const newTotal = rel.totalGross + revenue;
             const newWeeklyGross = [...rel.weeklyGross, revenue];
@@ -2815,7 +2996,11 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                             if (interest > 60 || Math.random() > 0.7) {
                                 const bidProfile = getStreamingBidProfile(packageStrength, isSeries, runStrength);
                                 const qualityFactor = Math.max(0.85, 0.95 + ((packageStrength - 55) / 105));
-                                const floorOffer = rel.budget * bidProfile.floor;
+                                const baseFloorOffer = rel.budget * bidProfile.floor;
+                                const topPlatformCash = Math.max(...platforms.map(id => nextPlayer.world.platforms?.[id]?.cashReserve || 0), 1);
+                                const platformMuscle = Math.max(0.25, Math.min(1, (platformState.cashReserve || 0) / topPlatformCash));
+                                const safeMinimum = packageStrength >= 60 ? rel.budget * 1.02 : baseFloorOffer * 0.94;
+                                const floorOffer = Math.floor(Math.max(safeMinimum, baseFloorOffer * (0.96 + Math.random() * 0.1 + platformMuscle * 0.05)));
                                 const qualityRange = rel.budget * (
                                     bidProfile.floor + ((bidProfile.ceiling - bidProfile.floor) * (0.18 + Math.random() * 0.5))
                                 );
@@ -3268,8 +3453,8 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
 
         // Check for player death (age > 70)
         if (nextPlayer.age > 70) {
-            const happiness = nextPlayer.stats.happiness || 50;
-            const health = nextPlayer.stats.health || 50;
+            const happiness = nextPlayer.stats.happiness ?? 50;
+            const health = nextPlayer.stats.health ?? 50;
             
             if (health < 30 && happiness < 30) {
                 nextPlayer.stats.health = Math.max(0, health - Math.floor(Math.random() * 15 + 5));
@@ -3330,7 +3515,33 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
 
     try {
         const weeklyNews = generateWeeklyNews(nextPlayer);
-        nextPlayer.news = [...weeklyNews, ...nextPlayer.news].slice(0, 50);
+        const releaseNewsKeys = weeklyNews
+            .map(item => item.id)
+            .filter(id => /^news_(bo|crit)_/.test(id));
+
+        if (releaseNewsKeys.length > 0) {
+            nextPlayer.activeReleases = nextPlayer.activeReleases.map(release => {
+                const matchingKeys = releaseNewsKeys.filter(key => key.endsWith(`_${release.id}`));
+                if (matchingKeys.length === 0) return release;
+
+                const generatedNewsKeys = Array.from(new Set([
+                    ...(release.generatedNewsKeys || []),
+                    ...matchingKeys
+                ])).slice(-24);
+
+                return { ...release, generatedNewsKeys };
+            });
+        }
+
+        const seenNewsIds = new Set<string>();
+        nextPlayer.news = [...weeklyNews, ...nextPlayer.news]
+            .filter(item => {
+                if (!item?.id) return true;
+                if (seenNewsIds.has(item.id)) return false;
+                seenNewsIds.add(item.id);
+                return true;
+            })
+            .slice(0, 50);
     } catch (error) {
         console.error('Weekly news generation failed during week processing:', error);
     }

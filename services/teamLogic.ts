@@ -193,6 +193,26 @@ export const PUBLICIST_CATALOG: TeamMember[] = [
     }
 ];
 
+// --- WELLNESS CATALOG ---
+export const WELLNESS_CATALOG: TeamMember[] = [
+    {
+        id: 'well_rookie', name: 'Meal Prep Coach', type: 'WELLNESS', tier: 'ROOKIE', weeklyCost: 250,
+        description: 'Simple diet planning and weekly check-ins. Keeps early health decay manageable.', perks: 'Slows Health decay'
+    },
+    {
+        id: 'well_std', name: 'Private Nutritionist', type: 'WELLNESS', tier: 'STANDARD', weeklyCost: 1200,
+        description: 'Builds your meals, sleep routine, and recovery plan around your schedule.', perks: 'Stops Health decay'
+    },
+    {
+        id: 'well_elite', name: 'Medical Concierge', type: 'WELLNESS', tier: 'ELITE', weeklyCost: 4500,
+        description: 'A private wellness team for scans, recovery, supplements, and crisis prevention.', perks: 'Health recovery + lower hospital bills'
+    },
+    {
+        id: 'well_legend', name: 'Longevity Doctor', type: 'WELLNESS', tier: 'LEGEND', weeklyCost: 14000,
+        description: 'Elite long-term health management for stars who cannot afford to crash.', perks: 'Strong Health recovery + crisis shield'
+    }
+];
+
 // --- SPONSORSHIP DATA ---
 const BRAND_DB: Record<SponsorshipCategory, string[]> = {
     FASHION: ['H&M', 'Zara', 'Gucci', 'Nike', 'Supreme', 'Uniqlo', 'Louis Vuitton', 'Prada', 'Balenciaga', 'Calvin Klein'],
@@ -206,31 +226,68 @@ const BRAND_DB: Record<SponsorshipCategory, string[]> = {
 const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
 
 // --- HELPERS ---
+const shuffle = <T>(arr: T[]): T[] => [...arr].sort(() => 0.5 - Math.random());
 
-export const getRandomAgents = (count: number): Agent[] => {
-    const shuffled = [...AGENT_CATALOG].sort(() => 0.5 - Math.random());
-    return shuffled.slice(0, count);
+const getHiredTeamIds = (player: Player): Set<string> => new Set([
+    player.team?.agent?.id,
+    player.team?.manager?.id,
+    player.team?.personalTrainer?.id,
+    player.team?.stylist?.id,
+    player.team?.therapist?.id,
+    player.team?.publicist?.id,
+    player.team?.wellness?.id,
+].filter((id): id is string => typeof id === 'string' && id.length > 0));
+
+const withoutHired = <T extends { id: string }>(pool: T[] | undefined, hiredIds: Set<string>): T[] =>
+    Array.isArray(pool) ? pool.filter(member => !hiredIds.has(member.id)) : [];
+
+export const sanitizeTeamPools = (player: Player): Player['team'] => {
+    const hiredIds = getHiredTeamIds(player);
+    return {
+        ...player.team,
+        availableAgents: withoutHired(player.team?.availableAgents, hiredIds),
+        availableManagers: withoutHired(player.team?.availableManagers, hiredIds),
+        availableTrainers: withoutHired(player.team?.availableTrainers, hiredIds),
+        availableStylists: withoutHired(player.team?.availableStylists, hiredIds),
+        availableTherapists: withoutHired(player.team?.availableTherapists, hiredIds),
+        availablePublicists: withoutHired(player.team?.availablePublicists, hiredIds),
+        availableWellness: withoutHired(player.team?.availableWellness, hiredIds),
+    };
 };
 
-export const getRandomManagers = (count: number): Manager[] => {
-    const shuffled = [...MANAGER_CATALOG].sort(() => 0.5 - Math.random());
-    return shuffled.slice(0, count);
+export const getRandomAgents = (count: number, excludeIds: string[] = []): Agent[] => {
+    const excluded = new Set(excludeIds);
+    return shuffle(AGENT_CATALOG.filter(agent => !excluded.has(agent.id))).slice(0, count);
 };
 
-export const getRandomTrainers = (count: number): TeamMember[] => {
-    return [...TRAINER_CATALOG].sort(() => 0.5 - Math.random()).slice(0, count);
+export const getRandomManagers = (count: number, excludeIds: string[] = []): Manager[] => {
+    const excluded = new Set(excludeIds);
+    return shuffle(MANAGER_CATALOG.filter(manager => !excluded.has(manager.id))).slice(0, count);
 };
 
-export const getRandomTherapists = (count: number): TeamMember[] => {
-    return [...THERAPIST_CATALOG].sort(() => 0.5 - Math.random()).slice(0, count);
+export const getRandomTrainers = (count: number, excludeIds: string[] = []): TeamMember[] => {
+    const excluded = new Set(excludeIds);
+    return shuffle(TRAINER_CATALOG.filter(member => !excluded.has(member.id))).slice(0, count);
 };
 
-export const getRandomStylists = (count: number): TeamMember[] => {
-    return [...STYLIST_CATALOG].sort(() => 0.5 - Math.random()).slice(0, count);
+export const getRandomTherapists = (count: number, excludeIds: string[] = []): TeamMember[] => {
+    const excluded = new Set(excludeIds);
+    return shuffle(THERAPIST_CATALOG.filter(member => !excluded.has(member.id))).slice(0, count);
 };
 
-export const getRandomPublicists = (count: number): TeamMember[] => {
-    return [...PUBLICIST_CATALOG].sort(() => 0.5 - Math.random()).slice(0, count);
+export const getRandomStylists = (count: number, excludeIds: string[] = []): TeamMember[] => {
+    const excluded = new Set(excludeIds);
+    return shuffle(STYLIST_CATALOG.filter(member => !excluded.has(member.id))).slice(0, count);
+};
+
+export const getRandomPublicists = (count: number, excludeIds: string[] = []): TeamMember[] => {
+    const excluded = new Set(excludeIds);
+    return shuffle(PUBLICIST_CATALOG.filter(member => !excluded.has(member.id))).slice(0, count);
+};
+
+export const getRandomWellness = (count: number, excludeIds: string[] = []): TeamMember[] => {
+    const excluded = new Set(excludeIds);
+    return shuffle(WELLNESS_CATALOG.filter(member => !excluded.has(member.id))).slice(0, count);
 };
 
 // --- OFFER GENERATORS ---
