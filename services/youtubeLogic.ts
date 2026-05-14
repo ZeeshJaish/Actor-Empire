@@ -2,6 +2,7 @@
 import { Gender, NPCActor, NPCPrestige, NPCTier, Player, YoutubeBrandDeal, YoutubeChannel, YoutubeCollabOffer, YoutubeCreatorIdentity, YoutubeVideo, YoutubeVideoType } from '../types';
 import { getGenderedAvatar, NPC_DATABASE } from './npcLogic';
 import { MOD_TALENT_ROWS, ModTalentRow } from './modTalentData';
+import { hydrateGenreXP } from './genreCatalog';
 
 export const YOUTUBE_MONETIZATION_SUBS = 1000;
 export const YOUTUBE_MONETIZATION_VIEWS = 4000;
@@ -214,7 +215,7 @@ export const getEnabledGlobalCreatorSocialProfiles = (player: Player): NPCActor[
         stats: {
             talent: 70,
             fame: creator.followers >= 20 * M ? 88 : 62,
-            genreXP: {
+            genreXP: hydrateGenreXP({
                 ACTION: 30,
                 DRAMA: 35,
                 COMEDY: 75,
@@ -224,7 +225,7 @@ export const getEnabledGlobalCreatorSocialProfiles = (player: Player): NPCActor[
                 SCI_FI: 40,
                 ADVENTURE: 65,
                 SUPERHERO: 30
-            }
+            })
         },
         traits: ['AMBITIOUS', 'WORKAHOLIC'],
         potential: 85,

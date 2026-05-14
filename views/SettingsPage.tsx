@@ -5,6 +5,7 @@ import { Player } from '../types';
 import { APP_DISPLAY_VERSION } from '../services/appVersion';
 import { createGlobalActorPackNPCs, GLOBAL_ACTOR_PACKS } from '../services/npcLogic';
 import { getGlobalCreatorCountForPack } from '../services/youtubeLogic';
+import { getPlayerLanguage, t } from '../services/i18n';
 
 interface SettingsPageProps {
   player: Player;
@@ -15,6 +16,8 @@ interface SettingsPageProps {
 
 export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlayer, onBack, onMainMenu }) => {
   const [mode, setMode] = useState<'SETTINGS' | 'MODS' | 'EXTERNAL_ACTORS'>('SETTINGS');
+  const language = getPlayerLanguage(player);
+  const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
   const enabledPackIds = Array.isArray(player.flags?.enabledGlobalActorPacks)
     ? player.flags.enabledGlobalActorPacks as string[]
     : [];
@@ -74,8 +77,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
               <ArrowLeft size={20} className="text-white"/>
           </button>
           <div>
-            <div className="text-[10px] text-amber-400 font-black uppercase tracking-[0.28em]">Optional Content</div>
-            <h2 className="text-3xl font-bold text-white">Mods</h2>
+            <div className="text-[10px] text-amber-400 font-black uppercase tracking-[0.28em]">{tr('settings.optionalContent')}</div>
+            <h2 className="text-3xl font-bold text-white">{tr('settings.mods')}</h2>
           </div>
         </div>
 
@@ -89,11 +92,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
                 <Users size={22}/>
               </div>
               <div className="flex-1 min-w-0">
-                <div className="font-black text-white">External Talent</div>
-                <div className="text-xs text-zinc-400 mt-1">Country-based actor, director, and creator packs for casting, Forbes, and social discovery.</div>
+                <div className="font-black text-white">{tr('settings.externalTalent')}</div>
+                <div className="text-xs text-zinc-400 mt-1">{tr('settings.externalTalentSub')}</div>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-[10px] bg-amber-500/15 px-2 py-1 rounded text-amber-300 font-bold uppercase">{enabledPackIds.length} Active</span>
+                <span className="text-[10px] bg-amber-500/15 px-2 py-1 rounded text-amber-300 font-bold uppercase">{enabledPackIds.length} {tr('common.active')}</span>
                 <ChevronRight size={18} className="text-zinc-500"/>
               </div>
             </div>
@@ -105,10 +108,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
                 <Sparkles size={22}/>
               </div>
               <div className="flex-1 min-w-0">
-                <div className="font-black text-zinc-300">Creator Packs</div>
-                <div className="text-xs text-zinc-500 mt-1">Regional creator expansions can live here later.</div>
+                <div className="font-black text-zinc-300">{tr('settings.creatorPacks')}</div>
+                <div className="text-xs text-zinc-500 mt-1">{tr('settings.creatorPacksSub')}</div>
               </div>
-              <span className="text-[10px] bg-zinc-800 px-2 py-1 rounded text-zinc-500 font-bold uppercase">Later</span>
+              <span className="text-[10px] bg-zinc-800 px-2 py-1 rounded text-zinc-500 font-bold uppercase">{tr('common.later')}</span>
             </div>
           </div>
 
@@ -118,10 +121,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
                 <SlidersHorizontal size={22}/>
               </div>
               <div className="flex-1 min-w-0">
-                <div className="font-black text-zinc-300">Gameplay Rules</div>
-                <div className="text-xs text-zinc-500 mt-1">Future optional save modifiers and challenge rules.</div>
+                <div className="font-black text-zinc-300">{tr('settings.gameplayRules')}</div>
+                <div className="text-xs text-zinc-500 mt-1">{tr('settings.gameplayRulesSub')}</div>
               </div>
-              <span className="text-[10px] bg-zinc-800 px-2 py-1 rounded text-zinc-500 font-bold uppercase">Later</span>
+              <span className="text-[10px] bg-zinc-800 px-2 py-1 rounded text-zinc-500 font-bold uppercase">{tr('common.later')}</span>
             </div>
           </div>
         </div>
@@ -137,8 +140,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
               <ArrowLeft size={20} className="text-white"/>
           </button>
           <div>
-            <div className="text-[10px] text-amber-400 font-black uppercase tracking-[0.28em]">Mods</div>
-            <h2 className="text-3xl font-bold text-white">External Talent</h2>
+            <div className="text-[10px] text-amber-400 font-black uppercase tracking-[0.28em]">{tr('settings.mods')}</div>
+            <h2 className="text-3xl font-bold text-white">{tr('settings.externalTalent')}</h2>
           </div>
         </div>
 
@@ -146,16 +149,16 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
           <div className="flex items-start gap-3">
             <div className="p-2 rounded-2xl bg-amber-500 text-black"><Lock size={18}/></div>
             <div>
-              <div className="font-black text-white">Save-Locked Packs</div>
+              <div className="font-black text-white">{tr('settings.saveLockedPacks')}</div>
               <p className="text-xs text-zinc-400 leading-relaxed mt-1">
-                Once a pack is enabled, it stays active for this save. This prevents cast lists, projects, socials, and awards from losing people later.
+                {tr('settings.saveLockedPacksSub')}
               </p>
             </div>
           </div>
         </div>
 
         <div className="space-y-3">
-          <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest px-1">Available Country Packs</h3>
+          <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest px-1">{tr('settings.availableCountryPacks')}</h3>
           {GLOBAL_ACTOR_PACKS.map(pack => {
             const isEnabled = enabledPackIds.includes(pack.id);
             const creatorCount = getGlobalCreatorCountForPack(pack.id);
@@ -173,14 +176,14 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
                       </div>
                     </div>
                     <p className="text-xs text-zinc-500 mt-1 leading-relaxed">
-                      Adds regional actors/directors to casting/Forbes and creator personalities to YouTube/social collabs.
+                      {tr('settings.countryPackSub')}
                     </p>
                     <button
                       onClick={() => enableActorPack(pack.id)}
                       disabled={isEnabled}
                       className={`mt-3 w-full py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all ${isEnabled ? 'bg-emerald-500/15 text-emerald-300 cursor-default' : 'bg-white text-black hover:bg-amber-300'}`}
                     >
-                      {isEnabled ? 'Enabled For This Save' : 'Enable Pack'}
+                      {isEnabled ? tr('settings.enabledForSave') : tr('settings.enablePack')}
                     </button>
                   </div>
                 </div>
@@ -199,12 +202,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
         <button onClick={onBack} className="p-2 bg-zinc-900 rounded-full hover:bg-zinc-800 transition-colors">
             <ArrowLeft size={20} className="text-white"/>
         </button>
-        <h2 className="text-3xl font-bold text-white">Settings</h2>
+        <h2 className="text-3xl font-bold text-white">{tr('settings.title')}</h2>
       </div>
 
       {/* Support Section */}
       <div className="glass-card p-6 rounded-3xl space-y-4">
-          <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Support</h3>
+          <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest">{tr('settings.support')}</h3>
           
           <a 
             href="https://buymeacoffee.com/actorempire" 
@@ -215,8 +218,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
               <div className="flex items-center gap-3">
                   <div className="p-2 bg-black rounded-lg text-[#FFDD00]"><Coffee size={20}/></div>
                   <div className="text-left">
-                      <div className="font-bold text-black">Support Dev</div>
-                      <div className="text-xs text-black/60">Buy me a coffee</div>
+                      <div className="font-bold text-black">{tr('settings.supportDev')}</div>
+                      <div className="text-xs text-black/60">{tr('settings.buyCoffee')}</div>
                   </div>
               </div>
           </a>
@@ -230,8 +233,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
               <div className="flex items-center gap-3">
                   <div className="p-2 bg-amber-500 rounded-lg text-black"><Star size={20}/></div>
                   <div className="text-left">
-                      <div className="font-bold text-white">Rate Us on App Store</div>
-                      <div className="text-xs text-zinc-500">Love the game? Let us know!</div>
+                      <div className="font-bold text-white">{tr('settings.rateUs')}</div>
+                      <div className="text-xs text-zinc-500">{tr('settings.rateUsSub')}</div>
                   </div>
               </div>
           </a>
@@ -245,17 +248,17 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
               <div className="flex items-center gap-3">
                   <div className="p-2 bg-rose-500 rounded-lg text-white"><Bug size={20}/></div>
                   <div className="text-left">
-                      <div className="font-bold text-white">Report a Bug</div>
-                      <div className="text-xs text-zinc-400">Send us issue details and screen recordings</div>
+                      <div className="font-bold text-white">{tr('settings.reportBug')}</div>
+                      <div className="text-xs text-zinc-400">{tr('settings.reportBugSub')}</div>
                   </div>
               </div>
-              <div className="text-[10px] bg-rose-500/15 px-2 py-1 rounded text-rose-300 font-bold uppercase">Google Form</div>
+              <div className="text-[10px] bg-rose-500/15 px-2 py-1 rounded text-rose-300 font-bold uppercase">{tr('common.googleForm')}</div>
           </a>
       </div>
 
       {/* Mods Section */}
       <div className="glass-card p-6 rounded-3xl space-y-4">
-          <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Mods</h3>
+          <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest">{tr('settings.mods')}</h3>
           <button
             onClick={() => setMode('MODS')}
             className="w-full flex items-center justify-between p-4 bg-amber-500/10 rounded-2xl hover:bg-amber-500/15 transition-colors border border-amber-500/20"
@@ -263,24 +266,24 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
               <div className="flex items-center gap-3">
                   <div className="p-2 bg-amber-500 rounded-lg text-black"><Puzzle size={20}/></div>
                   <div className="text-left">
-                      <div className="font-bold text-white">Mod Packs</div>
-                      <div className="text-xs text-zinc-400">Enable optional country actors and creators</div>
+                      <div className="font-bold text-white">{tr('settings.modPacks')}</div>
+                      <div className="text-xs text-zinc-400">{tr('settings.modPacksSub')}</div>
                   </div>
               </div>
               <div className="text-[10px] bg-amber-500/15 px-2 py-1 rounded text-amber-300 font-bold uppercase">
-                {enabledPackIds.length} Active
+                {enabledPackIds.length} {tr('common.active')}
               </div>
           </button>
       </div>
 
       {/* Community Section */}
       <div className="glass-card p-6 rounded-3xl space-y-4">
-          <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Community</h3>
+          <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest">{tr('settings.community')}</h3>
           
           <a href="https://x.com/ActorEmpire" target="_blank" rel="noreferrer" className="flex items-center justify-between p-4 bg-zinc-900/50 rounded-2xl hover:bg-zinc-800 transition-colors border border-white/5">
               <div className="flex items-center gap-3">
                   <div className="p-2 bg-black rounded-lg text-white"><Twitter size={20}/></div>
-                  <div className="font-bold text-white">Follow us on X</div>
+                  <div className="font-bold text-white">{tr('settings.followX')}</div>
               </div>
               <div className="text-xs text-zinc-500">@ActorEmpire</div>
           </a>
@@ -288,15 +291,15 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
           <a href="https://t.me/actorempire" target="_blank" rel="noreferrer" className="flex items-center justify-between p-4 bg-zinc-900/50 rounded-2xl hover:bg-zinc-800 transition-colors border border-white/5">
               <div className="flex items-center gap-3">
                   <div className="p-2 bg-blue-500 rounded-lg text-white"><Send size={20}/></div>
-                  <div className="font-bold text-white">Join Telegram</div>
+                  <div className="font-bold text-white">{tr('settings.joinTelegram')}</div>
               </div>
-              <div className="text-xs text-zinc-500">Updates & Chat</div>
+              <div className="text-xs text-zinc-500">{tr('settings.telegramSub')}</div>
           </a>
       </div>
 
       {/* Game Actions */}
       <div className="glass-card p-6 rounded-3xl space-y-4">
-          <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Game Actions</h3>
+          <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest">{tr('settings.gameActions')}</h3>
           
           <button 
             onClick={onMainMenu}
@@ -305,26 +308,37 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
               <div className="flex items-center gap-3">
                   <div className="p-2 bg-zinc-800 rounded-lg text-zinc-400 group-hover:text-rose-500 group-hover:bg-rose-500/10 transition-colors"><LogOut size={20}/></div>
                   <div className="text-left">
-                      <div className="font-bold text-white">Main Menu</div>
-                      <div className="text-xs text-zinc-500">Save and quit to title</div>
+                      <div className="font-bold text-white">{tr('settings.mainMenu')}</div>
+                      <div className="text-xs text-zinc-500">{tr('settings.mainMenuSub')}</div>
                   </div>
               </div>
           </button>
       </div>
 
       {/* General Section */}
-      <div className="glass-card p-6 rounded-3xl space-y-4 opacity-75">
-          <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest">General</h3>
+      <div className="glass-card p-6 rounded-3xl space-y-4">
+          <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest">{tr('settings.general')}</h3>
           
-          <div className="flex items-center justify-between p-4 bg-zinc-900/50 rounded-2xl border border-white/5">
-              <div className="flex items-center gap-3">
+          <div className="p-4 bg-zinc-900/50 rounded-2xl border border-white/5 space-y-4">
+              <div className="flex items-start gap-3">
                   <div className="p-2 bg-zinc-800 rounded-lg text-zinc-400"><Globe size={20}/></div>
-                  <div className="text-left">
-                      <div className="font-bold text-zinc-400">Language</div>
-                      <div className="text-xs text-zinc-600">English (Default)</div>
+                  <div className="text-left flex-1">
+                      <div className="font-bold text-white">{tr('settings.language')}</div>
+                      <div className="text-xs text-zinc-500 leading-relaxed mt-1">{tr('settings.languagePhaseNote')}</div>
                   </div>
               </div>
-              <div className="text-[10px] bg-zinc-800 px-2 py-1 rounded text-zinc-500 font-bold uppercase">Coming Soon</div>
+              <div className="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="font-black text-white">English</div>
+                    <div className="text-[10px] uppercase tracking-widest text-zinc-500">{tr('settings.defaultLanguage')}</div>
+                  </div>
+                  <CheckCircle2 size={18} className="text-emerald-300" />
+                </div>
+                <div className="mt-3 rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs font-bold text-amber-200">
+                  {tr('settings.languageComingSoon')}
+                </div>
+              </div>
           </div>
       </div>
       

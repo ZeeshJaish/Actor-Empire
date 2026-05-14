@@ -1,6 +1,7 @@
 
 import { Business, BusinessType, BusinessSubtype, BusinessConfig, BusinessStaff, BusinessProduct, Player, EmployeeCandidate, StudioState } from '../types';
 import { generateWriters, generateIPMarket } from '../src/data/generators';
+import { createMarketTrends } from './marketTrends';
 
 export interface BusinessBlueprint {
     type: BusinessType;
@@ -372,7 +373,7 @@ export const createDefaultStudioState = (currentWeek: number): StudioState => ({
     scripts: [],
     concepts: [],
     writers: generateWriters(10),
-    ipMarket: generateIPMarket(5, []),
+    ipMarket: generateIPMarket(5, [], currentWeek),
     lastMarketRefreshWeek: currentWeek,
     lastWriterRefreshWeek: currentWeek,
     lastTalentRefreshWeek: currentWeek,
@@ -393,6 +394,8 @@ export const createDefaultStudioState = (currentWeek: number): StudioState => ({
     purchasedIPTitles: [],
     productionFund: 0,
     lockedStreamingFunds: [],
+    genreReputation: {},
+    marketTrends: createMarketTrends(currentWeek),
 });
 
 export const normalizeStudioState = (studioState: Partial<StudioState> | undefined, currentWeek: number): StudioState => {
@@ -407,6 +410,10 @@ export const normalizeStudioState = (studioState: Partial<StudioState> | undefin
         talentRoster: Array.isArray(studioState?.talentRoster) ? studioState!.talentRoster : defaults.talentRoster,
         purchasedIPTitles: Array.isArray(studioState?.purchasedIPTitles) ? studioState!.purchasedIPTitles : defaults.purchasedIPTitles,
         lockedStreamingFunds: Array.isArray(studioState?.lockedStreamingFunds) ? studioState!.lockedStreamingFunds : defaults.lockedStreamingFunds,
+        genreReputation: {
+            ...(studioState?.genreReputation || defaults.genreReputation || {}),
+        },
+        marketTrends: Array.isArray(studioState?.marketTrends) ? studioState!.marketTrends : defaults.marketTrends,
         departments: {
             ...defaults.departments,
             ...(studioState?.departments || {}),
@@ -743,18 +750,28 @@ export const processBusinessWeek = (business: Business, playerFame: number, week
                         bonus = 5 + Math.floor(Math.random() * 15);
                     }
                     
-                    const finalQuality = Math.max(10, Math.min(100, Math.floor(average + variance + bonus)));
+                    const conceptAttrs = script.attributes;
+                    const conceptQualityLift = conceptAttrs
+                        ? ((((conceptAttrs.plot || 50) + (conceptAttrs.characters || 50) + (conceptAttrs.pacing || 50) + (conceptAttrs.dialogue || 50) + (conceptAttrs.action || 50) + (conceptAttrs.originality || 50)) / 6) - 50) * 0.25
+                        : 0;
+                    const finalQuality = Math.max(10, Math.min(100, Math.floor(average + variance + bonus + conceptQualityLift)));
                     
                     // Generate sub-stats around the finalQuality
                     const generateSubStat = () => Math.max(10, Math.min(100, finalQuality + (Math.random() * 20 - 10)));
                     
+                    const blendSubStat = (key: 'plot' | 'characters' | 'pacing' | 'dialogue' | 'action' | 'originality') => {
+                        const generated = generateSubStat();
+                        const concept = conceptAttrs?.[key];
+                        return Math.floor(concept === undefined ? generated : (generated * 0.65) + (concept * 0.35));
+                    };
+
                     const attributes = {
-                        plot: Math.floor(generateSubStat()),
-                        characters: Math.floor(generateSubStat()),
-                        pacing: Math.floor(generateSubStat()),
-                        dialogue: Math.floor(generateSubStat()),
-                        action: Math.floor(generateSubStat()),
-                        originality: Math.floor(generateSubStat()),
+                        plot: blendSubStat('plot'),
+                        characters: blendSubStat('characters'),
+                        pacing: blendSubStat('pacing'),
+                        dialogue: blendSubStat('dialogue'),
+                        action: blendSubStat('action'),
+                        originality: blendSubStat('originality'),
                     };
                     
                     alerts.push(`🎬 Script Finished: "${script.title}" is ready for production! (Quality: ${finalQuality})`);
@@ -775,7 +792,8 @@ export const processBusinessWeek = (business: Business, playerFame: number, week
         // 6. PRODUCTION HOUSE SPECIFIC: MARKET & WRITER REFRESH
         // Refresh IP Market every 3 weeks
         if (week - (b.studioState.lastMarketRefreshWeek || 0) >= 3) {
-            b.studioState.ipMarket = generateIPMarket(5, b.studioState.purchasedIPTitles || []);
+            b.studioState.marketTrends = createMarketTrends(week);
+            b.studioState.ipMarket = generateIPMarket(5, b.studioState.purchasedIPTitles || [], week);
             b.studioState.lastMarketRefreshWeek = week;
         }
         

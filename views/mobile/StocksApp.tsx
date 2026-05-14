@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Player, Stock } from '../../types';
 import { formatMoney } from '../../services/formatUtils';
 import { calculatePortfolioValue } from '../../services/stockLogic';
+import { getPlayerLanguage, t } from '../../services/i18n';
 import { ArrowLeft, TrendingUp, TrendingDown, PieChart, Activity, DollarSign, Lock, AlertTriangle } from 'lucide-react';
 
 interface StocksAppProps {
@@ -14,6 +15,8 @@ interface StocksAppProps {
 export const StocksApp: React.FC<StocksAppProps> = ({ player, onBack, onTrade }) => {
   const [tab, setTab] = useState<'MARKET' | 'PORTFOLIO'>('MARKET');
   const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
+  const language = getPlayerLanguage(player);
+  const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
   
   // Buy/Sell State
   const [sharesInput, setSharesInput] = useState<string>('');
@@ -43,7 +46,7 @@ export const StocksApp: React.FC<StocksAppProps> = ({ player, onBack, onTrade })
                   </div>
                   <div>
                       <div className="font-bold text-white text-sm">{stock.name}</div>
-                      <div className="text-[10px] text-zinc-500">{stock.sector} {holding && `• ${holding.shares} owned`}</div>
+                      <div className="text-[10px] text-zinc-500">{stock.sector} {holding && `• ${holding.shares} ${tr('stocks.owned')}`}</div>
                   </div>
               </div>
               
@@ -84,7 +87,7 @@ export const StocksApp: React.FC<StocksAppProps> = ({ player, onBack, onTrade })
               <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
                   {/* Chart Placeholder */}
                   <div className="h-40 bg-zinc-900 rounded-2xl mb-6 flex items-end px-2 pb-2 relative overflow-hidden border border-zinc-800">
-                      <div className="absolute top-2 left-2 text-[10px] text-zinc-500">12 Week Trend</div>
+                      <div className="absolute top-2 left-2 text-[10px] text-zinc-500">{tr('stocks.weekTrend')}</div>
                       <div className="flex items-end w-full gap-1 h-full">
                           {selectedStock.priceHistory.map((p, i) => {
                               const min = Math.min(...selectedStock.priceHistory) * 0.9;
@@ -100,12 +103,12 @@ export const StocksApp: React.FC<StocksAppProps> = ({ player, onBack, onTrade })
                   {/* Stats Grid */}
                   <div className="grid grid-cols-2 gap-3 mb-6">
                       <div className="bg-zinc-900 p-3 rounded-xl border border-zinc-800">
-                          <div className="text-[10px] text-zinc-500 uppercase">Div Yield</div>
+                          <div className="text-[10px] text-zinc-500 uppercase">{tr('stocks.divYield')}</div>
                           <div className="font-mono font-bold text-emerald-400">{(selectedStock.dividendYield * 100).toFixed(1)}%</div>
                       </div>
                       <div className="bg-zinc-900 p-3 rounded-xl border border-zinc-800">
-                          <div className="text-[10px] text-zinc-500 uppercase">Volatility</div>
-                          <div className="font-mono font-bold text-yellow-400">{selectedStock.volatility > 0.04 ? 'HIGH' : 'LOW'}</div>
+                          <div className="text-[10px] text-zinc-500 uppercase">{tr('stocks.volatility')}</div>
+                          <div className="font-mono font-bold text-yellow-400">{selectedStock.volatility > 0.04 ? tr('stocks.high') : tr('stocks.low')}</div>
                       </div>
                   </div>
 
@@ -114,46 +117,46 @@ export const StocksApp: React.FC<StocksAppProps> = ({ player, onBack, onTrade })
                       <div className="bg-indigo-900/30 border border-indigo-500/30 p-3 rounded-xl mb-6 flex items-center gap-3">
                           <div className="p-2 bg-indigo-500 rounded-full"><Lock size={12} className="text-white"/></div>
                           <div>
-                              <div className="text-xs font-bold text-indigo-300">Partner Stock</div>
-                              <div className="text-[10px] text-indigo-400">You are sponsored by this brand.</div>
+                              <div className="text-xs font-bold text-indigo-300">{tr('stocks.partnerStock')}</div>
+                              <div className="text-[10px] text-indigo-400">{tr('stocks.partnerStockSub')}</div>
                           </div>
                       </div>
                   )}
 
                   {/* Position */}
                   <div className="bg-zinc-900 p-4 rounded-xl border border-zinc-800 mb-6">
-                      <div className="text-xs text-zinc-500 uppercase font-bold mb-2">Your Position</div>
+                      <div className="text-xs text-zinc-500 uppercase font-bold mb-2">{tr('stocks.yourPosition')}</div>
                       {holding ? (
                           <div className="flex justify-between items-end">
                               <div>
                                   <div className="text-2xl font-mono font-bold text-white">{holding.shares}</div>
-                                  <div className="text-[10px] text-zinc-400">Shares</div>
+                                  <div className="text-[10px] text-zinc-400">{tr('stocks.shares')}</div>
                               </div>
                               <div className="text-right">
                                   <div className="text-emerald-400 font-mono font-bold">{formatMoney(holding.shares * selectedStock.price)}</div>
-                                  <div className="text-[10px] text-zinc-400">Value</div>
+                                  <div className="text-[10px] text-zinc-400">{tr('stocks.value')}</div>
                               </div>
                           </div>
                       ) : (
-                          <div className="text-sm text-zinc-600 italic">You own no shares.</div>
+                          <div className="text-sm text-zinc-600 italic">{tr('stocks.noShares')}</div>
                       )}
                   </div>
 
                   {/* Trade Controls */}
                   <div className="bg-zinc-900 p-4 rounded-xl border border-zinc-800">
-                      <div className="text-xs text-zinc-500 uppercase font-bold mb-3">Trade</div>
+                      <div className="text-xs text-zinc-500 uppercase font-bold mb-3">{tr('stocks.trade')}</div>
                       <div className="flex gap-2 mb-3">
                           <input 
                             type="number" 
-                            placeholder="Shares" 
+                            placeholder={tr('stocks.shares')} 
                             value={sharesInput}
                             onChange={(e) => setSharesInput(e.target.value)}
                             className="flex-1 bg-black border border-zinc-700 rounded-lg p-3 text-white font-mono focus:outline-none focus:border-blue-500"
                           />
                       </div>
                       <div className="flex justify-between text-[10px] text-zinc-500 mb-4">
-                          <span>Est. Value: <span className="text-white font-mono">{formatMoney(isNaN(cost) ? 0 : cost)}</span></span>
-                          <span>Cash: <span className="text-white font-mono">{formatMoney(player.money)}</span></span>
+                          <span>{tr('stocks.estValue')}: <span className="text-white font-mono">{formatMoney(isNaN(cost) ? 0 : cost)}</span></span>
+                          <span>{tr('stocks.cash')}: <span className="text-white font-mono">{formatMoney(player.money)}</span></span>
                       </div>
                       <div className="grid grid-cols-2 gap-3">
                           <button 
@@ -166,7 +169,7 @@ export const StocksApp: React.FC<StocksAppProps> = ({ player, onBack, onTrade })
                                 }
                             }}
                           >
-                              Sell
+                              {tr('stocks.sell')}
                           </button>
                           <button 
                             className={`py-3 rounded-xl font-bold text-sm ${!canAfford ? 'bg-blue-900/50 text-blue-300/50' : 'bg-blue-600 text-white hover:bg-blue-500'}`}
@@ -178,7 +181,7 @@ export const StocksApp: React.FC<StocksAppProps> = ({ player, onBack, onTrade })
                                 }
                             }}
                           >
-                              Buy
+                              {tr('stocks.buy')}
                           </button>
                       </div>
                   </div>
@@ -193,30 +196,30 @@ export const StocksApp: React.FC<StocksAppProps> = ({ player, onBack, onTrade })
         <div className="bg-zinc-900 p-4 pt-12 pb-3 shadow-lg flex items-center justify-between shrink-0 border-b border-zinc-800">
             <button onClick={onBack} className="p-1 rounded-full hover:bg-white/10"><ArrowLeft size={20}/></button>
             <div className="flex items-center gap-2 text-emerald-500 font-bold tracking-widest uppercase">
-                <Activity size={20}/> STOCKS
+                <Activity size={20}/> {tr('stocks.title')}
             </div>
             <div className="w-8"></div>
         </div>
 
         {/* Portfolio Summary */}
         <div className="p-6 bg-zinc-900 border-b border-zinc-800">
-            <div className="text-zinc-500 text-[10px] uppercase font-bold tracking-widest mb-1">Total Portfolio Value</div>
+            <div className="text-zinc-500 text-[10px] uppercase font-bold tracking-widest mb-1">{tr('stocks.totalPortfolio')}</div>
             <div className="text-4xl font-mono font-bold text-white mb-4">{formatMoney(portfolioValue)}</div>
             <div className="flex gap-4">
                 <div className="flex-1 bg-zinc-950 p-3 rounded-xl border border-zinc-800">
-                    <div className="text-[10px] text-zinc-500 uppercase">Cash Available</div>
+                    <div className="text-[10px] text-zinc-500 uppercase">{tr('stocks.cashAvailable')}</div>
                     <div className="font-mono text-zinc-300 text-sm font-bold">{formatMoney(cash)}</div>
                 </div>
                 <div className="flex-1 bg-zinc-950 p-3 rounded-xl border border-zinc-800">
-                    <div className="text-[10px] text-zinc-500 uppercase">Yield (Est)</div>
+                    <div className="text-[10px] text-zinc-500 uppercase">{tr('stocks.yieldEst')}</div>
                     <div className="font-mono text-emerald-400 text-sm font-bold">+${(calculatePortfolioValue(player.portfolio, player.stocks) * 0.02).toFixed(0)}/yr</div>
                 </div>
             </div>
         </div>
 
         <div className="flex bg-zinc-950 border-b border-zinc-800">
-            <button onClick={() => setTab('MARKET')} className={`flex-1 py-3 text-xs font-bold uppercase tracking-wider ${tab === 'MARKET' ? 'text-white border-b-2 border-white' : 'text-zinc-600'}`}>Market</button>
-            <button onClick={() => setTab('PORTFOLIO')} className={`flex-1 py-3 text-xs font-bold uppercase tracking-wider ${tab === 'PORTFOLIO' ? 'text-white border-b-2 border-white' : 'text-zinc-600'}`}>Portfolio</button>
+            <button onClick={() => setTab('MARKET')} className={`flex-1 py-3 text-xs font-bold uppercase tracking-wider ${tab === 'MARKET' ? 'text-white border-b-2 border-white' : 'text-zinc-600'}`}>{tr('stocks.market')}</button>
+            <button onClick={() => setTab('PORTFOLIO')} className={`flex-1 py-3 text-xs font-bold uppercase tracking-wider ${tab === 'PORTFOLIO' ? 'text-white border-b-2 border-white' : 'text-zinc-600'}`}>{tr('stocks.portfolio')}</button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 custom-scrollbar space-y-2">
@@ -224,7 +227,7 @@ export const StocksApp: React.FC<StocksAppProps> = ({ player, onBack, onTrade })
             
             {tab === 'PORTFOLIO' && (
                 player.portfolio.length === 0 ? (
-                    <div className="text-center text-zinc-600 mt-10 text-sm">You have no investments.</div>
+                    <div className="text-center text-zinc-600 mt-10 text-sm">{tr('stocks.noInvestments')}</div>
                 ) : (
                     player.portfolio.map(item => {
                         const stock = player.stocks.find(s => s.id === item.stockId);

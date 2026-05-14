@@ -4,12 +4,14 @@ import { Player, ActorSkills, Commitment, ActiveRelease, ScheduledEvent, Message
 import { formatMoney } from '../services/formatUtils';
 import { StatsBar } from '../components/StatsBar';
 import { generateProjectDetails } from '../services/roleLogic';
-import { generateDirectEntryOffer } from '../services/universeLogic'; 
+import { generateDirectEntryOffer, normalizeUniverseForSave } from '../services/universeLogic';
 import { generateLifeEvent } from '../services/lifeEventLogic';
 import { getAbsoluteWeek } from '../services/legacyLogic';
 import { getGenderedAvatar, MALE_AVATAR_SEEDS, FEMALE_AVATAR_SEEDS, NPC_DATABASE } from '../services/npcLogic';
 import { createBusiness } from '../services/businessLogic';
 import { calculateYoutubeCreatorScore, generateYoutubeBrandDeal, generateYoutubeCollabOffer, getYoutubePublicImageLabel } from '../services/youtubeLogic';
+import { ALL_GENRES, formatGenreLabel } from '../services/genreCatalog';
+import { getPlayerLanguage, t } from '../services/i18n';
 import { Heart, Smile, Star, Zap, DollarSign, Brain, Calendar, Activity, TrendingUp, Trophy, X, Sliders, Users, Film, Tv, PlayCircle, Lock, FastForward, Key, AlertTriangle, Mic2, Mail, FileText, Dumbbell, Sparkles, Settings, ShoppingCart, Clapperboard, ZapOff, Crown, Skull, Camera, UploadCloud, Check, MessageSquareQuote, Globe } from 'lucide-react';
 
 interface HomePageProps {
@@ -21,14 +23,17 @@ interface HomePageProps {
   onOpenProductionHouseCheat?: () => void;
   onQueueBabyNamingCheat?: () => void;
   onOpenDeathSummaryPreview?: () => void;
+  onShowWhatsNewCheat?: () => void;
 }
 
-const CHEAT_GENRES: Genre[] = ['ACTION', 'DRAMA', 'COMEDY', 'ROMANCE', 'THRILLER', 'HORROR', 'SCI_FI', 'ADVENTURE', 'SUPERHERO'];
+const CHEAT_GENRES: Genre[] = ALL_GENRES;
 const DEV_TOOLS_PASSCODE = import.meta.env.VITE_DEV_TOOLS_PASSCODE || 'Kzign@420';
 const LEGACY_DEV_TOOLS_PASSCODES = ['actor-dev'];
 
-export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProcessing, onUpdatePlayer, setPage, onOpenProductionHouseCheat, onQueueBabyNamingCheat, onOpenDeathSummaryPreview }) => {
+export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProcessing, onUpdatePlayer, setPage, onOpenProductionHouseCheat, onQueueBabyNamingCheat, onOpenDeathSummaryPreview, onShowWhatsNewCheat }) => {
   const logContainerRef = useRef<HTMLDivElement>(null);
+  const language = getPlayerLanguage(player);
+  const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
   
   // Cheat Menu State
   const [activeCheatMenu, setActiveCheatMenu] = useState<'NONE' | 'DEV'>('NONE');
@@ -1313,7 +1318,9 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                   ...player.commitments
               ],
           activeReleases: player.activeReleases.length > 0 ? player.activeReleases : [activeRelease],
-          relationships: player.relationships.some(rel => rel.status === 'DATING' || rel.status === 'MARRIED')
+          relationships: player.relationships.some(rel =>
+              (rel.relation === 'Partner' || rel.relation === 'Spouse') && (rel.closeness ?? 0) >= 50
+          )
               ? player.relationships
               : [relationship, ...player.relationships],
           logs: [{ week: player.currentWeek, year: player.age, message: `📸 CHEAT: Instagram composer unlock conditions enabled.`, type: 'positive' }, ...player.logs].slice(0, 50)
@@ -1534,6 +1541,162 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
       onOpenProductionHouseCheat?.();
   };
 
+  const triggerReturningTalentNegotiationQa = () => {
+      if (!onUpdatePlayer) return;
+
+      const { updatedPlayer: basePlayer, studio } = ensureCheatStudio();
+      const now = Date.now();
+      const franchiseId = `cheat_return_deal_franchise_${now}`;
+      const scriptId = `cheat_return_deal_script_${now}`;
+      const projectId = `cheat_return_deal_project_${now}`;
+      const director = NPC_DATABASE.find(npc => npc.id === 'celeb_dir_1') || NPC_DATABASE.find(npc => npc.occupation === 'DIRECTOR');
+      const lead = NPC_DATABASE.find(npc => npc.name === 'Ryan Reynolds') || NPC_DATABASE.find(npc => npc.occupation === 'ACTOR' && npc.tier === 'A_LIST');
+      const support = NPC_DATABASE.find(npc => npc.name === 'Zendaya') || NPC_DATABASE.find(npc => npc.occupation === 'ACTOR' && npc.tier === 'A_LIST' && npc.id !== lead?.id);
+
+      const returningCast = [
+          {
+              id: `return_role_lead_${now}`,
+              name: lead?.name || 'Ryan Reynolds',
+              actorName: lead?.name || 'Ryan Reynolds',
+              role: 'Lead Actor',
+              roleType: 'LEAD',
+              actorId: lead?.id || 'celeb_act_5',
+              npcId: lead?.id || 'celeb_act_5',
+              image: lead?.avatar || getGenderedAvatar('MALE', 'Ryan Reynolds'),
+              type: 'ACTOR',
+              salary: 28_000_000,
+              characterId: 'iron_monarch',
+              characterName: 'Iron Monarch'
+          },
+          {
+              id: `return_role_support_${now}`,
+              name: support?.name || 'Zendaya',
+              actorName: support?.name || 'Zendaya',
+              role: 'Supporting Actor',
+              roleType: 'SUPPORTING',
+              actorId: support?.id || 'celeb_act_3',
+              npcId: support?.id || 'celeb_act_3',
+              image: support?.avatar || getGenderedAvatar('FEMALE', 'Zendaya'),
+              type: 'ACTOR',
+              salary: 18_000_000,
+              characterId: 'nova_shade',
+              characterName: 'Nova Shade'
+          }
+      ];
+
+      const returningTalent = [
+          {
+              role: 'DIRECTOR',
+              id: director?.id || 'celeb_dir_1',
+              name: director?.name || 'Christopher Nolan',
+              originalSalary: 85_000_000,
+              newDemand: 112_000_000,
+              negotiated: false,
+              accepted: false,
+              attemptsLeft: 3
+          },
+          ...returningCast.map(cast => ({
+              role: cast.roleType === 'LEAD' ? 'LEAD_ACTOR' : 'SUPPORTING_ACTOR',
+              id: cast.actorId,
+              name: cast.actorName,
+              originalSalary: cast.salary,
+              newDemand: Math.floor(cast.salary * 1.35),
+              negotiated: false,
+              accepted: false,
+              attemptsLeft: 3,
+              characterId: cast.characterId,
+              characterName: cast.characterName
+          }))
+      ];
+
+      const previousProject = {
+          id: projectId,
+          name: 'Return Deal: Iron Monarch',
+          title: 'Return Deal: Iron Monarch',
+          type: 'ACTING_GIG',
+          roleType: 'LEAD',
+          year: Math.max(16, basePlayer.age - 1),
+          earnings: 14_000_000,
+          rating: 8.4,
+          imdbRating: 8.4,
+          reception: 'Franchise breakout',
+          projectQuality: 84,
+          boxOfficeResult: 'BLOCKBUSTER',
+          outcomeTier: 'BLOCKBUSTER',
+          studioId: studio.id,
+          directorId: director?.id || 'celeb_dir_1',
+          directorName: director?.name || 'Christopher Nolan',
+          directorSalary: 85_000_000,
+          castList: returningCast,
+          crewList: [
+              { id: director?.id || 'celeb_dir_1', name: director?.name || 'Christopher Nolan', role: 'DIRECTOR', salary: 85_000_000 }
+          ],
+          reviews: [],
+          budget: 220_000_000,
+          gross: 820_000_000,
+          genre: 'SUPERHERO',
+          description: 'Cheat QA franchise starter for returning talent negotiation blockers.',
+          projectType: 'MOVIE',
+          franchiseId,
+          installmentNumber: 1
+      } as any;
+
+      const script = {
+          id: scriptId,
+          title: 'Return Deal: Iron Monarch 2',
+          logline: 'The sequel is ready, but the returning director and stars still need new deals.',
+          projectType: 'MOVIE',
+          genres: ['SUPERHERO'],
+          quality: 88,
+          status: 'READY',
+          writerId: 'cheat_writer_return_deal',
+          author: 'Cheat Writers Room',
+          weeksInDevelopment: 6,
+          totalDevelopmentWeeks: 6,
+          isOriginal: false,
+          options: [],
+          sourceMaterial: 'SEQUEL',
+          franchiseId,
+          installmentNumber: 2,
+          returningTalent,
+          connectedProjectIntent: 'SOLO',
+          tags: ['RETURNING_TALENT_QA', 'SEQUEL']
+      };
+
+      const updatedStudio = {
+          ...studio,
+          studioState: {
+              ...(studio.studioState || {}),
+              scripts: [
+                  script,
+                  ...(studio.studioState?.scripts || []).filter((existingScript: any) => !String(existingScript.id).startsWith('cheat_return_deal_script_'))
+              ],
+              concepts: (studio.studioState?.concepts || []).filter((concept: any) => !String(concept.scriptId || '').startsWith('cheat_return_deal_script_')),
+              purchasedIPTitles: studio.studioState?.purchasedIPTitles || [],
+              ipMarket: studio.studioState?.ipMarket || [],
+              writers: studio.studioState?.writers || []
+          }
+      };
+
+      onUpdatePlayer({
+          ...basePlayer,
+          businesses: basePlayer.businesses.map(b => b.id === studio.id ? updatedStudio : b),
+          pastProjects: [
+              previousProject,
+              ...basePlayer.pastProjects.filter(project => !String(project.id).startsWith('cheat_return_deal_project_'))
+          ],
+          logs: [{
+              week: basePlayer.currentWeek,
+              year: basePlayer.age,
+              message: '🧪 CHEAT: Returning talent negotiation blocker added. Open Greenlight and inspect the missing requirements list.',
+              type: 'positive'
+          }, ...basePlayer.logs].slice(0, 50)
+      } as Player);
+      setActiveCheatMenu('NONE');
+      onOpenProductionHouseCheat?.();
+      alert('Return Deal QA loaded. Open Development Lab / Greenlight, choose "Return Deal: Iron Monarch 2", then go to Confirm to test pending negotiation names and buttons.');
+  };
+
   const triggerStudioScenario = (scenario: 'PLANNING' | 'PRODUCTION' | 'AWAITING_RELEASE' | 'THEATRICAL_TO_BIDDING' | 'STREAMING_EXIT') => {
       if (!onUpdatePlayer) return;
 
@@ -1661,6 +1824,222 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
       alert(`Studio QA scenario ready: ${scenario.replace(/_/g, ' ')}. Age Up once for the result.`);
   };
 
+  const triggerFilmographySortQa = () => {
+      if (!onUpdatePlayer) return;
+
+      const { updatedPlayer: basePlayer, studio } = ensureCheatStudio();
+      const now = Date.now();
+      const currentAge = Math.max(18, basePlayer.age);
+      const currentWeek = Math.max(1, basePlayer.currentWeek || 1);
+
+      const poster = (title: string, gradient: string, icon: 'Film' | 'Tv' | 'Star' = 'Film') => ({
+          type: 'CONFIG' as const,
+          bgGradient: gradient,
+          icon,
+          textColor: 'text-white'
+      });
+
+      const baseFuturePotential = {
+          sequelChance: 65,
+          franchiseChance: 45,
+          rebootChance: 20,
+          renewalChance: 0,
+          isFranchiseStarter: false,
+          isSequelGreenlit: false,
+          isRenewed: false,
+          seriesStatus: 'N/A'
+      };
+
+      const makeLibraryProject = (data: {
+          id: string;
+          title: string;
+          projectType: 'MOVIE' | 'SERIES';
+          yearOffset: number;
+          rating: number;
+          budget: number;
+          gross: number;
+          streamingRevenue?: number;
+          views?: number;
+          genre: Genre;
+          subtype?: string;
+          franchiseId?: string;
+          universeId?: UniverseId;
+          posterGradient: string;
+          awardsWon?: number;
+      }) => ({
+          id: `cheat_filmography_${data.id}_${now}`,
+          name: data.title,
+          type: 'ACTING_GIG',
+          roleType: 'LEAD',
+          year: Math.max(16, currentAge - data.yearOffset),
+          earnings: Math.round((data.gross + (data.streamingRevenue || 0)) * 0.035),
+          rating: data.rating,
+          reception: data.rating >= 8.4 ? 'Universal acclaim' : data.rating >= 7.2 ? 'Audience favorite' : data.rating >= 6 ? 'Mixed response' : 'Critical disappointment',
+          projectQuality: Math.round(data.rating * 10),
+          imdbRating: data.rating,
+          boxOfficeResult: data.gross >= 450_000_000 ? 'BLOCKBUSTER' : data.gross >= 150_000_000 ? 'HIT' : data.gross < data.budget ? 'FLOP' : 'MODEST',
+          outcomeTier: data.gross >= 450_000_000 ? 'BLOCKBUSTER' : data.gross >= 150_000_000 ? 'HIT' : data.gross < data.budget ? 'FLOP' : 'AVERAGE',
+          subtype: data.subtype || 'STANDALONE',
+          futurePotential: {
+              ...baseFuturePotential,
+              franchiseChance: data.franchiseId || data.universeId ? 90 : 45,
+              sequelChance: data.rating >= 7 ? 82 : 42,
+              renewalChance: data.projectType === 'SERIES' ? 72 : 0,
+              seriesStatus: data.projectType === 'SERIES' ? 'ONGOING' : 'N/A'
+          },
+          studioId: studio.id,
+          castList: [],
+          reviews: [],
+          budget: data.budget,
+          gross: data.gross,
+          genre: data.genre,
+          description: `Cheat Filmography QA title for sorting and filtering: ${data.title}.`,
+          projectType: data.projectType,
+          streamingRevenue: data.streamingRevenue || 0,
+          totalViews: data.views || 0,
+          franchiseId: data.franchiseId,
+          universeId: data.universeId,
+          installmentNumber: data.franchiseId ? 1 : undefined,
+          awards: Array.from({ length: data.awardsWon || 0 }).map((_, index) => ({
+              id: `cheat_award_${data.id}_${index}_${now}`,
+              name: 'Golden Reel',
+              category: index === 0 ? 'Best Film' : 'Best Technical Achievement',
+              year: Math.max(16, currentAge - data.yearOffset),
+              outcome: 'WON',
+              projectId: `cheat_filmography_${data.id}_${now}`,
+              projectName: data.title,
+              type: 'OSCAR'
+          })),
+          customPoster: poster(data.title, data.posterGradient, data.projectType === 'SERIES' ? 'Tv' : data.rating >= 8.4 ? 'Star' : 'Film')
+      } as any);
+
+      const universeId = `cheat_filmography_universe_${now}` as UniverseId;
+      const franchiseId = `cheat_filmography_franchise_${now}`;
+      const libraryProjects = [
+          makeLibraryProject({ id: 'prestige', title: 'Velvet Crown', projectType: 'MOVIE', yearOffset: 1, rating: 9.1, budget: 42_000_000, gross: 188_000_000, genre: 'DRAMA', posterGradient: 'from-purple-950 via-fuchsia-900 to-black', awardsWon: 3 }),
+          makeLibraryProject({ id: 'blockbuster', title: 'Skyfire Protocol', projectType: 'MOVIE', yearOffset: 2, rating: 7.8, budget: 180_000_000, gross: 1_140_000_000, genre: 'ACTION', franchiseId, subtype: 'BLOCKBUSTER', posterGradient: 'from-blue-950 via-cyan-900 to-black' }),
+          makeLibraryProject({ id: 'profit', title: 'The Quiet Door', projectType: 'MOVIE', yearOffset: 3, rating: 8.0, budget: 4_000_000, gross: 96_000_000, genre: 'HORROR', posterGradient: 'from-zinc-950 via-stone-800 to-black' }),
+          makeLibraryProject({ id: 'flop', title: 'Mars Ballroom', projectType: 'MOVIE', yearOffset: 4, rating: 5.4, budget: 165_000_000, gross: 38_000_000, genre: 'SCI_FI', posterGradient: 'from-red-950 via-orange-900 to-black' }),
+          makeLibraryProject({ id: 'stream_series', title: 'Capital City: Season 1', projectType: 'SERIES', yearOffset: 1, rating: 8.3, budget: 72_000_000, gross: 0, streamingRevenue: 148_000_000, views: 64_000_000, genre: 'CRIME', posterGradient: 'from-slate-950 via-blue-900 to-black' }),
+          makeLibraryProject({ id: 'anime', title: 'Neon Lotus', projectType: 'MOVIE', yearOffset: 2, rating: 8.6, budget: 24_000_000, gross: 210_000_000, genre: 'ANIMATION', posterGradient: 'from-pink-950 via-violet-900 to-black' }),
+          makeLibraryProject({ id: 'sports', title: 'Final Whistle', projectType: 'MOVIE', yearOffset: 5, rating: 7.4, budget: 28_000_000, gross: 176_000_000, genre: 'SPORTS', posterGradient: 'from-emerald-950 via-lime-900 to-black' }),
+          makeLibraryProject({ id: 'doc', title: 'The Last Take', projectType: 'MOVIE', yearOffset: 6, rating: 8.8, budget: 3_500_000, gross: 32_000_000, streamingRevenue: 16_000_000, views: 22_000_000, genre: 'DOCUMENTARY', posterGradient: 'from-neutral-950 via-zinc-700 to-black' }),
+          makeLibraryProject({ id: 'universe', title: 'Celestial Order: Eclipse', projectType: 'MOVIE', yearOffset: 1, rating: 8.5, budget: 220_000_000, gross: 980_000_000, genre: 'SUPERHERO', universeId, subtype: 'UNIVERSE_EVENT', posterGradient: 'from-indigo-950 via-sky-900 to-black' })
+      ];
+
+      const activeTheatricalProject = generateProjectDetails('HIGH', 'MOVIE', [], basePlayer);
+      activeTheatricalProject.title = 'Thunder Harbor';
+      activeTheatricalProject.studioId = studio.id;
+      activeTheatricalProject.genre = 'ADVENTURE';
+      activeTheatricalProject.estimatedBudget = 130_000_000;
+      activeTheatricalProject.customPoster = poster('Thunder Harbor', 'from-amber-950 via-yellow-800 to-black');
+      activeTheatricalProject.hiddenStats.qualityScore = 82;
+      activeTheatricalProject.hiddenStats.releaseWeek = currentWeek;
+
+      const activeStreamingProject = generateProjectDetails('MID', 'SERIES', [], basePlayer);
+      activeStreamingProject.title = 'After Midnight: Limited Series';
+      activeStreamingProject.studioId = studio.id;
+      activeStreamingProject.genre = 'THRILLER';
+      activeStreamingProject.estimatedBudget = 58_000_000;
+      activeStreamingProject.customPoster = poster('After Midnight', 'from-violet-950 via-zinc-900 to-black', 'Tv');
+      activeStreamingProject.hiddenStats.qualityScore = 76;
+      activeStreamingProject.hiddenStats.releaseWeek = Math.max(1, currentWeek - 2);
+
+      const activeReleases: ActiveRelease[] = [
+          {
+              id: `cheat_filmography_theatrical_${now}`,
+              name: 'Thunder Harbor',
+              type: 'MOVIE',
+              roleType: 'LEAD',
+              projectDetails: activeTheatricalProject,
+              distributionPhase: 'THEATRICAL',
+              weekNum: 4,
+              weeklyGross: [96_000_000, 68_000_000, 44_000_000, 28_000_000],
+              totalGross: 236_000_000,
+              budget: 130_000_000,
+              status: 'RUNNING',
+              imdbRating: 7.9,
+              productionPerformance: 84,
+              maxTheatricalWeeks: 12,
+              weeksInTheaters: 4
+          } as any,
+          {
+              id: `cheat_filmography_streaming_${now}`,
+              name: 'After Midnight: Limited Series',
+              type: 'SERIES',
+              roleType: 'LEAD',
+              projectDetails: activeStreamingProject,
+              distributionPhase: 'STREAMING',
+              weekNum: 8,
+              weeklyGross: [],
+              totalGross: 0,
+              budget: 58_000_000,
+              status: 'FINISHED',
+              imdbRating: 7.6,
+              productionPerformance: 78,
+              streamingRevenue: 44_000_000,
+              streaming: {
+                  platformId: 'NETFLIX',
+                  weekOnPlatform: 8,
+                  totalViews: 31_000_000,
+                  weeklyViews: [9_000_000, 7_000_000, 4_200_000, 2_100_000],
+                  isLeaving: false
+              }
+          } as any
+      ];
+
+      const universe = normalizeUniverseForSave({
+          id: universeId,
+          name: 'Celestial Order',
+          description: 'Cheat Filmography universe used to test franchise/universe filters.',
+          studioId: studio.id,
+          currentPhase: 'Phase 2',
+          currentPhaseName: 'Phase 2',
+          saga: 1,
+          currentSagaName: 'Saga 1',
+          momentum: 84,
+          brandPower: 86,
+          marketShare: 0,
+          color: '#38bdf8',
+          roster: [],
+          slate: [],
+          products: [],
+          stats: { weeklyRevenue: 0, lifetimeRevenue: 0 },
+          weeksUntilNextPhase: 42
+      }, universeId);
+
+      const nextPlayer = {
+          ...basePlayer,
+          businesses: basePlayer.businesses.map(b => b.id === studio.id ? studio : b),
+          pastProjects: [
+              ...libraryProjects,
+              ...basePlayer.pastProjects.filter(project => !String(project.id).startsWith('cheat_filmography_'))
+          ],
+          activeReleases: [
+              ...activeReleases,
+              ...basePlayer.activeReleases.filter(release => !String(release.id).startsWith('cheat_filmography_'))
+          ],
+          world: {
+              ...basePlayer.world,
+              universes: {
+                  ...(basePlayer.world?.universes || {}),
+                  [universeId]: universe
+              }
+          },
+          logs: [{
+              week: basePlayer.currentWeek,
+              year: basePlayer.age,
+              message: '🎞️ CHEAT: Filmography sorting QA library added. Test Production Studio > Past Projects > See More.',
+              type: 'positive'
+          }, ...basePlayer.logs].slice(0, 50)
+      };
+
+      onUpdatePlayer(nextPlayer as Player);
+      setActiveCheatMenu('NONE');
+      onOpenProductionHouseCheat?.();
+      alert('Filmography QA loaded: 9 library titles plus theatrical and streaming active releases. Open Past Projects > See More to test sorting.');
+  };
+
   const triggerFranchiseQaScenario = (scenario: 'HOT' | 'TIRED' | 'RECAST' | 'CANDIDATE') => {
       if (!onUpdatePlayer) return;
 
@@ -1695,7 +2074,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                   role: 'Co-Star',
                   roleType: 'SUPPORTING',
                   isPlayer: false,
-                  image: coStar?.image || getGenderedAvatar('FEMALE', 'Zendaya'),
+                  image: coStar?.avatar || getGenderedAvatar('FEMALE', 'Zendaya'),
                   type: 'ACTOR',
                   npcId: coStar?.id,
                   actorId: coStar?.id,
@@ -1709,7 +2088,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                   role: 'Antagonist',
                   roleType: 'SUPPORTING',
                   isPlayer: false,
-                  image: thirdNpc?.image || getGenderedAvatar('MALE', 'Chris Evans'),
+                  image: thirdNpc?.avatar || getGenderedAvatar('MALE', 'Chris Evans'),
                   type: 'ACTOR',
                   npcId: thirdNpc?.id,
                   actorId: thirdNpc?.id,
@@ -1846,7 +2225,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
               role: index === 0 ? 'Lead' : index === 1 ? 'Co-Lead' : 'Supporting',
               roleType: index === 0 ? 'LEAD' : index === 1 ? 'SUPPORTING' : 'SUPPORTING',
               isPlayer: index === 0,
-              image: index === 0 ? basePlayer.avatar : actor?.image || getGenderedAvatar(index % 2 === 0 ? 'FEMALE' : 'MALE', actor?.name || characterName),
+              image: index === 0 ? basePlayer.avatar : actor?.avatar || getGenderedAvatar(index % 2 === 0 ? 'FEMALE' : 'MALE', actor?.name || characterName),
               type: 'ACTOR',
               npcId: actor?.id,
               actorId: index === 0 ? 'PLAYER_SELF' : actor?.id,
@@ -1989,6 +2368,264 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
       setActiveCheatMenu('NONE');
       onOpenProductionHouseCheat?.();
       alert(`${universeName} QA loaded. Test it in Development Lab > Universe and IMDb > Universe.`);
+  };
+
+  const triggerUniverseNamingFlowCheat = () => {
+      if (!onUpdatePlayer) return;
+
+      const { updatedPlayer: basePlayer, studio } = ensureCheatStudio();
+      const now = Date.now();
+      const franchiseId = `cheat_name_franchise_${now}`;
+      const universeId = `cheat_name_universe_${now}`;
+      const primaryNpc = NPC_DATABASE.find(n => n.tier === 'A_LIST') || NPC_DATABASE[0];
+      const secondNpc = NPC_DATABASE.find(n => n.id !== primaryNpc?.id && n.tier === 'A_LIST') || NPC_DATABASE[1] || primaryNpc;
+      const thirdNpc = NPC_DATABASE.find(n => n.id !== primaryNpc?.id && n.id !== secondNpc?.id) || NPC_DATABASE[2] || primaryNpc;
+      const slug = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+
+      const duneCast = [
+          {
+              id: `cast_paul_${now}`,
+              name: primaryNpc?.name || 'Timothee Chalamet',
+              actorName: primaryNpc?.name || 'Timothee Chalamet',
+              role: 'Lead',
+              roleType: 'LEAD',
+              actorId: primaryNpc?.id || 'cheat_actor_paul',
+              npcId: primaryNpc?.id,
+              image: primaryNpc?.avatar || getGenderedAvatar('MALE', 'Paul Atreides'),
+              type: 'ACTOR',
+              characterId: slug('Paul Atreides'),
+              characterName: 'Paul Atreides',
+              sourceUniverseId: universeId,
+              salary: 12_000_000
+          },
+          {
+              id: `cast_chani_${now}`,
+              name: secondNpc?.name || 'Zendaya',
+              actorName: secondNpc?.name || 'Zendaya',
+              role: 'Co-Lead',
+              roleType: 'SUPPORTING',
+              actorId: secondNpc?.id || 'cheat_actor_chani',
+              npcId: secondNpc?.id,
+              image: secondNpc?.avatar || getGenderedAvatar('FEMALE', 'Chani'),
+              type: 'ACTOR',
+              characterId: slug('Chani'),
+              characterName: 'Chani',
+              sourceUniverseId: universeId,
+              salary: 8_500_000
+          },
+          {
+              id: `cast_feyd_${now}`,
+              name: thirdNpc?.name || 'Austin Butler',
+              actorName: thirdNpc?.name || 'Austin Butler',
+              role: 'Antagonist',
+              roleType: 'SUPPORTING',
+              actorId: thirdNpc?.id || 'cheat_actor_feyd',
+              npcId: thirdNpc?.id,
+              image: thirdNpc?.avatar || getGenderedAvatar('MALE', 'Feyd-Rautha'),
+              type: 'ACTOR',
+              characterId: slug('Feyd Rautha'),
+              characterName: 'Feyd-Rautha',
+              sourceUniverseId: universeId,
+              salary: 6_000_000
+          }
+      ];
+
+      const makePastProject = (title: string, installmentNumber: number, yearOffset: number, gross: number, rating: number) => ({
+          id: `cheat_name_dune_${installmentNumber}_${now}`,
+          name: title,
+          type: 'ACTING_GIG',
+          roleType: 'LEAD',
+          year: Math.max(16, basePlayer.age - yearOffset),
+          earnings: Math.round(gross * 0.035),
+          rating,
+          reception: 'Fan event',
+          projectQuality: Math.round(rating * 10),
+          imdbRating: rating,
+          boxOfficeResult: gross >= 500000000 ? 'BLOCKBUSTER' : 'HIT',
+          outcomeTier: gross >= 500000000 ? 'BLOCKBUSTER' : 'HIT',
+          subtype: installmentNumber === 1 ? 'UNIVERSE_ENTRY' : 'SEQUEL',
+          futurePotential: {
+              sequelChance: 94,
+              franchiseChance: 96,
+              rebootChance: 12,
+              renewalChance: 0,
+              isFranchiseStarter: installmentNumber === 1,
+              isSequelGreenlit: false,
+              isRenewed: false,
+              seriesStatus: 'N/A'
+          },
+          studioId: studio.id,
+          castList: duneCast,
+          reviews: [],
+          budget: Math.round(gross * 0.28),
+          gross,
+          genre: 'SCI_FI',
+          description: `Cheat naming-flow release for ${title}.`,
+          projectType: 'MOVIE',
+          franchiseId,
+          universeId,
+          universeSagaName: 'Saga 1',
+          universePhaseName: 'Phase 1',
+          installmentNumber,
+          directorId: 'cheat_name_director'
+      } as any);
+
+      const pastProjects = [
+          makePastProject('Dune', 1, 3, 520_000_000, 8.2),
+          makePastProject('Dune: Part Two', 2, 1, 720_000_000, 8.7)
+      ];
+
+      const returningTalent = duneCast.map(cast => ({
+          role: cast.roleType === 'LEAD' ? 'LEAD_ACTOR' : 'SUPPORTING_ACTOR',
+          id: cast.actorId,
+          originalSalary: cast.salary,
+          newDemand: Math.floor(cast.salary * 1.2),
+          negotiated: false,
+          accepted: false,
+          attemptsLeft: 3,
+          characterId: cast.characterId,
+          characterName: cast.characterName,
+          sourceUniverseId: universeId
+      }));
+
+      const scripts = [
+          {
+              id: `cheat_name_script_standalone_${now}`,
+              title: 'Midnight Courier',
+              logline: 'A courier discovers a citywide conspiracy during one impossible night.',
+              projectType: 'MOVIE',
+              genres: ['THRILLER'],
+              quality: 82,
+              status: 'READY',
+              writerId: 'cheat_writer',
+              author: 'Cheat Writers Room',
+              weeksInDevelopment: 4,
+              totalDevelopmentWeeks: 4,
+              isOriginal: true,
+              options: [],
+              connectedProjectIntent: 'SOLO',
+              tags: ['NAMING_QA', 'STANDALONE']
+          },
+          {
+              id: `cheat_name_script_franchise_${now}`,
+              title: 'Dune: Part Three',
+              logline: 'The next chapter of House Atreides tests loyalty, prophecy, and the cost of empire.',
+              projectType: 'MOVIE',
+              genres: ['SCI_FI'],
+              quality: 86,
+              status: 'READY',
+              writerId: 'cheat_writer',
+              author: 'Cheat Writers Room',
+              weeksInDevelopment: 6,
+              totalDevelopmentWeeks: 6,
+              isOriginal: false,
+              options: [],
+              sourceMaterial: 'SEQUEL',
+              franchiseId,
+              universeId,
+              installmentNumber: 3,
+              returningTalent,
+              connectedProjectIntent: 'SOLO',
+              tags: ['NAMING_QA', 'FRANCHISE']
+          },
+          {
+              id: `cheat_name_script_universe_${now}`,
+              title: 'Arrakis Saga: Event 1',
+              logline: 'Paul, Chani, and Feyd-Rautha collide in a high-stakes crossover for the Arrakis Saga.',
+              projectType: 'MOVIE',
+              genres: ['SCI_FI'],
+              quality: 88,
+              status: 'READY',
+              writerId: 'cheat_writer',
+              author: 'Cheat Writers Room',
+              weeksInDevelopment: 6,
+              totalDevelopmentWeeks: 6,
+              isOriginal: false,
+              options: [],
+              sourceMaterial: 'SPINOFF',
+              franchiseId,
+              universeId,
+              universeSagaName: 'Saga 1',
+              universePhaseName: 'Phase 2',
+              returningTalent,
+              connectedProjectIntent: 'EVENT',
+              tags: ['NAMING_QA', 'UNIVERSE_EVENT']
+          }
+      ];
+
+      const universe = normalizeUniverseForSave({
+          id: universeId,
+          name: 'Arrakis Saga',
+          description: 'Cheat naming-flow universe for testing saga, phase, roster, sequel, and event naming.',
+          studioId: studio.id,
+          currentPhase: 'Phase 2',
+          currentPhaseName: 'Phase 2',
+          saga: 1,
+          currentSagaName: 'Saga 1',
+          momentum: 86,
+          brandPower: 88,
+          marketShare: 0,
+          color: '#d97706',
+          roster: duneCast.map(cast => ({
+              id: cast.characterId,
+              characterId: cast.characterId,
+              name: cast.characterName,
+              actorId: cast.actorId,
+              actorName: cast.actorName,
+              status: 'ACTIVE',
+              fanApproval: cast.roleType === 'LEAD' ? 91 : 84,
+              appearances: 2,
+              firstAppearanceTitle: 'Dune',
+              latestAppearanceTitle: 'Dune: Part Two',
+              description: `Cheat naming-flow character: ${cast.characterName}.`
+          })),
+          slate: [],
+          products: [],
+          stats: { weeklyRevenue: 0, lifetimeRevenue: 0 },
+          weeksUntilNextPhase: 48
+      }, universeId);
+
+      const updatedStudio = {
+          ...studio,
+          studioState: {
+              ...(studio.studioState || {}),
+              scripts: [
+                  ...scripts,
+                  ...(studio.studioState?.scripts || []).filter((script: any) => !String(script.id).startsWith('cheat_name_script_'))
+              ],
+              concepts: (studio.studioState?.concepts || []).filter((concept: any) => !String(concept.scriptId || '').startsWith('cheat_name_script_')),
+              purchasedIPTitles: studio.studioState?.purchasedIPTitles || [],
+              ipMarket: studio.studioState?.ipMarket || [],
+              writers: studio.studioState?.writers || []
+          }
+      };
+
+      const nextPlayer = {
+          ...basePlayer,
+          businesses: basePlayer.businesses.map(b => b.id === studio.id ? updatedStudio : b),
+          pastProjects: [
+              ...pastProjects,
+              ...basePlayer.pastProjects.filter(project => !String(project.id).startsWith('cheat_name_dune_'))
+          ],
+          world: {
+              ...basePlayer.world,
+              universes: {
+                  ...(basePlayer.world?.universes || {}),
+                  [universeId]: universe
+              }
+          },
+          logs: [{
+              week: basePlayer.currentWeek,
+              year: basePlayer.age,
+              message: '🧪 CHEAT: Universe naming flow kit added. Test Standalone, Dune sequel, and Arrakis event scripts in Development Lab.',
+              type: 'positive'
+          }, ...basePlayer.logs].slice(0, 50)
+      };
+
+      onUpdatePlayer(nextPlayer as Player);
+      setActiveCheatMenu('NONE');
+      onOpenProductionHouseCheat?.();
+      alert('Naming flow QA kit loaded: Standalone, Dune sequel, and Arrakis universe event scripts are ready in Development Lab.');
   };
 
   const addLegacyTestChild = () => {
@@ -2174,6 +2811,12 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                                   <button onClick={triggerStudioBootstrapAndOpen} className="col-span-2 bg-yellow-500/10 hover:bg-yellow-500/20 border border-yellow-400/40 text-xs font-bold py-3 rounded-lg text-yellow-300">
                                       Open Production House Now
                                   </button>
+                                  <button onClick={triggerFilmographySortQa} className="col-span-2 bg-pink-900/30 hover:bg-pink-900/50 border border-pink-500/30 text-xs font-bold py-3 rounded-lg text-pink-300">
+                                      Add Filmography Sort QA Library
+                                  </button>
+                                  <button onClick={triggerReturningTalentNegotiationQa} className="col-span-2 bg-rose-900/30 hover:bg-rose-900/50 border border-rose-500/30 text-xs font-bold py-3 rounded-lg text-rose-300">
+                                      Return Deal Blocker QA
+                                  </button>
                                   <button onClick={() => triggerStudioScenario('PLANNING')} className="bg-zinc-800 hover:bg-zinc-700 text-xs font-bold py-3 rounded-lg text-white">
                                       Planning to Pre-Prod
                                   </button>
@@ -2235,6 +2878,9 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                                   Tests Continue, fallback feedback, and safe recovery paths for corrupted queued events.
                               </div>
                               <div className="grid grid-cols-2 gap-2">
+                                  <button onClick={() => { setActiveCheatMenu('NONE'); onShowWhatsNewCheat?.(); }} className="col-span-2 bg-violet-900/30 hover:bg-violet-900/50 border border-violet-500/30 text-xs font-bold py-3 rounded-lg text-violet-300 flex items-center justify-center gap-2">
+                                      <Sparkles size={14}/> Show What&apos;s New Popup
+                                  </button>
                                   <button onClick={() => queueEventQaCase('SIMPLE_FEEDBACK')} className="bg-emerald-900/30 hover:bg-emerald-900/50 border border-emerald-500/30 text-[10px] font-bold py-3 rounded-lg text-emerald-300 flex items-center justify-center gap-2">
                                       <Check size={12}/> Simple Feedback
                                   </button>
@@ -2425,6 +3071,9 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                                   <button onClick={() => triggerUniverseQaScenario('MERCH')} className="col-span-2 bg-amber-900/30 hover:bg-amber-900/50 border border-amber-500/30 text-xs font-bold py-3 rounded-lg text-amber-300">
                                       Merch Empire
                                   </button>
+                                  <button onClick={triggerUniverseNamingFlowCheat} className="col-span-2 bg-blue-900/30 hover:bg-blue-900/50 border border-blue-500/30 text-xs font-bold py-3 rounded-lg text-blue-300">
+                                      Naming Flow Kit
+                                  </button>
                               </div>
                           </div>
                       )}
@@ -2550,7 +3199,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                               {CHEAT_GENRES.map((genre) => (
                                   <div key={genre}>
                                       <div className="flex justify-between mb-1">
-                                          <label className="text-xs font-bold text-zinc-400 capitalize">{genre.toLowerCase().replace('_', ' ')}</label>
+                                          <label className="text-xs font-bold text-zinc-400">{formatGenreLabel(genre)}</label>
                                           <span className="text-xs font-mono text-zinc-300">{Math.round((player.stats.genreXP[genre] || 0))}</span>
                                       </div>
                                       <input 
@@ -2702,9 +3351,9 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
             </div>
             
             <div className="flex flex-col items-center justify-center pl-4 border-l border-white/5 shrink-0">
-                <div className="text-[10px] text-zinc-500 uppercase tracking-wider font-bold mb-1">Week</div>
+                <div className="text-[10px] text-zinc-500 uppercase tracking-wider font-bold mb-1">{tr('home.week')}</div>
                 <div className="text-3xl font-light text-white">{player.currentWeek}</div>
-                <div className="text-[10px] text-zinc-600">of 52</div>
+                <div className="text-[10px] text-zinc-600">{tr('common.of')} 52</div>
                 
                 {/* SETTINGS AND STORE BUTTONS */}
                 <div className="flex gap-1 mt-2">
@@ -2712,7 +3361,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                         <button
                             onClick={() => setPage && setPage(Page.SOCIAL)}
                             className="p-1.5 bg-amber-900/50 hover:bg-amber-800/50 rounded-full text-amber-400 hover:text-white transition-colors"
-                            title="View Legacy"
+                            title={tr('home.viewLegacy')}
                         >
                             <Crown size={14} />
                         </button>
@@ -2738,10 +3387,10 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
       <div className="glass-card p-5 rounded-3xl relative overflow-hidden">
          <div className="flex justify-between items-center mb-3">
             <h2 className="text-xs font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-2">
-                <Zap className="text-amber-400 fill-amber-400" size={14} /> Energy
+                <Zap className="text-amber-400 fill-amber-400" size={14} /> {tr('home.energy')}
             </h2>
             <span className="text-xs text-zinc-500 font-mono">
-                <span className="text-white">{player.energy.current}</span> / {100 - weeklyDrain} MAX
+                <span className="text-white">{player.energy.current}</span> / {100 - weeklyDrain} {tr('home.max').toUpperCase()}
             </span>
          </div>
          <div className="h-4 bg-zinc-900/50 rounded-full overflow-hidden border border-white/5 relative">
@@ -2764,13 +3413,13 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
           {/* Personal Condition */}
           <div className="glass-card p-5 rounded-3xl space-y-3">
               <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2 flex items-center gap-2">
-                  <Activity size={12} /> Personal Condition
+                  <Activity size={12} /> {tr('home.personalCondition')}
               </h3>
               <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-                  <StatsBar label="Health" value={player.stats.health} color="bg-rose-500" icon={<Heart size={12}/>} />
-                  <StatsBar label="Physique" value={player.stats.body} color="bg-amber-500" icon={<Dumbbell size={12}/>} />
-                  <StatsBar label="Mood" value={player.stats.happiness} color="bg-teal-400" icon={<Smile size={12}/>} />
-                  <StatsBar label="Looks" value={player.stats.looks} color="bg-purple-500" icon={<Sparkles size={12}/>} />
+                  <StatsBar label={tr('home.health')} value={player.stats.health} color="bg-rose-500" icon={<Heart size={12}/>} />
+                  <StatsBar label={tr('home.physique')} value={player.stats.body} color="bg-amber-500" icon={<Dumbbell size={12}/>} />
+                  <StatsBar label={tr('home.mood')} value={player.stats.happiness} color="bg-teal-400" icon={<Smile size={12}/>} />
+                  <StatsBar label={tr('home.looks')} value={player.stats.looks} color="bg-purple-500" icon={<Sparkles size={12}/>} />
               </div>
           </div>
 
@@ -2778,17 +3427,17 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
           <div className="grid grid-cols-2 gap-4">
               <div className="glass-card p-5 rounded-3xl space-y-3">
                   <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1 flex items-center gap-2">
-                      <Brain size={12} /> Skills
+                      <Brain size={12} /> {tr('home.skills')}
                   </h3>
-                  <StatsBar label="Talent" value={player.stats.talent} color="bg-indigo-500" icon={<Brain size={12}/>} />
-                  <StatsBar label="Experience" value={player.stats.experience} color="bg-violet-500" icon={<TrendingUp size={12}/>} />
+                  <StatsBar label={tr('home.talent')} value={player.stats.talent} color="bg-indigo-500" icon={<Brain size={12}/>} />
+                  <StatsBar label={tr('home.experience')} value={player.stats.experience} color="bg-violet-500" icon={<TrendingUp size={12}/>} />
               </div>
               <div className="glass-card p-5 rounded-3xl space-y-3">
                   <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1 flex items-center gap-2">
-                      <Star size={12} /> Status
+                      <Star size={12} /> {tr('home.status')}
                   </h3>
-                  <StatsBar label="Reputation" value={player.stats.reputation} color="bg-blue-500" icon={<Trophy size={12}/>} />
-                  <StatsBar label="Fame" value={player.stats.fame} color="bg-gradient-to-r from-yellow-400 to-yellow-600" icon={<Star size={12}/>} />
+                  <StatsBar label={tr('home.reputation')} value={player.stats.reputation} color="bg-blue-500" icon={<Trophy size={12}/>} />
+                  <StatsBar label={tr('home.fame')} value={player.stats.fame} color="bg-gradient-to-r from-yellow-400 to-yellow-600" icon={<Star size={12}/>} />
               </div>
           </div>
       </div>
@@ -2797,7 +3446,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
       <div className="glass-card p-5 rounded-3xl h-48 flex flex-col relative overflow-hidden">
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-zinc-700 to-transparent opacity-50"></div>
         <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3 flex items-center gap-2">
-            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div> Live Feed
+            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div> {tr('home.liveFeed')}
         </h3>
         <div ref={logContainerRef} className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar mask-image-gradient">
             {player.logs.map((log, idx) => (
@@ -2805,7 +3454,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                     log.type === 'positive' ? 'border-emerald-500/50 text-emerald-100' : 
                     log.type === 'negative' ? 'border-rose-500/50 text-rose-100' : 'border-zinc-700 text-zinc-400'
                 }`}>
-                    <span className="text-zinc-600 text-[10px] font-mono mr-2 block uppercase">Year {log.year} • Week {log.week}</span>
+                    <span className="text-zinc-600 text-[10px] font-mono mr-2 block uppercase">{tr('common.year')} {log.year} • {tr('common.week')} {log.week}</span>
                     {log.message}
                 </div>
             ))}
@@ -2824,10 +3473,10 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
       >
         <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 blur-xl"></div>
         {isProcessing ? (
-            <span className="animate-pulse">Processing Week...</span>
+            <span className="animate-pulse">{tr('home.processingWeek')}</span>
         ) : (
             <>
-                <Calendar size={22} /> Age Up Week
+                <Calendar size={22} /> {tr('home.ageUpWeek')}
             </>
         )}
       </button>

@@ -8,6 +8,13 @@ export const STUDIO_CATALOG: Record<StudioId, Studio> = {
         qualityBias: { script: 1.0, hype: 1.0, distribution: 1.2 },
         payMultiplier: 1.1, budgetComfort: ['MID', 'HIGH'],
     },
+    HBO: {
+        id: 'HBO', name: 'HBO', archetype: 'PRESTIGE',
+        valuation: 18,
+        castingBias: { reputation: 1.4, followers: 0.8, experience: 1.2 },
+        qualityBias: { script: 1.35, hype: 1.0, distribution: 1.05 },
+        payMultiplier: 1.2, budgetComfort: ['MID', 'HIGH'],
+    },
     WARNER_BROS: {
         id: 'WARNER_BROS', name: 'Warner Bros.', archetype: 'LEGACY',
         valuation: 74, // Billion

@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
-import { Player, Business, Script, Writer, Genre, ProjectType, ScriptAttributes, TargetAudience, Universe } from '../../../types';
-import { ArrowLeft, PenTool, BookOpen, ShoppingCart, Users, Star, Clock, DollarSign, Sparkles, ChevronRight, Layers, Globe, RefreshCw, Plus, History, Film, Tv, Edit2, ShoppingBag, Palmtree, Flame, Gauge, Trophy, AlertTriangle, RotateCcw } from 'lucide-react';
+import { Player, Business, Script, Writer, Genre, ProjectType, ScriptAttributes, TargetAudience, Universe, ProjectFormat, ScriptSubjectType } from '../../../types';
+import { ArrowLeft, PenTool, BookOpen, ShoppingCart, Users, Star, Clock, DollarSign, Sparkles, ChevronRight, Layers, Globe, RefreshCw, Plus, History, Film, Tv, Edit2, ShoppingBag, Palmtree, Flame, Gauge, Trophy, AlertTriangle, RotateCcw, Info } from 'lucide-react';
 import { motion } from 'motion/react';
 import { getWriterTalent } from '../../../services/roleLogic';
 import { generateWriters, generateIPMarket, generateProceduralLogline } from '../../../src/data/generators';
-import { SCRIPT_TEMPLATES } from '../../../src/data/scriptTemplates';
+import { SCRIPT_TEMPLATES, ScriptQuestion } from '../../../src/data/scriptTemplates';
 import { normalizeStudioState } from '../../../services/businessLogic';
 import { buildUniverseRoster, calculateUniverseProductWeeklyRevenue, getUniverseDashboardProjects, getUniverseReleaseActivity, normalizeUniverseForSave, normalizeUniverseMap } from '../../../services/universeLogic';
+import { ALL_GENRES, PROJECT_FORMATS, formatGenreLabel, formatProjectFormatLabel, isSubjectDrivenGenre } from '../../../services/genreCatalog';
+import { createMarketTrends, getGenreMarketTrend, getScriptMarketDemand } from '../../../services/marketTrends';
 
 interface DevelopmentLabProps {
     player: Player;
@@ -18,6 +20,146 @@ interface DevelopmentLabProps {
 type DevTab = 'VAULT' | 'NEW_CONCEPT' | 'IP_MARKET' | 'FRANCHISES' | 'UNIVERSE';
 
 // --- Helpers ---
+const clampScriptStat = (value: number) => Math.max(10, Math.min(100, Math.round(value)));
+
+const getSubjectTypeLabel = (subjectType?: ScriptSubjectType) => (subjectType || 'PUBLIC_FIGURE').replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+
+const getSourceMaterialLabel = (source?: string) => {
+    if (!source) return 'Original';
+    if (source === 'LIFE_RIGHTS') return 'Life Rights';
+    if (source === 'DOCUMENTARY_SUBJECT') return 'Doc Access';
+    if (source === 'SPEC_SCRIPT') return 'Spec Script';
+    return source.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+};
+
+const getFormatQuestions = (format: ProjectFormat): ScriptQuestion[] => {
+    if (format === 'ANIMATED') {
+        return [{
+            id: 'format-animation-style',
+            question: 'What animation identity does it have?',
+            options: [
+                { id: 'family-spectacle', text: 'Family Spectacle', reviewSnippet: 'bright, emotional, and built for all ages', newsHeadline: 'Families are already responding to the animation concept.' },
+                { id: 'stylized-art-film', text: 'Stylized Art Film', reviewSnippet: 'visually daring and emotionally precise', newsHeadline: 'The animation style is being called bold and distinctive.' },
+                { id: 'voice-comedy', text: 'Voice-Driven Comedy', reviewSnippet: 'powered by funny, expressive performances', newsHeadline: 'The voice performances are expected to be the selling point.' }
+            ]
+        }];
+    }
+    if (format === 'ANIME') {
+        return [{
+            id: 'format-anime-lane',
+            question: 'Which anime lane does it follow?',
+            options: [
+                { id: 'shonen-event', text: 'Shonen Event Film', reviewSnippet: 'big emotion, rivalries, and explosive action', newsHeadline: 'Anime fans are circling the event-film energy.' },
+                { id: 'dark-fantasy', text: 'Dark Fantasy Anime', reviewSnippet: 'mythic, intense, and visually sharp', newsHeadline: 'The dark fantasy anime angle is building serious buzz.' },
+                { id: 'slice-of-life', text: 'Slice-of-Life Drama', reviewSnippet: 'quiet, heartfelt, and character-driven', newsHeadline: 'The intimate anime drama could be a sleeper hit.' }
+            ]
+        }];
+    }
+    return [];
+};
+
+const getSubjectQuestions = (genre: Genre, subjectName: string, subjectType: ScriptSubjectType): ScriptQuestion[] => {
+    if (!isSubjectDrivenGenre(genre)) return [];
+    const label = subjectName || 'the subject';
+    if (genre === 'BIOPIC') {
+        return [{
+            id: 'subject-biopic-focus',
+            question: `What part of ${label}'s story anchors the movie?`,
+            options: [
+                { id: 'private-cost', text: 'Private Cost of Fame', reviewSnippet: 'finding pain beneath the public image', newsHeadline: `${label}'s private life gives the biopic emotional weight.` },
+                { id: 'defining-victory', text: 'Defining Victory', reviewSnippet: 'building toward the moment that changed everything', newsHeadline: `${label}'s defining win gives the film a strong spine.` },
+                { id: 'messy-truth', text: 'Messy Truth', reviewSnippet: 'refusing to sand down the contradictions', newsHeadline: `The ${getSubjectTypeLabel(subjectType)} angle is being treated with unusual honesty.` }
+            ]
+        }];
+    }
+    return [{
+        id: 'subject-doc-access',
+        question: `What access do we have to ${label}?`,
+        options: [
+            { id: 'exclusive-footage', text: 'Exclusive Footage', reviewSnippet: 'driven by material nobody has seen before', newsHeadline: `Exclusive footage makes the ${label} documentary feel urgent.` },
+            { id: 'key-witnesses', text: 'Key Witnesses', reviewSnippet: 'built around firsthand testimony', newsHeadline: `Witness interviews are giving the documentary real authority.` },
+            { id: 'open-question', text: 'Unresolved Question', reviewSnippet: 'following a mystery without easy answers', newsHeadline: `The unresolved question at the center of ${label} is grabbing attention.` }
+        ]
+    }];
+};
+
+const getScriptQuestions = (genre: Genre, format: ProjectFormat, subjectName: string, subjectType: ScriptSubjectType): ScriptQuestion[] => [
+    ...getFormatQuestions(format),
+    ...getSubjectQuestions(genre, subjectName, subjectType),
+    ...(SCRIPT_TEMPLATES[genre] || []),
+];
+
+const calculateConceptAttributes = (
+    genre: Genre,
+    format: ProjectFormat,
+    subjectType: ScriptSubjectType,
+    selectedOptions: { questionId: string; choiceId: string }[],
+    hasSecondaryGenre: boolean
+): ScriptAttributes => {
+    const attrs: ScriptAttributes = { plot: 50, characters: 50, pacing: 50, dialogue: 50, action: 50, originality: 50 };
+    const boost = (stat: keyof ScriptAttributes, amount: number) => {
+        attrs[stat] = clampScriptStat((attrs[stat] || 50) + amount);
+    };
+
+    if (hasSecondaryGenre) boost('originality', 4);
+    if (format === 'ANIMATED') {
+        boost('originality', 8);
+        boost('characters', 5);
+        if (genre === 'ANIMATION' || genre === 'FANTASY') boost('action', 5);
+    }
+    if (format === 'ANIME') {
+        boost('originality', 10);
+        boost('action', 7);
+        boost('pacing', 4);
+    }
+    if (genre === 'BIOPIC') {
+        boost('characters', 10);
+        boost('dialogue', 4);
+        boost('originality', subjectType === 'ATHLETE' || subjectType === 'MUSICIAN' ? 5 : 2);
+    }
+    if (genre === 'DOCUMENTARY') {
+        boost('originality', 12);
+        boost('plot', 6);
+        boost('dialogue', 3);
+        boost('action', -8);
+    }
+    if (genre === 'MUSICAL') {
+        boost('originality', 8);
+        boost('dialogue', 5);
+        boost('pacing', 5);
+    }
+    if (genre === 'SPORTS') {
+        boost('action', 8);
+        boost('pacing', 6);
+        boost('characters', 4);
+    }
+    if (genre === 'CRIME') {
+        boost('plot', 8);
+        boost('pacing', 5);
+    }
+    if (genre === 'FANTASY') {
+        boost('plot', 8);
+        boost('originality', 7);
+    }
+
+    selectedOptions.forEach(option => {
+        const id = option.choiceId;
+        if (/archive|exclusive|original|forbidden|lost-heir|world|mature|stylized|messy/.test(id)) boost('originality', 5);
+        if (/authorized|private|intimate|character|slice|family|community|mob/.test(id)) boost('characters', 5);
+        if (/investigative|detective|mystery|case|truth|open-question/.test(id)) boost('plot', 5);
+        if (/shonen|rivalry|final|breakneck|sports|action|monster/.test(id)) boost('action', 5);
+        if (/jukebox|voice|comedy|dialogue|interviews|witnesses/.test(id)) boost('dialogue', 5);
+        if (/comeback|underdog|cultural|backstage|fame|dark-fantasy/.test(id)) boost('pacing', 4);
+    });
+
+    return attrs;
+};
+
+const calculateConceptQuality = (attrs: ScriptAttributes) => {
+    const weighted = ((attrs.plot || 50) * 1.2) + ((attrs.characters || 50) * 1.1) + (attrs.pacing || 50) + (attrs.dialogue || 50) + ((attrs.action || 50) * 0.85) + ((attrs.originality || 50) * 1.1);
+    return clampScriptStat(weighted / 6.25);
+};
+
 const formatCurrency = (amount: number): string => {
     if (amount >= 1000000) {
         const millions = amount / 1000000;
@@ -89,7 +231,8 @@ export const DevelopmentLab: React.FC<DevelopmentLabProps> = ({ player, studio, 
 
     const handleRefreshMarket = () => {
         if (studio.balance >= 250000) {
-            const newMarket = generateIPMarket(6, studioState.purchasedIPTitles || []);
+            const newMarket = generateIPMarket(6, studioState.purchasedIPTitles || [], player.currentWeek);
+            const marketTrends = createMarketTrends(player.currentWeek);
             const newWriters = generateWriters(10);
             
             const updatedStudio = { 
@@ -98,6 +241,7 @@ export const DevelopmentLab: React.FC<DevelopmentLabProps> = ({ player, studio, 
                 studioState: {
                     ...studioState,
                     ipMarket: newMarket,
+                    marketTrends,
                     writers: newWriters,
                     lastMarketRefreshWeek: player.currentWeek,
                     lastWriterRefreshWeek: player.currentWeek
@@ -121,11 +265,12 @@ export const DevelopmentLab: React.FC<DevelopmentLabProps> = ({ player, studio, 
 
         // 1. Refresh market only on 3-week cycle or if state is completely missing (initialization)
         if (currentBlock > lastBlock || !studio.studioState) {
-            const newMarket = generateIPMarket(6, studioState.purchasedIPTitles || []);
+            const newMarket = generateIPMarket(6, studioState.purchasedIPTitles || [], player.currentWeek);
             const newWriters = generateWriters(10);
             updatedState = { 
                 ...updatedState,
                 ipMarket: newMarket,
+                marketTrends: createMarketTrends(player.currentWeek),
                 writers: newWriters,
                 lastMarketRefreshWeek: player.currentWeek,
                 lastWriterRefreshWeek: player.currentWeek
@@ -166,7 +311,7 @@ export const DevelopmentLab: React.FC<DevelopmentLabProps> = ({ player, studio, 
                         </button>
                         <div>
                             <h1 className="text-xl font-black tracking-tight leading-none">Development Lab</h1>
-                            <p className="text-[10px] text-zinc-400 mt-1 uppercase tracking-wider">Where ideas become scripts</p>
+	                            <p className="text-[10px] text-zinc-400 mt-1 uppercase tracking-wider">Where ideas become scripts</p>
                         </div>
                     </div>
                 </div>
@@ -289,8 +434,10 @@ export const DevelopmentLab: React.FC<DevelopmentLabProps> = ({ player, studio, 
                     setActiveTab('VAULT');
                 }} />}
                 {activeTab === 'IP_MARKET' && <IPMarket 
-                    market={studioState.ipMarket} 
-                    playerMoney={studio.balance}
+	                    market={studioState.ipMarket}
+	                    playerMoney={studio.balance}
+	                    currentWeek={player.currentWeek}
+	                    marketTrends={studioState.marketTrends || createMarketTrends(player.currentWeek)}
                     weeksUntilRefresh={3 - (player.currentWeek % 3)}
                     onRefresh={handleRefreshMarket}
                     onBuy={(script, cost) => {
@@ -643,8 +790,14 @@ const ScriptVault: React.FC<{
                                     {script.projectType} {script.projectType === 'SERIES' && `(${script.episodes} eps)`}
                                 </span>
                                 {script.genres.map(g => (
-                                    <span key={g} className="text-[9px] bg-zinc-800 text-zinc-300 px-1.5 py-0.5 rounded uppercase tracking-wider">{g}</span>
+                                    <span key={g} className="text-[9px] bg-zinc-800 text-zinc-300 px-1.5 py-0.5 rounded uppercase tracking-wider">{formatGenreLabel(g)}</span>
                                 ))}
+                                {script.format && (
+                                    <span className="text-[9px] bg-sky-500/10 text-sky-300 px-1.5 py-0.5 rounded uppercase tracking-wider border border-sky-500/20">{formatProjectFormatLabel(script.format)}</span>
+                                )}
+                                {script.subjectName && (
+                                    <span className="text-[9px] bg-amber-500/10 text-amber-300 px-1.5 py-0.5 rounded uppercase tracking-wider border border-amber-500/20">Subject: {script.subjectName}</span>
+                                )}
                             </div>
                         </div>
                         <div className="text-right">
@@ -659,9 +812,9 @@ const ScriptVault: React.FC<{
                         </div>
                     </div>
 
-                    {script.logline && (
-                        <p className="text-xs text-zinc-400 mt-2 italic line-clamp-2">"{script.logline}"</p>
-                    )}
+	                    {script.logline && (
+	                        <p className="text-xs text-zinc-400 mt-2 italic line-clamp-2">"{script.logline}"</p>
+	                    )}
                     
                     {script.status === 'CONCEPT' && (
                         <div className="mt-4">
@@ -855,14 +1008,21 @@ const ScriptDoctorPanel: React.FC<{
     );
 };
 
+type ScriptBuilderStep = 'IDEA' | 'IDENTITY' | 'STORY' | 'DRAFT';
+
 const ScriptWizard: React.FC<{ onComplete: (script: Script) => void, initialScript?: Script }> = ({ onComplete, initialScript }) => {
-    const [step, setStep] = useState(initialScript ? 2 : 1);
+    const [step, setStep] = useState<ScriptBuilderStep>(initialScript ? 'STORY' : 'IDEA');
+    const [storyIndex, setStoryIndex] = useState(0);
     const [title, setTitle] = useState(initialScript?.title || '');
     const [projectType, setProjectType] = useState<ProjectType>(initialScript?.projectType || 'MOVIE');
+    const [format, setFormat] = useState<ProjectFormat>(initialScript?.format || 'LIVE_ACTION');
     const [targetAudience, setTargetAudience] = useState<TargetAudience>(initialScript?.targetAudience || 'PG-13');
     const [episodes, setEpisodes] = useState(initialScript?.episodes || 8);
     const [primaryGenre, setPrimaryGenre] = useState<Genre | ''>(initialScript?.genres[0] || '');
     const [secondaryGenre, setSecondaryGenre] = useState<Genre | ''>(initialScript?.genres[1] || '');
+    const [subjectName, setSubjectName] = useState(initialScript?.subjectName || '');
+    const [subjectType, setSubjectType] = useState<ScriptSubjectType>(initialScript?.subjectType || 'PUBLIC_FIGURE');
+    const [showStatInfo, setShowStatInfo] = useState(false);
     
     // Initialize options from initialScript if available
     const initialOptions: Record<string, string> = {};
@@ -872,199 +1032,518 @@ const ScriptWizard: React.FC<{ onComplete: (script: Script) => void, initialScri
         });
     }
     const [options, setOptions] = useState<Record<string, string>>(initialOptions);
+    const [seedLogline] = useState(initialScript?.logline || generateProceduralLogline());
 
-    const genres: Genre[] = ['ACTION', 'HORROR', 'COMEDY', 'SCI_FI', 'DRAMA', 'THRILLER', 'ROMANCE', 'ADVENTURE', 'SUPERHERO'];
+    const genres: Genre[] = ALL_GENRES;
+    const needsSubject = isSubjectDrivenGenre(primaryGenre);
+    const questions = primaryGenre ? getScriptQuestions(primaryGenre as Genre, format, subjectName, subjectType) : [];
+    const selectedScriptOptions = questions.map(q => ({
+        questionId: q.id,
+        choiceId: options[q.id] || q.options[0].id
+    }));
+    const previewAttributes = primaryGenre
+        ? calculateConceptAttributes(primaryGenre as Genre, format, subjectType, selectedScriptOptions, Boolean(secondaryGenre))
+        : { plot: 50, characters: 50, pacing: 50, dialogue: 50, action: 50, originality: 50 };
+    const previewQuality = calculateConceptQuality(previewAttributes);
+    const selectedOptionLabels = questions
+        .map(q => q.options.find(opt => opt.id === (options[q.id] || q.options[0].id))?.text)
+        .filter(Boolean);
+    const draftLogline = needsSubject && subjectName.trim()
+        ? `${primaryGenre === 'BIOPIC' ? 'A dramatic portrait' : 'A documentary investigation'} of ${subjectName.trim()}, built around the public story and private cost behind the headlines.`
+        : seedLogline;
+    const builderSteps: { id: ScriptBuilderStep; label: string; short: string }[] = [
+        { id: 'IDEA', label: 'Concept Basics', short: 'Basics' },
+        { id: 'IDENTITY', label: 'Genre & Subject', short: 'Genre' },
+        { id: 'STORY', label: 'Story Choices', short: 'Story' },
+        { id: 'DRAFT', label: 'Final Review', short: 'Review' }
+    ];
+    const stepIndex = builderSteps.findIndex(s => s.id === step);
+    const safeStoryIndex = Math.min(storyIndex, Math.max(questions.length - 1, 0));
+    const currentQuestion = questions[safeStoryIndex];
+    const selectedQuestionChoice = currentQuestion ? options[currentQuestion.id] : undefined;
+    const canLeaveIdea = Boolean(title.trim());
+    const canLeaveIdentity = Boolean(primaryGenre && (!needsSubject || subjectName.trim()));
+    const canLeaveStory = !currentQuestion || Boolean(selectedQuestionChoice);
+    const currentStepLabel = builderSteps[stepIndex]?.label || 'Script Builder';
+    const audienceTone: Record<TargetAudience, string> = {
+        G: 'bg-emerald-400 text-black border-emerald-300 shadow-[0_10px_24px_rgba(52,211,153,0.15)]',
+        PG: 'bg-lime-300 text-black border-lime-200 shadow-[0_10px_24px_rgba(190,242,100,0.13)]',
+        'PG-13': 'bg-amber-400 text-black border-amber-300 shadow-[0_10px_24px_rgba(251,191,36,0.15)]',
+        R: 'bg-rose-500 text-white border-rose-400 shadow-[0_10px_24px_rgba(244,63,94,0.16)]',
+        'NC-17': 'bg-red-700 text-white border-red-500 shadow-[0_10px_24px_rgba(185,28,28,0.18)]'
+    };
+    const statInfo = [
+        ['Plot', 'Raised by mystery, investigation, crime, fantasy world-building, documentary access, and choices about truth or cases.'],
+        ['Characters', 'Raised by biopic subjects, private stories, family/community choices, intimate tones, animation, sports, and character-led options.'],
+        ['Pacing', 'Raised by anime, sports, crime, comeback stories, underdog arcs, backstage pressure, and darker fantasy lanes.'],
+        ['Dialogue', 'Raised by biopics, documentaries, musicals, interviews, witnesses, comedy, voice-driven choices, and dialogue-heavy options.'],
+        ['Action', 'Raised by anime, sports, action-heavy set pieces, monster/rivalry/final-battle choices, and some animated fantasy concepts.'],
+        ['Originality', 'Raised by animated/anime formats, secondary genre hybrids, documentaries, fantasy, musicals, exclusive access, forbidden/messy/world-building choices.']
+    ];
 
-    const handleNext = () => {
-        if (step === 1 && title && primaryGenre) {
-            setStep(2);
-        } else if (step === 2) {
-            // Finish
-            const questions = SCRIPT_TEMPLATES[primaryGenre as Genre] || [];
-            const scriptOptions = questions.map(q => ({
-                questionId: q.id,
-                choiceId: options[q.id] || q.options[0].id
-            }));
+    const buildScript = (): Script => ({
+        ...(initialScript || {}),
+        id: initialScript?.id || `script_${Date.now()}`,
+        title,
+        projectType,
+        format,
+        targetAudience,
+        episodes: projectType === 'SERIES' ? episodes : undefined,
+        genres: secondaryGenre ? [primaryGenre as Genre, secondaryGenre as Genre] : [primaryGenre as Genre],
+        status: 'CONCEPT',
+        quality: initialScript?.quality || previewQuality,
+        options: selectedScriptOptions,
+        writerId: null,
+        weeksInDevelopment: 0,
+        totalDevelopmentWeeks: 0,
+        isOriginal: initialScript ? initialScript.isOriginal : true,
+        logline: draftLogline,
+        subjectName: needsSubject ? subjectName.trim() : undefined,
+        subjectType: needsSubject ? subjectType : undefined,
+        sourceMaterial: needsSubject ? 'ADAPTATION' : initialScript?.sourceMaterial,
+        sourceMaterialType: primaryGenre === 'BIOPIC' ? 'LIFE_RIGHTS' : primaryGenre === 'DOCUMENTARY' ? 'DOCUMENTARY_SUBJECT' : initialScript?.sourceMaterialType,
+        attributes: previewAttributes,
+        baseQuality: initialScript?.baseQuality || previewQuality,
+        developmentCost: initialScript?.developmentCost || 0
+    });
 
-            const newScript: Script = {
-                ...(initialScript || {}),
-                id: initialScript?.id || `script_${Date.now()}`,
-                title,
-                projectType,
-                targetAudience,
-                episodes: projectType === 'SERIES' ? episodes : undefined,
-                genres: secondaryGenre ? [primaryGenre as Genre, secondaryGenre as Genre] : [primaryGenre as Genre],
-                status: 'CONCEPT', // Reset to concept if rewriting? Or keep current status? Usually rewrite -> concept -> dev
-                quality: initialScript?.quality || 0,
-                options: scriptOptions,
-                writerId: null,
-                weeksInDevelopment: 0,
-                totalDevelopmentWeeks: 0,
-                isOriginal: initialScript ? initialScript.isOriginal : true,
-                logline: initialScript?.logline || generateProceduralLogline(),
-                baseQuality: initialScript?.baseQuality, // Preserve base quality if it exists
-                developmentCost: initialScript?.developmentCost || 0
-            };
-            onComplete(newScript);
+    const goForward = () => {
+        if (step === 'IDEA' && canLeaveIdea) {
+            setStep('IDENTITY');
+            return;
+        }
+        if (step === 'IDENTITY' && canLeaveIdentity) {
+            setStoryIndex(0);
+            setStep(questions.length ? 'STORY' : 'DRAFT');
+            return;
+        }
+        if (step === 'STORY' && canLeaveStory) {
+            if (safeStoryIndex < questions.length - 1) {
+                setStoryIndex(safeStoryIndex + 1);
+            } else {
+                setStep('DRAFT');
+            }
+            return;
+        }
+        if (step === 'DRAFT') {
+            onComplete(buildScript());
         }
     };
 
-    if (step === 1) {
-        return (
-            <div className="space-y-6 pb-nav-safe">
+    const goBack = () => {
+        if (step === 'IDENTITY') setStep('IDEA');
+        if (step === 'STORY') {
+            if (safeStoryIndex > 0) setStoryIndex(safeStoryIndex - 1);
+            else setStep('IDENTITY');
+        }
+        if (step === 'DRAFT') setStep(questions.length ? 'STORY' : 'IDENTITY');
+    };
+
+    const continueDisabled =
+        (step === 'IDEA' && !canLeaveIdea) ||
+        (step === 'IDENTITY' && !canLeaveIdentity) ||
+        (step === 'STORY' && !canLeaveStory);
+
+    const continueLabel = step === 'IDEA'
+        ? 'Next: Genre'
+        : step === 'IDENTITY'
+            ? 'Next: Story'
+            : step === 'STORY'
+                ? (safeStoryIndex < questions.length - 1 ? 'Next Choice' : 'Review Script')
+                : 'Add To Vault';
+
+    const ProgressRail = () => (
+        <div className="mb-6">
+            <div className="flex items-start justify-between gap-4 mb-5">
                 <div>
-                    <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Working Title</label>
-                    <input 
-                        type="text" 
-                        value={title}
-                        onChange={e => setTitle(e.target.value)}
-                        placeholder="e.g. The Last Stand"
-                        className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-4 text-white placeholder:text-zinc-600 focus:outline-none focus:border-amber-500 transition-colors"
-                    />
-                </div>
-
-                <div>
-                    <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Project Type</label>
-                    <div className="flex gap-2">
-                        {['MOVIE', 'SERIES'].map(t => (
-                            <button
-                                key={t}
-                                onClick={() => setProjectType(t as ProjectType)}
-                                className={`flex-1 p-3 rounded-xl text-xs font-bold tracking-wider transition-colors ${
-                                    projectType === t ? 'bg-amber-500 text-black' : 'bg-zinc-900 text-zinc-400 hover:bg-zinc-800'
-                                }`}
-                            >
-                                {t}
-                            </button>
-                        ))}
+                    <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.22em] text-amber-400">
+                        <PenTool size={13} />
+                        Script Concept
                     </div>
+                    <h2 className="text-3xl font-black tracking-tight mt-2">{currentStepLabel}</h2>
                 </div>
-
-                <div className="mb-6">
-                    <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Target Audience</label>
-                    <div className="flex gap-2 flex-wrap">
-                        {['G', 'PG', 'PG-13', 'R', 'NC-17'].map(t => (
-                            <button
-                                key={t}
-                                onClick={() => setTargetAudience(t as TargetAudience)}
-                                className={`flex-1 min-w-[60px] p-2 rounded-xl text-xs font-bold tracking-wider transition-colors ${
-                                    targetAudience === t ? 'bg-amber-500 text-black' : 'bg-zinc-900 text-zinc-400 hover:bg-zinc-800'
-                                }`}
-                            >
-                                {t}
-                            </button>
-                        ))}
-                    </div>
+                <div className="rounded-2xl border border-zinc-800 bg-black/50 px-4 py-3 text-right shrink-0">
+                    <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Quality</div>
+                    <div className="text-2xl font-black text-white leading-none mt-1">{previewQuality}</div>
                 </div>
+            </div>
+            <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
+                {builderSteps.map((item, idx) => {
+                    const isActive = item.id === step;
+                    const isDone = idx < stepIndex;
+                    return (
+                        <button
+                            key={item.id}
+                            onClick={() => {
+                                if (idx <= stepIndex) setStep(item.id);
+                            }}
+                            className={`group relative rounded-2xl border px-2 py-3 text-center transition-all ${
+                                isActive
+                                    ? 'border-amber-400 bg-amber-400 text-black shadow-[0_10px_28px_rgba(251,191,36,0.18)]'
+                                    : isDone
+                                        ? 'border-teal-400/25 bg-teal-400/10 text-teal-200'
+                                        : 'border-zinc-800 bg-zinc-950/80 text-zinc-600 hover:text-zinc-300'
+                            }`}
+                        >
+                            <div className="mx-auto mb-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/20 text-[10px] font-black">
+                                {idx + 1}
+                            </div>
+                            <div className="text-[9px] sm:text-[10px] font-black uppercase leading-tight">{item.short}</div>
+                        </button>
+                    );
+                })}
+            </div>
+        </div>
+    );
 
-                {projectType === 'SERIES' && (
-                    <div className="animate-in slide-in-from-top-2 duration-300">
-                        <div className="flex justify-between items-center mb-2">
-                            <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider">Number of Episodes</label>
-                            <span className="text-amber-500 font-mono font-bold text-sm">{episodes}</span>
+    const WizardFooter = () => (
+        <div className="mt-7 pt-5 border-t border-zinc-800/80 grid grid-cols-[minmax(96px,0.34fr)_1fr] gap-3 sm:grid-cols-[140px_1fr]">
+            <button
+                onClick={goBack}
+                disabled={step === 'IDEA'}
+                className="min-h-[58px] px-5 rounded-2xl bg-zinc-950 border border-zinc-800 text-zinc-300 disabled:text-zinc-700 disabled:opacity-50 font-black uppercase text-sm transition-colors hover:border-zinc-600"
+            >
+                Back
+            </button>
+            <button
+                onClick={goForward}
+                disabled={continueDisabled}
+                className="min-h-[58px] rounded-2xl bg-amber-400 px-4 text-black disabled:bg-zinc-800 disabled:text-zinc-600 disabled:cursor-not-allowed font-black uppercase text-sm tracking-wide shadow-[0_12px_34px_rgba(251,191,36,0.18)] transition-transform active:scale-[0.98]"
+            >
+                {continueLabel}
+            </button>
+        </div>
+    );
+
+    const SurfaceHeader: React.FC<{ title: string; description: string; icon: React.ReactNode }> = ({ title, description, icon }) => (
+        <div className="mb-6 flex items-start gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-amber-400 text-black flex items-center justify-center shrink-0 shadow-[0_10px_24px_rgba(251,191,36,0.16)]">
+                {icon}
+            </div>
+            <div>
+                <h3 className="text-2xl font-black leading-tight tracking-tight">{title}</h3>
+                <p className="text-sm text-zinc-500 mt-2 leading-relaxed">{description}</p>
+            </div>
+        </div>
+    );
+
+    const OptionTile: React.FC<{
+        active: boolean;
+        onClick: () => void;
+        children: React.ReactNode;
+        className?: string;
+    }> = ({ active, onClick, children, className = '' }) => (
+        <button
+            onClick={onClick}
+            className={`relative overflow-hidden rounded-2xl border p-4 text-left transition-all active:scale-[0.98] ${
+                active
+                    ? 'bg-white text-black border-white shadow-[0_16px_35px_rgba(255,255,255,0.08)]'
+                    : 'bg-zinc-950 text-zinc-300 border-zinc-800 hover:border-amber-400/50 hover:bg-zinc-900'
+            } ${className}`}
+        >
+            {active && <div className="absolute inset-y-0 left-0 w-1 bg-amber-400" />}
+            {children}
+        </button>
+    );
+
+    return (
+        <div className="min-h-full pb-20">
+            <div className="max-w-3xl mx-auto">
+                <div className="rounded-[2rem] border border-zinc-800 bg-[linear-gradient(180deg,rgba(24,24,27,0.96),rgba(5,5,6,0.98))] p-4 sm:p-6 shadow-2xl">
+                    <ProgressRail />
+                    <div className="mb-6 rounded-2xl border border-zinc-800 bg-black/45 p-3">
+                        <div className="min-w-0">
+                            <div className="text-[8px] font-black uppercase tracking-widest text-zinc-600">Concept</div>
+                            <div className="mt-1 text-base font-black leading-snug text-zinc-100 break-words">{title.trim() || 'Untitled'}</div>
                         </div>
-                        <input 
-                            type="range" 
-                            min="4" 
-                            max="24" 
-                            step="1"
-                            value={episodes}
-                            onChange={e => setEpisodes(parseInt(e.target.value))}
-                            className="w-full accent-amber-500 h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer"
+                        <div className="mt-3 flex flex-wrap gap-2">
+                            <span className="rounded-full border border-zinc-700 bg-zinc-900 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-zinc-200">{projectType}</span>
+                            <span className="rounded-full border border-zinc-700 bg-zinc-900 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-zinc-200">{formatProjectFormatLabel(format)}</span>
+                            <span className="rounded-full border border-zinc-700 bg-zinc-900 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-zinc-200">{primaryGenre ? formatGenreLabel(primaryGenre as Genre) : 'Genre Not Set'}</span>
+                            {secondaryGenre && (
+                                <span className="rounded-full border border-zinc-700 bg-zinc-900 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-zinc-200">{formatGenreLabel(secondaryGenre as Genre)}</span>
+                            )}
+                        </div>
+                    </div>
+                {step === 'IDEA' && (
+                    <div className="rounded-[1.5rem] border border-zinc-800 bg-[radial-gradient(circle_at_top_right,rgba(245,158,11,0.10),transparent_32%),#070708] p-5 sm:p-7">
+                        <SurfaceHeader
+                            title="Start the concept"
+                            description="Name the project and lock the basic production shape before choosing the creative lane."
+                            icon={<PenTool size={20} />}
                         />
-                        <div className="flex justify-between mt-1 px-1">
-                            <span className="text-[9px] text-zinc-600">Min: 4</span>
-                            <span className="text-[9px] text-zinc-600">Max: 24</span>
+                        <input
+                            type="text"
+                            value={title}
+                            onChange={e => setTitle(e.target.value)}
+                            placeholder="e.g. The Last Stand"
+                            className="w-full bg-black/70 border border-zinc-800 rounded-[1.4rem] px-5 py-5 text-2xl font-black text-white placeholder:text-zinc-700 focus:outline-none focus:border-white transition-colors"
+                        />
+                        <div className="mt-6 grid grid-cols-1 gap-4">
+                            <div>
+                                <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Format</div>
+                                <div className="grid grid-cols-3 gap-2">
+                                    {PROJECT_FORMATS.map(t => (
+                                        <OptionTile key={t} onClick={() => setFormat(t)} active={format === t} className="min-h-[74px]">
+                                            <div className="text-xs font-black uppercase">{formatProjectFormatLabel(t)}</div>
+                                        </OptionTile>
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                                {['MOVIE', 'SERIES'].map(t => (
+                                    <OptionTile key={t} onClick={() => setProjectType(t as ProjectType)} active={projectType === t}>
+                                        <div className="text-sm font-black uppercase">{t}</div>
+                                    </OptionTile>
+                                ))}
+                            </div>
+                            <div>
+                                <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Audience</div>
+                                <div className="flex gap-2 overflow-x-auto no-scrollbar">
+                                    {['G', 'PG', 'PG-13', 'R', 'NC-17'].map(t => (
+                                        <button
+                                            key={t}
+                                            onClick={() => setTargetAudience(t as TargetAudience)}
+                                            className={`shrink-0 min-w-[64px] px-4 py-3 rounded-2xl border text-xs font-black transition-colors ${
+                                                targetAudience === t ? audienceTone[t as TargetAudience] : 'bg-black border-zinc-800 text-zinc-400'
+                                            }`}
+                                        >
+                                            {t}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            {projectType === 'SERIES' && (
+                                <div className="rounded-[1.4rem] bg-black/60 border border-zinc-800 p-4">
+                                    <div className="flex justify-between items-center mb-3">
+                                        <div className="text-[10px] font-black uppercase text-zinc-500">Episodes</div>
+                                        <span className="text-teal-300 font-mono font-black text-sm">{episodes}</span>
+                                    </div>
+                                    <input
+                                        type="range"
+                                        min="4"
+                                        max="24"
+                                        step="1"
+                                        value={episodes}
+                                        onChange={e => setEpisodes(parseInt(e.target.value))}
+                                        className="w-full accent-teal-300 h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer"
+                                    />
+                                </div>
+                            )}
                         </div>
                     </div>
                 )}
 
-                <div>
-                    <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Primary Genre</label>
-                    <div className="grid grid-cols-3 gap-2">
-                        {genres.map(g => (
-                            <button
-                                key={g}
-                                onClick={() => setPrimaryGenre(g)}
-                                className={`p-3 rounded-xl text-xs font-bold tracking-wider transition-colors ${
-                                    primaryGenre === g ? 'bg-amber-500 text-black' : 'bg-zinc-900 text-zinc-400 hover:bg-zinc-800'
-                                }`}
-                            >
-                                {g}
-                            </button>
-                        ))}
+                {step === 'IDENTITY' && (
+                    <div className="rounded-[1.5rem] border border-zinc-800 bg-[radial-gradient(circle_at_top_left,rgba(20,184,166,0.10),transparent_32%),#070708] p-5 sm:p-7">
+                        <SurfaceHeader
+                            title="Choose the lane"
+                            description="Pick the primary movie type first. Add a secondary genre only when the idea is clearly a hybrid."
+                            icon={<Sparkles size={20} />}
+                        />
+                        <div className="space-y-5">
+                            <div>
+                                <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Primary Genre</div>
+                                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                                    {genres.map(g => (
+                                        <OptionTile
+                                            key={g}
+                                            onClick={() => {
+                                                setPrimaryGenre(g);
+                                                if (g === 'ANIMATION') setFormat('ANIMATED');
+                                                if (!isSubjectDrivenGenre(g)) setSubjectName('');
+                                            }}
+                                            active={primaryGenre === g}
+                                            className="min-h-[54px] p-3"
+                                        >
+                                            <div className="text-[10px] sm:text-xs font-black uppercase leading-tight break-words">{formatGenreLabel(g)}</div>
+                                        </OptionTile>
+                                    ))}
+                                </div>
+                            </div>
+                            <div>
+                                <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Secondary Genre</div>
+                                <div className="flex gap-2 overflow-x-auto no-scrollbar">
+                                    {genres.filter(g => g !== primaryGenre).map(g => (
+                                        <button
+                                            key={g}
+                                            onClick={() => setSecondaryGenre(secondaryGenre === g ? '' : g)}
+                                            className={`shrink-0 px-4 py-2.5 rounded-2xl text-[10px] font-black uppercase transition-colors ${
+                                                secondaryGenre === g ? 'bg-white text-black' : 'bg-black border border-zinc-800 text-zinc-500'
+                                            }`}
+                                        >
+                                            {formatGenreLabel(g)}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            {needsSubject && (
+                                <div className="rounded-[1.5rem] border border-amber-500/20 bg-amber-500/5 p-4">
+                                    <div className="text-sm font-black text-white mb-4">{primaryGenre === 'BIOPIC' ? 'Biopic Focus' : 'Documentary Focus'}</div>
+                                    <div className="grid grid-cols-1 md:grid-cols-[1.5fr_1fr] gap-3">
+                                        <div>
+                                            <label className="block text-[10px] font-black uppercase text-zinc-500 mb-2">
+                                                {primaryGenre === 'BIOPIC' ? 'Who is it about?' : 'What is it about?'}
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={subjectName}
+                                                onChange={e => setSubjectName(e.target.value)}
+                                                placeholder={primaryGenre === 'BIOPIC' ? 'e.g. Maya Stone, football legend' : 'e.g. The Westbridge Case'}
+                                                className="w-full bg-black border border-zinc-800 rounded-2xl p-4 text-white placeholder:text-zinc-700 focus:outline-none focus:border-white transition-colors"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-black uppercase text-zinc-500 mb-2">Subject Lane</label>
+                                            <select
+                                                value={subjectType}
+                                                onChange={e => setSubjectType(e.target.value as ScriptSubjectType)}
+                                                className="w-full bg-black border border-zinc-800 rounded-2xl p-4 text-white focus:outline-none focus:border-white transition-colors"
+                                            >
+                                                {['PUBLIC_FIGURE', 'ATHLETE', 'MUSICIAN', 'CRIMINAL_CASE', 'HISTORICAL_EVENT', 'COMPANY', 'TEAM', 'FANDOM'].map(type => (
+                                                    <option key={type} value={type}>{type.replace(/_/g, ' ')}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     </div>
-                </div>
+                )}
 
-                <div>
-                    <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Secondary Genre (Optional)</label>
-                    <div className="grid grid-cols-3 gap-2">
-                        {genres.filter(g => g !== primaryGenre).map(g => (
-                            <button
-                                key={g}
-                                onClick={() => setSecondaryGenre(secondaryGenre === g ? '' : g)}
-                                className={`p-3 rounded-xl text-xs font-bold tracking-wider transition-colors ${
-                                    secondaryGenre === g ? 'bg-zinc-700 text-white' : 'bg-zinc-900 text-zinc-500 hover:bg-zinc-800'
-                                }`}
-                            >
-                                {g}
-                            </button>
-                        ))}
+                {step === 'STORY' && (
+                    <div className="rounded-[1.5rem] border border-zinc-800 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.08),transparent_30%),#070708] p-5 sm:p-7">
+                        <SurfaceHeader
+                            title="Shape the story"
+                            description={`${safeStoryIndex + 1} of ${Math.max(questions.length, 1)} choices. Keep the old step flow, but make each choice feel decisive.`}
+                            icon={<BookOpen size={20} />}
+                        />
+                        {currentQuestion ? (
+                            <div>
+                                <div className="flex gap-1 mb-5">
+                                    {questions.map((q, idx) => (
+                                        <div key={q.id} className={`h-1 flex-1 rounded-full ${idx <= safeStoryIndex ? 'bg-white' : 'bg-zinc-800'}`} />
+                                    ))}
+                                </div>
+                                <h3 className="text-2xl font-black leading-tight mb-5 tracking-tight">{currentQuestion.question}</h3>
+                                <div className="grid grid-cols-1 gap-3">
+                                    {currentQuestion.options.map(opt => (
+                                        <OptionTile
+                                            key={opt.id}
+                                            active={options[currentQuestion.id] === opt.id}
+                                            onClick={() => setOptions({ ...options, [currentQuestion.id]: opt.id })}
+                                            className="min-h-[116px]"
+                                        >
+                                            <div className="flex items-start justify-between gap-4">
+                                                <div>
+                                                    <div className="text-lg font-black leading-tight">{opt.text}</div>
+                                                    <div className="text-xs opacity-70 mt-3 italic leading-relaxed">"{opt.reviewSnippet}"</div>
+                                                </div>
+                                                {options[currentQuestion.id] === opt.id && (
+                                                    <Star size={16} className="shrink-0 fill-current" />
+                                                )}
+                                            </div>
+                                        </OptionTile>
+                                    ))}
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="rounded-[1.5rem] bg-black border border-zinc-800 p-5 text-zinc-400 text-sm">
+                                This concept has no extra story questions yet. You can review the draft now.
+                            </div>
+                        )}
                     </div>
-                </div>
+                )}
 
-                <button 
-                    onClick={handleNext}
-                    disabled={!title || !primaryGenre}
-                    className="w-full bg-amber-500 text-black font-black uppercase tracking-wider py-4 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                    Next: Story DNA
-                </button>
+                {step === 'DRAFT' && (
+                    <div className="rounded-[1.5rem] overflow-hidden border border-zinc-800 bg-[#070708]">
+                        <div className="p-6 sm:p-8 bg-[radial-gradient(circle_at_top_right,rgba(20,184,166,0.18),transparent_35%),linear-gradient(145deg,#111113,#050505)] border-b border-zinc-800">
+                            <div className="text-[10px] font-black uppercase text-teal-300 mb-4">Final Draft Review</div>
+                            <h2 className="text-3xl sm:text-4xl font-black leading-tight break-words">{title}</h2>
+                            <div className="flex flex-wrap gap-2 mt-5">
+                                {[projectType, formatProjectFormatLabel(format), primaryGenre ? formatGenreLabel(primaryGenre as Genre) : null, secondaryGenre ? formatGenreLabel(secondaryGenre as Genre) : null].filter(Boolean).map(chip => (
+                                    <span key={chip} className="text-[10px] font-black uppercase bg-white/10 text-white border border-white/10 rounded-full px-3 py-1">
+                                        {chip}
+                                    </span>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="p-5 sm:p-6 space-y-5">
+                            <p className="text-sm text-zinc-300 italic leading-relaxed">"{draftLogline}"</p>
+                            {needsSubject && subjectName && (
+                                <div className="rounded-[1.4rem] border border-amber-500/20 bg-amber-500/5 p-4">
+                                    <div className="text-[10px] font-black uppercase text-amber-300 mb-1">Subject</div>
+                                    <div className="text-sm font-black text-white">{subjectName}</div>
+                                    <div className="text-xs text-zinc-500 mt-1">{getSubjectTypeLabel(subjectType)}</div>
+                                </div>
+                            )}
+                            <div className="flex items-center justify-between gap-3">
+                                <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Script DNA</div>
+                                <button
+                                    onClick={() => setShowStatInfo(!showStatInfo)}
+                                    className={`flex h-8 w-8 items-center justify-center rounded-full border transition-colors ${
+                                        showStatInfo ? 'border-amber-400 bg-amber-400 text-black' : 'border-zinc-800 bg-black text-zinc-400'
+                                    }`}
+                                    aria-label="Explain script DNA stats"
+                                >
+                                    <Info size={15} />
+                                </button>
+                            </div>
+                            {showStatInfo && (
+                                <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4">
+                                    <div className="text-sm font-black text-white">How these stats are calculated</div>
+                                    <p className="mt-2 text-xs leading-relaxed text-zinc-400">
+                                        Every concept starts at 50. Format, genre, subject type, secondary genre, and your story choices add small boosts. Final quality weighs Plot, Characters, and Originality slightly more than Action.
+                                    </p>
+                                    <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                        {statInfo.map(([label, description]) => (
+                                            <div key={label}>
+                                                <div className="text-[10px] font-black uppercase tracking-widest text-amber-300">{label}</div>
+                                                <p className="mt-1 text-[11px] leading-relaxed text-zinc-500">{description}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                            <div className="grid grid-cols-3 gap-2">
+                                {[
+                                    ['Plot', previewAttributes.plot],
+                                    ['Characters', previewAttributes.characters],
+                                    ['Pacing', previewAttributes.pacing],
+                                    ['Dialogue', previewAttributes.dialogue],
+                                    ['Action', previewAttributes.action],
+                                    ['Originality', previewAttributes.originality],
+                                ].map(([label, value]) => (
+                                    <div key={label as string} className="bg-black rounded-2xl p-3 border border-zinc-800">
+                                        <div className="text-[8px] text-zinc-500 font-black uppercase">{label}</div>
+                                        <div className="text-base text-white font-mono font-black">{value}</div>
+                                    </div>
+                                ))}
+                            </div>
+                            {selectedOptionLabels.length > 0 && (
+                                <div>
+                                    <div className="text-[10px] font-black uppercase text-zinc-500 mb-2">Chosen Angles</div>
+                                    <div className="flex flex-wrap gap-2">
+                                        {selectedOptionLabels.map(label => (
+                                            <span key={label} className="text-[10px] font-bold text-zinc-300 bg-zinc-900 border border-zinc-800 rounded-full px-3 py-1">{label}</span>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                            <div className="flex items-center justify-between rounded-[1.4rem] bg-teal-300 text-black p-4">
+                                <div>
+                                    <div className="text-[10px] font-black uppercase opacity-70">Draft Quality</div>
+                                    <div className="text-xs font-bold opacity-70 mt-1">Ready for the vault</div>
+                                </div>
+                                <div className="text-4xl font-black">{previewQuality}</div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+                    <WizardFooter />
+                </div>
             </div>
-        );
-    }
-
-    const questions = SCRIPT_TEMPLATES[primaryGenre as Genre] || [];
-
-    return (
-        <div className="space-y-8 pb-nav-safe">
-            <div className="mb-6">
-                <h2 className="text-xl font-black">{title}</h2>
-                <p className="text-zinc-400 text-sm">Define the core DNA of your {primaryGenre.toLowerCase()} script.</p>
-            </div>
-
-            {questions.map((q, idx) => (
-                <div key={q.id} className="space-y-3">
-                    <h3 className="text-sm font-bold text-amber-400">
-                        <span className="opacity-50 mr-2">{idx + 1}.</span>
-                        {q.question}
-                    </h3>
-                    <div className="space-y-2">
-                        {q.options.map(opt => (
-                            <button
-                                key={opt.id}
-                                onClick={() => setOptions({ ...options, [q.id]: opt.id })}
-                                className={`w-full text-left p-4 rounded-xl border transition-colors ${
-                                    options[q.id] === opt.id 
-                                        ? 'bg-amber-500/10 border-amber-500/50 text-white' 
-                                        : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:bg-zinc-800'
-                                }`}
-                            >
-                                <div className="font-bold text-sm">{opt.text}</div>
-                                <div className="text-[10px] opacity-70 mt-1 italic">"{opt.reviewSnippet}"</div>
-                            </button>
-                        ))}
-                    </div>
-                </div>
-            ))}
-
-            <button 
-                onClick={handleNext}
-                disabled={questions.some(q => !options[q.id])}
-                className="w-full bg-amber-500 text-black font-black uppercase tracking-wider py-4 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed sticky bottom-4 shadow-2xl"
-            >
-                Finalize Concept
-            </button>
         </div>
     );
 };
@@ -1074,13 +1553,16 @@ const IPMarket: React.FC<{
     playerMoney: number, 
     onBuy: (s: Script, cost: number) => void,
     onRefresh: () => void,
-    weeksUntilRefresh: number
-}> = ({ market, playerMoney, onBuy, onRefresh, weeksUntilRefresh }) => {
-    const [filter, setFilter] = useState<'ALL' | 'BOOK' | 'SCREENPLAY' | 'SPEC_SCRIPT'>('ALL');
+    weeksUntilRefresh: number,
+    currentWeek: number,
+    marketTrends: ReturnType<typeof createMarketTrends>
+}> = ({ market, playerMoney, onBuy, onRefresh, weeksUntilRefresh, currentWeek, marketTrends }) => {
+    const [filter, setFilter] = useState<'ALL' | 'TRENDING' | 'MOVIE' | 'SERIES'>('ALL');
 
     const filteredMarket = (market || []).filter(s => {
         if (filter === 'ALL') return true;
-        return s.sourceMaterialType === filter;
+        if (filter === 'TRENDING') return getScriptMarketDemand(s, currentWeek, marketTrends) >= 1.08;
+        return s.projectType === filter;
     });
 
     return (
@@ -1089,10 +1571,9 @@ const IPMarket: React.FC<{
                 <div className="flex-1">
                     <h2 className="text-4xl font-black tracking-tighter uppercase leading-none">IP Marketplace</h2>
                     <div className="mt-4 space-y-2 max-w-2xl">
-                        <p className="text-sm text-zinc-400 leading-relaxed">
-                            Acquire the rights to existing stories to adapt into your next big production. 
-                            Browse through best-selling novels, professional screenplays, and unique spec scripts.
-                        </p>
+	                        <p className="text-sm text-zinc-400 leading-relaxed">
+	                            Buy ready-made scripts and rights packages for your next movie or series. The market refreshes with new genres, subjects, and demand swings.
+	                        </p>
                         <div className="flex items-center gap-4">
                             <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-amber-500/80 bg-amber-500/5 px-3 py-1.5 rounded-lg border border-amber-500/10 w-fit">
                                 <Clock size={12} />
@@ -1123,12 +1604,12 @@ const IPMarket: React.FC<{
 
             {/* E-commerce Filters */}
             <div className="flex gap-4 overflow-x-auto pb-2 hide-scrollbar border-b border-zinc-800/20">
-                {[
-                    { id: 'ALL', label: 'All' },
-                    { id: 'BOOK', label: 'Novels' },
-                    { id: 'SCREENPLAY', label: 'Screenplays' },
-                    { id: 'SPEC_SCRIPT', label: 'Spec Scripts' }
-                ].map((f) => (
+	                {[
+	                    { id: 'ALL', label: 'All' },
+	                    { id: 'TRENDING', label: 'Trending' },
+	                    { id: 'MOVIE', label: 'Movie' },
+	                    { id: 'SERIES', label: 'Series' }
+	                ].map((f) => (
                     <button
                         key={f.id}
                         onClick={() => setFilter(f.id as any)}
@@ -1147,9 +1628,11 @@ const IPMarket: React.FC<{
             </div>
             
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredMarket.map((script, idx) => {
-                    const cost = (script.baseQuality || 50) * 15000;
-                    const canAfford = playerMoney >= cost;
+	                {filteredMarket.map((script, idx) => {
+	                    const demand = getScriptMarketDemand(script, currentWeek, marketTrends);
+	                    const trend = getGenreMarketTrend(script.genres[0] || 'DRAMA', currentWeek, marketTrends);
+	                    const cost = script.purchaseCost || Math.floor((script.baseQuality || 50) * 15000 * demand);
+	                    const canAfford = playerMoney >= cost;
                     
                     const colors = [
                         'from-blue-600 to-blue-900', 
@@ -1172,7 +1655,7 @@ const IPMarket: React.FC<{
                                 <div className="relative z-10 flex justify-between items-start">
                                     <div className="flex flex-col gap-1">
                                         <span className="bg-black/60 backdrop-blur-md text-white text-[8px] font-black px-2 py-1 rounded uppercase tracking-widest border border-white/10">
-                                            {script.sourceMaterialType || 'ORIGINAL'}
+                                            {getSourceMaterialLabel(script.sourceMaterialType)}
                                         </span>
                                         {isBook && (
                                             <div className="flex items-center gap-1 bg-amber-500/90 text-black text-[8px] font-black px-2 py-1 rounded uppercase tracking-widest">
@@ -1181,11 +1664,11 @@ const IPMarket: React.FC<{
                                             </div>
                                         )}
                                     </div>
-                                    {script.hype && script.hype > 70 && (
-                                        <div className="bg-white text-black text-[8px] font-black px-2 py-1 rounded-full uppercase tracking-widest shadow-xl animate-pulse">
-                                            Trending
-                                        </div>
-                                    )}
+	                                    {script.hype && script.hype > 70 && (
+	                                        <div className="bg-white text-black text-[8px] font-black px-2 py-1 rounded-full uppercase tracking-widest shadow-xl animate-pulse">
+	                                            {trend.label}
+	                                        </div>
+	                                    )}
                                 </div>
                                 
                                 <div className="relative z-10">
@@ -1199,8 +1682,11 @@ const IPMarket: React.FC<{
                                     )}
                                     <div className="flex gap-1 mt-4 flex-wrap">
                                         {script.genres.map(g => (
-                                            <span key={g} className="text-[7px] bg-white/10 backdrop-blur-sm text-white px-2 py-0.5 rounded-full uppercase tracking-widest border border-white/10 font-bold">{g}</span>
+                                            <span key={g} className="text-[7px] bg-white/10 backdrop-blur-sm text-white px-2 py-0.5 rounded-full uppercase tracking-widest border border-white/10 font-bold">{formatGenreLabel(g)}</span>
                                         ))}
+                                        {script.format && (
+                                            <span className="text-[7px] bg-sky-500/20 text-sky-200 px-2 py-0.5 rounded-full uppercase tracking-widest border border-sky-500/30 font-bold">{formatProjectFormatLabel(script.format)}</span>
+                                        )}
                                         {script.tags?.map(tag => (
                                             <span key={tag} className="text-[7px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full uppercase tracking-widest border border-amber-500/30 font-bold">{tag}</span>
                                         ))}
@@ -1214,16 +1700,22 @@ const IPMarket: React.FC<{
                             {/* Details & Buy Action */}
                             <div className="p-5 flex flex-col flex-1 justify-between bg-zinc-900/50">
                                 <div className="space-y-3">
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-[9px] text-zinc-500 uppercase tracking-widest font-black">Market Value</span>
-                                        <div className="flex items-center gap-1">
-                                            <Star size={10} className="text-amber-500 fill-amber-500" />
-                                            <span className="text-xs font-mono font-black text-white">{script.baseQuality}</span>
-                                        </div>
-                                    </div>
+	                                    <div className="flex justify-between items-center">
+	                                        <span className="text-[9px] text-zinc-500 uppercase tracking-widest font-black">{trend.label} Demand</span>
+	                                        <div className="flex items-center gap-1">
+	                                            <Star size={10} className="text-amber-500 fill-amber-500" />
+	                                            <span className="text-xs font-mono font-black text-white">{Math.round(demand * 100)}%</span>
+	                                        </div>
+	                                    </div>
+	                                    <p className="text-[10px] text-zinc-500 leading-relaxed">{trend.reason}</p>
                                     {script.logline && (
                                         <p className="text-[11px] text-zinc-400 line-clamp-3 leading-relaxed font-medium">
                                             {script.logline}
+                                        </p>
+                                    )}
+                                    {script.subjectName && (
+                                        <p className="text-[10px] text-amber-300 font-black uppercase tracking-widest">
+                                            Subject: {script.subjectName}
                                         </p>
                                     )}
                                 </div>
@@ -1623,6 +2115,7 @@ const FranchiseManager: React.FC<{
                 sourceMaterial: mode === 'SPINOFF' ? 'SPINOFF' : 'SEQUEL',
                 franchiseId: displayFranchise.id,
                 installmentNumber: mode === 'SPINOFF' ? 1 : nextNum,
+                connectedProjectIntent: mode === 'REBOOT' ? 'REBOOT' : mode === 'FINALE' ? 'EVENT' : mode === 'SPINOFF' ? 'CROSSOVER' : 'SOLO',
                 tags: [mode, 'FRANCHISE'],
                 logline: mode === 'FINALE'
                     ? `The closing chapter of the ${displayFranchise.name} saga.`
@@ -1753,7 +2246,7 @@ const FranchiseManager: React.FC<{
                     <div className="space-y-3">
                         <div className="flex items-end justify-between gap-3 px-1">
                             <div>
-                                <h3 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Character Focus</h3>
+                                <h3 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Returning Cast Preview</h3>
                                 <p className="text-[10px] text-zinc-600 mt-1">
                                     {characterFocus.summary.total} characters • {characterFocus.summary.recurring} recurring • {characterFocus.summary.recast} recast
                                 </p>
@@ -2305,10 +2798,12 @@ const UniverseDashboard: React.FC<{
     const activeProducts = (universe.products || []).filter(product => product.active !== false);
     const releaseActivity = getUniverseReleaseActivity(player, universe, player.activeReleases || []);
     const projectedLicensing = activeProducts.reduce((sum, product) => sum + Math.floor(calculateUniverseProductWeeklyRevenue(universe, product) * releaseActivity.multiplier), 0);
+    const recastCount = normalizedRoster.filter(character => character.status === 'RECAST').length;
+    const recurringCount = normalizedRoster.filter(character => (character.appearances || 0) >= 2).length;
     const continuityScore = clamp(
         70
-        + Math.min(20, normalizedRoster.filter(character => (character.appearances || 0) >= 2).length * 4)
-        - normalizedRoster.filter(character => character.status === 'RECAST').length * 8
+        + Math.min(20, recurringCount * 4)
+        - recastCount * 8
         - Math.max(0, upcomingProjects.length - 4) * 5
     );
     const fanTrust = clamp(
@@ -2328,6 +2823,14 @@ const UniverseDashboard: React.FC<{
         + fanTrust * 0.25
         - fatigue * 0.35
     );
+    const continuityRisk = clamp(
+        recastCount * 16
+        + Math.max(0, upcomingProjects.length - 3) * 10
+        + fatigue * 0.35
+        - recurringCount * 3
+    );
+    const continuityRiskLabel = continuityRisk >= 70 ? 'High Risk' : continuityRisk >= 38 ? 'Watch Closely' : 'Stable';
+    const continuityRiskTone = continuityRisk >= 70 ? 'text-rose-300 bg-rose-500/10 border-rose-500/20' : continuityRisk >= 38 ? 'text-amber-300 bg-amber-500/10 border-amber-500/20' : 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20';
     const healthLabel = fatigue >= 75
         ? 'Overheated'
         : eventReadiness >= 75
@@ -2367,6 +2870,7 @@ const UniverseDashboard: React.FC<{
             universeId: universe.id,
             universeSagaName: currentSagaName,
             universePhaseName: currentPhaseName,
+            connectedProjectIntent: 'EVENT',
             logline: topCharacters.length > 0
                 ? `${topCharacters.join(', ')} collide in a high-stakes ${currentPhaseName} crossover for ${universe.name}.`
                 : `A major crossover event that defines the next chapter of ${universe.name}.`,
@@ -2472,6 +2976,35 @@ const UniverseDashboard: React.FC<{
                         <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Licensing</p>
                         <p className="text-xl font-black text-amber-300">{formatCurrency(projectedLicensing)}</p>
                         <p className="text-[9px] font-black uppercase tracking-widest text-zinc-600 mt-1">{releaseActivity.label}</p>
+                    </div>
+                </div>
+
+                <div className="mt-3 bg-black/30 border border-white/10 rounded-2xl p-3">
+                    <div className="flex items-center justify-between gap-3 mb-2">
+                        <div className="flex items-center gap-2">
+                            <AlertTriangle size={14} className={continuityRisk >= 70 ? 'text-rose-300' : continuityRisk >= 38 ? 'text-amber-300' : 'text-emerald-300'} />
+                            <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Continuity Risk</p>
+                        </div>
+                        <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-full border ${continuityRiskTone}`}>
+                            {continuityRiskLabel}
+                        </span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                        <div>
+                            <p className="text-lg font-black text-white">{recastCount}</p>
+                            <p className="text-[8px] font-black uppercase tracking-widest text-zinc-600">Recasts</p>
+                        </div>
+                        <div>
+                            <p className="text-lg font-black text-white">{recurringCount}</p>
+                            <p className="text-[8px] font-black uppercase tracking-widest text-zinc-600">Returning</p>
+                        </div>
+                        <div>
+                            <p className="text-lg font-black text-white">{upcomingProjects.length}</p>
+                            <p className="text-[8px] font-black uppercase tracking-widest text-zinc-600">In Flight</p>
+                        </div>
+                    </div>
+                    <div className="mt-3 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                        <div className={`h-full ${continuityRisk >= 70 ? 'bg-rose-500' : continuityRisk >= 38 ? 'bg-amber-400' : 'bg-emerald-400'}`} style={{ width: `${Math.round(continuityRisk)}%` }} />
                     </div>
                 </div>
             </div>
@@ -2600,8 +3133,14 @@ const UniverseDashboard: React.FC<{
                                                 Played by <span className="text-zinc-300">{char.actorId === 'PLAYER_SELF' ? 'You' : char.actorName}</span>
                                             </p>
                                         </div>
-                                        <div className="shrink-0 bg-amber-500/10 text-amber-500 text-[9px] font-black px-2 py-1 rounded uppercase tracking-widest">
-                                            {char.roleType || 'ACTIVE'}
+                                        <div className={`shrink-0 text-[9px] font-black px-2 py-1 rounded uppercase tracking-widest ${
+                                            char.status === 'RECAST'
+                                                ? 'bg-rose-500/10 text-rose-300'
+                                                : char.status === 'RETIRED'
+                                                    ? 'bg-zinc-500/10 text-zinc-400'
+                                                    : 'bg-amber-500/10 text-amber-500'
+                                        }`}>
+                                            {char.status === 'RECAST' ? 'RECAST' : char.status === 'RETIRED' ? 'RETIRED' : (char.roleType || 'ACTIVE')}
                                         </div>
                                     </div>
                                     <div className="bg-black/25 rounded-xl p-2 space-y-1">

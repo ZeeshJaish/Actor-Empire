@@ -133,7 +133,7 @@ export const StartMenu: React.FC<StartMenuProps> = ({ saveSlots, onSelectSlot, o
                     </div>
                     
                     <h1 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-zinc-200 to-zinc-500 tracking-[0.2em] mb-2 drop-shadow-lg">
-                        ZEESH BUILDS
+                        EMPIRE STUDIOZ
                     </h1>
                     <div className="flex items-center gap-3">
                         <div className="h-[1px] w-8 bg-zinc-700"></div>

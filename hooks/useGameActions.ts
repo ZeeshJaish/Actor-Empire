@@ -1,13 +1,13 @@
 
 import React, { useState } from 'react';
-import { Player, Commitment, LogEntry, InstaPost, XPost, NewsItem, Stats, ImprovementOption, SocialEventOption, SocialEvent, Relationship, SponsorshipActionType, Message, AuditionOpportunity, NegotiationData, ScheduledEvent, PressInteraction, WriterStats, NPCActor, InteractionType, NPCState } from '../types';
+import { Player, Commitment, LogEntry, InstaPost, XPost, NewsItem, Stats, ImprovementOption, SocialEventOption, SocialEvent, Relationship, SponsorshipActionType, Message, AuditionOpportunity, NegotiationData, ScheduledEvent, PressInteraction, WriterStats, NPCActor, InteractionType, NPCState, PregnancyCarrier } from '../types';
 import { calculateAuditionGain, calculateProductionGain, generateReleasePressQuestions, rewardGenreExperience } from '../services/roleLogic';
 import { calculateInteraction, getGenderedAvatar } from '../services/npcLogic';
 import { SOCIAL_EVENTS_DB, FLAVOR_TEXTS } from '../services/socialEvents';
 import { createBusiness } from '../services/businessLogic';
 import { getAbsoluteWeek } from '../services/legacyLogic';
 import { hasOwnedPremiumAssetInCollection, spendPlayerEnergy } from '../services/premiumLogic';
-import { applyParenthoodAbandonment, applyPartnerBreakup, applyDivorceOutcome, reconnectWithChild } from '../services/familyLogic';
+import { applyParenthoodAbandonment, applyPartnerBreakup, applyDivorceOutcome, getPregnancyCarrier, getPregnancyFeedbackCopy, reconnectWithChild } from '../services/familyLogic';
 
 interface GameActionsProps {
     player: Player;
@@ -19,6 +19,7 @@ interface GameActionsProps {
     setPendingBabyNaming: (pending: {
         partnerId: string;
         partnerName: string;
+        pregnancyCarrier?: PregnancyCarrier;
         babyGender: 'MALE' | 'FEMALE';
         suggestedFirstName: string;
         birthWeekAbsolute: number;
@@ -110,8 +111,12 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
         if (prev.activePregnancy) {
             return { next: prev, scheduled: false };
         }
+        const pregnancyCarrier = getPregnancyCarrier(prev.gender, partner.gender);
+        if (pregnancyCarrier === 'NONE') {
+            return { next: prev, scheduled: false };
+        }
 
-        const babyGender = Math.random() > 0.5 ? 'MALE' : 'FEMALE';
+        const babyGender: 'MALE' | 'FEMALE' = Math.random() > 0.5 ? 'MALE' : 'FEMALE';
         const suggestedFirstName = babyGender === 'MALE' ? 'Leo' : 'Mia';
         const conceptionWeekAbsolute = getAbsoluteWeek(prev.age, prev.currentWeek);
         const next = {
@@ -119,6 +124,7 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
             activePregnancy: {
                 partnerId: partner.id,
                 partnerName: partner.name,
+                pregnancyCarrier,
                 babyGender,
                 suggestedFirstName,
                 conceptionWeekAbsolute,
@@ -515,12 +521,18 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
               else if (action === 'INTIMACY') {
                   energyCost = 30; newCloseness = Math.min(100, newCloseness + 5);
                   logMsg = `Intimacy with ${partner.name}.`;
-                  if (!prev.activePregnancy && Math.random() < 0.15) {
+                  const pregnancyCarrier = getPregnancyCarrier(prev.gender, partner.gender);
+                  if (pregnancyCarrier === 'NONE') {
+                      const feedback = getPregnancyFeedbackCopy('NONE', partner.name);
+                      setToastMessage({ title: feedback.title, subtext: feedback.toast });
+                      logMsg = feedback.log;
+                  } else if (!prev.activePregnancy && Math.random() < 0.15) {
                       const scheduledPregnancy = schedulePregnancy(prev, partner, false);
                       if (scheduledPregnancy.scheduled) {
                           scheduledActivePregnancy = scheduledPregnancy.next.activePregnancy;
-                          setToastMessage({ title: 'Pregnancy Confirmed', subtext: `${partner.name} is pregnant. The baby is due in about 9 months.` });
-                          logMsg += ` 🍼 ${partner.name} is pregnant. Due in about 9 months.`;
+                          const feedback = getPregnancyFeedbackCopy(scheduledActivePregnancy?.pregnancyCarrier || 'PARTNER', partner.name);
+                          setToastMessage({ title: feedback.title, subtext: feedback.toast });
+                          logMsg += ` 🍼 ${feedback.log}`;
                       }
                   }
               }
@@ -679,12 +691,19 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
 
           const chance = choice === 'UNPROTECTED' ? 0.3 : 0.01;
           
-          if (!prev.activePregnancy && Math.random() < chance) {
+          const pregnancyCarrier = getPregnancyCarrier(prev.gender, partner.gender);
+
+          if (pregnancyCarrier === 'NONE') {
+              const feedback = getPregnancyFeedbackCopy('NONE', partner.name);
+              setToastMessage({ title: feedback.title, subtext: feedback.toast });
+              logMsg = feedback.log;
+          } else if (!prev.activePregnancy && Math.random() < chance) {
               const scheduledPregnancy = schedulePregnancy(prev, partner, partner.relation !== 'Spouse' && prev.stats.fame > 20);
               if (scheduledPregnancy.scheduled) {
                   scheduledActivePregnancy = scheduledPregnancy.next.activePregnancy;
-                  setToastMessage({ title: 'Pregnancy Confirmed', subtext: `${partner.name} is pregnant. The baby is due in about 9 months.` });
-                  logMsg += ` 🍼 ${partner.name} is pregnant. Due in about 9 months.`;
+                  const feedback = getPregnancyFeedbackCopy(scheduledActivePregnancy?.pregnancyCarrier || 'PARTNER', partner.name);
+                  setToastMessage({ title: feedback.title, subtext: feedback.toast });
+                  logMsg += ` 🍼 ${feedback.log}`;
               }
           }
 

@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { Player, PastProject, ActiveRelease, CastMember, Review, Award, Universe, UniverseId, IndustryProject, CustomPoster } from '../../types';
 import { formatMoney } from '../../services/formatUtils';
+import { getProjectIdentityLabel } from '../../services/genreCatalog';
 import { AWARD_CALENDAR, AWARD_SHOW_DB, AwardShowLore, AwardDefinition, Nomination, sanitizeAwardRecords, getAwardCeremonyYear } from '../../services/awardLogic';
 import { ArrowLeft, Star, Film, ChevronRight, User, TrendingUp, DollarSign, Eye, Award as AwardIcon, Calendar, BookOpen, Clock, List, MessageSquare, Users, Globe, Zap, LayoutGrid, Shield, ArrowRight, Tv } from 'lucide-react';
 import { buildUniverseRoster, calculateUniverseProductWeeklyRevenue, getFallbackCharacterName, getUniverseDashboardProjects, getUniverseReleaseActivity, normalizeUniverseForSave, normalizeUniverseMap } from '../../services/universeLogic';
@@ -30,6 +31,7 @@ interface DisplayProject {
     originalObject: PastProject | ActiveRelease;
     mediaType: 'MOVIE' | 'SERIES';
     customPoster?: CustomPoster;
+    identityLabel: string;
 }
 
 type Tab = 'PROFILE' | 'FILMOGRAPHY' | 'AWARDS' | 'FRANCHISES' | 'SEASON'; // Added SEASON
@@ -143,13 +145,13 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
       id: r.id, name: r.name, year: player.age, role: r.roleType, rating: r.imdbRating || 0, status: 'ACTIVE' as const,
       gross: r.totalGross, budget: r.budget, description: r.projectDetails.description, cast: r.projectDetails.castList,
       reviews: r.projectDetails.reviews, streamingViews: r.streaming?.totalViews, originalObject: r,
-      mediaType: r.type, customPoster: r.projectDetails.customPoster
+      mediaType: r.type, customPoster: r.projectDetails.customPoster, identityLabel: getProjectIdentityLabel(r.projectDetails)
   }));
 
   const pastList: DisplayProject[] = player.pastProjects.map(p => ({
       id: p.id, name: p.name, year: p.year, role: p.roleType || 'Role', rating: p.imdbRating || 0, status: 'ARCHIVED' as const,
       gross: p.gross, budget: p.budget, description: p.description, cast: p.castList, reviews: p.reviews, streamingViews: p.totalViews, awards: p.awards, originalObject: p,
-      mediaType: p.projectType || 'MOVIE', customPoster: p.customPoster
+      mediaType: p.projectType || 'MOVIE', customPoster: p.customPoster, identityLabel: getProjectIdentityLabel(p)
   })).reverse();
 
   const fullList = [...activeList, ...pastList];
@@ -748,6 +750,7 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
                                             {selectedProject.mediaType === 'SERIES' ? <Tv size={10}/> : <Film size={10}/>}
                                             {selectedProject.mediaType === 'SERIES' ? 'TV Series' : 'Movie'}
                                         </span>
+                                        <span className="truncate">{selectedProject.identityLabel}</span>
                                     </div>
                                     <div className="flex items-center gap-4">
                                         <div className="flex items-center gap-1.5">
@@ -782,6 +785,7 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
                                         {selectedProject.mediaType === 'SERIES' ? <Tv size={10}/> : <Film size={10}/>}
                                         {selectedProject.mediaType === 'SERIES' ? 'TV Series' : 'Movie'}
                                     </span>
+                                    <span className="truncate">{selectedProject.identityLabel}</span>
                                 </div>
                                 <div className="flex items-center gap-4">
                                     <div className="flex items-center gap-1.5">
@@ -1015,7 +1019,7 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
                                  )}
                                  <div className="flex-1 min-w-0">
                                      <div className="font-bold text-base text-zinc-100 truncate">{project.name}</div>
-                                     <div className="text-xs text-zinc-500 mb-1">{project.year} • {project.role}</div>
+                                     <div className="text-xs text-zinc-500 mb-1 truncate">{project.year} • {project.role} • {project.identityLabel}</div>
                                      <div className="flex items-center gap-3 mt-1.5">
                                          {project.rating > 0 && <span className="flex items-center gap-1 text-zinc-200 text-xs font-bold"><Star size={10} className="text-yellow-400 fill-yellow-400"/> {project.rating.toFixed(1)}</span>}
                                          <span className="text-[10px] text-zinc-600 font-bold uppercase border border-zinc-700 px-1.5 rounded">{project.mediaType === 'SERIES' ? 'TV' : 'Movie'}</span>

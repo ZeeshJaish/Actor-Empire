@@ -12,12 +12,15 @@ export enum Page {
 }
 
 export type Gender = 'MALE' | 'FEMALE' | 'NON_BINARY' | 'ALL';
-export type Genre = 'ACTION' | 'DRAMA' | 'COMEDY' | 'ROMANCE' | 'THRILLER' | 'HORROR' | 'SCI_FI' | 'ADVENTURE' | 'SUPERHERO';
+export type PregnancyCarrier = 'PLAYER' | 'PARTNER' | 'NONE';
+export type Genre = 'ACTION' | 'DRAMA' | 'COMEDY' | 'ROMANCE' | 'THRILLER' | 'HORROR' | 'SCI_FI' | 'ADVENTURE' | 'SUPERHERO' | 'MUSICAL' | 'BIOPIC' | 'SPORTS' | 'ANIMATION' | 'FANTASY' | 'CRIME' | 'DOCUMENTARY';
 export type RoleType = 'MINOR' | 'CAMEO' | 'SUPPORTING' | 'ENSEMBLE' | 'LEAD';
 export type BudgetTier = 'LOW' | 'MID' | 'HIGH' | 'BLOCKBUSTER';
 export type TargetAudience = 'G' | 'PG' | 'PG-13' | 'R' | 'NC-17';
 export type ProjectType = 'MOVIE' | 'SERIES';
-export type StudioId = 'PARAMOUNT' | 'WARNER_BROS' | 'UNIVERSAL' | 'ARTISAN_PICTURES' | 'NETFLIX' | 'APPLE_TV' | 'DISNEY_PLUS' | 'HULU' | 'YOUTUBE' | 'MARVEL_STUDIOS' | 'DC_STUDIOS' | 'LUCASFILM' | string;
+export type ProjectFormat = 'LIVE_ACTION' | 'ANIMATED' | 'ANIME';
+export type ScriptSubjectType = 'REAL_PERSON' | 'PUBLIC_FIGURE' | 'ATHLETE' | 'MUSICIAN' | 'CRIMINAL_CASE' | 'HISTORICAL_EVENT' | 'COMPANY' | 'TEAM' | 'FANDOM' | 'UNKNOWN';
+export type StudioId = 'PARAMOUNT' | 'HBO' | 'WARNER_BROS' | 'UNIVERSAL' | 'ARTISAN_PICTURES' | 'NETFLIX' | 'APPLE_TV' | 'DISNEY_PLUS' | 'HULU' | 'YOUTUBE' | 'MARVEL_STUDIOS' | 'DC_STUDIOS' | 'LUCASFILM' | string;
 export type UniverseId = 'MCU' | 'DCU' | 'SW' | string;
 export type AwardType = 'OSCAR' | 'GOLDEN_GLOBE' | 'EMMY' | 'BAFTA';
 export type ClothingCategory = 'OUTFIT' | 'TOP' | 'BOTTOM' | 'SHOES' | 'ACCESSORY';
@@ -52,7 +55,7 @@ export interface CampaignItem {
     type: 'SOCIAL' | 'TV' | 'EVENT' | 'PREMIERE' | 'OTHER';
 }
 export type OutcomeTier = 'MASSIVE_SUCCESS' | 'SUCCESS' | 'NEUTRAL' | 'FAILURE' | 'MAJOR_FAILURE';
-export type ProjectSubtype = 'STANDALONE' | 'SEQUEL' | 'SPINOFF' | 'UNIVERSE_ENTRY' | 'UNIVERSE_EVENT' | 'UNIVERSE_CROSSOVER';
+export type ProjectSubtype = 'STANDALONE' | 'SEQUEL' | 'SPINOFF' | 'REBOOT' | 'UNIVERSE_ENTRY' | 'UNIVERSE_EVENT' | 'UNIVERSE_CROSSOVER';
 export type UniversePhase = 'PHASE_1_ORIGINS' | 'PHASE_2_EXPANSION' | 'PHASE_3_WAR' | 'PHASE_4_MULTIVERSE';
 export type SeriesStatus = 'N/A' | 'RUNNING' | 'CANCELLED' | 'ENDED';
 export type PlayerReturnStatus = 'RETURNING' | 'WRITTEN_OFF' | 'KILLED_OFF';
@@ -195,13 +198,17 @@ export interface Script {
     totalDevelopmentWeeks: number;
     isOriginal: boolean;
     projectType: ProjectType;
+    format?: ProjectFormat;
     targetAudience?: TargetAudience;
     episodes?: number;
     baseQuality?: number;
     logline?: string;
     attributes?: ScriptAttributes;
     sourceMaterial?: 'ORIGINAL' | 'ADAPTATION' | 'SEQUEL' | 'SPINOFF';
-    sourceMaterialType?: 'BOOK' | 'ARTICLE' | 'SCREENPLAY' | 'GAME' | 'GRAPHIC_NOVEL' | 'SPEC_SCRIPT';
+    sourceMaterialType?: 'BOOK' | 'ARTICLE' | 'SCREENPLAY' | 'GAME' | 'GRAPHIC_NOVEL' | 'SPEC_SCRIPT' | 'LIFE_RIGHTS' | 'DOCUMENTARY_SUBJECT';
+    subjectName?: string;
+    subjectType?: ScriptSubjectType;
+    connectedProjectIntent?: 'AUTO' | 'SOLO' | 'CROSSOVER' | 'EVENT' | 'REBOOT';
     author?: string;
     hype?: number;
     tags?: string[];
@@ -253,7 +260,8 @@ export interface ProjectConcept {
         roleType?: RoleType,
         salary?: number,
         characterId?: string,
-        characterName?: string
+        characterName?: string,
+        sourceUniverseId?: UniverseId
     }[];
     selectedLocations: string[]; // Changed from selectedLocation: string | null
     tone: number;
@@ -261,6 +269,10 @@ export interface ProjectConcept {
     lastStep?: 'SELECT_SCRIPT' | 'DIRECTOR' | 'CAST' | 'CREW' | 'EQUIPMENT' | 'LOCATION' | 'TONE' | 'CONFIRM';
     customPoster?: CustomPoster;
     lockedStreamingFunding?: LockedStreamingFunding;
+    format?: ProjectFormat;
+    subjectName?: string;
+    subjectType?: ScriptSubjectType;
+    connectedProjectIntent?: 'AUTO' | 'SOLO' | 'CROSSOVER' | 'EVENT' | 'REBOOT';
     universeId?: UniverseId;
     franchiseId?: string;
     installmentNumber?: number;
@@ -296,6 +308,15 @@ export interface StudioState {
     productionFund?: number; // NEW: Funds provided by a streaming platform for the next project
     lockedStreamingFunds?: LockedStreamingFunding[];
     financeLedger?: StudioFinanceEntry[];
+    genreReputation?: Record<string, number>;
+    marketTrends?: GenreMarketTrend[];
+}
+
+export interface GenreMarketTrend {
+    genre: Genre;
+    demand: number;
+    label: 'Cold' | 'Soft' | 'Stable' | 'Hot' | 'Breakout';
+    reason: string;
 }
 
 export interface LockedStreamingFunding {
@@ -336,6 +357,8 @@ export interface ProjectHiddenStats {
     castDepthNote?: string;
     studioPrestigeScore?: number;
     isRecast?: boolean;
+    connectedProjectIntent?: 'AUTO' | 'SOLO' | 'CROSSOVER' | 'EVENT' | 'REBOOT';
+    linkedUniverseCastCount?: number;
     releaseWeek?: number;
     platformId?: string | null;
     festivalPremiere?: string | null;
@@ -365,6 +388,7 @@ export interface CastMember {
     status?: 'PENDING' | 'CONFIRMED' | 'REJECTED';
     characterId?: string;
     characterName?: string;
+    sourceUniverseId?: UniverseId;
 }
 
 export interface Review {
@@ -414,6 +438,10 @@ export interface ProjectDetails {
     studioId: StudioId;
     subtype: ProjectSubtype;
     genre: Genre;
+    format?: ProjectFormat;
+    subjectName?: string;
+    subjectType?: ScriptSubjectType;
+    connectedProjectIntent?: 'AUTO' | 'SOLO' | 'CROSSOVER' | 'EVENT' | 'REBOOT';
     targetAudience?: TargetAudience;
     budgetTier: BudgetTier;
     estimatedBudget: number;
@@ -575,6 +603,9 @@ export interface PastProject {
     budget: number;
     gross: number;
     genre: Genre;
+    format?: ProjectFormat;
+    subjectName?: string;
+    subjectType?: ScriptSubjectType;
     description?: string;
     projectType: ProjectType;
     royaltyPercentage?: number;
@@ -1415,12 +1446,19 @@ export interface FamilyObligation {
     reason: 'ABANDONMENT' | 'DIVORCE';
 }
 
+export type GameLanguage = 'en' | 'pt-BR';
+
+export interface PlayerSettings {
+    language: GameLanguage;
+}
+
 export interface Player {
     id: string;
     name: string;
     age: number;
     gender: Gender;
     avatar: string;
+    settings: PlayerSettings;
     money: number;
     energy: { current: number; max: number };
     stats: Stats;
@@ -1523,6 +1561,7 @@ export interface Player {
     activePregnancy?: {
         partnerId: string;
         partnerName?: string;
+        pregnancyCarrier?: PregnancyCarrier;
         babyGender?: 'MALE' | 'FEMALE';
         suggestedFirstName?: string;
         birthWeekAbsolute?: number;
@@ -1538,6 +1577,7 @@ export const INITIAL_PLAYER: Player = {
     age: 18,
     gender: 'MALE',
     avatar: 'https://api.dicebear.com/8.x/pixel-art/svg?seed=Felix',
+    settings: { language: 'en' },
     money: 2000,
     energy: { current: 100, max: 100 },
     stats: {
@@ -1545,7 +1585,7 @@ export const INITIAL_PLAYER: Player = {
         fame: 0, reputation: 0, experience: 0, talent: 0, followers: 0, // Starts at 0
         skills: { delivery: 0, memorization: 0, expression: 0, improvisation: 0, discipline: 0, presence: 0, charisma: 0, writing: 0 },
         directorSkills: { vision: 0, technical: 0, leadership: 0, style: 0 },
-        genreXP: { ACTION: 0, DRAMA: 0, COMEDY: 0, ROMANCE: 0, THRILLER: 0, HORROR: 0, SCI_FI: 0, ADVENTURE: 0, SUPERHERO: 0 }
+        genreXP: { ACTION: 0, DRAMA: 0, COMEDY: 0, ROMANCE: 0, THRILLER: 0, HORROR: 0, SCI_FI: 0, ADVENTURE: 0, SUPERHERO: 0, MUSICAL: 0, BIOPIC: 0, SPORTS: 0, ANIMATION: 0, FANTASY: 0, CRIME: 0, DOCUMENTARY: 0 }
     },
     writerStats: { creativity: 0, dialogue: 0, structure: 0, pacing: 0 },
     directorStats: { vision: 0, technical: 0, leadership: 0, style: 0 },
@@ -1662,6 +1702,7 @@ export const INITIAL_PLAYER: Player = {
         },
         studios: {
             PARAMOUNT: { id: 'PARAMOUNT', name: 'Paramount Pictures', valuation: 22, reputation: 85, cashReserve: 3000, recentHits: 0, archetype: 'LEGACY' },
+            HBO: { id: 'HBO', name: 'HBO', valuation: 18, reputation: 94, cashReserve: 3200, recentHits: 0, archetype: 'PRESTIGE' },
             WARNER_BROS: { id: 'WARNER_BROS', name: 'Warner Bros.', valuation: 74, reputation: 90, cashReserve: 5000, recentHits: 0, archetype: 'LEGACY' },
             UNIVERSAL: { id: 'UNIVERSAL', name: 'Universal Pictures', valuation: 65, reputation: 88, cashReserve: 4500, recentHits: 0, archetype: 'LEGACY' },
             ARTISAN_PICTURES: { id: 'ARTISAN_PICTURES', name: 'Artisan Pictures', valuation: 3, reputation: 95, cashReserve: 500, recentHits: 0, archetype: 'PRESTIGE' },

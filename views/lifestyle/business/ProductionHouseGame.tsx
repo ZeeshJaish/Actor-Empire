@@ -1,11 +1,12 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Player, BudgetTier, Genre, ProjectDetails, ActiveRelease, Commitment, Business, LocationDetails, NewsItem, XPost, StudioEquipment, Script, Writer } from '../../../types';
+import { Player, BudgetTier, Genre, ProjectDetails, ActiveRelease, Commitment, Business, LocationDetails, NewsItem, XPost, StudioEquipment, Script, Writer, GameLanguage } from '../../../types';
 import { ArrowLeft, Film, DollarSign, Users, TrendingUp, Calendar, Check, Plus, Star, Award, Zap, Briefcase, LayoutGrid, MapPin, PenTool, Globe, Camera, Clapperboard, ChevronRight, Lock, Building2, BarChart3, ShieldAlert, Crown, LogOut, AlertTriangle, Sparkles, BookOpen, Video, X, Clock, Palette, Lightbulb, Mic, Box, Tv, ArrowDownLeft, ArrowUpRight, WalletCards } from 'lucide-react';
 import { NPC_DATABASE, getAvailableTalent, calculateProjectFameMultiplier } from '../../../services/npcLogic';
 import { sellBusiness, liquidateBusiness } from '../../../services/businessLogic';
 import { NPCActor, NPCTier } from '../../../types';
 import { getDirectorTalent } from '../../../services/roleLogic';
+import { getPlayerLanguage, t } from '../../../services/i18n';
 
 
 import { DevelopmentLab } from './DevelopmentLab';
@@ -24,7 +25,7 @@ interface ProductionHouseGameProps {
     onUpdatePlayer: (p: Player) => void;
 }
 
-type StudioView = 'DASHBOARD' | 'DEVELOPMENT' | 'PRE_PROD' | 'PRODUCTION' | 'RELEASE' | 'RELEASES' | 'OFFICE' | 'FINANCE' | 'GREENLIGHT' | 'TALENT' | 'IP_MANAGEMENT';
+type StudioView = 'DASHBOARD' | 'DEVELOPMENT' | 'PRE_PROD' | 'PRODUCTION' | 'RELEASE' | 'RELEASES' | 'OFFICE' | 'FINANCE' | 'GREENLIGHT' | 'TALENT' | 'IP_MANAGEMENT' | 'FILMOGRAPHY';
 
 // --- HELPERS ---
 const formatMoney = (val: number) => {
@@ -44,6 +45,8 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
     // Locate the Studio Business
     const studio = player.businesses.find(b => b.type === 'PRODUCTION_HOUSE');
     if (!studio) return <div className="p-10 text-white">Error: Studio not found.</div>;
+    const language = getPlayerLanguage(player);
+    const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
 
     // --- DATA AGGREGATION ---
     
@@ -152,6 +155,8 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
             customPoster: p.customPoster
         }))
     ];
+    const sortedPastProjectsSlate = [...pastProjectsSlate].sort(sortStudioArchiveByRecent);
+    const recentPastProjectsPreview = sortedPastProjectsSlate.slice(0, 8);
 
     // --- RENDER HELPERS ---
     
@@ -204,7 +209,7 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
                     description: pastProject.description || '',
                     studioId: studio.id,
                     subtype: pastProject.subtype || 'STANDALONE',
-                    genre: pastProject.genre || 'DRAMA',
+                    genre: pastProject.genre || (pastProject as any).projectDetails?.genre || 'ACTION',
                     budgetTier: 'MID',
                     estimatedBudget: pastProject.budget,
                     visibleHype: 'MID',
@@ -444,7 +449,10 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
                     roleType: c.roleType,
                     actorId: c.actorId === 'UNKNOWN' ? null : c.actorId,
                     actorName: c.name || c.actorName,
-                    salary: salary
+                    salary: salary,
+                    characterId: c.characterId,
+                    characterName: c.characterName,
+                    sourceUniverseId: c.sourceUniverseId
                 };
             });
         }
@@ -590,6 +598,23 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
                         }}
                     />
                 </motion.div>
+            ) : view === 'FILMOGRAPHY' ? (
+                <motion.div
+                    key="filmography"
+                    initial={{ opacity: 0, x: 24 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -24 }}
+                    transition={{ duration: 0.35 }}
+                    className="fixed inset-0 z-[60]"
+                >
+                    <StudioFilmographyView
+                        projects={sortedPastProjectsSlate as any[]}
+                        studio={studio}
+                        language={language}
+                        onBack={() => setView('DASHBOARD')}
+                        onOpenProject={(project) => setSelectedProjectDashboard(project)}
+                    />
+                </motion.div>
             ) : (
                 <motion.div 
                     key="dashboard"
@@ -685,7 +710,7 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
                 {/* 2. ACTIVE SLATE (Netflix Style) */}
                 <div className="pt-6 pb-2">
                     <div className="px-4 mb-3 flex justify-between items-end">
-                        <h2 className="text-lg font-bold text-white tracking-tight">Active Slate</h2>
+                        <h2 className="text-lg font-bold text-white tracking-tight">{tr('studio.activeSlate')}</h2>
                     </div>
                     
                     <div className="flex gap-4 overflow-x-auto px-4 pb-4 no-scrollbar">
@@ -695,7 +720,7 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
                             <div className="w-12 h-12 rounded-full bg-amber-500/20 flex items-center justify-center group-hover:scale-110 group-hover:bg-amber-500/30 transition-all duration-300">
                                 <Plus size={24} className="text-amber-400" />
                             </div>
-                            <span className="text-xs font-bold uppercase tracking-widest drop-shadow-sm">New Project</span>
+                            <span className="text-xs font-bold uppercase tracking-widest drop-shadow-sm">{tr('studio.newProject')}</span>
                         </button>
 
                         {/* Active Projects */}
@@ -723,11 +748,17 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
                 {/* RECENT ARCHIVE (Past Projects) */}
                 {pastProjectsSlate.length > 0 && (
                     <div className="pt-2 pb-6">
-                        <div className="px-4 mb-3">
-                            <h2 className="text-lg font-bold text-white tracking-tight">Past Projects</h2>
+                        <div className="px-4 mb-3 flex items-center justify-between gap-3">
+                            <h2 className="text-lg font-bold text-white tracking-tight">{tr('studio.pastProjects')}</h2>
+                            <button
+                                onClick={() => setView('FILMOGRAPHY')}
+                                className="inline-flex items-center gap-1.5 rounded-full border border-zinc-700 bg-zinc-900/80 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-zinc-300 hover:border-amber-500/50 hover:text-amber-300 transition-colors"
+                            >
+                                {tr('studio.seeMore')} <ChevronRight size={12} />
+                            </button>
                         </div>
                         <div className="flex gap-4 overflow-x-auto px-4 pb-4 no-scrollbar">
-                            {pastProjectsSlate.map(p => (
+                            {recentPastProjectsPreview.map(p => (
                                 <ArchiveProjectCard 
                                     key={p.id} 
                                     project={p as any} 
@@ -743,12 +774,12 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
 
                 {/* 3. CORPORATE DIVISIONS (Lower Section) */}
                 <div className="px-4 pb-8">
-                    <h2 className="text-lg font-bold text-white tracking-tight mb-4">Corporate Divisions</h2>
+                    <h2 className="text-lg font-bold text-white tracking-tight mb-4">{tr('studio.corporateDivisions')}</h2>
                     
                     <div className="grid grid-cols-2 gap-3">
                         {/* Development Division */}
                         <DivisionCard 
-                            title="Dev Lab"
+                            title={tr('studio.devLab')}
                             subtitle="Scripts & IP"
                             icon={<PenTool size={20}/>}
                             color="bg-blue-600"
@@ -760,7 +791,7 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
 
                         {/* Production Infrastructure */}
                         <DivisionCard 
-                            title="Facilities"
+                            title={tr('studio.facilities')}
                             subtitle="Upgrades"
                             icon={<Building2 size={20}/>}
                             color="bg-emerald-600"
@@ -772,7 +803,7 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
 
                         {/* Talent Division */}
                         <DivisionCard 
-                            title="Talent"
+                            title={tr('studio.talent')}
                             subtitle="Farm System"
                             icon={<Users size={20}/>}
                             color="bg-purple-600"
@@ -784,7 +815,7 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
 
                         {/* Finance Division */}
                         <DivisionCard 
-                            title="Finance"
+                            title={tr('studio.finance')}
                             subtitle="P&L & Capital"
                             icon={<DollarSign size={20}/>}
                             color="bg-amber-600"
@@ -1405,6 +1436,257 @@ const getPosterBg = (title: string = '') => {
 const getCustomPoster = (project: any) => {
     return project.customPoster || project.projectDetails?.customPoster || project.concept?.customPoster;
 };
+
+const getStudioArchiveRevenue = (project: any) => {
+    return (project.gross || 0) + (project.streamingRevenue || project.projectDetails?.streamingRevenue || 0);
+};
+
+const getStudioArchiveProfit = (project: any) => {
+    return getStudioArchiveRevenue(project) - (project.budget || project.projectDetails?.estimatedBudget || 0);
+};
+
+const getStudioArchiveRating = (project: any) => {
+    return Number(project.rating || project.imdbRating || 0);
+};
+
+const getStudioArchiveDateValue = (project: any) => {
+    const details = project.projectDetails || {};
+    const year = Number(project.year || project.releaseYear || details.releaseYear || details.year || 0);
+    const week = Number(project.releaseWeek || details.releaseWeek || project.weekNum || 0);
+    const activeBoost = project.phase === 'IN THEATERS' || project.phase === 'STREAMING' || project.phase === 'BIDDING' ? 100000 : 0;
+    return activeBoost + (year * 60) + week;
+};
+
+function sortStudioArchiveByRecent(a: any, b: any) {
+    return getStudioArchiveDateValue(b) - getStudioArchiveDateValue(a);
+}
+
+type FilmographySort = 'RECENT' | 'RATING' | 'REVENUE' | 'PROFIT';
+type FilmographyFilter = 'ALL' | 'MOVIE' | 'SERIES' | 'THEATRICAL' | 'STREAMING' | 'FRANCHISE';
+
+const StudioFilmographyView: React.FC<{
+    projects: any[];
+    studio: Business;
+    language: GameLanguage;
+    onBack: () => void;
+    onOpenProject: (project: any) => void;
+}> = ({ projects, studio, language, onBack, onOpenProject }) => {
+    const [sortMode, setSortMode] = useState<FilmographySort>('RECENT');
+    const [filterMode, setFilterMode] = useState<FilmographyFilter>('ALL');
+    const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
+
+    const filteredProjects = useMemo(() => {
+        const filtered = projects.filter(project => {
+            if (filterMode === 'MOVIE') return project.type === 'MOVIE' || project.projectDetails?.type === 'MOVIE';
+            if (filterMode === 'SERIES') return project.type === 'SERIES' || project.projectDetails?.type === 'SERIES';
+            if (filterMode === 'THEATRICAL') return project.phase === 'IN THEATERS' || project.distributionPhase === 'THEATRICAL';
+            if (filterMode === 'STREAMING') return project.phase === 'STREAMING' || project.distributionPhase === 'STREAMING' || !!project.streamingRevenue || !!project.views;
+            if (filterMode === 'FRANCHISE') return !!(project.franchiseId || project.universeId || project.projectDetails?.franchiseId || project.projectDetails?.universeId);
+            return true;
+        });
+
+        return filtered.sort((a, b) => {
+            if (sortMode === 'RATING') return getStudioArchiveRating(b) - getStudioArchiveRating(a) || sortStudioArchiveByRecent(a, b);
+            if (sortMode === 'REVENUE') return getStudioArchiveRevenue(b) - getStudioArchiveRevenue(a) || sortStudioArchiveByRecent(a, b);
+            if (sortMode === 'PROFIT') return getStudioArchiveProfit(b) - getStudioArchiveProfit(a) || sortStudioArchiveByRecent(a, b);
+            return sortStudioArchiveByRecent(a, b);
+        });
+    }, [projects, filterMode, sortMode]);
+
+    const totalRevenue = projects.reduce((sum, project) => sum + getStudioArchiveRevenue(project), 0);
+    const avgRating = projects.length > 0 ? projects.reduce((sum, project) => sum + getStudioArchiveRating(project), 0) / projects.length : 0;
+    const bestHit = [...projects].sort((a, b) => getStudioArchiveRevenue(b) - getStudioArchiveRevenue(a))[0];
+
+    return (
+        <div className="absolute inset-0 bg-[#050505] text-white flex flex-col font-sans overflow-hidden">
+            <div className="relative shrink-0 z-20 border-b border-zinc-800 bg-zinc-950/95 px-4 pt-12 pb-5 shadow-[0_18px_60px_rgba(0,0,0,0.35)]">
+                <div className="flex items-center justify-between gap-4">
+                    <button onClick={onBack} className="p-2 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-white">
+                        <ArrowLeft size={20} />
+                    </button>
+                    <div className="min-w-0 flex-1">
+                        <div className="text-[10px] font-black uppercase tracking-[0.24em] text-amber-400">{tr('studio.filmography.eyebrow')}</div>
+                        <h1 className="text-2xl font-black tracking-tight text-white leading-tight truncate">{tr('studio.filmography.title', { studio: studio.name })}</h1>
+                    </div>
+                    <div className="rounded-full border border-amber-500/20 bg-amber-500/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-amber-300">
+                        {tr('studio.filmography.titles', { count: projects.length })}
+                    </div>
+                </div>
+
+                <div className="mt-5 grid grid-cols-3 gap-2">
+                    <FilmographyMetric label={tr('studio.filmography.projects')} value={`${projects.length}`} />
+                    <FilmographyMetric label={tr('studio.filmography.avgRating')} value={avgRating > 0 ? avgRating.toFixed(1) : '-.--'} />
+                    <FilmographyMetric label={tr('studio.filmography.revenue')} value={formatMoney(totalRevenue)} />
+                </div>
+                {bestHit && (
+                    <div className="mt-3 rounded-2xl border border-zinc-800 bg-black/35 px-4 py-3">
+                        <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">{tr('studio.filmography.topEarner')}</div>
+                        <div className="mt-1 flex items-center justify-between gap-3">
+                            <div className="min-w-0 truncate text-sm font-bold text-white">{bestHit.name}</div>
+                            <div className="shrink-0 font-mono text-xs font-black text-emerald-400">{formatMoney(getStudioArchiveRevenue(bestHit))}</div>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            <div className="shrink-0 border-b border-zinc-900 bg-black/80 px-4 py-3 backdrop-blur-xl space-y-3">
+                <div className="flex gap-2 overflow-x-auto no-scrollbar">
+                    {[
+                        { id: 'RECENT', label: tr('studio.filmography.sort.recent') },
+                        { id: 'RATING', label: tr('studio.filmography.sort.rating') },
+                        { id: 'REVENUE', label: tr('studio.filmography.sort.revenue') },
+                        { id: 'PROFIT', label: tr('studio.filmography.sort.profit') }
+                    ].map(option => (
+                        <button
+                            key={option.id}
+                            onClick={() => setSortMode(option.id as FilmographySort)}
+                            className={`shrink-0 rounded-full px-4 py-2 text-[10px] font-black uppercase tracking-widest transition-colors ${
+                                sortMode === option.id ? 'bg-amber-500 text-black' : 'border border-zinc-800 bg-zinc-950 text-zinc-400 hover:text-white'
+                            }`}
+                        >
+                            {option.label}
+                        </button>
+                    ))}
+                </div>
+                <div className="flex gap-2 overflow-x-auto no-scrollbar">
+                    {[
+                        { id: 'ALL', label: tr('studio.filmography.filter.all') },
+                        { id: 'MOVIE', label: tr('studio.filmography.filter.movies') },
+                        { id: 'SERIES', label: tr('studio.filmography.filter.series') },
+                        { id: 'THEATRICAL', label: tr('studio.filmography.filter.theatrical') },
+                        { id: 'STREAMING', label: tr('studio.filmography.filter.streaming') },
+                        { id: 'FRANCHISE', label: tr('studio.filmography.filter.franchise') }
+                    ].map(option => (
+                        <button
+                            key={option.id}
+                            onClick={() => setFilterMode(option.id as FilmographyFilter)}
+                            className={`shrink-0 rounded-full px-3.5 py-2 text-[10px] font-black uppercase tracking-widest transition-colors ${
+                                filterMode === option.id ? 'bg-white text-black' : 'border border-zinc-800 bg-zinc-950 text-zinc-500 hover:text-zinc-200'
+                            }`}
+                        >
+                            {option.label}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto custom-scrollbar px-4 py-4 pb-24">
+                {filteredProjects.length > 0 ? (
+                    <div className="space-y-3">
+                        {filteredProjects.map(project => (
+                            <FilmographyProjectRow key={project.id} project={project} language={language} onClick={() => onOpenProject(project)} />
+                        ))}
+                    </div>
+                ) : (
+                    <div className="rounded-[2rem] border border-zinc-800 bg-zinc-950 px-5 py-10 text-center">
+                        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl border border-zinc-800 bg-black text-zinc-500">
+                            <Film size={22} />
+                        </div>
+                        <div className="text-sm font-black text-white">{tr('studio.filmography.empty')}</div>
+                        <div className="mt-1 text-xs text-zinc-500">{tr('studio.filmography.emptySub')}</div>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
+const FilmographyMetric = ({ label, value }: { label: string; value: string }) => (
+    <div className="rounded-2xl border border-zinc-800 bg-black/35 px-3 py-3 min-w-0">
+        <div className="truncate text-[8px] font-black uppercase tracking-widest text-zinc-500">{label}</div>
+        <div className="mt-1 truncate text-sm font-black text-white">{value}</div>
+    </div>
+);
+
+const getArchiveStatusLabel = (status: string, language: GameLanguage) => {
+    const normalized = status.toUpperCase();
+    if (normalized === 'IN THEATERS' || normalized === 'THEATRICAL') return t(language, 'studio.filmography.status.inTheaters');
+    if (normalized === 'STREAMING') return t(language, 'studio.filmography.status.streaming');
+    if (normalized === 'BIDDING' || normalized === 'STREAMING_BIDDING') return t(language, 'studio.filmography.status.bidding');
+    if (normalized === 'RELEASED') return t(language, 'studio.filmography.status.released');
+    return status;
+};
+
+const FilmographyProjectRow: React.FC<{ project: any; language: GameLanguage; onClick: () => void }> = ({ project, language, onClick }) => {
+    const revenue = getStudioArchiveRevenue(project);
+    const profit = getStudioArchiveProfit(project);
+    const rating = getStudioArchiveRating(project);
+    const type = project.type || project.projectDetails?.type || 'MOVIE';
+    const genre = project.genre || project.projectDetails?.genre || 'Studio';
+    const status = project.phase || (project.distributionPhase === 'STREAMING' ? 'STREAMING' : project.distributionPhase === 'THEATRICAL' ? 'IN THEATERS' : 'RELEASED');
+    const year = project.year || project.projectDetails?.releaseYear || project.projectDetails?.year || 'Now';
+    const franchiseName = project.universeSagaName || project.projectDetails?.universeSagaName || (project.universeId || project.projectDetails?.universeId ? 'Universe' : project.franchiseId || project.projectDetails?.franchiseId ? 'Franchise' : '');
+    const customPoster = getCustomPoster(project);
+
+    return (
+        <button
+            onClick={onClick}
+            className="group w-full rounded-[1.45rem] border border-zinc-800 bg-zinc-950/90 p-3 text-left transition-all hover:border-amber-500/40 hover:bg-zinc-900"
+        >
+            <div className="flex gap-3">
+                <div className="relative h-24 w-16 shrink-0 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900 shadow-lg">
+                    {(customPoster?.type === 'IMAGE' || customPoster?.type === 'CANVA') && customPoster.imageData ? (
+                        <img src={customPoster.imageData} alt={project.name} className="h-full w-full object-cover" />
+                    ) : (
+                        <div className={`h-full w-full bg-gradient-to-br ${customPoster?.bgGradient || getPosterBg(project.name)} flex items-center justify-center p-1`}>
+                            <div className="text-center font-serif text-lg font-black uppercase leading-none tracking-tighter text-white/25 -rotate-6">
+                                {project.name}
+                            </div>
+                        </div>
+                    )}
+                    <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-black to-transparent" />
+                </div>
+
+                <div className="min-w-0 flex-1 py-0.5">
+                    <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                            <div className="line-clamp-2 text-base font-black leading-tight text-white group-hover:text-amber-100">
+                                {project.name}
+                            </div>
+                            <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-zinc-500">
+                                <span>{year}</span>
+                                <span>•</span>
+                                <span>{type}</span>
+                                <span>•</span>
+                                <span>{genre}</span>
+                            </div>
+                        </div>
+                        <ChevronRight size={17} className="mt-1 shrink-0 text-zinc-600 group-hover:text-amber-300" />
+                    </div>
+
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <span className="rounded-full border border-zinc-700 bg-black/40 px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-zinc-300">
+                            {getArchiveStatusLabel(status, language)}
+                        </span>
+                        {franchiseName && (
+                            <span className="rounded-full border border-blue-500/20 bg-blue-500/10 px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-blue-300">
+                                {franchiseName}
+                            </span>
+                        )}
+                        {rating > 0 && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-yellow-500 px-2.5 py-1 text-[9px] font-black text-black">
+                                <Star size={10} className="fill-black" /> {rating.toFixed(1)}
+                            </span>
+                        )}
+                    </div>
+
+                    <div className="mt-3 grid grid-cols-3 gap-2">
+                        <CompactArchiveStat label={t(language, 'studio.filmography.metric.revenue')} value={formatMoney(revenue)} tone="text-emerald-400" />
+                        <CompactArchiveStat label={t(language, 'studio.filmography.metric.profit')} value={`${profit >= 0 ? '+' : '-'}${formatMoney(Math.abs(profit))}`} tone={profit >= 0 ? 'text-amber-300' : 'text-rose-300'} />
+                        <CompactArchiveStat label={project.views ? t(language, 'studio.filmography.metric.views') : t(language, 'studio.filmography.metric.budget')} value={project.views ? `${(project.views / 1000000).toFixed(1)}M` : formatMoney(project.budget || 0)} tone="text-zinc-200" />
+                    </div>
+                </div>
+            </div>
+        </button>
+    );
+};
+
+const CompactArchiveStat = ({ label, value, tone }: { label: string; value: string; tone: string }) => (
+    <div className="min-w-0 rounded-xl border border-zinc-800 bg-black/30 px-2.5 py-2">
+        <div className="truncate text-[8px] font-black uppercase tracking-widest text-zinc-600">{label}</div>
+        <div className={`mt-0.5 truncate text-[11px] font-black font-mono ${tone}`}>{value}</div>
+    </div>
+);
 
 const ActiveProjectCard: React.FC<{ project: any, onClick?: () => void, onDelete?: () => void }> = ({ project, onClick, onDelete }) => {
     // Determine colors based on phase

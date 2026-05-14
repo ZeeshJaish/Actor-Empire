@@ -5,10 +5,11 @@ import { NPC_DATABASE, calculateProjectFameMultiplier } from './npcLogic';
 import { generateProjectTitle, getEstimatedBudget, generateProjectDetails } from './roleLogic';
 import { initUniverses, normalizeUniverseMap, processUniverseTurn } from './universeLogic';
 import { processNpcVentures, syncNpcVenturesToStudios } from './npcVentureLogic';
+import { ALL_GENRES } from './genreCatalog';
 
 // Helpers
 const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
-const GENRES: Genre[] = ['DRAMA', 'COMEDY', 'ACTION', 'SCI_FI', 'HORROR', 'THRILLER', 'ROMANCE', 'ADVENTURE', 'SUPERHERO'];
+const GENRES: Genre[] = ALL_GENRES;
 
 export const FESTIVALS: Festival[] = [
     { id: 'sundance', name: 'Sundance Film Festival', weeks: [3, 4], prestigeReq: 60, cost: 100000, description: 'Best for Indie/Limited releases. High prestige boost.' },
@@ -114,6 +115,20 @@ export const processWorldTurn = (player: Player): { world: WorldState, news: New
     const logs: string[] = [];
     if (!newWorld.npcVentures) newWorld.npcVentures = {};
     newWorld = syncNpcVenturesToStudios(newWorld);
+    if (!newWorld.studios) newWorld.studios = {};
+    Object.values(STUDIO_CATALOG).forEach(studio => {
+        if (!newWorld.studios![studio.id]) {
+            newWorld.studios![studio.id] = {
+                id: studio.id,
+                name: studio.name,
+                valuation: studio.valuation,
+                reputation: Math.round(Math.min(98, 72 + (studio.qualityBias.script * 8) + (studio.qualityBias.distribution * 5))),
+                cashReserve: Math.round(studio.valuation * 120),
+                recentHits: 0,
+                archetype: studio.archetype
+            };
+        }
+    });
     newWorld.universes = normalizeUniverseMap(newWorld.universes);
 
     // --- A. MAINTAIN RIVAL SCHEDULE ---

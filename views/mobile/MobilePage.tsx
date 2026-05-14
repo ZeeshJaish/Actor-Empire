@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Player, Commitment, InstaPostType, NPCActor, InteractionType, Agent, Manager, Message, SponsorshipActionType, AuditionOpportunity, DatingMatch, InstaPost, Relationship, SponsorshipOffer, NegotiationData, ContractFilm, YoutubeBrandDeal, YoutubeCollabOffer } from '../../types';
+import { Player, Commitment, InstaPostType, NPCActor, InteractionType, Agent, Manager, Message, SponsorshipActionType, AuditionOpportunity, DatingMatch, InstaPost, Relationship, SponsorshipOffer, NegotiationData, ContractFilm, YoutubeBrandDeal, YoutubeCollabOffer, PregnancyCarrier } from '../../types';
 import { MessageSquare, Search, BarChart3, Camera, Users, Newspaper, TrendingUp, Activity, Heart, Folder, Flame, Gem, Landmark, X, CheckCircle, AlertCircle, BookOpen, Map } from 'lucide-react';
 import { getPhaseDuration } from '../../services/roleLogic';
 
@@ -25,6 +25,7 @@ import { GuideView } from '../../components/GuideView'; // Imported GuideView
 import { getAbsoluteWeek } from '../../services/legacyLogic';
 import { spendPlayerEnergy } from '../../services/premiumLogic';
 import { normalizeUniverseMap } from '../../services/universeLogic';
+import { getPlayerLanguage, t } from '../../services/i18n';
 
 // Helper Component for App Icon
 const AppIcon = ({ icon, color, label, onClick, badge, customContent, customBg }: any) => (
@@ -64,6 +65,7 @@ interface MobilePageProps {
   onTriggerBabyNaming?: (pending: {
       partnerId: string;
       partnerName: string;
+      pregnancyCarrier?: PregnancyCarrier;
       babyGender: 'MALE' | 'FEMALE';
       suggestedFirstName: string;
       birthWeekAbsolute: number;
@@ -79,6 +81,8 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
 
   if (!props.player) return null; 
 
+  const language = getPlayerLanguage(props.player);
+  const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
   const unreadMessages = props.player.inbox?.filter(m => !m.isRead).length || 0;
   const handleUpdatePlayer = props.onUpdatePlayer || ((p: Player) => {});
 
@@ -109,7 +113,7 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
           if (msg.type === 'OFFER_NEGOTIATION') {
               const data = msg.data as NegotiationData;
               if (!data?.opportunity) {
-                  showToast("This offer is missing contract details.", "bg-rose-500");
+                  showToast(tr('mobile.toast.missingContract'), "bg-rose-500");
                   handleUpdatePlayer(updatedPlayer);
                   return;
               }
@@ -118,7 +122,7 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
               royalty = data.royaltyPercentage || 0;
           } else {
               if (!msg.data) {
-                  showToast("This offer is missing project details.", "bg-rose-500");
+                  showToast(tr('mobile.toast.missingProject'), "bg-rose-500");
                   handleUpdatePlayer(updatedPlayer);
                   return;
               }
@@ -234,7 +238,7 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
       else if (msg.type === 'OFFER_SPONSORSHIP') {
           const offer = msg.data as SponsorshipOffer;
           if (!offer) {
-              showToast("This deal is missing sponsor details.", "bg-rose-500");
+              showToast(tr('mobile.toast.missingSponsor'), "bg-rose-500");
               handleUpdatePlayer(updatedPlayer);
               return;
           }
@@ -244,7 +248,7 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
       } else if (msg.type === 'OFFER_YOUTUBE_COLLAB') {
           const offer = msg.data as YoutubeCollabOffer;
           if (!offer) {
-              showToast("This collab offer is missing details.", "bg-rose-500");
+              showToast(tr('mobile.toast.missingCollab'), "bg-rose-500");
               handleUpdatePlayer(updatedPlayer);
               return;
           }
@@ -256,7 +260,7 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
       } else if (msg.type === 'OFFER_YOUTUBE_BRAND') {
           const offer = msg.data as YoutubeBrandDeal;
           if (!offer) {
-              showToast("This YouTube deal is missing details.", "bg-rose-500");
+              showToast(tr('mobile.toast.missingYoutubeDeal'), "bg-rose-500");
               handleUpdatePlayer(updatedPlayer);
               return;
           }
@@ -269,7 +273,7 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
 
       // 3. Update Player
       handleUpdatePlayer(updatedPlayer);
-      showToast("Offer Accepted");
+      showToast(tr('mobile.toast.offerAccepted'));
   };
 
   // --- HANDLER: Perform Sponsorship ---
@@ -281,7 +285,7 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
       
       // Energy Check
       if (props.player!.energy.current < spon.requirements.energyCost) {
-          showToast("Not enough energy!", "bg-rose-500");
+          showToast(tr('mobile.toast.notEnoughEnergy'), "bg-rose-500");
           return;
       }
 
@@ -302,7 +306,7 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
       spendPlayerEnergy(updatedPlayer, spon.requirements.energyCost);
 
       handleUpdatePlayer(updatedPlayer);
-      showToast(`${action === 'POST' ? 'Post' : 'Shoot'} Complete!`, 'bg-blue-500');
+      showToast(action === 'POST' ? tr('mobile.toast.postComplete') : tr('mobile.toast.shootComplete'), 'bg-blue-500');
   };
 
   const handleTinderDateSuccess = (match: DatingMatch) => {
@@ -330,7 +334,7 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
   // --- NEW HANDLERS: HIRE AGENT/MANAGER (Strict Money Check) ---
   const handleHireAgent = (agent: Agent) => {
       if (props.player!.money < agent.annualFee) {
-          showToast("Insufficient Funds for Annual Fee", "bg-rose-500");
+          showToast(tr('mobile.toast.insufficientFunds'), "bg-rose-500");
           return;
       }
       handleUpdatePlayer({
@@ -348,12 +352,12 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
               type: 'neutral' 
           }]
       });
-      showToast("Agent Hired", "bg-emerald-500");
+      showToast(tr('mobile.toast.agentHired'), "bg-emerald-500");
   };
 
   const handleHireManager = (manager: Manager) => {
       if (props.player!.money < manager.annualFee) {
-          showToast("Insufficient Funds for Annual Fee", "bg-rose-500");
+          showToast(tr('mobile.toast.insufficientFunds'), "bg-rose-500");
           return;
       }
       handleUpdatePlayer({
@@ -371,7 +375,7 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
               type: 'neutral' 
           }]
       });
-      showToast("Manager Hired", "bg-emerald-500");
+      showToast(tr('mobile.toast.managerHired'), "bg-emerald-500");
   };
 
   return (
@@ -406,7 +410,7 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
                             <AppIcon 
                                 icon={<MessageSquare size={26} fill="white" />} 
                                 color="bg-green-500" 
-                                label="Messages" 
+                                label={tr('mobile.messages')} 
                                 onClick={() => setAppMode('MESSAGES')} 
                                 badge={unreadMessages} 
                             />
@@ -431,13 +435,13 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
                                     </div>
                                     <div className="w-full h-full"></div>
                                 </div>
-                                <span className="text-[10px] text-white font-medium drop-shadow-md">Social</span>
+                                <span className="text-[10px] text-white font-medium drop-shadow-md">{tr('mobile.social')}</span>
                             </div>
 
                             <AppIcon 
                                 icon={<Newspaper size={26} />} 
                                 color="bg-red-600" 
-                                label="News" 
+                                label={tr('mobile.news')} 
                                 onClick={() => setAppMode('NEWS')} 
                             />
                             <AppIcon 
@@ -449,32 +453,32 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
                             <AppIcon 
                                 icon={<BarChart3 size={26} />} 
                                 color="bg-emerald-600" 
-                                label="BoxOffice" 
+                                label={tr('mobile.boxOffice')} 
                                 onClick={() => setAppMode('BOXOFFICE')} 
                             />
                             <AppIcon 
                                 icon={<Users size={26} />} 
                                 color="bg-blue-500" 
-                                label="Team" 
+                                label={tr('mobile.team')} 
                                 onClick={() => setAppMode('TEAM')} 
                             />
                             <AppIcon 
                                 icon={<Landmark size={26} />} 
                                 color="bg-[#004b87]" 
-                                label="Bank" 
+                                label={tr('mobile.bank')} 
                                 onClick={() => setAppMode('BANK')} 
                             />
                             <AppIcon 
                                 icon={<TrendingUp size={26} />} 
                                 color="bg-black" 
-                                label="Forbes" 
+                                label={tr('mobile.forbes')} 
                                 onClick={() => setAppMode('FORBES')}
                                 customContent={<span className="font-serif font-black text-xs tracking-tighter text-white">FORBES</span>} 
                             />
                             <AppIcon 
                                 icon={<Activity size={26} />} 
                                 color="bg-zinc-800" 
-                                label="Stocks" 
+                                label={tr('mobile.stocks')} 
                                 onClick={() => setAppMode('STOCKS')} 
                             />
                             
@@ -491,14 +495,14 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
                                     <div className="w-full h-full"></div>
                                     <div className="w-full h-full"></div>
                                 </div>
-                                <span className="text-[10px] text-white font-medium drop-shadow-md">Dating</span>
+                                <span className="text-[10px] text-white font-medium drop-shadow-md">{tr('mobile.dating')}</span>
                             </div>
 
                             {/* GUIDE APP (Updated Icon) */}
                             <AppIcon 
                                 icon={<Map size={26} />} 
                                 color="bg-zinc-800" 
-                                label="Guide" 
+                                label={tr('mobile.guide')} 
                                 onClick={() => setAppMode('GUIDE')} 
                             />
 

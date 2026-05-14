@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect } from 'react';
-import { INITIAL_PLAYER, Player, Page, Commitment, PressInteraction, SocialEvent, ActorSkills, AdType, Relationship, ProjectDetails, ActiveRelease, PastProject, StreamingState } from './types';
+import React, { useState, useEffect, useRef } from 'react';
+import { INITIAL_PLAYER, Player, Page, Commitment, PressInteraction, SocialEvent, ActorSkills, AdType, Relationship, ProjectDetails, ActiveRelease, PastProject, StreamingState, PregnancyCarrier } from './types';
 import { BottomNav } from './components/BottomNav';
 import { ProductionCrisisModal } from './components/ProductionCrisisModal';
 import { LifeEventModal } from './components/LifeEventModal';
@@ -34,15 +34,17 @@ import { applyPremiumPurchase, getRequiredPremiumProductForAsset, hasNoAds, Prem
 import { purchasePremiumProduct, restorePremiumPurchases } from './services/iapService';
 import { sanitizeAwardRecords } from './services/awardLogic';
 import { RoleType } from './types';
-import { applyParenthoodAbandonment } from './services/familyLogic';
+import { applyParenthoodAbandonment, getPregnancyFeedbackCopy } from './services/familyLogic';
 import { APP_DISPLAY_VERSION } from './services/appVersion';
 import { calculateInstagramPostOutcome, clampInstagramStat, INSTAGRAM_POST_CONFIGS } from './services/instagramLogic';
 import { normalizeUniverseMap } from './services/universeLogic';
+import { hydrateGenreXP } from './services/genreCatalog';
 
 type GameStatus = 'START_MENU' | 'CREATION' | 'PLAYING' | 'DEATH_SCREEN';
 type PendingBabyNaming = {
   partnerId: string;
   partnerName: string;
+  pregnancyCarrier?: PregnancyCarrier;
   babyGender: 'MALE' | 'FEMALE';
   suggestedFirstName: string;
   birthWeekAbsolute: number;
@@ -53,6 +55,56 @@ type PendingBabyNaming = {
 
 const PREGNANCY_TERM_WEEKS = 39;
 const WHATS_NEW_STORAGE_KEY = 'actorEmpireSeenWhatsNewVersion';
+const AUTOSAVE_DEBOUNCE_MS = 750;
+const RECENT_TIMELINE_WEEKS = 104;
+const RECENT_TIMELINE_MAX_ITEMS = 180;
+const LEGACY_HIGHLIGHT_MAX_ITEMS = 80;
+const FULL_LOCAL_MIRROR_BUDGET_BYTES = 3_500_000;
+
+type CompactTimelineEntry = {
+  id: string;
+  week: number;
+  year: number;
+  absoluteWeek: number;
+  title: string;
+  kind: 'LOG' | 'NEWS' | 'MESSAGE';
+  tone: 'positive' | 'negative' | 'neutral';
+  impact?: 'HIGH' | 'MEDIUM' | 'LOW';
+};
+
+const getApproxAbsoluteWeek = (year: number, week: number) => {
+  const safeYear = Number.isFinite(year) ? year : 18;
+  const safeWeek = Math.min(52, Math.max(1, Number.isFinite(week) ? week : 1));
+  return getAbsoluteWeek(safeYear, safeWeek);
+};
+
+const makeTimelineEntry = (
+  sourceId: string,
+  year: number,
+  week: number,
+  title: string,
+  kind: CompactTimelineEntry['kind'],
+  tone: CompactTimelineEntry['tone'],
+  impact?: CompactTimelineEntry['impact']
+): CompactTimelineEntry => ({
+  id: `${kind}_${sourceId}_${year}_${week}`,
+  year,
+  week,
+  absoluteWeek: getApproxAbsoluteWeek(year, week),
+  title: title.replace(/\s+/g, ' ').trim().slice(0, 180),
+  kind,
+  tone,
+  impact,
+});
+
+const isLegacyWorthyText = (text: string) => {
+  const normalized = text.toLowerCase();
+  return [
+    'award', 'won', 'nominated', 'billion', 'festival', 'married', 'divorce',
+    'child', 'baby', 'scandal', 'lawsuit', 'death', 'passed away', 'founded',
+    'studio', 'franchise', 'universe', 'forbes', 'record', 'hit', 'flop'
+  ].some(keyword => normalized.includes(keyword));
+};
 
 const dedupeAwards = <T extends { type: string; year: number; category: string; projectId: string; outcome: 'WON' | 'NOMINATED' }>(awards: T[] = []): T[] => {
   return sanitizeAwardRecords(awards);
@@ -76,7 +128,7 @@ const normalizeProjectDetails = (details: Partial<ProjectDetails> | undefined): 
         description: details?.description || 'No description available.',
         studioId: details?.studioId || 'INDEPENDENT',
         subtype: details?.subtype || 'STANDALONE',
-        genre: details?.genre || 'DRAMA',
+        genre: details?.genre || 'ACTION',
         budgetTier: details?.budgetTier || 'LOW',
         estimatedBudget: typeof details?.estimatedBudget === 'number' ? details.estimatedBudget : 0,
         visibleHype: details?.visibleHype || 'LOW',
@@ -186,7 +238,7 @@ const normalizePastProject = (project: Partial<PastProject>): PastProject => ({
     studioId: project.studioId || 'INDEPENDENT',
     budget: typeof project.budget === 'number' ? project.budget : 0,
     gross: typeof project.gross === 'number' ? project.gross : 0,
-    genre: project.genre || 'DRAMA',
+    genre: project.genre || (project as any).projectDetails?.genre || 'ACTION',
     projectType: project.projectType || 'MOVIE',
     awards: dedupeAwards(project.awards || []),
     castList: Array.isArray(project.castList) ? project.castList : [],
@@ -288,14 +340,131 @@ export const App: React.FC = () => {
   const [babySurnameChoice, setBabySurnameChoice] = useState('');
   const [deathScreenPreviewPlayer, setDeathScreenPreviewPlayer] = useState<Player | null>(null);
   const [showWhatsNewModal, setShowWhatsNewModal] = useState(false);
+  const [showPreviousWhatsNewNotes, setShowPreviousWhatsNewNotes] = useState(false);
   
   // DEBT / AD STATES
   const [showDebtModal, setShowDebtModal] = useState(false);
   const [isShowingAd, setIsShowingAd] = useState(false);
   const [adStep, setAdStep] = useState(0); 
   const [adTotalSteps, setAdTotalSteps] = useState(1);
+  const autosaveTimerRef = useRef<number | null>(null);
 
   const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
+  const preparePlayerForPersistence = (nextPlayer: Player): Player => {
+      const currentAbsoluteWeek = getApproxAbsoluteWeek(nextPlayer.age, nextPlayer.currentWeek);
+      const recentCutoff = currentAbsoluteWeek - RECENT_TIMELINE_WEEKS;
+      const existingTimeline = Array.isArray(nextPlayer.flags?.recentTimeline)
+          ? nextPlayer.flags.recentTimeline
+          : [];
+      const existingHighlights = Array.isArray(nextPlayer.flags?.legacyHighlights)
+          ? nextPlayer.flags.legacyHighlights
+          : [];
+      const logTimeline = Array.isArray(nextPlayer.logs)
+          ? nextPlayer.logs.map((log, index) => makeTimelineEntry(
+              `log_${index}_${log.message}`,
+              log.year,
+              log.week,
+              log.message,
+              'LOG',
+              log.type
+          ))
+          : [];
+      const newsTimeline = Array.isArray(nextPlayer.news)
+          ? nextPlayer.news.map((item: any, index: number) => makeTimelineEntry(
+              item.id || `news_${index}`,
+              item.year || nextPlayer.age,
+              item.week || nextPlayer.currentWeek,
+              item.headline || item.subtext || 'Industry news',
+              'NEWS',
+              item.impactLevel === 'HIGH' ? 'positive' : 'neutral',
+              item.impactLevel
+          ))
+          : [];
+      const timelineById = new Map<string, CompactTimelineEntry>();
+      [...existingTimeline, ...logTimeline, ...newsTimeline]
+          .filter((entry: CompactTimelineEntry) => entry?.title && entry.absoluteWeek >= recentCutoff)
+          .forEach((entry: CompactTimelineEntry) => timelineById.set(entry.id, entry));
+      const recentTimeline = Array.from(timelineById.values())
+          .sort((a, b) => b.absoluteWeek - a.absoluteWeek)
+          .slice(0, RECENT_TIMELINE_MAX_ITEMS);
+      const highlightById = new Map<string, CompactTimelineEntry>();
+      [...existingHighlights, ...recentTimeline.filter(entry => entry.impact === 'HIGH' || isLegacyWorthyText(entry.title))]
+          .filter((entry: CompactTimelineEntry) => entry?.title)
+          .forEach((entry: CompactTimelineEntry) => highlightById.set(entry.id, entry));
+      const legacyHighlights = Array.from(highlightById.values())
+          .sort((a, b) => b.absoluteWeek - a.absoluteWeek)
+          .slice(0, LEGACY_HIGHLIGHT_MAX_ITEMS);
+      const safePlayer: any = {
+          ...nextPlayer,
+          logs: Array.isArray(nextPlayer.logs) ? nextPlayer.logs.slice(-50) : [],
+          news: Array.isArray(nextPlayer.news) ? nextPlayer.news.slice(0, 80) : [],
+          inbox: Array.isArray(nextPlayer.inbox) ? nextPlayer.inbox.slice(0, 120) : [],
+          flags: {
+              ...(nextPlayer.flags || {}),
+              recentTimeline,
+              legacyHighlights,
+              persistenceOptimizedAtWeek: currentAbsoluteWeek,
+          },
+      };
+
+      if (safePlayer.instagram) {
+          safePlayer.instagram = {
+              ...safePlayer.instagram,
+              posts: Array.isArray(safePlayer.instagram.posts) ? safePlayer.instagram.posts.slice(0, 200) : [],
+              feed: Array.isArray(safePlayer.instagram.feed) ? safePlayer.instagram.feed.slice(0, 80) : [],
+          };
+      }
+
+      if (safePlayer.x) {
+          safePlayer.x = {
+              ...safePlayer.x,
+              posts: Array.isArray(safePlayer.x.posts) ? safePlayer.x.posts.slice(0, 200) : [],
+              feed: Array.isArray(safePlayer.x.feed) ? safePlayer.x.feed.slice(0, 80) : [],
+          };
+      }
+
+      if (safePlayer.youtube) {
+          safePlayer.youtube = {
+              ...safePlayer.youtube,
+              videos: Array.isArray(safePlayer.youtube.videos)
+                  ? safePlayer.youtube.videos.slice(0, 120).map((video: any) => ({
+                      ...video,
+                      comments: Array.isArray(video.comments) ? video.comments.slice(0, 12) : [],
+                      weeklyHistory: Array.isArray(video.weeklyHistory) ? video.weeklyHistory.slice(-24) : [],
+                  }))
+                  : [],
+          };
+      }
+
+      return safePlayer as Player;
+  };
+  const writeLocalStorageMirror = (slot: number, playerToSave: Player) => {
+      try {
+          const serialized = JSON.stringify(playerToSave);
+          if (serialized.length <= FULL_LOCAL_MIRROR_BUDGET_BYTES) {
+              localStorage.setItem(`actorEmpireSave_${slot}`, serialized);
+              if (slot === 1) {
+                  // Keep a shadow copy for migration compatibility with older builds.
+                  localStorage.setItem('actorEmpireSave', serialized);
+              }
+          } else {
+              localStorage.setItem(`actorEmpireSave_${slot}_meta`, JSON.stringify({
+                  version: APP_DISPLAY_VERSION,
+                  slot,
+                  playerName: playerToSave.name,
+                  age: playerToSave.age,
+                  week: playerToSave.currentWeek,
+                  savedAt: Date.now(),
+                  storage: 'indexeddb',
+                  note: 'Full save stored in IndexedDB. Local mirror skipped to avoid mobile quota pressure.',
+              }));
+              localStorage.removeItem(`actorEmpireSave_${slot}`);
+              if (slot === 1) localStorage.removeItem('actorEmpireSave');
+          }
+      } catch (error) {
+          console.error("Local save mirror failed", error);
+      }
+  };
   const getSurname = (fullName: string) => {
       const parts = (fullName || '').trim().split(/\s+/).filter(Boolean);
       if (parts.length === 0) return 'Legacy';
@@ -317,15 +486,18 @@ export const App: React.FC = () => {
       return options.filter((option, index, arr) => arr.findIndex(other => other.value === option.value) === index);
   };
   const persistSlotSave = (slot: number, nextPlayer: Player) => {
-      saveGameData(`actorEmpireSave_${slot}`, nextPlayer);
-      try {
-          localStorage.setItem(`actorEmpireSave_${slot}`, JSON.stringify(nextPlayer));
-          if (slot === 1) {
-              // Keep a shadow copy for migration compatibility with older builds.
-              localStorage.setItem('actorEmpireSave', JSON.stringify(nextPlayer));
-          }
-      } catch (error) {
-          console.error("Local save mirror failed", error);
+      const playerToSave = preparePlayerForPersistence(nextPlayer);
+      saveGameData(`actorEmpireSave_${slot}`, playerToSave);
+
+      const writeLocalMirror = () => {
+          writeLocalStorageMirror(slot, playerToSave);
+      };
+
+      const requestIdleCallback = (globalThis as any).requestIdleCallback as ((cb: () => void, options?: { timeout?: number }) => void) | undefined;
+      if (requestIdleCallback) {
+          requestIdleCallback(writeLocalMirror, { timeout: 1800 });
+      } else {
+          globalThis.setTimeout(writeLocalMirror, 0);
       }
   };
   const syncCurrentSlotSnapshot = (nextPlayer: Player) => {
@@ -375,7 +547,18 @@ export const App: React.FC = () => {
     } catch (error) {
       console.error('Failed to persist What\'s New state', error);
     }
+    setShowPreviousWhatsNewNotes(false);
     setShowWhatsNewModal(false);
+  };
+
+  const handleShowWhatsNewCheat = () => {
+    try {
+      localStorage.removeItem(WHATS_NEW_STORAGE_KEY);
+    } catch (error) {
+      console.error('Failed to reset What\'s New state', error);
+    }
+    setShowPreviousWhatsNewNotes(false);
+    setShowWhatsNewModal(true);
   };
 
   const handleConfirmBabyName = () => {
@@ -524,10 +707,25 @@ export const App: React.FC = () => {
 
   // Auto-save logic
   useEffect(() => {
-    if (gameStatus === 'PLAYING' && currentSlot) {
+    if (autosaveTimerRef.current) {
+        window.clearTimeout(autosaveTimerRef.current);
+        autosaveTimerRef.current = null;
+    }
+
+    if (gameStatus !== 'PLAYING' || !currentSlot) return;
+
+    autosaveTimerRef.current = window.setTimeout(() => {
         setSaveSlots(prev => ({ ...prev, [currentSlot]: player }));
         persistSlotSave(currentSlot, player);
-    }
+        autosaveTimerRef.current = null;
+    }, AUTOSAVE_DEBOUNCE_MS);
+
+    return () => {
+        if (autosaveTimerRef.current) {
+            window.clearTimeout(autosaveTimerRef.current);
+            autosaveTimerRef.current = null;
+        }
+    };
   }, [player, gameStatus, currentSlot]);
 
   const handleSelectSlot = (slot: number) => {
@@ -593,6 +791,12 @@ export const App: React.FC = () => {
               if (typeof safePlayer.energy.max !== 'number') safePlayer.energy.max = Math.max(100, safePlayer.energy.current);
           }
 
+          safePlayer.settings = {
+              ...clone(INITIAL_PLAYER.settings),
+              ...(safePlayer.settings && typeof safePlayer.settings === 'object' ? safePlayer.settings : {})
+          };
+          safePlayer.settings.language = 'en';
+
           if (!safePlayer.writerStats) {
               safePlayer.writerStats = { creativity: 0, dialogue: 0, structure: 0, pacing: 0 };
           } else {
@@ -610,6 +814,9 @@ export const App: React.FC = () => {
               if (safePlayer.directorStats.leadership === undefined) safePlayer.directorStats.leadership = 0;
               if (safePlayer.directorStats.style === undefined) safePlayer.directorStats.style = 0;
           }
+
+          if (!safePlayer.stats) safePlayer.stats = clone(INITIAL_PLAYER.stats);
+          safePlayer.stats.genreXP = hydrateGenreXP(safePlayer.stats.genreXP);
 
           if (!safePlayer.team) safePlayer.team = { ...INITIAL_PLAYER.team };
           if (safePlayer.team.wellness === undefined) safePlayer.team.wellness = null;
@@ -777,12 +984,13 @@ export const App: React.FC = () => {
           safePlayer.businesses = safePlayer.businesses.map((biz: any) => {
               if (biz.type !== 'PRODUCTION_HOUSE') return biz;
               const normalizedStudioState = normalizeStudioState(biz.studioState, safePlayer.currentWeek || 1);
+              const normalizedStudioStateWithLegacyUniverses = normalizedStudioState as any;
               return {
                   ...biz,
                   studioState: {
                       ...normalizedStudioState,
-                      universes: Array.isArray(normalizedStudioState.universes)
-                          ? normalizedStudioState.universes.map((universe: any) => {
+                      universes: Array.isArray(normalizedStudioStateWithLegacyUniverses.universes)
+                          ? normalizedStudioStateWithLegacyUniverses.universes.map((universe: any) => {
                               const normalizedUniverse = normalizeUniverseMap({ [universe?.id || 'CUSTOM_UNIVERSE']: universe });
                               const resolved = Object.values(normalizedUniverse).find((entry: any) => entry.id === universe?.id) || universe;
                               return safePlayer.world.universes[resolved.id] || resolved;
@@ -860,6 +1068,7 @@ export const App: React.FC = () => {
               activePregnancy: {
                   partnerId: request.partnerId,
                   partnerName: request.partnerName,
+                  pregnancyCarrier: request.pregnancyCarrier || 'PARTNER',
                   babyGender: request.babyGender,
                   suggestedFirstName: request.suggestedFirstName,
                   conceptionWeekAbsolute: currentAbsoluteWeek,
@@ -868,8 +1077,8 @@ export const App: React.FC = () => {
                   shouldCreateScandalNews: request.shouldCreateScandalNews,
               },
           };
-      }, `🍼 ${request.partnerName} is pregnant. The baby is due in about 9 months.`);
-      setToastMessage({ title: 'Pregnancy Confirmed', subtext: `${request.partnerName} is pregnant. Naming comes when the baby is born.` });
+      }, `🍼 ${getPregnancyFeedbackCopy(request.pregnancyCarrier || 'PARTNER', request.partnerName).log}`);
+      setToastMessage({ title: 'Pregnancy Confirmed', subtext: getPregnancyFeedbackCopy(request.pregnancyCarrier || 'PARTNER', request.partnerName).toast });
   };
 
   const handleNextWeek = async () => {
@@ -903,6 +1112,7 @@ export const App: React.FC = () => {
                 babyNamingDue = {
                     partnerId: pregnancy.partnerId,
                     partnerName,
+                    pregnancyCarrier: pregnancy.pregnancyCarrier || 'PARTNER',
                     babyGender: pregnancy.babyGender || (Math.random() > 0.5 ? 'MALE' : 'FEMALE'),
                     suggestedFirstName: pregnancy.suggestedFirstName || (Math.random() > 0.5 ? 'Leo' : 'Mia'),
                     birthWeekAbsolute: currentAbsoluteWeek,
@@ -914,7 +1124,7 @@ export const App: React.FC = () => {
                     ...syncedPlayerState,
                     activePregnancy: undefined,
                     logs: [
-                        { week: syncedPlayerState.currentWeek, year: syncedPlayerState.age, message: `🍼 ${partnerName}'s baby is here. Time to choose a name.`, type: 'positive' as const },
+                        { week: syncedPlayerState.currentWeek, year: syncedPlayerState.age, message: `🍼 The baby with ${partnerName} is here. Time to choose a name.`, type: 'positive' as const },
                         ...syncedPlayerState.logs,
                     ].slice(0, 50),
                 };
@@ -935,6 +1145,7 @@ export const App: React.FC = () => {
             setPendingBabyNaming({
                 partnerId: 'cheat_partner',
                 partnerName: 'Jordan Vale',
+                pregnancyCarrier: 'PARTNER',
                 babyGender: Math.random() > 0.5 ? 'MALE' : 'FEMALE',
                 suggestedFirstName: Math.random() > 0.5 ? 'Leo' : 'Mia',
                 birthWeekAbsolute: getAbsoluteWeek(syncedPlayerState.age, syncedPlayerState.currentWeek),
@@ -1756,29 +1967,83 @@ export const App: React.FC = () => {
       )}
 
       {showWhatsNewModal && gameStatus === 'PLAYING' && (
-          <div className="fixed inset-0 z-[140] bg-black/80 backdrop-blur-md overflow-y-auto custom-scrollbar px-4 py-8 sm:p-6 animate-in fade-in duration-200">
-              <div className="bg-zinc-900 border border-zinc-700 rounded-3xl w-full max-w-sm mx-auto min-h-0 shadow-2xl flex flex-col relative overflow-hidden">
+          <div className="fixed inset-0 z-[140] bg-black/85 backdrop-blur-md overflow-y-auto custom-scrollbar px-3 py-5 sm:p-6 animate-in fade-in duration-200">
+              <div className="bg-zinc-900 border border-zinc-700 rounded-3xl w-full max-w-lg mx-auto max-h-[calc(100dvh-2.5rem)] sm:max-h-[calc(100dvh-3rem)] shadow-2xl flex flex-col relative overflow-hidden">
                   <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-500 via-orange-500 to-pink-500"></div>
-                  <div className="max-h-[calc(100dvh-4rem)] overflow-y-auto custom-scrollbar p-6 pb-4">
+                  <div className="min-h-0 flex-1 overflow-y-auto custom-scrollbar p-5 pb-4 sm:p-6">
                       <div className="mb-6">
                           <div className="text-[10px] font-black uppercase tracking-[0.25em] text-amber-400 mb-3">What&apos;s New</div>
                           <h3 className="text-2xl font-black text-white mb-2">Version {APP_DISPLAY_VERSION}</h3>
                           <p className="text-sm text-zinc-400 leading-relaxed">
-                              This update is rolling out early to fix iOS in-app purchases. The YouTube features were planned with the broader social update, but they are included now so the App Store build can be corrected faster.
+                              This update focuses on the latest player-reported fixes: streaming growth, relationship pregnancy logic, returning talent blockers, and long-career stability.
                           </p>
                       </div>
 
-                      <div className="space-y-3 text-sm text-zinc-300">
-                          <div className="rounded-2xl border border-white/5 bg-zinc-950/70 px-4 py-3">Fixed the iOS purchase bridge so App Store in-app purchases can work correctly again.</div>
-                          <div className="rounded-2xl border border-white/5 bg-zinc-950/70 px-4 py-3">YouTube now has uploads, Studio progression, monetization, creator events, and small-channel growth.</div>
-                          <div className="rounded-2xl border border-white/5 bg-zinc-950/70 px-4 py-3">Custom YouTube thumbnails can be uploaded, fitted, and saved safely on-device.</div>
-                          <div className="rounded-2xl border border-white/5 bg-zinc-950/70 px-4 py-3">Uploaded videos now open into a watch page with stats, likes, dislikes, and video-specific comments.</div>
-                          <div className="rounded-2xl border border-white/5 bg-zinc-950/70 px-4 py-3">Global creator and talent mod packs were expanded with duplicate filtering.</div>
-                          <div className="rounded-2xl border border-white/5 bg-zinc-950/70 px-4 py-3">The broader social update is still coming later with more interaction and drama systems.</div>
+                      <div className="space-y-4 text-sm text-zinc-300">
+                          <div className="rounded-2xl border border-amber-500/15 bg-amber-500/10 px-4 py-3">
+                              <div className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-300 mb-2">Studio & Streaming</div>
+                              <ul className="space-y-2 leading-relaxed">
+                                  <li>• Fixed runaway streaming viewership so weekly streams rise, peak, and taper in a more realistic way.</li>
+                                  <li>• Improved streaming bid wars so platforms compete with clearer offers and better sequel/season handling.</li>
+                                  <li>• Greenlight now shows exactly which returning talent deals are pending, with quick negotiate actions.</li>
+                              </ul>
+                          </div>
+
+                          <div className="rounded-2xl border border-emerald-500/15 bg-emerald-500/10 px-4 py-3">
+                              <div className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-300 mb-2">Career & Family</div>
+                              <ul className="space-y-2 leading-relaxed">
+                                  <li>• Fixed pregnancy logic so the correct person is treated as pregnant based on player and partner gender.</li>
+                                  <li>• Same-sex and non-binary intimacy now stays romance/drama focused without triggering impossible pregnancy outcomes.</li>
+                                  <li>• Improved relationship and baby feedback so family story moments happen in the right order.</li>
+                              </ul>
+                          </div>
+
+                          <div className="rounded-2xl border border-sky-500/15 bg-sky-500/10 px-4 py-3">
+                              <div className="text-[10px] font-black uppercase tracking-[0.2em] text-sky-300 mb-2">Mobile Stability</div>
+                              <ul className="space-y-2 leading-relaxed">
+                                  <li>• Optimized save storage for long careers so old timelines do not overload mobile WebViews.</li>
+                                  <li>• Reduced heavy visual effects on mobile devices to help Android screens stay responsive.</li>
+                                  <li>• Improved recovery protection around events, weekly processing, and large social/news histories.</li>
+                              </ul>
+                          </div>
+
+                          <div className="rounded-2xl border border-violet-500/15 bg-violet-500/10 px-4 py-3">
+                              <div className="text-[10px] font-black uppercase tracking-[0.2em] text-violet-300 mb-2">UI & Save Fixes</div>
+                              <ul className="space-y-2 leading-relaxed">
+                                  <li>• Cleaned decimal/overflow UI issues in festival, Forbes, IMDb, and career surfaces.</li>
+                                  <li>• Added more old-save safety across universe, franchise, roster, and generated content paths.</li>
+                                  <li>• Tightened weekly processing and recovery handling to reduce stuck-event loops.</li>
+                              </ul>
+                          </div>
+
+                          <button
+                              type="button"
+                              onClick={() => setShowPreviousWhatsNewNotes(prev => !prev)}
+                              className="w-full rounded-2xl border border-white/10 bg-zinc-950/80 px-4 py-3 text-left transition-colors hover:bg-zinc-900"
+                          >
+                              <div className="flex items-center justify-between gap-3">
+                                  <div>
+                                      <div className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-300">Previous Notes</div>
+                                      <p className="mt-1 text-xs leading-relaxed text-zinc-500">Tap to view earlier update highlights.</p>
+                                  </div>
+                                  <span className="text-lg font-black text-zinc-400">{showPreviousWhatsNewNotes ? '-' : '+'}</span>
+                              </div>
+                          </button>
+
+                          {showPreviousWhatsNewNotes && (
+                              <div className="rounded-2xl border border-white/10 bg-zinc-950/80 px-4 py-3">
+                                  <div className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-300 mb-2">Previous Highlights</div>
+                                  <ul className="space-y-2 leading-relaxed text-zinc-400">
+                                      <li>• Expanded Development Lab, franchise, universe, creator, social, and global talent systems.</li>
+                                      <li>• Added deeper script support for musical, biopic, sports, animation, fantasy, crime, and documentary projects.</li>
+                                      <li>• Improved teams, bank actions, lifestyle assets, award records, and older save compatibility.</li>
+                                  </ul>
+                              </div>
+                          )}
                       </div>
                   </div>
 
-                  <div className="sticky bottom-0 bg-zinc-900/95 backdrop-blur px-6 pb-6 pt-3 border-t border-white/5">
+                  <div className="shrink-0 bg-zinc-900/95 backdrop-blur px-5 pb-5 pt-3 sm:px-6 sm:pb-6 border-t border-white/5">
                       <button
                           onClick={handleDismissWhatsNew}
                           className="w-full py-4 bg-white text-black font-bold rounded-2xl hover:bg-zinc-200 transition-colors"
@@ -1810,7 +2075,7 @@ export const App: React.FC = () => {
         {gameStatus === 'PLAYING' && (
             <>
                 <div className={`flex-1 px-5 pt-5 pb-nav-safe overflow-y-auto custom-scrollbar ${player.money < 0 ? 'pt-8' : ''}`}>
-                    {activePage === Page.HOME && (<HomePage player={player} onNextWeek={handleNextWeek} isProcessing={isProcessing} onUpdatePlayer={handleUpdatePlayer} setPage={setActivePage} onOpenProductionHouseCheat={() => { setLifestyleInitialView('PRODUCTION_GAME'); setActivePage(Page.LIFESTYLE); }} onQueueBabyNamingCheat={handleQueueBabyNamingCheat} onOpenDeathSummaryPreview={handleOpenDeathSummaryPreview} />)}
+                    {activePage === Page.HOME && (<HomePage player={player} onNextWeek={handleNextWeek} isProcessing={isProcessing} onUpdatePlayer={handleUpdatePlayer} setPage={setActivePage} onOpenProductionHouseCheat={() => { setLifestyleInitialView('PRODUCTION_GAME'); setActivePage(Page.LIFESTYLE); }} onQueueBabyNamingCheat={handleQueueBabyNamingCheat} onOpenDeathSummaryPreview={handleOpenDeathSummaryPreview} onShowWhatsNewCheat={handleShowWhatsNewCheat} />)}
                     {activePage === Page.CAREER && (<CareerPage player={player} onQuitJob={handleQuitJob} onRehearse={handleRehearse} />)}
                     {activePage === Page.IMPROVE && (<ImprovePage player={player} onTrain={()=>{}} onEnroll={(c)=>handleGenericUpdate(p=>{ const previousCommitments = p.commitments; const next: Player = { ...p, money: p.money- (c.upfrontCost||0), commitments: [...p.commitments, {...c, id: `c_${Date.now()}`, weeksCompleted:0}] }; syncWeeklyEnergyForCommitments(next, previousCommitments); return next; })} onCancel={(id)=>handleGenericUpdate(p=>{ const previousCommitments = p.commitments; const next: Player = { ...p, commitments: p.commitments.filter(c=>c.id!==id)}; syncWeeklyEnergyForCommitments(next, previousCommitments); return next; })} onPerformAction={handleImproveAction} />)}
                     {activePage === Page.SOCIAL && (<SocialPage player={player} onInteract={handleSocialInteract} onContinueAsChild={handleContinueAsChild} />)}

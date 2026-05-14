@@ -24,6 +24,9 @@ export const FAMOUS_MOVIE_DB: FamousProjectDef[] = [
     { title: "Gladiator", genre: "ACTION", director: "Ridley Scott", difficulty: 85, studioId: "UNIVERSAL", prestige: 92, description: "Are you not entertained?", type: 'MOVIE' },
     { title: "Parasite", genre: "THRILLER", director: "Bong Joon-ho", difficulty: 92, studioId: "ARTISAN_PICTURES", prestige: 99, description: "A dark satire on class discrimination.", type: 'MOVIE' },
     { title: "La La Land", genre: "ROMANCE", director: "Damien Chazelle", difficulty: 80, studioId: "ARTISAN_PICTURES", prestige: 88, description: "Here's to the fools who dream.", type: 'MOVIE' },
+    { title: "Oppenheimer", genre: "DRAMA", director: "Christopher Nolan", difficulty: 92, studioId: "UNIVERSAL", prestige: 98, description: "A towering biographical epic about ambition, genius, and consequence.", type: 'MOVIE' },
+    { title: "Whiplash", genre: "DRAMA", director: "Damien Chazelle", difficulty: 84, studioId: "ARTISAN_PICTURES", prestige: 92, description: "A young musician is pushed to the edge by a ruthless mentor.", type: 'MOVIE' },
+    { title: "The Social Network", genre: "DRAMA", director: "David Fincher", difficulty: 86, studioId: "ARTISAN_PICTURES", prestige: 93, description: "A sharp drama about ambition, betrayal, and the birth of a tech empire.", type: 'MOVIE' },
 
     // 🧠 HIGH-CONCEPT / CULT ICONS
     { title: "Inception", genre: "SCI_FI", director: "Christopher Nolan", difficulty: 85, studioId: "WARNER_BROS", prestige: 90, description: "Dreams within dreams.", type: 'MOVIE' },
@@ -32,6 +35,9 @@ export const FAMOUS_MOVIE_DB: FamousProjectDef[] = [
     { title: "The Matrix", genre: "SCI_FI", director: "The Wachowskis", difficulty: 82, studioId: "WARNER_BROS", prestige: 95, description: "Take the red pill.", type: 'MOVIE' },
     { title: "Joker", genre: "DRAMA", director: "Todd Phillips", difficulty: 90, studioId: "WARNER_BROS", prestige: 92, description: "Put on a happy face.", type: 'MOVIE' },
     { title: "The Dark Knight", genre: "ACTION", director: "Christopher Nolan", difficulty: 95, studioId: "WARNER_BROS", prestige: 98, description: "Why so serious?", type: 'MOVIE' },
+    { title: "Dune", genre: "SCI_FI", director: "Denis Villeneuve", difficulty: 88, studioId: "WARNER_BROS", prestige: 94, description: "A desert empire, prophecy, and power collide on Arrakis.", type: 'MOVIE' },
+    { title: "Avatar", genre: "SCI_FI", director: "James Cameron", difficulty: 90, studioId: "ARTISAN_PICTURES", prestige: 94, description: "A visually massive alien-world adventure built around wonder and survival.", type: 'MOVIE' },
+    { title: "Blade Runner 2049", genre: "SCI_FI", director: "Denis Villeneuve", difficulty: 90, studioId: "WARNER_BROS", prestige: 93, description: "A future detective story about identity, memory, and what makes someone real.", type: 'MOVIE' },
 
     // 🔥 ACTION / THRILLER LEGENDS
     { title: "John Wick", genre: "ACTION", director: "Chad Stahelski", difficulty: 75, studioId: "ARTISAN_PICTURES", prestige: 80, description: "Just a man and his dog.", type: 'MOVIE' },
@@ -39,37 +45,57 @@ export const FAMOUS_MOVIE_DB: FamousProjectDef[] = [
     { title: "Die Hard", genre: "ACTION", director: "John McTiernan", difficulty: 70, studioId: "ARTISAN_PICTURES", prestige: 85, description: "Yippee-ki-yay.", type: 'MOVIE' },
     { title: "The Bourne Identity", genre: "ACTION", director: "Doug Liman", difficulty: 75, studioId: "UNIVERSAL", prestige: 80, description: "He doesn't know who he is.", type: 'MOVIE' },
     { title: "Taken", genre: "ACTION", director: "Pierre Morel", difficulty: 65, studioId: "ARTISAN_PICTURES", prestige: 70, description: "I have a particular set of skills.", type: 'MOVIE' },
+    { title: "Top Gun: Maverick", genre: "ACTION", director: "Joseph Kosinski", difficulty: 82, studioId: "PARAMOUNT", prestige: 90, description: "A legacy pilot returns for one impossible mission.", type: 'MOVIE' },
+    { title: "Mission: Impossible - Fallout", genre: "ACTION", director: "Christopher McQuarrie", difficulty: 84, studioId: "PARAMOUNT", prestige: 88, description: "A globe-spanning stunt thriller where every second matters.", type: 'MOVIE' },
+    { title: "Jurassic Park", genre: "ADVENTURE", director: "Steven Spielberg", difficulty: 78, studioId: "UNIVERSAL", prestige: 92, description: "A theme park full of dinosaurs becomes a survival nightmare.", type: 'MOVIE' },
+    { title: "Raiders of the Lost Ark", genre: "ADVENTURE", director: "Steven Spielberg", difficulty: 80, studioId: "LUCASFILM", prestige: 94, description: "A legendary archeologist races for a sacred artifact.", type: 'MOVIE' },
+    { title: "Rocky", genre: "SPORTS", director: "John G. Avildsen", difficulty: 72, studioId: "PARAMOUNT", prestige: 88, description: "An underdog boxer gets one shot to prove he belongs.", type: 'MOVIE' },
+    { title: "Creed", genre: "SPORTS", director: "Ryan Coogler", difficulty: 76, studioId: "WARNER_BROS", prestige: 84, description: "A fighter steps into legacy while building his own name.", type: 'MOVIE' },
 
     // 😄 COMEDY / FEEL-GOOD CLASSICS
     { title: "The Hangover", genre: "COMEDY", director: "Todd Phillips", difficulty: 60, studioId: "WARNER_BROS", prestige: 75, description: "Some guys just can't handle Vegas.", type: 'MOVIE' },
     { title: "Home Alone", genre: "COMEDY", director: "Chris Columbus", difficulty: 55, studioId: "ARTISAN_PICTURES", prestige: 80, description: "Keep the change, ya filthy animal.", type: 'MOVIE' },
     { title: "The Grand Budapest Hotel", genre: "COMEDY", director: "Wes Anderson", difficulty: 85, studioId: "ARTISAN_PICTURES", prestige: 92, description: "A story within a story.", type: 'MOVIE' },
     { title: "The Wolf of Wall Street", genre: "COMEDY", director: "Martin Scorsese", difficulty: 90, studioId: "PARAMOUNT", prestige: 90, description: "Sell me this pen.", type: 'MOVIE' },
+    { title: "Barbie", genre: "COMEDY", director: "Greta Gerwig", difficulty: 82, studioId: "WARNER_BROS", prestige: 88, description: "A bright pop comedy about identity, image, and reinvention.", type: 'MOVIE' },
+    { title: "Mean Girls", genre: "COMEDY", director: "Mark Waters", difficulty: 58, studioId: "PARAMOUNT", prestige: 78, description: "High school status becomes a full-contact sport.", type: 'MOVIE' },
+    { title: "A Star Is Born", genre: "MUSICAL", director: "Bradley Cooper", difficulty: 84, studioId: "WARNER_BROS", prestige: 88, description: "A romance rises and falls through fame, music, and sacrifice.", type: 'MOVIE' },
 
     // 🩸 HORROR / DARK CULT
     { title: "The Exorcist", genre: "HORROR", director: "William Friedkin", difficulty: 88, studioId: "WARNER_BROS", prestige: 95, description: "The scariest movie ever made.", type: 'MOVIE' },
     { title: "Get Out", genre: "HORROR", director: "Jordan Peele", difficulty: 85, studioId: "UNIVERSAL", prestige: 92, description: "Just because you're invited, doesn't mean you're welcome.", type: 'MOVIE' },
     { title: "A Quiet Place", genre: "HORROR", director: "John Krasinski", difficulty: 75, studioId: "PARAMOUNT", prestige: 85, description: "If they hear you, they hunt you.", type: 'MOVIE' },
-    { title: "Hereditary", genre: "HORROR", director: "Ari Aster", difficulty: 90, studioId: "ARTISAN_PICTURES", prestige: 90, description: "Evil runs in the family.", type: 'MOVIE' }
+    { title: "Hereditary", genre: "HORROR", director: "Ari Aster", difficulty: 90, studioId: "ARTISAN_PICTURES", prestige: 90, description: "Evil runs in the family.", type: 'MOVIE' },
+    { title: "Scream", genre: "HORROR", director: "Wes Craven", difficulty: 70, studioId: "PARAMOUNT", prestige: 84, description: "A masked killer turns horror rules into a deadly game.", type: 'MOVIE' }
 ];
 
 // 📺 CURATED LIST OF FAMOUS TV SERIES
 export const FAMOUS_SERIES_DB: FamousProjectDef[] = [
     { title: "The Big Bang Theory", genre: "COMEDY", director: "Chuck Lorre", difficulty: 60, studioId: "WARNER_BROS", prestige: 85, description: "Smart is the new sexy. A sitcom about physicists and their neighbors.", type: 'SERIES' },
     { title: "Grey's Anatomy", genre: "DRAMA", director: "Shonda Rhimes", difficulty: 70, studioId: "DISNEY_PLUS", prestige: 88, description: "Lives on the line. Doctors breaking boundaries and hearts.", type: 'SERIES' },
-    { title: "Game of Thrones", genre: "ADVENTURE", director: "HBO", difficulty: 95, studioId: "WARNER_BROS", prestige: 99, description: "Winter is coming. The battle for the Iron Throne begins.", type: 'SERIES' },
+    { title: "Game of Thrones", genre: "ADVENTURE", director: "HBO", difficulty: 95, studioId: "HBO", prestige: 99, description: "Winter is coming. The battle for the Iron Throne begins.", type: 'SERIES' },
     { title: "Breaking Bad", genre: "THRILLER", director: "Vince Gilligan", difficulty: 92, studioId: "ARTISAN_PICTURES", prestige: 100, description: "A chemistry teacher turns to a life of crime.", type: 'SERIES' },
     { title: "Friends", genre: "COMEDY", director: "David Crane", difficulty: 65, studioId: "WARNER_BROS", prestige: 90, description: "I'll be there for you. Six friends living in New York.", type: 'SERIES' },
     { title: "Stranger Things", genre: "SCI_FI", director: "The Duffer Brothers", difficulty: 80, studioId: "NETFLIX", prestige: 92, description: "One summer can change everything. Hawkins is not safe.", type: 'SERIES' },
     { title: "The Office", genre: "COMEDY", director: "Greg Daniels", difficulty: 60, studioId: "UNIVERSAL", prestige: 88, description: "A mockumentary about everyday office life.", type: 'SERIES' },
-    { title: "Succession", genre: "DRAMA", director: "Jesse Armstrong", difficulty: 90, studioId: "WARNER_BROS", prestige: 98, description: "Power, politics, and money in a dysfunctional family.", type: 'SERIES' },
+    { title: "Succession", genre: "DRAMA", director: "Jesse Armstrong", difficulty: 90, studioId: "HBO", prestige: 98, description: "Power, politics, and money in a dysfunctional family.", type: 'SERIES' },
     { title: "Lost", genre: "SCI_FI", director: "J.J. Abrams", difficulty: 80, studioId: "DISNEY_PLUS", prestige: 85, description: "Survivors of a plane crash uncover secrets on a mysterious island.", type: 'SERIES' },
-    { title: "The Sopranos", genre: "THRILLER", director: "David Chase", difficulty: 95, studioId: "WARNER_BROS", prestige: 100, description: "A mob boss tries to balance family and crime.", type: 'SERIES' },
+    { title: "The Sopranos", genre: "THRILLER", director: "David Chase", difficulty: 95, studioId: "HBO", prestige: 100, description: "A mob boss tries to balance family and crime.", type: 'SERIES' },
     { title: "Seinfeld", genre: "COMEDY", director: "Larry David", difficulty: 70, studioId: "UNIVERSAL", prestige: 92, description: "A show about nothing.", type: 'SERIES' },
     { title: "House of Cards", genre: "DRAMA", director: "David Fincher", difficulty: 85, studioId: "NETFLIX", prestige: 90, description: "Democracy is overrated. Ruthless politics in DC.", type: 'SERIES' },
     { title: "Black Mirror", genre: "SCI_FI", director: "Charlie Brooker", difficulty: 88, studioId: "NETFLIX", prestige: 94, description: "The dark side of technology and modern society.", type: 'SERIES' },
     { title: "The Mandalorian", genre: "SCI_FI", director: "Jon Favreau", difficulty: 85, studioId: "LUCASFILM", prestige: 92, description: "This is the way. A bounty hunter protects a child.", type: 'SERIES' },
-    { title: "Ted Lasso", genre: "COMEDY", director: "Bill Lawrence", difficulty: 65, studioId: "APPLE_TV", prestige: 90, description: "Believe. An American coach takes over a British soccer team.", type: 'SERIES' }
+    { title: "Ted Lasso", genre: "COMEDY", director: "Bill Lawrence", difficulty: 65, studioId: "APPLE_TV", prestige: 90, description: "Believe. An American coach takes over a British soccer team.", type: 'SERIES' },
+    { title: "The Last of Us", genre: "DRAMA", director: "Craig Mazin", difficulty: 88, studioId: "HBO", prestige: 94, description: "A dangerous journey through grief, survival, and found family.", type: 'SERIES' },
+    { title: "House of the Dragon", genre: "FANTASY", director: "Ryan Condal", difficulty: 90, studioId: "HBO", prestige: 91, description: "A dynasty of dragons begins tearing itself apart.", type: 'SERIES' },
+    { title: "The White Lotus", genre: "DRAMA", director: "Mike White", difficulty: 82, studioId: "HBO", prestige: 92, description: "Luxury vacations expose secrets, status games, and ugly truths.", type: 'SERIES' },
+    { title: "True Detective", genre: "CRIME", director: "Nic Pizzolatto", difficulty: 88, studioId: "HBO", prestige: 93, description: "A brooding crime anthology built on obsession and darkness.", type: 'SERIES' },
+    { title: "The Wire", genre: "CRIME", director: "David Simon", difficulty: 92, studioId: "HBO", prestige: 100, description: "A city-wide portrait of crime, power, institutions, and survival.", type: 'SERIES' },
+    { title: "Chernobyl", genre: "DRAMA", director: "Craig Mazin", difficulty: 90, studioId: "HBO", prestige: 97, description: "A catastrophic disaster becomes a study of truth and accountability.", type: 'SERIES' },
+    { title: "Euphoria", genre: "DRAMA", director: "Sam Levinson", difficulty: 82, studioId: "HBO", prestige: 86, description: "A stylized drama about youth, addiction, identity, and chaos.", type: 'SERIES' },
+    { title: "Yellowstone", genre: "DRAMA", director: "Taylor Sheridan", difficulty: 78, studioId: "PARAMOUNT", prestige: 86, description: "A ranching dynasty fights to protect land, family, and power.", type: 'SERIES' },
+    { title: "Dexter", genre: "THRILLER", director: "James Manos Jr.", difficulty: 82, studioId: "PARAMOUNT", prestige: 86, description: "A forensic expert hides a deadly double life.", type: 'SERIES' },
+    { title: "Halo", genre: "SCI_FI", director: "Kyle Killen", difficulty: 76, studioId: "PARAMOUNT", prestige: 78, description: "A soldier becomes the face of a massive sci-fi war.", type: 'SERIES' }
 ];
 
 const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];

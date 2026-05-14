@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { Player, Agent, Manager, SponsorshipActionType, TeamMember } from '../../types';
+import { getPlayerLanguage, t } from '../../services/i18n';
 import { ArrowLeft, Send, Camera, Clock, DollarSign, XCircle, AlertTriangle, Dumbbell, Sparkles, Megaphone, HeartPulse, CheckCircle, Stethoscope, ChevronRight } from 'lucide-react';
 
 interface TeamAppProps {
@@ -21,6 +22,8 @@ export const TeamApp: React.FC<TeamAppProps> = ({ player, onBack, onHireAgent, o
   const [tab, setTab] = useState<Tab>('OVERVIEW');
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
   const [selectedManager, setSelectedManager] = useState<Manager | null>(null);
+  const language = getPlayerLanguage(player);
+  const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
   
   // Generic Selection for Lifestyle Team
   const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null);
@@ -49,34 +52,34 @@ export const TeamApp: React.FC<TeamAppProps> = ({ player, onBack, onHireAgent, o
   };
 
   const roleLabel = (roleType: TeamMember['type']) => {
-      if (roleType === 'TRAINER') return 'Trainer';
-      if (roleType === 'STYLIST') return 'Stylist';
-      if (roleType === 'PUBLICIST') return 'Publicist';
-      if (roleType === 'WELLNESS') return 'Wellness Coach';
-      return 'Therapist';
+      if (roleType === 'TRAINER') return tr('team.trainer');
+      if (roleType === 'STYLIST') return tr('team.stylist');
+      if (roleType === 'PUBLICIST') return tr('team.publicist');
+      if (roleType === 'WELLNESS') return tr('team.wellnessCoach');
+      return tr('team.therapist');
   };
 
   const roleFocus = (roleType: TeamMember['type']) => {
-      if (roleType === 'TRAINER') return 'Physique';
-      if (roleType === 'STYLIST') return 'Looks';
-      if (roleType === 'PUBLICIST') return 'Fame';
-      if (roleType === 'WELLNESS') return 'Health';
-      return 'Mood';
+      if (roleType === 'TRAINER') return tr('home.physique');
+      if (roleType === 'STYLIST') return tr('home.looks');
+      if (roleType === 'PUBLICIST') return tr('home.fame');
+      if (roleType === 'WELLNESS') return tr('home.health');
+      return tr('home.mood');
   };
 
   const lifestyleRoles = [
-      { label: 'Personal Trainer', icon: Dumbbell, member: player.team.personalTrainer, tab: 'TRAINER' as const },
-      { label: 'Stylist', icon: Sparkles, member: player.team.stylist, tab: 'STYLIST' as const },
-      { label: 'Therapist', icon: HeartPulse, member: player.team.therapist, tab: 'THERAPIST' as const },
-      { label: 'Publicist', icon: Megaphone, member: player.team.publicist, tab: 'PUBLICIST' as const },
-      { label: 'Wellness', icon: Stethoscope, member: player.team.wellness, tab: 'WELLNESS' as const },
+      { label: tr('team.personalTrainer'), icon: Dumbbell, member: player.team.personalTrainer, tab: 'TRAINER' as const },
+      { label: tr('team.stylist'), icon: Sparkles, member: player.team.stylist, tab: 'STYLIST' as const },
+      { label: tr('team.therapist'), icon: HeartPulse, member: player.team.therapist, tab: 'THERAPIST' as const },
+      { label: tr('team.publicist'), icon: Megaphone, member: player.team.publicist, tab: 'PUBLICIST' as const },
+      { label: tr('team.wellness'), icon: Stethoscope, member: player.team.wellness, tab: 'WELLNESS' as const },
   ];
   const filledLifestyleRoles = lifestyleRoles.filter(role => role.member).length;
   const weeklyLifestyleCost = lifestyleRoles.reduce((sum, role) => sum + (role.member?.weeklyCost || 0), 0);
 
   const guardTeamChange = () => {
       if (player.flags.teamChangeLocked) {
-          safeShowToast("Team changes locked for this week.", "bg-zinc-700");
+          safeShowToast(tr('team.changeLocked'), "bg-zinc-700");
           return false;
       }
       return true;
@@ -85,7 +88,7 @@ export const TeamApp: React.FC<TeamAppProps> = ({ player, onBack, onHireAgent, o
   const handleHireAgentFromModal = () => {
       if (!selectedAgent || !guardTeamChange()) return;
       if (player.money < selectedAgent.annualFee) {
-          safeShowToast(`Need $${selectedAgent.annualFee.toLocaleString()} for the annual fee.`, "bg-rose-500");
+          safeShowToast(tr('team.needAnnualFee', { amount: selectedAgent.annualFee.toLocaleString() }), "bg-rose-500");
           return;
       }
       onHireAgent(selectedAgent);
@@ -95,7 +98,7 @@ export const TeamApp: React.FC<TeamAppProps> = ({ player, onBack, onHireAgent, o
   const handleHireManagerFromModal = () => {
       if (!selectedManager || !guardTeamChange()) return;
       if (player.money < selectedManager.annualFee) {
-          safeShowToast(`Need $${selectedManager.annualFee.toLocaleString()} for the annual fee.`, "bg-rose-500");
+          safeShowToast(tr('team.needAnnualFee', { amount: selectedManager.annualFee.toLocaleString() }), "bg-rose-500");
           return;
       }
       onHireManager(selectedManager);
@@ -119,7 +122,7 @@ export const TeamApp: React.FC<TeamAppProps> = ({ player, onBack, onHireAgent, o
       
       // NEW CHECK: Can afford first week?
       if (player.money < member.weeklyCost) {
-          safeShowToast(`Need $${member.weeklyCost.toLocaleString()} for first week.`, "bg-rose-500");
+          safeShowToast(tr('team.needFirstWeek', { amount: member.weeklyCost.toLocaleString() }), "bg-rose-500");
           return;
       }
 
@@ -159,7 +162,7 @@ export const TeamApp: React.FC<TeamAppProps> = ({ player, onBack, onHireAgent, o
       
       onUpdatePlayer({ ...player, team: updatedTeam, flags: updatedFlags, money: newMoney, logs: newLogs });
       setSelectedMember(null);
-      safeShowToast(`${member.name} hired!`, "bg-emerald-500");
+      safeShowToast(tr('team.memberHired', { name: member.name }), "bg-emerald-500");
   };
 
   const handleFireMember = (type: string) => {
@@ -176,7 +179,7 @@ export const TeamApp: React.FC<TeamAppProps> = ({ player, onBack, onHireAgent, o
       const updatedFlags = { ...player.flags, teamChangeLocked: true };
       
       onUpdatePlayer({ ...player, team: updatedTeam, flags: updatedFlags });
-      safeShowToast("Staff member fired.", "bg-zinc-700");
+      safeShowToast(tr('team.memberFired'), "bg-zinc-700");
   };
 
   const renderLifestyleTab = (
@@ -192,31 +195,31 @@ export const TeamApp: React.FC<TeamAppProps> = ({ player, onBack, onHireAgent, o
                   </div>
                   <div className="flex justify-between items-start mb-2 relative z-10">
                       <div>
-                          <div className="text-xs text-blue-500 font-bold uppercase mb-1">Current {roleLabel(roleType)}</div>
+                          <div className="text-xs text-blue-500 font-bold uppercase mb-1">{tr('team.currentRole', { role: roleLabel(roleType) })}</div>
                           <div className="font-bold text-xl">{current.name}</div>
                       </div>
-                      <button onClick={() => handleFireMember(roleType)} className="text-rose-500 text-xs font-bold px-3 py-1 bg-rose-50 rounded-lg border border-rose-100">Fire</button>
+                      <button onClick={() => handleFireMember(roleType)} className="text-rose-500 text-xs font-bold px-3 py-1 bg-rose-50 rounded-lg border border-rose-100">{tr('team.fire')}</button>
                   </div>
                   <div className="text-sm text-slate-600 mb-4 relative z-10">{current.description}</div>
                   <div className="grid grid-cols-2 gap-2 text-xs text-slate-500 bg-slate-50 p-3 rounded-xl relative z-10">
-                      <div>Cost: <strong>${current.weeklyCost.toLocaleString()}/wk</strong></div>
-                      <div>Focus: <strong>{roleFocus(roleType)}</strong></div>
+                      <div>{tr('team.cost')}: <strong>${current.weeklyCost.toLocaleString()}/wk</strong></div>
+                      <div>{tr('team.focus')}: <strong>{roleFocus(roleType)}</strong></div>
                   </div>
               </div>
           )}
           
           <div className="flex items-end justify-between mb-3 px-2">
               <div>
-                  <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest">Available Professionals</h3>
-                  <p className="text-[11px] text-slate-400 mt-1">Tap a card to review cost and perks.</p>
+                  <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest">{tr('team.availablePros')}</h3>
+                  <p className="text-[11px] text-slate-400 mt-1">{tr('team.availableProsSub')}</p>
               </div>
-              {current && <div className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-full">Filled</div>}
+              {current && <div className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-full">{tr('team.filled')}</div>}
           </div>
           <div className="space-y-3">
               {pool.length === 0 && (
                   <div className="bg-white border border-dashed border-slate-300 rounded-2xl p-6 text-center">
-                      <div className="text-sm font-bold text-slate-700 mb-1">No available {roleLabel(roleType).toLowerCase()} right now.</div>
-                      <div className="text-xs text-slate-400">The hiring pool refreshes every 3 weeks and never repeats someone already on your team.</div>
+                      <div className="text-sm font-bold text-slate-700 mb-1">{tr('team.noAvailable', { role: roleLabel(roleType).toLowerCase() })}</div>
+                      <div className="text-xs text-slate-400">{tr('team.poolRefresh')}</div>
                   </div>
               )}
               {pool.map(member => (
@@ -239,8 +242,8 @@ export const TeamApp: React.FC<TeamAppProps> = ({ player, onBack, onHireAgent, o
   return (
     <div className="absolute inset-0 bg-slate-100 flex flex-col z-40 text-slate-900 animate-in slide-in-from-right duration-300">
         <div className="bg-blue-600 p-4 pt-12 pb-3 shadow-lg flex items-center justify-between shrink-0 text-white z-10">
-            <button onClick={() => { if(selectedAgent || selectedManager || selectedMember) { setSelectedAgent(null); setSelectedManager(null); setSelectedMember(null); } else onBack(); }} className="flex items-center gap-1 font-medium text-white/90"><ArrowLeft size={18} /> Back</button>
-            <div className="font-bold text-lg">My Team</div>
+            <button onClick={() => { if(selectedAgent || selectedManager || selectedMember) { setSelectedAgent(null); setSelectedManager(null); setSelectedMember(null); } else onBack(); }} className="flex items-center gap-1 font-medium text-white/90"><ArrowLeft size={18} /> {tr('common.back')}</button>
+            <div className="font-bold text-lg">{tr('team.title')}</div>
             <div className="w-10"></div>
         </div>
 
@@ -248,14 +251,14 @@ export const TeamApp: React.FC<TeamAppProps> = ({ player, onBack, onHireAgent, o
         {!selectedAgent && !selectedManager && !selectedMember && (
             <div className="flex bg-white border-b border-slate-200 overflow-x-auto no-scrollbar">
                 {[
-                    { id: 'OVERVIEW', label: 'Overview' },
-                    { id: 'AGENT', label: 'Agent' },
-                    { id: 'MANAGER', label: 'Manager' },
-                    { id: 'TRAINER', label: 'Trainer' },
-                    { id: 'STYLIST', label: 'Stylist' },
-                    { id: 'THERAPIST', label: 'Therapist' },
-                    { id: 'PUBLICIST', label: 'Publicist' },
-                    { id: 'WELLNESS', label: 'Wellness' },
+                    { id: 'OVERVIEW', label: tr('team.overview') },
+                    { id: 'AGENT', label: tr('team.agent') },
+                    { id: 'MANAGER', label: tr('team.manager') },
+                    { id: 'TRAINER', label: tr('team.trainer') },
+                    { id: 'STYLIST', label: tr('team.stylist') },
+                    { id: 'THERAPIST', label: tr('team.therapist') },
+                    { id: 'PUBLICIST', label: tr('team.publicist') },
+                    { id: 'WELLNESS', label: tr('team.wellness') },
                 ].map(item => (
                     <button 
                         key={item.id}

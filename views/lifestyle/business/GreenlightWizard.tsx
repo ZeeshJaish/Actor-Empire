@@ -1,14 +1,16 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
 import { Player, BudgetTier, Genre, ProjectDetails, ActiveRelease, Commitment, Business, LocationDetails, NewsItem, XPost, StudioEquipment, CrewMember, Universe, UniverseId } from '../../../types';
 import { ArrowLeft, Film, DollarSign, Users, TrendingUp, Calendar, Check, Plus, Star, Award, Zap, Briefcase, LayoutGrid, MapPin, PenTool, Globe, Camera, Clapperboard, ChevronRight, Lock, Building2, BarChart3, ShieldAlert, Crown, LogOut, AlertTriangle, Sparkles, BookOpen, Video, X, Clock, Palette, Lightbulb, Mic, Box, Info, CheckCircle, XCircle, Layers, Loader2 } from 'lucide-react';
 import { NPC_DATABASE, getAvailableTalent, calculateProjectFameMultiplier } from '../../../services/npcLogic';
 import { calculateCastDepthScore, getDirectorTalent } from '../../../services/roleLogic';
-import { buildUniverseRoster, getFallbackCharacterName, getUniverseDashboardProjects, normalizeUniverseCharacterKey, normalizeUniverseForSave, normalizeUniverseMap } from '../../../services/universeLogic';
+import { buildUniverseRoster, getFallbackCharacterName, getUniverseCharacterKeyAliases, getUniverseDashboardProjects, normalizeUniverseCharacterKey, normalizeUniverseForSave, normalizeUniverseMap } from '../../../services/universeLogic';
 import { getEquipmentStageName } from './FacilitiesView';
 import { showAd } from '../../../services/adLogic';
 import { hasNoAds } from '../../../services/premiumLogic';
+import { formatProjectFormatLabel } from '../../../services/genreCatalog';
 
+type ConnectedProjectIntent = 'AUTO' | 'SOLO' | 'CROSSOVER' | 'EVENT' | 'REBOOT';
 
 export const formatMoney = (val: number) => {
     if (val >= 1_000_000_000_000) return `${(val/1_000_000_000_000).toFixed(1)}T`;
@@ -36,6 +38,20 @@ const normalizeCrewReturningRole = (role?: string) => {
     return role;
 };
 
+const formatReturningRoleLabel = (role?: string) => {
+    if (!role) return 'Talent';
+    const labels: Record<string, string> = {
+        DIRECTOR: 'Director',
+        CINEMATOGRAPHER: 'Cinematographer',
+        COMPOSER: 'Composer',
+        LINE_PRODUCER: 'Line Producer',
+        VFX_SUPERVISOR: 'VFX Supervisor',
+        LEAD_ACTOR: 'Lead Actor',
+        SUPPORTING_ACTOR: 'Supporting Actor',
+    };
+    return labels[role] || role.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, char => char.toUpperCase());
+};
+
 const getUniversePhaseLabel = (phase?: Universe['currentPhase']) => {
     if (typeof phase === 'number') return `Phase ${phase}`;
     if (typeof phase === 'string') {
@@ -49,8 +65,7 @@ const getUniversePhaseLabel = (phase?: Universe['currentPhase']) => {
 const toUniverseCharacterId = (universeId: UniverseId | 'NEW' | null, characterName?: string) => {
     const trimmed = characterName?.trim();
     if (!trimmed || !universeId || universeId === 'NEW') return undefined;
-    const slug = normalizeUniverseCharacterKey(trimmed);
-    return slug ? `${universeId}_${slug}` : undefined;
+    return normalizeUniverseCharacterKey(trimmed);
 };
 
 export const GEAR_TIERS: Record<string, { name: string, desc: string, cost: number, quality: number }> = {
@@ -91,16 +106,16 @@ const CrewSelector: React.FC<{
     return (
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 animate-in slide-in-from-bottom-2 duration-500">
             <h3 className="text-sm font-bold text-white mb-3 flex items-center gap-2">{icon} {title}</h3>
-            
+
             {/* Mode Selection */}
             <div className="grid grid-cols-3 gap-2 mb-4">
-                <button 
+                <button
                     onClick={() => onModeChange('HIRE')}
                     className={`p-2 rounded-lg border text-center transition-all ${mode === 'HIRE' ? 'bg-blue-500/10 border-blue-500 text-white shadow-[0_0_15px_rgba(59,130,246,0.5)]' : 'bg-black/20 border-zinc-800 text-zinc-500 hover:bg-zinc-800'}`}
                 >
                     <div className="text-[10px] font-bold uppercase">Hire Talent</div>
                 </button>
-                <button 
+                <button
                     onClick={() => onModeChange('IN_HOUSE')}
                     disabled={inHouseLevel === 0}
                     className={`p-2 rounded-lg border text-center transition-all ${
@@ -112,7 +127,7 @@ const CrewSelector: React.FC<{
                     <div className="text-[10px] font-bold uppercase">In-House</div>
                 </button>
                 {role === 'DIRECTOR' && (
-                    <button 
+                    <button
                         onClick={() => onModeChange('SELF')}
                         className={`p-2 rounded-lg border text-center transition-all ${mode === 'SELF' ? 'bg-amber-500/10 border-amber-500 text-white shadow-[0_0_15px_rgba(245,158,11,0.5)]' : 'bg-black/20 border-zinc-800 text-zinc-500 hover:bg-zinc-800'}`}
                     >
@@ -133,7 +148,7 @@ const CrewSelector: React.FC<{
                                 .map(rel => {
                                     const npc = candidates.find(c => c.id === (rel.npcId || rel.id));
                                     if (!npc) return null;
-                                    
+
                                     let salary = npc.salary;
                                     if (!salary) {
                                         // Use same logic as below but with discount
@@ -142,7 +157,7 @@ const CrewSelector: React.FC<{
                                         else if (npc.tier === 'RISING') salary = 10000000 + Math.random() * 20000000;
                                         else salary = 1000000 + Math.random() * 4000000;
                                     }
-                                    
+
                                     let discount = 0;
                                     if (rel.closeness > 50) discount = Math.min(0.6, (rel.closeness - 50) / 100 + 0.1);
                                     salary = Math.floor(salary * (1 - discount));
@@ -150,12 +165,12 @@ const CrewSelector: React.FC<{
                                     const isSelected = selectedId === npc.id;
 
                                     return (
-                                        <button 
+                                        <button
                                             key={rel.id}
                                             onClick={() => onSelect(npc.id)}
                                             className={`w-full p-4 rounded-xl border flex justify-between items-center transition-all duration-300 group relative overflow-hidden ${
                                                 isSelected
-                                                ? 'bg-purple-900/20 border-purple-500 text-white shadow-[0_0_20px_rgba(168,85,247,0.3)]' 
+                                                ? 'bg-purple-900/20 border-purple-500 text-white shadow-[0_0_20px_rgba(168,85,247,0.3)]'
                                                 : 'bg-zinc-900/80 border-purple-900/30 text-zinc-400 hover:bg-zinc-800 hover:border-purple-500/50'
                                             }`}
                                         >
@@ -216,14 +231,14 @@ const CrewSelector: React.FC<{
                         // Stats Display
                         let talentDisplay = 'Talent: 50';
                         let fameDisplay = 'Fame: 10';
-                        
+
                         if (c.stats) {
                             if ('talent' in c.stats) {
                                 talentDisplay = `Talent: ${Math.floor((c.stats as any).talent || 0)}`;
                             } else if ('vision' in c.stats) {
                                 talentDisplay = `Vision: ${Math.floor((c.stats as any).vision || 0)}`;
                             }
-                            
+
                             if ('fame' in c.stats) {
                                 fameDisplay = `Fame: ${Math.floor((c.stats as any).fame || 0)}`;
                             }
@@ -235,7 +250,7 @@ const CrewSelector: React.FC<{
                         // For now, we just rely on the list being filtered before passed here if needed, or visual indicators.
 
                         return (
-                            <button 
+                            <button
                                 key={c.id}
                                 onClick={() => {
                                     if (isReturning && !returningData?.accepted && returningData?.attemptsLeft === 0) return;
@@ -243,7 +258,7 @@ const CrewSelector: React.FC<{
                                 }}
                                 className={`w-full p-4 rounded-xl border flex justify-between items-center transition-all duration-300 group relative overflow-hidden ${
                                     isSelected
-                                    ? 'bg-zinc-800 border-emerald-500 text-white shadow-[0_0_20px_rgba(16,185,129,0.3)]' 
+                                    ? 'bg-zinc-800 border-emerald-500 text-white shadow-[0_0_20px_rgba(16,185,129,0.3)]'
                                     : isReturning && !returningData?.accepted && returningData?.attemptsLeft === 0
                                         ? 'bg-red-900/10 border-red-900/30 opacity-50 cursor-not-allowed'
                                         : 'bg-zinc-900/80 border-zinc-800 text-zinc-400 hover:bg-zinc-800 hover:border-zinc-600'
@@ -287,7 +302,7 @@ const CrewSelector: React.FC<{
                                 <div className="text-right relative z-10">
                                     <div className={`text-sm font-mono font-bold ${isSelected ? 'text-white' : 'text-emerald-400'}`}>
                                         {isReturning && !returningData?.accepted && returningData?.attemptsLeft > 0 && onNegotiate ? (
-                                            <button 
+                                            <button
                                                 onClick={(e) => {
                                                     e.stopPropagation();
                                                     onNegotiate(c.id, returningData);
@@ -379,28 +394,28 @@ const LocationSelector: React.FC<{
                                 const isSelected = selectedIds.includes(loc.id);
                                 return (
                                     <g key={loc.id} className="cursor-pointer group/loc" onClick={() => { onSelect(loc.id); setSelectedContinent(continent); }}>
-                                        <circle 
-                                            cx={loc.x * 10} 
-                                            cy={loc.y * 5} 
-                                            r={isSelected ? 8 : 4} 
-                                            fill={isSelected ? '#fbbf24' : '#ffffff'} 
+                                        <circle
+                                            cx={loc.x * 10}
+                                            cy={loc.y * 5}
+                                            r={isSelected ? 8 : 4}
+                                            fill={isSelected ? '#fbbf24' : '#ffffff'}
                                             className="transition-all duration-300 group-hover/loc:r-10"
                                         />
                                         {isSelected && (
-                                            <circle 
-                                                cx={loc.x * 10} 
-                                                cy={loc.y * 5} 
-                                                r={12} 
-                                                fill="none" 
-                                                stroke="#fbbf24" 
-                                                strokeWidth="2" 
+                                            <circle
+                                                cx={loc.x * 10}
+                                                cy={loc.y * 5}
+                                                r={12}
+                                                fill="none"
+                                                stroke="#fbbf24"
+                                                strokeWidth="2"
                                                 className="animate-ping"
                                             />
                                         )}
-                                        <text 
-                                            x={loc.x * 10} 
-                                            y={loc.y * 5 - 12} 
-                                            textAnchor="middle" 
+                                        <text
+                                            x={loc.x * 10}
+                                            y={loc.y * 5 - 12}
+                                            textAnchor="middle"
                                             className={`text-[10px] font-bold fill-white pointer-events-none transition-opacity duration-300 ${isSelected ? 'opacity-100' : 'opacity-0 group-hover/loc:opacity-100'}`}
                                             style={{ textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}
                                         >
@@ -414,17 +429,17 @@ const LocationSelector: React.FC<{
 
                     {/* Continent Labels (Overlay) */}
                     {continents.map(c => (
-                        <button 
+                        <button
                             key={c.id}
                             className={`absolute px-2 py-1 rounded-md text-[9px] font-black uppercase tracking-tighter transition-all duration-300 z-10 ${
-                                selectedContinent === c.id 
-                                ? 'bg-amber-500 text-black scale-110 shadow-lg' 
+                                selectedContinent === c.id
+                                ? 'bg-amber-500 text-black scale-110 shadow-lg'
                                 : 'bg-black/40 text-white/60 hover:bg-black/60 hover:text-white'
                             }`}
                             style={{ left: `${c.x}%`, top: `${c.y}%`, transform: 'translate(-50%, -50%)' }}
                             onClick={(e) => {
                                 e.stopPropagation();
-                                setSelectedContinent(c.id); 
+                                setSelectedContinent(c.id);
                             }}
                         >
                             {c.name}
@@ -433,7 +448,7 @@ const LocationSelector: React.FC<{
                 </div>
 
                 <div className="absolute top-4 left-4 bg-black/60 backdrop-blur-md px-4 py-2 rounded-xl border border-white/10 text-[10px] font-black text-white flex items-center gap-2 shadow-xl">
-                    <Globe size={14} className="text-emerald-400 animate-pulse" /> 
+                    <Globe size={14} className="text-emerald-400 animate-pulse" />
                     <span className="tracking-widest">GLOBAL PRODUCTION NETWORK</span>
                 </div>
 
@@ -453,12 +468,12 @@ const LocationSelector: React.FC<{
                     {(locations[selectedContinent] || []).map(loc => {
                         const isSelected = selectedIds.includes(loc.id);
                         return (
-                        <button 
+                        <button
                             key={loc.id}
                             onClick={() => onSelect(loc.id)}
                             className={`p-4 rounded-xl border text-left transition-all flex justify-between items-center ${
-                                isSelected 
-                                ? 'bg-emerald-500/10 border-emerald-500 text-white' 
+                                isSelected
+                                ? 'bg-emerald-500/10 border-emerald-500 text-white'
                                 : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-700'
                             }`}
                         >
@@ -490,12 +505,12 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
     const [selectedScriptId, setSelectedScriptId] = useState<string | null>(initialConcept?.scriptId || null);
     const [step, setStep] = useState<'SELECT_SCRIPT' | 'DIRECTOR' | 'CAST' | 'CREW' | 'EQUIPMENT' | 'LOCATION' | 'TONE' | 'CONFIRM' | 'BUZZ'>(initialConcept?.lastStep || (initialConcept ? 'DIRECTOR' : 'SELECT_SCRIPT'));
     const isInternallyControlledTalent = (id?: string | null) => id === 'PLAYER_SELF' || id === 'STUDIO_STAFF';
-    
+
     // Setup State
     const [tone, setTone] = useState(initialConcept?.tone || 50); // 0 = Practical, 100 = CGI
     const [visualStyle, setVisualStyle] = useState<'REALISTIC' | 'STYLISTIC' | 'GRITTY' | 'VIBRANT'>('REALISTIC');
     const [pacing, setPacing] = useState<'SLOW' | 'MODERATE' | 'FAST' | 'FRENETIC'>('MODERATE');
-    
+
     // Crew State
     const [crewModes, setCrewModes] = useState<Record<string, 'HIRE' | 'SELF' | 'IN_HOUSE'>>(initialConcept?.crewModes || {
         director: 'HIRE',
@@ -514,14 +529,15 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
 
     // Cast State
     const [castList, setCastList] = useState<{
-        id: string, 
-        role: string, 
-        roleType: 'LEAD' | 'SUPPORTING' | 'CAMEO' | 'EXTRA', 
+        id: string,
+        role: string,
+        roleType: 'LEAD' | 'SUPPORTING' | 'CAMEO' | 'EXTRA',
         actorId: string | null,
         actorName?: string,
         salary?: number,
         characterId?: string,
-        characterName?: string
+        characterName?: string,
+        sourceUniverseId?: UniverseId
     }[]>(initialConcept?.castList || [
         { id: 'lead_1', role: 'Lead Actor', roleType: 'LEAD', actorId: null },
         { id: 'supp_1', role: 'Supporting Actor', roleType: 'SUPPORTING', actorId: null }
@@ -532,6 +548,9 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
     const [newUniverseName, setNewUniverseName] = useState<string>("");
     const [selectedFranchiseId, setSelectedFranchiseId] = useState<string | 'NEW' | null>(initialConcept?.franchiseId || null);
     const [previousInstallmentCost, setPreviousInstallmentCost] = useState<number | null>(null);
+    const [connectedProjectIntent, setConnectedProjectIntent] = useState<ConnectedProjectIntent>(initialConcept?.connectedProjectIntent || 'AUTO');
+    const [showStoryConnectionInfo, setShowStoryConnectionInfo] = useState(false);
+    const [showCharacterFlowInfo, setShowCharacterFlowInfo] = useState(false);
 
     // Equipment State
     const [equipmentChoices, setEquipmentChoices] = useState<Record<string, string>>(initialConcept?.equipmentChoices || {
@@ -553,11 +572,45 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         );
     }, [player.studio?.talentRoster, studio.studioState?.talentRoster]);
 
+    const getReturningTalentKey = (talent: any) => [
+        talent?.role || 'UNKNOWN_ROLE',
+        talent?.id || 'UNKNOWN_TALENT',
+        talent?.characterId || talent?.characterName || ''
+    ].join(':');
+
+    const dedupeReturningTalent = (talentList: any[] = []) => {
+        const byKey = new Map<string, any>();
+        talentList.forEach((talent: any) => {
+            if (!talent?.id || !talent?.role) return;
+            const key = getReturningTalentKey(talent);
+            const existing = byKey.get(key);
+            if (!existing) {
+                byKey.set(key, talent);
+                return;
+            }
+
+            // Preserve the most progressed negotiation state if duplicate sources collide.
+            byKey.set(key, {
+                ...existing,
+                ...talent,
+                accepted: !!existing.accepted || !!talent.accepted,
+                negotiated: !!existing.negotiated || !!talent.negotiated,
+                attemptsLeft: Math.min(
+                    typeof existing.attemptsLeft === 'number' ? existing.attemptsLeft : 3,
+                    typeof talent.attemptsLeft === 'number' ? talent.attemptsLeft : 3
+                ),
+                newDemand: Math.max(Number(existing.newDemand || 0), Number(talent.newDemand || 0)),
+                originalSalary: Math.max(Number(existing.originalSalary || 0), Number(talent.originalSalary || 0))
+            });
+        });
+        return Array.from(byKey.values());
+    };
+
     const normalizeReturningTalentEntries = (script: any) => {
         if (!script?.returningTalent || !Array.isArray(script.returningTalent)) return script;
         return {
             ...script,
-            returningTalent: script.returningTalent.map((talent: any) => {
+            returningTalent: dedupeReturningTalent(script.returningTalent.map((talent: any) => {
                 const isContractedReturningActor = talent && talent.role !== 'DIRECTOR' && contractedTalentIds.has(talent.id);
                 const isInternalReturnee = isInternallyControlledTalent(talent?.id);
                 return {
@@ -566,7 +619,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                     accepted: isContractedReturningActor || isInternalReturnee ? true : !!talent?.accepted,
                     negotiated: isInternalReturnee ? true : !!talent?.negotiated
                 };
-            })
+            }))
         };
     };
 
@@ -592,13 +645,14 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             lockedStreamingFunding: selectedScript?.lockedStreamingFunding || initialConcept?.lockedStreamingFunding,
             newUniverseName: selectedUniverseId === 'NEW' ? newUniverseName : undefined,
             franchiseId: selectedFranchiseId,
+            connectedProjectIntent,
             lastStep: step
         };
 
         const updatedStudio = { ...studio };
         if (!updatedStudio.studioState) updatedStudio.studioState = { scripts: [], concepts: [], writers: [], ipMarket: [], lastMarketRefreshWeek: 0, lastWriterRefreshWeek: 0 };
         else updatedStudio.studioState = { ...updatedStudio.studioState }; // Shallow copy to trigger re-render
-        
+
         if (!updatedStudio.studioState.concepts) updatedStudio.studioState.concepts = [];
         else updatedStudio.studioState.concepts = [...updatedStudio.studioState.concepts];
 
@@ -613,10 +667,10 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         if (selectedScript) {
             if (!updatedStudio.studioState.scripts) updatedStudio.studioState.scripts = [];
             else updatedStudio.studioState.scripts = [...updatedStudio.studioState.scripts];
-            
+
             const scriptIndex = updatedStudio.studioState.scripts.findIndex(s => s.id === selectedScript.id);
             if (scriptIndex >= 0) {
-                updatedStudio.studioState.scripts[scriptIndex] = { ...selectedScript };
+                updatedStudio.studioState.scripts[scriptIndex] = { ...selectedScript, returningTalent: dedupeReturningTalent(currentReturningTalent) };
             }
         }
 
@@ -672,7 +726,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
     const [currentReturningTalent, setCurrentReturningTalent] = useState<any[]>([]);
 
     useEffect(() => {
-        setCurrentReturningTalent(selectedScript?.returningTalent || []);
+        setCurrentReturningTalent(dedupeReturningTalent(selectedScript?.returningTalent || []));
     }, [selectedScript?.id, selectedScript?.returningTalent]);
 
     const activeUniverseId = useMemo(() => {
@@ -682,7 +736,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
 
     const universeCharacterOptions = useMemo(() => {
         if (!activeUniverseId) return [];
-        const universe = player.world?.universes?.[activeUniverseId];
+        const universe = normalizeUniverseMap(player.world?.universes || {})[activeUniverseId];
         if (!universe) return [];
         const projects = getUniverseDashboardProjects(player, activeUniverseId, player.activeReleases || []);
         return buildUniverseRoster(universe, projects, player.name)
@@ -692,6 +746,19 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                 normalizedId: toUniverseCharacterId(activeUniverseId, character.name) || character.characterId || character.id
             }));
     }, [activeUniverseId, player]);
+
+    const isKnownConnectedRole = (role: { characterId?: string; characterName?: string; sourceUniverseId?: UniverseId }) => {
+        if (role.sourceUniverseId) return true;
+        const roleKey = normalizeUniverseCharacterKey(role.characterId || role.characterName || '');
+        if (!roleKey) return false;
+        return linkedCharacterOptions.some(character => {
+            if (character.sourceUniverseId) {
+                return getUniverseCharacterKeyAliases(character.sourceUniverseId, character.characterId || character.id, character.name)
+                    .includes(roleKey);
+            }
+            return normalizeUniverseCharacterKey(character.characterId || character.id || character.name) === roleKey;
+        });
+    };
 
     const getDefaultCharacterName = (role: any, index: number) => {
         const projectTitle = selectedScript?.title || 'Project';
@@ -705,7 +772,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             index
         );
     };
-    
+
     // Identify studio franchises (for selection)
     const studioFranchises = useMemo(() => {
         const studioProjects = [
@@ -737,10 +804,170 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                 id,
                 name: root.name || root.title,
                 lastInstallment: sorted[sorted.length - 1].installmentNumber || 1,
-                genre: root.genre
+                genre: root.genre,
+                projects: sorted
             };
         });
     }, [player.pastProjects, player.activeReleases, studio.id]);
+
+    const previousFranchiseInstallments = useMemo(() => {
+        if (!selectedScript?.franchiseId) return [];
+        const franchiseId = selectedScript.franchiseId;
+        return [
+            ...(player.pastProjects || []),
+            ...(player.activeReleases || [])
+        ]
+            .filter((project: any) => {
+                const details = project.projectDetails || project;
+                return project.franchiseId === franchiseId
+                    || details.franchiseId === franchiseId
+                    || project.id === franchiseId
+                    || details.id === franchiseId;
+            })
+            .sort((a: any, b: any) => {
+                const aDetails = a.projectDetails || a;
+                const bDetails = b.projectDetails || b;
+                return (bDetails.installmentNumber || b.installmentNumber || 0) - (aDetails.installmentNumber || a.installmentNumber || 0)
+                    || (b.year || b.releaseYear || 0) - (a.year || a.releaseYear || 0);
+            });
+    }, [selectedScript?.franchiseId, player.pastProjects, player.activeReleases]);
+
+    const previousCharacterOptions = useMemo(() => {
+        if (!selectedScript?.franchiseId || previousFranchiseInstallments.length === 0) return [];
+        const sourceName = studioFranchises.find(franchise => franchise.id === selectedScript.franchiseId)?.name || selectedScript.title || 'Previous Movie';
+        const seen = new Set<string>();
+        const options: any[] = [];
+
+        previousFranchiseInstallments.forEach((project: any) => {
+            const details = project.projectDetails || project;
+            (details.castList || []).forEach((member: any, index: number) => {
+                if (!member || String(member.roleType || 'SUPPORTING') === 'EXTRA') return;
+                const name = member.characterName || member.roleName || member.role || (index === 0 ? details.name || details.title || project.name : `${details.name || details.title || project.name} Role ${index + 1}`);
+                const characterId = member.characterId || normalizeUniverseCharacterKey(name);
+                const key = `${member.sourceUniverseId || selectedScript.franchiseId}:${normalizeUniverseCharacterKey(characterId || name)}`;
+                if (seen.has(key)) return;
+                seen.add(key);
+                options.push({
+                    id: characterId,
+                    characterId,
+                    name,
+                    actorId: member.actorId || 'UNKNOWN',
+                    actorName: member.actorName || member.name || 'Actor open',
+                    status: 'ACTIVE',
+                    fanApproval: 62,
+                    roleType: member.roleType,
+                    appearances: 1,
+                    latestAppearanceTitle: details.name || details.title || project.name,
+                    sourceName,
+                    sourceType: 'FRANCHISE',
+                    sourceFranchiseId: selectedScript.franchiseId,
+                    sourceUniverseId: member.sourceUniverseId
+                });
+            });
+        });
+
+        return options;
+    }, [previousFranchiseInstallments, selectedScript?.franchiseId, selectedScript?.title, studioFranchises]);
+
+    const allowsOutsideConnectedCharacters = useMemo(() => {
+        const intent = connectedProjectIntent !== 'AUTO' ? connectedProjectIntent : selectedScript?.connectedProjectIntent;
+        return intent === 'CROSSOVER' || intent === 'EVENT' || selectedScript?.tags?.includes('UNIVERSE_EVENT');
+    }, [connectedProjectIntent, selectedScript?.connectedProjectIntent, selectedScript?.tags]);
+
+    const linkedCharacterOptions = useMemo(() => {
+        const options: any[] = [...previousCharacterOptions];
+        const seen = new Set<string>();
+        previousCharacterOptions.forEach(character => {
+            seen.add(`${character.sourceUniverseId || character.sourceFranchiseId || 'LOCAL'}:${normalizeUniverseCharacterKey(character.characterId || character.name)}`);
+        });
+        const normalizedUniverses = normalizeUniverseMap(player.world?.universes || {});
+
+        Object.values(normalizedUniverses)
+            .filter((universe) => universe.studioId === studio.id && (universe.id === activeUniverseId || allowsOutsideConnectedCharacters))
+            .forEach((universe) => {
+                const projects = getUniverseDashboardProjects(player, universe.id, player.activeReleases || []);
+                buildUniverseRoster(universe, projects, player.name)
+                    .filter(character => character.status !== 'RETIRED')
+                    .forEach(character => {
+                        const characterId = character.characterId || character.id || normalizeUniverseCharacterKey(character.name);
+                        const key = `${universe.id}:${characterId}`;
+                        if (seen.has(key)) return;
+                        seen.add(key);
+                        options.push({
+                            ...character,
+                            characterId,
+                            sourceUniverseId: universe.id,
+                            sourceName: universe.name,
+                            sourceType: 'UNIVERSE'
+                        });
+                    });
+            });
+
+        if (selectedFranchiseId && selectedFranchiseId !== 'NEW' && previousCharacterOptions.length === 0) {
+            const franchise = studioFranchises.find(f => f.id === selectedFranchiseId);
+            franchise?.projects?.forEach((project: any) => {
+                (project.castList || []).forEach((member: any, index: number) => {
+                    if (!member || String(member.roleType || 'SUPPORTING') === 'EXTRA') return;
+                    const name = member.characterName || member.roleName || member.role || (index === 0 ? project.name : `${project.name} Role ${index + 1}`);
+                    const characterId = member.characterId || normalizeUniverseCharacterKey(name);
+                    const key = `FRANCHISE:${selectedFranchiseId}:${characterId}`;
+                    if (seen.has(key)) return;
+                    seen.add(key);
+                    options.push({
+                        id: characterId,
+                        characterId,
+                        name,
+                        actorId: member.actorId || 'UNKNOWN',
+                        actorName: member.name || member.actorName || 'Unknown Actor',
+                        status: 'ACTIVE',
+                        fanApproval: 55,
+                        roleType: member.roleType,
+                        appearances: 1,
+                        latestAppearanceTitle: project.name,
+                        sourceName: franchise.name,
+                        sourceType: 'FRANCHISE'
+                    });
+                });
+            });
+        }
+
+        const projectIsConnected = previousCharacterOptions.length > 0 || !!activeUniverseId || !!selectedFranchiseId || !!selectedScript?.universeId || !!selectedScript?.franchiseId || allowsOutsideConnectedCharacters;
+        return projectIsConnected
+            ? options.sort((a, b) => {
+                const aPrevious = a.sourceType === 'FRANCHISE' && a.sourceFranchiseId === selectedScript?.franchiseId ? 0 : 1;
+                const bPrevious = b.sourceType === 'FRANCHISE' && b.sourceFranchiseId === selectedScript?.franchiseId ? 0 : 1;
+                if (aPrevious !== bPrevious) return aPrevious - bPrevious;
+                const aSameUniverse = activeUniverseId && a.sourceUniverseId === activeUniverseId ? 0 : 1;
+                const bSameUniverse = activeUniverseId && b.sourceUniverseId === activeUniverseId ? 0 : 1;
+                if (aSameUniverse !== bSameUniverse) return aSameUniverse - bSameUniverse;
+                return String(a.name).localeCompare(String(b.name));
+            })
+            : [];
+    }, [activeUniverseId, player, selectedFranchiseId, selectedScript?.universeId, selectedScript?.franchiseId, studio.id, studioFranchises, previousCharacterOptions, allowsOutsideConnectedCharacters]);
+
+    const getCharacterOptionValue = (character: any) => {
+        const characterKey = normalizeUniverseCharacterKey(character.characterId || character.id || character.name || '');
+        if (character.sourceUniverseId) return `UNIVERSE:${character.sourceUniverseId}:${characterKey}`;
+        return `${character.sourceType || 'FRANCHISE'}:${character.sourceFranchiseId || selectedFranchiseId || selectedScript?.franchiseId || 'franchise'}:${characterKey}`;
+    };
+
+    const getRoleCharacterOption = (role: { characterId?: string; characterName?: string; sourceUniverseId?: UniverseId }) => {
+        const roleKey = normalizeUniverseCharacterKey(role.characterId || role.characterName || '');
+        if (!roleKey) return null;
+        return linkedCharacterOptions.find(character => {
+            if (role.sourceUniverseId || character.sourceUniverseId) {
+                if (role.sourceUniverseId && character.sourceUniverseId && role.sourceUniverseId !== character.sourceUniverseId) return false;
+                return getUniverseCharacterKeyAliases(character.sourceUniverseId || role.sourceUniverseId, character.characterId || character.id, character.name)
+                    .includes(roleKey);
+            }
+            return normalizeUniverseCharacterKey(character.characterId || character.id || character.name) === roleKey;
+        }) || null;
+    };
+
+    const getRoleCharacterOptionValue = (role: { characterId?: string; characterName?: string; sourceUniverseId?: UniverseId }) => {
+        const option = getRoleCharacterOption(role);
+        return option ? getCharacterOptionValue(option) : '';
+    };
 
     const studioPrestigeScore = useMemo(() => {
         const studioProjects = [
@@ -760,15 +987,9 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
 
     // Track previous installment cost for comparison
     useEffect(() => {
-        if (selectedScript && (selectedScript.sourceMaterial === 'SEQUEL' || selectedScript.sourceMaterial === 'SPINOFF') && selectedScript.franchiseId) {
-            const previousInstallments = [
-                ...(player.pastProjects || []),
-                ...(player.activeReleases || [])
-            ].filter(p => p.franchiseId === selectedScript.franchiseId || p.id === selectedScript.franchiseId);
-            
-            if (previousInstallments.length > 0) {
-                previousInstallments.sort((a, b) => (b.installmentNumber || 0) - (a.installmentNumber || 0));
-                const lastInstallment = previousInstallments[0];
+        if (selectedScript?.franchiseId) {
+            if (previousFranchiseInstallments.length > 0) {
+                const lastInstallment = previousFranchiseInstallments[0];
                 const details = lastInstallment.projectDetails || lastInstallment;
                 setPreviousInstallmentCost(details.budget || details.estimatedBudget || lastInstallment.budget || null);
             } else {
@@ -777,7 +998,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         } else {
             setPreviousInstallmentCost(null);
         }
-    }, [selectedScript?.id]);
+    }, [selectedScript?.id, selectedScript?.franchiseId, previousFranchiseInstallments]);
 
     // Reset state when script changes
     useEffect(() => {
@@ -812,6 +1033,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                 setSelectedUniverseId(existingConcept.universeId || selectedScript?.universeId || null);
                 setNewUniverseName(existingConcept.newUniverseName || "");
                 setSelectedFranchiseId(existingConcept.franchiseId || selectedScript?.franchiseId || null);
+                setConnectedProjectIntent(existingConcept.connectedProjectIntent || selectedScript?.connectedProjectIntent || (selectedScript?.tags?.includes('UNIVERSE_EVENT') ? 'EVENT' : selectedScript?.tags?.includes('REBOOT') ? 'REBOOT' : 'AUTO'));
                 setTone(existingConcept.tone ?? 50);
                 setVisualStyle(existingConcept.visualStyle || 'REALISTIC');
                 setPacing(existingConcept.pacing || 'MODERATE');
@@ -845,6 +1067,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                 setSelectedUniverseId(selectedScript?.universeId || null);
                 setNewUniverseName("");
                 setSelectedFranchiseId(selectedScript?.franchiseId || null);
+                setConnectedProjectIntent(selectedScript?.connectedProjectIntent || (selectedScript?.tags?.includes('UNIVERSE_EVENT') ? 'EVENT' : selectedScript?.tags?.includes('REBOOT') ? 'REBOOT' : 'AUTO'));
                 setTone(50);
                 setVisualStyle('REALISTIC');
                 setPacing('MODERATE');
@@ -854,7 +1077,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
 
     // Pre-fill sequel cast and crew
     useEffect(() => {
-        if (selectedScript && (selectedScript.sourceMaterial === 'SEQUEL' || selectedScript.sourceMaterial === 'SPINOFF') && selectedScript.franchiseId) {
+        if (selectedScript?.franchiseId && previousFranchiseInstallments.length > 0) {
             let directorToSet = selectedCrew.director;
             let directorModeToSet = crewModes.director;
 
@@ -869,20 +1092,37 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             }
 
             // Find the most recent installment of this franchise to pre-fill other details
-            const previousInstallments = [
-                ...(player.pastProjects || []),
-                ...(player.activeReleases || [])
-            ].filter(p => p.franchiseId === selectedScript.franchiseId || p.id === selectedScript.franchiseId);
-            
-            if (previousInstallments.length > 0) {
-                previousInstallments.sort((a, b) => (b.installmentNumber || 0) - (a.installmentNumber || 0));
-                const lastInstallment = previousInstallments[0];
+            if (previousFranchiseInstallments.length > 0) {
+                const lastInstallment = previousFranchiseInstallments[0];
                 const details = lastInstallment.projectDetails || lastInstallment;
 
                 // Pre-fill director if not already set by returningTalent logic above
                 if (details.directorId && !directorToSet) {
                     directorToSet = details.directorId!;
                     directorModeToSet = details.directorId === 'PLAYER_SELF' ? 'SELF' : (details.directorId === 'STUDIO_STAFF' ? 'IN_HOUSE' : 'HIRE');
+                }
+
+                if (details.directorId) {
+                    const directorSalary = details.crewList?.find((crew: any) => crew.role === 'DIRECTOR')?.salary || details.directorSalary || Math.max(100_000, Math.floor((details.budget || lastInstallment.budget || 5_000_000) * 0.05));
+                    setCurrentReturningTalent(prev => {
+                        const merged = [...(selectedScript.returningTalent || []), ...prev];
+                        if (merged.some((talent: any) => talent.id === details.directorId && talent.role === 'DIRECTOR')) {
+                            return dedupeReturningTalent(merged);
+                        }
+                        return dedupeReturningTalent([
+                            ...merged,
+                            {
+                                role: 'DIRECTOR',
+                                id: details.directorId,
+                                name: details.directorName || 'Returning Director',
+                                originalSalary: directorSalary,
+                                newDemand: Math.floor(directorSalary * 1.2),
+                                negotiated: isInternallyControlledTalent(details.directorId),
+                                accepted: isInternallyControlledTalent(details.directorId),
+                                attemptsLeft: isInternallyControlledTalent(details.directorId) ? 0 : 3
+                            }
+                        ]);
+                    });
                 }
 
                 // Apply director changes if any
@@ -912,10 +1152,11 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                 // Pre-fill cast (only if castList is still default)
                 const isCastDefault = castList.length === 2 && castList.every(c => !c.actorId);
                 if (details.castList && details.castList.length > 0 && isCastDefault) {
+                    const returningBase = selectedScript.returningTalent || currentReturningTalent || [];
                     const newCastList = details.castList.map((c: any) => {
                         let salary = c.salary || 0;
                         // Check if this actor is in the returning talent list to get their new demand
-                        const returning = currentReturningTalent.find(t => t.id === c.actorId);
+                        const returning = returningBase.find((t: any) => t.id === c.actorId);
                         if (returning) {
                             salary = returning.newDemand;
                         }
@@ -928,10 +1169,40 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                             actorName: c.name || c.actorName,
                             salary: salary,
                             characterId: c.characterId,
-                            characterName: c.characterName
+                            characterName: c.characterName,
+                            sourceUniverseId: c.sourceUniverseId
                         };
                     });
                     setCastList(newCastList);
+                    setCurrentReturningTalent(prev => {
+                        const merged = [...(selectedScript.returningTalent || []), ...prev];
+                        const existingKeys = new Set(merged.map((talent: any) => `${talent.id}:${talent.role}`));
+                        const additions = details.castList
+                            .filter((c: any) => c.actorId && c.actorId !== 'UNKNOWN')
+                            .map((c: any) => {
+                                const role = c.roleType === 'LEAD' ? 'LEAD_ACTOR' : 'SUPPORTING_ACTOR';
+                                const originalSalary = Math.max(100_000, Math.floor(c.salary || lastInstallment.budget * (c.roleType === 'LEAD' ? 0.08 : 0.03) || 100_000));
+                                return {
+                                    role,
+                                    id: c.actorId,
+                                    originalSalary,
+                                    newDemand: Math.floor(originalSalary * 1.2),
+                                    negotiated: isInternallyControlledTalent(c.actorId),
+                                    accepted: isInternallyControlledTalent(c.actorId),
+                                    attemptsLeft: isInternallyControlledTalent(c.actorId) ? 0 : 3,
+                                    characterId: c.characterId,
+                                    characterName: c.characterName,
+                                    sourceUniverseId: c.sourceUniverseId
+                                };
+                            })
+                            .filter((talent: any) => {
+                                const key = `${talent.id}:${talent.role}`;
+                                if (existingKeys.has(key)) return false;
+                                existingKeys.add(key);
+                                return true;
+                            });
+                        return dedupeReturningTalent([...merged, ...additions]);
+                    });
                 }
 
                 // Pre-fill equipment
@@ -945,19 +1216,35 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                 if (details.pacing) setPacing(details.pacing);
             }
         }
-    }, [selectedScript?.id]);
+    }, [selectedScript?.id, selectedScript?.franchiseId, previousFranchiseInstallments]);
 
     // Real NPC Data Integration
     const availableDirectors = useMemo(() => {
         // Refresh every 3 weeks
         const seedWeek = Math.floor(player.currentWeek / 3);
         const talent = getAvailableTalent(player.currentWeek, 'DIRECTOR', player.flags.extraNPCs || []);
-        
+        const lastInstallment = previousFranchiseInstallments[0];
+        const lastDetails = lastInstallment ? (lastInstallment.projectDetails || lastInstallment) : null;
+        const returningDirector = currentReturningTalent.find(talentEntry => talentEntry.role === 'DIRECTOR');
+        const requiredDirectorId = selectedCrew.director || returningDirector?.id || lastDetails?.directorId;
+
         // Ensure selected director is always in the list
-        const selectedId = selectedCrew.director;
+        const selectedId = requiredDirectorId;
         if (selectedId && !talent.some(t => t.id === selectedId)) {
             const selectedNPC = [...NPC_DATABASE, ...(player.flags.extraNPCs || [])].find(n => n.id === selectedId);
             if (selectedNPC) talent.unshift(selectedNPC);
+            else {
+                const salary = returningDirector?.newDemand || lastDetails?.directorSalary || Math.max(100_000, Math.floor((lastDetails?.budget || lastInstallment?.budget || 5_000_000) * 0.06));
+                talent.unshift({
+                    id: selectedId,
+                    name: returningDirector?.name || lastDetails?.directorName || 'Returning Director',
+                    occupation: 'DIRECTOR',
+                    tier: 'ESTABLISHED',
+                    avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(returningDirector?.name || lastDetails?.directorName || 'Returning Director')}&background=18181b&color=ffffff`,
+                    salary,
+                    stats: { vision: 82, technical: 78, leadership: 80, style: 76, fame: 55, talent: 80 }
+                } as any);
+            }
         }
 
         return talent.map(t => {
@@ -975,13 +1262,13 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             const fluctuation = Math.sin(seedWeek * 0.5 + seed) * 10; // +/- 10 fluctuation
             const baseFame = t.stats?.fame || 50;
             const currentFame = Math.max(0, Math.min(100, baseFame + fluctuation));
-            
+
             const baseTalent = (t.stats as any)?.talent || (t.stats as any)?.vision || 50;
             const currentTalent = Math.max(0, Math.min(100, baseTalent + (fluctuation * 0.5)));
 
             return { ...t, salary, stats: { ...t.stats, fame: currentFame, talent: currentTalent } };
         });
-    }, [Math.floor(player.currentWeek / 3), player.flags.extraNPCs]);
+    }, [Math.floor(player.currentWeek / 3), player.flags.extraNPCs, selectedCrew.director, previousFranchiseInstallments, currentReturningTalent]);
 
     const availableActors = useMemo(() => {
         const seedWeek = Math.floor(player.currentWeek / 3);
@@ -1019,7 +1306,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             const fluctuation = Math.sin(seedWeek * 0.5 + seed) * 10;
             const baseFame = t.stats?.fame || 50;
             const currentFame = Math.max(0, Math.min(100, baseFame + fluctuation));
-            
+
             const baseTalent = t.stats?.talent || 50;
             const currentTalent = Math.max(0, Math.min(100, baseTalent + (fluctuation * 0.5)));
 
@@ -1040,10 +1327,38 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         return !contractedTalentIds.has(talent.id);
     };
 
+    const getReturningTalentDisplay = (talent: any) => {
+        const crewStateKey = returningCrewRoleToStateKey(talent.role);
+        const castRole = castList.find(role => role.actorId === talent.id && (
+            (talent.role === 'LEAD_ACTOR' && role.roleType === 'LEAD') ||
+            (talent.role === 'SUPPORTING_ACTOR' && role.roleType === 'SUPPORTING') ||
+            role.actorId === talent.id
+        ));
+        let source: any = null;
+
+        if (crewStateKey === 'director') source = availableDirectors.find(d => d.id === talent.id);
+        if (crewStateKey === 'cinematographer') source = mockCrew.cinematographers.find(c => c.id === talent.id);
+        if (crewStateKey === 'composer') source = mockCrew.composers.find(c => c.id === talent.id);
+        if (crewStateKey === 'lineProducer') source = mockCrew.producers.find(c => c.id === talent.id);
+        if (crewStateKey === 'vfx') source = mockCrew.vfxTeams.find(c => c.id === talent.id);
+        if (!source) source = availableActors.find(actor => actor.id === talent.id);
+        if (!source) source = player.relationships.find(rel => (rel.npcId || rel.id) === talent.id);
+
+        return {
+            name: source?.name || talent.name || castRole?.actorName || 'Returning Talent',
+            roleLabel: formatReturningRoleLabel(talent.role),
+            roleId: castRole?.id,
+            image: source?.avatar || source?.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(source?.name || talent.name || 'Returning Talent')}&background=18181b&color=ffffff`,
+            demand: Math.round(talent.newDemand || 0),
+            attemptsLeft: Math.max(0, talent.attemptsLeft ?? 3),
+            selected: crewStateKey ? selectedCrew[crewStateKey] === talent.id : !!castRole,
+        };
+    };
+
     // Mock Data Generators (Refreshes every 3 weeks)
     const mockCrew = useMemo(() => {
         const seedWeek = Math.floor(player.currentWeek / 3);
-        
+
         // Helper to generate deterministic stats based on seed and index
         const getStats = (base: number, idx: number) => {
             const fluctuation = Math.sin(seedWeek * 0.5 + idx) * 10;
@@ -1179,6 +1494,12 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                 talentName = act.name;
                 talentImage = act.avatar || '';
                 talentTier = act.tier || 'INDIE';
+            } else {
+                const castRole = castList.find(role => role.id === roleId || role.actorId === talentId);
+                if (castRole?.actorName) {
+                    talentName = castRole.actorName;
+                    talentTier = 'ESTABLISHED';
+                }
             }
         }
 
@@ -1201,10 +1522,11 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         roleType: string,
         updater: (talent: any) => any
     ) => {
-        const talentIndex = currentReturningTalent.findIndex(t => t.id === talentId && t.role === roleType);
+        const normalizedReturningTalent = dedupeReturningTalent(currentReturningTalent);
+        const talentIndex = normalizedReturningTalent.findIndex(t => t.id === talentId && t.role === roleType);
         if (talentIndex === -1) return false;
 
-        const updatedReturningTalent = currentReturningTalent.map((talent, index) =>
+        const updatedReturningTalent = normalizedReturningTalent.map((talent, index) =>
             index === talentIndex ? updater(talent) : talent
         );
         setCurrentReturningTalent(updatedReturningTalent);
@@ -1266,7 +1588,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         }
     };
 
-    
+
     const calculateActorSalary = (actor: any, roleType: string, closeness: number = 0) => {
         if (currentReturningTalent.length > 0) {
             const returning = currentReturningTalent.find(t => t.id === actor.id);
@@ -1291,7 +1613,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         else if (roleType === 'EXTRA') roleMultiplier = 0.05;
 
         const base = Math.floor(baseSalary * fameMultiplier * roleMultiplier);
-        
+
         // Relationship Discount
         let discount = 0;
         if (closeness > 50) {
@@ -1301,6 +1623,73 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         return Math.floor(base * (1 - discount));
     };
 
+    const estimateLinkedCharacterSalary = (character: any, roleType: string) => {
+        const actorId = character.actorId && character.actorId !== 'UNKNOWN' ? character.actorId : null;
+        const actor = actorId ? availableActors.find(a => a.id === actorId) : null;
+        if (actor) return calculateActorSalary(actor, roleType);
+
+        const fame = Math.max(20, Math.min(100, Number(character.fame ?? character.appeal ?? character.fanApproval ?? 55)));
+        const baseSalary = fame >= 85 ? 18_000_000 : fame >= 70 ? 9_000_000 : fame >= 50 ? 3_000_000 : 750_000;
+        const roleMultiplier = roleType === 'LEAD' ? 1 : roleType === 'SUPPORTING' ? 0.42 : roleType === 'CAMEO' ? 0.18 : 0.06;
+        return Math.floor(baseSalary * roleMultiplier * (0.85 + fame / 180));
+    };
+
+    const attachLinkedCharacterToRole = (roleId: string, character: any) => {
+        const currentRole = castList.find(role => role.id === roleId);
+        const roleType = currentRole?.roleType || 'SUPPORTING';
+        const actorId = character.actorId && character.actorId !== 'UNKNOWN' ? character.actorId : null;
+        const actor = actorId ? availableActors.find(a => a.id === actorId) : null;
+        const salary = estimateLinkedCharacterSalary(character, roleType);
+        const returningRole = roleType === 'LEAD' ? 'LEAD_ACTOR' : 'SUPPORTING_ACTOR';
+
+        setCastList(prev => prev.map(role => role.id === roleId ? {
+            ...role,
+            characterId: character.characterId || normalizeUniverseCharacterKey(character.name),
+            characterName: character.name,
+            sourceUniverseId: character.sourceUniverseId || activeUniverseId || undefined,
+            actorId: actorId || role.actorId,
+            actorName: character.actorName || actor?.name || role.actorName,
+            salary: actorId ? salary : role.salary
+        } : role));
+
+        if (actorId && !contractedTalentIds.has(actorId) && !isInternallyControlledTalent(actorId)) {
+            setCurrentReturningTalent(prev => {
+                const normalized = dedupeReturningTalent(prev);
+                if (normalized.some(talent => talent.id === actorId && talent.role === returningRole)) return normalized;
+                return dedupeReturningTalent([
+                    ...prev,
+                    {
+                        role: returningRole,
+                        id: actorId,
+                        originalSalary: Math.max(100_000, Math.floor(salary * 0.82)),
+                        newDemand: Math.max(150_000, salary),
+                        negotiated: false,
+                        accepted: false,
+                        attemptsLeft: 3,
+                        characterId: character.characterId || normalizeUniverseCharacterKey(character.name),
+                        characterName: character.name,
+                        sourceUniverseId: character.sourceUniverseId || activeUniverseId
+                    }
+                ]);
+            });
+        }
+    };
+
+    const linkedUniverseCastCount = useMemo(() => {
+        return castList.filter(role => isKnownConnectedRole(role)).length;
+    }, [castList, linkedCharacterOptions]);
+
+    const effectiveConnectedIntent = useMemo<ConnectedProjectIntent>(() => {
+        if (connectedProjectIntent !== 'AUTO') return connectedProjectIntent;
+        if (selectedScript?.connectedProjectIntent && selectedScript.connectedProjectIntent !== 'AUTO') return selectedScript.connectedProjectIntent;
+        if (selectedScript?.tags?.includes('UNIVERSE_EVENT')) return 'EVENT';
+        if (selectedScript?.tags?.includes('REBOOT')) return 'REBOOT';
+        if (linkedUniverseCastCount >= 3) return 'EVENT';
+        if (linkedUniverseCastCount >= 1) return 'CROSSOVER';
+        if (selectedScript?.sourceMaterial === 'SEQUEL' || selectedFranchiseId) return 'SOLO';
+        return 'SOLO';
+    }, [connectedProjectIntent, selectedScript, linkedUniverseCastCount, selectedFranchiseId]);
+
     const getInHouseQuality = (role: string) => {
         const depts = studio.studioState?.departments || { writing: 0, directing: 0, casting: 0, production: 0, postProduction: 0 };
         let level = 0;
@@ -1308,7 +1697,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         else if (role === 'CINEMATOGRAPHER' || role === 'cinematographer' || role === 'LINE_PRODUCER' || role === 'lineProducer') level = depts.production || 0;
         else if (role === 'COMPOSER' || role === 'composer' || role === 'VFX' || role === 'vfx') level = depts.postProduction || 0;
         else if (role === 'ACTOR') level = depts.casting || 0;
-        
+
         if (level === 0) return 0;
         return 10 + ((level - 1) * 9); // Level 1 = 10, Level 10 = 91
     };
@@ -1320,7 +1709,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         else if (role === 'CINEMATOGRAPHER' || role === 'cinematographer' || role === 'LINE_PRODUCER' || role === 'lineProducer') level = depts.production || 0;
         else if (role === 'COMPOSER' || role === 'composer' || role === 'VFX' || role === 'vfx') level = depts.postProduction || 0;
         else if (role === 'ACTOR') level = depts.casting || 0;
-        
+
         return 10 + (level * 2); // Base 10, max 30
     };
 
@@ -1337,13 +1726,13 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
     const getCrewData = (role: 'director' | 'cinematographer' | 'composer' | 'lineProducer' | 'vfx') => {
         const mode = crewModes[role];
         const id = selectedCrew[role];
-        
+
         if (mode === 'SELF') {
             const quality = role === 'director' ? getDirectorTalent(player.directorStats) : 70;
             return { name: player.name, tier: 'Indie', quality, cost: 0 };
         }
         if (mode === 'IN_HOUSE') return { name: 'Studio Staff', tier: 'In-House', quality: getInHouseQuality(role), fame: getInHouseFame(role), cost: 0 };
-        
+
         // Find hired crew
         let candidate: any = null;
         if (role === 'director') candidate = availableDirectors.find(c => c.id === id);
@@ -1387,15 +1776,15 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             }
         }
 
-        return candidate 
-            ? { name: candidate.name, tier: candidate.tier, quality: candidate.stats?.talent || candidate.stats?.vision || 85, fame: candidate.stats?.fame || 0, cost } 
+        return candidate
+            ? { name: candidate.name, tier: candidate.tier, quality: candidate.stats?.talent || candidate.stats?.vision || 85, fame: candidate.stats?.fame || 0, cost }
             : { name: 'Unknown', tier: 'Unknown', quality: 50, fame: 0, cost: 0 };
     };
 
     const budgetBreakdown = useMemo(() => {
         let estimatedBudget = 5000000; // Base production cost
         const baseCost = 5000000;
-        
+
         const scriptCost = selectedScript?.developmentCost || 0;
         estimatedBudget += scriptCost;
 
@@ -1410,7 +1799,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         estimatedBudget += (composerData.cost || 0);
         estimatedBudget += (lpData.cost || 0);
         estimatedBudget += (vfxData.cost || 0);
-        
+
         // Add Cast Costs
         let castCost = 0;
         castList.forEach(role => {
@@ -1421,8 +1810,8 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                     // No upfront cost for contracted actors
                 } else {
                     const actor = availableActors.find(a => a.id === role.actorId);
-                    if (actor) {
-                        // Use the salary already stored in the role (which accounts for returning talent and connections)
+                    if (actor || role.salary) {
+                        // Use the salary already stored in the role, including linked universe actors who may not be in the weekly pool.
                         castCost += (role.salary || 0);
                     }
                 }
@@ -1432,7 +1821,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
 
         // Location Cost & Stats
         let locationCost = 0;
-        
+
         if (selectedLocations.length > 0) {
             selectedLocations.forEach(lid => {
                 const locData = findLocation(lid);
@@ -1468,7 +1857,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
     const unresolvedReturningTalent = useMemo(() => {
         if (currentReturningTalent.length === 0) return [];
 
-        return currentReturningTalent.filter(talent => {
+        return dedupeReturningTalent(currentReturningTalent).filter(talent => {
             if (!requiresReturningTalentNegotiation(talent)) return false;
 
             const crewStateKey = returningCrewRoleToStateKey(talent.role);
@@ -1484,9 +1873,29 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                 return castList.some(role => role.actorId === talent.id && role.roleType === 'SUPPORTING');
             }
 
-            return castList.some(role => role.actorId === talent.id);
+        return castList.some(role => role.actorId === talent.id);
         });
     }, [currentReturningTalent, selectedCrew, castList, contractedActors]);
+
+    const linkedCastSummary = useMemo(() => {
+        return castList
+            .filter(role => isKnownConnectedRole(role))
+            .map(role => {
+                const negotiation = currentReturningTalent.find(talent => talent.id === role.actorId && (talent.role === 'LEAD_ACTOR' || talent.role === 'SUPPORTING_ACTOR'));
+                return {
+                    ...role,
+                    negotiationStatus: negotiation
+                        ? negotiation.accepted
+                            ? 'Locked'
+                            : negotiation.attemptsLeft <= 0
+                                ? 'Declined'
+                                : 'Negotiating'
+                        : role.actorId
+                            ? 'Locked'
+                            : 'Uncast'
+                };
+            });
+    }, [castList, currentReturningTalent, linkedCharacterOptions]);
 
     // Buzz State
     const [buzzItems, setBuzzItems] = useState<any[]>([]);
@@ -1496,7 +1905,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         if (!selectedScript) return { can: false, errors: ["No script selected"] };
         if (selectedScript.status === 'IN_DEVELOPMENT') errors.push("Scripting is still in progress");
         if (selectedLocations.length === 0) errors.push("No filming locations selected");
-        
+
         const roles = ['director', 'cinematographer', 'composer', 'lineProducer', 'vfx'] as const;
         for (const role of roles) {
             if (crewModes[role] === 'HIRE' && !selectedCrew[role]) {
@@ -1504,13 +1913,30 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                 errors.push(`${roleName} is required`);
             }
         }
-        
+
         if (!castList.some(c => c.roleType === 'LEAD' && (c.actorId || c.actorId === 'PLAYER_SELF' || c.actorId === 'STUDIO_STAFF'))) {
             errors.push("At least one lead actor is required");
         }
-        
+
+        if (effectiveConnectedIntent === 'CROSSOVER' && linkedUniverseCastCount < 1) {
+            errors.push("Crossover needs at least one known character");
+        }
+
+        if (effectiveConnectedIntent === 'EVENT' && linkedUniverseCastCount < 3) {
+            errors.push("Event film needs at least three known characters");
+        }
+
+        if (effectiveConnectedIntent === 'REBOOT' && !selectedUniverseId && !selectedFranchiseId && !selectedScript.universeId && !selectedScript.franchiseId) {
+            errors.push("Reboot needs a universe or franchise connection");
+        }
+
         if (unresolvedReturningTalent.length > 0) {
-            errors.push("Returning talent negotiations pending");
+            const names = unresolvedReturningTalent
+                .map(talent => getReturningTalentDisplay(talent).name)
+                .filter(Boolean)
+                .slice(0, 3);
+            const suffix = unresolvedReturningTalent.length > 3 ? ` +${unresolvedReturningTalent.length - 3} more` : '';
+            errors.push(`Returning talent negotiations pending: ${names.join(', ')}${suffix}`);
         }
 
         const productionFund = studio.studioState?.productionFund || 0;
@@ -1519,10 +1945,9 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         }
 
         return { can: errors.length === 0, errors };
-    }, [selectedScript, selectedLocations, crewModes, selectedCrew, castList, studio.balance, studio.studioState?.productionFund, lockedStreamingFundingAmount, budgetBreakdown.total, unresolvedReturningTalent]);
+    }, [selectedScript, selectedLocations, crewModes, selectedCrew, castList, studio.balance, studio.studioState?.productionFund, lockedStreamingFundingAmount, budgetBreakdown.total, unresolvedReturningTalent, effectiveConnectedIntent, linkedUniverseCastCount, selectedUniverseId, selectedFranchiseId]);
 
     const canGreenlight = greenlightStatus.can;
-
     const hiredIds = useMemo(() => {
         const ids = new Set<string>();
         Object.values(selectedCrew).forEach(id => { if (id) ids.add(id as string); });
@@ -1548,14 +1973,14 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         }
 
         const directorData = getCrewData('director');
-        
+
         // Calculate Budget
         const estimatedBudget = budgetBreakdown.total;
-        
+
         // Location Cost & Stats
         let locationQualityBonus = 0;
         let locationName = 'Multiple Locations';
-        
+
         if (selectedLocations.length > 0) {
             let totalQuality = 0;
             selectedLocations.forEach(lid => {
@@ -1563,7 +1988,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                 if (locData) totalQuality += locData.quality;
             });
             locationQualityBonus = Math.round(totalQuality / selectedLocations.length);
-            
+
             if (selectedLocations.length === 1) {
                 const loc = findLocation(selectedLocations[0]);
                 if (loc) locationName = loc.name;
@@ -1582,11 +2007,11 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
              if (rel) return rel.npcId || rel.id;
              return c.actorId;
         }).filter(Boolean) as string[];
-        
+
         if (directorData.tier === 'In-House') {
             extraFame += (directorData as any).fame || 0;
         }
-        
+
         const fameMultiplier = calculateProjectFameMultiplier(castIds, directorData.name as string, player.stats.fame, player.stats.talent, extraFame);
         const finalBudgetTier = estimatedBudget > 50000000 ? 'BLOCKBUSTER' : estimatedBudget > 10000000 ? 'HIGH' : 'MID';
         const castDepth = calculateCastDepthScore(castList.length, selectedScript.genres[0], finalBudgetTier, currentCastingStrength);
@@ -1596,39 +2021,33 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         // We introduce variance.
         const qualityVariance = (Math.random() * 20) - 10; // +/- 10 points
         // User request: "there is no need of safety net." -> Removed baseQuality boost
-        
+
         const actualQuality = Math.max(1, Math.min(100, currentEstimatedQuality + qualityVariance));
 
         // Random Pre-Production Duration (4-10 weeks)
         const preProdDuration = Math.floor(Math.random() * 7) + 4;
         const isCreatingNewUniverse = selectedUniverseId === 'NEW' && !!newUniverseName.trim();
-        const finalUniverseId = isCreatingNewUniverse ? `universe_${Date.now()}` : (selectedUniverseId || undefined);
+        const primaryCastUniverseId = castList.find(c => c.sourceUniverseId)?.sourceUniverseId;
+        const finalUniverseId = isCreatingNewUniverse ? `universe_${Date.now()}` : (selectedUniverseId || selectedScript.universeId || primaryCastUniverseId || undefined);
         const normalizedWorldUniverses = normalizeUniverseMap(player.world?.universes || {});
         const universeColors = ['#e11d48', '#2563eb', '#16a34a', '#d97706', '#7c3aed', '#db2777'];
         const randomUniverseColor = universeColors[Math.floor(Math.random() * universeColors.length)];
 
         // --- CHECK RECASTING ---
         let isRecast = false;
-        if ((selectedScript.sourceMaterial === 'SEQUEL' || selectedScript.sourceMaterial === 'SPINOFF') && selectedScript.franchiseId) {
-            const previousInstallments = [
-                ...(player.pastProjects || []),
-                ...(player.activeReleases || [])
-            ].filter(p => p.franchiseId === selectedScript.franchiseId || p.id === selectedScript.franchiseId);
-            if (previousInstallments.length > 0) {
-                previousInstallments.sort((a, b) => (b.installmentNumber || 0) - (a.installmentNumber || 0));
-                const lastInstallment = previousInstallments[0];
-                
-                // Check if any lead actor changed
-                if (lastInstallment.castList) {
-                    const oldLeads = lastInstallment.castList.filter(c => c.roleType === 'LEAD').map(c => c.actorId);
-                    const newLeads = castList.filter(c => c.roleType === 'LEAD').map(c => c.actorId);
-                    
-                    // Simple check: if a new lead wasn't in the old leads, it's a recast
-                    for (const newLead of newLeads) {
-                        if (newLead && !oldLeads.includes(newLead)) {
-                            isRecast = true;
-                            break;
-                        }
+        if (selectedScript.franchiseId && previousFranchiseInstallments.length > 0) {
+            const lastInstallment = previousFranchiseInstallments[0];
+            const lastDetails = lastInstallment.projectDetails || lastInstallment;
+            // Check if any lead actor changed
+            if (lastDetails.castList) {
+                const oldLeads = lastDetails.castList.filter(c => c.roleType === 'LEAD').map(c => c.actorId);
+                const newLeads = castList.filter(c => c.roleType === 'LEAD').map(c => c.actorId);
+
+                // Simple check: if a new lead wasn't in the old leads, it's a recast
+                for (const newLead of newLeads) {
+                    if (newLead && !oldLeads.includes(newLead)) {
+                        isRecast = true;
+                        break;
                     }
                 }
             }
@@ -1636,23 +2055,23 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
 
         const fullCrewList: CrewMember[] = [];
         const roles: ('director' | 'cinematographer' | 'composer' | 'lineProducer' | 'vfx')[] = ['director', 'cinematographer', 'composer', 'lineProducer', 'vfx'];
-        
+
         roles.forEach(role => {
             const mode = crewModes[role];
             const id = selectedCrew[role];
             if (mode === 'HIRE' && !id) return;
-            
+
             const data = getCrewData(role);
             let roleEnum: CrewMember['role'] = 'DIRECTOR';
             if (role === 'cinematographer') roleEnum = 'CINEMATOGRAPHER';
             else if (role === 'composer') roleEnum = 'COMPOSER';
             else if (role === 'lineProducer') roleEnum = 'LINE_PRODUCER';
             else if (role === 'vfx') roleEnum = 'VFX_SUPERVISOR';
-            
+
             let tierEnum: CrewMember['tier'] = 'INDIE';
             if (data.tier === 'LEGEND' || data.tier === 'AUTEUR' || data.tier === 'PROFESSIONAL' || data.tier === 'INDIE') tierEnum = data.tier as any;
             else if (data.tier === 'In-House') tierEnum = 'PROFESSIONAL';
-            
+
             fullCrewList.push({
                 id: mode === 'SELF' ? 'PLAYER_SELF' : mode === 'IN_HOUSE' ? 'STUDIO_STAFF' : (id as string) || `unknown_${role}`,
                 name: data.name,
@@ -1667,9 +2086,9 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
 
         const finalizedCastList = castList.map((c, index) => {
             const characterName = (c.characterName || '').trim() || getDefaultCharacterName(c, index);
-            const normalizedCharacterId = finalUniverseId
-                ? toUniverseCharacterId(finalUniverseId as any, characterName)
-                : c.characterId || normalizeUniverseCharacterKey(`${selectedScript.title}_${characterName}`);
+            const normalizedCharacterId = c.characterId
+                || (finalUniverseId ? toUniverseCharacterId(finalUniverseId as any, characterName) : undefined)
+                || normalizeUniverseCharacterKey(`${selectedScript.title}_${characterName}`);
 
             return {
                 roleId: c.id,
@@ -1680,10 +2099,27 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                 characterId: normalizedCharacterId,
                 characterName,
                 salary: c.salary,
+                sourceUniverseId: c.sourceUniverseId,
                 status: 'CONFIRMED' as const,
                 isReturning: currentReturningTalent.some(t => t.id === c.actorId) || false
             };
         });
+        const hasLinkedUniverseCast = finalizedCastList.some(c => c.sourceUniverseId);
+        const projectSubtype = effectiveConnectedIntent === 'EVENT'
+            ? 'UNIVERSE_EVENT'
+            : effectiveConnectedIntent === 'CROSSOVER'
+                ? 'UNIVERSE_CROSSOVER'
+                : effectiveConnectedIntent === 'REBOOT'
+                    ? 'REBOOT'
+                    : selectedScript.tags?.includes('UNIVERSE_EVENT')
+                        ? 'UNIVERSE_EVENT'
+                        : hasLinkedUniverseCast && selectedScript.sourceMaterial !== 'SEQUEL'
+                            ? 'UNIVERSE_CROSSOVER'
+                            : selectedScript.sourceMaterial === 'SEQUEL'
+                                ? 'SEQUEL'
+                                : selectedScript.sourceMaterial === 'SPINOFF'
+                                    ? 'SPINOFF'
+                                    : 'STANDALONE';
 
         const newCommitmentId = `proj_${Date.now()}`;
         const newCommitment: Commitment = {
@@ -1695,21 +2131,16 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             income: 0,
             payoutType: 'LUMPSUM',
             projectPhase: 'PRE_PRODUCTION',
-            phaseWeeksLeft: preProdDuration, 
+            phaseWeeksLeft: preProdDuration,
             totalPhaseDuration: preProdDuration,
             projectDetails: {
                 title: selectedScript.title,
                 type: selectedScript.projectType,
+                format: selectedScript.format || 'LIVE_ACTION',
                 episodes: selectedScript.episodes,
-                description: `A ${selectedScript.genres.join('/')} ${selectedScript.projectType === 'SERIES' ? 'series' : 'film'} produced by ${studio.name}.`,
+                description: `A ${selectedScript.genres.join('/')} ${formatProjectFormatLabel(selectedScript.format)} ${selectedScript.projectType === 'SERIES' ? 'series' : 'film'} produced by ${studio.name}${selectedScript.subjectName ? ` about ${selectedScript.subjectName}` : ''}.`,
                 studioId: studio.id as any,
-                subtype: selectedScript.tags?.includes('UNIVERSE_EVENT')
-                    ? 'UNIVERSE_EVENT'
-                    : selectedScript.sourceMaterial === 'SEQUEL'
-                        ? 'SEQUEL'
-                        : selectedScript.sourceMaterial === 'SPINOFF'
-                            ? 'SPINOFF'
-                            : 'STANDALONE',
+                subtype: projectSubtype,
                 universeId: finalUniverseId,
                 universeSagaName: isCreatingNewUniverse
                     ? 'Saga 1'
@@ -1721,6 +2152,9 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                 franchiseId: selectedFranchiseId === 'NEW' ? `fran_${Date.now()}` : (selectedFranchiseId || undefined),
                 installmentNumber: (selectedFranchiseId && selectedFranchiseId !== 'NEW') ? (studioFranchises.find(f => f.id === selectedFranchiseId)?.lastInstallment || 0) + 1 : 1,
                 genre: selectedScript.genres[0],
+                subjectName: selectedScript.subjectName,
+                subjectType: selectedScript.subjectType,
+                connectedProjectIntent: effectiveConnectedIntent,
                 targetAudience: selectedScript.targetAudience || 'PG-13',
                 budgetTier: finalBudgetTier,
                 estimatedBudget: estimatedBudget,
@@ -1738,6 +2172,8 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                     castDepthNote: castDepth.note,
                     studioPrestigeScore,
                     isRecast: isRecast,
+                    connectedProjectIntent: effectiveConnectedIntent,
+                    linkedUniverseCastCount,
                     ...(lockedStreamingFunding ? {
                         platformId: lockedStreamingFunding.platformId,
                         nextSeasonFundingAmount: lockedStreamingFunding.amount,
@@ -1767,7 +2203,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             }
         };
 
-        const updatedScripts = studio.studioState!.scripts.map(s => 
+        const updatedScripts = studio.studioState!.scripts.map(s =>
             s.id === selectedScriptId ? { ...s, status: 'PRODUCED' as const, producedAtWeek: player.currentWeek } : s
         );
 
@@ -1776,7 +2212,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
 
         // Update talent roster to decrement moviesRemaining for contracted actors
         const usedActorIds = castList.map(c => c.actorId).filter(Boolean);
-        
+
         // Update both player.studio.talentRoster and studio.studioState.talentRoster for consistency
         const updateRoster = (roster: any[]) => {
             return roster?.map(contract => {
@@ -1793,7 +2229,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         // --- GENERATE BUZZ ITEMS ---
         const generatedBuzz: any[] = [];
         // Use the ESTIMATED quality for initial buzz, as the public doesn't know the actual quality yet
-        const buzzQuality = currentEstimatedQuality; 
+        const buzzQuality = currentEstimatedQuality;
         const isBlockbuster = estimatedBudget > 100000000;
         const isHighQuality = buzzQuality > 85;
         const isLowQuality = buzzQuality < 45;
@@ -1801,7 +2237,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         // 1. HEADLINE (Always 1)
         let headlineText = `${studio.name} Greenlights "${selectedScript.title}"`;
         let headlineSub = `Production set to begin immediately.`;
-        
+
         if (isHighQuality) {
             headlineText = `Must-See: ${studio.name} Bets Big on "${selectedScript.title}"`;
             headlineSub = `Insiders are calling the script a "masterpiece". ${directorData.name} attached to direct.`;
@@ -1834,14 +2270,17 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             if (universe) {
                 const existingProjects = getUniverseDashboardProjects(player, finalUniverseId as UniverseId, player.activeReleases || []);
                 const existingRoster = buildUniverseRoster(universe, existingProjects, player.name);
-                const existingById = new Map(existingRoster.map(character => [
-                    character.characterId || character.id || normalizeUniverseCharacterKey(character.name),
-                    character
-                ]));
+                const existingById = new Map<string, any>();
+                existingRoster.forEach(character => {
+                    getUniverseCharacterKeyAliases(finalUniverseId as UniverseId, character.characterId || character.id, character.name)
+                        .forEach(alias => existingById.set(alias, character));
+                });
 
                 const returningCharacters = finalizedCastList
                     .map(cast => {
-                        const existing = existingById.get(cast.characterId || normalizeUniverseCharacterKey(cast.characterName));
+                        const existing = getUniverseCharacterKeyAliases(finalUniverseId as UniverseId, cast.characterId, cast.characterName)
+                            .map(alias => existingById.get(alias))
+                            .find(Boolean);
                         if (!existing) return null;
                         return {
                             cast,
@@ -1905,15 +2344,15 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         // 2. SOCIAL POSTS (Increased Count)
         // User request: "push not just one but more tweets"
         const socialCount = isHighQuality ? 8 : isLowQuality ? 6 : 5;
-        
+
         for (let i = 0; i < socialCount; i++) {
             const isPositive = isHighQuality ? Math.random() > 0.2 : isLowQuality ? Math.random() > 0.8 : Math.random() > 0.4;
             const isHater = !isPositive && Math.random() > 0.5;
-            
+
             let content = '';
             let author = '';
             let handle = '';
-            
+
             if (i === 0) {
                 // Industry Account
                 author = 'FilmUpdates';
@@ -2020,7 +2459,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         }
 
         let newProductionFund = studio.studioState?.productionFund || 0;
-        
+
         if (newProductionFund >= remainingBudgetToPay) {
             newProductionFund -= remainingBudgetToPay;
             remainingBudgetToPay = 0;
@@ -2070,8 +2509,8 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             businesses: player.businesses.map(b => b.id === studio.id ? {
                 ...b,
                 balance: newStudioBalance,
-                studioState: { 
-                    ...studio.studioState!, 
+                studioState: {
+                    ...studio.studioState!,
                     scripts: updatedScripts,
                     concepts: updatedConcepts,
                     talentRoster: updatedStudioTalentRoster,
@@ -2210,10 +2649,10 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
     return (
         <div className="fixed inset-0 z-[70] bg-[#020a05] text-white flex flex-col font-sans overflow-hidden">
             {/* GRID BACKGROUND */}
-            <div className="absolute inset-0 pointer-events-none z-0" 
-                style={{ 
-                    backgroundImage: 'linear-gradient(to right, rgba(16, 185, 129, 0.15) 1px, transparent 1px), linear-gradient(to bottom, rgba(16, 185, 129, 0.15) 1px, transparent 1px)', 
-                    backgroundSize: '40px 40px' 
+            <div className="absolute inset-0 pointer-events-none z-0"
+                style={{
+                    backgroundImage: 'linear-gradient(to right, rgba(16, 185, 129, 0.15) 1px, transparent 1px), linear-gradient(to bottom, rgba(16, 185, 129, 0.15) 1px, transparent 1px)',
+                    backgroundSize: '40px 40px'
                 }}>
             </div>
             <div className="absolute inset-0 bg-gradient-to-b from-emerald-950/20 via-black/10 to-black/80 pointer-events-none z-0"></div>
@@ -2255,8 +2694,8 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                 <div className="flex items-center gap-1">
                                     <div className="relative inline-block w-[14px] h-[14px]">
                                         <Star size={14} className="absolute inset-0 text-zinc-700" />
-                                        <div 
-                                            className="absolute inset-0 overflow-hidden" 
+                                        <div
+                                            className="absolute inset-0 overflow-hidden"
                                             style={{ width: `${Math.min(100, Math.max(0, currentEstimatedBuzz))}%` }}
                                         >
                                             <Star size={14} className={`fill-amber-400 text-amber-400 ${currentEstimatedBuzz >= 100 ? 'animate-pulse drop-shadow-[0_0_8px_rgba(251,191,36,0.8)]' : ''}`} />
@@ -2271,7 +2710,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                     <div className="flex items-center gap-1 group/budget relative">
                                         <span className="text-[7px] sm:text-[8px] font-black uppercase tracking-[0.2em] text-zinc-500">Est. Budget</span>
                                         <Info size={8} className="text-zinc-600 cursor-help" />
-                                        
+
                                         {/* Tooltip */}
                                         <div className="absolute top-full right-0 mt-2 w-48 bg-zinc-950 border border-zinc-800 rounded-xl p-3 shadow-2xl z-50 opacity-0 group-hover/budget:opacity-100 pointer-events-none transition-opacity">
                                             <div className="space-y-1.5">
@@ -2313,7 +2752,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                         <div className="flex justify-between items-start relative">
                             {/* Track Line */}
                             <div className="absolute left-0 right-0 top-[14px] h-0.5 bg-zinc-900/50 -z-10 rounded-full"></div>
-                            <div className="absolute left-0 top-[14px] h-0.5 bg-emerald-500 -z-10 transition-all duration-700 ease-out rounded-full shadow-[0_0_10px_rgba(16,185,129,0.5)]" 
+                            <div className="absolute left-0 top-[14px] h-0.5 bg-emerald-500 -z-10 transition-all duration-700 ease-out rounded-full shadow-[0_0_10px_rgba(16,185,129,0.5)]"
                                 style={{ width: `${(['SELECT_SCRIPT', 'DIRECTOR', 'CAST', 'CREW', 'EQUIPMENT', 'LOCATION', 'TONE', 'CONFIRM', 'BUZZ'].indexOf(step) / 7) * 100}%` }}>
                             </div>
 
@@ -2324,8 +2763,8 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                 const canNavigate = selectedScriptId !== null && step !== 'BUZZ'; // Lock nav during BUZZ
 
                                 return (
-                                    <button 
-                                        key={s} 
+                                    <button
+                                        key={s}
                                         onClick={() => {
                                             if (canNavigate) {
                                                 const steps = ['SELECT_SCRIPT', 'DIRECTOR', 'CAST', 'CREW', 'EQUIPMENT', 'LOCATION', 'TONE', 'CONFIRM'];
@@ -2336,10 +2775,10 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                         className={`flex flex-col items-center gap-1.5 relative group ${canNavigate ? 'cursor-pointer' : 'cursor-not-allowed'}`}
                                     >
                                         <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[9px] font-black border-2 transition-all duration-500 ${
-                                            isActive 
-                                            ? 'bg-emerald-500 border-emerald-300 text-black scale-110 shadow-[0_0_15px_rgba(16,185,129,0.6)] z-10' 
-                                            : isCompleted 
-                                            ? 'bg-emerald-900 border-emerald-600 text-emerald-400 group-hover:bg-emerald-800' 
+                                            isActive
+                                            ? 'bg-emerald-500 border-emerald-300 text-black scale-110 shadow-[0_0_15px_rgba(16,185,129,0.6)] z-10'
+                                            : isCompleted
+                                            ? 'bg-emerald-900 border-emerald-600 text-emerald-400 group-hover:bg-emerald-800'
                                             : 'bg-zinc-950 border-zinc-800 text-zinc-700 group-hover:border-zinc-600'
                                         }`}>
                                             {isCompleted ? <Check size={12} strokeWidth={4} /> : idx + 1}
@@ -2370,33 +2809,33 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                         ) : (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-4">
                                 {scripts.map(script => (
-                                    <button 
+                                    <button
                                         key={script.id}
                                         onClick={() => setSelectedScriptId(script.id)}
                                         className={`relative group text-left transition-all duration-500 hover:-translate-y-2 ${selectedScriptId === script.id ? 'scale-105 z-10' : 'hover:scale-105'}`}
                                     >
                                         {/* Script Dossier Visual */}
                                         <div className={`h-[320px] rounded-xl border-2 p-6 flex flex-col justify-between relative overflow-hidden shadow-2xl ${
-                                            selectedScriptId === script.id 
-                                            ? 'bg-zinc-900 border-emerald-500 shadow-[0_0_40px_rgba(16,185,129,0.2)]' 
+                                            selectedScriptId === script.id
+                                            ? 'bg-zinc-900 border-emerald-500 shadow-[0_0_40px_rgba(16,185,129,0.2)]'
                                             : 'bg-zinc-900 border-zinc-800 hover:border-zinc-600'
                                         }`}>
                                             {/* Background Pattern */}
                                             <div className="absolute inset-0 opacity-5 pointer-events-none" style={{ backgroundImage: 'radial-gradient(#fff 1px, transparent 1px)', backgroundSize: '10px 10px' }}></div>
-                                            
+
                                             {/* Top Section */}
                                             <div>
                                                 <div className="flex justify-between items-start mb-4">
                                                     <div className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider border ${
-                                                        script.projectType === 'MOVIE' 
-                                                        ? 'bg-blue-500/10 text-blue-400 border-blue-500/30' 
+                                                        script.projectType === 'MOVIE'
+                                                        ? 'bg-blue-500/10 text-blue-400 border-blue-500/30'
                                                         : 'bg-rose-500/10 text-rose-400 border-rose-500/30'
                                                     }`}>
                                                         {script.projectType}
                                                     </div>
                                                     {selectedScriptId === script.id && <div className="w-6 h-6 bg-emerald-500 rounded-full flex items-center justify-center text-black shadow-[0_0_10px_rgba(16,185,129,0.8)] animate-in zoom-in"><Check size={14} strokeWidth={3} /></div>}
                                                 </div>
-                                                
+
                                                 <h3 className={`text-2xl font-black uppercase leading-none mb-2 ${selectedScriptId === script.id ? 'text-white' : 'text-zinc-300 group-hover:text-white'}`}>
                                                     {script.title}
                                                 </h3>
@@ -2405,11 +2844,11 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                                         <span key={g} className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider">#{g}</span>
                                                     ))}
                                                 </div>
-                                                
-                                                <p className="text-xs text-zinc-400 line-clamp-3 leading-relaxed italic">
-                                                    "{script.logline || "A compelling story waiting to be told..."}"
-                                                </p>
-                                            </div>
+
+		                                                <p className="text-xs text-zinc-400 line-clamp-3 leading-relaxed italic">
+		                                                    "{script.logline || "A compelling story waiting to be told..."}"
+		                                                </p>
+		                                            </div>
 
                                             {/* Bottom Stats */}
                                             <div className="space-y-3 pt-4 border-t border-zinc-800/50">
@@ -2425,27 +2864,27 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                                     <span className="text-xs font-mono text-zinc-400">{script.weeksInDevelopment} Weeks</span>
                                                 </div>
                                             </div>
-                                        </div>
-                                    </button>
-                                ))}
+		                                        </div>
+		                                    </button>
+		                                ))}
                             </div>
                         )}
 
                         {/* Fixed Action Bar */}
                         <div className="fixed bottom-0 left-0 right-0 p-6 pb-safe-lg bg-gradient-to-t from-[#020a05] via-[#020a05]/90 to-transparent pointer-events-none flex justify-center z-30">
                             <div className="pointer-events-auto flex gap-4 w-full max-w-md">
-                                <button 
-                                    onClick={onBack} 
+                                <button
+                                    onClick={onBack}
                                     className="flex-1 bg-zinc-900/80 hover:bg-zinc-800 text-zinc-400 hover:text-white font-bold py-4 rounded-xl transition-colors border border-zinc-700 backdrop-blur-md"
                                 >
                                     Cancel
                                 </button>
-                                <button 
+                                <button
                                     onClick={() => selectedScriptId && setStep('DIRECTOR')}
                                     disabled={!selectedScriptId}
                                     className={`flex-[2] font-black uppercase tracking-wider py-4 rounded-xl shadow-lg transition-all duration-300 hover:scale-105 flex items-center justify-center gap-2 ${
-                                        selectedScriptId 
-                                        ? 'bg-emerald-500 hover:bg-emerald-400 text-black shadow-[0_0_30px_rgba(16,185,129,0.4)]' 
+                                        selectedScriptId
+                                        ? 'bg-emerald-500 hover:bg-emerald-400 text-black shadow-[0_0_30px_rgba(16,185,129,0.4)]'
                                         : 'bg-zinc-800 text-zinc-500 cursor-not-allowed'
                                     }`}
                                 >
@@ -2489,18 +2928,18 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                         {/* Fixed Action Bar */}
                         <div className="fixed bottom-0 left-0 right-0 p-6 pb-safe-lg bg-gradient-to-t from-[#020a05] via-[#020a05]/90 to-transparent pointer-events-none flex justify-center z-30">
                             <div className="pointer-events-auto flex gap-4 w-full max-w-md">
-                                <button 
-                                    onClick={() => initialConcept ? onBack() : setStep('SELECT_SCRIPT')} 
+                                <button
+                                    onClick={() => initialConcept ? onBack() : setStep('SELECT_SCRIPT')}
                                     className="flex-1 bg-zinc-900/80 hover:bg-zinc-800 text-white font-bold py-4 rounded-xl border border-zinc-700 backdrop-blur-md transition-colors"
                                 >
                                     {initialConcept ? 'Exit' : 'Back'}
                                 </button>
-                                <button 
+                                <button
                                     onClick={() => {
                                         if (crewModes.director === 'HIRE' && !selectedCrew.director) return;
                                         saveDraft();
                                         setStep('CAST');
-                                    }} 
+                                    }}
                                     disabled={crewModes.director === 'HIRE' && !selectedCrew.director}
                                     className={`flex-[2] font-black uppercase tracking-wider py-4 rounded-xl shadow-[0_0_30px_rgba(16,185,129,0.4)] transition-all duration-300 hover:scale-105 ${
                                         (crewModes.director === 'HIRE' && !selectedCrew.director)
@@ -2526,29 +2965,78 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                         {/* Actor Selection Overlay moved to end of file */}
 
                         <div className="space-y-3">
-                            {castList.map((role, idx) => {
-                                const assignedActor = role.actorId && role.actorId !== 'STUDIO_STAFF' ? availableActors.find(a => a.id === role.actorId) : null;
-                                const isSelf = role.actorId === 'PLAYER_SELF';
-                                const isStudio = role.actorId === 'STUDIO_STAFF';
-                                const isConnection = role.actorId && !assignedActor && !isSelf && !isStudio;
-                                const connection = isConnection ? player.relationships.find(r => (r.npcId || r.id) === role.actorId) : null;
+	                            {castList.map((role, idx) => {
+	                                const assignedActor = role.actorId && role.actorId !== 'STUDIO_STAFF' ? availableActors.find(a => a.id === role.actorId) : null;
+	                                const isSelf = role.actorId === 'PLAYER_SELF';
+	                                const isStudio = role.actorId === 'STUDIO_STAFF';
+	                                const isConnection = role.actorId && !assignedActor && !isSelf && !isStudio;
+	                                const connection = isConnection ? player.relationships.find(r => (r.npcId || r.id) === role.actorId) : null;
+                                    const selectedCharacterOption = getRoleCharacterOption(role);
+                                    const selectedCharacterValue = getRoleCharacterOptionValue(role);
+                                    const isKnownRole = !!selectedCharacterOption || isKnownConnectedRole(role);
+                                    const usedCharacterValues = new Set(
+                                        castList
+                                            .filter(otherRole => otherRole.id !== role.id)
+                                            .map(otherRole => getRoleCharacterOptionValue(otherRole))
+                                            .filter(Boolean)
+                                    );
+                                    const availableCharacterOptions = linkedCharacterOptions.filter(character => {
+                                        const value = getCharacterOptionValue(character);
+                                        return value === selectedCharacterValue || !usedCharacterValues.has(value);
+                                    });
+                                    const characterFlowHelp = allowsOutsideConnectedCharacters
+                                        ? 'Crossover/Event: choose from this project plus other owned connected IP.'
+                                        : previousCharacterOptions.length > 0
+                                            ? 'Sequel: continuing characters from the previous movie or franchise.'
+                                            : activeUniverseId
+                                                ? 'Universe: choose characters from the selected universe.'
+                                                : 'Standalone: name a new character for this movie.';
+                                    const returningData = role.actorId
+                                        ? currentReturningTalent.find(t => t.id === role.actorId && (t.role === 'LEAD_ACTOR' || t.role === 'SUPPORTING_ACTOR'))
+                                        : null;
+                                    const talentScore = isSelf
+                                        ? Math.round(player.stats.talent || 0)
+                                        : isStudio
+                                            ? getInHouseQuality('ACTOR')
+                                            : assignedActor
+                                                ? Math.round(assignedActor.stats.talent || 50)
+                                                : role.actorId
+                                                    ? 45
+                                                    : null;
+                                    const fameScore = isSelf
+                                        ? Math.round(player.stats.fame || 0)
+                                        : isStudio
+                                            ? getInHouseFame('ACTOR')
+                                            : assignedActor
+                                                ? Math.round(assignedActor.stats.fame || 0)
+                                                : role.actorId
+                                                    ? 15
+                                                    : null;
+                                    const feeDisplay = isSelf || isStudio
+                                        ? 'Free'
+                                        : (role.actorId && contractedActors.some(a => a.id === role.actorId))
+                                            ? 'Contracted'
+                                            : returningData && requiresReturningTalentNegotiation(returningData)
+                                                ? 'Needs Deal'
+                                                : returningData && !returningData.accepted && (returningData.attemptsLeft ?? 0) === 0
+                                                    ? 'Walked Away'
+                                                    : formatMoney(role.salary || 0);
 
-                                return (
-                                    <div key={role.id} className="relative p-3 sm:p-5 bg-zinc-900/40 border border-zinc-800/50 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 animate-in slide-in-from-bottom-2 hover:bg-zinc-900/60 transition-all group">
-                                        {/* Remove Button - Absolute on mobile, relative on desktop */}
-                                        <button 
-                                            onClick={() => setCastList(prev => prev.filter(r => r.id !== role.id))}
-                                            className="absolute top-2 right-2 sm:hidden p-1.5 text-zinc-600 hover:text-rose-500 transition-colors z-10 bg-black/40 rounded-full"
-                                            title="Remove Role"
-                                        >
-                                            <X size={14} />
-                                        </button>
+	                                return (
+	                                    <div key={role.id} className="relative overflow-hidden bg-zinc-950/70 border border-zinc-800 rounded-2xl p-4 animate-in slide-in-from-bottom-2 hover:border-zinc-700 transition-all">
+	                                        <button
+	                                            onClick={() => setCastList(prev => prev.filter(r => r.id !== role.id))}
+	                                            className="absolute top-3 right-3 p-2 text-zinc-600 hover:text-rose-500 transition-colors z-10 bg-black/40 rounded-full"
+	                                            title="Remove Role"
+	                                        >
+	                                            <X size={16} />
+	                                        </button>
 
-                                        <div className="flex items-center gap-3 sm:gap-5 w-full sm:w-auto pr-6 sm:pr-0">
-                                            <div className={`shrink-0 w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center border-2 overflow-hidden ${assignedActor || isSelf || isStudio || connection ? 'border-emerald-500/20' : 'bg-zinc-800 border-zinc-700 text-zinc-600'}`}>
-                                                {isSelf ? (
-                                                    <div className="w-full h-full bg-amber-500/10 flex items-center justify-center overflow-hidden">
-                                                        {player.avatar ? <img src={player.avatar} className="w-full h-full object-cover" referrerPolicy="no-referrer" /> : <Crown size={20} className="text-amber-500" />}
+                                        <div className="grid grid-cols-[56px_1fr] sm:grid-cols-[64px_1fr_auto] gap-4 items-start pr-10 sm:pr-0">
+	                                            <div className={`shrink-0 w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center border overflow-hidden ${assignedActor || isSelf || isStudio || connection ? 'border-emerald-500/30 bg-emerald-500/5' : 'bg-zinc-900 border-zinc-800 text-zinc-600'}`}>
+	                                                {isSelf ? (
+	                                                    <div className="w-full h-full bg-amber-500/10 flex items-center justify-center overflow-hidden">
+	                                                        {player.avatar ? <img src={player.avatar} className="w-full h-full object-cover" referrerPolicy="no-referrer" /> : <Crown size={20} className="text-amber-500" />}
                                                     </div>
                                                 ) : isStudio ? (
                                                     <div className="w-full h-full bg-emerald-500/10 flex items-center justify-center overflow-hidden">
@@ -2559,170 +3047,179 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                                 ) : assignedActor ? (
                                                     <img src={assignedActor.avatar} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                                                 ) : (
-                                                    <Users size={20} />
-                                                )}
-                                            </div>
-                                            <div className="flex flex-col gap-1 min-w-0 flex-1">
-                                                <div className="flex items-center gap-2">
-                                                    <select 
-                                                        value={role.roleType || 'SUPPORTING'}
-                                                        onChange={(e) => {
-                                                            const newType = e.target.value as any;
-                                                            setCastList(prev => prev.map(r => r.id === role.id ? { ...r, roleType: newType, role: newType === 'LEAD' ? 'Lead Actor' : newType === 'SUPPORTING' ? 'Supporting Actor' : newType === 'CAMEO' ? 'Cameo Appearance' : 'Extra' } : r));
-                                                        }}
-                                                        className="bg-black/40 border border-zinc-800 rounded-md px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-zinc-500 focus:outline-none focus:border-emerald-500 hover:border-zinc-700 transition-colors cursor-pointer"
-                                                        onClick={(e) => e.stopPropagation()}
-                                                    >
-                                                        <option value="LEAD">Lead Role</option>
-                                                        <option value="SUPPORTING">Supporting</option>
+	                                                    <Users size={20} />
+	                                                )}
+	                                            </div>
+	                                            <div className="min-w-0 space-y-3">
+	                                                <div className="flex items-start justify-between gap-3">
+                                                        <div className="min-w-0">
+                                                            <div className="flex flex-wrap items-center gap-2 mb-2">
+	                                                    <select
+	                                                        value={role.roleType || 'SUPPORTING'}
+	                                                        onChange={(e) => {
+	                                                            const newType = e.target.value as any;
+	                                                            setCastList(prev => prev.map(r => r.id === role.id ? { ...r, roleType: newType, role: newType === 'LEAD' ? 'Lead Actor' : newType === 'SUPPORTING' ? 'Supporting Actor' : newType === 'CAMEO' ? 'Cameo Appearance' : 'Extra' } : r));
+	                                                        }}
+	                                                        className="bg-black/50 border border-zinc-800 rounded-lg px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-zinc-400 focus:outline-none focus:border-emerald-500 hover:border-zinc-700 transition-colors cursor-pointer"
+	                                                        onClick={(e) => e.stopPropagation()}
+	                                                    >
+	                                                        <option value="LEAD">Lead Role</option>
+	                                                        <option value="SUPPORTING">Supporting</option>
                                                         <option value="CAMEO">Cameo</option>
-                                                        <option value="EXTRA">Extra</option>
-                                                    </select>
-                                                </div>
-                                                                     <div className="flex items-baseline gap-2 truncate">
-                                                    {role.actorId ? (
-                                                        <div className="text-base sm:text-xl font-black text-white tracking-tight truncate">
-                                                            {role.actorName || 'Selected Actor'} 
-                                                            {contractedActors.some(a => a.id === role.actorId) && <span className="text-[9px] sm:text-[10px] font-bold text-emerald-500 uppercase ml-1">(Contracted)</span>}
-                                                            {currentReturningTalent.some(t => t.id === role.actorId) && <span className="text-[9px] sm:text-[10px] font-bold text-purple-400 uppercase ml-1">(Returning)</span>}
+	                                                        <option value="EXTRA">Extra</option>
+	                                                    </select>
+                                                            {returningData && <span className="px-2 py-1 rounded-lg bg-purple-500/10 text-purple-300 text-[9px] font-black uppercase tracking-widest">Returning</span>}
+                                                            {isKnownRole && <span className="px-2 py-1 rounded-lg bg-blue-500/10 text-blue-300 text-[9px] font-black uppercase tracking-widest">Known Character</span>}
+                                                            </div>
+	                                                    {role.actorId ? (
+	                                                        <div className="text-lg sm:text-2xl font-black text-white tracking-tight truncate">
+	                                                            {role.actorName || 'Selected Actor'}
+	                                                        </div>
+	                                                    ) : (
+	                                                        <div className="text-base sm:text-xl font-black text-zinc-500 italic">Pending Audition</div>
+	                                                    )}
                                                         </div>
-                                                    ) : (
-                                                        <div className="text-xs sm:text-sm text-zinc-600 italic font-medium">Pending Audition</div>
-                                                    )}
-                                                </div>
+	                                                </div>
 
-                                                <div className="mt-2 grid grid-cols-1 sm:grid-cols-[0.8fr_1.2fr] gap-2">
-                                                    {activeUniverseId && universeCharacterOptions.length > 0 && (
-                                                        <div>
-                                                            <label className="block text-[8px] sm:text-[9px] font-black text-zinc-500 uppercase tracking-widest mb-1">
-                                                                Character Link
-                                                            </label>
-                                                            <select
-                                                                value={role.characterId || (role.characterName ? toUniverseCharacterId(activeUniverseId, role.characterName) : '') || ''}
-                                                                onChange={(e) => {
-                                                                    const selectedId = e.target.value;
-                                                                    const selectedCharacter = universeCharacterOptions.find(character => character.normalizedId === selectedId || character.characterId === selectedId || character.id === selectedId);
-                                                                    setCastList(prev => prev.map(r => r.id === role.id ? {
-                                                                        ...r,
-                                                                        characterId: selectedCharacter ? selectedId : undefined,
-                                                                        characterName: selectedCharacter ? selectedCharacter.name : ''
-                                                                    } : r));
-                                                                }}
-                                                                onClick={(e) => e.stopPropagation()}
-                                                                className="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
-                                                            >
-                                                                <option value="">Create New</option>
-                                                                {universeCharacterOptions.map(character => (
-                                                                    <option key={character.normalizedId} value={character.normalizedId}>
-                                                                        {character.name} {character.actorName ? `(${character.actorName})` : ''}
-                                                                    </option>
-                                                                ))}
-                                                            </select>
-                                                        </div>
-                                                    )}
-                                                    <div className={activeUniverseId && universeCharacterOptions.length > 0 ? '' : 'sm:col-span-2'}>
-                                                        <label className="block text-[8px] sm:text-[9px] font-black text-zinc-500 uppercase tracking-widest mb-1">
-                                                            Character Name
-                                                        </label>
-                                                        <input
-                                                            value={role.characterName || ''}
-                                                            onChange={(e) => {
+	                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                        {linkedCharacterOptions.length > 0 && (
+                                                            <div>
+                                                                <div className="flex items-center gap-1.5 mb-1">
+                                                                    <label className="block text-[8px] sm:text-[9px] font-black text-zinc-500 uppercase tracking-widest">
+                                                                        Playing Character
+                                                                    </label>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setShowCharacterFlowInfo(prev => !prev)}
+                                                                        className={`w-5 h-5 rounded-full border flex items-center justify-center ${
+                                                                            showCharacterFlowInfo
+                                                                                ? 'border-blue-500 bg-blue-500/10 text-blue-300'
+                                                                                : 'border-zinc-700 bg-black/30 text-zinc-500 hover:text-white'
+                                                                        }`}
+                                                                        aria-label="Explain playing character"
+                                                                    >
+                                                                        <Info size={11} />
+                                                                    </button>
+                                                                </div>
+                                                                <select
+                                                                    value={selectedCharacterValue}
+                                                                    onChange={(e) => {
+                                                                        const selectedValue = e.target.value;
+                                                                        const selectedCharacter = linkedCharacterOptions.find(character => getCharacterOptionValue(character) === selectedValue);
+                                                                        if (selectedCharacter) {
+                                                                            attachLinkedCharacterToRole(role.id, selectedCharacter);
+                                                                        } else {
+                                                                            setCastList(prev => prev.map(r => r.id === role.id ? {
+                                                                                ...r,
+                                                                                characterId: undefined,
+                                                                                characterName: '',
+                                                                                sourceUniverseId: undefined
+                                                                            } : r));
+                                                                        }
+                                                                    }}
+                                                                    onClick={(e) => e.stopPropagation()}
+                                                                    className="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500"
+                                                                >
+                                                                    <option value="">Create New Character</option>
+                                                                    {availableCharacterOptions.map(character => (
+                                                                        <option key={getCharacterOptionValue(character)} value={getCharacterOptionValue(character)}>
+                                                                            {character.name} {character.actorName ? `(${character.actorName})` : ''} - {character.sourceName}
+                                                                        </option>
+                                                                    ))}
+                                                                </select>
+                                                                <p className="mt-1 text-[9px] text-zinc-600 leading-snug">{characterFlowHelp}</p>
+                                                            </div>
+                                                        )}
+	                                                    <div className={linkedCharacterOptions.length > 0 ? '' : 'sm:col-span-2'}>
+	                                                        <label className="block text-[8px] sm:text-[9px] font-black text-zinc-500 uppercase tracking-widest mb-1">
+	                                                            {selectedCharacterOption ? 'Character Identity' : 'New Character Name'}
+	                                                        </label>
+                                                            {selectedCharacterOption ? (
+                                                                <div className="min-h-[42px] flex items-center justify-between gap-3 bg-blue-500/5 border border-blue-500/20 rounded-xl px-3 py-2.5">
+                                                                    <div className="min-w-0">
+                                                                        <p className="text-sm font-black text-blue-100 truncate">{role.characterName || selectedCharacterOption.name}</p>
+                                                                        <p className="text-[9px] font-black uppercase tracking-widest text-blue-300/70 truncate">{selectedCharacterOption.sourceName}</p>
+                                                                    </div>
+                                                                    <CheckCircle size={15} className="text-blue-300 shrink-0" />
+                                                                </div>
+                                                            ) : (
+	                                                        <input
+	                                                            value={role.characterName || ''}
+	                                                            onChange={(e) => {
                                                                 const value = e.target.value;
                                                                 setCastList(prev => prev.map(r => r.id === role.id ? {
                                                                     ...r,
                                                                     characterName: value,
-                                                                    characterId: activeUniverseId ? toUniverseCharacterId(activeUniverseId, value) : undefined
+                                                                    characterId: activeUniverseId ? toUniverseCharacterId(activeUniverseId, value) : undefined,
+                                                                    sourceUniverseId: undefined
                                                                 } : r));
                                                             }}
                                                             onBlur={() => {
                                                                 setCastList(prev => prev.map((r, roleIndex) => r.id === role.id && !r.characterName?.trim() ? {
                                                                     ...r,
                                                                     characterName: getDefaultCharacterName(r, roleIndex),
-                                                                    characterId: activeUniverseId ? toUniverseCharacterId(activeUniverseId, getDefaultCharacterName(r, roleIndex)) : undefined
+                                                                    characterId: activeUniverseId ? toUniverseCharacterId(activeUniverseId, getDefaultCharacterName(r, roleIndex)) : undefined,
+                                                                    sourceUniverseId: undefined
                                                                 } : r));
                                                             }}
                                                             onClick={(e) => e.stopPropagation()}
-                                                            placeholder={role.roleType === 'LEAD' ? `e.g. ${selectedScript?.title || 'Iron Man'}` : getDefaultCharacterName(role, idx)}
-                                                            className="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500"
-                                                        />
-                                                    </div>
-                                                </div>
+	                                                            placeholder={role.roleType === 'LEAD' ? `e.g. ${selectedScript?.title || 'Iron Man'}` : getDefaultCharacterName(role, idx)}
+	                                                            className="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500"
+	                                                        />
+                                                            )}
+	                                                    </div>
+	                                                </div>
+                                                    {showCharacterFlowInfo && (
+                                                        <div className="bg-black/35 border border-blue-500/20 rounded-xl p-3">
+                                                            <p className="text-[10px] text-zinc-400 leading-relaxed">
+                                                                Existing characters can only be used once in this cast. Sequels continue the last movie's characters, universe projects use that universe roster, and outside owned IP appears only for crossover or event plans.
+                                                            </p>
+                                                        </div>
+                                                    )}
 
-                                                {role.actorId && (
-                                                    <>
-                                                    <div className="flex gap-3 sm:gap-4 mt-1">
-                                                        <div className="flex flex-col">
-                                                            <span className="text-[8px] sm:text-[9px] font-black text-emerald-500/70 uppercase tracking-tighter">Talent:</span>
-                                                            <span className="text-[10px] sm:text-xs font-mono text-emerald-400 font-bold">
-                                                                {isSelf ? Math.round(player.stats.talent || 0) : 
-                                                                 isStudio ? getInHouseQuality('ACTOR') :
-                                                                 assignedActor ? Math.round(assignedActor.stats.talent || 50) : 45}
-                                                            </span>
-                                                        </div>
-                                                        <div className="flex flex-col">
-                                                            <span className="text-[8px] sm:text-[9px] font-black text-rose-500/70 uppercase tracking-tighter">Fame:</span>
-                                                            <span className="text-[10px] sm:text-xs font-mono text-rose-400 font-bold">
-                                                               {isSelf ? Math.round(player.stats.fame || 0) :
-                                                                 isStudio ? getInHouseFame('ACTOR') :
-                                                                 assignedActor ? Math.round(assignedActor.stats.fame || 0) : 15}
-                                                            </span>
-                                                        </div>
-                                                        <div className="flex flex-col">
-                                                            <span className="text-[8px] sm:text-[9px] font-black text-amber-500/70 uppercase tracking-tighter">Fee:</span>
-                                                            <span className="text-[10px] sm:text-xs font-mono text-amber-400 font-bold">
-                                                                {isSelf || isStudio ? 'Free' :
-                                                                 (role.actorId && contractedActors.some(a => a.id === role.actorId)) ? 'Contracted' :
-                                                                 (() => {
-                                                                     const returningData = currentReturningTalent.find(t => t.id === role.actorId && (t.role === 'LEAD_ACTOR' || t.role === 'SUPPORTING_ACTOR'));
-                                                                     if (returningData && requiresReturningTalentNegotiation(returningData)) {
-                                                                         return (
-                                                                             <button 
-                                                                                 onClick={(e) => {
-                                                                                     e.stopPropagation();
-                                                                                     handleNegotiate(role.actorId!, returningData, role.id);
-                                                                                 }}
-                                                                                 className="px-2 py-0.5 bg-purple-500/20 text-purple-300 rounded text-[9px] hover:bg-purple-500/40 transition-colors"
-                                                                             >
-                                                                                 Negotiate
-                                                                             </button>
-                                                                         );
-                                                                     }
-                                                                     if (returningData && !returningData.accepted && (returningData.attemptsLeft ?? 0) === 0) {
-                                                                         return <span className="text-red-500 text-[9px]">Walked Away</span>;
-                                                                     }
-                                                                     return formatMoney(role.salary || 0);
-                                                                 })()
-                                                                }
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                    </>
-                                                )}
-                                            </div>
+	                                                {role.actorId && (
+	                                                    <div className="grid grid-cols-3 gap-2">
+	                                                        {[
+                                                                ['Talent', talentScore, 'text-emerald-300'],
+                                                                ['Fame', fameScore, 'text-rose-300'],
+                                                                ['Fee', feeDisplay, returningData && requiresReturningTalentNegotiation(returningData) ? 'text-purple-300' : 'text-amber-300']
+                                                            ].map(([label, value, color]) => (
+                                                                <div key={String(label)} className="bg-black/30 border border-zinc-800 rounded-xl px-3 py-2 min-w-0">
+                                                                    <p className="text-[8px] font-black uppercase tracking-widest text-zinc-600">{label}</p>
+                                                                    <p className={`text-xs font-black font-mono truncate ${color}`}>{value}</p>
+                                                                </div>
+                                                            ))}
+	                                                    </div>
+	                                                )}
+	                                            </div>
+	                                        <div className="sm:w-32 flex sm:flex-col gap-2 w-full col-span-2 sm:col-span-1">
+                                                {returningData && requiresReturningTalentNegotiation(returningData) && role.actorId ? (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleNegotiate(role.actorId!, returningData, role.id);
+                                                        }}
+                                                        className="flex-1 sm:flex-none text-[10px] px-4 py-3 rounded-xl uppercase font-black tracking-widest bg-purple-500/15 text-purple-200 border border-purple-500/25 hover:bg-purple-500/25 transition-all"
+                                                    >
+                                                        Negotiate
+                                                    </button>
+                                                ) : null}
+	                                            <button
+	                                                onClick={() => setSelectingActorFor(role.id)}
+	                                                className={`flex-1 sm:flex-none text-[10px] px-4 py-3 rounded-xl border uppercase font-black tracking-widest transition-all ${
+	                                                    assignedActor || isSelf || isStudio || connection
+	                                                    ? 'bg-emerald-500/5 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/10'
+	                                                    : 'bg-zinc-800/50 text-zinc-500 border-zinc-800 hover:bg-zinc-800 hover:text-white'
+	                                                }`}
+	                                            >
+	                                                {assignedActor || isSelf || isStudio || connection ? 'Change' : 'Select'}
+	                                            </button>
+	                                        </div>
                                         </div>
-                                        <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto justify-end mt-2 sm:mt-0">
-                                            <button 
-                                                onClick={() => setSelectingActorFor(role.id)}
-                                                className={`text-[9px] sm:text-[10px] px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl border-2 uppercase font-black tracking-widest transition-all w-full sm:w-auto ${
-                                                    assignedActor || isSelf || isStudio || connection
-                                                    ? 'bg-emerald-500/5 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/10' 
-                                                    : 'bg-zinc-800/50 text-zinc-500 border-zinc-800 hover:bg-zinc-800 hover:text-white'
-                                                }`}
-                                            >
-                                                {assignedActor || isSelf || isStudio || connection ? 'Change' : 'Select'}
-                                            </button>
-                                            <button 
-                                                onClick={() => setCastList(prev => prev.filter(r => r.id !== role.id))}
-                                                className="hidden sm:block p-2 text-zinc-700 hover:text-rose-500 transition-colors shrink-0"
-                                                title="Remove Role"
-                                            >
-                                                <X size={18} />
-                                            </button>
-                                        </div>
-                                    </div>
-                                );
+	                                    </div>
+	                                );
                             })}
-                            <button 
+                            <button
                                 onClick={() => setCastList([...castList, { id: `role_${Date.now()}`, role: 'Supporting Actor', roleType: 'SUPPORTING', actorId: null }])}
                                 className="w-full py-5 bg-zinc-900/40 border border-dashed border-zinc-800 rounded-2xl text-zinc-500 text-[10px] font-black uppercase tracking-widest hover:text-emerald-400 hover:border-emerald-500/30 hover:bg-emerald-500/5 transition-all flex items-center justify-center gap-3 group"
                             >
@@ -2734,18 +3231,18 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                         {/* Fixed Action Bar */}
                         <div className="fixed bottom-0 left-0 right-0 p-6 pb-safe-lg bg-gradient-to-t from-[#020a05] via-[#020a05]/90 to-transparent pointer-events-none flex justify-center z-30">
                             <div className="pointer-events-auto flex gap-4 w-full max-w-md">
-                                <button 
-                                    onClick={() => setStep('DIRECTOR')} 
+                                <button
+                                    onClick={() => setStep('DIRECTOR')}
                                     className="flex-1 bg-zinc-900/80 hover:bg-zinc-800 text-white font-black uppercase tracking-widest py-5 rounded-2xl border border-zinc-700 backdrop-blur-md transition-all active:scale-95"
                                 >
                                     Back
                                 </button>
-                                <button 
+                                <button
                                     onClick={() => {
                                         if (castList.some(c => !c.actorId)) return;
                                         saveDraft();
                                         setStep('CREW');
-                                    }} 
+                                    }}
                                     disabled={castList.some(c => !c.actorId)}
                                     className={`flex-[2] font-black uppercase tracking-widest py-5 rounded-2xl shadow-[0_0_40px_rgba(16,185,129,0.4)] transition-all duration-300 hover:scale-[1.02] active:scale-95 ${
                                         castList.some(c => !c.actorId)
@@ -2842,14 +3339,14 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                         {/* Fixed Action Bar */}
                         <div className="fixed bottom-0 left-0 right-0 p-6 pb-safe-lg bg-gradient-to-t from-[#020a05] via-[#020a05]/90 to-transparent pointer-events-none flex justify-center z-30">
                             <div className="pointer-events-auto flex gap-4 w-full max-w-md">
-                                <button 
-                                    onClick={() => setStep('CAST')} 
+                                <button
+                                    onClick={() => setStep('CAST')}
                                     className="flex-1 bg-zinc-900/80 hover:bg-zinc-800 text-white font-bold py-4 rounded-xl border border-zinc-700 backdrop-blur-md transition-colors"
                                 >
                                     Back
                                 </button>
-                                <button 
-                                    onClick={() => setStep('EQUIPMENT')} 
+                                <button
+                                    onClick={() => setStep('EQUIPMENT')}
                                     className="flex-[2] bg-emerald-500 hover:bg-emerald-400 text-black font-black uppercase tracking-wider py-4 rounded-xl shadow-[0_0_30px_rgba(16,185,129,0.4)] transition-all duration-300 hover:scale-105"
                                 >
                                     Next: Equipment
@@ -2869,7 +3366,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {[
-                                { 
+                                {
                                     id: 'cameras', name: 'Camera Rigs', icon: '🎥', color: 'text-purple-400',
                                     tiers: {
                                         'TIER_1': { name: 'Indie Kit', desc: 'Basic DSLR and mirrorless setup.' },
@@ -2879,7 +3376,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                         'TIER_5': { name: 'Experimental Tech', desc: 'Cutting-edge prototypes.' }
                                     }
                                 },
-                                { 
+                                {
                                     id: 'lighting', name: 'Lighting & Grip', icon: '💡', color: 'text-amber-400',
                                     tiers: {
                                         'TIER_1': { name: 'Basic Reflectors', desc: 'Natural light and bounce boards.' },
@@ -2889,7 +3386,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                         'TIER_5': { name: 'Sun-Sync Tech', desc: 'Massive artificial sunlight arrays.' }
                                     }
                                 },
-                                { 
+                                {
                                     id: 'sound', name: 'Sound Engineering', icon: '🎙️', color: 'text-emerald-400',
                                     tiers: {
                                         'TIER_1': { name: 'Zoom Recorder', desc: 'Basic field recorder and lavs.' },
@@ -2899,7 +3396,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                         'TIER_5': { name: 'Neural Audio Lab', desc: 'AI-enhanced perfect isolation.' }
                                     }
                                 },
-                                { 
+                                {
                                     id: 'practicalEffects', name: 'Practical Sets', icon: '📦', color: 'text-blue-400',
                                     tiers: {
                                         'TIER_1': { name: 'Garage Studio', desc: 'DIY sets and basic props.' },
@@ -2912,19 +3409,19 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                             ].map(gear => {
                                 const ownedLevel = studio.studioState?.equipment?.[gear.id as keyof StudioEquipment] || 0;
                                 const choice = equipmentChoices[gear.id];
-                                
+
                                 return (
                                     <div key={gear.id} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
                                         <h3 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
                                             <span className="text-lg">{gear.icon}</span> {gear.name}
                                         </h3>
-                                        
+
                                         <div className="space-y-2">
-                                            <button 
+                                            <button
                                                 onClick={() => setEquipmentChoices(prev => ({ ...prev, [gear.id]: 'OWNED' }))}
                                                 disabled={ownedLevel === 0}
                                                 className={`w-full p-3 rounded-lg border text-left transition-all flex justify-between items-center ${
-                                                    choice === 'OWNED' ? 'bg-emerald-500/10 border-emerald-500 text-white' : 
+                                                    choice === 'OWNED' ? 'bg-emerald-500/10 border-emerald-500 text-white' :
                                                     ownedLevel === 0 ? 'bg-zinc-950 border-zinc-800/50 text-zinc-600 cursor-not-allowed' :
                                                     'bg-zinc-900 border-zinc-800 text-zinc-400 hover:bg-zinc-800'
                                                 }`}
@@ -2943,7 +3440,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                             {Object.entries(GEAR_TIERS).map(([tierKey, tierData]) => {
                                                 const specificData = gear.tiers[tierKey as keyof typeof gear.tiers];
                                                 const isSelected = choice === tierKey;
-                                                
+
                                                 // Determine color based on tier
                                                 let colorClass = 'text-blue-400';
                                                 let bgClass = 'bg-blue-500/10 border-blue-500';
@@ -2953,11 +3450,11 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                                 if (tierKey === 'TIER_5') { colorClass = 'text-amber-400'; bgClass = 'bg-amber-500/10 border-amber-500'; }
 
                                                 return (
-                                                    <button 
+                                                    <button
                                                         key={tierKey}
                                                         onClick={() => setEquipmentChoices(prev => ({ ...prev, [gear.id]: tierKey }))}
                                                         className={`w-full p-3 rounded-lg border text-left transition-all flex justify-between items-center ${
-                                                            isSelected ? `${bgClass} text-white` : 
+                                                            isSelected ? `${bgClass} text-white` :
                                                             'bg-zinc-900 border-zinc-800 text-zinc-400 hover:bg-zinc-800'
                                                         }`}
                                                     >
@@ -2982,14 +3479,14 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                         {/* Fixed Action Bar */}
                         <div className="fixed bottom-0 left-0 right-0 p-6 pb-safe-lg bg-gradient-to-t from-[#020a05] via-[#020a05]/90 to-transparent pointer-events-none flex justify-center z-30">
                             <div className="pointer-events-auto flex gap-4 w-full max-w-md">
-                                <button 
-                                    onClick={() => setStep('CREW')} 
+                                <button
+                                    onClick={() => setStep('CREW')}
                                     className="flex-1 bg-zinc-900/80 hover:bg-zinc-800 text-white font-bold py-4 rounded-xl border border-zinc-700 backdrop-blur-md transition-colors"
                                 >
                                     Back
                                 </button>
-                                <button 
-                                    onClick={() => setStep('LOCATION')} 
+                                <button
+                                    onClick={() => setStep('LOCATION')}
                                     className="flex-[2] bg-emerald-500 hover:bg-emerald-400 text-black font-black uppercase tracking-wider py-4 rounded-xl shadow-[0_0_30px_rgba(16,185,129,0.4)] transition-all duration-300 hover:scale-105"
                                 >
                                     Next: Location
@@ -3008,10 +3505,10 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                         </div>
 
                         <div className="flex-1 min-h-[400px] relative">
-                             <LocationSelector 
+                             <LocationSelector
                                 selectedIds={selectedLocations}
                                 onSelect={(id) => {
-                                    setSelectedLocations(prev => 
+                                    setSelectedLocations(prev =>
                                         prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
                                     );
                                 }}
@@ -3023,18 +3520,18 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                         {/* Fixed Action Bar */}
                         <div className="fixed bottom-0 left-0 right-0 p-6 pb-safe-lg bg-gradient-to-t from-[#020a05] via-[#020a05]/90 to-transparent pointer-events-none flex justify-center z-30">
                             <div className="pointer-events-auto flex gap-4 w-full max-w-md">
-                                <button 
-                                    onClick={() => setStep('EQUIPMENT')} 
+                                <button
+                                    onClick={() => setStep('EQUIPMENT')}
                                     className="flex-1 bg-zinc-900/80 hover:bg-zinc-800 text-white font-bold py-4 rounded-xl border border-zinc-700 backdrop-blur-md transition-colors"
                                 >
                                     Back
                                 </button>
-                                <button 
+                                <button
                                     onClick={() => {
                                         if (selectedLocations.length === 0) return;
                                         saveDraft();
                                         setStep('TONE');
-                                    }} 
+                                    }}
                                     disabled={selectedLocations.length === 0}
                                     className={`flex-[2] font-black uppercase tracking-wider py-4 rounded-xl shadow-[0_0_30px_rgba(16,185,129,0.4)] transition-all duration-300 hover:scale-105 ${
                                         selectedLocations.length === 0
@@ -3124,29 +3621,107 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                     <span className={tone < 50 ? 'text-emerald-400' : 'text-zinc-500'}>Practical Effects</span>
                                     <span className={tone > 50 ? 'text-purple-400' : 'text-zinc-500'}>CGI Heavy</span>
                                 </div>
-                                <input 
-                                    type="range" 
-                                    min="0" 
-                                    max="100" 
-                                    value={tone} 
+                                <input
+                                    type="range"
+                                    min="0"
+                                    max="100"
+                                    value={tone}
                                     onChange={(e) => setTone(parseInt(e.target.value))}
                                     className="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
                                 />
                                 <div className="mt-4 text-center text-xs text-zinc-400">
-                                    {tone < 30 ? 'Focus on practical sets and stunts.' : 
-                                     tone > 70 ? 'Heavy reliance on visual effects.' : 
+                                    {tone < 30 ? 'Focus on practical sets and stunts.' :
+                                     tone > 70 ? 'Heavy reliance on visual effects.' :
                                      'Balanced approach.'}
                                 </div>
                             </div>
 
                             {/* Universe & Franchise Connection */}
                             <div className="space-y-6">
+                                <div className="bg-zinc-950/60 border border-zinc-800 rounded-2xl p-4 space-y-3">
+                                    <div className="flex items-center justify-between gap-3">
+                                        <div className="flex items-center gap-2 min-w-0">
+                                            <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-2">
+                                                <Clapperboard size={16} className="text-emerald-400" /> Story Connection
+                                            </h3>
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowStoryConnectionInfo(prev => !prev)}
+                                                className={`w-6 h-6 rounded-full border flex items-center justify-center transition-colors ${
+                                                    showStoryConnectionInfo
+                                                        ? 'border-emerald-500 bg-emerald-500/10 text-emerald-300'
+                                                        : 'border-zinc-700 bg-black/30 text-zinc-500 hover:text-white hover:border-zinc-500'
+                                                }`}
+                                                aria-label="Explain story connection"
+                                            >
+                                                <Info size={13} />
+                                            </button>
+                                        </div>
+                                        <span className="text-[9px] font-black uppercase tracking-widest text-zinc-500">
+                                            {linkedUniverseCastCount} known cast
+                                        </span>
+                                    </div>
+                                    {showStoryConnectionInfo && (
+                                        <div className="bg-black/35 border border-emerald-500/20 rounded-xl p-3 space-y-2">
+                                            <p className="text-xs text-zinc-300 leading-relaxed">
+                                                This tells the game what kind of IP movie you are making, so it can set validation, subtype, continuity risk, and fan expectations.
+                                            </p>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                {[
+                                                    ['Auto', 'Game picks the best plan from your cast and script.'],
+                                                    ['Solo', 'A normal franchise or universe chapter with its own main story.'],
+                                                    ['Crossover', 'Needs 1 known character pulled into the cast.'],
+                                                    ['Event', 'Needs 3 known characters, like a major universe team-up.'],
+                                                    ['Reboot', 'Starts a new era for an existing universe or franchise.']
+                                                ].map(([label, body]) => (
+                                                    <div key={label} className="bg-zinc-950/80 border border-zinc-800 rounded-lg p-2">
+                                                        <p className="text-[9px] font-black uppercase tracking-widest text-emerald-300">{label}</p>
+                                                        <p className="text-[10px] text-zinc-500 leading-relaxed mt-1">{body}</p>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                    <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                                        {[
+                                            { id: 'AUTO', label: 'Auto', hint: 'Best fit' },
+                                            { id: 'SOLO', label: 'Solo', hint: 'Own story' },
+                                            { id: 'CROSSOVER', label: 'Crossover', hint: '1+ known role' },
+                                            { id: 'EVENT', label: 'Event', hint: '3+ known roles' },
+                                            { id: 'REBOOT', label: 'Reboot', hint: 'New era' }
+                                        ].map(option => {
+                                            const isSelected = connectedProjectIntent === option.id;
+                                            const isEffective = effectiveConnectedIntent === option.id || (connectedProjectIntent === 'AUTO' && option.id === effectiveConnectedIntent);
+                                            return (
+                                                <button
+                                                    key={option.id}
+                                                    onClick={() => setConnectedProjectIntent(option.id as ConnectedProjectIntent)}
+                                                    className={`p-3 rounded-xl border text-left transition-all ${
+                                                        isSelected
+                                                            ? 'bg-emerald-500/10 border-emerald-500 text-white'
+                                                            : isEffective
+                                                                ? 'bg-blue-500/10 border-blue-500/30 text-blue-100'
+                                                                : 'bg-black/25 border-zinc-800 text-zinc-500 hover:text-white hover:border-zinc-700'
+                                                    }`}
+                                                >
+                                                    <div className="text-[10px] font-black uppercase tracking-widest">{option.label}</div>
+                                                    <div className="mt-1 text-[9px] opacity-60 leading-tight">{option.hint}</div>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                    <p className="text-[10px] text-zinc-500 uppercase tracking-widest">
+                                        Current plan: <span className="text-emerald-300">{effectiveConnectedIntent}</span>
+                                        {effectiveConnectedIntent === 'EVENT' ? ' • needs three known characters' : effectiveConnectedIntent === 'CROSSOVER' ? ' • needs one known character' : ''}
+                                    </p>
+                                </div>
+
                                 <div className="flex items-center justify-between">
                                     <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-2">
                                         <Globe size={16} className="text-blue-400" /> Universe Connection
                                     </h3>
                                     {selectedUniverseId && (
-                                        <button 
+                                        <button
                                             onClick={() => setSelectedUniverseId(null)}
                                             className="text-[10px] font-bold text-zinc-500 hover:text-white uppercase tracking-widest"
                                         >
@@ -3154,7 +3729,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                         </button>
                                     )}
                                 </div>
-                                
+
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     {(Object.values(normalizeUniverseMap(player.world?.universes || {})) as Universe[]).filter(u => u.studioId === studio.id).map((universe) => (
                                         <button
@@ -3166,13 +3741,13 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                                 : 'bg-zinc-900/50 border-zinc-800 text-zinc-400 hover:border-zinc-700'
                                             }`}
                                         >
-                                            <div 
+                                            <div
                                                 className="absolute top-0 right-0 w-16 h-16 opacity-10 blur-xl pointer-events-none"
                                                 style={{ backgroundColor: universe.color }}
                                             />
                                             <div className="flex items-center gap-2 mb-2">
-                                                <div 
-                                                    className="w-2 h-2 rounded-full" 
+                                                <div
+                                                    className="w-2 h-2 rounded-full"
                                                     style={{ backgroundColor: universe.color }}
                                                 />
                                                 <div className="font-black text-xs uppercase tracking-tight">{universe.name}</div>
@@ -3184,7 +3759,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                             </div>
                                         </button>
                                     ))}
-                                    
+
                                     {/* Create New Universe Option */}
                                     <button
                                         onClick={() => setSelectedUniverseId(selectedUniverseId === 'NEW' ? null : 'NEW')}
@@ -3209,7 +3784,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                 {selectedUniverseId === 'NEW' && (
                                     <div className="mt-4 p-4 bg-blue-500/5 border border-blue-500/20 rounded-xl space-y-3">
                                         <label className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">Universe Name</label>
-                                        <input 
+                                        <input
                                             type="text"
                                             value={newUniverseName}
                                             onChange={(e) => setNewUniverseName(e.target.value)}
@@ -3225,7 +3800,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                     <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-2">
                                         <Layers size={16} className="text-amber-400" /> Franchise Connection
                                     </h3>
-                                    
+
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         {/* Existing Franchises */}
                                         {studioFranchises.map((f) => (
@@ -3248,7 +3823,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                                 </div>
                                             </button>
                                         ))}
-                                        
+
                                         {/* New Franchise Option */}
                                         <button
                                             onClick={() => setSelectedFranchiseId(selectedFranchiseId === 'NEW' ? null : 'NEW')}
@@ -3296,17 +3871,17 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                         {/* Fixed Action Bar */}
                         <div className="fixed bottom-0 left-0 right-0 p-6 pb-safe-lg bg-gradient-to-t from-[#020a05] via-[#020a05]/90 to-transparent pointer-events-none flex justify-center z-30">
                             <div className="pointer-events-auto flex gap-4 w-full max-w-md">
-                                <button 
-                                    onClick={() => setStep('LOCATION')} 
+                                <button
+                                    onClick={() => setStep('LOCATION')}
                                     className="flex-1 bg-zinc-900/80 hover:bg-zinc-800 text-white font-bold py-4 rounded-xl border border-zinc-700 backdrop-blur-md transition-colors"
                                 >
                                     Back
                                 </button>
-                                <button 
+                                <button
                                     onClick={() => {
                                         saveDraft();
                                         setStep('CONFIRM');
-                                    }} 
+                                    }}
                                     className="flex-[2] bg-emerald-500 hover:bg-emerald-400 text-black font-black uppercase tracking-wider py-4 rounded-xl shadow-[0_0_30px_rgba(16,185,129,0.4)] transition-all duration-300 hover:scale-105"
                                 >
                                     Review Package
@@ -3334,8 +3909,14 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                             </div>
 
                             {/* Universe & Franchise Summary */}
-                            {(selectedUniverseId || selectedFranchiseId) && (
+                            {(selectedUniverseId || selectedFranchiseId || effectiveConnectedIntent !== 'SOLO') && (
                                 <div className="px-6 py-3 bg-zinc-950/50 border-b border-zinc-800 flex flex-wrap gap-4">
+                                    <div className="flex items-center gap-2">
+                                        <Clapperboard size={12} className="text-emerald-400" />
+                                        <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                                            Type: <span className="text-white">{effectiveConnectedIntent}</span>
+                                        </span>
+                                    </div>
                                     {selectedUniverseId && (
                                         <div className="flex items-center gap-2">
                                             <Globe size={12} className="text-blue-400" />
@@ -3360,10 +3941,56 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                 </div>
                             )}
 
-                            {/* Body */}
-                            <div className="p-6 space-y-6">
-                                {/* Above the Line */}
-                                <div>
+	                            {/* Body */}
+	                            <div className="p-6 space-y-6">
+                                {linkedCastSummary.length > 0 && (
+                                    <div className="bg-blue-500/5 border border-blue-500/20 rounded-xl p-4">
+                                        <div className="flex items-center justify-between gap-3 mb-3">
+                                            <div>
+                                                <h3 className="text-[10px] font-bold text-blue-300 uppercase tracking-widest">Connected Cast</h3>
+                                                <p className="text-[10px] text-zinc-500 mt-1">
+                                                    {linkedCastSummary.length} universe character{linkedCastSummary.length === 1 ? '' : 's'} attached • {effectiveConnectedIntent}
+                                                </p>
+                                            </div>
+                                            {unresolvedReturningTalent.length > 0 && (
+                                                <span className="bg-amber-500/10 text-amber-300 border border-amber-500/20 rounded-full px-2 py-1 text-[8px] font-black uppercase tracking-widest">
+                                                    {unresolvedReturningTalent.length} Pending
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className="space-y-2">
+                                            {linkedCastSummary.slice(0, 4).map(role => (
+                                                <div key={role.id} className="flex items-center justify-between gap-3 bg-black/25 border border-white/5 rounded-lg px-3 py-2">
+                                                    <div className="min-w-0">
+                                                        <p className="text-xs font-black text-white truncate">{role.characterName || role.roleName}</p>
+                                                        <p className="text-[9px] text-zinc-500 uppercase tracking-widest truncate">
+                                                            {role.actorName || 'Casting needed'} • {role.roleType}
+                                                        </p>
+                                                    </div>
+                                                    <div className="text-right shrink-0">
+                                                        <p className="text-xs font-mono font-bold text-zinc-200">{formatMoney(role.salary || 0)}</p>
+                                                        <p className={`text-[8px] font-black uppercase tracking-widest ${
+                                                            role.negotiationStatus === 'Negotiating' ? 'text-amber-300' :
+                                                            role.negotiationStatus === 'Declined' ? 'text-rose-300' :
+                                                            role.negotiationStatus === 'Uncast' ? 'text-zinc-500' :
+                                                            'text-emerald-300'
+                                                        }`}>
+                                                            {role.negotiationStatus}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            {linkedCastSummary.length > 4 && (
+                                                <p className="text-[9px] font-bold uppercase tracking-widest text-zinc-500">
+                                                    +{linkedCastSummary.length - 4} more connected role{linkedCastSummary.length - 4 === 1 ? '' : 's'}
+                                                </p>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
+	                                {/* Above the Line */}
+	                                <div>
                                     <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3 border-b border-zinc-800 pb-1">Above The Line</h3>
                                     <div className="space-y-2 text-sm">
                                         <div className="flex justify-between items-center">
@@ -3489,19 +4116,56 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                             </li>
                                         ))}
                                     </ul>
+                                    {unresolvedReturningTalent.length > 0 && (
+                                        <div className="mt-4 pt-4 border-t border-rose-500/20 space-y-2">
+                                            <div className="flex items-center justify-between gap-3">
+                                                <div className="text-[10px] font-black uppercase tracking-[0.18em] text-rose-200/80">
+                                                    Pending Return Deals
+                                                </div>
+                                                <div className="text-[10px] font-black text-white/70">
+                                                    {unresolvedReturningTalent.length} left
+                                                </div>
+                                            </div>
+                                            {unresolvedReturningTalent.map((talent) => {
+                                                const info = getReturningTalentDisplay(talent);
+                                                return (
+                                                    <div key={`${talent.id}_${talent.role}`} className="rounded-xl border border-rose-500/20 bg-black/25 p-3 flex items-center gap-3">
+                                                        <img
+                                                            src={info.image}
+                                                            alt={info.name}
+                                                            className="w-10 h-10 rounded-xl object-cover border border-white/10 bg-zinc-900"
+                                                            referrerPolicy="no-referrer"
+                                                        />
+                                                        <div className="min-w-0 flex-1">
+                                                            <div className="text-sm font-black text-white truncate">{info.name}</div>
+                                                            <div className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+                                                                {info.roleLabel} • Demand {formatMoney(info.demand)} • {info.attemptsLeft} tries
+                                                            </div>
+                                                        </div>
+                                                        <button
+                                                            onClick={() => handleNegotiate(talent.id, talent, info.roleId)}
+                                                            className="shrink-0 px-3 py-2 rounded-lg bg-rose-500 text-white text-[10px] font-black uppercase tracking-widest hover:bg-rose-400 transition-colors"
+                                                        >
+                                                            Negotiate
+                                                        </button>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
                                 </div>
                             )}
 
-                            <button 
+                            <button
                                 onClick={handleGreenlight}
                                 disabled={!canGreenlight}
                                 className={`w-full font-black text-xl py-6 rounded-xl transition-all flex items-center justify-center gap-3 ${
-                                    canGreenlight 
-                                    ? 'bg-emerald-500 hover:bg-emerald-400 text-black shadow-[0_0_40px_rgba(16,185,129,0.4)] hover:shadow-[0_0_60px_rgba(16,185,129,0.6)] hover:scale-105' 
+                                    canGreenlight
+                                    ? 'bg-emerald-500 hover:bg-emerald-400 text-black shadow-[0_0_40px_rgba(16,185,129,0.4)] hover:shadow-[0_0_60px_rgba(16,185,129,0.6)] hover:scale-105'
                                     : 'bg-zinc-800 text-zinc-500 cursor-not-allowed'
                                 }`}
                             >
-                                <Zap size={24} fill={canGreenlight ? "black" : "none"} /> 
+                                <Zap size={24} fill={canGreenlight ? "black" : "none"} />
                                 {selectedScript?.status === 'IN_DEVELOPMENT' ? "SCRIPTING IN PROGRESS..." : (canGreenlight ? "GREENLIGHT PROJECT" : "MISSING REQUIREMENTS")}
                             </button>
                         </div>
@@ -3524,7 +4188,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                             <h3 className="text-xs font-black text-zinc-500 uppercase tracking-[0.2em] flex items-center gap-2 mb-4">
                                 <TrendingUp size={14} className="text-amber-500" /> Early Buzz
                             </h3>
-                            
+
                             {buzzItems.map((item, idx) => {
                                 if (item.type === 'HEADLINE') {
                                     const news = item.data as NewsItem;
@@ -3573,7 +4237,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                             })}
                         </div>
 
-                        <button 
+                        <button
                             onClick={onComplete}
                             className="w-full mt-8 bg-zinc-800 hover:bg-zinc-700 text-white font-bold py-4 rounded-xl transition-all border border-zinc-700 hover:border-zinc-600 shadow-lg"
                         >
@@ -3592,17 +4256,17 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                             <button onClick={() => setSelectingActorFor(null)} className="p-2 hover:bg-zinc-800 rounded-full text-zinc-400 hover:text-white transition-colors"><X size={20}/></button>
                         </div>
                         <div className="flex-1 overflow-y-auto p-2 space-y-4 custom-scrollbar">
-                            
+
                             {/* 1. SELF OPTION */}
                             <div className="space-y-2">
                                 <div className="text-[10px] font-bold text-zinc-500 uppercase px-2">You</div>
-                                <button 
+                                <button
                                     onClick={() => {
-                                        setCastList(prev => prev.map(r => r.id === selectingActorFor ? { 
-                                            ...r, 
+                                        setCastList(prev => prev.map(r => r.id === selectingActorFor ? {
+                                            ...r,
                                             actorId: 'PLAYER_SELF',
                                             actorName: player.name,
-                                            salary: 0 
+                                            salary: 0
                                         } : r));
                                         setSelectingActorFor(null);
                                     }}
@@ -3633,14 +4297,14 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                             return !hiredIds.includes(actor.id) || actor.id === currentActorId;
                                         })
                                         .map(actor => (
-                                            <button 
+                                            <button
                                                 key={actor.id}
                                                 onClick={() => {
-                                                    setCastList(prev => prev.map(r => r.id === selectingActorFor ? { 
-                                                        ...r, 
+                                                    setCastList(prev => prev.map(r => r.id === selectingActorFor ? {
+                                                        ...r,
                                                         actorId: actor.id,
                                                         actorName: actor.name,
-                                                        salary: 0 
+                                                        salary: 0
                                                     } : r));
                                                     setSelectingActorFor(null);
                                                 }}
@@ -3677,7 +4341,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                         })
                                         .map(rel => {
                                             const connectedActor = availableActors.find(a => a.id === (rel.npcId || rel.id));
-                                            
+
                                             let isReturning = false;
                                             let returningData = null;
                                             if (currentReturningTalent.length > 0) {
@@ -3688,14 +4352,14 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                             }
 
                                             return (
-                                                <button 
+                                                <button
                                                     key={rel.id}
                                                     onClick={() => {
                                                         if (isReturning && !returningData?.accepted && returningData?.attemptsLeft === 0) return;
                                                         const currentRole = castList.find(c => c.id === selectingActorFor);
                                                         const salary = connectedActor ? calculateActorSalary(connectedActor, currentRole?.roleType || 'SUPPORTING', rel.closeness) : 0;
-                                                        setCastList(prev => prev.map(r => r.id === selectingActorFor ? { 
-                                                            ...r, 
+                                                        setCastList(prev => prev.map(r => r.id === selectingActorFor ? {
+                                                            ...r,
                                                             actorId: rel.npcId || rel.id,
                                                             actorName: rel.name,
                                                             salary: salary
@@ -3729,7 +4393,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                                     </div>
                                                     <div className="text-right">
                                                         {isReturning && !returningData?.accepted && returningData?.attemptsLeft > 0 ? (
-                                                            <button 
+                                                            <button
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
                                                                     handleNegotiate(rel.npcId || rel.id, returningData, selectingActorFor || undefined);
@@ -3764,7 +4428,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                         const currentRole = castList.find(c => c.id === selectingActorFor);
                                         const roleType = currentRole?.roleType || 'SUPPORTING';
                                         const salary = calculateActorSalary(actor, roleType);
-                                        
+
                                         let isReturning = false;
                                         let returningData = null;
                                         if (currentReturningTalent.length > 0) {
@@ -3775,15 +4439,15 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                         }
 
                                         return (
-                                            <button 
+                                            <button
                                                 key={actor.id}
                                                 onClick={() => {
                                                     if (isReturning && !returningData?.accepted && returningData?.attemptsLeft === 0) return;
                                                     const currentRole = castList.find(c => c.id === selectingActorFor);
                                                     const roleType = currentRole?.roleType || 'SUPPORTING';
                                                     const salary = calculateActorSalary(actor, roleType);
-                                                    setCastList(prev => prev.map(r => r.id === selectingActorFor ? { 
-                                                        ...r, 
+                                                    setCastList(prev => prev.map(r => r.id === selectingActorFor ? {
+                                                        ...r,
                                                         actorId: actor.id,
                                                         actorName: actor.name,
                                                         salary: salary
@@ -3816,7 +4480,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                                 </div>
                                                 <div className="text-emerald-400 font-mono text-sm font-bold">
                                                     {isReturning && !returningData?.accepted && returningData?.attemptsLeft > 0 ? (
-                                                        <button 
+                                                        <button
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
                                                                 handleNegotiate(actor.id, returningData, selectingActorFor || undefined);
@@ -3886,7 +4550,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                 </div>
                                 <div className="relative group">
                                     <div className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-500 font-mono font-bold text-lg">$</div>
-                                    <input 
+                                    <input
                                         type="number"
                                         value={counterOfferInput}
                                         onChange={(e) => setCounterOfferInput(e.target.value)}
@@ -3931,7 +4595,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                                 negotiationModal.roleType,
                                                 negotiationModal.roleId
                                             );
-                                            
+
                                             setNegotiationModal(prev => prev ? {
                                                 ...prev,
                                                 feedback: {
@@ -3939,7 +4603,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                                     type: 'SUCCESS'
                                                 }
                                             } : null);
-                                            
+
                                             setTimeout(() => setNegotiationModal(null), 1500);
                                         }}
                                         className="w-full py-4 bg-white/5 hover:bg-white/10 text-white font-black uppercase tracking-widest rounded-2xl transition-all border border-white/10 active:scale-95"
@@ -3956,20 +4620,20 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                         // Probability of acceptance depends on how close it is to their demand
                                         const demandDiff = negotiationModal.currentDemand - negotiationModal.originalSalary;
                                         const offerDiff = counterOffer - negotiationModal.originalSalary;
-                                        
+
                                         // Ratio of offer to demand (0 to 1+)
                                         const ratio = demandDiff > 0 ? offerDiff / demandDiff : 1;
-                                        
+
                                         // Base chance: 10% if matching original, 90% if matching demand
                                         let chance = 0.1 + (ratio * 0.8);
-                                        
+
                                         // Adjust for tier
                                         if (negotiationModal.talentTier === 'A_LIST') chance *= 0.8;
                                         if (negotiationModal.talentTier === 'ESTABLISHED') chance *= 0.9;
-                                        
+
                                         // Cap chance
                                         chance = Math.max(0.05, Math.min(0.95, chance));
-                                        
+
                                         const accepted = Math.random() < chance;
 
                                         if (accepted) {
@@ -3991,7 +4655,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                                 negotiationModal.roleType,
                                                 negotiationModal.roleId
                                             );
-                                            
+
                                             setNegotiationModal(prev => prev ? {
                                                 ...prev,
                                                 feedback: {
@@ -3999,11 +4663,11 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                                     type: 'SUCCESS'
                                                 }
                                             } : null);
-                                            
+
                                             setTimeout(() => setNegotiationModal(null), 2000);
                                         } else {
                                             const newAttempts = negotiationModal.attemptsLeft - 1;
-                                            
+
                                             updateReturningTalentState(
                                                 negotiationModal.talentId,
                                                 negotiationModal.roleType,
@@ -4056,7 +4720,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                 >
                                     Send Counter-Offer
                                 </button>
-                                
+
                                 <button
                                     disabled={!!negotiationModal.feedback}
                                     onClick={() => {
@@ -4075,7 +4739,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                             negotiationModal.roleType,
                                             negotiationModal.roleId
                                         );
-                                        
+
                                         setNegotiationModal(prev => prev ? {
                                             ...prev,
                                             attemptsLeft: 0,
@@ -4084,7 +4748,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                                 type: 'FINAL_FAILURE'
                                             }
                                         } : null);
-                                        
+
                                         setTimeout(() => setNegotiationModal(null), 2000);
                                     }}
                                     className="w-full py-4 text-zinc-500 hover:text-rose-400 text-[10px] font-black uppercase tracking-widest transition-colors"
@@ -4096,18 +4760,18 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                             {/* Feedback Overlay */}
                             {negotiationModal.feedback && (
                                 <div className="absolute inset-0 z-10 bg-zinc-950/95 backdrop-blur-md flex flex-col items-center justify-center p-8 text-center animate-in fade-in zoom-in duration-300">
-                                    <motion.div 
+                                    <motion.div
                                         initial={{ scale: 0.5, opacity: 0 }}
                                         animate={{ scale: 1, opacity: 1 }}
                                         className={`w-20 h-20 rounded-full flex items-center justify-center mb-6 shadow-2xl ${
-                                            negotiationModal.feedback.type === 'SUCCESS' 
-                                            ? 'bg-emerald-500/20 text-emerald-400 border-2 border-emerald-500/50 shadow-emerald-500/20' 
+                                            negotiationModal.feedback.type === 'SUCCESS'
+                                            ? 'bg-emerald-500/20 text-emerald-400 border-2 border-emerald-500/50 shadow-emerald-500/20'
                                             : 'bg-rose-500/20 text-rose-400 border-2 border-rose-500/50 shadow-rose-500/20'
                                         }`}
                                     >
                                         {negotiationModal.feedback.type === 'SUCCESS' ? <CheckCircle size={40} /> : <XCircle size={40} />}
                                     </motion.div>
-                                    <motion.h4 
+                                    <motion.h4
                                         initial={{ y: 10, opacity: 0 }}
                                         animate={{ y: 0, opacity: 1 }}
                                         transition={{ delay: 0.1 }}
@@ -4115,10 +4779,10 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                             negotiationModal.feedback.type === 'SUCCESS' ? 'text-emerald-400' : 'text-rose-400'
                                         }`}
                                     >
-                                        {negotiationModal.feedback.type === 'SUCCESS' ? 'Offer Accepted!' : 
+                                        {negotiationModal.feedback.type === 'SUCCESS' ? 'Offer Accepted!' :
                                          negotiationModal.feedback.type === 'FINAL_FAILURE' ? 'Negotiation Failed' : 'Offer Rejected'}
                                     </motion.h4>
-                                    <motion.p 
+                                    <motion.p
                                         initial={{ y: 10, opacity: 0 }}
                                         animate={{ y: 0, opacity: 1 }}
                                         transition={{ delay: 0.2 }}
@@ -4127,7 +4791,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                         {negotiationModal.feedback.message}
                                     </motion.p>
                                     {negotiationModal.feedback.type === 'FAILURE' && (
-                                        <motion.div 
+                                        <motion.div
                                             initial={{ opacity: 0 }}
                                             animate={{ opacity: 1 }}
                                             transition={{ delay: 0.3 }}

@@ -60,6 +60,18 @@ export const PROPERTY_CATALOG: Property[] = [
     // TOKYO (The Future)
     { id: 'prop_tokyo_shibuya', name: 'Shibuya High-Rise', type: 'Property', price: 8500000, weeklyExpense: 9000, moodBonus: 10, location: 'Tokyo', address: '2-24-12 Shibuya' },
 
+    // FREE PLAYER EXPANSION: ASPIRATIONAL GLOBAL ADDRESSES
+    { id: 'prop_la_sunset_skyloft', name: 'Sunset Strip Skyloft', type: 'Property', price: 1800000, weeklyExpense: 2800, moodBonus: 5, location: 'Los Angeles', address: '8460 Sunset Blvd' },
+    { id: 'prop_venice_canal_house', name: 'Venice Canal House', type: 'Property', price: 3900000, weeklyExpense: 5200, moodBonus: 8, location: 'Los Angeles', address: '241 Sherman Canal' },
+    { id: 'prop_atlanta_film_estate', name: 'Atlanta Film Estate', type: 'Property', price: 2600000, weeklyExpense: 3600, moodBonus: 7, location: 'Atlanta', address: '3100 Habersham Rd NW' },
+    { id: 'prop_nashville_music_row_loft', name: 'Music Row Loft', type: 'Property', price: 1250000, weeklyExpense: 1900, moodBonus: 5, location: 'Nashville', address: '1200 16th Ave S' },
+    { id: 'prop_austin_lake_house', name: 'Lake Travis Hideaway', type: 'Property', price: 3400000, weeklyExpense: 4500, moodBonus: 8, location: 'Austin', address: '6800 Comanche Trail' },
+    { id: 'prop_seoul_han_river_apartment', name: 'Han River Apartment', type: 'Property', price: 4200000, weeklyExpense: 4800, moodBonus: 8, location: 'Seoul', address: '300 Olympic-ro, Songpa-gu' },
+    { id: 'prop_sydney_harbour_flat', name: 'Sydney Harbour Flat', type: 'Property', price: 7200000, weeklyExpense: 7600, moodBonus: 10, location: 'Sydney', address: '7 Macquarie St' },
+    { id: 'prop_lisbon_cliff_villa', name: 'Lisbon Cliff Villa', type: 'Property', price: 5800000, weeklyExpense: 6200, moodBonus: 9, location: 'Lisbon', address: '38 Rua do Alecrim' },
+    { id: 'prop_marrakech_riad', name: 'Marrakech Private Riad', type: 'Property', price: 3100000, weeklyExpense: 4100, moodBonus: 9, location: 'Marrakech', address: '18 Derb El Ferrane' },
+    { id: 'prop_reykjavik_glass_cabin', name: 'Aurora Glass Cabin', type: 'Property', price: 2100000, weeklyExpense: 3000, moodBonus: 7, location: 'Iceland', address: 'Thingvellir National Park' },
+
     // DUBAI (The Elite)
     { id: 'prop_dubai_palm', name: 'Palm Jumeirah Villa', type: 'Property', price: 25000000, weeklyExpense: 18000, moodBonus: 14, location: 'Dubai', address: 'Frond N, Palm Jumeirah' },
     { id: 'prop_dubai_royal', name: 'Royal Atlantis Penthouse', type: 'Property', price: 150000000, weeklyExpense: 90000, moodBonus: 26, location: 'Dubai', address: 'Palm Jumeirah Crescent' },
@@ -80,6 +92,10 @@ export const CAR_CATALOG: Vehicle[] = [
     { id: 'veh_car_gwagon', name: 'Mercedes G-Wagon', type: 'Vehicle', vehicleType: 'Car', price: 450000, reputationBonus: 12, energySave: 4 },
     { id: 'veh_car_ferrari488', name: 'Ferrari F8 Tributo', type: 'Vehicle', vehicleType: 'Car', price: 750000, reputationBonus: 18, energySave: 6 },
     { id: 'veh_car_rr_cullinan', name: 'Rolls-Royce Cullinan', type: 'Vehicle', vehicleType: 'Car', price: 950000, reputationBonus: 22, energySave: 8 },
+    { id: 'veh_car_range_rover_sv', name: 'Range Rover Sport SV', type: 'Vehicle', vehicleType: 'Car', price: 210000, reputationBonus: 7, energySave: 5 },
+    { id: 'veh_car_lucid_sapphire', name: 'Lucid Air Sapphire', type: 'Vehicle', vehicleType: 'Car', price: 260000, reputationBonus: 9, energySave: 7 },
+    { id: 'veh_car_amg_gt', name: 'Mercedes-AMG GT Coupe', type: 'Vehicle', vehicleType: 'Car', price: 195000, reputationBonus: 8, energySave: 4 },
+    { id: 'veh_car_bmw_i8', name: 'BMW i8 Roadster', type: 'Vehicle', vehicleType: 'Car', price: 175000, reputationBonus: 7, energySave: 5 },
     { id: 'veh_car_bugatti', name: 'Bugatti Chiron', type: 'Vehicle', vehicleType: 'Car', price: 5500000, reputationBonus: 35, energySave: 7 },
     
     // NEW COLLECTABLES
@@ -93,12 +109,16 @@ export const MOTORCYCLE_CATALOG: Vehicle[] = [
     { id: 'veh_bike_honda_rebel', name: 'Honda Rebel 500', type: 'Vehicle', vehicleType: 'Motorcycle', price: 18000, reputationBonus: 2, energySave: 2 },
     { id: 'veh_bike_yamaha_r1', name: 'Yamaha R1', type: 'Vehicle', vehicleType: 'Motorcycle', price: 45000, reputationBonus: 5, energySave: 3 },
     { id: 'veh_bike_harley', name: 'Harley-Davidson Fat Boy', type: 'Vehicle', vehicleType: 'Motorcycle', price: 65000, reputationBonus: 7, energySave: 2 },
+    { id: 'veh_bike_indian_ftr', name: 'Indian FTR R Carbon', type: 'Vehicle', vehicleType: 'Motorcycle', price: 26000, reputationBonus: 4, energySave: 3 },
+    { id: 'veh_bike_bmw_m1000rr', name: 'BMW M 1000 RR', type: 'Vehicle', vehicleType: 'Motorcycle', price: 42000, reputationBonus: 6, energySave: 4 },
     { id: 'veh_bike_ducati', name: 'Ducati Panigale V4 R', type: 'Vehicle', vehicleType: 'Motorcycle', price: 90000, reputationBonus: 10, energySave: 4 },
     { id: 'veh_bike_arch', name: 'Arch KRGT-1', type: 'Vehicle', vehicleType: 'Motorcycle', price: 180000, reputationBonus: 15, energySave: 5 }, // Keanu's bike brand equivalent
 ];
 
 export const BOAT_CATALOG: Vehicle[] = [
     { id: 'veh_boat_jetski', name: 'Sea-Doo GTX', type: 'Vehicle', vehicleType: 'Boat', price: 35000, reputationBonus: 3, energySave: 1 },
+    { id: 'veh_boat_axopar37', name: 'Axopar 37 Sun-Top', type: 'Vehicle', vehicleType: 'Boat', price: 220000, reputationBonus: 6, energySave: 2 },
+    { id: 'veh_boat_riva_aquariva', name: 'Riva Aquariva Super', type: 'Vehicle', vehicleType: 'Boat', price: 850000, reputationBonus: 12, energySave: 3 },
     { id: 'veh_boat_mastercraft', name: 'MasterCraft XStar', type: 'Vehicle', vehicleType: 'Boat', price: 350000, reputationBonus: 8, energySave: 2 },
     { id: 'veh_boat_yacht', name: 'Sunseeker 90', type: 'Vehicle', vehicleType: 'Boat', price: 12000000, reputationBonus: 25, energySave: 5 },
     { id: 'veh_boat_superyacht', name: 'Project Azzam', type: 'Vehicle', vehicleType: 'Boat', price: 600000000, reputationBonus: 100, energySave: 10 }, // NEW
@@ -106,6 +126,8 @@ export const BOAT_CATALOG: Vehicle[] = [
 
 export const AIRCRAFT_CATALOG: Vehicle[] = [
     { id: 'veh_plane_cessna', name: 'Cessna 172', type: 'Vehicle', vehicleType: 'Aircraft', price: 850000, reputationBonus: 10, energySave: 10 },
+    { id: 'veh_plane_hondajet', name: 'HondaJet Elite II', type: 'Vehicle', vehicleType: 'Aircraft', price: 7200000, reputationBonus: 26, energySave: 16 },
+    { id: 'veh_plane_phenom300', name: 'Embraer Phenom 300E', type: 'Vehicle', vehicleType: 'Aircraft', price: 11500000, reputationBonus: 32, energySave: 18 },
     { id: 'veh_plane_cirrus', name: 'Cirrus Vision Jet', type: 'Vehicle', vehicleType: 'Aircraft', price: 6500000, reputationBonus: 30, energySave: 15 },
     { id: 'veh_plane_gulfstream', name: 'Gulfstream G700', type: 'Vehicle', vehicleType: 'Aircraft', price: 120000000, reputationBonus: 60, energySave: 25 },
     { id: 'veh_plane_bbj', name: 'Boeing Business Jet', type: 'Vehicle', vehicleType: 'Aircraft', price: 450000000, reputationBonus: 90, energySave: 30 }, // NEW
@@ -120,6 +142,8 @@ export const CLOTHING_CATALOG: ClothingItem[] = [
     { id: 'cloth_outfit_tux_armani', name: 'Armani Tuxedo', category: 'OUTFIT', type: 'Clothing', price: 15000, style: 'Luxury', auditionBonus: 2.5 },
     { id: 'cloth_outfit_tom_ford', name: 'Tom Ford Shelton Suit', category: 'OUTFIT', type: 'Clothing', price: 18000, style: 'Luxury', auditionBonus: 2.8 },
     { id: 'cloth_outfit_brioni', name: 'Brioni Bespoke Suit', category: 'OUTFIT', type: 'Clothing', price: 25000, style: 'Luxury', auditionBonus: 3.2 },
+    { id: 'cloth_outfit_valentino_redcarpet', name: 'Valentino Red Carpet Suit', category: 'OUTFIT', type: 'Clothing', price: 22000, style: 'Luxury', auditionBonus: 3.0 },
+    { id: 'cloth_outfit_oscar_gown', name: 'Oscar de la Renta Gown', category: 'OUTFIT', type: 'Clothing', price: 38000, style: 'Luxury', auditionBonus: 3.4 },
     { id: 'cloth_outfit_dress_chanel', name: 'Chanel Evening Gown', category: 'OUTFIT', type: 'Clothing', price: 45000, style: 'Luxury', auditionBonus: 3.5 },
     { id: 'cloth_outfit_dress_dior', name: 'Dior Haute Couture', category: 'OUTFIT', type: 'Clothing', price: 85000, style: 'Luxury', auditionBonus: 4.0 },
     { id: 'cloth_outfit_met_gala', name: 'Avant-Garde Piece', category: 'OUTFIT', type: 'Clothing', price: 250000, style: 'Luxury', auditionBonus: 5.0 },
@@ -138,6 +162,7 @@ export const CLOTHING_CATALOG: ClothingItem[] = [
     { id: 'cloth_top_givenchy', name: 'Givenchy Hoodie', category: 'TOP', type: 'Clothing', price: 3200, style: 'Premium', auditionBonus: 0.9 },
     { id: 'cloth_top_leather_jacket', name: 'Saint Laurent Jacket', category: 'TOP', type: 'Clothing', price: 12000, style: 'Luxury', auditionBonus: 2.0 },
     { id: 'cloth_top_silk_shirt', name: 'Versace Silk Shirt', category: 'TOP', type: 'Clothing', price: 4500, style: 'Premium', auditionBonus: 1.2 },
+    { id: 'cloth_top_celine_blazer', name: 'Celine Velvet Blazer', category: 'TOP', type: 'Clothing', price: 6900, style: 'Luxury', auditionBonus: 1.7 },
     { id: 'cloth_top_burberry_coat', name: 'Burberry Trench', category: 'TOP', type: 'Clothing', price: 8500, style: 'Premium', auditionBonus: 1.5 },
     { id: 'cloth_top_prada_shirt', name: 'Prada Re-Nylon Shirt', category: 'TOP', type: 'Clothing', price: 5000, style: 'Luxury', auditionBonus: 1.4 },
 
@@ -146,6 +171,7 @@ export const CLOTHING_CATALOG: ClothingItem[] = [
     { id: 'cloth_bot_sweats_nike', name: 'Nike Tech Fleece', category: 'BOTTOM', type: 'Clothing', price: 350, style: 'Casual', auditionBonus: 0.2 },
     { id: 'cloth_bot_essentials', name: 'Fear of God Sweats', category: 'BOTTOM', type: 'Clothing', price: 850, style: 'Casual', auditionBonus: 0.4 },
     { id: 'cloth_bot_amiri', name: 'Amiri MX1 Jeans', category: 'BOTTOM', type: 'Clothing', price: 3500, style: 'Premium', auditionBonus: 1.2 },
+    { id: 'cloth_bot_loro_piana', name: 'Loro Piana Cashmere Trousers', category: 'BOTTOM', type: 'Clothing', price: 4200, style: 'Luxury', auditionBonus: 1.3 },
     { id: 'cloth_bot_chino_rl', name: 'Ralph Lauren Chinos', category: 'BOTTOM', type: 'Clothing', price: 550, style: 'Premium', auditionBonus: 0.5 },
     { id: 'cloth_bot_thom_browne', name: 'Thom Browne Shorts', category: 'BOTTOM', type: 'Clothing', price: 2200, style: 'Luxury', auditionBonus: 1.0 },
     { id: 'cloth_bot_leather_pants', name: 'Rick Owens Pants', category: 'BOTTOM', type: 'Clothing', price: 4500, style: 'Luxury', auditionBonus: 1.5 },
@@ -162,6 +188,8 @@ export const CLOTHING_CATALOG: ClothingItem[] = [
     { id: 'cloth_shoe_loafers_gucci', name: 'Gucci Loafers', category: 'SHOES', type: 'Clothing', price: 2800, style: 'Premium', auditionBonus: 1.0 },
     { id: 'cloth_shoe_heels_loub', name: 'Louboutin Heels', category: 'SHOES', type: 'Clothing', price: 3500, style: 'Luxury', auditionBonus: 1.5 },
     { id: 'cloth_shoe_oxford_tf', name: 'Tom Ford Oxfords', category: 'SHOES', type: 'Clothing', price: 6500, style: 'Luxury', auditionBonus: 1.8 },
+    { id: 'cloth_shoe_loro_loafers', name: 'Loro Piana Summer Walks', category: 'SHOES', type: 'Clothing', price: 1800, style: 'Premium', auditionBonus: 0.9 },
+    { id: 'cloth_shoe_jimmy_choo', name: 'Jimmy Choo Diamond Heels', category: 'SHOES', type: 'Clothing', price: 4200, style: 'Luxury', auditionBonus: 1.6 },
     { id: 'cloth_shoe_mags', name: 'Nike Air Mag', category: 'SHOES', type: 'Clothing', price: 150000, style: 'Luxury', auditionBonus: 3.5 }, // Collectable
 
     // --- ACCESSORIES: EYEWEAR ---
@@ -169,6 +197,7 @@ export const CLOTHING_CATALOG: ClothingItem[] = [
     { id: 'cloth_acc_oakley', name: 'Oakley Sunglasses', category: 'ACCESSORY', subCategory: 'EYEWEAR', type: 'Clothing', price: 450, style: 'Casual', auditionBonus: 0.2 },
     { id: 'cloth_acc_persol', name: 'Persol 714', category: 'ACCESSORY', subCategory: 'EYEWEAR', type: 'Clothing', price: 850, style: 'Premium', auditionBonus: 0.5 },
     { id: 'cloth_acc_gucci_shades', name: 'Gucci Oversized', category: 'ACCESSORY', subCategory: 'EYEWEAR', type: 'Clothing', price: 1200, style: 'Premium', auditionBonus: 0.7 },
+    { id: 'cloth_acc_gentle_monster', name: 'Gentle Monster Studios', category: 'ACCESSORY', subCategory: 'EYEWEAR', type: 'Clothing', price: 720, style: 'Premium', auditionBonus: 0.6 },
     { id: 'cloth_acc_jacques', name: 'Jacques Marie Mage', category: 'ACCESSORY', subCategory: 'EYEWEAR', type: 'Clothing', price: 2500, style: 'Luxury', auditionBonus: 1.2 },
     { id: 'cloth_acc_cartier_glasses', name: 'Cartier Rimless', category: 'ACCESSORY', subCategory: 'EYEWEAR', type: 'Clothing', price: 3500, style: 'Luxury', auditionBonus: 1.5 },
     { id: 'cloth_acc_chrome', name: 'Chrome Hearts', category: 'ACCESSORY', subCategory: 'EYEWEAR', type: 'Clothing', price: 5000, style: 'Luxury', auditionBonus: 2.0 },
@@ -183,9 +212,11 @@ export const CLOTHING_CATALOG: ClothingItem[] = [
     { id: 'cloth_acc_vintage_rolex', name: 'Paul Newman Daytona', category: 'ACCESSORY', subCategory: 'WATCH', type: 'Clothing', price: 1500000, style: 'Luxury', auditionBonus: 8.0 },
     { id: 'cloth_acc_omega', name: 'Omega Speedmaster', category: 'ACCESSORY', subCategory: 'WATCH', type: 'Clothing', price: 8500, style: 'Premium', auditionBonus: 1.2 },
     { id: 'cloth_acc_cartier_tank', name: 'Cartier Tank', category: 'ACCESSORY', subCategory: 'WATCH', type: 'Clothing', price: 6000, style: 'Premium', auditionBonus: 1.0 },
+    { id: 'cloth_acc_tag_monaco', name: 'TAG Heuer Monaco', category: 'ACCESSORY', subCategory: 'WATCH', type: 'Clothing', price: 7800, style: 'Premium', auditionBonus: 1.2 },
 
     // --- ACCESSORIES: BAGS ---
     { id: 'cloth_acc_lv_bag', name: 'LV Keepall Bag', category: 'ACCESSORY', subCategory: 'BAG', type: 'Clothing', price: 8500, style: 'Premium', auditionBonus: 1.2 },
+    { id: 'cloth_acc_rimowa', name: 'Rimowa Aluminum Carry-On', category: 'ACCESSORY', subCategory: 'BAG', type: 'Clothing', price: 1900, style: 'Premium', auditionBonus: 0.8 },
     { id: 'cloth_acc_birkin', name: 'Hermès Birkin', category: 'ACCESSORY', subCategory: 'BAG', type: 'Clothing', price: 85000, style: 'Luxury', auditionBonus: 4.0 },
     { id: 'cloth_acc_dior_saddle', name: 'Dior Saddle Bag', category: 'ACCESSORY', subCategory: 'BAG', type: 'Clothing', price: 4200, style: 'Premium', auditionBonus: 0.9 },
     { id: 'cloth_acc_chanel_flap', name: 'Chanel Classic Flap', category: 'ACCESSORY', subCategory: 'BAG', type: 'Clothing', price: 12000, style: 'Luxury', auditionBonus: 2.2 },
@@ -199,6 +230,7 @@ export const CLOTHING_CATALOG: ClothingItem[] = [
     { id: 'cloth_acc_diamond_ring', name: 'Pink Star Diamond Ring', category: 'ACCESSORY', subCategory: 'JEWELRY', type: 'Clothing', price: 25000000, style: 'Luxury', auditionBonus: 10.0 },
     { id: 'cloth_acc_crown', name: 'Crown of the Empire', category: 'ACCESSORY', subCategory: 'JEWELRY', type: 'Clothing', price: 10000000, style: 'Luxury', auditionBonus: 9.0 },
     { id: 'cloth_acc_vca', name: 'Van Cleef Necklace', category: 'ACCESSORY', subCategory: 'JEWELRY', type: 'Clothing', price: 18000, style: 'Luxury', auditionBonus: 1.4 },
+    { id: 'cloth_acc_cartier_juste', name: 'Cartier Juste un Clou', category: 'ACCESSORY', subCategory: 'JEWELRY', type: 'Clothing', price: 12000, style: 'Luxury', auditionBonus: 1.3 },
     { id: 'cloth_acc_tiffany', name: 'Tiffany Diamond Studs', category: 'ACCESSORY', subCategory: 'JEWELRY', type: 'Clothing', price: 8500, style: 'Premium', auditionBonus: 0.9 },
     { id: 'cloth_acc_bulgari', name: 'Bulgari Serpenti', category: 'ACCESSORY', subCategory: 'JEWELRY', type: 'Clothing', price: 35000, style: 'Luxury', auditionBonus: 2.5 },
     { id: 'cloth_acc_harry_winston', name: 'Harry Winston Necklace', category: 'ACCESSORY', subCategory: 'JEWELRY', type: 'Clothing', price: 150000, style: 'Luxury', auditionBonus: 4.5 },
@@ -336,6 +368,13 @@ export const GENRE_TRAINING_CATALOG: { genre: Genre, label: string, desc: string
     { genre: 'SCI_FI', label: 'Green Screen Tech', desc: 'Acting with nothing.', cost: 25, energy: 10, gain: 1 },
     { genre: 'ADVENTURE', label: 'Parkour & Movement', desc: 'Running and jumping.', cost: 25, energy: 10, gain: 1 },
     { genre: 'SUPERHERO', label: 'Wire Work', desc: 'Flying on cables.', cost: 25, energy: 10, gain: 1 },
+    { genre: 'MUSICAL', label: 'Musical Theatre', desc: 'Sing, move, and sell emotion.', cost: 30, energy: 10, gain: 1 },
+    { genre: 'BIOPIC', label: 'Character Study', desc: 'Research real lives and mannerisms.', cost: 30, energy: 10, gain: 1 },
+    { genre: 'SPORTS', label: 'Athletic Screen Test', desc: 'Train like a believable competitor.', cost: 30, energy: 10, gain: 1 },
+    { genre: 'ANIMATION', label: 'Voice Acting Booth', desc: 'Build animated character energy.', cost: 25, energy: 10, gain: 1 },
+    { genre: 'FANTASY', label: 'Mythic Performance', desc: 'Ground big worlds in real emotion.', cost: 30, energy: 10, gain: 1 },
+    { genre: 'CRIME', label: 'Crime Procedural Lab', desc: 'Study detectives, suspects, and pressure.', cost: 25, energy: 10, gain: 1 },
+    { genre: 'DOCUMENTARY', label: 'Documentary Presence', desc: 'Practice natural, unscripted delivery.', cost: 20, energy: 10, gain: 1 },
 ];
 
 export type ImproveCategory = 'BODY' | 'HEALTH' | 'LOOKS' | 'MOOD';

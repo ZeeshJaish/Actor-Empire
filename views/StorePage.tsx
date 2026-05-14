@@ -5,6 +5,7 @@ import { formatMoney } from '../services/formatUtils';
 import { ArrowLeft, Zap, DollarSign, Heart, Brain, Clapperboard, PlayCircle, ShieldAlert, Crown, Gem, Home, CarFront, Plane, CheckCircle2 } from 'lucide-react';
 import { hasPremiumProduct, PREMIUM_PRODUCTS, PremiumProductId } from '../services/premiumLogic';
 import { getPremiumCatalogProducts } from '../services/iapService';
+import { ALL_GENRES, formatGenreLabel } from '../services/genreCatalog';
 
 const PREMIUM_STORE_ENABLED = true;
 
@@ -28,7 +29,7 @@ export const StorePage: React.FC<StorePageProps> = ({ player, onBack, onWatchAd,
     );
     const showPremiumStore = PREMIUM_STORE_ENABLED && (isIOSDevice || import.meta.env.DEV);
 
-    const GENRES: Genre[] = ['ACTION', 'DRAMA', 'COMEDY', 'ROMANCE', 'THRILLER', 'HORROR', 'SCI_FI', 'ADVENTURE', 'SUPERHERO'];
+    const GENRES: Genre[] = ALL_GENRES;
     const SKILLS: (keyof ActorSkills)[] = ['delivery', 'memorization', 'expression', 'improvisation', 'discipline', 'presence', 'charisma'];
     const bonusEnergy = player.flags?.bonusEnergyBank || 0;
     useEffect(() => {
@@ -307,9 +308,9 @@ export const StorePage: React.FC<StorePageProps> = ({ player, onBack, onWatchAd,
                         <button
                             key={g}
                             onClick={() => setSelectedGenre(g)}
-                            className={`px-3 py-1.5 rounded-lg text-[10px] font-bold whitespace-nowrap capitalize transition-colors ${selectedGenre === g ? 'bg-purple-600 text-white' : 'bg-zinc-900 text-zinc-500'}`}
+                            className={`px-3 py-1.5 rounded-lg text-[10px] font-bold whitespace-nowrap transition-colors ${selectedGenre === g ? 'bg-purple-600 text-white' : 'bg-zinc-900 text-zinc-500'}`}
                         >
-                            {g}
+                            {formatGenreLabel(g)}
                         </button>
                     ))}
                 </div>
@@ -318,7 +319,7 @@ export const StorePage: React.FC<StorePageProps> = ({ player, onBack, onWatchAd,
                     onClick={() => onWatchAd('REWARDED_GENRE', selectedGenre)}
                     className="w-full py-3 bg-purple-600/20 border border-purple-500/50 rounded-xl text-purple-300 font-bold text-sm hover:bg-purple-600 hover:text-white transition-all flex items-center justify-center gap-2"
                 >
-                    <PlayCircle size={16}/> Study {selectedGenre} (+10 XP)
+                    <PlayCircle size={16}/> Study {formatGenreLabel(selectedGenre)} (+10 XP)
                 </button>
             </div>
 

@@ -307,5 +307,118 @@ export const SCRIPT_TEMPLATES: Record<Genre, ScriptQuestion[]> = {
                 { id: 'street-level', text: 'Street-Level Crime Lord', reviewSnippet: 'a grounded and personal conflict', newsHeadline: 'A gritty and realistic take on superheroics.' }
             ]
         }
+    ],
+    MUSICAL: [
+        {
+            id: 'music-style',
+            question: 'What kind of musical is it?',
+            options: [
+                { id: 'original-songs', text: 'Original Songs', reviewSnippet: 'built around fresh, memorable numbers', newsHeadline: 'The original soundtrack is already gaining buzz.' },
+                { id: 'jukebox', text: 'Jukebox Musical', reviewSnippet: 'using familiar hits with theatrical energy', newsHeadline: 'Audiences are singing along to the big numbers.' },
+                { id: 'backstage', text: 'Backstage Drama', reviewSnippet: 'following performers chasing one impossible opening night', newsHeadline: 'The show-business angle gives the musical real bite.' }
+            ]
+        },
+        {
+            id: 'emotional-core',
+            question: 'What is the emotional core?',
+            options: [
+                { id: 'first-love', text: 'First Love', reviewSnippet: 'romantic, bright, and vulnerable', newsHeadline: 'The romance gives the musical its beating heart.' },
+                { id: 'fame-cost', text: 'Cost of Fame', reviewSnippet: 'glittering on stage and bruised off it', newsHeadline: 'A sharp musical about ambition and sacrifice.' },
+                { id: 'community', text: 'Community Finding Its Voice', reviewSnippet: 'a crowd-pleasing ensemble story', newsHeadline: 'The ensemble finale has become a fan favorite.' }
+            ]
+        }
+    ],
+    BIOPIC: [
+        {
+            id: 'subject-angle',
+            question: 'What angle does the biopic take?',
+            options: [
+                { id: 'rise', text: 'Rise to Fame', reviewSnippet: 'a stirring portrait of ambition and discovery', newsHeadline: 'The rise-to-fame arc is inspiring audiences.' },
+                { id: 'fallout', text: 'Public Scandal', reviewSnippet: 'examining the price of being watched', newsHeadline: 'The controversial chapter is driving debate.' },
+                { id: 'final-years', text: 'Final Years', reviewSnippet: 'quiet, reflective, and deeply human', newsHeadline: 'Critics praise the restraint of the final act.' }
+            ]
+        },
+        {
+            id: 'access',
+            question: 'How close is the film to the real subject?',
+            options: [
+                { id: 'authorized', text: 'Authorized Life Rights', reviewSnippet: 'intimate and access-driven', newsHeadline: 'Family access gives the biopic rare detail.' },
+                { id: 'unauthorized', text: 'Unauthorized Take', reviewSnippet: 'bold, risky, and unafraid to question the myth', newsHeadline: 'The unauthorized approach has everyone talking.' },
+                { id: 'ensemble-history', text: 'Seen Through Their Circle', reviewSnippet: 'told through friends, rivals, and witnesses', newsHeadline: 'The ensemble structure reveals new sides of the icon.' }
+            ]
+        }
+    ],
+    SPORTS: [
+        {
+            id: 'sports-arc',
+            question: 'What kind of sports story is it?',
+            options: [
+                { id: 'underdog', text: 'Underdog Championship', reviewSnippet: 'classic, emotional, and satisfying', newsHeadline: 'The underdog story is winning over crowds.' },
+                { id: 'rivalry', text: 'Bitter Rivalry', reviewSnippet: 'fueled by pressure, pride, and history', newsHeadline: 'The rivalry scenes are pure electricity.' },
+                { id: 'comeback', text: 'Injury Comeback', reviewSnippet: 'a physical and emotional recovery journey', newsHeadline: 'The comeback arc has audiences cheering.' }
+            ]
+        },
+        {
+            id: 'arena',
+            question: 'Where does the pressure peak?',
+            options: [
+                { id: 'final-match', text: 'Final Match', reviewSnippet: 'building to one decisive game', newsHeadline: 'The final match sequence delivers.' },
+                { id: 'locker-room', text: 'Locker Room Collapse', reviewSnippet: 'focused on trust inside the team', newsHeadline: 'The locker-room drama adds real emotional weight.' },
+                { id: 'public-trial', text: 'Media Trial', reviewSnippet: 'where every mistake becomes a headline', newsHeadline: 'The sports-media angle feels painfully current.' }
+            ]
+        }
+    ],
+    ANIMATION: [
+        {
+            id: 'animation-world',
+            question: 'What world does the animation create?',
+            options: [
+                { id: 'talking-creatures', text: 'Talking Creatures', reviewSnippet: 'warm, funny, and instantly merchandisable', newsHeadline: 'Families are falling for the animated characters.' },
+                { id: 'toybox-city', text: 'Toybox City', reviewSnippet: 'packed with visual imagination', newsHeadline: 'The animated world is already iconic.' },
+                { id: 'mature-animation', text: 'Mature Animation', reviewSnippet: 'using animation for something darker and sharper', newsHeadline: 'Critics praise the mature animated storytelling.' }
+            ]
+        }
+    ],
+    FANTASY: [
+        {
+            id: 'myth',
+            question: 'What fantasy engine drives the plot?',
+            options: [
+                { id: 'lost-heir', text: 'Lost Heir', reviewSnippet: 'royal destiny with emotional stakes', newsHeadline: 'The lost-heir fantasy has franchise potential.' },
+                { id: 'forbidden-magic', text: 'Forbidden Magic', reviewSnippet: 'dangerous, beautiful, and costly', newsHeadline: 'The magic system is winning fans online.' },
+                { id: 'monster-alliance', text: 'Monster Alliance', reviewSnippet: 'unlikely allies in a hostile realm', newsHeadline: 'The creature work is a major talking point.' }
+            ]
+        }
+    ],
+    CRIME: [
+        {
+            id: 'crime-focus',
+            question: 'What crime story are we following?',
+            options: [
+                { id: 'detective-case', text: 'Detective Case', reviewSnippet: 'procedural detail with a personal edge', newsHeadline: 'The detective angle gives the crime film bite.' },
+                { id: 'mob-family', text: 'Mob Family', reviewSnippet: 'loyalty, betrayal, and generational damage', newsHeadline: 'The crime-family drama feels prestige-ready.' },
+                { id: 'true-crime', text: 'True-Crime Inspired', reviewSnippet: 'unsettling because it feels real', newsHeadline: 'The true-crime angle is driving audience curiosity.' }
+            ]
+        }
+    ],
+    DOCUMENTARY: [
+        {
+            id: 'doc-approach',
+            question: 'What is the documentary approach?',
+            options: [
+                { id: 'investigative', text: 'Investigative', reviewSnippet: 'following evidence, witnesses, and hard questions', newsHeadline: 'The documentary investigation has started a public conversation.' },
+                { id: 'intimate-profile', text: 'Intimate Profile', reviewSnippet: 'quiet access to a remarkable life', newsHeadline: 'The intimate access is being praised by critics.' },
+                { id: 'cultural-moment', text: 'Cultural Moment', reviewSnippet: 'capturing why this story mattered to millions', newsHeadline: 'The cultural lens gives the documentary wide appeal.' }
+            ]
+        },
+        {
+            id: 'source-access',
+            question: 'What access does the team have?',
+            options: [
+                { id: 'archive', text: 'Rare Archive Footage', reviewSnippet: 'built from footage people have never seen', newsHeadline: 'Rare footage makes the documentary feel essential.' },
+                { id: 'interviews', text: 'Exclusive Interviews', reviewSnippet: 'driven by revealing first-person accounts', newsHeadline: 'The exclusive interviews are making headlines.' },
+                { id: 'verite', text: 'On-the-Ground Verite', reviewSnippet: 'raw, immediate, and immersive', newsHeadline: 'The verite style puts viewers inside the story.' }
+            ]
+        }
     ]
 };

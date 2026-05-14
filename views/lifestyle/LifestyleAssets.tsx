@@ -4,6 +4,7 @@ import { Player, Property, Vehicle, ClothingItem } from '../../types';
 import { PROPERTY_CATALOG, CAR_CATALOG, MOTORCYCLE_CATALOG, BOAT_CATALOG, AIRCRAFT_CATALOG, CLOTHING_CATALOG } from '../../services/lifestyleLogic';
 import { ShoppingBag, ArrowLeft, ChevronRight, Home, Car, Shirt, MapPin, Crown, Lock } from 'lucide-react';
 import { getPremiumCollectionGateForAsset, getPremiumProduct, hasPremiumAccessForAsset, PremiumProductId } from '../../services/premiumLogic';
+import { getPlayerLanguage, t } from '../../services/i18n';
 
 interface LifestyleAssetsProps {
     player: Player;
@@ -20,6 +21,12 @@ export const LifestyleAssets: React.FC<LifestyleAssetsProps> = ({ player, onBack
     const [category, setCategory] = useState<'PROPERTY' | 'VEHICLE' | 'CLOTHING'>('PROPERTY');
     const [filter, setFilter] = useState<string>('ALL');
     const [pendingPremiumAssetId, setPendingPremiumAssetId] = useState<string | null>(null);
+    const language = getPlayerLanguage(player);
+    const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
+    const trFallback = (key: string, fallback: string) => {
+        const translated = tr(key);
+        return translated === key ? fallback : translated;
+    };
 
     const pendingPremiumGate = useMemo(() => pendingPremiumAssetId ? getPremiumCollectionGateForAsset(pendingPremiumAssetId) : null, [pendingPremiumAssetId]);
     const pendingPremiumProduct = pendingPremiumGate ? getPremiumProduct(pendingPremiumGate.productId) : null;
@@ -71,7 +78,7 @@ export const LifestyleAssets: React.FC<LifestyleAssetsProps> = ({ player, onBack
                         <div className="font-bold text-white text-sm leading-tight">{item.name}</div>
                         {premiumGate && (
                             <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${hasPremiumAccess ? 'border-amber-500/30 bg-amber-500/10 text-amber-300' : 'border-fuchsia-500/30 bg-fuchsia-500/10 text-fuchsia-300'}`}>
-                                <Crown size={10} /> Premium
+                                <Crown size={10} /> {tr('lifestyle.premium')}
                             </div>
                         )}
                     </div>
@@ -90,11 +97,11 @@ export const LifestyleAssets: React.FC<LifestyleAssetsProps> = ({ player, onBack
 
                     {/* Generic Stats */}
                     <div className="text-[10px] text-zinc-500 uppercase tracking-wide mt-1">
-                        {item.type === 'Clothing' ? item.style : item.type === 'Vehicle' ? `+${item.reputationBonus} Rep` : `+${item.moodBonus} Mood`}
+                        {item.type === 'Clothing' ? item.style : item.type === 'Vehicle' ? `+${item.reputationBonus} ${tr('lifestyle.rep')}` : `+${item.moodBonus} ${tr('lifestyle.mood')}`}
                     </div>
                     {isLockedPremium && premiumGate && (
                         <div className="text-[10px] text-amber-300 mt-1 font-semibold">
-                            Requires {premiumGate.title}
+                            {tr('lifestyle.requires', { title: premiumGate.title })}
                         </div>
                     )}
                 </div>
@@ -104,10 +111,10 @@ export const LifestyleAssets: React.FC<LifestyleAssetsProps> = ({ player, onBack
                     <div className="flex gap-2">
                         {item.type === 'Property' && (
                             <button onClick={() => onSetResidence(item.id)} disabled={player.residenceId === item.id} className={`px-3 py-1 rounded text-[10px] font-bold ${player.residenceId === item.id ? 'bg-emerald-900 text-emerald-400' : 'bg-zinc-800 text-zinc-300'}`}>
-                                {player.residenceId === item.id ? 'Home' : 'Move In'}
+                                {player.residenceId === item.id ? tr('lifestyle.home') : tr('lifestyle.moveIn')}
                             </button>
                         )}
-                        <button onClick={() => onSell(item.id)} className="bg-zinc-800 text-zinc-400 px-3 py-1 rounded text-[10px] hover:text-rose-400">Sell</button>
+                        <button onClick={() => onSell(item.id)} className="bg-zinc-800 text-zinc-400 px-3 py-1 rounded text-[10px] hover:text-rose-400">{tr('lifestyle.sell')}</button>
                     </div>
                 ) : (
                     <>
@@ -123,7 +130,7 @@ export const LifestyleAssets: React.FC<LifestyleAssetsProps> = ({ player, onBack
                             disabled={!isLockedPremium && player.money < item.price}
                             className={`mt-1 px-3 py-1 rounded text-[10px] font-bold disabled:opacity-50 ${isLockedPremium ? 'bg-fuchsia-500 text-white' : 'bg-white text-black'}`}
                         >
-                            {isLockedPremium ? 'Unlock Collection' : item.type === 'Clothing' ? 'Buy' : 'Customize'}
+                            {isLockedPremium ? tr('lifestyle.unlockCollection') : item.type === 'Clothing' ? tr('lifestyle.buy') : tr('lifestyle.customize')}
                         </button>
                     </>
                 )}
@@ -156,15 +163,15 @@ export const LifestyleAssets: React.FC<LifestyleAssetsProps> = ({ player, onBack
     if (mode === 'HUB') {
         return (
             <div className="space-y-4 animate-in slide-in-from-right duration-300 pb-24">
-                <div className="flex items-center gap-4 mb-4"><button onClick={onBack}><ArrowLeft/></button><h2 className="text-2xl font-bold">My Assets</h2></div>
+                <div className="flex items-center gap-4 mb-4"><button onClick={onBack}><ArrowLeft/></button><h2 className="text-2xl font-bold">{tr('lifestyle.myAssets')}</h2></div>
                 <button onClick={() => { setCategory('PROPERTY'); setMode('DETAILS'); }} className="w-full glass-card p-5 rounded-2xl flex items-center justify-between group hover:bg-white/5 transition-all">
-                    <div className="flex items-center gap-4"><div className="p-3 bg-blue-500/10 text-blue-400 rounded-xl"><Home size={24}/></div><div className="text-left"><div className="font-bold text-lg text-white">Real Estate</div><div className="text-xs text-zinc-400">Properties</div></div></div><ChevronRight className="text-zinc-600 group-hover:text-zinc-400"/>
+                    <div className="flex items-center gap-4"><div className="p-3 bg-blue-500/10 text-blue-400 rounded-xl"><Home size={24}/></div><div className="text-left"><div className="font-bold text-lg text-white">{tr('lifestyle.realEstate')}</div><div className="text-xs text-zinc-400">{tr('lifestyle.properties')}</div></div></div><ChevronRight className="text-zinc-600 group-hover:text-zinc-400"/>
                 </button>
                 <button onClick={() => { setCategory('VEHICLE'); setMode('DETAILS'); }} className="w-full glass-card p-5 rounded-2xl flex items-center justify-between group hover:bg-white/5 transition-all">
-                    <div className="flex items-center gap-4"><div className="p-3 bg-amber-500/10 text-amber-400 rounded-xl"><Car size={24}/></div><div className="text-left"><div className="font-bold text-lg text-white">Vehicles</div><div className="text-xs text-zinc-400">Garage</div></div></div><ChevronRight className="text-zinc-600 group-hover:text-zinc-400"/>
+                    <div className="flex items-center gap-4"><div className="p-3 bg-amber-500/10 text-amber-400 rounded-xl"><Car size={24}/></div><div className="text-left"><div className="font-bold text-lg text-white">{tr('lifestyle.vehicles')}</div><div className="text-xs text-zinc-400">{tr('lifestyle.garage')}</div></div></div><ChevronRight className="text-zinc-600 group-hover:text-zinc-400"/>
                 </button>
                 <button onClick={() => { setCategory('CLOTHING'); setMode('DETAILS'); }} className="w-full glass-card p-5 rounded-2xl flex items-center justify-between group hover:bg-white/5 transition-all">
-                    <div className="flex items-center gap-4"><div className="p-3 bg-pink-500/10 text-pink-400 rounded-xl"><Shirt size={24}/></div><div className="text-left"><div className="font-bold text-lg text-white">Wardrobe</div><div className="text-xs text-zinc-400">Fashion</div></div></div><ChevronRight className="text-zinc-600 group-hover:text-zinc-400"/>
+                    <div className="flex items-center gap-4"><div className="p-3 bg-pink-500/10 text-pink-400 rounded-xl"><Shirt size={24}/></div><div className="text-left"><div className="font-bold text-lg text-white">{tr('lifestyle.wardrobe')}</div><div className="text-xs text-zinc-400">{tr('lifestyle.fashion')}</div></div></div><ChevronRight className="text-zinc-600 group-hover:text-zinc-400"/>
                 </button>
             </div>
         );
@@ -173,28 +180,28 @@ export const LifestyleAssets: React.FC<LifestyleAssetsProps> = ({ player, onBack
     return (
         <div className="space-y-4 animate-in slide-in-from-right duration-300 pb-24">
             <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-4"><button onClick={() => { if (mode === 'MARKET') setMode('DETAILS'); else setMode('HUB'); }}><ArrowLeft/></button><h2 className="text-2xl font-bold">{mode === 'MARKET' ? 'Market' : category}</h2></div>
-                {mode === 'DETAILS' && <button onClick={() => setMode('MARKET')} className="bg-white text-black px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2"><ShoppingBag size={14}/> Shop</button>}
+                <div className="flex items-center gap-4"><button onClick={() => { if (mode === 'MARKET') setMode('DETAILS'); else setMode('HUB'); }}><ArrowLeft/></button><h2 className="text-2xl font-bold">{mode === 'MARKET' ? tr('lifestyle.market') : trFallback(`lifestyle.category.${category}`, category)}</h2></div>
+                {mode === 'DETAILS' && <button onClick={() => setMode('MARKET')} className="bg-white text-black px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2"><ShoppingBag size={14}/> {tr('lifestyle.shop')}</button>}
             </div>
             
             {category === 'CLOTHING' && (
                 <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
                     {['ALL', 'OUTFIT', 'TOP', 'BOTTOM', 'SHOES', 'EYEWEAR', 'WATCH', 'BAG', 'JEWELRY'].map((f) => (
-                        <button key={f} onClick={() => setFilter(f)} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold whitespace-nowrap transition-colors ${filter === f ? 'bg-indigo-600 text-white' : 'bg-zinc-900 text-zinc-500'}`}>{f}</button>
+                        <button key={f} onClick={() => setFilter(f)} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold whitespace-nowrap transition-colors ${filter === f ? 'bg-indigo-600 text-white' : 'bg-zinc-900 text-zinc-500'}`}>{trFallback(`lifestyle.filter.${f}`, f)}</button>
                     ))}
                 </div>
             )}
             {category === 'VEHICLE' && (
                 <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
                     {['ALL', 'Car', 'Motorcycle', 'Boat', 'Aircraft'].map((f) => (
-                        <button key={f} onClick={() => setFilter(f)} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold whitespace-nowrap transition-colors ${filter === f ? 'bg-amber-600 text-white' : 'bg-zinc-900 text-zinc-500'}`}>{f}</button>
+                        <button key={f} onClick={() => setFilter(f)} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold whitespace-nowrap transition-colors ${filter === f ? 'bg-amber-600 text-white' : 'bg-zinc-900 text-zinc-500'}`}>{trFallback(`lifestyle.filter.${f}`, f)}</button>
                     ))}
                 </div>
             )}
 
             <div className="space-y-3">
                 {getItems(mode === 'MARKET').map(item => renderCard(item, mode === 'DETAILS'))}
-                {getItems(mode === 'MARKET').length === 0 && <div className="text-center text-zinc-500 text-sm py-10">No items found.</div>}
+                {getItems(mode === 'MARKET').length === 0 && <div className="text-center text-zinc-500 text-sm py-10">{tr('lifestyle.noItems')}</div>}
             </div>
 
             {pendingPremiumGate && pendingPremiumProduct && (
@@ -205,15 +212,15 @@ export const LifestyleAssets: React.FC<LifestyleAssetsProps> = ({ player, onBack
                                 <Lock size={20} />
                             </div>
                             <div>
-                                <div className="text-white font-black text-xl">Premium Asset</div>
+                                <div className="text-white font-black text-xl">{tr('lifestyle.premiumAsset')}</div>
                                 <div className="text-sm text-zinc-400 leading-relaxed">
-                                    This item is visible in the market for everyone, but it needs <span className="text-white font-semibold">{pendingPremiumGate.title}</span> before you can buy it with in-game cash.
+                                    {tr('lifestyle.premiumAssetSub', { title: pendingPremiumGate.title })}
                                 </div>
                             </div>
                         </div>
 
                         <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4">
-                            <div className="text-xs font-black uppercase tracking-[0.2em] text-amber-300">Unlock Perk</div>
+                            <div className="text-xs font-black uppercase tracking-[0.2em] text-amber-300">{tr('lifestyle.unlockPerk')}</div>
                             <div className="text-white font-bold mt-1">{pendingPremiumGate.title}</div>
                             <div className="text-sm text-zinc-400 mt-1">{pendingPremiumGate.teaser}</div>
                             <div className="text-amber-200 font-black mt-3">{pendingPremiumProduct.priceLabel}</div>
@@ -224,7 +231,7 @@ export const LifestyleAssets: React.FC<LifestyleAssetsProps> = ({ player, onBack
                                 onClick={() => setPendingPremiumAssetId(null)}
                                 className="flex-1 py-3 rounded-2xl border border-zinc-800 bg-zinc-900 text-zinc-300 font-bold"
                             >
-                                Maybe Later
+                                {tr('lifestyle.maybeLater')}
                             </button>
                             <button
                                 onClick={() => {
@@ -233,7 +240,7 @@ export const LifestyleAssets: React.FC<LifestyleAssetsProps> = ({ player, onBack
                                 }}
                                 className="flex-1 py-3 rounded-2xl bg-white text-black font-black"
                             >
-                                Unlock Now
+                                {tr('lifestyle.unlockNow')}
                             </button>
                         </div>
                     </div>

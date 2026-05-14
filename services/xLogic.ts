@@ -4,6 +4,7 @@ import { NPC_DATABASE } from './npcLogic';
 import { AWARD_GOSSIP_TEMPLATES } from './awardLogic';
 import { getEnabledGlobalCreatorProfiles } from './youtubeLogic';
 import { normalizeUniverseMap } from './universeLogic';
+import { getPlayerLanguage } from './i18n';
 
 // --- TWEET TEMPLATES ---
 
@@ -23,6 +24,22 @@ const GENERAL_TWEETS = [
     "Who's watching the game tonight?"
 ];
 
+const GENERAL_TWEETS_PT = [
+    "Acabei de tomar o melhor café da minha vida. ☕",
+    "Mais alguém sente que hoje vai ser um ótimo dia?",
+    "Lendo roteiros o dia inteiro. 📖",
+    "Trânsito de LA já virou traço de personalidade.",
+    "Por que é tão difícil achar sushi bom às 2h da manhã?",
+    "Pensando em começar um podcast. Opiniões?",
+    "Vida de set é a melhor vida. 🎬",
+    "Manifestando energia boa para todo mundo lendo isso.",
+    "Podemos pular direto para o fim de semana?",
+    "O cinema voltou.",
+    "Acabei de ver uma obra-prima. Sem spoilers.",
+    "Treino feito. Agora vou comer tudo.",
+    "Quem vai assistir ao jogo hoje?"
+];
+
 const NEWS_TWEETS = [
     "BREAKING: Studio execs hinting at a massive merger.",
     "Box Office Update: Numbers are looking strong for the summer slate.",
@@ -30,6 +47,15 @@ const NEWS_TWEETS = [
     "Streaming services announced price hikes again. 📉",
     "Award season predictions are already heating up.",
     "Just In: Production halted on major blockbuster due to weather."
+];
+
+const NEWS_TWEETS_PT = [
+    "URGENTE: executivos de estúdio indicam uma fusão enorme.",
+    "Bilheteria: os números parecem fortes para a temporada de verão.",
+    "Rumores dizem que um grande nome está saindo de sua franquia.",
+    "Serviços de streaming anunciaram aumento de preço de novo. 📉",
+    "Previsões da temporada de prêmios já estão esquentando.",
+    "Agora: produção de grande blockbuster pausada por causa do clima."
 ];
 
 const UNIVERSE_TWEETS = [
@@ -43,9 +69,34 @@ const UNIVERSE_TWEETS = [
     "The casting for the new {Universe} villain is absolutely perfect."
 ];
 
+const UNIVERSE_TWEETS_PT = [
+    "Estou cravando agora: o próximo filme de {Universe} vai quebrar recordes.",
+    "Quem mais vai ficar acordado até 3h para ver o trailer novo de {Universe}?",
+    "Se não trouxerem o elenco original de {Universe}, vai dar ruim.",
+    "Vi a arte conceitual vazada de {Universe}. Estou GRITANDO.",
+    "Podemos falar da cena pós-créditos do último filme de {Universe}?",
+    "Mapeei toda a linha do tempo de {Universe} na parede. Preciso de ajuda.",
+    "Opinião impopular: a Fase 1 de {Universe} foi o auge.",
+    "O elenco do novo vilão de {Universe} ficou perfeito."
+];
+
 const HASHTAGS = [
     "#ActorEmpire", "#Hollywood", "#FilmTwitter", "#SetLife", "#Cinema", 
     "#Trending", "#MondayMotivation", "#ThrowbackThursday", "#NewRelease", "#IndieFilm"
+];
+
+const REPLIES_PT = [
+    'A timeline precisava desse contexto.',
+    'Film Twitter já está debatendo isso.',
+    'Alguém no PR acabou de abrir o grupo.',
+    'Isso vai envelhecer de um jeito interessante.'
+];
+
+const QUOTES_PT = [
+    'Isso explica muita coisa.',
+    'As pessoas não estão prontas para essa conversa.',
+    'Salvando isso para depois.',
+    'A indústria está se mexendo estranho hoje.'
 ];
 
 // --- GENERATORS ---
@@ -54,6 +105,7 @@ const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
 
 export const generateXFeed = (player: Player): XPost[] => {
     const feed: XPost[] = [];
+    const isPt = getPlayerLanguage(player) === 'pt-BR';
     const creatorProfiles = getEnabledGlobalCreatorProfiles(player).map(creator => ({
         ...creator,
         tier: 'A_LIST' as const
@@ -90,12 +142,12 @@ export const generateXFeed = (player: Player): XPost[] => {
              content += " #AwardsSeason";
         } else if (isUniverseGossip) {
              const randomUniverse = pick(universes);
-             content = pick(UNIVERSE_TWEETS).replace(/{Universe}/g, randomUniverse.name);
+             content = pick(isPt ? UNIVERSE_TWEETS_PT : UNIVERSE_TWEETS).replace(/{Universe}/g, randomUniverse.name);
              content += ` #${randomUniverse.name.replace(/\s+/g, '')}`;
         } else if (isNews && npc.tier === 'A_LIST') {
-            content = pick(NEWS_TWEETS);
+            content = pick(isPt ? NEWS_TWEETS_PT : NEWS_TWEETS);
         } else {
-            content = pick(GENERAL_TWEETS);
+            content = pick(isPt ? GENERAL_TWEETS_PT : GENERAL_TWEETS);
         }
 
         // Add hashtags randomly
@@ -124,18 +176,18 @@ export const generateXFeed = (player: Player): XPost[] => {
             isVerified: npc.tier === 'A_LIST' || npc.tier === 'ESTABLISHED',
             postType: isNews ? 'CAREER' : isUniverseGossip ? 'FILM_OPINION' : 'GENERAL',
             sentiment: isNews ? 'INDUSTRY' : 'NEUTRAL',
-            replyList: [
+            replyList: (isPt ? REPLIES_PT : [
                 'The timeline needed this context.',
                 'Film Twitter is already debating this.',
                 'Someone in PR just opened the group chat.',
                 'This is going to age interestingly.'
-            ].sort(() => 0.5 - Math.random()).slice(0, 3),
-            quoteList: [
+            ]).sort(() => 0.5 - Math.random()).slice(0, 3),
+            quoteList: (isPt ? QUOTES_PT : [
                 'This explains a lot.',
                 'People are not ready for this conversation.',
                 'Bookmarking this for later.',
                 'The industry is moving weird today.'
-            ].sort(() => 0.5 - Math.random()).slice(0, 2)
+            ]).sort(() => 0.5 - Math.random()).slice(0, 2)
         });
     }
 

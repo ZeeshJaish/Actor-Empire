@@ -30,10 +30,10 @@ export const saveGameData = async (key: string, data: any): Promise<void> => {
       return new Promise((resolve, reject) => {
         const transaction = db.transaction(STORE_NAME, 'readwrite');
         const store = transaction.objectStore(STORE_NAME);
-        // We clone the data to ensure it's a clean object for IDB
-        // (removes any non-cloneable reactive proxies if using specialized state libs, though standard React state is fine)
-        const cleanData = JSON.parse(JSON.stringify(data)); 
-        const request = store.put(cleanData, key);
+        // IndexedDB already performs a structured clone. Avoid an extra JSON
+        // stringify/parse here because large long-running saves can stutter
+        // mobile WebViews when autosave runs.
+        const request = store.put(data, key);
         
         request.onerror = () => {
             console.error("Error saving game:", request.error);

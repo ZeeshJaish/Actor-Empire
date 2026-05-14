@@ -4,6 +4,7 @@ import { Player, Message, AuditionOpportunity, SponsorshipOffer, NegotiationData
 import { ArrowLeft, Star, DollarSign, Calendar, CheckCircle, Lock, Trash2, Mail, Heart, Play, Users } from 'lucide-react';
 import { ProjectDetailView } from '../../components/ProjectDetailView';
 import { APP_DISPLAY_VERSION } from '../../services/appVersion';
+import { getPlayerLanguage, t } from '../../services/i18n';
 
 interface MessagesAppProps {
   player: Player;
@@ -16,6 +17,8 @@ interface MessagesAppProps {
 export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAccept, onDelete, onMarkRead }) => {
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const language = getPlayerLanguage(player);
+  const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
   
   // State for the full-screen contract view
   const [contractViewData, setContractViewData] = useState<{
@@ -59,7 +62,7 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
   const handleCounterOffer = (salary: number, royalty: number) => {
       // Simulate counter offer logic (In a real app this would update the message state)
       // For this UI demo, we will just alert and close for now, or assume it's accepted for gameplay flow
-      alert(`Counter Offer Sent: $${salary.toLocaleString()} + ${royalty}% Royalty.\n\n(Simulated: The studio accepts!)`);
+      alert(tr('messages.counterOfferSent', { salary: salary.toLocaleString(), royalty }));
       
       // Update the local data to reflect the "Accepted" counter
       if (selectedMessage && contractViewData?.data) {
@@ -107,10 +110,10 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
               // Standard Props
               onBack={() => setContractViewData(null)}
               onAction={handleSignDeal}
-              actionLabel={isNeg ? "Accept Current Offer" : "Sign Contract"}
+              actionLabel={isNeg ? tr('messages.acceptCurrentOffer') : tr('messages.signContract')}
               isProcessing={isProcessing}
               actionColorClass={isNeg ? 'bg-emerald-600 text-white hover:bg-emerald-500' : 'bg-white text-black hover:bg-zinc-200'}
-              headerTitle={isNeg ? "Deal Negotiation" : "Official Contract"}
+              headerTitle={isNeg ? tr('messages.dealNegotiation') : tr('messages.officialContract')}
           />
       );
   }
@@ -125,10 +128,10 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                 onClick={() => selectedMessage ? setSelectedMessage(null) : onBack()} 
                 className="flex items-center gap-1 font-medium text-slate-600 hover:text-slate-900"
             >
-                <ArrowLeft size={20} /> {selectedMessage ? 'Inbox' : 'Home'}
+                <ArrowLeft size={20} /> {selectedMessage ? tr('messages.inbox') : tr('messages.home')}
             </button>
             <div className="font-bold text-lg flex-1 text-center pr-8">
-                {selectedMessage ? 'Message' : 'Inbox'}
+                {selectedMessage ? tr('messages.message') : tr('messages.inbox')}
             </div>
         </div>
 
@@ -141,7 +144,7 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                     {messages.length === 0 ? (
                         <div className="flex flex-col items-center justify-center h-[60vh] text-slate-400">
                             <div className="w-16 h-16 bg-slate-200 rounded-full flex items-center justify-center mb-4 text-2xl">📭</div>
-                            <p className="font-medium">No messages</p>
+                            <p className="font-medium">{tr('messages.noMessages')}</p>
                         </div>
                     ) : (
                         <div className="divide-y divide-slate-200 bg-white">
@@ -162,10 +165,10 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                                         <div className="flex justify-between items-baseline mb-1">
                                             <div className="font-bold text-slate-900 truncate pr-2">{msg.sender}</div>
                                             <div className="text-right">
-                                                <div className="text-[10px] text-slate-400 font-mono">Wk {msg.weekSent}</div>
+                                                <div className="text-[10px] text-slate-400 font-mono">{tr('common.week')} {msg.weekSent}</div>
                                                 {typeof msg.expiresIn === 'number' && (
                                                     <div className={`text-[10px] font-semibold ${msg.expiresIn <= 1 ? 'text-rose-500' : 'text-amber-500'}`}>
-                                                        {msg.expiresIn}w left
+                                                        {tr('messages.weeksLeft', { count: msg.expiresIn })}
                                                     </div>
                                                 )}
                                             </div>
@@ -245,7 +248,7 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                                     <div className="absolute top-0 right-0 p-6 opacity-10"><Star size={120} /></div>
                                     <div className="relative z-10">
                                         <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                                            <Star size={14} className="text-amber-400"/> Cast Offer
+                                            <Star size={14} className="text-amber-400"/> {tr('messages.castOffer')}
                                         </div>
                                         
                                         {(() => {
@@ -261,19 +264,19 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
 
                                             return (
                                                 <>
-                                                    <h3 className="text-2xl font-bold mb-1 leading-tight">{opp?.projectName || 'Offer details unavailable'}</h3>
+                                                    <h3 className="text-2xl font-bold mb-1 leading-tight">{opp?.projectName || tr('messages.offerUnavailable')}</h3>
                                                     <p className="text-sm text-slate-400 mb-6">
-                                                        {opp ? `${opp.roleType} Role • ${opp.genre}` : 'This contract is missing some data.'}
+                                                        {opp ? `${opp.roleType} Role • ${opp.genre}` : tr('messages.contractMissing')}
                                                     </p>
                                                     
                                                     <div className="flex items-end justify-between mb-6 border-t border-white/10 pt-4">
                                                         <div>
-                                                            <div className="text-[10px] text-slate-500 uppercase font-bold">Salary</div>
+                                                            <div className="text-[10px] text-slate-500 uppercase font-bold">{tr('messages.salary')}</div>
                                                             <div className="text-xl font-mono font-bold text-emerald-400">${safePay.toLocaleString()}</div>
                                                         </div>
                                                         {opp?.royaltyPercentage && opp.royaltyPercentage > 0 && (
                                                             <div className="text-right">
-                                                                <div className="text-[10px] text-slate-500 uppercase font-bold">Points</div>
+                                                                <div className="text-[10px] text-slate-500 uppercase font-bold">{tr('messages.points')}</div>
                                                                 <div className="text-xl font-mono font-bold text-amber-400">{opp.royaltyPercentage}%</div>
                                                             </div>
                                                         )}
@@ -284,7 +287,7 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                                                         disabled={!hasValidContract}
                                                         className="w-full py-4 bg-white text-slate-900 rounded-xl font-bold text-sm hover:bg-slate-100 transition-colors shadow-lg flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
                                                     >
-                                                        <CheckCircle size={18}/> Review Contract
+                                                        <CheckCircle size={18}/> {tr('messages.reviewContract')}
                                                     </button>
                                                 </>
                                             );
@@ -300,7 +303,7 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                                     <div className="relative z-10">
                                         <h3 className="text-2xl font-bold mb-2">{(selectedMessage.data as any).brandName}</h3>
                                         <p className="text-sm text-emerald-200/80 mb-6">{(selectedMessage.data as any).description}</p>
-                                        <button onClick={handleSignDeal} className="w-full py-4 bg-emerald-500 text-white rounded-xl font-bold text-sm">Accept Deal</button>
+                                        <button onClick={handleSignDeal} className="w-full py-4 bg-emerald-500 text-white rounded-xl font-bold text-sm">{tr('messages.acceptDeal')}</button>
                                     </div>
                                 </div>
                             )}
@@ -314,19 +317,19 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                                             return (
                                                 <>
                                                     <div className="text-xs font-bold text-red-300 uppercase tracking-widest mb-3 flex items-center gap-2">
-                                                        <Play size={14}/> Creator Collab
+                                                        <Play size={14}/> {tr('messages.creatorCollab')}
                                                     </div>
                                                     <h3 className="text-2xl font-bold mb-1">{collab.creatorName}</h3>
                                                     <div className="text-sm text-red-200/80 mb-2">{collab.creatorHandle}</div>
                                                     <div className="text-lg font-semibold mb-3">{collab.conceptTitle}</div>
                                                     <p className="text-sm text-red-100/80 mb-5">{collab.description}</p>
                                                     <div className="grid grid-cols-2 gap-3 text-xs mb-5">
-                                                        <div className="bg-white/5 rounded-xl p-3">Format: <strong>{collab.requiredType.replace(/_/g, ' ')}</strong></div>
-                                                        <div className="bg-white/5 rounded-xl p-3">Energy: <strong>{collab.energyCost}E</strong></div>
-                                                        <div className="bg-white/5 rounded-xl p-3">Potential Views: <strong>~{collab.bonusViews.toLocaleString()}</strong></div>
-                                                        <div className="bg-white/5 rounded-xl p-3">Potential Subs: <strong>~+{collab.bonusSubscribers.toLocaleString()}</strong></div>
+                                                        <div className="bg-white/5 rounded-xl p-3">{tr('messages.format')}: <strong>{collab.requiredType.replace(/_/g, ' ')}</strong></div>
+                                                        <div className="bg-white/5 rounded-xl p-3">{tr('messages.energy')}: <strong>{collab.energyCost}E</strong></div>
+                                                        <div className="bg-white/5 rounded-xl p-3">{tr('messages.potentialViews')}: <strong>~{collab.bonusViews.toLocaleString()}</strong></div>
+                                                        <div className="bg-white/5 rounded-xl p-3">{tr('messages.potentialSubs')}: <strong>~+{collab.bonusSubscribers.toLocaleString()}</strong></div>
                                                     </div>
-                                                    <button onClick={handleSignDeal} className="w-full py-4 bg-red-500 text-white rounded-xl font-bold text-sm">Accept Collab</button>
+                                                    <button onClick={handleSignDeal} className="w-full py-4 bg-red-500 text-white rounded-xl font-bold text-sm">{tr('messages.acceptCollab')}</button>
                                                 </>
                                             );
                                         })()}
@@ -343,18 +346,18 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                                             return (
                                                 <>
                                                     <div className="text-xs font-bold text-amber-300 uppercase tracking-widest mb-3 flex items-center gap-2">
-                                                        <Play size={14}/> Channel Integration
+                                                        <Play size={14}/> {tr('messages.channelIntegration')}
                                                     </div>
                                                     <h3 className="text-2xl font-bold mb-1">{deal.brandName}</h3>
                                                     <div className="text-sm text-amber-200/80 mb-2">{deal.category}</div>
                                                     <p className="text-sm text-amber-100/80 mb-5">{deal.description}</p>
                                                     <div className="grid grid-cols-2 gap-3 text-xs mb-5">
-                                                        <div className="bg-white/5 rounded-xl p-3">Format: <strong>{deal.requiredType.replace(/_/g, ' ')}</strong></div>
-                                                        <div className="bg-white/5 rounded-xl p-3">Energy: <strong>{deal.energyCost}E</strong></div>
-                                                        <div className="bg-white/5 rounded-xl p-3">Payout: <strong>${deal.payout.toLocaleString()}</strong></div>
-                                                        <div className="bg-white/5 rounded-xl p-3">Penalty: <strong>${deal.penalty.toLocaleString()}</strong></div>
+                                                        <div className="bg-white/5 rounded-xl p-3">{tr('messages.format')}: <strong>{deal.requiredType.replace(/_/g, ' ')}</strong></div>
+                                                        <div className="bg-white/5 rounded-xl p-3">{tr('messages.energy')}: <strong>{deal.energyCost}E</strong></div>
+                                                        <div className="bg-white/5 rounded-xl p-3">{tr('messages.payout')}: <strong>${deal.payout.toLocaleString()}</strong></div>
+                                                        <div className="bg-white/5 rounded-xl p-3">{tr('messages.penalty')}: <strong>${deal.penalty.toLocaleString()}</strong></div>
                                                     </div>
-                                                    <button onClick={handleSignDeal} className="w-full py-4 bg-amber-500 text-black rounded-xl font-bold text-sm">Accept Deal</button>
+                                                    <button onClick={handleSignDeal} className="w-full py-4 bg-amber-500 text-black rounded-xl font-bold text-sm">{tr('messages.acceptDeal')}</button>
                                                 </>
                                             );
                                         })()}
@@ -369,7 +372,7 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                         onClick={handleDelete}
                         className="w-full mt-6 py-4 border border-slate-200 text-slate-400 rounded-xl font-bold text-xs hover:bg-rose-50 hover:text-rose-500 hover:border-rose-200 transition-colors flex items-center justify-center gap-2"
                     >
-                        <Trash2 size={16}/> Delete Message
+                        <Trash2 size={16}/> {tr('messages.delete')}
                     </button>
 
                 </div>

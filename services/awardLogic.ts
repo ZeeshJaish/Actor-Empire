@@ -19,6 +19,24 @@ export const AWARD_CALENDAR: Record<number, AwardDefinition> = {
     38: { type: 'EMMY', name: 'Primetime Emmy Awards', prestige: 2.0, inviteWeek: 34 }, 
 };
 
+const getFallbackAwardNominee = (cat: string, salt: string) => {
+    const isActress = cat.includes('Actress');
+    const isActor = cat.includes('Actor') && !cat.includes('Actress');
+    const isDirector = cat.includes('Director');
+    const pool = NPC_DATABASE.filter(n => {
+        if (isActress) return n.gender === 'FEMALE';
+        if (isActor) return n.gender === 'MALE';
+        if (isDirector) return n.occupation === 'DIRECTOR';
+        return true;
+    });
+    if (pool.length > 0) {
+        const index = Math.abs(Array.from(salt).reduce((sum, char) => sum + char.charCodeAt(0), 0)) % pool.length;
+        return pool[index].name;
+    }
+    if (isDirector) return 'Avery Stone';
+    return isActress ? 'Maya Hart' : 'Julian Cross';
+};
+
 export const getAwardCeremonyYear = (
     definition: AwardDefinition,
     ceremonyWeek: number,
@@ -348,8 +366,8 @@ export const generateFullBallot = (player: Player, awardType: AwardType, playerN
                 // Determine nominee name based on category
                 const linkedActor = p.leadActorId ? NPC_DATABASE.find(n => n.id === p.leadActorId) : null;
                 let nomineeName = p.leadActorName || linkedActor?.name || p.directorName || p.title;
-                if (isActor || isActress) nomineeName = p.leadActorName || linkedActor?.name || "Industry Nominee";
-                else if (isDirector) nomineeName = p.directorName || "Guest Director";
+                if (isActor || isActress) nomineeName = p.leadActorName || linkedActor?.name || getFallbackAwardNominee(cat, p.id || p.title);
+                else if (isDirector) nomineeName = p.directorName || getFallbackAwardNominee(cat, p.id || p.title);
                 else if (reallyIsProjectAward) nomineeName = "Producers";
 
                 categoryNoms.push({
@@ -491,8 +509,8 @@ export const generateSeasonWinners = (player: Player, awardType: AwardType, awar
                 projName = winnerProj.title;
                 usedNames.add(projName);
 
-                if (isActor || isActress) winnerName = winnerProj.leadActorName;
-                else if (isDirector) winnerName = winnerProj.directorName;
+                if (isActor || isActress) winnerName = winnerProj.leadActorName || getFallbackAwardNominee(cat, winnerProj.id || winnerProj.title);
+                else if (isDirector) winnerName = winnerProj.directorName || getFallbackAwardNominee(cat, winnerProj.id || winnerProj.title);
                 else if (isProjectAward) winnerName = "Producers";
                 else winnerName = winnerProj.leadActorName; 
             } else {

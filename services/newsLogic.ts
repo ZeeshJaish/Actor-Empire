@@ -1,9 +1,10 @@
 
-import { Player, NewsItem, NewsCategory, ActiveRelease, Commitment, ProjectType, BudgetTier } from '../types';
+import { GameLanguage, Player, NewsItem, NewsCategory, ActiveRelease, Commitment, ProjectType, BudgetTier } from '../types';
 import { NPC_DATABASE } from './npcLogic';
 import { STUDIO_CATALOG } from './studioLogic';
 import { AWARD_GOSSIP_TEMPLATES, SNUB_TEMPLATES } from './awardLogic'; // Import templates
 import { normalizeUniverseMap } from './universeLogic';
+import { getPlayerLanguage } from './i18n';
 
 // ... (Keep existing TEMPLATES arrays like INDUSTRY_TEMPLATES, NPC_HEADLINES, etc.)
 const INDUSTRY_TEMPLATES = [
@@ -280,8 +281,179 @@ const UNIVERSE_NEWS_TEMPLATES = [
 ];
 
 const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
+const usePortuguese = (language: GameLanguage) => language === 'pt-BR';
+const pickLocalized = (language: GameLanguage, english: string[], portuguese: string[]) => pick(usePortuguese(language) ? portuguese : english);
 const hasPublishedReleaseNews = (rel: ActiveRelease, key: string): boolean =>
     Array.isArray(rel.generatedNewsKeys) && rel.generatedNewsKeys.includes(key);
+
+const INDUSTRY_TEMPLATES_PT = [
+    "Executivos de estúdio veem sinais de cansaço com franquias entre o público jovem.",
+    "O cinema independente registra alta nas vendas de ingressos neste trimestre.",
+    "A guerra do streaming esquenta com plataformas disputando direitos exclusivos.",
+    "Negociações sindicais travam e aumentam o medo de pausa nas produções.",
+    "Mercados internacionais viram motor decisivo para grandes blockbusters.",
+    "Críticos dizem que a era da estrela de cinema está voltando.",
+    "O terror segue como o gênero de maior retorno para estúdios.",
+    "Comédias românticas ensaiam uma volta surpresa nesta temporada.",
+    "Marcas de luxo aumentam investimento em campanhas com celebridades.",
+    "Streamers globais buscam sucessos regionais com potencial de crossover."
+];
+
+const NPC_HEADLINES_PT = [
+    "{Name} deve estrelar uma nova cinebiografia.",
+    "{Name} deixa projeto por diferenças criativas.",
+    "{Name} fecha acordo de primeira opção com um grande estúdio.",
+    "Rumores crescem sobre {Name} em uma franquia de super-heróis.",
+    "{Name} é visto procurando locações na Itália.",
+    "Críticos elogiam a transformação de {Name} no papel mais recente.",
+    "{Name} estaria negociando um thriller caro para streaming.",
+    "{Name} entra na mira de uma série limitada de prestígio.",
+    "{Name} vira assunto de prêmios após exibição privada.",
+    "{Name} alimenta rumores de participação surpresa em franquia."
+];
+
+const HIT_HEADLINES_PT = [
+    "'{Title}' domina as bilheterias pela segunda semana.",
+    "O público lota sessões de '{Title}' e surpreende analistas.",
+    "'{Title}' vira fenômeno cultural.",
+    "Bilheteria global pega fogo com '{Title}'.",
+    "'{Title}' transforma bom boca a boca em força real de mercado.",
+    "'{Title}' prova que repetição de público ainda muda tudo.",
+    "'{Title}' parece o sucesso que os estúdios esperavam."
+];
+
+const UNIVERSE_HIT_HEADLINES_PT = [
+    "'{Title}' prova que o universo cinematográfico está mais forte do que nunca.",
+    "Fãs chamam '{Title}' de melhor entrada da franquia até agora.",
+    "Bilheteria explode enquanto '{Title}' expande a mitologia do universo.",
+    "'{Title}' prepara perfeitamente o próximo grande crossover."
+];
+
+const FLOP_HEADLINES_PT = [
+    "'{Title}' tropeça na estreia com abertura fraca.",
+    "Preocupações de orçamento cercam '{Title}' após desempenho abaixo do esperado.",
+    "'{Title}' não consegue se conectar com seu público central.",
+    "Erro de marketing é apontado no desempenho decepcionante de '{Title}'.",
+    "A queda de '{Title}': o que deu errado?",
+    "'{Title}' estreia abaixo até das previsões cautelosas."
+];
+
+const UNIVERSE_FLOP_HEADLINES_PT = [
+    "Cansaço de franquia? '{Title}' fica abaixo do esperado.",
+    "'{Title}' não captura a magia das entradas anteriores do universo.",
+    "Fãs se decepcionam com '{Title}' e questionam a direção do universo.",
+    "Um raro tropeço da franquia: '{Title}' fracassa nas bilheterias."
+];
+
+const CRITIC_LOVED_HEADLINES_PT = [
+    "Críticos chamam '{Title}' de obra-prima moderna.",
+    "'{Title}' gera burburinho inicial de Oscar.",
+    "Uma conquista impressionante: '{Title}' conquista até céticos.",
+    "'{Title}' vira o queridinho da crítica na temporada.",
+    "Críticos dizem que '{Title}' entrega confiança, estilo e emoção.",
+    "'{Title}' já é tratado como forte nome para a temporada de prêmios."
+];
+
+const UNIVERSE_CRITIC_LOVED_HEADLINES_PT = [
+    "Críticos elogiam '{Title}' por elevar toda a franquia.",
+    "'{Title}' prova que filmes de super-herói podem buscar arte maior.",
+    "A construção de mundo de '{Title}' impressiona críticos.",
+    "'{Title}' equilibra serviço aos fãs com uma história forte."
+];
+
+const CRITIC_HATED_HEADLINES_PT = [
+    "Críticos detonam '{Title}' por roteiro fraco.",
+    "'{Title}' é chamado de confusão por grandes resenhistas.",
+    "Estilo acima de substância: '{Title}' não convence.",
+    "Críticos veem '{Title}' como oportunidade perdida.",
+    "'{Title}' recebe críticas duras por caos de tom e personagens rasos.",
+    "A reação crítica a '{Title}' fica rapidamente negativa."
+];
+
+const UNIVERSE_CRITIC_HATED_HEADLINES_PT = [
+    "Críticos veem '{Title}' como produto sem alma.",
+    "'{Title}' depende demais de cameos e esquece a trama.",
+    "Excesso de lore em '{Title}' afasta espectadores casuais.",
+    "Resenhas dizem que '{Title}' mostra um universo perdendo rumo."
+];
+
+const SEQUEL_HYPE_HEADLINES_PT = [
+    "Fãs pedem sequência de '{Title}' nas redes.",
+    "O buzz cresce em torno de um possível universo de '{Title}'.",
+    "O público quer ver mais do mundo de '{Title}'.",
+    "'{Title}' é o início de uma nova franquia? Fãs acreditam que sim.",
+    "Analistas dizem que '{Title}' tem perfil claro de franquia."
+];
+
+const SEQUEL_CONFIRMED_HEADLINES_PT = [
+    "É OFICIAL: estúdio aprova sequência de '{Title}'.",
+    "'{Title} 2' vai acontecer! Pré-produção começa em breve.",
+    "Estúdio confirma retorno ao mundo de '{Title}'.",
+    "Alerta de franquia: sequência de '{Title}' é anunciada oficialmente."
+];
+
+const SCANDAL_HEADLINES_PT = [
+    "URGENTE: {Name} entra em nova controvérsia.",
+    "É o fim para {Name}? Novas acusações surgem.",
+    "Redes sociais explodem após o passado de {Name} voltar à tona.",
+    "Marcas se afastam de {Name} depois dos últimos acontecimentos.",
+    "Opinião pública sobre {Name} despenca.",
+    "Equipe de {Name} corre para conter uma crise de PR."
+];
+
+const LEGAL_HEADLINES_PT = [
+    "Batalha legal se aproxima para {Name} com data no tribunal marcada.",
+    "Por dentro do tribunal: o drama jurídico de {Name}.",
+    "{Name} vai fechar acordo? Especialistas analisam o caso.",
+    "Problemas legais aumentam a pressão sobre a carreira de {Name}.",
+    "Documentos judiciais adicionam nova camada ao caso de {Name}."
+];
+
+const FORBES_ENTRY_HEADLINES_PT = [
+    "Estreia na Forbes: {Name} entra na lista em #{Rank}.",
+    "Novo dinheiro: {Name} entra para a lista dos mais ricos de Hollywood.",
+    "Bem-vindo ao clube: {Name} passa no corte da Forbes."
+];
+
+const FORBES_RISE_HEADLINES_PT = [
+    "{Name} sobe no ranking de fortuna e chega a #{Rank}.",
+    "Alta financeira: {Name} salta para #{Rank} na lista Forbes.",
+    "Investimentos inteligentes impulsionam {Name} (posição #{Rank})."
+];
+
+const FORBES_DROP_HEADLINES_PT = [
+    "{Name} cai no ranking para #{Rank}.",
+    "Ganhos estagnados fazem {Name} descer para #{Rank}.",
+    "Atualização Forbes: {Name} escorrega na lista."
+];
+
+const FORBES_TOP_10_HEADLINES_PT = [
+    "STATUS ELITE: {Name} entra no Top 10 da Forbes.",
+    "{Name} agora está entre os 10 atores mais ricos.",
+    "Jogada de poder: {Name} entra na elite financeira."
+];
+
+const FORBES_NUMBER_ONE_HEADLINES_PT = [
+    "NOVO #1: {Name} lidera a lista dos mais ricos.",
+    "O topo é de {Name}: maior fortuna entre atores.",
+    "{Name} senta no trono financeiro de Hollywood."
+];
+
+const FORBES_INDUSTRY_HEADLINES_PT = [
+    "Forbes divulga relatório anual sobre fortuna no cinema.",
+    "Investimentos em tecnologia impulsionam riqueza de atores, diz Forbes.",
+    "Residuais de streaming mudam a lista dos mais ricos deste ano.",
+    "Forbes diz que marcas de celebridades superam endorsos tradicionais."
+];
+
+const UNIVERSE_NEWS_TEMPLATES_PT = [
+    "Fãs especulam intensamente sobre a próxima fase do universo {Universe}.",
+    "{Universe} prepara um grande crossover? Fontes dizem que sim.",
+    "Vendas de produtos de {Universe} atingem novo recorde.",
+    "Rumores indicam que {Universe} busca um grande nome para o próximo vilão.",
+    "A internet destrincha easter eggs dos projetos recentes de {Universe}.",
+    "Executivos prometem que a próxima saga de {Universe} vai mudar tudo."
+];
 
 // ... (Generate Personal News, Top Stories, Industry News functions remain same)
 
@@ -289,12 +461,15 @@ const generatePersonalNews = (player: Player): NewsItem[] => {
     const news: NewsItem[] = [];
     const week = player.currentWeek;
     const year = player.age;
+    const language = getPlayerLanguage(player);
 
     player.commitments.forEach(c => {
         if (c.type === 'ACTING_GIG' && c.projectDetails) {
             if (c.projectPhase === 'PRODUCTION' && c.phaseWeeksLeft === c.totalPhaseDuration) {
-                const headline = `Casting Alert: You join the cast of '${c.name}'.`;
-                const subtext = c.roleType === 'LEAD' ? "Sources say it's a career-defining role." : "Production begins immediately.";
+                const headline = usePortuguese(language) ? `Alerta de elenco: você entra no elenco de '${c.name}'.` : `Casting Alert: You join the cast of '${c.name}'.`;
+                const subtext = c.roleType === 'LEAD'
+                    ? (usePortuguese(language) ? "Fontes dizem que pode ser um papel decisivo para a carreira." : "Sources say it's a career-defining role.")
+                    : (usePortuguese(language) ? "A produção começa imediatamente." : "Production begins immediately.");
                 news.push({
                     id: `news_you_sign_${c.id}`, headline, subtext, category: 'YOU', week, year, impactLevel: 'MEDIUM'
                 });
@@ -309,6 +484,7 @@ const generateTopStories = (player: Player): NewsItem[] => {
     const news: NewsItem[] = [];
     const week = player.currentWeek;
     const year = player.age;
+    const language = getPlayerLanguage(player);
 
     player.activeReleases.forEach(rel => {
         if (rel.weekNum === 1) {
@@ -319,22 +495,26 @@ const generateTopStories = (player: Player): NewsItem[] => {
                 const newsKey = `news_bo_hit_${rel.id}`;
                 if (hasPublishedReleaseNews(rel, newsKey)) return;
                 const isUniverse = rel.projectDetails.universeId != null;
-                const headlineArr = isUniverse ? [...HIT_HEADLINES, ...UNIVERSE_HIT_HEADLINES] : HIT_HEADLINES;
+                const headlineArr = isUniverse
+                    ? (usePortuguese(language) ? [...HIT_HEADLINES_PT, ...UNIVERSE_HIT_HEADLINES_PT] : [...HIT_HEADLINES, ...UNIVERSE_HIT_HEADLINES])
+                    : (usePortuguese(language) ? HIT_HEADLINES_PT : HIT_HEADLINES);
                 news.push({
                     id: newsKey,
                     headline: pick(headlineArr).replace('{Title}', rel.name),
-                    subtext: `$${(gross/1000000).toFixed(1)}M opening weekend stuns Hollywood.`,
+                    subtext: usePortuguese(language) ? `Estreia de $${(gross/1000000).toFixed(1)}M impressiona Hollywood.` : `$${(gross/1000000).toFixed(1)}M opening weekend stuns Hollywood.`,
                     category: 'TOP_STORY', week, year, impactLevel: 'HIGH'
                 });
             } else if (gross < budget * 0.15 && rel.projectDetails.budgetTier !== 'LOW') {
                 const newsKey = `news_bo_flop_${rel.id}`;
                 if (hasPublishedReleaseNews(rel, newsKey)) return;
                 const isUniverse = rel.projectDetails.universeId != null;
-                const headlineArr = isUniverse ? [...FLOP_HEADLINES, ...UNIVERSE_FLOP_HEADLINES] : FLOP_HEADLINES;
+                const headlineArr = isUniverse
+                    ? (usePortuguese(language) ? [...FLOP_HEADLINES_PT, ...UNIVERSE_FLOP_HEADLINES_PT] : [...FLOP_HEADLINES, ...UNIVERSE_FLOP_HEADLINES])
+                    : (usePortuguese(language) ? FLOP_HEADLINES_PT : FLOP_HEADLINES);
                 news.push({
                     id: newsKey,
                     headline: pick(headlineArr).replace('{Title}', rel.name),
-                    subtext: `Disastrous $${(gross/1000000).toFixed(1)}M opening raises questions.`,
+                    subtext: usePortuguese(language) ? `Abertura fraca de $${(gross/1000000).toFixed(1)}M levanta dúvidas.` : `Disastrous $${(gross/1000000).toFixed(1)}M opening raises questions.`,
                     category: 'TOP_STORY', week, year, impactLevel: 'HIGH'
                 });
             } else if (rel.projectDetails.budgetTier === 'HIGH') {
@@ -342,8 +522,8 @@ const generateTopStories = (player: Player): NewsItem[] => {
                 if (hasPublishedReleaseNews(rel, newsKey)) return;
                 news.push({
                     id: newsKey,
-                    headline: `'${rel.name}' opens at #1.`,
-                    subtext: `Solid performance for the ${rel.projectDetails.genre} blockbuster.`,
+                    headline: usePortuguese(language) ? `'${rel.name}' estreia em #1.` : `'${rel.name}' opens at #1.`,
+                    subtext: usePortuguese(language) ? `Desempenho sólido para o blockbuster de ${rel.projectDetails.genre}.` : `Solid performance for the ${rel.projectDetails.genre} blockbuster.`,
                     category: 'TOP_STORY', week, year, impactLevel: 'MEDIUM'
                 });
             }
@@ -353,22 +533,26 @@ const generateTopStories = (player: Player): NewsItem[] => {
                 const newsKey = `news_crit_high_${rel.id}`;
                 if (hasPublishedReleaseNews(rel, newsKey)) return;
                 const isUniverse = rel.projectDetails.universeId != null;
-                const headlineArr = isUniverse ? [...CRITIC_LOVED_HEADLINES, ...UNIVERSE_CRITIC_LOVED_HEADLINES] : CRITIC_LOVED_HEADLINES;
+                const headlineArr = isUniverse
+                    ? (usePortuguese(language) ? [...CRITIC_LOVED_HEADLINES_PT, ...UNIVERSE_CRITIC_LOVED_HEADLINES_PT] : [...CRITIC_LOVED_HEADLINES, ...UNIVERSE_CRITIC_LOVED_HEADLINES])
+                    : (usePortuguese(language) ? CRITIC_LOVED_HEADLINES_PT : CRITIC_LOVED_HEADLINES);
                 news.push({
                     id: newsKey,
                     headline: pick(headlineArr).replace('{Title}', rel.name),
-                    subtext: `With an ${rel.imdbRating} rating, word of mouth is electric.`,
+                    subtext: usePortuguese(language) ? `Com nota ${rel.imdbRating}, o boca a boca está forte.` : `With an ${rel.imdbRating} rating, word of mouth is electric.`,
                     category: 'TOP_STORY', week, year, impactLevel: 'MEDIUM'
                 });
             } else if (rel.imdbRating <= 4.0) {
                 const newsKey = `news_crit_low_${rel.id}`;
                 if (hasPublishedReleaseNews(rel, newsKey)) return;
                 const isUniverse = rel.projectDetails.universeId != null;
-                const headlineArr = isUniverse ? [...CRITIC_HATED_HEADLINES, ...UNIVERSE_CRITIC_HATED_HEADLINES] : CRITIC_HATED_HEADLINES;
+                const headlineArr = isUniverse
+                    ? (usePortuguese(language) ? [...CRITIC_HATED_HEADLINES_PT, ...UNIVERSE_CRITIC_HATED_HEADLINES_PT] : [...CRITIC_HATED_HEADLINES, ...UNIVERSE_CRITIC_HATED_HEADLINES])
+                    : (usePortuguese(language) ? CRITIC_HATED_HEADLINES_PT : CRITIC_HATED_HEADLINES);
                 news.push({
                     id: newsKey,
                     headline: pick(headlineArr).replace('{Title}', rel.name),
-                    subtext: "Audience scores are equally punishing.",
+                    subtext: usePortuguese(language) ? "As notas do público também são duras." : "Audience scores are equally punishing.",
                     category: 'TOP_STORY', week, year, impactLevel: 'MEDIUM'
                 });
             }
@@ -382,18 +566,19 @@ const generateIndustryNews = (player: Player): NewsItem[] => {
     const news: NewsItem[] = [];
     const week = player.currentWeek;
     const year = player.age;
+    const language = getPlayerLanguage(player);
 
     if (Math.random() < 0.2) {
         news.push({
             id: `news_ind_trend_${Date.now()}`,
-            headline: pick(INDUSTRY_TEMPLATES),
+            headline: pickLocalized(language, INDUSTRY_TEMPLATES, INDUSTRY_TEMPLATES_PT),
             category: 'INDUSTRY', week, year, impactLevel: 'LOW'
         });
     }
 
     if (Math.random() < 0.3) {
         const npc = pick(NPC_DATABASE);
-        const headline = pick(NPC_HEADLINES).replace('{Name}', npc.name);
+        const headline = pickLocalized(language, NPC_HEADLINES, NPC_HEADLINES_PT).replace('{Name}', npc.name);
         news.push({
             id: `news_ind_npc_${Date.now()}`,
             headline: headline,
@@ -420,7 +605,7 @@ const generateIndustryNews = (player: Player): NewsItem[] => {
                 category: 'INDUSTRY',
                 week, year,
                 impactLevel: 'MEDIUM',
-                subtext: "The rumor mill is spinning as the ceremony approaches."
+                subtext: usePortuguese(language) ? "A máquina de rumores está girando conforme a cerimônia se aproxima." : "The rumor mill is spinning as the ceremony approaches."
             });
         }
     }
@@ -429,7 +614,7 @@ const generateIndustryNews = (player: Player): NewsItem[] => {
         const studio = pick(Object.values(STUDIO_CATALOG));
         news.push({
             id: `news_ind_studio_${Date.now()}`,
-            headline: `${studio.name} reshuffles executive leadership.`,
+            headline: usePortuguese(language) ? `${studio.name} reorganiza sua liderança executiva.` : `${studio.name} reshuffles executive leadership.`,
             category: 'INDUSTRY', week, year, impactLevel: 'MEDIUM'
         });
     }
@@ -439,7 +624,7 @@ const generateIndustryNews = (player: Player): NewsItem[] => {
         if (Math.random() < 0.7) {
             news.push({
                 id: `news_legal_active_${Date.now()}`,
-                headline: pick(LEGAL_HEADLINES).replace('{Name}', player.name),
+                headline: pickLocalized(language, LEGAL_HEADLINES, LEGAL_HEADLINES_PT).replace('{Name}', player.name),
                 category: 'TOP_STORY', week, year, impactLevel: 'HIGH'
             });
         }
@@ -448,7 +633,7 @@ const generateIndustryNews = (player: Player): NewsItem[] => {
     if (player.heat > 30 && Math.random() < (player.heat / 100)) {
         news.push({
             id: `news_scandal_active_${Date.now()}`,
-            headline: pick(SCANDAL_HEADLINES).replace('{Name}', player.name),
+            headline: pickLocalized(language, SCANDAL_HEADLINES, SCANDAL_HEADLINES_PT).replace('{Name}', player.name),
             category: 'TOP_STORY', week, year, impactLevel: 'HIGH'
         });
     }
@@ -457,44 +642,44 @@ const generateIndustryNews = (player: Player): NewsItem[] => {
 };
 
 // ... (Exported Helpers)
-export const generateSequelHypeNews = (title: string, week: number, year: number): NewsItem => ({
+export const generateSequelHypeNews = (title: string, week: number, year: number, language: GameLanguage = 'en'): NewsItem => ({
     id: `news_hype_${Date.now()}`,
-    headline: pick(SEQUEL_HYPE_HEADLINES).replace('{Title}', title),
+    headline: pickLocalized(language, SEQUEL_HYPE_HEADLINES, SEQUEL_HYPE_HEADLINES_PT).replace('{Title}', title),
     category: 'TOP_STORY', week, year, impactLevel: 'MEDIUM'
 });
-export const generateSequelConfirmedNews = (title: string, week: number, year: number): NewsItem => ({
+export const generateSequelConfirmedNews = (title: string, week: number, year: number, language: GameLanguage = 'en'): NewsItem => ({
     id: `news_sequel_yes_${Date.now()}`,
-    headline: pick(SEQUEL_CONFIRMED_HEADLINES).replace('{Title}', title),
-    subtext: "Studio insiders confirm a deal is in the works.",
+    headline: pickLocalized(language, SEQUEL_CONFIRMED_HEADLINES, SEQUEL_CONFIRMED_HEADLINES_PT).replace('{Title}', title),
+    subtext: usePortuguese(language) ? "Fontes do estúdio confirmam que um acordo está em andamento." : "Studio insiders confirm a deal is in the works.",
     category: 'TOP_STORY', week, year, impactLevel: 'HIGH'
 });
-export const generateSequelCancelledNews = (title: string, week: number, year: number): NewsItem => ({
+export const generateSequelCancelledNews = (title: string, week: number, year: number, language: GameLanguage = 'en'): NewsItem => ({
     id: `news_sequel_no_${Date.now()}`,
-    headline: pick(SEQUEL_CANCELLED_HEADLINES).replace('{Title}', title),
+    headline: (usePortuguese(language) ? "Estúdio confirma que '{Title}' seguirá como filme independente." : pick(SEQUEL_CANCELLED_HEADLINES)).replace('{Title}', title),
     category: 'INDUSTRY', week, year, impactLevel: 'MEDIUM'
 });
-export const generateNegotiationFailNews = (title: string, week: number, year: number): NewsItem => ({
+export const generateNegotiationFailNews = (title: string, week: number, year: number, language: GameLanguage = 'en'): NewsItem => ({
     id: `news_negot_fail_${Date.now()}`,
-    headline: pick(NEGOTIATION_FAIL_HEADLINES).replace('{Title}', title),
+    headline: (usePortuguese(language) ? "Negociações travam para retorno em sequência de '{Title}'." : pick(NEGOTIATION_FAIL_HEADLINES)).replace('{Title}', title),
     category: 'TOP_STORY', week, year, impactLevel: 'HIGH'
 });
-export const generateFanBacklashNews = (title: string, week: number, year: number): NewsItem => ({
+export const generateFanBacklashNews = (title: string, week: number, year: number, language: GameLanguage = 'en'): NewsItem => ({
     id: `news_backlash_${Date.now()}`,
-    headline: pick(FAN_BACKLASH_HEADLINES).replace('{Title}', title),
-    subtext: "The internet is not happy about the recasting news.",
+    headline: (usePortuguese(language) ? "Fãs criticam rumores de elenco em '{Title}'." : pick(FAN_BACKLASH_HEADLINES)).replace('{Title}', title),
+    subtext: usePortuguese(language) ? "A internet não gostou das notícias sobre recast." : "The internet is not happy about the recasting news.",
     category: 'TOP_STORY', week, year, impactLevel: 'HIGH'
 });
 
 // NEW EXPORTS FOR TV
-export const generateRenewalNews = (title: string, season: number, week: number, year: number): NewsItem => ({
+export const generateRenewalNews = (title: string, season: number, week: number, year: number, language: GameLanguage = 'en'): NewsItem => ({
     id: `news_renew_${Date.now()}`,
-    headline: pick(TV_RENEWAL_HEADLINES).replace('{Title}', title).replace('{Season}', season.toString()),
+    headline: (usePortuguese(language) ? "'{Title}' foi renovada para mais uma temporada!" : pick(TV_RENEWAL_HEADLINES)).replace('{Title}', title).replace('{Season}', season.toString()),
     category: 'TOP_STORY', week, year, impactLevel: 'HIGH'
 });
 
-export const generateCancellationNews = (title: string, season: number, week: number, year: number): NewsItem => ({
+export const generateCancellationNews = (title: string, season: number, week: number, year: number, language: GameLanguage = 'en'): NewsItem => ({
     id: `news_cancel_${Date.now()}`,
-    headline: pick(TV_CANCELLATION_HEADLINES).replace('{Title}', title).replace('{Season}', season.toString()),
+    headline: (usePortuguese(language) ? "'{Title}' foi cancelada após {Season} temporada(s)." : pick(TV_CANCELLATION_HEADLINES)).replace('{Title}', title).replace('{Season}', season.toString()),
     category: 'INDUSTRY', week, year, impactLevel: 'MEDIUM'
 });
 
@@ -502,13 +687,14 @@ export const generateForbesNews = (player: Player, currentRank: number, prevRank
     const news: NewsItem[] = [];
     const week = player.currentWeek;
     const year = player.age;
+    const language = getPlayerLanguage(player);
 
     if (prevRank === undefined) {
         if (currentRank <= 100) {
              news.push({
                 id: `news_forbes_entry_${Date.now()}`,
-                headline: pick(FORBES_ENTRY_HEADLINES).replace('{Name}', player.name).replace('{Rank}', currentRank.toString()),
-                subtext: "A sign of rising power in the industry.",
+                headline: pickLocalized(language, FORBES_ENTRY_HEADLINES, FORBES_ENTRY_HEADLINES_PT).replace('{Name}', player.name).replace('{Rank}', currentRank.toString()),
+                subtext: usePortuguese(language) ? "Um sinal de poder crescente na indústria." : "A sign of rising power in the industry.",
                 category: 'YOU', week, year, impactLevel: 'HIGH'
             });
         }
@@ -520,7 +706,7 @@ export const generateForbesNews = (player: Player, currentRank: number, prevRank
     if (currentRank === 1 && prevRank !== 1) {
         news.push({
             id: `news_forbes_one_${Date.now()}`,
-            headline: pick(FORBES_NUMBER_ONE_HEADLINES).replace('{Name}', player.name),
+            headline: pickLocalized(language, FORBES_NUMBER_ONE_HEADLINES, FORBES_NUMBER_ONE_HEADLINES_PT).replace('{Name}', player.name),
             category: 'TOP_STORY', week, year, impactLevel: 'HIGH'
         });
         return news;
@@ -529,7 +715,7 @@ export const generateForbesNews = (player: Player, currentRank: number, prevRank
     if (currentRank <= 10 && prevRank > 10) {
         news.push({
             id: `news_forbes_top10_${Date.now()}`,
-            headline: pick(FORBES_TOP_10_HEADLINES).replace('{Name}', player.name),
+            headline: pickLocalized(language, FORBES_TOP_10_HEADLINES, FORBES_TOP_10_HEADLINES_PT).replace('{Name}', player.name),
             category: 'TOP_STORY', week, year, impactLevel: 'HIGH'
         });
         return news;
@@ -538,7 +724,7 @@ export const generateForbesNews = (player: Player, currentRank: number, prevRank
     if (diff >= 5) {
         news.push({
             id: `news_forbes_rise_${Date.now()}`,
-            headline: pick(FORBES_RISE_HEADLINES).replace('{Name}', player.name).replace('{Rank}', currentRank.toString()),
+            headline: pickLocalized(language, FORBES_RISE_HEADLINES, FORBES_RISE_HEADLINES_PT).replace('{Name}', player.name).replace('{Rank}', currentRank.toString()),
             category: 'YOU', week, year, impactLevel: 'MEDIUM'
         });
     }
@@ -546,7 +732,7 @@ export const generateForbesNews = (player: Player, currentRank: number, prevRank
     if (diff <= -5) {
         news.push({
             id: `news_forbes_drop_${Date.now()}`,
-            headline: pick(FORBES_DROP_HEADLINES).replace('{Name}', player.name).replace('{Rank}', currentRank.toString()),
+            headline: pickLocalized(language, FORBES_DROP_HEADLINES, FORBES_DROP_HEADLINES_PT).replace('{Name}', player.name).replace('{Rank}', currentRank.toString()),
             category: 'YOU', week, year, impactLevel: 'LOW'
         });
     }
@@ -554,21 +740,21 @@ export const generateForbesNews = (player: Player, currentRank: number, prevRank
     return news;
 };
 
-export const generateForbesIndustryNews = (week: number, year: number): NewsItem => ({
+export const generateForbesIndustryNews = (week: number, year: number, language: GameLanguage = 'en'): NewsItem => ({
     id: `news_forbes_ind_${Date.now()}`,
-    headline: pick(FORBES_INDUSTRY_HEADLINES),
+    headline: pickLocalized(language, FORBES_INDUSTRY_HEADLINES, FORBES_INDUSTRY_HEADLINES_PT),
     category: 'INDUSTRY', week, year, impactLevel: 'LOW'
 });
 
-export const generateScandalNews = (name: string, week: number, year: number): NewsItem => ({
+export const generateScandalNews = (name: string, week: number, year: number, language: GameLanguage = 'en'): NewsItem => ({
     id: `news_scandal_${Date.now()}`,
-    headline: pick(SCANDAL_HEADLINES).replace('{Name}', name),
+    headline: pickLocalized(language, SCANDAL_HEADLINES, SCANDAL_HEADLINES_PT).replace('{Name}', name),
     category: 'TOP_STORY', week, year, impactLevel: 'HIGH'
 });
 
-export const generateLegalNews = (name: string, week: number, year: number): NewsItem => ({
+export const generateLegalNews = (name: string, week: number, year: number, language: GameLanguage = 'en'): NewsItem => ({
     id: `news_legal_${Date.now()}`,
-    headline: pick(LEGAL_HEADLINES).replace('{Name}', name),
+    headline: pickLocalized(language, LEGAL_HEADLINES, LEGAL_HEADLINES_PT).replace('{Name}', name),
     category: 'TOP_STORY', week, year, impactLevel: 'HIGH'
 });
 
@@ -576,6 +762,7 @@ const generateUniverseNews = (player: Player): NewsItem[] => {
     const news: NewsItem[] = [];
     const week = player.currentWeek;
     const year = player.age;
+    const language = getPlayerLanguage(player);
 
     // Find if player has a studio with universes
     const studio = player.businesses?.find(b => b.type === 'PRODUCTION_HOUSE');
@@ -583,7 +770,7 @@ const generateUniverseNews = (player: Player): NewsItem[] => {
         const universes = Object.values(normalizeUniverseMap(player.world.universes || {})).filter(u => u.studioId === studio.id);
         if (universes.length > 0 && Math.random() < 0.4) { // 40% chance per week if they have a universe
             const randomUniverse = pick(universes);
-            const headline = pick(UNIVERSE_NEWS_TEMPLATES).replace(/{Universe}/g, randomUniverse.name);
+            const headline = pickLocalized(language, UNIVERSE_NEWS_TEMPLATES, UNIVERSE_NEWS_TEMPLATES_PT).replace(/{Universe}/g, randomUniverse.name);
             news.push({
                 id: `news_uni_buzz_${Date.now()}`,
                 headline,

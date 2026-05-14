@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Player, ActiveRelease } from '../../types';
 import { PLATFORMS } from '../../services/streamingLogic';
+import { getProjectIdentityLabel } from '../../services/genreCatalog';
+import { getPlayerLanguage, t } from '../../services/i18n';
 import { ArrowLeft, BarChart3, TrendingUp, TrendingDown } from 'lucide-react';
 
 interface BoxOfficeAppProps {
@@ -10,6 +12,8 @@ interface BoxOfficeAppProps {
 
 export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) => {
   const [tab, setTab] = useState<'THEATERS' | 'STREAMING'>('THEATERS');
+  const language = getPlayerLanguage(player);
+  const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
   
   // Safe access to arrays
   const activeReleases = player.activeReleases || [];
@@ -44,15 +48,15 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
         <div className="bg-emerald-900/50 p-4 pt-12 pb-3 shadow-lg flex items-center justify-between shrink-0 border-b border-emerald-500/20 backdrop-blur-md">
             <button onClick={onBack} className="p-1 rounded-full hover:bg-white/10"><ArrowLeft size={20}/></button>
             <div className="flex items-center gap-2 font-bold text-emerald-400 text-lg">
-                <BarChart3 size={20} /> BoxOffice
+                <BarChart3 size={20} /> {tr('box.title')}
             </div>
             <div className="w-8"></div>
         </div>
 
         {/* Tabs */}
         <div className="flex bg-black/40 border-b border-emerald-500/20">
-            <button onClick={() => setTab('THEATERS')} className={`flex-1 py-3 text-xs font-bold uppercase tracking-wider ${tab === 'THEATERS' ? 'text-emerald-400 border-b-2 border-emerald-400 bg-emerald-900/20' : 'text-zinc-500 hover:text-zinc-300'}`}>In Theaters</button>
-            <button onClick={() => setTab('STREAMING')} className={`flex-1 py-3 text-xs font-bold uppercase tracking-wider ${tab === 'STREAMING' ? 'text-emerald-400 border-b-2 border-emerald-400 bg-emerald-900/20' : 'text-zinc-500 hover:text-zinc-300'}`}>Streaming</button>
+            <button onClick={() => setTab('THEATERS')} className={`flex-1 py-3 text-xs font-bold uppercase tracking-wider ${tab === 'THEATERS' ? 'text-emerald-400 border-b-2 border-emerald-400 bg-emerald-900/20' : 'text-zinc-500 hover:text-zinc-300'}`}>{tr('box.inTheaters')}</button>
+            <button onClick={() => setTab('STREAMING')} className={`flex-1 py-3 text-xs font-bold uppercase tracking-wider ${tab === 'STREAMING' ? 'text-emerald-400 border-b-2 border-emerald-400 bg-emerald-900/20' : 'text-zinc-500 hover:text-zinc-300'}`}>{tr('box.streaming')}</button>
         </div>
 
         {/* Content */}
@@ -62,7 +66,7 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
             {tab === 'THEATERS' && (
                 <>
                     {theatrical.length === 0 && (
-                        <div className="text-center text-zinc-600 mt-10 text-sm">No active theatrical releases.<br/>Complete a movie project to see stats here.</div>
+                        <div className="text-center text-zinc-600 mt-10 text-sm">{tr('box.noTheatrical')}<br/>{tr('box.noTheatricalSub')}</div>
                     )}
                     {theatrical.map(rel => {
                         // Calculate max for bar graph scaling
@@ -73,19 +77,19 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
                                 <div className="flex justify-between items-start mb-3 gap-3">
                                     <div className="min-w-0">
                                         <div className="font-bold text-lg leading-tight break-words">{rel.name}</div>
-                                        <div className="text-[10px] text-zinc-400 break-words">{rel.projectDetails.genre} • {rel.projectDetails.studioId.replace(/_/g, ' ')}</div>
+                                        <div className="text-[10px] text-zinc-400 break-words">{getProjectIdentityLabel(rel.projectDetails)} • {rel.projectDetails.studioId.replace(/_/g, ' ')}</div>
                                     </div>
-                                    <div className="text-xs bg-emerald-900 text-emerald-400 px-2 py-1 rounded font-mono font-bold shrink-0">Wk {rel.weekNum}</div>
+                                    <div className="text-xs bg-emerald-900 text-emerald-400 px-2 py-1 rounded font-mono font-bold shrink-0">{tr('common.week')} {rel.weekNum}</div>
                                 </div>
 
                                 {/* Stats Grid */}
                                 <div className="grid grid-cols-2 gap-4 mb-4 bg-black/20 p-3 rounded-xl">
                                     <div className="min-w-0">
-                                        <div className="text-[10px] text-zinc-500 uppercase font-bold">Total Gross</div>
+                                        <div className="text-[10px] text-zinc-500 uppercase font-bold">{tr('box.totalGross')}</div>
                                         <div className="text-white font-bold font-mono text-sm break-all">{formatMoney(rel.totalGross)}</div>
                                     </div>
                                     <div className="min-w-0">
-                                        <div className="text-[10px] text-zinc-500 uppercase font-bold">Budget</div>
+                                        <div className="text-[10px] text-zinc-500 uppercase font-bold">{tr('box.budget')}</div>
                                         <div className="text-zinc-400 font-bold font-mono text-sm break-all">{formatMoney(rel.budget)}</div>
                                     </div>
                                 </div>
@@ -93,7 +97,7 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
                                 {/* Bar Graph Visualization */}
                                 <div>
                                     <div className="text-[10px] text-zinc-500 uppercase font-bold mb-2 flex items-center gap-1">
-                                        <TrendingUp size={12}/> Weekly Revenue
+                                        <TrendingUp size={12}/> {tr('box.weeklyRevenue')}
                                     </div>
                                     <div className="flex items-end gap-2 h-24 w-full overflow-x-auto pb-1 no-scrollbar">
                                         {rel.weeklyGross.map((gross, idx) => {
@@ -133,7 +137,7 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
             {tab === 'STREAMING' && (
                 <>
                     {streaming.length === 0 && (
-                        <div className="text-center text-zinc-600 mt-10 text-sm">No active streaming titles.</div>
+                        <div className="text-center text-zinc-600 mt-10 text-sm">{tr('box.noStreaming')}</div>
                     )}
                     {streaming.map(rel => {
                         const platform = PLATFORMS[rel.streaming!.platformId];
@@ -143,17 +147,20 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
                         return (
                             <div key={rel.id} className="bg-zinc-800 p-4 rounded-2xl border border-zinc-700 shadow-lg">
                                 <div className="flex justify-between items-start mb-3 gap-3">
-                                    <div className="font-bold text-lg min-w-0 break-words">{rel.name}</div>
+                                    <div className="min-w-0">
+                                        <div className="font-bold text-lg break-words">{rel.name}</div>
+                                        <div className="text-[10px] text-zinc-400 break-words">{getProjectIdentityLabel(rel.projectDetails)}</div>
+                                    </div>
                                     <div className={`text-[10px] px-2 py-1 rounded font-bold uppercase ${platform.color} bg-white/10 shrink-0`}>{platform.name}</div>
                                 </div>
                                 
                                 <div className="grid grid-cols-2 gap-4 mb-4">
                                     <div className="bg-black/20 p-3 rounded-xl min-w-0">
-                                        <div className="text-[10px] text-zinc-500 uppercase font-bold">Total Views</div>
+                                        <div className="text-[10px] text-zinc-500 uppercase font-bold">{tr('box.totalViews')}</div>
                                         <div className="text-white font-bold font-mono text-lg break-all">{formatViews(rel.streaming!.totalViews)}</div>
                                     </div>
                                     <div className="bg-black/20 p-3 rounded-xl flex flex-col justify-center min-w-0">
-                                        <div className="text-[10px] text-zinc-500 uppercase font-bold">Latest Week</div>
+                                        <div className="text-[10px] text-zinc-500 uppercase font-bold">{tr('box.latestWeek')}</div>
                                         <div className="text-zinc-300 text-sm font-mono font-bold break-all">
                                             {weeklyViews.length > 0 ? formatViews(weeklyViews[weeklyViews.length-1]) : '0'}
                                         </div>
@@ -163,7 +170,7 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
                                 {/* Bar Graph for Streaming */}
                                 <div>
                                     <div className="text-[10px] text-zinc-500 uppercase font-bold mb-2 flex items-center gap-1">
-                                        <TrendingUp size={12}/> Weekly Viewership
+                                        <TrendingUp size={12}/> {tr('box.weeklyViewership')}
                                     </div>
                                     <div className="flex items-end gap-2 h-24 w-full overflow-x-auto pb-1 no-scrollbar">
                                         {weeklyViews.map((views, idx) => {
@@ -196,7 +203,7 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
 
                                 {rel.streaming!.isLeaving && (
                                     <div className="text-xs text-rose-500 font-bold mt-3 bg-rose-500/10 px-3 py-2 rounded-lg flex items-center justify-center border border-rose-500/20">
-                                        ⚠️ Leaving platform soon
+                                        ⚠️ {tr('box.leavingSoon')}
                                     </div>
                                 )}
                             </div>

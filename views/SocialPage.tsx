@@ -4,6 +4,7 @@ import { MessageCircle, Phone, Coffee, Gift, Users, X, Zap, Heart, Baby, Gem, Cr
 import { calculateLegacyScore, getGenerationNumber, getInteractionAgeInWeeks, getLegacyInheritancePreview, getRelationshipAge, LEGACY_INHERITANCE_TAX_RATE, LEGACY_MIN_PLAYABLE_AGE } from '../services/legacyLogic';
 import { getDivorceLawyerCost, isChildAbandoned } from '../services/familyLogic';
 import { hasOwnedPremiumAssetInCollection } from '../services/premiumLogic';
+import { getPlayerLanguage, t } from '../services/i18n';
 
 interface SocialPageProps {
   player: Player;
@@ -25,6 +26,9 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
   const [activeTab, setActiveTab] = useState<SocialTab>('connections');
   const [legacyCandidate, setLegacyCandidate] = useState<Relationship | null>(null);
   const [showDivorceOptions, setShowDivorceOptions] = useState(false);
+  const language = getPlayerLanguage(player);
+  const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
+  const relationLabel = (relation: Relationship['relation']) => tr(`connections.relation.${relation}`);
 
   const getHangoutCost = () => {
       if (player.stats.fame > 75) return 500;
@@ -113,14 +117,14 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
       legacyHistory.forEach((ancestor: BloodlineMember) => {
           rows.push({
               generation: ancestor.generation,
-              title: `Generation ${ancestor.generation}`,
-              subtitle: `Legacy ruler of the ${ancestor.generation === 1 ? 'founding' : 'previous'} era`,
+              title: tr('connections.generation', { number: ancestor.generation }),
+              subtitle: ancestor.generation === 1 ? tr('connections.foundingEra') : tr('connections.previousEra'),
               members: [{
                   id: ancestor.id,
                   name: ancestor.name,
                   avatar: ancestor.avatar,
-                  caption: `${formatWealth(ancestor.netWorth)} • ${ancestor.moviesMade} projects • ${ancestor.awards} awards`,
-                  secondary: `Fame ${ancestor.peakFame || 0} • Businesses ${ancestor.businessCount || 0}`,
+                  caption: `${formatWealth(ancestor.netWorth)} • ${ancestor.moviesMade} ${tr('connections.projects')} • ${ancestor.awards} ${tr('connections.awards')}`,
+                  secondary: `${tr('connections.fame')} ${ancestor.peakFame || 0} • ${tr('connections.businesses')} ${ancestor.businessCount || 0}`,
                   accent: 'amber',
                   score: ancestor.legacyScore || calculateLegacyScore(ancestor),
               }],
@@ -129,15 +133,15 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
 
       rows.push({
           generation: currentGeneration,
-          title: `Generation ${currentGeneration}`,
-          subtitle: siblings.length > 0 ? 'Current ruler and same-generation family' : 'Current ruler of the family empire',
+          title: tr('connections.generation', { number: currentGeneration }),
+          subtitle: siblings.length > 0 ? tr('connections.currentRulerAndFamily') : tr('connections.currentRuler'),
           members: [
               {
                   id: player.id,
                   name: player.name,
                   avatar: player.avatar,
-                  caption: `${formatWealth(player.money)} • ${player.pastProjects.length} projects • ${player.awards?.length || 0} awards`,
-                  secondary: `Fame ${Math.floor(player.stats.fame)} • Businesses ${player.businesses?.length || 0}`,
+                  caption: `${formatWealth(player.money)} • ${player.pastProjects.length} ${tr('connections.projects')} • ${player.awards?.length || 0} ${tr('connections.awards')}`,
+                  secondary: `${tr('connections.fame')} ${Math.floor(player.stats.fame)} • ${tr('connections.businesses')} ${player.businesses?.length || 0}`,
                   accent: 'emerald',
                   score: currentLegacyScore,
               },
@@ -145,8 +149,8 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
                   id: sibling.id,
                   name: sibling.name,
                   avatar: sibling.image,
-                  caption: `Sibling • Age ${getRelationshipAge(sibling, player.age, player.currentWeek)}`,
-                  secondary: `Bond ${Math.floor(sibling.closeness)}/100`,
+                  caption: `${tr('connections.sibling')} • ${tr('connections.age')} ${getRelationshipAge(sibling, player.age, player.currentWeek)}`,
+                  secondary: `${tr('connections.bond')} ${Math.floor(sibling.closeness)}/100`,
                   accent: 'zinc',
               })),
           ],
@@ -155,21 +159,21 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
       if (children.length > 0) {
           rows.push({
               generation: currentGeneration + 1,
-              title: `Generation ${currentGeneration + 1}`,
-              subtitle: 'Heirs waiting to carry the dynasty forward',
+              title: tr('connections.generation', { number: currentGeneration + 1 }),
+              subtitle: tr('connections.heirsWaiting'),
               members: children.map(child => ({
                   id: child.id,
                   name: child.name,
                   avatar: child.image,
-                  caption: `Heir • Age ${child.age || 0}`,
-                  secondary: `Bond ${Math.floor(child.closeness)}/100`,
+                  caption: `${tr('connections.heir')} • ${tr('connections.age')} ${child.age || 0}`,
+                  secondary: `${tr('connections.bond')} ${Math.floor(child.closeness)}/100`,
                   accent: 'blue',
               })),
           });
       }
 
       return rows;
-  }, [children, currentGeneration, currentLegacyScore, legacyHistory, player, siblings]);
+  }, [children, currentGeneration, currentLegacyScore, legacyHistory, player, siblings, language]);
 
   React.useEffect(() => {
       setShowDivorceOptions(false);
@@ -242,12 +246,12 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
               <div className="flex-1 min-w-0">
                   <div className="flex justify-between items-start mb-1">
                       <div className="font-bold text-white text-lg truncate">{rel.name}</div>
-                      {isCritical && <div className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-rose-500 text-white animate-pulse">Estranged</div>}
+                      {isCritical && <div className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-rose-500 text-white animate-pulse">{tr('connections.estranged')}</div>}
                   </div>
                   
                   <div className="space-y-1">
                       <div className="flex justify-between text-[10px] text-zinc-500 uppercase mb-0.5">
-                          <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[9px] font-bold tracking-[0.18em] ${getRelationPill(rel.relation)}`}>{rel.relation}</span>
+                          <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[9px] font-bold tracking-[0.18em] ${getRelationPill(rel.relation)}`}>{relationLabel(rel.relation)}</span>
                           <span className={(rel.closeness || 0) > 80 ? 'text-emerald-400 font-bold' : ''}>{Math.round(rel.closeness || 0)}/100</span>
                       </div>
                       <div className="h-1.5 w-full bg-zinc-800 rounded-full overflow-hidden">
@@ -278,7 +282,7 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
               <div className="flex gap-2 text-[10px] font-mono mt-1 text-zinc-500">
                   <span className="flex items-center gap-0.5"><Zap size={10}/> -{costEnergy}</span>
                   <span className={`flex items-center gap-0.5 ${costMoney > 0 ? 'text-rose-400' : 'text-emerald-500'}`}>
-                      {costMoney > 0 ? `-$${costMoney}` : 'Free'}
+                      {costMoney > 0 ? `-$${costMoney}` : tr('connections.free')}
                   </span>
               </div>
           </div>
@@ -292,13 +296,13 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
     <div className="space-y-6 pb-24 pt-4 relative">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-bold text-white">{activeTab === 'connections' ? 'Connections' : 'Legacy'}</h2>
+          <h2 className="text-3xl font-bold text-white">{activeTab === 'connections' ? tr('connections.title') : tr('connections.legacy')}</h2>
           <p className="text-xs uppercase tracking-[0.25em] text-zinc-500 mt-1">
-            {activeTab === 'connections' ? 'Manage family and industry bonds' : 'Track your bloodline generation by generation'}
+            {activeTab === 'connections' ? tr('connections.subtitle') : tr('connections.legacySubtitle')}
           </p>
         </div>
         <div className="px-3 py-2 rounded-2xl border border-amber-500/20 bg-amber-500/5 text-right shrink-0">
-          <div className="text-[10px] uppercase tracking-[0.2em] text-amber-500">Dynasty Score</div>
+          <div className="text-[10px] uppercase tracking-[0.2em] text-amber-500">{tr('connections.dynastyScore')}</div>
           <div className="text-lg font-black text-white">{dynastyScore}</div>
         </div>
       </div>
@@ -308,13 +312,13 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
           onClick={() => setActiveTab('connections')}
           className={`py-3 rounded-xl text-sm font-bold uppercase tracking-widest transition-all ${activeTab === 'connections' ? 'bg-white text-black shadow-lg' : 'text-zinc-400 hover:text-white'}`}
         >
-          Connections
+          {tr('connections.title')}
         </button>
         <button
           onClick={() => setActiveTab('legacy')}
           className={`py-3 rounded-xl text-sm font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${activeTab === 'legacy' ? 'bg-amber-500 text-black shadow-lg' : 'text-amber-400 hover:bg-amber-500/10'}`}
         >
-          <Crown size={14} /> Legacy
+          <Crown size={14} /> {tr('connections.legacy')}
         </button>
       </div>
 
@@ -322,7 +326,7 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
         <div className="space-y-8">
           {innerCircle.length > 0 && (
               <div className="space-y-4">
-                  <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">Inner Circle</h3>
+                  <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">{tr('connections.innerCircle')}</h3>
                   <div className="space-y-3">
                       {innerCircle.map(renderRelationshipCard)}
                   </div>
@@ -331,7 +335,7 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
 
           {relationshipCircle.length > 0 && (
               <div className="space-y-4">
-                  <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">Relationships</h3>
+                  <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">{tr('connections.relationships')}</h3>
                   <div className="space-y-3">
                       {relationshipCircle.map(renderRelationshipCard)}
                   </div>
@@ -340,7 +344,7 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
 
           {professionalNetwork.length > 0 && (
               <div className="space-y-4">
-                  <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">Networking & Connections</h3>
+                  <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">{tr('connections.networking')}</h3>
                   <div className="space-y-3">
                       {professionalNetwork.map(renderRelationshipCard)}
                   </div>
@@ -350,7 +354,7 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
           {sortedRelationships.length === 0 && (
               <div className="text-center py-12 bg-zinc-900/30 rounded-3xl border border-dashed border-zinc-800">
                   <Users className="mx-auto text-zinc-700 mb-2" size={32} />
-                  <p className="text-zinc-500 text-sm">No connections yet. Go out and meet people!</p>
+                  <p className="text-zinc-500 text-sm">{tr('connections.noConnections')}</p>
               </div>
           )}
         </div>
@@ -358,22 +362,22 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
         <div className="space-y-5">
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-3xl border border-zinc-800 bg-zinc-900/70 p-5">
-              <div className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 mb-2">Current Generation</div>
+              <div className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 mb-2">{tr('connections.currentGeneration')}</div>
               <div className="text-3xl font-black text-white">{currentGeneration}</div>
-              <div className="text-sm text-zinc-400 mt-1">{player.name} leads the family right now.</div>
+              <div className="text-sm text-zinc-400 mt-1">{tr('connections.leadsFamily', { name: player.name })}</div>
             </div>
             <div className="rounded-3xl border border-zinc-800 bg-zinc-900/70 p-5">
-              <div className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 mb-2">Heirs In Line</div>
+              <div className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 mb-2">{tr('connections.heirsInLine')}</div>
               <div className="text-3xl font-black text-white">{children.length}</div>
-              <div className="text-sm text-zinc-400 mt-1">{children.length > 0 ? 'Your dynasty can continue.' : 'No child heir yet.'}</div>
+              <div className="text-sm text-zinc-400 mt-1">{children.length > 0 ? tr('connections.dynastyCanContinue') : tr('connections.noChildHeir')}</div>
             </div>
           </div>
 
           <div className="rounded-[2rem] border border-zinc-800 bg-[radial-gradient(circle_at_top,rgba(245,158,11,0.14),rgba(24,24,27,0.92)_38%,rgba(9,9,11,1)_100%)] p-5 space-y-5">
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-[10px] uppercase tracking-[0.25em] text-amber-500 mb-1">Family Tree</div>
-                <h3 className="text-2xl font-black text-white">Bloodline Timeline</h3>
+                <div className="text-[10px] uppercase tracking-[0.25em] text-amber-500 mb-1">{tr('connections.familyTree')}</div>
+                <h3 className="text-2xl font-black text-white">{tr('connections.bloodlineTimeline')}</h3>
               </div>
               <Sparkles className="text-amber-400" size={20} />
             </div>
@@ -404,7 +408,7 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
                                 <div className="font-bold text-white truncate">{member.name}</div>
                                 {typeof member.score === 'number' && (
                                   <div className="text-[10px] font-bold px-2 py-1 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                                    Score {member.score}
+                                    {tr('connections.score')} {member.score}
                                   </div>
                                 )}
                               </div>
@@ -424,8 +428,8 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
           {children.length === 0 && (
             <div className="rounded-3xl border border-dashed border-zinc-800 bg-zinc-900/40 p-6 text-center">
               <Baby className="mx-auto text-zinc-600 mb-3" size={28} />
-              <div className="font-bold text-white">No next generation yet</div>
-              <div className="text-sm text-zinc-500 mt-1">Have a child and they will appear here as the next branch of your family empire.</div>
+              <div className="font-bold text-white">{tr('connections.noNextGeneration')}</div>
+              <div className="text-sm text-zinc-500 mt-1">{tr('connections.noNextGenerationText')}</div>
             </div>
           )}
         </div>
@@ -441,13 +445,13 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
                           <img src={selectedContact.image} className="w-full h-full rounded-full object-cover border-4 border-black" />
                       </div>
                       <h3 className="text-2xl font-bold text-white mb-1">{selectedContact.name}</h3>
-                      <div className={`mb-2 inline-flex items-center rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] ${getRelationPill(selectedContact.relation)}`}>{selectedContact.relation}</div>
+                      <div className={`mb-2 inline-flex items-center rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] ${getRelationPill(selectedContact.relation)}`}>{relationLabel(selectedContact.relation)}</div>
                       {(selectedContact.relation === 'Child' || selectedContact.relation === 'Sibling' || selectedContact.relation === 'Parent' || selectedContact.relation === 'Deceased Parent') && (
-                        <div className="text-xs text-zinc-400 mb-4">Age {getRelationshipAge(selectedContact, player.age, player.currentWeek)}</div>
+                        <div className="text-xs text-zinc-400 mb-4">{tr('connections.age')} {getRelationshipAge(selectedContact, player.age, player.currentWeek)}</div>
                       )}
                       
                       <div className="w-full max-w-[200px] flex items-center gap-3 bg-black/40 p-2 rounded-xl border border-white/5">
-                          <span className="text-[10px] font-bold text-zinc-500 uppercase">Bond</span>
+                          <span className="text-[10px] font-bold text-zinc-500 uppercase">{tr('connections.bond')}</span>
                           <div className="flex-1 h-2 bg-zinc-800 rounded-full overflow-hidden">
                                <div className={`h-full rounded-full ${selectedContact.closeness > 80 ? 'bg-emerald-500' : 'bg-amber-400'}`} style={{ width: `${selectedContact.closeness}%` }}/>
                           </div>
@@ -458,12 +462,12 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
                   <div className="flex-1 overflow-y-auto p-4 pb-12 custom-scrollbar bg-black">
                       {(selectedContact.relation === 'Partner' || selectedContact.relation === 'Spouse') && (
                           <div className="mb-6">
-                              <h4 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3 pl-1">Romance</h4>
+                              <h4 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3 pl-1">{tr('connections.romance')}</h4>
                               <div className="grid grid-cols-2 gap-3">
-                                  <ActionCard label="Date Night" icon={Heart} color="bg-pink-500" costMoney={200} costEnergy={20} disabled={player.money < 200 || player.energy.current < 20} onClick={() => handleInteraction('DATE')} />
-                                  <ActionCard label="Clubbing" icon={Music} color="bg-purple-500" costMoney={500} costEnergy={40} disabled={player.money < 500 || player.energy.current < 40} onClick={() => handleInteraction('CLUBBING')} />
-                                  <ActionCard label="Luxury Trip" icon={Plane} color="bg-blue-500" costMoney={5000} costEnergy={0} subtext="Vacation" disabled={player.money < 5000} onClick={() => handleInteraction('TRIP')} />
-                                  <ActionCard label="Intimacy" icon={Flame} color="bg-rose-500" costMoney={0} costEnergy={30} disabled={player.energy.current < 30} onClick={() => handleInteraction('INTIMACY')} />
+                                  <ActionCard label={tr('connections.dateNight')} icon={Heart} color="bg-pink-500" costMoney={200} costEnergy={20} disabled={player.money < 200 || player.energy.current < 20} onClick={() => handleInteraction('DATE')} />
+                                  <ActionCard label={tr('connections.clubbing')} icon={Music} color="bg-purple-500" costMoney={500} costEnergy={40} disabled={player.money < 500 || player.energy.current < 40} onClick={() => handleInteraction('CLUBBING')} />
+                                  <ActionCard label={tr('connections.luxuryTrip')} icon={Plane} color="bg-blue-500" costMoney={5000} costEnergy={0} subtext={tr('connections.vacation')} disabled={player.money < 5000} onClick={() => handleInteraction('TRIP')} />
+                                  <ActionCard label={tr('connections.intimacy')} icon={Flame} color="bg-rose-500" costMoney={0} costEnergy={30} disabled={player.energy.current < 30} onClick={() => handleInteraction('INTIMACY')} />
                               </div>
                               
                               {selectedContact.relation !== 'Spouse' && (
@@ -472,53 +476,53 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
                                       disabled={player.money < 5000}
                                       className="w-full mt-3 py-4 rounded-2xl bg-gradient-to-r from-amber-600 to-amber-500 text-black font-bold text-sm flex items-center justify-center gap-2 shadow-lg opacity-90 hover:opacity-100 disabled:opacity-50"
                                   >
-                                      <Gem size={16}/> Propose Marriage <span className="opacity-60 text-xs font-normal">($5k Ring)</span>
+                                      <Gem size={16}/> {tr('connections.proposeMarriage')} <span className="opacity-60 text-xs font-normal">($5k {tr('connections.ring')})</span>
                                   </button>
                               )}
 
                               <div className="mt-4 space-y-3">
-                                  <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">Luxury Moments</div>
+                                  <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">{tr('connections.luxuryMoments')}</div>
                                   <div className="grid grid-cols-2 gap-3">
                                       {hasOwnedPremiumAssetInCollection(player, 'bundle_luxury_homes') ? (
-                                          <ActionCard label="Estate Night" icon={Home} color="bg-amber-500" costMoney={1200} costEnergy={16} subtext="Homes" disabled={player.money < 1200 || player.energy.current < 16} onClick={() => handleInteraction('ESTATE_DATE')} />
+                                          <ActionCard label={tr('connections.estateNight')} icon={Home} color="bg-amber-500" costMoney={1200} costEnergy={16} subtext={tr('connections.homes')} disabled={player.money < 1200 || player.energy.current < 16} onClick={() => handleInteraction('ESTATE_DATE')} />
                                       ) : null}
                                       {hasOwnedPremiumAssetInCollection(player, 'bundle_sky_sea') ? (
                                           <>
-                                              <ActionCard label="Yacht Date" icon={Plane} color="bg-sky-500" costMoney={2500} costEnergy={18} subtext="Sky & Sea" disabled={player.money < 2500 || player.energy.current < 18} onClick={() => handleInteraction('YACHT_DATE')} />
-                                              <ActionCard label="Jet Escape" icon={Plane} color="bg-blue-500" costMoney={9000} costEnergy={10} subtext="Jet-Set" disabled={player.money < 9000 || player.energy.current < 10} onClick={() => handleInteraction('JET_ESCAPE')} />
+                                              <ActionCard label={tr('connections.yachtDate')} icon={Plane} color="bg-sky-500" costMoney={2500} costEnergy={18} subtext={tr('connections.skySea')} disabled={player.money < 2500 || player.energy.current < 18} onClick={() => handleInteraction('YACHT_DATE')} />
+                                              <ActionCard label={tr('connections.jetEscape')} icon={Plane} color="bg-blue-500" costMoney={9000} costEnergy={10} subtext={tr('connections.jetSet')} disabled={player.money < 9000 || player.energy.current < 10} onClick={() => handleInteraction('JET_ESCAPE')} />
                                           </>
                                       ) : null}
                                       {hasOwnedPremiumAssetInCollection(player, 'bundle_ultimate_lifestyle') ? (
-                                          <ActionCard label="Luxury Gift" icon={Gem} color="bg-fuchsia-500" costMoney={8000} costEnergy={4} subtext="Lifestyle" disabled={player.money < 8000 || player.energy.current < 4} onClick={() => handleInteraction('LUXURY_GIFT')} />
+                                          <ActionCard label={tr('connections.luxuryGift')} icon={Gem} color="bg-fuchsia-500" costMoney={8000} costEnergy={4} subtext={tr('connections.lifestyle')} disabled={player.money < 8000 || player.energy.current < 4} onClick={() => handleInteraction('LUXURY_GIFT')} />
                                       ) : null}
                                   </div>
                               </div>
 
                               <div className="mt-4 rounded-2xl border border-rose-500/20 bg-rose-500/5 p-4">
-                                  <div className="mb-2 text-[10px] font-bold uppercase tracking-widest text-rose-300">Relationship Exit</div>
+                                  <div className="mb-2 text-[10px] font-bold uppercase tracking-widest text-rose-300">{tr('connections.relationshipExit')}</div>
                                   {selectedContact.relation === 'Partner' ? (
                                       <>
                                           <p className="mb-3 text-xs text-zinc-400">
-                                              A breakup can still trigger child support and public fallout if your life together is messy enough.
+                                              {tr('connections.breakupWarning')}
                                           </p>
                                           <button
                                               onClick={() => handleInteraction('BREAK_UP')}
                                               className="w-full rounded-2xl border border-rose-500/30 bg-rose-500/10 py-4 text-sm font-bold text-rose-200 hover:bg-rose-500/20"
                                           >
-                                              Break Up
+                                              {tr('connections.breakUp')}
                                           </button>
                                       </>
                                   ) : (
                                       <>
                                           <p className="mb-3 text-xs text-zinc-400">
-                                              Divorce can become a full wealth event. Settle quietly or fight in court and risk a brutal split.
+                                              {tr('connections.divorceWarning')}
                                           </p>
                                           {!showDivorceOptions ? (
                                               <button
                                                   onClick={() => setShowDivorceOptions(true)}
                                                   className="w-full rounded-2xl border border-rose-500/30 bg-rose-500/10 py-4 text-sm font-bold text-rose-200 hover:bg-rose-500/20"
                                               >
-                                                  Start Divorce
+                                                  {tr('connections.startDivorce')}
                                               </button>
                                           ) : (
                                               <div className="space-y-3">
@@ -526,35 +530,35 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
                                                       onClick={() => handleInteraction('DIVORCE_SETTLE')}
                                                       className="w-full rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-left hover:bg-amber-500/20"
                                                   >
-                                                      <div className="text-sm font-bold text-amber-200">Peaceful Settlement</div>
-                                                      <div className="mt-1 text-xs text-zinc-400">Lower legal burn, but you still concede cash and ongoing support.</div>
+                                                      <div className="text-sm font-bold text-amber-200">{tr('connections.peacefulSettlement')}</div>
+                                                      <div className="mt-1 text-xs text-zinc-400">{tr('connections.peacefulSettlementSub')}</div>
                                                   </button>
                                                   <button
                                                       onClick={() => handleInteraction('DIVORCE_FIGHT_BUDGET')}
                                                       className="w-full rounded-2xl border border-zinc-700 bg-zinc-950 p-4 text-left hover:bg-zinc-900"
                                                   >
-                                                      <div className="text-sm font-bold text-white">Fight With Budget Lawyer</div>
-                                                      <div className="mt-1 text-xs text-zinc-400">Fee: {formatWealth(getDivorceLawyerCost('BUDGET'))} • cheap, volatile, dangerous.</div>
+                                                      <div className="text-sm font-bold text-white">{tr('connections.fightBudgetLawyer')}</div>
+                                                      <div className="mt-1 text-xs text-zinc-400">{tr('connections.fee')}: {formatWealth(getDivorceLawyerCost('BUDGET'))} • {tr('connections.fightBudgetLawyerSub')}</div>
                                                   </button>
                                                   <button
                                                       onClick={() => handleInteraction('DIVORCE_FIGHT_ESTABLISHED')}
                                                       className="w-full rounded-2xl border border-blue-500/20 bg-blue-500/10 p-4 text-left hover:bg-blue-500/15"
                                                   >
-                                                      <div className="text-sm font-bold text-blue-200">Fight With Established Counsel</div>
-                                                      <div className="mt-1 text-xs text-zinc-400">Fee: {formatWealth(getDivorceLawyerCost('ESTABLISHED'))} • balanced protection.</div>
+                                                      <div className="text-sm font-bold text-blue-200">{tr('connections.fightEstablishedCounsel')}</div>
+                                                      <div className="mt-1 text-xs text-zinc-400">{tr('connections.fee')}: {formatWealth(getDivorceLawyerCost('ESTABLISHED'))} • {tr('connections.fightEstablishedCounselSub')}</div>
                                                   </button>
                                                   <button
                                                       onClick={() => handleInteraction('DIVORCE_FIGHT_ELITE')}
                                                       className="w-full rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4 text-left hover:bg-emerald-500/15"
                                                   >
-                                                      <div className="text-sm font-bold text-emerald-200">Fight With Elite Counsel</div>
-                                                      <div className="mt-1 text-xs text-zinc-400">Fee: {formatWealth(getDivorceLawyerCost('ELITE'))} • best odds, still no guarantees.</div>
+                                                      <div className="text-sm font-bold text-emerald-200">{tr('connections.fightEliteCounsel')}</div>
+                                                      <div className="mt-1 text-xs text-zinc-400">{tr('connections.fee')}: {formatWealth(getDivorceLawyerCost('ELITE'))} • {tr('connections.fightEliteCounselSub')}</div>
                                                   </button>
                                                   <button
                                                       onClick={() => setShowDivorceOptions(false)}
                                                       className="w-full rounded-2xl border border-zinc-800 bg-zinc-900/40 py-3 text-xs font-bold uppercase tracking-widest text-zinc-400"
                                                   >
-                                                      Cancel
+                                                      {tr('connections.cancel')}
                                                   </button>
                                               </div>
                                           )}
@@ -565,17 +569,17 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
                       )}
 
                       <div className="mb-6">
-                          <h4 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3 pl-1">Social</h4>
+                          <h4 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3 pl-1">{tr('connections.social')}</h4>
                           <div className="grid grid-cols-2 gap-3">
-                              <ActionCard label="Call / Text" icon={Phone} color="bg-blue-500" costMoney={0} costEnergy={5} disabled={player.energy.current < 5} onClick={() => handleInteraction('CALL')} />
-                              <ActionCard label="Hang Out" icon={Coffee} color="bg-orange-500" costMoney={getHangoutCost()} costEnergy={15} disabled={player.energy.current < 15 || player.money < getHangoutCost()} onClick={() => handleInteraction('HANGOUT')} />
-                              <ActionCard label="Send Gift" icon={Gift} color="bg-purple-500" costMoney={getGiftCost()} costEnergy={0} disabled={player.money < getGiftCost()} onClick={() => handleInteraction('GIFT')} />
+                              <ActionCard label={tr('connections.callText')} icon={Phone} color="bg-blue-500" costMoney={0} costEnergy={5} disabled={player.energy.current < 5} onClick={() => handleInteraction('CALL')} />
+                              <ActionCard label={tr('connections.hangOut')} icon={Coffee} color="bg-orange-500" costMoney={getHangoutCost()} costEnergy={15} disabled={player.energy.current < 15 || player.money < getHangoutCost()} onClick={() => handleInteraction('HANGOUT')} />
+                              <ActionCard label={tr('connections.sendGift')} icon={Gift} color="bg-purple-500" costMoney={getGiftCost()} costEnergy={0} disabled={player.money < getGiftCost()} onClick={() => handleInteraction('GIFT')} />
                               
                               {['Agent', 'Director', 'Connection', 'Manager', 'Colleague', 'Networking'].includes(selectedContact.relation) ? (
-                                  <ActionCard label="Network" icon={Users} color="bg-emerald-500" costMoney={0} costEnergy={25} disabled={player.energy.current < 25} onClick={() => handleInteraction('NETWORK')} />
+                                  <ActionCard label={tr('connections.network')} icon={Users} color="bg-emerald-500" costMoney={0} costEnergy={25} disabled={player.energy.current < 25} onClick={() => handleInteraction('NETWORK')} />
                               ) : (
                                   <div className="p-4 rounded-2xl border border-zinc-800 bg-zinc-900/30 flex items-center justify-center text-zinc-700 text-xs font-bold uppercase tracking-wider">
-                                      No Network Action
+                                      {tr('connections.noNetworkAction')}
                                   </div>
                               )}
                           </div>
@@ -583,7 +587,7 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
 
                       <div className="text-center pb-6">
                            <p className="text-[10px] text-zinc-600 font-mono">
-                              Last Interaction: {getInteractionAgeInWeeks(selectedContact, player.age, player.currentWeek) === 0 ? 'This Week' : `${getInteractionAgeInWeeks(selectedContact, player.age, player.currentWeek)} weeks ago`}
+                              {tr('connections.lastInteraction')}: {getInteractionAgeInWeeks(selectedContact, player.age, player.currentWeek) === 0 ? tr('connections.thisWeek') : tr('connections.weeksAgo', { count: getInteractionAgeInWeeks(selectedContact, player.age, player.currentWeek) })}
                            </p>
                       </div>
 
@@ -591,11 +595,11 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
                           <div className="px-4 pb-6">
                               {isChildAbandoned(player, selectedContact.id) ? (
                                   <div className="mb-3 rounded-2xl border border-rose-500/20 bg-rose-500/10 p-3 text-center text-xs text-rose-200">
-                                      You are currently an absent parent here. Weekly child support can still drag you into debt until you rebuild this relationship.
+                                      {tr('connections.absentParentWarning')}
                                   </div>
                               ) : (
                                   <div className="mb-3 rounded-2xl border border-amber-500/20 bg-amber-500/10 p-3 text-center text-xs text-amber-200">
-                                      Walking away from this child can trigger custody fallout, scandal news, and weekly support pressure.
+                                      {tr('connections.childFalloutWarning')}
                                   </div>
                               )}
                               <div className="grid grid-cols-2 gap-3 mb-3">
@@ -609,31 +613,31 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
                                   >
                                       {isChildAbandoned(player, selectedContact.id) ? (
                                           <>
-                                              <Heart size={16} /> Reconnect
+                                              <Heart size={16} /> {tr('connections.reconnect')}
                                           </>
                                       ) : (
                                           <>
-                                              <Skull size={16} /> Abandon Child
+                                              <Skull size={16} /> {tr('connections.abandonChild')}
                                           </>
                                       )}
                                   </button>
                                   <div className="rounded-2xl border border-zinc-800 bg-zinc-900/30 px-3 py-4 text-center">
-                                      <div className="text-[10px] uppercase tracking-wider text-zinc-500">Status</div>
+                                      <div className="text-[10px] uppercase tracking-wider text-zinc-500">{tr('connections.status')}</div>
                                       <div className={`mt-1 text-xs font-bold ${isChildAbandoned(player, selectedContact.id) ? 'text-rose-300' : 'text-emerald-300'}`}>
-                                          {isChildAbandoned(player, selectedContact.id) ? 'Absent Parent' : 'Active Parent'}
+                                          {isChildAbandoned(player, selectedContact.id) ? tr('connections.absentParent') : tr('connections.activeParent')}
                                       </div>
                                   </div>
                               </div>
                               {getRelationshipAge(selectedContact, player.age, player.currentWeek) < LEGACY_MIN_PLAYABLE_AGE && (
                                   <div className="mb-3 rounded-2xl border border-blue-500/20 bg-blue-500/5 p-3 text-center text-xs text-blue-300">
-                                      This heir is still too young. If you continue, the game will safely skip forward until they turn {LEGACY_MIN_PLAYABLE_AGE}.
+                                      {tr('connections.heirTooYoung', { age: LEGACY_MIN_PLAYABLE_AGE })}
                                   </div>
                               )}
                               <button
                                   onClick={() => setLegacyCandidate(selectedContact)}
                                   className="w-full py-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-500 font-bold text-sm flex items-center justify-center gap-2 hover:bg-amber-500/20 transition-all"
                               >
-                                  <Crown size={16} /> Continue as Child (Retire)
+                                  <Crown size={16} /> {tr('connections.continueAsChild')}
                               </button>
                           </div>
                       )}
@@ -651,10 +655,10 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
                               <img src={legacyCandidate.image} alt={legacyCandidate.name} className="w-full h-full object-cover" />
                           </div>
                           <div>
-                              <div className="text-[10px] uppercase tracking-[0.25em] text-amber-500 mb-1">Legacy Transfer</div>
-                              <h3 className="text-xl font-black text-white">Continue as {legacyCandidate.name}?</h3>
+                              <div className="text-[10px] uppercase tracking-[0.25em] text-amber-500 mb-1">{tr('connections.legacyTransfer')}</div>
+                              <h3 className="text-xl font-black text-white">{tr('connections.continueAsName', { name: legacyCandidate.name })}</h3>
                               <div className="text-sm text-zinc-400 mt-1">
-                                  Heir age {getRelationshipAge(legacyCandidate, player.age, player.currentWeek)}
+                                  {tr('connections.heirAge', { age: getRelationshipAge(legacyCandidate, player.age, player.currentWeek) })}
                               </div>
                           </div>
                       </div>
@@ -666,44 +670,44 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
                   <div className="p-6 space-y-4">
                       <div className="rounded-2xl border border-amber-500/15 bg-black/25 p-4">
                           <div className="text-sm text-zinc-200 leading-relaxed">
-                              You will retire from this generation and place the family empire in your child&apos;s hands.
+                              {tr('connections.retireText')}
                           </div>
                           {getRelationshipAge(legacyCandidate, player.age, player.currentWeek) < LEGACY_MIN_PLAYABLE_AGE && (
                               <div className="mt-3 rounded-xl border border-blue-500/20 bg-blue-500/10 p-3 text-xs text-blue-200">
-                                  This heir is still young, so the game will safely move time forward until they turn {LEGACY_MIN_PLAYABLE_AGE}.
+                                  {tr('connections.tooYoungTransfer', { age: LEGACY_MIN_PLAYABLE_AGE })}
                               </div>
                           )}
                       </div>
 
                       <div className="grid grid-cols-2 gap-3">
                           <div className="rounded-2xl border border-zinc-800 bg-black/30 p-4">
-                              <div className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 mb-2">Cash After Tax</div>
+                              <div className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 mb-2">{tr('connections.cashAfterTax')}</div>
                               <div className="text-xl font-black text-white">{formatWealth(inheritancePreview.inheritedMoney)}</div>
                               <div className="text-xs text-rose-400 mt-1">
-                                  Govt takes {formatWealth(inheritancePreview.moneyTaxPaid)}
+                                  {tr('connections.govtTakes', { amount: formatWealth(inheritancePreview.moneyTaxPaid) })}
                               </div>
                           </div>
                           <div className="rounded-2xl border border-zinc-800 bg-black/30 p-4">
-                              <div className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 mb-2">Shares After Tax</div>
+                              <div className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 mb-2">{tr('connections.sharesAfterTax')}</div>
                               <div className="text-xl font-black text-white">{inheritancePreview.inheritedShares.toLocaleString()}</div>
                               <div className="text-xs text-rose-400 mt-1">
-                                  {inheritancePreview.sharesTaxPaid.toLocaleString()} shares taxed
+                                  {tr('connections.sharesTaxed', { count: inheritancePreview.sharesTaxPaid.toLocaleString() })}
                               </div>
                           </div>
                       </div>
 
                       <div className="rounded-2xl border border-emerald-500/15 bg-emerald-500/5 p-4 space-y-2">
-                          <div className="text-[10px] uppercase tracking-[0.2em] text-emerald-400">Transfers Free Of Cost</div>
+                          <div className="text-[10px] uppercase tracking-[0.2em] text-emerald-400">{tr('connections.transfersFree')}</div>
                           <div className="text-sm text-zinc-200">
-                              Cars, homes, luxury items, businesses, and the rest of your empire stay with the family.
+                              {tr('connections.transfersFreeText')}
                           </div>
                           <div className="text-xs text-zinc-400">
-                              {inheritancePreview.untaxedAssetCount} personal assets and {inheritancePreview.businessCount} businesses pass over with no inheritance tax.
+                              {tr('connections.transfersFreeSub', { assets: inheritancePreview.untaxedAssetCount, businesses: inheritancePreview.businessCount })}
                           </div>
                       </div>
 
                       <div className="text-[11px] text-zinc-500 text-center">
-                          Inheritance tax rate: {Math.round(LEGACY_INHERITANCE_TAX_RATE * 100)}% on cash and shares only.
+                          {tr('connections.inheritanceTaxRate', { rate: Math.round(LEGACY_INHERITANCE_TAX_RATE * 100) })}
                       </div>
                   </div>
 
@@ -712,7 +716,7 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
                           onClick={closeLegacyConfirmation}
                           className="py-3 rounded-2xl border border-zinc-800 bg-zinc-900/80 text-zinc-300 font-bold text-sm hover:bg-zinc-800 transition-colors"
                       >
-                          Cancel
+                          {tr('connections.cancel')}
                       </button>
                       <button
                           onClick={() => {
@@ -722,7 +726,7 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
                           }}
                           className="py-3 rounded-2xl bg-amber-500 text-black font-black text-sm hover:bg-amber-400 transition-colors flex items-center justify-center gap-2"
                       >
-                          <Crown size={16} /> Confirm Legacy Shift
+                          <Crown size={16} /> {tr('connections.confirmLegacyShift')}
                       </button>
                   </div>
               </div>

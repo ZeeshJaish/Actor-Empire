@@ -1,4 +1,6 @@
-import { Writer, Script, Genre, WriterTier, ProjectType } from '../../types';
+import { Writer, Script, Genre, WriterTier, ProjectType, ProjectFormat, ScriptSubjectType } from '../../types';
+import { ALL_GENRES, PROJECT_FORMATS } from '../../services/genreCatalog';
+import { getScriptMarketDemand } from '../../services/marketTrends';
 
 const FIRST_NAMES = ['John', 'Jane', 'Alex', 'Sarah', 'Michael', 'Emily', 'David', 'Jessica', 'Chris', 'Amanda', 'Robert', 'Ashley', 'William', 'Brittany', 'James', 'Megan', 'Joseph', 'Samantha', 'Charles', 'Lauren', 'Thomas', 'Kayla', 'Daniel', 'Brianna', 'Matthew', 'Rachel', 'Anthony', 'Victoria', 'Mark', 'Morgan', 'Paul', 'Taylor', 'Steven', 'Haley', 'Andrew', 'Alexis', 'Kenneth', 'Sydney', 'Joshua', 'Chloe', 'Kevin', 'Alyssa', 'Brian', 'Hannah', 'George', 'Madison', 'Edward', 'Jasmine', 'Ronald', 'Destiny'];
 const LAST_NAMES = ['Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Garcia', 'Miller', 'Davis', 'Rodriguez', 'Martinez', 'Hernandez', 'Lopez', 'Gonzalez', 'Wilson', 'Anderson', 'Thomas', 'Taylor', 'Moore', 'Jackson', 'Martin', 'Lee', 'Perez', 'Thompson', 'White', 'Harris', 'Sanchez', 'Clark', 'Ramirez', 'Lewis', 'Robinson', 'Walker', 'Young', 'Allen', 'King', 'Wright', 'Scott', 'Torres', 'Nguyen', 'Hill', 'Flores', 'Green', 'Adams', 'Nelson', 'Baker', 'Hall', 'Rivera', 'Campbell', 'Mitchell', 'Carter', 'Roberts'];
@@ -12,7 +14,68 @@ const TITLES_BY_GENRE: Record<Genre, string[]> = {
     ROMANCE: ['The Notebook', 'Titanic', 'Pride and Prejudice', 'La La Land', 'Casablanca', 'When Harry Met Sally', 'Dirty Dancing', 'A Walk to Remember', 'Notting Hill', 'Love Actually'],
     THRILLER: ['The Silence of the Lambs', 'Se7en', 'The Sixth Sense', 'Gone Girl', 'Prisoners', 'Zodiac', 'Shutter Island', 'The Departed', 'Memento', 'Black Swan'],
     ADVENTURE: ['Indiana Jones', 'Jurassic Park', 'Pirates of the Caribbean', 'The Lord of the Rings', 'Jumanji', 'The Mummy', 'National Treasure', 'Tomb Raider', 'The Goonies', 'Cast Away'],
-    SUPERHERO: ['The Dark Knight', 'The Avengers', 'Spider-Man', 'Iron Man', 'Black Panther', 'Wonder Woman', 'Superman', 'Captain America', 'Thor', 'Guardians of the Galaxy']
+    SUPERHERO: ['The Dark Knight', 'The Avengers', 'Spider-Man', 'Iron Man', 'Black Panther', 'Wonder Woman', 'Superman', 'Captain America', 'Thor', 'Guardians of the Galaxy'],
+    MUSICAL: ['Opening Night', 'The Last Encore', 'City of Songs', 'Spotlight Hearts', 'Final Verse', 'Broadway Nights', 'Stage Door', 'Golden Chorus'],
+    BIOPIC: ['The Life of Maya Stone', 'Before the Crown', 'The Unwritten Years', 'Icon', 'Against the Noise', 'The Price of Genius', 'True North'],
+    SPORTS: ['Final Whistle', 'Underdog Season', 'The Comeback', 'Rivals', 'Last Shot', 'Home Ground', 'No Offseason', 'The Captain'],
+    ANIMATION: ['Cloud Kingdom', 'The Tiny Brave', 'Moonlit Forest', 'Robot Meadow', 'The Painted Door', 'Star Sprites', 'Pocket Planet'],
+    FANTASY: ['The Glass Kingdom', 'Crown of Ash', 'The Dragon Gate', 'Moonblade', 'The Last Spell', 'Empire of Thorns', 'The Hidden Realm'],
+    CRIME: ['Cold Evidence', 'The Silent Witness', 'Blue Line', 'Night Ledger', 'The Missing Hour', 'Under Oath', 'The Last Informant'],
+    DOCUMENTARY: ['The Untold Record', 'Inside the Machine', 'Witnesses', 'The Last Archive', 'Truth on Tape', 'No Easy Answers', 'The Real Story']
+};
+
+const SUBJECT_NAMES = [
+    'Aarav Khan', 'Maya Stone', 'Rafael Cruz', 'Nora Blake', 'Dev Malhotra', 'Lina Hart', 'Victor Vale', 'Sofia Reed',
+    'The Mumbai Tigers', 'The Neon Choir', 'Atlas Robotics', 'The Westbridge Case', 'Elena Voss', 'Jordan Miles'
+];
+
+const SUBJECT_TYPES: ScriptSubjectType[] = ['PUBLIC_FIGURE', 'ATHLETE', 'MUSICIAN', 'CRIMINAL_CASE', 'HISTORICAL_EVENT', 'COMPANY', 'TEAM'];
+
+const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
+
+const generateScriptSubject = (genre: Genre): { subjectName?: string; subjectType?: ScriptSubjectType; logline?: string } => {
+    if (genre !== 'BIOPIC' && genre !== 'DOCUMENTARY') return {};
+    const subjectName = pick(SUBJECT_NAMES);
+    const subjectType = genre === 'BIOPIC' ? pick(['PUBLIC_FIGURE', 'ATHLETE', 'MUSICIAN'] as ScriptSubjectType[]) : pick(SUBJECT_TYPES);
+    const logline = genre === 'BIOPIC'
+        ? `A dramatic portrait of ${subjectName}, tracing the private cost behind a public legacy.`
+        : `A documentary investigation into ${subjectName}, built around rare access, interviews, and unresolved questions.`;
+    return { subjectName, subjectType, logline };
+};
+
+const createSubjectPackage = (genre: 'BIOPIC' | 'DOCUMENTARY', index: number): Script => {
+    const subject = generateScriptSubject(genre);
+    const baseQuality = genre === 'BIOPIC' ? 62 + Math.floor(Math.random() * 28) : 55 + Math.floor(Math.random() * 32);
+    const format: ProjectFormat = genre === 'DOCUMENTARY' ? 'LIVE_ACTION' : Math.random() < 0.12 ? 'ANIMATED' : 'LIVE_ACTION';
+    const subjectLabel = subject.subjectName || pick(SUBJECT_NAMES);
+    const title = genre === 'BIOPIC'
+        ? pick([`The ${subjectLabel} Story`, `${subjectLabel}: No Apologies`, `Becoming ${subjectLabel}`, `${subjectLabel}: Final Verse`])
+        : pick([`Inside ${subjectLabel}`, `${subjectLabel}: The Untold Record`, `The ${subjectLabel} Files`, `Witnesses: ${subjectLabel}`]);
+
+    return {
+        id: `ip_subject_${genre.toLowerCase()}_${Date.now()}_${index}`,
+        title,
+        author: genre === 'BIOPIC' ? 'Life Rights Package' : 'Documentary Access Package',
+        genres: [genre],
+        status: 'READY',
+        quality: baseQuality,
+        options: [],
+        writerId: null,
+        weeksInDevelopment: 0,
+        totalDevelopmentWeeks: 0,
+        isOriginal: false,
+        projectType: 'MOVIE',
+        format,
+        baseQuality,
+        logline: subject.logline,
+        sourceMaterial: 'ADAPTATION',
+        sourceMaterialType: genre === 'BIOPIC' ? 'LIFE_RIGHTS' : 'DOCUMENTARY_SUBJECT',
+        subjectName: subjectLabel,
+        subjectType: subject.subjectType,
+        hype: genre === 'BIOPIC' ? 45 + Math.floor(Math.random() * 45) : 35 + Math.floor(Math.random() * 45),
+        purchaseCost: genre === 'BIOPIC' ? 500000 + Math.floor(Math.random() * 1800000) : 180000 + Math.floor(Math.random() * 900000),
+        tags: generateTags(baseQuality, genre)
+    };
 };
 
 const TITLE_COMPONENTS = {
@@ -294,7 +357,7 @@ export const generateTags = (quality: number, genre: Genre): string[] => {
     const r = Math.random();
     
     // Oscar Bait logic: High quality, usually Drama/Indie/Historical
-    if (quality > 75 && ['DRAMA', 'INDIE', 'ROMANCE'].includes(genre) && r < 0.3) {
+    if (quality > 75 && ['DRAMA', 'ROMANCE', 'BIOPIC', 'DOCUMENTARY', 'MUSICAL'].includes(genre) && r < 0.3) {
         tags.push('Oscar Bait');
     }
     
@@ -308,14 +371,17 @@ export const generateTags = (quality: number, genre: Genre): string[] => {
     if (Math.random() < 0.1) tags.push('High Concept');
     if (Math.random() < 0.1 && genre === 'HORROR') tags.push('Elevated Horror');
     if (Math.random() < 0.1 && genre === 'SCI_FI') tags.push('Hard Sci-Fi');
+    if (Math.random() < 0.2 && genre === 'BIOPIC') tags.push('Life Rights');
+    if (Math.random() < 0.2 && genre === 'DOCUMENTARY') tags.push('Doc Access');
     
     return tags;
 };
 
 export const generateBookIP = (): Script => {
     const { adjectives, nouns, verbs } = BOOK_TITLE_COMPONENTS;
-    const genres = Object.keys(TITLES_BY_GENRE) as Genre[];
+    const genres = ALL_GENRES.filter(genre => genre !== 'DOCUMENTARY');
     const genre = genres[Math.floor(Math.random() * genres.length)];
+    const subject = generateScriptSubject(genre);
     
     const r = Math.random();
     let title = '';
@@ -346,29 +412,49 @@ export const generateBookIP = (): Script => {
         totalDevelopmentWeeks: 0,
         isOriginal: false,
         projectType,
+        format: genre === 'ANIMATION' ? 'ANIMATED' : genre === 'FANTASY' && Math.random() < 0.2 ? 'ANIME' : 'LIVE_ACTION',
         baseQuality,
-        logline: generateProceduralLogline(),
+        logline: subject.logline || generateProceduralLogline(),
         sourceMaterial: 'ADAPTATION',
-        sourceMaterialType: 'BOOK',
+        sourceMaterialType: genre === 'BIOPIC' ? 'LIFE_RIGHTS' : 'BOOK',
+        subjectName: subject.subjectName,
+        subjectType: subject.subjectType,
         hype: Math.floor(Math.random() * 100),
         purchaseCost: 100000 + Math.floor(Math.random() * 900000), // 100k to 1M
         tags: generateTags(baseQuality, genre)
     };
 };
 
-export const generateIPMarket = (count: number, excludeTitles: string[] = []): Script[] => {
+const priceScriptForMarket = (script: Script, week: number): Script => {
+    const demand = getScriptMarketDemand(script, week);
+    const quality = script.baseQuality || script.quality || 50;
+    const sourcePremium = script.sourceMaterialType === 'LIFE_RIGHTS' ? 1.4
+        : script.sourceMaterialType === 'DOCUMENTARY_SUBJECT' ? 0.85
+        : script.sourceMaterialType === 'BOOK' ? 1.15
+        : 1;
+    const purchaseCost = script.purchaseCost || Math.floor(quality * 15000 * sourcePremium * demand);
+    const demandTag = demand >= 1.2 ? 'Breakout Demand' : demand >= 1.08 ? 'Hot Market' : demand <= 0.85 ? 'Buyer Caution' : undefined;
+    return {
+        ...script,
+        hype: Math.min(100, Math.max(0, Math.floor((script.hype || 35) * demand))),
+        purchaseCost,
+        tags: demandTag && !(script.tags || []).includes(demandTag) ? [...(script.tags || []), demandTag] : script.tags,
+    };
+};
+
+export const generateIPMarket = (count: number, excludeTitles: string[] = [], currentWeek: number = 1): Script[] => {
     const scripts: Script[] = [];
     
     // Add 2-3 famous books to the market
     const shuffledFamous = [...FAMOUS_BOOKS]
         .filter(book => !excludeTitles.includes(book.title))
         .sort(() => 0.5 - Math.random());
-    const famousCount = Math.min(3, count);
+    const famousCount = Math.min(2, count);
     
     for (let i = 0; i < famousCount; i++) {
         const book = shuffledFamous[i];
         if (!book) continue;
-        scripts.push({
+        scripts.push(priceScriptForMarket({
             id: `ip_famous_${Date.now()}_${i}`,
             title: book.title,
             author: book.author,
@@ -388,17 +474,23 @@ export const generateIPMarket = (count: number, excludeTitles: string[] = []): S
             hype: 80 + Math.floor(Math.random() * 20),
             purchaseCost: 1000000 + Math.floor(Math.random() * 4000000), // 1M to 5M
             tags: generateTags(book.quality, book.genre)
-        });
+        }, currentWeek));
     }
 
-    const genres = Object.keys(TITLES_BY_GENRE) as Genre[];
+    (['BIOPIC', 'DOCUMENTARY'] as const).forEach((genre, index) => {
+        if (scripts.length >= count) return;
+        const pack = createSubjectPackage(genre, index);
+        if (!excludeTitles.includes(pack.title)) scripts.push(priceScriptForMarket(pack, currentWeek));
+    });
+
+    const genres = ALL_GENRES;
 
     for (let i = scripts.length; i < count; i++) {
         const r = Math.random();
         if (r < 0.4) {
             const book = generateBookIP();
             if (!excludeTitles.includes(book.title)) {
-                scripts.push(book);
+                scripts.push(priceScriptForMarket(book, currentWeek));
             } else {
                 i--; // Try again
             }
@@ -411,15 +503,21 @@ export const generateIPMarket = (count: number, excludeTitles: string[] = []): S
                 continue;
             }
 
-            const logline = generateProceduralLogline();
+            const subject = generateScriptSubject(genre);
+            const logline = subject.logline || generateProceduralLogline();
 
             const baseQuality = Math.floor(Math.random() * 60) + 20; // 20 to 80
             const projectType = Math.random() > 0.3 ? 'MOVIE' : 'SERIES';
             const episodes = projectType === 'SERIES' ? (Math.floor(Math.random() * 8) + 6) : undefined;
+            const format: ProjectFormat = genre === 'ANIMATION'
+                ? 'ANIMATED'
+                : genre === 'FANTASY' && Math.random() < 0.25
+                    ? 'ANIME'
+                    : pick(PROJECT_FORMATS);
             
             const isSpecScript = Math.random() > 0.5;
 
-            scripts.push({
+            scripts.push(priceScriptForMarket({
                 id: `ip_${Date.now()}_${i}`,
                 title,
                 genres: [genre],
@@ -431,14 +529,17 @@ export const generateIPMarket = (count: number, excludeTitles: string[] = []): S
                 totalDevelopmentWeeks: 0,
                 isOriginal: false,
                 projectType,
+                format,
                 episodes,
                 baseQuality,
                 logline,
-                sourceMaterial: 'ORIGINAL',
-                sourceMaterialType: isSpecScript ? 'SPEC_SCRIPT' : 'SCREENPLAY',
+                sourceMaterial: genre === 'BIOPIC' || genre === 'DOCUMENTARY' ? 'ADAPTATION' : 'ORIGINAL',
+                sourceMaterialType: genre === 'BIOPIC' ? 'LIFE_RIGHTS' : genre === 'DOCUMENTARY' ? 'DOCUMENTARY_SUBJECT' : isSpecScript ? 'SPEC_SCRIPT' : 'SCREENPLAY',
+                subjectName: subject.subjectName,
+                subjectType: subject.subjectType,
                 hype: Math.floor(Math.random() * 50),
                 tags: generateTags(baseQuality, genre)
-            });
+            }, currentWeek));
         }
     }
     return scripts;

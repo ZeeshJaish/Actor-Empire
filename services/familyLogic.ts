@@ -1,9 +1,47 @@
-import { FamilyObligation, NewsItem, Player, Relationship } from '../types';
+import { FamilyObligation, Gender, NewsItem, Player, PregnancyCarrier, Relationship } from '../types';
 import { getAbsoluteWeek, getRelationshipAge } from './legacyLogic';
 import { getGenderedAvatar } from './npcLogic';
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 const sample = <T,>(items: T[]): T => items[Math.floor(Math.random() * items.length)];
+
+export const getPregnancyCarrier = (
+    playerGender?: Gender,
+    partnerGender?: Gender
+): PregnancyCarrier => {
+    if (playerGender === 'MALE' && partnerGender === 'FEMALE') return 'PARTNER';
+    if (playerGender === 'FEMALE' && partnerGender === 'MALE') return 'PLAYER';
+    return 'NONE';
+};
+
+export const getPregnancyFeedbackCopy = (
+    carrier: PregnancyCarrier,
+    partnerName: string
+) => {
+    const firstName = (partnerName || 'Your partner').split(' ')[0];
+    if (carrier === 'PLAYER') {
+        return {
+            title: 'Pregnancy Confirmed',
+            body: "You're pregnant. The baby is due in about 9 months, and naming will happen when the baby is born.",
+            log: 'You are pregnant. Due in about 9 months.',
+            toast: "You're pregnant. Naming comes when the baby is born.",
+        };
+    }
+    if (carrier === 'PARTNER') {
+        return {
+            title: 'Pregnancy Confirmed',
+            body: `${firstName} is pregnant. The baby is due in about 9 months, and naming will happen when the baby is born.`,
+            log: `${partnerName} is pregnant. Due in about 9 months.`,
+            toast: `${partnerName} is pregnant. Naming comes when the baby is born.`,
+        };
+    }
+    return {
+        title: 'Intimacy Locked',
+        body: `You and ${firstName} had a great time together, but biologically this intimacy cannot lead to pregnancy.`,
+        log: `You and ${partnerName} had a great time together, but pregnancy is not possible from this intimacy.`,
+        toast: `You and ${firstName} had a great time. Pregnancy is not biologically possible here.`,
+    };
+};
 
 const BREAKUP_HEADLINES = [
     '{Name} and {Partner} quietly call it quits.',

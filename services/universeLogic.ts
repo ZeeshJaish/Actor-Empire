@@ -299,6 +299,43 @@ export const normalizeUniverseCharacterKey = (value: string) =>
         .replace(/[^a-z0-9]+/g, '_')
         .replace(/^_+|_+$/g, '') || 'character';
 
+export const getUniverseCharacterKeyAliases = (
+    universeId: UniverseId | undefined,
+    characterId?: string,
+    characterName?: string
+) => {
+    const aliases = new Set<string>();
+    const add = (value?: string) => {
+        const normalized = value ? normalizeUniverseCharacterKey(value) : '';
+        if (normalized) aliases.add(normalized);
+    };
+
+    add(characterId);
+    add(characterName);
+
+    if (universeId && characterId) {
+        const prefix = `${normalizeUniverseCharacterKey(universeId)}_`;
+        const normalizedId = normalizeUniverseCharacterKey(characterId);
+        if (normalizedId.startsWith(prefix)) aliases.add(normalizedId.slice(prefix.length));
+        aliases.add(`${prefix}${normalizedId}`);
+    }
+
+    return Array.from(aliases);
+};
+
+const findUniverseRosterMatch = (
+    rosterMap: Map<string, UniverseCharacter>,
+    universeId: UniverseId | undefined,
+    characterId?: string,
+    characterName?: string
+) => {
+    for (const alias of getUniverseCharacterKeyAliases(universeId, characterId, characterName)) {
+        const match = rosterMap.get(alias);
+        if (match) return { key: alias, character: match };
+    }
+    return null;
+};
+
 export const getDefaultUniverseRoster = (universeId: UniverseId): UniverseCharacter[] => {
     const template = UNIVERSE_TEMPLATES[universeId];
     if (!template) return [];
@@ -490,9 +527,36 @@ export const normalizeUniverseForSave = (raw: any, fallbackId?: UniverseId): Uni
 
     const rawRoster = Array.isArray(raw?.roster) ? raw.roster : [];
     const rosterSource = rawRoster.length > 0 ? rawRoster : base.roster;
-    const roster = rosterSource
+    const rosterMap = new Map<string, UniverseCharacter>();
+    rosterSource
         .map((entry: any, index: number) => normalizeUniverseCharacter(entry, id, index))
-        .filter(Boolean) as UniverseCharacter[];
+        .filter(Boolean)
+        .forEach((entry: any) => {
+            const character = entry as UniverseCharacter;
+            const primaryKey = character.characterId || character.id || normalizeUniverseCharacterKey(character.name);
+            const existingMatch = findUniverseRosterMatch(rosterMap, id, primaryKey, character.name);
+            const existing = existingMatch?.character;
+            const merged: UniverseCharacter = existing
+                ? {
+                    ...existing,
+                    ...character,
+                    id: existing.id || character.id || primaryKey,
+                    characterId: existing.characterId || character.characterId || primaryKey,
+                    actorId: character.actorId !== 'UNKNOWN' ? character.actorId : existing.actorId,
+                    actorName: !/^unknown actor$/i.test(character.actorName || '') ? character.actorName : existing.actorName,
+                    status: existing.actorId && character.actorId !== 'UNKNOWN' && existing.actorId !== character.actorId ? 'RECAST' : (character.status || existing.status),
+                    appearances: Math.max(existing.appearances || 0, character.appearances || 0),
+                    firstAppearanceTitle: existing.firstAppearanceTitle || character.firstAppearanceTitle,
+                    latestAppearanceTitle: character.latestAppearanceTitle || existing.latestAppearanceTitle,
+                    fanApproval: Math.max(existing.fanApproval || 50, character.fanApproval || 50)
+                }
+                : character;
+            const canonicalKey = merged.characterId || merged.id || normalizeUniverseCharacterKey(merged.name);
+            if (existingMatch?.key && existingMatch.key !== canonicalKey) rosterMap.delete(existingMatch.key);
+            getUniverseCharacterKeyAliases(id, canonicalKey, merged.name).forEach(alias => rosterMap.delete(alias));
+            rosterMap.set(canonicalKey, merged);
+        });
+    const roster = Array.from(rosterMap.values());
 
     const rawProducts = Array.isArray(raw?.products) ? raw.products : [];
     const productsSource = rawProducts.length > 0 ? rawProducts : (base.products || []);
@@ -694,7 +758,7 @@ export const buildUniverseRoster = (
         const safeAppearances = typeof entry.appearances === 'number' && entry.appearances > 0
             ? entry.appearances
             : fallbackAppearances;
-        rosterMap.set(characterId, {
+        const normalizedEntry = {
             id: entry.id || characterId,
             characterId,
             name: entry.name,
@@ -714,34 +778,46 @@ export const buildUniverseRoster = (
             fame: entry.fame,
             appeal: entry.appeal,
             type: entry.type
-        });
+        };
+        getUniverseCharacterKeyAliases(universe.id, characterId, entry.name).forEach(alias => rosterMap.set(alias, normalizedEntry));
     });
 
     projects.forEach(project => {
         normalizeUniverseCastEntries(project.castList, project.title, playerName).forEach(character => {
             const characterKey = character.characterId || character.name;
-            const legacyCharacterKey = normalizeUniverseCharacterKey(character.name);
-            const existing = rosterMap.get(characterKey) || rosterMap.get(legacyCharacterKey);
-            if (existing && characterKey !== legacyCharacterKey) {
-                rosterMap.delete(legacyCharacterKey);
-            }
+            const existingMatch = findUniverseRosterMatch(rosterMap, universe.id, characterKey, character.name);
+            const existing = existingMatch?.character;
             const wasRecast = !!existing && existing.actorId !== character.actorId;
-            rosterMap.set(characterKey, {
+            const isReboot = project.subtype === 'REBOOT';
+            const continuityApproval = wasRecast
+                ? Math.max(25, (existing?.fanApproval || 55) - (isReboot ? 4 : 14))
+                : Math.min(100, Math.max(existing?.fanApproval || 50, character.fanApproval || 50) + (existing ? 3 : 0));
+            const merged = {
                 ...(existing || {}),
                 ...character,
                 id: character.id || existing?.id || character.characterId,
                 characterId: character.characterId || existing?.characterId,
                 status: wasRecast ? 'RECAST' : (existing?.status || character.status),
-                fanApproval: Math.max(existing?.fanApproval || 50, character.fanApproval || 50),
+                fanApproval: continuityApproval,
                 appearances: (existing?.appearances || 0) + 1,
                 firstAppearanceTitle: existing?.firstAppearanceTitle || project.title,
                 latestAppearanceTitle: project.title,
-                description: `Played by ${character.actorId === 'PLAYER_SELF' ? 'you' : character.actorName}.`
-            });
+                description: wasRecast
+                    ? `${character.name} was ${isReboot ? 'reintroduced' : 'recast'} with ${character.actorId === 'PLAYER_SELF' ? 'you' : character.actorName}.`
+                    : `Played by ${character.actorId === 'PLAYER_SELF' ? 'you' : character.actorName}.`
+            };
+            if (existingMatch?.key && existingMatch.key !== characterKey) rosterMap.delete(existingMatch.key);
+            getUniverseCharacterKeyAliases(universe.id, characterKey, character.name).forEach(alias => rosterMap.delete(alias));
+            rosterMap.set(characterKey, merged);
         });
     });
 
-    return Array.from(rosterMap.values()).sort((a, b) => {
+    const uniqueRoster = Array.from(new Map(Array.from(rosterMap.values()).map(character => [
+        character.characterId || character.id || normalizeUniverseCharacterKey(character.name),
+        character
+    ])).values());
+
+    return uniqueRoster.sort((a, b) => {
         const appearanceDelta = (b.appearances || 0) - (a.appearances || 0);
         if (appearanceDelta !== 0) return appearanceDelta;
         return a.name.localeCompare(b.name);
@@ -980,6 +1056,31 @@ export const getUniverseReleaseActivity = (
     return { weeksSinceLatestRelease, multiplier: 0, label: 'No recent releases' };
 };
 
+const getUniverseReleaseImpact = (player: Player, universe: Pick<Universe, 'id'>) => {
+    const universeId = universe?.id;
+    if (!universeId) return { momentum: 0, brandPower: 0, marketShare: 0 };
+
+    const recentPlayerProjects = (player.pastProjects || [])
+        .filter((project: any) => getProjectUniverseId(project) === universeId)
+        .filter((project: any) => {
+            const releaseYear = Number(project.year || project.releaseYear || player.age);
+            const releaseWeek = Number(project.week || project.releaseWeek || project.completedWeek || 26);
+            return getGameAbsoluteWeek(player.age, player.currentWeek) - getGameAbsoluteWeek(releaseYear, releaseWeek) <= 156;
+        });
+
+    const totalGross = recentPlayerProjects.reduce((sum: number, project: any) => sum + Math.max(0, Number(project.gross || project.boxOffice || 0)), 0);
+    const averageRating = recentPlayerProjects.length
+        ? recentPlayerProjects.reduce((sum: number, project: any) => sum + Math.max(0, Number(project.imdbRating || project.rating || 0)), 0) / recentPlayerProjects.length
+        : 0;
+    const hitCount = recentPlayerProjects.filter((project: any) => Number(project.gross || project.boxOffice || 0) >= 500_000_000 || Number(project.imdbRating || project.rating || 0) >= 7.5).length;
+
+    return {
+        momentum: Math.min(35, recentPlayerProjects.length * 3 + hitCount * 4 + Math.floor(totalGross / 800_000_000)),
+        brandPower: Math.min(25, hitCount * 3 + Math.max(0, Math.floor((averageRating - 6.5) * 3)) + Math.floor(totalGross / 1_500_000_000)),
+        marketShare: Math.min(18, hitCount * 1.25 + Math.floor(totalGross / 750_000_000) * 0.75 + Math.max(0, averageRating - 7) * 0.8)
+    };
+};
+
 // Main processing loop
 export const processUniverseTurn = (player: Player, universe: Universe): { universe: Universe, news: NewsItem[], project?: IndustryProject } => {
     const updated = normalizeUniverseForSave(universe, universe?.id);
@@ -1008,6 +1109,25 @@ export const processUniverseTurn = (player: Player, universe: Universe): { unive
 
     updated.stats.weeklyRevenue = weeklyLicensingRevenue;
     updated.stats.lifetimeRevenue = (updated.stats.lifetimeRevenue || 0) + weeklyLicensingRevenue;
+
+    const releaseImpact = getUniverseReleaseImpact(player, updated);
+    const licensingImpact = weeklyLicensingRevenue > 0 ? Math.min(4, Math.log10(weeklyLicensingRevenue + 1) - 4) : 0;
+    updated.momentum = clampNumber(
+        updated.momentum + releaseImpact.momentum * 0.08 + licensingImpact - (releaseActivity.multiplier === 0 ? 0.35 : 0.08),
+        updated.momentum,
+        0,
+        100
+    );
+    updated.brandPower = clampNumber(
+        updated.brandPower + releaseImpact.brandPower * 0.04 + (weeklyLicensingRevenue > 0 ? 0.08 : 0),
+        updated.brandPower,
+        0,
+        100
+    );
+    updated.marketShare = Math.min(
+        100,
+        Math.max(0, Number((updated.marketShare + releaseImpact.marketShare * 0.06 + (weeklyLicensingRevenue > 0 ? 0.03 : 0)).toFixed(2)))
+    );
 
     // 1. Advance Phase Timer
     updated.weeksUntilNextPhase--;
@@ -1112,7 +1232,7 @@ export const processUniverseTurn = (player: Player, universe: Universe): { unive
                 year: player.age,
                 weekReleased: player.currentWeek,
                 leadActorId: "NPC", 
-                leadActorName: "Famous Star", 
+                leadActorName: pick(NPC_DATABASE).name,
                 directorName: "Russo Brothers",
                 reviews: "HIT",
                 universeId: updated.id

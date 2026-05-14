@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Player, DatingMatch, DatingPreferences } from '../../types';
+import { Player, DatingMatch, DatingPreferences, PregnancyCarrier } from '../../types';
 import { generateTinderProfile, calculateSwipeSuccess } from '../../services/datingLogic';
 import { getAbsoluteWeek } from '../../services/legacyLogic';
 import { spendPlayerEnergy } from '../../services/premiumLogic';
+import { getPregnancyCarrier, getPregnancyFeedbackCopy } from '../../services/familyLogic';
 import { ArrowLeft, Flame, X, Heart, MessageCircle, Briefcase, Send, ChevronLeft, Calendar, Moon, Link2, Sparkles } from 'lucide-react';
 
 interface TinderAppProps {
@@ -13,6 +14,7 @@ interface TinderAppProps {
     onTriggerBabyNaming?: (pending: {
         partnerId: string;
         partnerName: string;
+        pregnancyCarrier?: PregnancyCarrier;
         babyGender: 'MALE' | 'FEMALE';
         suggestedFirstName: string;
         birthWeekAbsolute: number;
@@ -287,7 +289,9 @@ export const TinderApp: React.FC<TinderAppProps> = ({ player, onBack, onUpdatePl
         setTimeout(() => setFeedback(null), 2600);
     };
 
-    const buildPregnancyRequest = (match: DatingMatch) => {
+    const getMatchPregnancyCarrier = (match: DatingMatch) => getPregnancyCarrier(player.gender, match.gender);
+
+    const buildPregnancyRequest = (match: DatingMatch, pregnancyCarrier: PregnancyCarrier) => {
         const babyGender = Math.random() > 0.5 ? 'MALE' : 'FEMALE';
         const suggestedFirstName = babyGender === 'MALE' ? 'Leo' : 'Mia';
         const activePartner = player.relationships.find(rel => (rel.relation === 'Partner' || rel.relation === 'Spouse') && rel.name !== match.name);
@@ -295,6 +299,7 @@ export const TinderApp: React.FC<TinderAppProps> = ({ player, onBack, onUpdatePl
         return {
             partnerId: match.id,
             partnerName: match.name,
+            pregnancyCarrier,
             babyGender,
             suggestedFirstName,
             birthWeekAbsolute: currentAbsoluteWeek + 39,
@@ -302,16 +307,6 @@ export const TinderApp: React.FC<TinderAppProps> = ({ player, onBack, onUpdatePl
             eventYear: player.age,
             shouldCreateScandalNews: !!activePartner,
         };
-    };
-
-    const canTriggerPregnancy = (match: DatingMatch) => {
-        const playerGender = player.gender;
-        const matchGender = match.gender;
-        if (!matchGender) return false;
-        const oppositePair =
-            (playerGender === 'MALE' && matchGender === 'FEMALE') ||
-            (playerGender === 'FEMALE' && matchGender === 'MALE');
-        return oppositePair;
     };
 
     const loadNewProfile = () => {
@@ -587,20 +582,24 @@ export const TinderApp: React.FC<TinderAppProps> = ({ player, onBack, onUpdatePl
             return;
         }
 
-        const pregnancyTriggered = success && onTriggerBabyNaming && canTriggerPregnancy(activeChatMatch) && Math.random() < 0.12;
+        const pregnancyCarrier = getMatchPregnancyCarrier(activeChatMatch);
+        const pregnancyTriggered = success && onTriggerBabyNaming && pregnancyCarrier !== 'NONE' && Math.random() < 0.12;
+        const pregnancyFeedback = getPregnancyFeedbackCopy(pregnancyTriggered ? pregnancyCarrier : 'NONE', activeChatMatch.name);
         setResultModal({
             title: success ? (pregnancyTriggered ? 'Pregnancy Confirmed' : 'Hookup Locked') : 'Killed The Mood',
             body: success
                 ? pregnancyTriggered
-                    ? `${activeChatMatch.name.split(' ')[0]} is pregnant. The baby is due in about 9 months, and naming will happen when the baby is born.`
-                    : `${activeChatMatch.name.split(' ')[0]} went for it. This is now much messier and much more physical.`
+                    ? pregnancyFeedback.body
+                    : pregnancyCarrier === 'NONE'
+                        ? pregnancyFeedback.body
+                        : `${activeChatMatch.name.split(' ')[0]} went for it. This is now much messier and much more physical.`
                 : `${activeChatMatch.name.split(' ')[0]} pulled back hard. The vibe is shakier now.`,
             tone: success ? 'success' : 'neutral',
         });
 
         if (pregnancyTriggered) {
             window.setTimeout(() => {
-                onTriggerBabyNaming?.(buildPregnancyRequest(activeChatMatch));
+                onTriggerBabyNaming?.(buildPregnancyRequest(activeChatMatch, pregnancyCarrier));
             }, 900);
         }
     };

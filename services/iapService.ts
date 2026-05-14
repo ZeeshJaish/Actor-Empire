@@ -1,4 +1,4 @@
-import { registerPlugin } from '@capacitor/core';
+import { Capacitor, registerPlugin } from '@capacitor/core';
 import { PremiumProductId } from './premiumLogic';
 
 export const IOS_PRODUCT_IDS: Record<PremiumProductId, string> = {
@@ -54,11 +54,17 @@ export interface PremiumCatalogProduct {
 }
 
 const isCapacitorIOS = () => {
-    return window.Capacitor?.isNativePlatform?.() && window.Capacitor?.getPlatform?.() === 'ios';
+    return Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios';
 };
 
 const Purchases = registerPlugin<PurchasesPlugin>('Purchases');
-const getPurchasesPlugin = () => Purchases;
+const isPurchasesPluginAvailable = () => {
+    return Capacitor.isPluginAvailable('Purchases');
+};
+
+const getPurchasesPlugin = () => {
+    return isPurchasesPluginAvailable() ? Purchases : null;
+};
 
 export const getPremiumCatalogProducts = async (): Promise<PremiumCatalogProduct[]> => {
     if (import.meta.env.DEV || !isCapacitorIOS()) {
@@ -67,6 +73,9 @@ export const getPremiumCatalogProducts = async (): Promise<PremiumCatalogProduct
 
     try {
         const purchases = getPurchasesPlugin();
+        if (!purchases?.getProducts) {
+            return [];
+        }
         const result = await purchases.getProducts({ productIds: Object.values(IOS_PRODUCT_IDS) });
         const products = result?.products || [];
 
@@ -96,7 +105,7 @@ export const purchasePremiumProduct = async (productId: PremiumProductId): Promi
 
     const purchases = getPurchasesPlugin();
     if (!purchases?.purchaseProduct) {
-        return { success: false, message: 'Capacitor purchase plugin is not configured yet.' };
+        return { success: false, message: 'Purchases are not available in this build yet. Please update the app and try again.' };
     }
 
     try {
@@ -127,7 +136,7 @@ export const restorePremiumPurchases = async (): Promise<RestoreResult> => {
 
     const purchases = getPurchasesPlugin();
     if (!purchases?.restorePurchases) {
-        return { success: false, restoredProductIds: [], message: 'Capacitor purchase plugin is not configured yet.' };
+        return { success: false, restoredProductIds: [], message: 'Purchases are not available in this build yet. Please update the app and try again.' };
     }
 
     try {

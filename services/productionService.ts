@@ -126,7 +126,7 @@ const CRISIS_TEMPLATES: Record<ActorTrait, (npc: NPCActor) => ProductionCrisis> 
     AMBITIOUS: () => null
 };
 
-import { GENERAL_CRISIS_TEMPLATES } from './productionEvents';
+import { getProductionCrisisTemplates } from './productionEvents';
 import { generateRandomCrisis } from './crisisGenerator';
 import { generateDirectorDecision, DirectorDecision } from './directorGenerator';
 
@@ -213,8 +213,9 @@ export const applyCrisisImpact = (player: Player, event: ScheduledEvent, choiceI
         };
     } else if (event.data.isGeneral) {
         const templateIndex = event.data.templateIndex;
-        if (templateIndex !== undefined && GENERAL_CRISIS_TEMPLATES[templateIndex]) {
-            crisis = GENERAL_CRISIS_TEMPLATES[templateIndex](project);
+        const templates = getProductionCrisisTemplates(project);
+        if (templateIndex !== undefined && templates[templateIndex]) {
+            crisis = templates[templateIndex](project);
         }
     } else {
         const trait = event.data.trait as ActorTrait;
@@ -243,8 +244,15 @@ export const applyCrisisImpact = (player: Player, event: ScheduledEvent, choiceI
 export const checkForProductionCrisis = (player: Player, project: Commitment): ProductionCrisis | null => {
     if (project.projectPhase !== 'PRODUCTION') return null;
     
-    // 15% chance per week of a crisis
-    if (Math.random() > 0.15) return null;
+    const genre = project.projectDetails?.genre;
+    const format = project.projectDetails?.format;
+    let crisisChance = 0.15;
+    if (format === 'ANIMATED' || format === 'ANIME') crisisChance -= 0.03;
+    if (genre === 'DOCUMENTARY') crisisChance -= 0.04;
+    if (genre === 'MUSICAL') crisisChance += 0.03;
+    if (genre === 'ACTION' || genre === 'SUPERHERO') crisisChance += 0.02;
+
+    if (Math.random() > Math.max(0.06, Math.min(0.24, crisisChance))) return null;
 
     const roll = Math.random();
 
@@ -273,8 +281,9 @@ export const checkForProductionCrisis = (player: Player, project: Commitment): P
 
     // 30% chance for general static crisis
     if (roll < 0.6) {
-        const templateIndex = Math.floor(Math.random() * GENERAL_CRISIS_TEMPLATES.length);
-        const crisis = GENERAL_CRISIS_TEMPLATES[templateIndex](project);
+        const templates = getProductionCrisisTemplates(project);
+        const templateIndex = Math.floor(Math.random() * templates.length);
+        const crisis = templates[templateIndex](project);
         (crisis as any).isGeneral = true;
         (crisis as any).templateIndex = templateIndex;
         return crisis;

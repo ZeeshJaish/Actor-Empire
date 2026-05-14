@@ -3,6 +3,7 @@ import React from 'react';
 import { Player, Commitment } from '../types';
 import { getBuzzLabel } from '../services/roleLogic';
 import { getAbsoluteWeek, getElapsedWeeks } from '../services/legacyLogic';
+import { getPlayerLanguage, t } from '../services/i18n';
 import { Film, Clapperboard, Trophy, Mic2, Video, Zap, PenTool, Coffee, TrendingUp, Twitter, Camera, Hourglass, CheckCircle2, Calendar } from 'lucide-react';
 
 interface CareerPageProps {
@@ -15,6 +16,8 @@ export const CareerPage: React.FC<CareerPageProps> = ({ player, onQuitJob, onReh
   const pendingApps = player.applications || [];
   const actingCommitments = player.commitments.filter(c => c.type === 'ACTING_GIG');
   const pastProjects = player.pastProjects || [];
+  const language = getPlayerLanguage(player);
+  const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
 
   const auditionPhase = actingCommitments.filter(c => c.projectPhase === 'AUDITION');
   const planningPhase = actingCommitments.filter(c => c.projectPhase === 'PLANNING');
@@ -31,10 +34,10 @@ export const CareerPage: React.FC<CareerPageProps> = ({ player, onQuitJob, onReh
             <Film size={28} />
          </div>
          <div>
-            <h2 className="text-3xl font-bold text-white">Career Profile</h2>
+            <h2 className="text-3xl font-bold text-white">{tr('career.title')}</h2>
             <div className="flex gap-3 text-xs text-zinc-400 mt-1">
-                <span className="flex items-center gap-1"><Trophy size={12} className="text-blue-500"/> Reputation: {Math.round(player.stats.reputation || 0)}</span>
-                <span className="flex items-center gap-1"><Clapperboard size={12} /> Credits: {pastProjects.filter(p => p.type === 'ACTING_GIG').length}</span>
+                <span className="flex items-center gap-1"><Trophy size={12} className="text-blue-500"/> {tr('home.reputation')}: {Math.round(player.stats.reputation || 0)}</span>
+                <span className="flex items-center gap-1"><Clapperboard size={12} /> {tr('career.credits')}: {pastProjects.filter(p => p.type === 'ACTING_GIG').length}</span>
             </div>
          </div>
       </div>
@@ -43,7 +46,7 @@ export const CareerPage: React.FC<CareerPageProps> = ({ player, onQuitJob, onReh
       {auditionPhase.length > 0 && (
           <div className="space-y-3 animate-in slide-in-from-left duration-300">
             <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest pl-1 flex items-center gap-2">
-                <Mic2 size={12} className="text-pink-500"/> Audition Room
+                <Mic2 size={12} className="text-pink-500"/> {tr('career.auditionRoom')}
             </h3>
             {auditionPhase.map(gig => {
                 const isMaxed = (gig.auditionPerformance || 0) >= 100;
@@ -53,18 +56,18 @@ export const CareerPage: React.FC<CareerPageProps> = ({ player, onQuitJob, onReh
                             <div>
                                 <div className="font-bold text-white text-lg">{gig.name}</div>
                                 <div className="text-[10px] text-zinc-500 uppercase tracking-wide">
-                                    Role: <span className="text-pink-400 font-bold">{gig.roleType}</span>
+                                    {tr('career.role')}: <span className="text-pink-400 font-bold">{gig.roleType}</span>
                                 </div>
                             </div>
                             <div className="text-right">
-                                 <div className="text-[10px] text-zinc-600 uppercase">Selection In</div>
-                                 <div className="font-mono font-bold text-white">{gig.phaseWeeksLeft} wks</div>
+                                 <div className="text-[10px] text-zinc-600 uppercase">{tr('career.selectionIn')}</div>
+                                 <div className="font-mono font-bold text-white">{gig.phaseWeeksLeft} {tr('career.weeksShort')}</div>
                             </div>
                          </div>
                          
                          <div className="bg-zinc-900/50 rounded-xl p-3 mb-3 border border-white/5">
                             <div className="flex justify-between text-[10px] text-zinc-400 uppercase mb-1">
-                                <span>Preparation Level</span>
+                                <span>{tr('career.preparationLevel')}</span>
                                 <span>{Math.round(gig.auditionPerformance || 0)}/100</span>
                             </div>
                             <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
@@ -81,7 +84,7 @@ export const CareerPage: React.FC<CareerPageProps> = ({ player, onQuitJob, onReh
                                 : 'bg-zinc-800 hover:bg-zinc-700 text-white'
                             }`}
                          >
-                             {isMaxed ? <><CheckCircle2 size={12}/> Ready for Audition</> : <><Zap size={12} className="text-amber-400 fill-amber-400" /> Rehearse (-20 Energy)</>}
+                             {isMaxed ? <><CheckCircle2 size={12}/> {tr('career.readyForAudition')}</> : <><Zap size={12} className="text-amber-400 fill-amber-400" /> {tr('career.rehearseEnergy')}</>}
                          </button>
                     </div>
                 );
@@ -93,7 +96,7 @@ export const CareerPage: React.FC<CareerPageProps> = ({ player, onQuitJob, onReh
       {planningPhase.length > 0 && (
           <div className="space-y-3 animate-in slide-in-from-left duration-300">
             <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest pl-1 flex items-center gap-2">
-                <PenTool size={12} className="text-yellow-500"/> Development
+                <PenTool size={12} className="text-yellow-500"/> {tr('career.development')}
             </h3>
             {planningPhase.map(gig => (
                 <div key={gig.id} className="glass-card p-5 rounded-3xl border-l-4 border-l-yellow-500 relative opacity-80">
@@ -101,16 +104,16 @@ export const CareerPage: React.FC<CareerPageProps> = ({ player, onQuitJob, onReh
                         <div>
                             <div className="font-bold text-white text-lg">{gig.name}</div>
                             <div className="text-[10px] text-zinc-500 uppercase tracking-wide">
-                                Status: <span className="text-yellow-400 font-bold">Scripting</span>
+                                {tr('home.status')}: <span className="text-yellow-400 font-bold">{tr('career.scripting')}</span>
                             </div>
                         </div>
                         <div className="text-right">
-                             <div className="text-[10px] text-zinc-600 uppercase">Pre-Prod In</div>
-                             <div className="font-mono font-bold text-white">{gig.phaseWeeksLeft} wks</div>
+                             <div className="text-[10px] text-zinc-600 uppercase">{tr('career.preProdIn')}</div>
+                             <div className="font-mono font-bold text-white">{gig.phaseWeeksLeft} {tr('career.weeksShort')}</div>
                         </div>
                      </div>
                      <div className="bg-zinc-900/30 p-3 rounded-xl text-center">
-                         <p className="text-[10px] text-zinc-500 italic">"Writers are working. Sit tight."</p>
+                         <p className="text-[10px] text-zinc-500 italic">"{tr('career.writersWorking')}"</p>
                      </div>
                 </div>
             ))}
@@ -121,7 +124,7 @@ export const CareerPage: React.FC<CareerPageProps> = ({ player, onQuitJob, onReh
       {preProductionPhase.length > 0 && (
           <div className="space-y-3 animate-in slide-in-from-left duration-300">
             <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest pl-1 flex items-center gap-2">
-                <Coffee size={12} className="text-orange-500"/> Pre-Production
+                <Coffee size={12} className="text-orange-500"/> {tr('career.preProduction')}
             </h3>
             {preProductionPhase.map(gig => {
                 const isMaxed = (gig.auditionPerformance || 0) >= 100; // Using auditionPerf variable for 'Readiness' in pre-prod
@@ -131,18 +134,18 @@ export const CareerPage: React.FC<CareerPageProps> = ({ player, onQuitJob, onReh
                             <div>
                                 <div className="font-bold text-white text-lg">{gig.name}</div>
                                 <div className="text-[10px] text-zinc-500 uppercase tracking-wide">
-                                    Status: <span className="text-orange-400 font-bold">Prep Phase</span>
+                                    {tr('home.status')}: <span className="text-orange-400 font-bold">{tr('career.prepPhase')}</span>
                                 </div>
                             </div>
                             <div className="text-right">
-                                 <div className="text-[10px] text-zinc-600 uppercase">Shooting In</div>
-                                 <div className="font-mono font-bold text-white">{gig.phaseWeeksLeft} wks</div>
+                                 <div className="text-[10px] text-zinc-600 uppercase">{tr('career.shootingIn')}</div>
+                                 <div className="font-mono font-bold text-white">{gig.phaseWeeksLeft} {tr('career.weeksShort')}</div>
                             </div>
                          </div>
                          
                          <div className="bg-zinc-900/50 rounded-xl p-3 mb-3 border border-white/5">
                             <div className="flex justify-between text-[10px] text-zinc-400 uppercase mb-1">
-                                <span>Readiness</span>
+                                <span>{tr('career.readiness')}</span>
                                 <span>{Math.round(gig.auditionPerformance || 0)}/100</span>
                             </div>
                             <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
@@ -159,7 +162,7 @@ export const CareerPage: React.FC<CareerPageProps> = ({ player, onQuitJob, onReh
                                 : 'bg-zinc-800 hover:bg-zinc-700 text-white'
                             }`}
                          >
-                             {isMaxed ? <><CheckCircle2 size={12}/> Ready to Film</> : <><Coffee size={12} className="text-amber-200" /> Table Read (-10 Energy)</>}
+                             {isMaxed ? <><CheckCircle2 size={12}/> {tr('career.readyToFilm')}</> : <><Coffee size={12} className="text-amber-200" /> {tr('career.tableRead')}</>}
                          </button>
                     </div>
                 );
@@ -171,7 +174,7 @@ export const CareerPage: React.FC<CareerPageProps> = ({ player, onQuitJob, onReh
       {productionPhase.length > 0 && (
           <div className="space-y-3 animate-in slide-in-from-left duration-500">
             <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest pl-1 flex items-center gap-2">
-                <Video size={12} className="text-emerald-500"/> On Set
+                <Video size={12} className="text-emerald-500"/> {tr('career.onSet')}
             </h3>
             {productionPhase.map(gig => {
                 const isMaxed = (gig.productionPerformance || 0) >= 100;
@@ -184,18 +187,18 @@ export const CareerPage: React.FC<CareerPageProps> = ({ player, onQuitJob, onReh
                             <div>
                                 <div className="font-bold text-white text-lg">{gig.name}</div>
                                 <div className="text-[10px] text-zinc-500 uppercase tracking-wide">
-                                    Shooting Phase
+                                    {tr('career.shootingPhase')}
                                 </div>
                             </div>
                             <div className="text-right">
-                                 <div className="text-[10px] text-zinc-600 uppercase">Wrap In</div>
-                                 <div className="font-mono font-bold text-white">{gig.phaseWeeksLeft} wks</div>
+                                 <div className="text-[10px] text-zinc-600 uppercase">{tr('career.wrapIn')}</div>
+                                 <div className="font-mono font-bold text-white">{gig.phaseWeeksLeft} {tr('career.weeksShort')}</div>
                             </div>
                          </div>
                          
                          <div className="bg-zinc-900/80 rounded-xl p-3 mb-3 border border-white/5 relative z-10">
                             <div className="flex justify-between text-[10px] text-zinc-400 uppercase mb-1">
-                                <span>Scene Performance</span>
+                                <span>{tr('career.scenePerformance')}</span>
                                 <span>{Math.round(gig.productionPerformance || 0)}/100</span>
                             </div>
                             <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
@@ -212,7 +215,7 @@ export const CareerPage: React.FC<CareerPageProps> = ({ player, onQuitJob, onReh
                                 : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-900/20'
                             }`}
                          >
-                             {isMaxed ? <><CheckCircle2 size={12}/> Scene Perfected</> : <><Zap size={12} className="text-yellow-300 fill-yellow-300" /> Rehearse Scene (-20 Energy)</>}
+                             {isMaxed ? <><CheckCircle2 size={12}/> {tr('career.scenePerfected')}</> : <><Zap size={12} className="text-yellow-300 fill-yellow-300" /> {tr('career.rehearseScene')}</>}
                          </button>
                     </div>
                 );
@@ -224,7 +227,7 @@ export const CareerPage: React.FC<CareerPageProps> = ({ player, onQuitJob, onReh
       {postPhase.length > 0 && (
           <div className="space-y-3 animate-in slide-in-from-left duration-700">
             <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest pl-1 flex items-center gap-2">
-                <TrendingUp size={12} className="text-blue-500"/> Promotion & Buzz
+                <TrendingUp size={12} className="text-blue-500"/> {tr('career.promotionBuzz')}
             </h3>
             {postPhase.map(gig => {
                 const buzz = gig.promotionalBuzz || 0;
@@ -245,11 +248,11 @@ export const CareerPage: React.FC<CareerPageProps> = ({ player, onQuitJob, onReh
                             <div>
                                 <div className="font-bold text-white text-lg">{gig.name}</div>
                                 <div className="text-[10px] text-zinc-500 uppercase tracking-wide">
-                                    Releases in: <span className="text-blue-400 font-bold">{gig.phaseWeeksLeft} wks</span>
+                                    {tr('career.releasesIn')}: <span className="text-blue-400 font-bold">{gig.phaseWeeksLeft} {tr('career.weeksShort')}</span>
                                 </div>
                             </div>
                             <div className="text-right">
-                                <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Hype Level</div>
+                                <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">{tr('career.hypeLevel')}</div>
                                 <div className={`font-bold text-sm ${buzzLabel.color} px-2 py-0.5 bg-zinc-900 rounded border border-white/5`}>
                                     {buzzLabel.label}
                                 </div>
@@ -264,7 +267,7 @@ export const CareerPage: React.FC<CareerPageProps> = ({ player, onQuitJob, onReh
                                 className="flex flex-col items-center justify-center p-3 bg-zinc-800 hover:bg-zinc-700 rounded-xl gap-1 transition-colors border border-white/5 disabled:opacity-50"
                             >
                                 <Camera size={18} className="text-pink-500" />
-                                <span className="text-[10px] font-bold text-zinc-300">Post</span>
+                                <span className="text-[10px] font-bold text-zinc-300">{tr('career.post')}</span>
                                 <span className="text-[9px] text-zinc-500">-10E</span>
                             </button>
 
@@ -275,7 +278,7 @@ export const CareerPage: React.FC<CareerPageProps> = ({ player, onQuitJob, onReh
                                 className="flex flex-col items-center justify-center p-3 bg-zinc-800 hover:bg-zinc-700 rounded-xl gap-1 transition-colors border border-white/5 disabled:opacity-50"
                             >
                                 <Twitter size={18} className="text-blue-400" />
-                                <span className="text-[10px] font-bold text-zinc-300">Hype</span>
+                                <span className="text-[10px] font-bold text-zinc-300">{tr('career.hype')}</span>
                                 <span className="text-[9px] text-zinc-500">-15E</span>
                             </button>
 
@@ -286,8 +289,8 @@ export const CareerPage: React.FC<CareerPageProps> = ({ player, onQuitJob, onReh
                                 className={`flex flex-col items-center justify-center p-3 rounded-xl gap-1 transition-colors border border-white/5 disabled:opacity-50 ${!canPress ? 'bg-zinc-900 cursor-not-allowed' : 'bg-blue-900/30 hover:bg-blue-900/50 border-blue-500/30'}`}
                             >
                                 <Mic2 size={18} className={canPress ? "text-blue-300" : "text-zinc-600"} />
-                                <span className={`text-[10px] font-bold ${canPress ? 'text-blue-200' : 'text-zinc-500'}`}>Press</span>
-                                <span className="text-[9px] text-zinc-500">{!canPress ? `${4 - weeksSincePress}w Cool` : '-25E'}</span>
+                                <span className={`text-[10px] font-bold ${canPress ? 'text-blue-200' : 'text-zinc-500'}`}>{tr('career.press')}</span>
+                                <span className="text-[9px] text-zinc-500">{!canPress ? tr('career.cooldown', { count: 4 - weeksSincePress }) : '-25E'}</span>
                             </button>
                         </div>
                     </div>
@@ -300,7 +303,7 @@ export const CareerPage: React.FC<CareerPageProps> = ({ player, onQuitJob, onReh
       {scheduledPhase.length > 0 && (
           <div className="space-y-3 animate-in slide-in-from-left duration-700">
              <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest pl-1 flex items-center gap-2">
-                <Calendar size={12} className="text-indigo-500"/> Upcoming Slate
+                <Calendar size={12} className="text-indigo-500"/> {tr('career.upcomingSlate')}
             </h3>
             {scheduledPhase.map((gig, idx) => (
                 <div key={gig.id} className="glass-card p-4 rounded-2xl border border-dashed border-zinc-700 bg-zinc-900/30 flex items-center justify-between">
@@ -309,8 +312,8 @@ export const CareerPage: React.FC<CareerPageProps> = ({ player, onQuitJob, onReh
                         <div className="text-[10px] text-zinc-500">{gig.projectDetails?.subtype.replace('_', ' ')} • {gig.roleType}</div>
                     </div>
                     <div className="text-right">
-                        <div className="text-[10px] text-zinc-600 uppercase font-bold">Starts In</div>
-                        <div className="text-indigo-400 font-mono font-bold text-sm">~{gig.phaseWeeksLeft}w</div>
+                        <div className="text-[10px] text-zinc-600 uppercase font-bold">{tr('career.startsIn')}</div>
+                        <div className="text-indigo-400 font-mono font-bold text-sm">~{gig.phaseWeeksLeft}{tr('career.weeksShort')}</div>
                     </div>
                 </div>
             ))}
@@ -320,7 +323,7 @@ export const CareerPage: React.FC<CareerPageProps> = ({ player, onQuitJob, onReh
       {/* 7. PENDING APPLICATIONS */}
       {pendingApps.length > 0 && (
           <div className="space-y-3">
-            <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest pl-1">Applications Sent</h3>
+            <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest pl-1">{tr('career.applicationsSent')}</h3>
             <div className="grid grid-cols-1 gap-2">
                 {pendingApps.map(app => (
                     <div key={app.id} className="glass-card p-3 rounded-xl flex items-center justify-between border-dashed border-zinc-700">
@@ -330,11 +333,11 @@ export const CareerPage: React.FC<CareerPageProps> = ({ player, onQuitJob, onReh
                              </div>
                              <div>
                                  <div className="font-bold text-zinc-200 text-sm">{app.name}</div>
-                                 <div className="text-[10px] text-zinc-500">Casting review...</div>
+                                 <div className="text-[10px] text-zinc-500">{tr('career.castingReview')}</div>
                              </div>
                          </div>
                          <div className="text-xs text-zinc-500 font-mono">
-                             ~{app.weeksRemaining}w
+                             ~{app.weeksRemaining}{tr('career.weeksShort')}
                          </div>
                     </div>
                 ))}
@@ -345,7 +348,7 @@ export const CareerPage: React.FC<CareerPageProps> = ({ player, onQuitJob, onReh
       {/* EMPTY STATE */}
       {auditionPhase.length === 0 && planningPhase.length === 0 && preProductionPhase.length === 0 && productionPhase.length === 0 && postPhase.length === 0 && pendingApps.length === 0 && scheduledPhase.length === 0 && (
           <div className="border border-dashed border-zinc-800 rounded-3xl p-8 text-center bg-zinc-900/30 mt-8">
-               <p className="text-zinc-500 text-sm">No active projects. Check CastLink to find work!</p>
+               <p className="text-zinc-500 text-sm">{tr('career.noActiveProjects')}</p>
           </div>
       )}
     </div>

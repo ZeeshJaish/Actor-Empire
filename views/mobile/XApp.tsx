@@ -5,6 +5,7 @@ import { generateXFeed, generateTrendingTopics } from '../../services/xLogic';
 import { NPC_DATABASE } from '../../services/npcLogic';
 import { getEnabledGlobalCreatorSocialProfiles } from '../../services/youtubeLogic';
 import { spendPlayerEnergy } from '../../services/premiumLogic';
+import { getPlayerLanguage, t } from '../../services/i18n';
 import { ArrowLeft, Home, Search, PenTool, Heart, Repeat, MessageCircle, MoreHorizontal, Check, User, Mail, Calendar, MapPin, Link as LinkIcon, Bell, Star, XCircle, Flame, ShieldCheck, Laugh, Megaphone, Film, Users, MessageSquareQuote } from 'lucide-react';
 
 interface XAppProps {
@@ -59,6 +60,8 @@ const X_REPLY_BANK: Record<XPostType, string[]> = {
 };
 
 export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) => {
+    const language = getPlayerLanguage(player);
+    const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
     const [tab, setTab] = useState<XTab>('HOME');
     const [view, setView] = useState<XView>('MAIN');
     const [feedTab, setFeedTab] = useState<FeedTab>('FOR_YOU');
@@ -543,11 +546,11 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
                     </div>
                     <div className="flex text-sm font-bold text-zinc-500">
                         <button onClick={() => setFeedTab('FOR_YOU')} className={`flex-1 py-3 text-center hover:bg-white/5 relative ${feedTab === 'FOR_YOU' ? 'text-white' : ''}`}>
-                            For you
+                            {tr('x.forYou')}
                             {feedTab === 'FOR_YOU' && <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-14 h-1 bg-blue-500 rounded-full"></div>}
                         </button>
                         <button onClick={() => setFeedTab('FOLLOWING')} className={`flex-1 py-3 text-center hover:bg-white/5 relative ${feedTab === 'FOLLOWING' ? 'text-white' : ''}`}>
-                            Following
+                            {tr('x.following')}
                             {feedTab === 'FOLLOWING' && <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-16 h-1 bg-blue-500 rounded-full"></div>}
                         </button>
                     </div>
@@ -556,7 +559,7 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
                 <div className="sticky top-0 z-20 bg-black/80 backdrop-blur-md px-4 pt-12 pb-3 border-b border-zinc-800">
                     <div className="relative">
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={16}/>
-                        <input type="text" placeholder="Search X" className="w-full bg-zinc-900 rounded-full py-2 pl-10 pr-4 text-sm text-white focus:outline-none focus:bg-black border border-zinc-800 focus:border-blue-500 transition-colors" />
+                        <input type="text" placeholder={tr('x.search')} className="w-full bg-zinc-900 rounded-full py-2 pl-10 pr-4 text-sm text-white focus:outline-none focus:bg-black border border-zinc-800 focus:border-blue-500 transition-colors" />
                     </div>
                 </div>
             ) : tab === 'PROFILE' ? (
@@ -564,11 +567,11 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
                     <button onClick={() => { if(selectedProfile) setSelectedProfile(null); setTab('HOME'); }} className="p-2 -ml-2 rounded-full hover:bg-white/10"><ArrowLeft size={20}/></button>
                     <div>
                         <div className="font-bold text-lg leading-none">{selectedProfile ? selectedProfile.name : player.name}</div>
-                        <div className="text-xs text-zinc-500">{selectedProfile ? '24' : player.x.posts.length} posts</div>
+                        <div className="text-xs text-zinc-500">{selectedProfile ? '24' : player.x.posts.length} {tr('x.posts').toLowerCase()}</div>
                     </div>
                 </div>
             ) : (
-                <div className="sticky top-0 z-20 bg-black/80 backdrop-blur-md px-4 pt-12 pb-3 border-b border-zinc-800 font-bold text-lg">Notifications</div>
+                <div className="sticky top-0 z-20 bg-black/80 backdrop-blur-md px-4 pt-12 pb-3 border-b border-zinc-800 font-bold text-lg">{tr('x.notifications')}</div>
             )}
 
             {/* --- MAIN CONTENT AREA --- */}
@@ -579,9 +582,9 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
                     <div className="pb-20">
                         {filteredFeed.length === 0 ? (
                             <div className="p-8 text-center text-zinc-500">
-                                <div className="font-bold text-lg text-white mb-2">Welcome to X!</div>
-                                <p>This is the best place to see what's happening in your world. Find some people and topics to follow now.</p>
-                                <button onClick={() => setTab('SEARCH')} className="mt-4 bg-blue-500 text-white px-6 py-2 rounded-full font-bold text-sm">Let's go</button>
+                                <div className="font-bold text-lg text-white mb-2">{tr('x.welcome')}</div>
+                                <p>{tr('x.welcomeSub')}</p>
+                                <button onClick={() => setTab('SEARCH')} className="mt-4 bg-blue-500 text-white px-6 py-2 rounded-full font-bold text-sm">{tr('x.letsGo')}</button>
                             </div>
                         ) : (
                             filteredFeed.map(post => <TweetCard key={post.id} post={post} />)
@@ -593,12 +596,12 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
                 {tab === 'SEARCH' && (
                     <div>
                         <div className="p-4 border-b border-zinc-800">
-                            <h3 className="font-extrabold text-lg mb-4">Trends for you</h3>
+                            <h3 className="font-extrabold text-lg mb-4">{tr('x.trendsForYou')}</h3>
                             <div className="space-y-5">
                                 {trending.map((t, i) => (
                                     <div key={i} className="flex justify-between items-start">
                                         <div>
-                                            <div className="text-xs text-zinc-500 font-bold">{t.category} · Trending</div>
+                                            <div className="text-xs text-zinc-500 font-bold">{t.category} · {tr('x.trending')}</div>
                                             <div className="font-bold text-white text-base mt-0.5">{t.tag}</div>
                                             <div className="text-xs text-zinc-500 mt-0.5">{t.posts}</div>
                                         </div>
@@ -608,7 +611,7 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
                             </div>
                         </div>
                         <div className="p-4 pb-20">
-                            <h3 className="font-extrabold text-lg mb-4">Who to follow</h3>
+                            <h3 className="font-extrabold text-lg mb-4">{tr('x.whoToFollow')}</h3>
                             <div className="space-y-4">
                                 {npcPool.slice(0, 5).map(npc => {
                                     const isFollowing = npcStates[npc.id]?.isFollowing;
@@ -626,7 +629,7 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
                                                 onClick={(e) => { e.stopPropagation(); handleFollowToggle(npc); }}
                                                 className={`px-4 py-1.5 rounded-full text-sm font-bold border transition-colors ${isFollowing ? 'bg-transparent border-zinc-600 text-white' : 'bg-white text-black border-white'}`}
                                             >
-                                                {isFollowing ? 'Following' : 'Follow'}
+                                                {isFollowing ? tr('x.following') : tr('x.follow')}
                                             </button>
                                         </div>
                                     )
@@ -657,11 +660,11 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
                                             onClick={() => handleFollowToggle(selectedProfile)}
                                             className={`px-5 py-1.5 rounded-full text-sm font-bold border ${npcStates[selectedProfile.id]?.isFollowing ? 'border-zinc-600 text-white' : 'bg-white text-black border-white'}`}
                                         >
-                                            {npcStates[selectedProfile.id]?.isFollowing ? 'Following' : 'Follow'}
+                                            {npcStates[selectedProfile.id]?.isFollowing ? tr('x.following') : tr('x.follow')}
                                         </button>
                                     </div>
                                 ) : (
-                                    <button className="px-4 py-1.5 rounded-full text-sm font-bold border border-zinc-600 text-white">Edit profile</button>
+                                    <button className="px-4 py-1.5 rounded-full text-sm font-bold border border-zinc-600 text-white">{tr('x.editProfile')}</button>
                                 )}
                             </div>
                             <div className="mt-1">
@@ -679,17 +682,17 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
                                 <div className="flex flex-wrap gap-x-4 gap-y-2 text-zinc-500 text-sm mb-3">
                                     <div className="flex items-center gap-1"><MapPin size={14}/> Los Angeles, CA</div>
                                     <div className="flex items-center gap-1"><LinkIcon size={14}/> <span className="text-blue-400">imdb.com/name</span></div>
-                                    <div className="flex items-center gap-1"><Calendar size={14}/> Joined {selectedProfile ? 'March 2018' : 'September 2024'}</div>
+                                    <div className="flex items-center gap-1"><Calendar size={14}/> {tr('x.joined')} {selectedProfile ? 'March 2018' : 'September 2024'}</div>
                                 </div>
 
                                 <div className="flex gap-4 text-sm">
-                                    <div><span className="font-bold text-white">{selectedProfile ? '450' : '12'}</span> <span className="text-zinc-500">Following</span></div>
+                                    <div><span className="font-bold text-white">{selectedProfile ? '450' : '12'}</span> <span className="text-zinc-500">{tr('x.following')}</span></div>
                                     {/* USE X SPECIFIC FOLLOWERS FOR PLAYER */}
                                     <div>
                                         <span className="font-bold text-white">
                                             {formatNumber(selectedProfile ? selectedProfile.followers : (player.x.followers || 0))}
                                         </span> 
-                                        <span className="text-zinc-500">Followers</span>
+                                        <span className="text-zinc-500">{tr('x.followers')}</span>
                                     </div>
                                 </div>
                             </div>
@@ -697,16 +700,16 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
 
                         {/* Profile Tabs */}
                         <div className="flex border-b border-zinc-800 mt-2 font-bold text-sm text-zinc-500">
-                            <button className="flex-1 py-3 text-white border-b-2 border-blue-500 relative">Posts</button>
-                            <button className="flex-1 py-3 hover:bg-white/5">Replies</button>
-                            <button className="flex-1 py-3 hover:bg-white/5">Media</button>
-                            <button className="flex-1 py-3 hover:bg-white/5">Likes</button>
+                            <button className="flex-1 py-3 text-white border-b-2 border-blue-500 relative">{tr('x.posts')}</button>
+                            <button className="flex-1 py-3 hover:bg-white/5">{tr('x.replies')}</button>
+                            <button className="flex-1 py-3 hover:bg-white/5">{tr('x.media')}</button>
+                            <button className="flex-1 py-3 hover:bg-white/5">{tr('x.likes')}</button>
                         </div>
 
                         {/* Profile Feed */}
                         <div>
                             {profilePosts.length === 0 ? (
-                                <div className="p-8 text-center text-zinc-500 text-sm">No posts yet.</div>
+                                <div className="p-8 text-center text-zinc-500 text-sm">{tr('x.noPostsYet')}</div>
                             ) : (
                                 profilePosts.map(p => <TweetCard key={p.id} post={p} />)
                             )}
@@ -718,7 +721,7 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
                 {tab === 'NOTIFICATIONS' && (
                     <div className="divide-y divide-zinc-800">
                         {player.x.posts.length === 0 ? (
-                            <div className="p-8 text-center text-zinc-500 text-sm">Post on X to start getting notifications.</div>
+                            <div className="p-8 text-center text-zinc-500 text-sm">{tr('x.noNotifications')}</div>
                         ) : player.x.posts.slice(0, 6).map((post, index) => {
                             const npc = npcPool[(index * 3) % npcPool.length] || NPC_DATABASE[0];
                             const action = index % 3 === 0 ? 'liked' : index % 3 === 1 ? 'reposted' : 'replied to';
@@ -770,11 +773,11 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
                             onClick={() => setComposeOpen(false)}
                             className="rounded-full bg-zinc-950 border border-zinc-800 px-4 py-2 text-xs font-black uppercase tracking-widest text-zinc-300 active:scale-95 transition-transform"
                         >
-                            Cancel
+                            {tr('x.cancel')}
                         </button>
                         <div className="text-center">
-                            <div className="font-black text-lg leading-tight">X Studio</div>
-                            <div className="text-[9px] text-blue-400 font-black uppercase tracking-[0.25em]">Create Post</div>
+                            <div className="font-black text-lg leading-tight">{tr('x.studio')}</div>
+                            <div className="text-[9px] text-blue-400 font-black uppercase tracking-[0.25em]">{tr('x.createPost')}</div>
                         </div>
                         <div className="w-[76px]" />
                     </div>
@@ -811,7 +814,7 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
                                 <div className="flex items-center justify-between mb-2">
                                     <div className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">{activeComposeConfig.prompt}</div>
                                     <div className={`text-[10px] font-black uppercase tracking-widest ${tweetContent.trim() ? 'text-emerald-400' : 'text-zinc-600'}`}>
-                                        {tweetContent.trim() ? 'Ready' : 'Required'}
+                                        {tweetContent.trim() ? tr('x.ready') : tr('x.required')}
                                     </div>
                                 </div>
                                 <textarea
@@ -825,8 +828,8 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
 
                             <div className="space-y-3">
                                 <div className="px-1">
-                                    <div className="text-xs font-black text-zinc-400 uppercase tracking-[0.22em]">Public Voice</div>
-                                    <div className="text-[11px] text-zinc-600 mt-1">Choose how the timeline reads this post.</div>
+                                    <div className="text-xs font-black text-zinc-400 uppercase tracking-[0.22em]">{tr('x.publicVoice')}</div>
+                                    <div className="text-[11px] text-zinc-600 mt-1">{tr('x.chooseTone')}</div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-2">
                                     {(Object.keys(X_POST_TYPES) as XPostType[]).filter(type => type !== 'DRAMA_REPLY').map(type => {
@@ -857,7 +860,7 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
                             </div>
 
                             <div className="rounded-[1.5rem] border border-zinc-800 bg-gradient-to-br from-zinc-950 to-black p-4">
-                                <div className="text-sm font-black text-white">Timeline Forecast</div>
+                                <div className="text-sm font-black text-white">{tr('x.timelineForecast')}</div>
                                 <div className="text-[11px] text-zinc-500 mt-1 leading-relaxed">
                                     X is volatile. Small accounts can still get discovered, but heat can spill into reputation and future events.
                                 </div>
@@ -879,7 +882,7 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
                             disabled={!tweetContent.trim()}
                             className="pointer-events-auto w-full rounded-[1.4rem] bg-gradient-to-r from-blue-600 to-sky-400 py-4 text-white font-black tracking-wide shadow-[0_18px_45px_rgba(37,99,235,0.28)] disabled:opacity-50 disabled:from-zinc-800 disabled:to-zinc-800 disabled:text-zinc-500 active:scale-[0.99] transition-transform"
                         >
-                            Post to X
+                            {tr('x.postToX')}
                         </button>
                     </div>
                 </div>

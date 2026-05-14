@@ -161,7 +161,9 @@ export const InstagramApp: React.FC<InstagramAppProps> = ({ player, onBack, onPo
   const hasActiveRole = player.commitments.some(c => c.type === 'ACTING_GIG');
   const hasFilmingRole = player.commitments.some(c => c.type === 'ACTING_GIG' && c.projectPhase === 'PRODUCTION');
   const hasReleasedMovie = player.activeReleases.some(r => r.status === 'RUNNING' || r.status === 'BLOCKBUSTER_TRACK' || r.status === 'FLOP_WARNING');
-  const hasRomance = player.relationships.some(r => r.status === 'DATING' || r.status === 'MARRIED');
+  const hasRomance = player.relationships.some(r =>
+      (r.relation === 'Partner' || r.relation === 'Spouse') && (r.closeness ?? 0) >= 50
+  );
   const publicFollowers = Math.max(player.stats.followers || 0, player.instagram?.followers || 0);
   const selectedConfig = INSTAGRAM_POST_CONFIGS[selectedPresetType];
   const dmContacts = npcPool

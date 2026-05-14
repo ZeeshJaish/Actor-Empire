@@ -177,9 +177,9 @@ export const calculateStreamingAuctionOffer = (
     const topPlatformBudget = Math.max(...PLATFORMS.map(p => p.maxBudget));
     const platformMuscle = topPlatformBudget > 0 ? platform.maxBudget / topPlatformBudget : 0.5;
     const floorVariance = 0.96 + (Math.random() * 0.1) + (platformMuscle * 0.05);
-    const safeMinimum = projectBudget > 0 && packageScore >= 60
-        ? projectBudget * 1.02
-        : baseFloorOffer * 0.94;
+    const safeMinimum = projectBudget > 0
+        ? Math.max(baseFloorOffer, packageScore < 45 ? projectBudget * 0.8 : 0)
+        : baseFloorOffer;
     const floorOffer = Math.floor(Math.max(safeMinimum, baseFloorOffer * floorVariance));
     const qualityRange = projectBudget > 0
         ? projectBudget * (bidProfile.floor + ((bidProfile.ceiling - bidProfile.floor) * (0.24 + Math.random() * 0.62)))

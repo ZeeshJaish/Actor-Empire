@@ -1,4 +1,26 @@
-import { Player, Commitment, NPCActor, ProductionCrisis } from '../types';
+import { Player, Commitment, NPCActor, ProductionCrisis, Genre } from '../types';
+
+const tuneProject = (project: Commitment, performanceDelta = 0, hypeDelta = 0): Commitment => {
+    const updatedProject = {
+        ...project,
+        productionPerformance: Math.max(0, Math.min(100, (project.productionPerformance || 50) + performanceDelta)),
+    };
+    if (updatedProject.projectDetails && hypeDelta !== 0) {
+        updatedProject.projectDetails = {
+            ...updatedProject.projectDetails,
+            hiddenStats: {
+                ...updatedProject.projectDetails.hiddenStats,
+                rawHype: Math.max(0, Math.min(100, (updatedProject.projectDetails.hiddenStats.rawHype || 50) + hypeDelta)),
+            },
+        };
+    }
+    return updatedProject;
+};
+
+const delayProject = (project: Commitment, weeks = 1, performanceDelta = 0, hypeDelta = 0): Commitment => ({
+    ...tuneProject(project, performanceDelta, hypeDelta),
+    phaseWeeksLeft: (project.phaseWeeksLeft || 1) + weeks,
+});
 
 export const GENERAL_CRISIS_TEMPLATES: ((project: Commitment) => ProductionCrisis)[] = [
     (project) => ({
@@ -311,3 +333,333 @@ export const GENERAL_CRISIS_TEMPLATES: ((project: Commitment) => ProductionCrisi
     })
 ];
 import { spendPlayerEnergy } from './premiumLogic';
+
+const GENRE_CRISIS_TEMPLATES: Partial<Record<Genre | 'ANIME_FORMAT', ((project: Commitment) => ProductionCrisis)[]>> = {
+    MUSICAL: [
+        project => ({
+            id: `crisis_musical_choreo_${Date.now()}`,
+            title: 'Choreography Collapse',
+            description: `The big ensemble number in ${project.name} is not landing. The dancers look out of sync, and the director wants another rehearsal block.`,
+            options: [
+                {
+                    label: 'Hire Choreography Coach ($75k)',
+                    impact: (p, c) => ({
+                        updatedPlayer: { ...p, money: p.money - 75000 },
+                        updatedProject: tuneProject(c, 9, 4),
+                        log: 'The new coach tightened the number. The scene now has real stage energy.',
+                    }),
+                },
+                {
+                    label: 'Simplify the Number',
+                    impact: (p, c) => ({
+                        updatedPlayer: p,
+                        updatedProject: tuneProject(c, -4, -2),
+                        log: 'You simplified the choreography. It works, but the musical feels less spectacular.',
+                    }),
+                },
+            ],
+        }),
+        project => ({
+            id: `crisis_musical_soundtrack_${Date.now()}`,
+            title: 'Soundtrack Buzz',
+            description: `A rough demo from ${project.name} has leaked online, and fans are already looping the chorus.`,
+            options: [
+                {
+                    label: 'Release Official Single ($40k)',
+                    impact: (p, c) => ({
+                        updatedPlayer: { ...p, money: p.money - 40000 },
+                        updatedProject: tuneProject(c, 3, 16),
+                        log: 'The official single turned the leak into a marketing win.',
+                    }),
+                },
+                {
+                    label: 'Keep It Under Wraps',
+                    impact: (p, c) => ({
+                        updatedPlayer: p,
+                        updatedProject: tuneProject(c, 1, -4),
+                        log: 'You protected the surprise, but the online momentum cooled.',
+                    }),
+                },
+            ],
+        }),
+    ],
+    BIOPIC: [
+        project => ({
+            id: `crisis_biopic_family_${Date.now()}`,
+            title: 'Family Approval',
+            description: `People close to ${project.projectDetails?.subjectName || 'the subject'} are objecting to a sensitive scene in ${project.name}.`,
+            options: [
+                {
+                    label: 'Consult the Family ($60k)',
+                    impact: (p, c) => ({
+                        updatedPlayer: { ...p, money: p.money - 60000 },
+                        updatedProject: tuneProject(c, 7, 3),
+                        log: 'The consultation softened the controversy and made the portrayal feel more humane.',
+                    }),
+                },
+                {
+                    label: 'Protect the Truth',
+                    impact: (p, c) => ({
+                        updatedPlayer: p,
+                        updatedProject: tuneProject(c, 4, -8),
+                        log: 'You kept the scene. Critics may respect the honesty, but public backlash is building.',
+                    }),
+                },
+            ],
+        }),
+        project => ({
+            id: `crisis_biopic_transformation_${Date.now()}`,
+            title: 'Transformation Pressure',
+            description: `The makeup and dialect work for ${project.name} is close, but not convincing enough for the camera tests.`,
+            options: [
+                {
+                    label: 'Extend Prep (Delay)',
+                    impact: (p, c) => ({
+                        updatedPlayer: p,
+                        updatedProject: delayProject(c, 1, 10, 0),
+                        log: 'Extra prep paid off. The transformation now anchors the performance.',
+                    }),
+                },
+                {
+                    label: 'Trust the Performance',
+                    impact: (p, c) => ({
+                        updatedPlayer: p,
+                        updatedProject: tuneProject(c, -3, 0),
+                        log: 'You trusted the acting. The performance is intact, but the resemblance may divide viewers.',
+                    }),
+                },
+            ],
+        }),
+    ],
+    SPORTS: [
+        project => ({
+            id: `crisis_sports_training_${Date.now()}`,
+            title: 'Training Injury',
+            description: `A realistic training sequence for ${project.name} caused a minor injury. The stunt coordinator wants to reduce contact.`,
+            options: [
+                {
+                    label: 'Hire Athletic Doubles ($45k)',
+                    impact: (p, c) => ({
+                        updatedPlayer: { ...p, money: p.money - 45000 },
+                        updatedProject: tuneProject(c, 6, 2),
+                        log: 'The doubles made the sports action look real without risking the cast.',
+                    }),
+                },
+                {
+                    label: 'Tone Down Contact',
+                    impact: (p, c) => ({
+                        updatedPlayer: p,
+                        updatedProject: tuneProject(c, -5, -1),
+                        log: 'The shoot is safer, but the game scenes lost some physical bite.',
+                    }),
+                },
+            ],
+        }),
+        project => ({
+            id: `crisis_sports_consultant_${Date.now()}`,
+            title: 'Authenticity Consultant',
+            description: `Former pros are calling the locker-room scenes in ${project.name} fake. A consultant is available this week.`,
+            options: [
+                {
+                    label: 'Bring Consultant In ($35k)',
+                    impact: (p, c) => ({
+                        updatedPlayer: { ...p, money: p.money - 35000 },
+                        updatedProject: tuneProject(c, 7, 5),
+                        log: 'The consultant added texture. Sports fans are going to notice the details.',
+                    }),
+                },
+                {
+                    label: 'Ignore the Noise',
+                    impact: (p, c) => ({
+                        updatedPlayer: p,
+                        updatedProject: tuneProject(c, -4, -3),
+                        log: 'You ignored the feedback. The scenes still play, but sports fans may be harsh.',
+                    }),
+                },
+            ],
+        }),
+    ],
+    DOCUMENTARY: [
+        project => ({
+            id: `crisis_doc_subject_${Date.now()}`,
+            title: 'Subject Backs Out',
+            description: `${project.projectDetails?.subjectName || 'The documentary subject'} is threatening to pull access from ${project.name}.`,
+            options: [
+                {
+                    label: 'Renegotiate Access ($80k)',
+                    impact: (p, c) => ({
+                        updatedPlayer: { ...p, money: p.money - 80000 },
+                        updatedProject: tuneProject(c, 8, 4),
+                        log: 'The access deal is repaired. The documentary keeps its strongest material.',
+                    }),
+                },
+                {
+                    label: 'Go Investigative',
+                    impact: (p, c) => ({
+                        updatedPlayer: p,
+                        updatedProject: tuneProject(c, 3, 8),
+                        log: 'You pivoted to a tougher investigation. Riskier, but the hook is stronger.',
+                    }),
+                },
+            ],
+        }),
+        project => ({
+            id: `crisis_doc_footage_${Date.now()}`,
+            title: 'Footage Leak',
+            description: `A key clip from ${project.name} leaked before the edit is ready, changing the public conversation overnight.`,
+            options: [
+                {
+                    label: 'Release Context Clip',
+                    impact: (p, c) => ({
+                        updatedPlayer: p,
+                        updatedProject: tuneProject(c, 4, 12),
+                        log: 'The added context turned the leak into a serious conversation.',
+                    }),
+                },
+                {
+                    label: 'Threaten Legal Action ($25k)',
+                    impact: (p, c) => ({
+                        updatedPlayer: { ...p, money: p.money - 25000 },
+                        updatedProject: tuneProject(c, 1, -5),
+                        log: 'The leak slowed down, but the legal tone made the project feel defensive.',
+                    }),
+                },
+            ],
+        }),
+    ],
+    ANIMATION: [
+        project => ({
+            id: `crisis_animation_delay_${Date.now()}`,
+            title: 'Animation Delay',
+            description: `The animation team on ${project.name} says the current style will miss deadline unless you simplify or expand the team.`,
+            options: [
+                {
+                    label: 'Expand Animation Team ($120k)',
+                    impact: (p, c) => ({
+                        updatedPlayer: { ...p, money: p.money - 120000 },
+                        updatedProject: tuneProject(c, 8, 3),
+                        log: 'The larger team protected the visual ambition.',
+                    }),
+                },
+                {
+                    label: 'Simplify Visual Style',
+                    impact: (p, c) => ({
+                        updatedPlayer: p,
+                        updatedProject: tuneProject(c, -5, 0),
+                        log: 'The schedule is safe, but the film lost some visual richness.',
+                    }),
+                },
+            ],
+        }),
+        project => ({
+            id: `crisis_animation_voice_${Date.now()}`,
+            title: 'Voice Cast Controversy',
+            description: `Fans are questioning one of the voice-casting choices for ${project.name}.`,
+            options: [
+                {
+                    label: 'Release Voice Test',
+                    impact: (p, c) => ({
+                        updatedPlayer: p,
+                        updatedProject: tuneProject(c, 4, 10),
+                        log: 'The voice test won fans over and boosted online buzz.',
+                    }),
+                },
+                {
+                    label: 'Stay Silent',
+                    impact: (p, c) => ({
+                        updatedPlayer: p,
+                        updatedProject: tuneProject(c, -3, -5),
+                        log: 'Silence kept the controversy alive longer than it needed to.',
+                    }),
+                },
+            ],
+        }),
+    ],
+    ANIME_FORMAT: [
+        project => ({
+            id: `crisis_anime_fandom_${Date.now()}`,
+            title: 'Anime Fandom Scrutiny',
+            description: `Early stills from ${project.name} are being dissected frame by frame by anime fans.`,
+            options: [
+                {
+                    label: 'Polish Key Frames ($70k)',
+                    impact: (p, c) => ({
+                        updatedPlayer: { ...p, money: p.money - 70000 },
+                        updatedProject: tuneProject(c, 7, 8),
+                        log: 'The polish pass turned skeptical fans into loud supporters.',
+                    }),
+                },
+                {
+                    label: 'Defend the Style',
+                    impact: (p, c) => ({
+                        updatedPlayer: p,
+                        updatedProject: tuneProject(c, 2, -4),
+                        log: 'You defended the style. Some fans respect it, others are still not convinced.',
+                    }),
+                },
+            ],
+        }),
+    ],
+    CRIME: [
+        project => ({
+            id: `crisis_crime_legal_${Date.now()}`,
+            title: 'Legal Sensitivity',
+            description: `A real person connected to ${project.name} claims the crime story is too close to their case.`,
+            options: [
+                {
+                    label: 'Legal Review ($55k)',
+                    impact: (p, c) => ({
+                        updatedPlayer: { ...p, money: p.money - 55000 },
+                        updatedProject: tuneProject(c, 3, 0),
+                        log: 'The legal review protected the movie without dulling the tension.',
+                    }),
+                },
+                {
+                    label: 'Change Names and Push',
+                    impact: (p, c) => ({
+                        updatedPlayer: p,
+                        updatedProject: tuneProject(c, -4, 6),
+                        log: 'You pushed forward. The controversy is generating attention, but the risk is real.',
+                    }),
+                },
+            ],
+        }),
+    ],
+    FANTASY: [
+        project => ({
+            id: `crisis_fantasy_lore_${Date.now()}`,
+            title: 'Worldbuilding Confusion',
+            description: `Test viewers are confused by the lore rules in ${project.name}. The world is rich, but hard to follow.`,
+            options: [
+                {
+                    label: 'Add Clarifying Scene (Delay)',
+                    impact: (p, c) => ({
+                        updatedPlayer: p,
+                        updatedProject: delayProject(c, 1, 8, 0),
+                        log: 'The new scene clarified the lore and made the fantasy world easier to enter.',
+                    }),
+                },
+                {
+                    label: 'Trust the Fans',
+                    impact: (p, c) => ({
+                        updatedPlayer: p,
+                        updatedProject: tuneProject(c, -2, 7),
+                        log: 'You kept the dense mythology. Hardcore fans are intrigued, casual viewers may struggle.',
+                    }),
+                },
+            ],
+        }),
+    ],
+};
+
+export const getProductionCrisisTemplates = (project: Commitment): ((project: Commitment) => ProductionCrisis)[] => {
+    const genre = project.projectDetails?.genre;
+    const templates = [...GENERAL_CRISIS_TEMPLATES];
+    if (genre && GENRE_CRISIS_TEMPLATES[genre]) {
+        templates.push(...GENRE_CRISIS_TEMPLATES[genre]!);
+    }
+    if (project.projectDetails?.format === 'ANIME') {
+        templates.push(...(GENRE_CRISIS_TEMPLATES.ANIME_FORMAT || []));
+    }
+    return templates;
+};

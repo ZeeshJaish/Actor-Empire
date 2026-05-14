@@ -3,6 +3,7 @@
 import { NPCActor, NPCTier, NPCPrestige, Player, InstaPost, InstaPostType, InteractionType, Genre, Gender, ActorTrait } from '../types';
 import { MOD_TALENT_ROWS, ModTalentRow } from './modTalentData';
 import { getInstagramPostComments, getInstagramPresetCaption } from './instagramLogic';
+import { ALL_GENRES, hydrateGenreXP } from './genreCatalog';
 
 const ACTOR_TRAITS: ActorTrait[] = ['DIVA', 'METHOD', 'WORKAHOLIC', 'UNRELIABLE', 'EASY_GOING', 'BOX_OFFICE_POISON', 'PROFESSIONAL', 'AMBITIOUS'];
 
@@ -498,11 +499,10 @@ const GLOBAL_TALENT_EXPANSION: RealCeleb[] = [
 // --- RANDOM NPC GENERATOR (For low budget filler) ---
 const FIRST_NAMES = ['Kai', 'Luna', 'Nova', 'Ezra', 'Milo', 'Ayla', 'Finn', 'Ivy', 'Leo', 'Mia', 'Jax', 'Zoey', 'Ash', 'Sky', 'River', 'Sage', 'Jett', 'Piper', 'Zane', 'Remi', 'Atlas', 'Cleo', 'Hugo', 'Eden', 'Theo', 'Jade', 'Nash', 'Faye', 'Otis', 'Vera'];
 const LAST_NAMES = ['Rivers', 'Stone', 'Wilder', 'Frost', 'Knight', 'Woods', 'Black', 'Steel', 'Moon', 'Storm', 'Fox', 'Wolf', 'Hart', 'Drake', 'Cross', 'Banks', 'Reid', 'Cole', 'West', 'Gray', 'Brooks', 'Hayes', 'Price', 'Rice', 'Lane', 'Ford', 'King', 'Rose', 'Snow', 'Lake'];
-const GENRES: Genre[] = ['ACTION', 'DRAMA', 'COMEDY', 'ROMANCE', 'THRILLER', 'SCI_FI', 'HORROR', 'ADVENTURE', 'SUPERHERO'];
+const GENRES: Genre[] = ALL_GENRES;
 
 const createGenreXP = (favored: Genre[]): Record<Genre, number> => {
-    const xp: any = {};
-    const ALL_GENRES: Genre[] = ['ACTION', 'DRAMA', 'COMEDY', 'ROMANCE', 'THRILLER', 'HORROR', 'SCI_FI', 'ADVENTURE', 'SUPERHERO'];
+    const xp: any = hydrateGenreXP();
     ALL_GENRES.forEach(g => {
         xp[g] = favored.includes(g) ? 80 + Math.floor(Math.random() * 20) : Math.floor(Math.random() * 20);
     });

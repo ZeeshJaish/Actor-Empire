@@ -7,6 +7,7 @@ import { getEnabledGlobalCreatorSocialProfiles } from '../../services/youtubeLog
 import { STUDIO_CATALOG } from '../../services/studioLogic';
 import { PLATFORMS, PlatformProfile } from '../../services/streamingLogic';
 import { PROPERTY_CATALOG, CAR_CATALOG, MOTORCYCLE_CATALOG, BOAT_CATALOG, AIRCRAFT_CATALOG, CLOTHING_CATALOG } from '../../services/lifestyleLogic';
+import { getPlayerLanguage, t } from '../../services/i18n';
 import { ArrowLeft, TrendingUp, DollarSign, Crown, Video, Building2, User, ChevronRight, Award, Star, Zap, Share2 } from 'lucide-react';
 import { motion } from 'motion/react';
 
@@ -19,6 +20,8 @@ type Tab = 'ACTORS' | 'STUDIOS' | 'STREAMING' | 'MY_RANK';
 
 export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack }) => {
   const [tab, setTab] = useState<Tab>('ACTORS');
+  const language = getPlayerLanguage(player);
+  const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
   const actorPool = [
       ...NPC_DATABASE,
       ...(Array.isArray(player.flags?.extraNPCs) ? player.flags.extraNPCs : []),
@@ -157,7 +160,7 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack }) => {
             <button onClick={onBack} className="p-1 rounded-full hover:bg-white/10 transition-colors"><ArrowLeft size={20} className="text-zinc-400"/></button>
             <div className="flex flex-col items-center">
                 <h2 className="text-2xl font-black tracking-[0.2em] uppercase font-serif italic">FORBES</h2>
-                <div className="text-[7px] tracking-[0.4em] text-zinc-500 uppercase font-black">The World's Richest</div>
+                <div className="text-[7px] tracking-[0.4em] text-zinc-500 uppercase font-black">{tr('forbes.richest')}</div>
             </div>
             <div className="w-8"></div>
         </div>
@@ -165,16 +168,16 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack }) => {
         {/* Tabs */}
         <div className="flex bg-zinc-950 border-b border-zinc-800 font-sans">
             <button onClick={() => setTab('ACTORS')} className={`flex-1 py-4 text-[10px] font-black uppercase tracking-[0.2em] transition-all flex flex-col items-center gap-1.5 ${tab === 'ACTORS' ? 'text-white bg-zinc-900 border-b-2 border-white' : 'text-zinc-600 hover:text-zinc-400'}`}>
-                <User size={16}/> Celebs
+                <User size={16}/> {tr('forbes.celebs')}
             </button>
             <button onClick={() => setTab('STUDIOS')} className={`flex-1 py-4 text-[10px] font-black uppercase tracking-[0.2em] transition-all flex flex-col items-center gap-1.5 ${tab === 'STUDIOS' ? 'text-white bg-zinc-900 border-b-2 border-white' : 'text-zinc-600 hover:text-zinc-400'}`}>
-                <Building2 size={16}/> Studios
+                <Building2 size={16}/> {tr('forbes.studios')}
             </button>
             <button onClick={() => setTab('STREAMING')} className={`flex-1 py-4 text-[10px] font-black uppercase tracking-[0.2em] transition-all flex flex-col items-center gap-1.5 ${tab === 'STREAMING' ? 'text-white bg-zinc-900 border-b-2 border-white' : 'text-zinc-600 hover:text-zinc-400'}`}>
-                <Video size={16}/> Stream
+                <Video size={16}/> {tr('forbes.stream')}
             </button>
             <button onClick={() => setTab('MY_RANK')} className={`flex-1 py-4 text-[10px] font-black uppercase tracking-[0.2em] transition-all flex flex-col items-center gap-1.5 ${tab === 'MY_RANK' ? 'text-amber-400 bg-zinc-900 border-b-2 border-amber-400' : 'text-zinc-600 hover:text-zinc-400'}`}>
-                <Crown size={16}/> My Rank
+                <Crown size={16}/> {tr('forbes.myRank')}
             </button>
         </div>
 
@@ -195,7 +198,7 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack }) => {
                             <div className="flex-1">
                                 <div className="flex items-center gap-2">
                                     <div className={`font-bold ${actor.isPlayer ? 'text-white' : 'text-zinc-300'}`}>{actor.name}</div>
-                                    {actor.isPlayer && <span className="bg-amber-500 text-black text-[8px] font-bold px-1.5 rounded">YOU</span>}
+                                    {actor.isPlayer && <span className="bg-amber-500 text-black text-[8px] font-bold px-1.5 rounded">{tr('forbes.you')}</span>}
                                 </div>
                                 <div className="text-[10px] text-zinc-500 uppercase tracking-wide">{actor.forbesCategory}</div>
                             </div>
@@ -224,7 +227,7 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack }) => {
                                             </div>
                                         </div>
                                         <div className="shrink-0 text-right min-w-[72px] max-w-[88px]">
-                                            <div className="text-[7px] text-zinc-600 uppercase font-black tracking-[0.2em] mb-1">Valuation</div>
+                                            <div className="text-[7px] text-zinc-600 uppercase font-black tracking-[0.2em] mb-1">{tr('forbes.valuation')}</div>
                                             <div className="font-mono text-[clamp(1rem,4.8vw,1.35rem)] font-black text-white leading-none tabular-nums">{formatValuation(studio.valuation)}</div>
                                         </div>
                                     </div>
@@ -232,14 +235,14 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack }) => {
                                             <div className="px-1.5 py-0.5 bg-zinc-800 rounded text-[7px] text-zinc-400 uppercase tracking-widest font-black truncate max-w-[86px]">{studio.archetype}</div>
                                             <div className="w-1 h-1 rounded-full bg-zinc-800"></div>
                                             <div className={`text-[8px] uppercase tracking-widest font-black leading-tight ${studio.isPlayerOwned ? 'text-amber-300/90' : studio.isNpcVenture ? 'text-sky-300/90' : 'text-emerald-500/80'}`}>
-                                                <span className="block">{studio.isPlayerOwned ? 'Player' : studio.isNpcVenture ? 'NPC' : 'Market'}</span>
-                                                <span className="block">{studio.isPlayerOwned ? 'Owned' : studio.isNpcVenture ? 'Venture' : 'Leader'}</span>
+                                                <span className="block">{studio.isPlayerOwned ? tr('forbes.playerOwned').split(' ')[0] : studio.isNpcVenture ? tr('forbes.npcVenture').split(' ')[0] : tr('forbes.marketLeader').split(' ')[0]}</span>
+                                                <span className="block">{studio.isPlayerOwned ? tr('forbes.playerOwned').split(' ').slice(1).join(' ') : studio.isNpcVenture ? tr('forbes.npcVenture').split(' ').slice(1).join(' ') : tr('forbes.marketLeader').split(' ').slice(1).join(' ')}</span>
                                             </div>
-                                            {studio.isPlayerOwned && <span className="ml-auto shrink-0 rounded bg-amber-500 px-1.5 py-0.5 text-[7px] font-black text-black">YOU</span>}
+                                            {studio.isPlayerOwned && <span className="ml-auto shrink-0 rounded bg-amber-500 px-1.5 py-0.5 text-[7px] font-black text-black">{tr('forbes.you')}</span>}
                                     </div>
                                     {studio.isNpcVenture && studio.ownerName && (
                                         <div className="mt-2 truncate text-[8px] uppercase tracking-widest font-black text-zinc-600">
-                                            Founded by {studio.ownerName}
+                                            {tr('forbes.foundedBy', { name: studio.ownerName })}
                                         </div>
                                     )}
                                 </div>
@@ -258,18 +261,18 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack }) => {
                         <div className="relative z-10">
                             <div className="flex items-start justify-between gap-3 mb-5">
                                 <div className="min-w-0">
-                                    <div className="text-[8px] uppercase tracking-[0.28em] text-zinc-500 font-black mb-1">Forbes Stream Index</div>
-                                    <div className="text-xl font-black uppercase leading-none text-white">Market Share</div>
+                                    <div className="text-[8px] uppercase tracking-[0.28em] text-zinc-500 font-black mb-1">{tr('forbes.streamIndex')}</div>
+                                    <div className="text-xl font-black uppercase leading-none text-white">{tr('forbes.marketShare')}</div>
                                 </div>
                                 <div className="shrink-0 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[8px] uppercase tracking-widest font-black text-zinc-300">
-                                    {platformShareSegments.length} Platforms
+                                    {platformShareSegments.length} {tr('forbes.platforms')}
                                 </div>
                             </div>
 
                             <div className="grid grid-cols-[116px_minmax(0,1fr)] items-center gap-4">
                                 <div className="relative h-[116px] w-[116px] rounded-full shadow-[0_0_42px_rgba(0,0,0,0.5)] ring-1 ring-white/10" style={{ background: `conic-gradient(${platformShareGradient})` }}>
                                     <div className="absolute inset-[18px] rounded-full bg-black/95 border border-white/10 flex flex-col items-center justify-center text-center shadow-inner">
-                                        <div className="text-[7px] uppercase tracking-[0.22em] text-zinc-600 font-black">Leader</div>
+                                        <div className="text-[7px] uppercase tracking-[0.22em] text-zinc-600 font-black">{tr('forbes.leader')}</div>
                                         <div className="font-mono text-2xl font-black text-white leading-none">{platformShareSegments[0]?.share.toFixed(0)}%</div>
                                         <div className="mt-1 max-w-[54px] truncate text-[7px] uppercase tracking-widest text-zinc-500 font-black">{platformShareSegments[0]?.name}</div>
                                     </div>
@@ -309,9 +312,9 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack }) => {
                                     <div className="min-w-0">
                                         <div className={`text-[clamp(1.25rem,7vw,1.75rem)] font-black uppercase leading-[0.95] mb-2 break-words ${plat.color || 'text-indigo-400'}`}>{plat.name}</div>
                                         <div className="flex flex-wrap items-center gap-2">
-                                            <div className="text-[8px] text-zinc-500 font-black uppercase tracking-[0.3em]">Global Network</div>
+                                            <div className="text-[8px] text-zinc-500 font-black uppercase tracking-[0.3em]">{tr('forbes.globalNetwork')}</div>
                                             <div className="bg-white/5 px-2.5 py-1 rounded-full text-[8px] font-black text-zinc-400 border border-white/5 uppercase tracking-widest backdrop-blur-md whitespace-nowrap">
-                                                {plat.churnRate ? `${plat.churnRate} Churn` : 'Churn N/A'}
+                                                {plat.churnRate ? tr('forbes.churn', { value: plat.churnRate }) : tr('forbes.churnNA')}
                                             </div>
                                         </div>
                                     </div>
@@ -319,11 +322,11 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack }) => {
 
                             <div className="grid grid-cols-2 gap-3 relative z-10">
                                 <div className="bg-black/40 p-3 rounded-[1.5rem] border border-white/5 shadow-inner min-w-0 overflow-hidden">
-                                    <div className="text-[7px] text-zinc-600 uppercase font-black tracking-[0.2em] mb-1.5">Subscribers</div>
+                                    <div className="text-[7px] text-zinc-600 uppercase font-black tracking-[0.2em] mb-1.5">{tr('forbes.subscribers')}</div>
                                     <div className="font-mono text-xl text-white font-black leading-none tabular-nums truncate">{formatSubs(plat.subscribers)}</div>
                                 </div>
                                 <div className="bg-black/40 p-3 rounded-[1.5rem] border border-white/5 shadow-inner min-w-0 overflow-hidden">
-                                    <div className="text-[7px] text-zinc-600 uppercase font-black tracking-[0.2em] mb-1.5">Valuation</div>
+                                    <div className="text-[7px] text-zinc-600 uppercase font-black tracking-[0.2em] mb-1.5">{tr('forbes.valuation')}</div>
                                     <div className="font-mono text-xl text-emerald-400 font-black leading-none tabular-nums truncate">{formatValuation(plat.valuation)}</div>
                                 </div>
                             </div>
@@ -355,7 +358,7 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack }) => {
                             >
                                 <div className="flex items-center gap-3 mb-4">
                                     <div className="h-[1px] w-12 bg-amber-500"></div>
-                                    <div className="text-amber-500 text-[10px] font-black uppercase tracking-[0.4em]">The Power List</div>
+                                    <div className="text-amber-500 text-[10px] font-black uppercase tracking-[0.4em]">{tr('forbes.powerList')}</div>
                                 </div>
                                 <h1 className="text-7xl font-black leading-none mb-4 tracking-tighter">
                                     <span className="text-white block">RANK</span>
@@ -376,11 +379,11 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack }) => {
                             transition={{ delay: 0.7 }}
                             className="bg-zinc-900/80 backdrop-blur-xl border border-white/5 p-4 rounded-[1.75rem] shadow-2xl min-w-0 overflow-hidden"
                         >
-                            <div className="text-[8px] text-zinc-500 uppercase font-black tracking-widest mb-2">Net Worth</div>
+                            <div className="text-[8px] text-zinc-500 uppercase font-black tracking-widest mb-2">{tr('forbes.netWorth')}</div>
                             <div className="text-xl font-black text-emerald-400 font-mono tracking-tighter truncate">{formatMoney(playerNetWorth)}</div>
                             <div className="mt-4 flex items-center gap-2">
                                 <TrendingUp size={12} className="text-emerald-500" />
-                                <span className="text-[8px] text-emerald-500 font-bold uppercase">+12% this year</span>
+                                <span className="text-[8px] text-emerald-500 font-bold uppercase">{tr('forbes.thisYear')}</span>
                             </div>
                         </motion.div>
 
@@ -390,7 +393,7 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack }) => {
                             transition={{ delay: 0.8 }}
                             className="bg-zinc-900/80 backdrop-blur-xl border border-white/5 p-4 rounded-[1.75rem] shadow-2xl min-w-0 overflow-hidden"
                         >
-                            <div className="text-[8px] text-zinc-500 uppercase font-black tracking-widest mb-2">Fame Level</div>
+                            <div className="text-[8px] text-zinc-500 uppercase font-black tracking-widest mb-2">{tr('forbes.fameLevel')}</div>
                             <div className="text-xl font-black text-amber-400 tracking-tighter uppercase italic font-serif truncate">{player.stats.fame > 90 ? 'Icon' : player.stats.fame > 70 ? 'A-List' : 'Rising'}</div>
                             <div className="mt-4 flex items-center gap-2">
                                 <Star size={12} className="text-amber-500" fill="currentColor" />
@@ -412,8 +415,8 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack }) => {
                                     <Award size={24} />
                                 </div>
                                 <div>
-                                    <div className="text-xs font-black uppercase tracking-widest text-white">Awards Won</div>
-                                    <div className="text-[10px] text-zinc-500 uppercase tracking-widest">Industry Recognition</div>
+                                    <div className="text-xs font-black uppercase tracking-widest text-white">{tr('forbes.awardsWon')}</div>
+                                    <div className="text-[10px] text-zinc-500 uppercase tracking-widest">{tr('forbes.industryRecognition')}</div>
                                 </div>
                             </div>
                             <div className="text-2xl font-black text-white">{player.awards?.length || 0}</div>
@@ -425,7 +428,7 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack }) => {
                             className="w-full py-5 bg-white text-black rounded-[2rem] font-black uppercase tracking-[0.3em] text-[10px] flex items-center justify-center gap-3 shadow-[0_20px_40px_rgba(255,255,255,0.1)]"
                         >
                             <Share2 size={16} />
-                            Share My Ranking
+                            {tr('forbes.shareRanking')}
                         </motion.button>
                     </div>
                 </div>

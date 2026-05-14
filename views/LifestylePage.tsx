@@ -8,6 +8,7 @@ import { ProductionWizard } from './lifestyle/business/ProductionWizard';
 import { ProductionHouseGame } from './lifestyle/business/ProductionHouseGame';
 import { PROPERTY_CUSTOMIZATIONS, VEHICLE_CUSTOMIZATIONS } from '../services/lifestyleLogic';
 import { PremiumProductId } from '../services/premiumLogic';
+import { getPlayerLanguage, t } from '../services/i18n';
 
 interface LifestylePageProps {
   player: Player;
@@ -28,6 +29,12 @@ export const LifestylePage: React.FC<LifestylePageProps> = ({ player, onBuyItem,
   const [view, setView] = useState<'MAIN' | 'ASSETS' | 'BUSINESS' | 'PRODUCTION_WIZARD' | 'PRODUCTION_GAME'>('MAIN');
   const [customizationItem, setCustomizationItem] = useState<Property | Vehicle | null>(null);
   const [selectedCustomizations, setSelectedCustomizations] = useState<any[]>([]);
+  const language = getPlayerLanguage(player);
+  const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
+  const trFallback = (key: string, fallback: string) => {
+      const translated = tr(key);
+      return translated === key ? fallback : translated;
+  };
 
   useEffect(() => {
       onNavVisibilityChange?.(view === 'MAIN' && !customizationItem);
@@ -119,7 +126,7 @@ export const LifestylePage: React.FC<LifestylePageProps> = ({ player, onBuyItem,
       return (
           <div className="fixed inset-0 z-[100] bg-black flex flex-col animate-in slide-in-from-bottom duration-300">
               <div className="p-4 pt-12 border-b border-zinc-800 flex items-center justify-between bg-zinc-900 shrink-0">
-                  <div className="flex items-center gap-3"><button onClick={() => setCustomizationItem(null)} className="text-white">Back</button><div className="font-bold text-lg">Customize</div></div>
+                  <div className="flex items-center gap-3"><button onClick={() => setCustomizationItem(null)} className="text-white">{tr('common.back')}</button><div className="font-bold text-lg">{tr('lifestyle.customize')}</div></div>
                   <div className="text-emerald-400 font-mono font-bold">${calculateCustomTotal().toLocaleString()}</div>
               </div>
               <div className="flex-1 overflow-y-auto p-6 bg-black custom-scrollbar pb-32">
@@ -129,15 +136,15 @@ export const LifestylePage: React.FC<LifestylePageProps> = ({ player, onBuyItem,
                           const isSelected = selectedCustomizations.some(s => s.id === opt.id);
                           return (
                               <button key={opt.id} onClick={() => toggleCustomization(opt)} className={`w-full p-4 rounded-xl border text-left transition-all ${isSelected ? 'bg-indigo-900/30 border-indigo-500' : 'bg-zinc-900 border-zinc-800'}`}>
-                                  <div className="font-bold text-sm text-white">{opt.label}</div>
-                                  <div className="text-xs text-zinc-500">{opt.description}</div>
+                                  <div className="font-bold text-sm text-white">{trFallback(`lifestyle.custom.${opt.id}.name`, opt.label)}</div>
+                                  <div className="text-xs text-zinc-500">{trFallback(`lifestyle.custom.${opt.id}.desc`, opt.description)}</div>
                               </button>
                           );
                       })}
                   </div>
               </div>
               <div className="p-6 pb-20 border-t border-zinc-800 bg-zinc-900 shrink-0 z-50">
-                  <button onClick={finalizeCustomPurchase} disabled={player.money < calculateCustomTotal()} className="w-full py-4 bg-white text-black font-bold rounded-xl disabled:opacity-50">Purchase</button>
+                  <button onClick={finalizeCustomPurchase} disabled={player.money < calculateCustomTotal()} className="w-full py-4 bg-white text-black font-bold rounded-xl disabled:opacity-50">{tr('lifestyle.purchase')}</button>
               </div>
           </div>
       );
@@ -153,16 +160,16 @@ export const LifestylePage: React.FC<LifestylePageProps> = ({ player, onBuyItem,
 
   return (
     <div className="space-y-6 pb-24 pt-4">
-        <div className="flex items-center gap-4 mb-6"><h2 className="text-3xl font-bold text-white">Lifestyle</h2></div>
+        <div className="flex items-center gap-4 mb-6"><h2 className="text-3xl font-bold text-white">{tr('lifestyle.title')}</h2></div>
         
         <div className="glass-card p-6 rounded-3xl relative overflow-hidden">
             <div className="absolute top-0 right-0 p-4 opacity-5"><CreditCard size={100} /></div>
             <div className="relative z-10">
-                <div className="text-zinc-500 text-xs font-bold uppercase tracking-widest mb-1">Liquid Cash</div>
+                <div className="text-zinc-500 text-xs font-bold uppercase tracking-widest mb-1">{tr('lifestyle.liquidCash')}</div>
                 <div className="text-3xl font-bold text-white tracking-tight mb-4">${player.money.toLocaleString()}</div>
                 <div className="flex gap-4">
-                    <div><div className="text-[10px] text-zinc-600 uppercase font-bold">Assets</div><div className="text-sm font-mono text-zinc-300">~${(player.assets.length * 50000).toLocaleString()}</div></div>
-                    <div><div className="text-[10px] text-zinc-600 uppercase font-bold">Equity</div><div className="text-sm font-mono text-emerald-400">${player.businesses.reduce((sum, b) => sum + b.stats.valuation, 0).toLocaleString()}</div></div>
+                    <div><div className="text-[10px] text-zinc-600 uppercase font-bold">{tr('lifestyle.assets')}</div><div className="text-sm font-mono text-zinc-300">~${(player.assets.length * 50000).toLocaleString()}</div></div>
+                    <div><div className="text-[10px] text-zinc-600 uppercase font-bold">{tr('lifestyle.equity')}</div><div className="text-sm font-mono text-emerald-400">${player.businesses.reduce((sum, b) => sum + b.stats.valuation, 0).toLocaleString()}</div></div>
                 </div>
             </div>
         </div>
@@ -183,11 +190,11 @@ export const LifestylePage: React.FC<LifestylePageProps> = ({ player, onBuyItem,
                     </div>
                     <div>
                         <div className="font-bold text-xl text-white flex items-center gap-2">
-                            {productionStudio ? productionStudio.name : 'Production House'}
+                            {productionStudio ? productionStudio.name : tr('lifestyle.productionHouse')}
                             {productionStudio && <Star size={12} className="text-amber-500 fill-amber-500"/>}
                         </div>
                         <div className="text-sm text-zinc-400">
-                            {productionStudio ? 'Manage Studio Slate' : 'Create blockbuster films.'}
+                            {productionStudio ? tr('lifestyle.manageStudioSlate') : tr('lifestyle.createBlockbusters')}
                         </div>
                     </div>
                 </div>
@@ -196,19 +203,19 @@ export const LifestylePage: React.FC<LifestylePageProps> = ({ player, onBuyItem,
 
             {/* Standard Assets */}
             <button onClick={() => setView('ASSETS')} className="glass-card p-6 rounded-3xl text-left hover:bg-white/5 transition-all group relative">
-                <div className="flex items-center gap-4"><div className="p-3 rounded-2xl bg-blue-500/10 text-blue-400"><Store size={24}/></div><div><div className="font-bold text-xl text-white">Assets</div><div className="text-sm text-zinc-400">Properties, vehicles & wardrobe.</div></div></div>
+                <div className="flex items-center gap-4"><div className="p-3 rounded-2xl bg-blue-500/10 text-blue-400"><Store size={24}/></div><div><div className="font-bold text-xl text-white">{tr('lifestyle.assetsTitle')}</div><div className="text-sm text-zinc-400">{tr('lifestyle.assetsSub')}</div></div></div>
                 <ChevronRight className="absolute top-1/2 -translate-y-1/2 right-6 text-zinc-700 group-hover:text-zinc-400 transition-colors"/>
             </button>
 
             {/* Business Empire (Excluding Production House) */}
             <button onClick={() => setView('BUSINESS')} className="glass-card p-6 rounded-3xl text-left hover:bg-white/5 transition-all group relative">
-                <div className="flex items-center gap-4"><div className="p-3 rounded-2xl bg-emerald-500/10 text-emerald-400"><Briefcase size={24}/></div><div><div className="font-bold text-xl text-white">Business Empire</div><div className="text-sm text-zinc-400">Manage your companies.</div></div></div>
+                <div className="flex items-center gap-4"><div className="p-3 rounded-2xl bg-emerald-500/10 text-emerald-400"><Briefcase size={24}/></div><div><div className="font-bold text-xl text-white">{tr('lifestyle.businessEmpire')}</div><div className="text-sm text-zinc-400">{tr('lifestyle.businessSub')}</div></div></div>
                 <ChevronRight className="absolute top-1/2 -translate-y-1/2 right-6 text-zinc-700 group-hover:text-zinc-400 transition-colors"/>
             </button>
 
             {/* Locked Content */}
             <button className="glass-card p-6 rounded-3xl text-left hover:bg-white/5 transition-all group relative opacity-50 cursor-not-allowed">
-                <div className="flex items-center gap-4"><div className="p-3 rounded-2xl bg-purple-500/10 text-purple-400"><Tv size={24}/></div><div><div className="font-bold text-xl text-white">Streaming Platform</div><div className="text-sm text-zinc-400">Launch your own platform.</div></div><div className="ml-auto bg-zinc-800/50 px-2 py-1 rounded text-[10px] font-bold text-zinc-500 flex items-center gap-1 border border-zinc-700"><Lock size={10}/> SOON</div></div>
+                <div className="flex items-center gap-4"><div className="p-3 rounded-2xl bg-purple-500/10 text-purple-400"><Tv size={24}/></div><div><div className="font-bold text-xl text-white">{tr('lifestyle.streamingPlatform')}</div><div className="text-sm text-zinc-400">{tr('lifestyle.streamingSub')}</div></div><div className="ml-auto bg-zinc-800/50 px-2 py-1 rounded text-[10px] font-bold text-zinc-500 flex items-center gap-1 border border-zinc-700"><Lock size={10}/> {tr('lifestyle.soon')}</div></div>
             </button>
         </div>
     </div>

@@ -130,12 +130,54 @@ export const determineStreamingAcquisition = (project: ProjectDetails): Platform
 
 // --- VIEWERSHIP LOGIC ---
 
+const getStreamingMarketMultiplier = (marketDemand: number, weekOnPlatform: number): number => {
+    const safeDemand = Number.isFinite(marketDemand) ? marketDemand : 1;
+    if (safeDemand >= 1) {
+        const lift = safeDemand - 1;
+        if (weekOnPlatform <= 1) return 1 + lift;
+        if (weekOnPlatform <= 4) return 1 + (lift * 0.55);
+        if (weekOnPlatform <= 8) return 1 + (lift * 0.2);
+        return 1 + (lift * 0.06);
+    }
+
+    // Soft/cold markets should still hurt the long tail, just not crater it forever.
+    const drag = 1 - safeDemand;
+    if (weekOnPlatform <= 8) return Math.max(0.72, safeDemand);
+    return Math.max(0.82, 1 - (drag * 0.45));
+};
+
+const getWeeklyStreamingViewCap = (
+    platformId: PlatformId,
+    weekOnPlatform: number,
+    projectQuality: number,
+    type: ProjectType
+): number => {
+    const platform = PLATFORMS[platformId];
+    const subscribers = Math.max(1, platform.subscribers) * 1_000_000;
+    const qualityMultiplier = Math.max(0.55, Math.min(1.55, 0.5 + (projectQuality / 100)));
+    const typeMultiplier = type === 'SERIES' ? 0.38 : 0.16;
+    const platformReachMultiplier = Math.max(0.35, Math.min(2.1, platform.audienceMult));
+    const lifecycleMultiplier = weekOnPlatform <= 2
+        ? 1
+        : weekOnPlatform <= 6
+            ? 0.78
+            : weekOnPlatform <= 12
+                ? 0.52
+                : 0.32;
+
+    return Math.max(
+        type === 'SERIES' ? 2_000_000 : 750_000,
+        Math.floor(subscribers * typeMultiplier * platformReachMultiplier * qualityMultiplier * lifecycleMultiplier)
+    );
+};
+
 export const calculateStreamingViewership = (
     platformId: PlatformId,
     weekOnPlatform: number,
     projectQuality: number,
     prevViews: number,
-    type: ProjectType
+    type: ProjectType,
+    marketDemand: number = 1
 ): number => {
     const platform = PLATFORMS[platformId];
     
@@ -151,7 +193,9 @@ export const calculateStreamingViewership = (
     if (weekOnPlatform === 1) {
         // Launch week
         const hypeMult = (projectQuality / 50); // 0.5 - 2.0
-        return Math.floor(baseUnit * hypeMult * (Math.random() + 0.5));
+        const rawViews = baseUnit * hypeMult * (Math.random() + 0.5);
+        const adjustedViews = rawViews * getStreamingMarketMultiplier(marketDemand, weekOnPlatform);
+        return Math.floor(Math.min(adjustedViews, getWeeklyStreamingViewCap(platformId, weekOnPlatform, projectQuality, type)));
     } else {
         // Decay
         let decay = 0.85; // Default decay
@@ -167,7 +211,15 @@ export const calculateStreamingViewership = (
         // Cap decay to prevent infinite runs, but allow good legs
         decay = Math.min(0.98, decay);
 
-        return Math.floor(prevViews * decay * (Math.random() * 0.2 + 0.9));
+        let views = prevViews * decay * (Math.random() * 0.2 + 0.9);
+        views *= getStreamingMarketMultiplier(marketDemand, weekOnPlatform);
+
+        // After the early launch window, market heat should not overpower decay forever.
+        if (weekOnPlatform > 6 && prevViews > 0 && views > prevViews * 0.98) {
+            views = prevViews * (0.84 + Math.random() * 0.1);
+        }
+
+        return Math.floor(Math.min(views, getWeeklyStreamingViewCap(platformId, weekOnPlatform, projectQuality, type)));
     }
 };
 

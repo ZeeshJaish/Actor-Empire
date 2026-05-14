@@ -396,7 +396,7 @@ const FranchiseMarketplace: React.FC<{ player: Player; studio: Business; onUpdat
     const handleRefresh = () => {
         if (studio.balance < 250000) return;
 
-        const newMarket = generateIPMarket(6, studioState.purchasedIPTitles || []);
+        const newMarket = generateIPMarket(6, studioState.purchasedIPTitles || [], player.currentWeek);
         const updatedStudio = {
             ...studio,
             balance: studio.balance - 250000,

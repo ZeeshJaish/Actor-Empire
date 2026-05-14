@@ -5,11 +5,12 @@ import {
     ProjectDetails, ReleaseScale, OutcomeTier, ProjectMemoryTag, FuturePotential, 
     ProjectSubtype, SeriesStatus, ReleaseStrategy, AuditionOpportunity, 
     ProjectHiddenStats, ActiveRelease, NegotiationData, CastMember, Review, 
-    NPCActor, StudioId, PressInteraction, Genre, IndustryProject, WriterStats, DirectorStats, TargetAudience
+    NPCActor, StudioId, PressInteraction, Genre, IndustryProject, WriterStats, DirectorStats, TargetAudience, ProjectFormat
 } from '../types';
 import { selectStudioForProject } from './studioLogic';
 import { NPC_DATABASE } from './npcLogic';
 import { generateFamousMovieOpportunity, generateFamousSeriesOpportunity } from './famousMovieLogic';
+import { ALL_GENRES } from './genreCatalog';
 
 // --- CONSTANTS ---
 
@@ -22,7 +23,7 @@ export const ROLE_DEFINITIONS: Record<RoleType, { label: string; difficulty: num
 };
 
 // ... (Keep existing GENRES, SYNERGIES, HELPERS, CALCULATIONS) ...
-const GENRES: Genre[] = ['DRAMA', 'COMEDY', 'ACTION', 'SCI_FI', 'HORROR', 'THRILLER', 'ROMANCE', 'ADVENTURE', 'SUPERHERO'];
+const GENRES: Genre[] = ALL_GENRES;
 
 export const GENRE_SYNERGIES: Record<Genre, Genre[]> = {
     ACTION: ['ADVENTURE', 'THRILLER', 'SUPERHERO'],
@@ -33,12 +34,19 @@ export const GENRE_SYNERGIES: Record<Genre, Genre[]> = {
     SCI_FI: ['ADVENTURE', 'ACTION', 'SUPERHERO'],
     HORROR: ['THRILLER', 'SCI_FI'],
     ADVENTURE: ['ACTION', 'SCI_FI', 'SUPERHERO'],
-    SUPERHERO: ['ACTION', 'SCI_FI', 'ADVENTURE']
+    SUPERHERO: ['ACTION', 'SCI_FI', 'ADVENTURE'],
+    MUSICAL: ['DRAMA', 'ROMANCE', 'COMEDY'],
+    BIOPIC: ['DRAMA', 'DOCUMENTARY'],
+    SPORTS: ['DRAMA', 'ACTION'],
+    ANIMATION: ['ADVENTURE', 'COMEDY', 'FANTASY'],
+    FANTASY: ['ADVENTURE', 'SCI_FI', 'ANIMATION'],
+    CRIME: ['THRILLER', 'DRAMA'],
+    DOCUMENTARY: ['BIOPIC', 'DRAMA']
 };
 
 const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
-const SPECTACLE_GENRES = new Set<Genre>(['ACTION', 'SCI_FI', 'SUPERHERO', 'ADVENTURE']);
-const INTIMATE_GENRES = new Set<Genre>(['DRAMA', 'ROMANCE', 'THRILLER', 'COMEDY', 'HORROR']);
+const SPECTACLE_GENRES = new Set<Genre>(['ACTION', 'SCI_FI', 'SUPERHERO', 'ADVENTURE', 'FANTASY', 'ANIMATION']);
+const INTIMATE_GENRES = new Set<Genre>(['DRAMA', 'ROMANCE', 'THRILLER', 'COMEDY', 'HORROR', 'BIOPIC', 'CRIME', 'DOCUMENTARY', 'MUSICAL', 'SPORTS']);
 
 export const getRecommendedCastDepth = (genre: Genre, budgetTier: BudgetTier): number => {
     if (SPECTACLE_GENRES.has(genre)) {
@@ -240,7 +248,8 @@ export const checkAuditionPass = (player: Player, commitment: Commitment): { pas
     const talent = getActorTalent(player.stats.skills);
     const genreFit = calculateGenreFit(player, commitment.projectDetails);
     
-    let playerScore = (prep * 0.4) + (talent * 0.3) + (genreFit.fitScore * 0.3);
+    const masteryBonus = genreFit.fitScore >= 85 ? 8 : genreFit.fitScore >= 65 ? 5 : genreFit.fitScore >= 40 ? 2 : 0;
+    let playerScore = (prep * 0.4) + (talent * 0.3) + (genreFit.fitScore * 0.3) + masteryBonus;
     
     if (player.activeUniverseContract && commitment.projectDetails.universeId === player.activeUniverseContract.universeId) {
         playerScore += 50; 
@@ -506,8 +515,11 @@ export const generateAuditions = (player: Player, usedTitles: string[]): Auditio
             }
         }
 
+        const fameAccessBonus = player.stats.fame >= 55 ? 0.12 : player.stats.fame >= 30 ? 0.08 : player.stats.fame >= 15 ? 0.04 : 0;
+        const reputationAccessBonus = player.stats.reputation >= 65 ? 0.04 : player.stats.reputation >= 40 ? 0.02 : 0;
+        const famousChance = Math.min(0.22, 0.10 + fameAccessBonus + reputationAccessBonus);
         const famousRoll = Math.random();
-        if (famousRoll < 0.05) {
+        if (famousRoll < famousChance) {
             const famousOpp = Math.random() > 0.5 
                 ? generateFamousMovieOpportunity(player) 
                 : generateFamousSeriesOpportunity(player);
@@ -622,7 +634,9 @@ export const generateReviews = (
     playerName: string,
     isRecast?: boolean,
     castDepthScore: number = 70,
-    budgetTier: BudgetTier = 'MID'
+    budgetTier: BudgetTier = 'MID',
+    format: ProjectFormat = 'LIVE_ACTION',
+    subjectName?: string
 ): Review[] => {
     const reviews: Review[] = [];
     const count = 3;
@@ -650,6 +664,62 @@ export const generateReviews = (
         'The lead pair works, but the missing ensemble makes the scale feel smaller than the budget.',
         'A stronger supporting cast could have made this feel like a real event.',
     ];
+    const genrePositiveLines: Record<string, string[]> = {
+        MUSICAL: [
+            `The songs actually carry story, and ${playerName} gives the musical its pulse.`,
+            'The choreography, vocals, and emotional arc finally move as one.',
+        ],
+        BIOPIC: [
+            `${playerName} finds the person beneath the public myth${subjectName ? ` of ${subjectName}` : ''}.`,
+            'A thoughtful biopic anchored by transformation rather than imitation.',
+        ],
+        SPORTS: [
+            'The sports scenes have impact because the emotional stakes are clear.',
+            `A sincere underdog story that lets ${playerName} play grit without losing vulnerability.`,
+        ],
+        DOCUMENTARY: [
+            `${subjectName ? `${subjectName}'s story` : 'The subject'} is handled with access, tension, and real curiosity.`,
+            'The documentary earns its urgency by asking hard questions instead of selling easy answers.',
+        ],
+        ANIMATION: [
+            'The animation has personality, not just polish.',
+            `A visually warm animated film with a performance from ${playerName} that still registers through the craft.`,
+        ],
+        CRIME: [
+            'The crime plotting is tight, morally uneasy, and built with real momentum.',
+            'A sharp crime story that understands consequence as much as suspense.',
+        ],
+        FANTASY: [
+            'The fantasy world feels lived in, and the lore supports the emotion instead of burying it.',
+            'A richly built fantasy that gives the spectacle a human center.',
+        ],
+    };
+    const genreMixedLines: Record<string, string[]> = {
+        MUSICAL: ['The numbers are catchy, but the book scenes between them are uneven.'],
+        BIOPIC: ['The performance is committed, though the biopic keeps smoothing out the messier truths.'],
+        SPORTS: ['The sports drama is sincere, but too many beats feel familiar.'],
+        DOCUMENTARY: ['The access is valuable, but the argument could be sharper.'],
+        ANIMATION: ['The visual identity is strong, even when the story feels thin.'],
+        CRIME: ['The crime mechanics work, but the characters needed more interior life.'],
+        FANTASY: ['The world is imaginative, but the lore sometimes crowds out the drama.'],
+    };
+    const genreNegativeLines: Record<string, string[]> = {
+        MUSICAL: ['The songs stop the movie cold instead of lifting it.'],
+        BIOPIC: ['A surface-level biopic that mistakes makeup for insight.'],
+        SPORTS: ['The sports scenes lack authenticity, and the drama never finds a second gear.'],
+        DOCUMENTARY: ['The documentary has a subject, but not a point of view.'],
+        ANIMATION: ['The animation is busy, but the emotional design is missing.'],
+        CRIME: ['A crime story with twists but no tension.'],
+        FANTASY: ['The fantasy world is expensive, confusing, and strangely weightless.'],
+    };
+    if (format === 'ANIME') {
+        genrePositiveLines.ANIMATION = [
+            'The anime style brings kinetic emotion and a distinct visual rhythm.',
+            'A strong anime feature that understands fandom without pandering to it.',
+        ];
+        genreMixedLines.ANIMATION = ['The anime craft is exciting, though the pacing occasionally overwhelms the character work.'];
+        genreNegativeLines.ANIMATION = ['The anime influence is visible, but the film never earns its intensity.'];
+    }
 
     for(let i=0; i<count; i++) {
         let sentiment: 'POSITIVE' | 'MIXED' | 'NEGATIVE' = 'MIXED';
@@ -663,15 +733,15 @@ export const generateReviews = (
             text = pick(thinCastLines);
         }
         if (sentiment === 'POSITIVE') {
-            text = text || pick(positiveLines);
+            text = text || pick(genrePositiveLines[genre] || positiveLines);
             if (isRecast && Math.random() > 0.5) text = `The new cast breathes fresh life into the franchise! A stunning entry in the ${genre} genre.`;
         }
         else if (sentiment === 'MIXED') {
-            text = text || pick(mixedLines);
+            text = text || pick(genreMixedLines[genre] || mixedLines);
             if (isRecast && Math.random() > 0.5) text = `The recasting is jarring, but it has its moments.`;
         }
         else {
-            text = text || pick(negativeLines);
+            text = text || pick(genreNegativeLines[genre] || negativeLines);
             if (isRecast && Math.random() > 0.5) text = `A disastrous recast ruins whatever magic the original had. Avoid.`;
         }
 
@@ -715,6 +785,11 @@ export const calculateIMDbRating = (commitment: Commitment): number => {
     if (['COMEDY', 'HORROR'].includes(genre)) baseRating -= 0.6; 
     if (['DRAMA', 'THRILLER'].includes(genre)) baseRating += 0.3; 
     if (['ACTION', 'SUPERHERO'].includes(genre) && details.budgetTier === 'LOW') baseRating -= 0.8; 
+    if (genre === 'DOCUMENTARY') baseRating += (stats.scriptQuality || 50) > 72 ? 0.45 : 0.1;
+    if (genre === 'BIOPIC') baseRating += details.subjectName ? 0.25 : -0.2;
+    if (genre === 'MUSICAL') baseRating += (stats.scriptQuality || 50) > 70 ? 0.2 : -0.25;
+    if (details.format === 'ANIME') baseRating += ['ANIMATION', 'FANTASY', 'ACTION'].includes(genre) ? 0.25 : -0.15;
+    if (details.format === 'ANIMATED') baseRating += ['ANIMATION', 'ADVENTURE', 'FANTASY', 'COMEDY'].includes(genre) ? 0.2 : -0.1;
 
     if (hype > 80 && quality < 50) baseRating -= 1.5; 
     if (hype < 30 && quality > 80) baseRating += 0.5; 
@@ -762,11 +837,18 @@ const GENRE_MULTIPLIERS: Record<Genre, number> = {
     'ROMANCE': 0.7, 
     'THRILLER': 0.8,
     'COMEDY': 0.8, 
-    'HORROR': 0.6 // Consistent but lower cap
+    'HORROR': 0.6, // Consistent but lower cap
+    'MUSICAL': 0.75,
+    'BIOPIC': 0.65,
+    'SPORTS': 0.85,
+    'ANIMATION': 1.15,
+    'FANTASY': 1.25,
+    'CRIME': 0.75,
+    'DOCUMENTARY': 0.35
 };
 
 export const calculateWeeklyBoxOffice = (
-    week: number, budget: number, stats: ProjectHiddenStats, prevGross: number, buzzScore: number | undefined, budgetTier: BudgetTier = 'LOW', genre: Genre = 'DRAMA'
+    week: number, budget: number, stats: ProjectHiddenStats, prevGross: number, buzzScore: number | undefined, budgetTier: BudgetTier = 'LOW', genre: Genre = 'DRAMA', format: ProjectFormat = 'LIVE_ACTION', marketDemand: number = 1, studioGenreReputation: number = 0
 ): number => {
     const caps = BOX_OFFICE_CAPS[budgetTier];
     const genreMod = GENRE_MULTIPLIERS[genre];
@@ -779,12 +861,16 @@ export const calculateWeeklyBoxOffice = (
     const studioPrestigeScore = stats.studioPrestigeScore ?? 0;
     const packageStrength = (scriptQuality * 0.35) + (directorQuality * 0.25) + (castingStrength * 0.4);
     const audienceStrength = (qualityScore * 0.55) + (scriptQuality * 0.25) + (directorQuality * 0.2);
-    const genreOpeningMod = 0.85 + ((genreMod - 1) * 0.6);
+    const formatAudienceMod = format === 'ANIMATED' ? 1.08 : format === 'ANIME' ? 0.92 : 1;
+    const formatOpeningMod = format === 'ANIMATED' ? 1.05 : format === 'ANIME' ? 0.9 : 1;
+    const genreOpeningMod = (0.85 + ((genreMod - 1) * 0.6)) * formatOpeningMod;
     const castDepthMod = castDepthScore >= 85 ? 1.08
         : castDepthScore >= 65 ? 1
         : castDepthScore >= 45 ? 0.88
         : 0.7;
     const studioPrestigeMod = 1 + Math.min(0.14, studioPrestigeScore / 700);
+    const marketDemandMod = Math.max(0.72, Math.min(1.36, marketDemand));
+    const studioReputationMod = 1 + Math.min(0.14, Math.max(0, studioGenreReputation) / 700);
 
     // --- OPENING WEEKEND ---
     if (week === 1) {
@@ -796,7 +882,7 @@ export const calculateWeeklyBoxOffice = (
         const qualityMod = 0.85 + ((qualityScore - 50) / 100) * 0.45;
         const fameMod = 0.85 + ((fameMultiplier - 1) * 0.7);
 
-        let rawOpening = budget * baseMultiplier * distMod * buzzMod * packageMod * qualityMod * fameMod * castDepthMod * studioPrestigeMod;
+        let rawOpening = budget * baseMultiplier * distMod * buzzMod * packageMod * qualityMod * fameMod * castDepthMod * studioPrestigeMod * studioReputationMod * formatAudienceMod * marketDemandMod;
         rawOpening *= (0.8 + Math.random() * 0.4); // Variance
 
         // Genre Adjustment
@@ -848,7 +934,7 @@ export const calculateWeeklyBoxOffice = (
 
     // Genre tweaks for legs
     if (genre === 'HORROR') dropRate += 0.1; // Front-loaded
-    if (genre === 'DRAMA' || genre === 'ROMANCE') dropRate -= 0.05; // Long tail
+    if (genre === 'DRAMA' || genre === 'ROMANCE' || genre === 'BIOPIC' || genre === 'DOCUMENTARY') dropRate -= 0.05; // Long tail
 
     // Good script and direction improve legs. Star-heavy weak movies drop faster after the opening.
     if (scriptQuality > 85) dropRate -= 0.05;
@@ -864,7 +950,7 @@ export const calculateWeeklyBoxOffice = (
     if (week >= 8) dropRate += 0.10;
 
     const retention = Math.max(0.05, 1 - dropRate);
-    return Math.floor(prevGross * retention);
+    return Math.floor(prevGross * retention * formatAudienceMod * marketDemandMod * studioReputationMod);
 };
 
 export const calculateRunOutcome = (totalGross: number, budget: number, rating: number): { tier: OutcomeTier, score: number } => {
