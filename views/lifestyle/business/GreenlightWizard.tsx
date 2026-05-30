@@ -9,6 +9,7 @@ import { getEquipmentStageName } from './FacilitiesView';
 import { showAd } from '../../../services/adLogic';
 import { hasNoAds } from '../../../services/premiumLogic';
 import { formatProjectFormatLabel } from '../../../services/genreCatalog';
+import { addBreadcrumb, markGameCheckpoint, markTraceAction, setCrashContext, startPerformanceTrace, stopPerformanceTrace, trackGameEvent } from '../../../services/firebaseService';
 
 type ConnectedProjectIntent = 'AUTO' | 'SOLO' | 'CROSSOVER' | 'EVENT' | 'REBOOT';
 
@@ -51,6 +52,16 @@ const formatReturningRoleLabel = (role?: string) => {
     };
     return labels[role] || role.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, char => char.toUpperCase());
 };
+
+const VALID_RETURNING_TALENT_ROLES = new Set([
+    'DIRECTOR',
+    'CINEMATOGRAPHER',
+    'COMPOSER',
+    'LINE_PRODUCER',
+    'VFX_SUPERVISOR',
+    'LEAD_ACTOR',
+    'SUPPORTING_ACTOR',
+]);
 
 const getUniversePhaseLabel = (phase?: Universe['currentPhase']) => {
     if (typeof phase === 'number') return `Phase ${phase}`;
@@ -573,44 +584,72 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
     }, [player.studio?.talentRoster, studio.studioState?.talentRoster]);
 
     const getReturningTalentKey = (talent: any) => [
-        talent?.role || 'UNKNOWN_ROLE',
-        talent?.id || 'UNKNOWN_TALENT',
-        talent?.characterId || talent?.characterName || ''
+        String(talent?.role || 'UNKNOWN_ROLE'),
+        String(talent?.id || 'UNKNOWN_TALENT'),
+        String(talent?.characterId || talent?.characterName || '')
     ].join(':');
 
     const dedupeReturningTalent = (talentList: any[] = []) => {
         const byKey = new Map<string, any>();
-        talentList.forEach((talent: any) => {
-            if (!talent?.id || !talent?.role) return;
-            const key = getReturningTalentKey(talent);
+        const safeTalentList = Array.isArray(talentList) ? talentList : [];
+
+        safeTalentList.forEach((talent: any) => {
+            if (!talent || typeof talent !== 'object') return;
+
+            const id = String(talent.id || '');
+            const role = String(talent.role || '');
+            if (!id || !VALID_RETURNING_TALENT_ROLES.has(role)) return;
+
+            const originalSalary = Math.max(0, Number.isFinite(Number(talent.originalSalary)) ? Number(talent.originalSalary) : Number(talent.newDemand || 0));
+            const newDemand = Math.max(0, Number.isFinite(Number(talent.newDemand)) ? Number(talent.newDemand) : originalSalary);
+            const attemptsLeft = Math.max(0, Math.min(3, Number.isFinite(Number(talent.attemptsLeft)) ? Number(talent.attemptsLeft) : 3));
+            const cleaned = {
+                ...talent,
+                id,
+                role,
+                originalSalary,
+                newDemand,
+                attemptsLeft,
+                accepted: Boolean(talent.accepted),
+                negotiated: Boolean(talent.negotiated),
+            };
+            const key = getReturningTalentKey(cleaned);
             const existing = byKey.get(key);
             if (!existing) {
-                byKey.set(key, talent);
+                byKey.set(key, cleaned);
                 return;
             }
 
             // Preserve the most progressed negotiation state if duplicate sources collide.
             byKey.set(key, {
                 ...existing,
-                ...talent,
-                accepted: !!existing.accepted || !!talent.accepted,
-                negotiated: !!existing.negotiated || !!talent.negotiated,
+                ...cleaned,
+                accepted: !!existing.accepted || !!cleaned.accepted,
+                negotiated: !!existing.negotiated || !!cleaned.negotiated,
                 attemptsLeft: Math.min(
                     typeof existing.attemptsLeft === 'number' ? existing.attemptsLeft : 3,
-                    typeof talent.attemptsLeft === 'number' ? talent.attemptsLeft : 3
+                    cleaned.attemptsLeft
                 ),
-                newDemand: Math.max(Number(existing.newDemand || 0), Number(talent.newDemand || 0)),
-                originalSalary: Math.max(Number(existing.originalSalary || 0), Number(talent.originalSalary || 0))
+                newDemand: Math.max(Number(existing.newDemand || 0), cleaned.newDemand),
+                originalSalary: Math.max(Number(existing.originalSalary || 0), cleaned.originalSalary)
             });
         });
-        return Array.from(byKey.values());
+        return Array.from(byKey.values()).slice(0, 12);
     };
 
     const normalizeReturningTalentEntries = (script: any) => {
-        if (!script?.returningTalent || !Array.isArray(script.returningTalent)) return script;
+        if (!script || typeof script !== 'object') return null;
+        const safeGenres = Array.isArray(script.genres) && script.genres.length > 0
+            ? script.genres.filter(Boolean)
+            : [script.genre || 'DRAMA'];
         return {
             ...script,
-            returningTalent: dedupeReturningTalent(script.returningTalent.map((talent: any) => {
+            id: String(script.id || `safe_script_${script.title || Date.now()}`),
+            title: String(script.title || script.name || 'Untitled Project'),
+            projectType: script.projectType === 'SERIES' ? 'SERIES' : 'MOVIE',
+            genres: safeGenres.length ? safeGenres : ['DRAMA'],
+            status: script.status || 'READY',
+            returningTalent: dedupeReturningTalent((Array.isArray(script.returningTalent) ? script.returningTalent : []).map((talent: any) => {
                 const isContractedReturningActor = talent && talent.role !== 'DIRECTOR' && contractedTalentIds.has(talent.id);
                 const isInternalReturnee = isInternallyControlledTalent(talent?.id);
                 return {
@@ -698,9 +737,12 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
 
     // Filter scripts that are already in active concepts (unless it's the current one being edited)
     const scripts = useMemo(() => {
-        const existingConceptScriptIds = new Set((studio.studioState?.concepts || []).map((c: any) => c.scriptId));
-        return (studio.studioState?.scripts || [])
+        const rawConcepts = Array.isArray(studio.studioState?.concepts) ? studio.studioState!.concepts : [];
+        const rawScripts = Array.isArray(studio.studioState?.scripts) ? studio.studioState!.scripts : [];
+        const existingConceptScriptIds = new Set(rawConcepts.map((c: any) => c?.scriptId).filter(Boolean));
+        return rawScripts
             .map(script => normalizeReturningTalentEntries(script))
+            .filter(Boolean)
             .filter((s: any) => {
                 if (s.status !== 'READY') return false;
                 const hasExistingConcept = existingConceptScriptIds.has(s.id);
@@ -711,9 +753,15 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
 
     const selectedScript = useMemo(() => {
         return scripts.find(s => s.id === selectedScriptId)
-            || (selectedScriptId ? normalizeReturningTalentEntries(studio.studioState?.scripts?.find(s => s.id === selectedScriptId)) : null)
-            || (initialConcept ? normalizeReturningTalentEntries(studio.studioState?.scripts?.find(s => s.id === initialConcept.scriptId)) : null);
+            || (selectedScriptId ? normalizeReturningTalentEntries((Array.isArray(studio.studioState?.scripts) ? studio.studioState!.scripts : []).find(s => s.id === selectedScriptId)) : null)
+            || (initialConcept ? normalizeReturningTalentEntries((Array.isArray(studio.studioState?.scripts) ? studio.studioState!.scripts : []).find(s => s.id === initialConcept.scriptId)) : null);
     }, [scripts, selectedScriptId, studio.studioState?.scripts, initialConcept?.scriptId, contractedTalentIds]);
+
+    useEffect(() => {
+        if (!selectedScript && step !== 'SELECT_SCRIPT' && step !== 'BUZZ') {
+            setStep('SELECT_SCRIPT');
+        }
+    }, [selectedScript, step]);
 
     const lockedStreamingFunding = useMemo(() => {
         return selectedScript?.lockedStreamingFunding || initialConcept?.lockedStreamingFunding || null;
@@ -1342,16 +1390,20 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         if (crewStateKey === 'lineProducer') source = mockCrew.producers.find(c => c.id === talent.id);
         if (crewStateKey === 'vfx') source = mockCrew.vfxTeams.find(c => c.id === talent.id);
         if (!source) source = availableActors.find(actor => actor.id === talent.id);
-        if (!source) source = player.relationships.find(rel => (rel.npcId || rel.id) === talent.id);
+        if (!source) source = (Array.isArray(player.relationships) ? player.relationships : []).find(rel => (rel.npcId || rel.id) === talent.id);
+
+        const safeName = String(source?.name || talent?.name || castRole?.actorName || 'Returning Talent');
+        const safeDemand = Number.isFinite(Number(talent?.newDemand)) ? Number(talent.newDemand) : 0;
+        const safeAttempts = Number.isFinite(Number(talent?.attemptsLeft)) ? Number(talent.attemptsLeft) : 3;
 
         return {
-            name: source?.name || talent.name || castRole?.actorName || 'Returning Talent',
-            roleLabel: formatReturningRoleLabel(talent.role),
+            name: safeName,
+            roleLabel: formatReturningRoleLabel(talent?.role),
             roleId: castRole?.id,
-            image: source?.avatar || source?.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(source?.name || talent.name || 'Returning Talent')}&background=18181b&color=ffffff`,
-            demand: Math.round(talent.newDemand || 0),
-            attemptsLeft: Math.max(0, talent.attemptsLeft ?? 3),
-            selected: crewStateKey ? selectedCrew[crewStateKey] === talent.id : !!castRole,
+            image: source?.avatar || source?.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(safeName)}&background=18181b&color=ffffff`,
+            demand: Math.max(0, Math.round(safeDemand)),
+            attemptsLeft: Math.max(0, Math.min(3, safeAttempts)),
+            selected: crewStateKey ? selectedCrew[crewStateKey] === talent?.id : !!castRole,
         };
     };
 
@@ -1503,6 +1555,17 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             }
         }
 
+        markGameCheckpoint('greenlight_negotiation_opened', player, {
+            step,
+            studio_id: studio.id,
+            script_title: selectedScript?.title || 'none',
+            talent_id: talentId,
+            talent_name: talentName,
+            role: returningData.role || 'unknown',
+            attempts_left: returningData.negotiated ? 0 : (returningData.attemptsLeft ?? 3),
+            demand_m: Math.round((returningData.newDemand || 0) / 1000000),
+            pending_count: unresolvedReturningTalent.length,
+        });
         setCounterOfferInput(Math.round(returningData.originalSalary + (returningData.newDemand - returningData.originalSalary) * 0.5).toString());
         setNegotiationModal({
             talentId,
@@ -1948,6 +2011,39 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
     }, [selectedScript, selectedLocations, crewModes, selectedCrew, castList, studio.balance, studio.studioState?.productionFund, lockedStreamingFundingAmount, budgetBreakdown.total, unresolvedReturningTalent, effectiveConnectedIntent, linkedUniverseCastCount, selectedUniverseId, selectedFranchiseId]);
 
     const canGreenlight = greenlightStatus.can;
+
+    useEffect(() => {
+        markTraceAction('greenlight_step_opened', {
+            greenlight_step: step,
+            last_screen: 'GreenlightWizard',
+            flow: 'greenlight_project',
+            active_project_phase: step === 'BUZZ' ? 'GREENLIGHT_BUZZ' : 'GREENLIGHT_SETUP',
+        });
+        markGameCheckpoint('greenlight_step', player, {
+            step,
+            studio_id: studio.id,
+            script_title: selectedScript?.title || 'none',
+            script_id: selectedScript?.id || 'none',
+            cast_count: castList.length,
+            unresolved_returning_talent: unresolvedReturningTalent.length,
+            budget_m: Math.round((budgetBreakdown.total || 0) / 1000000),
+        });
+    }, [step, selectedScript?.id, castList.length, unresolvedReturningTalent.length, budgetBreakdown.total, player.age, player.currentWeek, studio.id]);
+
+    useEffect(() => {
+        if (step !== 'CONFIRM') return;
+        markGameCheckpoint('greenlight_confirm_status', player, {
+            studio_id: studio.id,
+            script_title: selectedScript?.title || 'none',
+            can_greenlight: canGreenlight,
+            error_count: greenlightStatus.errors.length,
+            first_error: greenlightStatus.errors[0] || 'none',
+            unresolved_returning_talent: unresolvedReturningTalent.length,
+            cast_count: castList.length,
+            budget_m: Math.round((budgetBreakdown.total || 0) / 1000000),
+        });
+    }, [step, canGreenlight, greenlightStatus.errors.length, greenlightStatus.errors[0], unresolvedReturningTalent.length, castList.length, budgetBreakdown.total, player.age, player.currentWeek, studio.id, selectedScript?.id]);
+
     const hiredIds = useMemo(() => {
         const ids = new Set<string>();
         Object.values(selectedCrew).forEach(id => { if (id) ids.add(id as string); });
@@ -1959,6 +2055,37 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
 
     const handleGreenlight = async () => {
         if (!canGreenlight) return;
+        const traceName = 'greenlight_project';
+        const startedAt = performance.now();
+        markTraceAction('greenlight_started', {
+            greenlight_step: step,
+            last_screen: 'GreenlightWizard',
+            flow: 'greenlight_project',
+            active_project_phase: 'GREENLIGHT_CONFIRM',
+        });
+        setCrashContext(player, {
+            flow: 'greenlight_project',
+            studio_id: studio.id,
+            script_title: selectedScript?.title || 'missing_script',
+            step,
+            unresolved_returning_talent: unresolvedReturningTalent.length,
+        });
+        addBreadcrumb('greenlight:start', {
+            title: selectedScript?.title || 'missing_script',
+            projectType: selectedScript?.projectType || 'unknown',
+            budget: Math.round(budgetBreakdown.total || 0),
+            unresolvedReturningTalent: unresolvedReturningTalent.length,
+        });
+        trackGameEvent('greenlight_started', {
+            project_type: selectedScript?.projectType || 'unknown',
+            genre: selectedScript?.genre || 'unknown',
+            budget_m: Math.round((budgetBreakdown.total || 0) / 1000000),
+            unresolved_returning_talent: unresolvedReturningTalent.length,
+        });
+        startPerformanceTrace(traceName, {
+            project_type: selectedScript?.projectType || 'unknown',
+            genre: selectedScript?.genre || 'unknown',
+        });
 
         // --- SHOW INTERSTITIAL AD BEFORE GREENLIGHT ---
         if (!hasNoAds(player)) {
@@ -2530,6 +2657,35 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                 }
             } : b)
         });
+        addBreadcrumb('greenlight:success', {
+            title: newCommitment.name,
+            commitmentId: newCommitment.id,
+            budget: Math.round(estimatedBudget || 0),
+        });
+        markTraceAction('greenlight_completed', {
+            greenlight_step: 'BUZZ',
+            last_screen: 'GreenlightWizard',
+            flow: 'greenlight_project',
+            active_project_phase: newCommitment.projectPhase || 'PRE_PRODUCTION',
+            last_event_id: newCommitment.id,
+        });
+        markGameCheckpoint('greenlight_success', player, {
+            title: newCommitment.name,
+            commitment_id: newCommitment.id,
+            project_type: selectedScript?.projectType || 'unknown',
+            genre: selectedScript?.genre || 'unknown',
+            budget_m: Math.round((estimatedBudget || 0) / 1000000),
+            cast_count: castList.filter(c => c.actorId).length,
+            crew_count: Object.values(selectedCrew).filter(Boolean).length,
+        });
+        trackGameEvent('greenlight_completed', {
+            project_type: selectedScript?.projectType || 'unknown',
+            genre: selectedScript?.genre || 'unknown',
+            budget_m: Math.round((estimatedBudget || 0) / 1000000),
+            cast_count: castList.filter(c => c.actorId).length,
+            crew_count: Object.values(selectedCrew).filter(Boolean).length,
+        });
+        stopPerformanceTrace(traceName, { duration_ms: Math.round(performance.now() - startedAt) });
         setStep('BUZZ');
     };
 
@@ -2645,6 +2801,35 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         }
         return Math.max(1, Math.min(100, Math.round(score || 50)));
     }, [selectedScript, selectedCrew, selectedLocations, availableDirectors, mockLocations, crewModes, equipmentChoices, studio, mockCrew, currentCastingStrength]);
+
+    if (!selectedScript && step !== 'SELECT_SCRIPT' && step !== 'BUZZ') {
+        return (
+            <div className="fixed inset-0 z-[70] bg-[#020a05] text-white flex flex-col items-center justify-center p-8 text-center font-sans">
+                <div className="w-full max-w-md rounded-[2rem] border border-emerald-500/30 bg-zinc-950/90 p-8 shadow-2xl">
+                    <p className="text-emerald-400 font-black tracking-[0.35em] text-xs uppercase mb-3">Greenlight Recovery</p>
+                    <h2 className="text-3xl font-black mb-3">Choose Script Again</h2>
+                    <p className="text-zinc-400 text-base leading-relaxed mb-6">
+                        This draft was pointing to a script that is no longer valid. Pick a script again instead of getting stuck.
+                    </p>
+                    <button
+                        onClick={() => {
+                            setSelectedScriptId(null);
+                            setStep('SELECT_SCRIPT');
+                        }}
+                        className="w-full py-4 rounded-2xl bg-emerald-500 text-black font-black uppercase tracking-widest mb-3"
+                    >
+                        Choose Script
+                    </button>
+                    <button
+                        onClick={onBack}
+                        className="w-full py-4 rounded-2xl bg-zinc-900 border border-white/10 text-white font-black uppercase tracking-widest"
+                    >
+                        Back To Studio
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="fixed inset-0 z-[70] bg-[#020a05] text-white flex flex-col font-sans overflow-hidden">
@@ -4126,10 +4311,10 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                                     {unresolvedReturningTalent.length} left
                                                 </div>
                                             </div>
-                                            {unresolvedReturningTalent.map((talent) => {
+                                            {unresolvedReturningTalent.slice(0, 6).map((talent, index) => {
                                                 const info = getReturningTalentDisplay(talent);
                                                 return (
-                                                    <div key={`${talent.id}_${talent.role}`} className="rounded-xl border border-rose-500/20 bg-black/25 p-3 flex items-center gap-3">
+                                                    <div key={`${talent.id}_${talent.role}_${talent.characterId || talent.characterName || index}`} className="rounded-xl border border-rose-500/20 bg-black/25 p-3 flex items-center gap-3">
                                                         <img
                                                             src={info.image}
                                                             alt={info.name}
@@ -4151,6 +4336,11 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                                     </div>
                                                 );
                                             })}
+                                            {unresolvedReturningTalent.length > 6 && (
+                                                <div className="rounded-xl border border-rose-500/10 bg-black/20 p-3 text-[10px] font-black uppercase tracking-widest text-rose-200/70 text-center">
+                                                    {unresolvedReturningTalent.length - 6} more return deals are hidden here. Use Repair Return Deals if this came from QA stress data.
+                                                </div>
+                                            )}
                                         </div>
                                     )}
                                 </div>
@@ -4577,6 +4767,14 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                         onClick={() => {
                                             // Accept Demand
                                             const finalDemand = negotiationModal.currentDemand;
+                                            markGameCheckpoint('greenlight_negotiation_accept_demand', player, {
+                                                script_title: selectedScript?.title || 'none',
+                                                talent_name: negotiationModal.talentName,
+                                                role: negotiationModal.roleType,
+                                                demand_m: Math.round(finalDemand / 1000000),
+                                                attempts_left: negotiationModal.attemptsLeft,
+                                                pending_count: unresolvedReturningTalent.length,
+                                            });
                                             updateReturningTalentState(
                                                 negotiationModal.talentId,
                                                 negotiationModal.roleType,
@@ -4635,6 +4833,17 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                         chance = Math.max(0.05, Math.min(0.95, chance));
 
                                         const accepted = Math.random() < chance;
+                                        markGameCheckpoint('greenlight_negotiation_counter_offer', player, {
+                                            script_title: selectedScript?.title || 'none',
+                                            talent_name: negotiationModal.talentName,
+                                            role: negotiationModal.roleType,
+                                            offer_m: Math.round(counterOffer / 1000000),
+                                            demand_m: Math.round(negotiationModal.currentDemand / 1000000),
+                                            chance_pct: Math.round(chance * 100),
+                                            accepted,
+                                            attempts_left: negotiationModal.attemptsLeft,
+                                            pending_count: unresolvedReturningTalent.length,
+                                        });
 
                                         if (accepted) {
                                             updateReturningTalentState(
@@ -4724,6 +4933,13 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                 <button
                                     disabled={!!negotiationModal.feedback}
                                     onClick={() => {
+                                        markGameCheckpoint('greenlight_negotiation_walk_away', player, {
+                                            script_title: selectedScript?.title || 'none',
+                                            talent_name: negotiationModal.talentName,
+                                            role: negotiationModal.roleType,
+                                            attempts_left: negotiationModal.attemptsLeft,
+                                            pending_count: unresolvedReturningTalent.length,
+                                        });
                                         updateReturningTalentState(
                                             negotiationModal.talentId,
                                             negotiationModal.roleType,

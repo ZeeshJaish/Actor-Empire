@@ -1,0 +1,17 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /issueReports/{reportId} {
+      allow create: if request.auth != null
+        && request.resource.data.issue_id == reportId
+        && request.resource.data.status == 'new'
+        && request.resource.data.source == 'in_app_support'
+        && request.resource.data.details is string
+        && request.resource.data.detail_length is int
+        && request.resource.data.detail_length <= 500;
+
+      allow read, update, delete: if false;
+    }
+  }
+}

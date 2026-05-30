@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "14822737702",
+    "project_id": "actor-empire-1ff1d",
+    "storage_bucket": "actor-empire-1ff1d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:14822737702:android:ff4aeae8ed55b15b10e3e7",
+        "android_client_info": {
+          "package_name": "com.zeeshapps.actorempire"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCnalAoJJEfPe2ruWYtoyGRVMlp3WVokWg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

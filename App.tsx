@@ -39,6 +39,18 @@ import { APP_DISPLAY_VERSION } from './services/appVersion';
 import { calculateInstagramPostOutcome, clampInstagramStat, INSTAGRAM_POST_CONFIGS } from './services/instagramLogic';
 import { normalizeUniverseMap } from './services/universeLogic';
 import { hydrateGenreXP } from './services/genreCatalog';
+import {
+  addBreadcrumb,
+  markGameCheckpoint,
+  markTraceAction,
+  recordFlowFailure,
+  recordNonFatal,
+  setCrashContext,
+  setCurrentGameScreen,
+  startPerformanceTrace,
+  stopPerformanceTrace,
+  trackGameEvent,
+} from './services/firebaseService';
 
 type GameStatus = 'START_MENU' | 'CREATION' | 'PLAYING' | 'DEATH_SCREEN';
 type PendingBabyNaming = {
@@ -282,7 +294,8 @@ type GameErrorBoundaryProps = { onRecover: () => void; children: React.ReactNode
 type GameErrorBoundaryState = { hasError: boolean };
 
 class GameErrorBoundary extends React.Component<GameErrorBoundaryProps, GameErrorBoundaryState> {
-    props!: GameErrorBoundaryProps;
+    declare props: GameErrorBoundaryProps;
+    declare setState: (state: Partial<GameErrorBoundaryState>) => void;
     state: GameErrorBoundaryState = { hasError: false };
 
     constructor(props: GameErrorBoundaryProps) {
@@ -295,7 +308,13 @@ class GameErrorBoundary extends React.Component<GameErrorBoundaryProps, GameErro
 
     componentDidCatch(error: Error) {
         console.error('Game render crash recovered by boundary:', error);
+        recordNonFatal(error, 'react_render_boundary_recovered');
     }
+
+    handleRecover = () => {
+        this.props.onRecover();
+        this.setState({ hasError: false });
+    };
 
     render() {
         if (this.state.hasError) {
@@ -306,7 +325,7 @@ class GameErrorBoundary extends React.Component<GameErrorBoundaryProps, GameErro
                         A save or screen error was detected. You can return to the menu instead of getting stuck on a black screen.
                     </p>
                     <button
-                        onClick={this.props.onRecover}
+                        onClick={this.handleRecover}
                         className="px-6 py-3 rounded-xl bg-white text-black font-bold hover:bg-zinc-200"
                     >
                         Return To Menu
@@ -512,6 +531,47 @@ export const App: React.FC = () => {
     }
   }, [activePage]);
 
+  useEffect(() => {
+    const pageName = Page[activePage] || String(activePage);
+    const screenName = `${gameStatus}_${pageName}`;
+    setCurrentGameScreen(screenName);
+    setCrashContext(player, {
+      screen: pageName,
+      game_status: gameStatus,
+      save_slot: currentSlot,
+    });
+    markGameCheckpoint('screen_changed', player, {
+      screen: pageName,
+      game_status: gameStatus,
+      save_slot: currentSlot,
+    });
+
+    if (gameStatus === 'PLAYING') {
+      if (activePage === Page.CAREER) {
+        markGameCheckpoint('profile_opened', player, {
+          screen: pageName,
+          credits: player.filmography?.length || 0,
+          awards: player.awards?.length || 0,
+          commitments: player.commitments?.length || 0,
+        });
+      }
+      if (activePage === Page.LIFESTYLE) {
+        markGameCheckpoint('lifestyle_opened', player, {
+          screen: pageName,
+          businesses: player.businesses?.length || 0,
+          production_house: !!player.productionHouse,
+        });
+      }
+      if (activePage === Page.MOBILE) {
+        markGameCheckpoint('mobile_apps_opened', player, {
+          screen: pageName,
+          messages: player.messages?.length || 0,
+          pending_events: player.pendingEvents?.length || 0,
+        });
+      }
+    }
+  }, [activePage, gameStatus, currentSlot, player.age, player.currentWeek]);
+
   // --- LOGIC HOOK ---
   const { 
       handleGenericUpdate, handleRehearse, handleImproveAction, 
@@ -675,6 +735,7 @@ export const App: React.FC = () => {
                             slots[i] = savedData;
                         } catch (e) {
                             console.error(`Legacy slot ${i} corrupt`, e);
+                            recordNonFatal(e, 'legacy_slot_migration_failed', { slot: i });
                         }
                     }
 
@@ -689,6 +750,7 @@ export const App: React.FC = () => {
                                 slots[1] = savedData;
                             } catch (e) {
                                 console.error("Legacy save corrupt", e);
+                                recordNonFatal(e, 'legacy_save_migration_failed');
                             }
                         }
                     }
@@ -698,6 +760,7 @@ export const App: React.FC = () => {
             setSaveSlots(slots);
         } catch (e) {
             console.error("Init failed", e);
+            recordNonFatal(e, 'app_init_failed');
         } finally {
             setIsInitializing(false);
         }
@@ -796,6 +859,7 @@ export const App: React.FC = () => {
               ...(safePlayer.settings && typeof safePlayer.settings === 'object' ? safePlayer.settings : {})
           };
           safePlayer.settings.language = 'en';
+          safePlayer.settings.smoothMode = safePlayer.settings.smoothMode === true;
 
           if (!safePlayer.writerStats) {
               safePlayer.writerStats = { creativity: 0, dialogue: 0, structure: 0, pacing: 0 };
@@ -1005,12 +1069,37 @@ export const App: React.FC = () => {
           }));
           safePlayer.awards = dedupeAwards(safePlayer.awards || []);
           if (safePlayer.business) {
-              const indMap: Record<string, any> = { 'Cafe': { type: 'CAFE', subtype: 'COFFEE_SHOP', emoji: '☕' }, 'Online Brand': { type: 'FASHION', subtype: 'STREETWEAR', emoji: '👕' }, 'Production House': { type: 'MERCH', subtype: 'ONLINE_STORE', emoji: '📦' } };
-              const mapped = indMap[safePlayer.business.type] || { type: 'RESTAURANT', subtype: 'CASUAL_DINING', emoji: '🍽️' };
-              const newBiz = createBusiness(safePlayer.business.name, mapped.type, mapped.subtype, { quality: 'STANDARD', pricing: 'MARKET', marketing: 'LOW' }, mapped.emoji, safePlayer.currentWeek);
-              newBiz.stats.valuation = safePlayer.business.totalInvestment * 1.5;
-              newBiz.balance = safePlayer.business.totalInvestment * 0.2; 
-              safePlayer.businesses.push(newBiz);
+              const legacyName = String(safePlayer.business.type || '');
+              const alreadyHasProductionHouse = safePlayer.businesses.some((biz: any) => biz.type === 'PRODUCTION_HOUSE');
+              const indMap: Record<string, any> = {
+                  'Cafe': { type: 'CAFE', subtype: 'COFFEE_SHOP', emoji: '☕' },
+                  'Online Brand': { type: 'FASHION', subtype: 'STREETWEAR', emoji: '👕' },
+                  'Production House': { type: 'PRODUCTION_HOUSE', subtype: 'MAJOR_STUDIO', emoji: '🎬' }
+              };
+              const mapped = indMap[legacyName] || { type: 'RESTAURANT', subtype: 'CASUAL_DINING', emoji: '🍽️' };
+
+              // Legacy saves used a single `business` object. Do not downgrade an old
+              // production house into merch during migration, and avoid duplicates if a
+              // newer `businesses` entry already exists.
+              if (mapped.type !== 'PRODUCTION_HOUSE' || !alreadyHasProductionHouse) {
+                  const newBiz = createBusiness(
+                      safePlayer.business.name,
+                      mapped.type,
+                      mapped.subtype,
+                      { quality: 'STANDARD', pricing: 'MARKET', marketing: 'LOW' },
+                      mapped.emoji,
+                      safePlayer.currentWeek
+                  );
+                  const legacyInvestment = Math.max(0, Number(safePlayer.business.totalInvestment || 0));
+                  if (legacyInvestment > 0) {
+                      newBiz.stats.valuation = Math.max(newBiz.stats.valuation, legacyInvestment * 1.5);
+                      newBiz.balance = Math.max(newBiz.balance, legacyInvestment * 0.2);
+                      if (newBiz.type === 'PRODUCTION_HOUSE' && newBiz.studioState) {
+                          newBiz.studioState.productionFund = Math.max(newBiz.studioState.productionFund || 0, legacyInvestment * 0.2);
+                      }
+                  }
+                  safePlayer.businesses.push(newBiz);
+              }
               delete safePlayer.business; 
           }
           return safePlayer;
@@ -1084,6 +1173,36 @@ export const App: React.FC = () => {
   const handleNextWeek = async () => {
     if (isProcessing) return;
     setIsProcessing(true);
+    const traceName = 'process_game_week';
+    const startedAt = performance.now();
+    markTraceAction('process_week_started', {
+      last_screen: Page[activePage] || String(activePage),
+      flow: 'process_week',
+      save_slot: currentSlot,
+    });
+    setCrashContext(player, {
+      flow: 'process_week',
+      screen: activePage,
+      game_status: gameStatus,
+      save_slot: currentSlot,
+    });
+    addBreadcrumb('process_week:start', {
+      age: player.age,
+      week: player.currentWeek,
+      pendingEvents: player.pendingEvents?.length || 0,
+      commitments: player.commitments?.length || 0,
+    });
+    markGameCheckpoint('process_week_start', player, {
+      screen: activePage,
+      pending_events: player.pendingEvents?.length || 0,
+      commitments: player.commitments?.length || 0,
+      active_releases: player.activeReleases?.length || 0,
+    });
+    startPerformanceTrace(traceName, {
+      age: player.age,
+      week: player.currentWeek,
+      screen: activePage,
+    });
     try {
         const { player: newPlayerState, triggerAd } = await processGameWeek(player);
         const shouldTriggerBabyQa = !!newPlayerState.flags?.qaBabyNamingNextWeek;
@@ -1159,6 +1278,10 @@ export const App: React.FC = () => {
         }
 
         if (syncedPlayerState.flags?.isDead) {
+            trackGameEvent('process_week_death_screen', {
+                age: syncedPlayerState.age,
+                week: syncedPlayerState.currentWeek,
+            });
             setGameStatus('DEATH_SCREEN');
             return;
         }
@@ -1174,13 +1297,59 @@ export const App: React.FC = () => {
                 await showAd('INTERSTITIAL');
             }, 800);
         }
+        addBreadcrumb('process_week:success', {
+            age: syncedPlayerState.age,
+            week: syncedPlayerState.currentWeek,
+            triggerAd,
+        });
+        markTraceAction('process_week_completed', {
+            last_screen: Page[activePage] || String(activePage),
+            flow: 'process_week',
+            save_slot: currentSlot,
+        });
+        markGameCheckpoint('process_week_success', syncedPlayerState, {
+            screen: activePage,
+            trigger_ad: triggerAd,
+            pending_events: syncedPlayerState.pendingEvents?.length || 0,
+            active_releases: syncedPlayerState.activeReleases?.length || 0,
+        });
+        trackGameEvent('week_processed', {
+            age: syncedPlayerState.age,
+            week: syncedPlayerState.currentWeek,
+            pending_events: syncedPlayerState.pendingEvents?.length || 0,
+            commitments: syncedPlayerState.commitments?.length || 0,
+            active_releases: syncedPlayerState.activeReleases?.length || 0,
+        });
     } catch (error) {
         console.error('Week processing failed:', error);
+        markTraceAction('process_week_failed', {
+            last_screen: Page[activePage] || String(activePage),
+            flow: 'process_week',
+            save_slot: currentSlot,
+        });
+        recordFlowFailure(error, 'process_week', player, {
+            screen: activePage,
+            pending_events: player.pendingEvents?.length || 0,
+            commitments: player.commitments?.length || 0,
+            active_releases: player.activeReleases?.length || 0,
+        });
+        recordNonFatal(error, 'process_week_failed', {
+            age: player.age,
+            week: player.currentWeek,
+            pending_events: player.pendingEvents?.length || 0,
+            commitments: player.commitments?.length || 0,
+            active_releases: player.activeReleases?.length || 0,
+        });
+        trackGameEvent('week_process_failed', {
+            age: player.age,
+            week: player.currentWeek,
+        });
         setToastMessage({
             title: "Week Processing Failed",
             subtext: "The week could not finish. Please try again."
         });
     } finally {
+        stopPerformanceTrace(traceName, { duration_ms: Math.round(performance.now() - startedAt) });
         setIsProcessing(false);
     }
   };
@@ -2063,7 +2232,7 @@ export const App: React.FC = () => {
           </div>
       )}
 
-      <div className="max-w-md mx-auto h-screen relative z-10 bg-zinc-950/80 shadow-2xl border-x border-white/5 flex flex-col pt-safe-top">
+      <div className={`max-w-md mx-auto h-screen relative z-10 bg-zinc-950/80 shadow-2xl border-x border-white/5 flex flex-col pt-safe-top ${player?.settings?.smoothMode ? 'smooth-mode' : ''}`}>
         {gameStatus === 'START_MENU' && (
             <StartMenu 
                 saveSlots={saveSlots}

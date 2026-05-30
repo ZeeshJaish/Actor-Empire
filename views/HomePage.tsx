@@ -13,6 +13,7 @@ import { calculateYoutubeCreatorScore, generateYoutubeBrandDeal, generateYoutube
 import { ALL_GENRES, formatGenreLabel } from '../services/genreCatalog';
 import { getPlayerLanguage, t } from '../services/i18n';
 import { Heart, Smile, Star, Zap, DollarSign, Brain, Calendar, Activity, TrendingUp, Trophy, X, Sliders, Users, Film, Tv, PlayCircle, Lock, FastForward, Key, AlertTriangle, Mic2, Mail, FileText, Dumbbell, Sparkles, Settings, ShoppingCart, Clapperboard, ZapOff, Crown, Skull, Camera, UploadCloud, Check, MessageSquareQuote, Globe } from 'lucide-react';
+import { addBreadcrumb, recordNonFatal, setCrashContext, startPerformanceTrace, stopPerformanceTrace, trackGameEvent } from '../services/firebaseService';
 
 interface HomePageProps {
   player: Player;
@@ -797,6 +798,47 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
       alert('Event QA case queued. Close this menu and resolve the popup.');
   };
 
+  const triggerFirebaseDiagnostics = () => {
+      const traceName = 'firebase_diagnostics';
+      setCrashContext(player, {
+          flow: 'firebase_diagnostics',
+          source: 'dev_tools',
+      });
+      addBreadcrumb('firebase_diagnostics:button_pressed', {
+          age: player.age,
+          week: player.currentWeek,
+      });
+      trackGameEvent('diagnostics_triggered', {
+          age: player.age,
+          week: player.currentWeek,
+      });
+      startPerformanceTrace(traceName, { source: 'dev_tools' });
+      window.setTimeout(() => {
+          stopPerformanceTrace(traceName, { duration_ms: 180 });
+      }, 180);
+      recordNonFatal(new Error('Firebase diagnostics test non-fatal'), 'firebase_diagnostics_test', {
+          age: player.age,
+          week: player.currentWeek,
+      });
+
+      if (onUpdatePlayer) {
+          onUpdatePlayer({
+              ...player,
+              logs: [
+                  {
+                      week: player.currentWeek,
+                      year: player.age,
+                      message: '🧪 Firebase diagnostics sent. Check Analytics, Crashlytics, and Performance on a native build.',
+                      type: 'neutral' as const
+                  },
+                  ...player.logs
+              ].slice(0, 50)
+          });
+      }
+      setActiveCheatMenu('NONE');
+      alert('Firebase diagnostics fired. On web this is a safe no-op; on Android/iOS it should appear in Firebase.');
+  };
+
   const triggerYoutubeBootstrap = () => {
       if (!onUpdatePlayer) return;
 
@@ -1474,7 +1516,8 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
   };
 
   const ensureCheatStudio = () => {
-      const existingStudio = player.businesses.find(b => b.type === 'PRODUCTION_HOUSE');
+      const safeBusinesses = Array.isArray(player.businesses) ? player.businesses : [];
+      const existingStudio = safeBusinesses.find(b => b.type === 'PRODUCTION_HOUSE');
       if (existingStudio) {
           const boostedStudio = {
               ...existingStudio,
@@ -1489,7 +1532,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
               updatedPlayer: {
                   ...player,
                   money: Math.max(player.money, 250000000),
-                  businesses: player.businesses.map(b => b.id === existingStudio.id ? boostedStudio : b),
+                  businesses: safeBusinesses.map(b => b.id === existingStudio.id ? boostedStudio : b),
                   logs: [{ week: player.currentWeek, year: player.age, message: `🏢 CHEAT: ${boostedStudio.name} funded for studio QA.`, type: 'positive' }, ...player.logs].slice(0, 50)
               },
               studio: boostedStudio
@@ -1518,7 +1561,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
           updatedPlayer: {
               ...player,
               money: Math.max(player.money, 250000000),
-              businesses: [...player.businesses, fundedStudio],
+              businesses: [...safeBusinesses, fundedStudio],
               logs: [{ week: player.currentWeek, year: player.age, message: `🏢 CHEAT: Cheat Test Studios created for studio QA.`, type: 'positive' }, ...player.logs].slice(0, 50)
           },
           studio: fundedStudio
@@ -1541,11 +1584,241 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
       onOpenProductionHouseCheat?.();
   };
 
-  const triggerReturningTalentNegotiationQa = () => {
+  const triggerLegacyProductionHouseMigrationQa = () => {
+      if (!onUpdatePlayer) return;
+
+      const legacyInvestment = 180_000_000;
+      const safeBusinesses = Array.isArray(player.businesses) ? player.businesses : [];
+      const businessesWithoutProductionHouse = safeBusinesses.filter(b => b.type !== 'PRODUCTION_HOUSE');
+      const studioName = `${(player.name || 'Legacy').split(' ')[0]} Legacy Studios`;
+
+      onUpdatePlayer({
+          ...player,
+          money: Math.max(player.money, 50_000_000),
+          businesses: businessesWithoutProductionHouse,
+          business: {
+              type: 'Production House',
+              name: studioName,
+              totalInvestment: legacyInvestment
+          },
+          logs: [{
+              week: player.currentWeek,
+              year: player.age,
+              message: `🧪 CHEAT: Legacy production house save shape injected. Reload/Continue to verify it migrates into a real Production House.`,
+              type: 'neutral'
+          }, ...player.logs].slice(0, 50)
+      } as Player & { business: { type: string; name: string; totalInvestment: number } });
+
+      setActiveCheatMenu('NONE');
+      alert('Legacy production house QA injected. Refresh/reopen the save, then confirm it becomes a Production House instead of being removed or converted to merch.');
+  };
+
+  const triggerLowConditionRestQa = () => {
+      if (!onUpdatePlayer) return;
+
+      onUpdatePlayer({
+          ...player,
+          money: Math.max(player.money, 100_000),
+          energy: {
+              ...player.energy,
+              current: Math.max(player.energy.current, Math.min(player.energy.max || 100, 60))
+          },
+          stats: {
+              ...player.stats,
+              health: 4,
+              happiness: Math.min(player.stats.happiness, 8),
+              body: Math.min(player.stats.body, 12),
+              looks: Math.min(player.stats.looks, 15)
+          },
+          flags: {
+              ...player.flags,
+              lastHealthCrisisAbsoluteWeek: 0,
+              lastWellbeingAlertAbsoluteWeek: 0,
+              lastConditionAlertAbsoluteWeek: 0
+          },
+          logs: [{
+              week: player.currentWeek,
+              year: player.age,
+              message: '🧪 CHEAT: Low-condition/rest QA loaded. Age up once to test hospital/rest recovery safety.',
+              type: 'negative'
+          }, ...player.logs].slice(0, 50)
+      });
+
+      setActiveCheatMenu('NONE');
+      alert('Low-condition QA loaded. Age Up Week once to test health crisis, hospital/rest feedback, and recovery handling.');
+  };
+
+  const sanitizeProductionHouseReturnDealsQa = () => {
+      if (!onUpdatePlayer) return;
+
+      const validRoles = new Set([
+          'DIRECTOR',
+          'LEAD_ACTOR',
+          'SUPPORTING_ACTOR',
+          'CINEMATOGRAPHER',
+          'COMPOSER',
+          'LINE_PRODUCER',
+          'VFX_SUPERVISOR'
+      ]);
+
+      let removedDeals = 0;
+      let cleanedConceptCast = 0;
+      let cleanedScripts = 0;
+      let cleanedConcepts = 0;
+      const safeBusinesses = Array.isArray(player.businesses) ? player.businesses : [];
+      const isReturnDealQaScript = (script: any) => {
+          const scriptId = String(script?.id || '');
+          const title = String(script?.title || script?.name || '').toLowerCase();
+          const tags = Array.isArray(script?.tags) ? script.tags : [];
+          return scriptId.startsWith('cheat_return_deal_script_')
+              || tags.includes('RETURNING_TALENT_QA')
+              || title.includes('return deal: iron monarch');
+      };
+
+      const repairedBusinesses = safeBusinesses.map((business: any) => {
+          if (business.type !== 'PRODUCTION_HOUSE' || !business.studioState) {
+              return business;
+          }
+
+          const rawScripts = Array.isArray(business.studioState.scripts) ? business.studioState.scripts : [];
+          const seenScriptKeys = new Set<string>();
+          const repairedScripts = rawScripts.filter((script: any) => {
+              const scriptId = String(script?.id || '');
+              const scriptKey = isReturnDealQaScript(script) ? 'RETURNING_TALENT_QA_SCRIPT' : scriptId;
+              if (!scriptId || seenScriptKeys.has(scriptKey)) {
+                  cleanedScripts += 1;
+                  return false;
+              }
+              seenScriptKeys.add(scriptKey);
+              return true;
+          }).map((script: any) => {
+              const safeGenres = Array.isArray(script.genres) && script.genres.length > 0
+                  ? script.genres.filter(Boolean)
+                  : [script.genre || 'DRAMA'];
+              if (!Array.isArray(script.returningTalent)) {
+                  return {
+                      ...script,
+                      title: script.title || script.name || 'Untitled Project',
+                      projectType: script.projectType === 'SERIES' ? 'SERIES' : 'MOVIE',
+                      genres: safeGenres.length ? safeGenres : ['DRAMA'],
+                      returningTalent: []
+                  };
+              }
+
+              const seenDeals = new Set<string>();
+              const returningTalent = script.returningTalent.filter((deal: any) => {
+                  const role = String(deal?.role || '');
+                  const id = String(deal?.id || '');
+                  const key = `${role}:${id}:${deal?.characterId || deal?.characterName || ''}`;
+
+                  if (!id || !validRoles.has(role)) {
+                      removedDeals += 1;
+                      return false;
+                  }
+                  if (seenDeals.has(key)) {
+                      removedDeals += 1;
+                      return false;
+                  }
+
+                  seenDeals.add(key);
+                  return true;
+              }).slice(0, 12).map((deal: any) => {
+                  const id = String(deal.id || '');
+                  const internalTalent = id === 'PLAYER_SELF' || id === 'STUDIO_STAFF' || id.startsWith('IN_HOUSE_');
+                  return {
+                      ...deal,
+                      id,
+                      role: String(deal.role || ''),
+                      originalSalary: Math.max(0, Number.isFinite(Number(deal.originalSalary)) ? Number(deal.originalSalary) : Number(deal.newDemand || 0)),
+                      newDemand: Math.max(0, Number.isFinite(Number(deal.newDemand)) ? Number(deal.newDemand) : Number(deal.originalSalary || 0)),
+                      negotiated: internalTalent ? true : Boolean(deal.negotiated),
+                      accepted: internalTalent ? true : Boolean(deal.accepted),
+                      attemptsLeft: Math.max(0, Math.min(3, Number.isFinite(Number(deal.attemptsLeft)) ? Number(deal.attemptsLeft) : 3))
+                  };
+              });
+
+              return {
+                  ...script,
+                  title: script.title || script.name || 'Untitled Project',
+                  projectType: script.projectType === 'SERIES' ? 'SERIES' : 'MOVIE',
+                  genres: safeGenres.length ? safeGenres : ['DRAMA'],
+                  status: script.status || 'READY',
+                  returningTalent
+              };
+          });
+
+          const scriptIds = new Set(repairedScripts.map((script: any) => String(script.id)));
+          const concepts = Array.isArray(business.studioState.concepts) ? business.studioState.concepts : [];
+          const seenConceptKeys = new Set<string>();
+          const repairedConcepts = concepts.filter((concept: any) => {
+              const scriptId = String(concept?.scriptId || '');
+              if (scriptId && scriptIds.size > 0 && !scriptIds.has(scriptId)) {
+                  cleanedConcepts += 1;
+                  return false;
+              }
+              const keptScript = repairedScripts.find((script: any) => String(script.id) === scriptId);
+              const conceptKey = keptScript && isReturnDealQaScript(keptScript)
+                  ? 'RETURNING_TALENT_QA_CONCEPT'
+                  : String(concept?.id || scriptId || '');
+              if (conceptKey && seenConceptKeys.has(conceptKey)) {
+                  cleanedConcepts += 1;
+                  return false;
+              }
+              if (conceptKey) {
+                  seenConceptKeys.add(conceptKey);
+              }
+              return true;
+          }).map((concept: any) => {
+              if (!Array.isArray(concept.castList)) {
+                  return concept;
+              }
+
+              const seenCast = new Set<string>();
+              const castList = concept.castList.filter((cast: any) => {
+                  const actorId = cast?.actorId || cast?.npcId || cast?.id;
+                  const key = `${cast?.roleType || cast?.role || 'ROLE'}:${actorId || 'unknown'}:${cast?.characterName || ''}`;
+                  if (!actorId || seenCast.has(key)) {
+                      cleanedConceptCast += 1;
+                      return false;
+                  }
+                  seenCast.add(key);
+                  return true;
+              });
+
+              return { ...concept, castList };
+          });
+
+          return {
+              ...business,
+              studioState: {
+                  ...business.studioState,
+                  scripts: repairedScripts,
+                  concepts: repairedConcepts
+              }
+          };
+      });
+
+      onUpdatePlayer({
+          ...player,
+          businesses: repairedBusinesses,
+          logs: [{
+              week: player.currentWeek,
+              year: player.age,
+              message: `🧹 CHEAT: Production-house return deals repaired. Removed ${removedDeals} stale/duplicate deals, ${cleanedConceptCast} duplicate cast cards, ${cleanedScripts} duplicate scripts, and ${cleanedConcepts} stale drafts.`,
+              type: removedDeals || cleanedConceptCast || cleanedScripts || cleanedConcepts ? 'positive' : 'neutral'
+          }, ...player.logs].slice(0, 50)
+      });
+
+      setActiveCheatMenu('NONE');
+      alert(`Production-house repair complete.\nRemoved return deals: ${removedDeals}\nRemoved duplicate cast cards: ${cleanedConceptCast}\nRemoved duplicate scripts: ${cleanedScripts}\nRemoved stale drafts: ${cleanedConcepts}`);
+  };
+
+  const triggerReturningTalentNegotiationQa = (duplicateMultiplier = 1) => {
       if (!onUpdatePlayer) return;
 
       const { updatedPlayer: basePlayer, studio } = ensureCheatStudio();
       const now = Date.now();
+      const safeDuplicateMultiplier = Math.max(1, Math.min(duplicateMultiplier, 8));
       const franchiseId = `cheat_return_deal_franchise_${now}`;
       const scriptId = `cheat_return_deal_script_${now}`;
       const projectId = `cheat_return_deal_project_${now}`;
@@ -1584,7 +1857,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
           }
       ];
 
-      const returningTalent = [
+      const returningTalentBase = [
           {
               role: 'DIRECTOR',
               id: director?.id || 'celeb_dir_1',
@@ -1608,6 +1881,9 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
               characterName: cast.characterName
           }))
       ];
+      const returningTalent = Array.from({ length: safeDuplicateMultiplier }).flatMap(() =>
+          returningTalentBase.map(deal => ({ ...deal }))
+      );
 
       const previousProject = {
           id: projectId,
@@ -1662,6 +1938,19 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
           connectedProjectIntent: 'SOLO',
           tags: ['RETURNING_TALENT_QA', 'SEQUEL']
       };
+      const isExistingReturnDealQaScript = (existingScript: any) => {
+          const existingId = String(existingScript?.id || '');
+          const existingTitle = String(existingScript?.title || existingScript?.name || '').toLowerCase();
+          const existingTags = Array.isArray(existingScript?.tags) ? existingScript.tags : [];
+          return existingId.startsWith('cheat_return_deal_script_')
+              || existingTags.includes('RETURNING_TALENT_QA')
+              || existingTitle.includes('return deal: iron monarch');
+      };
+      const staleQaScriptIds = new Set(
+          (studio.studioState?.scripts || [])
+              .filter((existingScript: any) => isExistingReturnDealQaScript(existingScript))
+              .map((existingScript: any) => String(existingScript.id || ''))
+      );
 
       const updatedStudio = {
           ...studio,
@@ -1669,9 +1958,12 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
               ...(studio.studioState || {}),
               scripts: [
                   script,
-                  ...(studio.studioState?.scripts || []).filter((existingScript: any) => !String(existingScript.id).startsWith('cheat_return_deal_script_'))
+                  ...(studio.studioState?.scripts || []).filter((existingScript: any) => !isExistingReturnDealQaScript(existingScript))
               ],
-              concepts: (studio.studioState?.concepts || []).filter((concept: any) => !String(concept.scriptId || '').startsWith('cheat_return_deal_script_')),
+              concepts: (studio.studioState?.concepts || []).filter((concept: any) => {
+                  const conceptScriptId = String(concept.scriptId || '');
+                  return !staleQaScriptIds.has(conceptScriptId) && !conceptScriptId.startsWith('cheat_return_deal_script_');
+              }),
               purchasedIPTitles: studio.studioState?.purchasedIPTitles || [],
               ipMarket: studio.studioState?.ipMarket || [],
               writers: studio.studioState?.writers || []
@@ -1688,13 +1980,18 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
           logs: [{
               week: basePlayer.currentWeek,
               year: basePlayer.age,
-              message: '🧪 CHEAT: Returning talent negotiation blocker added. Open Greenlight and inspect the missing requirements list.',
+              message: duplicateMultiplier > 1
+                  ? `🧪 CHEAT: Controlled duplicate return-deal QA added (${returningTalent.length} raw entries). Greenlight should repair it to unique deals.`
+                  : '🧪 CHEAT: Returning talent negotiation blocker added. Open Greenlight and inspect the missing requirements list.',
               type: 'positive'
           }, ...basePlayer.logs].slice(0, 50)
       } as Player);
       setActiveCheatMenu('NONE');
       onOpenProductionHouseCheat?.();
-      alert('Return Deal QA loaded. Open Development Lab / Greenlight, choose "Return Deal: Iron Monarch 2", then go to Confirm to test pending negotiation names and buttons.');
+      alert(duplicateMultiplier > 1
+          ? 'Duplicate Return Deal stress QA loaded. Open Greenlight to see the broken/stress case, then run Repair Return Deals QA.'
+          : 'Return Deal QA loaded. Open Development Lab / Greenlight, choose "Return Deal: Iron Monarch 2", then go to Confirm to test pending negotiation names and buttons.'
+      );
   };
 
   const triggerStudioScenario = (scenario: 'PLANNING' | 'PRODUCTION' | 'AWAITING_RELEASE' | 'THEATRICAL_TO_BIDDING' | 'STREAMING_EXIT') => {
@@ -2814,8 +3111,17 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                                   <button onClick={triggerFilmographySortQa} className="col-span-2 bg-pink-900/30 hover:bg-pink-900/50 border border-pink-500/30 text-xs font-bold py-3 rounded-lg text-pink-300">
                                       Add Filmography Sort QA Library
                                   </button>
-                                  <button onClick={triggerReturningTalentNegotiationQa} className="col-span-2 bg-rose-900/30 hover:bg-rose-900/50 border border-rose-500/30 text-xs font-bold py-3 rounded-lg text-rose-300">
+                                  <button onClick={() => triggerReturningTalentNegotiationQa()} className="col-span-2 bg-rose-900/30 hover:bg-rose-900/50 border border-rose-500/30 text-xs font-bold py-3 rounded-lg text-rose-300">
                                       Return Deal Blocker QA
+                                  </button>
+                                  <button onClick={() => triggerReturningTalentNegotiationQa(60)} className="col-span-2 bg-red-950/50 hover:bg-red-900/60 border border-red-500/40 text-xs font-bold py-3 rounded-lg text-red-200">
+                                      Duplicate Return Deal Stress QA
+                                  </button>
+                                  <button onClick={sanitizeProductionHouseReturnDealsQa} className="bg-emerald-900/30 hover:bg-emerald-900/50 border border-emerald-500/30 text-xs font-bold py-3 rounded-lg text-emerald-300">
+                                      Repair Return Deals
+                                  </button>
+                                  <button onClick={triggerLegacyProductionHouseMigrationQa} className="bg-cyan-900/30 hover:bg-cyan-900/50 border border-cyan-500/30 text-xs font-bold py-3 rounded-lg text-cyan-300">
+                                      Legacy PH Migration
                                   </button>
                                   <button onClick={() => triggerStudioScenario('PLANNING')} className="bg-zinc-800 hover:bg-zinc-700 text-xs font-bold py-3 rounded-lg text-white">
                                       Planning to Pre-Prod
@@ -2880,6 +3186,12 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                               <div className="grid grid-cols-2 gap-2">
                                   <button onClick={() => { setActiveCheatMenu('NONE'); onShowWhatsNewCheat?.(); }} className="col-span-2 bg-violet-900/30 hover:bg-violet-900/50 border border-violet-500/30 text-xs font-bold py-3 rounded-lg text-violet-300 flex items-center justify-center gap-2">
                                       <Sparkles size={14}/> Show What&apos;s New Popup
+                                  </button>
+                                  <button onClick={triggerFirebaseDiagnostics} className="col-span-2 bg-sky-900/30 hover:bg-sky-900/50 border border-sky-500/30 text-xs font-bold py-3 rounded-lg text-sky-300 flex items-center justify-center gap-2">
+                                      <Activity size={14}/> Firebase Diagnostics Test
+                                  </button>
+                                  <button onClick={triggerLowConditionRestQa} className="col-span-2 bg-lime-900/30 hover:bg-lime-900/50 border border-lime-500/30 text-xs font-bold py-3 rounded-lg text-lime-300 flex items-center justify-center gap-2">
+                                      <Activity size={14}/> Low Condition / Rest QA
                                   </button>
                                   <button onClick={() => queueEventQaCase('SIMPLE_FEEDBACK')} className="bg-emerald-900/30 hover:bg-emerald-900/50 border border-emerald-500/30 text-[10px] font-bold py-3 rounded-lg text-emerald-300 flex items-center justify-center gap-2">
                                       <Check size={12}/> Simple Feedback
