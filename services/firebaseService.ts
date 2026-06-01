@@ -1,16 +1,27 @@
 import { Capacitor } from '@capacitor/core';
 import { FirebaseAnalytics } from '@capacitor-firebase/analytics';
 import { FirebaseCrashlytics } from '@capacitor-firebase/crashlytics';
+import { FirebaseMessaging } from '@capacitor-firebase/messaging';
 import { FirebasePerformance } from '@capacitor-firebase/performance';
 import { APP_DISPLAY_VERSION } from './appVersion';
 import { Player } from '../types';
 
 let firebaseBootstrapped = false;
 let firebaseAuthBootstrapped = false;
+let firebasePushBootstrapped = false;
+let firebasePushListenersInstalled = false;
 let firebaseAuthUserId: string | null = null;
 export type FirebaseAuthStatus = {
   state: 'idle' | 'web_skipped' | 'starting' | 'ready' | 'signed_out' | 'failed';
   userId: string | null;
+  isNative: boolean;
+  error?: string;
+};
+export type FirebasePushPermissionState = 'prompt' | 'prompt-with-rationale' | 'granted' | 'denied';
+export type FirebasePushStatus = {
+  state: 'web_skipped' | 'not_requested' | 'checking' | 'prompting' | 'ready' | 'denied' | 'failed';
+  receive?: FirebasePushPermissionState;
+  tokenTail: string | null;
   isNative: boolean;
   error?: string;
 };
@@ -19,7 +30,13 @@ let firebaseAuthStatus: FirebaseAuthStatus = {
   userId: null,
   isNative: Capacitor.isNativePlatform(),
 };
+let firebasePushStatus: FirebasePushStatus = {
+  state: Capacitor.isNativePlatform() ? 'not_requested' : 'web_skipped',
+  tokenTail: null,
+  isNative: Capacitor.isNativePlatform(),
+};
 const firebaseAuthStatusListeners = new Set<(status: FirebaseAuthStatus) => void>();
+const firebasePushStatusListeners = new Set<(status: FirebasePushStatus) => void>();
 const activeTraceStarts = new Map<string, Promise<boolean>>();
 const stoppingTraceNames = new Set<string>();
 const RESERVED_ANALYTICS_PREFIXES = ['firebase_', 'google_', 'ga_'];
@@ -84,12 +101,21 @@ const isNativeTelemetry = () => Capacitor.isNativePlatform();
 export const getTelemetryPlatform = () => Capacitor.getPlatform();
 export const getFirebaseAuthUserId = () => firebaseAuthUserId;
 export const getFirebaseAuthStatus = () => ({ ...firebaseAuthStatus });
+export const getFirebasePushStatus = () => ({ ...firebasePushStatus });
 
 export const onFirebaseAuthStatusChanged = (listener: (status: FirebaseAuthStatus) => void) => {
   firebaseAuthStatusListeners.add(listener);
   listener(getFirebaseAuthStatus());
   return () => {
     firebaseAuthStatusListeners.delete(listener);
+  };
+};
+
+export const onFirebasePushStatusChanged = (listener: (status: FirebasePushStatus) => void) => {
+  firebasePushStatusListeners.add(listener);
+  listener(getFirebasePushStatus());
+  return () => {
+    firebasePushStatusListeners.delete(listener);
   };
 };
 
@@ -101,6 +127,15 @@ const setFirebaseAuthStatus = (status: Partial<FirebaseAuthStatus>) => {
     isNative: Capacitor.isNativePlatform(),
   };
   firebaseAuthStatusListeners.forEach((listener) => listener(getFirebaseAuthStatus()));
+};
+
+const setFirebasePushStatus = (status: Partial<FirebasePushStatus>) => {
+  firebasePushStatus = {
+    ...firebasePushStatus,
+    ...status,
+    isNative: Capacitor.isNativePlatform(),
+  };
+  firebasePushStatusListeners.forEach((listener) => listener(getFirebasePushStatus()));
 };
 
 const attachFirebaseAuthUserId = async () => {
@@ -183,6 +218,16 @@ const getErrorMessage = (error: unknown) => {
   if (error instanceof Error) return error.message;
   return String(error || 'Unknown error');
 };
+
+const getPushPermissionReceive = (permission: unknown): FirebasePushPermissionState | undefined => {
+  const receive = (permission as { receive?: FirebasePushPermissionState })?.receive;
+  if (receive === 'prompt' || receive === 'prompt-with-rationale' || receive === 'granted' || receive === 'denied') {
+    return receive;
+  }
+  return undefined;
+};
+
+const getTokenTail = (token?: string | null) => token ? token.slice(-10) : null;
 
 const withTimeout = async <T,>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> => {
   let timeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -378,9 +423,151 @@ const shouldSendCheckpointEvent = (checkpoint: string) => {
   return true;
 };
 
+const installPushMessagingListeners = () => {
+  if (!isNativeTelemetry() || firebasePushListenersInstalled) return;
+  firebasePushListenersInstalled = true;
+
+  void runSafely('push-token-listener', async () => {
+    await FirebaseMessaging.addListener('tokenReceived', (event) => {
+      const tokenTail = getTokenTail(event.token);
+      setFirebasePushStatus({ state: 'ready', tokenTail, error: undefined });
+      setCrashKey('push_token_tail', tokenTail || '');
+      addBreadcrumb('push_token_received', { token_tail: tokenTail || 'none' });
+      trackGameEvent('push_token_received', { has_token: Boolean(tokenTail), token_tail: tokenTail || 'none' });
+    });
+  });
+
+  void runSafely('push-received-listener', async () => {
+    await FirebaseMessaging.addListener('notificationReceived', (event) => {
+      addBreadcrumb('push_notification_received', {
+        title: event.notification.title || '',
+        has_data: Boolean(event.notification.data),
+      });
+      trackGameEvent('push_notification_received', {
+        has_title: Boolean(event.notification.title),
+        has_data: Boolean(event.notification.data),
+      });
+    });
+  });
+
+  void runSafely('push-action-listener', async () => {
+    await FirebaseMessaging.addListener('notificationActionPerformed', (event) => {
+      addBreadcrumb('push_notification_opened', {
+        action_id: event.actionId || 'tap',
+        title: event.notification.title || '',
+      });
+      trackGameEvent('push_notification_opened', {
+        action_id: event.actionId || 'tap',
+        has_data: Boolean(event.notification.data),
+      });
+    });
+  });
+
+  if (Capacitor.getPlatform() === 'ios') {
+    void runSafely('push-apns-token-listener', async () => {
+      await FirebaseMessaging.addListener('apnsTokenReceived', (event) => {
+        const tokenTail = getTokenTail(event.token);
+        setCrashKey('apns_token_tail', tokenTail || '');
+        addBreadcrumb('push_apns_token_received', { token_tail: tokenTail || 'none' });
+      });
+    });
+  }
+};
+
+export const bootstrapPushMessaging = async () => {
+  if (!Capacitor.isNativePlatform()) {
+    setFirebasePushStatus({ state: 'web_skipped', tokenTail: null, error: undefined });
+    return getFirebasePushStatus();
+  }
+  if (firebasePushBootstrapped) return getFirebasePushStatus();
+  firebasePushBootstrapped = true;
+  installPushMessagingListeners();
+  setFirebasePushStatus({ state: 'checking', error: undefined });
+
+  try {
+    const supported = await FirebaseMessaging.isSupported();
+    if (!supported.isSupported) {
+      setFirebasePushStatus({ state: 'failed', tokenTail: null, error: 'Firebase Messaging is not supported on this device.' });
+      return getFirebasePushStatus();
+    }
+    const permission = await FirebaseMessaging.checkPermissions();
+    const receive = getPushPermissionReceive(permission);
+    setFirebasePushStatus({
+      state: receive === 'granted' ? 'ready' : receive === 'denied' ? 'denied' : 'not_requested',
+      receive,
+      error: undefined,
+    });
+    setCrashKey('push_permission', receive || 'unknown');
+  } catch (error) {
+    const message = getErrorMessage(error);
+    setFirebasePushStatus({ state: 'failed', tokenTail: null, error: message });
+    recordNonFatal(error, 'push_bootstrap_failed', { platform: getTelemetryPlatform() });
+  }
+
+  return getFirebasePushStatus();
+};
+
+export const enableManualPushNotifications = async () => {
+  if (!Capacitor.isNativePlatform()) {
+    setFirebasePushStatus({ state: 'web_skipped', tokenTail: null, error: undefined });
+    return getFirebasePushStatus();
+  }
+
+  installPushMessagingListeners();
+  markTraceAction('push_permission_requested', { flow: 'manual_push' });
+  addBreadcrumb('push_permission_requested', { platform: getTelemetryPlatform() });
+  trackGameEvent('push_permission_requested', { source: 'settings_support' });
+  setFirebasePushStatus({ state: 'prompting', error: undefined });
+
+  try {
+    const supported = await FirebaseMessaging.isSupported();
+    if (!supported.isSupported) {
+      setFirebasePushStatus({ state: 'failed', tokenTail: null, error: 'Firebase Messaging is not supported on this device.' });
+      return getFirebasePushStatus();
+    }
+
+    const permission = await FirebaseMessaging.requestPermissions();
+    const receive = getPushPermissionReceive(permission);
+    setCrashKey('push_permission', receive || 'unknown');
+
+    if (receive !== 'granted') {
+      setFirebasePushStatus({ state: 'denied', receive, tokenTail: null, error: undefined });
+      addBreadcrumb('push_permission_denied', { receive: receive || 'unknown' });
+      trackGameEvent('push_permission_denied', { receive: receive || 'unknown', source: 'settings_support' });
+      return getFirebasePushStatus();
+    }
+
+    const result = await FirebaseMessaging.getToken();
+    const tokenTail = getTokenTail(result.token);
+    setFirebasePushStatus({ state: 'ready', receive, tokenTail, error: undefined });
+    setCrashKey('push_enabled', true);
+    setCrashKey('push_token_tail', tokenTail || '');
+    addBreadcrumb('push_manual_enabled', { token_tail: tokenTail || 'none' });
+    trackGameEvent('push_manual_enabled', {
+      has_token: Boolean(tokenTail),
+      token_tail: tokenTail || 'none',
+      source: 'settings_support',
+    });
+  } catch (error) {
+    const message = getErrorMessage(error);
+    if (Capacitor.getPlatform() === 'ios' && message.includes('No APNS token specified')) {
+      setFirebasePushStatus({ state: 'checking', error: 'Waiting for APNS token.' });
+      addBreadcrumb('push_waiting_for_apns_token', { platform: getTelemetryPlatform() });
+      trackGameEvent('push_waiting_for_apns_token', { source: 'settings_support' });
+      return getFirebasePushStatus();
+    }
+    setFirebasePushStatus({ state: 'failed', error: message });
+    recordNonFatal(error, 'push_manual_enable_failed', { platform: getTelemetryPlatform() });
+    trackGameEvent('push_manual_enable_failed', { error: message, source: 'settings_support' });
+  }
+
+  return getFirebasePushStatus();
+};
+
 export const bootstrapFirebase = async () => {
   if (!Capacitor.isNativePlatform()) {
     setFirebaseAuthStatus({ state: 'web_skipped', userId: null });
+    setFirebasePushStatus({ state: 'web_skipped', tokenTail: null });
     return;
   }
   if (firebaseBootstrapped) return;
@@ -394,6 +581,7 @@ export const bootstrapFirebase = async () => {
     }),
     runSafely('performance', () => FirebasePerformance.setEnabled({ enabled: true })),
     bootstrapFirebaseAuth(),
+    bootstrapPushMessaging(),
   ]);
 };
 

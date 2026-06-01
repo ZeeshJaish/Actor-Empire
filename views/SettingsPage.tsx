@@ -1,13 +1,13 @@
 
 import React, { useEffect, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
-import { ArrowLeft, Twitter, Send, Star, Globe, LogOut, Coffee, Bug, Puzzle, Lock, CheckCircle2, Users, ChevronRight, Sparkles, SlidersHorizontal, ShieldCheck, Gauge, Database, Copy, Smartphone, MessageCircle, LifeBuoy } from 'lucide-react';
+import { ArrowLeft, Twitter, Send, Star, Globe, LogOut, Coffee, Bug, Puzzle, Lock, CheckCircle2, Users, ChevronRight, Sparkles, SlidersHorizontal, ShieldCheck, Gauge, Database, Copy, Smartphone, MessageCircle, LifeBuoy, Bell } from 'lucide-react';
 import { Player } from '../types';
 import { APP_DISPLAY_VERSION } from '../services/appVersion';
 import { createGlobalActorPackNPCs, GLOBAL_ACTOR_PACKS } from '../services/npcLogic';
 import { getGlobalCreatorCountForPack } from '../services/youtubeLogic';
 import { getPlayerLanguage, t } from '../services/i18n';
-import { addBreadcrumb, getFirebaseAuthStatus, markTraceAction, onFirebaseAuthStatusChanged, submitPlayerIssueReport, trackGameEvent } from '../services/firebaseService';
+import { addBreadcrumb, enableManualPushNotifications, getFirebaseAuthStatus, getFirebasePushStatus, markTraceAction, onFirebaseAuthStatusChanged, onFirebasePushStatusChanged, submitPlayerIssueReport, trackGameEvent } from '../services/firebaseService';
 
 interface SettingsPageProps {
   player: Player;
@@ -60,6 +60,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
   const [supportNotice, setSupportNotice] = useState<string | null>(null);
   const [supportDeviceId] = useState(getSupportDeviceId);
   const [authStatus, setAuthStatus] = useState(getFirebaseAuthStatus);
+  const [pushStatus, setPushStatus] = useState(getFirebasePushStatus);
+  const [isEnablingPush, setIsEnablingPush] = useState(false);
   const language = getPlayerLanguage(player);
   const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
   const smoothModeEnabled = player.settings?.smoothMode === true;
@@ -90,10 +92,38 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
     ? player.flags.enabledGlobalActorPacks as string[]
     : [];
   const selectedIssueCategory = ISSUE_CATEGORIES.find(category => category.id === reportCategory) || ISSUE_CATEGORIES[0];
+  const pushStatusLabel = pushStatus.state === 'ready'
+    ? 'On'
+    : pushStatus.state === 'denied'
+      ? 'Blocked'
+      : pushStatus.state === 'prompting'
+        ? 'Asking'
+        : pushStatus.state === 'web_skipped'
+          ? 'Native'
+          : 'Off';
+  const pushStatusSubtext = pushStatus.state === 'ready'
+    ? 'Manual updates can reach this device.'
+    : pushStatus.state === 'denied'
+      ? 'Enable in system settings.'
+      : pushStatus.state === 'failed'
+        ? 'Check native logs.'
+        : pushStatus.state === 'web_skipped'
+          ? 'Available on iOS and Android builds.'
+          : 'Update alerts only.';
 
   useEffect(() => {
     return onFirebaseAuthStatusChanged(setAuthStatus);
   }, []);
+
+  useEffect(() => {
+    return onFirebasePushStatusChanged(setPushStatus);
+  }, []);
+
+  useEffect(() => {
+    if (pushStatus.state === 'ready' && supportNotice?.startsWith('Notification setup')) {
+      setSupportNotice('Notifications enabled.');
+    }
+  }, [pushStatus.state, supportNotice]);
 
   useEffect(() => {
     trackGameEvent('settings_viewed', {
@@ -225,6 +255,26 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
       } catch {
         setSupportNotice(`Debug ID: ${visibleDebugId}`);
       }
+    }
+  };
+
+  const handleEnablePush = async () => {
+    if (isEnablingPush) return;
+    setIsEnablingPush(true);
+    setSupportNotice(null);
+    const status = await enableManualPushNotifications();
+    setIsEnablingPush(false);
+
+    if (status.state === 'ready') {
+      setSupportNotice('Notifications enabled.');
+    } else if (status.state === 'denied') {
+      setSupportNotice('Notifications are blocked in system settings.');
+    } else if (status.state === 'checking') {
+      setSupportNotice('Notification setup is finishing. Wait a moment.');
+    } else if (status.state === 'web_skipped') {
+      setSupportNotice('Notifications can be tested in the native app.');
+    } else {
+      setSupportNotice(status.error ? `Notification setup failed: ${status.error}` : 'Notification setup failed.');
     }
   };
 
@@ -525,6 +575,21 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
         </div>
 
         <div className="space-y-3">
+          <button
+            onClick={handleEnablePush}
+            disabled={isEnablingPush || pushStatus.state === 'ready'}
+            className="w-full flex items-center justify-between p-4 bg-emerald-500/10 rounded-2xl hover:bg-emerald-500/15 transition-colors border border-emerald-500/20 disabled:opacity-80 disabled:hover:bg-emerald-500/10"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-emerald-500/15 rounded-lg text-emerald-300"><Bell size={20}/></div>
+              <div className="text-left">
+                <div className="font-bold text-white">{pushStatus.state === 'ready' ? 'Notifications Enabled' : 'Enable Updates'}</div>
+                <div className="text-xs text-zinc-400">{isEnablingPush ? 'Opening permission prompt.' : pushStatusSubtext}</div>
+              </div>
+            </div>
+            <div className="text-[10px] bg-emerald-500/15 px-2 py-1 rounded text-emerald-300 font-bold uppercase">{pushStatusLabel}</div>
+          </button>
+
           <button
             onClick={() => {
               setSentIssueId(null);
