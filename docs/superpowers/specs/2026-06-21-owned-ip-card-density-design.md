@@ -21,6 +21,17 @@ Each IP uses one compact card with:
 
 The card removes oversized metric pills, excessive vertical gaps, background initials, and decorative empty space. It keeps the existing accent edge, dark cinematic surface, and clear owned/expired state.
 
+### IP type signal
+
+Genre remains muted supporting information. Ownership scope is separated into a compact colored badge on the same metadata line so it is immediately clear what the studio controls:
+
+- Character IP: blue with a people icon.
+- Story World IP: violet with a globe icon.
+- Franchise IP: gold with a layers icon.
+- Catalog IP: teal with an archive icon.
+
+The badge must not add another card row or increase the compact card height.
+
 ## Performance data
 
 Lifetime gross is derived from existing active releases and past studio projects whose `subjectName` matches the owned IP title. It includes theatrical gross plus recorded streaming revenue. If no matching release has earned revenue, the card shows **Unproven** rather than `$0`.

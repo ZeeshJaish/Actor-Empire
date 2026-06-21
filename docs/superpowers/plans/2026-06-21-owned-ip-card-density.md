@@ -44,3 +44,14 @@
 
 - [ ] Run `npm run lint`, rights audits, `npm run build`, and a targeted `git diff --check`.
 - [ ] Use the in-app Browser at `http://127.0.0.1:3000/` to verify the Rights lane, compact mobile density, terminology, lifetime gross state, and Develop IP modal interaction.
+
+### Task 5: Highlight ownership scope
+
+**Files:**
+- Modify: `scripts/audit-owned-right-ui.mjs`
+- Modify: `views/lifestyle/business/DevelopmentLab.tsx`
+
+- [ ] Add failing source-audit assertions for `Character IP`, `Story World IP`, `Franchise IP`, and `Catalog IP`.
+- [ ] Add one presentation mapper for the existing `propertyType` values, returning the approved label, icon, and tone.
+- [ ] Replace the combined `GENRE · TYPE` text with muted genre text and a colored IP-type badge on the same line.
+- [ ] Run the UI audit, TypeScript lint, production build, and Browser visual QA; verify the card height is unchanged and the type badge is readable.
