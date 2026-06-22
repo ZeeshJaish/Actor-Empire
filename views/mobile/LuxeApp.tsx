@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { DatingMatch, NewsItem, Player, Relationship, XPost } from '../../types';
+import { DatingMatch, DatingPreferences, NewsItem, Player, Relationship, XPost } from '../../types';
 import {
     calculateSwipeSuccess,
     getLuxeCandidates,
@@ -10,6 +10,7 @@ import {
 } from '../../services/datingLogic';
 import { getEstimatedNetWorth } from '../../services/loanLogic';
 import { getAbsoluteWeek } from '../../services/legacyLogic';
+import { DatingPreferencesSheet, preferenceLabel } from './DatingPreferencesSheet';
 import {
     ArrowLeft,
     Camera,
@@ -22,6 +23,7 @@ import {
     MessageCircle,
     Send,
     ShipWheel,
+    SlidersHorizontal,
     Sparkles,
     Wallet,
 } from 'lucide-react';
@@ -193,6 +195,8 @@ export const LuxeApp: React.FC<LuxeAppProps> = ({ player, onBack, onUpdatePlayer
     const [liveChatHistory, setLiveChatHistory] = useState<DatingMatch['chatHistory']>([]);
     const [showProfileDetails, setShowProfileDetails] = useState(false);
     const [isAwaitingReply, setIsAwaitingReply] = useState(false);
+    const [showPreferencesSheet, setShowPreferencesSheet] = useState(false);
+    const [preferences, setPreferences] = useState<DatingPreferences>(player.dating.preferences);
     const chatEndRef = useRef<HTMLDivElement>(null);
     const pendingReplyTimeoutRef = useRef<number | null>(null);
 
@@ -229,6 +233,17 @@ export const LuxeApp: React.FC<LuxeAppProps> = ({ player, onBack, onUpdatePlayer
         setView(activeChatMatchId ? 'CHAT' : 'BROWSE');
         setCandidates(getLuxeCandidates(player, 5, rotationSeed));
     }, [player.dating.isLuxeActive, player.currentWeek, player.dating.luxeCycleStartAbsoluteWeek, player.dating.luxeRefreshOffset, rotationSeed, canAccess]);
+
+    useEffect(() => {
+        if (!showPreferencesSheet) {
+            setPreferences(player.dating.preferences);
+        }
+    }, [
+        player.dating.preferences.gender,
+        player.dating.preferences.minAge,
+        player.dating.preferences.maxAge,
+        showPreferencesSheet,
+    ]);
 
     useEffect(() => {
         if (!selectedCandidateId && candidates[0]) setSelectedCandidateId(candidates[0].id);
@@ -287,6 +302,7 @@ export const LuxeApp: React.FC<LuxeAppProps> = ({ player, onBack, onUpdatePlayer
             ...player,
             dating: {
                 ...player.dating,
+                preferences,
                 isLuxeActive: true,
                 luxeCycleStartAbsoluteWeek: cycleStartAbsoluteWeek,
                 luxeRefreshOffset: 0,
@@ -295,6 +311,22 @@ export const LuxeApp: React.FC<LuxeAppProps> = ({ player, onBack, onUpdatePlayer
         onUpdatePlayer(updatedPlayer);
         setCandidates(getLuxeCandidates(updatedPlayer, 5, cycleIndex * 11));
         setView('BROWSE');
+    };
+
+    const saveDatingPreferences = () => {
+        const updatedPlayer = {
+            ...player,
+            dating: {
+                ...player.dating,
+                preferences,
+            },
+        };
+        const nextCandidates = getLuxeCandidates(updatedPlayer, 5, rotationSeed);
+        onUpdatePlayer(updatedPlayer);
+        setCandidates(nextCandidates);
+        setSelectedCandidateId(nextCandidates[0]?.id || null);
+        setShowPreferencesSheet(false);
+        pushFeedback(`Luxe filters updated: ${preferenceLabel(preferences)}.`, 'success');
     };
 
     const handlePaidRefresh = () => {
@@ -917,6 +949,17 @@ export const LuxeApp: React.FC<LuxeAppProps> = ({ player, onBack, onUpdatePlayer
                             </div>
                         </div>
 
+                        <button
+                            onClick={() => setShowPreferencesSheet(true)}
+                            className="mt-5 flex w-full items-center justify-between gap-3 rounded-[24px] border border-amber-400/15 bg-amber-500/10 px-4 py-3 text-left font-sans"
+                        >
+                            <div>
+                                <div className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-200/80">Dating Filters</div>
+                                <div className="mt-1 text-sm font-bold text-white">{preferenceLabel(preferences)}</div>
+                            </div>
+                            <SlidersHorizontal size={18} className="text-amber-200" />
+                        </button>
+
                         <div className="mt-6">
                             {canAccess ? (
                                 <button
@@ -937,6 +980,18 @@ export const LuxeApp: React.FC<LuxeAppProps> = ({ player, onBack, onUpdatePlayer
                         </div>
                     </div>
                 </div>
+                {showPreferencesSheet && (
+                    <DatingPreferencesSheet
+                        preferences={preferences}
+                        onChange={setPreferences}
+                        onClose={() => {
+                            setPreferences(player.dating.preferences);
+                            setShowPreferencesSheet(false);
+                        }}
+                        onSave={saveDatingPreferences}
+                        tone="luxe"
+                    />
+                )}
             </div>
         );
     }
@@ -958,9 +1013,12 @@ export const LuxeApp: React.FC<LuxeAppProps> = ({ player, onBack, onUpdatePlayer
                     <div className="flex items-center gap-2 text-sm font-bold uppercase tracking-[0.28em] text-amber-500">
                         <Gem size={16} /> Luxe
                     </div>
-                    <div className="text-right font-sans text-[10px] uppercase tracking-[0.18em] text-amber-300/70">
-                        {player.dating.isLuxeActive ? `Week ${player.currentWeek}` : 'Members only'}
-                    </div>
+                    <button
+                        onClick={() => setShowPreferencesSheet(true)}
+                        className="rounded-full border border-amber-400/20 bg-amber-500/10 px-3 py-1.5 font-sans text-[10px] font-black uppercase tracking-[0.14em] text-amber-100"
+                    >
+                        {preferenceLabel(preferences)}
+                    </button>
                 </div>
             </div>
 
@@ -1067,6 +1125,16 @@ export const LuxeApp: React.FC<LuxeAppProps> = ({ player, onBack, onUpdatePlayer
                                 <Wallet size={14} /> {formatMoneyCompact(LUXE_REFRESH_COST)}
                             </button>
                         </div>
+                        <button
+                            onClick={() => setShowPreferencesSheet(true)}
+                            className="mt-4 flex w-full items-center justify-between gap-3 rounded-[22px] border border-white/7 bg-white/[0.03] px-4 py-3 text-left font-sans"
+                        >
+                            <div>
+                                <div className="text-[10px] font-black uppercase tracking-[0.18em] text-zinc-500">Filters</div>
+                                <div className="mt-1 text-sm font-bold text-zinc-200">{preferenceLabel(preferences)}</div>
+                            </div>
+                            <SlidersHorizontal size={17} className="text-amber-200" />
+                        </button>
                     </section>
 
                     {!selectedCandidate && (
@@ -1575,6 +1643,19 @@ export const LuxeApp: React.FC<LuxeAppProps> = ({ player, onBack, onUpdatePlayer
                         </div>
                     </div>
                 </div>
+            )}
+
+            {showPreferencesSheet && (
+                <DatingPreferencesSheet
+                    preferences={preferences}
+                    onChange={setPreferences}
+                    onClose={() => {
+                        setPreferences(player.dating.preferences);
+                        setShowPreferencesSheet(false);
+                    }}
+                    onSave={saveDatingPreferences}
+                    tone="luxe"
+                />
             )}
 
         </div>

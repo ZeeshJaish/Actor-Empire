@@ -178,7 +178,7 @@ export const InstagramApp: React.FC<InstagramAppProps> = ({ player, onBack, onPo
   const selectedPendingDmAction = selectedNpcState?.chatHistory?.find(msg => msg.sender === 'NPC' && msg.action?.status === 'PENDING')?.action;
 
   const getDmActionTitle = (kind?: string) => {
-      if (kind === 'IG_REFERRAL') return 'Referral Lead';
+      if (kind === 'IG_REFERRAL') return 'Casting Referral';
       if (kind === 'IG_BRAND_OFFER') return 'Paid Brand Deal';
       return 'Drama DM';
   };
@@ -192,7 +192,7 @@ export const InstagramApp: React.FC<InstagramAppProps> = ({ player, onBack, onPo
       }
       if (action.kind === 'IG_REFERRAL') {
           const weeks = Math.max(1, Math.round(payload.weeksLeft || 2));
-          return `Casting may respond in ${weeks}-${weeks + 1} weeks • expires in ${payload.expiresWeeks || 3} weeks`;
+          return `Audition invite arrives in ${weeks} weeks after acceptance • expires in ${payload.expiresWeeks || 3} weeks`;
       }
       return 'Your reply can affect reputation and relationships.';
   };

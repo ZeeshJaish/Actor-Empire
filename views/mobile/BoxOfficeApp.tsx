@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Player, ActiveRelease } from '../../types';
 import { PLATFORMS } from '../../services/streamingLogic';
 import { getProjectIdentityLabel } from '../../services/genreCatalog';
+import { getProjectReleaseLabel } from '../../services/releaseTiming';
 import { getPlayerLanguage, t } from '../../services/i18n';
 import { ArrowLeft, BarChart3, TrendingUp, TrendingDown } from 'lucide-react';
 
@@ -19,6 +20,7 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
   const activeReleases = player.activeReleases || [];
   const theatrical = activeReleases.filter(r => r.distributionPhase === 'THEATRICAL');
   const streaming = activeReleases.filter(r => r.distributionPhase === 'STREAMING' && r.streaming);
+  const releaseFallback = { currentAge: player.age, currentWeek: player.currentWeek };
 
   const formatMoney = (amount: number) => {
       if (amount >= 1_000_000) return `$${(amount / 1_000_000).toFixed(1)}M`;
@@ -40,6 +42,48 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
   const formatViewsShort = (num: number) => {
       if (num >= 1_000_000) return (num / 1_000_000).toFixed(1) + 'M';
       return (num / 1_000).toFixed(0) + 'k';
+  };
+
+  const getCompactReleaseLabel = (rel: ActiveRelease) => (
+      getProjectReleaseLabel(rel, releaseFallback, { includeWeek: true })
+          .replace(/^Age\s+(\d+),\s+Week\s+(\d+)$/i, 'Age $1 W$2')
+  );
+
+  const getProjectMetaTags = (rel: ActiveRelease) => [
+      ...getProjectIdentityLabel(rel.projectDetails)
+          .split('•')
+          .map(part => part.trim())
+          .filter(Boolean)
+          .slice(0, 2),
+      getCompactReleaseLabel(rel)
+  ].filter(Boolean);
+
+  const renderMetaTags = (rel: ActiveRelease, tone: 'theatrical' | 'streaming' = 'theatrical') => {
+      const tags = getProjectMetaTags(rel);
+      const accentClass = tone === 'streaming'
+          ? 'border-indigo-400/20 bg-indigo-400/10 text-indigo-200'
+          : 'border-emerald-400/20 bg-emerald-400/10 text-emerald-200';
+
+      return (
+          <div
+              className="mt-3 grid w-full gap-1.5"
+              style={{ gridTemplateColumns: `repeat(${Math.max(1, Math.min(tags.length, 3))}, minmax(0, 1fr))` }}
+          >
+              {tags.map((tag, idx) => (
+                  <span
+                      key={`${rel.id}-meta-${idx}`}
+                      className={`flex h-7 min-w-0 items-center justify-center truncate rounded-lg border px-1.5 text-center text-[8px] font-black uppercase tracking-[0.08em] leading-none ${
+                          idx === tags.length - 1
+                              ? 'border-white/10 bg-white/5 text-zinc-400'
+                              : accentClass
+                      }`}
+                      title={tag}
+                  >
+                      {tag}
+                  </span>
+              ))}
+          </div>
+      );
   };
 
   return (
@@ -74,12 +118,14 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
                         
                         return (
                             <div key={rel.id} className="bg-zinc-800 p-4 rounded-2xl border border-zinc-700 shadow-lg">
-                                <div className="flex justify-between items-start mb-3 gap-3">
-                                    <div className="min-w-0">
-                                        <div className="font-bold text-lg leading-tight break-words">{rel.name}</div>
-                                        <div className="text-[10px] text-zinc-400 break-words">{getProjectIdentityLabel(rel.projectDetails)} • {rel.projectDetails.studioId.replace(/_/g, ' ')}</div>
+                                <div className="mb-3">
+                                    <div className="flex justify-between items-start gap-3">
+                                        <div className="min-w-0">
+                                            <div className="font-bold text-lg leading-tight break-words">{rel.name}</div>
+                                        </div>
+                                        <div className="text-xs bg-emerald-900 text-emerald-400 px-2 py-1 rounded font-mono font-bold shrink-0">Run W{rel.weekNum}</div>
                                     </div>
-                                    <div className="text-xs bg-emerald-900 text-emerald-400 px-2 py-1 rounded font-mono font-bold shrink-0">{tr('common.week')} {rel.weekNum}</div>
+                                    {renderMetaTags(rel)}
                                 </div>
 
                                 {/* Stats Grid */}
@@ -146,12 +192,14 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
 
                         return (
                             <div key={rel.id} className="bg-zinc-800 p-4 rounded-2xl border border-zinc-700 shadow-lg">
-                                <div className="flex justify-between items-start mb-3 gap-3">
-                                    <div className="min-w-0">
-                                        <div className="font-bold text-lg break-words">{rel.name}</div>
-                                        <div className="text-[10px] text-zinc-400 break-words">{getProjectIdentityLabel(rel.projectDetails)}</div>
+                                <div className="mb-3">
+                                    <div className="flex justify-between items-start gap-3">
+                                        <div className="min-w-0">
+                                            <div className="font-bold text-lg break-words">{rel.name}</div>
+                                        </div>
+                                        <div className={`text-[10px] px-2 py-1 rounded font-bold uppercase ${platform.color} bg-white/10 shrink-0`}>{platform.name}</div>
                                     </div>
-                                    <div className={`text-[10px] px-2 py-1 rounded font-bold uppercase ${platform.color} bg-white/10 shrink-0`}>{platform.name}</div>
+                                    {renderMetaTags(rel, 'streaming')}
                                 </div>
                                 
                                 <div className="grid grid-cols-2 gap-4 mb-4">

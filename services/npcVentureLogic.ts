@@ -73,11 +73,11 @@ const ARCHETYPE_BUDGETS: Record<NpcVentureArchetype, BudgetTier[]> = {
 };
 
 const ARCHETYPE_GENRES: Record<NpcVentureArchetype, Genre[]> = {
-    PRESTIGE_LABEL: ['DRAMA', 'THRILLER', 'ROMANCE'],
+    PRESTIGE_LABEL: ['DRAMA', 'THRILLER', 'ROMANCE', 'MYSTERY'],
     COMMERCIAL_STUDIO: ['ACTION', 'COMEDY', 'ADVENTURE'],
-    GENRE_HOUSE: ['HORROR', 'THRILLER', 'SCI_FI'],
+    GENRE_HOUSE: ['HORROR', 'THRILLER', 'SCI_FI', 'MYSTERY'],
     CREATOR_MEDIA: ['COMEDY', 'HORROR', 'ACTION'],
-    AWARDS_BOUTIQUE: ['DRAMA', 'ROMANCE', 'THRILLER'],
+    AWARDS_BOUTIQUE: ['DRAMA', 'ROMANCE', 'THRILLER', 'MYSTERY'],
 };
 
 const getTalentPool = (player: Player) => {

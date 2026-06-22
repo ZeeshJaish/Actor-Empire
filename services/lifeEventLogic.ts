@@ -933,7 +933,7 @@ export const generateLifeEvent = (player: Player): LifeEvent | null => {
                         label: "Give the Money ($50k)",
                         impact: (p) => {
                             p.money -= 50000;
-                            const rel = p.relationships.find(r => r.name === 'Family' || r.relation === 'Parent');
+                            const rel = p.relationships.find(r => r.relation !== 'Deceased Parent' && (r.name === 'Family' || r.relation === 'Parent'));
                             if (rel) rel.closeness += 20;
                             return { updatedPlayer: p, log: "You gave him the money. He's thrilled, but you're skeptical." };
                         }
@@ -941,7 +941,7 @@ export const generateLifeEvent = (player: Player): LifeEvent | null => {
                     {
                         label: "Refuse",
                         impact: (p) => {
-                            const rel = p.relationships.find(r => r.name === 'Family' || r.relation === 'Parent');
+                            const rel = p.relationships.find(r => r.relation !== 'Deceased Parent' && (r.name === 'Family' || r.relation === 'Parent'));
                             if (rel) rel.closeness -= 15;
                             return { updatedPlayer: p, log: "You said no. Family dinner is going to be awkward." };
                         }
@@ -1009,7 +1009,7 @@ export const generateLifeEvent = (player: Player): LifeEvent | null => {
                     label: "Make Time Immediately",
                     impact: (p) => {
                         p.stats.happiness += 6;
-                        const rel = p.relationships.find(r => r.id === closeFamily.id);
+                        const rel = p.relationships.find(r => r.id === closeFamily.id && r.relation !== 'Deceased Parent');
                         if (rel) rel.closeness += 10;
                         return { updatedPlayer: p, log: "You cleared the schedule and showed up in person. It mattered." };
                     }
@@ -1018,7 +1018,7 @@ export const generateLifeEvent = (player: Player): LifeEvent | null => {
                     label: "Send Money Instead",
                     impact: (p) => {
                         p.money -= 25000;
-                        const rel = p.relationships.find(r => r.id === closeFamily.id);
+                        const rel = p.relationships.find(r => r.id === closeFamily.id && r.relation !== 'Deceased Parent');
                         if (rel) rel.closeness += 2;
                         return { updatedPlayer: p, log: "The gesture helped, but everyone knew it wasn't the same as being there." };
                     }
@@ -1027,7 +1027,7 @@ export const generateLifeEvent = (player: Player): LifeEvent | null => {
                     label: "Ignore the Guilt",
                     impact: (p) => {
                         p.stats.reputation -= 2;
-                        const rel = p.relationships.find(r => r.id === closeFamily.id);
+                        const rel = p.relationships.find(r => r.id === closeFamily.id && r.relation !== 'Deceased Parent');
                         if (rel) rel.closeness -= 10;
                         return { updatedPlayer: p, log: "You told yourself they would understand. They did not." };
                     }

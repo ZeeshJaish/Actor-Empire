@@ -4,8 +4,29 @@ import { getEstimatedNetWorth } from './loanLogic';
 import { getAbsoluteWeek } from './legacyLogic';
 
 const RANDOM_JOBS = [
-    'Barista', 'Model', 'Student', 'Influencer', 'Writer', 'Stylist', 'Musician', 'Dancer', 'Photographer', 'Artist',
-    'Nurse', 'Teacher', 'Trainer', 'Chef', 'Assistant', 'Producer', 'Designer', 'Engineer', 'Lawyer', 'Doctor'
+    'Actor', 'Assistant Director', 'Barista', 'Chef', 'Choreographer', 'Creative Producer', 'Dancer', 'Designer',
+    'Doctor', 'Engineer', 'Event Curator', 'Fashion Stylist', 'Fitness Coach', 'Founder', 'Gallery Manager',
+    'Indie Musician', 'Influencer', 'Journalist', 'Lawyer', 'Model', 'Music Producer', 'Nurse', 'Photographer',
+    'Podcast Host', 'Publicist', 'Screenwriter', 'Social Media Manager', 'Startup Operator', 'Student', 'Teacher',
+    'Trainer', 'Travel Creator', 'VFX Artist', 'Writer'
+];
+
+const RANDOM_CITIES = [
+    'Los Angeles', 'New York', 'London', 'Mumbai', 'Toronto', 'Paris', 'Seoul', 'Dubai', 'Atlanta', 'Austin',
+    'Chicago', 'Miami', 'Vancouver', 'Melbourne', 'Berlin', 'Madrid', 'Tokyo', 'Singapore', 'Cape Town', 'Dublin'
+];
+
+const RANDOM_TINDER_BIOS = [
+    'Knows the best late-night food spots and will judge your playlist.',
+    'Mostly here for sharp banter, coffee, and a reason to dress up.',
+    'Career-focused, low-drama, surprisingly good at remembering tiny details.',
+    'Will say yes to a spontaneous plan if the vibe is convincing.',
+    'Soft spot for movies, rooftop views, and people who text like adults.',
+    'Looking for chemistry that does not feel like another networking event.',
+    'Equal parts ambition, sarcasm, and questionable sleep schedule.',
+    'Trying to keep life fun without turning everything into a headline.',
+    'Will absolutely ask what your favorite bad movie is.',
+    'Busy week, open calendar, curious mood.'
 ];
 
 const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
@@ -16,11 +37,35 @@ const POWER_TRAITS = ['Collector', 'Discreet', 'Jet-setter', 'Investor', 'Philan
 const INTENTS: DatingMatch['relationshipIntent'][] = ['CASUAL', 'PRIVATE_ROMANCE', 'POWER_COUPLE', 'LONG_TERM', 'DISCREET'];
 const PRIVACY_STYLES: DatingMatch['privacyStyle'][] = ['LOW_KEY', 'PUBLIC_FACING', 'MEDIA_MAGNET'];
 const RANDOM_TINDER_NAMES: Record<'MALE' | 'FEMALE' | 'NON_BINARY', string[]> = {
-    MALE: ['Alex', 'Sam', 'Jordan', 'Taylor', 'Jamie', 'Mason', 'Logan', 'Theo', 'Noah', 'Ethan'],
-    FEMALE: ['Avery', 'Morgan', 'Riley', 'Quinn', 'Chloe', 'Mia', 'Luna', 'Nora', 'Zoe', 'Ella'],
-    NON_BINARY: ['Casey', 'Rowan', 'Sage', 'Ari', 'Phoenix', 'Emery', 'River', 'Harper', 'Kai', 'Dakota'],
+    MALE: [
+        'Aarav', 'Adrian', 'Aiden', 'Alex', 'Andre', 'Arjun', 'Asher', 'Ben', 'Caleb', 'Cameron',
+        'Dante', 'Dev', 'Elias', 'Ethan', 'Felix', 'Finn', 'Gabriel', 'Hugo', 'Isaac', 'Jayden',
+        'Kabir', 'Kai', 'Leo', 'Liam', 'Logan', 'Luca', 'Malik', 'Mason', 'Mateo', 'Miles',
+        'Noah', 'Omar', 'Oscar', 'Rafael', 'Reid', 'Rohan', 'Roman', 'Sam', 'Theo', 'Zane'
+    ],
+    FEMALE: [
+        'Aanya', 'Aisha', 'Amara', 'Anika', 'Aria', 'Avery', 'Bella', 'Chloe', 'Clara', 'Daisy',
+        'Elena', 'Ella', 'Freya', 'Gia', 'Hana', 'Iris', 'Jade', 'Kiara', 'Layla', 'Leah',
+        'Lila', 'Luna', 'Maya', 'Mia', 'Mira', 'Naomi', 'Nora', 'Priya', 'Quinn', 'Riley',
+        'Sana', 'Sienna', 'Sofia', 'Tara', 'Valeria', 'Yara', 'Zara', 'Zoe'
+    ],
+    NON_BINARY: [
+        'Ari', 'Ash', 'Blake', 'Casey', 'Dakota', 'Emery', 'Harper', 'Indigo', 'Jules', 'Kai',
+        'Kendall', 'Lane', 'Noor', 'Phoenix', 'Reese', 'Remy', 'River', 'Rowan', 'Sage', 'Sky',
+        'Tatum', 'Wren'
+    ],
 };
-const RANDOM_TINDER_SURNAMES = ['Smith', 'Doe', 'Brown', 'Wilson', 'Lee', 'Kim', 'Patel', 'Clark', 'Stone', 'Parker'];
+const RANDOM_TINDER_SURNAMES = [
+    'Adams', 'Bennett', 'Brooks', 'Carter', 'Chaudhary', 'Chen', 'Clark', 'Cruz', 'Diaz', 'Ellis',
+    'Foster', 'Garcia', 'Green', 'Hayes', 'Hughes', 'Kapoor', 'Khan', 'Kim', 'King', 'Lee',
+    'Lewis', 'Martinez', 'Mehra', 'Morgan', 'Nakamura', 'Nguyen', 'Patel', 'Parker', 'Reed', 'Rivera',
+    'Roy', 'Santos', 'Shah', 'Stone', 'Taylor', 'Thomas', 'Torres', 'Walker', 'Wilson', 'Young'
+];
+
+interface TinderProfileOptions {
+    excludeNames?: string[];
+    excludeFirstNames?: string[];
+}
 
 export const LUXE_REFRESH_COST = 85000;
 export const LUXE_REFRESH_CYCLE_WEEKS = 3;
@@ -132,25 +177,67 @@ const npcMatchesPrefs = (npc: NPCActor, prefs: DatingPreferences) => {
     return preferredGenders.includes(npc.gender) && age >= prefs.minAge && age <= prefs.maxAge;
 };
 
-export const generateTinderProfile = (prefs: DatingPreferences): DatingMatch => {
-    const age = Math.floor(Math.random() * (prefs.maxAge - prefs.minAge + 1)) + prefs.minAge;
+const normalizeNameKey = (name: string) => name.trim().toLowerCase();
+
+const getFirstName = (name: string) => normalizeNameKey(name).split(/\s+/)[0] || '';
+
+export const generateTinderProfile = (prefs: DatingPreferences, options: TinderProfileOptions = {}): DatingMatch => {
+    const minAge = Math.min(prefs.minAge, prefs.maxAge);
+    const maxAge = Math.max(prefs.minAge, prefs.maxAge);
     const availableGenders = getPreferredGenders(prefs).filter((gender): gender is 'MALE' | 'FEMALE' | 'NON_BINARY' => gender !== 'ALL');
-    const gender = availableGenders.length ? pick(availableGenders) : 'NON_BINARY';
-    const firstName = pick(RANDOM_TINDER_NAMES[gender]);
-    const lastName = pick(RANDOM_TINDER_SURNAMES);
-    const fullName = `${firstName} ${lastName}`;
-    const job = pick(RANDOM_JOBS);
+    const excludedNames = new Set((options.excludeNames || []).map(normalizeNameKey));
+    const excludedFirstNames = new Set((options.excludeFirstNames || []).map(getFirstName).filter(Boolean));
+
+    let selected = {
+        age: minAge,
+        gender: (availableGenders.length ? pick(availableGenders) : 'NON_BINARY') as 'MALE' | 'FEMALE' | 'NON_BINARY',
+        firstName: 'Alex',
+        lastName: 'Stone',
+        fullName: 'Alex Stone',
+        job: pick(RANDOM_JOBS),
+        city: pick(RANDOM_CITIES),
+        bio: pick(RANDOM_TINDER_BIOS),
+    };
+
+    for (let attempt = 0; attempt < 80; attempt += 1) {
+        const gender = availableGenders.length ? pick(availableGenders) : 'NON_BINARY';
+        const firstName = pick(RANDOM_TINDER_NAMES[gender]);
+        const lastName = pick(RANDOM_TINDER_SURNAMES);
+        const fullName = `${firstName} ${lastName}`;
+        const fullNameKey = normalizeNameKey(fullName);
+        const firstNameKey = getFirstName(fullName);
+        selected = {
+            age: Math.floor(Math.random() * (maxAge - minAge + 1)) + minAge,
+            gender,
+            firstName,
+            lastName,
+            fullName,
+            job: pick(RANDOM_JOBS),
+            city: pick(RANDOM_CITIES),
+            bio: pick(RANDOM_TINDER_BIOS),
+        };
+
+        if (!excludedNames.has(fullNameKey) && !excludedFirstNames.has(firstNameKey)) {
+            break;
+        }
+
+        if (attempt > 30 && !excludedNames.has(fullNameKey)) {
+            break;
+        }
+    }
 
     return {
-        id: `tinder_rnd_${Date.now()}_${Math.random()}`,
-        name: fullName,
-        age,
-        gender,
-        job,
-        image: getGenderedAvatar(gender, fullName),
+        id: `tinder_rnd_${Date.now()}_${normalizeNameKey(selected.fullName).replace(/\s+/g, '_')}_${Math.random()}`,
+        name: selected.fullName,
+        age: selected.age,
+        gender: selected.gender,
+        job: selected.job,
+        image: getGenderedAvatar(selected.gender, `${selected.fullName}_${selected.job}_${selected.city}`),
         type: 'RANDOM',
         chemistry: Math.floor(Math.random() * 100),
-        isPremium: false
+        isPremium: false,
+        bio: `${selected.city} • ${selected.bio}`,
+        handle: `@${selected.firstName.toLowerCase()}${selected.lastName.toLowerCase()}${Math.floor(10 + Math.random() * 89)}`,
     };
 };
 

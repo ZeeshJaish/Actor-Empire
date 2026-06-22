@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Business, Player } from '../../types';
 import { formatMoney } from '../../services/formatUtils';
 import { NPC_DATABASE } from '../../services/npcLogic';
@@ -10,16 +10,43 @@ import { PROPERTY_CATALOG, CAR_CATALOG, MOTORCYCLE_CATALOG, BOAT_CATALOG, AIRCRA
 import { getPlayerLanguage, t } from '../../services/i18n';
 import { ArrowLeft, TrendingUp, DollarSign, Crown, Video, Building2, User, ChevronRight, Award, Star, Zap, Share2 } from 'lucide-react';
 import { motion } from 'motion/react';
+import { buildForbesStudioProfile, ForbesStudioProfile as ForbesStudioProfileData } from '../../services/forbesStudioProfile';
+import { deriveStudioOriginalRights } from '../../services/studioOriginalIp';
+import {
+    applyForbesOwnershipDiscovery,
+    getForbesOwnershipDiscoveries,
+} from '../../services/forbesOwnershipDiscovery';
+import { ForbesStudioProfile } from './components/ForbesStudioProfile';
+import { StudioAcquisitionDesk } from './components/StudioAcquisitionDesk';
+import { getCompanyPosition } from '../../services/companyPosition';
+import {
+    acceptAcquisitionCounter,
+    beatAcquisitionRivalBid,
+    completeStudioAcquisition,
+    getAcquisitionCase,
+    reviseAcquisitionOffer,
+    runDueDiligence,
+    submitOpeningOffer,
+    walkAwayFromAcquisition,
+} from '../../services/studioAcquisition';
+import { setSubsidiaryOperatingModel } from '../../services/studioGroup';
 
 interface ForbesAppProps {
   player: Player;
   onBack: () => void;
+  onUpdatePlayer: (player: Player) => void;
+  onOpenStocks: () => void;
+  onImmersiveChange?: (immersive: boolean) => void;
+  initialStudioId?: string;
+  onInitialStudioConsumed?: () => void;
 }
 
 type Tab = 'ACTORS' | 'STUDIOS' | 'STREAMING' | 'MY_RANK';
 
-export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack }) => {
+export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePlayer, onOpenStocks, onImmersiveChange, initialStudioId, onInitialStudioConsumed }) => {
   const [tab, setTab] = useState<Tab>('ACTORS');
+  const [selectedStudioProfile, setSelectedStudioProfile] = useState<ForbesStudioProfileData | null>(null);
+  const [acquisitionDeskOpen, setAcquisitionDeskOpen] = useState(false);
   const language = getPlayerLanguage(player);
   const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
   const actorPool = [
@@ -94,6 +121,112 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack }) => {
   ].filter((studio, idx, arr) => arr.findIndex(entry => entry.id === studio.id) === idx)
     .sort((a, b) => b.valuation - a.valuation);
 
+  const openStudioProfile = (studio: any, rank: number) => {
+      const playerBusiness = playerOwnedStudios.some(entry => entry.id === studio.id)
+          ? (player.businesses || []).find(business => business.id === studio.id && business.type === 'PRODUCTION_HOUSE')
+          : undefined;
+      const playerStudioReleases = playerBusiness ? player.pastProjects.filter(project => project.studioId === studio.id) : [];
+      const playerActiveStudioReleases = playerBusiness ? player.activeReleases.filter(release => release.projectDetails?.studioId === studio.id) : [];
+      const acquiredRights = playerBusiness?.studioState?.ownedRights || [];
+      const originalRights = playerBusiness ? deriveStudioOriginalRights({
+          studioId: studio.id,
+          scripts: playerBusiness.studioState?.scripts || [],
+          activeReleases: player.activeReleases,
+          pastProjects: player.pastProjects,
+          acquiredRights,
+          purchasedIPTitles: playerBusiness.studioState?.purchasedIPTitles || [],
+      }) : [];
+      const departmentLabels: Record<string, string> = {
+          writing: 'Writing Department',
+          directing: 'Directing Department',
+          casting: 'Casting Department',
+          production: 'Production Department',
+          postProduction: 'Post-Production Department',
+      };
+      const equipmentLabels: Record<string, string> = {
+          cameras: 'Camera Department',
+          lighting: 'Lighting Department',
+          sound: 'Sound Department',
+          practicalEffects: 'Practical Effects Shop',
+      };
+      const playerFacilities = playerBusiness ? [
+          ...Object.entries(playerBusiness.studioState?.departments || {})
+              .filter(([, level]) => Number(level) > 0)
+              .map(([key, level]) => `${departmentLabels[key] || key} L${level}`),
+          ...Object.entries(playerBusiness.studioState?.equipment || {})
+              .filter(([, level]) => Number(level) > 0)
+              .map(([key, level]) => `${equipmentLabels[key] || key} L${level}`),
+      ] : [];
+      if (playerBusiness && playerFacilities.length === 0) {
+          playerFacilities.push(`${playerBusiness.config.quality} Production Base`);
+      }
+      const studioContracts = playerBusiness
+          ? [...(player.studio?.talentRoster || []), ...(playerBusiness.studioState?.talentRoster || [])]
+          : [];
+      const playerTalent = playerBusiness ? [
+          ...studioContracts.map(contract => {
+              const npc = actorPool.find(candidate => candidate.id === contract.npcId);
+              return npc ? { name: npc.name, role: contract.type === 'MOVIE_DEAL' ? 'Contract Talent' : 'Studio Talent' } : null;
+          }),
+          ...(playerBusiness.staff || []).map(member => ({ name: member.name, role: member.role })),
+          ...playerStudioReleases.flatMap(project => (project.castList || []).map(member => ({
+              name: member.name,
+              role: member.role || 'Cast',
+          }))),
+      ].filter((entry): entry is { name: string; role: string } => Boolean(entry))
+          .filter((entry, index, entries) => entries.findIndex(candidate => candidate.name === entry.name) === index)
+          .slice(0, 4) : [];
+      const playerFranchiseIds = playerBusiness ? [
+          ...playerStudioReleases.map(project => project.franchiseId),
+          ...playerActiveStudioReleases.map(release => release.projectDetails.franchiseId),
+          ...(playerBusiness.studioState?.scripts || []).map(script => script.franchiseId),
+      ].filter((id): id is string => Boolean(id)) : [];
+      setSelectedStudioProfile(buildForbesStudioProfile({
+          studio,
+          rank,
+          worldProjects: player.world.projects || [],
+          universes: player.world.universes || {},
+          venture: player.world.npcVentures?.[studio.id],
+          playerBusiness,
+          playerRights: playerBusiness ? [...acquiredRights, ...originalRights].map(right => ({ id: right.id, title: right.title })) : undefined,
+          playerFranchiseIds,
+          playerFacilities,
+          playerTalent,
+          playerProjects: playerBusiness ? [
+              ...playerStudioReleases
+                  .map(project => ({
+                      id: project.id,
+                      title: project.name,
+                      year: project.releaseYear || project.year,
+                      week: project.releaseWeek || 1,
+                      revenue: Math.max(0, (project.gross || 0) + (project.streamingRevenue || 0)),
+                      quality: project.imdbRating ? project.imdbRating * 10 : project.projectQuality || 0,
+                      outcome: project.outcomeTier || project.boxOfficeResult || 'RELEASED',
+                  })),
+              ...playerActiveStudioReleases
+                  .map(release => ({
+                      id: release.id,
+                      title: release.name,
+                      year: release.projectDetails.releaseYear || player.age,
+                      week: release.projectDetails.releaseDate || player.currentWeek,
+                      revenue: Math.max(0, (release.totalGross || 0) + (release.streamingRevenue || 0)),
+                      quality: release.imdbRating ? release.imdbRating * 10 : release.productionPerformance || 0,
+                      outcome: release.status,
+                  })),
+          ] : undefined,
+      }));
+  };
+
+  useEffect(() => {
+      if (!initialStudioId) return;
+      const targetIndex = studioRanking.findIndex(studio => studio.id === initialStudioId);
+      if (targetIndex < 0) return;
+      setTab('STUDIOS');
+      openStudioProfile(studioRanking[targetIndex], targetIndex + 1);
+      setAcquisitionDeskOpen(true);
+      onInitialStudioConsumed?.();
+  }, [initialStudioId]);
+
   // STREAMERS
   const platformRanking = player.world.platforms
     ? (Object.values(player.world.platforms) as any[]).sort((a, b) => b.subscribers - a.subscribers)
@@ -155,6 +288,109 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack }) => {
 
   return (
     <div className="absolute inset-0 bg-black flex flex-col z-40 text-white animate-in slide-in-from-right duration-300 font-sans">
+        {selectedStudioProfile && (
+            <ForbesStudioProfile
+                profile={selectedStudioProfile}
+                onClose={() => {
+                    setAcquisitionDeskOpen(false);
+                    setSelectedStudioProfile(null);
+                }}
+                ownershipCommandRecorded={getForbesOwnershipDiscoveries(player).some(record => record.studioId === selectedStudioProfile.id)}
+                onOwnershipCommand={() => {
+                    const result = applyForbesOwnershipDiscovery({
+                        player,
+                        profile: selectedStudioProfile,
+                    });
+                    if (result.success) onUpdatePlayer(result.player);
+                    return result;
+                }}
+                companyPosition={getCompanyPosition(player, selectedStudioProfile)}
+                acquisitionCase={getAcquisitionCase(player, selectedStudioProfile.id)}
+                onApproachStudio={() => setAcquisitionDeskOpen(true)}
+                onOpenStocks={onOpenStocks}
+            />
+        )}
+        {selectedStudioProfile && acquisitionDeskOpen && (
+            <StudioAcquisitionDesk
+                player={player}
+                profile={selectedStudioProfile}
+                acquisitionCase={getAcquisitionCase(player, selectedStudioProfile.id)}
+                onClose={() => setAcquisitionDeskOpen(false)}
+                onImmersiveChange={onImmersiveChange}
+                onSetOperatingModel={(model) => {
+                    const result = setSubsidiaryOperatingModel({
+                        player,
+                        studioId: selectedStudioProfile.id,
+                        model,
+                    });
+                    if (result.success) onUpdatePlayer(result.player);
+                    return result;
+                }}
+                onRunDiligence={(funding) => {
+                    const result = runDueDiligence({
+                        player,
+                        profile: selectedStudioProfile,
+                        funding,
+                    });
+                    if (result.success) onUpdatePlayer(result.player);
+                    return result;
+                }}
+                onSubmitOffer={({ offerType, offerAmount, minorityPercent, funding, commitments }) => {
+                    const result = submitOpeningOffer({
+                        player,
+                        profile: selectedStudioProfile,
+                        offerType,
+                        offerAmount,
+                        minorityPercent,
+                        funding,
+                        commitments,
+                    });
+                    if (result.success) onUpdatePlayer(result.player);
+                    return result;
+                }}
+                onAcceptCounter={() => {
+                    const result = acceptAcquisitionCounter({ player, studioId: selectedStudioProfile.id });
+                    if (result.success) onUpdatePlayer(result.player);
+                    return result;
+                }}
+                onReviseOffer={(offerAmount) => {
+                    const result = reviseAcquisitionOffer({ player, studioId: selectedStudioProfile.id, offerAmount });
+                    if (result.success) onUpdatePlayer(result.player);
+                    return result;
+                }}
+                onBeatRival={(offerAmount) => {
+                    const result = beatAcquisitionRivalBid({ player, studioId: selectedStudioProfile.id, offerAmount });
+                    if (result.success) onUpdatePlayer(result.player);
+                    return result;
+                }}
+                onWalkAway={() => {
+                    const result = walkAwayFromAcquisition({ player, studioId: selectedStudioProfile.id });
+                    if (result.success) {
+                        onUpdatePlayer(result.player);
+                        setAcquisitionDeskOpen(false);
+                    }
+                    return result;
+                }}
+                onCompleteAcquisition={() => {
+                    const result = completeStudioAcquisition({
+                        player,
+                        profile: selectedStudioProfile,
+                    });
+                    if (result.success) {
+                        onUpdatePlayer(result.player);
+                        setSelectedStudioProfile(current => current ? {
+                            ...current,
+                            isPlayerOwned: true,
+                            acquisitionState: 'NOT_FOR_SALE',
+                            capital: result.acquiredBusiness?.balance ?? current.capital,
+                            ownershipStructure: 'Privately held · Player controlled',
+                            assetDataSource: 'SAVE_DATA',
+                        } : current);
+                    }
+                    return result;
+                }}
+            />
+        )}
         {/* Header */}
         <div className="bg-zinc-900 p-4 pt-12 pb-3 shadow-lg flex items-center justify-between shrink-0 border-b border-zinc-800">
             <button onClick={onBack} className="p-1 rounded-full hover:bg-white/10 transition-colors"><ArrowLeft size={20} className="text-zinc-400"/></button>
@@ -214,7 +450,13 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack }) => {
             {tab === 'STUDIOS' && (
                 <div className="p-4 space-y-3">
                     {studioRanking.map((studio, idx) => (
-                        <div key={studio.id} className={`bg-zinc-900/40 backdrop-blur-xl border p-4 rounded-[2rem] group hover:bg-zinc-900/60 transition-all duration-500 overflow-hidden ${studio.isPlayerOwned ? 'border-amber-500/35 shadow-[0_0_35px_rgba(245,158,11,0.08)]' : 'border-white/5 hover:border-white/10'}`}>
+                        <button
+                            key={studio.id}
+                            type="button"
+                            aria-label={`Open studio profile: ${studio.name}`}
+                            onClick={() => openStudioProfile(studio, idx + 1)}
+                            className={`w-full bg-zinc-900/40 backdrop-blur-xl border p-4 rounded-[2rem] text-left group hover:bg-zinc-900/60 active:scale-[0.985] transition-all duration-300 overflow-hidden ${studio.isPlayerOwned ? 'border-amber-500/35 shadow-[0_0_35px_rgba(245,158,11,0.08)]' : 'border-white/5 hover:border-white/10'}`}
+                        >
                             <div className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-3">
                                 <div className={`font-serif italic font-black text-3xl leading-none w-8 ${idx < 3 ? 'text-amber-500' : 'text-zinc-800'}`}>
                                         {idx + 1}
@@ -226,9 +468,12 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack }) => {
                                                 {studio.name}
                                             </div>
                                         </div>
-                                        <div className="shrink-0 text-right min-w-[72px] max-w-[88px]">
+                                        <div className="flex shrink-0 items-center gap-2 text-right min-w-[82px] max-w-[102px]">
+                                            <div>
                                             <div className="text-[7px] text-zinc-600 uppercase font-black tracking-[0.2em] mb-1">{tr('forbes.valuation')}</div>
                                             <div className="font-mono text-[clamp(1rem,4.8vw,1.35rem)] font-black text-white leading-none tabular-nums">{formatValuation(studio.valuation)}</div>
+                                            </div>
+                                            <ChevronRight size={15} className="shrink-0 text-zinc-700 transition-transform group-hover:translate-x-0.5 group-hover:text-amber-400" />
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-2 min-w-0">
@@ -247,7 +492,7 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack }) => {
                                     )}
                                 </div>
                             </div>
-                        </div>
+                        </button>
                     ))}
                 </div>
             )}

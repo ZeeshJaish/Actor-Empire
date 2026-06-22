@@ -5,9 +5,10 @@ import { Page } from '../types';
 interface BottomNavProps {
   activePage: Page;
   setPage: (page: Page) => void;
+  unreadMessages?: number;
 }
 
-export const BottomNav: React.FC<BottomNavProps> = ({ activePage, setPage }) => {
+export const BottomNav: React.FC<BottomNavProps> = ({ activePage, setPage, unreadMessages = 0 }) => {
   const navItems = [
     { page: Page.HOME, icon: Home, label: 'Home' },
     { page: Page.CAREER, icon: Briefcase, label: 'Career' },
@@ -24,6 +25,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activePage, setPage }) => 
             {navItems.map((item) => {
               const isActive = activePage === item.page;
               const Icon = item.icon;
+              const badgeCount = item.page === Page.MOBILE ? unreadMessages : 0;
               return (
                 <button
                   key={item.page}
@@ -33,7 +35,14 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activePage, setPage }) => 
                   }`}
                 >
                   <div className={`absolute -top-3 left-1/2 transform -translate-x-1/2 w-8 h-1 bg-amber-400/50 blur-md rounded-full transition-opacity duration-300 ${isActive ? 'opacity-100' : 'opacity-0'}`} />
-                  <Icon size={22} strokeWidth={isActive ? 2.5 : 1.5} className={`transition-transform duration-300 ${isActive ? 'scale-110 drop-shadow-[0_0_8px_rgba(251,191,36,0.5)]' : ''}`} />
+                  <div className="relative">
+                    <Icon size={22} strokeWidth={isActive ? 2.5 : 1.5} className={`transition-transform duration-300 ${isActive ? 'scale-110 drop-shadow-[0_0_8px_rgba(251,191,36,0.5)]' : ''}`} />
+                    {badgeCount > 0 && (
+                      <span className="absolute -top-2 -right-2 min-w-4 h-4 px-1 rounded-full bg-rose-500 text-white text-[9px] leading-4 font-black border border-zinc-950 shadow-lg">
+                        {badgeCount > 9 ? '9+' : badgeCount}
+                      </span>
+                    )}
+                  </div>
                   {isActive && <span className="absolute -bottom-1 w-1 h-1 bg-amber-400 rounded-full"></span>}
                 </button>
               );

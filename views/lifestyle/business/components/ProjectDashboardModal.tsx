@@ -4,17 +4,16 @@ import { X, Film, Tv, Users, DollarSign, Star, TrendingUp, Calendar, Check, Acti
 import { Player, Studio, CustomPoster, PlatformId } from '../../../../types';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
 import { getAbsoluteWeek } from '../../../../services/legacyLogic';
+import { canRenameProjectTitle } from '../../../../services/projectNaming';
+import { WorkingTitleDialog } from './WorkingTitleDialog';
+import { getContinuationEligibility } from '../../../../services/sequelFlow';
+import { getProjectReleaseLabel, getProjectReleaseTiming } from '../../../../services/releaseTiming';
 
 const formatMoney = (val: number) => {
     if (val >= 1_000_000_000_000) return `$${(val/1_000_000_000_000).toFixed(2)}T`;
     if (val >= 1_000_000_000) return `$${(val/1_000_000_000).toFixed(2)}B`;
     if (val >= 1_000_000) return `$${(val/1_000_000).toFixed(1)}M`;
     return `$${(val/1_000).toFixed(0)}k`;
-};
-
-const getWeeksSinceRelease = (currentWeek: number, releaseWeek: number) => {
-    if (!releaseWeek) return 0;
-    return currentWeek >= releaseWeek ? currentWeek - releaseWeek : (52 - releaseWeek) + currentWeek;
 };
 
 const PHASES = [
@@ -48,40 +47,36 @@ interface ProjectDashboardModalProps {
     onMakeSequel?: (project: any) => void;
     onMakeSpinoff?: (project: any) => void;
     onStartStreamingBidding?: (project: any) => void;
+    onRenameProject?: (title: string) => void;
 }
 
-export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ project, player, studio, onClose, onUpdatePlayer, onMakeSequel, onMakeSpinoff, onStartStreamingBidding }) => {
+export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ project, player, studio, onClose, onUpdatePlayer, onMakeSequel, onMakeSpinoff, onStartStreamingBidding, onRenameProject }) => {
     const [view, setView] = useState<'DETAILS'>('DETAILS');
+    const [isRenamingTitle, setIsRenamingTitle] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const displayTitle = project.name || project.title || project.projectDetails?.title || 'Untitled Project';
+    const canRenameTitle = !!onRenameProject && canRenameProjectTitle(project.phase);
+    const isReleaseHistoryPhase = ['RELEASED', 'STREAMING', 'IN THEATERS', 'BIDDING'].includes(project.phase) || Boolean(project.gross || project.totalGross || project.streamingRevenue);
+    const releaseFallback = isReleaseHistoryPhase ? { currentAge: player.age, currentWeek: player.currentWeek } : {};
+    const releaseTiming = getProjectReleaseTiming(project, releaseFallback);
+    const releaseSummaryLabel = getProjectReleaseLabel(project, releaseFallback, { emptyLabel: 'TBA' });
+    const runWeek = Number(project.weekNum || project.projectDetails?.weekNum || 0);
+    const currentPhaseLabel = PHASES.find(p => p.id === project.phase)?.label || String(project.phase || 'Planning').replace(/[_-]/g, ' ');
+    const timelineValue = runWeek > 0 ? `Run W${runWeek}` : releaseTiming.releaseWeek ? `Week ${releaseTiming.releaseWeek}` : currentPhaseLabel;
+    const timelineCaption = runWeek > 0 ? currentPhaseLabel : releaseTiming.releaseWeek ? releaseSummaryLabel : 'Current stage';
 
-    const hasSequel = React.useMemo(() => {
-        const franchiseId = project.franchiseId || project.id;
-        const nextInstallment = (project.installmentNumber || 1) + 1;
-        
-        const inScripts = studio.studioState?.scripts?.some(s => s.franchiseId === franchiseId && s.sourceMaterial === 'SEQUEL' && s.installmentNumber === nextInstallment);
-        const inActive = player.activeReleases?.some(r => r.franchiseId === franchiseId && r.sourceMaterial === 'SEQUEL' && r.installmentNumber === nextInstallment);
-        const inPast = player.pastProjects?.some(p => p.franchiseId === franchiseId && p.sourceMaterial === 'SEQUEL' && p.installmentNumber === nextInstallment);
-        const inConcepts = studio.studioState?.concepts?.some(c => {
-            const script = studio.studioState?.scripts?.find(s => s.id === c.scriptId);
-            return script && script.franchiseId === franchiseId && script.sourceMaterial === 'SEQUEL' && script.installmentNumber === nextInstallment;
-        });
-        
-        return inScripts || inActive || inPast || inConcepts;
-    }, [project, studio, player]);
-
-    const hasSpinoff = React.useMemo(() => {
-        const franchiseId = project.franchiseId || project.id;
-        
-        const inScripts = studio.studioState?.scripts?.some(s => s.franchiseId === franchiseId && s.sourceMaterial === 'SPINOFF');
-        const inActive = player.activeReleases?.some(r => r.franchiseId === franchiseId && r.sourceMaterial === 'SPINOFF');
-        const inPast = player.pastProjects?.some(p => p.franchiseId === franchiseId && p.sourceMaterial === 'SPINOFF');
-        const inConcepts = studio.studioState?.concepts?.some(c => {
-            const script = studio.studioState?.scripts?.find(s => s.id === c.scriptId);
-            return script && script.franchiseId === franchiseId && script.sourceMaterial === 'SPINOFF';
-        });
-        
-        return inScripts || inActive || inPast || inConcepts;
-    }, [project, studio, player]);
+    const sequelEligibility = React.useMemo(() => getContinuationEligibility({
+        player,
+        studioScripts: studio.studioState?.scripts || [],
+        project,
+        mode: 'SEQUEL',
+    }), [player, project, studio.studioState?.scripts]);
+    const spinoffEligibility = React.useMemo(() => getContinuationEligibility({
+        player,
+        studioScripts: studio.studioState?.scripts || [],
+        project,
+        mode: 'SPINOFF',
+    }), [player, project, studio.studioState?.scripts]);
 
     const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -285,7 +280,7 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                 });
             }
 
-            if (roi > 2 && getWeeksSinceRelease(player.currentWeek, (project.releaseWeek || project.projectDetails?.releaseDate || 0)) >= 2) {
+            if (roi > 2 && sequelEligibility.weeksElapsed >= 2) {
                 buzzItems.push({
                     week: 'Current',
                     headline: `${title} is a box office juggernaut`,
@@ -406,14 +401,14 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
             );
         }
 
-        const bgGradient = activePoster?.bgGradient || getPosterBg(project.name);
+        const bgGradient = activePoster?.bgGradient || getPosterBg(displayTitle);
         return (
             <div className={`w-full aspect-[2/3] rounded-2xl overflow-hidden relative bg-gradient-to-br ${bgGradient} flex flex-col items-center justify-center p-6 text-center border border-white/10 shadow-2xl group`}>
                 <div className="absolute inset-0 opacity-[0.03] pointer-events-none bg-[url('https://grainy-gradients.vercel.app/noise.svg')]"></div>
                 <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-white/10"></div>
                 <div className="relative z-10 w-full h-full flex flex-col justify-center gap-4">
                     <h3 className="text-3xl font-black uppercase tracking-tighter text-white drop-shadow-[0_4px_8px_rgba(0,0,0,0.5)] leading-none mb-2">
-                        {project.name}
+                        {displayTitle}
                     </h3>
                 </div>
                 <div className="absolute inset-0 shadow-[inset_0_0_100px_rgba(0,0,0,0.5)] pointer-events-none"></div>
@@ -540,15 +535,25 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                 </div>
 
                                 {/* Title Overlay for Mobile */}
-                                <div className="absolute bottom-10 left-8 right-8 lg:hidden">
+                                <div className="absolute bottom-10 left-8 right-8 z-20 lg:hidden">
                                     <h1 className="text-5xl font-serif italic text-white leading-none tracking-tight drop-shadow-2xl mb-2" style={{ fontFamily: "'Playfair Display', serif" }}>
-                                        {project.name}
+                                        {displayTitle}
                                     </h1>
                                     <div className="flex items-center gap-3 text-xs font-bold text-zinc-400 uppercase tracking-widest">
                                         <span>{project.type === 'SERIES' ? 'Original Series' : 'Feature Film'}</span>
                                         <span className="w-1 h-1 bg-zinc-600 rounded-full"></span>
                                         <span>{project.genre || 'Drama'}</span>
                                     </div>
+                                    {canRenameTitle && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsRenamingTitle(true)}
+                                            className="mt-4 inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/40 px-3 py-2 text-[10px] font-black uppercase tracking-[0.16em] text-white backdrop-blur-md transition-colors hover:border-amber-400/60 hover:text-amber-300"
+                                        >
+                                            <Edit3 size={13} />
+                                            Edit Working Title
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -563,7 +568,7 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                     className="text-7xl font-serif italic text-white leading-none tracking-tight mb-4"
                                     style={{ fontFamily: "'Playfair Display', serif" }}
                                 >
-                                    {project.name}
+                                    {displayTitle}
                                 </motion.h1>
                                 <div className="flex items-center gap-4 text-sm font-bold text-zinc-500 uppercase tracking-[0.3em]">
                                     <span>{project.type === 'SERIES' ? 'Original Series' : 'Feature Film'}</span>
@@ -576,6 +581,16 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                         </>
                                     )}
                                 </div>
+                                {canRenameTitle && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsRenamingTitle(true)}
+                                        className="mt-5 inline-flex items-center gap-2 rounded-full border border-zinc-700 bg-zinc-900 px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.18em] text-zinc-300 transition-colors hover:border-amber-500/50 hover:bg-amber-500/10 hover:text-amber-300"
+                                    >
+                                        <Edit3 size={14} />
+                                        Edit Working Title
+                                    </button>
+                                )}
                             </div>
 
                             {/* Main Grid */}
@@ -607,6 +622,24 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                                 {Math.round(project.promotionalBuzz || project.projectDetails?.hiddenStats?.qualityScore || 50)}
                                             </div>
                                             <div className="text-[10px] sm:text-sm font-bold text-zinc-600">/ 100</div>
+                                        </div>
+                                    </div>
+                                    <div className="p-5 sm:p-6 bg-white/[0.03] rounded-3xl border border-white/5 backdrop-blur-sm flex flex-col justify-center h-[120px]">
+                                        <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Release</div>
+                                        <div className="text-2xl sm:text-3xl font-bold text-white tracking-tight truncate">
+                                            {releaseSummaryLabel}
+                                        </div>
+                                        <div className="mt-1 text-[10px] font-black uppercase tracking-widest text-zinc-600">
+                                            {releaseTiming.releaseWeek ? `Week ${releaseTiming.releaseWeek}` : 'History'}
+                                        </div>
+                                    </div>
+                                    <div className="p-5 sm:p-6 bg-white/[0.03] rounded-3xl border border-white/5 backdrop-blur-sm flex flex-col justify-center h-[120px]">
+                                        <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Timeline</div>
+                                        <div className="text-2xl sm:text-3xl font-bold text-white tracking-tight truncate">
+                                            {timelineValue}
+                                        </div>
+                                        <div className="mt-1 truncate text-[10px] font-black uppercase tracking-widest text-zinc-600">
+                                            {timelineCaption}
                                         </div>
                                     </div>
 
@@ -643,6 +676,17 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                                     {budget ? (((projectRevenue - budget) / budget) * 100).toFixed(0) : 0}%
                                                 </div>
                                             </div>
+                                            <div className="p-5 sm:p-6 bg-white/[0.03] rounded-3xl border border-white/5 backdrop-blur-sm flex flex-col justify-center h-[120px]">
+                                                <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Sources</div>
+                                                <div className="flex items-center justify-between gap-3 text-xs font-bold text-zinc-300">
+                                                    <span>Theaters</span>
+                                                    <span className="font-mono text-white">{formatMoney(actualGross)}</span>
+                                                </div>
+                                                <div className="mt-1 flex items-center justify-between gap-3 text-xs font-bold text-zinc-300">
+                                                    <span>Streaming</span>
+                                                    <span className="font-mono text-white">{formatMoney(streamingRevenue)}</span>
+                                                </div>
+                                            </div>
                                         </>
                                     )}
 
@@ -672,7 +716,7 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                                 {/* Stats Grid */}
                                                 <div className="grid grid-cols-2 sm:flex sm:flex-wrap justify-start lg:justify-end gap-y-4 gap-x-4 sm:gap-16 w-full lg:w-auto border-t border-white/5 pt-4 sm:pt-8 lg:border-0 lg:pt-0">
                                                     <div className="flex flex-col items-start lg:items-end">
-                                                        <div className="text-[7px] sm:text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-0.5 sm:mb-2">Release Date</div>
+                                                        <div className="text-[7px] sm:text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-0.5 sm:mb-2">Planned Week</div>
                                                         <div className="text-sm sm:text-3xl font-bold text-white tracking-tighter">Week {project.projectDetails?.releaseDate || project.releaseDate || 'TBD'}</div>
                                                     </div>
                                                     
@@ -877,13 +921,13 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                         <div className="flex-1 flex flex-col gap-1">
                                             <button 
                                                 onClick={() => onMakeSequel(project)}
-                                                disabled={hasSequel || getWeeksSinceRelease(player.currentWeek, (project.releaseWeek || project.projectDetails?.releaseDate || 0)) < 4}
+                                                disabled={!sequelEligibility.eligible}
                                                 className="w-full py-5 bg-amber-500 hover:bg-amber-400 text-black font-black uppercase tracking-[0.2em] rounded-2xl transition-all shadow-xl hover:shadow-amber-500/20 flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50 disabled:grayscale disabled:cursor-not-allowed"
                                             >
-                                                <Sparkles size={20} /> {hasSequel ? 'Sequel in Dev' : 'Develop Sequel'}
+                                                <Sparkles size={20} /> {sequelEligibility.reason === 'ALREADY_IN_DEVELOPMENT' ? 'Sequel in Dev' : 'Develop Sequel'}
                                             </button>
-                                            {!hasSequel && getWeeksSinceRelease(player.currentWeek, (project.releaseWeek || project.projectDetails?.releaseDate || 0)) < 4 && (
-                                                <p className="text-[8px] text-amber-500/60 font-black uppercase tracking-widest text-center">Available in {4 - getWeeksSinceRelease(player.currentWeek, (project.releaseWeek || project.projectDetails?.releaseDate || 0))} weeks</p>
+                                            {!sequelEligibility.eligible && (
+                                                <p className="text-[8px] text-amber-500/60 font-black uppercase tracking-widest text-center">{sequelEligibility.message}</p>
                                             )}
                                         </div>
                                     )}
@@ -891,13 +935,13 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                         <div className="flex-1 flex flex-col gap-1">
                                             <button 
                                                 onClick={() => onMakeSpinoff(project)}
-                                                disabled={hasSpinoff || getWeeksSinceRelease(player.currentWeek, (project.releaseWeek || project.projectDetails?.releaseDate || 0)) < 4}
+                                                disabled={!spinoffEligibility.eligible}
                                                 className="w-full py-5 bg-white/5 hover:bg-white/10 text-white font-black uppercase tracking-[0.2em] rounded-2xl transition-all border border-white/10 flex items-center justify-center gap-3 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
                                             >
-                                                <Layers size={20} /> {hasSpinoff ? 'Spin-off in Dev' : 'Develop Spin-off'}
+                                                <Layers size={20} /> {spinoffEligibility.reason === 'ALREADY_IN_DEVELOPMENT' ? 'Spin-off in Dev' : 'Develop Spin-off'}
                                             </button>
-                                            {!hasSpinoff && getWeeksSinceRelease(player.currentWeek, (project.releaseWeek || project.projectDetails?.releaseDate || 0)) < 4 && (
-                                                <p className="text-[8px] text-zinc-600 font-black uppercase tracking-widest text-center">Available in {4 - getWeeksSinceRelease(player.currentWeek, (project.releaseWeek || project.projectDetails?.releaseDate || 0))} weeks</p>
+                                            {!spinoffEligibility.eligible && (
+                                                <p className="text-[8px] text-zinc-600 font-black uppercase tracking-widest text-center">{spinoffEligibility.message}</p>
                                             )}
                                         </div>
                                     )}
@@ -947,6 +991,22 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                         </div>
                     </div>
                 </div>
+                {isRenamingTitle && (
+                    <WorkingTitleDialog
+                        mode="RENAME"
+                        eyebrow="Project Details"
+                        title="Edit Working Title"
+                        description="Update the title everywhere this production appears."
+                        initialTitle={displayTitle}
+                        helperText="The working title remains editable until filming begins."
+                        infoText="Once production starts, the title locks to keep news, cast records, releases, and franchise history consistent."
+                        onClose={() => setIsRenamingTitle(false)}
+                        onConfirm={(title) => {
+                            onRenameProject?.(title);
+                            setIsRenamingTitle(false);
+                        }}
+                    />
+                )}
             </motion.div>
         </div>
     );

@@ -1,5 +1,5 @@
 
-import { GameLanguage, Player, NewsItem, NewsCategory, ActiveRelease, Commitment, ProjectType, BudgetTier } from '../types';
+import { GameLanguage, Player, NewsItem, NewsCategory, ActiveRelease, Commitment, ProjectType, BudgetTier, RightsDealType } from '../types';
 import { NPC_DATABASE } from './npcLogic';
 import { STUDIO_CATALOG } from './studioLogic';
 import { AWARD_GOSSIP_TEMPLATES, SNUB_TEMPLATES } from './awardLogic'; // Import templates
@@ -29,7 +29,8 @@ const INDUSTRY_TEMPLATES = [
     "Private equity money continues to reshape independent film financing.",
     "Prestige distributors are paying more for breakout festival titles.",
     "Global streamers are chasing regional hits with crossover potential.",
-    "Merchandising revenue is becoming a deciding factor in sequel greenlights."
+    "Merchandising revenue is becoming a deciding factor in sequel greenlights.",
+    "Mystery projects are drawing renewed buyer interest after a run of clue-driven breakouts."
 ];
 
 const NPC_HEADLINES = [
@@ -669,6 +670,31 @@ export const generateFanBacklashNews = (title: string, week: number, year: numbe
     subtext: usePortuguese(language) ? "A internet não gostou das notícias sobre recast." : "The internet is not happy about the recasting news.",
     category: 'TOP_STORY', week, year, impactLevel: 'HIGH'
 });
+
+export const generateRightsAcquisitionNews = (
+    studioName: string,
+    title: string,
+    dealType: RightsDealType,
+    week: number,
+    year: number,
+): NewsItem => {
+    const dealLabel = dealType === 'OPTION'
+        ? 'screen option'
+        : dealType === 'LICENSE'
+            ? 'limited screen license'
+            : dealType === 'CATALOG_PURCHASE'
+                ? 'catalog acquisition'
+                : 'permanent rights buyout';
+    return {
+        id: `news_rights_${title.toLowerCase().replace(/[^a-z0-9]+/g, '_')}_${week}`,
+        headline: `${studioName} secures ${title} in a ${dealLabel}.`,
+        subtext: 'Industry rivals are already watching what the studio develops from its newest IP.',
+        category: 'INDUSTRY',
+        week,
+        year,
+        impactLevel: dealType === 'BUYOUT' || dealType === 'CATALOG_PURCHASE' ? 'HIGH' : 'MEDIUM',
+    };
+};
 
 // NEW EXPORTS FOR TV
 export const generateRenewalNews = (title: string, season: number, week: number, year: number, language: GameLanguage = 'en'): NewsItem => ({

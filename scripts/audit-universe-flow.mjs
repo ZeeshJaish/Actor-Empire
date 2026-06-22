@@ -11,6 +11,7 @@ const files = {
   productionHouse: read('views/lifestyle/business/ProductionHouseGame.tsx'),
   releaseWizard: read('views/lifestyle/business/ReleaseWizard.tsx'),
   universeLogic: read('services/universeLogic.ts'),
+  sequelFlow: read('services/sequelFlow.ts'),
   gameLoop: read('services/gameLoop.ts'),
   homePage: read('views/HomePage.tsx'),
   types: read('types.ts'),
@@ -123,7 +124,7 @@ check('greenlight: final project stores linked known cast count', has('greenligh
 
 check('production house: sequel script stores franchise id', has('productionHouse', 'franchiseId: project.franchiseId || project.id'));
 check('production house: sequel script stores returning talent', has('productionHouse', 'returningTalent,'));
-check('production house: sequel script marks sequel source material', has('productionHouse', "sourceMaterial: isSpinoff ? 'SPINOFF' : 'SEQUEL'"));
+check('production house: sequel script marks sequel source material', has('sequelFlow', "sourceMaterial: mode === 'SPINOFF' ? 'SPINOFF' : 'SEQUEL'"));
 check('production house: sequel concept pre-fills cast', has('productionHouse', 'newConcept.castList = details.castList.map'));
 check('production house: sequel prefill preserves character id', has('productionHouse', 'characterId: c.characterId'));
 check('production house: sequel prefill preserves source universe id', has('productionHouse', 'sourceUniverseId: c.sourceUniverseId'));

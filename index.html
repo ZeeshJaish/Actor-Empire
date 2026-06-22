@@ -48,19 +48,67 @@
         }
         /* Android WebView can corrupt layers when many blurred panels are stacked.
            Keep the look, but use cheaper solid glass on touch devices. */
-        @media (pointer: coarse) {
-            .glass-card,
-            [class*="backdrop-blur"] {
-                backdrop-filter: none !important;
-                -webkit-backdrop-filter: none !important;
+      @media (pointer: coarse) {
+        .glass-card,
+        [class*="backdrop-blur"] {
+          backdrop-filter: none !important;
+          -webkit-backdrop-filter: none !important;
             }
             .glass-card {
                 background: rgba(20, 20, 23, 0.94);
             }
-            [class*="blur-"] {
-                filter: none !important;
-            }
+        [class*="blur-"] {
+          filter: none !important;
         }
+      }
+
+      .smooth-mode .glass-card,
+      .smooth-mode [class*="backdrop-blur"] {
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+      }
+
+      .smooth-mode .glass-card {
+        background: rgba(20, 20, 23, 0.96);
+      }
+
+      .smooth-mode [class*="blur-"] {
+        filter: none !important;
+      }
+
+      .smooth-mode *,
+      .smooth-mode *::before,
+      .smooth-mode *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+
+      .genre-lab-grid {
+        contain: layout paint;
+        transform: translateZ(0);
+      }
+
+      .genre-lab-card {
+        backface-visibility: hidden;
+        -webkit-backface-visibility: hidden;
+        transform: translateZ(0);
+      }
+
+      .smooth-mode .genre-lab-card {
+        background: rgba(24, 24, 27, 0.98) !important;
+        box-shadow: none !important;
+        transform: none !important;
+      }
+
+      .smooth-mode .genre-lab-card:active {
+        transform: none !important;
+      }
+
+      .smooth-mode .genre-lab-progress {
+        transition: none !important;
+      }
         .pattern-diagonal-lines {
             background-image: repeating-linear-gradient(
                 45deg,

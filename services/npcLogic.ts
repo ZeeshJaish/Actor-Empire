@@ -180,7 +180,8 @@ const inferGenresFromKnownFor = (knownFor: string, category: ModTalentRow['categ
     if (/romance|romantic|love|period/.test(source)) genres.push('ROMANCE');
     if (/adventure|travel|epic|fantasy/.test(source)) genres.push('ADVENTURE');
     if (/drama|prestige|emotional|historical|indie|auteur/.test(source)) genres.push('DRAMA');
-    if (/mystery|psychological|noir/.test(source)) genres.push('THRILLER');
+    if (/psychological|noir/.test(source)) genres.push('THRILLER');
+    if (/mystery|detective|whodunit|case|investigation/.test(source)) genres.push('MYSTERY');
     if (category === 'director' && genres.length === 0) genres.push('DRAMA');
     return [...new Set(genres.length ? genres : ['DRAMA', 'COMEDY'])] as Genre[];
 };

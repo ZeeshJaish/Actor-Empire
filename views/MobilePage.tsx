@@ -249,7 +249,12 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
                     <ImdbApp player={props.player} onBack={() => setAppMode('HOME')} />
                 )}
                 {appMode === 'FORBES' && (
-                    <ForbesApp player={props.player} onBack={() => setAppMode('HOME')} />
+                    <ForbesApp
+                        player={props.player}
+                        onBack={() => setAppMode('HOME')}
+                        onUpdatePlayer={handleUpdatePlayer}
+                        onOpenStocks={() => setAppMode('STOCKS')}
+                    />
                 )}
                 {appMode === 'STOCKS' && (
                     <StocksApp player={props.player} onBack={() => setAppMode('HOME')} onTrade={props.onTradeStock!} />
@@ -300,15 +305,15 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
 
 // Helper Component for App Icon
 const AppIcon = ({ icon, color, label, onClick, badge, customContent, customBg }: any) => (
-    <div className="flex flex-col items-center gap-1 group cursor-pointer" onClick={onClick}>
+    <div className="relative flex w-16 flex-col items-center gap-1 group cursor-pointer" onClick={onClick}>
         <div className={`w-14 h-14 ${customBg || color} rounded-2xl flex items-center justify-center text-white shadow-lg group-active:scale-95 transition-transform relative overflow-hidden`}>
             {customContent ? customContent : icon}
-            {badge > 0 && (
-                <div className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full border-2 border-zinc-900 flex items-center justify-center text-[10px] font-bold">
-                    {badge}
-                </div>
-            )}
         </div>
+        {badge > 0 && (
+            <div className="absolute -top-1 right-1 z-20 min-w-5 h-5 px-1 bg-red-500 rounded-full border-2 border-zinc-900 flex items-center justify-center text-[10px] leading-none font-black text-white shadow-lg">
+                {badge > 9 ? '9+' : badge}
+            </div>
+        )}
         <span className="text-[10px] text-white font-medium drop-shadow-md">{label}</span>
     </div>
 );

@@ -5,12 +5,13 @@ import {
     ProjectDetails, ReleaseScale, OutcomeTier, ProjectMemoryTag, FuturePotential, 
     ProjectSubtype, SeriesStatus, ReleaseStrategy, AuditionOpportunity, 
     ProjectHiddenStats, ActiveRelease, NegotiationData, CastMember, Review, 
-    NPCActor, StudioId, PressInteraction, Genre, IndustryProject, WriterStats, DirectorStats, TargetAudience, ProjectFormat
+    NPCActor, StudioId, PressInteraction, Genre, IndustryProject, WriterStats, DirectorStats, TargetAudience, ProjectFormat, PlatformId
 } from '../types';
 import { selectStudioForProject } from './studioLogic';
 import { NPC_DATABASE } from './npcLogic';
-import { generateFamousMovieOpportunity, generateFamousSeriesOpportunity } from './famousMovieLogic';
+import { createFamousOpportunity, generateFamousMovieOpportunity, generateFamousSeriesOpportunity, getNextFamousMovie } from './famousMovieLogic';
 import { ALL_GENRES } from './genreCatalog';
+import { getAbsoluteWeek } from './legacyLogic';
 
 // --- CONSTANTS ---
 
@@ -30,7 +31,8 @@ export const GENRE_SYNERGIES: Record<Genre, Genre[]> = {
     DRAMA: ['ROMANCE', 'THRILLER'],
     COMEDY: ['ROMANCE'],
     ROMANCE: ['DRAMA', 'COMEDY'],
-    THRILLER: ['HORROR', 'DRAMA', 'ACTION'],
+    THRILLER: ['HORROR', 'DRAMA', 'ACTION', 'MYSTERY'],
+    MYSTERY: ['THRILLER', 'CRIME', 'DRAMA'],
     SCI_FI: ['ADVENTURE', 'ACTION', 'SUPERHERO'],
     HORROR: ['THRILLER', 'SCI_FI'],
     ADVENTURE: ['ACTION', 'SCI_FI', 'SUPERHERO'],
@@ -40,13 +42,13 @@ export const GENRE_SYNERGIES: Record<Genre, Genre[]> = {
     SPORTS: ['DRAMA', 'ACTION'],
     ANIMATION: ['ADVENTURE', 'COMEDY', 'FANTASY'],
     FANTASY: ['ADVENTURE', 'SCI_FI', 'ANIMATION'],
-    CRIME: ['THRILLER', 'DRAMA'],
+    CRIME: ['THRILLER', 'MYSTERY', 'DRAMA'],
     DOCUMENTARY: ['BIOPIC', 'DRAMA']
 };
 
 const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
 const SPECTACLE_GENRES = new Set<Genre>(['ACTION', 'SCI_FI', 'SUPERHERO', 'ADVENTURE', 'FANTASY', 'ANIMATION']);
-const INTIMATE_GENRES = new Set<Genre>(['DRAMA', 'ROMANCE', 'THRILLER', 'COMEDY', 'HORROR', 'BIOPIC', 'CRIME', 'DOCUMENTARY', 'MUSICAL', 'SPORTS']);
+const INTIMATE_GENRES = new Set<Genre>(['DRAMA', 'ROMANCE', 'THRILLER', 'MYSTERY', 'COMEDY', 'HORROR', 'BIOPIC', 'CRIME', 'DOCUMENTARY', 'MUSICAL', 'SPORTS']);
 
 export const getRecommendedCastDepth = (genre: Genre, budgetTier: BudgetTier): number => {
     if (SPECTACLE_GENRES.has(genre)) {
@@ -171,6 +173,235 @@ export const getActorTalent = (skills: ActorSkills): number => {
     ].map(v => isNaN(v) ? 0 : v);
     const talent = actorValues.reduce((sum, val) => sum + val, 0) / actorValues.length;
     return isNaN(talent) ? 0 : talent;
+};
+
+const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value));
+
+export type CastingDirectorStyle = 'BALANCED' | 'CRAFT_FIRST' | 'STAR_DRIVEN' | 'GENRE_PURIST' | 'RISK_TAKER';
+
+export interface CastingApplicationEvaluation {
+    baseChance: number;
+    finalChance: number;
+    plausible: boolean;
+    fitScore: number;
+    fitMargin: number;
+    momentumBonus: number;
+    directorStyle: CastingDirectorStyle;
+}
+
+export interface CastingOpportunityAccess {
+    careerStrength: number;
+    famousProjectChance: number;
+    midBudgetChance: number;
+    highBudgetChance: number;
+    leadRoleChance: number;
+    supportingRoleChance: number;
+}
+
+export type BreakthroughInviteKind = 'FRESH_FACE' | 'BLOCKBUSTER_EXTRA';
+
+export interface BreakthroughInviteProfile {
+    eligible: boolean;
+    weeklyChance: number;
+    blockbusterExtraChance: number;
+    talent: number;
+    bestGenre: Genre;
+    bestGenreScore: number;
+    craftGap: number;
+}
+
+export interface BreakthroughAuditionInvite {
+    kind: BreakthroughInviteKind;
+    opportunity: AuditionOpportunity;
+    sender: string;
+    subject: string;
+    text: string;
+}
+
+export const getCastingDirectorStyle = (directorName: string = ''): CastingDirectorStyle => {
+    const styles: CastingDirectorStyle[] = ['BALANCED', 'CRAFT_FIRST', 'STAR_DRIVEN', 'GENRE_PURIST', 'RISK_TAKER'];
+    const hash = [...directorName].reduce((total, char) => ((total * 31) + char.charCodeAt(0)) >>> 0, 7);
+    return styles[hash % styles.length];
+};
+
+export const getCastingOpportunityAccess = (player: Player): CastingOpportunityAccess => {
+    const fame = clamp(player.stats.fame || 0, 0, 100);
+    const reputation = clamp(player.stats.reputation || 0, 0, 100);
+    const experience = clamp(player.stats.experience || 0, 0, 100);
+    const talent = clamp(getActorTalent(player.stats.skills), 0, 100);
+    const careerStrength = (fame * 0.42) + (reputation * 0.18) + (talent * 0.25) + (experience * 0.15);
+
+    return {
+        careerStrength,
+        famousProjectChance: clamp(0.06 + (careerStrength * 0.0018), 0.06, 0.22),
+        midBudgetChance: clamp(0.12 + (careerStrength * 0.006), 0.12, 0.68),
+        highBudgetChance: clamp(0.015 + (careerStrength * 0.0028), 0.015, 0.30),
+        leadRoleChance: clamp(0.02 + (careerStrength * 0.0038), 0.02, 0.40),
+        supportingRoleChance: clamp(0.10 + (careerStrength * 0.0035), 0.10, 0.38)
+    };
+};
+
+export const getBreakthroughInviteProfile = (player: Player): BreakthroughInviteProfile => {
+    const fame = clamp(player.stats.fame || 0, 0, 100);
+    const reputation = clamp(player.stats.reputation || 0, 0, 100);
+    const experience = clamp(player.stats.experience || 0, 0, 100);
+    const talent = clamp(getActorTalent(player.stats.skills), 0, 100);
+    const genreEntries = Object.entries(player.stats.genreXP || {}) as [Genre, number][];
+    const [bestGenre, bestGenreScore] = genreEntries.reduce<[Genre, number]>(
+        (best, entry) => entry[1] > best[1] ? entry : best,
+        ['DRAMA', 0]
+    );
+    const recentProjectQuality = (player.pastProjects || [])
+        .slice(-3)
+        .reduce((best, project) => Math.max(best, project.projectQuality || 0, (project.imdbRating || project.rating || 0) * 10), 0);
+    const craftSignal = (talent * 0.55) + (bestGenreScore * 0.25) + (experience * 0.20);
+    const craftGap = craftSignal - fame;
+    const hasCareerEvidence = experience >= 8 || bestGenreScore >= 25 || reputation >= 15 || recentProjectQuality >= 68;
+    const eligible = fame < 55 && talent >= 42 && craftSignal >= 38 && craftGap >= 12 && hasCareerEvidence;
+    const qualityBoost = recentProjectQuality >= 78 ? 0.012 : recentProjectQuality >= 68 ? 0.006 : 0;
+    const weeklyChance = eligible
+        ? clamp(0.012 + (Math.max(0, craftGap - 12) * 0.001) + (reputation * 0.00025) + qualityBoost, 0.012, 0.08)
+        : 0;
+    const blockbusterExtraChance = eligible
+        ? clamp(0.08 + (talent * 0.0012) + (bestGenreScore * 0.001) + (recentProjectQuality >= 78 ? 0.04 : 0), 0.08, 0.26)
+        : 0;
+
+    return {
+        eligible,
+        weeklyChance,
+        blockbusterExtraChance,
+        talent,
+        bestGenre,
+        bestGenreScore,
+        craftGap
+    };
+};
+
+export const generateBreakthroughAuditionInvite = (
+    player: Player,
+    usedTitles: string[],
+    random: () => number = Math.random
+): BreakthroughAuditionInvite | null => {
+    const profile = getBreakthroughInviteProfile(player);
+    if (!profile.eligible) return null;
+
+    const currentAbsoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
+    const lastInviteWeek = Number(player.flags?.lastBreakthroughInviteAbsoluteWeek ?? -999);
+    if (currentAbsoluteWeek - lastInviteWeek < 12) return null;
+
+    const hasPendingInvite = (player.inbox || []).some(message =>
+        message.type === 'OFFER_AUDITION' || message.id.startsWith('breakthrough_invite_')
+    );
+    if (hasPendingInvite) return null;
+
+    const hasActiveBlockbuster = (player.commitments || []).some(commitment =>
+        commitment.type === 'ACTING_GIG'
+        && commitment.projectDetails?.budgetTier === 'HIGH'
+        && ['AUDITION', 'PRE_PRODUCTION', 'PRODUCTION'].includes(commitment.projectPhase || '')
+    );
+    if (hasActiveBlockbuster) return null;
+
+    if (random() > profile.weeklyChance) return null;
+
+    if (random() < profile.blockbusterExtraChance) {
+        const famousProject = getNextFamousMovie(player);
+        if (famousProject && !usedTitles.includes(famousProject.title)) {
+            const roleType: RoleType = random() < 0.65 ? 'SUPPORTING' : 'ENSEMBLE';
+            const opportunity = createFamousOpportunity(famousProject, roleType, 'DIRECT');
+            opportunity.source = 'DIRECTOR';
+            opportunity.config = {
+                ...opportunity.config,
+                label: roleType === 'SUPPORTING' ? 'Breakout Supporting Audition' : 'Breakout Ensemble Audition'
+            };
+            opportunity.estimatedIncome = Math.floor(opportunity.estimatedIncome * 0.65);
+
+            return {
+                kind: 'BLOCKBUSTER_EXTRA',
+                opportunity,
+                sender: `${famousProject.title} Casting`,
+                subject: `Fresh Face Audition: ${famousProject.title}`,
+                text: `The casting team is opening an additional ${roleType.toLowerCase()} role for a fresh face. Your recent work put you on their list, but you still need to win the room.`
+            };
+        }
+    }
+
+    const roleType: RoleType = random() < 0.65 ? 'SUPPORTING' : 'ENSEMBLE';
+    const tier: BudgetTier = random() < 0.30 ? 'MID' : 'LOW';
+    const opportunity = generateAudition(roleType, tier, usedTitles, player, 'DIRECTOR');
+    opportunity.config = {
+        ...opportunity.config,
+        label: 'Fresh Face Audition'
+    };
+
+    return {
+        kind: 'FRESH_FACE',
+        opportunity,
+        sender: 'Studio Casting',
+        subject: `Fresh Face Audition: ${opportunity.projectName}`,
+        text: `A casting director noticed your craft before your fame caught up. They want to see you for a ${roleType.toLowerCase()} role, but the part is still yours to earn.`
+    };
+};
+
+export const evaluateCastingApplication = (
+    player: Player,
+    opportunity: AuditionOpportunity,
+    momentum: number = 0
+): CastingApplicationEvaluation => {
+    const project = opportunity.project;
+    const talent = clamp(getActorTalent(player.stats.skills), 0, 100);
+    const genreFit = clamp(player.stats.genreXP[project.genre] || 0, 0, 100);
+    const fame = clamp(player.stats.fame || 0, 0, 100);
+    const reputation = clamp(player.stats.reputation || 0, 0, 100);
+    const experience = clamp(player.stats.experience || 0, 0, 100);
+    const directorStyle = getCastingDirectorStyle(project.directorName);
+
+    let fitScore = (talent * 0.30) + (genreFit * 0.30) + (fame * 0.20) + (reputation * 0.12) + (experience * 0.08);
+
+    if (directorStyle === 'CRAFT_FIRST') fitScore += (talent - 50) * 0.10;
+    if (directorStyle === 'STAR_DRIVEN') fitScore += (fame - 50) * 0.12;
+    if (directorStyle === 'GENRE_PURIST') fitScore += (genreFit - 50) * 0.12;
+    if (directorStyle === 'RISK_TAKER') {
+        const underdogCraft = ((talent + genreFit) / 2) - fame;
+        fitScore += clamp(underdogCraft * 0.10, -3, 6);
+    }
+
+    const sourceBonus = opportunity.source === 'DIRECT'
+        ? 18
+        : opportunity.source === 'DIRECTOR'
+            ? 15
+            : opportunity.source === 'AGENT'
+                ? 5
+                : 0;
+    fitScore += sourceBonus;
+
+    const roleDifficulty = opportunity.config?.difficulty ?? ROLE_DEFINITIONS[opportunity.roleType].difficulty;
+    const budgetPressure = project.budgetTier === 'HIGH' ? 12 : project.budgetTier === 'MID' ? 6 : 0;
+    const famousPressure = project.isFamous ? 14 : 0;
+    const castingPressure = ((project.hiddenStats?.castingStrength || 50) - 50) * 0.16;
+    const directorPressure = ((project.hiddenStats?.directorQuality || 50) - 50) * 0.08;
+    const requiredScore = (roleDifficulty * 0.50) + budgetPressure + famousPressure + castingPressure + directorPressure;
+    const fitMargin = fitScore - requiredScore;
+
+    // Smooth logistic curve: no hard locks, but extreme long shots stay genuinely rare.
+    let baseChance = 0.02 + (0.93 / (1 + Math.exp(-fitMargin / 15)));
+    if (directorStyle === 'RISK_TAKER' && fitMargin < -20) {
+        baseChance = Math.max(baseChance, 0.07);
+    }
+    baseChance = clamp(baseChance, 0.02, 0.95);
+
+    const plausible = baseChance >= 0.12 && fitMargin >= -34;
+    const momentumBonus = plausible ? clamp(Math.floor(momentum) * 0.04, 0, 0.12) : 0;
+    const finalChance = clamp(baseChance + momentumBonus, 0.02, 0.95);
+
+    return {
+        baseChance,
+        finalChance,
+        plausible,
+        fitScore,
+        fitMargin,
+        momentumBonus,
+        directorStyle
+    };
 };
 
 export const getWriterTalent = (writerStats: WriterStats): number => {
@@ -311,6 +542,88 @@ export const checkAuditionPass = (player: Player, commitment: Commitment): { pas
     if (prep < 50) return { passed: false, reason: "You seemed unprepared." };
     
     return { passed: false, reason: "Stronger candidates available." };
+};
+
+export const getRoleRejectionFeedback = (
+    player: Player,
+    opportunity: Partial<AuditionOpportunity> | ProjectDetails | undefined,
+    stage: 'APPLICATION' | 'AUDITION',
+    rivalWinner?: NPCActor
+): { summary: string; reasons: string[]; hint: string } => {
+    const project = 'project' in (opportunity || {}) ? (opportunity as AuditionOpportunity).project : opportunity as ProjectDetails | undefined;
+    const roleType = 'roleType' in (opportunity || {}) ? (opportunity as AuditionOpportunity).roleType : undefined;
+    const role = roleType ? ROLE_DEFINITIONS[roleType] : undefined;
+    const genre = project?.genre;
+    const genreScore = genre ? (player.stats.genreXP[genre] || 0) : 0;
+    const fame = player.stats.fame || 0;
+    const talent = getActorTalent(player.stats.skills);
+    const reasons: string[] = [];
+
+    if (rivalWinner) {
+        reasons.push(`Competition: Casting leaned toward ${rivalWinner.name}, who had stronger market pull for this one.`);
+    }
+
+    if (project?.isFamous && fame < 45) {
+        reasons.push('Reputation gap: Your profile is growing, but this was a legacy-level project looking for a bigger name.');
+    } else if (role && role.difficulty >= 60 && fame < 35) {
+        reasons.push('Reputation gap: Lead roles are starting to notice you, but your fame is still below their comfort zone.');
+    } else if (fame < 18 && stage === 'APPLICATION') {
+        reasons.push('Visibility gap: Casting wanted someone with more public heat before calling them in.');
+    }
+
+    if (genre && genreScore < 35) {
+        reasons.push(`Genre fit: ${genre.replace(/_/g, ' ')} is not a trusted lane for you yet.`);
+    } else if (genre && genreScore >= 70 && stage === 'AUDITION') {
+        reasons.push(`Genre fit helped: Your ${genre.replace(/_/g, ' ')} reputation kept you in the conversation.`);
+    }
+
+    if (stage === 'AUDITION') {
+        reasons.push(talent < 45
+            ? 'Room read: The audition needed sharper craft and presence.'
+            : 'Room read: The audition was competitive, but another package felt safer to the studio.');
+    }
+
+    if (reasons.length === 0) {
+        reasons.push(stage === 'APPLICATION'
+            ? 'Shortlist pressure: The studio only called in a small group this week.'
+            : 'Casting pressure: The room liked parts of your profile, but not enough to close the deal.');
+    }
+
+    const hint = genre && genreScore < 55
+        ? `Build ${genre.replace(/_/g, ' ')} reputation with smaller work, then chase bigger roles in that lane.`
+        : fame < 35
+            ? 'Stack smaller roles, social reach, and press momentum to make bigger studios feel safer.'
+            : 'Keep audition prep high and stay active; close calls can turn into offers as your recent work improves.';
+
+    return {
+        summary: stage === 'APPLICATION'
+            ? 'The team decided not to move forward before callbacks.'
+            : 'The room liked parts of your read, but the role went another way.',
+        reasons: reasons.slice(0, 2),
+        hint
+    };
+};
+
+const cleanCastingFeedbackReason = (reason: string): string => reason.replace(/^[^:]+:\s*/, '').trim();
+
+export const formatRoleRejectionReview = (
+    projectName: string,
+    stage: 'APPLICATION' | 'AUDITION',
+    feedback: { summary: string; reasons: string[]; hint: string }
+): string => {
+    const primaryReason = cleanCastingFeedbackReason(feedback.reasons[0] || 'Casting wanted a safer fit for this project.');
+    const secondaryReason = feedback.reasons[1] ? cleanCastingFeedbackReason(feedback.reasons[1]) : '';
+    const intro = stage === 'APPLICATION'
+        ? `Thanks for applying for ${projectName}.`
+        : `Thanks for coming in for ${projectName}.`;
+
+    return [
+        intro,
+        feedback.summary,
+        `Director note:\n${primaryReason}`,
+        secondaryReason ? `Casting note:\n${secondaryReason}` : '',
+        `What to work on:\n${feedback.hint}`
+    ].filter(Boolean).join('\n\n');
 };
 
 export const calculateProjectPay = (roleType: RoleType, budgetTier: BudgetTier, type: ProjectType): number => {
@@ -466,7 +779,7 @@ export const generateAudition = (
     tier: BudgetTier, 
     usedTitles: string[], 
     player: Player, 
-    source: 'CASTING_APP' | 'AGENT' | 'DIRECT',
+    source: 'CASTING_APP' | 'AGENT' | 'DIRECTOR' | 'DIRECT',
     forcedType?: ProjectType
 ): AuditionOpportunity => {
     const type: ProjectType = forcedType || (Math.random() > 0.4 ? 'MOVIE' : 'SERIES');
@@ -497,6 +810,7 @@ export const generateAudition = (
 export const generateAuditions = (player: Player, usedTitles: string[]): AuditionOpportunity[] => {
     const count = 3 + Math.floor(Math.random() * 3);
     const opps: AuditionOpportunity[] = [];
+    const access = getCastingOpportunityAccess(player);
     
     for(let i=0; i<count; i++) {
         // Director Favor (Direct Bookings)
@@ -515,11 +829,8 @@ export const generateAuditions = (player: Player, usedTitles: string[]): Auditio
             }
         }
 
-        const fameAccessBonus = player.stats.fame >= 55 ? 0.12 : player.stats.fame >= 30 ? 0.08 : player.stats.fame >= 15 ? 0.04 : 0;
-        const reputationAccessBonus = player.stats.reputation >= 65 ? 0.04 : player.stats.reputation >= 40 ? 0.02 : 0;
-        const famousChance = Math.min(0.22, 0.10 + fameAccessBonus + reputationAccessBonus);
         const famousRoll = Math.random();
-        if (famousRoll < famousChance) {
+        if (famousRoll < access.famousProjectChance) {
             const famousOpp = Math.random() > 0.5 
                 ? generateFamousMovieOpportunity(player) 
                 : generateFamousSeriesOpportunity(player);
@@ -531,16 +842,15 @@ export const generateAuditions = (player: Player, usedTitles: string[]): Auditio
         }
 
         let tier: BudgetTier = 'LOW';
-        if (player.stats.fame > 20 && Math.random() > 0.6) tier = 'MID';
-        if (player.stats.fame > 60 && Math.random() > 0.7) tier = 'HIGH';
+        const tierRoll = Math.random();
+        if (tierRoll < access.highBudgetChance) tier = 'HIGH';
+        else if (tierRoll < access.highBudgetChance + access.midBudgetChance) tier = 'MID';
         
         let role: RoleType = 'MINOR';
         const r = Math.random();
-        if (r > 0.9) role = 'SUPPORTING';
-        else if (r > 0.6) role = 'CAMEO';
-        else role = 'MINOR';
-        
-        if (player.stats.fame > 30 && r > 0.8) role = 'LEAD';
+        if (r < access.leadRoleChance) role = 'LEAD';
+        else if (r < access.leadRoleChance + access.supportingRoleChance) role = 'SUPPORTING';
+        else if (r < access.leadRoleChance + access.supportingRoleChance + 0.28) role = 'CAMEO';
 
         opps.push(generateAudition(role, tier, usedTitles, player, 'CASTING_APP'));
     }
@@ -681,6 +991,10 @@ export const generateReviews = (
             `${subjectName ? `${subjectName}'s story` : 'The subject'} is handled with access, tension, and real curiosity.`,
             'The documentary earns its urgency by asking hard questions instead of selling easy answers.',
         ],
+        MYSTERY: [
+            'The mystery pays off because the clues feel planted, not cheated.',
+            `A tightly wound mystery that lets ${playerName} play suspicion, restraint, and discovery.`,
+        ],
         ANIMATION: [
             'The animation has personality, not just polish.',
             `A visually warm animated film with a performance from ${playerName} that still registers through the craft.`,
@@ -699,6 +1013,7 @@ export const generateReviews = (
         BIOPIC: ['The performance is committed, though the biopic keeps smoothing out the messier truths.'],
         SPORTS: ['The sports drama is sincere, but too many beats feel familiar.'],
         DOCUMENTARY: ['The access is valuable, but the argument could be sharper.'],
+        MYSTERY: ['The clues are intriguing, but the final reveal lands softer than the setup.'],
         ANIMATION: ['The visual identity is strong, even when the story feels thin.'],
         CRIME: ['The crime mechanics work, but the characters needed more interior life.'],
         FANTASY: ['The world is imaginative, but the lore sometimes crowds out the drama.'],
@@ -708,6 +1023,7 @@ export const generateReviews = (
         BIOPIC: ['A surface-level biopic that mistakes makeup for insight.'],
         SPORTS: ['The sports scenes lack authenticity, and the drama never finds a second gear.'],
         DOCUMENTARY: ['The documentary has a subject, but not a point of view.'],
+        MYSTERY: ['A mystery with suspects, but no real sense of discovery.'],
         ANIMATION: ['The animation is busy, but the emotional design is missing.'],
         CRIME: ['A crime story with twists but no tension.'],
         FANTASY: ['The fantasy world is expensive, confusing, and strangely weightless.'],
@@ -783,7 +1099,7 @@ export const calculateIMDbRating = (commitment: Commitment): number => {
     baseRating += (perfDelta * perfWeight);
 
     if (['COMEDY', 'HORROR'].includes(genre)) baseRating -= 0.6; 
-    if (['DRAMA', 'THRILLER'].includes(genre)) baseRating += 0.3; 
+    if (['DRAMA', 'THRILLER', 'MYSTERY'].includes(genre)) baseRating += 0.3;
     if (['ACTION', 'SUPERHERO'].includes(genre) && details.budgetTier === 'LOW') baseRating -= 0.8; 
     if (genre === 'DOCUMENTARY') baseRating += (stats.scriptQuality || 50) > 72 ? 0.45 : 0.1;
     if (genre === 'BIOPIC') baseRating += details.subjectName ? 0.25 : -0.2;
@@ -836,6 +1152,7 @@ const GENRE_MULTIPLIERS: Record<Genre, number> = {
     'DRAMA': 0.6, 
     'ROMANCE': 0.7, 
     'THRILLER': 0.8,
+    'MYSTERY': 0.75,
     'COMEDY': 0.8, 
     'HORROR': 0.6, // Consistent but lower cap
     'MUSICAL': 0.75,
@@ -935,6 +1252,7 @@ export const calculateWeeklyBoxOffice = (
     // Genre tweaks for legs
     if (genre === 'HORROR') dropRate += 0.1; // Front-loaded
     if (genre === 'DRAMA' || genre === 'ROMANCE' || genre === 'BIOPIC' || genre === 'DOCUMENTARY') dropRate -= 0.05; // Long tail
+    if (genre === 'MYSTERY' || genre === 'CRIME') dropRate -= 0.03; // Good word of mouth for clue-driven stories
 
     // Good script and direction improve legs. Star-heavy weak movies drop faster after the opening.
     if (scriptQuality > 85) dropRate -= 0.05;
@@ -988,6 +1306,92 @@ export const getConsequences = (outcome: OutcomeTier, role: RoleType, perf: numb
 };
 
 // ... (calculateFuturePotential remains same) ...
+export interface SeriesRenewalContext {
+    budget: number;
+    rating: number;
+    role: RoleType;
+    genre: string;
+    totalViews?: number;
+    recentWeeklyViews?: number[];
+    streamingRevenue?: number;
+    productionPerformance?: number;
+    platformId?: PlatformId;
+}
+
+const PLATFORM_GENRE_FIT: Partial<Record<PlatformId, string[]>> = {
+    NETFLIX: ['THRILLER', 'MYSTERY', 'ACTION', 'COMEDY', 'ROMANCE', 'SCI_FI', 'CRIME'],
+    APPLE_TV: ['DRAMA', 'MYSTERY', 'INDIE', 'SCI_FI', 'DOCUMENTARY'],
+    DISNEY_PLUS: ['FANTASY', 'ACTION', 'SCI_FI', 'SUPERHERO', 'ADVENTURE', 'ANIMATION'],
+    HULU: ['DRAMA', 'COMEDY', 'ROMANCE', 'THRILLER', 'MYSTERY', 'CRIME'],
+    YOUTUBE: ['INDIE', 'HORROR', 'DOCUMENTARY', 'COMEDY']
+};
+
+const getSeriesViewScore = (totalViews: number): number => {
+    if (totalViews >= 100_000_000) return 34;
+    if (totalViews >= 60_000_000) return 30;
+    if (totalViews >= 30_000_000) return 24;
+    if (totalViews >= 15_000_000) return 18;
+    if (totalViews >= 6_000_000) return 10;
+    if (totalViews >= 2_000_000) return 5;
+    return 0;
+};
+
+export const calculateSeriesRenewalChance = ({
+    budget,
+    rating,
+    role,
+    genre,
+    totalViews,
+    recentWeeklyViews,
+    streamingRevenue,
+    productionPerformance,
+    platformId
+}: SeriesRenewalContext): number => {
+    const hasTvSignals =
+        typeof totalViews === 'number' ||
+        typeof streamingRevenue === 'number' ||
+        typeof productionPerformance === 'number' ||
+        (Array.isArray(recentWeeklyViews) && recentWeeklyViews.length > 0);
+
+    if (!hasTvSignals) {
+        return rating > 7.5 ? 70 : 20;
+    }
+
+    const safeBudget = Math.max(1, budget || 1);
+    const safeRating = Number.isFinite(rating) ? rating : 5;
+    const viewScore = getSeriesViewScore(Math.max(0, totalViews || 0));
+    const ratingScore = clamp((safeRating - 6) * 10, -12, 22);
+    const revenueRatio = Math.max(0, streamingRevenue || 0) / safeBudget;
+    const revenueScore = revenueRatio >= 0.75 ? 12
+        : revenueRatio >= 0.4 ? 5
+            : revenueRatio >= 0.18 ? 0
+                : revenueRatio > 0 ? -4
+                    : -8;
+    const performanceScore = typeof productionPerformance === 'number'
+        ? clamp((productionPerformance - 60) * 0.25, -8, 10)
+        : 0;
+    const roleScore: Record<RoleType, number> = {
+        LEAD: 4,
+        SUPPORTING: 1,
+        ENSEMBLE: 2,
+        CAMEO: -2,
+        MINOR: -3
+    };
+    const platformFitScore = platformId && PLATFORM_GENRE_FIT[platformId]?.includes(genre) ? 4 : 0;
+
+    let trendScore = 0;
+    const recentViews = (recentWeeklyViews || []).filter(value => Number.isFinite(value) && value >= 0);
+    if (recentViews.length >= 2) {
+        const first = Math.max(1, recentViews[0]);
+        const last = recentViews[recentViews.length - 1];
+        const retention = last / first;
+        trendScore = retention >= 1 ? 12 : retention >= 0.75 ? 10 : retention >= 0.45 ? 4 : -8;
+    }
+
+    const chance = 16 + viewScore + ratingScore + trendScore + revenueScore + performanceScore + roleScore[role] + platformFitScore;
+    return Math.round(clamp(chance, 8, 94));
+};
+
 export const calculateFuturePotential = (
     type: ProjectType, 
     budgetTier: BudgetTier, 
@@ -995,7 +1399,8 @@ export const calculateFuturePotential = (
     budget: number, 
     rating: number, 
     genre: string,
-    role: RoleType
+    role: RoleType,
+    seriesRenewalContext?: Partial<SeriesRenewalContext>
 ): FuturePotential => {
     const roi = gross / budget;
     let sequelChance = 0;
@@ -1011,8 +1416,14 @@ export const calculateFuturePotential = (
         if (['DRAMA', 'ROMANCE', 'INDIE'].includes(genre)) sequelChance -= 30; 
         if (['ACTION', 'SCI_FI', 'SUPERHERO'].includes(genre)) sequelChance += 10; 
     } else {
-        if (rating > 7.5 || roi > 2.0) renewalChance = 70;
-        else renewalChance = 20;
+        renewalChance = calculateSeriesRenewalChance({
+            budget,
+            rating,
+            genre,
+            role,
+            ...seriesRenewalContext
+        });
+        if (roi > 2.0) renewalChance = Math.max(renewalChance, 70);
     }
     
     return {

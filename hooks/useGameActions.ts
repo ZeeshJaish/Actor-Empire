@@ -448,6 +448,10 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
           const idx = prev.relationships.findIndex(r => r.id === relId);
           if (idx === -1) return prev;
           const partner = prev.relationships[idx];
+          if (partner.relation === 'Deceased Parent') {
+              setToastMessage({ title: "In Memory", subtext: "That bond is preserved and no longer needs maintenance." });
+              return prev;
+          }
           if (['DATE', 'PROPOSE', 'INTIMACY', 'CLUBBING', 'TRIP', 'ESTATE_DATE', 'YACHT_DATE', 'JET_ESCAPE', 'LUXURY_GIFT'].includes(action) && isFamilyRelation(partner.relation)) {
               setToastMessage({ title: "Blocked", subtext: "Family members cannot be used for romantic actions." });
               return prev;

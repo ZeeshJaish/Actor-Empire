@@ -10,6 +10,7 @@ import { showAd } from '../../../services/adLogic';
 import { hasNoAds } from '../../../services/premiumLogic';
 import { formatProjectFormatLabel } from '../../../services/genreCatalog';
 import { addBreadcrumb, markGameCheckpoint, markTraceAction, setCrashContext, startPerformanceTrace, stopPerformanceTrace, trackGameEvent } from '../../../services/firebaseService';
+import { applyLockedSeasonFunding, markHiddenSeasonFundingUsed } from '../../../services/streamingFundingLogic';
 
 type ConnectedProjectIntent = 'AUTO' | 'SOLO' | 'CROSSOVER' | 'EVENT' | 'REBOOT';
 
@@ -931,7 +932,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         const normalizedUniverses = normalizeUniverseMap(player.world?.universes || {});
 
         Object.values(normalizedUniverses)
-            .filter((universe) => universe.studioId === studio.id && (universe.id === activeUniverseId || allowsOutsideConnectedCharacters))
+            .filter((universe) => universe.status !== 'RETIRED' && universe.studioId === studio.id && (universe.id === activeUniverseId || allowsOutsideConnectedCharacters))
             .forEach((universe) => {
                 const projects = getUniverseDashboardProjects(player, universe.id, player.activeReleases || []);
                 buildUniverseRoster(universe, projects, player.name)
@@ -2262,6 +2263,8 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             totalPhaseDuration: preProdDuration,
             projectDetails: {
                 title: selectedScript.title,
+                sourceScriptId: selectedScript.id,
+                isOriginal: selectedScript.isOriginal,
                 type: selectedScript.projectType,
                 format: selectedScript.format || 'LIVE_ACTION',
                 episodes: selectedScript.episodes,
@@ -2563,39 +2566,57 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         setBuzzItems(generatedBuzz);
 
         // --- UPDATE PLAYER STATE ---
-        const newNews = [newsItem, ...characterNewsItems, ...player.news];
+        const baseNewNews = [newsItem, ...characterNewsItems, ...player.news];
         const newXFeed = generatedBuzz
             .filter(b => b.type === 'TWEET')
             .map(b => b.data)
             .concat(player.x.feed);
 
-        // Deduct budget
-        let remainingBudgetToPay = estimatedBudget;
-        let lockedFundApplied = 0;
-        let updatedLockedStreamingFunds = [...(studio.studioState?.lockedStreamingFunds || [])];
-
-        if (lockedStreamingFunding && lockedStreamingFundingAmount > 0) {
-            lockedFundApplied = Math.min(remainingBudgetToPay, lockedStreamingFundingAmount);
-            remainingBudgetToPay -= lockedFundApplied;
-
-            // A renewal cap is project-specific. Once the next season is greenlit,
-            // unused cap expires instead of becoming free studio money.
-            updatedLockedStreamingFunds = updatedLockedStreamingFunds
-                .map(fund => fund.id === lockedStreamingFunding.id ? { ...fund, usedByProjectId: newCommitment.id } : fund)
-                .filter(fund => fund.id !== lockedStreamingFunding.id);
-        }
-
-        let newProductionFund = studio.studioState?.productionFund || 0;
-
-        if (newProductionFund >= remainingBudgetToPay) {
-            newProductionFund -= remainingBudgetToPay;
-            remainingBudgetToPay = 0;
-        } else {
-            remainingBudgetToPay -= newProductionFund;
-            newProductionFund = 0;
-        }
-
-        const newStudioBalance = studio.balance - remainingBudgetToPay;
+        const fundingResult = applyLockedSeasonFunding({
+            budget: estimatedBudget,
+            lockedFunding: lockedStreamingFunding,
+            lockedStreamingFunds: studio.studioState?.lockedStreamingFunds || [],
+            projectId: newCommitment.id,
+            studioBalance: studio.balance,
+            productionFund: studio.studioState?.productionFund || 0,
+            week: player.currentWeek,
+            year: player.age,
+            newsYear: Math.floor(player.currentWeek / 52) + 2024,
+            projectTitle: newCommitment.name
+        });
+        const lockedFundApplied = fundingResult.lockedFundApplied;
+        const unusedFundingReturned = fundingResult.unusedFundingReturned;
+        const newProductionFund = fundingResult.nextProductionFund;
+        const newStudioBalance = fundingResult.nextStudioBalance;
+        const updatedLockedStreamingFunds = fundingResult.updatedLockedStreamingFunds;
+        const fundingNewsItems = fundingResult.news ? [fundingResult.news] : [];
+        const fundingLogEntries = fundingResult.feedbackMessages.map(message => ({
+            week: player.currentWeek,
+            year: player.age,
+            message,
+            type: message.startsWith('Studio added') ? 'neutral' as const : 'positive' as const
+        }));
+        const markSourceSeasonFundingUsed = (details?: ProjectDetails) =>
+            markHiddenSeasonFundingUsed(details, lockedStreamingFunding, newCommitment.id);
+        const fundingSourceMatches = (details?: ProjectDetails, fallbackId?: string) => {
+            if (!lockedStreamingFunding) return false;
+            return fallbackId === lockedStreamingFunding.sourceProjectId
+                || details?.hiddenStats?.nextSeasonFundingSourceProjectId === lockedStreamingFunding.sourceProjectId;
+        };
+        const updatedActiveReleases = lockedStreamingFunding
+            ? player.activeReleases.map(release => {
+                if (!fundingSourceMatches(release.projectDetails, release.id)) return release;
+                const projectDetails = markSourceSeasonFundingUsed(release.projectDetails);
+                return projectDetails ? { ...release, projectDetails } : release;
+            })
+            : player.activeReleases;
+        const updatedCommitments = lockedStreamingFunding
+            ? player.commitments.map(commitment => {
+                if (!fundingSourceMatches(commitment.projectDetails, commitment.id)) return commitment;
+                const projectDetails = markSourceSeasonFundingUsed(commitment.projectDetails);
+                return projectDetails ? { ...commitment, projectDetails } : commitment;
+            })
+            : player.commitments;
         const updatedWorldUniverses = isCreatingNewUniverse
             ? {
                 ...normalizedWorldUniverses,
@@ -2619,15 +2640,28 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                 }, finalUniverseId!)
             }
             : normalizedWorldUniverses;
+        const updatedWorldPlatforms = { ...player.world.platforms };
+        if (unusedFundingReturned > 0 && lockedStreamingFunding?.platformId) {
+            const platform = updatedWorldPlatforms[lockedStreamingFunding.platformId as keyof typeof updatedWorldPlatforms];
+            if (platform) {
+                updatedWorldPlatforms[lockedStreamingFunding.platformId as keyof typeof updatedWorldPlatforms] = {
+                    ...platform,
+                    cashReserve: platform.cashReserve + unusedFundingReturned
+                };
+            }
+        }
 
         onUpdatePlayer({
             ...player,
-            news: newNews,
+            news: [...fundingNewsItems, ...baseNewNews].slice(0, 80),
+            logs: [...player.logs, ...fundingLogEntries].slice(-80),
             x: { ...player.x, feed: newXFeed },
-            commitments: [...player.commitments, newCommitment],
+            activeReleases: updatedActiveReleases,
+            commitments: [...updatedCommitments, newCommitment],
             world: {
                 ...player.world,
-                universes: updatedWorldUniverses
+                universes: updatedWorldUniverses,
+                platforms: updatedWorldPlatforms
             },
             studio: {
                 ...player.studio,
@@ -2643,17 +2677,15 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                     talentRoster: updatedStudioTalentRoster,
                     productionFund: newProductionFund,
                     lockedStreamingFunds: updatedLockedStreamingFunds,
-                    financeLedger: [{
-                        id: `studio_ledger_greenlight_${newCommitment.id}_${player.age}_${player.currentWeek}`,
-                        week: player.currentWeek,
-                        year: player.age,
-                        amount: -remainingBudgetToPay,
-                        type: 'PRODUCTION_SPEND',
-                        label: lockedFundApplied > 0
-                            ? `${newCommitment.name} greenlight spend (${formatMoney(lockedFundApplied)} renewal cap used)`
-                            : `${newCommitment.name} greenlight spend`,
-                        projectId: newCommitment.id
-                    }, ...((studio.studioState?.financeLedger || []))].slice(0, 200)
+                    financeLedger: [
+                        ...fundingResult.ledgerEntries.map(entry => ({
+                            ...entry,
+                            label: entry.type === 'PRODUCTION_SPEND' && lockedFundApplied > 0
+                                ? `${newCommitment.name} greenlight spend (${formatMoney(lockedFundApplied)} renewal cap used${unusedFundingReturned > 0 ? `, ${formatMoney(unusedFundingReturned)} unused returned` : ''})`
+                                : entry.label
+                        })),
+                        ...((studio.studioState?.financeLedger || []))
+                    ].slice(0, 200)
                 }
             } : b)
         });
@@ -3916,7 +3948,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    {(Object.values(normalizeUniverseMap(player.world?.universes || {})) as Universe[]).filter(u => u.studioId === studio.id).map((universe) => (
+                                    {(Object.values(normalizeUniverseMap(player.world?.universes || {})) as Universe[]).filter(u => u.status !== 'RETIRED' && u.studioId === studio.id).map((universe) => (
                                         <button
                                             key={universe.id}
                                             onClick={() => setSelectedUniverseId(universe.id)}
@@ -4259,7 +4291,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                         <div>
                                             <div className="text-[10px] font-bold text-sky-400 uppercase tracking-widest">Locked Next Season Cap</div>
                                             <div className="text-xs text-sky-300/70">
-                                                {lockedStreamingFunding?.platformName || 'Streaming platform'} funds this season first. Unused cap expires.
+                                                {lockedStreamingFunding?.platformName || 'Streaming platform'} funds this season first. Any unused cap returns to the platform.
                                             </div>
                                         </div>
                                         <div className="text-xl font-black font-mono text-sky-300">

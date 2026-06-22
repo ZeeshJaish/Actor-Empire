@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Player, NPCActor, StudioContract, ContractType, PaymentMode } from '../types';
 import { Users, Briefcase, Star, TrendingUp, DollarSign, X, Check, AlertCircle, Info, Clock, Calendar, Film, ShieldAlert, PenTool } from 'lucide-react';
 import { getAvailableTalent, NPC_DATABASE } from '../services/npcLogic';
-import { calculateNPCAsk, evaluateOffer, createContract } from '../services/talentService';
+import { calculateNPCAsk, evaluateOffer, createContract, getTalentNegotiationProfile } from '../services/talentService';
 
 interface StudioPageProps {
     player: Player;
@@ -16,7 +16,7 @@ export const StudioPage: React.FC<StudioPageProps> = ({ player, onUpdatePlayer, 
     const [paymentMode, setPaymentMode] = useState<PaymentMode>('UPFRONT');
     const [negotiationDuration, setNegotiationDuration] = useState(3);
     const [offerAmountStr, setOfferAmountStr] = useState<string>('');
-    const [negotiationResult, setNegotiationResult] = useState<{ success: boolean, message: string, maintenanceFee?: number } | null>(null);
+    const [negotiationResult, setNegotiationResult] = useState<{ success: boolean, message: string, maintenanceFee?: number, profileLabel?: string } | null>(null);
 
     const studio = player.businesses.find(b => b.type === 'PRODUCTION_HOUSE');
     const signedContracts = studio?.studioState?.talentRoster || player.studio?.talentRoster || [];
@@ -135,6 +135,7 @@ export const StudioPage: React.FC<StudioPageProps> = ({ player, onUpdatePlayer, 
     };
 
     const ask = selectedNPC ? calculateNPCAsk(selectedNPC, negotiationDuration) : null;
+    const negotiationProfile = selectedNPC ? getTalentNegotiationProfile(selectedNPC) : null;
     const currentAttempts = selectedNPC ? (attempts[selectedNPC.id] || 0) : 0;
     const attemptsLeft = 3 - currentAttempts;
 
@@ -296,6 +297,18 @@ export const StudioPage: React.FC<StudioPageProps> = ({ player, onUpdatePlayer, 
                                     </div>
 
                                     <div className="space-y-4 font-sans">
+                                        {negotiationProfile && (
+                                            <div className="bg-amber-50 border border-amber-200 rounded p-3">
+                                                <div className="flex items-start gap-2">
+                                                    <Info size={15} className="text-amber-700 shrink-0 mt-0.5" />
+                                                    <div>
+                                                        <div className="text-[10px] font-black text-amber-800 uppercase tracking-widest">Negotiation Read: {negotiationProfile.label}</div>
+                                                        <p className="text-xs text-amber-900/80 mt-1 leading-relaxed">{negotiationProfile.summary} Market ask is a guide, not a guaranteed yes.</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
                                         {/* Terms */}
                                         <div>
                                             <label className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-1 block">1. Commitment (Movies)</label>

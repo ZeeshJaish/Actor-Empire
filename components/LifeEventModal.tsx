@@ -1,8 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Player, ScheduledEvent, LifeEvent, LifeEventOption } from '../types';
+import { EventImpactSignal, Player, ScheduledEvent, LifeEvent, LifeEventImpactResult, LifeEventOption } from '../types';
 import { AlertTriangle, ShieldAlert, Scale, User, Zap, ChevronRight, PlayCircle, Loader2, CheckCircle, Activity, Newspaper } from 'lucide-react';
 import { motion } from 'motion/react';
 import { showAd } from '../services/adLogic';
+import { addBreadcrumb, recordNonFatal, setCrashContext, trackGameEvent } from '../services/firebaseService';
+import { resolveYoutubeEventChoice, YoutubeEventResolution } from '../services/youtubeEventLogic';
 
 interface LifeEventModalProps {
     player: Player;
@@ -12,7 +14,13 @@ interface LifeEventModalProps {
 
 export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, onChoice }) => {
     const [isProcessingAd, setIsProcessingAd] = useState(false);
-    const [feedback, setFeedback] = useState<{ updatedPlayer: Player, log: string, optionLabel: string, wasGolden: boolean } | null>(null);
+    const [feedback, setFeedback] = useState<{
+        updatedPlayer: Player;
+        log: string;
+        optionLabel: string;
+        wasGolden: boolean;
+        effects?: EventImpactSignal[];
+    } | null>(null);
     const [isResolvingFeedback, setIsResolvingFeedback] = useState(false);
     const [resolveError, setResolveError] = useState('');
     const mountedRef = useRef(true);
@@ -26,7 +34,62 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
     // Extract the actual LifeEvent data
     const lifeEvent: LifeEvent = event.data?.lifeEvent;
 
+    const executeOptionImpact = (
+        option: LifeEventOption,
+        idx: number,
+        pCopy: Player,
+        isGolden: boolean
+    ): LifeEventImpactResult => {
+        const youtubeResolution = event.data?.youtubeResolution as YoutubeEventResolution | undefined;
+
+        try {
+            if (youtubeResolution?.domain === 'YOUTUBE' && option.id) {
+                return resolveYoutubeEventChoice(pCopy, youtubeResolution, option.id);
+            }
+
+            if (typeof option.impact === 'function') {
+                return option.impact(pCopy);
+            }
+        } catch (error) {
+            console.error('LifeEvent impact failed. Using fallback logic.', error);
+            recordNonFatal(error, 'life_event_impact_failed', {
+                event_id: event.id,
+                event_type: event.type,
+                option_index: idx,
+                golden: isGolden,
+            });
+            return getFallbackImpact(lifeEvent, idx, pCopy, option);
+        }
+
+        console.warn('LifeEvent impact function missing. Using fallback logic.');
+        trackGameEvent('life_event_impact_missing', {
+            event_type: event.type,
+            option_index: idx,
+            golden: isGolden,
+        });
+        return getFallbackImpact(lifeEvent, idx, pCopy, option);
+    };
+
     const handleOptionClick = async (option: LifeEventOption, idx: number) => {
+        setCrashContext(player, {
+            flow: 'life_event_choice',
+            event_id: event.id,
+            event_type: event.type,
+            event_title: lifeEvent?.title || 'missing_life_event',
+            option_index: idx,
+            option_label: option.label,
+        });
+        addBreadcrumb('life_event:choice_selected', {
+            eventId: event.id,
+            eventType: event.type,
+            optionIndex: idx,
+            golden: !!option.isGolden,
+        });
+        trackGameEvent('life_event_choice_selected', {
+            event_type: event.type,
+            option_index: idx,
+            golden: !!option.isGolden,
+        });
         let impactResult;
         
         if (option.isGolden) {
@@ -41,18 +104,7 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
                         pCopy.pendingEvents = [...player.pendingEvents];
                     }
 
-                    // Fallback for missing impact function (e.g. after a reload from localStorage)
-                    if (typeof option.impact === 'function') {
-                        try {
-                            impactResult = option.impact(pCopy);
-                        } catch (error) {
-                            console.error('LifeEvent impact failed. Using fallback logic.', error);
-                            impactResult = getFallbackImpact(lifeEvent, idx, pCopy, option);
-                        }
-                    } else {
-                        console.warn("LifeEvent impact function missing. Using fallback logic.");
-                        impactResult = getFallbackImpact(lifeEvent, idx, pCopy, option);
-                    }
+                    impactResult = executeOptionImpact(option, idx, pCopy, true);
                 } else {
                     return; // Ad failed or cancelled
                 }
@@ -70,22 +122,11 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
                 pCopy.pendingEvents = [...player.pendingEvents];
             }
 
-            // Fallback for missing impact function
-            if (typeof option.impact === 'function') {
-                try {
-                    impactResult = option.impact(pCopy);
-                } catch (error) {
-                    console.error('LifeEvent impact failed. Using fallback logic.', error);
-                    impactResult = getFallbackImpact(lifeEvent, idx, pCopy, option);
-                }
-            } else {
-                console.warn("LifeEvent impact function missing. Using fallback logic.");
-                impactResult = getFallbackImpact(lifeEvent, idx, pCopy, option);
-            }
+            impactResult = executeOptionImpact(option, idx, pCopy, false);
         }
 
         if (impactResult) {
-            const { updatedPlayer, log, feedbackDelay, feedbackType } = impactResult;
+            const { updatedPlayer, log, feedbackDelay, feedbackType, effects } = impactResult;
             
             // Handle delayed feedback if any
             if (feedbackDelay && feedbackType) {
@@ -97,7 +138,13 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
                 });
             }
             
-            setFeedback({ updatedPlayer, log, optionLabel: option.label, wasGolden: !!option.isGolden });
+            setFeedback({
+                updatedPlayer,
+                log,
+                optionLabel: option.label,
+                wasGolden: !!option.isGolden,
+                effects,
+            });
         }
     };
 
@@ -209,10 +256,31 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
             .slice(0, 4);
     };
 
+    const getSignalClasses = (tone: EventImpactSignal['tone']) => {
+        if (tone === 'positive') return 'border-emerald-500/25 bg-emerald-500/10 text-emerald-200';
+        if (tone === 'negative') return 'border-rose-500/25 bg-rose-500/10 text-rose-200';
+        return 'border-white/10 bg-white/5 text-zinc-200';
+    };
+
     const handleFeedbackContinue = () => {
         if (!feedback || isResolvingFeedback) return;
         setResolveError('');
         setIsResolvingFeedback(true);
+        setCrashContext(feedback.updatedPlayer, {
+            flow: 'life_event_continue',
+            event_id: event.id,
+            event_type: event.type,
+            event_title: lifeEvent?.title || 'missing_life_event',
+        });
+        addBreadcrumb('life_event:continue_pressed', {
+            eventId: event.id,
+            eventType: event.type,
+            option: feedback.optionLabel,
+        });
+        trackGameEvent('life_event_continue_pressed', {
+            event_type: event.type,
+            golden: feedback.wasGolden,
+        });
         try {
             onChoice(feedback.updatedPlayer, feedback.log);
             window.setTimeout(() => {
@@ -222,6 +290,11 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
             }, 1800);
         } catch (error) {
             console.error('LifeEvent continue failed:', error);
+            recordNonFatal(error, 'life_event_continue_failed', {
+                event_id: event.id,
+                event_type: event.type,
+                event_title: lifeEvent?.title || 'missing_life_event',
+            });
             setIsResolvingFeedback(false);
             setResolveError('Could not close this event. Tap Continue again.');
         }
@@ -232,6 +305,12 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
             if (isResolvingFeedback) return;
             setResolveError('');
             setIsResolvingFeedback(true);
+            setCrashContext(player, {
+                flow: 'invalid_life_event_dismiss',
+                event_id: event.id,
+                event_type: event.type,
+            });
+            addBreadcrumb('life_event:invalid_dismiss', { eventId: event.id, eventType: event.type });
             try {
                 onChoice(player, 'The moment passed without major damage. Your team kept the story moving and the career stayed on track.');
                 window.setTimeout(() => {
@@ -241,6 +320,10 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
                 }, 1800);
             } catch (error) {
                 console.error('Invalid life event dismiss failed:', error);
+                recordNonFatal(error, 'invalid_life_event_dismiss_failed', {
+                    event_id: event.id,
+                    event_type: event.type,
+                });
                 setIsResolvingFeedback(false);
                 setResolveError('Could not skip this event. Tap Continue again.');
             }
@@ -270,7 +353,8 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
 
     if (feedback) {
         const outcomeCopy = getOutcomeCopy(feedback.log);
-        const signals = extractOutcomeSignals(feedback.log);
+        const structuredEffects = feedback.effects || [];
+        const fallbackSignals = structuredEffects.length > 0 ? [] : extractOutcomeSignals(feedback.log);
 
         return (
             <div className="fixed inset-0 z-[200] bg-black/85 backdrop-blur-md flex items-end sm:items-center justify-center p-3 sm:p-4">
@@ -304,13 +388,21 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
                             <p className="text-sm text-zinc-400 leading-relaxed mt-3">{outcomeCopy.tone}</p>
                         </div>
 
-                        {signals.length > 0 && (
+                        {(structuredEffects.length > 0 || fallbackSignals.length > 0) && (
                             <div className="rounded-3xl border border-white/10 bg-zinc-950/70 p-4">
                                 <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-3">
                                     <Activity size={13} /> Visible Impact
                                 </div>
                                 <div className="flex flex-wrap gap-2">
-                                    {signals.map(signal => (
+                                    {structuredEffects.map(effect => (
+                                        <span
+                                            key={`${effect.label}-${effect.value}`}
+                                            className={`rounded-full border px-3 py-1.5 text-xs font-black ${getSignalClasses(effect.tone)}`}
+                                        >
+                                            {effect.label} {effect.value}
+                                        </span>
+                                    ))}
+                                    {fallbackSignals.map(signal => (
                                         <span key={signal} className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-black text-zinc-200">
                                             {signal}
                                         </span>
@@ -422,6 +514,18 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
                                 {opt.description && (
                                     <div className="mt-2 text-xs text-zinc-500 font-medium italic relative z-10 pr-10">
                                         {opt.description}
+                                    </div>
+                                )}
+                                {!!opt.previewEffects?.length && (
+                                    <div className="mt-3 flex flex-wrap gap-1.5 relative z-10 pr-8">
+                                        {opt.previewEffects.slice(0, 3).map(effect => (
+                                            <span
+                                                key={`${effect.label}-${effect.value}`}
+                                                className={`rounded-full border px-2.5 py-1 text-[10px] font-black ${getSignalClasses(effect.tone)}`}
+                                            >
+                                                {effect.label} {effect.value}
+                                            </span>
+                                        ))}
                                     </div>
                                 )}
                             </motion.button>

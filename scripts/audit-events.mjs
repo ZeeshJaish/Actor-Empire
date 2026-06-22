@@ -20,6 +20,7 @@ const source = `
 	import { generateWeeklyFeed } from '${root}services/npcLogic.ts';
 	import { generateTrendingTopics, generateXFeed } from '${root}services/xLogic.ts';
 	import { createYoutubeBacklashEvent, createYoutubeCopyrightEvent, createYoutubeCreatorInviteEvent, createYoutubeRivalryEvent, processGameWeek } from '${root}services/gameLoop.ts';
+	import { createInstagramReferralAudition, createInstagramReferralOutcome } from '${root}services/instagramOfferLogic.ts';
 	import { calculateStreamingAuctionOffer, getStreamingBidProfile } from '${root}views/lifestyle/business/ReleaseWizard.tsx';
 	import { AWARD_CALENDAR, checkAwardEligibility, generateSeasonWinners, getAwardCeremonyYear, sanitizeAwardRecords } from '${root}services/awardLogic.ts';
 
@@ -468,7 +469,185 @@ await recordAsync('social:weekly_sim', 'instagram_referral_dm', async () => {
   const referralAction = states.flatMap(state => state.chatHistory || []).find((message: any) => message.action?.kind === 'IG_REFERRAL');
   if (!referralAction) throw new Error('No Instagram referral DM generated');
   if (!Number.isFinite(referralAction.action.payload?.weeksLeft) || referralAction.action.payload.weeksLeft <= 0) throw new Error('Bad Instagram referral payload');
+  if (!/audition invite/i.test(referralAction.text || '')) throw new Error('Instagram referral DM does not clearly promise an actionable audition');
+  checks += 2;
+});
+
+await recordAsync('social:weekly_sim', 'accepted_instagram_referral_delivers_audition', async () => {
+  const player = makePlayer('early');
+  player.stats.fame = 12;
+  player.stats.reputation = 10;
+  player.stats.followers = 600;
+  player.instagram.followers = 600;
+  player.youtube.subscribers = 0;
+  player.youtube.totalChannelViews = 0;
+  player.flags.lastInstagramDmOfferAbsWeek = (player.age * 52) + player.currentWeek;
+  player.flags.pendingInstagramReferrals = [{
+    id: 'ig_referral_audit',
+    actionId: 'ig_action_audit',
+    npcId: 'npc_referral_audit',
+    npcName: 'Audit Director',
+    weeksLeft: 1,
+    status: 'PENDING',
+  }];
+
+  const result = await withMockedRandom(0.99, () => processGameWeek(player));
+  const delivered = result.player.inbox.filter((message: any) =>
+    message.id?.startsWith('ig_referral_offer_')
+    && message.type === 'OFFER_AUDITION'
+    && message.data?.id
+  );
+  if (delivered.length !== 1) {
+    throw new Error(\`Accepted Instagram referral delivered \${delivered.length} actionable auditions instead of 1\`);
+  }
+  if ((result.player.flags.pendingInstagramReferrals || []).some((referral: any) => referral.id === 'ig_referral_audit')) {
+    throw new Error('Delivered Instagram referral remained pending');
+  }
+  checks += 2;
+});
+
+await recordAsync('social:weekly_sim', 'prestige_instagram_referral_delivers_direct_role', async () => {
+  const player = makePlayer('famous');
+  const opportunity = createInstagramReferralAudition(player);
+  player.flags.lastInstagramDmOfferAbsWeek = (player.age * 52) + player.currentWeek;
+  player.flags.pendingInstagramReferrals = [{
+    id: 'ig_referral_direct_audit',
+    actionId: 'ig_action_direct_audit',
+    npcId: 'npc_direct_audit',
+    npcName: 'Prestige Director',
+    weeksLeft: 1,
+    status: 'PENDING',
+    deliveryType: 'DIRECT_ROLE',
+    opportunity,
+  }];
+
+  const result = await withMockedRandom(0.99, () => processGameWeek(player));
+  const delivered = result.player.inbox.find((message: any) => message.id === 'ig_referral_offer_ig_referral_direct_audit');
+  if (delivered?.type !== 'OFFER_ROLE') {
+    throw new Error('Prestige Instagram referral delivered ' + (delivered?.type || 'nothing') + ' instead of OFFER_ROLE');
+  }
+  if (!Number.isFinite(result.player.flags.lastInstagramDirectRoleAbsoluteWeek)) {
+    throw new Error('Delivered Instagram direct role did not start its cooldown');
+  }
+  checks += 2;
+});
+
+await recordAsync('social:weekly_sim', 'malformed_instagram_referral_recovers_to_valid_audition', async () => {
+  const player = makePlayer('early');
+  player.flags.lastInstagramDmOfferAbsWeek = (player.age * 52) + player.currentWeek;
+  player.flags.pendingInstagramReferrals = [{
+    id: 'ig_referral_malformed_audit',
+    actionId: 'ig_action_malformed_audit',
+    npcId: 'npc_malformed_audit',
+    npcName: 'Recovery Director',
+    weeksLeft: 1,
+    status: 'PENDING',
+    deliveryType: 'DIRECT_ROLE',
+    opportunity: { id: 'broken_payload' },
+  }];
+
+  const result = await withMockedRandom(0.99, () => processGameWeek(player));
+  const delivered = result.player.inbox.find((message: any) => message.id === 'ig_referral_offer_ig_referral_malformed_audit');
+  if (
+    delivered?.type !== 'OFFER_AUDITION'
+    || !delivered.data?.id
+    || !delivered.data?.projectName
+    || !delivered.data?.project
+  ) {
+    throw new Error('Malformed Instagram referral did not recover into a valid audition');
+  }
   checks += 1;
+});
+
+record('social:instagram_referral', 'prestige_direct_role_is_rare_and_gated', () => {
+  const veteran = makePlayer('famous');
+  veteran.stats.fame = 90;
+  veteran.stats.reputation = 80;
+  veteran.stats.talent = 85;
+  veteran.commitments = [];
+  veteran.inbox = [];
+  veteran.flags.lastInstagramDirectRoleAbsoluteWeek = -999;
+
+  const prestigeOutcome = createInstagramReferralOutcome(veteran, () => 0);
+  if (prestigeOutcome.deliveryType !== 'DIRECT_ROLE') {
+    throw new Error('Eligible prestige referral did not produce a direct role on a winning rare roll');
+  }
+  if (prestigeOutcome.opportunity.source !== 'DIRECT') {
+    throw new Error('Prestige Instagram referral was not marked as a direct offer');
+  }
+
+  const ordinaryRoll = createInstagramReferralOutcome(veteran, () => 0.99);
+  if (ordinaryRoll.deliveryType !== 'AUDITION') {
+    throw new Error('Instagram direct role was not kept rare');
+  }
+
+  const early = makePlayer('early');
+  early.stats.fame = 20;
+  early.stats.reputation = 15;
+  early.stats.talent = 90;
+  const earlyOutcome = createInstagramReferralOutcome(early, () => 0);
+  if (earlyOutcome.deliveryType !== 'AUDITION') {
+    throw new Error('Early-career referral bypassed the audition gate');
+  }
+
+  veteran.flags.lastInstagramDirectRoleAbsoluteWeek = (veteran.age * 52) + veteran.currentWeek - 10;
+  const cooldownOutcome = createInstagramReferralOutcome(veteran, () => 0);
+  if (cooldownOutcome.deliveryType !== 'AUDITION') {
+    throw new Error('Instagram direct-role cooldown was bypassed');
+  }
+
+  veteran.flags.lastInstagramDirectRoleAbsoluteWeek = -999;
+  veteran.commitments = [{
+    id: 'active_role',
+    name: 'Busy Production',
+    type: 'ACTING_GIG',
+    projectPhase: 'PRODUCTION',
+  } as any];
+  const busyOutcome = createInstagramReferralOutcome(veteran, () => 0);
+  if (busyOutcome.deliveryType !== 'AUDITION') {
+    throw new Error('Busy actor received an Instagram direct role');
+  }
+
+  veteran.commitments = [];
+  veteran.inbox = [{
+    id: 'pending_direct_role',
+    sender: 'Studio',
+    subject: 'Existing role',
+    text: 'Existing role',
+    type: 'OFFER_ROLE',
+    data: prestigeOutcome.opportunity,
+    isRead: false,
+    weekSent: veteran.currentWeek,
+  }];
+  const pendingOfferOutcome = createInstagramReferralOutcome(veteran, () => 0);
+  if (pendingOfferOutcome.deliveryType !== 'AUDITION') {
+    throw new Error('Actor with a pending role offer received another Instagram direct role');
+  }
+  checks += 7;
+});
+
+await recordAsync('social:weekly_sim', 'duplicate_instagram_referrals_deliver_once', async () => {
+  const player = makePlayer('early');
+  const duplicate = {
+    id: 'ig_referral_duplicate_audit',
+    actionId: 'ig_action_duplicate_audit',
+    npcId: 'npc_duplicate_audit',
+    npcName: 'Duplicate Director',
+    weeksLeft: 1,
+    status: 'PENDING',
+  };
+  player.flags.lastInstagramDmOfferAbsWeek = (player.age * 52) + player.currentWeek;
+  player.flags.pendingInstagramReferrals = [duplicate, { ...duplicate }];
+
+  const result = await withMockedRandom(0.99, () => processGameWeek(player));
+  const delivered = result.player.inbox.filter((message: any) => message.id === 'ig_referral_offer_ig_referral_duplicate_audit');
+  if (delivered.length !== 1) {
+    throw new Error('Duplicate Instagram referral records delivered ' + delivered.length + ' inbox offers');
+  }
+  if ((result.player.flags.pendingInstagramReferrals || []).some((referral: any) => referral.id === duplicate.id)) {
+    throw new Error('Duplicate Instagram referral remained pending after delivery');
+  }
+  checks += 2;
 });
 
 record('awards:calendar', 'stable_year_helpers', () => {

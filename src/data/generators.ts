@@ -13,6 +13,7 @@ const TITLES_BY_GENRE: Record<Genre, string[]> = {
     DRAMA: ['The Godfather', 'Schindler\'s List', 'The Shawshank Redemption', 'Forrest Gump', 'Fight Club', 'Pulp Fiction', 'The Green Mile', 'Goodfellas', 'The Social Network', 'There Will Be Blood'],
     ROMANCE: ['The Notebook', 'Titanic', 'Pride and Prejudice', 'La La Land', 'Casablanca', 'When Harry Met Sally', 'Dirty Dancing', 'A Walk to Remember', 'Notting Hill', 'Love Actually'],
     THRILLER: ['The Silence of the Lambs', 'Se7en', 'The Sixth Sense', 'Gone Girl', 'Prisoners', 'Zodiac', 'Shutter Island', 'The Departed', 'Memento', 'Black Swan'],
+    MYSTERY: ['Glass Clue', 'The Last Alibi', 'The Locked Room', 'Cold Pattern', 'The Missing Heiress', 'Witness Number Nine', 'The Orchard Case', 'One More Suspect', 'The False Confession', 'The Final Cipher'],
     ADVENTURE: ['Indiana Jones', 'Jurassic Park', 'Pirates of the Caribbean', 'The Lord of the Rings', 'Jumanji', 'The Mummy', 'National Treasure', 'Tomb Raider', 'The Goonies', 'Cast Away'],
     SUPERHERO: ['The Dark Knight', 'The Avengers', 'Spider-Man', 'Iron Man', 'Black Panther', 'Wonder Woman', 'Superman', 'Captain America', 'Thor', 'Guardians of the Galaxy'],
     MUSICAL: ['Opening Night', 'The Last Encore', 'City of Songs', 'Spotlight Hearts', 'Final Verse', 'Broadway Nights', 'Stage Door', 'Golden Chorus'],

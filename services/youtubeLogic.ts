@@ -221,6 +221,7 @@ export const getEnabledGlobalCreatorSocialProfiles = (player: Player): NPCActor[
                 COMEDY: 75,
                 ROMANCE: 20,
                 THRILLER: 25,
+                MYSTERY: 25,
                 HORROR: 20,
                 SCI_FI: 40,
                 ADVENTURE: 65,

@@ -264,6 +264,26 @@ export const SCRIPT_TEMPLATES: Record<Genre, ScriptQuestion[]> = {
             ]
         }
     ],
+    MYSTERY: [
+        {
+            id: 'mystery-engine',
+            question: 'What drives the mystery?',
+            options: [
+                { id: 'locked-room', text: 'Locked-Room Puzzle', reviewSnippet: 'built around a precise, satisfying puzzle', newsHeadline: 'The locked-room hook has mystery fans guessing early.' },
+                { id: 'cold-case', text: 'Cold Case Reopened', reviewSnippet: 'digging through old secrets with emotional stakes', newsHeadline: 'The reopened case is giving the project long-tail intrigue.' },
+                { id: 'missing-heir', text: 'Missing Heir', reviewSnippet: 'mixing family secrets with a slow-burn investigation', newsHeadline: 'The missing-heir angle gives the mystery prestige appeal.' }
+            ]
+        },
+        {
+            id: 'mystery-reveal',
+            question: 'What kind of reveal does it build toward?',
+            options: [
+                { id: 'betrayal-reveal', text: 'Trusted Ally Betrayal', reviewSnippet: 'turning trust into the final clue', newsHeadline: 'Viewers are already debating who can be trusted.' },
+                { id: 'hidden-identity', text: 'Hidden Identity', reviewSnippet: 'using identity and memory as the final twist', newsHeadline: 'The hidden-identity hook is fueling fan theories.' },
+                { id: 'system-coverup', text: 'Institutional Cover-Up', reviewSnippet: 'expanding the case into a larger conspiracy', newsHeadline: 'The cover-up angle makes the mystery feel bigger than one case.' }
+            ]
+        }
+    ],
     ADVENTURE: [
         {
             id: 'goal',

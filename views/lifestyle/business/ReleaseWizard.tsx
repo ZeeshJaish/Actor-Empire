@@ -1,10 +1,11 @@
 import React, { useState, useMemo } from 'react';
-import { Player, PendingEvent, ScreeningStrategy, CampaignItem, ProjectHiddenStats } from '../../../types';
+import { Player, PendingEvent, ScreeningStrategy, CampaignItem, ProjectHiddenStats, NextSeasonFundingTier } from '../../../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { ArrowLeft, Film, Tv, Calendar, TrendingUp, CheckCircle2, Camera, Star, Globe, Youtube, Share2 } from 'lucide-react';
 import { FESTIVALS, CALENDAR_EVENTS } from '../../../services/worldLogic';
 import { mergeUniverseRosterWithProject, normalizeUniverseMap } from '../../../services/universeLogic';
 import { getAbsoluteWeek } from '../../../services/legacyLogic';
+import { calculateBalancedNextSeasonFundingCap, getPlatformFundingRelationshipMultiplier } from '../../../services/streamingFundingLogic';
 
 interface ReleaseWizardProps {
     player: Player;
@@ -93,22 +94,6 @@ export const getStreamingBidProfile = (packageScore: number, isSeries: boolean, 
     };
 };
 
-const calculateNextSeasonFundingCap = (projectBudget: number, packageScore: number, currentOffer: number) => {
-    if (projectBudget <= 0) return 0;
-    let multiplier = 1.05;
-    if (packageScore < 45) multiplier = 0.88;
-    else if (packageScore < 60) multiplier = 1.08;
-    else if (packageScore < 72) multiplier = 1.24;
-    else if (packageScore < 84) multiplier = 1.45;
-    else if (packageScore < 92) multiplier = 1.75;
-    else multiplier = 2.15;
-
-    const platformConfidence = 0.94 + Math.random() * 0.18;
-    const budgetBased = projectBudget * multiplier * platformConfidence;
-    const offerBased = currentOffer * (0.72 + Math.random() * 0.22);
-    return Math.floor(Math.max(projectBudget * 0.82, Math.min(projectBudget * 2.6, Math.max(budgetBased, offerBased))));
-};
-
 const getStreamingMarketProofCap = (
     projectBudget: number,
     packageScore: number,
@@ -153,8 +138,18 @@ interface Bid {
     type: BidType;
     fundingAmount?: number;
     backendPct?: number;
+    fundingTier?: NextSeasonFundingTier;
+    fundingReason?: string;
     bidValue: number;
     timestamp: number;
+}
+
+interface FundingPerformanceContext {
+    genre?: string;
+    rating?: number;
+    seasonOneViews?: number;
+    streamingRevenue?: number;
+    rawHype?: number;
 }
 
 export const calculateStreamingAuctionOffer = (
@@ -167,7 +162,9 @@ export const calculateStreamingAuctionOffer = (
     isPostTheatricalBidding?: boolean,
     theatricalGross = 0,
     hiddenStats: Partial<ProjectHiddenStats> = {},
-    hasProvenIp = false
+    hasProvenIp = false,
+    fundingContext: FundingPerformanceContext = {},
+    relationshipMultiplier = 1
 ): Bid | null => {
     const runStrength = projectBudget > 0 && theatricalGross > 0 ? theatricalGross / projectBudget : 0;
     const bidProfile = getStreamingBidProfile(packageScore, isSeries, isPostTheatricalBidding, runStrength);
@@ -232,23 +229,48 @@ export const calculateStreamingAuctionOffer = (
     let fundingAmount = 0;
     let backendPct = 0;
     let upfrontAmount = newAmount;
+    let fundingTier: NextSeasonFundingTier | undefined;
+    let fundingReason: string | undefined;
+    const calculateSeriesFunding = () => calculateBalancedNextSeasonFundingCap({
+        projectBudget,
+        packageScore,
+        currentOffer: newAmount,
+        platform,
+        genre: fundingContext.genre,
+        rating: fundingContext.rating,
+        seasonOneViews: fundingContext.seasonOneViews,
+        streamingRevenue: fundingContext.streamingRevenue,
+        rawHype: fundingContext.rawHype ?? hiddenStats.rawHype,
+        hasProvenIp
+    });
     
     if (isSeries && rand > 0.66) {
         type = 'GREENLIGHT_DEAL';
         upfrontAmount = newAmount;
-        fundingAmount = calculateNextSeasonFundingCap(projectBudget, packageScore, newAmount);
+        const funding = calculateSeriesFunding();
+        fundingAmount = funding.amount;
+        fundingTier = funding.tier;
+        fundingReason = funding.reason;
     } else if (rand > 0.94) {
         type = 'GREENLIGHT_DEAL';
         upfrontAmount = Math.min(newAmount, Math.floor(Math.max(floorOffer, newAmount * 0.45)));
-        fundingAmount = isSeries
-            ? calculateNextSeasonFundingCap(projectBudget, packageScore, newAmount)
-            : Math.max(0, newAmount - upfrontAmount);
+        if (isSeries) {
+            const funding = calculateSeriesFunding();
+            fundingAmount = funding.amount;
+            fundingTier = funding.tier;
+            fundingReason = funding.reason;
+        } else {
+            fundingAmount = Math.max(0, newAmount - upfrontAmount);
+        }
     } else if (rand > 0.84) {
         type = 'BACKEND_POINTS';
         upfrontAmount = Math.min(newAmount, Math.floor(Math.max(floorOffer, newAmount * (isPostTheatricalBidding ? 0.7 : 0.8))));
         backendPct = Math.floor(Math.random() * (isPostTheatricalBidding ? 6 : 8)) + (isPostTheatricalBidding ? 4 : 6);
     }
 
+    const safeRelationshipMultiplier = Math.max(0.84, Math.min(1, Number(relationshipMultiplier) || 1));
+    upfrontAmount = Math.floor(upfrontAmount * safeRelationshipMultiplier);
+    fundingAmount = Math.floor(fundingAmount * safeRelationshipMultiplier);
     const bidValue = type === 'GREENLIGHT_DEAL' ? upfrontAmount + fundingAmount : upfrontAmount;
     
     return {
@@ -258,6 +280,8 @@ export const calculateStreamingAuctionOffer = (
         type,
         fundingAmount,
         backendPct,
+        fundingTier,
+        fundingReason,
         bidValue,
         timestamp: Date.now()
     };
@@ -277,6 +301,9 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
     const lockedPremierePlatformId = projectHiddenStats.nextSeasonFundingUsedByProjectId === project.id
         ? (projectHiddenStats.nextSeasonFundingPlatformId || projectHiddenStats.platformId || null)
         : null;
+    const lockedPremiereFundingAmount = Math.max(0, Math.floor(Number(projectHiddenStats.nextSeasonFundingAmount || 0)));
+    const lockedPremiereFundingTier = projectHiddenStats.nextSeasonFundingTier;
+    const lockedPremiereFundingReason = projectHiddenStats.nextSeasonFundingReason;
     const lockedPremierePlatform = lockedPremierePlatformId
         ? PLATFORMS.find(platform => platform.id === lockedPremierePlatformId)
         : null;
@@ -288,6 +315,8 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
             type: 'UPFRONT_ONLY',
             fundingAmount: 0,
             backendPct: 0,
+            fundingTier: lockedPremiereFundingTier,
+            fundingReason: lockedPremiereFundingReason,
             bidValue: 0,
             timestamp: Date.now()
         }
@@ -313,16 +342,29 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
         const packageScore = (estQuality * 0.4) + (scriptQuality * 0.2) + (directorQuality * 0.15) + (castingStrength * 0.15) + (rawHype * 0.1);
         const projectBudget = project.projectDetails?.estimatedBudget || 0;
         const theatricalGross = project.totalGross || project.gross || 0;
+        const rating = Number(project.imdbRating || project.rating || project.projectDetails?.imdbRating || 0) || undefined;
+        const seasonOneViews = Number(project.streaming?.totalViews || project.totalViews || 0) || undefined;
+        const streamingRevenue = Number(project.streamingRevenue || project.projectDetails?.streamingRevenue || 0) || undefined;
         const hasProvenIp = Boolean(project.projectDetails?.franchiseId || project.projectDetails?.universeId || project.projectDetails?.subtype === 'SEQUEL' || project.projectDetails?.subtype === 'SPINOFF' || project.projectDetails?.subtype === 'UNIVERSE_EVENT');
-        return { hiddenStats, packageScore, projectBudget, theatricalGross, hasProvenIp };
+        const fundingContext: FundingPerformanceContext = {
+            genre: project.projectDetails?.genre,
+            rating,
+            seasonOneViews,
+            streamingRevenue,
+            rawHype
+        };
+        return { hiddenStats, packageScore, projectBudget, theatricalGross, hasProvenIp, fundingContext };
     };
 
     const createOpeningBids = () => {
-        const { hiddenStats, packageScore, projectBudget, theatricalGross, hasProvenIp } = getProjectAuctionContext();
+        const { hiddenStats, packageScore, projectBudget, theatricalGross, hasProvenIp, fundingContext } = getProjectAuctionContext();
         const independentBids = PLATFORMS
             .map(platform => {
                 const fitGap = Math.max(0, platform.qualityReq - packageScore);
                 const effectiveScore = Math.max(32, packageScore - (fitGap * 0.28));
+                const relationshipMultiplier = getPlatformFundingRelationshipMultiplier(
+                    studio?.studioState?.platformRelations?.[platform.id]
+                );
                 return calculateStreamingAuctionOffer(
                     platform,
                     projectBudget,
@@ -333,7 +375,9 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                     isPostTheatricalBidding,
                     theatricalGross,
                     hiddenStats,
-                    hasProvenIp
+                    hasProvenIp,
+                    fundingContext,
+                    relationshipMultiplier
                 );
             })
             .filter((bid): bid is Bid => !!bid)
@@ -438,7 +482,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
             });
 
             // AI Bidding Logic
-            const { hiddenStats, packageScore, projectBudget, theatricalGross, hasProvenIp } = getProjectAuctionContext();
+            const { hiddenStats, packageScore, projectBudget, theatricalGross, hasProvenIp, fundingContext } = getProjectAuctionContext();
             const eligiblePlatforms = PLATFORMS.filter(p => activePlatforms.includes(p.id));
 
             const lastBidderId = currentBids.length > 0 ? currentBids[0].platformId : null;
@@ -460,6 +504,9 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                 const currentHighest = highestBid ? highestBid.bidValue : 0;
                 const fitGap = Math.max(0, platform.qualityReq - packageScore);
                 const effectivePackageScore = Math.max(32, packageScore - (fitGap * 0.28));
+                const relationshipMultiplier = getPlatformFundingRelationshipMultiplier(
+                    studio?.studioState?.platformRelations?.[platform.id]
+                );
                 const newBid = calculateStreamingAuctionOffer(
                     platform,
                     projectBudget,
@@ -470,7 +517,9 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                     isPostTheatricalBidding,
                     theatricalGross,
                     hiddenStats,
-                    hasProvenIp
+                    hasProvenIp,
+                    fundingContext,
+                    relationshipMultiplier
                 );
                 
                 if (newBid) {
@@ -514,7 +563,9 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                 installmentNumber: project.projectDetails?.installmentNumber || project.installmentNumber || 1,
                 projectType: 'SERIES' as const,
                 createdWeek: player.currentWeek,
-                createdYear: player.age
+                createdYear: player.age,
+                tier: bid.fundingTier,
+                reason: bid.fundingReason
             }
             : null;
         
@@ -582,7 +633,9 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                         ...(lockedFunding ? {
                             nextSeasonFundingAmount: lockedFunding.amount,
                             nextSeasonFundingPlatformId: lockedFunding.platformId,
-                            nextSeasonFundingSourceProjectId: lockedFunding.sourceProjectId
+                            nextSeasonFundingSourceProjectId: lockedFunding.sourceProjectId,
+                            nextSeasonFundingTier: lockedFunding.tier,
+                            nextSeasonFundingReason: lockedFunding.reason
                         } : {})
                     }
                 } : undefined
@@ -628,7 +681,9 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                             ...(lockedFunding ? {
                                 nextSeasonFundingAmount: lockedFunding.amount,
                                 nextSeasonFundingPlatformId: lockedFunding.platformId,
-                                nextSeasonFundingSourceProjectId: lockedFunding.sourceProjectId
+                                nextSeasonFundingSourceProjectId: lockedFunding.sourceProjectId,
+                                nextSeasonFundingTier: lockedFunding.tier,
+                                nextSeasonFundingReason: lockedFunding.reason
                             } : {})
                         }
                     }
@@ -943,7 +998,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                                     <h2 className="text-5xl md:text-7xl font-serif font-light tracking-tight text-white/90">The War Room</h2>
                                     <p className="text-lg text-white/50 font-light tracking-wide">
                                         {lockedPremiereBid
-                                            ? `${lockedPremierePlatform?.name} already funded this season, so the premiere is locked.`
+                                            ? `${lockedPremierePlatform?.name} already funded this season.`
                                             : 'Streaming platforms are bidding for your project.'}
                                     </p>
                                 </div>
@@ -954,9 +1009,25 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                                             {lockedPremiereBid ? (
                                                 <>
                                                     <div className="mb-6 rounded-3xl border border-sky-400/30 bg-sky-500/10 p-6">
-                                                        <div className="text-[10px] font-black uppercase tracking-[0.35em] text-sky-300 mb-3">Exclusive Renewal</div>
-                                                        <p className="text-white/75">
-                                                            This season was produced under a locked renewal cap. There is no second auction, no platform hopping, and no extra upfront check.
+                                                        <div className="text-[10px] font-black uppercase tracking-[0.35em] text-sky-300 mb-3">Season 2 Funded</div>
+                                                        <div className="text-2xl font-black text-white mb-2">
+                                                            Season funded by {lockedPremierePlatform?.name}
+                                                        </div>
+                                                        <div className="text-sm font-mono text-sky-200 mb-4">
+                                                            Funding cap: ${lockedPremiereFundingAmount > 0 ? (lockedPremiereFundingAmount / 1000000).toFixed(1) : '0.0'}M
+                                                        </div>
+                                                        {lockedPremiereFundingTier && (
+                                                            <div className="mb-3 inline-flex rounded-full border border-sky-300/30 bg-sky-300/10 px-3 py-1 text-[9px] font-black uppercase tracking-[0.25em] text-sky-200">
+                                                                {lockedPremiereFundingTier.replace('_', ' ')} cap
+                                                            </div>
+                                                        )}
+                                                        {lockedPremiereFundingReason && (
+                                                            <p className="mb-4 text-sm text-sky-100/75 leading-relaxed">
+                                                                {lockedPremiereFundingReason}
+                                                            </p>
+                                                        )}
+                                                        <p className="text-white/75 leading-relaxed">
+                                                            No bidding room because the platform already committed. If production goes over cap, the studio pays the extra; if it comes under cap, unused funding returns to the platform.
                                                         </p>
                                                     </div>
                                                     <button onClick={() => handleAcceptBid(lockedPremiereBid)} className="px-12 py-4 bg-sky-400 text-black rounded-full font-bold tracking-widest uppercase text-xs hover:scale-105 transition-all shadow-[0_0_30px_rgba(56,189,248,0.3)]">
@@ -1011,8 +1082,15 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                                                         </div>
                                                         
                                                         {highestBid.type === 'GREENLIGHT_DEAL' && (
-                                                            <div className="inline-block mt-4 px-4 py-2 bg-emerald-500/20 border border-emerald-500/30 rounded-full text-emerald-300 text-[10px] font-bold uppercase tracking-widest">
-                                                                + ${(highestBid.fundingAmount! / 1000000).toFixed(1)}M {isSeries ? 'Locked Next Season Cap' : 'Production Fund'}
+                                                            <div className="mt-4 space-y-2">
+                                                                <div className="inline-block px-4 py-2 bg-emerald-500/20 border border-emerald-500/30 rounded-full text-emerald-300 text-[10px] font-bold uppercase tracking-widest">
+                                                                    + ${(highestBid.fundingAmount! / 1000000).toFixed(1)}M {isSeries ? `${highestBid.fundingTier ? `${highestBid.fundingTier.replace('_', ' ')} ` : ''}Next Season Cap` : 'Production Fund'}
+                                                                </div>
+                                                                {isSeries && highestBid.fundingReason && (
+                                                                    <p className="mx-auto max-w-sm text-xs leading-relaxed text-emerald-100/65">
+                                                                        {highestBid.fundingReason}
+                                                                    </p>
+                                                                )}
                                                             </div>
                                                         )}
                                                         {highestBid.type === 'BACKEND_POINTS' && (
@@ -1053,7 +1131,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                                                                     <span className="font-serif" style={{ color: p?.color }}>{p?.name}</span>
                                                                     <span className="font-mono text-emerald-400">${(bid.amount / 1000000).toFixed(1)}M</span>
                                                                 </div>
-                                                                {bid.type === 'GREENLIGHT_DEAL' && <div className="text-[9px] text-emerald-500/80 uppercase tracking-widest">+ Fund</div>}
+                                                                {bid.type === 'GREENLIGHT_DEAL' && <div className="text-[9px] text-emerald-500/80 uppercase tracking-widest">+ {bid.fundingTier ? bid.fundingTier.replace('_', ' ') : 'Fund'}</div>}
                                                                 {bid.type === 'BACKEND_POINTS' && <div className="text-[9px] text-purple-500/80 uppercase tracking-widest">+ Backend</div>}
                                                             </motion.div>
                                                         );

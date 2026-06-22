@@ -5,7 +5,7 @@ import { WORKSHOP_CATALOG, IMPROVEMENT_CATALOG, ImproveCategory, GENRE_TRAINING_
 import { rewardGenreExperience, calculateGlobalTalent } from '../services/roleLogic';
 import { formatGenreLabel } from '../services/genreCatalog';
 import { getPlayerLanguage, t } from '../services/i18n';
-import { Dumbbell, BookOpen, Brain, Drama, Check, ChevronDown, ChevronUp, Zap, DollarSign, Activity, Smile, Heart, Lock, Sparkles, HeartPulse, X, Clapperboard, Monitor, Skull, Ghost, Sword, Rocket, Map, Shield, Mic, Camera, FlaskConical, Award, Users } from 'lucide-react';
+import { Dumbbell, BookOpen, Brain, Drama, Check, ChevronDown, ChevronUp, Zap, DollarSign, Activity, Smile, Heart, Lock, Sparkles, HeartPulse, X, Clapperboard, Monitor, Skull, Ghost, Sword, Rocket, Map, Shield, Mic, Camera, FlaskConical, Award, Users, Search } from 'lucide-react';
 
 interface ImprovePageProps {
   player: Player;
@@ -21,6 +21,7 @@ export const ImprovePage: React.FC<ImprovePageProps> = ({ player, onEnroll, onCa
   const [workshopFilter, setWorkshopFilter] = useState<'ALL' | 'ACTING' | 'WRITING' | 'DIRECTING'>('ALL');
   const language = getPlayerLanguage(player);
   const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
+  const smoothMode = player.settings?.smoothMode === true;
   const trFallback = (key: string, fallback: string) => {
       const translated = tr(key);
       return translated === key ? fallback : translated;
@@ -69,6 +70,7 @@ export const ImprovePage: React.FC<ImprovePageProps> = ({ player, onEnroll, onCa
           case 'COMEDY': return <Smile size={18} className="text-yellow-400" />;
           case 'ROMANCE': return <Heart size={18} className="text-pink-500" />;
           case 'THRILLER': return <Activity size={18} className="text-blue-500" />;
+          case 'MYSTERY': return <Search size={18} className="text-indigo-400" />;
           case 'HORROR': return <Ghost size={18} className="text-zinc-400" />;
           case 'SCI_FI': return <Monitor size={18} className="text-cyan-400" />;
           case 'ADVENTURE': return <Map size={18} className="text-emerald-500" />;
@@ -462,13 +464,13 @@ export const ImprovePage: React.FC<ImprovePageProps> = ({ player, onEnroll, onCa
 
       {/* TAB CONTENT: GENRE LAB (NEW GRID UI) */}
       {activeTab === 'GENRE' && (
-          <div className="space-y-4 animate-in fade-in zoom-in-95 duration-300">
+          <div className={`space-y-4 genre-lab-grid ${smoothMode ? '' : 'animate-in fade-in zoom-in-95 duration-300'}`}>
               <div className="flex items-center gap-2 text-zinc-500 px-2 text-xs mb-2">
                   <Monitor size={12}/>
                   <p>{tr('improve.genreHelp')}</p>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-3 gap-3 genre-lab-grid">
                   {GENRE_TRAINING_CATALOG.map(training => {
                       const currentXP = player.stats.genreXP[training.genre] || 0;
                       const isMastered = currentXP >= 100;
@@ -486,17 +488,18 @@ export const ImprovePage: React.FC<ImprovePageProps> = ({ player, onEnroll, onCa
                               }}
                               disabled={isMastered || !canTrain}
                               className={`
-                                relative flex flex-col items-center p-3 rounded-2xl border transition-all duration-300 group
+                                genre-lab-card relative flex flex-col items-center p-3 rounded-2xl border group
+                                ${smoothMode ? '' : 'transition-all duration-300'}
                                 ${isMastered 
                                     ? 'bg-amber-900/10 border-amber-500/50 cursor-default shadow-[0_0_15px_rgba(245,158,11,0.1)]' 
-                                    : 'bg-zinc-900/50 border-white/5 hover:bg-zinc-800 active:scale-[0.98]'
+                                    : `bg-zinc-900/50 border-white/5 ${smoothMode ? '' : 'hover:bg-zinc-800 active:scale-[0.98]'}`
                                 }
                               `}
                           >
                               {/* Icon Badge */}
                               <div className={`
-                                w-10 h-10 rounded-full flex items-center justify-center mb-2 transition-transform
-                                ${isMastered ? 'bg-amber-500 text-black scale-110' : 'bg-zinc-800 text-zinc-400 group-hover:bg-zinc-700 group-hover:text-white'}
+                                w-10 h-10 rounded-full flex items-center justify-center mb-2 ${smoothMode ? '' : 'transition-transform'}
+                                ${isMastered ? `bg-amber-500 text-black ${smoothMode ? '' : 'scale-110'}` : `bg-zinc-800 text-zinc-400 ${smoothMode ? '' : 'group-hover:bg-zinc-700 group-hover:text-white'}`}
                               `}>
                                   {isMastered ? <Check size={20} strokeWidth={3}/> : getGenreIcon(training.genre)}
                               </div>
@@ -509,7 +512,7 @@ export const ImprovePage: React.FC<ImprovePageProps> = ({ player, onEnroll, onCa
                               {/* Progress Bar */}
                               <div className="w-full h-1.5 bg-zinc-950 rounded-full overflow-hidden mb-2 relative">
                                   <div 
-                                    className={`h-full transition-all duration-500 ${isMastered ? 'bg-amber-500' : 'bg-indigo-500'} `}
+                                    className={`genre-lab-progress h-full ${smoothMode ? '' : 'transition-all duration-500'} ${isMastered ? 'bg-amber-500' : 'bg-indigo-500'} `}
                                     style={{ width: `${currentXP}%` }}
                                   ></div>
                               </div>

@@ -1,7 +1,9 @@
 
-import { Business, BusinessType, BusinessSubtype, BusinessConfig, BusinessStaff, BusinessProduct, Player, EmployeeCandidate, StudioState } from '../types';
+import { Business, BusinessType, BusinessSubtype, BusinessConfig, BusinessStaff, BusinessProduct, Player, EmployeeCandidate, StudioState, NewsItem, RightsNegotiation, RightsOpportunity } from '../types';
 import { generateWriters, generateIPMarket } from '../src/data/generators';
 import { createMarketTrends } from './marketTrends';
+import { advanceRightsInvestigations, RIGHTS_MARKET_CYCLE_WEEKS } from './rightsMarket';
+import { advanceRightsNegotiations } from './rightsNegotiation';
 
 export interface BusinessBlueprint {
     type: BusinessType;
@@ -231,7 +233,172 @@ const getProductPriceSweetSpot = (business: Business, product: BusinessProduct):
     };
 };
 
-const getBusinessValuation = (business: Business): number => {
+const getProductionHouseLibraryValue = (business: Business, player?: Player): number => {
+    if (business.type !== 'PRODUCTION_HOUSE') return 0;
+
+    const releasedProjects = (player?.pastProjects || []).filter(project => project.studioId === business.id);
+    const activeReleases = (player?.activeReleases || []).filter(release => release.projectDetails?.studioId === business.id);
+
+    const releasedValue = releasedProjects.reduce((sum, project) => {
+        const gross = Math.max(0, project.gross || 0);
+        const streamingRevenue = Math.max(0, project.streamingRevenue || 0);
+        const rating = Math.max(0, project.imdbRating || project.rating || 0);
+        const qualityPremium = rating >= 8 ? 0.24 : rating >= 7 ? 0.16 : rating >= 6 ? 0.09 : 0.04;
+        const franchisePremium = project.franchiseId || project.universeId ? 0.08 : 0;
+        return sum + Math.floor((gross * (0.08 + qualityPremium + franchisePremium)) + (streamingRevenue * 1.4));
+    }, 0);
+
+    const activeValue = activeReleases.reduce((sum, release) => {
+        const totalGross = Math.max(0, release.totalGross || 0);
+        const streamingRevenue = Math.max(0, release.streamingRevenue || 0);
+        const rating = Math.max(0, release.imdbRating || 0);
+        const livePremium = rating >= 8 ? 0.18 : rating >= 7 ? 0.12 : 0.06;
+        return sum + Math.floor((totalGross * livePremium) + (streamingRevenue * 1.2));
+    }, 0);
+
+    return releasedValue + activeValue;
+};
+
+type StudioReleaseOutcome = 'MEGA_HIT' | 'HIT' | 'SOLID' | 'MISS' | 'FLOP' | 'BOMB';
+
+const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
+
+const getStudioOutcome = (totalRevenue: number, budget: number, rating: number): StudioReleaseOutcome => {
+    const ratio = totalRevenue / Math.max(1, budget);
+
+    if (ratio >= 4 || (ratio >= 3.2 && rating >= 8)) return 'MEGA_HIT';
+    if (ratio >= 2.15 || (ratio >= 1.75 && rating >= 7.6)) return 'HIT';
+    if (ratio >= 1.25 || (ratio >= 1 && rating >= 7)) return 'SOLID';
+    if (ratio >= 0.9 || rating >= 6.5) return 'MISS';
+    if (ratio >= 0.55 || rating >= 5.5) return 'FLOP';
+    return 'BOMB';
+};
+
+const getOutcomePressure = (outcome: StudioReleaseOutcome, totalRevenue: number, budget: number) => {
+    const lossRatio = Math.max(0, (budget - totalRevenue) / Math.max(1, budget));
+
+    switch (outcome) {
+        case 'MEGA_HIT':
+            return { momentum: 18, confidence: 12, brand: 7, hype: 10 };
+        case 'HIT':
+            return { momentum: 11, confidence: 7, brand: 4, hype: 6 };
+        case 'SOLID':
+            return { momentum: 4, confidence: 2, brand: 1, hype: 2 };
+        case 'MISS':
+            return { momentum: -5, confidence: -4, brand: -1, hype: -2 };
+        case 'FLOP':
+            return { momentum: -12 - Math.round(lossRatio * 4), confidence: -9 - Math.round(lossRatio * 5), brand: -3, hype: -5 };
+        case 'BOMB':
+            return { momentum: -21 - Math.round(lossRatio * 6), confidence: -16 - Math.round(lossRatio * 7), brand: -6, hype: -9 };
+    }
+};
+
+const makeStudioOutcomeNews = (
+    business: Business,
+    projectName: string,
+    outcome: StudioReleaseOutcome,
+    flopStreak: number,
+    hitStreak: number,
+    week: number,
+    year: number
+): NewsItem | null => {
+    const name = business.name;
+    let headline = '';
+    let subtext = '';
+    let impactLevel: NewsItem['impactLevel'] = 'MEDIUM';
+
+    if (outcome === 'BOMB') {
+        headline = flopStreak >= 2
+            ? `${name} faces pressure after another costly box office bomb`
+            : `${name} takes a valuation hit after ${projectName} bombs`;
+        subtext = 'Industry confidence cooled as the latest release missed both audience and financial expectations.';
+        impactLevel = 'HIGH';
+    } else if (outcome === 'FLOP') {
+        headline = flopStreak >= 2
+            ? `${name} under scrutiny after back-to-back flops`
+            : `${projectName} disappoints, putting pressure on ${name}`;
+        subtext = 'Analysts are watching whether the studio can steady its next slate.';
+    } else if (outcome === 'MISS') {
+        headline = `${projectName} underperforms for ${name}`;
+        subtext = 'The release avoided disaster, but market confidence slipped.';
+        impactLevel = 'LOW';
+    } else if (outcome === 'HIT') {
+        headline = hitStreak >= 2
+            ? `${name} builds momentum with another hit`
+            : `${projectName} strengthens ${name}'s studio valuation`;
+        subtext = 'The strong run lifted investor confidence around the studio slate.';
+    } else if (outcome === 'MEGA_HIT') {
+        headline = `${projectName} becomes a breakout win for ${name}`;
+        subtext = 'The blockbuster result sharply improved studio momentum and deal leverage.';
+        impactLevel = 'HIGH';
+    } else if (hitStreak >= 2) {
+        headline = `${name} keeps its slate steady with ${projectName}`;
+        subtext = 'The release added modest confidence without changing the market overnight.';
+        impactLevel = 'LOW';
+    }
+
+    if (!headline) return null;
+
+    return {
+        id: `news_studio_momentum_${business.id}_${Date.now()}_${Math.random()}`,
+        headline,
+        subtext,
+        category: 'INDUSTRY',
+        week,
+        year,
+        impactLevel
+    };
+};
+
+export const applyProductionHouseReleaseOutcome = (
+    business: Business,
+    release: { id: string; name: string; totalRevenue: number; budget: number; rating?: number },
+    week: number,
+    year: number
+): { business: Business; news: NewsItem | null; log: string | null } => {
+    if (business.type !== 'PRODUCTION_HOUSE') return { business, news: null, log: null };
+
+    const outcomeKey = `${release.id}:market_outcome`;
+    const processed = business.stats.processedReleaseOutcomeIds || [];
+    if (processed.includes(outcomeKey)) return { business, news: null, log: null };
+
+    const outcome = getStudioOutcome(release.totalRevenue, release.budget, release.rating || 0);
+    const pressure = getOutcomePressure(outcome, release.totalRevenue, release.budget);
+    const isBad = outcome === 'MISS' || outcome === 'FLOP' || outcome === 'BOMB';
+    const isGood = outcome === 'HIT' || outcome === 'MEGA_HIT';
+    const previousFlopStreak = business.stats.recentFlopStreak || 0;
+    const previousHitStreak = business.stats.recentHitStreak || 0;
+    const flopStreak = isBad ? previousFlopStreak + 1 : 0;
+    const hitStreak = isGood ? previousHitStreak + 1 : 0;
+    const outcomeLabel = `${year}W${week}:${release.name}:${outcome}`;
+
+    const updatedBusiness: Business = {
+        ...business,
+        stats: {
+            ...business.stats,
+            studioMomentum: clamp((business.stats.studioMomentum ?? 50) + pressure.momentum - Math.max(0, previousFlopStreak - 1) * 2, 0, 100),
+            investorConfidence: clamp((business.stats.investorConfidence ?? 50) + pressure.confidence - Math.max(0, previousFlopStreak - 1) * 2, 0, 100),
+            recentHitStreak: hitStreak,
+            recentFlopStreak: flopStreak,
+            recentReleaseOutcomes: [outcomeLabel, ...(business.stats.recentReleaseOutcomes || [])].slice(0, 8),
+            processedReleaseOutcomeIds: [outcomeKey, ...processed].slice(0, 40),
+            brandHealth: clamp((business.stats.brandHealth || 50) + pressure.brand, 0, 100),
+            hype: clamp((business.stats.hype || 0) + pressure.hype, 0, 100)
+        }
+    };
+
+    const news = makeStudioOutcomeNews(updatedBusiness, release.name, outcome, flopStreak, hitStreak, week, year);
+    const readableOutcome = outcome.replace('_', ' ').toLowerCase();
+    const log = isBad
+        ? `${updatedBusiness.name} valuation pressure increased after ${release.name} became a ${readableOutcome}.`
+        : isGood
+            ? `${updatedBusiness.name} investor confidence rose after ${release.name} became a ${readableOutcome}.`
+            : null;
+
+    return { business: updatedBusiness, news, log };
+};
+
+const getBusinessValuation = (business: Business, player?: Player): number => {
     const blueprint = BUSINESS_BLUEPRINTS[business.type];
     const locations = business.stats.locations || 1;
     const weeksTracked = Math.min(12, Math.max(0, business.history?.length || 0));
@@ -276,14 +443,45 @@ const getBusinessValuation = (business: Business): number => {
             ((studioState.equipment ? Object.values(studioState.equipment).reduce((sum, level) => sum + level, 0) : 0) * 600000)
         )
         : 0;
+    const studioCashValue = business.type === 'PRODUCTION_HOUSE' ? Math.max(0, business.balance || 0) : 0;
+    const studioRevenueValue = business.type === 'PRODUCTION_HOUSE'
+        ? Math.floor(Math.max(0, business.stats.lifetimeRevenue || 0) * 0.35)
+        : 0;
+    const studioLibraryValue = getProductionHouseLibraryValue(business, player);
+    const studioMomentum = business.type === 'PRODUCTION_HOUSE' ? (business.stats.studioMomentum ?? 50) : 50;
+    const investorConfidence = business.type === 'PRODUCTION_HOUSE' ? (business.stats.investorConfidence ?? 50) : 50;
+    const flopStreak = business.type === 'PRODUCTION_HOUSE' ? (business.stats.recentFlopStreak || 0) : 0;
+    const hitStreak = business.type === 'PRODUCTION_HOUSE' ? (business.stats.recentHitStreak || 0) : 0;
 
     const downsidePressure =
         avgProfit < 0 ? Math.min(0.35, Math.abs(avgProfit) / Math.max(blueprint.baseCost, 1)) : 0;
-    const riskMultiplier = Math.max(0.65, Math.min(1.15, 0.9 + (consistency * 0.18) - downsidePressure));
+    const marketTrustMultiplier = business.type === 'PRODUCTION_HOUSE'
+        ? clamp(
+            0.76
+            + (studioMomentum / 100) * 0.22
+            + (investorConfidence / 100) * 0.18
+            + Math.min(0.08, hitStreak * 0.025)
+            - Math.min(0.18, flopStreak * 0.045),
+            0.58,
+            1.22
+        )
+        : 1;
+    const riskMultiplier = Math.max(0.65, Math.min(1.15, 0.9 + (consistency * 0.18) - downsidePressure)) * marketTrustMultiplier;
 
-    const valuation = Math.floor((assetBase + earningsValue + brandValue + studioAssetValue) * riskMultiplier);
-    return Math.max(Math.floor(assetBase), valuation);
+    const valuation = Math.floor((assetBase + earningsValue + brandValue + studioAssetValue + studioCashValue + studioRevenueValue + studioLibraryValue) * riskMultiplier);
+    const productionHouseFloor = business.type === 'PRODUCTION_HOUSE'
+        ? Math.max(blueprint.baseCost, studioCashValue)
+        : 0;
+    return Math.max(Math.floor(assetBase), valuation, productionHouseFloor);
 };
+
+export const recalculateBusinessValuation = (business: Business, player?: Player): Business => ({
+    ...business,
+    stats: {
+        ...business.stats,
+        valuation: getBusinessValuation(business, player)
+    }
+});
 
 
 // ... (Keep setup costs, hiring logic) ...
@@ -346,7 +544,8 @@ export const createBusiness = (
 ): Business => {
     const cost = calculateSetupCost(type, subtype, config);
     const blueprint = BUSINESS_BLUEPRINTS[type];
-    const initialBalance = cost * 0.2; 
+    const creationCost = type === 'PRODUCTION_HOUSE' ? blueprint.baseCost : cost;
+    const initialBalance = creationCost * 0.2;
 
     // Calculate Initial Capacity based on Config
     let capacity = blueprint.model === 'SERVICE' ? 50 : undefined;
@@ -361,7 +560,13 @@ export const createBusiness = (
         id: `biz_${Date.now()}`, name, type, subtype, logo, color: 'bg-zinc-800', foundedWeek: currentWeek, balance: initialBalance, isActive: true,
         config: { ...config, marketingBudget: { social: 0, influencer: 0, billboard: 0, tv: 0 } },
         stats: {
-            weeklyRevenue: 0, weeklyExpenses: 0, weeklyProfit: 0, lifetimeRevenue: 0, valuation: cost, brandHealth: 50, customerSatisfaction: 50, riskLevel: 10, hype: 20, 
+            weeklyRevenue: 0, weeklyExpenses: 0, weeklyProfit: 0, lifetimeRevenue: 0, valuation: creationCost, brandHealth: 50, customerSatisfaction: 50, riskLevel: 10, hype: 20,
+            studioMomentum: type === 'PRODUCTION_HOUSE' ? 50 : undefined,
+            investorConfidence: type === 'PRODUCTION_HOUSE' ? 50 : undefined,
+            recentHitStreak: type === 'PRODUCTION_HOUSE' ? 0 : undefined,
+            recentFlopStreak: type === 'PRODUCTION_HOUSE' ? 0 : undefined,
+            recentReleaseOutcomes: type === 'PRODUCTION_HOUSE' ? [] : undefined,
+            processedReleaseOutcomeIds: type === 'PRODUCTION_HOUSE' ? [] : undefined,
             capacity: capacity, inventory: blueprint.model === 'PRODUCT' ? 0 : undefined, locations: 1
         },
         staff: [], products: [], history: [], hiringPool: generateCandidates(), lastHiringRefreshWeek: currentWeek,
@@ -396,14 +601,71 @@ export const createDefaultStudioState = (currentWeek: number): StudioState => ({
     lockedStreamingFunds: [],
     genreReputation: {},
     marketTrends: createMarketTrends(currentWeek),
+    rightsMarket: [],
+    rightsMarketCycle: Math.floor(currentWeek / RIGHTS_MARKET_CYCLE_WEEKS),
+    lastRightsMarketAdvanceWeek: currentWeek,
+    lastRightsScoutingCycle: -1,
+    rightsMarketNotices: [],
+    rightsNegotiations: [],
+    ownedRights: [],
 });
+
+export const sanitizeReturningTalentList = (talentList: any[] = []) => {
+    if (!Array.isArray(talentList)) return [];
+
+    const byKey = new Map<string, any>();
+    talentList.forEach((talent: any) => {
+        if (!talent || typeof talent !== 'object' || !talent.id || !talent.role) return;
+
+        const key = [
+            talent.role,
+            talent.id,
+            talent.characterId || talent.characterName || ''
+        ].join(':');
+        const existing = byKey.get(key);
+        const cleaned = {
+            ...talent,
+            attemptsLeft: Math.max(0, Math.min(3, Number.isFinite(Number(talent.attemptsLeft)) ? Number(talent.attemptsLeft) : 3)),
+            accepted: !!talent.accepted,
+            negotiated: !!talent.negotiated,
+            newDemand: Math.max(0, Number(talent.newDemand || talent.originalSalary || 0)),
+            originalSalary: Math.max(0, Number(talent.originalSalary || talent.newDemand || 0)),
+        };
+
+        if (!existing) {
+            if (byKey.size < 24) byKey.set(key, cleaned);
+            return;
+        }
+
+        byKey.set(key, {
+            ...existing,
+            ...cleaned,
+            accepted: !!existing.accepted || cleaned.accepted,
+            negotiated: !!existing.negotiated || cleaned.negotiated,
+            attemptsLeft: Math.min(
+                Number.isFinite(Number(existing.attemptsLeft)) ? Number(existing.attemptsLeft) : 3,
+                cleaned.attemptsLeft
+            ),
+            newDemand: Math.max(Number(existing.newDemand || 0), cleaned.newDemand),
+            originalSalary: Math.max(Number(existing.originalSalary || 0), cleaned.originalSalary),
+        });
+    });
+
+    return Array.from(byKey.values());
+};
 
 export const normalizeStudioState = (studioState: Partial<StudioState> | undefined, currentWeek: number): StudioState => {
     const defaults = createDefaultStudioState(currentWeek);
+    const safeScripts = Array.isArray(studioState?.scripts)
+        ? studioState!.scripts.map((script: any) => ({
+            ...script,
+            returningTalent: sanitizeReturningTalentList(script?.returningTalent),
+        }))
+        : defaults.scripts;
     return {
         ...defaults,
         ...studioState,
-        scripts: Array.isArray(studioState?.scripts) ? studioState!.scripts : defaults.scripts,
+        scripts: safeScripts,
         concepts: Array.isArray(studioState?.concepts) ? studioState!.concepts : defaults.concepts,
         writers: Array.isArray(studioState?.writers) ? studioState!.writers : defaults.writers,
         ipMarket: Array.isArray(studioState?.ipMarket) ? studioState!.ipMarket : defaults.ipMarket,
@@ -414,6 +676,25 @@ export const normalizeStudioState = (studioState: Partial<StudioState> | undefin
             ...(studioState?.genreReputation || defaults.genreReputation || {}),
         },
         marketTrends: Array.isArray(studioState?.marketTrends) ? studioState!.marketTrends : defaults.marketTrends,
+        rightsMarket: Array.isArray(studioState?.rightsMarket) ? studioState.rightsMarket : defaults.rightsMarket,
+        rightsMarketCycle: typeof studioState?.rightsMarketCycle === 'number'
+            ? studioState.rightsMarketCycle
+            : defaults.rightsMarketCycle,
+        lastRightsMarketAdvanceWeek: typeof studioState?.lastRightsMarketAdvanceWeek === 'number'
+            ? studioState.lastRightsMarketAdvanceWeek
+            : defaults.lastRightsMarketAdvanceWeek,
+        lastRightsScoutingCycle: typeof studioState?.lastRightsScoutingCycle === 'number'
+            ? studioState.lastRightsScoutingCycle
+            : defaults.lastRightsScoutingCycle,
+        rightsMarketNotices: Array.isArray(studioState?.rightsMarketNotices)
+            ? studioState.rightsMarketNotices
+            : defaults.rightsMarketNotices,
+        rightsNegotiations: Array.isArray(studioState?.rightsNegotiations)
+            ? studioState.rightsNegotiations
+            : defaults.rightsNegotiations,
+        ownedRights: Array.isArray(studioState?.ownedRights)
+            ? studioState.ownedRights
+            : defaults.ownedRights,
         departments: {
             ...defaults.departments,
             ...(studioState?.departments || {}),
@@ -453,10 +734,33 @@ export const checkAndRefreshHiringPool = (business: Business, currentWeek: numbe
 
 // --- CORE SIMULATION LOOP ---
 
-export const processBusinessWeek = (business: Business, playerFame: number, week: number): { updated: Business, alerts: string[] } => {
+export interface RightsReportReadyNotice {
+    studioId: string;
+    studioName: string;
+    opportunity: RightsOpportunity;
+}
+
+export interface RightsNegotiationResponseNotice {
+    studioId: string;
+    studioName: string;
+    negotiation: RightsNegotiation;
+}
+
+export const processBusinessWeek = (
+    business: Business,
+    playerFame: number,
+    week: number,
+): {
+    updated: Business;
+    alerts: string[];
+    rightsReportsReady: RightsReportReadyNotice[];
+    rightsNegotiationResponses: RightsNegotiationResponseNotice[];
+} => {
     const b = JSON.parse(JSON.stringify(business)) as Business;
     const blueprint = BUSINESS_BLUEPRINTS[b.type];
     const alerts: string[] = [];
+    const rightsReportsReady: RightsReportReadyNotice[] = [];
+    const rightsNegotiationResponses: RightsNegotiationResponseNotice[] = [];
 
     const locations = b.stats.locations || 1;
     const theme = b.config.theme ? BUSINESS_THEMES.find(t => t.id === b.config.theme) : null;
@@ -802,6 +1106,48 @@ export const processBusinessWeek = (business: Business, playerFame: number, week
             b.studioState.writers = generateWriters(10);
             b.studioState.lastWriterRefreshWeek = week;
         }
+
+        // Business processing represents the week the player is advancing into.
+        const investigationWeek = week + 1;
+        const investigationAdvance = advanceRightsInvestigations(b.studioState.rightsMarket || [], investigationWeek);
+        if (investigationAdvance.newlyReady.length > 0) {
+            const readyIds = new Set(investigationAdvance.newlyReady.map(item => item.id));
+            b.studioState.rightsMarket = investigationAdvance.opportunities.map(item => {
+                if (!readyIds.has(item.id) || item.reportNotifiedAtWeek !== undefined) return item;
+                rightsReportsReady.push({
+                    studioId: b.id,
+                    studioName: b.name,
+                    opportunity: item,
+                });
+                return { ...item, reportNotifiedAtWeek: investigationWeek };
+            });
+        } else {
+            b.studioState.rightsMarket = investigationAdvance.opportunities;
+        }
+
+        const negotiationAdvance = advanceRightsNegotiations({
+            negotiations: b.studioState.rightsNegotiations || [],
+            opportunities: b.studioState.rightsMarket || [],
+            currentWeek: investigationWeek,
+            studioPrestige: Math.max(
+                0,
+                Math.min(100, Math.round(b.stats.brandHealth || b.stats.customerSatisfaction || 25)),
+            ),
+        });
+        if (negotiationAdvance.newResponses.length > 0) {
+            const responseIds = new Set(negotiationAdvance.newResponses.map(item => item.id));
+            b.studioState.rightsNegotiations = negotiationAdvance.negotiations.map(item => {
+                if (!responseIds.has(item.id) || item.responseNotifiedAtWeek !== undefined) return item;
+                rightsNegotiationResponses.push({
+                    studioId: b.id,
+                    studioName: b.name,
+                    negotiation: item,
+                });
+                return { ...item, responseNotifiedAtWeek: investigationWeek };
+            });
+        } else {
+            b.studioState.rightsNegotiations = negotiationAdvance.negotiations;
+        }
     }
 
     // 7. BANKRUPTCY CHECK
@@ -812,7 +1158,7 @@ export const processBusinessWeek = (business: Business, playerFame: number, week
     b.history.unshift({ week: 0, profit }); 
     if (b.history.length > 12) b.history.pop();
 
-    return { updated: b, alerts };
+    return { updated: b, alerts, rightsReportsReady, rightsNegotiationResponses };
 };
 
 // ... (Keep existing helpers: promoteBusiness, injectCapital, withdrawCapital, sellBusiness, liquidateBusiness, restockProduct, updateProductPrice, expandBusiness, hireEmployee) ...
@@ -852,7 +1198,9 @@ export const sellBusiness = (business: Business): { success: boolean, payout: nu
         6;
     const maturityFactor = Math.min(1, (business.history?.length || 0) / maturityTarget);
     const strategicValue = stats.valuation * (0.35 + (maturityFactor * 0.65));
-    const payout = Math.floor(strategicValue + Math.max(0, business.balance || 0));
+    const payout = business.type === 'PRODUCTION_HOUSE'
+        ? Math.floor(strategicValue)
+        : Math.floor(strategicValue + Math.max(0, business.balance || 0));
     return { success: true, payout, msg: `Sold ${business.name} for $${payout.toLocaleString()}.` };
 };
 

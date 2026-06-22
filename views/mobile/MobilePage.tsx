@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Player, Commitment, InstaPostType, NPCActor, InteractionType, Agent, Manager, Message, SponsorshipActionType, AuditionOpportunity, DatingMatch, InstaPost, Relationship, SponsorshipOffer, NegotiationData, ContractFilm, YoutubeBrandDeal, YoutubeCollabOffer, PregnancyCarrier } from '../../types';
 import { MessageSquare, Search, BarChart3, Camera, Users, Newspaper, TrendingUp, Activity, Heart, Folder, Flame, Gem, Landmark, X, CheckCircle, AlertCircle, BookOpen, Map } from 'lucide-react';
 import { getPhaseDuration } from '../../services/roleLogic';
@@ -29,15 +29,15 @@ import { getPlayerLanguage, t } from '../../services/i18n';
 
 // Helper Component for App Icon
 const AppIcon = ({ icon, color, label, onClick, badge, customContent, customBg }: any) => (
-    <div className="flex flex-col items-center gap-1 group cursor-pointer" onClick={onClick}>
+    <div className="relative flex w-16 flex-col items-center gap-1 group cursor-pointer" onClick={onClick}>
         <div className={`w-14 h-14 ${customBg || color} rounded-2xl flex items-center justify-center text-white shadow-lg group-active:scale-95 transition-transform relative overflow-hidden`}>
             {customContent ? customContent : icon}
-            {badge > 0 && (
-                <div className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full border-2 border-zinc-900 flex items-center justify-center text-[10px] font-bold">
-                    {badge}
-                </div>
-            )}
         </div>
+        {badge > 0 && (
+            <div className="absolute -top-1 right-1 z-20 min-w-5 h-5 px-1 bg-red-500 rounded-full border-2 border-zinc-900 flex items-center justify-center text-[10px] leading-none font-black text-white shadow-lg">
+                {badge > 9 ? '9+' : badge}
+            </div>
+        )}
         <span className="text-[10px] text-white font-medium drop-shadow-md">{label}</span>
     </div>
 );
@@ -62,6 +62,11 @@ interface MobilePageProps {
   onDeleteMessage?: (id: string) => void;
   onTradeStock?: (stockId: string, amount: number) => void;
   onUpdatePlayer?: (player: Player) => void; 
+  onOpenRightsMarket?: (opportunityId?: string) => void;
+  onNavVisibilityChange?: (visible: boolean) => void;
+  onFullBleedChange?: (enabled: boolean) => void;
+  initialForbesStudioId?: string;
+  onInitialForbesStudioConsumed?: () => void;
   onTriggerBabyNaming?: (pending: {
       partnerId: string;
       partnerName: string;
@@ -78,6 +83,25 @@ interface MobilePageProps {
 export const MobilePage: React.FC<MobilePageProps> = (props) => {
   const [appMode, setAppMode] = useState<'HOME' | 'CASTLINK' | 'IMDB' | 'BOXOFFICE' | 'INSTAGRAM' | 'X' | 'YOUTUBE' | 'NEWS' | 'TEAM' | 'MESSAGES' | 'FORBES' | 'STOCKS' | 'DATING_FOLDER' | 'SOCIAL_FOLDER' | 'TINDER' | 'LUXE' | 'BANK' | 'GUIDE'>('HOME');
   const [toast, setToast] = useState<{msg: string, color: string} | null>(null);
+  const [forbesStudioTargetId, setForbesStudioTargetId] = useState<string | null>(null);
+  const [isImmersiveForbesScene, setIsImmersiveForbesScene] = useState(false);
+
+  useEffect(() => {
+      if (!props.initialForbesStudioId) return;
+      setForbesStudioTargetId(props.initialForbesStudioId);
+      setAppMode('FORBES');
+      props.onInitialForbesStudioConsumed?.();
+  }, [props.initialForbesStudioId, props.onInitialForbesStudioConsumed]);
+
+  useEffect(() => {
+      const fullBleed = appMode === 'FORBES' && isImmersiveForbesScene;
+      props.onNavVisibilityChange?.(!fullBleed);
+      props.onFullBleedChange?.(fullBleed);
+      return () => {
+          props.onNavVisibilityChange?.(true);
+          props.onFullBleedChange?.(false);
+      };
+  }, [appMode, isImmersiveForbesScene, props.onFullBleedChange, props.onNavVisibilityChange]);
 
   if (!props.player) return null; 
 
@@ -105,7 +129,42 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
       let updatedPlayer = { ...props.player!, inbox: newInbox };
 
       // 2. Process Logic based on Type
-      if (msg.type === 'OFFER_ROLE' || msg.type === 'OFFER_NEGOTIATION') {
+      if (msg.type === 'OFFER_AUDITION') {
+          const opp = msg.data as AuditionOpportunity;
+          if (!opp?.project) {
+              showToast(tr('mobile.toast.missingProject'), "bg-rose-500");
+              handleUpdatePlayer(updatedPlayer);
+              return;
+          }
+
+          const auditionDuration = getPhaseDuration('AUDITION');
+          const newCommitment: Commitment = {
+              id: `audition_invite_${Date.now()}`,
+              name: opp.projectName,
+              type: 'ACTING_GIG',
+              roleType: opp.roleType,
+              energyCost: 0,
+              income: 0,
+              lumpSum: opp.estimatedIncome,
+              payoutType: 'LUMPSUM',
+              projectDetails: opp.project,
+              projectPhase: 'AUDITION',
+              phaseWeeksLeft: auditionDuration,
+              totalPhaseDuration: auditionDuration,
+              auditionPerformance: 0,
+              productionPerformance: 0,
+              agentCommission: props.player!.team.agent?.commission || 0,
+              royaltyPercentage: opp.royaltyPercentage || 0
+          };
+
+          updatedPlayer.commitments = [...updatedPlayer.commitments, newCommitment];
+          updatedPlayer.logs.push({
+              week: updatedPlayer.currentWeek,
+              year: updatedPlayer.age,
+              message: `Accepted breakthrough audition invite for "${opp.projectName}".`,
+              type: 'positive'
+          });
+      } else if (msg.type === 'OFFER_ROLE' || msg.type === 'OFFER_NEGOTIATION') {
           let opp: AuditionOpportunity;
           let salary = 0;
           let royalty = 0;
@@ -273,7 +332,7 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
 
       // 3. Update Player
       handleUpdatePlayer(updatedPlayer);
-      showToast(tr('mobile.toast.offerAccepted'));
+      showToast(msg.type === 'OFFER_AUDITION' ? tr('mobile.toast.auditionAccepted') : tr('mobile.toast.offerAccepted'));
   };
 
   // --- HANDLER: Perform Sponsorship ---
@@ -378,22 +437,24 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
       showToast(tr('mobile.toast.managerHired'), "bg-emerald-500");
   };
 
+  const isFullBleedApp = appMode === 'FORBES' && isImmersiveForbesScene;
+
   return (
-    <div className="h-[calc(100vh-8rem)] flex items-center justify-center pt-4 relative">
-        <div className="w-full max-w-xs h-full max-h-[650px] bg-black border-[6px] border-zinc-800 rounded-[3rem] overflow-hidden relative shadow-2xl ring-1 ring-zinc-700">
+    <div className={isFullBleedApp ? "fixed inset-0 z-[120] h-screen w-screen bg-black" : "h-[calc(100vh-8rem)] flex items-center justify-center pt-4 relative"}>
+        <div className={isFullBleedApp ? "h-full w-full overflow-hidden bg-black relative" : "w-full max-w-xs h-full max-h-[650px] bg-black border-[6px] border-zinc-800 rounded-[3rem] overflow-hidden relative shadow-2xl ring-1 ring-zinc-700"}>
             {/* Notch */}
-            <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-32 h-6 bg-zinc-900 rounded-b-xl z-50"></div>
+            {!isFullBleedApp && <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-32 h-6 bg-zinc-900 rounded-b-xl z-50"></div>}
             
             <div className="w-full h-full bg-cover bg-center relative overflow-hidden" style={{ backgroundImage: 'linear-gradient(to bottom, #1e1b4b, #312e81)' }}>
                 {/* Status Bar */}
-                <div className="h-8 w-full flex justify-between items-center px-6 pt-2 text-[10px] text-white font-medium z-20 relative">
+                {!isFullBleedApp && <div className="h-8 w-full flex justify-between items-center px-6 pt-2 text-[10px] text-white font-medium z-20 relative">
                     <span>12:45</span>
                     <div className="flex gap-1">
                         <div className="w-3 h-3 bg-white rounded-full opacity-20"></div>
                         <div className="w-3 h-3 bg-white rounded-full opacity-20"></div>
                         <div className="w-3 h-3 bg-white rounded-full"></div>
                     </div>
-                </div>
+                </div>}
 
                 {/* TOAST NOTIFICATION (Inside Phone Screen for better Z-index/Visibility) */}
                 {toast && (
@@ -555,6 +616,11 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
                         onAccept={handleAcceptMessage} // Use local smart handler
                         onDelete={props.onDeleteMessage!} 
                         onMarkRead={handleMarkMessageRead}
+                        onOpenRightsMarket={props.onOpenRightsMarket}
+                        onOpenStudioAcquisition={(studioId) => {
+                            setForbesStudioTargetId(studioId);
+                            setAppMode('FORBES');
+                        }}
                     />
                 )}
                 {appMode === 'TEAM' && (
@@ -577,7 +643,15 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
                     <ImdbApp player={props.player} onBack={() => setAppMode('HOME')} />
                 )}
                 {appMode === 'FORBES' && (
-                    <ForbesApp player={props.player} onBack={() => setAppMode('HOME')} />
+                    <ForbesApp
+                        player={props.player}
+                        onBack={() => setAppMode('HOME')}
+                        onUpdatePlayer={handleUpdatePlayer}
+                        onOpenStocks={() => setAppMode('STOCKS')}
+                        onImmersiveChange={setIsImmersiveForbesScene}
+                        initialStudioId={forbesStudioTargetId || undefined}
+                        onInitialStudioConsumed={() => setForbesStudioTargetId(null)}
+                    />
                 )}
                 {appMode === 'STOCKS' && (
                     <StocksApp player={props.player} onBack={() => setAppMode('HOME')} onTrade={props.onTradeStock!} />

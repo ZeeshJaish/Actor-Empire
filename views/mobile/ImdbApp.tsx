@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { Player, PastProject, ActiveRelease, CastMember, Review, Award, Universe, UniverseId, IndustryProject, CustomPoster } from '../../types';
 import { formatMoney } from '../../services/formatUtils';
 import { getProjectIdentityLabel } from '../../services/genreCatalog';
+import { getProjectReleaseLabel, getProjectReleaseTiming } from '../../services/releaseTiming';
 import { AWARD_CALENDAR, AWARD_SHOW_DB, AwardShowLore, AwardDefinition, Nomination, sanitizeAwardRecords, getAwardCeremonyYear } from '../../services/awardLogic';
 import { ArrowLeft, Star, Film, ChevronRight, User, TrendingUp, DollarSign, Eye, Award as AwardIcon, Calendar, BookOpen, Clock, List, MessageSquare, Users, Globe, Zap, LayoutGrid, Shield, ArrowRight, Tv } from 'lucide-react';
 import { buildUniverseRoster, calculateUniverseProductWeeklyRevenue, getFallbackCharacterName, getUniverseDashboardProjects, getUniverseReleaseActivity, normalizeUniverseForSave, normalizeUniverseMap } from '../../services/universeLogic';
@@ -32,6 +33,8 @@ interface DisplayProject {
     mediaType: 'MOVIE' | 'SERIES';
     customPoster?: CustomPoster;
     identityLabel: string;
+    releaseLabel: string;
+    releaseDetailLabel: string;
 }
 
 type Tab = 'PROFILE' | 'FILMOGRAPHY' | 'AWARDS' | 'FRANCHISES' | 'SEASON'; // Added SEASON
@@ -141,18 +144,29 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
   };
 
   // --- DATA TRANSFORMATION ---
-  const activeList: DisplayProject[] = player.activeReleases.map(r => ({
-      id: r.id, name: r.name, year: player.age, role: r.roleType, rating: r.imdbRating || 0, status: 'ACTIVE' as const,
-      gross: r.totalGross, budget: r.budget, description: r.projectDetails.description, cast: r.projectDetails.castList,
-      reviews: r.projectDetails.reviews, streamingViews: r.streaming?.totalViews, originalObject: r,
-      mediaType: r.type, customPoster: r.projectDetails.customPoster, identityLabel: getProjectIdentityLabel(r.projectDetails)
-  }));
+  const releaseFallback = { currentAge: player.age, currentWeek: player.currentWeek };
+  const activeList: DisplayProject[] = player.activeReleases.map(r => {
+      const timing = getProjectReleaseTiming(r, releaseFallback);
+      return {
+          id: r.id, name: r.name, year: timing.releaseYear || player.age, role: r.roleType, rating: r.imdbRating || 0, status: 'ACTIVE' as const,
+          gross: r.totalGross, budget: r.budget, description: r.projectDetails.description, cast: r.projectDetails.castList,
+          reviews: r.projectDetails.reviews, streamingViews: r.streaming?.totalViews, originalObject: r,
+          mediaType: r.type, customPoster: r.projectDetails.customPoster, identityLabel: getProjectIdentityLabel(r.projectDetails),
+          releaseLabel: getProjectReleaseLabel(r, releaseFallback),
+          releaseDetailLabel: getProjectReleaseLabel(r, releaseFallback, { includeWeek: true })
+      };
+  });
 
-  const pastList: DisplayProject[] = player.pastProjects.map(p => ({
-      id: p.id, name: p.name, year: p.year, role: p.roleType || 'Role', rating: p.imdbRating || 0, status: 'ARCHIVED' as const,
-      gross: p.gross, budget: p.budget, description: p.description, cast: p.castList, reviews: p.reviews, streamingViews: p.totalViews, awards: p.awards, originalObject: p,
-      mediaType: p.projectType || 'MOVIE', customPoster: p.customPoster, identityLabel: getProjectIdentityLabel(p)
-  })).reverse();
+  const pastList: DisplayProject[] = player.pastProjects.map(p => {
+      const timing = getProjectReleaseTiming(p, releaseFallback);
+      return {
+          id: p.id, name: p.name, year: timing.releaseYear || p.year, role: p.roleType || 'Role', rating: p.imdbRating || 0, status: 'ARCHIVED' as const,
+          gross: p.gross, budget: p.budget, description: p.description, cast: p.castList, reviews: p.reviews, streamingViews: p.totalViews, awards: p.awards, originalObject: p,
+          mediaType: p.projectType || 'MOVIE', customPoster: p.customPoster, identityLabel: getProjectIdentityLabel(p),
+          releaseLabel: getProjectReleaseLabel(p, releaseFallback),
+          releaseDetailLabel: getProjectReleaseLabel(p, releaseFallback, { includeWeek: true })
+      };
+  }).reverse();
 
   const fullList = [...activeList, ...pastList];
   
@@ -742,7 +756,7 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
                                 <div className="absolute bottom-0 left-0 p-4 w-full bg-gradient-to-t from-zinc-950 via-zinc-950/80 to-transparent z-10">
                                     <h1 className="text-2xl font-bold leading-tight mb-1">{selectedProject.name}</h1>
                                     <div className="flex items-center gap-3 text-xs text-zinc-400 mb-2">
-                                        <span>{selectedProject.year}</span>
+                                        <span>{selectedProject.releaseDetailLabel}</span>
                                         <span>•</span>
                                         <span className="bg-zinc-800 border border-zinc-700 px-1.5 rounded text-[10px]">PG-13</span>
                                         <span>•</span>
@@ -777,7 +791,7 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
                             <div className="absolute bottom-0 left-0 p-4 w-full bg-gradient-to-t from-zinc-950 via-zinc-950/80 to-transparent z-10">
                                 <h1 className="text-2xl font-bold leading-tight mb-1">{selectedProject.name}</h1>
                                 <div className="flex items-center gap-3 text-xs text-zinc-400 mb-2">
-                                    <span>{selectedProject.year}</span>
+                                    <span>{selectedProject.releaseDetailLabel}</span>
                                     <span>•</span>
                                     <span className="bg-zinc-800 border border-zinc-700 px-1.5 rounded text-[10px]">PG-13</span>
                                     <span>•</span>
@@ -1019,7 +1033,7 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
                                  )}
                                  <div className="flex-1 min-w-0">
                                      <div className="font-bold text-base text-zinc-100 truncate">{project.name}</div>
-                                     <div className="text-xs text-zinc-500 mb-1 truncate">{project.year} • {project.role} • {project.identityLabel}</div>
+                                     <div className="text-xs text-zinc-500 mb-1 truncate">{project.releaseLabel} • {project.role} • {project.identityLabel}</div>
                                      <div className="flex items-center gap-3 mt-1.5">
                                          {project.rating > 0 && <span className="flex items-center gap-1 text-zinc-200 text-xs font-bold"><Star size={10} className="text-yellow-400 fill-yellow-400"/> {project.rating.toFixed(1)}</span>}
                                          <span className="text-[10px] text-zinc-600 font-bold uppercase border border-zinc-700 px-1.5 rounded">{project.mediaType === 'SERIES' ? 'TV' : 'Movie'}</span>

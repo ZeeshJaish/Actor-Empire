@@ -22,7 +22,7 @@ export const PLATFORMS: Record<PlatformId, PlatformProfile> = {
         prestigeMult: 0.8, // Medium prestige
         payoutMult: 1.2,   // Good money
         churnRate: 'FAST', // Content leaves quickly
-        genreBias: ['Thriller', 'Action', 'RomCom', 'Sci-Fi'],
+        genreBias: ['Thriller', 'Mystery', 'Action', 'RomCom', 'Sci-Fi'],
         color: 'text-red-600',
         subscribers: 260,
         valuation: 260
@@ -34,7 +34,7 @@ export const PLATFORMS: Record<PlatformId, PlatformProfile> = {
         prestigeMult: 1.5, // Awards bait
         payoutMult: 1.0,
         churnRate: 'SLOW', // Content stays
-        genreBias: ['Drama', 'Indie', 'Sci-Fi'],
+        genreBias: ['Drama', 'Mystery', 'Indie', 'Sci-Fi'],
         color: 'text-zinc-400',
         subscribers: 45,
         valuation: 2900 // Parent company
@@ -58,7 +58,7 @@ export const PLATFORMS: Record<PlatformId, PlatformProfile> = {
         prestigeMult: 0.9,
         payoutMult: 0.9,
         churnRate: 'MEDIUM',
-        genreBias: ['Drama', 'RomCom', 'Thriller'],
+        genreBias: ['Drama', 'RomCom', 'Thriller', 'Mystery'],
         color: 'text-emerald-500',
         subscribers: 48,
         valuation: 27
@@ -93,9 +93,16 @@ export const determineStreamingAcquisition = (project: ProjectDetails): Platform
     const budget = project.budgetTier;
     const quality = project.hiddenStats.qualityScore;
 
+    const normalizeGenreBias = (value: string): string => {
+        const normalized = value.toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+        if (normalized === 'ROMCOM') return 'ROMANCE';
+        if (normalized === 'INDIE') return 'DRAMA';
+        return normalized;
+    };
+
     // 1. Genre Fit
     Object.values(PLATFORMS).forEach(plat => {
-        if (plat.genreBias.includes(genre)) scores[plat.id] += 20;
+        if (plat.genreBias.some(bias => normalizeGenreBias(bias) === genre)) scores[plat.id] += 20;
     });
 
     // 2. Budget Fit

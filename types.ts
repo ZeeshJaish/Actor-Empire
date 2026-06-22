@@ -13,7 +13,7 @@ export enum Page {
 
 export type Gender = 'MALE' | 'FEMALE' | 'NON_BINARY' | 'ALL';
 export type PregnancyCarrier = 'PLAYER' | 'PARTNER' | 'NONE';
-export type Genre = 'ACTION' | 'DRAMA' | 'COMEDY' | 'ROMANCE' | 'THRILLER' | 'HORROR' | 'SCI_FI' | 'ADVENTURE' | 'SUPERHERO' | 'MUSICAL' | 'BIOPIC' | 'SPORTS' | 'ANIMATION' | 'FANTASY' | 'CRIME' | 'DOCUMENTARY';
+export type Genre = 'ACTION' | 'DRAMA' | 'COMEDY' | 'ROMANCE' | 'THRILLER' | 'MYSTERY' | 'HORROR' | 'SCI_FI' | 'ADVENTURE' | 'SUPERHERO' | 'MUSICAL' | 'BIOPIC' | 'SPORTS' | 'ANIMATION' | 'FANTASY' | 'CRIME' | 'DOCUMENTARY';
 export type RoleType = 'MINOR' | 'CAMEO' | 'SUPPORTING' | 'ENSEMBLE' | 'LEAD';
 export type BudgetTier = 'LOW' | 'MID' | 'HIGH' | 'BLOCKBUSTER';
 export type TargetAudience = 'G' | 'PG' | 'PG-13' | 'R' | 'NC-17';
@@ -121,6 +121,12 @@ export interface BusinessStats {
     customerSatisfaction: number;
     riskLevel: number;
     hype: number;
+    studioMomentum?: number;
+    investorConfidence?: number;
+    recentHitStreak?: number;
+    recentFlopStreak?: number;
+    recentReleaseOutcomes?: string[];
+    processedReleaseOutcomeIds?: string[];
     capacity?: number;
     inventory?: number;
     locations?: number;
@@ -293,6 +299,160 @@ export interface StudioEquipment {
     practicalEffects: number;
 }
 
+export type RightsPropertyType = 'CHARACTER' | 'FRANCHISE' | 'CATALOG' | 'STORY_WORLD';
+
+export type RightsArchetype =
+    | 'DORMANT_HERO'
+    | 'CULT_HORROR'
+    | 'FAILED_BLOCKBUSTER'
+    | 'VIRAL_STORY'
+    | 'STREAMING_CATALOG'
+    | 'PRESTIGE_PROPERTY';
+
+export type RightsRarity = 'COMMON' | 'UNCOMMON' | 'RARE' | 'LEGENDARY';
+export type RightsSignal = 'LOW' | 'MEDIUM' | 'HIGH' | 'EXTREME';
+export type RightsMarketStatus = 'AVAILABLE' | 'EXPIRED';
+export type RightsInvestigationStatus =
+    | 'NONE'
+    | 'INVESTIGATING'
+    | 'REPORT_READY'
+    | 'PURSUIT_READY'
+    | 'DISMISSED';
+export type RightsRecommendedFormat =
+    | 'FEATURE_FILM'
+    | 'LIMITED_SERIES'
+    | 'ONGOING_SERIES'
+    | 'ANIMATED_FILM'
+    | 'FRANCHISE_REBOOT';
+
+export interface RightsInsideReport {
+    estimatedValueLow: number;
+    estimatedValueHigh: number;
+    audienceLoyalty: RightsSignal;
+    commercialPotential: RightsSignal;
+    ownershipRisk: RightsSignal;
+    rivalActivity: RightsSignal;
+    recommendedFormat: RightsRecommendedFormat;
+    hiddenAdvantage: string;
+    hiddenDanger: string;
+}
+
+export interface RightsOpportunity {
+    id: string;
+    title: string;
+    archetype: RightsArchetype;
+    propertyType: RightsPropertyType;
+    primaryGenre: Genre;
+    shortPitch: string;
+    availabilityReason: string;
+    sellerName: string;
+    askingPrice: number;
+    rarity: RightsRarity;
+    fanbase: RightsSignal;
+    publicRisk: RightsSignal;
+    visibleUpside: string;
+    publicConcern: string;
+    rivalInterest: RightsSignal;
+    listedAtWeek: number;
+    expiresAtWeek: number;
+    marketStatus: RightsMarketStatus;
+    isTracked: boolean;
+    accent: string;
+    emblemKey: 'SHIELD' | 'SKULL' | 'FLAME' | 'BOOK' | 'LIBRARY' | 'AWARD';
+    intelligenceSeed: number;
+    investigationStatus?: RightsInvestigationStatus;
+    investigationStartedWeek?: number;
+    investigationCompletesWeek?: number;
+    investigationCost?: number;
+    insideReport?: RightsInsideReport;
+    reportNotifiedAtWeek?: number;
+    dismissedCycle?: number;
+}
+
+export interface RightsMarketNotice {
+    id: string;
+    opportunityTitle: string;
+    kind: 'FINAL_WEEK' | 'EXPIRED';
+    week: number;
+}
+
+export type RightsDealType = 'OPTION' | 'LICENSE' | 'BUYOUT' | 'CATALOG_PURCHASE';
+export type RightsNegotiationStatus =
+    | 'AWAITING_RESPONSE'
+    | 'ACCEPTED'
+    | 'REJECTED'
+    | 'COUNTEROFFER'
+    | 'CREATIVE_GUARANTEE'
+    | 'RIVAL_OFFER'
+    | 'BIDDING_WAR'
+    | 'READY_TO_SIGN'
+    | 'SIGNED'
+    | 'WITHDRAWN';
+
+export interface RightsCreativeGuarantee {
+    id: string;
+    title: string;
+    description: string;
+}
+
+export interface RightsNegotiation {
+    id: string;
+    opportunityId: string;
+    opportunityTitle: string;
+    sellerName: string;
+    dealType: RightsDealType;
+    openingOffer: number;
+    currentOffer: number;
+    askingPrice: number;
+    agreedAmount?: number;
+    counterAmount?: number;
+    rivalAmount?: number;
+    round: number;
+    maxRounds: number;
+    status: RightsNegotiationStatus;
+    submittedWeek: number;
+    responseDueWeek: number;
+    responseSummary?: string;
+    creativeGuarantee?: RightsCreativeGuarantee;
+    isInvestigated: boolean;
+    intelligenceSeed: number;
+    responseNotifiedAtWeek?: number;
+}
+
+export interface OwnedRight {
+    id: string;
+    sourceOpportunityId: string;
+    title: string;
+    sellerName: string;
+    propertyType: RightsPropertyType;
+    archetype: RightsArchetype;
+    primaryGenre: Genre;
+    rarity: RightsRarity;
+    accent: string;
+    emblemKey: RightsOpportunity['emblemKey'];
+    dealType: RightsDealType;
+    purchasePrice: number;
+    acquiredWeek: number;
+    acquiredYear: number;
+    expiresAtWeek?: number;
+    projectsAllowed?: number;
+    projectsUsed: number;
+    creativeGuarantee?: RightsCreativeGuarantee;
+    status: 'ACTIVE' | 'EXPIRED';
+    ownershipSource?: 'ACQUIRED' | 'STUDIO_ORIGINAL';
+    sourceProjectId?: string;
+    franchiseId?: string;
+    universeId?: UniverseId;
+}
+
+export type OwnedRightDevelopmentStrategy = 'FRESH_ADAPTATION' | 'REBOOT';
+export type SubsidiaryOperatingModel = 'INDEPENDENT_LABEL' | 'CONTROLLED_SUBSIDIARY' | 'FULL_MERGER';
+
+export interface OwnedRightDevelopmentChoice {
+    format: Extract<ProjectType, 'MOVIE' | 'SERIES'>;
+    strategy: OwnedRightDevelopmentStrategy;
+}
+
 export interface StudioState {
     scripts: Script[];
     concepts: ProjectConcept[]; // NEW: Drafts
@@ -307,9 +467,23 @@ export interface StudioState {
     purchasedIPTitles?: string[];
     productionFund?: number; // NEW: Funds provided by a streaming platform for the next project
     lockedStreamingFunds?: LockedStreamingFunding[];
+    platformRelations?: Record<string, PlatformFundingRelationship>;
     financeLedger?: StudioFinanceEntry[];
     genreReputation?: Record<string, number>;
     marketTrends?: GenreMarketTrend[];
+    rightsMarket?: RightsOpportunity[];
+    rightsMarketCycle?: number;
+    lastRightsMarketAdvanceWeek?: number;
+    lastRightsScoutingCycle?: number;
+    rightsMarketNotices?: RightsMarketNotice[];
+    rightsNegotiations?: RightsNegotiation[];
+    ownedRights?: OwnedRight[];
+    acquisitionOrigin?: 'STUDIO_ACQUISITION';
+    acquiredWeek?: number;
+    acquiredYear?: number;
+    operatingModel?: SubsidiaryOperatingModel;
+    operatingModelChangedWeek?: number;
+    operatingModelChangedYear?: number;
 }
 
 export interface GenreMarketTrend {
@@ -332,6 +506,19 @@ export interface LockedStreamingFunding {
     createdWeek?: number;
     createdYear?: number;
     usedByProjectId?: string;
+    tier?: NextSeasonFundingTier;
+    reason?: string;
+    warningStage?: 'FIRST' | 'FINAL';
+    deadlineExtensionWeeks?: number;
+}
+
+export type NextSeasonFundingTier = 'CONSERVATIVE' | 'STANDARD' | 'PREMIUM' | 'BREAKOUT' | 'RISKY_BET';
+
+export interface PlatformFundingRelationship {
+    trustModifier: number;
+    recoveryWeeksRemaining: number;
+    lastBreachWeek?: number;
+    lastBreachYear?: number;
 }
 
 export interface StudioFinanceEntry {
@@ -339,7 +526,7 @@ export interface StudioFinanceEntry {
     week: number;
     year: number;
     amount: number;
-    type: 'THEATRICAL' | 'STREAMING_DEAL' | 'STREAMING_ROYALTY' | 'UNIVERSE' | 'CAPITAL_INJECTION' | 'CAPITAL_WITHDRAWAL' | 'PRODUCTION_SPEND';
+    type: 'THEATRICAL' | 'STREAMING_DEAL' | 'STREAMING_ROYALTY' | 'UNIVERSE' | 'CAPITAL_INJECTION' | 'CAPITAL_WITHDRAWAL' | 'PRODUCTION_SPEND' | 'FUNDING_SURPLUS';
     label: string;
     projectId?: string;
 }
@@ -368,7 +555,23 @@ export interface ProjectHiddenStats {
     nextSeasonFundingPlatformId?: string | null;
     nextSeasonFundingSourceProjectId?: string;
     nextSeasonFundingUsedByProjectId?: string;
+    nextSeasonFundingTier?: NextSeasonFundingTier;
+    nextSeasonFundingReason?: string;
+    rareChaosResolved?: boolean;
+    rareChaosKind?: RareHollywoodChaosKind;
+    rareChaosReason?: string;
+    rareChaosPlatformId?: string | null;
+    rareChaosFundingCap?: number;
+    rareChaosResolvedWeek?: number;
+    rareChaosResolvedYear?: number;
+    forcedRareChaosKind?: RareHollywoodChaosKind;
 }
+
+export type RareHollywoodChaosKind =
+    | 'FLOP_SEQUEL_GAMBLE'
+    | 'CANCELLED_SHOW_REVIVAL'
+    | 'PLATFORM_MOONSHOT'
+    | 'STUDIO_REBOOT_GAMBLE';
 
 export interface CastMember {
     id: string;
@@ -433,6 +636,8 @@ export interface CustomPoster {
 
 export interface ProjectDetails {
     title: string;
+    sourceScriptId?: string;
+    isOriginal?: boolean;
     type: ProjectType;
     description: string;
     studioId: StudioId;
@@ -566,6 +771,9 @@ export interface ActiveRelease {
     royaltyPercentage?: number;
     previousBestBidValue?: number;
     generatedNewsKeys?: string[];
+    releaseWeek?: number;
+    releaseYear?: number;
+    releasedAtAbsoluteWeek?: number;
 }
 
 export interface Award {
@@ -616,7 +824,12 @@ export interface PastProject {
     universePhaseName?: string;
     installmentNumber?: number;
     directorId?: string;
+    releaseWeek?: number;
+    releaseYear?: number;
+    releasedAtAbsoluteWeek?: number;
     customPoster?: CustomPoster;
+    sourceScriptId?: string;
+    isOriginal?: boolean;
 }
 
 export interface Commitment {
@@ -781,10 +994,26 @@ export interface LegalCase {
 }
 
 export interface LifeEventOption {
+    id?: string;
     label: string;
     description?: string;
     isGolden?: boolean; // Requires Ad
-    impact: (player: Player) => { updatedPlayer: Player, log: string, feedbackDelay?: number, feedbackType?: string };
+    previewEffects?: EventImpactSignal[];
+    impact?: (player: Player) => LifeEventImpactResult;
+}
+
+export interface EventImpactSignal {
+    label: string;
+    value: string;
+    tone?: 'positive' | 'negative' | 'neutral';
+}
+
+export interface LifeEventImpactResult {
+    updatedPlayer: Player;
+    log: string;
+    effects?: EventImpactSignal[];
+    feedbackDelay?: number;
+    feedbackType?: string;
 }
 
 export interface LifeEvent {
@@ -879,7 +1108,7 @@ export interface Message {
     sender: string;
     subject: string;
     text: string;
-    type: 'OFFER_ROLE' | 'OFFER_SPONSORSHIP' | 'OFFER_NEGOTIATION' | 'OFFER_EVENT' | YoutubeMessageType | 'TEXT' | 'SYSTEM';
+    type: 'OFFER_ROLE' | 'OFFER_AUDITION' | 'OFFER_SPONSORSHIP' | 'OFFER_NEGOTIATION' | 'OFFER_EVENT' | YoutubeMessageType | 'TEXT' | 'SYSTEM' | 'CASTING_FEEDBACK' | 'RIGHTS_REPORT' | 'RIGHTS_NEGOTIATION' | 'STUDIO_ACQUISITION';
     data?: AuditionOpportunity | SponsorshipOffer | NegotiationData | ScheduledEvent | YoutubeCollabOffer | YoutubeBrandDeal | any;
     isRead: boolean;
     weekSent: number;
@@ -1090,6 +1319,7 @@ export interface Stock {
     name: string;
     sector: 'TECH' | 'MEDIA' | 'FASHION' | 'BEVERAGE' | 'AUTOMOTIVE';
     price: number;
+    outstandingShares?: number;
     volatility: number;
     dividendYield: number;
     relatedBrandName?: string;
@@ -1192,6 +1422,16 @@ export interface UniverseSaga {
     }[];
 }
 
+export type UniverseStatus = 'ACTIVE' | 'RETIRED';
+
+export interface UniverseLifecycleEvent {
+    id: string;
+    type: 'RETIRED' | 'REBOOTED';
+    year: number;
+    week: number;
+    label: string;
+}
+
 export interface Universe {
     id: UniverseId;
     name: string;
@@ -1214,6 +1454,17 @@ export interface Universe {
         lifetimeRevenue: number;
     };
     weeksUntilNextPhase: number;
+    status?: UniverseStatus;
+    retiredAt?: {
+        year: number;
+        week: number;
+    };
+    lastRebootAt?: {
+        year: number;
+        week: number;
+    };
+    rebootCount?: number;
+    lifecycleHistory?: UniverseLifecycleEvent[];
 }
 
 export interface AwardHistoryEntry {
@@ -1450,6 +1701,7 @@ export type GameLanguage = 'en' | 'pt-BR';
 
 export interface PlayerSettings {
     language: GameLanguage;
+    smoothMode?: boolean;
 }
 
 export interface Player {
@@ -1577,7 +1829,7 @@ export const INITIAL_PLAYER: Player = {
     age: 18,
     gender: 'MALE',
     avatar: 'https://api.dicebear.com/8.x/pixel-art/svg?seed=Felix',
-    settings: { language: 'en' },
+    settings: { language: 'en', smoothMode: false },
     money: 2000,
     energy: { current: 100, max: 100 },
     stats: {
@@ -1585,7 +1837,7 @@ export const INITIAL_PLAYER: Player = {
         fame: 0, reputation: 0, experience: 0, talent: 0, followers: 0, // Starts at 0
         skills: { delivery: 0, memorization: 0, expression: 0, improvisation: 0, discipline: 0, presence: 0, charisma: 0, writing: 0 },
         directorSkills: { vision: 0, technical: 0, leadership: 0, style: 0 },
-        genreXP: { ACTION: 0, DRAMA: 0, COMEDY: 0, ROMANCE: 0, THRILLER: 0, HORROR: 0, SCI_FI: 0, ADVENTURE: 0, SUPERHERO: 0, MUSICAL: 0, BIOPIC: 0, SPORTS: 0, ANIMATION: 0, FANTASY: 0, CRIME: 0, DOCUMENTARY: 0 }
+        genreXP: { ACTION: 0, DRAMA: 0, COMEDY: 0, ROMANCE: 0, THRILLER: 0, MYSTERY: 0, HORROR: 0, SCI_FI: 0, ADVENTURE: 0, SUPERHERO: 0, MUSICAL: 0, BIOPIC: 0, SPORTS: 0, ANIMATION: 0, FANTASY: 0, CRIME: 0, DOCUMENTARY: 0 }
     },
     writerStats: { creativity: 0, dialogue: 0, structure: 0, pacing: 0 },
     directorStats: { vision: 0, technical: 0, leadership: 0, style: 0 },

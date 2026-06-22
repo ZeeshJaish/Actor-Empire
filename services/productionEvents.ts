@@ -625,6 +625,54 @@ const GENRE_CRISIS_TEMPLATES: Partial<Record<Genre | 'ANIME_FORMAT', ((project: 
             ],
         }),
     ],
+    MYSTERY: [
+        project => ({
+            id: `crisis_mystery_clues_${Date.now()}`,
+            title: 'Clue Logic Problem',
+            description: `Test viewers for ${project.name} spotted a clue that makes the final reveal feel unfair.`,
+            options: [
+                {
+                    label: 'Rewrite Clue Trail',
+                    impact: (p, c) => ({
+                        updatedPlayer: p,
+                        updatedProject: delayProject(c, 1, 7, 0),
+                        log: 'The revised clue trail made the mystery feel earned instead of random.',
+                    }),
+                },
+                {
+                    label: 'Protect the Twist',
+                    impact: (p, c) => ({
+                        updatedPlayer: p,
+                        updatedProject: tuneProject(c, -4, 5),
+                        log: 'You protected the twist, but some viewers may call the reveal a cheat.',
+                    }),
+                },
+            ],
+        }),
+        project => ({
+            id: `crisis_mystery_theory_${Date.now()}`,
+            title: 'Ending Theory Goes Viral',
+            description: `A fan theory about ${project.name} is dangerously close to the real culprit.`,
+            options: [
+                {
+                    label: 'Plant Misdirection',
+                    impact: (p, c) => ({
+                        updatedPlayer: p,
+                        updatedProject: delayProject(tuneProject(c, 4, 6), 1, 0, 0),
+                        log: 'You planted smarter misdirection and protected the reveal.',
+                    }),
+                },
+                {
+                    label: 'Let Fans Cook',
+                    impact: (p, c) => ({
+                        updatedPlayer: p,
+                        updatedProject: tuneProject(c, 1, 4),
+                        log: 'Fan theories kept the mystery hot, but expectations rose.',
+                    }),
+                },
+            ],
+        }),
+    ],
     FANTASY: [
         project => ({
             id: `crisis_fantasy_lore_${Date.now()}`,

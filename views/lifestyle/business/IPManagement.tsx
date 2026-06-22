@@ -1,8 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { Player, Business, Universe, Script } from '../../../types';
-import { Globe, Layers, ShoppingCart, Sparkles, Star, ChevronRight, Check, TrendingUp, RefreshCw } from 'lucide-react';
-import { generateIPMarket } from '../../../src/data/generators';
+import { Globe, Layers, Sparkles, Star, ChevronRight, Check, Crosshair } from 'lucide-react';
 import { normalizeUniverseForSave, normalizeUniverseMap } from '../../../services/universeLogic';
+import { RightsMarket } from './components/RightsMarket';
 
 interface IPManagementProps {
     player: Player;
@@ -11,7 +11,7 @@ interface IPManagementProps {
     onBack?: () => void;
 }
 
-type IPTab = 'UNIVERSES' | 'FRANCHISES' | 'MARKETPLACE';
+type IPTab = 'UNIVERSES' | 'FRANCHISES' | 'RIGHTS_MARKET';
 
 const formatCurrency = (amount: number): string => {
     if (amount >= 1000000000) return `$${(amount / 1000000000).toFixed(1)}B`;
@@ -35,7 +35,7 @@ export const IPManagement: React.FC<IPManagementProps> = ({ player, studio, onUp
                             </button>
                         )}
                         <h1 className="text-4xl font-black uppercase tracking-tighter mb-2">IP & Universes</h1>
-                        <p className="text-zinc-400 text-sm">Manage your franchises, cinematic universes, and acquire new intellectual property.</p>
+                        <p className="text-zinc-400 text-sm">Build worlds, manage franchises, and watch the industry's most valuable rights.</p>
                     </div>
                 </div>
 
@@ -44,7 +44,7 @@ export const IPManagement: React.FC<IPManagementProps> = ({ player, studio, onUp
                     {[
                         { id: 'UNIVERSES', label: 'Universes', icon: <Globe size={14} /> },
                         { id: 'FRANCHISES', label: 'My Franchises', icon: <Layers size={14} /> },
-                        { id: 'MARKETPLACE', label: 'Acquisitions', icon: <ShoppingCart size={14} /> }
+                        { id: 'RIGHTS_MARKET', label: 'Rights Market', icon: <Crosshair size={14} /> }
                     ].map(tab => (
                         <button
                             key={tab.id}
@@ -63,10 +63,10 @@ export const IPManagement: React.FC<IPManagementProps> = ({ player, studio, onUp
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+            <div className={`flex-1 overflow-y-auto custom-scrollbar ${activeTab === 'RIGHTS_MARKET' ? 'p-0' : 'p-8'}`}>
                 {activeTab === 'UNIVERSES' && <UniverseManager player={player} studio={studio} onUpdatePlayer={onUpdatePlayer} />}
                 {activeTab === 'FRANCHISES' && <FranchiseManager player={player} studio={studio} />}
-                {activeTab === 'MARKETPLACE' && <FranchiseMarketplace player={player} studio={studio} onUpdatePlayer={onUpdatePlayer} />}
+                {activeTab === 'RIGHTS_MARKET' && <RightsMarket player={player} studio={studio} onUpdatePlayer={onUpdatePlayer} />}
             </div>
         </div>
     );
@@ -373,133 +373,6 @@ const FranchiseManager: React.FC<{ player: Player; studio: Business; }> = ({ pla
                     ))}
                 </div>
             )}
-        </div>
-    );
-};
-
-const FranchiseMarketplace: React.FC<{ player: Player; studio: Business; onUpdatePlayer: (p: Player) => void; }> = ({ player, studio, onUpdatePlayer }) => {
-    const studioState = studio.studioState || { scripts: [], writers: [], ipMarket: [], lastMarketRefreshWeek: 0, lastWriterRefreshWeek: 0, purchasedIPTitles: [] };
-    
-    // Use the market from studio state if available, otherwise use a fallback
-    const availableIPs = useMemo(() => {
-        const market = studioState.ipMarket || [];
-        if (market.length > 0) return market;
-
-        // Fallback if market is empty
-        return [
-            { id: 'ip_1', title: 'Galactic Frontiers', genre: 'SCI_FI', developmentCost: 150000000, quality: 85, logline: 'A massive sci-fi space opera franchise whose original studio went bankrupt.' },
-            { id: 'ip_2', title: 'The Shadow Knight', genre: 'SUPERHERO', developmentCost: 450000000, quality: 95, logline: 'A gritty superhero IP. The current owners are looking for a quick cash injection.' },
-            { id: 'ip_3', title: 'Dino Park', genre: 'ADVENTURE', developmentCost: 200000000, quality: 70, logline: 'Classic monster adventure franchise that hasn\'t had a movie in 15 years.' }
-        ];
-    }, [studioState.ipMarket]);
-
-    const handleRefresh = () => {
-        if (studio.balance < 250000) return;
-
-        const newMarket = generateIPMarket(6, studioState.purchasedIPTitles || [], player.currentWeek);
-        const updatedStudio = {
-            ...studio,
-            balance: studio.balance - 250000,
-            studioState: {
-                ...studioState,
-                ipMarket: newMarket,
-                lastMarketRefreshWeek: player.currentWeek
-            }
-        };
-
-        onUpdatePlayer({
-            ...player,
-            businesses: player.businesses.map(b => b.id === studio.id ? updatedStudio : b)
-        });
-    };
-
-    const handleBuy = (ip: any) => {
-        if (studio.balance < ip.developmentCost) return;
-
-        const updatedStudio = { ...studio, balance: studio.balance - ip.developmentCost };
-        const purchased = [...(studioState.purchasedIPTitles || []), ip.title];
-        
-        updatedStudio.studioState = {
-            ...studioState,
-            scripts: [...(studioState.scripts || []), { ...ip, status: 'READY', createdAtWeek: player.currentWeek }],
-            ipMarket: (studioState.ipMarket || []).filter(s => s.id !== ip.id),
-            purchasedIPTitles: purchased
-        };
-
-        onUpdatePlayer({
-            ...player,
-            businesses: player.businesses.map(b => b.id === studio.id ? updatedStudio : b)
-        });
-    };
-
-    return (
-        <div className="space-y-8">
-            <div className="flex justify-between items-center">
-                <div>
-                    <h2 className="text-2xl font-black uppercase tracking-tight text-amber-500">IP Acquisitions</h2>
-                    <p className="text-zinc-400 text-sm mt-1">Buy out rival franchises and add them to your studio's portfolio.</p>
-                </div>
-                <button 
-                    onClick={handleRefresh}
-                    disabled={studio.balance < 250000}
-                    className="flex items-center gap-2 px-4 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-zinc-800 transition-colors disabled:opacity-50"
-                >
-                    <RefreshCw size={14} className={studio.balance < 250000 ? '' : 'text-amber-500'} />
-                    Refresh Market ($250k)
-                </button>
-            </div>
-
-            <div className="grid grid-cols-1 gap-4">
-                {availableIPs.map(ip => {
-                    const cost = ip.developmentCost || 0;
-                    const canAfford = studio.balance >= cost;
-                    return (
-                        <div key={ip.id} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 flex flex-col md:flex-row gap-6 items-center hover:border-amber-500/50 transition-colors">
-                            <div className="flex-1 space-y-2">
-                                <div className="flex items-center gap-3">
-                                    <h3 className="text-2xl font-black text-white uppercase">{ip.title}</h3>
-                                    <span className="bg-zinc-800 text-zinc-300 text-[10px] font-black px-2 py-1 rounded uppercase tracking-widest">
-                                        {ip.genres?.[0] || ip.genre || 'DRAMA'}
-                                    </span>
-                                </div>
-                                <p className="text-sm text-zinc-400">{ip.logline || ip.desc}</p>
-                                <div className="flex items-center gap-4 pt-2">
-                                    <div className="flex items-center gap-1 text-xs text-zinc-500 font-bold uppercase">
-                                        <TrendingUp size={14} className="text-amber-500" />
-                                        Market Hype: <span className="text-white">{ip.quality || 50}/100</span>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div className="w-full md:w-64 flex flex-col gap-3 border-t md:border-t-0 md:border-l border-zinc-800 pt-4 md:pt-0 md:pl-6">
-                                <div>
-                                    <p className="text-[10px] text-zinc-500 uppercase font-black mb-1">Acquisition Cost</p>
-                                    <p className={`text-2xl font-mono font-black ${canAfford ? 'text-white' : 'text-rose-500'}`}>
-                                        {formatCurrency(cost)}
-                                    </p>
-                                </div>
-                                <button 
-                                    onClick={() => handleBuy(ip)}
-                                    disabled={!canAfford}
-                                    className={`w-full py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${
-                                        canAfford 
-                                            ? 'bg-white text-black hover:bg-amber-500 hover:scale-[1.02] active:scale-95' 
-                                            : 'bg-zinc-800 text-zinc-600 cursor-not-allowed'
-                                    }`}
-                                >
-                                    <ShoppingCart size={14} />
-                                    {canAfford ? 'Buyout IP' : 'Insufficient Funds'}
-                                </button>
-                            </div>
-                        </div>
-                    );
-                })}
-                {availableIPs.length === 0 && (
-                    <div className="text-center py-12 text-zinc-500">
-                        No new IPs available on the market right now. Check back later.
-                    </div>
-                )}
-            </div>
         </div>
     );
 };

@@ -1,10 +1,10 @@
 
 import React, { useRef, useEffect, useState, useMemo } from 'react';
-import { Player, ActorSkills, Commitment, ActiveRelease, ScheduledEvent, Message, AuditionOpportunity, NegotiationData, UniverseContract, UniverseId, Page, Genre, Relationship, LifeEvent, SponsorshipOffer, XPost } from '../types';
+import { Player, ActorSkills, Commitment, ActiveRelease, ScheduledEvent, Message, AuditionOpportunity, NegotiationData, UniverseContract, UniverseId, Page, Genre, Relationship, LifeEvent, SponsorshipOffer, XPost, Script, RareHollywoodChaosKind } from '../types';
 import { formatMoney } from '../services/formatUtils';
 import { StatsBar } from '../components/StatsBar';
-import { generateProjectDetails } from '../services/roleLogic';
-import { generateDirectEntryOffer, normalizeUniverseForSave } from '../services/universeLogic';
+import { formatRoleRejectionReview, generateProjectDetails, getRoleRejectionFeedback, ROLE_DEFINITIONS } from '../services/roleLogic';
+import { generateDirectEntryOffer, normalizeUniverseForSave, rebootRetiredUniverse, retireUniverseForArchive } from '../services/universeLogic';
 import { generateLifeEvent } from '../services/lifeEventLogic';
 import { getAbsoluteWeek } from '../services/legacyLogic';
 import { getGenderedAvatar, MALE_AVATAR_SEEDS, FEMALE_AVATAR_SEEDS, NPC_DATABASE } from '../services/npcLogic';
@@ -22,6 +22,7 @@ interface HomePageProps {
   onUpdatePlayer?: (player: Player) => void;
   setPage?: (page: Page) => void;
   onOpenProductionHouseCheat?: () => void;
+  onOpenStudioAcquisitionCheat?: (studioId: string) => void;
   onQueueBabyNamingCheat?: () => void;
   onOpenDeathSummaryPreview?: () => void;
   onShowWhatsNewCheat?: () => void;
@@ -31,7 +32,7 @@ const CHEAT_GENRES: Genre[] = ALL_GENRES;
 const DEV_TOOLS_PASSCODE = import.meta.env.VITE_DEV_TOOLS_PASSCODE || 'Kzign@420';
 const LEGACY_DEV_TOOLS_PASSCODES = ['actor-dev'];
 
-export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProcessing, onUpdatePlayer, setPage, onOpenProductionHouseCheat, onQueueBabyNamingCheat, onOpenDeathSummaryPreview, onShowWhatsNewCheat }) => {
+export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProcessing, onUpdatePlayer, setPage, onOpenProductionHouseCheat, onOpenStudioAcquisitionCheat, onQueueBabyNamingCheat, onOpenDeathSummaryPreview, onShowWhatsNewCheat }) => {
   const logContainerRef = useRef<HTMLDivElement>(null);
   const language = getPlayerLanguage(player);
   const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
@@ -230,6 +231,60 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
   const updateEnergy = (value: number) => {
       if (!onUpdatePlayer) return;
       onUpdatePlayer({ ...player, energy: { ...player.energy, current: value } });
+  };
+
+  const sendCastingFeedbackQaMessage = (stage: 'APPLICATION' | 'AUDITION') => {
+      if (!onUpdatePlayer) return;
+
+      const usedTitles = [
+          ...player.commitments.map(c => c.name),
+          ...player.activeReleases.map(r => r.name),
+          ...player.pastProjects.map(p => p.name)
+      ];
+      const project = generateProjectDetails('HIGH', 'MOVIE', usedTitles, player);
+      project.title = stage === 'APPLICATION' ? 'Cheat Shortlist Rejection' : 'Cheat Audition Rejection';
+      project.genre = 'ACTION';
+      project.visibleHype = 'HIGH';
+      project.isFamous = true;
+
+      const opportunity: AuditionOpportunity = {
+          id: `cheat_casting_feedback_${stage.toLowerCase()}_${Date.now()}`,
+          roleType: 'LEAD',
+          projectName: project.title,
+          genre: project.genre,
+          config: ROLE_DEFINITIONS.LEAD,
+          project,
+          estimatedIncome: 12000000,
+          source: 'CASTING_APP'
+      };
+      const rivalWinner = stage === 'AUDITION'
+          ? NPC_DATABASE.find(npc => npc.occupation === 'ACTOR') || NPC_DATABASE[0]
+          : undefined;
+      const feedback = getRoleRejectionFeedback(player, opportunity, stage, rivalWinner);
+      const newMessage: Message = {
+          id: `msg_cheat_casting_feedback_${Date.now()}`,
+          sender: 'Casting Office',
+          subject: `Casting Review: ${project.title}`,
+          text: formatRoleRejectionReview(project.title, stage, feedback),
+          type: 'CASTING_FEEDBACK',
+          isRead: false,
+          weekSent: player.currentWeek,
+          expiresIn: 8
+      };
+
+      onUpdatePlayer({
+          ...player,
+          inbox: [newMessage, ...player.inbox],
+          logs: [{
+              week: player.currentWeek,
+              year: player.age,
+              message: `CHEAT: ${stage === 'APPLICATION' ? 'Shortlist' : 'Audition'} rejection feedback sent to inbox.`,
+              type: 'neutral'
+          }, ...player.logs].slice(0, 50)
+      });
+      setActiveCheatMenu('NONE');
+      setPage?.(Page.MOBILE);
+      alert('Casting feedback QA message sent. Open Phone > Messages to test the badge and copy.');
   };
 
   const maxAllSkills = () => {
@@ -1584,6 +1639,606 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
       onOpenProductionHouseCheat?.();
   };
 
+  const triggerStudioAcquisitionSigningCheat = () => {
+      if (!onUpdatePlayer) return;
+
+      const studioId = 'ARTISAN_PICTURES';
+      const studioName = 'Artisan Pictures';
+      const now = Date.now();
+      const offerAmount = 3_200_000_000;
+      const agreedAmount = 3_300_000_000;
+      const acceptedCase = {
+          studioId,
+          studioName,
+          acquisitionState: 'OPEN_TO_OFFERS',
+          publicValuation: 3_050_000_000,
+          approachedWeek: player.currentWeek,
+          approachedYear: player.age,
+          status: 'ACCEPTED',
+          offer: {
+              type: 'FAIR',
+              amount: offerAmount,
+              funding: { source: 'PERSONAL' },
+              complianceRisk: 8,
+              complianceBand: 'ROUTINE',
+              commitments: ['PRESERVE_STUDIO_NAME', 'PROTECT_EMPLOYEES', 'GUARANTEE_PRODUCTIONS'],
+              submittedWeek: player.currentWeek,
+              submittedYear: player.age,
+              round: 1,
+          },
+          sellerResponse: {
+              decision: 'ACCEPTED',
+              agreedAmount,
+              round: 1,
+              respondedWeek: player.currentWeek,
+              respondedYear: player.age,
+              summary: `${studioName} accepted your acquisition terms. The closing packet is ready for signature.`,
+          },
+      };
+      const messageId = `cheat_studio_acquisition_signing_${studioId}_${now}`;
+      const updatedPlayer = {
+          ...player,
+          money: Math.max(player.money, 5_000_000_000),
+          flags: {
+              ...player.flags,
+              studioAcquisitionCases: [
+                  ...((player.flags?.studioAcquisitionCases || []).filter((entry: any) => entry?.studioId !== studioId)),
+                  acceptedCase,
+              ],
+          },
+          inbox: [
+              {
+                  id: messageId,
+                  sender: 'Business Affairs',
+                  subject: `Terms Agreed: ${studioName}`,
+                  text: acceptedCase.sellerResponse.summary,
+                  type: 'STUDIO_ACQUISITION' as const,
+                  data: {
+                      studioId,
+                      studioName,
+                      decision: 'ACCEPTED',
+                      agreedAmount,
+                  },
+                  isRead: false,
+                  weekSent: player.currentWeek,
+              },
+              ...(player.inbox || []).filter(message => !(message.type === 'STUDIO_ACQUISITION' && message.data?.studioId === studioId)),
+          ],
+          logs: [{
+              week: player.currentWeek,
+              year: player.age,
+              message: `🧾 CHEAT: Studio Acquisition Signing QA prepared for ${studioName}.`,
+              type: 'positive' as const,
+          }, ...player.logs].slice(0, 50),
+      };
+
+      onUpdatePlayer(updatedPlayer);
+      setActiveCheatMenu('NONE');
+      onOpenStudioAcquisitionCheat?.(studioId);
+  };
+
+  const triggerVaultSortingQa = () => {
+      if (!onUpdatePlayer) return;
+
+      const { updatedPlayer: basePlayer, studio } = ensureCheatStudio();
+      const now = Date.now();
+      const currentWeek = basePlayer.currentWeek;
+      const qaPrefix = 'cheat_vault_sort_';
+      const existingScripts = (studio.studioState?.scripts || []).filter((script: Script) => !script.id.startsWith(qaPrefix));
+
+      const qaScripts: Script[] = [
+          {
+              id: `${qaPrefix}produced_${now}`,
+              title: 'Vault QA Produced Archive',
+              genres: ['ACTION'],
+              status: 'PRODUCED',
+              quality: 78,
+              options: [],
+              writerId: 'cheat_writer_archive',
+              weeksInDevelopment: 8,
+              totalDevelopmentWeeks: 8,
+              isOriginal: true,
+              projectType: 'MOVIE',
+              format: 'LIVE_ACTION',
+              logline: 'A finished studio title that should live below active work.',
+              createdAtWeek: Math.max(1, currentWeek - 20),
+              producedAtWeek: Math.max(1, currentWeek - 4)
+          },
+          {
+              id: `${qaPrefix}development_${now}`,
+              title: 'Vault QA In Development',
+              genres: ['THRILLER'],
+              status: 'IN_DEVELOPMENT',
+              quality: 52,
+              options: [],
+              writerId: 'cheat_writer_room',
+              weeksInDevelopment: 3,
+              totalDevelopmentWeeks: 9,
+              isOriginal: true,
+              projectType: 'MOVIE',
+              format: 'LIVE_ACTION',
+              logline: 'A draft still being written, useful for progress bar QA.',
+              createdAtWeek: Math.max(1, currentWeek - 3)
+          },
+          {
+              id: `${qaPrefix}concept_${now}`,
+              title: 'Vault QA Raw Concept',
+              genres: ['COMEDY'],
+              status: 'CONCEPT',
+              quality: 35,
+              options: [],
+              writerId: null,
+              weeksInDevelopment: 0,
+              totalDevelopmentWeeks: 8,
+              isOriginal: true,
+              projectType: 'MOVIE',
+              format: 'LIVE_ACTION',
+              logline: 'A raw idea that should sit above in-development work after ready scripts.',
+              createdAtWeek: Math.max(1, currentWeek - 1)
+          },
+          {
+              id: `${qaPrefix}ready_${now}`,
+              title: 'Vault QA Ready To Greenlight',
+              genres: ['DRAMA'],
+              status: 'READY',
+              quality: 86,
+              options: [],
+              writerId: 'cheat_writer_final',
+              weeksInDevelopment: 7,
+              totalDevelopmentWeeks: 7,
+              isOriginal: true,
+              projectType: 'MOVIE',
+              format: 'LIVE_ACTION',
+              logline: 'A polished script that should appear first in Active Scripts.',
+              createdAtWeek: currentWeek
+          }
+      ];
+
+      const updatedStudio = {
+          ...studio,
+          studioState: {
+              ...(studio.studioState || {}),
+              scripts: [...qaScripts, ...existingScripts],
+              concepts: studio.studioState?.concepts || [],
+              writers: studio.studioState?.writers || [],
+              ipMarket: studio.studioState?.ipMarket || [],
+              lastMarketRefreshWeek: studio.studioState?.lastMarketRefreshWeek || currentWeek,
+              lastWriterRefreshWeek: studio.studioState?.lastWriterRefreshWeek || currentWeek
+          }
+      };
+
+      onUpdatePlayer({
+          ...basePlayer,
+          businesses: (basePlayer.businesses || []).map(b => b.id === updatedStudio.id ? updatedStudio : b),
+          logs: [{
+              week: currentWeek,
+              year: basePlayer.age,
+              message: '🧪 CHEAT: Vault sorting QA kit added. Open Production House > Development Lab > Vault.',
+              type: 'positive'
+          }, ...basePlayer.logs].slice(0, 50)
+      });
+      setActiveCheatMenu('NONE');
+      onOpenProductionHouseCheat?.();
+      alert('Vault sorting QA kit loaded. Open Development Lab > Vault to confirm Active Scripts appear above Produced Archive.');
+  };
+
+  const triggerFullStudioSlateQa = () => {
+      if (!onUpdatePlayer) return;
+
+      const { updatedPlayer: basePlayer, studio } = ensureCheatStudio();
+      const now = Date.now();
+      const currentWeek = Math.max(1, basePlayer.currentWeek || 1);
+      const currentAge = Math.max(18, basePlayer.age || 18);
+      const qaPrefix = 'cheat_full_slate_';
+
+      const scriptIds = {
+          readyFeature: `${qaPrefix}script_ready_feature_${now}`,
+          readySeries: `${qaPrefix}script_ready_series_${now}`,
+          development: `${qaPrefix}script_development_${now}`,
+          concept: `${qaPrefix}script_concept_${now}`,
+          produced: `${qaPrefix}script_produced_${now}`
+      };
+
+      const makeScript = (
+          id: string,
+          title: string,
+          projectType: 'MOVIE' | 'SERIES',
+          genres: Genre[],
+          status: Script['status'],
+          quality: number,
+          weeksInDevelopment: number,
+          totalDevelopmentWeeks: number,
+          logline: string
+      ): Script => ({
+          id,
+          title,
+          genres,
+          status,
+          quality,
+          options: [],
+          writerId: status === 'CONCEPT' ? null : 'cheat_full_slate_writer',
+          weeksInDevelopment,
+          totalDevelopmentWeeks,
+          isOriginal: true,
+          projectType,
+          format: 'LIVE_ACTION',
+          logline,
+          createdAtWeek: Math.max(1, currentWeek - Math.max(1, weeksInDevelopment)),
+          producedAtWeek: status === 'PRODUCED' ? Math.max(1, currentWeek - 6) : undefined,
+          tags: ['FULL_STUDIO_SLATE_QA']
+      });
+
+      const qaScripts: Script[] = [
+          makeScript(
+              scriptIds.readyFeature,
+              'Full Slate Ready Feature',
+              'MOVIE',
+              ['ACTION'],
+              'READY',
+              88,
+              8,
+              8,
+              'A completed feature script ready to greenlight immediately.'
+          ),
+          makeScript(
+              scriptIds.readySeries,
+              'Full Slate Ready Series',
+              'SERIES',
+              ['CRIME'],
+              'READY',
+              84,
+              7,
+              7,
+              'A premium series package ready for platform bidding tests.'
+          ),
+          makeScript(
+              scriptIds.development,
+              'Full Slate In Development',
+              'MOVIE',
+              ['THRILLER'],
+              'IN_DEVELOPMENT',
+              57,
+              4,
+              9,
+              'A script still being written for progress and sorting QA.'
+          ),
+          makeScript(
+              scriptIds.concept,
+              'Full Slate Raw Concept',
+              'MOVIE',
+              ['COMEDY'],
+              'CONCEPT',
+              34,
+              0,
+              8,
+              'A raw idea that should remain visible as early development work.'
+          ),
+          makeScript(
+              scriptIds.produced,
+              'Full Slate Produced Archive',
+              'MOVIE',
+              ['DRAMA'],
+              'PRODUCED',
+              79,
+              8,
+              8,
+              'A finished script used to verify produced archive behavior.'
+          )
+      ];
+
+      const qaConcepts = [
+          {
+              id: `${qaPrefix}concept_feature_${now}`,
+              scriptId: scriptIds.readyFeature,
+              lastUpdated: currentWeek,
+              crewModes: {},
+              selectedCrew: {},
+              castList: [],
+              selectedLocations: ['Los Angeles'],
+              tone: 72,
+              lastStep: 'CONFIRM',
+              format: 'LIVE_ACTION',
+              connectedProjectIntent: 'SOLO'
+          },
+          {
+              id: `${qaPrefix}concept_series_${now}`,
+              scriptId: scriptIds.readySeries,
+              lastUpdated: currentWeek,
+              crewModes: {},
+              selectedCrew: {},
+              castList: [],
+              selectedLocations: ['New York'],
+              tone: 64,
+              lastStep: 'CAST',
+              format: 'LIVE_ACTION',
+              connectedProjectIntent: 'SOLO'
+          }
+      ];
+
+      const makeCommitment = (
+          phase: NonNullable<Commitment['projectPhase']>,
+          title: string,
+          projectType: 'MOVIE' | 'SERIES',
+          genre: Genre,
+          phaseWeeksLeft: number,
+          budget: number,
+          quality: number
+      ): Commitment => {
+          const project = generateProjectDetails('HIGH', projectType, [], basePlayer);
+          project.title = title;
+          project.studioId = studio.id;
+          project.genre = genre;
+          project.estimatedBudget = budget;
+          project.visibleHype = 'HIGH';
+          project.hiddenStats.rawHype = 84;
+          project.hiddenStats.qualityScore = quality;
+          project.hiddenStats.scriptQuality = Math.max(60, quality - 4);
+          project.hiddenStats.directorQuality = Math.max(60, quality - 6);
+          project.hiddenStats.castingStrength = Math.max(60, quality - 8);
+
+          return {
+              id: `${qaPrefix}commit_${phase.toLowerCase()}_${now}`,
+              name: title,
+              type: 'JOB',
+              roleType: 'LEAD',
+              energyCost: 0,
+              income: 0,
+              lumpSum: 0,
+              payoutType: 'LUMPSUM',
+              projectPhase: phase,
+              phaseWeeksLeft,
+              totalPhaseDuration: Math.max(1, phaseWeeksLeft),
+              projectDetails: phase === 'AWAITING_RELEASE'
+                  ? {
+                      ...project,
+                      releaseStrategy: 'THEATRICAL',
+                      screeningStrategy: 'NATIONAL',
+                      releaseDate: currentWeek + 1
+                  }
+                  : project,
+              productionPerformance: quality,
+              promotionalBuzz: phase === 'AWAITING_RELEASE' ? 36 : 20
+          };
+      };
+
+      const qaCommitments: Commitment[] = [
+          makeCommitment('PLANNING', 'Full Slate Planning Room', 'MOVIE', 'CRIME', 3, 36_000_000, 74),
+          makeCommitment('PRE_PRODUCTION', 'Full Slate Pre-Production', 'SERIES', 'DRAMA', 5, 64_000_000, 81),
+          makeCommitment('PRODUCTION', 'Full Slate On Set', 'MOVIE', 'ACTION', 6, 118_000_000, 86),
+          makeCommitment('POST_PRODUCTION', 'Full Slate Post House', 'MOVIE', 'SCI_FI', 2, 92_000_000, 83),
+          makeCommitment('AWAITING_RELEASE', 'Full Slate Release Ready', 'SERIES', 'THRILLER', 1, 52_000_000, 80)
+      ];
+
+      const makeReleaseProject = (title: string, projectType: 'MOVIE' | 'SERIES', genre: Genre, budget: number, quality: number) => {
+          const project = generateProjectDetails('HIGH', projectType, [], basePlayer);
+          project.title = title;
+          project.studioId = studio.id;
+          project.genre = genre;
+          project.estimatedBudget = budget;
+          project.hiddenStats.qualityScore = quality;
+          project.hiddenStats.releaseWeek = Math.max(1, currentWeek - 2);
+          return project;
+      };
+
+      const activeMovie = makeReleaseProject('Full Slate Box Office Run', 'MOVIE', 'ADVENTURE', 145_000_000, 82);
+      const activeSeries = makeReleaseProject('Full Slate Streaming Run', 'SERIES', 'CRIME', 66_000_000, 79);
+
+      const qaActiveReleases: ActiveRelease[] = [
+          {
+              id: `${qaPrefix}active_theatrical_${now}`,
+              name: activeMovie.title,
+              type: 'MOVIE',
+              roleType: 'LEAD',
+              projectDetails: {
+                  ...activeMovie,
+                  releaseStrategy: 'THEATRICAL',
+                  releaseDate: Math.max(1, currentWeek - 4)
+              },
+              distributionPhase: 'THEATRICAL',
+              weekNum: 4,
+              weeklyGross: [82_000_000, 54_000_000, 33_000_000, 20_000_000],
+              totalGross: 189_000_000,
+              budget: 145_000_000,
+              status: 'RUNNING',
+              imdbRating: 7.7,
+              productionPerformance: 82,
+              maxTheatricalWeeks: 12,
+              weeksInTheaters: 4
+          } as any,
+          {
+              id: `${qaPrefix}active_streaming_${now}`,
+              name: activeSeries.title,
+              type: 'SERIES',
+              roleType: 'LEAD',
+              projectDetails: {
+                  ...activeSeries,
+                  releaseStrategy: 'STREAMING_ONLY',
+                  releaseDate: Math.max(1, currentWeek - 3),
+                  hiddenStats: {
+                      ...activeSeries.hiddenStats,
+                      platformId: 'NETFLIX'
+                  }
+              },
+              distributionPhase: 'STREAMING',
+              weekNum: 6,
+              weeklyGross: [],
+              totalGross: 0,
+              budget: 66_000_000,
+              status: 'FINISHED',
+              imdbRating: 8.0,
+              productionPerformance: 81,
+              streamingRevenue: 78_000_000,
+              streaming: {
+                  platformId: 'NETFLIX',
+                  weekOnPlatform: 6,
+                  totalViews: 42_000_000,
+                  weeklyViews: [11_000_000, 8_500_000, 6_000_000, 3_800_000],
+                  isLeaving: false
+              }
+          } as any
+      ];
+
+      const qaPastProjects = [
+          {
+              id: `${qaPrefix}past_hit_${now}`,
+              name: 'Full Slate Legacy Hit',
+              type: 'ACTING_GIG',
+              roleType: 'LEAD',
+              year: currentAge,
+              releaseYear: currentAge,
+              releaseWeek: Math.max(1, currentWeek - 18),
+              releasedAtAbsoluteWeek: Math.max(1, getAbsoluteWeek(currentAge, currentWeek) - 18),
+              earnings: 12_600_000,
+              rating: 8.4,
+              reception: 'Audience favorite',
+              projectQuality: 84,
+              imdbRating: 8.4,
+              boxOfficeResult: 'HIT',
+              outcomeTier: 'HIT',
+              subtype: 'STANDALONE',
+              futurePotential: {
+                  sequelChance: 82,
+                  franchiseChance: 55,
+                  rebootChance: 12,
+                  renewalChance: 0,
+                  isFranchiseStarter: true,
+                  isSequelGreenlit: false,
+                  isRenewed: false,
+                  seriesStatus: 'N/A'
+              },
+              studioId: studio.id,
+              castList: [],
+              reviews: [],
+              budget: 48_000_000,
+              gross: 240_000_000,
+              genre: 'DRAMA',
+              description: 'Full slate QA archived hit for history and release-year testing.',
+              projectType: 'MOVIE'
+          },
+          {
+              id: `${qaPrefix}past_series_${now}`,
+              name: 'Full Slate Season One',
+              type: 'ACTING_GIG',
+              roleType: 'LEAD',
+              year: Math.max(16, currentAge - 1),
+              releaseYear: Math.max(16, currentAge - 1),
+              releaseWeek: 34,
+              earnings: 8_200_000,
+              rating: 8.1,
+              reception: 'Streaming breakout',
+              projectQuality: 81,
+              imdbRating: 8.1,
+              boxOfficeResult: 'HIT',
+              outcomeTier: 'HIT',
+              subtype: 'STANDALONE',
+              futurePotential: {
+                  sequelChance: 0,
+                  franchiseChance: 28,
+                  rebootChance: 10,
+                  renewalChance: 84,
+                  isFranchiseStarter: false,
+                  isSequelGreenlit: false,
+                  isRenewed: true,
+                  seriesStatus: 'ONGOING'
+              },
+              studioId: studio.id,
+              castList: [],
+              reviews: [],
+              budget: 58_000_000,
+              gross: 0,
+              streamingRevenue: 132_000_000,
+              totalViews: 52_000_000,
+              genre: 'CRIME',
+              description: 'Full slate QA successful series for renewal/history checks.',
+              projectType: 'SERIES'
+          },
+          {
+              id: `${qaPrefix}past_flop_${now}`,
+              name: 'Full Slate Costly Miss',
+              type: 'ACTING_GIG',
+              roleType: 'LEAD',
+              year: Math.max(16, currentAge - 2),
+              releaseYear: Math.max(16, currentAge - 2),
+              releaseWeek: 12,
+              earnings: 1_400_000,
+              rating: 5.6,
+              reception: 'Expensive disappointment',
+              projectQuality: 56,
+              imdbRating: 5.6,
+              boxOfficeResult: 'FLOP',
+              outcomeTier: 'FLOP',
+              subtype: 'STANDALONE',
+              futurePotential: {
+                  sequelChance: 12,
+                  franchiseChance: 5,
+                  rebootChance: 24,
+                  renewalChance: 0,
+                  isFranchiseStarter: false,
+                  isSequelGreenlit: false,
+                  isRenewed: false,
+                  seriesStatus: 'N/A'
+              },
+              studioId: studio.id,
+              castList: [],
+              reviews: [],
+              budget: 155_000_000,
+              gross: 42_000_000,
+              genre: 'SCI_FI',
+              description: 'Full slate QA flop for valuation and archive sorting checks.',
+              projectType: 'MOVIE'
+          }
+      ];
+
+      const existingScripts = (studio.studioState?.scripts || []).filter((script: Script) => !script.id.startsWith(qaPrefix));
+      const existingConcepts = (studio.studioState?.concepts || []).filter((concept: any) => !String(concept.id || '').startsWith(qaPrefix) && !String(concept.scriptId || '').startsWith(qaPrefix));
+      const updatedStudio = {
+          ...studio,
+          balance: Math.max(studio.balance || 0, 500_000_000),
+          stats: {
+              ...studio.stats,
+              valuation: Math.max(studio.stats?.valuation || 0, 750_000_000)
+          },
+          studioState: {
+              ...(studio.studioState || {}),
+              scripts: [...qaScripts, ...existingScripts],
+              concepts: [...qaConcepts, ...existingConcepts],
+              writers: studio.studioState?.writers || [],
+              ipMarket: studio.studioState?.ipMarket || [],
+              purchasedIPTitles: studio.studioState?.purchasedIPTitles || [],
+              lastMarketRefreshWeek: studio.studioState?.lastMarketRefreshWeek || currentWeek,
+              lastWriterRefreshWeek: studio.studioState?.lastWriterRefreshWeek || currentWeek
+          }
+      };
+
+      const nextPlayer = {
+          ...basePlayer,
+          businesses: (basePlayer.businesses || []).map(b => b.id === updatedStudio.id ? updatedStudio : b),
+          commitments: [
+              ...qaCommitments,
+              ...basePlayer.commitments.filter(commitment => !String(commitment.id).startsWith(qaPrefix))
+          ],
+          activeReleases: [
+              ...qaActiveReleases,
+              ...basePlayer.activeReleases.filter(release => !String(release.id).startsWith(qaPrefix))
+          ],
+          pastProjects: [
+              ...qaPastProjects,
+              ...basePlayer.pastProjects.filter(project => !String(project.id).startsWith(qaPrefix))
+          ],
+          logs: [{
+              week: currentWeek,
+              year: basePlayer.age,
+              message: '🧪 CHEAT: Full studio slate loaded across scripts, development, production, releases, and archive.',
+              type: 'positive'
+          }, ...basePlayer.logs].slice(0, 50)
+      };
+
+      onUpdatePlayer(nextPlayer as Player);
+      setActiveCheatMenu('NONE');
+      onOpenProductionHouseCheat?.();
+      alert('Full Studio Slate loaded. Check Dashboard lanes, Development Lab/Vault, active releases, and Past Projects.');
+  };
+
   const triggerLegacyProductionHouseMigrationQa = () => {
       if (!onUpdatePlayer) return;
 
@@ -2337,6 +2992,120 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
       alert('Filmography QA loaded: 9 library titles plus theatrical and streaming active releases. Open Past Projects > See More to test sorting.');
   };
 
+  const triggerRareHollywoodChaosQa = (kind: RareHollywoodChaosKind) => {
+      if (!onUpdatePlayer) return;
+
+      const { updatedPlayer: basePlayer, studio } = ensureCheatStudio();
+      const now = Date.now();
+      const isSeries = kind === 'CANCELLED_SHOW_REVIVAL' || kind === 'PLATFORM_MOONSHOT';
+      const project = generateProjectDetails('HIGH', isSeries ? 'SERIES' : 'MOVIE', [], basePlayer);
+      const scenario = {
+          FLOP_SEQUEL_GAMBLE: {
+              title: 'Neon Reckoning',
+              budget: 120_000_000,
+              gross: 145_000_000,
+              rating: 6.8,
+              performance: 72,
+              hype: 82,
+              platformId: 'NETFLIX'
+          },
+          CANCELLED_SHOW_REVIVAL: {
+              title: 'Midnight District: Season 1',
+              budget: 42_000_000,
+              gross: 0,
+              rating: 8.5,
+              performance: 84,
+              hype: 68,
+              platformId: 'HULU'
+          },
+          PLATFORM_MOONSHOT: {
+              title: 'Red Frontier: Season 1',
+              budget: 110_000_000,
+              gross: 0,
+              rating: 6.4,
+              performance: 66,
+              hype: 76,
+              platformId: 'NETFLIX'
+          },
+          STUDIO_REBOOT_GAMBLE: {
+              title: 'Titan Protocol II',
+              budget: 120_000_000,
+              gross: 75_000_000,
+              rating: 5.7,
+              performance: 54,
+              hype: 78,
+              platformId: 'NETFLIX'
+          }
+      }[kind];
+      const releaseId = `cheat_rare_chaos_${kind.toLowerCase()}_${now}`;
+      const franchiseId = `cheat_rare_chaos_franchise_${now}`;
+
+      project.title = scenario.title;
+      project.type = isSeries ? 'SERIES' : 'MOVIE';
+      project.studioId = studio.id;
+      project.subtype = isSeries ? 'STANDALONE' : 'SEQUEL';
+      project.franchiseId = franchiseId;
+      project.installmentNumber = isSeries ? 1 : 2;
+      project.estimatedBudget = scenario.budget;
+      project.visibleHype = 'HIGH';
+      project.hiddenStats = {
+          ...project.hiddenStats,
+          rawHype: scenario.hype,
+          platformId: scenario.platformId,
+          forcedRareChaosKind: kind
+      };
+
+      const release: ActiveRelease = {
+          id: releaseId,
+          name: scenario.title,
+          type: isSeries ? 'SERIES' : 'MOVIE',
+          roleType: 'LEAD',
+          projectDetails: project,
+          distributionPhase: isSeries ? 'STREAMING' : 'THEATRICAL',
+          weekNum: 5,
+          weeklyGross: isSeries ? [] : [68_000_000, 39_000_000, 22_000_000, 16_000_000],
+          totalGross: scenario.gross,
+          budget: scenario.budget,
+          status: 'RUNNING',
+          imdbRating: scenario.rating,
+          productionPerformance: scenario.performance,
+          sequelDecisionWeek: 5,
+          sequelDecisionMade: false,
+          promotionalBuzz: scenario.hype,
+          maxTheatricalWeeks: 12,
+          streamingRevenue: isSeries ? Math.round(scenario.budget * 0.42) : 0,
+          streaming: isSeries ? {
+              platformId: scenario.platformId as any,
+              weekOnPlatform: 5,
+              totalViews: kind === 'CANCELLED_SHOW_REVIVAL' ? 24_000_000 : 11_000_000,
+              weeklyViews: kind === 'CANCELLED_SHOW_REVIVAL'
+                  ? [5_000_000, 4_700_000, 4_400_000, 4_200_000]
+                  : [4_200_000, 3_100_000, 2_200_000, 1_700_000],
+              isLeaving: false
+          } : undefined
+      };
+
+      onUpdatePlayer({
+          ...basePlayer,
+          activeReleases: [
+              release,
+              ...basePlayer.activeReleases.filter(item => !String(item.id).startsWith('cheat_rare_chaos_'))
+          ],
+          logs: [{
+              week: basePlayer.currentWeek,
+              year: basePlayer.age,
+              message: `🎲 CHEAT: ${scenario.title} loaded for ${kind.replaceAll('_', ' ').toLowerCase()} QA. Age Up once.`,
+              type: 'neutral'
+          }, ...basePlayer.logs].slice(0, 50)
+      });
+      setActiveCheatMenu('NONE');
+
+      const destination = kind === 'PLATFORM_MOONSHOT'
+          ? 'Then check News and Production House funding.'
+          : 'Then check News for the rare industry outcome.';
+      alert(`${scenario.title} is ready. Age Up once. ${destination}`);
+  };
+
   const triggerFranchiseQaScenario = (scenario: 'HOT' | 'TIRED' | 'RECAST' | 'CANDIDATE') => {
       if (!onUpdatePlayer) return;
 
@@ -2665,6 +3434,276 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
       setActiveCheatMenu('NONE');
       onOpenProductionHouseCheat?.();
       alert(`${universeName} QA loaded. Test it in Development Lab > Universe and IMDb > Universe.`);
+  };
+
+  const triggerUniverseLifecycleQa = () => {
+      if (!onUpdatePlayer) return;
+
+      const { updatedPlayer: basePlayer, studio } = ensureCheatStudio();
+      const now = Date.now();
+      const currentWeek = Math.max(1, basePlayer.currentWeek || 1);
+      const currentAge = Math.max(18, basePlayer.age || 18);
+      const qaPrefix = 'cheat_lifecycle_';
+      const actors = NPC_DATABASE.filter(n => n.occupation === 'ACTOR');
+      const pickActor = (index: number) => actors[index % Math.max(actors.length, 1)] || NPC_DATABASE[index % Math.max(NPC_DATABASE.length, 1)];
+      const slug = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+
+      const makeCast = (universeId: string, title: string, characters: string[]) => characters.map((characterName, index) => {
+          const actor = index === 0 ? null : pickActor(index + 3);
+          return {
+              id: `${qaPrefix}cast_${slug(title)}_${index}_${now}`,
+              name: index === 0 ? basePlayer.name : actor?.name || `QA Actor ${index}`,
+              actorName: index === 0 ? basePlayer.name : actor?.name || `QA Actor ${index}`,
+              role: index === 0 ? 'Lead' : index === 1 ? 'Co-Lead' : 'Supporting',
+              roleType: index === 0 ? 'LEAD' : 'SUPPORTING',
+              isPlayer: index === 0,
+              image: index === 0 ? basePlayer.avatar : actor?.avatar || getGenderedAvatar(index % 2 === 0 ? 'FEMALE' : 'MALE', actor?.name || characterName),
+              type: 'ACTOR',
+              npcId: actor?.id,
+              actorId: index === 0 ? 'PLAYER_SELF' : actor?.id,
+              characterId: `${universeId}_${slug(characterName)}`,
+              characterName
+          };
+      });
+
+      const makeProject = (
+          universeId: string,
+          title: string,
+          index: number,
+          gross: number,
+          rating: number,
+          phase: string,
+          characters: string[]
+      ) => ({
+          id: `${qaPrefix}project_${slug(title)}_${now}`,
+          name: title,
+          type: 'ACTING_GIG',
+          roleType: 'LEAD',
+          year: Math.max(16, currentAge - Math.max(0, 4 - index)),
+          releaseYear: Math.max(16, currentAge - Math.max(0, 4 - index)),
+          releaseWeek: Math.max(1, currentWeek - (index * 4)),
+          earnings: Math.round(gross * 0.035),
+          rating,
+          reception: rating >= 8 ? 'Canon-defining hit' : rating >= 7 ? 'Strong franchise chapter' : 'Mixed archive chapter',
+          projectQuality: Math.round(rating * 10),
+          imdbRating: rating,
+          boxOfficeResult: gross >= 500_000_000 ? 'BLOCKBUSTER' : gross >= 180_000_000 ? 'HIT' : 'MODEST',
+          outcomeTier: gross >= 500_000_000 ? 'BLOCKBUSTER' : gross >= 180_000_000 ? 'HIT' : 'AVERAGE',
+          subtype: index === 1 ? 'UNIVERSE_ENTRY' : 'UNIVERSE_EVENT',
+          futurePotential: {
+              sequelChance: rating >= 7 ? 80 : 35,
+              franchiseChance: rating >= 7 ? 90 : 45,
+              rebootChance: rating < 7 ? 72 : 18,
+              renewalChance: 0,
+              isFranchiseStarter: index === 1,
+              isSequelGreenlit: false,
+              isRenewed: false,
+              seriesStatus: 'N/A'
+          },
+          studioId: studio.id,
+          castList: makeCast(universeId, title, characters),
+          reviews: [],
+          budget: Math.round(gross * 0.32),
+          gross,
+          genre: 'SCI_FI',
+          description: `Lifecycle QA canon release for ${title}.`,
+          projectType: 'MOVIE',
+          universeId,
+          universeSagaName: 'Saga 1',
+          universePhaseName: phase,
+          directorId: `${qaPrefix}director`
+      } as any);
+
+      const buildRoster = (projects: any[]) => {
+          const rosterMap = new Map<string, any>();
+          projects.forEach(project => {
+              project.castList.forEach((cast: any) => {
+                  const existing = rosterMap.get(cast.characterId);
+                  rosterMap.set(cast.characterId, {
+                      id: cast.characterId,
+                      characterId: cast.characterId,
+                      name: cast.characterName,
+                      actorId: cast.actorId,
+                      actorName: cast.actorName,
+                      status: existing && existing.actorId !== cast.actorId ? 'RECAST' : 'ACTIVE',
+                      fanApproval: Math.min(95, 76 + rosterMap.size * 4),
+                      appearances: (existing?.appearances || 0) + 1,
+                      firstAppearanceTitle: existing?.firstAppearanceTitle || project.name,
+                      latestAppearanceTitle: project.name,
+                      description: `Lifecycle QA character for ${project.name}.`
+                  });
+              });
+          });
+          return Array.from(rosterMap.values());
+      };
+
+      const makeUniverse = (
+          universeId: string,
+          name: string,
+          description: string,
+          projects: any[],
+          color: string,
+          momentum: number,
+          brandPower: number,
+          products: any[] = []
+      ) => normalizeUniverseForSave({
+          id: universeId,
+          name,
+          description,
+          studioId: studio.id,
+          currentPhase: 'PHASE_2_EXPANSION',
+          currentPhaseName: 'Phase 2: Expansion',
+          saga: 1,
+          currentSagaName: 'Saga 1',
+          momentum,
+          brandPower,
+          marketShare: 0,
+          color,
+          roster: buildRoster(projects),
+          slate: projects.map(project => ({
+              id: project.id,
+              title: project.name,
+              status: 'RELEASED',
+              year: project.releaseYear || project.year,
+              week: project.releaseWeek || 1
+          })),
+          products,
+          stats: {
+              weeklyRevenue: products.reduce((sum, product) => sum + product.sellingPrice, 0),
+              lifetimeRevenue: projects.reduce((sum, project) => sum + (project.gross || 0), 0)
+          },
+          weeksUntilNextPhase: 28
+      } as any, universeId);
+
+      const activeUniverseId = `${qaPrefix}active_${now}`;
+      const retiredUniverseId = `${qaPrefix}retired_${now}`;
+      const rebootedUniverseId = `${qaPrefix}rebooted_${now}`;
+
+      const activeProjects = [
+          makeProject(activeUniverseId, 'Phoenix Circuit', 1, 640_000_000, 8.1, 'Phase 1', ['Vera Volt', 'Circuit King', 'Null Saint']),
+          makeProject(activeUniverseId, 'Phoenix Circuit: Voltage War', 2, 720_000_000, 8.3, 'Phase 1', ['Vera Volt', 'Circuit King', 'Null Saint'])
+      ];
+      const retiredProjects = [
+          makeProject(retiredUniverseId, 'Obsidian League', 1, 510_000_000, 7.6, 'Phase 1', ['Obsidian Knight', 'Glass Oracle', 'Metro Ghost']),
+          makeProject(retiredUniverseId, 'Obsidian League: Last Signal', 2, 295_000_000, 6.4, 'Phase 2', ['Obsidian Knight', 'Glass Oracle', 'Metro Ghost'])
+      ];
+      const rebootedProjects = [
+          makeProject(rebootedUniverseId, 'Silver Dominion', 1, 420_000_000, 7.2, 'Phase 1', ['Silver Queen', 'Crownbreaker', 'Mirror Duke']),
+          makeProject(rebootedUniverseId, 'Silver Dominion: Fall', 2, 210_000_000, 6.1, 'Phase 2', ['Silver Queen', 'Crownbreaker', 'Mirror Duke'])
+      ];
+
+      const activeUniverse = makeUniverse(
+          activeUniverseId,
+          'Phoenix Circuit',
+          'Lifecycle QA active universe. This should show Retire Universe because history exists and no linked work is in flight.',
+          activeProjects,
+          '#22d3ee',
+          84,
+          88
+      );
+
+      const retiredBaseUniverse = makeUniverse(
+          retiredUniverseId,
+          'Obsidian League',
+          'Lifecycle QA retired universe. History stays visible, new phases are locked, and legacy licensing remains reduced.',
+          retiredProjects,
+          '#a855f7',
+          48,
+          72,
+          [
+              { id: `${qaPrefix}legacy_apparel_${now}`, catalogId: 'merch_apparel', name: 'Legacy Apparel', quality: 78, productionCost: 450_000, sellingPrice: 40_000, appeal: 62, unitsSold: 160, inventory: 0, active: true },
+              { id: `${qaPrefix}legacy_collectibles_${now}`, catalogId: 'merch_toys', name: 'Archive Collectibles', quality: 82, productionCost: 700_000, sellingPrice: 85_000, appeal: 66, unitsSold: 220, inventory: 0, active: true }
+          ]
+      );
+      const retiredUniverse = retireUniverseForArchive(retiredBaseUniverse, Math.max(18, currentAge - 1), 32);
+
+      const rebootedBaseUniverse = retireUniverseForArchive(
+          makeUniverse(
+              rebootedUniverseId,
+              'Silver Dominion',
+              'Lifecycle QA rebooted universe. This should be active again and show Reboot Era state.',
+              rebootedProjects,
+              '#f59e0b',
+              36,
+              65
+          ),
+          Math.max(18, currentAge - 2),
+          14
+      );
+      const rebooted = rebootRetiredUniverse(rebootedBaseUniverse, 'Silver Dominion: Reborn', 'SCI_FI', currentAge, currentWeek);
+
+      const qaScripts = [rebooted.script];
+      const qaUniverses = [activeUniverse, retiredUniverse, rebooted.universe];
+      const existingWorldUniverses = Object.fromEntries(
+          Object.entries(basePlayer.world?.universes || {}).filter(([id]) => !id.startsWith(qaPrefix))
+      ) as Record<UniverseId, any>;
+      const existingStudioUniverses = ((studio.studioState as any)?.universes || []).filter((universe: any) => !String(universe.id).startsWith(qaPrefix));
+      const existingScripts = (studio.studioState?.scripts || []).filter((script: Script) => !String(script.id).startsWith(`${qaPrefix}script_`) && !String(script.id).startsWith('script_universe_reboot_'));
+
+      const updatedStudio = {
+          ...studio,
+          studioState: {
+              ...(studio.studioState || {}),
+              scripts: [...qaScripts, ...existingScripts],
+              concepts: studio.studioState?.concepts || [],
+              writers: studio.studioState?.writers || [],
+              ipMarket: studio.studioState?.ipMarket || [],
+              lastMarketRefreshWeek: studio.studioState?.lastMarketRefreshWeek || currentWeek,
+              lastWriterRefreshWeek: studio.studioState?.lastWriterRefreshWeek || currentWeek,
+              universes: [...qaUniverses, ...existingStudioUniverses]
+          } as any
+      };
+
+      onUpdatePlayer({
+          ...basePlayer,
+          businesses: (basePlayer.businesses || []).map(b => b.id === studio.id ? updatedStudio : b),
+          pastProjects: [
+              ...activeProjects,
+              ...retiredProjects,
+              ...rebootedProjects,
+              ...basePlayer.pastProjects.filter(project => !String(project.id).startsWith(`${qaPrefix}project_`))
+          ],
+          world: {
+              ...basePlayer.world,
+              universes: {
+                  ...existingWorldUniverses,
+                  [activeUniverse.id]: activeUniverse,
+                  [retiredUniverse.id]: retiredUniverse,
+                  [rebooted.universe.id]: rebooted.universe
+              }
+          },
+          newsItems: [
+              {
+                  id: `${qaPrefix}news_retired_${now}`,
+                  headline: 'Obsidian League enters the legacy archive.',
+                  subtext: 'The canon history remains public, but new phases are closed until a reboot relaunches the brand.',
+                  category: 'UNIVERSE',
+                  week: currentWeek,
+                  year: currentAge,
+                  impactLevel: 'MEDIUM'
+              },
+              {
+                  id: `${qaPrefix}news_reboot_${now}`,
+                  headline: 'Silver Dominion gets a reboot era.',
+                  subtext: 'A new Reboot Era script is now in development while older releases remain part of the archive.',
+                  category: 'UNIVERSE',
+                  week: currentWeek,
+                  year: currentAge,
+                  impactLevel: 'HIGH'
+              },
+              ...(basePlayer.newsItems || []).filter(item => !String(item.id).startsWith(`${qaPrefix}news_`))
+          ],
+          logs: [{
+              week: currentWeek,
+              year: currentAge,
+              message: '🌐 CHEAT: Universe lifecycle QA kit added. Check Active Canon, Legacy Archive, and Reboot Era behavior.',
+              type: 'positive'
+          }, ...basePlayer.logs].slice(0, 50)
+      } as Player);
+
+      setActiveCheatMenu('NONE');
+      onOpenProductionHouseCheat?.();
+      alert('Universe lifecycle QA loaded. Open Development Lab > Universe: Phoenix Circuit is active, Obsidian League is archived, and Silver Dominion has a reboot script in Vault.');
   };
 
   const triggerUniverseNamingFlowCheat = () => {
@@ -3108,8 +4147,17 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                                   <button onClick={triggerStudioBootstrapAndOpen} className="col-span-2 bg-yellow-500/10 hover:bg-yellow-500/20 border border-yellow-400/40 text-xs font-bold py-3 rounded-lg text-yellow-300">
                                       Open Production House Now
                                   </button>
+                                  <button onClick={triggerFullStudioSlateQa} className="col-span-2 bg-emerald-900/30 hover:bg-emerald-900/50 border border-emerald-400/40 text-xs font-bold py-3 rounded-lg text-emerald-300">
+                                      Fill Full Studio Slate
+                                  </button>
+                                  <button onClick={triggerStudioAcquisitionSigningCheat} className="col-span-2 bg-orange-950/40 hover:bg-orange-900/60 border border-orange-400/40 text-xs font-bold py-3 rounded-lg text-orange-200">
+                                      Studio Acquisition Signing QA
+                                  </button>
                                   <button onClick={triggerFilmographySortQa} className="col-span-2 bg-pink-900/30 hover:bg-pink-900/50 border border-pink-500/30 text-xs font-bold py-3 rounded-lg text-pink-300">
                                       Add Filmography Sort QA Library
+                                  </button>
+                                  <button onClick={triggerVaultSortingQa} className="col-span-2 bg-blue-900/30 hover:bg-blue-900/50 border border-blue-500/30 text-xs font-bold py-3 rounded-lg text-blue-300">
+                                      Add Vault Sorting QA Kit
                                   </button>
                                   <button onClick={() => triggerReturningTalentNegotiationQa()} className="col-span-2 bg-rose-900/30 hover:bg-rose-900/50 border border-rose-500/30 text-xs font-bold py-3 rounded-lg text-rose-300">
                                       Return Deal Blocker QA
@@ -3137,6 +4185,22 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                                   </button>
                                   <button onClick={() => triggerStudioScenario('STREAMING_EXIT')} className="col-span-2 bg-cyan-900/30 hover:bg-cyan-900/50 border border-cyan-500/30 text-xs font-bold py-3 rounded-lg text-cyan-400">
                                       Streaming to Library
+                                  </button>
+                              </div>
+                          </div>
+                      )}
+
+                      {activeCheatMenu === 'DEV' && (
+                          <div className="space-y-2">
+                              <h4 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest border-b border-zinc-800 pb-1 flex items-center gap-2">
+                                 <MessageSquareQuote size={10} /> Casting Feedback QA
+                              </h4>
+                              <div className="grid grid-cols-2 gap-2">
+                                  <button onClick={() => sendCastingFeedbackQaMessage('APPLICATION')} className="bg-sky-900/30 hover:bg-sky-900/50 border border-sky-500/30 text-[10px] font-bold py-3 rounded-lg text-sky-300 flex items-center justify-center gap-2">
+                                      <Mail size={12}/> Shortlist Decline
+                                  </button>
+                                  <button onClick={() => sendCastingFeedbackQaMessage('AUDITION')} className="bg-fuchsia-900/30 hover:bg-fuchsia-900/50 border border-fuchsia-500/30 text-[10px] font-bold py-3 rounded-lg text-fuchsia-300 flex items-center justify-center gap-2">
+                                      <AlertTriangle size={12}/> Audition Rejection
                                   </button>
                               </div>
                           </div>
@@ -3367,6 +4431,32 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                           </div>
                       )}
 
+                      {/* DEV ONLY: Rare Hollywood Chaos QA */}
+                      {activeCheatMenu === 'DEV' && (
+                          <div className="space-y-2">
+                              <h4 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest border-b border-zinc-800 pb-1 flex items-center gap-2">
+                                 <Sparkles size={10} /> Rare Hollywood Chaos QA
+                              </h4>
+                              <p className="rounded-xl border border-zinc-800 bg-zinc-950 p-3 text-[10px] leading-relaxed text-zinc-400">
+                                  Load one scenario, Age Up once, then check News. Platform Moonshot also creates locked studio funding.
+                              </p>
+                              <div className="grid grid-cols-2 gap-2">
+                                  <button onClick={() => triggerRareHollywoodChaosQa('FLOP_SEQUEL_GAMBLE')} className="bg-amber-900/30 hover:bg-amber-900/50 border border-amber-500/30 text-[10px] font-bold py-3 rounded-lg text-amber-300">
+                                      Flop Sequel Bet
+                                  </button>
+                                  <button onClick={() => triggerRareHollywoodChaosQa('CANCELLED_SHOW_REVIVAL')} className="bg-emerald-900/30 hover:bg-emerald-900/50 border border-emerald-500/30 text-[10px] font-bold py-3 rounded-lg text-emerald-300">
+                                      Cancelled Revival
+                                  </button>
+                                  <button onClick={() => triggerRareHollywoodChaosQa('PLATFORM_MOONSHOT')} className="bg-cyan-900/30 hover:bg-cyan-900/50 border border-cyan-500/30 text-[10px] font-bold py-3 rounded-lg text-cyan-300">
+                                      Platform Moonshot
+                                  </button>
+                                  <button onClick={() => triggerRareHollywoodChaosQa('STUDIO_REBOOT_GAMBLE')} className="bg-violet-900/30 hover:bg-violet-900/50 border border-violet-500/30 text-[10px] font-bold py-3 rounded-lg text-violet-300">
+                                      Reboot Gamble
+                                  </button>
+                              </div>
+                          </div>
+                      )}
+
                       {/* DEV ONLY: Universe QA */}
                       {activeCheatMenu === 'DEV' && (
                           <div className="space-y-2">
@@ -3382,6 +4472,9 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                                   </button>
                                   <button onClick={() => triggerUniverseQaScenario('MERCH')} className="col-span-2 bg-amber-900/30 hover:bg-amber-900/50 border border-amber-500/30 text-xs font-bold py-3 rounded-lg text-amber-300">
                                       Merch Empire
+                                  </button>
+                                  <button onClick={triggerUniverseLifecycleQa} className="col-span-2 bg-emerald-900/30 hover:bg-emerald-900/50 border border-emerald-500/30 text-xs font-bold py-3 rounded-lg text-emerald-300">
+                                      Lifecycle Archive Kit
                                   </button>
                                   <button onClick={triggerUniverseNamingFlowCheat} className="col-span-2 bg-blue-900/30 hover:bg-blue-900/50 border border-blue-500/30 text-xs font-bold py-3 rounded-lg text-blue-300">
                                       Naming Flow Kit

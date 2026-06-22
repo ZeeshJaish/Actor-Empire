@@ -39,6 +39,7 @@ import { APP_DISPLAY_VERSION } from './services/appVersion';
 import { calculateInstagramPostOutcome, clampInstagramStat, INSTAGRAM_POST_CONFIGS } from './services/instagramLogic';
 import { normalizeUniverseMap } from './services/universeLogic';
 import { hydrateGenreXP } from './services/genreCatalog';
+import { createInstagramReferralOutcome } from './services/instagramOfferLogic';
 import {
   addBreadcrumb,
   markGameCheckpoint,
@@ -342,6 +343,8 @@ export const App: React.FC = () => {
   const [player, setPlayer] = useState<Player>(INITIAL_PLAYER);
   const [activePage, setActivePage] = useState<Page>(Page.HOME);
   const [lifestyleInitialView, setLifestyleInitialView] = useState<'MAIN' | 'ASSETS' | 'BUSINESS' | 'PRODUCTION_WIZARD' | 'PRODUCTION_GAME' | null>(null);
+  const [rightsMarketOpportunityId, setRightsMarketOpportunityId] = useState<string | null>(null);
+  const [initialForbesStudioId, setInitialForbesStudioId] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [gameStatus, setGameStatus] = useState<GameStatus>('START_MENU');
   const [saveSlots, setSaveSlots] = useState<Record<number, Player | null>>({ 1: null, 2: null, 3: null });
@@ -353,6 +356,7 @@ export const App: React.FC = () => {
   const [activePressEvent, setActivePressEvent] = useState<{ project: Commitment, questions: PressInteraction[] } | null>(null);
   const [showProtectionPrompt, setShowProtectionPrompt] = useState<{ partnerId: string, partnerName: string } | null>(null);
   const [isBottomNavVisible, setIsBottomNavVisible] = useState(true);
+  const [isFullBleedMobileSurface, setIsFullBleedMobileSurface] = useState(false);
   const [activeSocialEvent, setActiveSocialEvent] = useState<{ event: SocialEvent, partnerId: string } | null>(null);
   const [pendingBabyNaming, setPendingBabyNaming] = useState<PendingBabyNaming | null>(null);
   const [babyFirstNameInput, setBabyFirstNameInput] = useState('');
@@ -526,10 +530,13 @@ export const App: React.FC = () => {
   };
 
   useEffect(() => {
-    if (activePage !== Page.LIFESTYLE) {
+    if (activePage !== Page.MOBILE) {
+      setIsFullBleedMobileSurface(false);
+    }
+    if (activePage !== Page.LIFESTYLE && !(activePage === Page.MOBILE && isFullBleedMobileSurface)) {
       setIsBottomNavVisible(true);
     }
-  }, [activePage]);
+  }, [activePage, isFullBleedMobileSurface]);
 
   useEffect(() => {
     const pageName = Page[activePage] || String(activePage);
@@ -2232,7 +2239,7 @@ export const App: React.FC = () => {
           </div>
       )}
 
-      <div className={`max-w-md mx-auto h-screen relative z-10 bg-zinc-950/80 shadow-2xl border-x border-white/5 flex flex-col pt-safe-top ${player?.settings?.smoothMode ? 'smooth-mode' : ''}`}>
+      <div className={`${isFullBleedMobileSurface ? 'w-screen max-w-none' : 'max-w-md mx-auto border-x border-white/5 pt-safe-top shadow-2xl'} h-screen relative z-10 bg-zinc-950/80 flex flex-col ${player?.settings?.smoothMode ? 'smooth-mode' : ''}`}>
         {gameStatus === 'START_MENU' && (
             <StartMenu 
                 saveSlots={saveSlots}
@@ -2243,17 +2250,26 @@ export const App: React.FC = () => {
         {gameStatus === 'CREATION' && <CreationMenu onStartGame={handleStartGame} />}
         {gameStatus === 'PLAYING' && (
             <>
-                <div className={`flex-1 px-5 pt-5 pb-nav-safe overflow-y-auto custom-scrollbar ${player.money < 0 ? 'pt-8' : ''}`}>
-                    {activePage === Page.HOME && (<HomePage player={player} onNextWeek={handleNextWeek} isProcessing={isProcessing} onUpdatePlayer={handleUpdatePlayer} setPage={setActivePage} onOpenProductionHouseCheat={() => { setLifestyleInitialView('PRODUCTION_GAME'); setActivePage(Page.LIFESTYLE); }} onQueueBabyNamingCheat={handleQueueBabyNamingCheat} onOpenDeathSummaryPreview={handleOpenDeathSummaryPreview} onShowWhatsNewCheat={handleShowWhatsNewCheat} />)}
+                <div className={`${isFullBleedMobileSurface ? 'flex-1 overflow-hidden p-0' : `flex-1 px-5 pt-5 pb-nav-safe overflow-y-auto custom-scrollbar ${player.money < 0 ? 'pt-8' : ''}`}`}>
+                    {activePage === Page.HOME && (<HomePage player={player} onNextWeek={handleNextWeek} isProcessing={isProcessing} onUpdatePlayer={handleUpdatePlayer} setPage={setActivePage} onOpenProductionHouseCheat={() => { setLifestyleInitialView('PRODUCTION_GAME'); setActivePage(Page.LIFESTYLE); }} onOpenStudioAcquisitionCheat={(studioId) => { setInitialForbesStudioId(studioId); setActivePage(Page.MOBILE); }} onQueueBabyNamingCheat={handleQueueBabyNamingCheat} onOpenDeathSummaryPreview={handleOpenDeathSummaryPreview} onShowWhatsNewCheat={handleShowWhatsNewCheat} />)}
                     {activePage === Page.CAREER && (<CareerPage player={player} onQuitJob={handleQuitJob} onRehearse={handleRehearse} />)}
                     {activePage === Page.IMPROVE && (<ImprovePage player={player} onTrain={()=>{}} onEnroll={(c)=>handleGenericUpdate(p=>{ const previousCommitments = p.commitments; const next: Player = { ...p, money: p.money- (c.upfrontCost||0), commitments: [...p.commitments, {...c, id: `c_${Date.now()}`, weeksCompleted:0}] }; syncWeeklyEnergyForCommitments(next, previousCommitments); return next; })} onCancel={(id)=>handleGenericUpdate(p=>{ const previousCommitments = p.commitments; const next: Player = { ...p, commitments: p.commitments.filter(c=>c.id!==id)}; syncWeeklyEnergyForCommitments(next, previousCommitments); return next; })} onPerformAction={handleImproveAction} />)}
                     {activePage === Page.SOCIAL && (<SocialPage player={player} onInteract={handleSocialInteract} onContinueAsChild={handleContinueAsChild} />)}
-                    {activePage === Page.LIFESTYLE && (<LifestylePage player={player} onBuyItem={handleBuyLifestyleItem} onSellItem={(id)=>handleGenericUpdate(p=>{ const it = [...PROPERTY_CATALOG, ...CAR_CATALOG, ...CLOTHING_CATALOG].find(x=>x.id===id); return { ...p, money: p.money + (it ? it.price*0.5 : 0), assets: p.assets.filter(a=>a!==id) }; })} onSetResidence={(id)=>handleGenericUpdate(p=>({ ...p, residenceId: id }))} onSetActiveStyle={(s)=>handleGenericUpdate(p=>({ ...p, activeClothingStyle: s }))} onStartBusiness={()=>{}} onShutdownBusiness={()=>{}} onUpdatePlayer={handleUpdatePlayer} onPremiumPurchase={handlePremiumPurchase} onNavVisibilityChange={setIsBottomNavVisible} initialView={lifestyleInitialView ?? undefined} onInitialViewConsumed={() => setLifestyleInitialView(null)} />)}
+                    {activePage === Page.LIFESTYLE && (<LifestylePage player={player} onBuyItem={handleBuyLifestyleItem} onSellItem={(id)=>handleGenericUpdate(p=>{ const it = [...PROPERTY_CATALOG, ...CAR_CATALOG, ...CLOTHING_CATALOG].find(x=>x.id===id); return { ...p, money: p.money + (it ? it.price*0.5 : 0), assets: p.assets.filter(a=>a!==id) }; })} onSetResidence={(id)=>handleGenericUpdate(p=>({ ...p, residenceId: id }))} onSetActiveStyle={(s)=>handleGenericUpdate(p=>({ ...p, activeClothingStyle: s }))} onStartBusiness={()=>{}} onShutdownBusiness={()=>{}} onUpdatePlayer={handleUpdatePlayer} onPremiumPurchase={handlePremiumPurchase} onNavVisibilityChange={setIsBottomNavVisible} initialView={lifestyleInitialView ?? undefined} onInitialViewConsumed={() => setLifestyleInitialView(null)} initialRightsMarketOpportunityId={rightsMarketOpportunityId ?? undefined} onRightsMarketTargetConsumed={() => setRightsMarketOpportunityId(null)} />)}
                     {activePage === Page.MOBILE && (
                         <MobilePage 
                             player={player} 
                             onUpdatePlayer={handleUpdatePlayer}
+                            onNavVisibilityChange={setIsBottomNavVisible}
+                            onFullBleedChange={setIsFullBleedMobileSurface}
+                            initialForbesStudioId={initialForbesStudioId ?? undefined}
+                            onInitialForbesStudioConsumed={() => setInitialForbesStudioId(null)}
                             onTriggerBabyNaming={handleSchedulePregnancy}
+                            onOpenRightsMarket={(opportunityId) => {
+                                setRightsMarketOpportunityId(opportunityId || null);
+                                setLifestyleInitialView('PRODUCTION_GAME');
+                                setActivePage(Page.LIFESTYLE);
+                            }}
                             onAudition={(opp)=>handleGenericUpdate(p=>{ const next: Player = { ...p, applications: [...p.applications, { id: `app_${Date.now()}`, type: 'AUDITION' as const, name: opp.projectName, weeksRemaining: 1, data: opp }] }; spendPlayerEnergy(next, 25); return next; })}
                             onTakeJob={(job)=>handleGenericUpdate(p=>{ const previousCommitments = p.commitments; const next: Player = { ...p, commitments: [...p.commitments, job] }; syncWeeklyEnergyForCommitments(next, previousCommitments); return next; })}
                             onQuitJob={handleQuitJob} 
@@ -2351,13 +2367,15 @@ export const App: React.FC = () => {
                                 };
                                 let selectedAction: any = null;
                                 const updatedChat = (state.chatHistory || []).map(message => {
-                                    if (message.action?.id !== actionId) return message;
+                                    if (message.action?.id !== actionId || message.action.status !== 'PENDING') return message;
                                     selectedAction = message.action;
                                     return {
                                         ...message,
                                         action: { ...message.action, status: accepted ? 'ACCEPTED' as const : 'DECLINED' as const }
                                     };
                                 });
+
+                                if (!selectedAction) return p;
 
                                 const replyText = accepted
                                     ? (selectedAction?.kind === 'IG_REFERRAL'
@@ -2403,12 +2421,24 @@ export const App: React.FC = () => {
                                 if (accepted && selectedAction?.kind === 'IG_REFERRAL') {
                                     const referrals = Array.isArray(nextPlayer.flags.pendingInstagramReferrals) ? nextPlayer.flags.pendingInstagramReferrals : [];
                                     const weeksLeft = Math.max(1, Math.round(selectedAction.payload?.weeksLeft || 2 + Math.floor(Math.random() * 2)));
+                                    const referralId = selectedAction.id;
+                                    const outcome = createInstagramReferralOutcome(nextPlayer);
                                     nextPlayer.flags.pendingInstagramReferrals = [
-                                        ...referrals,
-                                        { npcId: npc.id, npcName: npc.name, weeksLeft }
+                                        ...referrals.filter((referral: any) => referral.id !== referralId && referral.actionId !== referralId),
+                                        {
+                                            id: referralId,
+                                            actionId: referralId,
+                                            npcId: npc.id,
+                                            npcName: npc.name,
+                                            weeksLeft,
+                                            status: 'PENDING',
+                                            deliveryType: outcome.deliveryType,
+                                            opportunity: outcome.opportunity
+                                        }
                                     ];
-                                    nextPlayer.logs = [{ week: p.currentWeek, year: p.age, message: `📱 Instagram Referral Accepted: ${npc.name} may trigger a casting message in ${weeksLeft}-${weeksLeft + 1} weeks.`, type: 'positive' as const }, ...nextPlayer.logs].slice(0, 50);
-                                    setToastMessage({ title: 'DM Accepted', subtext: `Casting may reach out in ${weeksLeft}-${weeksLeft + 1} weeks.` });
+                                    const promisedResult = outcome.deliveryType === 'DIRECT_ROLE' ? 'direct role offer' : 'casting audition';
+                                    nextPlayer.logs = [{ week: p.currentWeek, year: p.age, message: `📱 Instagram Referral Accepted: ${npc.name} secured a ${promisedResult} in ${weeksLeft} weeks.`, type: 'positive' as const }, ...nextPlayer.logs].slice(0, 50);
+                                    setToastMessage({ title: 'Referral Accepted', subtext: `A ${promisedResult} will arrive in ${weeksLeft} weeks.` });
                                 } else if (accepted && selectedAction?.kind === 'IG_BRAND_OFFER' && selectedAction.payload?.offer) {
                                     nextPlayer.activeSponsorships = [...nextPlayer.activeSponsorships, selectedAction.payload.offer];
                                     nextPlayer.logs = [{ week: p.currentWeek, year: p.age, message: `📱 Instagram Brand Deal: ${selectedAction.payload.offer.brandName} contract moved to your Team app.`, type: 'positive' as const }, ...nextPlayer.logs].slice(0, 50);
@@ -2532,7 +2562,13 @@ export const App: React.FC = () => {
                         />
                     )}
                 </div>
-                {isBottomNavVisible && <BottomNav activePage={activePage} setPage={setActivePage} />}
+                {isBottomNavVisible && (
+                    <BottomNav
+                        activePage={activePage}
+                        setPage={setActivePage}
+                        unreadMessages={player.inbox?.filter(message => !message.isRead).length || 0}
+                    />
+                )}
             </>
         )}
       </div>

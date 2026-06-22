@@ -4,7 +4,8 @@ import { generateTinderProfile, calculateSwipeSuccess } from '../../services/dat
 import { getAbsoluteWeek } from '../../services/legacyLogic';
 import { spendPlayerEnergy } from '../../services/premiumLogic';
 import { getPregnancyCarrier, getPregnancyFeedbackCopy } from '../../services/familyLogic';
-import { ArrowLeft, Flame, X, Heart, MessageCircle, Briefcase, Send, ChevronLeft, Calendar, Moon, Link2, Sparkles } from 'lucide-react';
+import { DatingPreferencesSheet, preferenceLabel } from './DatingPreferencesSheet';
+import { ArrowLeft, Flame, X, Heart, MessageCircle, Briefcase, Send, ChevronLeft, Calendar, Moon, Link2, Sparkles, SlidersHorizontal } from 'lucide-react';
 
 interface TinderAppProps {
     player: Player;
@@ -246,6 +247,8 @@ export const TinderApp: React.FC<TinderAppProps> = ({ player, onBack, onUpdatePl
     const [feedback, setFeedback] = useState<{ message: string; tone: 'success' | 'error' | 'neutral' } | null>(null);
     const [resultModal, setResultModal] = useState<{ title: string; body: string; tone: 'success' | 'error' | 'neutral' } | null>(null);
     const [isAwaitingReply, setIsAwaitingReply] = useState(false);
+    const [showPreferencesSheet, setShowPreferencesSheet] = useState(false);
+    const [recentTinderNames, setRecentTinderNames] = useState<string[]>([]);
     const chatEndRef = useRef<HTMLDivElement>(null);
     const replyTimeoutRef = useRef<number | null>(null);
 
@@ -256,9 +259,22 @@ export const TinderApp: React.FC<TinderAppProps> = ({ player, onBack, onUpdatePl
     useEffect(() => {
         if (player.dating.isTinderActive) {
             setView(activeChatMatchId ? 'CHAT' : 'SWIPE');
-            setCurrentProfile(generateTinderProfile(preferences));
+            setCurrentProfile(generateTinderProfile(player.dating.preferences, {
+                excludeNames: player.dating.matches.filter(match => !match.isPremium).map(match => match.name),
+            }));
         }
     }, []);
+
+    useEffect(() => {
+        if (!showPreferencesSheet) {
+            setPreferences(player.dating.preferences);
+        }
+    }, [
+        player.dating.preferences.gender,
+        player.dating.preferences.minAge,
+        player.dating.preferences.maxAge,
+        showPreferencesSheet,
+    ]);
 
     useEffect(() => {
         if (view === 'CHAT') {
@@ -309,9 +325,38 @@ export const TinderApp: React.FC<TinderAppProps> = ({ player, onBack, onUpdatePl
         };
     };
 
-    const loadNewProfile = () => {
-        setCurrentProfile(generateTinderProfile(preferences));
+    const rememberTinderProfile = (profile: DatingMatch) => {
+        setRecentTinderNames(prev => [profile.name, ...prev.filter(name => name !== profile.name)].slice(0, 24));
+    };
+
+    const getTinderProfileExclusions = () => {
+        const matchedNames = player.dating.matches.filter(match => !match.isPremium).map(match => match.name);
+        const currentName = currentProfile?.name ? [currentProfile.name] : [];
+        const names = [...recentTinderNames, ...currentName, ...matchedNames];
+        return {
+            excludeNames: names,
+            excludeFirstNames: names.map(name => name.split(/\s+/)[0]),
+        };
+    };
+
+    const loadNewProfile = (nextPreferences = preferences) => {
+        const nextProfile = generateTinderProfile(nextPreferences, getTinderProfileExclusions());
+        setCurrentProfile(nextProfile);
+        rememberTinderProfile(nextProfile);
         setLastSwipe(null);
+    };
+
+    const saveDatingPreferences = () => {
+        onUpdatePlayer({
+            ...player,
+            dating: {
+                ...player.dating,
+                preferences,
+            },
+        });
+        loadNewProfile(preferences);
+        setShowPreferencesSheet(false);
+        pushFeedback(`Showing ${preferenceLabel(preferences)}.`, 'success');
     };
 
     const updateMatch = (
@@ -848,8 +893,21 @@ export const TinderApp: React.FC<TinderAppProps> = ({ player, onBack, onUpdatePl
                 <>
                     <div className="p-4 pt-12 flex justify-between items-center border-b border-gray-100 bg-white z-10 shrink-0">
                         <button onClick={() => setView('MATCHES')} className={`p-2 rounded-full ${view === 'MATCHES' ? 'text-pink-500' : 'text-gray-300'}`}><MessageCircle size={28} fill={view === 'MATCHES' ? 'currentColor' : 'none'} /></button>
-                        <button onClick={() => setView('SWIPE')} className={`p-2 rounded-full ${view === 'SWIPE' ? 'text-pink-500' : 'text-gray-300'}`}><Flame size={28} fill={view === 'SWIPE' ? 'currentColor' : 'none'} /></button>
-                        <button onClick={onBack} className="p-2 rounded-full text-gray-400 hover:bg-gray-100"><ArrowLeft size={24} /></button>
+                        <div className="flex flex-col items-center gap-1">
+                            <button onClick={() => setView('SWIPE')} className={`p-2 rounded-full ${view === 'SWIPE' ? 'text-pink-500' : 'text-gray-300'}`}><Flame size={28} fill={view === 'SWIPE' ? 'currentColor' : 'none'} /></button>
+                            <button
+                                onClick={() => setShowPreferencesSheet(true)}
+                                className="rounded-full bg-gray-100 px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-gray-500"
+                            >
+                                {preferenceLabel(preferences)}
+                            </button>
+                        </div>
+                        <div className="flex items-center gap-1">
+                            <button onClick={() => setShowPreferencesSheet(true)} className="p-2 rounded-full text-gray-400 hover:bg-gray-100" aria-label="Edit Tinder filters">
+                                <SlidersHorizontal size={22} />
+                            </button>
+                            <button onClick={onBack} className="p-2 rounded-full text-gray-400 hover:bg-gray-100"><ArrowLeft size={24} /></button>
+                        </div>
                     </div>
 
                     {view === 'SWIPE' && currentProfile && (
@@ -863,6 +921,11 @@ export const TinderApp: React.FC<TinderAppProps> = ({ player, onBack, onUpdatePl
                                         <span className="text-xl font-normal opacity-80">{currentProfile.age}</span>
                                     </h2>
                                     <p className="text-white/80 flex items-center gap-1 mt-1"><Briefcase size={14} /> {currentProfile.job}</p>
+                                    {currentProfile.bio && (
+                                        <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-white/75">
+                                            {currentProfile.bio}
+                                        </p>
+                                    )}
                                 </div>
                             </div>
 
@@ -906,6 +969,18 @@ export const TinderApp: React.FC<TinderAppProps> = ({ player, onBack, onUpdatePl
                         </div>
                     )}
                 </>
+            )}
+            {showPreferencesSheet && (
+                <DatingPreferencesSheet
+                    preferences={preferences}
+                    onChange={setPreferences}
+                    onClose={() => {
+                        setPreferences(player.dating.preferences);
+                        setShowPreferencesSheet(false);
+                    }}
+                    onSave={saveDatingPreferences}
+                    tone="tinder"
+                />
             )}
         </div>
     );

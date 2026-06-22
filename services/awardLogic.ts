@@ -248,7 +248,7 @@ export const checkAwardEligibility = (player: Player, week: number, awardYear = 
 
         // Oscar Bias: Drama/Prestige
         if (week === 10) {
-            if (project.genre === 'DRAMA' || project.genre === 'THRILLER') nomScore += 10;
+            if (project.genre === 'DRAMA' || project.genre === 'THRILLER' || project.genre === 'MYSTERY') nomScore += 10;
             if (perfScore > 90) nomScore += 5; 
         }
         

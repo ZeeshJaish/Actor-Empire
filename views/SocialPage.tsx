@@ -63,8 +63,10 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
       });
   }, [player.relationships]);
 
+  const legacyBonds = sortedRelationships.filter(rel => rel.relation === 'Deceased Parent');
+
   const innerCircle = sortedRelationships.filter(rel =>
-      ['Parent', 'Deceased Parent', 'Spouse', 'Child', 'Sibling'].includes(rel.relation)
+      ['Parent', 'Spouse', 'Child', 'Sibling'].includes(rel.relation)
   );
 
   const relationshipCircle = sortedRelationships.filter(rel =>
@@ -73,7 +75,8 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
 
   const professionalNetwork = sortedRelationships.filter(rel =>
       !innerCircle.some(entry => entry.id === rel.id) &&
-      !relationshipCircle.some(entry => entry.id === rel.id)
+      !relationshipCircle.some(entry => entry.id === rel.id) &&
+      !legacyBonds.some(entry => entry.id === rel.id)
   );
 
   const children = useMemo(() => {
@@ -217,15 +220,16 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
   const renderRelationshipCard = (rel: Relationship) => {
       const weeksSince = getInteractionAgeInWeeks(rel, player.age, player.currentWeek);
       const closeness = rel.closeness || 0;
-      const isCritical = weeksSince >= 8 && closeness < 45;
+      const isLegacyBond = rel.relation === 'Deceased Parent';
+      const isCritical = !isLegacyBond && weeksSince >= 8 && closeness < 45;
       
       return (
-          <div key={rel.id} onClick={() => setSelectedContact(rel)} className={`glass-card p-4 rounded-3xl flex items-center gap-4 group cursor-pointer transition-transform active:scale-[0.98] ${rel.relation === 'Partner' || rel.relation === 'Spouse' ? 'border-pink-500/30 bg-pink-900/5' : ''} ${rel.relation === 'Ex-Partner' || rel.relation === 'Ex-Spouse' ? 'border-rose-500/20 bg-rose-900/5' : ''}`}>
+          <div key={rel.id} onClick={() => setSelectedContact(rel)} className={`glass-card p-4 rounded-3xl flex items-center gap-4 group cursor-pointer transition-transform active:scale-[0.98] ${rel.relation === 'Partner' || rel.relation === 'Spouse' ? 'border-pink-500/30 bg-pink-900/5' : ''} ${rel.relation === 'Ex-Partner' || rel.relation === 'Ex-Spouse' ? 'border-rose-500/20 bg-rose-900/5' : ''} ${isLegacyBond ? 'border-zinc-700/60 bg-zinc-950/60' : ''}`}>
               <div className="relative">
                   <img
                       src={rel.image}
                       alt={rel.name}
-                      className={`w-14 h-14 rounded-full object-cover border-2 transition-colors ${isCritical ? 'border-rose-500' : 'border-zinc-800 group-hover:border-zinc-600'}`}
+                      className={`w-14 h-14 rounded-full object-cover border-2 transition-colors ${isLegacyBond ? 'grayscale border-zinc-700 opacity-80' : isCritical ? 'border-rose-500' : 'border-zinc-800 group-hover:border-zinc-600'}`}
                   />
                   <div className="absolute -bottom-1 -right-1 bg-zinc-900 rounded-full p-1 border border-zinc-800 shadow-md">
                       {rel.relation === 'Partner' || rel.relation === 'Spouse' ? <Heart size={10} className="text-rose-500 fill-rose-500"/> :
@@ -252,14 +256,14 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
                   <div className="space-y-1">
                       <div className="flex justify-between text-[10px] text-zinc-500 uppercase mb-0.5">
                           <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[9px] font-bold tracking-[0.18em] ${getRelationPill(rel.relation)}`}>{relationLabel(rel.relation)}</span>
-                          <span className={(rel.closeness || 0) > 80 ? 'text-emerald-400 font-bold' : ''}>{Math.round(rel.closeness || 0)}/100</span>
+                          <span className={isLegacyBond ? 'text-zinc-400 font-bold' : (rel.closeness || 0) > 80 ? 'text-emerald-400 font-bold' : ''}>{Math.round(rel.closeness || 0)}/100</span>
                       </div>
                       <div className="h-1.5 w-full bg-zinc-800 rounded-full overflow-hidden">
-                          <div className={`h-full rounded-full transition-all duration-500 ${(rel.closeness || 0) > 80 ? 'bg-emerald-500' : (rel.closeness || 0) < 30 ? 'bg-rose-500' : 'bg-amber-400'}`} style={{ width: `${rel.closeness || 0}%` }}></div>
+                          <div className={`h-full rounded-full transition-all duration-500 ${isLegacyBond ? 'bg-zinc-500' : (rel.closeness || 0) > 80 ? 'bg-emerald-500' : (rel.closeness || 0) < 30 ? 'bg-rose-500' : 'bg-amber-400'}`} style={{ width: `${rel.closeness || 0}%` }}></div>
                       </div>
                   </div>
               </div>
-              <div className="text-zinc-600 group-hover:text-zinc-400 transition-colors"><MessageCircle size={20} /></div>
+              <div className="text-zinc-600 group-hover:text-zinc-400 transition-colors">{isLegacyBond ? <Skull size={20} /> : <MessageCircle size={20} />}</div>
           </div>
       );
   };
@@ -338,6 +342,15 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
                   <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">{tr('connections.relationships')}</h3>
                   <div className="space-y-3">
                       {relationshipCircle.map(renderRelationshipCard)}
+                  </div>
+              </div>
+          )}
+
+          {legacyBonds.length > 0 && (
+              <div className="space-y-4">
+                  <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">{tr('connections.legacyBonds')}</h3>
+                  <div className="space-y-3">
+                      {legacyBonds.map(renderRelationshipCard)}
                   </div>
               </div>
           )}
@@ -442,7 +455,7 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
 
                   <div className="relative pt-12 pb-6 px-6 bg-zinc-900 border-b border-zinc-800 flex flex-col items-center shrink-0">
                       <div className="w-24 h-24 rounded-full p-1 bg-gradient-to-tr from-zinc-700 to-zinc-900 shadow-xl mb-3">
-                          <img src={selectedContact.image} className="w-full h-full rounded-full object-cover border-4 border-black" />
+                          <img src={selectedContact.image} className={`w-full h-full rounded-full object-cover border-4 border-black ${selectedContact.relation === 'Deceased Parent' ? 'grayscale opacity-80' : ''}`} />
                       </div>
                       <h3 className="text-2xl font-bold text-white mb-1">{selectedContact.name}</h3>
                       <div className={`mb-2 inline-flex items-center rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] ${getRelationPill(selectedContact.relation)}`}>{relationLabel(selectedContact.relation)}</div>
@@ -453,13 +466,23 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
                       <div className="w-full max-w-[200px] flex items-center gap-3 bg-black/40 p-2 rounded-xl border border-white/5">
                           <span className="text-[10px] font-bold text-zinc-500 uppercase">{tr('connections.bond')}</span>
                           <div className="flex-1 h-2 bg-zinc-800 rounded-full overflow-hidden">
-                               <div className={`h-full rounded-full ${selectedContact.closeness > 80 ? 'bg-emerald-500' : 'bg-amber-400'}`} style={{ width: `${selectedContact.closeness}%` }}/>
+                               <div className={`h-full rounded-full ${selectedContact.relation === 'Deceased Parent' ? 'bg-zinc-500' : selectedContact.closeness > 80 ? 'bg-emerald-500' : 'bg-amber-400'}`} style={{ width: `${selectedContact.closeness}%` }}/>
                           </div>
                           <span className="text-xs font-mono text-zinc-300">{selectedContact.closeness}</span>
                       </div>
                   </div>
 
                   <div className="flex-1 overflow-y-auto p-4 pb-12 custom-scrollbar bg-black">
+                      {selectedContact.relation === 'Deceased Parent' && (
+                          <div className="mb-6 rounded-3xl border border-zinc-700/60 bg-zinc-950 p-5 text-center">
+                              <Skull className="mx-auto mb-3 text-zinc-500" size={28} />
+                              <div className="text-[10px] font-bold uppercase tracking-[0.24em] text-zinc-500">{tr('connections.inMemory')}</div>
+                              <p className="mt-3 text-sm leading-relaxed text-zinc-300">
+                                  {tr('connections.legacyBondNote')}
+                              </p>
+                          </div>
+                      )}
+
                       {(selectedContact.relation === 'Partner' || selectedContact.relation === 'Spouse') && (
                           <div className="mb-6">
                               <h4 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3 pl-1">{tr('connections.romance')}</h4>
@@ -568,6 +591,7 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
                           </div>
                       )}
 
+                      {selectedContact.relation !== 'Deceased Parent' ? (
                       <div className="mb-6">
                           <h4 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3 pl-1">{tr('connections.social')}</h4>
                           <div className="grid grid-cols-2 gap-3">
@@ -584,10 +608,17 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
                               )}
                           </div>
                       </div>
+                      ) : (
+                          <div className="mb-6 rounded-2xl border border-zinc-800 bg-zinc-900/30 p-4 text-center text-xs font-bold uppercase tracking-wider text-zinc-600">
+                              {tr('connections.noActiveActions')}
+                          </div>
+                      )}
 
                       <div className="text-center pb-6">
                            <p className="text-[10px] text-zinc-600 font-mono">
-                              {tr('connections.lastInteraction')}: {getInteractionAgeInWeeks(selectedContact, player.age, player.currentWeek) === 0 ? tr('connections.thisWeek') : tr('connections.weeksAgo', { count: getInteractionAgeInWeeks(selectedContact, player.age, player.currentWeek) })}
+                              {selectedContact.relation === 'Deceased Parent'
+                                  ? tr('connections.inMemory')
+                                  : `${tr('connections.lastInteraction')}: ${getInteractionAgeInWeeks(selectedContact, player.age, player.currentWeek) === 0 ? tr('connections.thisWeek') : tr('connections.weeksAgo', { count: getInteractionAgeInWeeks(selectedContact, player.age, player.currentWeek) })}`}
                            </p>
                       </div>
 

@@ -26,7 +26,11 @@ import {
     calculateProductionGain,
     calculatePassiveGain,
     getBoxOfficeCaps,
-    rewardGenreExperience
+    rewardGenreExperience,
+    getRoleRejectionFeedback,
+    formatRoleRejectionReview,
+    evaluateCastingApplication,
+    generateBreakthroughAuditionInvite
 } from './roleLogic';
 import { 
     determineStreamingAcquisition, 
@@ -56,7 +60,7 @@ import { generateFamousMovieOpportunity, generateCameoOffer } from './famousMovi
 import { calculateYoutubeCreatorScore, generateYoutubeBrandDeal, generateYoutubeCollabOffer, getYoutubePublicImageLabel, processYoutubeChannel } from './youtubeLogic';
 import { getInstagramPostComments, pickInstagramMicroBrand } from './instagramLogic';
 import { checkForDirectorDecision, checkForProductionCrisis } from './productionService';
-import { processBusinessWeek } from './businessLogic';
+import { applyProductionHouseReleaseOutcome, processBusinessWeek, recalculateBusinessValuation } from './businessLogic';
 import { getAbsoluteWeek, getRelationshipAge, inferStreamingStartWeekAbsolute } from './legacyLogic';
 import { hasNoAds, resetWeeklyEnergy, spendPlayerEnergy } from './premiumLogic';
 import { advanceLuxeConnections, advanceTinderConnections } from './datingLogic';
@@ -66,6 +70,13 @@ import { processFamilyDramaWeek } from './familyLogic';
 import { getProjectMarketDemand } from './marketTrends';
 import { getStudioGenreReputation, improveStudioGenreReputation } from './studioSpecialization';
 import { getPlayerLanguage } from './i18n';
+import { addBreadcrumb, setCrashContext, trackGameEvent } from './firebaseService';
+import { resolveRareHollywoodChaos } from './rareHollywoodChaos';
+import { getReturnStatusForContinuation } from './continuationReturnLogic';
+import { processStreamingFundingContracts } from './streamingFundingLogic';
+import { resolveInstagramReferralOutcome } from './instagramOfferLogic';
+import { resolveYoutubeEventChoice, YoutubeEventResolution } from './youtubeEventLogic';
+import { resolveStudioAcquisitionResponses } from './studioAcquisition';
 
 // --- CONSTANTS ---
 const ANNUAL_TAX_FREE_ALLOWANCE = 25000;
@@ -87,59 +98,109 @@ const getWeeksSince = (postWeek: number, postYear: number, currentWeek: number, 
     return ((currentYear - postYear) * 52) + (currentWeek - postWeek);
 };
 
-const HIGH_FATALITY_GENRES = new Set(['ACTION', 'THRILLER', 'SCI_FI', 'SUPERHERO', 'ADVENTURE']);
+const formatMoneyShort = (value: number) => {
+    const safeValue = Math.max(0, Math.floor(Number(value) || 0));
+    if (safeValue >= 1_000_000_000) return `$${(safeValue / 1_000_000_000).toFixed(1)}B`;
+    if (safeValue >= 1_000_000) return `$${(safeValue / 1_000_000).toFixed(1)}M`;
+    if (safeValue >= 1_000) return `$${(safeValue / 1_000).toFixed(0)}k`;
+    return `$${safeValue.toLocaleString()}`;
+};
 
-const getReturnStatusForContinuation = (
-    rel: ActiveRelease,
+const adjustPlatformFundingRelationship = (
     player: Player,
-    isPlayerProduction: boolean,
-    isUniverseContracted: boolean
-): { getsOffer: boolean; status: PlayerReturnStatus; note: string } => {
-    if (isPlayerProduction || isUniverseContracted) {
-        return {
-            getsOffer: true,
-            status: 'RETURNING',
-            note: rel.type === 'SERIES'
-                ? 'The continuation keeps your character in the center of the story.'
-                : 'The sequel keeps you on the call sheet.'
-        };
-    }
+    businessId: string,
+    platformId: string,
+    modifierDelta: number,
+    recoveryDelta: number
+) => {
+    const business = player.businesses.find(item => item.id === businessId);
+    if (!business?.studioState) return;
 
-    const baseReturnChanceByRole: Record<RoleType, number> = {
-        LEAD: 88,
-        SUPPORTING: 66,
-        ENSEMBLE: 54,
-        CAMEO: 34,
-        MINOR: 22,
+    const relations = business.studioState.platformRelations || {};
+    const current = relations[platformId];
+    if (!current) return;
+
+    const trustModifier = Math.max(-8, Math.min(0, current.trustModifier + modifierDelta));
+    const recoveryWeeksRemaining = Math.max(0, Math.min(36, current.recoveryWeeksRemaining + recoveryDelta));
+    business.studioState.platformRelations = {
+        ...relations,
+        ...(trustModifier === 0 || recoveryWeeksRemaining === 0
+            ? {}
+            : {
+                [platformId]: {
+                    ...current,
+                    trustModifier,
+                    recoveryWeeksRemaining
+                }
+            })
     };
-    const role = rel.roleType || 'SUPPORTING';
-    const performanceBonus = rel.productionPerformance >= 85 ? 10 : rel.productionPerformance >= 70 ? 5 : rel.productionPerformance <= 40 ? -10 : 0;
-    const ratingBonus = (rel.imdbRating || 5) >= 8 ? 8 : (rel.imdbRating || 5) >= 7 ? 4 : (rel.imdbRating || 5) < 5.8 ? -10 : 0;
-    const fameBonus = player.stats.fame >= 80 ? 6 : player.stats.fame >= 60 ? 3 : 0;
-    const returnChance = Math.max(8, Math.min(96, baseReturnChanceByRole[role] + performanceBonus + ratingBonus + fameBonus));
-    const getsOffer = Math.random() * 100 < returnChance;
 
-    if (getsOffer) {
-        return {
-            getsOffer: true,
-            status: 'RETURNING',
-            note: rel.type === 'SERIES'
-                ? 'The network wants your character back for the next season.'
-                : 'The studio wants your character back for the follow-up film.'
-        };
+    if (trustModifier === 0 || recoveryWeeksRemaining === 0) {
+        delete business.studioState.platformRelations[platformId];
     }
+};
 
-    const lethalChance = HIGH_FATALITY_GENRES.has(rel.projectDetails.genre) ? 0.55 : 0.18;
-    const status: PlayerReturnStatus = Math.random() < lethalChance ? 'KILLED_OFF' : 'WRITTEN_OFF';
-    const note = status === 'KILLED_OFF'
-        ? (rel.type === 'SERIES'
-            ? 'The renewed season continues without your character after an off-screen death.'
-            : 'The sequel moves forward after your character is killed off.')
-        : (rel.type === 'SERIES'
-            ? 'The renewed season continues without your character.'
-            : 'The sequel moves forward after your character is written out.');
+const createFundingBreachLifeEvent = (
+    businessId: string,
+    businessName: string,
+    platformId: string,
+    platformName: string,
+    sourceTitle: string,
+    fundingAmount: number,
+    studioBalance: number
+): LifeEvent => {
+    const settlement = Math.max(
+        100_000,
+        Math.min(5_000_000, fundingAmount * 0.03, Math.max(100_000, studioBalance * 0.08))
+    );
+    const legalFee = Math.max(50_000, Math.floor(settlement * 0.35));
 
-    return { getsOffer: false, status, note };
+    return {
+        id: `funding_breach_${businessId}_${platformId}_${Date.now()}`,
+        type: 'LEGAL',
+        title: `${platformName} Files a Funding Claim`,
+        description: `${businessName} did not commence the funded follow-up to "${sourceTitle}" within two years. ${platformName} has cancelled the reserved cap and filed a contract claim. Future offers from this platform are slightly weaker until trust recovers.`,
+        options: [
+            {
+                label: `Settle Quietly (${formatMoneyShort(settlement)})`,
+                description: 'Pay a controlled settlement and repair part of the relationship immediately.',
+                impact: (player) => {
+                    const business = player.businesses.find(item => item.id === businessId);
+                    if (business) business.balance -= settlement;
+                    adjustPlatformFundingRelationship(player, businessId, platformId, 1, -6);
+                    return {
+                        updatedPlayer: player,
+                        log: `${businessName} settled ${platformName}'s funding claim for ${formatMoneyShort(settlement)}.`
+                    };
+                }
+            },
+            {
+                label: `Fight in Arbitration (${formatMoneyShort(legalFee)})`,
+                description: 'A risky attempt to reduce the claim. Winning repairs trust faster; losing costs more.',
+                impact: (player) => {
+                    const business = player.businesses.find(item => item.id === businessId);
+                    if (business) business.balance -= legalFee;
+                    const won = Math.random() < 0.4;
+
+                    if (won) {
+                        adjustPlatformFundingRelationship(player, businessId, platformId, 2, -10);
+                        return {
+                            updatedPlayer: player,
+                            log: `${businessName} won arbitration against ${platformName}. The relationship begins recovering faster.`
+                        };
+                    }
+
+                    const loss = Math.max(100_000, Math.floor(settlement * 0.75));
+                    if (business) business.balance -= loss;
+                    adjustPlatformFundingRelationship(player, businessId, platformId, -1, 6);
+                    return {
+                        updatedPlayer: player,
+                        log: `${businessName} lost arbitration and paid ${formatMoneyShort(legalFee + loss)} in legal costs and damages.`
+                    };
+                }
+            }
+        ]
+    };
 };
 
 const createReturnStatusNews = (
@@ -293,195 +354,145 @@ const getYoutubeIdentityTuning = (identity?: string) => {
     }
 };
 
-const getNextWeekNumber = (week: number): number => week >= 52 ? 1 : week + 1;
-
-const createYoutubeLegalCase = (
-    player: Player,
-    title: string,
-    description: string,
-    evidenceStrength: number,
-    playerDefense: number
-): LegalCase => ({
-    id: `yt_case_${Date.now()}_${Math.random()}`,
-    title,
-    description,
-    weeksRemaining: 0,
-    severity: evidenceStrength >= 70 ? 'HIGH' : evidenceStrength >= 50 ? 'MEDIUM' : 'LOW',
-    evidence: evidenceStrength,
-    currentHearing: 1,
-    totalHearings: 2 + Math.floor(Math.random() * 2),
-    nextHearingWeek: getNextWeekNumber(player.currentWeek),
-    evidenceStrength,
-    playerDefense,
-    status: 'ACTIVE',
-    history: []
-});
+const createYoutubeChoiceImpact = (resolution: YoutubeEventResolution, choiceId: string) =>
+    (player: Player) => resolveYoutubeEventChoice(player, resolution, choiceId);
 
 export const createYoutubeCopyrightEvent = (
     videoTitle: string,
     claimAmount: number,
     evidenceStrength: number
-): ScheduledEvent => ({
-    id: `yt_copyright_event_${Date.now()}_${Math.random()}`,
-    week: 0,
-    type: 'LEGAL_HEARING',
-    title: 'YouTube Copyright Claim',
-    data: {
-        lifeEvent: {
-            id: `yt_copyright_life_${Date.now()}_${Math.random()}`,
-            type: 'LEGAL',
-            title: 'Copyright Claim',
-            description: `"${videoTitle}" has been hit with a copyright claim. You can accept the claim, quietly edit the upload, or dispute it and risk a court case.`,
-            options: [
-                {
-                    label: 'Accept Claim',
-                    description: 'Pay the claim and move on. Safest, but it costs money and trust.',
-                    impact: (p: Player) => {
-                        p.money -= claimAmount;
-                        p.youtube.audienceTrust = Math.max(0, (p.youtube.audienceTrust ?? 55) - 2);
-                        p.youtube.controversy = Math.max(0, (p.youtube.controversy ?? 0) - 2);
-                        return { updatedPlayer: p, log: `You accepted the copyright claim and paid $${claimAmount.toLocaleString()}.` };
-                    }
-                },
-                {
-                    label: 'Risky Dispute',
-                    description: 'Can clear your name, but losing creates a legal case.',
-                    impact: (p: Player) => {
-                        const defenseScore = (p.stats.reputation * 0.45) + ((p.youtube.audienceTrust ?? 55) * 0.35) + Math.random() * 35;
-                        if (defenseScore > evidenceStrength + 18) {
-                            p.youtube.audienceTrust = Math.min(100, (p.youtube.audienceTrust ?? 55) + 4);
-                            p.stats.reputation = Math.min(100, p.stats.reputation + 2);
-                            return { updatedPlayer: p, log: 'You disputed the claim and won. Fans praised you for standing up for the channel.' };
-                        }
+): ScheduledEvent => {
+    const editingFee = Math.max(100, Math.round(claimAmount * 0.35));
+    const resolution: YoutubeEventResolution = {
+        domain: 'YOUTUBE',
+        kind: 'COPYRIGHT',
+        payload: { videoTitle, claimAmount, evidenceStrength }
+    };
 
-                        if (!p.flags.activeCases) p.flags.activeCases = [];
-                        p.flags.activeCases.push(createYoutubeLegalCase(
-                            p,
-                            'YouTube Copyright Dispute',
-                            `A copyright holder escalated the claim around "${videoTitle}".`,
-                            evidenceStrength,
-                            Math.floor(defenseScore)
-                        ));
-                        p.youtube.controversy = Math.min(100, (p.youtube.controversy ?? 0) + 8);
-                        p.news.unshift({
-                            id: `news_yt_copyright_case_${Date.now()}`,
-                            headline: `${p.name} faces a copyright dispute over a YouTube upload.`,
-                            subtext: 'The creator side of fame just got legally messy.',
-                            category: 'YOU',
-                            week: p.currentWeek,
-                            year: p.age,
-                            impactLevel: 'MEDIUM'
-                        });
-                        p.news = p.news.slice(0, 50);
-                        return { updatedPlayer: p, log: 'The dispute escalated into a legal case. A hearing has been scheduled.' };
+    return {
+        id: `yt_copyright_event_${Date.now()}_${Math.random()}`,
+        week: 0,
+        type: 'LEGAL_HEARING',
+        title: 'YouTube Copyright Claim',
+        data: {
+            youtubeResolution: resolution,
+            lifeEvent: {
+                id: `yt_copyright_life_${Date.now()}_${Math.random()}`,
+                type: 'LEGAL',
+                title: 'Copyright Claim',
+                description: `"${videoTitle}" has been hit with a copyright claim. Choose between a clean settlement, a quieter edit, or a risky dispute.`,
+                options: [
+                    {
+                        id: 'ACCEPT_CLAIM',
+                        label: 'Accept Claim',
+                        description: 'Close it immediately. You pay the full claim and lose a little audience trust.',
+                        previewEffects: [
+                            { label: 'Cash', value: `-$${claimAmount.toLocaleString()}`, tone: 'negative' },
+                            { label: 'Audience Trust', value: '-2', tone: 'negative' },
+                            { label: 'Risk', value: 'None', tone: 'positive' }
+                        ],
+                        impact: createYoutubeChoiceImpact(resolution, 'ACCEPT_CLAIM')
+                    },
+                    {
+                        id: 'EDIT_UPLOAD',
+                        label: 'Edit Upload Quietly',
+                        description: 'Remove the disputed segment. Cheaper than settling, but the audience notices the awkward edit.',
+                        previewEffects: [
+                            { label: 'Editing Cost', value: `-$${editingFee.toLocaleString()}`, tone: 'negative' },
+                            { label: 'Controversy', value: '-6', tone: 'positive' },
+                            { label: 'Fan Mood', value: '-1', tone: 'negative' }
+                        ],
+                        impact: createYoutubeChoiceImpact(resolution, 'EDIT_UPLOAD')
+                    },
+                    {
+                        id: 'DISPUTE_CLAIM',
+                        label: 'Risky Dispute',
+                        description: 'A win boosts trust and reputation. A loss opens a legal case and raises controversy.',
+                        previewEffects: [
+                            { label: 'Upside', value: 'Trust +4', tone: 'positive' },
+                            { label: 'Risk', value: 'Legal case', tone: 'negative' }
+                        ],
+                        impact: createYoutubeChoiceImpact(resolution, 'DISPUTE_CLAIM')
+                    },
+                    {
+                        id: 'GOLDEN_LEGAL',
+                        label: 'Golden Legal Team (Watch Ad)',
+                        isGolden: true,
+                        description: 'Platform lawyers clear the claim, recover momentum, and protect your channel.',
+                        previewEffects: [
+                            { label: 'Audience Trust', value: '+5', tone: 'positive' },
+                            { label: 'Controversy', value: '-10', tone: 'positive' },
+                            { label: 'Views', value: 'Recovered', tone: 'positive' }
+                        ],
+                        impact: createYoutubeChoiceImpact(resolution, 'GOLDEN_LEGAL')
                     }
-                },
-                {
-                    label: 'Golden Legal Team (Watch Ad)',
-                    isGolden: true,
-                    description: 'Safest route. Clear the claim with platform lawyers and keep the channel clean.',
-                    impact: (p: Player) => {
-                        const video = p.youtube.videos.find(v => v.title === videoTitle);
-                        if (video) {
-                            const recoveredViews = Math.floor(Math.max(750, video.views * 0.08));
-                            video.views += recoveredViews;
-                            video.likes += Math.floor(recoveredViews * 0.05);
-                            video.comments = ['The claim was handled professionally.', ...(video.comments || [])].slice(0, 5);
-                        }
-                        p.youtube.audienceTrust = Math.min(100, (p.youtube.audienceTrust ?? 55) + 5);
-                        p.youtube.fanMood = Math.min(100, (p.youtube.fanMood ?? 55) + 2);
-                        p.youtube.controversy = Math.max(0, (p.youtube.controversy ?? 0) - 10);
-                        p.stats.reputation = Math.min(100, p.stats.reputation + 2);
-                        return { updatedPlayer: p, log: 'Your legal team cleared the copyright claim before it damaged the channel.' };
-                    }
-                }
-            ]
-        } as LifeEvent
-    }
-});
+                ]
+            } as LifeEvent
+        }
+    };
+};
 
 export const createYoutubeBacklashEvent = (
     videoTitle: string,
     severity: number
-): ScheduledEvent => ({
-    id: `yt_backlash_event_${Date.now()}_${Math.random()}`,
-    week: 0,
-    type: 'SCANDAL',
-    title: 'YouTube Backlash',
-    data: {
-        lifeEvent: {
-            id: `yt_backlash_life_${Date.now()}_${Math.random()}`,
-            type: 'SCANDAL',
-            title: 'Creator Backlash',
-            description: `The comments around "${videoTitle}" are turning ugly. Fans want a response before this becomes bigger than the video.`,
-            options: [
-                {
-                    label: 'Post Apology Video',
-                    description: 'Costs pride, restores trust, lowers heat.',
-                    impact: (p: Player) => {
-                        p.youtube.audienceTrust = Math.min(100, (p.youtube.audienceTrust ?? 55) + 7);
-                        p.youtube.fanMood = Math.min(100, (p.youtube.fanMood ?? 55) + 3);
-                        p.youtube.controversy = Math.max(0, (p.youtube.controversy ?? 0) - 12);
-                        p.stats.reputation = Math.min(100, p.stats.reputation + 1);
-                        return { updatedPlayer: p, log: 'You posted a grounded apology. The heat cooled before it became a career fire.' };
-                    }
-                },
-                {
-                    label: 'Crisis PR Team (Watch Ad)',
-                    isGolden: true,
-                    description: 'Safest route. Turn the outrage into accountability, trust, and controlled buzz.',
-                    impact: (p: Player) => {
-                        const recoveryViews = Math.floor(Math.max(1200, p.youtube.subscribers * (0.05 + Math.random() * 0.08)));
-                        const video = p.youtube.videos.find(v => v.title === videoTitle);
-                        if (video) {
-                            video.views += recoveryViews;
-                            video.likes += Math.floor(recoveryViews * 0.06);
-                            video.comments = ['This response actually felt mature.', ...(video.comments || [])].slice(0, 5);
-                        }
-                        p.youtube.totalChannelViews += recoveryViews;
-                        p.youtube.audienceTrust = Math.min(100, (p.youtube.audienceTrust ?? 55) + 9);
-                        p.youtube.fanMood = Math.min(100, (p.youtube.fanMood ?? 55) + 5);
-                        p.youtube.controversy = Math.max(0, (p.youtube.controversy ?? 0) - 16);
-                        p.stats.reputation = Math.min(100, p.stats.reputation + 3);
-                        return { updatedPlayer: p, log: `Your PR team turned the backlash into a mature comeback and recovered ${recoveryViews.toLocaleString()} views.` };
-                    }
-                },
-                {
-                    label: 'Double Down',
-                    description: 'Riskier response. Can spike views, but severe backlash can become legal.',
-                    impact: (p: Player) => {
-                        const spikeViews = Math.floor(Math.max(1000, p.youtube.subscribers * (0.08 + Math.random() * 0.14)));
-                        const video = p.youtube.videos.find(v => v.title === videoTitle);
-                        if (video) {
-                            video.views += spikeViews;
-                            video.likes += Math.floor(spikeViews * 0.035);
-                            video.comments = ['This response made everything louder.', ...(video.comments || [])].slice(0, 5);
-                        }
-                        p.youtube.totalChannelViews += spikeViews;
-                        p.youtube.fanMood = Math.max(0, (p.youtube.fanMood ?? 55) - 2);
-                        p.youtube.audienceTrust = Math.max(0, (p.youtube.audienceTrust ?? 55) - 8);
-                        p.youtube.controversy = Math.min(100, (p.youtube.controversy ?? 0) + 15);
-                        p.stats.fame = Math.min(100, p.stats.fame + 1);
+): ScheduledEvent => {
+    const resolution: YoutubeEventResolution = {
+        domain: 'YOUTUBE',
+        kind: 'BACKLASH',
+        payload: { videoTitle, severity }
+    };
 
-                        if (severity >= 72 || Math.random() < 0.25) {
-                            if (!p.flags.activeCases) p.flags.activeCases = [];
-                            p.flags.activeCases.push(createYoutubeLegalCase(
-                                p,
-                                'Creator Backlash Defamation Case',
-                                `A public response to backlash around "${videoTitle}" triggered a legal complaint.`,
-                                55 + Math.floor(Math.random() * 25),
-                                Math.floor((p.stats.reputation * 0.35) + Math.random() * 30)
-                            ));
-                            return { updatedPlayer: p, log: `You doubled down and gained views, but the backlash escalated into a legal complaint.` };
-                        }
-
-                        return { updatedPlayer: p, log: `You doubled down and gained ${spikeViews.toLocaleString()} extra views, but trust took a hit.` };
+    return {
+        id: `yt_backlash_event_${Date.now()}_${Math.random()}`,
+        week: 0,
+        type: 'SCANDAL',
+        title: 'YouTube Backlash',
+        data: {
+            youtubeResolution: resolution,
+            lifeEvent: {
+                id: `yt_backlash_life_${Date.now()}_${Math.random()}`,
+                type: 'SCANDAL',
+                title: 'Creator Backlash',
+                description: `The comments around "${videoTitle}" are turning ugly. Fans want a response before this becomes bigger than the video.`,
+                options: [
+                    {
+                        id: 'POST_APOLOGY',
+                        label: 'Post Apology Video',
+                        description: 'A controlled response that restores trust and cools the backlash.',
+                        previewEffects: [
+                            { label: 'Audience Trust', value: '+7', tone: 'positive' },
+                            { label: 'Controversy', value: '-12', tone: 'positive' }
+                        ],
+                        impact: createYoutubeChoiceImpact(resolution, 'POST_APOLOGY')
+                    },
+                    {
+                        id: 'PR_TEAM',
+                        label: 'Crisis PR Team (Watch Ad)',
+                        isGolden: true,
+                        description: 'Turn outrage into accountability while recovering audience momentum.',
+                        previewEffects: [
+                            { label: 'Audience Trust', value: '+9', tone: 'positive' },
+                            { label: 'Controversy', value: '-16', tone: 'positive' },
+                            { label: 'Views', value: 'Recovered', tone: 'positive' }
+                        ],
+                        impact: createYoutubeChoiceImpact(resolution, 'PR_TEAM')
+                    },
+                    {
+                        id: 'DOUBLE_DOWN',
+                        label: 'Double Down',
+                        description: 'Gain views and fame, but damage trust. Severe backlash may become a legal complaint.',
+                        previewEffects: [
+                            { label: 'Views', value: 'Spike', tone: 'positive' },
+                            { label: 'Audience Trust', value: '-8', tone: 'negative' },
+                            { label: 'Legal Risk', value: 'High', tone: 'negative' }
+                        ],
+                        impact: createYoutubeChoiceImpact(resolution, 'DOUBLE_DOWN')
                     }
-                }
-            ]
-        } as LifeEvent
-    }
-});
+                ]
+            } as LifeEvent
+        }
+    };
+};
 
 export const createYoutubeCreatorInviteEvent = (
     player: Player,
@@ -505,6 +516,11 @@ export const createYoutubeCreatorInviteEvent = (
         }
     };
     const copy = eventCopy[kind];
+    const resolution: YoutubeEventResolution = {
+        domain: 'YOUTUBE',
+        kind: 'CREATOR_INVITE',
+        payload: { inviteKind: kind, venue: copy.venue }
+    };
 
     return {
         id: `yt_creator_invite_${kind}_${Date.now()}_${Math.random()}`,
@@ -512,6 +528,7 @@ export const createYoutubeCreatorInviteEvent = (
         type: 'LIFE_EVENT',
         title: copy.title,
         data: {
+            youtubeResolution: resolution,
             lifeEvent: {
                 id: `yt_creator_life_${kind}_${Date.now()}_${Math.random()}`,
                 type: kind === 'PODCAST' ? 'NETWORKING' : 'LIFE',
@@ -519,46 +536,38 @@ export const createYoutubeCreatorInviteEvent = (
                 description: copy.description,
                 options: [
                     {
+                        id: 'STEADY_NETWORK',
                         label: kind === 'PODCAST' ? 'Give A Real Interview' : 'Work The Room',
-                        description: 'Build trust and reputation with a steady creator move.',
-                        impact: (p: Player) => {
-                            p.youtube.audienceTrust = Math.min(100, (p.youtube.audienceTrust ?? 55) + 6);
-                            p.youtube.fanMood = Math.min(100, (p.youtube.fanMood ?? 55) + 4);
-                            p.stats.reputation = Math.min(100, p.stats.reputation + 3);
-                            p.x.followers += kind === 'PLATFORM_SUMMIT' ? 12000 : 6000;
-                            return { updatedPlayer: p, log: `${copy.venue} turned into a clean creator reputation win.` };
-                        }
+                        description: 'Build trust, reputation, and professional reach without chasing drama.',
+                        previewEffects: [
+                            { label: 'Audience Trust', value: '+6', tone: 'positive' },
+                            { label: 'Reputation', value: '+3', tone: 'positive' },
+                            { label: 'X Followers', value: kind === 'PLATFORM_SUMMIT' ? '+12K' : '+6K', tone: 'positive' }
+                        ],
+                        impact: createYoutubeChoiceImpact(resolution, 'STEADY_NETWORK')
                     },
                     {
+                        id: 'CHASE_VIRAL',
                         label: kind === 'PODCAST' ? 'Chase The Viral Clip' : 'Make A Loud Entrance',
-                        description: 'More fame and views, but more heat.',
-                        impact: (p: Player) => {
-                            const bonusViews = Math.floor(Math.max(15000, p.youtube.subscribers * (0.18 + Math.random() * 0.25)));
-                            p.youtube.totalChannelViews += bonusViews;
-                            p.youtube.subscribers += Math.floor(bonusViews / 120);
-                            p.youtube.fanMood = Math.min(100, (p.youtube.fanMood ?? 55) + 5);
-                            p.youtube.controversy = Math.min(100, (p.youtube.controversy ?? 0) + 12);
-                            p.youtube.audienceTrust = Math.max(0, (p.youtube.audienceTrust ?? 55) - 4);
-                            p.stats.fame = Math.min(100, p.stats.fame + 3);
-                            p.x.followers += Math.floor(bonusViews * 0.02);
-                            return { updatedPlayer: p, log: `${copy.venue} gave you a viral creator spike: +${bonusViews.toLocaleString()} channel views.` };
-                        }
+                        description: 'Chase views, subscribers, and fame at the cost of trust and higher controversy.',
+                        previewEffects: [
+                            { label: 'Growth', value: 'High', tone: 'positive' },
+                            { label: 'Audience Trust', value: '-4', tone: 'negative' },
+                            { label: 'Controversy', value: '+12', tone: 'negative' }
+                        ],
+                        impact: createYoutubeChoiceImpact(resolution, 'CHASE_VIRAL')
                     },
                     {
+                        id: 'GOLDEN_HANDLER',
                         label: 'Golden Handler (Watch Ad)',
                         isGolden: true,
                         description: 'Best route. Your team scripts the moment, protects your image, and captures the upside.',
-                        impact: (p: Player) => {
-                            const bonusViews = Math.floor(Math.max(22000, p.youtube.subscribers * (0.22 + Math.random() * 0.25)));
-                            p.youtube.totalChannelViews += bonusViews;
-                            p.youtube.subscribers += Math.floor(bonusViews / 95);
-                            p.youtube.audienceTrust = Math.min(100, (p.youtube.audienceTrust ?? 55) + 8);
-                            p.youtube.fanMood = Math.min(100, (p.youtube.fanMood ?? 55) + 6);
-                            p.youtube.controversy = Math.max(0, (p.youtube.controversy ?? 0) - 8);
-                            p.stats.reputation = Math.min(100, p.stats.reputation + 4);
-                            p.x.followers += Math.floor(bonusViews * 0.025);
-                            return { updatedPlayer: p, log: `Your team turned ${copy.venue} into a controlled creator win: +${bonusViews.toLocaleString()} views and stronger trust.` };
-                        }
+                        previewEffects: [
+                            { label: 'Growth', value: 'Highest', tone: 'positive' },
+                            { label: 'Audience Trust', value: '+8', tone: 'positive' },
+                            { label: 'Controversy', value: '-8', tone: 'positive' }
+                        ],
+                        impact: createYoutubeChoiceImpact(resolution, 'GOLDEN_HANDLER')
                     }
                 ]
             } as LifeEvent
@@ -577,33 +586,21 @@ const YOUTUBE_RIVAL_NAMES = [
     'Blake Vale'
 ];
 
-const createCreatorRivalPost = (content: string, reach: number, rivalName: string): XPost => ({
-    id: `x_yt_rival_${Date.now()}_${Math.random()}`,
-    authorId: `rival_${rivalName.toLowerCase().replace(/\s+/g, '_')}`,
-    authorName: rivalName,
-    authorHandle: `@${rivalName.toLowerCase().replace(/\s+/g, '')}`,
-    authorAvatar: `https://api.dicebear.com/8.x/pixel-art/svg?seed=${encodeURIComponent(rivalName)}`,
-    content,
-    timestamp: Date.now(),
-    likes: Math.max(80, Math.floor(reach * 0.05)),
-    retweets: Math.max(10, Math.floor(reach * 0.012)),
-    replies: Math.max(8, Math.floor(reach * 0.01)),
-    isPlayer: false,
-    isLiked: false,
-    isRetweeted: false,
-    isVerified: true
-});
-
-export const createYoutubeRivalryEvent = (player: Player): ScheduledEvent => {
-    const rivalName = YOUTUBE_RIVAL_NAMES[Math.floor(Math.random() * YOUTUBE_RIVAL_NAMES.length)];
+export const createYoutubeRivalryEvent = (player: Player, random: () => number = Math.random): ScheduledEvent => {
+    const rivalName = YOUTUBE_RIVAL_NAMES[Math.floor(random() * YOUTUBE_RIVAL_NAMES.length)];
     const creatorScore = calculateYoutubeCreatorScore(player);
     const publicImage = getYoutubePublicImageLabel(player);
-    const baseReach = Math.max(25000, player.youtube.subscribers * (0.25 + Math.random() * 0.35));
+    const baseReach = Math.max(25000, player.youtube.subscribers * (0.25 + random() * 0.35));
     const topic = player.youtube.creatorIdentity === 'CONTROVERSY_MAGNET' || publicImage === 'Volatile'
         ? 'called your channel manufactured chaos'
         : player.youtube.creatorIdentity === 'PRESTIGE_FILMMAKER'
             ? 'said your creator era is too polished to be real'
             : 'accused you of copying their creator lane';
+    const resolution: YoutubeEventResolution = {
+        domain: 'YOUTUBE',
+        kind: 'RIVALRY',
+        payload: { rivalName, baseReach }
+    };
 
     return {
         id: `yt_rivalry_${Date.now()}_${Math.random()}`,
@@ -611,6 +608,7 @@ export const createYoutubeRivalryEvent = (player: Player): ScheduledEvent => {
         type: 'SCANDAL',
         title: 'Creator Rivalry',
         data: {
+            youtubeResolution: resolution,
             lifeEvent: {
                 id: `yt_rivalry_life_${Date.now()}_${Math.random()}`,
                 type: 'SCANDAL',
@@ -618,53 +616,38 @@ export const createYoutubeRivalryEvent = (player: Player): ScheduledEvent => {
                 description: `${rivalName} just ${topic}. The clip is moving across X and YouTube comments. This can become a growth moment, a messy feud, or a surprisingly valuable bridge.`,
                 options: [
                     {
+                        id: 'IGNORE_BAIT',
                         label: 'Ignore The Bait',
                         description: 'Avoid drama, protect trust, but lose a little momentum.',
-                        impact: (p: Player) => {
-                            p.youtube.audienceTrust = Math.min(100, (p.youtube.audienceTrust ?? 55) + 3);
-                            p.youtube.fanMood = Math.max(0, (p.youtube.fanMood ?? 55) - 1);
-                            p.youtube.controversy = Math.max(0, (p.youtube.controversy ?? 0) - 5);
-                            p.x.feed.unshift(createCreatorRivalPost(`${p.name} refusing to feed the ${rivalName} drama is... annoyingly mature.`, baseReach, 'Creator Watch'));
-                            p.x.feed = p.x.feed.slice(0, 50);
-                            return { updatedPlayer: p, log: `You ignored ${rivalName}'s bait. The channel stayed cleaner.` };
-                        }
+                        previewEffects: [
+                            { label: 'Audience Trust', value: '+3', tone: 'positive' },
+                            { label: 'Controversy', value: '-5', tone: 'positive' },
+                            { label: 'Fan Mood', value: '-1', tone: 'negative' }
+                        ],
+                        impact: createYoutubeChoiceImpact(resolution, 'IGNORE_BAIT')
                     },
                     {
+                        id: 'CLAP_BACK',
                         label: 'Clap Back Publicly',
                         description: 'Fast views and fame, but more heat and sponsor risk.',
-                        impact: (p: Player) => {
-                            const bonusViews = Math.floor(baseReach * (0.65 + Math.random() * 0.55));
-                            const bonusSubs = Math.floor(bonusViews / 110);
-                            p.youtube.totalChannelViews += bonusViews;
-                            p.youtube.subscribers += bonusSubs;
-                            p.youtube.fanMood = Math.min(100, (p.youtube.fanMood ?? 55) + 5);
-                            p.youtube.audienceTrust = Math.max(0, (p.youtube.audienceTrust ?? 55) - 6);
-                            p.youtube.controversy = Math.min(100, (p.youtube.controversy ?? 0) + 16);
-                            p.stats.fame = Math.min(100, p.stats.fame + 2);
-                            p.stats.reputation = Math.max(0, p.stats.reputation - 2);
-                            p.x.followers += Math.floor(bonusViews * 0.015);
-                            p.x.feed.unshift(createCreatorRivalPost(`${p.name} just answered ${rivalName} and the timeline is on fire.`, bonusViews, 'Creator Watch'));
-                            p.x.feed = p.x.feed.slice(0, 50);
-                            return { updatedPlayer: p, log: `You clapped back at ${rivalName}: +${bonusViews.toLocaleString()} views and +${bonusSubs.toLocaleString()} subs, but heat rose.` };
-                        }
+                        previewEffects: [
+                            { label: 'Views & Subs', value: 'Spike', tone: 'positive' },
+                            { label: 'Audience Trust', value: '-6', tone: 'negative' },
+                            { label: 'Controversy', value: '+16', tone: 'negative' }
+                        ],
+                        impact: createYoutubeChoiceImpact(resolution, 'CLAP_BACK')
                     },
                     {
+                        id: 'MEDIATED_COLLAB',
                         label: 'Golden Mediated Collab (Watch Ad)',
                         isGolden: true,
                         description: 'Best route. A mediator turns the feud into a controlled collab without the messy downside.',
-                        impact: (p: Player) => {
-                            const trust = p.youtube.audienceTrust ?? 55;
-                            const bonusViews = Math.floor(baseReach * (0.85 + Math.random() * 0.75));
-                            p.youtube.totalChannelViews += bonusViews;
-                            p.youtube.subscribers += Math.floor(bonusViews / 90);
-                            p.youtube.audienceTrust = Math.min(100, trust + 8);
-                            p.youtube.fanMood = Math.min(100, (p.youtube.fanMood ?? 55) + 8);
-                            p.youtube.controversy = Math.max(0, (p.youtube.controversy ?? 0) - 12);
-                            p.stats.reputation = Math.min(100, p.stats.reputation + 5);
-                            p.x.feed.unshift(createCreatorRivalPost(`${p.name} and ${rivalName} turned beef into a polished collab. That is career control.`, bonusViews, 'Creator Watch'));
-                            p.x.feed = p.x.feed.slice(0, 50);
-                            return { updatedPlayer: p, log: `You turned ${rivalName}'s feud into a controlled hit collab. The industry noticed.` };
-                        }
+                        previewEffects: [
+                            { label: 'Views & Subs', value: 'Big gain', tone: 'positive' },
+                            { label: 'Audience Trust', value: '+8', tone: 'positive' },
+                            { label: 'Controversy', value: '-12', tone: 'positive' }
+                        ],
+                        impact: createYoutubeChoiceImpact(resolution, 'MEDIATED_COLLAB')
                     }
                 ]
             } as LifeEvent,
@@ -688,6 +671,16 @@ const getPlayerProjectRoleType = (roleType: string | undefined, castList?: any[]
 
 // Returns updated player AND a flag if an ad should be triggered
 export const processGameWeek = async (player: Player): Promise<{ player: Player, triggerAd: boolean }> => {
+    setCrashContext(player, {
+        flow: 'game_loop',
+        loop_stage: 'start',
+    });
+    addBreadcrumb('game_loop:start', {
+        age: player.age,
+        week: player.currentWeek,
+        commitments: player.commitments?.length || 0,
+        releases: player.activeReleases?.length || 0,
+    });
     let nextPlayer = JSON.parse(JSON.stringify(player)) as Player;
     let triggerAd = false;
     const language = getPlayerLanguage(nextPlayer);
@@ -876,7 +869,17 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
             weeklyExpenses: ensureFiniteNumber((business as any).stats?.weeklyExpenses),
             weeklyProfit: ensureFiniteNumber((business as any).stats?.weeklyProfit),
             lifetimeRevenue: ensureFiniteNumber((business as any).stats?.lifetimeRevenue),
-            valuation: ensureFiniteNumber((business as any).stats?.valuation)
+            valuation: ensureFiniteNumber((business as any).stats?.valuation),
+            studioMomentum: business.type === 'PRODUCTION_HOUSE' ? ensureFiniteNumber((business as any).stats?.studioMomentum, 50) : (business as any).stats?.studioMomentum,
+            investorConfidence: business.type === 'PRODUCTION_HOUSE' ? ensureFiniteNumber((business as any).stats?.investorConfidence, 50) : (business as any).stats?.investorConfidence,
+            recentHitStreak: business.type === 'PRODUCTION_HOUSE' ? ensureFiniteNumber((business as any).stats?.recentHitStreak, 0) : (business as any).stats?.recentHitStreak,
+            recentFlopStreak: business.type === 'PRODUCTION_HOUSE' ? ensureFiniteNumber((business as any).stats?.recentFlopStreak, 0) : (business as any).stats?.recentFlopStreak,
+            recentReleaseOutcomes: business.type === 'PRODUCTION_HOUSE' && Array.isArray((business as any).stats?.recentReleaseOutcomes)
+                ? (business as any).stats.recentReleaseOutcomes.filter((value: any) => typeof value === 'string')
+                : (business.type === 'PRODUCTION_HOUSE' ? [] : (business as any).stats?.recentReleaseOutcomes),
+            processedReleaseOutcomeIds: business.type === 'PRODUCTION_HOUSE' && Array.isArray((business as any).stats?.processedReleaseOutcomeIds)
+                ? (business as any).stats.processedReleaseOutcomeIds.filter((value: any) => typeof value === 'string')
+                : (business.type === 'PRODUCTION_HOUSE' ? [] : (business as any).stats?.processedReleaseOutcomeIds)
         },
         studioState: business.type === 'PRODUCTION_HOUSE' && business.studioState && typeof business.studioState === 'object'
             ? {
@@ -886,6 +889,9 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                 library: ensureObjectArray((business.studioState as any).library),
                 bids: ensureObjectArray((business.studioState as any).bids),
                 lockedStreamingFunds: ensureObjectArray((business.studioState as any).lockedStreamingFunds),
+                platformRelations: business.studioState.platformRelations && typeof business.studioState.platformRelations === 'object'
+                    ? business.studioState.platformRelations
+                    : {},
                 financeLedger: ensureObjectArray((business.studioState as any).financeLedger)
             }
             : business.studioState
@@ -966,6 +972,22 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
     }
 
     const logsToAdd: {msg: string, type: 'positive'|'negative'|'neutral'}[] = [];
+    const addCastingFeedbackMessage = (
+        projectName: string,
+        stage: 'APPLICATION' | 'AUDITION',
+        feedback: { summary: string; reasons: string[]; hint: string }
+    ) => {
+        nextPlayer.inbox.unshift({
+            id: `casting_feedback_${Date.now()}_${Math.random()}`,
+            sender: 'Casting Office',
+            subject: `Casting Review: ${projectName}`,
+            text: formatRoleRejectionReview(projectName, stage, feedback),
+            type: 'CASTING_FEEDBACK',
+            isRead: false,
+            weekSent: nextPlayer.currentWeek,
+            expiresIn: 8
+        });
+    };
 
     // --- 0.5 INBOX MAINTENANCE ---
     nextPlayer.inbox = nextPlayer.inbox.filter(msg => {
@@ -1613,20 +1635,33 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
         pendingReferrals.forEach((referral: any) => {
             const weeksLeft = ensureFiniteNumber(referral.weeksLeft, 0) - 1;
             if (weeksLeft <= 0) {
-                const offer = generateDirectOffer(nextPlayer);
-                if (offer) {
+                const referralId = referral.id || referral.actionId || `legacy_${referral.npcId || 'connection'}`;
+                const messageId = `ig_referral_offer_${referralId}`;
+                const alreadyDelivered = nextPlayer.inbox.some(message => message.id === messageId);
+                if (!alreadyDelivered) {
+                    const outcome = resolveInstagramReferralOutcome(referral, nextPlayer);
+                    const isDirectRole = outcome.deliveryType === 'DIRECT_ROLE';
+                    const opportunity = outcome.opportunity;
                     nextPlayer.inbox.unshift({
-                        id: `ig_referral_offer_${Date.now()}_${Math.random()}`,
+                        id: messageId,
                         sender: 'Casting Director',
-                        subject: `Referral Follow-Up: ${offer.projectName}`,
-                        text: `${referral.npcName || 'A celebrity connection'} mentioned you might be a strong fit. We'd like to talk about this role.`,
-                        type: 'OFFER_ROLE',
-                        data: offer,
+                        subject: `${isDirectRole ? 'Referral Role Offer' : 'Referral Audition'}: ${opportunity.projectName}`,
+                        text: isDirectRole
+                            ? `${referral.npcName || 'A celebrity connection'} recommended you. Casting is offering you the role directly.`
+                            : `${referral.npcName || 'A celebrity connection'} recommended you. Casting would like you to audition for this role.`,
+                        type: isDirectRole ? 'OFFER_ROLE' : 'OFFER_AUDITION',
+                        data: opportunity,
                         isRead: false,
                         weekSent: nextPlayer.currentWeek,
                         expiresIn: 4
                     });
-                    logsToAdd.push({ msg: `📩 Instagram Referral: ${referral.npcName || 'A connection'}'s DM turned into a project offer.`, type: 'positive' });
+                    if (isDirectRole) {
+                        nextPlayer.flags.lastInstagramDirectRoleAbsoluteWeek = getAbsoluteWeek(nextPlayer.age, nextPlayer.currentWeek);
+                    }
+                    logsToAdd.push({
+                        msg: `📩 Instagram Referral: ${referral.npcName || 'A connection'} got you ${isDirectRole ? 'a direct role offer' : 'an audition'} for "${opportunity.projectName}".`,
+                        type: 'positive'
+                    });
                 }
             } else {
                 remainingReferrals.push({ ...referral, weeksLeft });
@@ -1821,7 +1856,7 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                     ...(state.chatHistory || []),
                     {
                         sender: 'NPC',
-                        text: `Hey. I heard a casting director asking around for a solid fit on ${projectHint}. I mentioned your name. If you want me to keep the door open, reply within 3 weeks. If you accept, they may reach out in ${referralWeeks}-${referralWeeks + 1} weeks.`,
+                        text: `Hey. I heard a casting director asking around for a solid fit on ${projectHint}. I mentioned your name. Reply within 3 weeks if you want the referral. If you accept, casting will send an audition invite in ${referralWeeks} weeks.`,
                         timestamp: Date.now(),
                         tag: 'IG_REFERRAL_DM',
                         action: { id: actionId, kind: 'IG_REFERRAL', status: 'PENDING', payload: { weeksLeft: referralWeeks, createdAbsWeek: currentAbs, expiresAbsWeek: currentAbs + 3, expiresWeeks: 3 } }
@@ -2048,6 +2083,68 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
             try {
                 const res = processBusinessWeek(biz, nextPlayer.stats.fame, nextPlayer.currentWeek);
                 updatedBusinesses.push(res.updated);
+
+                res.rightsReportsReady.forEach(report => {
+                    const opportunity = report.opportunity;
+                    const reportMessageId = `rights_report_${report.studioId}_${opportunity.id}`;
+                    if (nextPlayer.inbox.some(message => message.id === reportMessageId)) return;
+                    nextPlayer.inbox.unshift({
+                        id: reportMessageId,
+                        sender: 'Studio Intelligence',
+                        subject: `Inside Report Ready: ${opportunity.title}`,
+                        text: `Your research team finished its confidential review of ${opportunity.title}. Open Development Lab > Market > IP Rights to review the findings and decide your next move.`,
+                        type: 'RIGHTS_REPORT',
+                        data: {
+                            studioId: report.studioId,
+                            studioName: report.studioName,
+                            opportunityId: opportunity.id,
+                            opportunityTitle: opportunity.title,
+                            report: opportunity.insideReport,
+                        },
+                        isRead: false,
+                        weekSent: nextPlayer.currentWeek >= 52 ? 1 : nextPlayer.currentWeek + 1,
+                    });
+                    logsToAdd.push({
+                        msg: `🔎 Inside Report ready: ${opportunity.title}.`,
+                        type: 'neutral',
+                    });
+                });
+
+                res.rightsNegotiationResponses.forEach(response => {
+                    const negotiation = response.negotiation;
+                    const messageId = `rights_negotiation_${response.studioId}_${negotiation.id}_r${negotiation.round}_${negotiation.status}`;
+                    if (nextPlayer.inbox.some(message => message.id === messageId)) return;
+                    const subjectPrefix: Record<string, string> = {
+                        ACCEPTED: 'Offer Accepted',
+                        COUNTEROFFER: 'Counteroffer',
+                        CREATIVE_GUARANTEE: 'Creative Terms Requested',
+                        RIVAL_OFFER: 'Rival Offer',
+                        BIDDING_WAR: 'Bidding War',
+                        REJECTED: 'Offer Rejected',
+                    };
+                    nextPlayer.inbox.unshift({
+                        id: messageId,
+                        sender: 'Business Affairs',
+                        subject: `${subjectPrefix[negotiation.status] || 'Rights Update'}: ${negotiation.opportunityTitle}`,
+                        text: `${negotiation.responseSummary || 'The rights holder responded to your offer.'} Open Development Lab > Market > IP Rights to review the response.`,
+                        type: 'RIGHTS_NEGOTIATION',
+                        data: {
+                            studioId: response.studioId,
+                            studioName: response.studioName,
+                            negotiation,
+                        },
+                        isRead: false,
+                        weekSent: nextPlayer.currentWeek >= 52 ? 1 : nextPlayer.currentWeek + 1,
+                    });
+                    logsToAdd.push({
+                        msg: `📑 Rights response: ${negotiation.opportunityTitle} (${negotiation.status.toLowerCase().replace(/_/g, ' ')}).`,
+                        type: negotiation.status === 'ACCEPTED'
+                            ? 'positive'
+                            : negotiation.status === 'REJECTED'
+                                ? 'negative'
+                                : 'neutral',
+                    });
+                });
                 
                 // Color-code alerts based on content
                 res.alerts.forEach(a => {
@@ -2106,7 +2203,7 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                 });
             });
 
-            return updatedBusiness;
+            return recalculateBusinessValuation(updatedBusiness, nextPlayer);
         });
 
         if (totalUniversePayout > 0) {
@@ -2424,6 +2521,10 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
 
     // --- 5. RELATIONSHIPS DECAY ---
     nextPlayer.relationships = nextPlayer.relationships.map(rel => {
+        if (rel.relation === 'Deceased Parent') {
+            return rel;
+        }
+
         const lastInteraction = rel.lastInteractionWeek || nextPlayer.currentWeek;
         const weeksSince = nextPlayer.currentWeek - lastInteraction;
         let newCloseness = rel.closeness;
@@ -2508,13 +2609,43 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
     // --- 7. APPLICATIONS ---
     const nextApplications: Application[] = [];
     const newAuditionCommitments: Commitment[] = [];
+    const castingAbsoluteWeek = getAbsoluteWeek(nextPlayer.age, nextPlayer.currentWeek);
+    const lastCastingMomentumWeek = ensureFiniteNumber(nextPlayer.flags.lastCastingMomentumAbsoluteWeek, -999);
+    const storedCastingMomentum = castingAbsoluteWeek - lastCastingMomentumWeek > 8
+        ? 0
+        : Math.max(0, Math.min(3, Math.floor(ensureFiniteNumber(nextPlayer.flags.castingApplicationMomentum, 0))));
+    const resolvingAuditionApps = nextPlayer.applications.filter(app =>
+        app.type === 'AUDITION'
+        && app.weeksRemaining - 1 <= 0
+        && app.data
+        && typeof app.data === 'object'
+    );
+    const baseCastingEvaluations = resolvingAuditionApps.map(app => ({
+        app,
+        evaluation: evaluateCastingApplication(nextPlayer, app.data as AuditionOpportunity, 0)
+    }));
+    const momentumTargetId = baseCastingEvaluations
+        .filter(entry => entry.evaluation.plausible)
+        .sort((a, b) => b.evaluation.baseChance - a.evaluation.baseChance)[0]?.app.id;
+    let shortlistedAnyApplication = false;
+    let rejectedPlausibleApplication = false;
+
     nextPlayer.applications.forEach(app => {
         const weeksLeft = app.weeksRemaining - 1;
         if (weeksLeft <= 0) {
             if (app.type === 'AUDITION') {
-                const passedShortlist = Math.random() > 0.3; 
+                if (!app.data || typeof app.data !== 'object') {
+                    logsToAdd.push({ msg: `Application data expired for "${app.name}".`, type: 'neutral' });
+                    return;
+                }
+                const opp = app.data as AuditionOpportunity;
+                const evaluation = evaluateCastingApplication(
+                    nextPlayer,
+                    opp,
+                    app.id === momentumTargetId ? storedCastingMomentum : 0
+                );
+                const passedShortlist = Math.random() < evaluation.finalChance;
                 if (passedShortlist) {
-                    const opp = app.data as AuditionOpportunity;
                     const duration = getPhaseDuration('AUDITION');
                     
                     newAuditionCommitments.push({
@@ -2535,9 +2666,13 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                         agentCommission: opp.source === 'AGENT' ? (nextPlayer.team.agent?.commission || 0) : 0,
                         royaltyPercentage: opp.royaltyPercentage
                     });
+                    shortlistedAnyApplication = true;
                     logsToAdd.push({ msg: `🎫 Audition Invite: "${opp.projectName}". Prepare yourself!`, type: 'positive' });
                 } else {
-                    logsToAdd.push({ msg: `❌ Application declined for "${app.name}".`, type: 'negative' });
+                    const feedback = getRoleRejectionFeedback(nextPlayer, opp, 'APPLICATION');
+                    addCastingFeedbackMessage(app.name, 'APPLICATION', feedback);
+                    if (evaluation.plausible) rejectedPlausibleApplication = true;
+                    logsToAdd.push({ msg: `❌ Application declined for "${app.name}". ${feedback.reasons[0] || feedback.summary}`, type: 'negative' });
                 }
             }
         } else {
@@ -2545,6 +2680,16 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
         }
     });
     nextPlayer.applications = nextApplications;
+    if (shortlistedAnyApplication) {
+        nextPlayer.flags.castingApplicationMomentum = 0;
+        nextPlayer.flags.lastCastingMomentumAbsoluteWeek = castingAbsoluteWeek;
+    } else if (rejectedPlausibleApplication) {
+        // At most one point per week, regardless of how many roles the player applies for.
+        nextPlayer.flags.castingApplicationMomentum = Math.min(3, storedCastingMomentum + 1);
+        nextPlayer.flags.lastCastingMomentumAbsoluteWeek = castingAbsoluteWeek;
+    } else if (storedCastingMomentum === 0) {
+        nextPlayer.flags.castingApplicationMomentum = 0;
+    }
 
     // --- 8. CAREER COMMITMENTS & 9. ACTIVE RELEASES (Collapsed for brevity, logic maintained) ---
     // ... [Career logic processing remains identical to original provided code] ...
@@ -2616,7 +2761,12 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                     nextCommitments.push({ ...updatedC, projectPhase: 'PRODUCTION', phaseWeeksLeft: duration, totalPhaseDuration: duration, productionPerformance: 0 });
                     nextPlayer.stats.experience = Math.min(100, nextPlayer.stats.experience + 1);
                 } else {
-                    logsToAdd.push({ msg: `❌ Rejection: "${updatedC.name}". ${result.reason}`, type: 'negative' });
+                    const feedbackSource = updatedC.projectDetails
+                        ? { project: updatedC.projectDetails, roleType: updatedC.roleType } as AuditionOpportunity
+                        : undefined;
+                    const feedback = getRoleRejectionFeedback(nextPlayer, feedbackSource, 'AUDITION', result.rivalWinner);
+                    addCastingFeedbackMessage(updatedC.name, 'AUDITION', feedback);
+                    logsToAdd.push({ msg: `❌ Rejection: "${updatedC.name}". ${result.reason} ${feedback.reasons[0] || ''}`, type: 'negative' });
                 }
             } else { nextCommitments.push({ ...updatedC, phaseWeeksLeft: weeksLeft }); }
         } else if (updatedC.projectPhase === 'PRODUCTION') {
@@ -2804,7 +2954,10 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                         studioRoyaltyPercentage: updatedC.projectDetails.hiddenStats.backendPct,
                         sequelDecisionWeek: 4 + Math.floor(Math.random() * 7),
                         promotionalBuzz: accumulatedBuzz,
-                        maxTheatricalWeeks
+                        maxTheatricalWeeks,
+                        releaseWeek: nextPlayer.currentWeek,
+                        releaseYear: nextPlayer.age,
+                        releasedAtAbsoluteWeek: getAbsoluteWeek(nextPlayer.age, nextPlayer.currentWeek)
 	                    };
 	                    newReleases.push(newRelease);
 	                    nextPlayer = improveStudioGenreReputation(nextPlayer, updatedC.projectDetails.studioId, updatedC.projectDetails.genre, imdb);
@@ -2826,6 +2979,35 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
     const allRunning = [...nextPlayer.activeReleases, ...newReleases];
     let newNews = [...nextPlayer.news];
     let newInbox = [...nextPlayer.inbox];
+    const applyStudioMarketOutcome = (studio: Business | undefined, rel: ActiveRelease, totalRevenue: number) => {
+        if (!studio || studio.type !== 'PRODUCTION_HOUSE') return;
+
+        const outcomeResult = applyProductionHouseReleaseOutcome(
+            studio,
+            {
+                id: rel.id,
+                name: rel.name,
+                totalRevenue,
+                budget: rel.budget,
+                rating: rel.imdbRating
+            },
+            nextPlayer.currentWeek,
+            nextPlayer.age
+        );
+        const revaluedStudio = recalculateBusinessValuation(outcomeResult.business, nextPlayer);
+        Object.assign(studio, revaluedStudio);
+
+        if (outcomeResult.news) {
+            newNews.unshift(outcomeResult.news);
+            newNews = newNews.slice(0, 50);
+        }
+        if (outcomeResult.log) {
+            logsToAdd.push({
+                msg: outcomeResult.log,
+                type: outcomeResult.log.includes('pressure') ? 'negative' : 'positive'
+            });
+        }
+    };
 
     allRunning.forEach(rel => {
         if (rel.imdbRating) {
@@ -2836,11 +3018,96 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
         const decisionWeek = rel.sequelDecisionWeek || 5; 
         if (rel.weekNum === decisionWeek && !rel.sequelDecisionMade) {
             rel.sequelDecisionMade = true;
-            const potential = calculateFuturePotential(rel.type, rel.projectDetails.budgetTier, rel.totalGross, rel.budget, rel.imdbRating || 5, rel.projectDetails.genre, rel.roleType);
+            const potential = calculateFuturePotential(
+                rel.type,
+                rel.projectDetails.budgetTier,
+                rel.totalGross,
+                rel.budget,
+                rel.imdbRating || 5,
+                rel.projectDetails.genre,
+                rel.roleType,
+                rel.type === 'SERIES' ? {
+                    totalViews: rel.streaming?.totalViews || 0,
+                    recentWeeklyViews: rel.streaming?.weeklyViews?.slice(-4) || [],
+                    streamingRevenue: rel.streamingRevenue || 0,
+                    productionPerformance: rel.productionPerformance,
+                    platformId: (rel.streaming?.platformId || rel.projectDetails.hiddenStats.platformId) as any
+                } : undefined
+            );
             const isUniverseContracted = !!(player.activeUniverseContract && rel.projectDetails.universeId && player.activeUniverseContract.universeId === rel.projectDetails.universeId);
             
             // Check if this project belongs to the player's production house
             const isPlayerProduction = nextPlayer.businesses?.some(b => b.id === rel.projectDetails.studioId && b.type === 'PRODUCTION_HOUSE');
+            const hasForcedRareChaos = Boolean(rel.projectDetails.hiddenStats.forcedRareChaosKind);
+            const shouldCheckRareChaos = hasForcedRareChaos
+                || (rel.type === 'SERIES' ? !potential.isRenewed : !potential.isSequelGreenlit);
+            const rareChaos = shouldCheckRareChaos
+                ? resolveRareHollywoodChaos({
+                    release: rel,
+                    player: nextPlayer,
+                    isPlayerProduction: !!isPlayerProduction
+                })
+                : null;
+
+            if (rareChaos) {
+                Object.assign(potential, rareChaos.futurePotentialPatch);
+                const hiddenStats = rel.projectDetails.hiddenStats;
+                const { forcedRareChaosKind: _forcedRareChaosKind, ...persistedHiddenStats } = hiddenStats;
+                rel.projectDetails.hiddenStats = {
+                    ...persistedHiddenStats,
+                    rareChaosResolved: true,
+                    rareChaosKind: rareChaos.kind,
+                    rareChaosReason: rareChaos.reason,
+                    rareChaosPlatformId: rareChaos.platformId || null,
+                    rareChaosFundingCap: rareChaos.funding?.amount || 0,
+                    rareChaosResolvedWeek: nextPlayer.currentWeek,
+                    rareChaosResolvedYear: nextPlayer.age,
+                    ...(rareChaos.platformId ? { platformId: rareChaos.platformId } : {}),
+                    ...(rareChaos.funding ? {
+                        nextSeasonFundingAmount: rareChaos.funding.amount,
+                        nextSeasonFundingPlatformId: rareChaos.platformId || null,
+                        nextSeasonFundingSourceProjectId: rel.id,
+                        nextSeasonFundingTier: rareChaos.funding.tier,
+                        nextSeasonFundingReason: rareChaos.funding.reason
+                    } : {})
+                };
+
+                if (rareChaos.funding && rareChaos.platformId && isPlayerProduction) {
+                    const studio = nextPlayer.businesses?.find(business =>
+                        business.id === rel.projectDetails.studioId
+                        && business.type === 'PRODUCTION_HOUSE'
+                    );
+                    if (studio?.studioState) {
+                        const existingFunds = studio.studioState.lockedStreamingFunds || [];
+                        const alreadyReserved = existingFunds.some(fund => fund.sourceProjectId === rel.id);
+                        if (!alreadyReserved) {
+                            studio.studioState.lockedStreamingFunds = [
+                                {
+                                    id: `rare_chaos_fund_${rel.id}_${nextPlayer.age}_${nextPlayer.currentWeek}`,
+                                    platformId: rareChaos.platformId,
+                                    platformName: rareChaos.platformName || PLATFORMS[rareChaos.platformId].name,
+                                    amount: rareChaos.funding.amount,
+                                    sourceProjectId: rel.id,
+                                    sourceTitle: rel.name,
+                                    franchiseId: rel.projectDetails.franchiseId || rel.id,
+                                    installmentNumber: rel.projectDetails.installmentNumber || 1,
+                                    projectType: rel.type,
+                                    createdWeek: nextPlayer.currentWeek,
+                                    createdYear: nextPlayer.age,
+                                    tier: rareChaos.funding.tier,
+                                    reason: rareChaos.funding.reason
+                                },
+                                ...existingFunds
+                            ].slice(0, 30);
+                        }
+                    }
+                }
+
+                logsToAdd.push({
+                    msg: `🎲 Rare Hollywood move: ${rareChaos.news.headline}`,
+                    type: rareChaos.kind === 'CANCELLED_SHOW_REVIVAL' ? 'positive' : 'neutral'
+                });
+            }
 
             if (rel.type === 'SERIES') {
                 if (potential.isRenewed) {
@@ -2852,21 +3119,42 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
 
                     if (!isPlayerProduction && returnDecision.getsOffer) {
                         const offer = generateRenewalOffer(rel, nextPlayer);
+                        if (rareChaos?.platformId) {
+                            offer.opportunity.project.hiddenStats = {
+                                ...offer.opportunity.project.hiddenStats,
+                                platformId: rareChaos.platformId,
+                                rareChaosResolved: true,
+                                rareChaosKind: rareChaos.kind,
+                                rareChaosReason: rareChaos.reason
+                            };
+                        }
                         const seasonMatch = offer.opportunity.projectName.match(/Season (\d+)/);
                         const nextSeasonNum = seasonMatch ? parseInt(seasonMatch[1]) : 2;
-                        newNews.unshift(generateRenewalNews(rel.name, nextSeasonNum, nextPlayer.currentWeek, nextPlayer.age, language));
+                        newNews.unshift(rareChaos?.news || generateRenewalNews(rel.name, nextSeasonNum, nextPlayer.currentWeek, nextPlayer.age, language));
                         newInbox.unshift({
-                            id: `renew_offer_${Date.now()}`, sender: 'Network Exec', subject: `RENEWAL: ${offer.opportunity.projectName}`, text: "We are picking up the show for another season.", type: 'OFFER_NEGOTIATION', data: offer, isRead: false, weekSent: nextPlayer.currentWeek, expiresIn: 4
+                            id: `renew_offer_${Date.now()}`,
+                            sender: rareChaos?.platformName ? `${rareChaos.platformName} Executive` : 'Network Exec',
+                            subject: rareChaos?.kind === 'CANCELLED_SHOW_REVIVAL'
+                                ? `REVIVAL OFFER: ${offer.opportunity.projectName}`
+                                : rareChaos?.kind === 'PLATFORM_MOONSHOT'
+                                    ? `RISKY RENEWAL: ${offer.opportunity.projectName}`
+                                    : `RENEWAL: ${offer.opportunity.projectName}`,
+                            text: rareChaos?.reason || "We are picking up the show for another season.",
+                            type: 'OFFER_NEGOTIATION',
+                            data: offer,
+                            isRead: false,
+                            weekSent: nextPlayer.currentWeek,
+                            expiresIn: 4
                         });
                     } else if (isPlayerProduction || returnDecision.status === 'RETURNING') {
                         // Just show news for player production if it's "renewed" (successful)
                         const seasonMatch = rel.name.match(/Season (\d+)/);
                         const nextSeasonNum = seasonMatch ? parseInt(seasonMatch[1]) + 1 : 2;
-                        newNews.unshift(generateRenewalNews(rel.name, nextSeasonNum, nextPlayer.currentWeek, nextPlayer.age, language));
+                        newNews.unshift(rareChaos?.news || generateRenewalNews(rel.name, nextSeasonNum, nextPlayer.currentWeek, nextPlayer.age, language));
                     } else {
                         const seasonMatch = rel.name.match(/Season (\d+)/);
                         const nextSeasonNum = seasonMatch ? parseInt(seasonMatch[1]) + 1 : 2;
-                        newNews.unshift(generateRenewalNews(rel.name, nextSeasonNum, nextPlayer.currentWeek, nextPlayer.age, language));
+                        newNews.unshift(rareChaos?.news || generateRenewalNews(rel.name, nextSeasonNum, nextPlayer.currentWeek, nextPlayer.age, language));
                         const returnStatusNews = createReturnStatusNews(rel.name, returnDecision.status, nextPlayer.currentWeek, nextPlayer.age, true);
                         if (returnStatusNews) newNews.unshift(returnStatusNews);
                     }
@@ -2883,15 +3171,42 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                     rel.futurePotential = potential;
 
                     if (!isUniverseContracted && !isPlayerProduction && returnDecision.getsOffer) {
-                        newNews.unshift(generateSequelConfirmedNews(rel.name, nextPlayer.currentWeek, nextPlayer.age, language));
+                        newNews.unshift(rareChaos?.news || generateSequelConfirmedNews(rel.name, nextPlayer.currentWeek, nextPlayer.age, language));
                         const offer = generateSequelOffer(rel, nextPlayer);
+                        if (rareChaos?.continuationSubtype === 'REBOOT') {
+                            const rebootTitle = `${rel.name}: New Blood`;
+                            offer.opportunity.projectName = rebootTitle;
+                            offer.opportunity.project = {
+                                ...offer.opportunity.project,
+                                title: rebootTitle,
+                                subtype: 'REBOOT',
+                                connectedProjectIntent: 'REBOOT',
+                                hiddenStats: {
+                                    ...offer.opportunity.project.hiddenStats,
+                                    connectedProjectIntent: 'REBOOT',
+                                    rareChaosResolved: true,
+                                    rareChaosKind: rareChaos.kind,
+                                    rareChaosReason: rareChaos.reason
+                                }
+                            };
+                        }
                         newInbox.unshift({
-                            id: `negot_${Date.now()}`, sender: 'Studio Legal', subject: `Return Offer: ${offer.opportunity.projectName}`, text: `We offer you the role in the sequel.`, type: 'OFFER_NEGOTIATION', data: offer, isRead: false, weekSent: nextPlayer.currentWeek, expiresIn: 4
+                            id: `negot_${Date.now()}`,
+                            sender: 'Studio Legal',
+                            subject: rareChaos?.continuationSubtype === 'REBOOT'
+                                ? `Reboot Offer: ${offer.opportunity.projectName}`
+                                : `Return Offer: ${offer.opportunity.projectName}`,
+                            text: rareChaos?.reason || `We offer you the role in the sequel.`,
+                            type: 'OFFER_NEGOTIATION',
+                            data: offer,
+                            isRead: false,
+                            weekSent: nextPlayer.currentWeek,
+                            expiresIn: 4
                         });
                     } else if ((isUniverseContracted || isPlayerProduction) || returnDecision.status === 'RETURNING') {
-                        newNews.unshift(generateSequelConfirmedNews(rel.name, nextPlayer.currentWeek, nextPlayer.age, language));
+                        newNews.unshift(rareChaos?.news || generateSequelConfirmedNews(rel.name, nextPlayer.currentWeek, nextPlayer.age, language));
                     } else {
-                        newNews.unshift(generateSequelConfirmedNews(rel.name, nextPlayer.currentWeek, nextPlayer.age, language));
+                        newNews.unshift(rareChaos?.news || generateSequelConfirmedNews(rel.name, nextPlayer.currentWeek, nextPlayer.age, language));
                         const returnStatusNews = createReturnStatusNews(rel.name, returnDecision.status, nextPlayer.currentWeek, nextPlayer.age, false);
                         if (returnStatusNews) newNews.unshift(returnStatusNews);
                     }
@@ -2962,6 +3277,7 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                         label: `${rel.name} theatrical receipts`,
                         projectId: rel.id
                     });
+                    playerStudio.stats.valuation = recalculateBusinessValuation(playerStudio, nextPlayer).stats.valuation;
                 }
             }
 
@@ -2978,6 +3294,7 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                     nextPlayer.stats.followers += consequences.followerDelta;
                     logsToAdd.push({ msg: `📈 Gained ${consequences.followerDelta.toLocaleString()} followers!`, type: 'positive' });
                 }
+                applyStudioMarketOutcome(playerStudio, rel, newTotal);
 
                 if (playerStudio) {
                     // Trigger bidding war for player's studio
@@ -2998,7 +3315,13 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                             if (!platformState) return;
 
                             // Base interest on quality, genre match, and platform's desperation (recentHits)
-                            const isGenreMatch = platformProfile.genreBias.some(g => g.toUpperCase().replace('-', '_') === rel.projectDetails.genre) ? 1.15 : 0.95;
+                            const normalizePlatformGenre = (value: string) => {
+                                const normalized = value.toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+                                if (normalized === 'ROMCOM') return 'ROMANCE';
+                                if (normalized === 'INDIE') return 'DRAMA';
+                                return normalized;
+                            };
+                            const isGenreMatch = platformProfile.genreBias.some(g => normalizePlatformGenre(g) === rel.projectDetails.genre) ? 1.15 : 0.95;
                             const desperation = Math.max(0.5, 1.5 - (platformState.recentHits * 0.1));
                             const qualityScore = rel.projectDetails.hiddenStats.qualityScore || 50;
                             const scriptQuality = rel.projectDetails.hiddenStats.scriptQuality || 50;
@@ -3207,11 +3530,14 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                         label: `${rel.name} streaming royalties`,
                         projectId: rel.id
                     });
+                    playerStudio.stats.valuation = recalculateBusinessValuation(playerStudio, nextPlayer).stats.valuation;
                 }
             }
             const newStreamingRevenue = (rel.streamingRevenue || 0) + weeklyStreamingRevenue;
 
             if (shouldExit) {
+                const outcomeStudio = nextPlayer.businesses?.find(b => b.id === rel.projectDetails.studioId && b.type === 'PRODUCTION_HOUSE');
+                applyStudioMarketOutcome(outcomeStudio, rel, rel.totalGross + newStreamingRevenue);
                 logsToAdd.push({ msg: `👋 "${rel.name}" left ${PLATFORMS[rel.streaming.platformId].name}.`, type: 'neutral' });
                 if (rel.royaltyPercentage && rel.royaltyPercentage > 0) {
                     const studioCut = rel.budget * 2; 
@@ -3224,10 +3550,13 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                         }
                     }
                 }
-                nextPlayer.pastProjects.push({
-                    id: rel.id, name: rel.name, type: 'ACTING_GIG', roleType: getPlayerProjectRoleType(rel.roleType, rel.projectDetails.castList), year: nextPlayer.age,
-                    earnings: 0, rating: rel.imdbRating || 0, reception: rel.status, projectQuality: rel.projectDetails.hiddenStats.qualityScore, imdbRating: rel.imdbRating, boxOfficeResult: `$${(rel.totalGross/1000000).toFixed(1)}M`, outcomeTier: calculateRunOutcome(rel.totalGross + newStreamingRevenue, rel.budget, rel.imdbRating || 5).tier, subtype: rel.projectDetails.subtype, futurePotential: rel.futurePotential || { sequelChance: 0, franchiseChance: 0, rebootChance: 0, renewalChance: 0, isFranchiseStarter: false, isSequelGreenlit: false, isRenewed: false, seriesStatus: 'N/A', playerReturnStatus: undefined, returnStatusNote: undefined }, studioId: rel.projectDetails.studioId, streamingPlatform: rel.streaming.platformId, totalViews, streamingRevenue: newStreamingRevenue, castList: rel.projectDetails.castList, reviews: rel.projectDetails.reviews, budget: rel.budget, gross: rel.totalGross, genre: rel.projectDetails.genre, format: rel.projectDetails.format, subjectName: rel.projectDetails.subjectName, subjectType: rel.projectDetails.subjectType, description: rel.projectDetails.description, projectType: rel.type, royaltyPercentage: rel.royaltyPercentage, franchiseId: rel.projectDetails.franchiseId, universeId: rel.projectDetails.universeId, universeSagaName: rel.projectDetails.universeSagaName, universePhaseName: rel.projectDetails.universePhaseName, installmentNumber: rel.projectDetails.installmentNumber, directorId: rel.projectDetails.directorId
-                });
+                    nextPlayer.pastProjects.push({
+                        id: rel.id, name: rel.name, type: 'ACTING_GIG', roleType: getPlayerProjectRoleType(rel.roleType, rel.projectDetails.castList), year: rel.releaseYear || nextPlayer.age,
+                        earnings: 0, rating: rel.imdbRating || 0, reception: rel.status, projectQuality: rel.projectDetails.hiddenStats.qualityScore, imdbRating: rel.imdbRating, boxOfficeResult: `$${(rel.totalGross/1000000).toFixed(1)}M`, outcomeTier: calculateRunOutcome(rel.totalGross + newStreamingRevenue, rel.budget, rel.imdbRating || 5).tier, subtype: rel.projectDetails.subtype, futurePotential: rel.futurePotential || { sequelChance: 0, franchiseChance: 0, rebootChance: 0, renewalChance: 0, isFranchiseStarter: false, isSequelGreenlit: false, isRenewed: false, seriesStatus: 'N/A', playerReturnStatus: undefined, returnStatusNote: undefined }, studioId: rel.projectDetails.studioId, streamingPlatform: rel.streaming.platformId, totalViews, streamingRevenue: newStreamingRevenue, castList: rel.projectDetails.castList, reviews: rel.projectDetails.reviews, budget: rel.budget, gross: rel.totalGross, genre: rel.projectDetails.genre, format: rel.projectDetails.format, subjectName: rel.projectDetails.subjectName, subjectType: rel.projectDetails.subjectType, description: rel.projectDetails.description, projectType: rel.type, royaltyPercentage: rel.royaltyPercentage, franchiseId: rel.projectDetails.franchiseId, universeId: rel.projectDetails.universeId, universeSagaName: rel.projectDetails.universeSagaName, universePhaseName: rel.projectDetails.universePhaseName, installmentNumber: rel.projectDetails.installmentNumber, directorId: rel.projectDetails.directorId, sourceScriptId: rel.projectDetails.sourceScriptId, isOriginal: rel.projectDetails.isOriginal,
+                        releaseWeek: rel.releaseWeek,
+                        releaseYear: rel.releaseYear,
+                        releasedAtAbsoluteWeek: rel.releasedAtAbsoluteWeek
+                    });
             } else {
                 processedReleases.push({ ...rel, streamingRevenue: newStreamingRevenue, streaming: { ...rel.streaming, totalViews, weeklyViews: newWeeklyViews, weekOnPlatform: rel.streaming.weekOnPlatform + 1, isLeaving: newWeeklyViews.length > 20 && newViews < 50000 } });
             }
@@ -3302,6 +3631,7 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
 
     // --- 11. END OF WEEK UPDATES ---
     nextPlayer.currentWeek += 1;
+    nextPlayer = resolveStudioAcquisitionResponses(nextPlayer);
     if (!hasNoAds(nextPlayer) && nextPlayer.currentWeek % 12 === 0) triggerAd = true;
     nextPlayer.flags.bailoutAdsUsedThisWeek = 0;
     nextPlayer = advanceTinderConnections(nextPlayer);
@@ -3459,7 +3789,7 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
         // Age up parents yearly. Children with tracked birth weeks are resolved separately.
         if (nextPlayer.relationships) {
             nextPlayer.relationships.forEach(rel => {
-                if (rel.relation === 'Child' || rel.relation === 'Parent' || rel.relation === 'Deceased Parent') {
+                if (rel.relation === 'Child' || rel.relation === 'Parent') {
                     if (rel.relation === 'Child' && typeof rel.birthWeekAbsolute === 'number') {
                         rel.age = getRelationshipAge(rel, nextPlayer.age, nextPlayer.currentWeek);
                     } else {
@@ -3674,6 +4004,38 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
     }
 
     try {
+        const usedTitles = [
+            ...nextPlayer.commitments.map(commitment => commitment.name),
+            ...nextPlayer.activeReleases.map(release => release.name),
+            ...nextPlayer.pastProjects.map(project => project.name),
+            ...nextPlayer.inbox
+                .map(message => (message.data as AuditionOpportunity | undefined)?.projectName)
+                .filter((title): title is string => typeof title === 'string')
+        ];
+        const breakthroughInvite = generateBreakthroughAuditionInvite(nextPlayer, usedTitles);
+        if (breakthroughInvite) {
+            nextPlayer.inbox.unshift({
+                id: `breakthrough_invite_${Date.now()}_${Math.random()}`,
+                sender: breakthroughInvite.sender,
+                subject: breakthroughInvite.subject,
+                text: breakthroughInvite.text,
+                type: 'OFFER_AUDITION',
+                data: breakthroughInvite.opportunity,
+                isRead: false,
+                weekSent: nextPlayer.currentWeek,
+                expiresIn: 4
+            });
+            nextPlayer.flags.lastBreakthroughInviteAbsoluteWeek = getAbsoluteWeek(nextPlayer.age, nextPlayer.currentWeek);
+            logsToAdd.push({
+                msg: `🎬 Breakthrough Audition: ${breakthroughInvite.opportunity.projectName} invited you to read for a ${breakthroughInvite.opportunity.roleType.toLowerCase()} role.`,
+                type: 'positive'
+            });
+        }
+    } catch (error) {
+        console.error('Breakthrough audition invite generation failed during week processing:', error);
+    }
+
+    try {
         const directOffer = generateDirectOffer(nextPlayer);
         if (directOffer) {
             nextPlayer.inbox.unshift({ id: `direct_${Date.now()}`, sender: "Studio Casting", subject: `Direct Offer: ${directOffer.projectName}`, text: `We want you for the lead.`, type: 'OFFER_ROLE', data: directOffer, isRead: false, weekSent: nextPlayer.currentWeek, expiresIn: 4 });
@@ -3712,11 +4074,110 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
         const usedTitles = [
             ...nextPlayer.commitments.map(c => c.name), 
             ...nextPlayer.activeReleases.map(r => r.name),
-            ...nextPlayer.pastProjects.map(p => p.name)
+            ...nextPlayer.pastProjects.map(p => p.name),
+            ...nextPlayer.inbox
+                .map(message => (message.data as AuditionOpportunity | undefined)?.projectName)
+                .filter((title): title is string => typeof title === 'string')
         ];
         nextPlayer.weeklyOpportunities = { auditions: generateAuditions(nextPlayer, usedTitles), jobs: generatePartTimeJobs() };
         logsToAdd.push({ msg: "🔄 CastLink updated.", type: 'neutral' });
     }
+
+    nextPlayer.businesses.forEach(business => {
+        if (business.type !== 'PRODUCTION_HOUSE' || !business.studioState) return;
+
+        const contractResult = processStreamingFundingContracts({
+            lockedStreamingFunds: business.studioState.lockedStreamingFunds || [],
+            platformRelations: business.studioState.platformRelations || {},
+            currentWeek: nextPlayer.currentWeek,
+            currentYear: nextPlayer.age
+        });
+
+        business.studioState.lockedStreamingFunds = contractResult.lockedStreamingFunds;
+        business.studioState.platformRelations = contractResult.platformRelations;
+
+        contractResult.events.forEach(event => {
+            const platformName = event.funding.platformName || 'Streaming platform';
+            const sourceTitle = event.funding.sourceTitle || 'the funded series';
+
+            if (event.type === 'WARNING' || event.type === 'FINAL_WARNING') {
+                const isFinal = event.type === 'FINAL_WARNING';
+                nextPlayer.inbox.unshift({
+                    id: `funding_deadline_${event.funding.id}_${event.type}`,
+                    sender: `${platformName} Business Affairs`,
+                    subject: isFinal
+                        ? `Final Funding Notice: ${sourceTitle}`
+                        : `Funding Deadline: ${sourceTitle}`,
+                    text: `${platformName}'s ${formatMoneyShort(event.funding.amount)} next-season commitment expires in ${event.weeksRemaining} weeks. Commence the funded season through Greenlight before the deadline to keep the deal.`,
+                    type: 'SYSTEM',
+                    data: {
+                        fundingId: event.funding.id,
+                        platformId: event.funding.platformId,
+                        weeksRemaining: event.weeksRemaining
+                    },
+                    isRead: false,
+                    weekSent: nextPlayer.currentWeek,
+                    expiresIn: Math.max(8, event.weeksRemaining)
+                });
+                logsToAdd.push({
+                    msg: `${isFinal ? '⚠️ Final notice' : '📅 Funding notice'}: ${sourceTitle} must commence within ${event.weeksRemaining} weeks.`,
+                    type: isFinal ? 'negative' : 'neutral'
+                });
+                return;
+            }
+
+            const platform = nextPlayer.world.platforms?.[event.funding.platformId as PlatformId];
+            if (platform) {
+                platform.cashReserve += Math.max(0, event.funding.amount);
+            }
+
+            const lifeEvent = createFundingBreachLifeEvent(
+                business.id,
+                business.name,
+                event.funding.platformId,
+                platformName,
+                sourceTitle,
+                Math.max(0, event.funding.amount),
+                business.balance
+            );
+            nextPlayer.pendingEvents.push({
+                id: lifeEvent.id,
+                week: nextPlayer.currentWeek,
+                type: 'SCANDAL',
+                title: lifeEvent.title,
+                description: lifeEvent.description,
+                data: { lifeEvent }
+            });
+            nextPlayer.inbox.unshift({
+                id: `funding_default_${event.funding.id}`,
+                sender: `${platformName} Legal`,
+                subject: `Funding Commitment Cancelled: ${sourceTitle}`,
+                text: `The two-year commencement deadline passed. ${platformName} cancelled the reserved ${formatMoneyShort(event.funding.amount)} cap and filed a contract claim. The relationship penalty is modest and recovers over the coming months.`,
+                type: 'SYSTEM',
+                data: {
+                    fundingId: event.funding.id,
+                    platformId: event.funding.platformId,
+                    status: 'DEFAULTED'
+                },
+                isRead: false,
+                weekSent: nextPlayer.currentWeek,
+                expiresIn: 26
+            });
+            nextPlayer.news.unshift({
+                id: `news_funding_default_${event.funding.id}_${Date.now()}`,
+                headline: `${platformName} cancels ${sourceTitle} funding`,
+                subtext: `${business.name} missed the two-year commencement deadline, triggering a contract dispute and a temporary dip in platform trust.`,
+                category: 'INDUSTRY',
+                week: nextPlayer.currentWeek,
+                year: nextPlayer.age,
+                impactLevel: 'MEDIUM'
+            });
+            logsToAdd.push({
+                msg: `⚖️ ${platformName} cancelled ${sourceTitle}'s unused funding and filed a contract claim.`,
+                type: 'negative'
+            });
+        });
+    });
 
     // Final safety caps keep older saves from becoming too heavy for mobile WebViews.
     nextPlayer.inbox = ensureObjectArray<Message>(nextPlayer.inbox).slice(0, 120);
@@ -3728,5 +4189,17 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
     const allLogs = [...nextPlayer.logs, ...logsToAdd.map(l => ({ week: nextPlayer.currentWeek, year: nextPlayer.age, message: l.msg, type: l.type }))];
     nextPlayer.logs = allLogs.slice(-50);
 
+    addBreadcrumb('game_loop:complete', {
+        age: nextPlayer.age,
+        week: nextPlayer.currentWeek,
+        logsAdded: logsToAdd.length,
+        inbox: nextPlayer.inbox?.length || 0,
+    });
+    trackGameEvent('game_loop_completed', {
+        age: nextPlayer.age,
+        week: nextPlayer.currentWeek,
+        logs_added: logsToAdd.length,
+        inbox_count: nextPlayer.inbox?.length || 0,
+    });
     return { player: nextPlayer, triggerAd };
 };

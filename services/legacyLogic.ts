@@ -240,3 +240,6 @@ export const getLegacyInheritancePreview = (player: Pick<Player, 'money' | 'port
         businessCount: player.businesses?.length || 0,
     };
 };
+
+
+// legacyLogic.ts contains fuction related to calculating legacy scores in

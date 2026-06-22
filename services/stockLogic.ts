@@ -1,19 +1,42 @@
 
 import { Stock, Player, PortfolioItem } from '../types';
 
+const KNOWN_OUTSTANDING_SHARES: Record<string, number> = {
+    stk_apple: 15_300_000_000,
+    stk_nflx: 430_000_000,
+    stk_dis: 1_820_000_000,
+    stk_wbd: 2_450_000_000,
+    stk_para: 650_000_000,
+    stk_cmcsa: 3_900_000_000,
+};
+
+const stableShareHash = (value: string) => Array.from(value).reduce(
+    (hash, character) => ((hash * 31) + character.charCodeAt(0)) >>> 0,
+    2166136261,
+);
+
+export const getStockOutstandingShares = (stock: Pick<Stock, 'id' | 'outstandingShares'>): number => (
+    Math.max(
+        1,
+        stock.outstandingShares
+        || KNOWN_OUTSTANDING_SHARES[stock.id]
+        || (250_000_000 + (stableShareHash(stock.id) % 1_750_000_000)),
+    )
+);
+
 // --- INITIAL MARKET DATA ---
 const INITIAL_STOCKS: Omit<Stock, 'priceHistory' | 'lastDividendPayoutWeek'>[] = [
     // --- TECH ---
-    { id: 'stk_apple', symbol: 'AAPL', name: 'Apple Inc.', sector: 'TECH', price: 185.00, volatility: 0.02, dividendYield: 0.005, relatedBrandName: 'Apple', relatedStudioId: 'APPLE_TV' },
+    { id: 'stk_apple', symbol: 'AAPL', name: 'Apple Inc.', sector: 'TECH', price: 185.00, outstandingShares: 15_300_000_000, volatility: 0.02, dividendYield: 0.005, relatedBrandName: 'Apple', relatedStudioId: 'APPLE_TV' },
     { id: 'stk_amzn', symbol: 'AMZN', name: 'Amazon', sector: 'TECH', price: 145.00, volatility: 0.03, dividendYield: 0 },
     { id: 'stk_goog', symbol: 'GOOG', name: 'Alphabet', sector: 'TECH', price: 160.00, volatility: 0.025, dividendYield: 0 },
     
     // --- MEDIA / STUDIOS ---
-    { id: 'stk_nflx', symbol: 'NFLX', name: 'Netflix', sector: 'MEDIA', price: 620.00, volatility: 0.05, dividendYield: 0, relatedStudioId: 'NETFLIX' },
-    { id: 'stk_dis', symbol: 'DIS', name: 'Disney', sector: 'MEDIA', price: 110.00, volatility: 0.03, dividendYield: 0.01, relatedStudioId: 'DISNEY_PLUS' },
-    { id: 'stk_wbd', symbol: 'WBD', name: 'Warner Bros. Discovery', sector: 'MEDIA', price: 12.50, volatility: 0.06, dividendYield: 0, relatedStudioId: 'WARNER_BROS' },
-    { id: 'stk_para', symbol: 'PARA', name: 'Paramount Global', sector: 'MEDIA', price: 13.00, volatility: 0.06, dividendYield: 0.03, relatedStudioId: 'PARAMOUNT' },
-    { id: 'stk_cmcsa', symbol: 'CMCSA', name: 'Comcast (Universal)', sector: 'MEDIA', price: 42.00, volatility: 0.02, dividendYield: 0.025, relatedStudioId: 'UNIVERSAL' },
+    { id: 'stk_nflx', symbol: 'NFLX', name: 'Netflix', sector: 'MEDIA', price: 620.00, outstandingShares: 430_000_000, volatility: 0.05, dividendYield: 0, relatedStudioId: 'NETFLIX' },
+    { id: 'stk_dis', symbol: 'DIS', name: 'Disney', sector: 'MEDIA', price: 110.00, outstandingShares: 1_820_000_000, volatility: 0.03, dividendYield: 0.01, relatedStudioId: 'DISNEY_PLUS' },
+    { id: 'stk_wbd', symbol: 'WBD', name: 'Warner Bros. Discovery', sector: 'MEDIA', price: 12.50, outstandingShares: 2_450_000_000, volatility: 0.06, dividendYield: 0, relatedStudioId: 'WARNER_BROS' },
+    { id: 'stk_para', symbol: 'PARA', name: 'Paramount Global', sector: 'MEDIA', price: 13.00, outstandingShares: 650_000_000, volatility: 0.06, dividendYield: 0.03, relatedStudioId: 'PARAMOUNT' },
+    { id: 'stk_cmcsa', symbol: 'CMCSA', name: 'Comcast (Universal)', sector: 'MEDIA', price: 42.00, outstandingShares: 3_900_000_000, volatility: 0.02, dividendYield: 0.025, relatedStudioId: 'UNIVERSAL' },
 
     // --- BRANDS (Sponsorships) ---
     { id: 'stk_nke', symbol: 'NKE', name: 'Nike', sector: 'FASHION', price: 105.00, volatility: 0.02, dividendYield: 0.015, relatedBrandName: 'Nike' },

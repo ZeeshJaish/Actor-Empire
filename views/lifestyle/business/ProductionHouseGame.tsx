@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Player, BudgetTier, Genre, ProjectDetails, ActiveRelease, Commitment, Business, LocationDetails, NewsItem, XPost, StudioEquipment, Script, Writer, GameLanguage } from '../../../types';
-import { ArrowLeft, Film, DollarSign, Users, TrendingUp, Calendar, Check, Plus, Star, Award, Zap, Briefcase, LayoutGrid, MapPin, PenTool, Globe, Camera, Clapperboard, ChevronRight, Lock, Building2, BarChart3, ShieldAlert, Crown, LogOut, AlertTriangle, Sparkles, BookOpen, Video, X, Clock, Palette, Lightbulb, Mic, Box, Tv, ArrowDownLeft, ArrowUpRight, WalletCards } from 'lucide-react';
+import { ArrowLeft, Film, DollarSign, Users, TrendingUp, Calendar, Check, Plus, Star, Award, Zap, Briefcase, LayoutGrid, MapPin, PenTool, Globe, Camera, Clapperboard, ChevronRight, Lock, Building2, BarChart3, ShieldAlert, Crown, LogOut, AlertTriangle, Sparkles, BookOpen, Video, X, Clock, Palette, Lightbulb, Mic, Box, Tv, ArrowDownLeft, ArrowUpRight, WalletCards, Landmark } from 'lucide-react';
 import { NPC_DATABASE, getAvailableTalent, calculateProjectFameMultiplier } from '../../../services/npcLogic';
 import { sellBusiness, liquidateBusiness } from '../../../services/businessLogic';
 import { NPCActor, NPCTier } from '../../../types';
@@ -17,15 +17,22 @@ import { FacilitiesView } from './FacilitiesView';
 import { StudioPage } from '../../StudioPage';
 import { ProjectDashboardModal } from './components/ProjectDashboardModal';
 import { SequelSetupModal } from './components/SequelSetupModal';
-import { IPManagement } from './IPManagement';
+import { markGameCheckpoint } from '../../../services/firebaseService';
+import { discardUnreleasedScript, renameStudioProjectTitle } from '../../../services/projectNaming';
+import { getProjectReleaseLabel, getProjectReleaseSortValue, getProjectReleaseTiming } from '../../../services/releaseTiming';
+import { createContinuationScript, getContinuationEligibility } from '../../../services/sequelFlow';
+import { getStudioGroup } from '../../../services/studioGroup';
+import { StudioGroupView } from './StudioGroupView';
 
 interface ProductionHouseGameProps {
     player: Player;
     onBack: () => void;
     onUpdatePlayer: (p: Player) => void;
+    initialRightsMarketOpportunityId?: string;
+    onRightsMarketTargetConsumed?: () => void;
 }
 
-type StudioView = 'DASHBOARD' | 'DEVELOPMENT' | 'PRE_PROD' | 'PRODUCTION' | 'RELEASE' | 'RELEASES' | 'OFFICE' | 'FINANCE' | 'GREENLIGHT' | 'TALENT' | 'IP_MANAGEMENT' | 'FILMOGRAPHY';
+type StudioView = 'DASHBOARD' | 'STUDIO_GROUP' | 'DEVELOPMENT' | 'PRE_PROD' | 'PRODUCTION' | 'RELEASE' | 'RELEASES' | 'OFFICE' | 'FINANCE' | 'GREENLIGHT' | 'TALENT' | 'FILMOGRAPHY';
 
 // --- HELPERS ---
 const formatMoney = (val: number) => {
@@ -37,13 +44,21 @@ const formatMoney = (val: number) => {
     return `$${val}`;
 };
 
-export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player, onBack, onUpdatePlayer }) => {
+export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player, onBack, onUpdatePlayer, initialRightsMarketOpportunityId, onRightsMarketTargetConsumed }) => {
     const [view, setView] = useState<StudioView>('DASHBOARD');
+    const [rightsMarketTargetId, setRightsMarketTargetId] = useState<string | null>(null);
     const [selectedProjectDashboard, setSelectedProjectDashboard] = useState<any>(null);
     const [sequelSetupProject, setSequelSetupProject] = useState<{ project: any, isSpinoff: boolean } | null>(null);
+
+    useEffect(() => {
+        if (!initialRightsMarketOpportunityId) return;
+        setRightsMarketTargetId(initialRightsMarketOpportunityId);
+        setView('DEVELOPMENT');
+    }, [initialRightsMarketOpportunityId]);
     
     // Locate the Studio Business
-    const studio = player.businesses.find(b => b.type === 'PRODUCTION_HOUSE');
+    const studioGroup = getStudioGroup(player);
+    const studio = studioGroup.parentStudio;
     if (!studio) return <div className="p-10 text-white">Error: Studio not found.</div>;
     const language = getPlayerLanguage(player);
     const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
@@ -90,6 +105,7 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
     const consistencyBonus = library.filter(p => (p.rating || 0) >= 7.5).length * 0.8;
     // Prestige Score (0-100): rewards quality, awards, consistency, and credible hits.
     const prestigeScore = Math.min(100, Math.floor((avgRating * 6) + (awardsWon * 2.5) + (library.length * 0.8) + (breakoutCount * 1.2) + consistencyBonus));
+    const groupValuation = studioGroup.allStudios.reduce((total, groupStudio) => total + (groupStudio.stats.valuation || 0), 0);
 
     // Active Slate List (Combined for the Netflix-style row)
     const activeSlate = [
@@ -99,7 +115,7 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
             return {
                 id: c.id,
                 name: script ? script.title : 'Untitled Concept',
-                type: script?.type || 'MOVIE',
+                type: script?.projectType || 'MOVIE',
                 phase: isScripting ? 'DEVELOPMENT' : 'CONCEPT',
                 risk: 'LOW',
                 budget: 0,
@@ -108,8 +124,8 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
         }) || []),
         ...(studio.studioState?.scripts.filter(s => s.status === 'IN_DEVELOPMENT' && !studio.studioState?.concepts?.some(c => c.scriptId === s.id)).map(s => ({ 
             id: s.id, 
-            name: s.name || s.title, 
-            type: s.type,
+            name: s.title,
+            type: s.projectType,
             phase: 'DEVELOPMENT', 
             risk: 'LOW',
             budget: 0, // Not yet budgeted
@@ -126,6 +142,20 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
         }))
     ];
 
+    const openGreenlight = (source: string, concept?: any) => {
+        markGameCheckpoint('production_house_greenlight_opened', player, {
+            source,
+            studio_id: studio.id,
+            active_slate: activeSlate.length,
+            studio_commitments: studioCommitments.length,
+            studio_scripts: studio.studioState?.scripts?.length || 0,
+            studio_concepts: studio.studioState?.concepts?.length || 0,
+            concept_id: concept?.id || 'none',
+            concept_phase: concept?.phase || 'new_project',
+        });
+        setView('GREENLIGHT');
+    };
+
     const pastProjectsSlate = [
         ...activeReleases.map(r => ({
             id: r.id,
@@ -139,7 +169,14 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
             views: r.streaming?.totalViews,
             streamingRevenue: r.streamingRevenue,
             projectDetails: r.projectDetails,
-            bids: r.bids
+            bids: r.bids,
+            weekNum: r.weekNum,
+            releaseWeek: r.releaseWeek,
+            releaseYear: r.releaseYear,
+            releasedAtAbsoluteWeek: r.releasedAtAbsoluteWeek,
+            franchiseId: r.projectDetails.franchiseId,
+            installmentNumber: r.projectDetails.installmentNumber,
+            genre: r.projectDetails.genre
         })),
         ...library.map(p => ({
             id: p.id,
@@ -152,7 +189,14 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
             awards: p.awards,
             views: p.totalViews,
             streamingRevenue: p.streamingRevenue,
-            customPoster: p.customPoster
+            customPoster: p.customPoster,
+            releaseWeek: p.releaseWeek,
+            releaseYear: p.releaseYear,
+            releasedAtAbsoluteWeek: p.releasedAtAbsoluteWeek,
+            franchiseId: p.franchiseId,
+            installmentNumber: p.installmentNumber,
+            genre: p.genre,
+            projectDetails: p
         }))
     ];
     const sortedPastProjectsSlate = [...pastProjectsSlate].sort(sortStudioArchiveByRecent);
@@ -163,7 +207,19 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
     const handleDeleteConcept = (conceptId: string) => {
         const updatedStudio = { ...studio };
         if (updatedStudio.studioState && updatedStudio.studioState.concepts) {
-            updatedStudio.studioState.concepts = updatedStudio.studioState.concepts.filter(c => c.id !== conceptId);
+            const concept = updatedStudio.studioState.concepts.find(c => c.id === conceptId);
+            if (!concept) return;
+            const result = discardUnreleasedScript(
+                updatedStudio.studioState.scripts || [],
+                updatedStudio.studioState.concepts,
+                concept.scriptId
+            );
+            if (!result.discarded) return;
+            updatedStudio.studioState = {
+                ...updatedStudio.studioState,
+                scripts: result.scripts,
+                concepts: result.concepts
+            };
             
             // Update player
             const updatedPlayer = { ...player };
@@ -203,6 +259,9 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
                 distributionPhase: 'STREAMING_BIDDING',
                 weeksInTheaters: (pastProject as any).weeksInTheaters || 0,
                 imdbRating: pastProject.imdbRating || 50,
+                releaseWeek: pastProject.releaseWeek,
+                releaseYear: pastProject.releaseYear,
+                releasedAtAbsoluteWeek: pastProject.releasedAtAbsoluteWeek,
                 projectDetails: (pastProject as any).projectDetails || {
                     title: pastProject.name,
                     type: pastProject.type || 'MOVIE',
@@ -246,10 +305,24 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
     };
 
     const handleMakeSequel = (project: any) => {
+        const eligibility = getContinuationEligibility({
+            player,
+            studioScripts: studio.studioState?.scripts || [],
+            project,
+            mode: 'SEQUEL'
+        });
+        if (!eligibility.eligible) return;
         setSequelSetupProject({ project, isSpinoff: false });
     };
 
     const handleMakeSpinoff = (project: any) => {
+        const eligibility = getContinuationEligibility({
+            player,
+            studioScripts: studio.studioState?.scripts || [],
+            project,
+            mode: 'SPINOFF'
+        });
+        if (!eligibility.eligible) return;
         setSequelSetupProject({ project, isSpinoff: true });
     };
 
@@ -258,6 +331,14 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
         const project = sequelSetupProject.project;
         const updatedStudio = { ...studio };
         if (!updatedStudio.studioState) return;
+        const continuation = createContinuationScript({
+            player,
+            studioScripts: updatedStudio.studioState.scripts || [],
+            project,
+            mode: isSpinoff ? 'SPINOFF' : 'SEQUEL',
+            title
+        });
+        if (!continuation.ok || !continuation.script) return;
         const isInternallyControlledTalent = (id: string) => id === 'PLAYER_SELF' || id === 'STUDIO_STAFF';
 
         // Deduct writer fee
@@ -266,7 +347,7 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
         }
 
         // Generate a new script based on the past project
-        const newScriptId = `script-${Date.now()}`;
+        const newScriptId = continuation.script.id;
         
         // Calculate returning talent demands
         const details = project.projectDetails || project;
@@ -356,8 +437,7 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
             : undefined;
 
         const newScript: Script = {
-            id: newScriptId,
-            title: title,
+            ...continuation.script,
             logline: randomLogline,
             projectType: isSpinoff ? (project.type === 'MOVIE' ? 'SERIES' : 'MOVIE') : (project.type || 'MOVIE'),
             targetAudience: project.projectDetails?.targetAudience || project.targetAudience || 'PG-13',
@@ -368,11 +448,6 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
             author: writer ? writer.name : 'In-House Writers',
             weeksInDevelopment: 0,
             totalDevelopmentWeeks: writer ? Math.max(4, 20 - writer.speed) : 10,
-            isOriginal: false,
-            options: [],
-            sourceMaterial: isSpinoff ? 'SPINOFF' : 'SEQUEL',
-            franchiseId: project.franchiseId || project.id,
-            installmentNumber: isSpinoff ? 1 : (project.installmentNumber || 1) + 1,
             returningTalent,
             lockedStreamingFunding
         };
@@ -508,12 +583,41 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
         return selectedProjectDashboard;
     }, [selectedProjectDashboard, player]);
 
+    const handleRenameProject = (title: string) => {
+        if (!currentProject) return;
+        const updatedPlayer = renameStudioProjectTitle(player, studio.id, currentProject, title);
+        if (updatedPlayer === player) return;
+
+        setSelectedProjectDashboard((current: any) => current ? {
+            ...current,
+            name: title,
+            title,
+            projectDetails: current.projectDetails
+                ? { ...current.projectDetails, title }
+                : current.projectDetails
+        } : current);
+        onUpdatePlayer(updatedPlayer);
+    };
+
     if (view === 'FINANCE') {
         return <StudioFinanceView player={player} studio={studio} onBack={() => setView('DASHBOARD')} onUpdatePlayer={onUpdatePlayer} onExit={onBack} />;
     }
 
+    if (view === 'STUDIO_GROUP') {
+        return <StudioGroupView player={player} onBack={() => setView('DASHBOARD')} onUpdatePlayer={onUpdatePlayer} />;
+    }
+
     if (view === 'DEVELOPMENT') {
-        return <DevelopmentLab player={player} studio={studio} onBack={() => setView('DASHBOARD')} onUpdatePlayer={onUpdatePlayer} />;
+        return <DevelopmentLab player={player} studio={studio} onBack={() => setView('DASHBOARD')} onUpdatePlayer={onUpdatePlayer} onOpenProject={(projectId) => {
+            const project = player.activeReleases.find(release => release.id === projectId)
+                || player.pastProjects.find(release => release.id === projectId);
+            if (!project) return;
+            setSelectedProjectDashboard(project);
+            setView('DASHBOARD');
+        }} initialRightsMarketOpportunityId={rightsMarketTargetId || undefined} onRightsMarketTargetConsumed={() => {
+            setRightsMarketTargetId(null);
+            onRightsMarketTargetConsumed?.();
+        }} />;
     }
 
     if (view === 'OFFICE') {
@@ -522,10 +626,6 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
 
     if (view === 'TALENT') {
         return <StudioPage player={player} onUpdatePlayer={onUpdatePlayer} onBack={() => setView('DASHBOARD')} />;
-    }
-
-    if (view === 'IP_MANAGEMENT') {
-        return <IPManagement player={player} studio={studio} onUpdatePlayer={onUpdatePlayer} onBack={() => setView('DASHBOARD')} />;
     }
 
     if (view === 'RELEASE' && currentProject) {
@@ -558,6 +658,7 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
                     onMakeSequel={handleMakeSequel}
                     onMakeSpinoff={handleMakeSpinoff}
                     onStartStreamingBidding={handleStartStreamingBidding}
+                    onRenameProject={handleRenameProject}
                     onConfigureRelease={(p) => {
                         setSelectedProjectDashboard(p);
                         setView('RELEASE');
@@ -715,7 +816,7 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
                     
                     <div className="flex gap-4 overflow-x-auto px-4 pb-4 no-scrollbar">
                         {/* New Project Tile */}
-                        <button onClick={() => setView('GREENLIGHT')} className="min-w-[140px] w-[140px] h-[210px] rounded-lg border-2 border-dashed border-amber-500/50 bg-amber-500/5 flex flex-col items-center justify-center gap-3 text-amber-500 hover:bg-amber-500/10 hover:border-amber-500 hover:scale-105 transition-all duration-300 group shrink-0 relative overflow-hidden shadow-lg">
+                        <button onClick={() => openGreenlight('new_project_tile')} className="min-w-[140px] w-[140px] h-[210px] rounded-lg border-2 border-dashed border-amber-500/50 bg-amber-500/5 flex flex-col items-center justify-center gap-3 text-amber-500 hover:bg-amber-500/10 hover:border-amber-500 hover:scale-105 transition-all duration-300 group shrink-0 relative overflow-hidden shadow-lg">
                             <div className="absolute inset-0 bg-gradient-to-b from-amber-500/0 to-amber-500/10"></div>
                             <div className="w-12 h-12 rounded-full bg-amber-500/20 flex items-center justify-center group-hover:scale-110 group-hover:bg-amber-500/30 transition-all duration-300">
                                 <Plus size={24} className="text-amber-400" />
@@ -731,7 +832,7 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
                                 onClick={() => {
                                     if (p.phase === 'CONCEPT' || (p.phase === 'DEVELOPMENT' && p.concept)) {
                                         setSelectedConcept(p.concept);
-                                        setView('GREENLIGHT');
+                                        openGreenlight('active_slate_concept', p.concept);
                                     } else if (p.phase === 'AWAITING RELEASE') {
                                         setSelectedProjectDashboard(p);
                                         setView('RELEASE');
@@ -774,15 +875,22 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
 
                 {/* 3. CORPORATE DIVISIONS (Lower Section) */}
                 <div className="px-4 pb-8">
-                    <h2 className="text-lg font-bold text-white tracking-tight mb-4">{tr('studio.corporateDivisions')}</h2>
-                    
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="mb-3 px-1">
+                        <div>
+                            <div className="text-[7px] font-black uppercase tracking-[0.28em] text-amber-300">Studio Control Console</div>
+                            <h2 className="mt-1 text-lg font-black uppercase tracking-tight text-white">{tr('studio.corporateDivisions')}</h2>
+                        </div>
+                    </div>
+
+                    <div className="relative overflow-hidden rounded-[24px] border-2 border-[#29251f] bg-[#0a0908] p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_10px_0_#020202,0_18px_32px_rgba(0,0,0,0.35)]">
+                        <div className="pointer-events-none absolute inset-x-4 top-0 h-px bg-gradient-to-r from-transparent via-amber-200/25 to-transparent" />
+                        <div className="grid grid-cols-2 gap-2.5">
                         {/* Development Division */}
                         <DivisionCard 
                             title={tr('studio.devLab')}
                             subtitle="Scripts & IP"
                             icon={<PenTool size={20}/>}
-                            color="bg-blue-600"
+                            accent="BLUE"
                             stats={[
                                 { label: "Scripts", value: studio.studioState?.scripts.length.toString() || "0" }
                             ]}
@@ -794,7 +902,7 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
                             title={tr('studio.facilities')}
                             subtitle="Upgrades"
                             icon={<Building2 size={20}/>}
-                            color="bg-emerald-600"
+                            accent="EMERALD"
                             stats={[
                                 { label: "Tier", value: studio.subtype === 'MAJOR_STUDIO' ? 'Major' : 'Indie' }
                             ]}
@@ -806,7 +914,7 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
                             title={tr('studio.talent')}
                             subtitle="Farm System"
                             icon={<Users size={20}/>}
-                            color="bg-purple-600"
+                            accent="PURPLE"
                             stats={[
                                 { label: "Stars", value: (player.studio?.talentRoster?.length || 0).toString() }
                             ]}
@@ -818,12 +926,27 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
                             title={tr('studio.finance')}
                             subtitle="P&L & Capital"
                             icon={<DollarSign size={20}/>}
-                            color="bg-amber-600"
+                            accent="ORANGE"
                             stats={[
                                 { label: "Capital", value: formatMoney(studio.balance) }
                             ]}
                             onClick={() => setView('FINANCE')}
                         />
+
+                        <DivisionCard
+                            wide
+                            eyebrow="Group Command"
+                            title="Studio Group"
+                            subtitle="Manage Subsidiaries"
+                            icon={<Landmark size={22}/>}
+                            accent="GOLD"
+                            stats={[
+                                { label: "Owned Studios", value: studioGroup.subsidiaries.length.toString() },
+                                { label: "Group Value", value: formatMoney(groupValuation) }
+                            ]}
+                            onClick={() => setView('STUDIO_GROUP')}
+                        />
+                        </div>
                     </div>
                 </div>
 
@@ -1068,6 +1191,7 @@ const StudioFinanceView: React.FC<{
             case 'CAPITAL_INJECTION': return 'Injection';
             case 'CAPITAL_WITHDRAWAL': return 'Withdrawal';
             case 'PRODUCTION_SPEND': return 'Production';
+            case 'FUNDING_SURPLUS': return 'Surplus';
             default: return 'Studio';
         }
     };
@@ -1382,7 +1506,7 @@ const StudioFinanceView: React.FC<{
                         <h3 className="text-2xl font-black text-white mb-2 uppercase tracking-tight">{showExitModal === 'SELL' ? 'Sell Studio' : 'Shut Down'}</h3>
                         <p className="text-sm text-zinc-400 mb-6 leading-relaxed">
                             {showExitModal === 'SELL' 
-                                ? `Are you sure you want to sell ${studio.name}? You will receive the valuation amount plus any cash in the business account.`
+                                ? `Are you sure you want to sell ${studio.name}? Studio cash is already included in valuation, and early exits are discounted.`
                                 : `Are you sure you want to shut down? Assets will be liquidated for scrap value. This cannot be undone.`
                             }
                         </p>
@@ -1450,11 +1574,8 @@ const getStudioArchiveRating = (project: any) => {
 };
 
 const getStudioArchiveDateValue = (project: any) => {
-    const details = project.projectDetails || {};
-    const year = Number(project.year || project.releaseYear || details.releaseYear || details.year || 0);
-    const week = Number(project.releaseWeek || details.releaseWeek || project.weekNum || 0);
     const activeBoost = project.phase === 'IN THEATERS' || project.phase === 'STREAMING' || project.phase === 'BIDDING' ? 100000 : 0;
-    return activeBoost + (year * 60) + week;
+    return activeBoost + getProjectReleaseSortValue(project);
 };
 
 function sortStudioArchiveByRecent(a: any, b: any) {
@@ -1614,7 +1735,9 @@ const FilmographyProjectRow: React.FC<{ project: any; language: GameLanguage; on
     const type = project.type || project.projectDetails?.type || 'MOVIE';
     const genre = project.genre || project.projectDetails?.genre || 'Studio';
     const status = project.phase || (project.distributionPhase === 'STREAMING' ? 'STREAMING' : project.distributionPhase === 'THEATRICAL' ? 'IN THEATERS' : 'RELEASED');
-    const year = project.year || project.projectDetails?.releaseYear || project.projectDetails?.year || 'Now';
+    const releaseLabel = getProjectReleaseLabel(project, {}, { emptyLabel: 'Now' });
+    const releaseTiming = getProjectReleaseTiming(project, {});
+    const runWeek = Number(project.weekNum || project.projectDetails?.weekNum || 0);
     const franchiseName = project.universeSagaName || project.projectDetails?.universeSagaName || (project.universeId || project.projectDetails?.universeId ? 'Universe' : project.franchiseId || project.projectDetails?.franchiseId ? 'Franchise' : '');
     const customPoster = getCustomPoster(project);
 
@@ -1644,7 +1767,7 @@ const FilmographyProjectRow: React.FC<{ project: any; language: GameLanguage; on
                                 {project.name}
                             </div>
                             <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-zinc-500">
-                                <span>{year}</span>
+                                <span>{releaseLabel}</span>
                                 <span>•</span>
                                 <span>{type}</span>
                                 <span>•</span>
@@ -1666,6 +1789,16 @@ const FilmographyProjectRow: React.FC<{ project: any; language: GameLanguage; on
                         {rating > 0 && (
                             <span className="inline-flex items-center gap-1 rounded-full bg-yellow-500 px-2.5 py-1 text-[9px] font-black text-black">
                                 <Star size={10} className="fill-black" /> {rating.toFixed(1)}
+                            </span>
+                        )}
+                        {releaseTiming.releaseWeek && (
+                            <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/20 bg-amber-500/10 px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-amber-300">
+                                <Calendar size={10} /> W{releaseTiming.releaseWeek}
+                            </span>
+                        )}
+                        {runWeek > 0 && (
+                            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-emerald-300">
+                                <Clock size={10} /> Run W{runWeek}
                             </span>
                         )}
                     </div>
@@ -1922,24 +2055,90 @@ const ArchiveProjectCard: React.FC<{ project: any, isLatestInstallment?: boolean
     );
 };
 
-const DivisionCard: React.FC<{ title: string, subtitle: string, icon: React.ReactNode, color: string, stats: {label: string, value: string}[], onClick: () => void, locked?: boolean }> = ({ title, subtitle, icon, color, stats, onClick, locked }) => (
-    <button onClick={locked ? undefined : onClick} className={`w-full bg-zinc-900 border border-zinc-800 rounded-2xl p-3 flex flex-col items-center justify-center text-center transition-all group relative overflow-hidden gap-2 aspect-square shadow-md ${locked ? 'opacity-50 cursor-not-allowed' : 'hover:bg-zinc-800 hover:border-zinc-600'}`}>
-        {locked && (
-            <div className="absolute top-2 right-2 text-zinc-600">
-                <Lock size={10} />
-            </div>
-        )}
-        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white shadow-lg shrink-0 ${color} ${!locked && 'group-hover:scale-110'} transition-transform`}>
-            {icon}
-        </div>
-        <div className="flex flex-col items-center w-full">
-            <div className="font-bold text-[11px] text-white group-hover:text-amber-100 transition-colors leading-tight line-clamp-1">{title}</div>
-            <div className="text-[8px] text-zinc-500 uppercase tracking-wide mt-1 line-clamp-1">{subtitle}</div>
-            {!locked && stats.length > 0 && (
-                <div className="mt-2 text-[9px] font-bold text-zinc-300 bg-black/30 px-2 py-0.5 rounded-full border border-white/5">
-                    {stats[0].value} {stats[0].label}
+type DivisionAccent = 'BLUE' | 'EMERALD' | 'PURPLE' | 'ORANGE' | 'GOLD';
+
+const DIVISION_TONES: Record<DivisionAccent, {
+    frame: string;
+    key: string;
+    light: string;
+    stat: string;
+}> = {
+    BLUE: {
+        frame: 'border-blue-400/25',
+        key: 'bg-[#10213a] text-blue-200 shadow-[0_5px_0_#071223]',
+        light: 'bg-blue-300 shadow-[0_0_8px_rgba(147,197,253,0.95)]',
+        stat: 'text-blue-300',
+    },
+    EMERALD: {
+        frame: 'border-emerald-400/25',
+        key: 'bg-[#0a2b21] text-emerald-200 shadow-[0_5px_0_#03140f]',
+        light: 'bg-emerald-300 shadow-[0_0_8px_rgba(110,231,183,0.95)]',
+        stat: 'text-emerald-300',
+    },
+    PURPLE: {
+        frame: 'border-purple-400/25',
+        key: 'bg-[#29143a] text-purple-200 shadow-[0_5px_0_#13081d]',
+        light: 'bg-purple-300 shadow-[0_0_8px_rgba(216,180,254,0.95)]',
+        stat: 'text-purple-300',
+    },
+    ORANGE: {
+        frame: 'border-orange-400/25',
+        key: 'bg-[#371b08] text-orange-200 shadow-[0_5px_0_#1d0c03]',
+        light: 'bg-orange-300 shadow-[0_0_8px_rgba(253,186,116,0.95)]',
+        stat: 'text-orange-300',
+    },
+    GOLD: {
+        frame: 'border-amber-300/40',
+        key: 'bg-[#3a2608] text-amber-100 shadow-[0_5px_0_#1c1002]',
+        light: 'bg-amber-200 shadow-[0_0_9px_rgba(253,230,138,1)]',
+        stat: 'text-amber-200',
+    },
+};
+
+const DivisionCard: React.FC<{
+    title: string;
+    subtitle: string;
+    eyebrow?: string;
+    icon: React.ReactNode;
+    accent: DivisionAccent;
+    stats: { label: string; value: string }[];
+    onClick: () => void;
+    locked?: boolean;
+    wide?: boolean;
+}> = ({ title, subtitle, eyebrow, icon, accent, stats, onClick, locked, wide }) => {
+    const tone = DIVISION_TONES[accent];
+    return (
+        <button
+            type="button"
+            onClick={locked ? undefined : onClick}
+            className={`division-command-card control-key group relative min-h-[88px] w-full rounded-[16px] border-2 bg-[#11100f] p-2.5 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_5px_0_#030303] transition-all active:translate-y-[3px] active:shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_2px_0_#030303] ${wide ? 'col-span-2 min-h-[92px]' : ''} ${locked ? 'cursor-not-allowed border-white/[0.06] opacity-45' : `${tone.frame} hover:bg-[#171512]`}`}
+        >
+            <span className={`status-light absolute right-2.5 top-2.5 h-1.5 w-1.5 rounded-full ${tone.light}`} />
+            <div className={`relative flex h-full items-center gap-2.5 pr-3 ${wide ? 'sm:gap-4' : ''}`}>
+                <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] border border-white/10 ${tone.key} transition-transform group-active:translate-y-[2px]`}>
+                        {icon}
                 </div>
-            )}
-        </div>
-    </button>
-);
+
+                <div className="min-w-0 flex-1">
+                    {eyebrow ? <div className="mb-1 text-[7px] font-black uppercase tracking-[0.22em] text-amber-300">{eyebrow}</div> : null}
+                    <div className="truncate text-[12px] font-black uppercase leading-none text-white">{title}</div>
+                    <div className="mt-1 truncate text-[6px] font-black uppercase tracking-[0.15em] text-zinc-600">{subtitle}</div>
+                    {!locked && stats.length > 0 ? (
+                        <div className={`mt-2 flex min-w-0 items-center gap-2 ${wide ? 'justify-between' : ''}`}>
+                            {stats.slice(0, wide ? 2 : 1).map((stat, index) => (
+                                <div key={stat.label} className={`min-w-0 ${wide && index > 0 ? 'text-right' : ''}`}>
+                                    <span className="block truncate text-[5px] font-black uppercase tracking-[0.12em] text-zinc-700">{stat.label}</span>
+                                    <span className={`mt-0.5 block truncate font-mono text-[9px] font-black ${tone.stat}`}>{stat.value}</span>
+                                </div>
+                            ))}
+                        </div>
+                    ) : null}
+                </div>
+
+                <div className="absolute bottom-0 right-0 flex h-5 w-4 items-center justify-center text-zinc-700 transition-colors group-hover:text-white">
+                    {locked ? <Lock size={11} /> : <ChevronRight size={15} />}
+                </div>
+            </div>
+        </button>
+    );
+};

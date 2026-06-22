@@ -364,6 +364,7 @@ export const GENRE_TRAINING_CATALOG: { genre: Genre, label: string, desc: string
     { genre: 'COMEDY', label: 'Improv Club', desc: 'Timing and wit.', cost: 25, energy: 10, gain: 1 },
     { genre: 'ROMANCE', label: 'Screen Chemistry', desc: 'Intimacy coordination.', cost: 25, energy: 10, gain: 1 },
     { genre: 'THRILLER', label: 'Tension Workshop', desc: 'Pacing and suspense.', cost: 25, energy: 10, gain: 1 },
+    { genre: 'MYSTERY', label: 'Mystery Room', desc: 'Practice clue work, restraint, and reveals.', cost: 25, energy: 10, gain: 1 },
     { genre: 'HORROR', label: 'Scream Queen 101', desc: 'Fear reactions.', cost: 25, energy: 10, gain: 1 },
     { genre: 'SCI_FI', label: 'Green Screen Tech', desc: 'Acting with nothing.', cost: 25, energy: 10, gain: 1 },
     { genre: 'ADVENTURE', label: 'Parkour & Movement', desc: 'Running and jumping.', cost: 25, energy: 10, gain: 1 },

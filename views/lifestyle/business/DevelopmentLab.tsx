@@ -1,26 +1,45 @@
-import React, { useState } from 'react';
-import { Player, Business, Script, Writer, Genre, ProjectType, ScriptAttributes, TargetAudience, Universe, ProjectFormat, ScriptSubjectType } from '../../../types';
-import { ArrowLeft, PenTool, BookOpen, ShoppingCart, Users, Star, Clock, DollarSign, Sparkles, ChevronRight, Layers, Globe, RefreshCw, Plus, History, Film, Tv, Edit2, ShoppingBag, Palmtree, Flame, Gauge, Trophy, AlertTriangle, RotateCcw, Info } from 'lucide-react';
-import { motion } from 'motion/react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Player, Business, Script, Writer, Genre, ProjectType, ScriptAttributes, TargetAudience, Universe, ProjectFormat, ScriptSubjectType, OwnedRight, OwnedRightDevelopmentChoice } from '../../../types';
+import { ArrowLeft, PenTool, BookOpen, ShoppingCart, Users, Star, Clock, DollarSign, Sparkles, ChevronRight, Layers, Globe, RefreshCw, Plus, History, Film, Tv, Edit2, ShoppingBag, Palmtree, Flame, Gauge, Trophy, AlertTriangle, RotateCcw, Info, Trash2, Archive, Clapperboard, ShieldCheck } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
 import { getWriterTalent } from '../../../services/roleLogic';
 import { generateWriters, generateIPMarket, generateProceduralLogline } from '../../../src/data/generators';
 import { SCRIPT_TEMPLATES, ScriptQuestion } from '../../../src/data/scriptTemplates';
 import { normalizeStudioState } from '../../../services/businessLogic';
-import { buildUniverseRoster, calculateUniverseProductWeeklyRevenue, getUniverseDashboardProjects, getUniverseReleaseActivity, normalizeUniverseForSave, normalizeUniverseMap } from '../../../services/universeLogic';
+import { buildUniverseRoster, calculateUniverseProductWeeklyRevenue, getUniverseDashboardProjects, getUniverseLifecycleRevenueMultiplier, getUniverseReleaseActivity, isUniverseRetired, normalizeUniverseForSave, normalizeUniverseMap, rebootRetiredUniverse, retireUniverseForArchive } from '../../../services/universeLogic';
 import { ALL_GENRES, PROJECT_FORMATS, formatGenreLabel, formatProjectFormatLabel, isSubjectDrivenGenre } from '../../../services/genreCatalog';
 import { createMarketTrends, getGenreMarketTrend, getScriptMarketDemand } from '../../../services/marketTrends';
+import { canManageWorkingTitle, discardUnreleasedScript, renameScriptWorkingTitle } from '../../../services/projectNaming';
+import { DiscardScriptDialog } from './components/DiscardScriptDialog';
+import { WorkingTitleDialog } from './components/WorkingTitleDialog';
+import { UniverseRetirementDialog } from './components/UniverseRetirementDialog';
+import { createContinuationScript, getContinuationEligibility } from '../../../services/sequelFlow';
+import { getStudioMarketScripts, StudioMarketLane } from '../../../services/studioMarket';
+import { RightsMarket } from './components/RightsMarket';
+import { developOwnedRight, renewOwnedRight } from '../../../services/rightsNegotiation';
+import { OwnedRightDevelopmentBrief } from './components/OwnedRightDevelopmentBrief';
+import { OwnedIpDossier } from './components/OwnedIpDossier';
+import { getOwnedIpPerformance } from '../../../services/ownedIpPerformance';
+import { deriveStudioOriginalRights } from '../../../services/studioOriginalIp';
 
 interface DevelopmentLabProps {
     player: Player;
     studio: Business;
     onBack: () => void;
     onUpdatePlayer: (p: Player) => void;
+    onOpenProject?: (projectId: string) => void;
+    initialRightsMarketOpportunityId?: string;
+    onRightsMarketTargetConsumed?: () => void;
 }
 
 type DevTab = 'VAULT' | 'NEW_CONCEPT' | 'IP_MARKET' | 'FRANCHISES' | 'UNIVERSE';
+type FranchiseCommissionMode = 'SEQUEL' | 'SPINOFF' | 'FINALE' | 'REBOOT';
 
 // --- Helpers ---
 const clampScriptStat = (value: number) => Math.max(10, Math.min(100, Math.round(value)));
+const CUSTOM_PREMISE_MAX_LENGTH = 180;
+
+const sanitizeCustomPremise = (value: string) => value.replace(/\s+/g, ' ').trimStart().slice(0, CUSTOM_PREMISE_MAX_LENGTH);
 
 const getSubjectTypeLabel = (subjectType?: ScriptSubjectType) => (subjectType || 'PUBLIC_FIGURE').replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
 
@@ -137,6 +156,12 @@ const calculateConceptAttributes = (
         boost('plot', 8);
         boost('pacing', 5);
     }
+    if (genre === 'MYSTERY') {
+        boost('plot', 10);
+        boost('originality', 4);
+        boost('pacing', 3);
+        boost('dialogue', 2);
+    }
     if (genre === 'FANTASY') {
         boost('plot', 8);
         boost('originality', 7);
@@ -171,6 +196,19 @@ const formatCurrency = (amount: number): string => {
     return `$${amount}`;
 };
 
+const getOwnedIpTypePresentation = (type: OwnedRight['propertyType']) => {
+    switch (type) {
+        case 'CHARACTER':
+            return { label: 'Character IP', Icon: Users, tone: 'border-sky-400/35 bg-sky-400/10 text-sky-300' };
+        case 'STORY_WORLD':
+            return { label: 'Story World IP', Icon: Globe, tone: 'border-violet-400/35 bg-violet-400/10 text-violet-300' };
+        case 'FRANCHISE':
+            return { label: 'Franchise IP', Icon: Layers, tone: 'border-amber-400/35 bg-amber-400/10 text-amber-300' };
+        case 'CATALOG':
+            return { label: 'Catalog IP', Icon: Archive, tone: 'border-teal-400/35 bg-teal-400/10 text-teal-300' };
+    }
+};
+
 const clamp = (value: number, min = 0, max = 100) => Math.max(min, Math.min(max, value));
 
 const getUniverseCharacterTimelineText = (char: any) => {
@@ -198,8 +236,12 @@ const getUniverseCharacterTimelineParts = (char: any) => {
     };
 };
 
-export const DevelopmentLab: React.FC<DevelopmentLabProps> = ({ player, studio, onBack, onUpdatePlayer }) => {
+export const DevelopmentLab: React.FC<DevelopmentLabProps> = ({ player, studio, onBack, onUpdatePlayer, onOpenProject, initialRightsMarketOpportunityId, onRightsMarketTargetConsumed }) => {
     const [activeTab, setActiveTab] = useState<DevTab>('VAULT');
+
+    useEffect(() => {
+        if (initialRightsMarketOpportunityId) setActiveTab('IP_MARKET');
+    }, [initialRightsMarketOpportunityId]);
     
     // Initialize Studio State if missing
     const studioState = normalizeStudioState(studio.studioState, player.currentWeek) as typeof studio.studioState & {
@@ -254,6 +296,17 @@ export const DevelopmentLab: React.FC<DevelopmentLabProps> = ({ player, studio, 
             });
         }
     };
+
+    const acquiredRights = studioState.ownedRights || [];
+    const studioOriginalRights = deriveStudioOriginalRights({
+        studioId: studio.id,
+        scripts: studioState.scripts,
+        activeReleases: player.activeReleases,
+        pastProjects: player.pastProjects,
+        acquiredRights,
+        purchasedIPTitles: studioState.purchasedIPTitles || [],
+    });
+    const unifiedOwnedRights = [...acquiredRights, ...studioOriginalRights];
 
     // Handle automatic market refresh and script cleanup
     React.useEffect(() => {
@@ -358,7 +411,47 @@ export const DevelopmentLab: React.FC<DevelopmentLabProps> = ({ player, studio, 
                     scripts={studioState.scripts} 
                     writers={studioState.writers}
                     studioBalance={studio.balance}
+                    studioId={studio.id}
                     player={player}
+                    ownedRights={unifiedOwnedRights}
+                    onOpenProject={onOpenProject}
+                    onOpenFranchise={() => setActiveTab('FRANCHISES')}
+                    onOpenUniverse={() => setActiveTab('UNIVERSE')}
+                    onRenewRight={(rightId) => {
+                        const ownedRight = acquiredRights.find(right => right.id === rightId);
+                        if (!ownedRight) return { changed: false, message: 'Only acquired rights can be renewed.' };
+                        const renewal = renewOwnedRight({ ownedRight, currentWeek: player.currentWeek, studioBalance: studio.balance });
+                        if (!renewal.changed) {
+                            return {
+                                changed: false,
+                                message: renewal.reason === 'INSUFFICIENT_FUNDS' ? 'Not enough studio capital to renew.' : 'This IP cannot be renewed yet.',
+                            };
+                        }
+                        const updatedStudio = {
+                            ...studio,
+                            balance: renewal.balance,
+                            studioState: {
+                                ...studioState,
+                                ownedRights: acquiredRights.map(right => right.id === rightId ? renewal.ownedRight : right),
+                            },
+                        };
+                        onUpdatePlayer({
+                            ...player,
+                            businesses: player.businesses.map(business => business.id === studio.id ? updatedStudio : business),
+                        });
+                        return { changed: true, message: `Licence renewed for ${renewal.ownedRight.expiresAtWeek! - player.currentWeek} weeks.` };
+                    }}
+                    onDevelopRight={(rightId, choice) => {
+                        const ownedRight = (studioState.ownedRights || []).find(right => right.id === rightId);
+                        if (!ownedRight) return null;
+                        const development = developOwnedRight({ ownedRight, currentWeek: player.currentWeek, choice });
+                        if (!development.changed || !development.script || !development.ownedRight) return null;
+                        handleUpdateStudioState({
+                            ownedRights: (studioState.ownedRights || []).map(right => right.id === rightId ? development.ownedRight! : right),
+                            scripts: [...studioState.scripts, development.script],
+                        });
+                        return development.script.id;
+                    }}
                     onAssign={(scriptId, writerId, cost, skill, speed) => {
                         if (studio.balance >= cost) {
                             const writer = studioState.writers.find(w => w.id === writerId);
@@ -409,8 +502,23 @@ export const DevelopmentLab: React.FC<DevelopmentLabProps> = ({ player, studio, 
                         onUpdatePlayer(updatedPlayer);
                     }}
                     onDelete={(scriptId) => {
-                        const updatedScripts = studioState.scripts.filter(s => s.id !== scriptId);
-                        handleUpdateStudioState({ scripts: updatedScripts });
+                        const result = discardUnreleasedScript(
+                            studioState.scripts,
+                            studioState.concepts || [],
+                            scriptId
+                        );
+                        if (result.discarded) {
+                            handleUpdateStudioState({
+                                scripts: result.scripts,
+                                concepts: result.concepts
+                            });
+                        }
+                    }}
+                    onRename={(scriptId, title) => {
+                        const updatedPlayer = renameScriptWorkingTitle(player, studio.id, scriptId, title);
+                        if (updatedPlayer !== player) {
+                            onUpdatePlayer(updatedPlayer);
+                        }
                     }}
                     onDeductEnergy={(amount) => {
                         onUpdatePlayer({
@@ -435,6 +543,11 @@ export const DevelopmentLab: React.FC<DevelopmentLabProps> = ({ player, studio, 
                 }} />}
                 {activeTab === 'IP_MARKET' && <IPMarket 
 	                    market={studioState.ipMarket}
+                        player={player}
+                        studio={studio}
+                        onUpdatePlayer={onUpdatePlayer}
+	                    initialRightsMarketOpportunityId={initialRightsMarketOpportunityId}
+	                    onRightsMarketTargetConsumed={onRightsMarketTargetConsumed}
 	                    playerMoney={studio.balance}
 	                    currentWeek={player.currentWeek}
 	                    marketTrends={studioState.marketTrends || createMarketTrends(player.currentWeek)}
@@ -486,16 +599,62 @@ const ScriptVault: React.FC<{
     scripts: Script[], 
     writers: Writer[],
     studioBalance: number,
+    studioId: string,
     player: Player,
+    ownedRights: OwnedRight[],
+    onOpenProject?: (projectId: string) => void,
+    onOpenFranchise: () => void,
+    onOpenUniverse: () => void,
+    onRenewRight: (rightId: string) => { changed: boolean; message: string },
+    onDevelopRight: (rightId: string, choice: OwnedRightDevelopmentChoice) => string | null,
     onAssign: (scriptId: string, writerId: string, cost: number, skill: number, speed: number) => void,
     onUpdateScript: (script: Script, costType?: 'ENERGY' | 'MONEY', costAmount?: number) => void,
     onDelete: (id: string) => void,
+    onRename: (id: string, title: string) => void,
     onDeductEnergy: (amount: number) => void,
     onDeductMoney: (amount: number) => void
-}> = ({ scripts, writers, studioBalance, player, onAssign, onUpdateScript, onDelete, onDeductEnergy, onDeductMoney }) => {
+}> = ({ scripts, writers, studioBalance, studioId, player, ownedRights, onOpenProject, onOpenFranchise, onOpenUniverse, onRenewRight, onDevelopRight, onAssign, onUpdateScript, onDelete, onRename, onDeductEnergy, onDeductMoney }) => {
     const [selectedScriptForAssignment, setSelectedScriptForAssignment] = useState<string | null>(null);
     const [assignmentMode, setAssignmentMode] = useState<'CHOICE' | 'HIRE' | 'WIZARD' | 'DOCTOR'>('CHOICE');
     const [confirmation, setConfirmation] = useState<string | null>(null);
+    const [discardScript, setDiscardScript] = useState<Script | null>(null);
+    const [renameScript, setRenameScript] = useState<Script | null>(null);
+    const [developmentRight, setDevelopmentRight] = useState<OwnedRight | null>(null);
+    const [dossierRight, setDossierRight] = useState<OwnedRight | null>(null);
+    const [vaultLane, setVaultLane] = useState<'SCRIPTS' | 'RIGHTS'>('SCRIPTS');
+    const [ipSourceFilter, setIpSourceFilter] = useState<'ALL' | 'ACQUIRED' | 'STUDIO_ORIGINAL'>('ALL');
+    const scriptStatusPriority: Record<Script['status'], number> = {
+        READY: 0,
+        CONCEPT: 1,
+        IN_DEVELOPMENT: 2,
+        PRODUCED: 3
+    };
+
+    const sortScriptsForVault = (items: Script[]) => [...items].sort((a, b) => {
+        const statusDelta = scriptStatusPriority[a.status] - scriptStatusPriority[b.status];
+        if (statusDelta !== 0) return statusDelta;
+        const aWeek = a.status === 'PRODUCED' ? (a.producedAtWeek ?? a.createdAtWeek ?? 0) : (a.createdAtWeek ?? 0);
+        const bWeek = b.status === 'PRODUCED' ? (b.producedAtWeek ?? b.createdAtWeek ?? 0) : (b.createdAtWeek ?? 0);
+        return bWeek - aWeek;
+    });
+
+    const activeScripts = sortScriptsForVault(scripts.filter(script => script.status !== 'PRODUCED'));
+    const producedScripts = sortScriptsForVault(scripts.filter(script => script.status === 'PRODUCED'));
+    const shouldCollapseProducedArchive = producedScripts.length > 5;
+    const [isProducedArchiveExpanded, setIsProducedArchiveExpanded] = useState(false);
+    const visibleProducedScripts = shouldCollapseProducedArchive && !isProducedArchiveExpanded ? [] : producedScripts;
+    const ownedIpPerformanceById = useMemo(() => new Map(ownedRights.map(right => [
+        right.id,
+        getOwnedIpPerformance({
+            ownedRight: right,
+            studioId,
+            scripts,
+            activeReleases: player.activeReleases,
+            pastProjects: player.pastProjects,
+        }),
+    ])), [ownedRights, studioId, scripts, player.activeReleases, player.pastProjects]);
+    const visibleOwnedRights = ownedRights.filter(right => ipSourceFilter === 'ALL'
+        || (right.ownershipSource || 'ACQUIRED') === ipSourceFilter);
 
     const handleAssign = (scriptId: string, writerId: string, cost: number, skill: number, speed: number) => {
         onAssign(scriptId, writerId, cost, skill, speed);
@@ -768,24 +927,12 @@ const ScriptVault: React.FC<{
         );
     }
 
-    if (scripts.length === 0) {
-        return (
-            <div className="flex flex-col items-center justify-center h-64 text-zinc-500">
-                <BookOpen size={48} className="mb-4 opacity-20" />
-                <p className="text-sm">Your vault is empty.</p>
-                <p className="text-xs mt-1">Develop a new concept or buy IP to get started.</p>
-            </div>
-        );
-    }
-
-    return (
-        <div className="space-y-3">
-            {scripts.map(script => (
-                <div key={script.id} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+    const renderScriptCard = (script: Script, variant: 'active' | 'archive' = 'active') => (
+                <div key={script.id} className={`border rounded-xl p-4 ${variant === 'archive' ? 'bg-zinc-950/70 border-zinc-800/70' : 'bg-zinc-900 border-zinc-800'}`}>
                     <div className="flex justify-between items-start mb-2">
-                        <div>
-                            <h3 className="font-bold text-lg">{script.title}</h3>
-                            <div className="flex items-center gap-2 mt-1">
+                        <div className="min-w-0 pr-3">
+                            <h3 className="min-w-0 break-words font-bold text-lg leading-tight">{script.title}</h3>
+                            <div className="flex flex-wrap items-center gap-2 mt-2">
                                 <span className={`text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider ${script.projectType === 'SERIES' ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30' : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'}`}>
                                     {script.projectType} {script.projectType === 'SERIES' && `(${script.episodes} eps)`}
                                 </span>
@@ -870,7 +1017,7 @@ const ScriptVault: React.FC<{
                                         setAssignmentMode('WIZARD'); // Go to wizard first for rewrite
                                     }}
                                     disabled={!script.isOriginal}
-                                    className={`font-bold py-2 rounded-lg text-xs uppercase tracking-wider transition-colors flex items-center justify-center gap-2 ${
+                                    className={`col-span-2 font-bold py-2 rounded-lg text-xs uppercase tracking-wider transition-colors flex items-center justify-center gap-2 ${
                                         script.isOriginal 
                                             ? 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300' 
                                             : 'bg-zinc-900 text-zinc-600 cursor-not-allowed border border-zinc-800'
@@ -880,12 +1027,6 @@ const ScriptVault: React.FC<{
                                     <PenTool size={12} />
                                     Page One Rewrite
                                 </button>
-                                <button 
-                                    onClick={() => onDelete(script.id)}
-                                    className="bg-rose-950/30 hover:bg-rose-900/40 text-rose-500 font-bold py-2 rounded-lg text-xs uppercase tracking-wider transition-colors"
-                                >
-                                    Delete
-                                </button>
                             </div>
                         </div>
                     )}
@@ -894,10 +1035,332 @@ const ScriptVault: React.FC<{
                         <div className="mt-4 flex items-center gap-2">
                             <Star size={14} className={script.quality >= 80 ? 'text-amber-400' : script.quality >= 50 ? 'text-zinc-400' : 'text-red-400'} />
                             <span className="text-sm font-bold">Quality: {script.quality}/100</span>
+                            {script.producedAtWeek !== undefined && (
+                                <span className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold ml-auto">Produced W{script.producedAtWeek}</span>
+                            )}
+                        </div>
+                    )}
+
+                    {canManageWorkingTitle(script.status) && (
+                        <div className="mt-4 flex items-center justify-between border-t border-zinc-800/80 pt-3">
+                            <p className="text-[10px] text-zinc-600">Unreleased project</p>
+                            <div className="flex items-center gap-1.5">
+                                <button
+                                    onClick={() => setRenameScript(script)}
+                                    className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[10px] font-black uppercase tracking-wider text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-white"
+                                    title="Rename working title"
+                                >
+                                    <Edit2 size={13} />
+                                    Rename
+                                </button>
+                                <button
+                                    onClick={() => setDiscardScript(script)}
+                                    className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[10px] font-black uppercase tracking-wider text-rose-400 transition-colors hover:bg-rose-500/10 hover:text-rose-300"
+                                    title="Discard unfinished project"
+                                >
+                                    <Trash2 size={13} />
+                                    Discard
+                                </button>
+                            </div>
                         </div>
                     )}
                 </div>
-            ))}
+    );
+
+    const renderScriptSection = (
+        title: string,
+        subtitle: string,
+        items: Script[],
+        variant: 'active' | 'archive' = 'active'
+    ) => {
+        if (items.length === 0) return null;
+
+        return (
+            <section className="space-y-3">
+                <div className="flex items-end justify-between gap-3 px-1">
+                    <div>
+                        <h3 className="text-xs font-black uppercase tracking-[0.24em] text-zinc-400">{title}</h3>
+                        <p className="text-[11px] text-zinc-600 mt-1">{subtitle}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-zinc-600">{items.length} {items.length === 1 ? 'script' : 'scripts'}</span>
+                    </div>
+                </div>
+                <div className="space-y-3">
+                    {items.map(script => renderScriptCard(script, variant))}
+                </div>
+            </section>
+        );
+    };
+
+    const renderProducedArchive = () => {
+        if (producedScripts.length === 0) return null;
+
+        const toggleLabel = isProducedArchiveExpanded ? 'Collapse' : 'Show archive';
+
+        return (
+            <section className="space-y-3">
+                <div className="flex items-end justify-between gap-3 px-1">
+                    <div>
+                        <h3 className="text-xs font-black uppercase tracking-[0.24em] text-zinc-400">Produced Archive</h3>
+                        <p className="text-[11px] text-zinc-600 mt-1">Completed projects stay here for reference and studio history.</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-zinc-600">
+                            {producedScripts.length} {producedScripts.length === 1 ? 'script' : 'scripts'}
+                        </span>
+                        {shouldCollapseProducedArchive && (
+                            <button
+                                onClick={() => setIsProducedArchiveExpanded(prev => !prev)}
+                                className="text-[10px] font-black uppercase tracking-wider text-zinc-300 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 rounded-full px-3 py-1 transition-colors"
+                            >
+                                {toggleLabel}
+                            </button>
+                        )}
+                    </div>
+                </div>
+
+                {shouldCollapseProducedArchive && !isProducedArchiveExpanded ? (
+                    <button
+                        onClick={() => setIsProducedArchiveExpanded(true)}
+                        className="w-full border border-zinc-800/70 bg-zinc-950/70 hover:bg-zinc-900 rounded-xl p-4 text-left transition-colors"
+                    >
+                        <div className="flex items-center justify-between gap-3">
+                            <div>
+                                <p className="text-sm font-black text-zinc-300">Archive collapsed</p>
+                                <p className="text-xs text-zinc-500 mt-1">Produced scripts are hidden so unfinished work stays easy to reach.</p>
+                            </div>
+                            <span className="text-[10px] font-black uppercase tracking-wider text-amber-400">Show</span>
+                        </div>
+                    </button>
+                ) : (
+                    <div className="space-y-3">
+                        {visibleProducedScripts.map(script => renderScriptCard(script, 'archive'))}
+                    </div>
+                )}
+            </section>
+        );
+    };
+
+    return (
+        <div className="space-y-6">
+            <div className="grid grid-cols-2 rounded-xl border border-zinc-800 bg-zinc-950 p-1">
+                {[
+                    { id: 'SCRIPTS', label: 'Scripts', icon: <BookOpen size={14} /> },
+                        { id: 'RIGHTS', label: 'IP', icon: <Archive size={14} /> },
+                ].map(lane => (
+                    <button
+                        key={lane.id}
+                        onClick={() => setVaultLane(lane.id as 'SCRIPTS' | 'RIGHTS')}
+                        className={`flex min-h-11 items-center justify-center gap-2 rounded-lg text-[10px] font-black uppercase tracking-[0.18em] transition-colors ${
+                            vaultLane === lane.id
+                                ? 'bg-zinc-800 text-white'
+                                : 'text-zinc-600 hover:text-zinc-300'
+                        }`}
+                    >
+                        {lane.icon}
+                        {lane.label}
+                    </button>
+                ))}
+            </div>
+
+            {vaultLane === 'RIGHTS' ? ownedRights.length === 0 ? (
+                <div className="flex min-h-64 flex-col items-center justify-center rounded-2xl border border-dashed border-zinc-800 bg-zinc-950/60 px-6 text-center">
+                    <Archive size={42} className="mb-4 text-amber-400/35" />
+                    <p className="text-sm font-black uppercase tracking-wider text-zinc-300">No owned IP yet</p>
+                    <p className="mt-2 max-w-sm text-xs leading-relaxed text-zinc-600">
+                        Completed IP acquisitions will appear here without mixing ownership records into your working scripts.
+                    </p>
+                </div>
+            ) : (
+                <div className="space-y-3">
+                    <div className="border-l-2 border-amber-400 pl-4">
+                        <p className="text-[9px] font-black uppercase tracking-[0.22em] text-amber-400">Owned IP</p>
+                        <h3 className="mt-1 text-xl font-black uppercase text-white">IP Library</h3>
+                        <p className="mt-2 text-xs leading-relaxed text-zinc-500">
+                            Manage acquired and studio-created IP, then expand it through the existing production systems.
+                        </p>
+                    </div>
+                    <div className="grid grid-cols-3 rounded-xl border border-white/10 bg-zinc-950 p-1">
+                        {[
+                            { id: 'ALL', label: 'All IP', count: ownedRights.length },
+                            { id: 'ACQUIRED', label: 'Acquired', count: ownedRights.filter(right => right.ownershipSource !== 'STUDIO_ORIGINAL').length },
+                            { id: 'STUDIO_ORIGINAL', label: 'Originals', count: ownedRights.filter(right => right.ownershipSource === 'STUDIO_ORIGINAL').length },
+                        ].map(filter => (
+                            <button
+                                key={filter.id}
+                                type="button"
+                                onClick={() => setIpSourceFilter(filter.id as typeof ipSourceFilter)}
+                                className={`min-h-9 rounded-lg text-[7px] font-black uppercase tracking-[0.13em] transition-colors ${ipSourceFilter === filter.id ? 'bg-zinc-800 text-white' : 'text-zinc-600 hover:text-zinc-300'}`}
+                            >
+                                {filter.label} <span className="ml-1 font-mono text-[7px] text-amber-300">{filter.count}</span>
+                            </button>
+                        ))}
+                    </div>
+                    {visibleOwnedRights.map(right => {
+                        const expired = right.expiresAtWeek !== undefined && player.currentWeek > right.expiresAtWeek;
+                        const atLimit = right.projectsAllowed !== undefined && right.projectsUsed >= right.projectsAllowed;
+                        const permanent = right.expiresAtWeek === undefined;
+                        const isStudioOriginal = right.ownershipSource === 'STUDIO_ORIGINAL';
+                        const lifetimeGross = ownedIpPerformanceById.get(right.id)?.lifetimeGross || 0;
+                        const ipType = getOwnedIpTypePresentation(right.propertyType);
+                        const IpTypeIcon = ipType.Icon;
+                        return (
+                            <article
+                                key={right.id}
+                                className="relative cursor-pointer overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-zinc-950 via-[#09090c] to-black p-4 shadow-[0_12px_32px_rgba(0,0,0,0.22)]"
+                                style={{ boxShadow: `inset 3px 0 0 ${right.accent}, 0 12px 32px rgba(0,0,0,0.22)` }}
+                            >
+                                <div className="pointer-events-none absolute right-[-26px] top-[-34px] h-32 w-32 rounded-full opacity-10 blur-3xl" style={{ backgroundColor: right.accent }} />
+                                <button
+                                    type="button"
+                                    aria-label={`Open ${right.title} IP dossier`}
+                                    onClick={() => setDossierRight(right)}
+                                    className="absolute inset-0 z-10"
+                                />
+                                <div className="pointer-events-none relative z-20 flex items-start justify-between gap-3">
+                                    <div className="min-w-0">
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <span className="border border-amber-400/25 bg-amber-400/10 px-2 py-0.5 text-[7px] font-black uppercase tracking-[0.16em] text-amber-300">
+                                                {isStudioOriginal ? 'Studio Original' : right.dealType.replace(/_/g, ' ')}
+                                            </span>
+                                            <span className="text-[7px] font-black uppercase tracking-[0.16em] text-zinc-600">{right.rarity}</span>
+                                        </div>
+                                        <h4 className="mt-2 text-xl font-black uppercase leading-none text-white">{right.title}</h4>
+                                        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                                            <span className="text-[8px] font-black uppercase tracking-[0.15em] text-zinc-600">
+                                                {right.primaryGenre.replace(/_/g, ' ')}
+                                            </span>
+                                            <span className={`inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[7px] font-black uppercase tracking-[0.12em] ${ipType.tone}`}>
+                                                <IpTypeIcon size={10} /> {ipType.label}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div className={`flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-[7px] font-black uppercase tracking-[0.13em] ${expired ? 'border-rose-500/30 bg-rose-500/10 text-rose-300' : 'border-emerald-400/30 bg-emerald-400/[0.08] text-emerald-300'}`}>
+                                        <ShieldCheck size={11} /> {expired ? 'Expired' : 'Owned'}
+                                    </div>
+                                </div>
+                                <div className="pointer-events-none relative z-20 mt-2.5 grid grid-cols-3 divide-x divide-white/10 border-y border-white/10 bg-white/[0.025] py-2.5">
+                                    <div className="min-w-0 px-2 first:pl-0">
+                                        <p className="text-[6px] font-black uppercase tracking-[0.13em] text-zinc-600">{isStudioOriginal ? 'Created' : 'Acquired'}</p>
+                                        <p className="mt-1 truncate font-mono text-[10px] font-black text-zinc-300">{isStudioOriginal ? 'In House' : formatCurrency(right.purchasePrice)}</p>
+                                    </div>
+                                    <div className="min-w-0 px-2">
+                                        <p className="text-[6px] font-black uppercase tracking-[0.13em] text-zinc-600">{isStudioOriginal ? 'Releases' : right.projectsAllowed === undefined ? 'Projects Made' : 'Projects Left'}</p>
+                                        <p className="mt-1 font-mono text-[10px] font-black text-zinc-300">
+                                            {right.projectsAllowed === undefined ? right.projectsUsed : Math.max(0, right.projectsAllowed - right.projectsUsed)}
+                                        </p>
+                                    </div>
+                                    <div className="min-w-0 px-2 pr-0">
+                                        <p className="text-[6px] font-black uppercase tracking-[0.13em] text-zinc-600">Lifetime Gross</p>
+                                        <p className={`mt-1 truncate font-mono text-[10px] font-black ${lifetimeGross > 0 ? 'text-emerald-300' : 'text-zinc-500'}`}>
+                                            {lifetimeGross > 0 ? formatCurrency(lifetimeGross) : 'Unproven'}
+                                        </p>
+                                    </div>
+                                </div>
+                                {right.creativeGuarantee && (
+                                    <div className="pointer-events-none relative z-20 mt-3 border-l-2 border-violet-400 bg-violet-400/[0.06] px-3 py-2">
+                                        <p className="text-[7px] font-black uppercase tracking-[0.15em] text-violet-300">{right.creativeGuarantee.title}</p>
+                                        <p className="mt-1 text-[10px] leading-relaxed text-zinc-400">{right.creativeGuarantee.description}</p>
+                                    </div>
+                                )}
+                                <button
+                                    onClick={() => isStudioOriginal ? setDossierRight(right) : setDevelopmentRight(right)}
+                                    disabled={!isStudioOriginal && (expired || atLimit)}
+                                    className="relative z-20 mt-3 flex min-h-10 w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-amber-400 to-yellow-300 px-4 text-[8px] font-black uppercase tracking-[0.16em] text-black shadow-[0_8px_22px_rgba(245,158,11,0.1)] transition-colors hover:from-amber-300 hover:to-yellow-200 disabled:cursor-not-allowed disabled:from-zinc-800 disabled:to-zinc-800 disabled:text-zinc-600"
+                                >
+                                    <Clapperboard size={14} />
+                                    {isStudioOriginal ? 'Manage IP' : expired ? 'Rights Expired' : atLimit ? 'Project Allowance Used' : 'Develop IP'}
+                                </button>
+                            </article>
+                        );
+                    })}
+                </div>
+            ) : scripts.length === 0 ? (
+                <div className="flex min-h-64 flex-col items-center justify-center text-zinc-500">
+                    <BookOpen size={48} className="mb-4 opacity-20" />
+                    <p className="text-sm">Your script vault is empty.</p>
+                    <p className="mt-1 text-xs">Develop a new concept or buy a market script to get started.</p>
+                </div>
+            ) : (
+                <>
+                    {renderScriptSection(
+                        'Active Scripts',
+                        'Scripts that can still be developed, polished, or prepared for greenlight.',
+                        activeScripts
+                    )}
+                    {renderProducedArchive()}
+                </>
+            )}
+            <AnimatePresence>
+                {dossierRight ? (
+                    <OwnedIpDossier
+                        ownedRight={dossierRight}
+                        player={player}
+                        studioId={studioId}
+                        scripts={scripts}
+                        currentWeek={player.currentWeek}
+                        onClose={() => setDossierRight(null)}
+                        onDevelop={() => {
+                            setDossierRight(null);
+                            setDevelopmentRight(dossierRight);
+                        }}
+                        onOpenProject={projectId => {
+                            setDossierRight(null);
+                            onOpenProject?.(projectId);
+                        }}
+                        onOpenFranchise={() => {
+                            setDossierRight(null);
+                            onOpenFranchise();
+                        }}
+                        onOpenUniverse={() => {
+                            setDossierRight(null);
+                            onOpenUniverse();
+                        }}
+                        onRenew={() => onRenewRight(dossierRight.id)}
+                    />
+                ) : null}
+                {developmentRight ? (
+                    <OwnedRightDevelopmentBrief
+                        ownedRight={developmentRight}
+                        currentWeek={player.currentWeek}
+                        onClose={() => setDevelopmentRight(null)}
+                        onAuthorize={choice => onDevelopRight(developmentRight.id, choice)}
+                        onAuthorized={(destination, createdScriptId) => {
+                            setDevelopmentRight(null);
+                            if (destination === 'RIGHTS_LIBRARY') return;
+                            setVaultLane('SCRIPTS');
+                            if (destination === 'ASSIGN_WRITER') {
+                                setAssignmentMode('CHOICE');
+                                setSelectedScriptForAssignment(createdScriptId);
+                            }
+                        }}
+                    />
+                ) : null}
+            </AnimatePresence>
+            {discardScript && (
+                <DiscardScriptDialog
+                    script={discardScript}
+                    onClose={() => setDiscardScript(null)}
+                    onConfirm={() => {
+                        onDelete(discardScript.id);
+                        setDiscardScript(null);
+                    }}
+                />
+            )}
+            {renameScript && (
+                <WorkingTitleDialog
+                    initialTitle={renameScript.title}
+                    contextLabel="Script Vault"
+                    helperText="Rename scripts while they are still unreleased. Once a project enters production, the title locks for continuity."
+                    infoText="Linked pre-production project pages update automatically, and a small industry buzz item is created."
+                    onClose={() => setRenameScript(null)}
+                    onConfirm={(title) => {
+                        onRename(renameScript.id, title);
+                        setRenameScript(null);
+                    }}
+                />
+            )}
         </div>
     );
 };
@@ -1023,6 +1486,8 @@ const ScriptWizard: React.FC<{ onComplete: (script: Script) => void, initialScri
     const [subjectName, setSubjectName] = useState(initialScript?.subjectName || '');
     const [subjectType, setSubjectType] = useState<ScriptSubjectType>(initialScript?.subjectType || 'PUBLIC_FIGURE');
     const [showStatInfo, setShowStatInfo] = useState(false);
+    const [draftPremise, setDraftPremise] = useState(initialScript?.logline || '');
+    const [premiseEdited, setPremiseEdited] = useState(Boolean(initialScript?.logline));
     
     // Initialize options from initialScript if available
     const initialOptions: Record<string, string> = {};
@@ -1048,9 +1513,11 @@ const ScriptWizard: React.FC<{ onComplete: (script: Script) => void, initialScri
     const selectedOptionLabels = questions
         .map(q => q.options.find(opt => opt.id === (options[q.id] || q.options[0].id))?.text)
         .filter(Boolean);
-    const draftLogline = needsSubject && subjectName.trim()
+    const suggestedPremise = needsSubject && subjectName.trim()
         ? `${primaryGenre === 'BIOPIC' ? 'A dramatic portrait' : 'A documentary investigation'} of ${subjectName.trim()}, built around the public story and private cost behind the headlines.`
         : seedLogline;
+    const displayedPremise = premiseEdited ? draftPremise : suggestedPremise;
+    const finalPremise = (displayedPremise.trim() || suggestedPremise).slice(0, CUSTOM_PREMISE_MAX_LENGTH);
     const builderSteps: { id: ScriptBuilderStep; label: string; short: string }[] = [
         { id: 'IDEA', label: 'Concept Basics', short: 'Basics' },
         { id: 'IDENTITY', label: 'Genre & Subject', short: 'Genre' },
@@ -1097,7 +1564,8 @@ const ScriptWizard: React.FC<{ onComplete: (script: Script) => void, initialScri
         weeksInDevelopment: 0,
         totalDevelopmentWeeks: 0,
         isOriginal: initialScript ? initialScript.isOriginal : true,
-        logline: draftLogline,
+        // Script DNA still drives gameplay calculations; this premise is player-facing flavor.
+        logline: finalPremise,
         subjectName: needsSubject ? subjectName.trim() : undefined,
         subjectType: needsSubject ? subjectType : undefined,
         sourceMaterial: needsSubject ? 'ADAPTATION' : initialScript?.sourceMaterial,
@@ -1470,7 +1938,43 @@ const ScriptWizard: React.FC<{ onComplete: (script: Script) => void, initialScri
                             </div>
                         </div>
                         <div className="p-5 sm:p-6 space-y-5">
-                            <p className="text-sm text-zinc-300 italic leading-relaxed">"{draftLogline}"</p>
+                            <div className="rounded-[1.4rem] border border-zinc-800 bg-black/55 p-4">
+                                <div className="mb-3 flex items-center justify-between gap-3">
+                                    <div>
+                                        <div className="text-[10px] font-black uppercase tracking-widest text-amber-300">Player Premise</div>
+                                        <div className="mt-1 text-[11px] font-bold text-zinc-500">The one-line pitch the town repeats.</div>
+                                    </div>
+                                    <div className={`shrink-0 rounded-full border px-3 py-1 text-[10px] font-black ${
+                                        finalPremise.length >= CUSTOM_PREMISE_MAX_LENGTH
+                                            ? 'border-amber-400/40 bg-amber-400/10 text-amber-300'
+                                            : 'border-zinc-800 bg-zinc-950 text-zinc-500'
+                                    }`}>
+                                        {finalPremise.length}/{CUSTOM_PREMISE_MAX_LENGTH}
+                                    </div>
+                                </div>
+                                <textarea
+                                    value={displayedPremise}
+                                    onChange={e => {
+                                        setPremiseEdited(true);
+                                        setDraftPremise(sanitizeCustomPremise(e.target.value));
+                                    }}
+                                    rows={3}
+                                    placeholder="A sharp one-line pitch for this project..."
+                                    className="w-full resize-none rounded-2xl border border-zinc-800 bg-zinc-950/80 px-4 py-3 text-sm font-semibold leading-relaxed text-zinc-100 placeholder:text-zinc-700 focus:border-amber-300 focus:outline-none"
+                                />
+                                {premiseEdited && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setPremiseEdited(false);
+                                            setDraftPremise('');
+                                        }}
+                                        className="mt-3 text-[10px] font-black uppercase tracking-widest text-zinc-500 transition-colors hover:text-amber-300"
+                                    >
+                                        Use DNA Suggestion
+                                    </button>
+                                )}
+                            </div>
                             {needsSubject && subjectName && (
                                 <div className="rounded-[1.4rem] border border-amber-500/20 bg-amber-500/5 p-4">
                                     <div className="text-[10px] font-black uppercase text-amber-300 mb-1">Subject</div>
@@ -1548,9 +2052,82 @@ const ScriptWizard: React.FC<{ onComplete: (script: Script) => void, initialScri
     );
 };
 
-const IPMarket: React.FC<{ 
-    market: Script[], 
-    playerMoney: number, 
+const IPMarket: React.FC<{
+    market: Script[],
+    player: Player,
+    studio: Business,
+    onUpdatePlayer: (player: Player) => void,
+    playerMoney: number,
+    onBuy: (s: Script, cost: number) => void,
+    onRefresh: () => void,
+    weeksUntilRefresh: number,
+    currentWeek: number,
+    marketTrends: ReturnType<typeof createMarketTrends>,
+    initialRightsMarketOpportunityId?: string,
+    onRightsMarketTargetConsumed?: () => void,
+}> = ({ market, player, studio, onUpdatePlayer, playerMoney, onBuy, onRefresh, weeksUntilRefresh, currentWeek, marketTrends, initialRightsMarketOpportunityId, onRightsMarketTargetConsumed }) => {
+    const [marketLane, setMarketLane] = useState<StudioMarketLane>('SCRIPTS');
+
+    useEffect(() => {
+        if (initialRightsMarketOpportunityId) setMarketLane('PROPERTIES');
+    }, [initialRightsMarketOpportunityId]);
+
+    return (
+        <div className="space-y-5 pb-20">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                    <div className="text-[10px] font-black uppercase tracking-[0.26em] text-amber-400">Studio Exchange</div>
+                    <h2 className="mt-2 text-3xl font-black uppercase tracking-tight">Market</h2>
+                    <p className="mt-2 max-w-xl text-xs leading-relaxed text-zinc-500">
+                        Acquire scripts and adaptable source material, or track valuable entertainment IP.
+                    </p>
+                </div>
+                <div className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-left sm:w-auto sm:shrink-0 sm:text-right">
+                    <span className="block text-[8px] font-black uppercase tracking-widest text-zinc-600">Funds</span>
+                    <span className="font-mono text-sm font-black text-emerald-300">{formatCurrency(playerMoney)}</span>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-2 rounded-xl border border-zinc-800 bg-zinc-950 p-1">
+                {[
+                    { id: 'SCRIPTS', label: 'Scripts', icon: <PenTool size={13} /> },
+                    { id: 'PROPERTIES', label: 'IP Rights', icon: <Globe size={13} /> },
+                ].map(lane => (
+                    <button
+                        key={lane.id}
+                        onClick={() => setMarketLane(lane.id as StudioMarketLane)}
+                        className={`flex min-h-12 flex-col items-center justify-center gap-1 rounded-lg text-[9px] font-black uppercase tracking-[0.12em] transition-all ${
+                            marketLane === lane.id
+                                ? 'bg-amber-500 text-black shadow-[0_0_18px_rgba(245,158,11,0.18)]'
+                                : 'text-zinc-600 hover:bg-zinc-900 hover:text-zinc-300'
+                        }`}
+                    >
+                        {lane.icon}
+                        {lane.label}
+                    </button>
+                ))}
+            </div>
+
+            {marketLane === 'PROPERTIES' ? (
+                <RightsMarket player={player} studio={studio} onUpdatePlayer={onUpdatePlayer} embedded initialOpportunityId={initialRightsMarketOpportunityId} onInitialOpportunityConsumed={onRightsMarketTargetConsumed} />
+            ) : (
+                <SourceMaterialMarket
+                    market={getStudioMarketScripts(market || [])}
+                    playerMoney={playerMoney}
+                    onBuy={onBuy}
+                    onRefresh={onRefresh}
+                    weeksUntilRefresh={weeksUntilRefresh}
+                    currentWeek={currentWeek}
+                    marketTrends={marketTrends}
+                />
+            )}
+        </div>
+    );
+};
+
+const SourceMaterialMarket: React.FC<{
+    market: Script[],
+    playerMoney: number,
     onBuy: (s: Script, cost: number) => void,
     onRefresh: () => void,
     weeksUntilRefresh: number,
@@ -1566,13 +2143,15 @@ const IPMarket: React.FC<{
     });
 
     return (
-        <div className="space-y-6 pb-20">
+        <div className="space-y-6">
             <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-8">
                 <div className="flex-1">
-                    <h2 className="text-4xl font-black tracking-tighter uppercase leading-none">IP Marketplace</h2>
+                    <h3 className="text-xl font-black tracking-tight uppercase leading-none">
+                        Scripts & Story Rights
+                    </h3>
                     <div className="mt-4 space-y-2 max-w-2xl">
 	                        <p className="text-sm text-zinc-400 leading-relaxed">
-	                            Buy ready-made scripts and rights packages for your next movie or series. The market refreshes with new genres, subjects, and demand swings.
+                                Buy finished screenplays or secure books, true stories, documentary subjects, and other source material for adaptation.
 	                        </p>
                         <div className="flex items-center gap-4">
                             <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-amber-500/80 bg-amber-500/5 px-3 py-1.5 rounded-lg border border-amber-500/10 w-fit">
@@ -1592,12 +2171,6 @@ const IPMarket: React.FC<{
                                 Refresh Now ($250,000)
                             </button>
                         </div>
-                    </div>
-                </div>
-                <div className="flex items-center gap-3 shrink-0">
-                    <div className="bg-zinc-900 border border-zinc-800 px-5 py-3 rounded-2xl flex flex-col gap-1 min-w-[120px]">
-                        <span className="text-[8px] font-black text-zinc-500 uppercase tracking-[0.2em]">Available Funds</span>
-                        <span className="text-xl text-emerald-400 font-mono font-black leading-none">{formatCurrency(playerMoney)}</span>
                     </div>
                 </div>
             </div>
@@ -1780,6 +2353,10 @@ const FranchiseManager: React.FC<{
     onCommission: (script: Script) => void;
 }> = ({ player, studio, onCommission }) => {
     const [selectedFranchiseId, setSelectedFranchiseId] = useState<string | null>(null);
+    const [franchiseCommissionDraft, setFranchiseCommissionDraft] = useState<{
+        mode: FranchiseCommissionMode;
+        suggestedTitle: string;
+    } | null>(null);
 
     const getFranchiseLifecycle = (franchiseId: string, projects: any[]) => {
         const pendingScripts = (studio.studioState?.scripts || []).filter(script => script.franchiseId === franchiseId && script.status !== 'PRODUCED');
@@ -1997,21 +2574,30 @@ const FranchiseManager: React.FC<{
             subtype: p.subtype,
             genre: p.genre,
             installmentNumber: p.installmentNumber || 1,
-            castList: p.castList || []
+            castList: p.castList || [],
+            releaseWeek: p.releaseWeek,
+            releaseYear: p.releaseYear,
+            releasedAtAbsoluteWeek: p.releasedAtAbsoluteWeek,
+            phase: 'RELEASED'
         })),
         ...player.activeReleases.filter(r => r.projectDetails.studioId === studio.id).map(r => ({ 
             id: r.id, 
             name: r.name, 
             franchiseId: r.projectDetails.franchiseId, 
             universeId: r.projectDetails.universeId, 
-            year: player.age, 
+            year: r.releaseYear || player.age,
             gross: r.totalGross || 0, 
             rating: r.imdbRating || 0,
             type: r.type,
             subtype: r.projectDetails.subtype,
             genre: r.projectDetails.genre,
             installmentNumber: r.projectDetails.installmentNumber || 1,
-            castList: r.projectDetails.castList || []
+            castList: r.projectDetails.castList || [],
+            releaseWeek: r.releaseWeek,
+            releaseYear: r.releaseYear,
+            releasedAtAbsoluteWeek: r.releasedAtAbsoluteWeek,
+            weekNum: r.weekNum,
+            phase: r.distributionPhase === 'STREAMING' ? 'STREAMING' : 'IN THEATERS'
         }))
     ];
 
@@ -2087,50 +2673,62 @@ const FranchiseManager: React.FC<{
         const pulse = displayFranchise.pulse || getFranchisePulse(displayFranchise.projects, displayFranchise.totalGross, displayFranchise.avgRating, displayFranchise.id);
         const characterFocus = getFranchiseCharacters(displayFranchise.projects);
         const characters = characterFocus.featured;
+        const continuationProject = displayFranchise.projects[displayFranchise.projects.length - 1];
+        const studioScripts = studio.studioState?.scripts || [];
+        const continuationEligibility = {
+            SEQUEL: getContinuationEligibility({ player, studioScripts, project: continuationProject, mode: 'SEQUEL' }),
+            SPINOFF: getContinuationEligibility({ player, studioScripts, project: continuationProject, mode: 'SPINOFF' }),
+            FINALE: getContinuationEligibility({ player, studioScripts, project: continuationProject, mode: 'FINALE' }),
+            REBOOT: getContinuationEligibility({ player, studioScripts, project: continuationProject, mode: 'REBOOT' })
+        };
 
-        const commissionScript = (mode: 'SEQUEL' | 'SPINOFF' | 'FINALE' | 'REBOOT') => {
+        const getSuggestedFranchiseTitle = (mode: FranchiseCommissionMode) => {
+            const last = displayFranchise.projects[displayFranchise.projects.length - 1];
+            const nextNum = (last.installmentNumber || displayFranchise.lastInstallment || 1) + 1;
+            return {
+                SEQUEL: `${displayFranchise.name} ${nextNum}`,
+                SPINOFF: `${displayFranchise.name}: A New Story`,
+                FINALE: `${displayFranchise.name}: Final Chapter`,
+                REBOOT: `${displayFranchise.name}: New Blood`
+            }[mode];
+        };
+
+        const requestFranchiseCommission = (mode: FranchiseCommissionMode) => {
             if ((mode === 'SEQUEL' && lifecycle.lockMainline) || (mode === 'FINALE' && lifecycle.lockFinale) || (mode === 'SPINOFF' && lifecycle.lockSpinoff)) {
                 return;
             }
-            const last = displayFranchise.projects[displayFranchise.projects.length - 1];
-            const nextNum = (last.installmentNumber || displayFranchise.lastInstallment || 1) + 1;
-            const titleByMode = {
-                SEQUEL: `${displayFranchise.name} ${nextNum}`,
-                SPINOFF: `Untitled ${displayFranchise.name} Spinoff`,
-                FINALE: `${displayFranchise.name}: Final Chapter`,
-                REBOOT: `${displayFranchise.name}: New Blood`
-            };
-            const newScript: Script = {
-                id: `script_${mode.toLowerCase()}_${Date.now()}`,
-                title: titleByMode[mode],
-                genres: [displayFranchise.genre],
-                status: 'CONCEPT',
-                quality: 0,
-                options: [],
-                writerId: null,
-                weeksInDevelopment: 0,
-                totalDevelopmentWeeks: 0,
-                isOriginal: false,
-                projectType: mode === 'SPINOFF' ? (displayFranchise.type === 'MOVIE' ? 'SERIES' : 'MOVIE') : displayFranchise.type,
-                sourceMaterial: mode === 'SPINOFF' ? 'SPINOFF' : 'SEQUEL',
-                franchiseId: displayFranchise.id,
-                installmentNumber: mode === 'SPINOFF' ? 1 : nextNum,
-                connectedProjectIntent: mode === 'REBOOT' ? 'REBOOT' : mode === 'FINALE' ? 'EVENT' : mode === 'SPINOFF' ? 'CROSSOVER' : 'SOLO',
-                tags: [mode, 'FRANCHISE'],
-                logline: mode === 'FINALE'
+            if (!continuationEligibility[mode].eligible) return;
+            setFranchiseCommissionDraft({ mode, suggestedTitle: getSuggestedFranchiseTitle(mode) });
+        };
+
+        const commissionScript = (mode: FranchiseCommissionMode, title: string) => {
+            const result = createContinuationScript({
+                player,
+                studioScripts,
+                project: continuationProject,
+                mode,
+                title,
+                overrides: {
+                    genres: [displayFranchise.genre],
+                    projectType: mode === 'SPINOFF' ? (displayFranchise.type === 'MOVIE' ? 'SERIES' : 'MOVIE') : displayFranchise.type,
+                    franchiseId: displayFranchise.id,
+                    logline: mode === 'FINALE'
                     ? `The closing chapter of the ${displayFranchise.name} saga.`
                     : mode === 'REBOOT'
                         ? `A fresh entry designed to revive ${displayFranchise.name} for a new audience.`
                         : mode === 'SPINOFF'
                             ? `A new story set in the world of ${displayFranchise.name}.`
                             : `The next chapter in the ${displayFranchise.name} saga.`
-            };
-            onCommission(newScript);
+                }
+            });
+            if (!result.ok || !result.script) return;
+            onCommission(result.script);
         };
 
-        const sequelLocked = lifecycle.lockMainline;
-        const finaleLocked = lifecycle.lockFinale;
-        const spinoffLocked = lifecycle.lockSpinoff;
+        const sequelLocked = lifecycle.lockMainline || !continuationEligibility.SEQUEL.eligible;
+        const finaleLocked = lifecycle.lockFinale || !continuationEligibility.FINALE.eligible;
+        const spinoffLocked = lifecycle.lockSpinoff || !continuationEligibility.SPINOFF.eligible;
+        const rebootLocked = !continuationEligibility.REBOOT.eligible;
         const lockedButtonClass = 'opacity-45 cursor-not-allowed grayscale hover:bg-zinc-900 active:scale-100';
 
         return (
@@ -2294,7 +2892,7 @@ const FranchiseManager: React.FC<{
                     <h3 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest px-1">Next Move</h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <button
-                            onClick={() => commissionScript('SEQUEL')}
+                            onClick={() => requestFranchiseCommission('SEQUEL')}
                             disabled={sequelLocked}
                             className={`bg-amber-500 hover:bg-amber-400 text-black p-4 rounded-2xl flex items-center justify-between transition-all active:scale-[0.98] shadow-[0_0_24px_rgba(245,158,11,0.18)] ${sequelLocked ? lockedButtonClass : ''}`}
                         >
@@ -2302,14 +2900,14 @@ const FranchiseManager: React.FC<{
                                 <Plus size={20} />
                                 <div className="text-left">
                                     <p className="font-black uppercase tracking-tight text-sm">{isCandidate ? 'Start Franchise (Sequel)' : sequelLocked ? 'Mainline Locked' : 'Commission Sequel'}</p>
-                                    <p className="text-[10px] opacity-70 font-bold">{sequelLocked ? lifecycle.label : `Develop ${displayFranchise.name} ${displayFranchise.lastInstallment + 1}`}</p>
+                                    <p className="text-[10px] opacity-70 font-bold">{sequelLocked ? (lifecycle.lockMainline ? lifecycle.label : continuationEligibility.SEQUEL.message) : `Develop ${displayFranchise.name} ${displayFranchise.lastInstallment + 1}`}</p>
                                 </div>
                             </div>
                             <ChevronRight size={20} />
                         </button>
 
                         <button
-                            onClick={() => commissionScript('SPINOFF')}
+                            onClick={() => requestFranchiseCommission('SPINOFF')}
                             disabled={spinoffLocked}
                             className={`bg-zinc-900 hover:bg-zinc-800 text-white p-4 rounded-2xl flex items-center justify-between transition-all border border-zinc-700 active:scale-[0.98] ${spinoffLocked ? lockedButtonClass : ''}`}
                         >
@@ -2317,13 +2915,13 @@ const FranchiseManager: React.FC<{
                                 <Sparkles size={20} className="text-amber-500" />
                                 <div className="text-left">
                                     <p className="font-black uppercase tracking-tight text-sm">Develop Spinoff</p>
-                                    <p className="text-[10px] text-zinc-400 font-bold">Expand the universe with a new perspective</p>
+                                    <p className="text-[10px] text-zinc-400 font-bold">{spinoffLocked ? (lifecycle.lockSpinoff ? lifecycle.label : continuationEligibility.SPINOFF.message) : 'Expand the universe with a new perspective'}</p>
                                 </div>
                             </div>
                             <ChevronRight size={20} />
                         </button>
                         <button
-                            onClick={() => commissionScript('FINALE')}
+                            onClick={() => requestFranchiseCommission('FINALE')}
                             disabled={finaleLocked}
                             className={`bg-zinc-900 hover:bg-zinc-800 text-white p-4 rounded-2xl flex items-center justify-between transition-all border border-blue-500/20 active:scale-[0.98] ${finaleLocked ? lockedButtonClass : ''}`}
                         >
@@ -2331,26 +2929,45 @@ const FranchiseManager: React.FC<{
                                 <Trophy size={20} className="text-blue-400" />
                                 <div className="text-left">
                                     <p className="font-black uppercase tracking-tight text-sm">{finaleLocked ? 'Finale Locked' : 'Event Finale'}</p>
-                                    <p className="text-[10px] text-zinc-400 font-bold">{finaleLocked ? lifecycle.label : 'Cash in legacy with a closer'}</p>
+                                    <p className="text-[10px] text-zinc-400 font-bold">{finaleLocked ? (lifecycle.lockFinale ? lifecycle.label : continuationEligibility.FINALE.message) : 'Cash in legacy with a closer'}</p>
                                 </div>
                             </div>
                             <ChevronRight size={20} />
                         </button>
                         <button
-                            onClick={() => commissionScript('REBOOT')}
-                            className="bg-zinc-900 hover:bg-zinc-800 text-white p-4 rounded-2xl flex items-center justify-between transition-all border border-rose-500/20 active:scale-[0.98]"
+                            onClick={() => requestFranchiseCommission('REBOOT')}
+                            disabled={rebootLocked}
+                            className={`bg-zinc-900 hover:bg-zinc-800 text-white p-4 rounded-2xl flex items-center justify-between transition-all border border-rose-500/20 active:scale-[0.98] ${rebootLocked ? lockedButtonClass : ''}`}
                         >
                             <div className="flex items-center gap-3">
                                 <RotateCcw size={20} className="text-rose-400" />
                                 <div className="text-left">
                                     <p className="font-black uppercase tracking-tight text-sm">Soft Reboot</p>
-                                    <p className="text-[10px] text-zinc-400 font-bold">Refresh cast and tone</p>
+                                    <p className="text-[10px] text-zinc-400 font-bold">{rebootLocked ? continuationEligibility.REBOOT.message : 'Refresh cast and tone'}</p>
                                 </div>
                             </div>
                             <ChevronRight size={20} />
                         </button>
                     </div>
                 </div>
+                {franchiseCommissionDraft && (
+                    <WorkingTitleDialog
+                        mode="COMMISSION"
+                        title={`Commission ${
+                            franchiseCommissionDraft.mode === 'SPINOFF' ? 'Spinoff' :
+                            franchiseCommissionDraft.mode === 'FINALE' ? 'Event Finale' :
+                            franchiseCommissionDraft.mode === 'REBOOT' ? 'Soft Reboot' :
+                            'Sequel'
+                        }`}
+                        description={`Choose the working title for the next ${displayFranchise.name} project.`}
+                        initialTitle={franchiseCommissionDraft.suggestedTitle}
+                        onClose={() => setFranchiseCommissionDraft(null)}
+                        onConfirm={(title) => {
+                            commissionScript(franchiseCommissionDraft.mode, title);
+                            setFranchiseCommissionDraft(null);
+                        }}
+                    />
+                )}
             </div>
         );
     }
@@ -2359,7 +2976,7 @@ const FranchiseManager: React.FC<{
         <div className="space-y-6 pb-20">
             <div className="bg-zinc-900/50 border border-zinc-800 p-6 rounded-2xl">
                 <h2 className="text-2xl font-black uppercase tracking-tight text-white mb-1">Studio Franchises</h2>
-                <p className="text-xs text-zinc-400">Track and expand your most successful properties.</p>
+                <p className="text-xs text-zinc-400">Track and expand your most successful IP.</p>
             </div>
 
             {franchises.length > 0 && (
@@ -2468,17 +3085,22 @@ const UniverseMerchView: React.FC<{
 }> = ({ universe, player, studio, onUpdatePlayer }) => {
     const activeProducts = (universe.products || []).filter(product => product.active !== false);
     const releaseActivity = getUniverseReleaseActivity(player, universe, player.activeReleases || []);
-    const activityNote = releaseActivity.weeksSinceLatestRelease === null
-        ? 'Release a canon project to activate licensing.'
-        : releaseActivity.multiplier <= 0
-            ? 'No recent canon release. Passive licensing is paused until this universe returns.'
-            : `${Math.max(0, Math.floor(releaseActivity.weeksSinceLatestRelease / 52))} years since the latest canon release.`;
+    const lifecycleRevenueMultiplier = getUniverseLifecycleRevenueMultiplier(universe);
+    const effectivePayoutRate = releaseActivity.multiplier * lifecycleRevenueMultiplier;
+    const activityNote = isUniverseRetired(universe)
+        ? 'Legacy archive demand remains at 35% of normal catalog potential until a reboot relaunches the universe.'
+        : releaseActivity.weeksSinceLatestRelease === null
+            ? 'Release a canon project to activate licensing.'
+            : releaseActivity.multiplier <= 0
+                ? 'No recent canon release. Passive licensing is paused until this universe returns.'
+                : `${Math.max(0, Math.floor(releaseActivity.weeksSinceLatestRelease / 52))} years since the latest canon release.`;
     const projectedWeeklyRevenue = activeProducts.reduce(
-        (sum, product) => sum + Math.floor(calculateUniverseProductWeeklyRevenue(universe, product) * releaseActivity.multiplier),
+        (sum, product) => sum + Math.floor(calculateUniverseProductWeeklyRevenue(universe, product) * effectivePayoutRate),
         0
     );
 
     const handleLaunchProduct = (blueprint: typeof UNIVERSE_PRODUCT_BLUEPRINTS[0]) => {
+        if (isUniverseRetired(universe)) return;
         if (studio.balance < blueprint.cost) return;
 
         const newProduct = {
@@ -2541,7 +3163,7 @@ const UniverseMerchView: React.FC<{
                 </p>
             </div>
 
-            <div className={`border rounded-2xl p-4 ${releaseActivity.multiplier > 0 ? 'bg-amber-500/10 border-amber-500/20' : 'bg-rose-500/10 border-rose-500/20'}`}>
+            <div className={`border rounded-2xl p-4 ${effectivePayoutRate > 0 ? 'bg-amber-500/10 border-amber-500/20' : 'bg-rose-500/10 border-rose-500/20'}`}>
                 <div className="flex items-center justify-between gap-3">
                     <div>
                         <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-1">Catalog Heat</p>
@@ -2549,7 +3171,7 @@ const UniverseMerchView: React.FC<{
                     </div>
                     <div className="text-right">
                         <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-1">Payout Rate</p>
-                        <p className={`text-xl font-black ${releaseActivity.multiplier > 0 ? 'text-amber-300' : 'text-rose-300'}`}>{Math.round(releaseActivity.multiplier * 100)}%</p>
+                        <p className={`text-xl font-black ${effectivePayoutRate > 0 ? 'text-amber-300' : 'text-rose-300'}`}>{Math.round(effectivePayoutRate * 100)}%</p>
                     </div>
                 </div>
                 <p className="text-xs text-zinc-400 mt-2">{activityNote}</p>
@@ -2583,7 +3205,7 @@ const UniverseMerchView: React.FC<{
                 ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         {universe.products.map((prod, idx) => {
-                            const projectedRevenue = Math.floor(calculateUniverseProductWeeklyRevenue(universe, prod) * releaseActivity.multiplier);
+                            const projectedRevenue = Math.floor(calculateUniverseProductWeeklyRevenue(universe, prod) * effectivePayoutRate);
                             return (
                             <div key={idx} className="bg-zinc-900 border border-zinc-800 p-4 rounded-2xl flex justify-between items-center">
                                 <div className="flex items-center gap-3">
@@ -2613,9 +3235,10 @@ const UniverseMerchView: React.FC<{
                     {UNIVERSE_PRODUCT_BLUEPRINTS.map(bp => {
                         const isOwned = (universe.products || []).some(p => p.catalogId === bp.id);
                         const canAfford = studio.balance >= bp.cost;
+                        const archiveLocked = isUniverseRetired(universe);
                         
                         return (
-                            <div key={bp.id} className={`bg-zinc-900 border border-zinc-800 p-4 rounded-2xl space-y-3 flex flex-col ${isOwned ? 'opacity-50' : ''}`}>
+                            <div key={bp.id} className={`bg-zinc-900 border border-zinc-800 p-4 rounded-2xl space-y-3 flex flex-col ${isOwned || archiveLocked ? 'opacity-50' : ''}`}>
                                 <div className="flex justify-between items-start">
                                     <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center text-zinc-400">
                                         {bp.type === 'PARK' ? <Palmtree size={20} /> : <ShoppingBag size={20} />}
@@ -2630,11 +3253,11 @@ const UniverseMerchView: React.FC<{
                                     <p className="text-[10px] text-zinc-500 leading-relaxed mt-1">{bp.description}</p>
                                 </div>
                                 <button 
-                                    disabled={isOwned || !canAfford}
+                                    disabled={archiveLocked || isOwned || !canAfford}
                                     onClick={() => handleLaunchProduct(bp)}
-                                    className={`w-full py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${isOwned ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed' : canAfford ? 'bg-amber-500 text-black hover:scale-[1.02]' : 'bg-zinc-800 text-zinc-500 cursor-not-allowed'}`}
+                                    className={`w-full py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${archiveLocked || isOwned ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed' : canAfford ? 'bg-amber-500 text-black hover:scale-[1.02]' : 'bg-zinc-800 text-zinc-500 cursor-not-allowed'}`}
                                 >
-                                    {isOwned ? 'Already Launched' : canAfford ? 'Launch Venture' : 'Insufficient Funds'}
+                                    {archiveLocked ? 'Archive Locked' : isOwned ? 'Already Launched' : canAfford ? 'Launch Venture' : 'Insufficient Funds'}
                                 </button>
                             </div>
                         );
@@ -2658,20 +3281,50 @@ const UniverseDashboard: React.FC<{
     const [editingPhase, setEditingPhase] = useState(false);
     const [sagaName, setSagaName] = useState(universe.currentSagaName || `Saga ${universe.saga}`);
     const [phaseName, setPhaseName] = useState(universe.currentPhaseName || `Phase ${universe.currentPhase}`);
+    const [eventFilmTitle, setEventFilmTitle] = useState<string | null>(null);
+    const [showRetirementDialog, setShowRetirementDialog] = useState(false);
+    const [rebootTitle, setRebootTitle] = useState<string | null>(null);
+    const retired = isUniverseRetired(universe);
 
-    const updateUniverse = (updates: Partial<Universe>) => {
-        const updatedUniverse = normalizeUniverseForSave({ ...universe, ...updates }, universe.id);
-        const updatedPlayer = {
+    const syncStudioUniverse = (updatedUniverse: Universe, extraStudioState: Record<string, any> = {}) => {
+        const existingUniverses = studio.studioState?.universes || [];
+        const hasUniverse = existingUniverses.some(u => u.id === updatedUniverse.id);
+        return {
+            ...studio,
+            studioState: {
+                ...studio.studioState,
+                ...extraStudioState,
+                universes: hasUniverse
+                    ? existingUniverses.map(u => u.id === updatedUniverse.id ? updatedUniverse : u)
+                    : [...existingUniverses, updatedUniverse]
+            }
+        };
+    };
+
+    const buildPlayerWithUniverse = (
+        updatedUniverse: Universe,
+        extraPlayerUpdates: Partial<Player> = {},
+        extraStudioState: Record<string, any> = {}
+    ) => {
+        const normalizedUniverse = normalizeUniverseForSave(updatedUniverse, updatedUniverse.id);
+        const updatedStudio = syncStudioUniverse(normalizedUniverse, extraStudioState);
+        return {
             ...player,
+            ...extraPlayerUpdates,
             world: {
                 ...player.world,
                 universes: {
                     ...normalizeUniverseMap(player.world?.universes || {}),
-                    [universe.id]: updatedUniverse
+                    [normalizedUniverse.id]: normalizedUniverse
                 }
-            }
+            },
+            businesses: player.businesses.map(b => b.id === studio.id ? updatedStudio : b)
         };
-        onUpdatePlayer(updatedPlayer);
+    };
+
+    const updateUniverse = (updates: Partial<Universe>) => {
+        const updatedUniverse = normalizeUniverseForSave({ ...universe, ...updates }, universe.id);
+        onUpdatePlayer(buildPlayerWithUniverse(updatedUniverse));
     };
 
     const handleSaveSaga = () => {
@@ -2685,6 +3338,7 @@ const UniverseDashboard: React.FC<{
     };
 
     const handleConcludePhase = () => {
+        if (retired) return;
         const currentPhaseNum = typeof universe.currentPhase === 'number' ? universe.currentPhase : parseInt(String(universe.currentPhase).replace(/\D/g, '')) || 1;
         const nextPhaseNum = currentPhaseNum + 1;
         
@@ -2734,6 +3388,7 @@ const UniverseDashboard: React.FC<{
     };
 
     const handleConcludeSaga = () => {
+        if (retired) return;
         const currentSagaNum = typeof universe.saga === 'number' ? universe.saga : parseInt(String(universe.saga).replace(/\D/g, '')) || 1;
         const nextSagaNum = currentSagaNum + 1;
         
@@ -2791,13 +3446,28 @@ const UniverseDashboard: React.FC<{
     const normalizedRoster = buildUniverseRoster(universe, universeProjects, player.name);
     const releasedProjects = universeProjects.filter(project => !project.isActive);
     const upcomingProjects = universeProjects.filter(project => project.isActive);
+    const linkedUnfinishedScripts = (studio.studioState?.scripts || []).filter(script => script.universeId === universe.id && script.status !== 'PRODUCED');
+    const linkedConcepts = (studio.studioState?.concepts || []).filter(concept => (concept as any).universeId === universe.id);
+    const linkedCommitments = (player.commitments || []).filter(commitment => {
+        const details = commitment.projectDetails as any;
+        return details?.universeId === universe.id || (commitment as any).universeId === universe.id;
+    });
+    const retirementBlockers = [
+        releasedProjects.length === 0 ? 'Release at least one canon project first.' : '',
+        upcomingProjects.length > 0 ? `${upcomingProjects.length} active canon project${upcomingProjects.length === 1 ? '' : 's'} still in flight.` : '',
+        linkedUnfinishedScripts.length > 0 ? `${linkedUnfinishedScripts.length} attached script${linkedUnfinishedScripts.length === 1 ? '' : 's'} still unfinished.` : '',
+        linkedConcepts.length > 0 ? `${linkedConcepts.length} attached concept${linkedConcepts.length === 1 ? '' : 's'} still in development.` : '',
+        linkedCommitments.length > 0 ? `${linkedCommitments.length} attached production commitment${linkedCommitments.length === 1 ? '' : 's'} still active.` : ''
+    ].filter(Boolean);
+    const canRetireUniverse = !retired && retirementBlockers.length === 0;
+    const lastReleasedGenre = (releasedProjects[0]?.genre || releasedProjects[releasedProjects.length - 1]?.genre || 'ACTION') as Genre;
     const averageRating = releasedProjects.length > 0
         ? releasedProjects.reduce((sum, project) => sum + (project.rating || 0), 0) / releasedProjects.length
         : 0;
     const totalGross = releasedProjects.reduce((sum, project) => sum + (project.gross || 0), 0);
     const activeProducts = (universe.products || []).filter(product => product.active !== false);
     const releaseActivity = getUniverseReleaseActivity(player, universe, player.activeReleases || []);
-    const projectedLicensing = activeProducts.reduce((sum, product) => sum + Math.floor(calculateUniverseProductWeeklyRevenue(universe, product) * releaseActivity.multiplier), 0);
+    const projectedLicensing = activeProducts.reduce((sum, product) => sum + Math.floor(calculateUniverseProductWeeklyRevenue(universe, product) * releaseActivity.multiplier * getUniverseLifecycleRevenueMultiplier(universe)), 0);
     const recastCount = normalizedRoster.filter(character => character.status === 'RECAST').length;
     const recurringCount = normalizedRoster.filter(character => (character.appearances || 0) >= 2).length;
     const continuityScore = clamp(
@@ -2831,21 +3501,30 @@ const UniverseDashboard: React.FC<{
     );
     const continuityRiskLabel = continuityRisk >= 70 ? 'High Risk' : continuityRisk >= 38 ? 'Watch Closely' : 'Stable';
     const continuityRiskTone = continuityRisk >= 70 ? 'text-rose-300 bg-rose-500/10 border-rose-500/20' : continuityRisk >= 38 ? 'text-amber-300 bg-amber-500/10 border-amber-500/20' : 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20';
-    const healthLabel = fatigue >= 75
+    const healthLabel = retired
+        ? 'Legacy Archive'
+        : fatigue >= 75
         ? 'Overheated'
         : eventReadiness >= 75
             ? 'Event Ready'
             : fanTrust >= 70
                 ? 'Stable Canon'
                 : 'Needs Build-Up';
-    const audiencePulse = eventReadiness >= 70
+    const audiencePulse = retired
+        ? `${universe.name} is archived as legacy IP. Canon history stays visible, passive licensing continues at reduced catalog demand, and a reboot can relaunch the same universe when the studio is ready.`
+        : eventReadiness >= 70
         ? `${universe.name} is primed for a major crossover. An event film has strong upside if the core roster stays intact.`
         : fatigue >= 70
             ? `${universe.name} is running hot. Let the audience miss the world before another giant swing.`
             : `${universe.name} needs stronger character attachment before the next mega-event. Build trust with solos, cameos, or a focused crossover.`;
 
-    const createUniverseEventScript = () => {
+    const getUniverseEventTitle = () => {
         const eventNumber = universeProjects.filter(project => project.subtype === 'UNIVERSE_EVENT' || /event|crossover|finale|war|crisis/i.test(project.title)).length + 1;
+        return `${universe.name}: Event ${eventNumber}`;
+    };
+
+    const createUniverseEventScript = (title: string) => {
+        if (retired) return;
         const currentSagaName = universe.currentSagaName || `Saga ${universe.saga || 1}`;
         const currentPhaseName = universe.currentPhaseName || `Phase ${universe.currentPhase || 1}`;
         const topCharacters = normalizedRoster
@@ -2853,7 +3532,6 @@ const UniverseDashboard: React.FC<{
             .sort((a, b) => ((b.fanApproval || 0) + (b.appearances || 0) * 10) - ((a.fanApproval || 0) + (a.appearances || 0) * 10))
             .slice(0, 4)
             .map(character => character.name);
-        const title = `${universe.name}: Event ${eventNumber}`;
         const newScript: Script = {
             id: `script_universe_event_${Date.now()}`,
             title,
@@ -2878,6 +3556,63 @@ const UniverseDashboard: React.FC<{
             hype: Math.round(eventReadiness)
         };
         onCommission(newScript);
+    };
+
+    const handleRetireUniverse = () => {
+        if (!canRetireUniverse) return;
+        const updatedUniverse = retireUniverseForArchive(universe, player.age, player.currentWeek);
+        const newsItem = {
+            id: `news_universe_retired_${updatedUniverse.id}_${Date.now()}`,
+            headline: `${updatedUniverse.name} enters the legacy archive.`,
+            subtext: `The studio is preserving the full canon while closing new phases and event films for now.`,
+            category: 'UNIVERSE' as const,
+            week: player.currentWeek,
+            year: player.age,
+            impactLevel: 'MEDIUM' as const
+        };
+        onUpdatePlayer(buildPlayerWithUniverse(updatedUniverse, {
+            news: [newsItem, ...player.news].slice(0, 50),
+            logs: [
+                {
+                    week: player.currentWeek,
+                    year: player.age,
+                    message: `📦 ${updatedUniverse.name} entered the legacy archive. History stays visible and reboot rights remain open.`,
+                    type: 'neutral' as const
+                },
+                ...(player.logs || [])
+            ].slice(0, 50)
+        }));
+        setShowRetirementDialog(false);
+    };
+
+    const handleLaunchReboot = (title: string) => {
+        if (!retired) return;
+        const { universe: rebootedUniverse, script } = rebootRetiredUniverse(universe, title, lastReleasedGenre, player.age, player.currentWeek);
+        const updatedScripts = [...(studio.studioState?.scripts || []), script];
+        const newsItem = {
+            id: `news_universe_reboot_${rebootedUniverse.id}_${Date.now()}`,
+            headline: `${rebootedUniverse.name} gets a reboot era.`,
+            subtext: `${title} reopens the canon while keeping the original timeline in the archive.`,
+            category: 'UNIVERSE' as const,
+            week: player.currentWeek,
+            year: player.age,
+            impactLevel: 'HIGH' as const
+        };
+        onUpdatePlayer(buildPlayerWithUniverse(rebootedUniverse, {
+            news: [newsItem, ...player.news].slice(0, 50),
+            logs: [
+                {
+                    week: player.currentWeek,
+                    year: player.age,
+                    message: `🎬 ${title} launched as a reboot script for ${rebootedUniverse.name}.`,
+                    type: 'positive' as const
+                },
+                ...(player.logs || [])
+            ].slice(0, 50)
+        }, { scripts: updatedScripts }));
+        setSagaName(rebootedUniverse.currentSagaName || 'Reboot Era');
+        setPhaseName(rebootedUniverse.currentPhaseName || 'Phase 1: Reintroduction');
+        setRebootTitle(null);
     };
 
     const timeline = universeProjects.reduce((acc, p) => {
@@ -2932,11 +3667,11 @@ const UniverseDashboard: React.FC<{
                         </p>
                     </div>
                     <button
-                        onClick={createUniverseEventScript}
-                        disabled={normalizedRoster.length < 2}
+                        onClick={() => setEventFilmTitle(getUniverseEventTitle())}
+                        disabled={retired || normalizedRoster.length < 2}
                         className="bg-white text-black px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-amber-300 disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-[0.98]"
                     >
-                        Commission Event Film
+                        {retired ? 'Archive Locked' : 'Commission Event Film'}
                     </button>
                 </div>
 
@@ -3017,14 +3752,52 @@ const UniverseDashboard: React.FC<{
                 <p className="text-xl font-black text-white leading-snug">{audiencePulse}</p>
             </div>
 
+            <div className={`border rounded-3xl p-5 ${retired ? 'bg-amber-500/10 border-amber-500/25' : 'bg-zinc-950/70 border-zinc-800'}`}>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div className="flex items-start gap-3">
+                        <div className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 ${retired ? 'bg-amber-500/15 text-amber-300' : 'bg-zinc-900 text-zinc-400'}`}>
+                            {retired ? <Archive size={20} /> : <History size={20} />}
+                        </div>
+                        <div>
+                            <p className="text-[10px] font-black uppercase tracking-[0.28em] text-zinc-500">Universe Lifecycle</p>
+                            <h3 className="text-lg font-black text-white">{retired ? 'Legacy Archive' : 'Active Canon'}</h3>
+                            <p className="text-xs text-zinc-400 leading-relaxed mt-1">
+                                {retired
+                                    ? `Retired in Age ${universe.retiredAt?.year || player.age}, Week ${universe.retiredAt?.week || player.currentWeek}. History remains visible and licensing runs at 35% legacy demand.`
+                                    : 'Retire only when the current canon has released history and no unfinished attached projects.'}
+                            </p>
+                            {!retired && retirementBlockers.length > 0 && (
+                                <p className="mt-2 text-[10px] font-bold uppercase tracking-wider text-amber-300">{retirementBlockers[0]}</p>
+                            )}
+                        </div>
+                    </div>
+                    {retired ? (
+                        <button
+                            onClick={() => setRebootTitle(`${universe.name}: Reborn`)}
+                            className="bg-white text-black px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-amber-300 transition-all active:scale-[0.98]"
+                        >
+                            <span className="flex items-center justify-center gap-2"><Clapperboard size={15} /> Launch Reboot</span>
+                        </button>
+                    ) : (
+                        <button
+                            onClick={() => setShowRetirementDialog(true)}
+                            disabled={!canRetireUniverse}
+                            className="bg-zinc-900 text-zinc-300 border border-zinc-700 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-amber-500 hover:text-black disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-zinc-900 disabled:hover:text-zinc-300 transition-all"
+                        >
+                            <span className="flex items-center justify-center gap-2"><Archive size={15} /> Retire Universe</span>
+                        </button>
+                    )}
+                </div>
+            </div>
+
             {activeTab === 'TIMELINE' && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Saga Control */}
                 <div className="bg-zinc-900/50 border border-zinc-800 p-5 rounded-2xl space-y-4">
                     <div className="flex justify-between items-center">
                         <h3 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Current Saga</h3>
-                        <button onClick={handleConcludeSaga} className="text-[9px] font-black uppercase tracking-widest bg-rose-500/10 text-rose-500 px-2 py-1 rounded hover:bg-rose-500/20">
-                            Conclude Saga
+                        <button disabled={retired} onClick={handleConcludeSaga} className="text-[9px] font-black uppercase tracking-widest bg-rose-500/10 text-rose-500 px-2 py-1 rounded hover:bg-rose-500/20 disabled:opacity-40 disabled:cursor-not-allowed">
+                            {retired ? 'Archived' : 'Conclude Saga'}
                         </button>
                     </div>
                     {editingSaga ? (
@@ -3039,7 +3812,7 @@ const UniverseDashboard: React.FC<{
                     ) : (
                         <div className="flex justify-between items-center group">
                             <p className="text-xl font-black text-white">{universe.currentSagaName || `Saga ${universe.saga}`}</p>
-                            <button onClick={() => setEditingSaga(true)} className="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-white transition-opacity">
+                            <button disabled={retired} onClick={() => setEditingSaga(true)} className="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-white transition-opacity disabled:opacity-20 disabled:cursor-not-allowed">
                                 <Edit2 size={14} />
                             </button>
                         </div>
@@ -3050,8 +3823,8 @@ const UniverseDashboard: React.FC<{
                 <div className="bg-zinc-900/50 border border-zinc-800 p-5 rounded-2xl space-y-4">
                     <div className="flex justify-between items-center">
                         <h3 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Current Phase</h3>
-                        <button onClick={handleConcludePhase} className="text-[9px] font-black uppercase tracking-widest bg-blue-500/10 text-blue-500 px-2 py-1 rounded hover:bg-blue-500/20">
-                            Conclude Phase
+                        <button disabled={retired} onClick={handleConcludePhase} className="text-[9px] font-black uppercase tracking-widest bg-blue-500/10 text-blue-500 px-2 py-1 rounded hover:bg-blue-500/20 disabled:opacity-40 disabled:cursor-not-allowed">
+                            {retired ? 'Archived' : 'Conclude Phase'}
                         </button>
                     </div>
                     {editingPhase ? (
@@ -3066,7 +3839,7 @@ const UniverseDashboard: React.FC<{
                     ) : (
                         <div className="flex justify-between items-center group">
                             <p className="text-xl font-black text-white">{universe.currentPhaseName || `Phase ${universe.currentPhase}`}</p>
-                            <button onClick={() => setEditingPhase(true)} className="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-white transition-opacity">
+                            <button disabled={retired} onClick={() => setEditingPhase(true)} className="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-white transition-opacity disabled:opacity-20 disabled:cursor-not-allowed">
                                 <Edit2 size={14} />
                             </button>
                         </div>
@@ -3189,6 +3962,38 @@ const UniverseDashboard: React.FC<{
                     onUpdatePlayer={onUpdatePlayer} 
                 />
             )}
+            {eventFilmTitle && (
+                <WorkingTitleDialog
+                    mode="COMMISSION"
+                    title="Commission Event Film"
+                    description={`Name the next crossover chapter in ${universe.name}.`}
+                    initialTitle={eventFilmTitle}
+                    confirmLabel="Commission Event"
+                    onClose={() => setEventFilmTitle(null)}
+                    onConfirm={(title) => {
+                        createUniverseEventScript(title);
+                        setEventFilmTitle(null);
+                    }}
+                />
+            )}
+            {rebootTitle && (
+                <WorkingTitleDialog
+                    mode="COMMISSION"
+                    title="Launch Universe Reboot"
+                    description={`Choose the working title that reopens ${universe.name} without deleting its original canon.`}
+                    initialTitle={rebootTitle}
+                    confirmLabel="Launch Reboot"
+                    onClose={() => setRebootTitle(null)}
+                    onConfirm={handleLaunchReboot}
+                />
+            )}
+            {showRetirementDialog && (
+                <UniverseRetirementDialog
+                    universe={universe}
+                    onClose={() => setShowRetirementDialog(false)}
+                    onConfirm={handleRetireUniverse}
+                />
+            )}
         </div>
     );
 };
@@ -3206,15 +4011,20 @@ const UniverseManager: React.FC<{
 
     const worldUniverses = normalizeUniverseMap(player.world?.universes || {});
     const studioUniverses = (Object.values(worldUniverses) as Universe[]).filter(u => u.studioId === studio.id);
-    const rivalUniverses = (Object.values(worldUniverses) as Universe[]).filter(u => u.studioId !== studio.id);
+    const activeStudioUniverses = studioUniverses.filter(u => !isUniverseRetired(u));
+    const retiredStudioUniverses = studioUniverses.filter(u => isUniverseRetired(u));
+    const getUniverseMarketPower = (u: Universe) => {
+        const basePower = (u.brandPower * 0.7 + u.momentum * 0.3);
+        return basePower * getUniverseLifecycleRevenueMultiplier(u);
+    };
 
     // Dynamic Market Share Calculation
     const allUniverses = Object.values(worldUniverses) as Universe[];
-    const totalPower = allUniverses.reduce((acc, u) => acc + (u.brandPower * 0.7 + u.momentum * 0.3), 0);
+    const totalPower = allUniverses.reduce((acc, u) => acc + getUniverseMarketPower(u), 0);
     
     const universesWithShare = allUniverses.map(u => ({
         ...u,
-        marketShare: totalPower > 0 ? ((u.brandPower * 0.7 + u.momentum * 0.3) / totalPower) * 100 : 0
+        marketShare: totalPower > 0 ? (getUniverseMarketPower(u) / totalPower) * 100 : 0
     })).sort((a, b) => b.marketShare - a.marketShare);
 
     const handleCreate = () => {
@@ -3373,13 +4183,13 @@ const UniverseManager: React.FC<{
 
                 <div className="space-y-4">
                     <h3 className="text-xs font-black text-zinc-500 uppercase tracking-widest px-2">Your Universes</h3>
-                    {studioUniverses.length === 0 ? (
+                    {activeStudioUniverses.length === 0 ? (
                         <div className="bg-zinc-900/30 border border-zinc-800 rounded-2xl p-8 flex flex-col items-center justify-center text-center">
                             <Sparkles size={32} className="text-zinc-700 mb-3" />
-                            <p className="text-[10px] font-black text-zinc-600 uppercase tracking-widest">No Studio Universes</p>
+                            <p className="text-[10px] font-black text-zinc-600 uppercase tracking-widest">No Active Studio Universes</p>
                         </div>
                     ) : (
-                        studioUniverses.map((u: any) => {
+                        activeStudioUniverses.map((u: any) => {
                             const rosterCount = buildUniverseRoster(
                                 u,
                                 getUniverseDashboardProjects(player, u.id, player.activeReleases || []),
@@ -3419,6 +4229,51 @@ const UniverseManager: React.FC<{
                             </div>
                             );
                         })
+                    )}
+
+                    {retiredStudioUniverses.length > 0 && (
+                        <div className="pt-4 space-y-3">
+                            <h3 className="text-xs font-black text-amber-300 uppercase tracking-widest px-2">Legacy Archive</h3>
+                            {retiredStudioUniverses.map((u: any) => {
+                                const canonCount = getUniverseDashboardProjects(player, u.id, player.activeReleases || []).length;
+                                const retiredLabel = u.retiredAt ? `Age ${u.retiredAt.year}, Week ${u.retiredAt.week}` : 'Archived';
+                                return (
+                                    <div
+                                        key={u.id}
+                                        onClick={() => setSelectedUniverseId(u.id)}
+                                        className="bg-amber-500/5 border border-amber-500/20 rounded-2xl p-5 space-y-4 cursor-pointer hover:bg-amber-500/10 hover:border-amber-500/35 transition-all group"
+                                    >
+                                        <div className="flex justify-between items-start gap-3">
+                                            <div className="flex items-start gap-3 min-w-0">
+                                                <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-300 flex items-center justify-center shrink-0">
+                                                    <Archive size={18} />
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <h4 className="text-sm font-black text-white uppercase group-hover:text-amber-300 transition-colors truncate">{u.name}</h4>
+                                                    <p className="text-[9px] text-zinc-500 uppercase tracking-widest mt-1">Retired {retiredLabel}</p>
+                                                </div>
+                                            </div>
+                                            <span className="text-[8px] font-black px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20">
+                                                Legacy
+                                            </span>
+                                        </div>
+                                        <p className="text-xs text-zinc-400 leading-relaxed">
+                                            History preserved. New phases are closed until a reboot relaunches this canon.
+                                        </p>
+                                        <div className="pt-2 border-t border-amber-500/10 grid grid-cols-2 gap-4">
+                                            <div>
+                                                <p className="text-[8px] text-zinc-500 uppercase font-black">Canon</p>
+                                                <p className="text-xs font-mono text-white">{canonCount} Projects</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-[8px] text-zinc-500 uppercase font-black">Licensing</p>
+                                                <p className="text-xs font-mono text-amber-300">35% Legacy</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
                     )}
                 </div>
             </div>

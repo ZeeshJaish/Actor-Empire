@@ -23,9 +23,11 @@ interface LifestylePageProps {
   onNavVisibilityChange?: (visible: boolean) => void;
   initialView?: 'MAIN' | 'ASSETS' | 'BUSINESS' | 'PRODUCTION_WIZARD' | 'PRODUCTION_GAME';
   onInitialViewConsumed?: () => void;
+  initialRightsMarketOpportunityId?: string;
+  onRightsMarketTargetConsumed?: () => void;
 }
 
-export const LifestylePage: React.FC<LifestylePageProps> = ({ player, onBuyItem, onSellItem, onSetResidence, onSetActiveStyle, onUpdatePlayer, onPremiumPurchase, onNavVisibilityChange, initialView, onInitialViewConsumed }) => {
+export const LifestylePage: React.FC<LifestylePageProps> = ({ player, onBuyItem, onSellItem, onSetResidence, onSetActiveStyle, onUpdatePlayer, onPremiumPurchase, onNavVisibilityChange, initialView, onInitialViewConsumed, initialRightsMarketOpportunityId, onRightsMarketTargetConsumed }) => {
   const [view, setView] = useState<'MAIN' | 'ASSETS' | 'BUSINESS' | 'PRODUCTION_WIZARD' | 'PRODUCTION_GAME'>('MAIN');
   const [customizationItem, setCustomizationItem] = useState<Property | Vehicle | null>(null);
   const [selectedCustomizations, setSelectedCustomizations] = useState<any[]>([]);
@@ -156,7 +158,7 @@ export const LifestylePage: React.FC<LifestylePageProps> = ({ player, onBuyItem,
   
   if (view === 'PRODUCTION_WIZARD') return <ProductionWizard player={player} onCancel={() => setView('MAIN')} onUpdatePlayer={onUpdatePlayer!} onComplete={() => setView('PRODUCTION_GAME')} />;
   
-  if (view === 'PRODUCTION_GAME') return <ProductionHouseGame player={player} onBack={() => setView('MAIN')} onUpdatePlayer={onUpdatePlayer!} />;
+  if (view === 'PRODUCTION_GAME') return <ProductionHouseGame player={player} onBack={() => setView('MAIN')} onUpdatePlayer={onUpdatePlayer!} initialRightsMarketOpportunityId={initialRightsMarketOpportunityId} onRightsMarketTargetConsumed={onRightsMarketTargetConsumed} />;
 
   return (
     <div className="space-y-6 pb-24 pt-4">

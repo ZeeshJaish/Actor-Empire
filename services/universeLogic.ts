@@ -1,8 +1,9 @@
 
-import { Universe, UniverseId, UniverseContract, Player, ProjectDetails, NewsItem, StudioId, Genre, IndustryProject, NPCActor, UniversePhase, RoleType, ProjectSubtype, ContractFilm, AuditionOpportunity, Gender, ActiveRelease, CastMember, UniverseCharacter } from '../types';
+import { Universe, UniverseId, UniverseContract, Player, ProjectDetails, NewsItem, StudioId, Genre, IndustryProject, NPCActor, UniversePhase, RoleType, ProjectSubtype, ContractFilm, AuditionOpportunity, Gender, ActiveRelease, CastMember, UniverseCharacter, Script } from '../types';
 import { STUDIO_CATALOG } from './studioLogic';
 import { NPC_DATABASE } from './npcLogic';
 import { generateProjectTitle, getEstimatedBudget, generateProjectDetails } from './roleLogic';
+import { getProjectReleaseSortValue, getProjectReleaseTiming } from './releaseTiming';
 
 // --- CONFIGURATION ---
 
@@ -522,7 +523,10 @@ export const normalizeUniverseForSave = (raw: any, fallbackId?: UniverseId): Uni
         slate: [],
         products: [],
         stats: { weeklyRevenue: 0, lifetimeRevenue: 0 },
-        weeksUntilNextPhase: 104
+        weeksUntilNextPhase: 104,
+        status: 'ACTIVE',
+        rebootCount: 0,
+        lifecycleHistory: []
     };
 
     const rawRoster = Array.isArray(raw?.roster) ? raw.roster : [];
@@ -592,8 +596,119 @@ export const normalizeUniverseForSave = (raw: any, fallbackId?: UniverseId): Uni
             weeklyRevenue: Math.max(0, toFiniteNumber(raw?.stats?.weeklyRevenue, base.stats?.weeklyRevenue || 0)),
             lifetimeRevenue: Math.max(0, toFiniteNumber(raw?.stats?.lifetimeRevenue, base.stats?.lifetimeRevenue || 0))
         },
-        weeksUntilNextPhase: Math.max(1, Math.round(toFiniteNumber(raw?.weeksUntilNextPhase, base.weeksUntilNextPhase || 104)))
+        weeksUntilNextPhase: Math.max(1, Math.round(toFiniteNumber(raw?.weeksUntilNextPhase, base.weeksUntilNextPhase || 104))),
+        status: raw?.status === 'RETIRED' ? 'RETIRED' : 'ACTIVE',
+        retiredAt: raw?.retiredAt && Number.isFinite(Number(raw.retiredAt.year)) && Number.isFinite(Number(raw.retiredAt.week))
+            ? { year: Number(raw.retiredAt.year), week: Number(raw.retiredAt.week) }
+            : undefined,
+        lastRebootAt: raw?.lastRebootAt && Number.isFinite(Number(raw.lastRebootAt.year)) && Number.isFinite(Number(raw.lastRebootAt.week))
+            ? { year: Number(raw.lastRebootAt.year), week: Number(raw.lastRebootAt.week) }
+            : undefined,
+        rebootCount: Math.max(0, Math.round(toFiniteNumber(raw?.rebootCount, 0))),
+        lifecycleHistory: Array.isArray(raw?.lifecycleHistory)
+            ? raw.lifecycleHistory
+                .filter((event: any) => event && (event.type === 'RETIRED' || event.type === 'REBOOTED'))
+                .map((event: any, index: number) => ({
+                    id: typeof event.id === 'string' && event.id ? event.id : `legacy_universe_event_${id}_${index}`,
+                    type: event.type,
+                    year: Number.isFinite(Number(event.year)) ? Number(event.year) : 1,
+                    week: Number.isFinite(Number(event.week)) ? Number(event.week) : 1,
+                    label: typeof event.label === 'string' && event.label.trim() ? event.label.trim() : event.type === 'RETIRED' ? 'Universe retired' : 'Universe rebooted'
+                }))
+            : []
     };
+};
+
+export const isUniverseRetired = (universe: Pick<Universe, 'status'> | null | undefined) =>
+    universe?.status === 'RETIRED';
+
+export const getUniverseLifecycleRevenueMultiplier = (universe: Pick<Universe, 'status'> | null | undefined) =>
+    isUniverseRetired(universe) ? 0.35 : 1;
+
+export const retireUniverseForArchive = (
+    rawUniverse: Universe,
+    year: number,
+    week: number
+): Universe => {
+    const universe = normalizeUniverseForSave(rawUniverse, rawUniverse.id);
+    if (isUniverseRetired(universe)) return universe;
+
+    return normalizeUniverseForSave({
+        ...universe,
+        status: 'RETIRED',
+        retiredAt: { year, week },
+        lifecycleHistory: [
+            ...(universe.lifecycleHistory || []),
+            {
+                id: `universe_retired_${universe.id}_${year}_${week}_${Date.now()}`,
+                type: 'RETIRED',
+                year,
+                week,
+                label: `${universe.name} entered the legacy archive`
+            }
+        ]
+    }, universe.id);
+};
+
+export const rebootRetiredUniverse = (
+    rawUniverse: Universe,
+    title: string,
+    genre: Genre,
+    year: number,
+    week: number
+): { universe: Universe; script: Script } => {
+    const universe = normalizeUniverseForSave(rawUniverse, rawUniverse.id);
+    const rebootCount = (universe.rebootCount || 0) + 1;
+    const nextSaga = Math.max(1, Number(universe.saga) || 1) + 1;
+    const rebootedUniverse = normalizeUniverseForSave({
+        ...universe,
+        status: 'ACTIVE',
+        lastRebootAt: { year, week },
+        rebootCount,
+        saga: nextSaga,
+        currentSagaName: `Reboot Era ${rebootCount}`,
+        currentPhase: 'PHASE_1_ORIGINS',
+        currentPhaseName: 'Phase 1: Reintroduction',
+        weeksUntilNextPhase: 104,
+        momentum: clampNumber(Math.max(20, universe.momentum * 0.45), 20, 0, 55),
+        brandPower: clampNumber(Math.max(20, universe.brandPower * 0.82), 20, 0, 100),
+        marketShare: Math.max(0, Number((universe.marketShare * 0.7).toFixed(2))),
+        lifecycleHistory: [
+            ...(universe.lifecycleHistory || []),
+            {
+                id: `universe_rebooted_${universe.id}_${year}_${week}_${Date.now()}`,
+                type: 'REBOOTED',
+                year,
+                week,
+                label: `${universe.name} relaunched with ${title}`
+            }
+        ]
+    }, universe.id);
+
+    const script: Script = {
+        id: `script_universe_reboot_${Date.now()}`,
+        title,
+        genres: [genre],
+        status: 'CONCEPT',
+        quality: 0,
+        options: [],
+        writerId: null,
+        weeksInDevelopment: 0,
+        totalDevelopmentWeeks: 0,
+        isOriginal: false,
+        projectType: 'MOVIE',
+        sourceMaterial: 'ADAPTATION',
+        connectedProjectIntent: 'REBOOT',
+        universeId: universe.id,
+        universeSagaName: rebootedUniverse.currentSagaName,
+        universePhaseName: rebootedUniverse.currentPhaseName,
+        logline: `A new creative era reintroduces ${universe.name} while preserving the history of its original canon.`,
+        tags: ['UNIVERSE_REBOOT', rebootedUniverse.currentSagaName || `Reboot Era ${rebootCount}`],
+        hype: Math.round(clampNumber(25 + universe.brandPower * 0.45, 45, 0, 85)),
+        createdAtWeek: week
+    };
+
+    return { universe: rebootedUniverse, script };
 };
 
 export const normalizeUniverseMap = (rawUniverses: any): Record<UniverseId, Universe> => {
@@ -704,7 +819,8 @@ export const getUniverseDashboardProjects = (
             type: project.projectType,
             genre: project.genre,
             budgetTier: project.budget >= 50_000_000 ? 'BLOCKBUSTER' : project.budget >= 10_000_000 ? 'HIGH' : project.budget >= 3_000_000 ? 'MID' : 'LOW',
-            year: project.year || player.age,
+            year: getProjectReleaseTiming(project, { currentAge: player.age }).releaseYear || player.age,
+            releaseSortValue: getProjectReleaseSortValue(project, { currentAge: player.age }),
             gross: project.gross || 0,
             rating: project.imdbRating || 0,
             subtype: project.subtype || (project as any).projectDetails?.subtype,
@@ -723,7 +839,8 @@ export const getUniverseDashboardProjects = (
             type: project.type,
             genre: project.projectDetails?.genre,
             budgetTier: project.projectDetails?.budgetTier,
-            year: player.age,
+            year: getProjectReleaseTiming(project, { currentAge: player.age }).releaseYear || player.age,
+            releaseSortValue: getProjectReleaseSortValue(project, { currentAge: player.age }),
             gross: project.totalGross || 0,
             rating: project.imdbRating || 0,
             subtype: project.projectDetails?.subtype,
@@ -734,7 +851,7 @@ export const getUniverseDashboardProjects = (
             source: 'ACTIVE' as const
         }));
 
-    return [...pastProjects, ...activeUniverseProjects].sort((a, b) => a.year - b.year);
+    return [...pastProjects, ...activeUniverseProjects].sort((a, b) => (a.releaseSortValue || a.year) - (b.releaseSortValue || b.year));
 };
 
 export const buildUniverseRoster = (
@@ -1097,9 +1214,10 @@ export const processUniverseTurn = (player: Player, universe: Universe): { unive
 
     const activeProducts = updated.products.filter((product: any) => product?.active !== false);
     const releaseActivity = getUniverseReleaseActivity(player, updated);
+    const lifecycleRevenueMultiplier = getUniverseLifecycleRevenueMultiplier(updated);
     const weeklyLicensingRevenue = activeProducts.reduce((sum, product: any) => {
         const baseRevenue = typeof product?.sellingPrice === 'number' ? product.sellingPrice : 0;
-        const productRevenue = Math.floor(calculateUniverseProductWeeklyRevenue(updated, product) * releaseActivity.multiplier);
+        const productRevenue = Math.floor(calculateUniverseProductWeeklyRevenue(updated, product) * releaseActivity.multiplier * lifecycleRevenueMultiplier);
 
         if (productRevenue > 0) {
             product.unitsSold = (typeof product.unitsSold === 'number' ? product.unitsSold : 0) + Math.max(1, Math.floor(productRevenue / Math.max(baseRevenue, 1)));
@@ -1109,6 +1227,12 @@ export const processUniverseTurn = (player: Player, universe: Universe): { unive
 
     updated.stats.weeklyRevenue = weeklyLicensingRevenue;
     updated.stats.lifetimeRevenue = (updated.stats.lifetimeRevenue || 0) + weeklyLicensingRevenue;
+
+    if (isUniverseRetired(updated)) {
+        updated.momentum = clampNumber(updated.momentum - 0.2, updated.momentum, 0, 100);
+        updated.marketShare = Math.max(0, Number((updated.marketShare * 0.997).toFixed(2)));
+        return { universe: updated, news, project: undefined };
+    }
 
     const releaseImpact = getUniverseReleaseImpact(player, updated);
     const licensingImpact = weeklyLicensingRevenue > 0 ? Math.min(4, Math.log10(weeklyLicensingRevenue + 1) - 4) : 0;
@@ -1178,6 +1302,7 @@ export const processUniverseTurn = (player: Player, universe: Universe): { unive
     // REDUCED FREQUENCY: ~1.5% chance per week (~0.7 films/yr per universe)
     if (Math.random() < 0.015) {
         const tmpl = UNIVERSE_TEMPLATES[updated.id];
+        if (!tmpl) return { universe: updated, news, project: undefined };
         
         // Find an arc that has an unreleased film
         // Exclude player's character if they have a contract
