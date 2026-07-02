@@ -30,6 +30,7 @@ import {
     getFundingOptions,
     getOfferPresets,
     completeStudioAcquisition,
+    completeStockControlAcquisition,
     runDueDiligence,
     submitOpeningOffer,
     type AcquisitionCase,
@@ -67,6 +68,7 @@ interface StudioAcquisitionDeskProps {
     onBeatRival: (offerAmount: number) => { success: boolean };
     onWalkAway: () => { success: boolean };
     onCompleteAcquisition: () => ReturnType<typeof completeStudioAcquisition>;
+    onCompleteStockControl: () => ReturnType<typeof completeStockControlAcquisition>;
 }
 
 const STRUCTURE_LABELS: Record<'FULL' | 'MINORITY', string> = {
@@ -193,15 +195,20 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
     onBeatRival,
     onWalkAway,
     onCompleteAcquisition,
+    onCompleteStockControl,
 }) => {
-    const hasDealStatus = Boolean(acquisitionCase && ['OFFER_SUBMITTED', 'COUNTERED', 'RIVAL_BID', 'ACCEPTED', 'REJECTED', 'ACQUIRED'].includes(acquisitionCase.status));
+    const publicCompany = profile.acquisitionState === 'PUBLICLY_TRADED';
+    const companyPosition = getCompanyPosition(player, profile);
+    const stockControlMode = publicCompany && !profile.isPlayerOwned && companyPosition.influenceStatus === 'CONTROLLING_OWNER';
+    const stockControlClosing = acquisitionCase?.status === 'ACQUIRED'
+        && acquisitionCase.closing?.finalPrice === 0
+        && /public-market control/i.test(acquisitionCase.closing.assetSummary || '');
+    const hasDealStatus = stockControlMode || Boolean(acquisitionCase && ['OFFER_SUBMITTED', 'COUNTERED', 'RIVAL_BID', 'ACCEPTED', 'REJECTED', 'ACQUIRED'].includes(acquisitionCase.status));
     const [stage, setStage] = React.useState<DeskStage>(hasDealStatus ? 'REVIEW' : 'ENTRY');
     const [fundingPurpose, setFundingPurpose] = React.useState<FundingPurpose>('OFFER');
-    const publicCompany = profile.acquisitionState === 'PUBLICLY_TRADED';
     const [offerType, setOfferType] = React.useState<AcquisitionOfferType>(publicCompany ? 'MINORITY' : 'FAIR');
     const strategicThreshold = getStrategicStakeThreshold(profile);
     const [minorityPercent, setMinorityPercent] = React.useState(strategicThreshold);
-    const companyPosition = getCompanyPosition(player, profile);
     const initialPresets = getOfferPresets({ profile, acquisitionCase, minorityPercent: strategicThreshold });
     const [offerAmountInput, setOfferAmountInput] = React.useState(String(
         publicCompany ? initialPresets.MINORITY.amount : initialPresets.FAIR.amount,
@@ -225,6 +232,7 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
     const [contractPage, setContractPage] = React.useState(0);
     const [stampDropped, setStampDropped] = React.useState(false);
     const [signedAcquisitionLocked, setSignedAcquisitionLocked] = React.useState(false);
+    const [stockControlComplete, setStockControlComplete] = React.useState(stockControlClosing);
     const [selectedOperatingModel, setSelectedOperatingModel] = React.useState<SubsidiaryOperatingModel | null>(null);
     const signingTimerRef = React.useRef<ReturnType<typeof window.setInterval> | null>(null);
     const signingCompleteRef = React.useRef(false);
@@ -290,6 +298,7 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
     const contractSerial = `${profile.id.replace(/[^A-Z0-9]/g, '').slice(0, 4)}-${player.currentWeek}-${Math.max(0, Math.round(finalPrice / 1_000_000))}`;
     const acceptedContractMode = acquisitionCase?.status === 'ACCEPTED' && Boolean(responseOffer && sellerResponse);
     const signingRoomVisible = signingRoomOpen || acceptedContractMode;
+    const showStockControlReview = stockControlMode || stockControlComplete || stockControlClosing;
 
     React.useEffect(() => {
         onImmersiveChange?.(signingRoomVisible);
@@ -544,6 +553,18 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
                 : 'This deal is not ready to sign.');
     };
 
+    const completeStockControlTransfer = () => {
+        const result = onCompleteStockControl();
+        if (result.success) {
+            setStockControlComplete(true);
+            setFeedback('Control transfer completed. No second acquisition price was charged.');
+            return;
+        }
+        setFeedback(result.reason === 'ALREADY_OWNED'
+            ? 'This studio is already inside your owned group.'
+            : 'Majority public-market control is required before this transfer can close.');
+    };
+
     const stopSigningHold = (reset = true) => {
         if (signingTimerRef.current) {
             window.clearInterval(signingTimerRef.current);
@@ -647,7 +668,82 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
                     </div>
                 </div>
                 <AnimatePresence mode="wait">
-                    {responseOffer && sellerResponse ? (
+                    {showStockControlReview ? (
+                        <motion.section
+                            key="stock-control-transfer"
+                            initial={{ opacity: 0, y: 8 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="overflow-hidden rounded-3xl border border-sky-300/35 bg-[linear-gradient(145deg,rgba(56,189,248,0.14),rgba(8,8,10,0.97))]"
+                        >
+                            <div className="border-b border-sky-300/15 p-4">
+                                <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-sky-300/30 bg-sky-300/10 text-sky-200">
+                                    <Landmark size={22} strokeWidth={3} />
+                                </div>
+                                <div className="mt-4 text-[8px] font-black uppercase tracking-[0.22em] text-sky-300">Majority Stock Control</div>
+                                <h3 className="mt-1 text-2xl font-black uppercase tracking-tight">
+                                    {stockControlComplete || stockControlClosing ? 'Control Transfer Complete' : 'Control Transfer Ready'}
+                                </h3>
+                                <p className="mt-2 text-[10px] font-semibold leading-relaxed text-zinc-400">
+                                    No seller counter is needed here. You already bought majority control through public shares, so this closes the company transfer without charging the acquisition price again.
+                                </p>
+                            </div>
+
+                            <div className="grid grid-cols-3 border-b border-sky-300/15">
+                                <div className="border-r border-sky-300/15 p-4">
+                                    <div className="text-[6px] font-black uppercase tracking-widest text-zinc-600">Owned</div>
+                                    <div className="mt-1 font-mono text-sm font-black text-sky-200">{companyPosition.ownershipPercent.toFixed(1)}%</div>
+                                </div>
+                                <div className="border-r border-sky-300/15 p-4">
+                                    <div className="text-[6px] font-black uppercase tracking-widest text-zinc-600">Stock Value</div>
+                                    <div className="mt-1 font-mono text-sm font-black text-white">{formatMoney(companyPosition.stockValue)}</div>
+                                </div>
+                                <div className="p-4">
+                                    <div className="text-[6px] font-black uppercase tracking-widest text-zinc-600">Additional Price</div>
+                                    <div className="mt-1 font-mono text-sm font-black text-emerald-300">{formatMoney(0)}</div>
+                                </div>
+                            </div>
+
+                            <div className="space-y-3 p-4">
+                                <div className="rounded-3xl border border-sky-300/20 bg-black/25 p-4">
+                                    <div className="flex items-center gap-2 text-[7px] font-black uppercase tracking-[0.2em] text-sky-300">
+                                        <Check size={14} /> Control Filing
+                                    </div>
+                                    <h4 className="mt-2 text-lg font-black uppercase tracking-tight text-white">
+                                        {stockControlComplete || stockControlClosing ? `${profile.name} is now controlled` : 'Ready to move into your group'}
+                                    </h4>
+                                    <p className="mt-2 text-[9px] font-semibold leading-relaxed text-sky-100/70">
+                                        Existing public shares become your control basis. The desk only files the transfer, records liabilities, and adds the studio to your owned production group.
+                                    </p>
+                                </div>
+                                {stockControlComplete || stockControlClosing ? (
+                                    <div className="grid grid-cols-1 gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={onClose}
+                                            className="min-h-12 rounded-xl border border-sky-300/25 bg-sky-300/[0.08] px-3 text-[8px] font-black uppercase tracking-wider text-sky-100"
+                                        >
+                                            Open Studio Profile
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={onClose}
+                                            className="min-h-11 rounded-xl border border-white/10 bg-white/[0.03] px-3 text-[8px] font-black uppercase tracking-wider text-zinc-500"
+                                        >
+                                            Return To Forbes
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <button
+                                        type="button"
+                                        onClick={completeStockControlTransfer}
+                                        className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-emerald-400 px-4 text-[9px] font-black uppercase tracking-[0.14em] text-black"
+                                    >
+                                        <Check size={15} /> Complete Control Transfer
+                                    </button>
+                                )}
+                            </div>
+                        </motion.section>
+                    ) : responseOffer && sellerResponse ? (
                         <motion.section
                             key={`response-${acquisitionCase?.status}`}
                             initial={{ opacity: 0, y: 8 }}

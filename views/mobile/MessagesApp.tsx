@@ -1,10 +1,12 @@
 
-import React, { useState } from 'react';
-import { Player, Message, AuditionOpportunity, SponsorshipOffer, NegotiationData, ScheduledEvent, YoutubeBrandDeal, YoutubeCollabOffer } from '../../types';
-import { ArrowLeft, Star, DollarSign, Calendar, CheckCircle, Lock, Trash2, Mail, Heart, Play, Users, Clapperboard, FileSearch, ShieldCheck, TrendingUp, AlertTriangle, FileSignature, Swords, ChevronRight, Landmark } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Player, Message, AuditionOpportunity, SponsorshipOffer, NegotiationData, ScheduledEvent, YoutubeBrandDeal, YoutubeCollabOffer, YoutubeMusicVideoFeatureOffer, OutsideProducerInvestmentOffer } from '../../types';
+import { ArrowLeft, Star, DollarSign, Calendar, CheckCircle, Lock, Trash2, Mail, Heart, Play, Users, Clapperboard, FileSearch, ShieldCheck, TrendingUp, AlertTriangle, FileSignature, Swords, ChevronRight, Landmark, Vote, Music2 } from 'lucide-react';
 import { ProjectDetailView } from '../../components/ProjectDetailView';
 import { APP_DISPLAY_VERSION } from '../../services/appVersion';
 import { getPlayerLanguage, t } from '../../services/i18n';
+import { formatProjectMusicByline } from '../../services/musicIndustry';
+import { calculateOutsideInvestmentAcceptanceChance } from '../../services/outsideProductions';
 
 interface MessagesAppProps {
   player: Player;
@@ -14,11 +16,16 @@ interface MessagesAppProps {
   onMarkRead: (id: string) => void;
   onOpenRightsMarket?: (opportunityId?: string) => void;
   onOpenStudioAcquisition?: (studioId: string) => void;
+  onOpenStock?: (stockId: string) => void;
+  onImmersiveReviewChange?: (active: boolean) => void;
 }
 
-export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAccept, onDelete, onMarkRead, onOpenRightsMarket, onOpenStudioAcquisition }) => {
+export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAccept, onDelete, onMarkRead, onOpenRightsMarket, onOpenStudioAcquisition, onOpenStock, onImmersiveReviewChange }) => {
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [outsideCounterCash, setOutsideCounterCash] = useState<number>(0);
+  const [outsideCounterStake, setOutsideCounterStake] = useState<number>(0);
+  const [outsideInvestmentReview, setOutsideInvestmentReview] = useState(false);
   const language = getPlayerLanguage(player);
   const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
   
@@ -34,6 +41,21 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
       ? selectedMessage.data?.negotiation?.status
       : undefined;
   const selectedRightsAccepted = selectedRightsStatus === 'ACCEPTED' || selectedRightsStatus === 'READY_TO_SIGN';
+  const selectedFriendFavor = selectedMessage?.type === 'SYSTEM' && selectedMessage.data?.kind === 'FRIEND_FAVOR'
+      ? selectedMessage.data
+      : null;
+  const selectedOutsideProducerUpdate = selectedMessage?.type === 'SYSTEM' && selectedMessage.data?.outsideProductionId
+      ? selectedMessage.data
+      : null;
+  const selectedOutsideProduction = selectedOutsideProducerUpdate
+      ? (player.outsideProductions || []).find(item => item.id === selectedOutsideProducerUpdate.outsideProductionId || item.projectId === selectedOutsideProducerUpdate.projectId)
+      : null;
+  const isOutsideInvestmentMessage = selectedMessage?.type === 'OFFER_OUTSIDE_PRODUCER_INVESTMENT' && Boolean(selectedMessage.data);
+  useEffect(() => {
+      onImmersiveReviewChange?.(outsideInvestmentReview);
+      return () => onImmersiveReviewChange?.(false);
+  }, [onImmersiveReviewChange, outsideInvestmentReview]);
+
   const formatMoney = (value: unknown) => {
       const amount = typeof value === 'number' && Number.isFinite(value) ? value : 0;
       if (amount >= 1_000_000_000) return `$${(amount / 1_000_000_000).toFixed(1)}B`;
@@ -44,10 +66,35 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
       .toLowerCase()
       .replace(/_/g, ' ')
       .replace(/\b\w/g, letter => letter.toUpperCase());
+  const getAbsoluteMessageWeek = (year: unknown, week: unknown) => (
+      Math.max(0, Number(year || 0) * 52 + Number(week || 0))
+  );
+  const outsideTimeline = (() => {
+      if (!selectedOutsideProducerUpdate) return null;
+      const acceptedYear = Number(selectedOutsideProducerUpdate.acceptedYear || selectedOutsideProduction?.acceptedYear || player.age);
+      const acceptedWeek = Number(selectedOutsideProducerUpdate.acceptedWeek || selectedOutsideProduction?.acceptedWeek || selectedMessage?.weekSent || player.currentWeek);
+      const rawReleaseYear = Number(selectedOutsideProducerUpdate.releaseYear || selectedOutsideProduction?.releaseYear || acceptedYear);
+      const rawReleaseWeek = Number(selectedOutsideProducerUpdate.releaseWeek || selectedOutsideProduction?.releaseWeek || acceptedWeek);
+      const acceptedAbsolute = getAbsoluteMessageWeek(acceptedYear, acceptedWeek);
+      const rawReleaseAbsolute = getAbsoluteMessageWeek(rawReleaseYear, rawReleaseWeek);
+      const finishYear = Number(selectedOutsideProducerUpdate.finishYear || selectedOutsideProduction?.finishYear || player.age);
+      const finishWeek = Number(selectedOutsideProducerUpdate.finishWeek || selectedOutsideProduction?.finishWeek || player.currentWeek);
+      const finishAbsolute = getAbsoluteMessageWeek(finishYear, finishWeek);
+      const useFinishAsRelease = rawReleaseAbsolute < acceptedAbsolute && finishAbsolute >= acceptedAbsolute;
+      const releaseYear = useFinishAsRelease ? finishYear : rawReleaseYear;
+      const releaseWeek = useFinishAsRelease ? finishWeek : rawReleaseWeek;
+      return { acceptedYear, acceptedWeek, releaseYear, releaseWeek };
+  })();
 
   const handleOpenMessage = (msg: Message) => {
       const openedMessage = msg.isRead ? msg : { ...msg, isRead: true };
       if (!msg.isRead) onMarkRead(msg.id);
+      if (msg.type === 'OFFER_OUTSIDE_PRODUCER_INVESTMENT' && msg.data) {
+          const offer = msg.data as OutsideProducerInvestmentOffer;
+          setOutsideCounterCash(offer.cashAsk);
+          setOutsideCounterStake(offer.offeredStakePercent);
+      }
+      setOutsideInvestmentReview(false);
       setSelectedMessage(openedMessage);
       setContractViewData(null);
   };
@@ -107,6 +154,37 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
   const handleDelete = () => {
       if (!selectedMessage) return;
       onDelete(selectedMessage.id);
+      setOutsideInvestmentReview(false);
+      setSelectedMessage(null);
+  };
+
+  const handleFriendFavorResponse = (accepted: boolean) => {
+      if (!selectedMessage) return;
+      onAccept({
+          ...selectedMessage,
+          data: {
+              ...(selectedMessage.data || {}),
+              response: accepted ? 'ACCEPTED' : 'DECLINED',
+          },
+      });
+      setOutsideInvestmentReview(false);
+      setSelectedMessage(null);
+  };
+
+  const handleOutsideInvestmentAction = (action: 'ACCEPT' | 'COUNTER' | 'PASS') => {
+      if (!selectedMessage) return;
+      const offer = selectedMessage.data as OutsideProducerInvestmentOffer;
+      onAccept({
+          ...selectedMessage,
+          data: {
+              ...offer,
+              offer,
+              action,
+              counterCash: outsideCounterCash,
+              counterStake: outsideCounterStake
+          }
+      });
+      setOutsideInvestmentReview(false);
       setSelectedMessage(null);
   };
 
@@ -142,13 +220,19 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
         {/* HEADER */}
         <div className="bg-white p-4 pt-12 pb-3 shadow-sm border-b border-slate-200 flex items-center gap-3 z-10 sticky top-0">
             <button 
-                onClick={() => selectedMessage ? setSelectedMessage(null) : onBack()} 
-                className="flex items-center gap-1 font-medium text-slate-600 hover:text-slate-900"
+                onClick={() => {
+                    if (outsideInvestmentReview) {
+                        setOutsideInvestmentReview(false);
+                        return;
+                    }
+                    selectedMessage ? setSelectedMessage(null) : onBack();
+                }} 
+                className="flex shrink-0 items-center gap-1 font-medium text-slate-600 hover:text-slate-900"
             >
-                <ArrowLeft size={20} /> {selectedMessage ? tr('messages.inbox') : tr('messages.home')}
+                <ArrowLeft size={20} /> {outsideInvestmentReview ? 'Summary' : selectedMessage ? tr('messages.inbox') : tr('messages.home')}
             </button>
-            <div className="font-bold text-lg flex-1 text-center pr-8">
-                {selectedMessage ? tr('messages.message') : tr('messages.inbox')}
+            <div className="min-w-0 flex-1 truncate text-right text-lg font-bold">
+                {outsideInvestmentReview ? 'Investment Review' : selectedMessage ? tr('messages.message') : tr('messages.inbox')}
             </div>
         </div>
 
@@ -175,6 +259,7 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                                         msg.type.includes('OFFER') ? 'bg-gradient-to-br from-indigo-500 to-purple-600' : 
                                         msg.type === 'CASTING_FEEDBACK' ? 'bg-gradient-to-br from-sky-600 to-indigo-700' :
                                         msg.type === 'STUDIO_ACQUISITION' ? 'bg-gradient-to-br from-amber-500 to-emerald-800' :
+                                        msg.type === 'SHAREHOLDER_VOTE' ? 'bg-gradient-to-br from-sky-700 to-emerald-700' :
                                         msg.type === 'RIGHTS_REPORT' ? 'bg-gradient-to-br from-amber-500 to-orange-700' :
                                         msg.type === 'RIGHTS_NEGOTIATION' ? 'bg-gradient-to-br from-zinc-800 to-amber-800' :
                                         msg.type === 'SYSTEM' ? 'bg-gradient-to-br from-zinc-700 to-black' : 
@@ -183,7 +268,9 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                                         {msg.type === 'CASTING_FEEDBACK'
                                             ? <Clapperboard size={20} />
                                             : msg.type === 'STUDIO_ACQUISITION'
-                                                ? <Landmark size={20} />
+                                            ? <Landmark size={20} />
+                                            : msg.type === 'SHAREHOLDER_VOTE'
+                                                ? <Vote size={20} />
                                             : msg.type === 'RIGHTS_REPORT'
                                                 ? <FileSearch size={20} />
                                                 : msg.type === 'RIGHTS_NEGOTIATION'
@@ -274,6 +361,41 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                                     className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-amber-400 px-4 text-[10px] font-black uppercase tracking-[0.15em] text-black"
                                 >
                                     {selectedMessage.data?.decision === 'RIVAL_BID' ? 'Enter Bidding War' : 'Review Offer'} <ChevronRight size={17} />
+                                </button>
+                            </div>
+                        </div>
+                    ) : selectedMessage.type === 'SHAREHOLDER_VOTE' ? (
+                        <div className="overflow-hidden rounded-3xl border border-sky-200 bg-slate-950 text-white shadow-xl">
+                            <div className="border-b border-white/10 px-6 py-7">
+                                <div className="mb-5 flex items-center gap-3">
+                                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-sky-300/40 bg-sky-400/10 text-sky-200">
+                                        <Vote size={22} />
+                                    </div>
+                                    <div>
+                                        <div className="text-[10px] font-black uppercase tracking-[0.2em] text-sky-300">Shareholder Services</div>
+                                        <div className="text-xs text-white/50">Board decision packet</div>
+                                    </div>
+                                </div>
+                                <h2 className="text-2xl font-black leading-tight">{selectedMessage.subject}</h2>
+                                <p className="mt-3 text-sm font-semibold leading-relaxed text-white/65">{selectedMessage.text}</p>
+                            </div>
+                            <div className="grid grid-cols-2 border-b border-white/10">
+                                <div className="border-r border-white/10 p-4">
+                                    <div className="text-[8px] font-black uppercase tracking-widest text-white/35">Company</div>
+                                    <div className="mt-1 text-sm font-black">{selectedMessage.data?.stockId || 'Stock'}</div>
+                                </div>
+                                <div className="p-4">
+                                    <div className="text-[8px] font-black uppercase tracking-widest text-white/35">Action</div>
+                                    <div className="mt-1 text-sm font-black">Vote required</div>
+                                </div>
+                            </div>
+                            <div className="p-4">
+                                <button
+                                    type="button"
+                                    onClick={() => onOpenStock?.(selectedMessage.data?.stockId)}
+                                    className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-sky-300 px-4 text-[10px] font-black uppercase tracking-[0.15em] text-slate-950"
+                                >
+                                    Open Shareholder Vote <ChevronRight size={17} />
                                 </button>
                             </div>
                         </div>
@@ -435,6 +557,73 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                                 </div>
                             </div>
                         </div>
+                    ) : selectedOutsideProducerUpdate ? (
+                        <div className="overflow-hidden rounded-[2rem] border border-emerald-200 bg-white shadow-xl">
+                            <div className="bg-gradient-to-br from-slate-950 via-emerald-950 to-slate-950 px-6 py-6 text-white">
+                                <div className="mb-5 flex items-center gap-3">
+                                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-emerald-300/30 bg-emerald-300/10 text-emerald-200">
+                                        <Clapperboard size={22} />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <div className="text-[10px] font-black uppercase tracking-[0.22em] text-emerald-200">Producer Return</div>
+                                        <div className="mt-0.5 truncate text-xs font-bold text-emerald-100/55">{formatReportLabel(selectedOutsideProducerUpdate.releasePath || selectedOutsideProduction?.releasePath)} package</div>
+                                    </div>
+                                </div>
+                                <h2 className="text-3xl font-black leading-tight">{selectedOutsideProducerUpdate.projectTitle || selectedOutsideProduction?.projectTitle || selectedMessage.subject}</h2>
+                                <div className="mt-4 grid grid-cols-3 gap-2">
+                                    <div className="rounded-2xl bg-white/10 p-3">
+                                        <div className="text-[8px] font-black uppercase tracking-widest text-emerald-100/50">Invested</div>
+                                        <div className="mt-1 font-mono text-sm font-black">{formatMoney(selectedOutsideProducerUpdate.investedAmount || selectedOutsideProduction?.investedAmount)}</div>
+                                    </div>
+                                    <div className="rounded-2xl bg-white/10 p-3">
+                                        <div className="text-[8px] font-black uppercase tracking-widest text-emerald-100/50">Release</div>
+                                        <div className="mt-1 font-mono text-sm font-black">
+                                            Y{outsideTimeline?.releaseYear} W{outsideTimeline?.releaseWeek}
+                                        </div>
+                                    </div>
+                                    <div className="rounded-2xl bg-white/10 p-3">
+                                        <div className="text-[8px] font-black uppercase tracking-widest text-emerald-100/50">Stake</div>
+                                        <div className="mt-1 font-mono text-sm font-black">{selectedOutsideProducerUpdate.stakePercent || selectedOutsideProduction?.stakePercent}%</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="space-y-4 px-5 py-5 text-slate-950">
+                                <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+                                    <div className="mb-3 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-emerald-700">
+                                        <TrendingUp size={14} /> Settlement
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        <div className="rounded-2xl bg-white p-3">
+                                            <div className="text-[8px] font-black uppercase tracking-widest text-slate-400">Receipts</div>
+                                            <div className="mt-1 font-mono text-sm font-black">{formatMoney(selectedOutsideProducerUpdate.producerReceipts || selectedOutsideProduction?.producerReceipts)}</div>
+                                        </div>
+                                        <div className="rounded-2xl bg-white p-3">
+                                            <div className="text-[8px] font-black uppercase tracking-widest text-slate-400">Paid</div>
+                                            <div className="mt-1 font-mono text-sm font-black">{formatMoney(selectedOutsideProducerUpdate.payout || selectedOutsideProduction?.playerPayout)}</div>
+                                        </div>
+                                        <div className="rounded-2xl bg-white p-3">
+                                            <div className="text-[8px] font-black uppercase tracking-widest text-slate-400">ROI</div>
+                                            <div className={`mt-1 font-mono text-sm font-black ${(selectedOutsideProducerUpdate.profit || selectedOutsideProduction?.profit || 0) >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
+                                                {(selectedOutsideProducerUpdate.roi ?? (selectedOutsideProduction?.profit && selectedOutsideProduction.investedAmount ? Math.round((selectedOutsideProduction.profit / selectedOutsideProduction.investedAmount) * 100) : 0))}%
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <p className="mt-4 text-sm font-bold leading-relaxed text-slate-600">
+                                        {selectedMessage.text}
+                                    </p>
+                                </div>
+                                <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                                    <div className="text-[9px] font-black uppercase tracking-widest text-slate-400">Timeline</div>
+                                    <div className="mt-2 text-sm font-black text-slate-900">
+                                        Invested Y{outsideTimeline?.acceptedYear} W{outsideTimeline?.acceptedWeek} • Released Y{outsideTimeline?.releaseYear} W{outsideTimeline?.releaseWeek}
+                                    </div>
+                                    <div className="mt-1 text-xs font-bold text-slate-500">
+                                        The payout arrives only after the movie finishes its run or platform settlement.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     ) : selectedMessage.type === 'SYSTEM' ? (
                         <div className="bg-gradient-to-br from-zinc-900 to-black p-8 rounded-3xl border border-zinc-800 shadow-2xl relative overflow-hidden text-white">
                             {/* Watermark */}
@@ -471,21 +660,438 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                     ) : (
                         // STANDARD MESSAGE LAYOUT
                         <>
-                            {/* Header Card */}
-                            <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 text-center mb-6">
-                                <div className={`w-20 h-20 rounded-full flex items-center justify-center text-white text-3xl font-bold mx-auto mb-4 shadow-lg ${
-                                    selectedMessage.type.includes('OFFER') ? 'bg-indigo-600' : 'bg-slate-500'
-                                }`}>
-                                    {selectedMessage.sender[0]}
-                                </div>
-                                <h2 className="text-xl font-bold text-slate-900 mb-1">{selectedMessage.sender}</h2>
-                                <p className="text-sm text-slate-500 font-medium">{selectedMessage.subject}</p>
-                            </div>
+                            {!(isOutsideInvestmentMessage && outsideInvestmentReview) && (
+                                <>
+                                    {/* Header Card */}
+                                    <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 text-center mb-6">
+                                        <div className={`w-20 h-20 rounded-full flex items-center justify-center text-white text-3xl font-bold mx-auto mb-4 shadow-lg ${
+                                            selectedMessage.type.includes('OFFER') ? 'bg-indigo-600' : 'bg-slate-500'
+                                        }`}>
+                                            {selectedMessage.sender[0]}
+                                        </div>
+                                        <h2 className="text-xl font-bold text-slate-900 mb-1">{selectedMessage.sender}</h2>
+                                        <p className="text-sm text-slate-500 font-medium">{selectedMessage.subject}</p>
+                                    </div>
 
-                            {/* Body */}
-                            <div className="bg-white p-5 rounded-2xl mb-6 shadow-sm border border-slate-100">
-                                <p className="text-sm leading-relaxed text-slate-700 whitespace-pre-wrap">{selectedMessage.text}</p>
-                            </div>
+                                    {/* Body */}
+                                    <div className="bg-white p-5 rounded-2xl mb-6 shadow-sm border border-slate-100">
+                                        <p className="text-sm leading-relaxed text-slate-700 whitespace-pre-wrap">{selectedMessage.text}</p>
+                                    </div>
+                                </>
+                            )}
+
+                            {selectedFriendFavor && (
+                                <div className="mb-6 overflow-hidden rounded-3xl border border-sky-100 bg-white shadow-xl">
+                                    <div className="bg-gradient-to-br from-slate-950 via-sky-950 to-slate-900 p-5 text-white">
+                                        <div className="mb-3 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.24em] text-sky-200">
+                                            <Heart size={14} /> Friend Favor
+                                        </div>
+                                        <h3 className="text-2xl font-black leading-tight">
+                                            {selectedFriendFavor.favorType === 'MONEY' ? formatMoney(selectedFriendFavor.amount) : 'Career Help'}
+                                        </h3>
+                                        <p className="mt-2 text-sm font-semibold leading-relaxed text-sky-100/75">
+                                            {selectedFriendFavor.favorType === 'MONEY'
+                                                ? 'Helping costs cash but builds loyalty. Passing may cool the friendship.'
+                                                : 'Putting in a word can deepen the friendship, with a small reputation risk if it feels forced.'}
+                                        </p>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3 p-4">
+                                        <button
+                                            onClick={() => handleFriendFavorResponse(true)}
+                                            disabled={isProcessing}
+                                            className="rounded-2xl bg-sky-600 px-4 py-3 text-sm font-black uppercase tracking-[0.12em] text-white disabled:opacity-50"
+                                        >
+                                            Help
+                                        </button>
+                                        <button
+                                            onClick={() => handleFriendFavorResponse(false)}
+                                            disabled={isProcessing}
+                                            className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-black uppercase tracking-[0.12em] text-slate-500 disabled:opacity-50"
+                                        >
+                                            Pass
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {selectedMessage.type === 'OFFER_OUTSIDE_PRODUCER_INVESTMENT' && selectedMessage.data && (() => {
+                                const offer = selectedMessage.data as OutsideProducerInvestmentOffer;
+                                const counterChance = calculateOutsideInvestmentAcceptanceChance({
+                                    offer,
+                                    cashAmount: outsideCounterCash,
+                                    stakePercent: outsideCounterStake,
+                                    player
+                                });
+                                const canCounter = offer.flexible && !offer.finalTerms && !offer.counterUsed;
+                                const notEnoughCash = offer.cashAsk > player.money;
+                                const counterInvalid = outsideCounterCash > player.money || outsideCounterCash < offer.minCashAsk || outsideCounterCash > offer.maxCashAsk || outsideCounterStake <= 0 || outsideCounterStake > offer.maxStakePercent;
+                                const report = offer.scoutReport;
+                                const cleanStakeValue = ((offer.cashAsk / Math.max(1, offer.budget)) * 100).toFixed(1);
+                                const isFraudRiskOffer = !!offer.fraudRisk && offer.fraudRisk !== 'NONE';
+                                const counterCashMillions = Number((outsideCounterCash / 1_000_000).toFixed(1));
+                                const clampCounterCashMillions = (value: number) => {
+                                    if (!Number.isFinite(value)) return;
+                                    const nextCash = Math.round(value * 1_000_000);
+                                    setOutsideCounterCash(Math.min(offer.maxCashAsk, Math.max(offer.minCashAsk, nextCash)));
+                                };
+                                const clampCounterStake = (value: number) => {
+                                    if (!Number.isFinite(value)) return;
+                                    setOutsideCounterStake(Math.min(offer.maxStakePercent, Math.max(1, Number(value.toFixed(1)))));
+                                };
+
+                                if (!outsideInvestmentReview) {
+                                    return (
+                                        <div className="mb-6 overflow-hidden rounded-[2rem] border border-emerald-300/25 bg-slate-950 text-white shadow-2xl shadow-emerald-950/20">
+                                            <div className="bg-gradient-to-br from-zinc-950 via-emerald-950 to-slate-950 p-6">
+                                                <div className="mb-5 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.24em] text-emerald-200">
+                                                    <Clapperboard size={14} /> Producer Investment
+                                                </div>
+                                                <h3 className="text-3xl font-black leading-tight">{offer.projectTitle}</h3>
+                                                <p className="mt-3 text-base font-semibold leading-relaxed text-emerald-100/75">
+                                                    {offer.producerName} wants {formatMoney(offer.cashAsk)} for {offer.offeredStakePercent}% of producer receipts.
+                                                </p>
+                                                {isFraudRiskOffer && (
+                                                    <div className="mt-4 flex flex-wrap gap-2">
+                                                        <span className="rounded-full border border-amber-300/30 bg-amber-300/15 px-3 py-1 text-[9px] font-black uppercase tracking-widest text-amber-100">Generous Terms</span>
+                                                        <span className="rounded-full border border-rose-300/30 bg-rose-300/15 px-3 py-1 text-[9px] font-black uppercase tracking-widest text-rose-100">Verification weak</span>
+                                                    </div>
+                                                )}
+
+                                                <div className="mt-6 grid grid-cols-3 gap-3">
+                                                    <div>
+                                                        <div className="text-[9px] font-black uppercase tracking-widest text-emerald-100/45">Ask</div>
+                                                        <div className="mt-1 font-mono text-lg font-black">{formatMoney(offer.cashAsk)}</div>
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-[9px] font-black uppercase tracking-widest text-emerald-100/45">Stake</div>
+                                                        <div className="mt-1 font-mono text-lg font-black">{offer.offeredStakePercent}%</div>
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-[9px] font-black uppercase tracking-widest text-emerald-100/45">Risk</div>
+                                                        <div className="mt-1 font-mono text-lg font-black text-amber-200">{report.risk}</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="space-y-3 p-4">
+                                                <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                                                    <div className="text-[9px] font-black uppercase tracking-widest text-emerald-200/60">Backer</div>
+                                                    <div className="mt-1 text-base font-black leading-snug text-white">{offer.producerType || 'Producer'}</div>
+                                                    <div className="mt-1 text-xs font-bold leading-snug text-emerald-100/55">{offer.ownerName || offer.producerName}</div>
+                                                </div>
+                                                <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                                                    <div className="text-[9px] font-black uppercase tracking-widest text-emerald-200/60">Project Lane</div>
+                                                    <div className="mt-1 text-base font-black leading-snug text-white">{formatReportLabel(offer.releasePath)}</div>
+                                                    <div className="mt-1 text-xs font-bold leading-snug text-emerald-100/55">Budget {formatMoney(offer.budget)} • Releases in ~{offer.expectedReleaseWeeks}w</div>
+                                                </div>
+
+                                                <div className="rounded-2xl border border-emerald-300/15 bg-emerald-300/5 p-4">
+                                                    <div className="mb-3 text-[10px] font-black uppercase tracking-[0.22em] text-emerald-100/55">Quick read</div>
+                                                    <div className="grid grid-cols-3 gap-2 text-center">
+                                                        <div className="rounded-xl bg-black/25 p-2">
+                                                            <div className="text-[8px] font-black uppercase tracking-widest text-emerald-100/45">Market</div>
+                                                            <div className="mt-1 text-sm font-black text-white">{report.marketFit}</div>
+                                                        </div>
+                                                        <div className="rounded-xl bg-black/25 p-2">
+                                                            <div className="text-[8px] font-black uppercase tracking-widest text-emerald-100/45">Cast</div>
+                                                            <div className="mt-1 text-sm font-black text-white">{report.castQuality}</div>
+                                                        </div>
+                                                        <div className="rounded-xl bg-black/25 p-2">
+                                                            <div className="text-[8px] font-black uppercase tracking-widest text-emerald-100/45">Clean</div>
+                                                            <div className="mt-1 text-sm font-black text-white">{cleanStakeValue}%</div>
+                                                        </div>
+                                                    </div>
+                                                    <p className="mt-3 text-xs font-bold leading-relaxed text-emerald-100/60">
+                                                        Review the full investment page before accepting. Counters are only available if the producer is open to bargaining.
+                                                    </p>
+                                                </div>
+
+                                                <button
+                                                    onClick={() => setOutsideInvestmentReview(true)}
+                                                    className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-white px-4 py-4 text-sm font-black uppercase tracking-[0.14em] text-slate-950 shadow-lg"
+                                                >
+                                                    Review Investment <ChevronRight size={17} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    );
+                                }
+
+                                return (
+                                    <div className="fixed inset-0 z-[9999] overflow-y-auto bg-slate-950 text-white">
+                                        <div className="sticky top-0 z-20 border-b border-white/10 bg-slate-950/95 p-4 shadow-2xl shadow-black/30 backdrop-blur">
+                                            <div className="mx-auto flex w-full max-w-5xl items-center gap-3">
+                                                <button
+                                                    onClick={() => setOutsideInvestmentReview(false)}
+                                                    className="flex shrink-0 items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm font-black text-slate-200"
+                                                >
+                                                    <ArrowLeft size={18} /> Summary
+                                                </button>
+                                                <div className="min-w-0 flex-1 text-right text-xl font-black">Investment Review</div>
+                                            </div>
+                                        </div>
+
+                                        <div className="mx-auto w-full max-w-5xl px-4 py-4 pb-36 sm:px-6 lg:px-8">
+                                            <div className="overflow-hidden rounded-[2rem] border border-emerald-300/25 bg-slate-950 text-white shadow-2xl shadow-emerald-950/20">
+                                        <div className="bg-gradient-to-br from-zinc-950 via-emerald-950 to-slate-950 p-5 text-white">
+                                            <div className="mb-3 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.24em] text-emerald-200">
+                                                <Clapperboard size={14} /> Producer Investment
+                                            </div>
+                                            <h3 className="text-2xl font-black leading-tight">{offer.projectTitle}</h3>
+                                            <p className="mt-2 text-sm font-semibold leading-relaxed text-emerald-100/75">
+                                                {offer.producerName} wants {formatMoney(offer.cashAsk)} for {offer.offeredStakePercent}% of producer receipts.
+                                            </p>
+                                            {isFraudRiskOffer && (
+                                                <div className="mt-4 rounded-2xl border border-amber-300/25 bg-amber-300/10 p-3">
+                                                    <div className="flex flex-wrap gap-2">
+                                                        <span className="rounded-full bg-amber-200 px-3 py-1 text-[9px] font-black uppercase tracking-widest text-slate-950">Generous Terms</span>
+                                                        <span className="rounded-full border border-rose-300/30 bg-rose-300/15 px-3 py-1 text-[9px] font-black uppercase tracking-widest text-rose-100">Unverified financing</span>
+                                                    </div>
+                                                    <p className="mt-2 text-xs font-bold leading-relaxed text-amber-100/80">
+                                                        This deal is unusually generous. Scout report cannot fully verify funding sources.
+                                                    </p>
+                                                </div>
+                                            )}
+                                            <div className="mt-4 grid grid-cols-2 gap-2">
+                                                <div className="rounded-2xl bg-white/[0.08] p-3">
+                                                    <div className="text-[8px] font-black uppercase tracking-widest text-emerald-100/45">Budget</div>
+                                                    <div className="mt-1 font-mono text-sm font-black">{formatMoney(offer.budget)}</div>
+                                                </div>
+                                                <div className="rounded-2xl bg-white/[0.08] p-3">
+                                                    <div className="text-[8px] font-black uppercase tracking-widest text-emerald-100/45">Risk</div>
+                                                    <div className="mt-1 font-mono text-sm font-black text-amber-200">{report.risk}</div>
+                                                </div>
+                                                <div className="col-span-2 rounded-2xl bg-white/[0.08] p-3">
+                                                    <div className="flex items-center justify-between gap-3">
+                                                        <div className="text-[8px] font-black uppercase tracking-widest text-emerald-100/45">Path</div>
+                                                        <div className="min-w-0 text-right text-sm font-black leading-snug text-white">{formatReportLabel(offer.releasePath)}</div>
+                                                    </div>
+                                                    <div className="mt-2 text-right text-[10px] font-black uppercase tracking-widest text-emerald-100/45">
+                                                        Releases in ~{offer.expectedReleaseWeeks} weeks
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-4 p-4 pb-32">
+                                            <div className="rounded-2xl border border-emerald-300/15 bg-white/[0.04] p-4">
+                                                <div className="mb-3 text-[10px] font-black uppercase tracking-[0.22em] text-emerald-100/55">Scout Report</div>
+                                                <div className="grid grid-cols-3 gap-2 text-center">
+                                                    {[
+                                                        ['Script', report.scriptQuality],
+                                                        ['Director', report.directorQuality],
+                                                        ['Cast', report.castQuality],
+                                                        ['Market', report.marketFit],
+                                                        ['Buzz', report.buzz],
+                                                        ['Budget', report.budgetDiscipline],
+                                                    ].map(([label, value]) => (
+                                                        <div key={label} className="rounded-xl bg-black/25 p-2">
+                                                            <div className="text-[8px] font-black uppercase tracking-widest text-emerald-100/45">{label}</div>
+                                                            <div className="mt-1 text-sm font-black text-white">{value}</div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                <div className="mt-3 rounded-xl bg-black/25 p-3 text-xs font-bold text-emerald-100/70">
+                                                    ROI Range: <span className="text-rose-300">{report.roiLowPct}%</span> to <span className="text-emerald-300">+{report.roiHighPct}%</span>
+                                                </div>
+                                            </div>
+
+                                            <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                                                <div className="mb-2 text-[10px] font-black uppercase tracking-[0.22em] text-emerald-100/55">Package</div>
+                                                <div className="text-base font-black text-white">{offer.directorName}</div>
+                                                <div className="mt-1 text-sm font-bold leading-snug text-emerald-100/60">{offer.castNames.join(', ')}</div>
+                                                <p className="mt-3 text-sm font-semibold leading-relaxed text-slate-300">{offer.logline}</p>
+                                                <div className="mt-4 grid grid-cols-1 gap-2">
+                                                    <div className="rounded-xl bg-black/25 p-3">
+                                                        <div className="text-[8px] font-black uppercase tracking-widest text-emerald-100/45">Backer</div>
+                                                        <div className="mt-1 text-sm font-black leading-snug text-white">{offer.producerType || 'Producer'}</div>
+                                                    </div>
+                                                    <div className="rounded-xl bg-black/25 p-3">
+                                                        <div className="text-[8px] font-black uppercase tracking-widest text-emerald-100/45">Owner</div>
+                                                        <div className="mt-1 text-sm font-black leading-snug text-white">{offer.ownerName || offer.producerName}</div>
+                                                    </div>
+                                                    <div className="rounded-xl bg-black/25 p-3">
+                                                        <div className="text-[8px] font-black uppercase tracking-widest text-emerald-100/45">Record</div>
+                                                        <div className="mt-1 font-mono text-sm font-black text-white">{offer.trackRecord || 50}/100</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {offer.finalTerms ? (
+                                                <div className="rounded-2xl border border-amber-300/25 bg-amber-300/10 p-3 text-sm font-bold leading-relaxed text-amber-100">
+                                                    Final terms. They are not looking to bargain on this package.
+                                                </div>
+                                            ) : (
+                                                <div className="overflow-hidden rounded-[1.75rem] border border-emerald-300/25 bg-gradient-to-br from-emerald-300/10 via-cyan-300/5 to-white/[0.03] shadow-xl shadow-emerald-950/25">
+                                                    <div className="border-b border-white/10 p-4">
+                                                        <div className="flex items-start justify-between gap-3">
+                                                            <div>
+                                                                <div className="text-[10px] font-black uppercase tracking-[0.24em] text-emerald-100/55">Counter Desk</div>
+                                                                <div className="mt-1 text-lg font-black leading-tight text-white">Make your terms</div>
+                                                            </div>
+                                                            <div className="shrink-0 rounded-2xl bg-white px-3 py-2 text-right shadow-lg">
+                                                                <div className="text-[8px] font-black uppercase tracking-widest text-emerald-700/70">Accept</div>
+                                                                <div className="font-mono text-xl font-black leading-none text-emerald-700">{counterChance}%</div>
+                                                            </div>
+                                                        </div>
+                                                        <div className="mt-4 h-2 overflow-hidden rounded-full bg-black/30">
+                                                            <div
+                                                                className="h-full rounded-full bg-gradient-to-r from-amber-300 via-emerald-300 to-cyan-300"
+                                                                style={{ width: `${Math.max(4, Math.min(100, counterChance))}%` }}
+                                                            />
+                                                        </div>
+                                                        <div className="mt-2 flex items-center justify-between text-[9px] font-black uppercase tracking-widest text-emerald-100/40">
+                                                            <span>Risky</span>
+                                                            <span>Likely</span>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="grid grid-cols-2 gap-2 p-4 pb-0">
+                                                        <div className="rounded-2xl border border-white/10 bg-black/25 p-3">
+                                                            <div className="text-[8px] font-black uppercase tracking-widest text-emerald-100/40">Their Ask</div>
+                                                            <div className="mt-2 font-mono text-sm font-black text-white">{formatMoney(offer.cashAsk)}</div>
+                                                            <div className="mt-1 text-xs font-black text-emerald-100/55">{offer.offeredStakePercent}% receipts</div>
+                                                        </div>
+                                                        <div className="rounded-2xl border border-emerald-300/20 bg-emerald-300/10 p-3">
+                                                            <div className="text-[8px] font-black uppercase tracking-widest text-emerald-100/45">Your Counter</div>
+                                                            <div className="mt-2 font-mono text-sm font-black text-white">{formatMoney(outsideCounterCash)}</div>
+                                                            <div className="mt-1 text-xs font-black text-emerald-100/65">{outsideCounterStake}% receipts</div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="space-y-3 p-4">
+                                                        <div className="rounded-[1.35rem] border border-white/10 bg-black/25 p-3">
+                                                            <div className="flex items-center justify-between gap-2">
+                                                                <span className="text-[9px] font-black uppercase tracking-widest text-emerald-100/55">Cash Offer</span>
+                                                                <span className="rounded-full bg-emerald-300/10 px-2 py-1 text-[8px] font-black uppercase tracking-widest text-emerald-100/55">
+                                                                    {formatMoney(offer.minCashAsk)} - {formatMoney(offer.maxCashAsk)}
+                                                                </span>
+                                                            </div>
+                                                            <div className="mt-2 grid grid-cols-[42px_1fr_42px] gap-2">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => clampCounterCashMillions(counterCashMillions - 0.5)}
+                                                                    className="flex h-12 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-2xl font-black text-emerald-100"
+                                                                >
+                                                                    -
+                                                                </button>
+                                                                <div className="flex h-12 min-w-0 items-center rounded-2xl border border-emerald-200 bg-white px-3 shadow-lg shadow-emerald-950/20">
+                                                                    <span className="shrink-0 text-sm font-black text-slate-400">$</span>
+                                                                    <input
+                                                                        type="number"
+                                                                        value={counterCashMillions}
+                                                                        min={Number((offer.minCashAsk / 1_000_000).toFixed(1))}
+                                                                        max={Number((offer.maxCashAsk / 1_000_000).toFixed(1))}
+                                                                        step={0.1}
+                                                                        onChange={event => clampCounterCashMillions(Number(event.target.value))}
+                                                                        className="min-w-0 flex-1 bg-transparent px-1 text-center text-xl font-black text-slate-950 outline-none"
+                                                                    />
+                                                                    <span className="shrink-0 text-xs font-black uppercase tracking-widest text-slate-400">M</span>
+                                                                </div>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => clampCounterCashMillions(counterCashMillions + 0.5)}
+                                                                    className="flex h-12 items-center justify-center rounded-2xl border border-emerald-300/25 bg-emerald-300/10 text-2xl font-black text-emerald-100"
+                                                                >
+                                                                    +
+                                                                </button>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="rounded-[1.35rem] border border-white/10 bg-black/25 p-3">
+                                                            <div className="flex items-center justify-between gap-2">
+                                                                <span className="text-[9px] font-black uppercase tracking-widest text-emerald-100/55">Receipt Stake</span>
+                                                                <span className="rounded-full bg-emerald-300/10 px-2 py-1 text-[8px] font-black uppercase tracking-widest text-emerald-100/55">
+                                                                    Max {offer.maxStakePercent}%
+                                                                </span>
+                                                            </div>
+                                                            <div className="mt-2 grid grid-cols-[42px_1fr_42px] gap-2">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => clampCounterStake(outsideCounterStake - 0.5)}
+                                                                    className="flex h-12 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-2xl font-black text-emerald-100"
+                                                                >
+                                                                    -
+                                                                </button>
+                                                                <div className="flex h-12 min-w-0 items-center rounded-2xl border border-emerald-200 bg-white px-3 shadow-lg shadow-emerald-950/20">
+                                                                    <input
+                                                                        type="number"
+                                                                        value={outsideCounterStake}
+                                                                        min={1}
+                                                                        max={offer.maxStakePercent}
+                                                                        step={0.5}
+                                                                        onChange={event => clampCounterStake(Number(event.target.value))}
+                                                                        className="min-w-0 flex-1 bg-transparent px-1 text-center text-xl font-black text-slate-950 outline-none"
+                                                                    />
+                                                                    <span className="shrink-0 text-sm font-black text-slate-400">%</span>
+                                                                </div>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => clampCounterStake(outsideCounterStake + 0.5)}
+                                                                    className="flex h-12 items-center justify-center rounded-2xl border border-emerald-300/25 bg-emerald-300/10 text-2xl font-black text-emerald-100"
+                                                                >
+                                                                    +
+                                                                </button>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="rounded-2xl border border-white/10 bg-black/20 p-3 text-[11px] font-bold leading-relaxed text-emerald-100/55">
+                                                            One counter only. If they decline, the deal is gone.
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {notEnoughCash && (
+                                                <div className="rounded-2xl border border-rose-300/25 bg-rose-300/10 p-3 text-sm font-bold leading-relaxed text-rose-100">
+                                                    You need {formatMoney(offer.cashAsk)} cash to accept the original terms.
+                                                </div>
+                                            )}
+
+                                            <div className="sticky bottom-0 -mx-4 mt-2 border-t border-white/10 bg-slate-950/95 p-4 shadow-[0_-18px_30px_rgba(0,0,0,0.35)] backdrop-blur">
+                                                <div className="mb-3 flex items-center justify-between gap-3">
+                                                    <div>
+                                                        <div className="text-[9px] font-black uppercase tracking-[0.22em] text-emerald-100/45">Decision</div>
+                                                        <div className="text-sm font-black text-white">Producer receipts • {offer.offeredStakePercent}%</div>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => setOutsideInvestmentReview(false)}
+                                                        className="rounded-full border border-white/10 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-slate-300"
+                                                    >
+                                                        Summary
+                                                    </button>
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <button
+                                                        onClick={() => handleOutsideInvestmentAction('ACCEPT')}
+                                                        disabled={notEnoughCash}
+                                                        className="rounded-2xl bg-emerald-500 px-4 py-4 text-sm font-black uppercase tracking-[0.12em] text-black disabled:opacity-40"
+                                                    >
+                                                        Accept Terms
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleOutsideInvestmentAction('PASS')}
+                                                        className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4 text-sm font-black uppercase tracking-[0.12em] text-slate-300"
+                                                    >
+                                                        Pass
+                                                    </button>
+                                                </div>
+                                                {canCounter && (
+                                                    <button
+                                                        onClick={() => handleOutsideInvestmentAction('COUNTER')}
+                                                        disabled={counterInvalid}
+                                                        className="mt-3 w-full rounded-2xl border border-emerald-300/25 bg-white px-4 py-4 text-sm font-black uppercase tracking-[0.12em] text-emerald-700 disabled:opacity-40"
+                                                    >
+                                                        Send Counter
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })()}
 
                             {/* CASTING OFFER CARD */}
                             {(selectedMessage.type === 'OFFER_ROLE' || selectedMessage.type === 'OFFER_AUDITION' || selectedMessage.type === 'OFFER_NEGOTIATION') && selectedMessage.data && (
@@ -506,6 +1112,7 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                                                 : (selectedMessage.data as AuditionOpportunity).estimatedIncome;
                                             const safePay = typeof pay === 'number' && Number.isFinite(pay) ? pay : 0;
                                             const hasValidContract = !!opp;
+                                            const musicByline = opp?.project ? formatProjectMusicByline(opp.project, 2) : '';
 
                                             return (
                                                 <>
@@ -513,6 +1120,15 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                                                     <p className="text-sm text-slate-400 mb-6">
                                                         {opp ? `${opp.roleType} Role • ${opp.genre}` : tr('messages.contractMissing')}
                                                     </p>
+                                                    {musicByline && (
+                                                        <div className="mb-6 flex items-start gap-2 rounded-2xl border border-cyan-400/20 bg-cyan-400/10 p-3">
+                                                            <Music2 size={14} className="mt-0.5 shrink-0 text-cyan-300" />
+                                                            <div className="min-w-0">
+                                                                <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-cyan-200/80">Music by</div>
+                                                                <div className="truncate text-sm font-bold text-white">{musicByline}</div>
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                     
                                                     <div className="flex items-end justify-between mb-6 border-t border-white/10 pt-4">
                                                         <div>
@@ -603,6 +1219,34 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                                                         <div className="bg-white/5 rounded-xl p-3">{tr('messages.penalty')}: <strong>${deal.penalty.toLocaleString()}</strong></div>
                                                     </div>
                                                     <button onClick={handleSignDeal} className="w-full py-4 bg-amber-500 text-black rounded-xl font-bold text-sm">{tr('messages.acceptDeal')}</button>
+                                                </>
+                                            );
+                                        })()}
+                                    </div>
+                                </div>
+                            )}
+
+                            {selectedMessage.type === 'OFFER_MUSIC_VIDEO_FEATURE' && selectedMessage.data && (
+                                <div className="bg-cyan-950 rounded-3xl p-5 text-white shadow-xl relative overflow-hidden">
+                                    <div className="absolute top-0 right-0 p-6 opacity-10"><Music2 size={120} /></div>
+                                    <div className="relative z-10">
+                                        {(() => {
+                                            const feature = selectedMessage.data as YoutubeMusicVideoFeatureOffer;
+                                            return (
+                                                <>
+                                                    <div className="text-xs font-bold text-cyan-300 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                                        <Music2 size={14}/> Music Video Feature
+                                                    </div>
+                                                    <h3 className="text-2xl font-bold mb-1">{feature.artistName}</h3>
+                                                    <div className="text-sm text-cyan-200/80 mb-2">{feature.genre} • {feature.songTitle}</div>
+                                                    <p className="text-sm text-cyan-100/80 mb-5">{feature.description}</p>
+                                                    <div className="grid grid-cols-2 gap-3 text-xs mb-5">
+                                                        <div className="bg-white/5 rounded-xl p-3">Fee: <strong>${feature.appearanceFee.toLocaleString()}</strong></div>
+                                                        <div className="bg-white/5 rounded-xl p-3">Video Reach: <strong>~{feature.bonusViews.toLocaleString()}</strong></div>
+                                                        <div className="bg-white/5 rounded-xl p-3">Follower Lift: <strong>~+{feature.followerGain.toLocaleString()}</strong></div>
+                                                        <div className="bg-white/5 rounded-xl p-3">Image Risk: <strong>{feature.reputationRisk}</strong></div>
+                                                    </div>
+                                                    <button onClick={handleSignDeal} className="w-full py-4 bg-cyan-400 text-black rounded-xl font-bold text-sm">Accept Cameo</button>
                                                 </>
                                             );
                                         })()}

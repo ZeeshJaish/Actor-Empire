@@ -4,6 +4,7 @@ import { Player, Business } from '../../../types';
 import { BUSINESS_BLUEPRINTS, checkAndRefreshHiringPool, hireCandidate, expandBusiness, restockProduct, updateProductPrice, createProduct, BUSINESS_THEMES, BUSINESS_AMENITIES, BUSINESS_PRODUCTION_TYPES, PRODUCT_CATALOG, PRODUCT_DEV_OPTIONS, injectCapital, withdrawCapital, sellBusiness, liquidateBusiness } from '../../../services/businessLogic';
 import { formatMoney } from '../../../services/formatUtils';
 import { spendPlayerEnergy } from '../../../services/premiumLogic';
+import { getPlayerLanguage, t } from '../../../services/i18n';
 import { ArrowLeft, Activity, Store, Megaphone, DollarSign, TrendingUp, Target, Settings, Shield, Globe, Plus, Minus, UserPlus, Briefcase, User, ShoppingBag, X, Zap, Beaker, RefreshCw, BarChart2, Users, Tv, Package, AlertTriangle, LogOut, Star, AlertCircle, ArrowRight } from 'lucide-react';
 
 interface BusinessDashboardProps {
@@ -38,6 +39,12 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ business, 
     // EXIT MODAL
     const [showExitModal, setShowExitModal] = useState<'SELL' | 'LIQUIDATE' | null>(null);
 
+    const language = getPlayerLanguage(player);
+    const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
+    const getProductCatalogName = (id: string) => tr(`services.business.catalog.product.${id}.name`);
+    const getDevSectionLabel = (sectionKey: string) => tr(`services.business.catalog.devSection.${sectionKey.toLowerCase()}`);
+    const getDevOptionLabel = (optionId: string) => tr(`services.business.catalog.devOption.${optionId}.label`);
+    const getDevOptionDescription = (optionId: string) => tr(`services.business.catalog.devOption.${optionId}.description`);
     const blueprint = BUSINESS_BLUEPRINTS[business.type];
     const filteredHiringPool = business.hiringPool.filter(candidate => {
         if (candidate.role === 'MANAGER' && business.staff.some(staff => staff.role === 'MANAGER')) return false;
@@ -119,38 +126,38 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ business, 
     }
 
     // --- INSIGHT LOGIC ---
-    let managerInsight = "Everything looks stable.";
+    let managerInsight = tr('services.business.dashboard.insight.stable');
     let insightColor = "text-zinc-400";
     let insightIcon = <Activity size={16}/>;
 
     if (blueprint.model === 'SERVICE') {
         if (business.staff.filter(s => s.role !== 'MANAGER').length === 0) {
-             managerInsight = "CRITICAL: No staff hired! We cannot serve anyone. Hire staff immediately.";
+             managerInsight = tr('services.business.dashboard.insight.noStaff');
              insightColor = "text-rose-500 animate-pulse";
              insightIcon = <AlertCircle size={16}/>;
         }
         else if (estimatedDemand > estimatedCapacity * 1.2) {
-            managerInsight = "We are turning people away! Hire more staff or expand locations.";
+            managerInsight = tr('services.business.dashboard.insight.turningAway');
             insightColor = "text-amber-400";
             insightIcon = <Store size={16}/>;
         } else if (estimatedCapacity > estimatedDemand * 1.5) {
-            managerInsight = "Tables are empty. Increase Marketing to fill seats.";
+            managerInsight = tr('services.business.dashboard.insight.emptyTables');
             insightColor = "text-blue-400";
             insightIcon = <Megaphone size={16}/>;
         }
     } else {
         // Product Logic
         if (estimatedCapacity === 0) {
-            managerInsight = "SOLD OUT! We are making $0 revenue. Restock inventory now!";
+            managerInsight = tr('services.business.dashboard.insight.soldOut');
             insightColor = "text-rose-500 animate-pulse";
             insightIcon = <Package size={16}/>;
         }
         else if (estimatedCapacity < estimatedDemand * 0.2) {
-            managerInsight = "Low Inventory! We will sell out soon. Restock.";
+            managerInsight = tr('services.business.dashboard.insight.lowInventory');
             insightColor = "text-amber-400";
             insightIcon = <Package size={16}/>;
         } else if (estimatedDemand < 50) {
-            managerInsight = "No one knows about our brand. Run a marketing campaign.";
+            managerInsight = tr('services.business.dashboard.insight.lowAwareness');
             insightColor = "text-blue-400";
             insightIcon = <Megaphone size={16}/>;
         }
@@ -169,13 +176,13 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ business, 
         const amount = parseInt(capitalAmount.replace(/,/g, ''));
         if (isNaN(amount) || amount <= 0) return;
         if (showCapitalModal === 'INJECT') {
-            if (player.money < amount) { alert("Insufficient personal funds."); return; }
+            if (player.money < amount) { alert(tr('services.business.dashboard.alert.insufficientPersonalFunds')); return; }
             const updatedBiz = injectCapital(business, amount);
             const businesses = player.businesses.map(b => b.id === business.id ? updatedBiz : b);
             onUpdatePlayer({ ...player, money: player.money - amount, businesses });
         } else {
             const res = withdrawCapital(business, amount);
-            if (!res.success) { alert("Insufficient business funds."); return; }
+            if (!res.success) { alert(tr('services.business.dashboard.alert.insufficientBusinessFunds')); return; }
             const businesses = player.businesses.map(b => b.id === business.id ? res.updated : b);
             onUpdatePlayer({ ...player, money: player.money + amount, businesses });
         }
@@ -185,11 +192,11 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ business, 
 
     const handleCreateProduct = () => {
         if (!newProdType || !newProdName) return;
-        if (player.energy.current < 25) { alert("Not enough energy! (25E)"); return; }
+        if (player.energy.current < 25) { alert(tr('services.business.dashboard.alert.notEnoughEnergy')); return; }
         const def = PRODUCT_CATALOG.find(p => p.id === newProdType);
         if (!def) return;
         const finalPrice = customSellingPrice ? parseInt(customSellingPrice) : undefined;
-        const res = createProduct(business, newProdName, newProdType, newProdQty, def.baseCost, finalPrice, devOptions);
+        const res = createProduct(business, newProdName, newProdType, newProdQty, def.baseCost, finalPrice, devOptions, language);
         if (res.success) {
             const businesses = player.businesses.map(b => b.id === business.id ? res.updated : b);
             const nextPlayer = { ...player, businesses };
@@ -221,7 +228,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ business, 
     };
 
     const handleHire = (candidate: any) => {
-        if (candidate.role === 'MANAGER' && business.staff.some(s => s.role === 'MANAGER')) { alert("Manager already hired."); return; }
+        if (candidate.role === 'MANAGER' && business.staff.some(s => s.role === 'MANAGER')) { alert(tr('services.business.dashboard.alert.managerAlreadyHired')); return; }
         const updated = hireCandidate(business, candidate);
         const businesses = player.businesses.map(b => b.id === business.id ? updated : b);
         onUpdatePlayer({ ...player, businesses });
@@ -236,7 +243,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ business, 
 
     const handleRestock = () => {
         if (!restockTarget) return;
-        const res = restockProduct(business, restockTarget.id, restockTarget.quantity);
+        const res = restockProduct(business, restockTarget.id, restockTarget.quantity, language);
         if (res.success) {
             const businesses = player.businesses.map(b => b.id === business.id ? res.updated : b);
             onUpdatePlayer({ ...player, businesses });
@@ -247,7 +254,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ business, 
     };
 
     const handleExpand = () => {
-        const res = expandBusiness(business);
+        const res = expandBusiness(business, language);
         if (res.success) {
             const businesses = player.businesses.map(b => b.id === business.id ? res.updated : b);
             onUpdatePlayer({ ...player, businesses });
@@ -270,7 +277,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ business, 
         if (!showExitModal) return;
 
         if (showExitModal === 'SELL') {
-            const res = sellBusiness(business);
+            const res = sellBusiness(business, language);
             if (!res.success) {
                 alert(res.msg);
                 setShowExitModal(null);
@@ -287,7 +294,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ business, 
             onBack();
         } 
         else if (showExitModal === 'LIQUIDATE') {
-            const res = liquidateBusiness(business);
+            const res = liquidateBusiness(business, language);
             const updatedBusinesses = player.businesses.filter(b => b.id !== business.id);
             const newMoney = player.money + res.payout;
             onUpdatePlayer({ 
@@ -304,11 +311,23 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ business, 
     const mBudget = business.config.marketingBudget || { social: 0, influencer: 0, billboard: 0, tv: 0 };
     const weeklyMarketingCost = (Object.values(mBudget) as number[]).reduce((a, b) => a + b, 0);
     const totalInventory = business.products.reduce((acc, p) => acc + (p.inventory || 0), 0);
-    const sellCheck = sellBusiness(business);
-    const liquidateCheck = liquidateBusiness(business);
+    const sellCheck = sellBusiness(business, language);
+    const liquidateCheck = liquidateBusiness(business, language);
 
     // Star Rating
     const starRating = Math.max(0, Math.min(5, (business.stats.customerSatisfaction / 20)));
+    const dashboardTabs = [
+        { id: 'OVERVIEW', icon: Activity, labelKey: 'services.business.dashboard.tab.overview' },
+        { id: 'OPS', icon: Store, labelKey: 'services.business.dashboard.tab.ops' },
+        { id: 'MARKET', icon: Megaphone, labelKey: 'services.business.dashboard.tab.promo' },
+        { id: 'MONEY', icon: DollarSign, labelKey: 'services.business.dashboard.tab.finance' },
+    ] as const;
+    const marketingChannels = [
+        { id: 'social', labelKey: 'services.business.dashboard.market.channel.social', min: 0, max: 5000, step: 100, icon: Globe },
+        { id: 'influencer', labelKey: 'services.business.dashboard.market.channel.influencer', min: 0, max: 20000, step: 500, icon: Users },
+        { id: 'billboard', labelKey: 'services.business.dashboard.market.channel.billboard', min: 0, max: 50000, step: 1000, icon: Store },
+        { id: 'tv', labelKey: 'services.business.dashboard.market.channel.tv', min: 0, max: 200000, step: 5000, icon: Tv },
+    ] as const;
 
     return (
         <div className="absolute inset-0 bg-[#050505] flex flex-col z-[60] text-white animate-in slide-in-from-right duration-300 font-sans">
@@ -317,8 +336,8 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ business, 
                 <div className="flex items-center justify-between mb-6">
                     <button onClick={onBack} className="bg-black/40 hover:bg-black/60 p-2 rounded-full backdrop-blur-md transition-colors border border-white/5"><ArrowLeft size={18} /></button>
                     <div className="flex gap-2">
-                        <button onClick={() => setShowCapitalModal('INJECT')} className="bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 px-3 py-1.5 rounded-full text-[10px] font-bold border border-emerald-500/20 transition-colors">+ Inject</button>
-                        <button onClick={() => setShowCapitalModal('WITHDRAW')} className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 px-3 py-1.5 rounded-full text-[10px] font-bold border border-rose-500/20 transition-colors">- Withdraw</button>
+                        <button onClick={() => setShowCapitalModal('INJECT')} className="bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 px-3 py-1.5 rounded-full text-[10px] font-bold border border-emerald-500/20 transition-colors">{tr('services.business.dashboard.header.inject')}</button>
+                        <button onClick={() => setShowCapitalModal('WITHDRAW')} className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 px-3 py-1.5 rounded-full text-[10px] font-bold border border-rose-500/20 transition-colors">{tr('services.business.dashboard.header.withdraw')}</button>
                     </div>
                 </div>
                 <div className="flex items-end justify-between">
@@ -335,15 +354,15 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ business, 
                             </div>
                         </div>
                     </div>
-                    <div className="text-right"><div className="text-[10px] text-zinc-500 font-bold uppercase mb-0.5">Cash Balance</div><div className="font-mono font-bold text-white text-lg">{formatMoney(business.balance)}</div></div>
+                    <div className="text-right"><div className="text-[10px] text-zinc-500 font-bold uppercase mb-0.5">{tr('services.business.dashboard.header.cashBalance')}</div><div className="font-mono font-bold text-white text-lg">{formatMoney(business.balance)}</div></div>
                 </div>
             </div>
 
             {/* TABS */}
             <div className="flex p-1 mx-4 mt-4 bg-zinc-900/80 rounded-xl border border-white/5 backdrop-blur-sm sticky top-2 z-10">
-                {[{ id: 'OVERVIEW', icon: Activity, label: 'Dash' }, { id: 'OPS', icon: Store, label: 'Ops' }, { id: 'MARKET', icon: Megaphone, label: 'Promo' }, { id: 'MONEY', icon: DollarSign, label: 'Finance' }].map(tab => (
+                {dashboardTabs.map(tab => (
                     <button key={tab.id} onClick={() => setActiveTab(tab.id as Tab)} className={`flex-1 flex flex-col items-center justify-center py-2 rounded-lg transition-all ${activeTab === tab.id ? 'bg-white text-black shadow-lg scale-[1.02]' : 'text-zinc-500 hover:text-zinc-300'}`}>
-                        <tab.icon size={16} strokeWidth={2.5} /><span className="text-[9px] font-bold uppercase tracking-wide mt-0.5">{tab.label}</span>
+                        <tab.icon size={16} strokeWidth={2.5} /><span className="text-[9px] font-bold uppercase tracking-wide mt-0.5">{tr(tab.labelKey)}</span>
                     </button>
                 ))}
             </div>
@@ -356,37 +375,37 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ business, 
                         <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-4 flex items-start gap-3">
                             <div className={`p-2 rounded-lg bg-black ${insightColor}`}>{insightIcon}</div>
                             <div>
-                                <div className="text-[10px] text-zinc-500 font-bold uppercase mb-1">Manager's Report</div>
+                                <div className="text-[10px] text-zinc-500 font-bold uppercase mb-1">{tr('services.business.dashboard.overview.managerReport')}</div>
                                 <div className="text-sm font-medium text-white leading-tight">{managerInsight}</div>
                             </div>
                         </div>
 
-                        {/* Traffic Funnel Visualization */}
+                        {/* Funnel visualization */}
                         <div className="bg-zinc-900 border border-zinc-800 rounded-[2rem] p-6">
-                            <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-4">Traffic Funnel</h3>
+                            <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-4">{tr('services.business.dashboard.overview.trafficFunnel')}</h3>
                             <div className="space-y-4">
                                 <div>
                                     <div className="flex justify-between text-xs mb-1">
-                                        <span className="font-bold text-blue-400">Demand</span>
-                                        <span className="text-zinc-400">{estimatedDemand.toLocaleString()} / wk</span>
+                                        <span className="font-bold text-blue-400">{tr('services.business.dashboard.overview.demand')}</span>
+                                        <span className="text-zinc-400">{tr('services.business.dashboard.overview.perWeek', { amount: estimatedDemand.toLocaleString() })}</span>
                                     </div>
                                     <div className="h-3 bg-zinc-800 rounded-full overflow-hidden">
                                         <div className="h-full bg-blue-500" style={{ width: '100%' }}></div>
                                     </div>
-                                    <div className="text-[9px] text-zinc-600 mt-1">Based on Hype & Location</div>
+                                    <div className="text-[9px] text-zinc-600 mt-1">{tr('services.business.dashboard.overview.basedOnHypeLocation')}</div>
                                 </div>
 
                                 <div>
                                     <div className="flex justify-between text-xs mb-1">
-                                        <span className="font-bold text-amber-400">{blueprint.model === 'SERVICE' ? 'Service Capacity' : 'Inventory'}</span>
-                                        <span className="text-zinc-400">{estimatedCapacity.toLocaleString()} {blueprint.model === 'SERVICE' ? 'seats' : 'units'}</span>
+                                        <span className="font-bold text-amber-400">{blueprint.model === 'SERVICE' ? tr('services.business.dashboard.overview.serviceCapacity') : tr('services.business.dashboard.overview.inventory')}</span>
+                                        <span className="text-zinc-400">{estimatedCapacity.toLocaleString()} {blueprint.model === 'SERVICE' ? tr('services.business.dashboard.overview.seats') : tr('services.business.dashboard.overview.units')}</span>
                                     </div>
                                     <div className="h-3 bg-zinc-800 rounded-full overflow-hidden">
                                         <div className="h-full bg-amber-500" style={{ width: `${Math.min(100, (estimatedCapacity / Math.max(estimatedDemand, 1)) * 100)}%` }}></div>
                                     </div>
                                     <div className="text-[9px] text-zinc-600 mt-1">
-                                        {blueprint.model === 'SERVICE' ? 'Limited by Staff & Space.' : 'Limited by Stock.'} 
-                                        {estimatedCapacity < estimatedDemand ? ' BOTTLENECK!' : ''}
+                                        {blueprint.model === 'SERVICE' ? tr('services.business.dashboard.overview.limitedByStaffSpace') : tr('services.business.dashboard.overview.limitedByStock')} 
+                                        {estimatedCapacity < estimatedDemand ? ` ${tr('services.business.dashboard.overview.bottleneck')}` : ''}
                                     </div>
                                 </div>
                             </div>
@@ -396,12 +415,12 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ business, 
                         <div className="grid grid-cols-2 gap-3">
                             <div className="bg-zinc-900 border border-zinc-800 rounded-[2rem] p-5 relative overflow-hidden group">
                                 <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity"><TrendingUp size={48}/></div>
-                                <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Weekly Net</div>
+                                <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">{tr('services.business.dashboard.overview.weeklyNet')}</div>
                                 <div className={`text-2xl font-black tracking-tight ${business.stats.weeklyProfit >= 0 ? 'text-emerald-400' : 'text-rose-500'}`}>{business.stats.weeklyProfit >= 0 ? '+' : ''}{formatMoney(business.stats.weeklyProfit)}</div>
                             </div>
                             <div className="bg-zinc-900 border border-zinc-800 rounded-[2rem] p-5 relative overflow-hidden group">
                                 <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity"><Target size={48}/></div>
-                                <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Valuation</div>
+                                <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">{tr('services.business.dashboard.overview.valuation')}</div>
                                 <div className="text-2xl font-black tracking-tight text-white">{formatMoney(business.stats.valuation)}</div>
                             </div>
                         </div>
@@ -415,16 +434,16 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ business, 
                         {blueprint.model === 'SERVICE' && (
                             <div className="bg-zinc-900 border border-zinc-800 rounded-[2rem] p-5">
                                 <div className="flex items-center gap-2 mb-4 text-amber-400 text-xs font-bold uppercase tracking-widest">
-                                    <Store size={14}/> Capacity Management
+                                    <Store size={14}/> {tr('services.business.dashboard.ops.capacityManagement')}
                                 </div>
                                 <div className="flex items-center justify-between mb-4 bg-black/40 p-3 rounded-xl border border-zinc-800">
                                     <div>
-                                        <div className="text-white font-bold">{business.stats.locations} Locations</div>
-                                        <div className="text-[10px] text-zinc-500">Physical Cap: {(business.stats.capacity || 50) * business.stats.locations}</div>
+                                        <div className="text-white font-bold">{tr('services.business.dashboard.ops.locations', { count: business.stats.locations })}</div>
+                                        <div className="text-[10px] text-zinc-500">{tr('services.business.dashboard.ops.physicalCap', { capacity: (business.stats.capacity || 50) * business.stats.locations })}</div>
                                     </div>
-                                    <button onClick={handleExpand} className="bg-amber-600 hover:bg-amber-500 text-black text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1"><Plus size={12}/> Expand</button>
+                                    <button onClick={handleExpand} className="bg-amber-600 hover:bg-amber-500 text-black text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1"><Plus size={12}/> {tr('services.business.dashboard.ops.expand')}</button>
                                 </div>
-                                <p className="text-[10px] text-zinc-500 leading-tight">Opening new locations increases your total capacity limit.</p>
+                                <p className="text-[10px] text-zinc-500 leading-tight">{tr('services.business.dashboard.ops.openingLocations')}</p>
                             </div>
                         )}
 
@@ -433,23 +452,23 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ business, 
                             <div className="bg-zinc-900 border border-zinc-800 rounded-[2rem] p-5">
                                 <div className="flex items-center justify-between mb-4">
                                     <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold uppercase tracking-widest">
-                                        <Users size={14}/> Staffing
+                                        <Users size={14}/> {tr('services.business.dashboard.ops.staffing')}
                                     </div>
-                                    <button onClick={handleRecruit} className="bg-zinc-800 text-white text-[10px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1 hover:bg-zinc-700"><UserPlus size={12}/> Recruit</button>
+                                    <button onClick={handleRecruit} className="bg-zinc-800 text-white text-[10px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1 hover:bg-zinc-700"><UserPlus size={12}/> {tr('services.business.dashboard.ops.recruit')}</button>
                                 </div>
                                 
                                 <div className="space-y-2">
-                                    {business.staff.length === 0 ? <div className="text-center text-rose-500 font-bold text-xs py-2">⚠️ No Staff! Business is halted.</div> :
+                                    {business.staff.length === 0 ? <div className="text-center text-rose-500 font-bold text-xs py-2">{tr('services.business.dashboard.ops.noStaffHalted')}</div> :
                                     business.staff.map(emp => (
                                         <div key={emp.id} className="bg-black/40 border border-zinc-800 p-3 rounded-xl flex items-center justify-between">
                                             <div className="flex items-center gap-3">
                                                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-zinc-400 border border-zinc-700 bg-zinc-800`}>{getRoleIcon(emp.role)}</div>
                                                 <div>
                                                     <div className="font-bold text-white text-sm">{emp.name}</div>
-                                                    <div className="flex items-center gap-2"><span className={`text-[8px] font-bold px-1.5 py-0.5 rounded border uppercase ${getRoleColor(emp.role)}`}>{emp.role}</span> <span className="text-[9px] text-zinc-500">Skill: {emp.skill}</span></div>
+                                                    <div className="flex items-center gap-2"><span className={`text-[8px] font-bold px-1.5 py-0.5 rounded border uppercase ${getRoleColor(emp.role)}`}>{emp.role}</span> <span className="text-[9px] text-zinc-500">{tr('services.business.dashboard.ops.skill', { skill: emp.skill })}</span></div>
                                                 </div>
                                             </div>
-                                            <button onClick={() => handleFire(emp.id)} className="text-rose-500 text-[10px] font-bold bg-rose-950/20 px-2 py-1 rounded hover:bg-rose-950/40">Fire</button>
+                                            <button onClick={() => handleFire(emp.id)} className="text-rose-500 text-[10px] font-bold bg-rose-950/20 px-2 py-1 rounded hover:bg-rose-950/40">{tr('services.business.dashboard.ops.fire')}</button>
                                         </div>
                                     ))}
                                 </div>
@@ -461,9 +480,9 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ business, 
                             <div className="bg-zinc-900 border border-zinc-800 rounded-[2rem] p-5">
                                 <div className="flex items-center justify-between mb-4">
                                     <div className="flex items-center gap-2 text-blue-400 text-xs font-bold uppercase tracking-widest">
-                                        <Package size={14}/> Product Lines
+                                        <Package size={14}/> {tr('services.business.dashboard.ops.productLines')}
                                     </div>
-                                    <button onClick={() => setShowProductCreator(true)} className="bg-blue-600 text-white text-[10px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1 hover:bg-blue-500"><Plus size={12}/> New SKU</button>
+                                    <button onClick={() => setShowProductCreator(true)} className="bg-blue-600 text-white text-[10px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1 hover:bg-blue-500"><Plus size={12}/> {tr('services.business.dashboard.ops.newSku')}</button>
                                 </div>
                                 <div className="space-y-3">
                                     {business.products.map(prod => {
@@ -476,12 +495,12 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ business, 
                                                     <div>
                                                         <div className="flex items-center gap-2 mb-1">
                                                             <div className="font-bold text-white text-base">{prod.name}</div>
-                                                            {prodDef && <div className="text-[9px] bg-zinc-800 text-zinc-400 px-1.5 py-0.5 rounded border border-zinc-700 uppercase tracking-wide">{prodDef.name}</div>}
+                                                            {prodDef && <div className="text-[9px] bg-zinc-800 text-zinc-400 px-1.5 py-0.5 rounded border border-zinc-700 uppercase tracking-wide">{getProductCatalogName(prodDef.id)}</div>}
                                                         </div>
                                                         <div className="flex items-center gap-3 text-[10px] text-zinc-500 mt-0.5">
-                                                            <span>Quality: {prod.quality}/100</span>
+                                                            <span>{tr('services.business.dashboard.product.quality', { quality: prod.quality })}</span>
                                                             <span className={`font-bold px-1.5 py-0.5 rounded ${prod.inventory === 0 ? 'bg-rose-500 text-white' : 'bg-zinc-950 text-zinc-400'}`}>
-                                                                {prod.inventory === 0 ? 'SOLD OUT' : `Stock: ${prod.inventory}`}
+                                                                {prod.inventory === 0 ? tr('services.business.dashboard.product.soldOut') : tr('services.business.dashboard.product.stock', { inventory: prod.inventory })}
                                                             </span>
                                                         </div>
                                                     </div>
@@ -489,14 +508,14 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ business, 
                                                 </div>
                                                 {isRestocking ? (
                                                     <div className="bg-zinc-900 p-3 rounded-xl border border-zinc-700 animate-in fade-in zoom-in-95 duration-200">
-                                                        <div className="flex justify-between items-center text-xs text-zinc-400 mb-2"><span className="font-bold uppercase tracking-wider text-[10px]">Restock Qty</span><span className="font-mono text-white font-bold">{restockTarget.quantity}</span></div>
+                                                        <div className="flex justify-between items-center text-xs text-zinc-400 mb-2"><span className="font-bold uppercase tracking-wider text-[10px]">{tr('services.business.dashboard.product.restockQty')}</span><span className="font-mono text-white font-bold">{restockTarget.quantity}</span></div>
                                                         <input type="range" min="0" max={maxPossible} value={restockTarget.quantity} onChange={(e) => setRestockTarget({...restockTarget, quantity: parseInt(e.target.value)})} className="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-indigo-500 mb-3"/>
-                                                        <div className="flex gap-2"><button onClick={() => setRestockTarget(null)} className="flex-1 py-2 bg-zinc-800 text-zinc-400 rounded-lg text-xs font-bold hover:text-white">Cancel</button><button onClick={handleRestock} disabled={restockTarget.quantity <= 0} className="flex-[2] py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-500 disabled:opacity-50">Confirm -${(restockTarget.quantity * prod.productionCost).toLocaleString()}</button></div>
+                                                        <div className="flex gap-2"><button onClick={() => setRestockTarget(null)} className="flex-1 py-2 bg-zinc-800 text-zinc-400 rounded-lg text-xs font-bold hover:text-white">{tr('services.business.dashboard.product.cancel')}</button><button onClick={handleRestock} disabled={restockTarget.quantity <= 0} className="flex-[2] py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-500 disabled:opacity-50">{tr('services.business.dashboard.product.confirmCost', { amount: (restockTarget.quantity * prod.productionCost).toLocaleString() })}</button></div>
                                                     </div>
                                                 ) : (
                                                     <div className="flex items-center gap-2 pt-2 border-t border-zinc-800/50">
-                                                        <button onClick={() => { if (maxPossible <= 0) { alert("Insufficient funds."); return; } setRestockTarget({ id: prod.id, quantity: Math.min(50, maxPossible) }); }} disabled={maxPossible <= 0} className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 py-2 rounded-lg text-[10px] font-bold uppercase disabled:opacity-50 flex items-center justify-center gap-1.5"><RefreshCw size={12}/> Restock</button>
-                                                        <div className="flex items-center bg-black rounded-lg border border-zinc-800"><button onClick={() => handlePriceChange(prod.id, -1)} className="p-2 text-zinc-500 hover:text-white"><Minus size={12}/></button><div className="text-[10px] font-bold w-12 text-center text-zinc-300">Price</div><button onClick={() => handlePriceChange(prod.id, 1)} className="p-2 text-zinc-500 hover:text-white"><Plus size={12}/></button></div>
+                                                        <button onClick={() => { if (maxPossible <= 0) { alert(tr('services.business.dashboard.alert.insufficientFunds')); return; } setRestockTarget({ id: prod.id, quantity: Math.min(50, maxPossible) }); }} disabled={maxPossible <= 0} className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 py-2 rounded-lg text-[10px] font-bold uppercase disabled:opacity-50 flex items-center justify-center gap-1.5"><RefreshCw size={12}/> {tr('services.business.dashboard.product.restock')}</button>
+                                                        <div className="flex items-center bg-black rounded-lg border border-zinc-800"><button onClick={() => handlePriceChange(prod.id, -1)} className="p-2 text-zinc-500 hover:text-white"><Minus size={12}/></button><div className="text-[10px] font-bold w-12 text-center text-zinc-300">{tr('services.business.dashboard.product.price')}</div><button onClick={() => handlePriceChange(prod.id, 1)} className="p-2 text-zinc-500 hover:text-white"><Plus size={12}/></button></div>
                                                     </div>
                                                 )}
                                             </div>
@@ -515,22 +534,22 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ business, 
                         <div className="bg-zinc-900 border border-zinc-800 rounded-[2rem] p-6 text-center relative overflow-hidden">
                             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-500 to-purple-500"></div>
                             <div className="relative z-10">
-                                <div className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-2">Market Hype</div>
+                                <div className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-2">{tr('services.business.dashboard.market.hype')}</div>
                                 <div className="text-6xl font-black text-white tracking-tighter mb-2">{Math.round(business.stats.hype || 0)}<span className="text-lg text-zinc-500 font-medium">/100</span></div>
                                 <div className="flex justify-center gap-4 text-xs font-mono">
-                                    <div className="text-emerald-400">Gain: +{(Math.sqrt(weeklyMarketingCost) * 0.05).toFixed(1)}/wk</div>
-                                    <div className="text-rose-500">Decay: -{Math.max(0.5, 4 - ((business.stats.brandHealth || 0) * 0.035)).toFixed(1)}/wk</div>
+                                    <div className="text-emerald-400">{tr('services.business.dashboard.market.gainPerWeek', { amount: (Math.sqrt(weeklyMarketingCost) * 0.05).toFixed(1) })}</div>
+                                    <div className="text-rose-500">{tr('services.business.dashboard.market.decayPerWeek', { amount: Math.max(0.5, 4 - ((business.stats.brandHealth || 0) * 0.035)).toFixed(1) })}</div>
                                 </div>
                                 
                                 <div className="mt-4 p-3 bg-black/40 rounded-xl text-left border border-white/5">
                                     <div className="flex justify-between items-center text-[10px] text-zinc-400 mb-1">
-                                        <span className="uppercase font-bold tracking-widest">Brand Health</span>
+                                        <span className="uppercase font-bold tracking-widest">{tr('services.business.dashboard.market.brandHealth')}</span>
                                         <span>{Math.round(business.stats.brandHealth || 0)}/100</span>
                                     </div>
                                     <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
                                         <div className="h-full bg-indigo-500" style={{width: `${business.stats.brandHealth || 0}%`}}></div>
                                     </div>
-                                    <div className="text-[9px] text-zinc-600 mt-1 italic">Higher Brand Health reduces Hype Decay naturally.</div>
+                                    <div className="text-[9px] text-zinc-600 mt-1 italic">{tr('services.business.dashboard.market.brandHealthHint')}</div>
                                 </div>
                             </div>
                         </div>
@@ -538,22 +557,17 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ business, 
                         {/* Weekly Spend Controls */}
                         <div>
                             <div className="flex justify-between items-center mb-3 px-2">
-                                <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Weekly Budget</h3>
-                                <div className="text-xs font-mono text-zinc-400">Total: <span className="text-white font-bold">${weeklyMarketingCost.toLocaleString()}</span>/wk</div>
+                                <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest">{tr('services.business.dashboard.market.weeklyBudget')}</h3>
+                                <div className="text-xs font-mono text-zinc-400">{tr('services.business.dashboard.market.totalPrefix')} <span className="text-white font-bold">${weeklyMarketingCost.toLocaleString()}</span>/wk</div>
                             </div>
                             
                             <div className="space-y-3">
-                                {[
-                                    { id: 'social', label: 'Social Media', min: 0, max: 5000, step: 100, icon: Globe },
-                                    { id: 'influencer', label: 'Influencers', min: 0, max: 20000, step: 500, icon: Users },
-                                    { id: 'billboard', label: 'Billboards', min: 0, max: 50000, step: 1000, icon: Store },
-                                    { id: 'tv', label: 'TV Spots', min: 0, max: 200000, step: 5000, icon: Tv },
-                                ].map((channel) => (
+                                {marketingChannels.map((channel) => (
                                     <div key={channel.id} className="bg-zinc-900 border border-zinc-800 p-4 rounded-2xl">
                                         <div className="flex justify-between items-center mb-3">
                                             <div className="flex items-center gap-3">
                                                 <div className="p-2 bg-black rounded-lg text-zinc-400"><channel.icon size={16}/></div>
-                                                <span className="font-bold text-sm text-white">{channel.label}</span>
+                                                <span className="font-bold text-sm text-white">{tr(channel.labelKey)}</span>
                                             </div>
                                             <div className="font-mono text-emerald-400 font-bold text-sm">
                                                 ${(mBudget[channel.id as keyof typeof mBudget] || 0).toLocaleString()}
@@ -580,21 +594,21 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ business, 
                      <div className="space-y-6 animate-in slide-in-from-bottom-2 duration-300">
                      <div className="bg-zinc-900 border border-zinc-800 rounded-[2rem] overflow-hidden">
                          <div className="bg-zinc-900/50 p-4 border-b border-zinc-800 flex justify-between items-center">
-                             <h3 className="font-bold text-white text-sm uppercase tracking-wide">P&L Statement</h3>
-                             <div className="text-[10px] font-bold bg-zinc-800 px-2 py-1 rounded text-zinc-400">This Week</div>
+                             <h3 className="font-bold text-white text-sm uppercase tracking-wide">{tr('services.business.dashboard.money.plStatement')}</h3>
+                             <div className="text-[10px] font-bold bg-zinc-800 px-2 py-1 rounded text-zinc-400">{tr('services.business.dashboard.money.thisWeek')}</div>
                          </div>
                          <div className="p-6 space-y-4">
                              <div className="flex justify-between items-center">
-                                 <div className="text-xs text-zinc-400 font-bold uppercase">Revenue</div>
+                                 <div className="text-xs text-zinc-400 font-bold uppercase">{tr('services.business.dashboard.money.revenue')}</div>
                                  <div className="font-mono font-bold text-emerald-400">{formatMoney(business.stats.weeklyRevenue)}</div>
                              </div>
                              <div className="flex justify-between items-center">
-                                 <div className="text-xs text-zinc-400 font-bold uppercase">Expenses</div>
+                                 <div className="text-xs text-zinc-400 font-bold uppercase">{tr('services.business.dashboard.money.expenses')}</div>
                                  <div className="font-mono font-bold text-rose-500">-{formatMoney(business.stats.weeklyExpenses)}</div>
                              </div>
                              <div className="h-px bg-zinc-800 w-full"></div>
                              <div className="flex justify-between items-center">
-                                 <div className="text-sm text-white font-bold uppercase">Net Profit</div>
+                                 <div className="text-sm text-white font-bold uppercase">{tr('services.business.dashboard.money.netProfit')}</div>
                                  <div className={`font-mono font-bold text-lg ${business.stats.weeklyProfit >= 0 ? 'text-emerald-400' : 'text-rose-500'}`}>
                                      {formatMoney(business.stats.weeklyProfit)}
                                  </div>
@@ -603,14 +617,14 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ business, 
                      </div>
 
                      <div className="bg-zinc-900 border border-zinc-800 rounded-[2rem] p-6">
-                         <h3 className="font-bold text-white text-sm uppercase tracking-wide mb-4">Balance Sheet</h3>
+                         <h3 className="font-bold text-white text-sm uppercase tracking-wide mb-4">{tr('services.business.dashboard.money.balanceSheet')}</h3>
                          <div className="grid grid-cols-2 gap-4">
                              <div className="bg-black/40 p-4 rounded-xl border border-zinc-800">
-                                 <div className="text-[10px] text-zinc-500 font-bold uppercase mb-1">Cash</div>
+                                 <div className="text-[10px] text-zinc-500 font-bold uppercase mb-1">{tr('services.business.dashboard.money.cash')}</div>
                                  <div className="font-mono font-bold text-white">{formatMoney(business.balance)}</div>
                              </div>
                              <div className="bg-black/40 p-4 rounded-xl border border-zinc-800">
-                                 <div className="text-[10px] text-zinc-500 font-bold uppercase mb-1">Total Valuation</div>
+                                 <div className="text-[10px] text-zinc-500 font-bold uppercase mb-1">{tr('services.business.dashboard.money.totalValuation')}</div>
                                  <div className="font-mono font-bold text-white">{formatMoney(business.stats.valuation)}</div>
                              </div>
                          </div>
@@ -619,7 +633,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ business, 
                      {/* EXIT STRATEGY SECTION */}
                      <div className="bg-red-950/20 border border-red-500/20 rounded-[2rem] p-6 relative overflow-hidden">
                         <div className="relative z-10">
-                            <h3 className="font-bold text-white text-sm uppercase tracking-wide mb-4 flex items-center gap-2"><LogOut size={16} className="text-red-500"/> Exit Strategy</h3>
+                            <h3 className="font-bold text-white text-sm uppercase tracking-wide mb-4 flex items-center gap-2"><LogOut size={16} className="text-red-500"/> {tr('services.business.dashboard.money.exitStrategy')}</h3>
                             <div className="space-y-3">
                                 {/* Sell Option */}
                                 <button 
@@ -632,8 +646,8 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ business, 
                                     }`}
                                 >
                                     <div className="flex justify-between items-center w-full">
-                                        <div className={`font-bold text-sm ${sellCheck.success ? 'text-emerald-400' : 'text-zinc-500'}`}>Sell Business</div>
-                                        {sellCheck.success && <div className="text-xs font-mono font-bold text-white">Est. {formatMoney(sellCheck.payout)}</div>}
+                                        <div className={`font-bold text-sm ${sellCheck.success ? 'text-emerald-400' : 'text-zinc-500'}`}>{tr('services.business.dashboard.money.sellBusiness')}</div>
+                                        {sellCheck.success && <div className="text-xs font-mono font-bold text-white">{tr('services.business.dashboard.money.estimate', { amount: formatMoney(sellCheck.payout) })}</div>}
                                     </div>
                                     {!sellCheck.success && <div className="text-[10px] text-zinc-500 font-normal">{sellCheck.msg}</div>}
                                 </button>
@@ -644,10 +658,10 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ business, 
                                     className="w-full p-4 rounded-xl border border-rose-500/30 bg-rose-950/10 hover:bg-rose-950/30 transition-all flex flex-col gap-1 text-left"
                                 >
                                     <div className="flex justify-between items-center w-full">
-                                        <div className="font-bold text-sm text-rose-400">Shut Down & Liquidate</div>
-                                        <div className="text-xs font-mono font-bold text-zinc-400">Est. {formatMoney(liquidateCheck.payout)}</div>
+                                        <div className="font-bold text-sm text-rose-400">{tr('services.business.dashboard.money.shutDownLiquidate')}</div>
+                                        <div className="text-xs font-mono font-bold text-zinc-400">{tr('services.business.dashboard.money.estimate', { amount: formatMoney(liquidateCheck.payout) })}</div>
                                     </div>
-                                    <div className="text-[10px] text-zinc-500 font-normal">Close operations. Assets sold for scrap.</div>
+                                    <div className="text-[10px] text-zinc-500 font-normal">{tr('services.business.dashboard.money.closeOperations')}</div>
                                 </button>
                             </div>
                         </div>
@@ -661,14 +675,14 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ business, 
                 <div className="fixed inset-0 z-[60] bg-black/90 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in zoom-in-95">
                     <div className="bg-zinc-900 w-full max-w-sm rounded-[2rem] border border-zinc-800 shadow-2xl relative overflow-hidden flex flex-col max-h-[85vh]">
                         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-purple-500"></div>
-                        <div className="p-6 pb-2 flex items-center justify-between"><h3 className="text-xl font-black text-white uppercase tracking-tight">Develop Product</h3><button onClick={() => setShowProductCreator(false)} className="text-zinc-500 hover:text-white"><X size={20}/></button></div>
+                        <div className="p-6 pb-2 flex items-center justify-between"><h3 className="text-xl font-black text-white uppercase tracking-tight">{tr('services.business.dashboard.modal.product.developProduct')}</h3><button onClick={() => setShowProductCreator(false)} className="text-zinc-500 hover:text-white"><X size={20}/></button></div>
                         <div className="flex px-6 gap-2 mb-4"><div className={`h-1 flex-1 rounded-full ${prodCreatorStep >= 1 ? 'bg-indigo-500' : 'bg-zinc-800'}`}></div><div className={`h-1 flex-1 rounded-full ${prodCreatorStep >= 2 ? 'bg-indigo-500' : 'bg-zinc-800'}`}></div><div className={`h-1 flex-1 rounded-full ${prodCreatorStep >= 3 ? 'bg-indigo-500' : 'bg-zinc-800'}`}></div></div>
                         <div className="flex-1 overflow-y-auto custom-scrollbar px-6 pb-6">
-                            {prodCreatorStep === 1 && (<div className="space-y-4"><label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest block">Category</label><div className="grid grid-cols-2 gap-2">{PRODUCT_CATALOG.filter(p => p.businessTypes.includes(business.type)).map(def => (<button key={def.id} onClick={() => { setNewProdType(def.id); setCustomSellingPrice(''); }} className={`p-3 rounded-xl border text-xs font-bold text-left flex items-center gap-2 transition-all ${newProdType === def.id ? 'bg-white text-black border-white' : 'bg-black border-zinc-800 text-zinc-400'}`}><span className="text-lg">{def.emoji}</span> {def.name}</button>))}</div>{newProdType && (<div><label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest block mb-2 mt-4">Product Name</label><input type="text" value={newProdName} onChange={(e) => setNewProdName(e.target.value)} className="w-full bg-black border border-zinc-800 rounded-xl p-4 text-white font-bold focus:outline-none focus:border-white transition-colors"/></div>)}</div>)}
-                            {prodCreatorStep === 2 && (<div className="space-y-6">{Object.entries(PRODUCT_DEV_OPTIONS).map(([key, section]) => (<div key={key}><label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest block mb-2">{section.label}</label><div className="grid grid-cols-1 gap-2">{section.options.map(opt => { const isSelected = devOptions[key.toLowerCase() as keyof typeof devOptions] === opt.id; return (<button key={opt.id} onClick={() => setDevOptions({...devOptions, [key.toLowerCase()]: opt.id})} className={`p-3 rounded-xl border text-left flex justify-between items-center transition-all ${isSelected ? 'bg-indigo-900/40 border-indigo-500' : 'bg-black border-zinc-800'}`}><div><div className={`text-xs font-bold ${isSelected ? 'text-white' : 'text-zinc-300'}`}>{opt.label}</div><div className="text-[10px] text-zinc-500">{opt.desc}</div></div><div className="text-right">{opt.costMult > 1 && <div className="text-[9px] text-rose-400 font-mono">+{Math.round((opt.costMult - 1)*100)}% Cost</div>}{opt.qualityBonus > 0 && <div className="text-[9px] text-emerald-400 font-mono">+{opt.qualityBonus} Qual</div>}</div></button>)})}</div></div>))}<div className="p-4 bg-zinc-950 border border-zinc-800 rounded-xl flex justify-between items-center mt-4"><span className="text-xs text-zinc-400 font-bold uppercase">Est. Unit Cost</span><span className="font-mono font-bold text-white text-lg">${getEstimatedUnitCost().toLocaleString()}</span></div></div>)}
-                            {prodCreatorStep === 3 && newProdType && (<div className="space-y-4"><div className="bg-zinc-950 p-4 rounded-xl border border-zinc-800 text-center"><div className="text-4xl mb-2">{PRODUCT_CATALOG.find(p => p.id === newProdType)?.emoji}</div><div className="text-xl font-bold text-white">{newProdName}</div><div className="text-xs text-zinc-500 mt-1">Ready for Production</div></div><div className="bg-black p-4 rounded-xl border border-zinc-800 space-y-4"><div className="flex justify-between items-center text-xs"><span className="text-zinc-500 font-bold uppercase">Unit Cost</span><span className="text-white font-mono font-bold">${getEstimatedUnitCost().toLocaleString()}</span></div><div><label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest block mb-2">Selling Price ($)</label><input type="number" value={customSellingPrice} onChange={(e) => setCustomSellingPrice(e.target.value)} className="w-full bg-zinc-900 border border-zinc-700 rounded-xl p-3 text-white font-mono font-bold text-right focus:border-indigo-500 focus:outline-none"/></div>{(() => { const cost = getEstimatedUnitCost(); const price = parseInt(customSellingPrice) || 0; const profit = price - cost; const margin = price > 0 ? (profit / price) * 100 : 0; const isProfitable = profit > 0; return (<div className={`p-3 rounded-lg border flex justify-between items-center ${isProfitable ? 'bg-emerald-900/10 border-emerald-500/30' : 'bg-rose-900/10 border-rose-500/30'}`}><div className="text-xs font-bold text-zinc-400 uppercase">Net Margin</div><div className="text-right"><div className={`font-mono font-bold ${isProfitable ? 'text-emerald-400' : 'text-rose-500'}`}>{margin.toFixed(1)}%</div><div className="text-[10px] text-zinc-500 font-mono">{isProfitable ? '+' : ''}${profit.toLocaleString()} / unit</div></div></div>); })()}<div className="flex justify-between text-xs pt-2 border-t border-zinc-800"><span className="text-zinc-500">Initial Batch</span><span className="text-white font-mono font-bold">{newProdQty} Units</span></div></div><div className="flex justify-between items-center text-xs px-2"><span className="text-zinc-500 font-bold uppercase">Energy Cost</span><div className="flex items-center gap-1 text-amber-400 font-bold"><Zap size={14} fill="currentColor"/> 25</div></div><div className="p-3 bg-indigo-900/20 border border-indigo-500/30 rounded-xl flex items-start gap-3"><Beaker className="text-indigo-400 shrink-0" size={18}/><div className="text-[10px] text-indigo-200">Final quality involves a luck factor. Premium materials increase chance of high quality but cost more to produce.</div></div></div>)}
+                            {prodCreatorStep === 1 && (<div className="space-y-4"><label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest block">{tr('services.business.dashboard.modal.product.category')}</label><div className="grid grid-cols-2 gap-2">{PRODUCT_CATALOG.filter(p => p.businessTypes.includes(business.type)).map(def => (<button key={def.id} onClick={() => { setNewProdType(def.id); setCustomSellingPrice(''); }} className={`p-3 rounded-xl border text-xs font-bold text-left flex items-center gap-2 transition-all ${newProdType === def.id ? 'bg-white text-black border-white' : 'bg-black border-zinc-800 text-zinc-400'}`}><span className="text-lg">{def.emoji}</span> {getProductCatalogName(def.id)}</button>))}</div>{newProdType && (<div><label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest block mb-2 mt-4">{tr('services.business.dashboard.modal.product.productName')}</label><input type="text" value={newProdName} onChange={(e) => setNewProdName(e.target.value)} className="w-full bg-black border border-zinc-800 rounded-xl p-4 text-white font-bold focus:outline-none focus:border-white transition-colors"/></div>)}</div>)}
+                            {prodCreatorStep === 2 && (<div className="space-y-6">{Object.entries(PRODUCT_DEV_OPTIONS).map(([key, section]) => (<div key={key}><label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest block mb-2">{getDevSectionLabel(key)}</label><div className="grid grid-cols-1 gap-2">{section.options.map(opt => { const isSelected = devOptions[key.toLowerCase() as keyof typeof devOptions] === opt.id; return (<button key={opt.id} onClick={() => setDevOptions({...devOptions, [key.toLowerCase()]: opt.id})} className={`p-3 rounded-xl border text-left flex justify-between items-center transition-all ${isSelected ? 'bg-indigo-900/40 border-indigo-500' : 'bg-black border-zinc-800'}`}><div><div className={`text-xs font-bold ${isSelected ? 'text-white' : 'text-zinc-300'}`}>{getDevOptionLabel(opt.id)}</div><div className="text-[10px] text-zinc-500">{getDevOptionDescription(opt.id)}</div></div><div className="text-right">{opt.costMult > 1 && <div className="text-[9px] text-rose-400 font-mono">{tr('services.business.dashboard.modal.product.costIncrease', { amount: Math.round((opt.costMult - 1)*100) })}</div>}{opt.qualityBonus > 0 && <div className="text-[9px] text-emerald-400 font-mono">{tr('services.business.dashboard.modal.product.qualityBonus', { amount: opt.qualityBonus })}</div>}</div></button>)})}</div></div>))}<div className="p-4 bg-zinc-950 border border-zinc-800 rounded-xl flex justify-between items-center mt-4"><span className="text-xs text-zinc-400 font-bold uppercase">{tr('services.business.dashboard.modal.product.estimatedUnitCost')}</span><span className="font-mono font-bold text-white text-lg">${getEstimatedUnitCost().toLocaleString()}</span></div></div>)}
+                            {prodCreatorStep === 3 && newProdType && (<div className="space-y-4"><div className="bg-zinc-950 p-4 rounded-xl border border-zinc-800 text-center"><div className="text-4xl mb-2">{PRODUCT_CATALOG.find(p => p.id === newProdType)?.emoji}</div><div className="text-xl font-bold text-white">{newProdName}</div><div className="text-xs text-zinc-500 mt-1">{tr('services.business.dashboard.modal.product.readyForProduction')}</div></div><div className="bg-black p-4 rounded-xl border border-zinc-800 space-y-4"><div className="flex justify-between items-center text-xs"><span className="text-zinc-500 font-bold uppercase">{tr('services.business.dashboard.modal.product.unitCost')}</span><span className="text-white font-mono font-bold">${getEstimatedUnitCost().toLocaleString()}</span></div><div><label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest block mb-2">{tr('services.business.dashboard.modal.product.sellingPrice')}</label><input type="number" value={customSellingPrice} onChange={(e) => setCustomSellingPrice(e.target.value)} className="w-full bg-zinc-900 border border-zinc-700 rounded-xl p-3 text-white font-mono font-bold text-right focus:border-indigo-500 focus:outline-none"/></div>{(() => { const cost = getEstimatedUnitCost(); const price = parseInt(customSellingPrice) || 0; const profit = price - cost; const margin = price > 0 ? (profit / price) * 100 : 0; const isProfitable = profit > 0; return (<div className={`p-3 rounded-lg border flex justify-between items-center ${isProfitable ? 'bg-emerald-900/10 border-emerald-500/30' : 'bg-rose-900/10 border-rose-500/30'}`}><div className="text-xs font-bold text-zinc-400 uppercase">{tr('services.business.dashboard.modal.product.netMargin')}</div><div className="text-right"><div className={`font-mono font-bold ${isProfitable ? 'text-emerald-400' : 'text-rose-500'}`}>{margin.toFixed(1)}%</div><div className="text-[10px] text-zinc-500 font-mono">{tr('services.business.dashboard.modal.product.profitPerUnit', { sign: isProfitable ? '+' : '', amount: profit.toLocaleString() })}</div></div></div>); })()}<div className="flex justify-between text-xs pt-2 border-t border-zinc-800"><span className="text-zinc-500">{tr('services.business.dashboard.modal.product.initialBatch')}</span><span className="text-white font-mono font-bold">{tr('services.business.dashboard.modal.product.units', { amount: newProdQty })}</span></div></div><div className="flex justify-between items-center text-xs px-2"><span className="text-zinc-500 font-bold uppercase">{tr('services.business.dashboard.modal.product.energyCost')}</span><div className="flex items-center gap-1 text-amber-400 font-bold"><Zap size={14} fill="currentColor"/> 25</div></div><div className="p-3 bg-indigo-900/20 border border-indigo-500/30 rounded-xl flex items-start gap-3"><Beaker className="text-indigo-400 shrink-0" size={18}/><div className="text-[10px] text-indigo-200">{tr('services.business.dashboard.modal.product.finalQualityHint')}</div></div></div>)}
                         </div>
-                        <div className="p-6 border-t border-zinc-800 bg-zinc-900"><div className="flex gap-3">{prodCreatorStep > 1 && (<button onClick={() => setProdCreatorStep(prodCreatorStep - 1)} className="px-4 py-3 bg-zinc-800 text-white rounded-xl font-bold text-sm hover:bg-zinc-700">Back</button>)}{prodCreatorStep < 3 ? (<button onClick={() => setProdCreatorStep(prodCreatorStep + 1)} disabled={prodCreatorStep === 1 && (!newProdType || !newProdName)} className="flex-1 py-3 bg-white text-black font-bold rounded-xl disabled:opacity-50">Next Step</button>) : (<button onClick={handleCreateProduct} disabled={player.energy.current < 25} className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"><BarChart2 size={18}/> Launch Product</button>)}</div></div>
+                        <div className="p-6 border-t border-zinc-800 bg-zinc-900"><div className="flex gap-3">{prodCreatorStep > 1 && (<button onClick={() => setProdCreatorStep(prodCreatorStep - 1)} className="px-4 py-3 bg-zinc-800 text-white rounded-xl font-bold text-sm hover:bg-zinc-700">{tr('services.business.dashboard.modal.common.back')}</button>)}{prodCreatorStep < 3 ? (<button onClick={() => setProdCreatorStep(prodCreatorStep + 1)} disabled={prodCreatorStep === 1 && (!newProdType || !newProdName)} className="flex-1 py-3 bg-white text-black font-bold rounded-xl disabled:opacity-50">{tr('services.business.dashboard.modal.product.nextStep')}</button>) : (<button onClick={handleCreateProduct} disabled={player.energy.current < 25} className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"><BarChart2 size={18}/> {tr('services.business.dashboard.modal.product.launchProduct')}</button>)}</div></div>
                     </div>
                 </div>
             )}
@@ -677,10 +691,10 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ business, 
                 <div className="fixed inset-0 z-[60] bg-black/90 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in zoom-in-95">
                     <div className="bg-zinc-900 w-full max-w-sm rounded-[2rem] border border-zinc-800 p-6 shadow-2xl relative">
                         <button onClick={() => setShowCapitalModal(null)} className="absolute top-4 right-4 text-zinc-500 hover:text-white"><X size={20}/></button>
-                        <h3 className="text-xl font-bold text-white mb-2">{showCapitalModal === 'INJECT' ? 'Inject Capital' : 'Withdraw Funds'}</h3>
-                        <p className="text-xs text-zinc-500 mb-6 font-medium">{showCapitalModal === 'INJECT' ? `Personal Balance: ${formatMoney(player.money)}` : `Business Balance: ${formatMoney(business.balance)}`}</p>
+                        <h3 className="text-xl font-bold text-white mb-2">{showCapitalModal === 'INJECT' ? tr('services.business.dashboard.modal.capital.injectTitle') : tr('services.business.dashboard.modal.capital.withdrawTitle')}</h3>
+                        <p className="text-xs text-zinc-500 mb-6 font-medium">{showCapitalModal === 'INJECT' ? tr('services.business.dashboard.modal.capital.personalBalance', { amount: formatMoney(player.money) }) : tr('services.business.dashboard.modal.capital.businessBalance', { amount: formatMoney(business.balance) })}</p>
                         <div className="bg-black rounded-2xl p-2 border border-zinc-800 mb-4 flex items-center"><span className="pl-4 text-zinc-500 font-bold">$</span><input type="number" value={capitalAmount} onChange={(e) => setCapitalAmount(e.target.value)} placeholder="0" className="w-full bg-transparent p-4 text-white text-2xl font-mono font-bold focus:outline-none"/></div>
-                        <button onClick={handleCapitalAction} className={`w-full py-4 text-white font-bold rounded-xl transition-colors shadow-lg ${showCapitalModal === 'INJECT' ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-rose-600 hover:bg-rose-500'}`}>Confirm {showCapitalModal === 'INJECT' ? 'Injection' : 'Withdrawal'}</button>
+                        <button onClick={handleCapitalAction} className={`w-full py-4 text-white font-bold rounded-xl transition-colors shadow-lg ${showCapitalModal === 'INJECT' ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-rose-600 hover:bg-rose-500'}`}>{showCapitalModal === 'INJECT' ? tr('services.business.dashboard.modal.capital.confirmInjection') : tr('services.business.dashboard.modal.capital.confirmWithdrawal')}</button>
                     </div>
                 </div>
             )}
@@ -691,28 +705,28 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ business, 
                         <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-500/40">
                              <AlertTriangle size={32} className="text-red-500"/>
                         </div>
-                        <h3 className="text-2xl font-black text-white mb-2 uppercase tracking-tight">{showExitModal === 'SELL' ? 'Sell Company' : 'Shut Down'}</h3>
+                        <h3 className="text-2xl font-black text-white mb-2 uppercase tracking-tight">{showExitModal === 'SELL' ? tr('services.business.dashboard.modal.exit.sellTitle') : tr('services.business.dashboard.modal.exit.shutDownTitle')}</h3>
                         <p className="text-sm text-zinc-400 mb-6 leading-relaxed">
                             {showExitModal === 'SELL' 
-                                ? `Are you sure you want to sell ${business.name}? You will receive the valuation amount plus any cash in the business account.`
-                                : `Are you sure you want to shut down? Assets will be liquidated for scrap value. This cannot be undone.`
+                                ? tr('services.business.dashboard.modal.exit.sellConfirmText', { businessName: business.name })
+                                : tr('services.business.dashboard.modal.exit.shutDownConfirmText')
                             }
                         </p>
                         
                         <div className="bg-black/40 p-4 rounded-xl border border-zinc-800 mb-6">
                             <div className="flex justify-between items-center mb-2 text-xs">
-                                <span className="text-zinc-500 font-bold uppercase">Cash Balance</span>
+                                <span className="text-zinc-500 font-bold uppercase">{tr('services.business.dashboard.header.cashBalance')}</span>
                                 <span className={business.balance >= 0 ? 'text-white' : 'text-rose-500'}>{formatMoney(business.balance)}</span>
                             </div>
                             <div className="flex justify-between items-center mb-2 text-xs">
-                                <span className="text-zinc-500 font-bold uppercase">{showExitModal === 'SELL' ? 'Valuation' : 'Scrap Value'}</span>
+                                <span className="text-zinc-500 font-bold uppercase">{showExitModal === 'SELL' ? tr('services.business.dashboard.overview.valuation') : tr('services.business.dashboard.modal.exit.scrapValue')}</span>
                                 <span className="text-white">
                                     {showExitModal === 'SELL' ? formatMoney(business.stats.valuation) : formatMoney(liquidateCheck.payout - business.balance)}
                                 </span>
                             </div>
                             <div className="border-t border-zinc-700 my-2"></div>
                             <div className="flex justify-between items-center text-sm font-bold">
-                                <span className="text-white uppercase">Net Payout</span>
+                                <span className="text-white uppercase">{tr('services.business.dashboard.modal.exit.netPayout')}</span>
                                 <span className={showExitModal === 'SELL' ? 'text-emerald-400' : 'text-zinc-200'}>
                                     {showExitModal === 'SELL' ? formatMoney(sellCheck.payout) : formatMoney(liquidateCheck.payout)}
                                 </span>
@@ -720,8 +734,8 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ business, 
                         </div>
 
                         <div className="grid grid-cols-2 gap-3">
-                            <button onClick={() => setShowExitModal(null)} className="py-3 bg-zinc-800 text-zinc-300 font-bold rounded-xl hover:bg-zinc-700">Cancel</button>
-                            <button onClick={executeExit} className="py-3 bg-red-600 text-white font-bold rounded-xl hover:bg-red-500 shadow-lg shadow-red-900/20">Confirm</button>
+                            <button onClick={() => setShowExitModal(null)} className="py-3 bg-zinc-800 text-zinc-300 font-bold rounded-xl hover:bg-zinc-700">{tr('services.business.dashboard.product.cancel')}</button>
+                            <button onClick={executeExit} className="py-3 bg-red-600 text-white font-bold rounded-xl hover:bg-red-500 shadow-lg shadow-red-900/20">{tr('services.business.dashboard.modal.common.confirm')}</button>
                         </div>
                     </div>
                 </div>
@@ -730,19 +744,19 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ business, 
             {showRecruit && (
                 <div className="fixed inset-0 z-[60] bg-black/90 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in zoom-in-95">
                     <div className="bg-zinc-900 w-full max-w-sm rounded-[2rem] border border-zinc-800 overflow-hidden shadow-2xl relative flex flex-col max-h-[70vh]">
-                        <div className="p-6 border-b border-zinc-800 bg-zinc-900 flex justify-between items-center"><h3 className="font-black text-white text-lg uppercase tracking-tight">Hiring Pool</h3><button onClick={() => setShowRecruit(false)} className="text-zinc-500 hover:text-white"><X size={20}/></button></div>
+                        <div className="p-6 border-b border-zinc-800 bg-zinc-900 flex justify-between items-center"><h3 className="font-black text-white text-lg uppercase tracking-tight">{tr('services.business.dashboard.modal.hiring.title')}</h3><button onClick={() => setShowRecruit(false)} className="text-zinc-500 hover:text-white"><X size={20}/></button></div>
                         <div className="p-6 space-y-3 overflow-y-auto custom-scrollbar">
                             {filteredHiringPool.map(c => (
                                 <div key={c.id} className="bg-black border border-zinc-800 p-4 rounded-2xl flex justify-between items-center group hover:border-zinc-700 transition-colors">
-                                    <div><div className="flex items-center gap-2 mb-1"><div className="font-bold text-white text-sm">{c.name}</div><span className={`text-[8px] font-bold px-1.5 py-0.5 rounded border uppercase ${getRoleColor(c.role)}`}>{c.role}</span></div><div className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Skill: {c.skill}</div></div>
-                                    <button onClick={() => handleHire(c)} className="bg-white text-black px-4 py-2 rounded-lg text-xs font-bold hover:bg-zinc-200">Hire (${c.salary})</button>
+                                    <div><div className="flex items-center gap-2 mb-1"><div className="font-bold text-white text-sm">{c.name}</div><span className={`text-[8px] font-bold px-1.5 py-0.5 rounded border uppercase ${getRoleColor(c.role)}`}>{c.role}</span></div><div className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">{tr('services.business.dashboard.ops.skill', { skill: c.skill })}</div></div>
+                                    <button onClick={() => handleHire(c)} className="bg-white text-black px-4 py-2 rounded-lg text-xs font-bold hover:bg-zinc-200">{tr('services.business.dashboard.modal.hiring.hire', { salary: c.salary })}</button>
                                 </div>
                             ))}
                             {filteredHiringPool.length === 0 && (
                                 <div className="text-center text-zinc-600 text-xs py-4 space-y-2">
-                                    <div>No suitable candidates available right now.</div>
+                                    <div>{tr('services.business.dashboard.modal.hiring.empty')}</div>
                                     {blueprint.model === 'PRODUCT' && (
-                                        <div className="text-[10px] text-zinc-500">Product businesses recruit managers and sales staff. Refresh the pool in a few weeks for new candidates.</div>
+                                        <div className="text-[10px] text-zinc-500">{tr('services.business.dashboard.modal.hiring.productHint')}</div>
                                     )}
                                 </div>
                             )}

@@ -43,6 +43,7 @@ interface MobilePageProps {
 
 export const MobilePage: React.FC<MobilePageProps> = (props) => {
   const [appMode, setAppMode] = useState<'HOME' | 'CASTLINK' | 'IMDB' | 'BOXOFFICE' | 'INSTAGRAM' | 'X' | 'YOUTUBE' | 'NEWS' | 'TEAM' | 'MESSAGES' | 'FORBES' | 'STOCKS' | 'DATING_FOLDER' | 'SOCIAL_FOLDER' | 'TINDER' | 'LUXE' | 'BANK'>('HOME');
+  const [initialStockId, setInitialStockId] = useState<string | null>(null);
   
   if (!props.player) return null; 
 
@@ -229,6 +230,11 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
                         onBack={() => setAppMode('HOME')} 
                         onAccept={props.onAcceptMessage!} 
                         onDelete={props.onDeleteMessage!} 
+                        onMarkRead={(id) => handleUpdatePlayer({ ...props.player!, inbox: props.player!.inbox.map(message => message.id === id ? { ...message, isRead: true } : message) })}
+                        onOpenStock={(stockId) => {
+                            setInitialStockId(stockId);
+                            setAppMode('STOCKS');
+                        }}
                     />
                 )}
                 {appMode === 'TEAM' && (
@@ -257,7 +263,14 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
                     />
                 )}
                 {appMode === 'STOCKS' && (
-                    <StocksApp player={props.player} onBack={() => setAppMode('HOME')} onTrade={props.onTradeStock!} />
+                    <StocksApp
+                        player={props.player}
+                        onBack={() => setAppMode('HOME')}
+                        onTrade={props.onTradeStock!}
+                        onUpdatePlayer={handleUpdatePlayer}
+                        initialStockId={initialStockId || undefined}
+                        onInitialStockConsumed={() => setInitialStockId(null)}
+                    />
                 )}
                 {appMode === 'BANK' && (
                     <BankApp player={props.player} onBack={() => setAppMode('HOME')} onUpdatePlayer={handleUpdatePlayer} />

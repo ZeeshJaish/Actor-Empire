@@ -1,9 +1,11 @@
 
 // ... existing imports
-import { NPCActor, NPCTier, NPCPrestige, Player, InstaPost, InstaPostType, InteractionType, Genre, Gender, ActorTrait } from '../types';
+import { NPCActor, NPCTier, NPCPrestige, Player, InstaPost, InstaPostType, InteractionType, Genre, Gender, ActorTrait, MusicArtist } from '../types';
 import { MOD_TALENT_ROWS, ModTalentRow } from './modTalentData';
 import { getInstagramPostComments, getInstagramPresetCaption } from './instagramLogic';
 import { ALL_GENRES, hydrateGenreXP } from './genreCatalog';
+import { MUSIC_ARTISTS } from './musicIndustry';
+import { INVESTOR_LEADERSHIP_POOL, PROJECT_INVESTORS, investorOwnerNpcId, investorOwnerNpcIdFromName } from './projectInvestors';
 
 const ACTOR_TRAITS: ActorTrait[] = ['DIVA', 'METHOD', 'WORKAHOLIC', 'UNRELIABLE', 'EASY_GOING', 'BOX_OFFICE_POISON', 'PROFESSIONAL', 'AMBITIOUS'];
 
@@ -57,6 +59,171 @@ interface RealCeleb {
     isIndependent?: boolean;
     country?: string;
 }
+
+const MUSIC_GENRE_TO_FILM_GENRE: Record<string, Genre> = {
+    Pop: 'ROMANCE',
+    Rap: 'CRIME',
+    'Hip-Hop': 'CRIME',
+    'Hip Hop': 'CRIME',
+    RnB: 'ROMANCE',
+    'R&B': 'ROMANCE',
+    Rock: 'ACTION',
+    Indie: 'DRAMA',
+    EDM: 'SCI_FI',
+    Country: 'DRAMA',
+    Latin: 'ROMANCE',
+    'K-pop': 'MUSICAL',
+    Kpop: 'MUSICAL',
+    Afrobeats: 'MUSICAL',
+    Classical: 'DRAMA',
+    Folk: 'DRAMA',
+    Punjabi: 'MUSICAL',
+    Bollywood: 'MUSICAL',
+    Metal: 'HORROR',
+    Jazz: 'DRAMA',
+};
+
+const musicArtistGenderToNpcGender = (gender: MusicArtist['gender']): Gender => {
+    if (gender === 'MALE') return 'MALE';
+    if (gender === 'FEMALE') return 'FEMALE';
+    return 'NON_BINARY';
+};
+
+const musicArtistTierToNpcTier = (tier: MusicArtist['fameTier']): NPCTier => {
+    if (tier === 'LEGEND') return 'ICON';
+    if (tier === 'SUPERSTAR') return 'A_LIST';
+    if (tier === 'STAR') return 'ESTABLISHED';
+    if (tier === 'KNOWN') return 'RISING';
+    return 'UNKNOWN';
+};
+
+const musicArtistNetWorth = (artist: MusicArtist): number => {
+    const fameMultiplier = artist.fameTier === 'LEGEND' ? 5.8
+        : artist.fameTier === 'SUPERSTAR' ? 3.8
+            : artist.fameTier === 'STAR' ? 2.3
+                : artist.fameTier === 'KNOWN' ? 1.2
+                    : 0.45;
+    const catalogValue = (artist.costLow + artist.costHigh) * 2.8;
+    const socialValue = artist.socialFollowers * (artist.fameTier === 'LEGEND' || artist.fameTier === 'SUPERSTAR' ? 2.4 : 1.35);
+    return Math.max(150_000, Math.round((catalogValue + socialValue) * fameMultiplier));
+};
+
+const investorOwnerGender = (ownerName: string): Gender => {
+    const firstName = ownerName.split(' ')[0]?.toLowerCase() || '';
+    if (['elena', 'rhea', 'lena', 'priya', 'mara', 'mina', 'sana', 'iris', 'valerie', 'nadia'].includes(firstName)) return 'FEMALE';
+    return 'MALE';
+};
+
+const investorOwnerTier = (cashCapacity: number): NPCTier => {
+    if (cashCapacity >= 180_000_000) return 'ICON';
+    if (cashCapacity >= 80_000_000) return 'A_LIST';
+    if (cashCapacity >= 35_000_000) return 'ESTABLISHED';
+    return 'RISING';
+};
+
+const createInvestorOwnerNPC = ({
+    id,
+    name,
+    company,
+    title,
+    cashCapacity = 30_000_000,
+    tags = [],
+    profile = 'Entertainment investor.'
+}: {
+    id: string;
+    name: string;
+    company: string;
+    title?: string;
+    cashCapacity?: number;
+    tags?: string[];
+    profile?: string;
+}): NPCActor => {
+    const gender = investorOwnerGender(name);
+    const netWorth = Math.max(5_000_000, Math.round(cashCapacity * 2.4));
+    const tier = investorOwnerTier(cashCapacity);
+    return {
+        id,
+        name,
+        handle: `@${name.toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 22) || id}`,
+        gender,
+        avatar: getGenderedAvatar(gender, name),
+        tier,
+        prestigeBias: tags.includes('prestige') || tags.includes('legacy') ? 'PRESTIGE' : tags.includes('commercial') || tags.includes('global') ? 'COMMERCIAL' : 'MIXED',
+        openness: 18 + (stableHash(name) % 32),
+        followers: Math.max(80_000, Math.round(netWorth / 12)),
+        netWorth,
+        occupation: 'INVESTOR',
+        bio: `${title || 'Investor'} at ${company}. ${profile}`,
+        forbesCategory: 'Entertainment Investor',
+        stats: {
+            talent: 55 + (stableHash(`${name}:talent`) % 30),
+            fame: Math.min(95, 35 + Math.log10(Math.max(10, netWorth)) * 8),
+            genreXP: createGenreXP(['DRAMA'])
+        },
+        traits: tags.includes('aggressive') || tags.includes('high-risk') ? ['AMBITIOUS', 'DIVA'] : ['PROFESSIONAL', 'AMBITIOUS'],
+        potential: Math.min(100, 60 + (stableHash(`${name}:potential`) % 30)),
+        isIndependent: true
+    };
+};
+
+export const createInvestorOwnerNPCs = (): NPCActor[] => {
+    const ownerNpcs = PROJECT_INVESTORS
+        .map(investor => {
+            if (!investor.ownerName) return null;
+            return createInvestorOwnerNPC({
+                id: investorOwnerNpcId(investor) || investorOwnerNpcIdFromName(investor.ownerName),
+                name: investor.ownerName,
+                company: investor.name,
+                title: investor.ownerTitle || 'Investor Principal',
+                cashCapacity: investor.cashCapacity,
+                tags: investor.investorTags,
+                profile: investor.profile
+            });
+        })
+        .filter((npc): npc is NPCActor => Boolean(npc));
+
+    const futureOwners = INVESTOR_LEADERSHIP_POOL.map((name, index) => createInvestorOwnerNPC({
+        id: investorOwnerNpcIdFromName(name),
+        name,
+        company: 'Entertainment Finance',
+        title: index % 3 === 0 ? 'Investor CEO' : index % 3 === 1 ? 'Managing Partner' : 'Media Finance Chair',
+        cashCapacity: 35_000_000 + (index * 7_500_000),
+        tags: ['investor', 'leadership', index % 2 === 0 ? 'strategic' : 'gap-money'],
+        profile: 'Part of the entertainment finance leadership pool and may take over investor companies over time.'
+    }));
+
+    const byId = new Map<string, NPCActor>();
+    [...ownerNpcs, ...futureOwners].forEach(npc => byId.set(npc.id, npc));
+    return Array.from(byId.values());
+};
+
+export const createNPCFromMusicArtist = (artist: MusicArtist, idOverride?: string): NPCActor => {
+    const gender = musicArtistGenderToNpcGender(artist.gender);
+    const filmGenre = MUSIC_GENRE_TO_FILM_GENRE[artist.genre] || MUSIC_GENRE_TO_FILM_GENRE[artist.subgenre] || 'DRAMA';
+    return {
+        id: idOverride || `music_npc_${artist.id}`,
+        name: artist.stageName,
+        handle: `@${artist.stageName.toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 24) || artist.id}`,
+        gender,
+        avatar: getGenderedAvatar(gender, artist.stageName),
+        tier: musicArtistTierToNpcTier(artist.fameTier),
+        prestigeBias: artist.soundtrackFitTags.includes('prestige') || artist.genre === 'Classical' || artist.genre === 'Jazz' ? 'PRESTIGE' : artist.fameTier === 'SUPERSTAR' || artist.fameTier === 'LEGEND' ? 'COMMERCIAL' : 'MIXED',
+        openness: artist.availability === 'COMMON' ? 62 : artist.availability === 'SELECTIVE' ? 42 : 22,
+        followers: artist.socialFollowers,
+        netWorth: musicArtistNetWorth(artist),
+        occupation: 'MUSIC_ARTIST',
+        bio: `${artist.genre}${artist.subgenre ? ` / ${artist.subgenre}` : ''} artist. ${artist.personality || artist.audience || 'Known for soundtrack-ready releases.'}`,
+        forbesCategory: `${artist.genre} Artist`,
+        stats: {
+            talent: Math.max(25, Math.min(100, artist.reputation)),
+            fame: Math.max(5, Math.min(100, artist.reputation * 0.55 + Math.log10(Math.max(10, artist.socialFollowers)) * 8)),
+            genreXP: createGenreXP([filmGenre])
+        },
+        traits: artist.scandalRisk === 'HIGH' ? ['DIVA', 'UNRELIABLE'] : artist.availability === 'RARE' ? ['PROFESSIONAL', 'AMBITIOUS'] : ['AMBITIOUS'],
+        potential: Math.max(35, Math.min(100, artist.reputation + (artist.fameTier === 'EMERGING' ? 18 : artist.fameTier === 'KNOWN' ? 10 : 4))),
+        isIndependent: artist.dealPreference.toLowerCase().includes('rights') || artist.availability === 'RARE'
+    };
+};
 
 const normalizeTalentName = (value: string): string =>
     value
@@ -677,7 +844,17 @@ export const generateNPCs = (): NPCActor[] => {
         });
     });
 
-    // 3. Add Random Directors (Cheap/Indie options)
+    // 3. Add Music Artists as world NPCs for Forbes, social, and industry surfaces.
+    MUSIC_ARTISTS.forEach((artist) => {
+        npcs.push(createNPCFromMusicArtist(artist));
+    });
+
+    // 4. Add investor principals and possible future CEOs as NPC-world people.
+    createInvestorOwnerNPCs().forEach((npc) => {
+        npcs.push(npc);
+    });
+
+    // 5. Add Random Directors (Cheap/Indie options)
     for(let i=0; i<40; i++) {
         const gender: Gender = Math.random() > 0.5 ? 'MALE' : 'FEMALE';
         const first = FIRST_NAMES[Math.floor(Math.random() * FIRST_NAMES.length)];
@@ -706,7 +883,7 @@ export const generateNPCs = (): NPCActor[] => {
         });
     }
 
-    // 4. Add Random Actors (Filler for low budget)
+    // 5. Add Random Actors (Filler for low budget)
     for(let i=0; i<50; i++) {
         npcs.push(generateRandomNPC(i));
     }

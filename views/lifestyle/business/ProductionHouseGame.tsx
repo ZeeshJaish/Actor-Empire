@@ -9,7 +9,7 @@ import { getDirectorTalent } from '../../../services/roleLogic';
 import { getPlayerLanguage, t } from '../../../services/i18n';
 
 
-import { DevelopmentLab } from './DevelopmentLab';
+import { DevelopmentLab, DevelopmentLabInitialTab } from './DevelopmentLab';
 import { GreenlightWizard } from "./GreenlightWizard";
 import { ReleaseWizard } from "./ReleaseWizard";
 
@@ -49,6 +49,13 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
     const [rightsMarketTargetId, setRightsMarketTargetId] = useState<string | null>(null);
     const [selectedProjectDashboard, setSelectedProjectDashboard] = useState<any>(null);
     const [sequelSetupProject, setSequelSetupProject] = useState<{ project: any, isSpinoff: boolean } | null>(null);
+    const [activeStudioId, setActiveStudioId] = useState<string | null>(null);
+    const [returnAfterStudioTool, setReturnAfterStudioTool] = useState<'STUDIO_GROUP' | null>(null);
+    const [studioGroupCommandReturnId, setStudioGroupCommandReturnId] = useState<string | null>(null);
+    const [subsidiaryLaunch, setSubsidiaryLaunch] = useState<{
+        tab: DevelopmentLabInitialTab;
+        projectType?: 'MOVIE' | 'SERIES';
+    } | null>(null);
 
     useEffect(() => {
         if (!initialRightsMarketOpportunityId) return;
@@ -58,7 +65,10 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
     
     // Locate the Studio Business
     const studioGroup = getStudioGroup(player);
-    const studio = studioGroup.parentStudio;
+    const parentStudio = studioGroup.parentStudio;
+    const activeStudio = studioGroup.allStudios.find(candidate => candidate.id === activeStudioId && candidate.studioState?.operatingModel !== 'FULL_MERGER')
+        || parentStudio;
+    const studio = activeStudio;
     if (!studio) return <div className="p-10 text-white">Error: Studio not found.</div>;
     const language = getPlayerLanguage(player);
     const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
@@ -95,7 +105,7 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
     }, [player.pastProjects]);
 
     // Calculate Studio Metrics
-    const totalGross = activeReleases.reduce((sum, r) => sum + r.totalGross + (r.streamingRevenue || 0), 0) + library.reduce((sum, p) => sum + (p.gross || 0) + (p.streamingRevenue || 0), 0);
+    const totalGross = activeReleases.reduce((sum, r) => sum + r.totalGross + (r.streamingRevenue || 0) + (r.soundtrackRevenue || 0), 0) + library.reduce((sum, p) => sum + (p.gross || 0) + (p.streamingRevenue || 0) + (p.soundtrackRevenue || 0), 0);
     const avgRating = library.length > 0 ? library.reduce((sum, p) => sum + (p.rating || 0), 0) / library.length : 0;
     
     // Calculate Awards Won
@@ -106,6 +116,8 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
     // Prestige Score (0-100): rewards quality, awards, consistency, and credible hits.
     const prestigeScore = Math.min(100, Math.floor((avgRating * 6) + (awardsWon * 2.5) + (library.length * 0.8) + (breakoutCount * 1.2) + consistencyBonus));
     const groupValuation = studioGroup.allStudios.reduce((total, groupStudio) => total + (groupStudio.stats.valuation || 0), 0);
+    const outsideProductions = (player.outsideProductions || []).slice(0, 8);
+    const outsideProducerProfit = outsideProductions.reduce((sum, item) => sum + (item.profit || 0), 0);
 
     // Active Slate List (Combined for the Netflix-style row)
     const activeSlate = [
@@ -154,6 +166,46 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
             concept_phase: concept?.phase || 'new_project',
         });
         setView('GREENLIGHT');
+    };
+
+    const openStudioWorkbench = (studioId: string, tab: DevelopmentLabInitialTab, projectType?: 'MOVIE' | 'SERIES') => {
+        setActiveStudioId(studioId);
+        setStudioGroupCommandReturnId(studioId);
+        setReturnAfterStudioTool('STUDIO_GROUP');
+        setSelectedConcept(null);
+        setSelectedProjectDashboard(null);
+        setRightsMarketTargetId(null);
+        setSubsidiaryLaunch({ tab, projectType });
+        setView('DEVELOPMENT');
+    };
+
+    const onGreenlightStudioProject = (studioId: string) => {
+        setActiveStudioId(studioId);
+        setStudioGroupCommandReturnId(studioId);
+        setReturnAfterStudioTool('STUDIO_GROUP');
+        setSelectedConcept(null);
+        setSelectedProjectDashboard(null);
+        setRightsMarketTargetId(null);
+        setSubsidiaryLaunch(null);
+        setView('GREENLIGHT');
+    };
+
+    const closeStudioTool = () => {
+        setSelectedConcept(null);
+        if (returnAfterStudioTool === 'STUDIO_GROUP') {
+            setView('STUDIO_GROUP');
+            return;
+        }
+        setView('DASHBOARD');
+    };
+
+    const returnToMainDashboard = () => {
+        setActiveStudioId(null);
+        setReturnAfterStudioTool(null);
+        setStudioGroupCommandReturnId(null);
+        setSubsidiaryLaunch(null);
+        setSelectedConcept(null);
+        setView('DASHBOARD');
     };
 
     const pastProjectsSlate = [
@@ -604,20 +656,29 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
     }
 
     if (view === 'STUDIO_GROUP') {
-        return <StudioGroupView player={player} onBack={() => setView('DASHBOARD')} onUpdatePlayer={onUpdatePlayer} />;
+        return (
+            <StudioGroupView
+                player={player}
+                onBack={returnToMainDashboard}
+                onUpdatePlayer={onUpdatePlayer}
+                initialCommandStudioId={studioGroupCommandReturnId}
+                onGreenlightStudioProject={onGreenlightStudioProject}
+                onOpenStudioWorkbench={(studioId, tab) => openStudioWorkbench(studioId, tab)}
+            />
+        );
     }
 
     if (view === 'DEVELOPMENT') {
-        return <DevelopmentLab player={player} studio={studio} onBack={() => setView('DASHBOARD')} onUpdatePlayer={onUpdatePlayer} onOpenProject={(projectId) => {
+        return <DevelopmentLab player={player} studio={studio} onBack={closeStudioTool} onUpdatePlayer={onUpdatePlayer} onOpenProject={(projectId) => {
             const project = player.activeReleases.find(release => release.id === projectId)
                 || player.pastProjects.find(release => release.id === projectId);
             if (!project) return;
             setSelectedProjectDashboard(project);
-            setView('DASHBOARD');
+            closeStudioTool();
         }} initialRightsMarketOpportunityId={rightsMarketTargetId || undefined} onRightsMarketTargetConsumed={() => {
             setRightsMarketTargetId(null);
             onRightsMarketTargetConsumed?.();
-        }} />;
+        }} initialTab={subsidiaryLaunch?.tab} initialProjectType={subsidiaryLaunch?.projectType} />;
     }
 
     if (view === 'OFFICE') {
@@ -689,13 +750,11 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
                         studio={studio} 
                         initialConcept={selectedConcept}
                         onBack={() => {
-                            setSelectedConcept(null);
-                            setView('DASHBOARD');
+                            closeStudioTool();
                         }} 
                         onUpdatePlayer={onUpdatePlayer} 
                         onComplete={() => {
-                            setSelectedConcept(null);
-                            setView('DASHBOARD');
+                            closeStudioTool();
                         }}
                     />
                 </motion.div>
@@ -846,6 +905,64 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
                     </div>
                 </div>
 
+                {outsideProductions.length > 0 && (
+                    <div className="pt-2 pb-6">
+                        <div className="px-4 mb-3 flex items-end justify-between gap-3">
+                            <div>
+                                <h2 className="text-lg font-bold text-white tracking-tight">Outside Productions</h2>
+                                <p className="mt-0.5 text-xs font-semibold text-zinc-500">Producer shares you bought in other companies' films.</p>
+                            </div>
+                            <div className={`shrink-0 rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-widest ${outsideProducerProfit >= 0 ? 'border-emerald-400/20 bg-emerald-400/10 text-emerald-300' : 'border-rose-400/20 bg-rose-400/10 text-rose-300'}`}>
+                                Net {formatMoney(outsideProducerProfit)}
+                            </div>
+                        </div>
+                        <div className="flex gap-3 overflow-x-auto px-4 pb-4 no-scrollbar">
+                            {outsideProductions.map(item => (
+                                <div key={item.id} className="min-w-[220px] rounded-3xl border border-emerald-400/15 bg-zinc-950 p-4 shadow-xl">
+                                    <div className="mb-3 flex items-start justify-between gap-3">
+                                        <div className="min-w-0">
+                                            <div className="truncate text-base font-black text-white">{item.projectTitle}</div>
+                                            <div className="mt-1 truncate text-[10px] font-black uppercase tracking-[0.18em] text-emerald-300/70">
+                                                {item.stakePercent}% share • {item.status}
+                                            </div>
+                                        </div>
+                                        <div className={`rounded-full px-2 py-1 text-[9px] font-black uppercase tracking-widest ${item.finalOutcome === 'HIT' || item.finalOutcome === 'PROFIT' ? 'bg-emerald-400 text-black' : item.finalOutcome === 'LOSS' || item.finalOutcome === 'CANCELLED' ? 'bg-rose-500 text-white' : 'bg-zinc-800 text-zinc-300'}`}>
+                                            {item.finalOutcome || item.releasePath}
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div className="rounded-2xl bg-black/40 p-3">
+                                            <div className="text-[8px] font-black uppercase tracking-widest text-zinc-500">Invested</div>
+                                            <div className="mt-1 font-mono text-sm font-black text-zinc-100">{formatMoney(item.investedAmount)}</div>
+                                        </div>
+                                        <div className="rounded-2xl bg-black/40 p-3">
+                                            <div className="text-[8px] font-black uppercase tracking-widest text-zinc-500">Payout</div>
+                                            <div className="mt-1 font-mono text-sm font-black text-emerald-300">{formatMoney(item.playerPayout || 0)}</div>
+                                        </div>
+                                    </div>
+                                    <div className="mt-2 grid grid-cols-2 gap-2">
+                                        <div className="rounded-2xl bg-black/40 p-3">
+                                            <div className="text-[8px] font-black uppercase tracking-widest text-zinc-500">Owner</div>
+                                            <div className="mt-1 truncate text-xs font-black text-zinc-100">{item.ownerName || item.producerName}</div>
+                                        </div>
+                                        <div className="rounded-2xl bg-black/40 p-3">
+                                            <div className="text-[8px] font-black uppercase tracking-widest text-zinc-500">Reputation</div>
+                                            <div className={`mt-1 font-mono text-sm font-black ${(item.reputationImpact || 0) >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>
+                                                {(item.reputationImpact || 0) >= 0 ? '+' : ''}{(item.reputationImpact || 0).toFixed(1)}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="mt-3 text-xs font-semibold leading-relaxed text-zinc-500">
+                                        {item.status === 'FINISHED' || item.status === 'CANCELLED'
+                                            ? item.resultSummary || `Profit ${formatMoney(item.profit || 0)} from producer receipts.`
+                                            : `Expected release: Y${item.releaseYear} W${item.releaseWeek}.`}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
                 {/* RECENT ARCHIVE (Past Projects) */}
                 {pastProjectsSlate.length > 0 && (
                     <div className="pt-2 pb-6">
@@ -894,7 +1011,10 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
                             stats={[
                                 { label: "Scripts", value: studio.studioState?.scripts.length.toString() || "0" }
                             ]}
-                            onClick={() => setView('DEVELOPMENT')}
+                            onClick={() => {
+                                setSubsidiaryLaunch(null);
+                                setView('DEVELOPMENT');
+                            }}
                         />
 
                         {/* Production Infrastructure */}
@@ -1138,11 +1258,13 @@ const StudioFinanceView: React.FC<{
     const [showExitModal, setShowExitModal] = useState<'SELL' | 'LIQUIDATE' | null>(null);
     const [ledgerRange, setLedgerRange] = useState<'12W' | '52W' | 'ALL'>('12W');
     const [visibleLedgerEntries, setVisibleLedgerEntries] = useState(12);
+    const language = getPlayerLanguage(player);
     const studioActiveReleases = useMemo(() => player.activeReleases.filter(r => r.projectDetails?.studioId === studio.id), [player.activeReleases, studio.id]);
     const studioLibrary = useMemo(() => player.pastProjects.filter(p => p.studioId === studio.id), [player.pastProjects, studio.id]);
     const totalProjectGross = useMemo(() => studioActiveReleases.reduce((sum, r) => sum + (r.totalGross || 0), 0) + studioLibrary.reduce((sum, p) => sum + (p.gross || 0), 0), [studioActiveReleases, studioLibrary]);
     const totalStreamingRevenue = useMemo(() => studioActiveReleases.reduce((sum, r) => sum + (r.streamingRevenue || 0), 0) + studioLibrary.reduce((sum, p) => sum + (p.streamingRevenue || 0), 0), [studioActiveReleases, studioLibrary]);
-    const estimatedStudioReceipts = useMemo(() => Math.floor(totalProjectGross * 0.5) + totalStreamingRevenue, [totalProjectGross, totalStreamingRevenue]);
+    const totalSoundtrackRevenue = useMemo(() => studioActiveReleases.reduce((sum, r) => sum + (r.soundtrackRevenue || 0), 0) + studioLibrary.reduce((sum, p) => sum + (p.soundtrackRevenue || 0), 0), [studioActiveReleases, studioLibrary]);
+    const estimatedStudioReceipts = useMemo(() => Math.floor(totalProjectGross * 0.5) + totalStreamingRevenue + totalSoundtrackRevenue, [totalProjectGross, totalStreamingRevenue, totalSoundtrackRevenue]);
     const totalProductionBudget = useMemo(() => studioLibrary.reduce((sum, p) => sum + (p.budget || 0), 0), [studioLibrary]);
     const financeLedger = useMemo(() => {
         const stored = Array.isArray(studio.studioState?.financeLedger) ? studio.studioState.financeLedger : [];
@@ -1155,7 +1277,7 @@ const StudioFinanceView: React.FC<{
                 id: `derived_receipt_${project.id}`,
                 week: 0,
                 year: project.year || player.age,
-                amount: Math.floor((project.gross || 0) * 0.5) + (project.streamingRevenue || 0),
+                amount: Math.floor((project.gross || 0) * 0.5) + (project.streamingRevenue || 0) + (project.soundtrackRevenue || 0),
                 type: 'THEATRICAL' as const,
                 label: `${project.name} studio receipts`,
                 projectId: project.id
@@ -1218,14 +1340,14 @@ const StudioFinanceView: React.FC<{
         return `$${val.toLocaleString()}`;
     };
 
-    const sellCheck = sellBusiness(studio);
-    const liquidateCheck = liquidateBusiness(studio);
+    const sellCheck = sellBusiness(studio, language);
+    const liquidateCheck = liquidateBusiness(studio, language);
 
     const executeExit = () => {
         if (!showExitModal) return;
 
         if (showExitModal === 'SELL') {
-            const res = sellBusiness(studio);
+            const res = sellBusiness(studio, language);
             if (!res.success) {
                 alert(res.msg);
                 setShowExitModal(null);
@@ -1242,7 +1364,7 @@ const StudioFinanceView: React.FC<{
             onExit();
         } 
         else if (showExitModal === 'LIQUIDATE') {
-            const res = liquidateBusiness(studio);
+            const res = liquidateBusiness(studio, language);
             const updatedBusinesses = player.businesses.filter(b => b.id !== studio.id);
             const newMoney = player.money + res.payout;
             onUpdatePlayer({ 
@@ -1562,7 +1684,7 @@ const getCustomPoster = (project: any) => {
 };
 
 const getStudioArchiveRevenue = (project: any) => {
-    return (project.gross || 0) + (project.streamingRevenue || project.projectDetails?.streamingRevenue || 0);
+    return (project.gross || 0) + (project.streamingRevenue || project.projectDetails?.streamingRevenue || 0) + (project.soundtrackRevenue || 0);
 };
 
 const getStudioArchiveProfit = (project: any) => {
@@ -1951,7 +2073,7 @@ const ArchiveProjectCard: React.FC<{ project: any, isLatestInstallment?: boolean
 
     let outcomeLabel = null;
     let outcomeColor = "";
-    const projectRevenue = (project.gross || 0) + (project.streamingRevenue || project.projectDetails?.streamingRevenue || 0);
+    const projectRevenue = (project.gross || 0) + (project.streamingRevenue || project.projectDetails?.streamingRevenue || 0) + (project.soundtrackRevenue || 0);
     if (projectRevenue > (project.budget || 0) * 5) {
         outcomeLabel = "BLOCKBUSTER";
         outcomeColor = "bg-purple-500 text-white";

@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Player, Relationship, BloodlineMember } from '../types';
-import { MessageCircle, Phone, Coffee, Gift, Users, X, Zap, Heart, Baby, Gem, Crown, Flame, Music, Plane, Briefcase, Trophy, Film, DollarSign, Skull, Sparkles, Home } from 'lucide-react';
+import { MessageCircle, Phone, Coffee, Gift, Users, X, Zap, Heart, Baby, Gem, Crown, Flame, Music, Plane, Briefcase, Trophy, Film, DollarSign, Skull, Sparkles, Home, PawPrint, Scissors, Stethoscope } from 'lucide-react';
 import { calculateLegacyScore, getGenerationNumber, getInteractionAgeInWeeks, getLegacyInheritancePreview, getRelationshipAge, LEGACY_INHERITANCE_TAX_RATE, LEGACY_MIN_PLAYABLE_AGE } from '../services/legacyLogic';
 import { getDivorceLawyerCost, isChildAbandoned } from '../services/familyLogic';
 import { hasOwnedPremiumAssetInCollection } from '../services/premiumLogic';
@@ -8,11 +8,12 @@ import { getPlayerLanguage, t } from '../services/i18n';
 
 interface SocialPageProps {
   player: Player;
-  onInteract: (id: string, type: 'CALL' | 'HANGOUT' | 'GIFT' | 'NETWORK' | 'DATE' | 'PROPOSE' | 'INTIMACY' | 'CLUBBING' | 'TRIP' | 'ESTATE_DATE' | 'YACHT_DATE' | 'JET_ESCAPE' | 'LUXURY_GIFT' | 'ABANDON_CHILD' | 'RECONNECT_CHILD' | 'BREAK_UP' | 'DIVORCE_SETTLE' | 'DIVORCE_FIGHT_BUDGET' | 'DIVORCE_FIGHT_ESTABLISHED' | 'DIVORCE_FIGHT_ELITE') => void;
+  onInteract: (id: string, type: SocialInteractionType) => void;
   onContinueAsChild: (child: Relationship) => void;
 }
 
 type SocialTab = 'connections' | 'legacy';
+type SocialInteractionType = 'CALL' | 'HANGOUT' | 'GIFT' | 'NETWORK' | 'DATE' | 'PROPOSE' | 'INTIMACY' | 'CLUBBING' | 'TRIP' | 'ESTATE_DATE' | 'YACHT_DATE' | 'JET_ESCAPE' | 'LUXURY_GIFT' | 'ABANDON_CHILD' | 'RECONNECT_CHILD' | 'BREAK_UP' | 'DIVORCE_SETTLE' | 'DIVORCE_FIGHT_BUDGET' | 'DIVORCE_FIGHT_ESTABLISHED' | 'DIVORCE_FIGHT_ELITE' | 'PET_FEED' | 'PET_PLAY' | 'PET_GROOM' | 'PET_VET';
 
 const formatWealth = (amount: number) => {
   if (amount >= 1000000000) return `$${(amount / 1000000000).toFixed(1)}B`;
@@ -28,7 +29,7 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
   const [showDivorceOptions, setShowDivorceOptions] = useState(false);
   const language = getPlayerLanguage(player);
   const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
-  const relationLabel = (relation: Relationship['relation']) => tr(`connections.relation.${relation}`);
+  const relationLabel = (relation: Relationship['relation']) => relation === 'Pet' ? 'Pet' : tr(`connections.relation.${relation}`);
 
   const getHangoutCost = () => {
       if (player.stats.fame > 75) return 500;
@@ -41,7 +42,7 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
       return 250;
   };
 
-  const handleInteraction = (type: 'CALL' | 'HANGOUT' | 'GIFT' | 'NETWORK' | 'DATE' | 'PROPOSE' | 'INTIMACY' | 'CLUBBING' | 'TRIP' | 'ESTATE_DATE' | 'YACHT_DATE' | 'JET_ESCAPE' | 'LUXURY_GIFT' | 'ABANDON_CHILD' | 'RECONNECT_CHILD' | 'BREAK_UP' | 'DIVORCE_SETTLE' | 'DIVORCE_FIGHT_BUDGET' | 'DIVORCE_FIGHT_ESTABLISHED' | 'DIVORCE_FIGHT_ELITE') => {
+  const handleInteraction = (type: SocialInteractionType) => {
       if (selectedContact) {
           onInteract(selectedContact.id, type);
           setShowDivorceOptions(false);
@@ -52,7 +53,7 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
   const sortedRelationships = useMemo(() => {
       return [...player.relationships].sort((a, b) => {
           const getPriority = (rel: Relationship) => {
-              if (['Parent', 'Deceased Parent', 'Sibling', 'Partner', 'Spouse', 'Ex-Partner', 'Ex-Spouse', 'Child'].includes(rel.relation)) return 3;
+              if (['Parent', 'Deceased Parent', 'Sibling', 'Partner', 'Spouse', 'Ex-Partner', 'Ex-Spouse', 'Child', 'Pet'].includes(rel.relation)) return 3;
               if (rel.relation === 'Connection') return 1;
               return 2;
           };
@@ -66,7 +67,7 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
   const legacyBonds = sortedRelationships.filter(rel => rel.relation === 'Deceased Parent');
 
   const innerCircle = sortedRelationships.filter(rel =>
-      ['Parent', 'Spouse', 'Child', 'Sibling'].includes(rel.relation)
+      ['Parent', 'Spouse', 'Child', 'Sibling', 'Pet'].includes(rel.relation)
   );
 
   const relationshipCircle = sortedRelationships.filter(rel =>
@@ -199,6 +200,8 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
               return 'bg-yellow-500/12 text-yellow-300 border-yellow-500/25';
           case 'Sibling':
               return 'bg-cyan-500/12 text-cyan-300 border-cyan-500/25';
+          case 'Pet':
+              return 'bg-lime-500/12 text-lime-300 border-lime-500/25';
           case 'Friend':
               return 'bg-emerald-500/12 text-emerald-300 border-emerald-500/25';
           case 'Director':
@@ -217,6 +220,31 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
       }
   };
 
+  const getPetCareMultiplier = (rel?: Relationship | null) => {
+      if (rel?.petRarity === 'endangered') return 8;
+      if (rel?.petRarity === 'exotic') return 4;
+      if (rel?.petRarity === 'premium') return 2;
+      return 1;
+  };
+
+  const getPetActionCost = (action: 'PET_FEED' | 'PET_PLAY' | 'PET_GROOM' | 'PET_VET', rel?: Relationship | null) => {
+      const multiplier = getPetCareMultiplier(rel);
+      if (action === 'PET_PLAY') return 0;
+      if (action === 'PET_FEED') return Math.round(150 * multiplier);
+      if (action === 'PET_GROOM') return Math.round(450 * multiplier);
+      return Math.round(1200 * multiplier);
+  };
+
+  const renderPetAvatar = (rel: Relationship, sizeClass = 'w-14 h-14', textClass = 'text-3xl') => (
+      <div
+          className={`${sizeClass} grid place-items-center rounded-full border-2 border-lime-500/35 bg-lime-500/10 shadow-[0_0_22px_rgba(163,230,53,0.10)] ${textClass}`}
+          style={{ fontFamily: '"Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif' }}
+          aria-label={rel.petSpecies || 'Pet'}
+      >
+          <span>{rel.petEmoji || '🐾'}</span>
+      </div>
+  );
+
   const renderRelationshipCard = (rel: Relationship) => {
       const weeksSince = getInteractionAgeInWeeks(rel, player.age, player.currentWeek);
       const closeness = rel.closeness || 0;
@@ -226,17 +254,20 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
       return (
           <div key={rel.id} onClick={() => setSelectedContact(rel)} className={`glass-card p-4 rounded-3xl flex items-center gap-4 group cursor-pointer transition-transform active:scale-[0.98] ${rel.relation === 'Partner' || rel.relation === 'Spouse' ? 'border-pink-500/30 bg-pink-900/5' : ''} ${rel.relation === 'Ex-Partner' || rel.relation === 'Ex-Spouse' ? 'border-rose-500/20 bg-rose-900/5' : ''} ${isLegacyBond ? 'border-zinc-700/60 bg-zinc-950/60' : ''}`}>
               <div className="relative">
-                  <img
-                      src={rel.image}
-                      alt={rel.name}
-                      className={`w-14 h-14 rounded-full object-cover border-2 transition-colors ${isLegacyBond ? 'grayscale border-zinc-700 opacity-80' : isCritical ? 'border-rose-500' : 'border-zinc-800 group-hover:border-zinc-600'}`}
-                  />
+                  {rel.relation === 'Pet' ? renderPetAvatar(rel) : (
+                      <img
+                          src={rel.image}
+                          alt={rel.name}
+                          className={`w-14 h-14 rounded-full object-cover border-2 transition-colors ${isLegacyBond ? 'grayscale border-zinc-700 opacity-80' : isCritical ? 'border-rose-500' : 'border-zinc-800 group-hover:border-zinc-600'}`}
+                      />
+                  )}
                   <div className="absolute -bottom-1 -right-1 bg-zinc-900 rounded-full p-1 border border-zinc-800 shadow-md">
                       {rel.relation === 'Partner' || rel.relation === 'Spouse' ? <Heart size={10} className="text-rose-500 fill-rose-500"/> :
                       rel.relation === 'Ex-Partner' || rel.relation === 'Ex-Spouse' ? <Heart size={10} className="text-rose-300"/> :
                       rel.relation === 'Parent' ? <span className="text-blue-500 text-[10px]">🏠</span> :
                       rel.relation === 'Deceased Parent' ? <Skull size={12} className="text-zinc-500"/> :
                       rel.relation === 'Child' ? <Baby size={12} className="text-yellow-400"/> :
+                      rel.relation === 'Pet' ? <PawPrint size={12} className="text-lime-300"/> :
                       rel.relation === 'Sibling' ? <Users size={12} className="text-cyan-400"/> :
                       rel.relation === 'Director' ? <Crown size={12} className="text-amber-400"/> :
                       rel.relation === 'Agent' ? <Briefcase size={12} className="text-blue-400"/> :
@@ -258,6 +289,18 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
                           <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[9px] font-bold tracking-[0.18em] ${getRelationPill(rel.relation)}`}>{relationLabel(rel.relation)}</span>
                           <span className={isLegacyBond ? 'text-zinc-400 font-bold' : (rel.closeness || 0) > 80 ? 'text-emerald-400 font-bold' : ''}>{Math.round(rel.closeness || 0)}/100</span>
                       </div>
+                      {rel.relation === 'Pet' && (
+                          <div className="space-y-0.5">
+                              <div className="truncate text-[10px] font-bold uppercase tracking-[0.16em] text-lime-200/70">
+                                  {rel.petBreed} {rel.petSpecies} • {rel.petStoreName || (rel.petAcquisition === 'endangered' ? 'Sanctuary' : rel.petAcquisition)}
+                              </div>
+                              {(rel.petHomeSetup || rel.petAccessory || rel.petCustomization) && (
+                                  <div className="truncate text-[10px] font-bold text-zinc-500">
+                                      {[rel.petHomeSetup, rel.petAccessory, rel.petCustomization].filter(Boolean).join(' • ')}
+                                  </div>
+                              )}
+                          </div>
+                      )}
                       <div className="h-1.5 w-full bg-zinc-800 rounded-full overflow-hidden">
                           <div className={`h-full rounded-full transition-all duration-500 ${isLegacyBond ? 'bg-zinc-500' : (rel.closeness || 0) > 80 ? 'bg-emerald-500' : (rel.closeness || 0) < 30 ? 'bg-rose-500' : 'bg-amber-400'}`} style={{ width: `${rel.closeness || 0}%` }}></div>
                       </div>
@@ -286,7 +329,7 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
               <div className="flex gap-2 text-[10px] font-mono mt-1 text-zinc-500">
                   <span className="flex items-center gap-0.5"><Zap size={10}/> -{costEnergy}</span>
                   <span className={`flex items-center gap-0.5 ${costMoney > 0 ? 'text-rose-400' : 'text-emerald-500'}`}>
-                      {costMoney > 0 ? `-$${costMoney}` : tr('connections.free')}
+                      {costMoney > 0 ? `-${formatWealth(costMoney)}` : tr('connections.free')}
                   </span>
               </div>
           </div>
@@ -455,10 +498,17 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
 
                   <div className="relative pt-12 pb-6 px-6 bg-zinc-900 border-b border-zinc-800 flex flex-col items-center shrink-0">
                       <div className="w-24 h-24 rounded-full p-1 bg-gradient-to-tr from-zinc-700 to-zinc-900 shadow-xl mb-3">
-                          <img src={selectedContact.image} className={`w-full h-full rounded-full object-cover border-4 border-black ${selectedContact.relation === 'Deceased Parent' ? 'grayscale opacity-80' : ''}`} />
+                          {selectedContact.relation === 'Pet' ? renderPetAvatar(selectedContact, 'w-full h-full', 'text-5xl') : (
+                              <img src={selectedContact.image} className={`w-full h-full rounded-full object-cover border-4 border-black ${selectedContact.relation === 'Deceased Parent' ? 'grayscale opacity-80' : ''}`} />
+                          )}
                       </div>
                       <h3 className="text-2xl font-bold text-white mb-1">{selectedContact.name}</h3>
                       <div className={`mb-2 inline-flex items-center rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] ${getRelationPill(selectedContact.relation)}`}>{relationLabel(selectedContact.relation)}</div>
+                      {selectedContact.relation === 'Pet' && (
+                        <div className="mb-4 text-center text-xs font-bold text-lime-100/70">
+                            {selectedContact.petBreed} {selectedContact.petSpecies} • {selectedContact.petAcquisition === 'endangered' ? 'Sanctuary sponsorship' : selectedContact.petAcquisition}
+                        </div>
+                      )}
                       {(selectedContact.relation === 'Child' || selectedContact.relation === 'Sibling' || selectedContact.relation === 'Parent' || selectedContact.relation === 'Deceased Parent') && (
                         <div className="text-xs text-zinc-400 mb-4">{tr('connections.age')} {getRelationshipAge(selectedContact, player.age, player.currentWeek)}</div>
                       )}
@@ -591,7 +641,24 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
                           </div>
                       )}
 
-                      {selectedContact.relation !== 'Deceased Parent' ? (
+                      {selectedContact.relation === 'Pet' ? (
+                      <div className="mb-6">
+	                          <h4 className="text-[10px] font-bold text-lime-200/70 uppercase tracking-widest mb-3 pl-1">{tr('connections.petCare')}</h4>
+	                          <div className="grid grid-cols-2 gap-3">
+	                              <ActionCard label={tr('connections.petFeedCare')} icon={Heart} color="bg-lime-500" costMoney={getPetActionCost('PET_FEED', selectedContact)} costEnergy={4} disabled={player.money < getPetActionCost('PET_FEED', selectedContact) || player.energy.current < 4} onClick={() => handleInteraction('PET_FEED')} />
+	                              <ActionCard label={tr('connections.petPlayTime')} icon={PawPrint} color="bg-green-500" costMoney={0} costEnergy={10} disabled={player.energy.current < 10} onClick={() => handleInteraction('PET_PLAY')} />
+	                              <ActionCard label={tr('connections.petGrooming')} icon={Scissors} color="bg-cyan-500" costMoney={getPetActionCost('PET_GROOM', selectedContact)} costEnergy={5} disabled={player.money < getPetActionCost('PET_GROOM', selectedContact) || player.energy.current < 5} onClick={() => handleInteraction('PET_GROOM')} />
+	                              <ActionCard label={tr('connections.petVetVisit')} icon={Stethoscope} color="bg-emerald-500" costMoney={getPetActionCost('PET_VET', selectedContact)} costEnergy={3} disabled={player.money < getPetActionCost('PET_VET', selectedContact) || player.energy.current < 3} onClick={() => handleInteraction('PET_VET')} />
+	                          </div>
+	                          {(selectedContact.petRarity === 'exotic' || selectedContact.petRarity === 'endangered') && (
+	                              <div className="mt-3 rounded-2xl border border-lime-300/20 bg-lime-300/8 p-3 text-xs font-bold leading-relaxed text-lime-100/75">
+	                                  {selectedContact.petRarity === 'endangered'
+	                                      ? tr('connections.petEndangeredNote')
+	                                      : tr('connections.petExoticNote')}
+	                              </div>
+	                          )}
+                      </div>
+                      ) : selectedContact.relation !== 'Deceased Parent' ? (
                       <div className="mb-6">
                           <h4 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3 pl-1">{tr('connections.social')}</h4>
                           <div className="grid grid-cols-2 gap-3">

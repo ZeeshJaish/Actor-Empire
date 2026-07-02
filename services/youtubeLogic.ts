@@ -1,8 +1,9 @@
 
-import { Gender, NPCActor, NPCPrestige, NPCTier, Player, YoutubeBrandDeal, YoutubeChannel, YoutubeCollabOffer, YoutubeCreatorIdentity, YoutubeVideo, YoutubeVideoType } from '../types';
+import { Gender, NPCActor, NPCPrestige, NPCTier, Player, YoutubeBrandDeal, YoutubeChannel, YoutubeCollabOffer, YoutubeCreatorIdentity, YoutubeMusicVideoFeatureOffer, YoutubeVideo, YoutubeVideoType } from '../types';
 import { getGenderedAvatar, NPC_DATABASE } from './npcLogic';
 import { MOD_TALENT_ROWS, ModTalentRow } from './modTalentData';
 import { hydrateGenreXP } from './genreCatalog';
+import { getMusicArtistCatalog } from './musicIndustry';
 
 export const YOUTUBE_MONETIZATION_SUBS = 1000;
 export const YOUTUBE_MONETIZATION_VIEWS = 4000;
@@ -310,6 +311,35 @@ const VIDEO_TEMPLATES = [
 
 export const generateYoutubeFeed = (player: Player): YoutubeVideo[] => {
     const feed: YoutubeVideo[] = [];
+    const recentMusicVideos = (player.world?.musicIndustry?.recentReleases || [])
+        .filter(release => ['VIDEO', 'SINGLE', 'EP', 'ALBUM'].includes(release.kind))
+        .slice(0, 6)
+        .map((release, index): YoutubeVideo => ({
+            id: `yt_music_${release.id}_${index}`,
+            title: `${release.artistName} - ${release.songTitle}`,
+            type: 'MUSIC_VIDEO',
+            thumbnailColor: ['bg-cyan-500', 'bg-fuchsia-500', 'bg-emerald-500', 'bg-violet-500'][index % 4],
+            views: Math.max(12000, release.youtubeViews || release.score * 12000),
+            likes: Math.floor(Math.max(12000, release.youtubeViews || release.score * 12000) * 0.065),
+            earnings: 0,
+            weekUploaded: release.week,
+            yearUploaded: release.year,
+            isPlayer: false,
+            authorName: release.artistName,
+            qualityScore: Math.max(35, Math.min(100, release.score)),
+            weeklyHistory: [],
+            comments: [
+                `${release.genre} fans are replaying this hook.`,
+                release.currentRank ? `This is charting around #${release.currentRank}.` : 'The music scene is watching this rollout.',
+                release.movement && release.movement > 0 ? `Moved up ${release.movement} spots this week.` : 'The visuals are doing promo work.'
+            ],
+            sourceArtistId: release.artistId,
+            sourceArtistName: release.artistName,
+            songTitle: release.songTitle,
+            isMusicVideo: true
+        }));
+
+    feed.push(...recentMusicVideos);
     
     // Generate 10 random videos from NPCs
     for(let i=0; i<10; i++) {
@@ -431,6 +461,54 @@ export const generateYoutubeBrandDeal = (player: Player): YoutubeBrandDeal | nul
         bonusViews,
         penalty,
         expiresInWeeks: 4
+    };
+};
+
+export const generateMusicVideoFeatureOffer = (player: Player): YoutubeMusicVideoFeatureOffer | null => {
+    const channel = player.youtube;
+    const creatorScore = calculateYoutubeCreatorScore(player);
+    const actingPull = (player.stats.fame || 0) + (player.stats.reputation || 0) * 0.55 + creatorScore * 0.35;
+    if (actingPull < 42 && (channel.subscribers || 0) < 2500) return null;
+    if ((player.inbox || []).some(message => message.type === 'OFFER_MUSIC_VIDEO_FEATURE')) return null;
+
+    const catalog = getMusicArtistCatalog(player.world)
+        .filter(artist => {
+            const state = player.world?.musicIndustry?.artists?.[artist.id];
+            const artistPull = artist.reputation + Math.log10(Math.max(10, state?.followers || artist.socialFollowers)) * 7;
+            return artistPull >= Math.max(32, actingPull * 0.46);
+        });
+    if (catalog.length === 0) return null;
+
+    const recentReleaseByArtist = new Map((player.world?.musicIndustry?.recentReleases || []).map(release => [release.artistId, release]));
+    const artist = pick(catalog);
+    const release = recentReleaseByArtist.get(artist.id);
+    const songTitle = release?.songTitle || `${pick(['Night Drive', 'Flashback', 'Afterparty', 'Gold Room', 'Final Scene'])} ${pick(['Video', 'Cut', 'Story', 'Premiere'])}`;
+    const reach = Math.max(artist.socialFollowers, player.world?.musicIndustry?.artists?.[artist.id]?.followers || 0);
+    const fameTierMultiplier = artist.fameTier === 'LEGEND' ? 2.4
+        : artist.fameTier === 'SUPERSTAR' ? 1.9
+            : artist.fameTier === 'STAR' ? 1.35
+                : artist.fameTier === 'KNOWN' ? 0.72
+                    : 0.32;
+    const imageMultiplier = actingPull >= 80 ? 1.25 : actingPull < 52 ? 0.78 : 1;
+    const bonusViews = Math.max(18000, Math.floor(reach * (0.018 + Math.random() * 0.035) * fameTierMultiplier * imageMultiplier));
+    const appearanceFee = Math.max(2500, Math.floor((player.stats.fame + player.stats.reputation + creatorScore) * 120 * fameTierMultiplier));
+    const followerGain = Math.max(80, Math.floor(bonusViews / (artist.fameTier === 'SUPERSTAR' || artist.fameTier === 'LEGEND' ? 95 : 140)));
+
+    return {
+        id: `music_video_feature_${Date.now()}_${artist.id}`,
+        artistId: artist.id,
+        artistName: artist.stageName,
+        artistHandle: `@${artist.stageName.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 24) || artist.id}`,
+        songTitle,
+        genre: artist.genre,
+        description: `${artist.stageName} wants you featured in the "${songTitle}" music video. It is more career visibility than a normal ad: fans judge chemistry, style, and whether the cameo feels natural.`,
+        appearanceFee,
+        energyCost: artist.fameTier === 'LEGEND' || artist.fameTier === 'SUPERSTAR' ? 24 : 18,
+        bonusViews,
+        followerGain,
+        fameBoost: artist.fameTier === 'LEGEND' || artist.fameTier === 'SUPERSTAR' ? 2 : 1,
+        reputationRisk: artist.scandalRisk === 'HIGH' ? 7 : artist.scandalRisk === 'MEDIUM' ? 4 : 2,
+        expiresInWeeks: 3
     };
 };
 

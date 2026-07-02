@@ -15,7 +15,9 @@ import {
     X,
 } from 'lucide-react';
 import type { Business, Player, SubsidiaryOperatingModel } from '../../../types';
+import type { DevelopmentLabInitialTab } from './DevelopmentLab';
 import {
+    executeFullStudioMerger,
     getOperatingModelDefinition,
     getStudioGroup,
     OPERATING_MODELS,
@@ -27,6 +29,9 @@ interface StudioGroupViewProps {
     player: Player;
     onBack: () => void;
     onUpdatePlayer: (player: Player) => void;
+    initialCommandStudioId?: string | null;
+    onGreenlightStudioProject: (studioId: string) => void;
+    onOpenStudioWorkbench: (studioId: string, tab: DevelopmentLabInitialTab) => void;
 }
 
 const formatMoney = (value: number) => {
@@ -128,7 +133,7 @@ const SubsidiaryPanel: React.FC<{
                     </div>
                 </div>
 
-                <div className="mt-3 grid grid-cols-[0.82fr_1.18fr] gap-2">
+                <div className="mt-3 grid grid-cols-2 gap-2">
                     <button
                         type="button"
                         onClick={onOpen}
@@ -141,7 +146,7 @@ const SubsidiaryPanel: React.FC<{
                         onClick={onConfigure}
                         className={`flex min-h-11 items-center justify-between rounded-[14px] border px-3 text-left text-[7px] font-black uppercase tracking-[0.12em] ${model ? `${accent.border} ${accent.surface} ${accent.text}` : 'border-rose-300/30 bg-rose-300/[0.08] text-rose-200'}`}
                     >
-                        <span className="truncate">Operating Model · {model?.shortLabel || 'Choose'}</span>
+                        <span className="truncate">Operating Model</span>
                         <ChevronRight size={13} className="shrink-0" />
                     </button>
                 </div>
@@ -150,16 +155,21 @@ const SubsidiaryPanel: React.FC<{
     );
 };
 
-export const StudioGroupView: React.FC<StudioGroupViewProps> = ({ player, onBack, onUpdatePlayer }) => {
+export const StudioGroupView: React.FC<StudioGroupViewProps> = ({ player, onBack, onUpdatePlayer, initialCommandStudioId, onGreenlightStudioProject, onOpenStudioWorkbench }) => {
     const group = getStudioGroup(player);
     const [selectedStudioId, setSelectedStudioId] = React.useState<string | null>(null);
-    const [commandStudioId, setCommandStudioId] = React.useState<string | null>(null);
+    const [commandStudioId, setCommandStudioId] = React.useState<string | null>(initialCommandStudioId || null);
     const [selectedModel, setSelectedModel] = React.useState<SubsidiaryOperatingModel | null>(null);
     const selectedStudio = group.subsidiaries.find(studio => studio.id === selectedStudioId);
     const commandStudio = group.subsidiaries.find(studio => studio.id === commandStudioId);
     const groupValuation = group.allStudios.reduce((total, studio) => total + (studio.stats.valuation || 0), 0);
     const groupCapital = group.allStudios.reduce((total, studio) => total + (studio.balance || 0), 0);
     const weeklyResult = group.allStudios.reduce((total, studio) => total + (studio.stats.weeklyProfit || 0), 0);
+    const integratedValue = group.mergedStudios.reduce((total, studio) => total + (studio.stats.valuation || 0), 0);
+
+    React.useEffect(() => {
+        if (initialCommandStudioId) setCommandStudioId(initialCommandStudioId);
+    }, [initialCommandStudioId]);
 
     const openModelCommand = (studio: Business) => {
         setSelectedStudioId(studio.id);
@@ -168,11 +178,16 @@ export const StudioGroupView: React.FC<StudioGroupViewProps> = ({ player, onBack
 
     const confirmModel = () => {
         if (!selectedStudio || !selectedModel) return;
-        const result = setSubsidiaryOperatingModel({
-            player,
-            studioId: selectedStudio.id,
-            model: selectedModel,
-        });
+        const result = selectedModel === 'FULL_MERGER'
+            ? executeFullStudioMerger({
+                player,
+                studioId: selectedStudio.id,
+            })
+            : setSubsidiaryOperatingModel({
+                player,
+                studioId: selectedStudio.id,
+                model: selectedModel,
+            });
         if (!result.success) return;
         onUpdatePlayer(result.player);
         setSelectedStudioId(null);
@@ -187,6 +202,9 @@ export const StudioGroupView: React.FC<StudioGroupViewProps> = ({ player, onBack
                     studio={commandStudio}
                     onBack={() => setCommandStudioId(null)}
                     onChangeOperatingModel={() => openModelCommand(commandStudio)}
+                    onUpdatePlayer={onUpdatePlayer}
+                    onGreenlightProject={() => onGreenlightStudioProject(commandStudio.id)}
+                    onOpenWorkbench={(tab) => onOpenStudioWorkbench(commandStudio.id, tab)}
                 />
                 <AnimatePresence>
                     {selectedStudio ? (
@@ -281,6 +299,50 @@ export const StudioGroupView: React.FC<StudioGroupViewProps> = ({ player, onBack
                         </div>
                     )}
                     </div>
+
+                    {group.mergedStudios.length ? (
+                        <section className="mt-7 rounded-[24px] border-2 border-amber-300/25 bg-[#120d06] p-4 shadow-[0_7px_0_#050301]">
+                            <div className="flex items-end justify-between gap-3">
+                                <div>
+                                    <div className="text-[7px] font-black uppercase tracking-[0.24em] text-amber-300">Integrated Assets</div>
+                                    <h2 className="mt-1 text-lg font-black uppercase tracking-tight">Merged Into HQ</h2>
+                                </div>
+                                <div className="text-right">
+                                    <div className="text-[6px] font-black uppercase tracking-wider text-zinc-600">Transferred Value</div>
+                                    <div className="mt-1 font-mono text-sm font-black text-amber-200">{formatMoney(integratedValue)}</div>
+                                </div>
+                            </div>
+                            <div className="mt-3 space-y-2">
+                                {group.mergedStudios.map(studio => (
+                                    <div key={studio.id} className="rounded-[16px] border border-amber-300/15 bg-black/35 p-3">
+                                        <div className="flex items-center justify-between gap-3">
+                                            <div className="min-w-0">
+                                                <div className="text-[6px] font-black uppercase tracking-[0.2em] text-zinc-600">Former Studio Banner</div>
+                                                <div className="mt-1 truncate font-serif text-[15px] font-black uppercase italic text-white">{studio.name}</div>
+                                            </div>
+                                            <div className="rounded-full border border-amber-300/25 bg-amber-300/[0.08] px-2.5 py-1 text-[6px] font-black uppercase tracking-wider text-amber-200">
+                                                Absorbed
+                                            </div>
+                                        </div>
+                                        <div className="mt-3 grid grid-cols-3 overflow-hidden rounded-[12px] border border-white/[0.06] bg-black/35">
+                                            <div className="border-r border-white/[0.06] p-2">
+                                                <div className="text-[5px] font-black uppercase tracking-wider text-zinc-600">Catalog</div>
+                                                <div className="mt-1 font-mono text-[10px] font-black text-white">{(studio.studioState?.ownedRights?.length || 0) + (studio.studioState?.purchasedIPTitles?.length || 0)}</div>
+                                            </div>
+                                            <div className="border-r border-white/[0.06] p-2">
+                                                <div className="text-[5px] font-black uppercase tracking-wider text-zinc-600">Capital</div>
+                                                <div className="mt-1 truncate font-mono text-[10px] font-black text-emerald-300">{formatMoney(studio.balance)}</div>
+                                            </div>
+                                            <div className="p-2">
+                                                <div className="text-[5px] font-black uppercase tracking-wider text-zinc-600">Status</div>
+                                                <div className="mt-1 text-[8px] font-black uppercase text-amber-200">HQ Asset</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </section>
+                    ) : null}
                 </div>
             </main>
 
@@ -305,68 +367,127 @@ const OperatingModelDialog: React.FC<{
     onSelect: (model: SubsidiaryOperatingModel) => void;
     onClose: () => void;
     onConfirm: () => void;
-}> = ({ studio, selectedModel, onSelect, onClose, onConfirm }) => (
-    <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[90] flex items-end bg-black/80 p-3 backdrop-blur-sm sm:items-center sm:justify-center"
-    >
-        <motion.section
-            initial={{ y: 40, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 40, opacity: 0 }}
-            className="max-h-[92vh] w-full overflow-y-auto rounded-[32px] border border-amber-400/25 bg-[#0b0b0d] p-5 shadow-[0_30px_100px_rgba(0,0,0,0.7)] sm:max-w-xl"
+}> = ({ studio, selectedModel, onSelect, onClose, onConfirm }) => {
+    const [confirmingMerger, setConfirmingMerger] = React.useState(false);
+    const selectedDefinition = selectedModel ? getOperatingModelDefinition(selectedModel) : null;
+    const isMerger = selectedModel === 'FULL_MERGER';
+
+    React.useEffect(() => {
+        setConfirmingMerger(false);
+    }, [studio.id, selectedModel]);
+
+    const handlePrimaryAction = () => {
+        if (!selectedModel) return;
+        if (isMerger && !confirmingMerger) {
+            setConfirmingMerger(true);
+            return;
+        }
+        onConfirm();
+    };
+
+    return (
+        <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[90] flex items-end bg-black/80 p-3 backdrop-blur-sm sm:items-center sm:justify-center"
         >
-            <div className="flex items-start justify-between gap-4">
-                <div>
-                    <div className="text-[8px] font-black uppercase tracking-[0.25em] text-amber-300">Board Directive</div>
-                    <h2 className="mt-1 text-2xl font-black uppercase tracking-tight">Operating Model</h2>
-                    <p className="mt-1 text-[10px] font-semibold text-zinc-500">{studio.name}</p>
-                </div>
-                <button type="button" onClick={onClose} className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-zinc-500">
-                    <X size={18} />
-                </button>
-            </div>
-            <div className="mt-5 space-y-3">
-                {OPERATING_MODELS.map(model => {
-                    const active = selectedModel === model.id;
-                    return (
-                        <button
-                            key={model.id}
-                            type="button"
-                            onClick={() => onSelect(model.id)}
-                            className={`w-full rounded-[24px] border p-4 text-left transition-all ${active ? modelTone[model.accent] : 'border-white/[0.08] bg-black/30 text-zinc-300'}`}
-                        >
-                            <div className="flex items-start justify-between gap-3">
-                                <div>
-                                    <div className="text-[8px] font-black uppercase tracking-[0.2em] opacity-70">{model.control}</div>
-                                    <div className="mt-1 text-base font-black uppercase text-white">{model.label}</div>
-                                </div>
-                                <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border ${active ? 'border-current bg-current text-black' : 'border-white/15 text-transparent'}`}>
-                                    <Check size={15} />
-                                </div>
-                            </div>
-                            <p className="mt-3 text-[9px] font-semibold leading-relaxed text-zinc-400">{model.description}</p>
-                            <div className="mt-3 flex flex-wrap gap-2">
-                                {model.benefits.slice(0, 2).map(benefit => (
-                                    <span key={benefit} className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[6px] font-black uppercase tracking-wider text-zinc-400">
-                                        {benefit}
-                                    </span>
-                                ))}
-                            </div>
-                        </button>
-                    );
-                })}
-            </div>
-            <button
-                type="button"
-                disabled={!selectedModel}
-                onClick={onConfirm}
-                className="mt-5 flex min-h-14 w-full items-center justify-center gap-2 rounded-[22px] bg-amber-400 px-4 text-[9px] font-black uppercase tracking-[0.18em] text-black shadow-[0_8px_0_#7a4a0a] transition-transform active:translate-y-1 active:shadow-[0_4px_0_#7a4a0a] disabled:cursor-not-allowed disabled:opacity-40"
+            <motion.section
+                initial={{ y: 40, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: 40, opacity: 0 }}
+                className="max-h-[92vh] w-full overflow-y-auto rounded-[32px] border border-amber-400/25 bg-[#0b0b0d] p-5 shadow-[0_30px_100px_rgba(0,0,0,0.7)] sm:max-w-xl"
             >
-                Confirm Operating Model <ArrowUpRight size={16} />
-            </button>
-        </motion.section>
-    </motion.div>
-);
+                <div className="flex items-start justify-between gap-4">
+                    <div>
+                        <div className="text-[8px] font-black uppercase tracking-[0.25em] text-amber-300">Board Directive</div>
+                        <h2 className="mt-1 text-2xl font-black uppercase tracking-tight">{confirmingMerger ? 'Merge Consequences' : 'Operating Model'}</h2>
+                        <p className="mt-1 text-[10px] font-semibold text-zinc-500">{studio.name}</p>
+                    </div>
+                    <button type="button" onClick={onClose} className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-zinc-500">
+                        <X size={18} />
+                    </button>
+                </div>
+
+                {!confirmingMerger ? (
+                    <div className="mt-5 space-y-3">
+                        {OPERATING_MODELS.map(model => {
+                            const active = selectedModel === model.id;
+                            return (
+                                <button
+                                    key={model.id}
+                                    type="button"
+                                    onClick={() => onSelect(model.id)}
+                                    className={`w-full rounded-[24px] border p-4 text-left transition-all ${active ? modelTone[model.accent] : 'border-white/[0.08] bg-black/30 text-zinc-300'}`}
+                                >
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div>
+                                            <div className="text-[8px] font-black uppercase tracking-[0.2em] opacity-70">{model.control}</div>
+                                            <div className="mt-1 text-base font-black uppercase text-white">{model.label}</div>
+                                        </div>
+                                        <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border ${active ? 'border-current bg-current text-black' : 'border-white/15 text-transparent'}`}>
+                                            <Check size={15} />
+                                        </div>
+                                    </div>
+                                    <p className="mt-3 text-[9px] font-semibold leading-relaxed text-zinc-400">{model.description}</p>
+                                    <div className="mt-3 flex flex-wrap gap-2">
+                                        {model.benefits.slice(0, 2).map(benefit => (
+                                            <span key={benefit} className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[6px] font-black uppercase tracking-wider text-zinc-400">
+                                                {benefit}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </button>
+                            );
+                        })}
+                    </div>
+                ) : (
+                    <div className="mt-5 rounded-[26px] border-2 border-amber-300/35 bg-[#1a1004] p-4">
+                        <div className="rounded-[18px] border border-amber-300/20 bg-black/30 p-4">
+                            <div className="text-[7px] font-black uppercase tracking-[0.22em] text-amber-300">Final Integration Warning</div>
+                            <h3 className="mt-2 text-xl font-black uppercase text-white">Confirm Full Merger</h3>
+                            <p className="mt-2 text-[10px] font-bold leading-relaxed text-zinc-400">
+                                {studio.name} will stop operating as a separate studio card. Its catalog, facilities, liabilities and selected talent move into headquarters.
+                            </p>
+                        </div>
+                        <div className="mt-3 grid gap-2">
+                            {[
+                                'Studio disappears from active Owned Studios.',
+                                'Catalog and production assets become HQ assets.',
+                                'Debt and liabilities are accepted by the parent studio.',
+                                'Reversing the merger will be difficult and expensive.',
+                            ].map(item => (
+                                <div key={item} className="flex items-center gap-2 rounded-[13px] border border-amber-300/12 bg-black/25 px-3 py-2">
+                                    <Check size={13} className="shrink-0 text-amber-300" />
+                                    <span className="text-[8px] font-bold text-zinc-300">{item}</span>
+                                </div>
+                            ))}
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => setConfirmingMerger(false)}
+                            className="mt-3 min-h-10 w-full rounded-[15px] border border-white/10 bg-white/[0.04] text-[8px] font-black uppercase tracking-[0.16em] text-zinc-400"
+                        >
+                            Review Other Models
+                        </button>
+                    </div>
+                )}
+
+                <button
+                    type="button"
+                    disabled={!selectedModel}
+                    onClick={handlePrimaryAction}
+                    className={`mt-5 flex min-h-14 w-full items-center justify-center gap-2 rounded-[22px] px-4 text-[9px] font-black uppercase tracking-[0.18em] shadow-[0_8px_0_#7a4a0a] transition-transform active:translate-y-1 active:shadow-[0_4px_0_#7a4a0a] disabled:cursor-not-allowed disabled:opacity-40 ${
+                        confirmingMerger
+                            ? 'bg-amber-300 text-black'
+                            : selectedDefinition?.id === 'FULL_MERGER'
+                                ? 'bg-[#2a1b06] text-amber-100 border-2 border-amber-300/35'
+                                : 'bg-amber-400 text-black'
+                    }`}
+                >
+                    {confirmingMerger ? 'Confirm Full Merger' : isMerger ? 'Review Merge Consequences' : 'Confirm Operating Model'} <ArrowUpRight size={16} />
+                </button>
+            </motion.section>
+        </motion.div>
+    );
+};

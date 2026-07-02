@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Player, PlayerLoan, Transaction } from '../../types';
+import { OutsideProductionInvestment, Player, PlayerLoan, Transaction } from '../../types';
 import { formatMoney } from '../../services/formatUtils';
 import {
   ArrowLeft,
@@ -49,9 +49,19 @@ const TERM_OPTIONS = [
 const INCOME_CATEGORIES = ['SALARY', 'ROYALTY', 'SPONSORSHIP', 'DIVIDEND', 'BUSINESS', 'AD_REVENUE'] as const;
 
 const formatPercent = (value: number) => `${(value * 100).toFixed(1)}%`;
+const formatIncomeCategoryLabel = (value: string) => value.toLowerCase().replace(/_/g, ' ');
+const getIncomeCategoryColor = (value: string) => {
+  if (value === 'ROYALTY') return 'bg-amber-500';
+  if (value === 'SALARY') return 'bg-blue-500';
+  if (value === 'SPONSORSHIP') return 'bg-emerald-500';
+  if (value === 'BUSINESS') return 'bg-violet-500';
+  if (value === 'DIVIDEND') return 'bg-cyan-500';
+  return 'bg-zinc-500';
+};
 
 export const BankApp: React.FC<BankAppProps> = ({ player, onBack, onUpdatePlayer }) => {
   const [tab, setTab] = useState<'OVERVIEW' | 'BREAKDOWN' | 'HISTORY'>('OVERVIEW');
+  const [detailView, setDetailView] = useState<'PRODUCER_INVESTMENTS' | null>(null);
   const language = getPlayerLanguage(player);
   const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
   const [selectedYear, setSelectedYear] = useState<number>(player.age);
@@ -151,6 +161,31 @@ export const BankApp: React.FC<BankAppProps> = ({ player, onBack, onUpdatePlayer
     const generalHistory = yearData.history.filter(tx => tx.category !== 'LOAN');
     return selectedYear === player.age ? [...loansForHistory, ...generalHistory] : yearData.history;
   }, [player.finance.history, yearData.history, selectedYear, player.age]);
+
+  const outsideProductions = player.outsideProductions || [];
+  const getOutsidePositionWeek = (item: OutsideProductionInvestment, phase: 'ACCEPTED' | 'FINISHED' = 'ACCEPTED') => {
+    if (phase === 'FINISHED' && item.finishYear && item.finishWeek) return item.finishYear * 52 + item.finishWeek;
+    return (item.acceptedYear || 0) * 52 + (item.acceptedWeek || 0);
+  };
+  const activeOutsideProductions = outsideProductions
+    .filter(item => !['FINISHED', 'CANCELLED'].includes(item.status))
+    .sort((left, right) => getOutsidePositionWeek(right) - getOutsidePositionWeek(left));
+  const completedOutsideProductions = outsideProductions
+    .filter(item => ['FINISHED', 'CANCELLED'].includes(item.status))
+    .sort((left, right) => getOutsidePositionWeek(right, 'FINISHED') - getOutsidePositionWeek(left, 'FINISHED'));
+  const outsidePortfolioEntries = [...outsideProductions].sort((left, right) => {
+    const leftWeek = ['FINISHED', 'CANCELLED'].includes(left.status) ? getOutsidePositionWeek(left, 'FINISHED') : getOutsidePositionWeek(left);
+    const rightWeek = ['FINISHED', 'CANCELLED'].includes(right.status) ? getOutsidePositionWeek(right, 'FINISHED') : getOutsidePositionWeek(right);
+    return rightWeek - leftWeek;
+  });
+  const outsideCapitalAtRisk = activeOutsideProductions.reduce((sum, item) => sum + item.investedAmount, 0);
+  const outsidePayouts = outsideProductions.reduce((sum, item) => sum + (item.playerPayout || 0), 0);
+  const outsideInvested = outsideProductions.reduce((sum, item) => sum + item.investedAmount, 0);
+  const outsideNetProfit = outsideProductions.reduce((sum, item) => sum + (item.profit || 0), 0);
+  const outsideRoi = outsideInvested > 0 ? Math.round((outsideNetProfit / outsideInvested) * 100) : 0;
+  const outsideInvestmentLedger = player.finance.history.filter(tx =>
+    /Producer (investment|payout):/i.test(tx.description)
+  );
 
   const handleApplyForLoan = () => {
     if (requestTooSmall) {
@@ -276,7 +311,7 @@ export const BankApp: React.FC<BankAppProps> = ({ player, onBack, onUpdatePlayer
     <div className="absolute inset-0 z-40 flex flex-col bg-zinc-950 font-sans text-white animate-in slide-in-from-right duration-300">
       <div className="relative shrink-0 overflow-hidden bg-[#004b87] p-4 pb-6 pt-12 shadow-xl transition-all">
         <div className="relative z-20 mb-4 flex items-start justify-between">
-          <button onClick={onBack} className="rounded-full bg-black/10 p-1 text-white/80 hover:text-white">
+          <button onClick={() => detailView ? setDetailView(null) : onBack()} className="rounded-full bg-black/10 p-1 text-white/80 hover:text-white">
             <ArrowLeft size={20} />
           </button>
           <div className="flex flex-col items-end">
@@ -320,7 +355,7 @@ export const BankApp: React.FC<BankAppProps> = ({ player, onBack, onUpdatePlayer
         <div className="absolute bottom-0 right-20 h-32 w-32 rounded-full bg-blue-400/20 blur-2xl" />
       </div>
 
-      <div className="sticky top-0 z-30 flex border-b border-zinc-800 bg-zinc-900/50 backdrop-blur-sm">
+      {!detailView && <div className="sticky top-0 z-30 flex border-b border-zinc-800 bg-zinc-900/50 backdrop-blur-sm">
         <button
           onClick={() => setTab('OVERVIEW')}
           className={`flex flex-1 items-center justify-center gap-2 py-4 text-[10px] font-bold uppercase tracking-wider ${tab === 'OVERVIEW' ? 'border-b-2 border-blue-400 bg-zinc-900 text-blue-400' : 'text-zinc-500 hover:text-zinc-300'}`}
@@ -342,10 +377,47 @@ export const BankApp: React.FC<BankAppProps> = ({ player, onBack, onUpdatePlayer
           <CreditCard size={14} />
           {tr('bank.passbook')}
         </button>
-      </div>
+      </div>}
 
       <div className="custom-scrollbar flex-1 overflow-y-auto bg-black p-4">
-        {tab === 'OVERVIEW' && (
+        {detailView === 'PRODUCER_INVESTMENTS' && (
+          <div className="space-y-3 animate-in slide-in-from-right-2 duration-300">
+            <div className="flex items-center justify-between px-1">
+              <div>
+                <div className="text-[10px] font-black uppercase tracking-[0.22em] text-emerald-300">Producer Portfolio</div>
+                <div className="mt-1 text-xl font-black text-white">All movie stakes</div>
+              </div>
+              <div className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-widest ${outsideNetProfit >= 0 ? 'border-emerald-400/20 bg-emerald-400/10 text-emerald-300' : 'border-rose-400/20 bg-rose-400/10 text-rose-300'}`}>
+                Net {formatMoney(outsideNetProfit)}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-4 gap-1.5 text-center">
+              <BankMiniMetric label="In" value={formatMoney(outsideInvested)} />
+              <BankMiniMetric label="Risk" value={formatMoney(outsideCapitalAtRisk)} />
+              <BankMiniMetric label="Paid" value={formatMoney(outsidePayouts)} />
+              <BankMiniMetric label="ROI" value={`${outsideRoi >= 0 ? '+' : ''}${outsideRoi}%`} tone={outsideRoi >= 0 ? 'text-emerald-300' : 'text-rose-300'} />
+            </div>
+
+            {outsidePortfolioEntries.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-zinc-800 bg-zinc-900/60 py-10 text-center text-sm font-bold text-zinc-600">
+                No outside producer investments yet.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {outsidePortfolioEntries.map(item => (
+                  <OutsideInvestmentBankRow
+                    key={item.id}
+                    item={item}
+                    mode={['FINISHED', 'CANCELLED'].includes(item.status) ? 'EXIT' : 'OPEN'}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {!detailView && tab === 'OVERVIEW' && (
           <div className="space-y-4 animate-in slide-in-from-bottom-2 duration-300">
             <div className="flex items-center justify-between rounded-2xl border border-zinc-800 bg-zinc-900 p-4">
               <div className="flex items-center gap-3">
@@ -577,49 +649,92 @@ export const BankApp: React.FC<BankAppProps> = ({ player, onBack, onUpdatePlayer
           </div>
         )}
 
-        {tab === 'BREAKDOWN' && (
-          <div className="space-y-6 animate-in slide-in-from-bottom-2 duration-300">
+        {!detailView && tab === 'BREAKDOWN' && (
+          <div className="space-y-4 animate-in slide-in-from-bottom-2 duration-300">
             <div className="flex items-center justify-between px-1">
               <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-500">Income Sources ({selectedYear})</h3>
               <div className="font-mono text-xs font-bold text-emerald-400">+{formatMoney(yearData.income)}</div>
             </div>
 
-            <div className="space-y-3">
+            <div className="overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900/80">
               {yearData.breakdown.map(cat => (
-                <div key={cat.label} className="rounded-xl border border-zinc-800 bg-zinc-900 p-3">
-                  <div className="mb-2 flex items-end justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className={`h-2 w-2 rounded-full ${cat.amount > 0 ? 'bg-blue-500' : 'bg-zinc-700'}`} />
-                      <span className="text-sm font-bold capitalize text-zinc-300">{cat.label.toLowerCase().replace('_', ' ')}</span>
+                <div key={cat.label} className="border-b border-zinc-800/70 px-3 py-2.5 last:border-b-0">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <div className={`h-2 w-2 shrink-0 rounded-full ${cat.amount > 0 ? getIncomeCategoryColor(cat.label) : 'bg-zinc-700'}`} />
+                      <span className="truncate text-sm font-black capitalize text-zinc-200">{formatIncomeCategoryLabel(cat.label)}</span>
                     </div>
-                    <span className="font-mono text-sm font-bold text-white">{formatMoney(cat.amount)}</span>
+                    <span className="shrink-0 font-mono text-sm font-black text-white">{formatMoney(cat.amount)}</span>
                   </div>
-                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-950">
+                  <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-black">
                     <div
-                      className={`h-full ${
-                        cat.label === 'ROYALTY'
-                          ? 'bg-amber-500'
-                          : cat.label === 'SALARY'
-                            ? 'bg-blue-500'
-                            : cat.label === 'SPONSORSHIP'
-                              ? 'bg-emerald-500'
-                              : cat.label === 'BUSINESS'
-                                ? 'bg-violet-500'
-                                : 'bg-cyan-500'
-                      }`}
+                      className={`h-full ${cat.amount > 0 ? getIncomeCategoryColor(cat.label) : 'bg-zinc-800'}`}
                       style={{ width: `${cat.percent}%` }}
                     />
                   </div>
                 </div>
               ))}
             </div>
+
+            <div className="rounded-[1.2rem] border border-emerald-500/20 bg-gradient-to-br from-emerald-950/20 via-zinc-950 to-black p-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.16em] text-emerald-300">
+                    <BadgeDollarSign size={14} /> Producer Investments
+                  </div>
+                  <div className="mt-1 text-[10px] font-black uppercase tracking-widest text-zinc-500">Latest 5 positions</div>
+                </div>
+                <div className={`shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-widest ${outsideNetProfit >= 0 ? 'border-emerald-400/20 bg-emerald-400/10 text-emerald-300' : 'border-rose-400/20 bg-rose-400/10 text-rose-300'}`}>
+                  Net {formatMoney(outsideNetProfit)}
+                </div>
+              </div>
+
+              <div className="mt-2 grid grid-cols-4 gap-1.5 text-center">
+                <BankMiniMetric label="In" value={formatMoney(outsideInvested)} />
+                <BankMiniMetric label="Risk" value={formatMoney(outsideCapitalAtRisk)} />
+                <BankMiniMetric label="Paid" value={formatMoney(outsidePayouts)} />
+                <BankMiniMetric label="ROI" value={`${outsideRoi >= 0 ? '+' : ''}${outsideRoi}%`} tone={outsideRoi >= 0 ? 'text-emerald-300' : 'text-rose-300'} />
+              </div>
+
+              {outsidePortfolioEntries.length === 0 ? (
+                <div className="mt-3 rounded-xl border border-dashed border-zinc-800 bg-black/25 p-4 text-center text-xs font-bold text-zinc-600">
+                  No outside producer investments yet.
+                </div>
+              ) : (
+                <div className="mt-2.5 space-y-2">
+                  {outsidePortfolioEntries.slice(0, 5).map(item => (
+                    <OutsideInvestmentBankRow
+                      key={item.id}
+                      item={item}
+                      mode={['FINISHED', 'CANCELLED'].includes(item.status) ? 'EXIT' : 'OPEN'}
+                    />
+                  ))}
+                  {outsidePortfolioEntries.length > 5 && (
+                    <button
+                      onClick={() => setDetailView('PRODUCER_INVESTMENTS')}
+                      className="flex w-full items-center justify-between rounded-xl border border-emerald-400/20 bg-emerald-400/10 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-emerald-200"
+                    >
+                      <span>See More</span>
+                      <span>{outsidePortfolioEntries.length - 5} more</span>
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
             {yearData.income === 0 && <div className="py-10 text-center text-sm text-zinc-600">No operating income recorded for {selectedYear}.</div>}
           </div>
         )}
 
-        {tab === 'HISTORY' && (
+        {!detailView && tab === 'HISTORY' && (
           <div className="space-y-3 animate-in slide-in-from-bottom-2 duration-300">
-            <div className="mb-2 px-1 text-xs font-bold uppercase tracking-widest text-zinc-500">Passbook • {selectedYear}</div>
+            <div className="mb-2 flex items-center justify-between px-1">
+              <div className="text-xs font-bold uppercase tracking-widest text-zinc-500">Passbook • {selectedYear}</div>
+              {outsideInvestmentLedger.length > 0 && (
+                <div className="text-[10px] font-black uppercase tracking-widest text-emerald-300">
+                  Producer ledger {outsideInvestmentLedger.length}
+                </div>
+              )}
+            </div>
             {transactionHistory.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-zinc-800 bg-zinc-900 py-10 text-center text-sm text-zinc-600">
                 No transaction history available for this period.
@@ -665,6 +780,68 @@ const DetailChip = ({ label, value }: { label: string; value: string }) => (
     <div className="mt-1 font-mono text-sm font-bold text-white">{value}</div>
   </div>
 );
+
+const BankMiniMetric = ({ label, value, tone = 'text-white' }: { label: string; value: string; tone?: string }) => (
+  <div className="rounded-lg border border-white/10 bg-black/25 px-1.5 py-2">
+    <div className="text-[7px] font-black uppercase tracking-widest text-zinc-500">{label}</div>
+    <div className={`mt-1 truncate text-[11px] font-black ${tone}`}>{value}</div>
+  </div>
+);
+
+const OutsideInvestmentBankRow: React.FC<{ item: OutsideProductionInvestment; mode: 'OPEN' | 'EXIT' }> = ({ item, mode }) => {
+  const profit = item.profit || 0;
+  const roi = item.investedAmount > 0 ? Math.round((profit / item.investedAmount) * 100) : 0;
+  const isPositive = profit >= 0;
+  const isFraudRisk = !!item.fraudRisk && item.fraudRisk !== 'NONE' && !item.fraudFalloutResolved;
+  const isLegal = item.finalOutcome === 'FRAUD_CASE' || !!item.legalFees;
+  const releaseLabel = `Release Y${item.releaseYear} W${item.releaseWeek}`;
+  const statusLabel = mode === 'OPEN'
+    ? releaseLabel
+    : `${isPositive ? 'Profit' : 'Loss'} ${formatMoney(Math.abs(profit))}`;
+  const compactType = String(item.producerType || 'Producer').replace(/\s+Company$/i, ' Co.');
+
+  return (
+    <div className={`rounded-xl border px-3 py-2 ${isLegal ? 'border-rose-400/25 bg-rose-950/10' : isFraudRisk ? 'border-amber-400/20 bg-amber-950/10' : 'border-white/10 bg-black/25'}`}>
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="truncate text-sm font-black text-white">{item.projectTitle}</div>
+          <div className="mt-0.5 truncate text-[9px] font-black uppercase tracking-widest text-emerald-200/60">
+            {item.stakePercent}% • {compactType} • {statusLabel}
+          </div>
+        </div>
+        <div className={`shrink-0 rounded-full border px-2 py-1 text-[9px] font-black uppercase tracking-widest ${mode === 'OPEN' ? 'border-cyan-400/20 bg-cyan-400/10 text-cyan-200' : isPositive ? 'border-emerald-400/20 bg-emerald-400/10 text-emerald-300' : 'border-rose-400/20 bg-rose-400/10 text-rose-300'}`}>
+          {mode === 'OPEN' ? 'Live' : `${roi >= 0 ? '+' : ''}${roi}%`}
+        </div>
+      </div>
+      <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[10px] font-black text-zinc-500">
+        <span>Invested <b className="text-white">{formatMoney(item.investedAmount)}</b></span>
+        {mode === 'OPEN' ? (
+          <span>Release <b className="text-white">Y{item.releaseYear} W{item.releaseWeek}</b></span>
+        ) : (
+          <>
+            <span>Paid <b className="text-white">{formatMoney(item.playerPayout || 0)}</b></span>
+            <span className={isPositive ? 'text-emerald-300' : 'text-rose-300'}>{isPositive ? 'Profit' : 'Loss'} {formatMoney(Math.abs(profit))}</span>
+          </>
+        )}
+        {(item.producerReceipts || 0) > 0 && <span>Receipts <b className="text-white">{formatMoney(item.producerReceipts || 0)}</b></span>}
+      </div>
+      {(isFraudRisk || isLegal) && (
+        <div className="mt-1.5 flex flex-wrap gap-1.5">
+          {isFraudRisk && (
+            <span className="rounded-full border border-amber-400/20 bg-amber-400/10 px-2 py-0.5 text-[8px] font-black uppercase tracking-widest text-amber-200">
+              Unverified
+            </span>
+          )}
+          {isLegal && (
+            <span className="rounded-full border border-rose-400/20 bg-rose-400/10 px-2 py-0.5 text-[8px] font-black uppercase tracking-widest text-rose-200">
+              Legal
+            </span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const LoanMiniStat = ({ label, value }: { label: string; value: string }) => (
   <div className="rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2">

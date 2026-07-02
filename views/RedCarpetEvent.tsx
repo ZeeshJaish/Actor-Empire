@@ -5,6 +5,7 @@ import { CLOTHING_CATALOG, CAR_CATALOG, MOTORCYCLE_CATALOG, BOAT_CATALOG, AIRCRA
 import { generatePressInteractions, determineWinners, Nomination, sanitizeAwardRecords, generateSeasonWinners } from '../services/awardLogic';
 import { RED_CARPET_INTERVIEWS } from '../services/premiereLogic';
 import { NPC_DATABASE } from '../services/npcLogic';
+import { getPlayerLanguage } from '../services/i18n';
 import { Camera, Star, Mic2, Shirt, ArrowRight, Trophy, Zap, X, MapPin, Watch, Footprints, Layers, Check, Car, Barcode, Users, Tv, Sparkles, Music, Video, Clapperboard, Globe, FastForward, Glasses, ShoppingBag, Gem } from 'lucide-react';
 
 interface RedCarpetEventProps {
@@ -43,6 +44,53 @@ const upsertAwardRecord = (awards: Award[], nextAward: Award): Award[] => {
             ? { ...award, ...nextAward, id: award.id, outcome: nextAward.outcome === 'WON' ? 'WON' : award.outcome }
             : award
     );
+};
+
+const isMusicAwardCategory = (category: string) => (
+    /song|score|soundtrack|trailer|music video/i.test(category)
+);
+
+const musicNpcId = (artistId: string) => `music_npc_${artistId}`;
+
+const boostMusicAwardPeople = (player: Player, project: any, category: string): Player => {
+    const credits = project?.musicPlan?.credits || project?.projectDetails?.musicPlan?.credits || [];
+    if (!credits.length) return player;
+    const matchingCredits = credits.filter((credit: any) => {
+        if (/score/i.test(category)) return /score|orchestra|classical|film/i.test(`${credit.genre} ${credit.songTitle}`);
+        if (/music video/i.test(category)) return credit.role === 'MUSIC_VIDEO_TIE_IN';
+        if (/song/i.test(category)) return ['LEAD_SINGLE', 'END_CREDIT_SONG', 'TRAILER_ANTHEM'].includes(credit.role);
+        if (/soundtrack/i.test(category)) return ['SOUNDTRACK_EP', 'PROMO_ALBUM'].includes(credit.role);
+        if (/trailer/i.test(category)) return credit.role === 'TRAILER_ANTHEM';
+        return false;
+    });
+    const creditsToBoost = matchingCredits.length ? matchingCredits : credits.slice(0, 1);
+    const boostIds = new Set(creditsToBoost.map((credit: any) => credit.artistId));
+    const boostNpc = (npc: any) => {
+        const matches = Array.from(boostIds).some(artistId => npc.id === artistId || npc.id === musicNpcId(String(artistId)));
+        if (!matches) return npc;
+        return {
+            ...npc,
+            netWorth: Math.round((npc.netWorth || 0) + 450_000),
+            followers: Math.round((npc.followers || 0) + 85_000),
+            stats: {
+                ...(npc.stats || {}),
+                fame: Math.min(100, (npc.stats?.fame || 45) + 2.5)
+            }
+        };
+    };
+    NPC_DATABASE.forEach((npc: any, index) => {
+        const updated = boostNpc(npc);
+        if (updated !== npc) NPC_DATABASE[index] = updated;
+    });
+    return {
+        ...player,
+        flags: {
+            ...(player.flags || {}),
+            extraNPCs: Array.isArray(player.flags?.extraNPCs)
+                ? player.flags.extraNPCs.map(boostNpc)
+                : []
+        }
+    };
 };
 
 const buildFallbackOpponentNames = (category: string, playerName: string): string[] => {
@@ -358,7 +406,7 @@ export const RedCarpetEvent: React.FC<RedCarpetEventProps> = ({ player, event, o
             // Pick 1 random question
             setPressQuestions([mappedQuestions[Math.floor(Math.random() * mappedQuestions.length)]]);
         } else {
-            const questions = generatePressInteractions(1);
+            const questions = generatePressInteractions(1, getPlayerLanguage(player));
             const outcomes = determineWinners(nominations, fullBallot);
             setPressQuestions(questions);
             setCurrentResults(outcomes);
@@ -547,12 +595,18 @@ export const RedCarpetEvent: React.FC<RedCarpetEventProps> = ({ player, event, o
                 }
 
                 if (res.won) {
-                    updatedPlayer.stats.fame = Math.min(100, updatedPlayer.stats.fame + 5);
-                    updatedPlayer.stats.reputation = Math.min(100, updatedPlayer.stats.reputation + 2);
-                    updatedPlayer.stats.followers += 50000;
+                    const musicCategory = isMusicAwardCategory(res.nomination.category);
+                    const wonProject = pastProjectsUpdate.find(p => p.id === res.nomination.project.id)
+                        || updatedPlayer.activeReleases.find(release => release.id === res.nomination.project.id);
+                    updatedPlayer.stats.fame = Math.min(100, updatedPlayer.stats.fame + (musicCategory ? 2 : 5));
+                    updatedPlayer.stats.reputation = Math.min(100, updatedPlayer.stats.reputation + (musicCategory ? 3 : 2));
+                    updatedPlayer.stats.followers += musicCategory ? 25000 : 50000;
+                    if (musicCategory && wonProject) {
+                        updatedPlayer = boostMusicAwardPeople(updatedPlayer, wonProject, res.nomination.category);
+                    }
                     newsToAdd = {
                         id: `news_win_${Date.now()}`,
-                        headline: `${player.name} wins Best Actor at ${event.title}!`,
+                        headline: `${res.nomination.project.name} wins ${res.nomination.category} at ${event.title}!`,
                         category: 'TOP_STORY', week: player.currentWeek, year: player.age, impactLevel: 'HIGH'
                     };
                 }

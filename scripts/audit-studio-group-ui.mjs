@@ -38,12 +38,30 @@ for (const [needle, description] of [
     ['Facilities & Talent', 'the existing production asset readout'],
     ['Acquisition Record', 'the existing acquisition closing history'],
     ['Change Operating Model', 'the command-center model action'],
+    ['Operating Mandate', 'the owned-studio strategy mandate surface'],
+    ['Issue Studio Mandate', 'the mandate save action'],
+    ['Command Permission', 'the model-aware mandate permission copy'],
+    ['Direct Production', 'the controlled-subsidiary production permission signal'],
+    ['Auto Label', 'the independent-label auto-operation signal'],
+    ['setStudioOperatingMandate', 'the shared mandate persistence service'],
+    ['getSubsidiaryControlProfile', 'the mandate permission selector'],
+    ['STUDIO_MANDATE_GROUPS', 'the mandate option groups'],
     ['getAcquisitionCase', 'the existing acquisition record selector'],
     ['Empire Map', 'the visual ownership hierarchy'],
     ['Group Headquarters', 'the compact parent-company anchor'],
-    ['Operating Model ·', 'the explicit operating-model control'],
+    ['Operating Model', 'the explicit operating-model control'],
     ['Studio Health', 'the at-a-glance momentum signal'],
     ['Open Studio', 'the clear command-center action'],
+    ['Integrated Assets', 'the merged-studio archive section'],
+    ['Merged Into HQ', 'the full-merger integrated state label'],
+    ['Confirm Full Merger', 'the second confirmation step for full merger'],
+    ['Merge Consequences', 'the full-merger consequence warning'],
+    ['Command Deck', 'the organized command-center tab system'],
+    ['Studio Slate', 'the organized slate tab'],
+    ['Catalog/IP', 'the organized catalog tab'],
+    ['Finance', 'the organized finance tab'],
+    ['Direct Production Console', 'the controlled-subsidiary production context'],
+    ['Autonomous Label Board', 'the independent-label model-aware command view'],
 ]) {
     if (!source.includes(needle)) {
         throw new Error(`Studio Group UI is missing ${description}: ${needle}`);
@@ -68,6 +86,10 @@ if (productionHouse.includes("min-h-[128px]") || productionHouse.includes("min-h
 
 if (groupView.includes("aria-label={`${model ? 'Change' : 'Set'} operating model")) {
     throw new Error('Studio Group still hides operating-model changes behind the old icon-only control.');
+}
+
+if (groupView.includes('grid-cols-[0.82fr_1.18fr]') || groupView.includes('Operating Model ·')) {
+    throw new Error('Studio Group owned-studio action row should use balanced 50/50 buttons without repeating the selected model.');
 }
 
 if (groupView.includes('Risk') || groupView.includes('riskLevel')) {

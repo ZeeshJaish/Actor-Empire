@@ -1,9 +1,10 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { INITIAL_PLAYER, Player, Page, Commitment, PressInteraction, SocialEvent, ActorSkills, AdType, Relationship, ProjectDetails, ActiveRelease, PastProject, StreamingState, PregnancyCarrier } from './types';
+import { INITIAL_PLAYER, Player, Page, Commitment, PressInteraction, SocialEvent, ActorSkills, AdType, Relationship, ProjectDetails, ActiveRelease, PastProject, StreamingState, PregnancyCarrier, ScheduledEvent } from './types';
 import { BottomNav } from './components/BottomNav';
 import { ProductionCrisisModal } from './components/ProductionCrisisModal';
 import { LifeEventModal } from './components/LifeEventModal';
+import { StockControlEventModal } from './components/StockControlEventModal';
 import { applyCrisisImpact } from './services/productionService';
 import { HomePage } from './views/HomePage';
 import { CareerPage } from './views/CareerPage';
@@ -40,6 +41,10 @@ import { calculateInstagramPostOutcome, clampInstagramStat, INSTAGRAM_POST_CONFI
 import { normalizeUniverseMap } from './services/universeLogic';
 import { hydrateGenreXP } from './services/genreCatalog';
 import { createInstagramReferralOutcome } from './services/instagramOfferLogic';
+import { executeStockTrade } from './services/stockLogic';
+import { migratePlayerSave } from './services/saveMigration';
+import { acceptOutsideProducerInvestmentOffer, counterOutsideProducerInvestmentOffer } from './services/outsideProductions';
+import { getPlayerLanguage, isSupportedGameLanguage, t } from './services/i18n';
 import {
   addBreadcrumb,
   markGameCheckpoint,
@@ -340,11 +345,13 @@ class GameErrorBoundary extends React.Component<GameErrorBoundaryProps, GameErro
 }
 
 export const App: React.FC = () => {
-  const [player, setPlayer] = useState<Player>(INITIAL_PLAYER);
+  const [player, setPlayer] = useState<Player>(() => migratePlayerSave(INITIAL_PLAYER));
   const [activePage, setActivePage] = useState<Page>(Page.HOME);
-  const [lifestyleInitialView, setLifestyleInitialView] = useState<'MAIN' | 'ASSETS' | 'BUSINESS' | 'PRODUCTION_WIZARD' | 'PRODUCTION_GAME' | null>(null);
+  const [lifestyleInitialView, setLifestyleInitialView] = useState<'MAIN' | 'ASSETS' | 'ACTIVITIES' | 'BUSINESS' | 'PRODUCTION_WIZARD' | 'PRODUCTION_GAME' | null>(null);
   const [rightsMarketOpportunityId, setRightsMarketOpportunityId] = useState<string | null>(null);
   const [initialForbesStudioId, setInitialForbesStudioId] = useState<string | null>(null);
+  const [initialMobileStockId, setInitialMobileStockId] = useState<string | null>(null);
+  const [initialMobileAppMode, setInitialMobileAppMode] = useState<'BOXOFFICE' | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [gameStatus, setGameStatus] = useState<GameStatus>('START_MENU');
   const [saveSlots, setSaveSlots] = useState<Record<number, Player | null>>({ 1: null, 2: null, 3: null });
@@ -362,6 +369,8 @@ export const App: React.FC = () => {
   const [babyFirstNameInput, setBabyFirstNameInput] = useState('');
   const [babySurnameChoice, setBabySurnameChoice] = useState('');
   const [deathScreenPreviewPlayer, setDeathScreenPreviewPlayer] = useState<Player | null>(null);
+  const language = getPlayerLanguage(player);
+  const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
   const [showWhatsNewModal, setShowWhatsNewModal] = useState(false);
   const [showPreviousWhatsNewNotes, setShowPreviousWhatsNewNotes] = useState(false);
   
@@ -422,6 +431,8 @@ export const App: React.FC = () => {
           logs: Array.isArray(nextPlayer.logs) ? nextPlayer.logs.slice(-50) : [],
           news: Array.isArray(nextPlayer.news) ? nextPlayer.news.slice(0, 80) : [],
           inbox: Array.isArray(nextPlayer.inbox) ? nextPlayer.inbox.slice(0, 120) : [],
+          shareholderVotes: Array.isArray(nextPlayer.shareholderVotes) ? nextPlayer.shareholderVotes.slice(0, 24) : [],
+          stockTakeovers: Array.isArray(nextPlayer.stockTakeovers) ? nextPlayer.stockTakeovers.slice(0, 20) : [],
           flags: {
               ...(nextPlayer.flags || {}),
               recentTimeline,
@@ -490,20 +501,20 @@ export const App: React.FC = () => {
   };
   const getSurname = (fullName: string) => {
       const parts = (fullName || '').trim().split(/\s+/).filter(Boolean);
-      if (parts.length === 0) return 'Legacy';
+      if (parts.length === 0) return tr('app.babyNaming.defaultSurname');
       return parts[parts.length - 1];
   };
   const getGivenName = (fullName: string) => {
       const parts = (fullName || '').trim().split(/\s+/).filter(Boolean);
-      return parts[0] || fullName || 'Partner';
+      return parts[0] || fullName || tr('app.babyNaming.defaultPartnerName');
   };
   const getBabySurnameOptions = (partnerName: string) => {
       const playerSurname = getSurname(player.name);
       const partnerSurname = getSurname(partnerName);
       const options = [
-          { id: 'PLAYER', label: `Your surname`, value: playerSurname },
-          { id: 'PARTNER', label: `${getGivenName(partnerName)}'s surname`, value: partnerSurname },
-          { id: 'BOTH', label: 'Both surnames', value: playerSurname === partnerSurname ? playerSurname : `${playerSurname}-${partnerSurname}` }
+          { id: 'PLAYER', label: tr('app.babyNaming.yourSurname'), value: playerSurname },
+          { id: 'PARTNER', label: tr('app.babyNaming.partnerSurname', { name: getGivenName(partnerName) }), value: partnerSurname },
+          { id: 'BOTH', label: tr('app.babyNaming.bothSurnames'), value: playerSurname === partnerSurname ? playerSurname : `${playerSurname}-${partnerSurname}` }
       ];
 
       return options.filter((option, index, arr) => arr.findIndex(other => other.value === option.value) === index);
@@ -659,8 +670,8 @@ export const App: React.FC = () => {
           if (shouldCreateScandalNews) {
               newNews.unshift({
                   id: `news_scandal_baby_${Date.now()}`,
-                  headline: `SCANDAL: ${prev.name} Welcomes Secret Love Child!`,
-                  subtext: `Fans shocked by sudden baby announcement with partner ${partnerName}.`,
+                  headline: tr('app.generated.babyScandal.headline', { name: prev.name }),
+                  subtext: tr('app.generated.babyScandal.subtext', { partnerName }),
                   category: 'TOP_STORY',
                   week: eventWeek,
                   year: eventYear,
@@ -672,11 +683,11 @@ export const App: React.FC = () => {
               ...prev,
               relationships: newRelationships,
               news: newNews,
-              logs: [{ week: eventWeek, year: eventYear, message: `🍼 ${finalName} was welcomed into your family with ${partnerName}.`, type: 'positive' }, ...prev.logs].slice(0, 50)
+              logs: [{ week: eventWeek, year: eventYear, message: tr('app.babyNaming.logWelcomed', { name: finalName, partnerName }), type: 'positive' }, ...prev.logs].slice(0, 50)
           };
       });
 
-      setToastMessage({ title: 'Baby Named', subtext: `Welcome, ${finalName}.` });
+      setToastMessage({ title: tr('app.babyNaming.toastNamedTitle'), subtext: tr('app.babyNaming.toastNamedSubtext', { name: finalName }) });
       setPendingBabyNaming(null);
       setBabyFirstNameInput('');
       setBabySurnameChoice('');
@@ -697,8 +708,8 @@ export const App: React.FC = () => {
       );
 
       setToastMessage({
-          title: 'Parenthood Rejected',
-          subtext: `You walked away. The fallout will follow you.`,
+          title: tr('app.babyNaming.toastRejectedTitle'),
+          subtext: tr('app.babyNaming.toastRejectedSubtext'),
       });
       setPendingBabyNaming(null);
       setBabyFirstNameInput('');
@@ -718,7 +729,11 @@ export const App: React.FC = () => {
             for (let i = 1; i <= 3; i++) {
                 const savedData = await loadGameData(`actorEmpireSave_${i}`);
                 if (savedData) {
-                    slots[i] = savedData;
+                    const migrated = migratePlayerSave(savedData);
+                    slots[i] = migrated;
+                    if ((savedData as Player)?.flags?.saveMigrationVersion !== migrated.flags?.saveMigrationVersion) {
+                        persistSlotSave(i, migrated);
+                    }
                 }
             }
             
@@ -729,17 +744,19 @@ export const App: React.FC = () => {
                 const legacyIndexedDbSave = await loadGameData('actorEmpireSave');
                 if (legacyIndexedDbSave) {
                     console.log("Migrating legacy IndexedDB save to Slot 1...");
-                    persistSlotSave(1, legacyIndexedDbSave);
-                    slots[1] = legacyIndexedDbSave;
+                    const migrated = migratePlayerSave(legacyIndexedDbSave);
+                    persistSlotSave(1, migrated);
+                    slots[1] = migrated;
                 } else {
                     for (let i = 1; i <= 3; i++) {
                         const legacySlotSave = localStorage.getItem(`actorEmpireSave_${i}`);
                         if (!legacySlotSave) continue;
                         try {
                             const savedData = JSON.parse(legacySlotSave);
+                            const migrated = migratePlayerSave(savedData);
                             console.log(`Migrating localStorage slot ${i} to IndexedDB...`);
-                            persistSlotSave(i, savedData);
-                            slots[i] = savedData;
+                            persistSlotSave(i, migrated);
+                            slots[i] = migrated;
                         } catch (e) {
                             console.error(`Legacy slot ${i} corrupt`, e);
                             recordNonFatal(e, 'legacy_slot_migration_failed', { slot: i });
@@ -752,9 +769,10 @@ export const App: React.FC = () => {
                         if (legacySave) {
                             try {
                                 const savedData = JSON.parse(legacySave);
+                                const migrated = migratePlayerSave(savedData);
                                 console.log("Migrating legacy save to Slot 1...");
-                                persistSlotSave(1, savedData);
-                                slots[1] = savedData;
+                                persistSlotSave(1, migrated);
+                                slots[1] = migrated;
                             } catch (e) {
                                 console.error("Legacy save corrupt", e);
                                 recordNonFatal(e, 'legacy_save_migration_failed');
@@ -802,10 +820,12 @@ export const App: React.FC = () => {
     setCurrentSlot(slot);
     const existingSave = saveSlots[slot];
     if (existingSave) {
-        setPlayer(existingSave);
+        const migrated = migratePlayerSave(existingSave);
+        setSaveSlots(prev => ({ ...prev, [slot]: migrated }));
+        setPlayer(migrated);
         setGameStatus('PLAYING');
     } else {
-        setPlayer(INITIAL_PLAYER);
+        setPlayer(migratePlayerSave(INITIAL_PLAYER));
         setGameStatus('CREATION');
     }
   };
@@ -831,7 +851,7 @@ export const App: React.FC = () => {
   useEffect(() => {
     if (gameStatus === 'PLAYING') {
       setPlayer(prev => {
-          const safePlayer = { ...prev } as any;
+          const safePlayer = migratePlayerSave(prev) as any;
           if (!safePlayer.world || typeof safePlayer.world !== 'object') {
               safePlayer.world = clone(INITIAL_PLAYER.world);
           } else {
@@ -865,7 +885,7 @@ export const App: React.FC = () => {
               ...clone(INITIAL_PLAYER.settings),
               ...(safePlayer.settings && typeof safePlayer.settings === 'object' ? safePlayer.settings : {})
           };
-          safePlayer.settings.language = 'en';
+          safePlayer.settings.language = isSupportedGameLanguage(safePlayer.settings.language) ? safePlayer.settings.language : 'en';
           safePlayer.settings.smoothMode = safePlayer.settings.smoothMode === true;
 
           if (!safePlayer.writerStats) {
@@ -918,6 +938,7 @@ export const App: React.FC = () => {
           safePlayer.activeReleases = safePlayer.activeReleases.map((release: any) => normalizeActiveRelease(release, safePlayer.age, safePlayer.currentWeek));
           if (!Array.isArray(safePlayer.pastProjects)) safePlayer.pastProjects = [];
           safePlayer.pastProjects = safePlayer.pastProjects.map((project: any) => normalizePastProject(project));
+          if (!Array.isArray(safePlayer.activeHealthConditions)) safePlayer.activeHealthConditions = [];
           if (!Array.isArray(safePlayer.news)) safePlayer.news = [];
           if (!Array.isArray(safePlayer.inbox)) safePlayer.inbox = [];
           if (!Array.isArray(safePlayer.activeSponsorships)) safePlayer.activeSponsorships = [];
@@ -1119,16 +1140,17 @@ export const App: React.FC = () => {
   }, [toastMessage]);
 
   const handleUpdatePlayer = (updatedPlayer: Player) => { 
+      const migratedPlayer = migratePlayerSave(updatedPlayer);
       const normalizedWorld = {
           ...clone(INITIAL_PLAYER.world),
-          ...(updatedPlayer.world || {}),
-          universes: normalizeUniverseMap(updatedPlayer.world?.universes)
+          ...(migratedPlayer.world || {}),
+          universes: normalizeUniverseMap(migratedPlayer.world?.universes)
       };
       setPlayer({
-          ...updatedPlayer,
+          ...migratedPlayer,
           world: normalizedWorld,
-          awards: dedupeAwards(updatedPlayer.awards || []),
-          pastProjects: (updatedPlayer.pastProjects || []).map((project: any) => ({
+          awards: dedupeAwards(migratedPlayer.awards || []),
+          pastProjects: (migratedPlayer.pastProjects || []).map((project: any) => ({
               ...project,
               awards: dedupeAwards(project.awards || [])
           }))
@@ -1145,13 +1167,16 @@ export const App: React.FC = () => {
           logs: [{ week: player.currentWeek, year: player.age, message: '🍼 CHEAT: Baby naming test queued for next week.', type: 'positive' }, ...player.logs].slice(0, 50)
       };
       handleUpdatePlayer(nextPlayer);
-      setToastMessage({ title: 'Baby QA Queued', subtext: 'Press Age Up once to open the naming flow.' });
+      setToastMessage({ title: tr('app.qa.babyQueuedTitle'), subtext: tr('app.qa.babyQueuedSubtext') });
   };
 
   const handleSchedulePregnancy = (request: PendingBabyNaming) => {
       handleGenericUpdate(prev => {
           if (prev.activePregnancy) {
-              setToastMessage({ title: 'Pregnancy Already Active', subtext: 'A baby is already on the way.' });
+              setToastMessage({
+                  title: tr('app.feedback.pregnancyActiveTitle'),
+                  subtext: tr('app.feedback.pregnancyActiveSubtext')
+              });
               return prev;
           }
 
@@ -1174,7 +1199,7 @@ export const App: React.FC = () => {
               },
           };
       }, `🍼 ${getPregnancyFeedbackCopy(request.pregnancyCarrier || 'PARTNER', request.partnerName).log}`);
-      setToastMessage({ title: 'Pregnancy Confirmed', subtext: getPregnancyFeedbackCopy(request.pregnancyCarrier || 'PARTNER', request.partnerName).toast });
+      setToastMessage({ title: tr('app.feedback.pregnancyConfirmedTitle'), subtext: getPregnancyFeedbackCopy(request.pregnancyCarrier || 'PARTNER', request.partnerName).toast });
   };
 
   const handleNextWeek = async () => {
@@ -1352,8 +1377,8 @@ export const App: React.FC = () => {
             week: player.currentWeek,
         });
         setToastMessage({
-            title: "Week Processing Failed",
-            subtext: "The week could not finish. Please try again."
+            title: tr('app.feedback.weekProcessingFailedTitle'),
+            subtext: tr('app.feedback.weekProcessingFailedSubtext')
         });
     } finally {
         stopPerformanceTrace(traceName, { duration_ms: Math.round(performance.now() - startedAt) });
@@ -1379,7 +1404,10 @@ export const App: React.FC = () => {
           };
       });
       setActivePressEvent(null);
-      setToastMessage({ title: "Press Tour Complete", subtext: "News outlets are running the story." });
+      setToastMessage({
+          title: tr('app.feedback.pressTourCompleteTitle'),
+          subtext: tr('app.feedback.pressTourCompleteSubtext')
+      });
   };
 
   const handleSocialEventChoice = (option: any) => {
@@ -1391,7 +1419,10 @@ export const App: React.FC = () => {
   // --- REWARDED AD SYSTEM (FIXED FOR MULTI-STEP) ---
   const handleTriggerRewardAd = async (type: AdType, data?: any) => {
       if (type === 'REWARDED_BAILOUT' && (player.flags?.bailoutAdsUsedThisWeek || 0) >= 2) {
-          setToastMessage({ title: "Bailout Limit Reached", subtext: "You can only claim 2 bailout ads per week." });
+          setToastMessage({
+              title: tr('app.rewards.bailoutLimitTitle'),
+              subtext: tr('app.rewards.bailoutLimitSubtext')
+          });
           return;
       }
 
@@ -1434,12 +1465,15 @@ export const App: React.FC = () => {
       if (successCount === steps) {
           handleAdComplete(type, data);
       } else {
-          setToastMessage({ title: "Reward Cancelled", subtext: "You must watch the complete ad." });
+          setToastMessage({
+              title: tr('app.rewards.cancelledTitle'),
+              subtext: tr('app.rewards.cancelledSubtext')
+          });
       }
   };
 
   const handleAdComplete = (type: AdType, data?: any) => {
-      let toastTitle = "Reward Received";
+      let toastTitle = tr('app.rewards.receivedTitle');
       let toastSub = "";
 
       handleGenericUpdate(prev => {
@@ -1447,7 +1481,7 @@ export const App: React.FC = () => {
           
           if (type === 'REWARDED_CASH') {
               p.money += 5000;
-              toastSub = "+$5,000";
+              toastSub = tr('app.rewards.cashSubtext');
           }
           else if (type === 'REWARDED_BAILOUT') {
               const bailoutAdsUsedThisWeek = p.flags?.bailoutAdsUsedThisWeek || 0;
@@ -1458,7 +1492,7 @@ export const App: React.FC = () => {
               
               p.money += bailoutAmount;
               p.flags.bailoutAdsUsedThisWeek = bailoutAdsUsedThisWeek + 1;
-              toastSub = `+$${bailoutAmount.toLocaleString()} Bailout Fund`;
+              toastSub = tr('app.rewards.bailoutSubtext', { amount: bailoutAmount.toLocaleString() });
               
               // Close debt modal if we are back in green
               if (p.money >= 0) {
@@ -1467,23 +1501,23 @@ export const App: React.FC = () => {
           }
           else if (type === 'REWARDED_ENERGY') {
               restoreWeeklyEnergy(p, 25);
-              toastSub = "+25 Energy";
+              toastSub = tr('app.rewards.energySubtext', { amount: '25' });
           }
           else if (type === 'REWARDED_STATS') {
               p.stats.health = Math.max(90, p.stats.health);
               p.stats.happiness = Math.max(90, p.stats.happiness);
               p.stats.looks = Math.max(90, p.stats.looks);
               p.stats.body = Math.max(90, p.stats.body);
-              toastSub = "Full Wellness Restoration";
+              toastSub = tr('app.rewards.wellnessSubtext');
           }
           else if (type === 'REWARDED_SKILL' && data) {
               const skillKey = data as keyof ActorSkills;
               p.stats.skills[skillKey] = Math.min(100, p.stats.skills[skillKey] + 10);
-              toastSub = `+10 ${skillKey}`;
+              toastSub = tr('app.rewards.skillSubtext', { amount: '10', skill: String(skillKey) });
           }
           else if (type === 'REWARDED_GENRE' && data) {
               rewardGenreExperience(p, data, 10);
-              toastSub = `+10 XP in ${data}`;
+              toastSub = tr('app.rewards.genreSubtext', { amount: '10', genre: String(data) });
           }
           
           setToastMessage({ title: toastTitle, subtext: toastSub });
@@ -1494,14 +1528,17 @@ export const App: React.FC = () => {
   const handlePremiumPurchase = async (productId: PremiumProductId) => {
       const result = await purchasePremiumProduct(productId);
       if (!result.success) {
-          setToastMessage({ title: result.cancelled ? "Purchase Cancelled" : "Purchase Failed", subtext: result.message });
+          setToastMessage({
+              title: result.cancelled ? tr('app.purchases.cancelledTitle') : tr('app.purchases.failedTitle'),
+              subtext: result.message
+          });
           return;
       }
 
       handleGenericUpdate(prev => {
           const p = JSON.parse(JSON.stringify(prev)) as Player;
           const message = applyPremiumPurchase(p, productId);
-          setToastMessage({ title: "Purchase Confirmed", subtext: message });
+          setToastMessage({ title: tr('app.purchases.confirmedTitle'), subtext: message });
           return p;
       });
   };
@@ -1516,13 +1553,13 @@ export const App: React.FC = () => {
           };
 
           const premiumCollection = getRequiredPremiumProductForAsset(item.id);
-          let logMessage = `Added ${item.name} to your lifestyle collection.`;
+          let logMessage = tr('app.generated.lifestyle.defaultLog', { itemName: item.name });
 
           if (premiumCollection === 'bundle_luxury_homes') {
               nextPlayer.news = [{
                   id: `news_home_buy_${Date.now()}`,
-                  headline: `${nextPlayer.name} upgrades their address with ${item.name}`,
-                  subtext: `The move is already being read as a statement about status, privacy, and how far the star lifestyle has expanded.`,
+                  headline: tr('app.generated.lifestyle.homeNewsHeadline', { name: nextPlayer.name, itemName: item.name }),
+                  subtext: tr('app.generated.lifestyle.homeNewsSubtext'),
                   category: 'TOP_STORY' as const,
                   week: nextPlayer.currentWeek,
                   year: nextPlayer.age,
@@ -1534,7 +1571,7 @@ export const App: React.FC = () => {
                   authorName: 'RealEstateWire',
                   authorHandle: '@realestatewire',
                   authorAvatar: 'https://api.dicebear.com/8.x/pixel-art/svg?seed=RealEstateWire',
-                  content: `${nextPlayer.name} just picked up ${item.name}. Celebrity real-estate brain is fully activated now.`,
+                  content: tr('app.generated.lifestyle.homeSocial', { name: nextPlayer.name, itemName: item.name }),
                   timestamp: Date.now(),
                   likes: 12000,
                   retweets: 1800,
@@ -1544,7 +1581,7 @@ export const App: React.FC = () => {
                   isRetweeted: false,
                   isVerified: true,
               }, ...nextPlayer.x.feed].slice(0, 50);
-              logMessage = `🏠 Bought ${item.name}. Your social circle is already treating the new address like a status move.`;
+              logMessage = tr('app.generated.lifestyle.homeLog', { itemName: item.name });
           } else if (premiumCollection === 'bundle_elite_vehicles') {
               nextPlayer.x.feed = [{
                   id: `x_vehicle_buy_${Date.now()}`,
@@ -1552,7 +1589,7 @@ export const App: React.FC = () => {
                   authorName: 'GarageWatch',
                   authorHandle: '@garagewatch',
                   authorAvatar: 'https://api.dicebear.com/8.x/pixel-art/svg?seed=GarageWatch',
-                  content: `${nextPlayer.name} just added ${item.name} to the garage. That is not transport, that is messaging.`,
+                  content: tr('app.generated.lifestyle.vehicleSocial', { name: nextPlayer.name, itemName: item.name }),
                   timestamp: Date.now(),
                   likes: 15000,
                   retweets: 2300,
@@ -1562,18 +1599,18 @@ export const App: React.FC = () => {
                   isRetweeted: false,
                   isVerified: true,
               }, ...nextPlayer.x.feed].slice(0, 50);
-              logMessage = `🚘 Bought ${item.name}. The garage just became part of your celebrity image.`;
+              logMessage = tr('app.generated.lifestyle.vehicleLog', { itemName: item.name });
           } else if (premiumCollection === 'bundle_sky_sea') {
               nextPlayer.news = [{
                   id: `news_skysea_buy_${Date.now()}`,
-                  headline: `${nextPlayer.name} adds ${item.name} to a growing luxury fleet`,
-                  subtext: `The purchase pushes the star further into full jet-set fantasy, and people are absolutely noticing.`,
+                  headline: tr('app.generated.lifestyle.skySeaNewsHeadline', { name: nextPlayer.name, itemName: item.name }),
+                  subtext: tr('app.generated.lifestyle.skySeaNewsSubtext'),
                   category: 'TOP_STORY' as const,
                   week: nextPlayer.currentWeek,
                   year: nextPlayer.age,
                   impactLevel: 'MEDIUM' as const,
               }, ...nextPlayer.news].slice(0, 50);
-              logMessage = `🛥️ Bought ${item.name}. Your life now reads like a private-travel fantasy.`;
+              logMessage = tr('app.generated.lifestyle.skySeaLog', { itemName: item.name });
           } else if (premiumCollection === 'bundle_ultimate_lifestyle') {
               nextPlayer.x.feed = [{
                   id: `x_lifestyle_buy_${Date.now()}`,
@@ -1581,7 +1618,7 @@ export const App: React.FC = () => {
                   authorName: 'Style Radar',
                   authorHandle: '@styleradar',
                   authorAvatar: 'https://api.dicebear.com/8.x/pixel-art/svg?seed=StyleRadar',
-                  content: `${nextPlayer.name} just picked up ${item.name}. Luxury-watch and style accounts are going to have a field day.`,
+                  content: tr('app.generated.lifestyle.ultimateSocial', { name: nextPlayer.name, itemName: item.name }),
                   timestamp: Date.now(),
                   likes: 18000,
                   retweets: 2600,
@@ -1591,7 +1628,7 @@ export const App: React.FC = () => {
                   isRetweeted: false,
                   isVerified: true,
               }, ...nextPlayer.x.feed].slice(0, 50);
-              logMessage = `💎 Bought ${item.name}. Style buzz around your image just got noticeably louder.`;
+              logMessage = tr('app.generated.lifestyle.ultimateLog', { itemName: item.name });
           }
 
           nextPlayer.logs = [...nextPlayer.logs, { week: nextPlayer.currentWeek, year: nextPlayer.age, message: logMessage, type: 'positive' as const }].slice(-50);
@@ -1602,12 +1639,12 @@ export const App: React.FC = () => {
   const handleRestorePurchases = async () => {
       const result = await restorePremiumPurchases();
       if (!result.success) {
-          setToastMessage({ title: "Restore Failed", subtext: result.message });
+          setToastMessage({ title: tr('app.purchases.restoreFailedTitle'), subtext: result.message });
           return;
       }
 
       if (result.restoredProductIds.length === 0) {
-          setToastMessage({ title: "Nothing to Restore", subtext: result.message });
+          setToastMessage({ title: tr('app.purchases.nothingToRestoreTitle'), subtext: result.message });
           return;
       }
 
@@ -1616,7 +1653,10 @@ export const App: React.FC = () => {
           result.restoredProductIds.forEach(productId => {
               applyPremiumPurchase(p, productId);
           });
-          setToastMessage({ title: "Purchases Restored", subtext: `${result.restoredProductIds.length} item(s) restored.` });
+          setToastMessage({
+              title: tr('app.purchases.restoredTitle'),
+              subtext: tr('app.purchases.restoredSubtext', { count: result.restoredProductIds.length.toString() })
+          });
           return p;
       });
   };
@@ -1639,10 +1679,11 @@ export const App: React.FC = () => {
           x: { ...INITIAL_PLAYER.x, handle: handle, followers: 0 },
           youtube: { ...INITIAL_PLAYER.youtube, handle: handle }
       };
+      const migratedNewPlayer = migratePlayerSave(newPlayer);
       if (currentSlot) {
-          setSaveSlots(prev => ({ ...prev, [currentSlot]: newPlayer }));
+          setSaveSlots(prev => ({ ...prev, [currentSlot]: migratedNewPlayer }));
       }
-      setPlayer(newPlayer); 
+      setPlayer(migratedNewPlayer); 
       setGameStatus('PLAYING'); 
   };
 
@@ -1751,7 +1792,7 @@ export const App: React.FC = () => {
               {
                   week: newPlayer.currentWeek,
                   year: newPlayer.age,
-                  message: `Your heir was too young to take over immediately. Time passed until ${child.name} turned ${LEGACY_MIN_PLAYABLE_AGE}.`,
+	                  message: tr('app.legacy.heirTooYoungLog', { name: child.name, age: LEGACY_MIN_PLAYABLE_AGE }),
                   type: 'neutral' as const
               }
           ].slice(-50);
@@ -1762,13 +1803,17 @@ export const App: React.FC = () => {
               {
                   week: newPlayer.currentWeek,
                   year: newPlayer.age,
-                  message: `Inheritance tax claimed $${inheritancePreview.moneyTaxPaid.toLocaleString()} in cash and ${inheritancePreview.sharesTaxPaid.toLocaleString()} stock shares. Properties, vehicles, businesses, and other assets transferred to the heir untouched.`,
+	                  message: tr('app.legacy.inheritanceTaxLog', {
+	                      money: inheritancePreview.moneyTaxPaid.toLocaleString(),
+	                      shares: inheritancePreview.sharesTaxPaid.toLocaleString()
+	                  }),
                   type: 'neutral' as const
               }
           ].slice(-50);
       }
-      syncCurrentSlotSnapshot(newPlayer);
-      setPlayer(newPlayer);
+      const migratedChildPlayer = migratePlayerSave(newPlayer);
+      syncCurrentSlotSnapshot(migratedChildPlayer);
+      setPlayer(migratedChildPlayer);
       setGameStatus('PLAYING');
       setActivePage(Page.HOME);
   };
@@ -1796,7 +1841,7 @@ export const App: React.FC = () => {
               {
                   week: updatedPlayer.currentWeek ?? sourcePlayer.currentWeek,
                   year: updatedPlayer.age ?? sourcePlayer.age,
-                  message: log || 'Event resolved.',
+                  message: log || tr('app.eventRecovery.resolvedLog'),
                   type: logType
               },
               ...(updatedPlayer.logs || sourcePlayer.logs || [])
@@ -1810,11 +1855,61 @@ export const App: React.FC = () => {
       } catch (error) {
           console.error('Queued event resolution failed:', error);
           setToastMessage({
-              title: 'Event Recovery',
-              subtext: 'That event could not close. Please tap Continue again.'
+              title: tr('app.eventRecovery.toastTitle'),
+              subtext: tr('app.eventRecovery.toastSubtext')
           });
           throw error;
       }
+  };
+
+  const openStockControlAcquisitionDesk = (event: ScheduledEvent) => {
+      const relatedStudioId = event?.data?.relatedStudioId;
+      const companyName = event?.data?.companyName || tr('app.stockControl.defaultStudio');
+      if (!relatedStudioId) {
+          setToastMessage({
+              title: tr('app.stockControl.acquisitionUnavailableTitle'),
+              subtext: tr('app.stockControl.acquisitionUnavailableSubtext')
+          });
+          return;
+      }
+      resolveQueuedEventSafely(
+          player,
+          player,
+          event.id,
+          tr('app.stockControl.acquisitionMovedLog', { companyName }),
+          'positive'
+      );
+      setInitialForbesStudioId(relatedStudioId);
+      setActivePage(Page.MOBILE);
+      setToastMessage({
+          title: tr('app.stockControl.openingAcquisitionTitle'),
+          subtext: tr('app.stockControl.openingAcquisitionSubtext', { companyName })
+      });
+  };
+
+  const openStockControlReview = (event: ScheduledEvent) => {
+      const stockId = event?.data?.stockId;
+      const companyName = event?.data?.companyName || tr('app.stockControl.defaultStock');
+      if (!stockId) {
+          setToastMessage({
+              title: tr('app.stockControl.stockUnavailableTitle'),
+              subtext: tr('app.stockControl.stockUnavailableSubtext')
+          });
+          return;
+      }
+      resolveQueuedEventSafely(
+          player,
+          player,
+          event.id,
+          tr('app.stockControl.reviewMovedLog', { companyName }),
+          'neutral'
+      );
+      setInitialMobileStockId(stockId);
+      setActivePage(Page.MOBILE);
+      setToastMessage({
+          title: tr('app.stockControl.openingStocksTitle'),
+          subtext: tr('app.stockControl.openingStocksSubtext', { companyName })
+      });
   };
   
   const handleRestartCareer = async () => {
@@ -1838,24 +1933,10 @@ export const App: React.FC = () => {
       return next;
   });
 
-  const handleTradeStock = (stockId: string, amount: number) => { 
-      const msg = amount > 0 ? "Bought stock" : "Sold stock";
+  const handleTradeStock = (stockId: string, amount: number) => {
       handleGenericUpdate(p => {
-          const stock = p.stocks.find(s => s.id === stockId);
-          if (!stock) return p;
-          const totalCost = stock.price * amount;
-          if (amount > 0) {
-              if (p.money < totalCost) return p; 
-              const existing = p.portfolio.find(i => i.stockId === stockId);
-              const newPort = existing ? p.portfolio.map(i => i.stockId === stockId ? { ...i, shares: i.shares + amount } : i) : [...p.portfolio, { stockId, shares: amount }];
-              return { ...p, money: p.money - totalCost, portfolio: newPort, logs: [...p.logs, { week: p.currentWeek, year: p.age, message: msg, type: 'neutral' }] };
-          } else {
-              const sellShares = Math.abs(amount);
-              const existing = p.portfolio.find(i => i.stockId === stockId);
-              if (!existing || existing.shares < sellShares) return p;
-              const newPort = existing.shares === sellShares ? p.portfolio.filter(i => i.stockId !== stockId) : p.portfolio.map(i => i.stockId === stockId ? { ...i, shares: i.shares - sellShares } : i);
-              return { ...p, money: p.money + (stock.price * sellShares), portfolio: newPort, logs: [...p.logs, { week: p.currentWeek, year: p.age, message: msg, type: 'neutral' }] };
-          }
+          const result = executeStockTrade(p, stockId, amount);
+          return result.success ? result.player : p;
       });
   };
 
@@ -1906,9 +1987,9 @@ export const App: React.FC = () => {
                   </div>
                   <div>
                       <h2 className="text-xl font-bold text-white uppercase tracking-widest">
-                          Ad {adTotalSteps > 1 ? `${adStep}/${adTotalSteps}` : ''} Loading...
-                      </h2>
-                      <p className="text-zinc-500 text-xs">Please wait for reward confirmation</p>
+	                          {tr('app.ads.loadingTitle', { step: adTotalSteps > 1 ? `${adStep}/${adTotalSteps}` : '' })}
+	                      </h2>
+	                      <p className="text-zinc-500 text-xs">{tr('app.ads.loadingSubtext')}</p>
                   </div>
               </div>
           </div>
@@ -1929,37 +2010,37 @@ export const App: React.FC = () => {
                   {(player.flags.weeksInDebt || 0) >= 8 ? (
                       // GAME OVER STATE
                       <>
-                          <h2 className="text-3xl font-black text-white mb-2 uppercase tracking-tight">Financial Ruin</h2>
-                          <p className="text-red-400 text-sm mb-6 leading-relaxed font-bold">
-                              You failed to recover from debt. Your assets have been seized and your reputation is destroyed.
-                          </p>
-                          <div className="bg-black/60 rounded-xl p-4 mb-6 border border-red-900">
-                              <div className="text-xs text-zinc-500 uppercase font-bold mb-1">Final Debt</div>
-                              <div className="text-2xl font-mono font-bold text-red-500">-${Math.abs(player.money).toLocaleString()}</div>
-                          </div>
+	                          <h2 className="text-3xl font-black text-white mb-2 uppercase tracking-tight">{tr('app.debt.ruinTitle')}</h2>
+	                          <p className="text-red-400 text-sm mb-6 leading-relaxed font-bold">
+	                              {tr('app.debt.ruinSubtext')}
+	                          </p>
+	                          <div className="bg-black/60 rounded-xl p-4 mb-6 border border-red-900">
+	                              <div className="text-xs text-zinc-500 uppercase font-bold mb-1">{tr('app.debt.finalDebt')}</div>
+	                              <div className="text-2xl font-mono font-bold text-red-500">-${Math.abs(player.money).toLocaleString()}</div>
+	                          </div>
                           <button 
                               onClick={handleRestartCareer}
                               className="w-full py-4 bg-white text-black font-bold rounded-xl hover:bg-zinc-200 transition-colors shadow-lg"
                           >
-                              Restart Career
+	                              {tr('app.debt.restartCareer')}
                           </button>
                       </>
                   ) : (
                       // WARNING STATE
                       <>
-                          <h2 className="text-2xl font-black text-white mb-2 uppercase tracking-tight">Bankruptcy Warning</h2>
-                          <p className="text-zinc-400 text-sm mb-6 leading-relaxed">
-                              You are in debt! You have <span className="text-white font-bold">{8 - (player.flags.weeksInDebt || 0)} weeks</span> to recover funds before your career ends.
-                          </p>
+	                          <h2 className="text-2xl font-black text-white mb-2 uppercase tracking-tight">{tr('app.debt.warningTitle')}</h2>
+	                          <p className="text-zinc-400 text-sm mb-6 leading-relaxed">
+	                              {tr('app.debt.warningPrefix')} <span className="text-white font-bold">{tr('app.debt.weeksToRecover', { weeks: 8 - (player.flags.weeksInDebt || 0) })}</span> {tr('app.debt.warningSuffix')}
+	                          </p>
                           
                           <div className="bg-black/40 rounded-xl p-4 mb-6 border border-zinc-800">
                               <div className="flex justify-between items-center text-xs text-zinc-500 uppercase font-bold mb-2">
-                                  <span>Current Debt</span>
-                                  <span>Runway</span>
+	                                  <span>{tr('app.debt.currentDebt')}</span>
+	                                  <span>{tr('app.debt.runway')}</span>
                               </div>
                               <div className="flex justify-between items-center">
                                   <span className="text-xl font-mono font-bold text-red-500">-${Math.abs(player.money).toLocaleString()}</span>
-                                  <span className="text-white font-bold">{8 - (player.flags.weeksInDebt || 0)} Weeks</span>
+	                                  <span className="text-white font-bold">{tr('app.debt.weeks', { weeks: 8 - (player.flags.weeksInDebt || 0) })}</span>
                               </div>
                           </div>
 
@@ -1970,18 +2051,18 @@ export const App: React.FC = () => {
                                   disabled={(player.flags.bailoutAdsUsedThisWeek || 0) >= 2}
                                   className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-800 disabled:text-zinc-500 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2 shadow-lg"
                               >
-                                  <PlayCircle size={18}/> Get Bailout (+${(((player.flags.bailoutAdsUsedThisWeek || 0) === 0 ? Math.floor(Math.abs(player.money) * 0.20) + 5000 : Math.floor(Math.abs(player.money) * 0.10) + 2500)).toLocaleString()})
-                              </button>
-                              <div className="text-[11px] text-zinc-500">
-                                  Bailout ads used this week: {player.flags.bailoutAdsUsedThisWeek || 0}/2
-                              </div>
+	                                  <PlayCircle size={18}/> {tr('app.debt.getBailout', { amount: (((player.flags.bailoutAdsUsedThisWeek || 0) === 0 ? Math.floor(Math.abs(player.money) * 0.20) + 5000 : Math.floor(Math.abs(player.money) * 0.10) + 2500)).toLocaleString() })}
+	                              </button>
+	                              <div className="text-[11px] text-zinc-500">
+	                                  {tr('app.debt.bailoutAdsUsed', { count: player.flags.bailoutAdsUsedThisWeek || 0 })}
+	                              </div>
                               
                               {/* Continue Option */}
                               <button 
                                   onClick={() => setShowDebtModal(false)}
                                   className="w-full py-3 bg-zinc-800 text-zinc-300 font-bold rounded-xl hover:bg-zinc-700 transition-colors flex items-center justify-center gap-2"
                               >
-                                  <Briefcase size={16}/> Manage Finances
+	                                  <Briefcase size={16}/> {tr('app.debt.manageFinances')}
                               </button>
                           </div>
                       </>
@@ -2011,6 +2092,16 @@ export const App: React.FC = () => {
           />
       )}
 
+      {player.pendingEvents && player.pendingEvents.length > 0 && player.pendingEvents[0].type === 'STOCK_CONTROL' && (
+          <StockControlEventModal
+              key={player.pendingEvents[0].id}
+              player={player}
+              event={player.pendingEvents[0]}
+              onOpenAcquisitionDesk={() => openStockControlAcquisitionDesk(player.pendingEvents![0])}
+              onReviewStock={() => openStockControlReview(player.pendingEvents![0])}
+          />
+      )}
+
       {player.pendingEvents && player.pendingEvents.length > 0 && 
         (player.pendingEvents[0].type === 'LIFE_EVENT' || 
          player.pendingEvents[0].type === 'LEGAL_HEARING' || 
@@ -2032,16 +2123,18 @@ export const App: React.FC = () => {
           <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-200">
               <div className="bg-zinc-900 border border-zinc-800 rounded-3xl w-full max-w-sm p-6 shadow-2xl flex flex-col items-center text-center">
                   <div className="w-12 h-12 bg-rose-500/20 text-rose-500 rounded-full flex items-center justify-center mb-4"><Heart size={24} fill="currentColor" /></div>
-                  <h3 className="text-white font-bold text-lg mb-1">Intimacy with {showProtectionPrompt.partnerName}</h3>
+                  <h3 className="text-white font-bold text-lg mb-1">
+                      {tr('app.intimacyPrompt.title', { partnerName: showProtectionPrompt.partnerName })}
+                  </h3>
                   <div className="grid grid-cols-1 gap-3 w-full mt-6">
                       <button onClick={() => { setShowProtectionPrompt(null); handleIntimacyChoice('PROTECTED', showProtectionPrompt.partnerId); }} className="py-4 px-4 rounded-xl bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 flex items-center justify-between group">
-                          <div className="text-left"><div className="font-bold text-white text-sm">Use Protection</div></div><CheckCircle size={18} className="text-emerald-500"/>
+                          <div className="text-left"><div className="font-bold text-white text-sm">{tr('app.intimacyPrompt.useProtection')}</div></div><CheckCircle size={18} className="text-emerald-500"/>
                       </button>
                       <button onClick={() => { setShowProtectionPrompt(null); handleIntimacyChoice('UNPROTECTED', showProtectionPrompt.partnerId); }} className="py-4 px-4 rounded-xl bg-zinc-800 border border-rose-900/30 hover:bg-rose-900/10 flex items-center justify-between group">
-                          <div className="text-left"><div className="font-bold text-rose-400 text-sm">Unprotected</div></div><ShieldAlert size={18} className="text-rose-500"/>
+                          <div className="text-left"><div className="font-bold text-rose-400 text-sm">{tr('app.intimacyPrompt.unprotected')}</div></div><ShieldAlert size={18} className="text-rose-500"/>
                       </button>
                   </div>
-                  <button onClick={() => setShowProtectionPrompt(null)} className="mt-4 text-xs text-zinc-500 hover:text-white underline">Cancel</button>
+                  <button onClick={() => setShowProtectionPrompt(null)} className="mt-4 text-xs text-zinc-500 hover:text-white underline">{tr('app.intimacyPrompt.cancel')}</button>
               </div>
           </div>
       )}
@@ -2053,13 +2146,13 @@ export const App: React.FC = () => {
                       <div className="w-14 h-14 bg-amber-500/15 text-amber-400 rounded-full flex items-center justify-center mb-4">
                           <Baby size={28} />
                       </div>
-                      <h3 className="text-white font-bold text-xl mb-1">Name Your Baby</h3>
-                      <p className="text-sm text-zinc-400">Choose your child&apos;s first name and family surname.</p>
+                      <h3 className="text-white font-bold text-xl mb-1">{tr('app.babyNaming.title')}</h3>
+                      <p className="text-sm text-zinc-400">{tr('app.babyNaming.subtitle')}</p>
                   </div>
 
                   <div className="space-y-5">
                       <div>
-                          <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 mb-2 block">First Name</label>
+                          <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 mb-2 block">{tr('app.babyNaming.firstName')}</label>
                           <input
                               value={babyFirstNameInput}
                               onChange={(e) => setBabyFirstNameInput(e.target.value)}
@@ -2070,7 +2163,7 @@ export const App: React.FC = () => {
                       </div>
 
                       <div>
-                          <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 mb-2 block">Last Name</label>
+                          <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 mb-2 block">{tr('app.babyNaming.lastName')}</label>
                           <div className="grid grid-cols-1 gap-2">
                               {getBabySurnameOptions(pendingBabyNaming.partnerName).map(option => (
                                   <button
@@ -2090,7 +2183,7 @@ export const App: React.FC = () => {
                       </div>
 
                       <div className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3">
-                          <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 mb-1">Full Name Preview</div>
+                          <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 mb-1">{tr('app.babyNaming.fullNamePreview')}</div>
                           <div className="text-lg font-bold text-white">
                               {`${babyFirstNameInput.trim() || pendingBabyNaming.suggestedFirstName} ${babySurnameChoice}`.trim()}
                           </div>
@@ -2101,7 +2194,7 @@ export const App: React.FC = () => {
                               onClick={handleAbandonBaby}
                               className="w-full py-4 rounded-2xl font-black uppercase tracking-wider transition-all bg-rose-500/10 hover:bg-rose-500/20 text-rose-200 border border-rose-500/30"
                           >
-                              Walk Away
+                              {tr('app.babyNaming.walkAway')}
                           </button>
                           <button
                               onClick={handleConfirmBabyName}
@@ -2112,11 +2205,11 @@ export const App: React.FC = () => {
                                       : 'bg-amber-500 hover:bg-amber-400 text-black shadow-[0_0_25px_rgba(245,158,11,0.35)]'
                               }`}
                           >
-                              Welcome Baby
+                              {tr('app.babyNaming.welcomeBaby')}
                           </button>
                       </div>
                       <p className="text-center text-[11px] text-zinc-500">
-                          Walking away can trigger custody fallout, divorce, child support, alimony, scandal news, and dynasty damage.
+                          {tr('app.babyNaming.walkAwayWarning')}
                       </p>
                   </div>
               </div>
@@ -2148,48 +2241,48 @@ export const App: React.FC = () => {
                   <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-500 via-orange-500 to-pink-500"></div>
                   <div className="min-h-0 flex-1 overflow-y-auto custom-scrollbar p-5 pb-4 sm:p-6">
                       <div className="mb-6">
-                          <div className="text-[10px] font-black uppercase tracking-[0.25em] text-amber-400 mb-3">What&apos;s New</div>
-                          <h3 className="text-2xl font-black text-white mb-2">Version {APP_DISPLAY_VERSION}</h3>
-                          <p className="text-sm text-zinc-400 leading-relaxed">
-                              This update focuses on the latest player-reported fixes: streaming growth, relationship pregnancy logic, returning talent blockers, and long-career stability.
-                          </p>
+	                          <div className="text-[10px] font-black uppercase tracking-[0.25em] text-amber-400 mb-3">{tr('app.whatsNew.eyebrow')}</div>
+	                          <h3 className="text-2xl font-black text-white mb-2">{tr('app.whatsNew.version', { version: APP_DISPLAY_VERSION })}</h3>
+	                          <p className="text-sm text-zinc-400 leading-relaxed">
+	                              {tr('app.whatsNew.intro')}
+	                          </p>
                       </div>
 
                       <div className="space-y-4 text-sm text-zinc-300">
                           <div className="rounded-2xl border border-amber-500/15 bg-amber-500/10 px-4 py-3">
-                              <div className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-300 mb-2">Studio & Streaming</div>
-                              <ul className="space-y-2 leading-relaxed">
-                                  <li>• Fixed runaway streaming viewership so weekly streams rise, peak, and taper in a more realistic way.</li>
-                                  <li>• Improved streaming bid wars so platforms compete with clearer offers and better sequel/season handling.</li>
-                                  <li>• Greenlight now shows exactly which returning talent deals are pending, with quick negotiate actions.</li>
-                              </ul>
+	                              <div className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-300 mb-2">{tr('app.whatsNew.studioStreaming')}</div>
+	                              <ul className="space-y-2 leading-relaxed">
+	                                  <li>{tr('app.whatsNew.studioStreaming.1')}</li>
+	                                  <li>{tr('app.whatsNew.studioStreaming.2')}</li>
+	                                  <li>{tr('app.whatsNew.studioStreaming.3')}</li>
+	                              </ul>
                           </div>
 
                           <div className="rounded-2xl border border-emerald-500/15 bg-emerald-500/10 px-4 py-3">
-                              <div className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-300 mb-2">Career & Family</div>
-                              <ul className="space-y-2 leading-relaxed">
-                                  <li>• Fixed pregnancy logic so the correct person is treated as pregnant based on player and partner gender.</li>
-                                  <li>• Same-sex and non-binary intimacy now stays romance/drama focused without triggering impossible pregnancy outcomes.</li>
-                                  <li>• Improved relationship and baby feedback so family story moments happen in the right order.</li>
-                              </ul>
+	                              <div className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-300 mb-2">{tr('app.whatsNew.careerFamily')}</div>
+	                              <ul className="space-y-2 leading-relaxed">
+	                                  <li>{tr('app.whatsNew.careerFamily.1')}</li>
+	                                  <li>{tr('app.whatsNew.careerFamily.2')}</li>
+	                                  <li>{tr('app.whatsNew.careerFamily.3')}</li>
+	                              </ul>
                           </div>
 
                           <div className="rounded-2xl border border-sky-500/15 bg-sky-500/10 px-4 py-3">
-                              <div className="text-[10px] font-black uppercase tracking-[0.2em] text-sky-300 mb-2">Mobile Stability</div>
-                              <ul className="space-y-2 leading-relaxed">
-                                  <li>• Optimized save storage for long careers so old timelines do not overload mobile WebViews.</li>
-                                  <li>• Reduced heavy visual effects on mobile devices to help Android screens stay responsive.</li>
-                                  <li>• Improved recovery protection around events, weekly processing, and large social/news histories.</li>
-                              </ul>
+	                              <div className="text-[10px] font-black uppercase tracking-[0.2em] text-sky-300 mb-2">{tr('app.whatsNew.mobileStability')}</div>
+	                              <ul className="space-y-2 leading-relaxed">
+	                                  <li>{tr('app.whatsNew.mobileStability.1')}</li>
+	                                  <li>{tr('app.whatsNew.mobileStability.2')}</li>
+	                                  <li>{tr('app.whatsNew.mobileStability.3')}</li>
+	                              </ul>
                           </div>
 
                           <div className="rounded-2xl border border-violet-500/15 bg-violet-500/10 px-4 py-3">
-                              <div className="text-[10px] font-black uppercase tracking-[0.2em] text-violet-300 mb-2">UI & Save Fixes</div>
-                              <ul className="space-y-2 leading-relaxed">
-                                  <li>• Cleaned decimal/overflow UI issues in festival, Forbes, IMDb, and career surfaces.</li>
-                                  <li>• Added more old-save safety across universe, franchise, roster, and generated content paths.</li>
-                                  <li>• Tightened weekly processing and recovery handling to reduce stuck-event loops.</li>
-                              </ul>
+	                              <div className="text-[10px] font-black uppercase tracking-[0.2em] text-violet-300 mb-2">{tr('app.whatsNew.uiSaveFixes')}</div>
+	                              <ul className="space-y-2 leading-relaxed">
+	                                  <li>{tr('app.whatsNew.uiSaveFixes.1')}</li>
+	                                  <li>{tr('app.whatsNew.uiSaveFixes.2')}</li>
+	                                  <li>{tr('app.whatsNew.uiSaveFixes.3')}</li>
+	                              </ul>
                           </div>
 
                           <button
@@ -2199,8 +2292,8 @@ export const App: React.FC = () => {
                           >
                               <div className="flex items-center justify-between gap-3">
                                   <div>
-                                      <div className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-300">Previous Notes</div>
-                                      <p className="mt-1 text-xs leading-relaxed text-zinc-500">Tap to view earlier update highlights.</p>
+	                                      <div className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-300">{tr('app.whatsNew.previousNotes')}</div>
+	                                      <p className="mt-1 text-xs leading-relaxed text-zinc-500">{tr('app.whatsNew.previousNotesSubtext')}</p>
                                   </div>
                                   <span className="text-lg font-black text-zinc-400">{showPreviousWhatsNewNotes ? '-' : '+'}</span>
                               </div>
@@ -2208,12 +2301,12 @@ export const App: React.FC = () => {
 
                           {showPreviousWhatsNewNotes && (
                               <div className="rounded-2xl border border-white/10 bg-zinc-950/80 px-4 py-3">
-                                  <div className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-300 mb-2">Previous Highlights</div>
-                                  <ul className="space-y-2 leading-relaxed text-zinc-400">
-                                      <li>• Expanded Development Lab, franchise, universe, creator, social, and global talent systems.</li>
-                                      <li>• Added deeper script support for musical, biopic, sports, animation, fantasy, crime, and documentary projects.</li>
-                                      <li>• Improved teams, bank actions, lifestyle assets, award records, and older save compatibility.</li>
-                                  </ul>
+	                                  <div className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-300 mb-2">{tr('app.whatsNew.previousHighlights')}</div>
+	                                  <ul className="space-y-2 leading-relaxed text-zinc-400">
+	                                      <li>{tr('app.whatsNew.previousHighlights.1')}</li>
+	                                      <li>{tr('app.whatsNew.previousHighlights.2')}</li>
+	                                      <li>{tr('app.whatsNew.previousHighlights.3')}</li>
+	                                  </ul>
                               </div>
                           )}
                       </div>
@@ -2224,7 +2317,7 @@ export const App: React.FC = () => {
                           onClick={handleDismissWhatsNew}
                           className="w-full py-4 bg-white text-black font-bold rounded-2xl hover:bg-zinc-200 transition-colors"
                       >
-                          Continue
+	                          {tr('common.continue')}
                       </button>
                   </div>
               </div>
@@ -2251,7 +2344,7 @@ export const App: React.FC = () => {
         {gameStatus === 'PLAYING' && (
             <>
                 <div className={`${isFullBleedMobileSurface ? 'flex-1 overflow-hidden p-0' : `flex-1 px-5 pt-5 pb-nav-safe overflow-y-auto custom-scrollbar ${player.money < 0 ? 'pt-8' : ''}`}`}>
-                    {activePage === Page.HOME && (<HomePage player={player} onNextWeek={handleNextWeek} isProcessing={isProcessing} onUpdatePlayer={handleUpdatePlayer} setPage={setActivePage} onOpenProductionHouseCheat={() => { setLifestyleInitialView('PRODUCTION_GAME'); setActivePage(Page.LIFESTYLE); }} onOpenStudioAcquisitionCheat={(studioId) => { setInitialForbesStudioId(studioId); setActivePage(Page.MOBILE); }} onQueueBabyNamingCheat={handleQueueBabyNamingCheat} onOpenDeathSummaryPreview={handleOpenDeathSummaryPreview} onShowWhatsNewCheat={handleShowWhatsNewCheat} />)}
+                    {activePage === Page.HOME && (<HomePage player={player} onNextWeek={handleNextWeek} isProcessing={isProcessing} onUpdatePlayer={handleUpdatePlayer} setPage={setActivePage} onOpenProductionHouseCheat={() => { setLifestyleInitialView('PRODUCTION_GAME'); setActivePage(Page.LIFESTYLE); }} onOpenStudioAcquisitionCheat={(studioId) => { setInitialForbesStudioId(studioId); setActivePage(Page.MOBILE); }} onOpenBoxOfficeCheat={() => { setInitialMobileAppMode('BOXOFFICE'); setActivePage(Page.MOBILE); }} onQueueBabyNamingCheat={handleQueueBabyNamingCheat} onOpenDeathSummaryPreview={handleOpenDeathSummaryPreview} onShowWhatsNewCheat={handleShowWhatsNewCheat} />)}
                     {activePage === Page.CAREER && (<CareerPage player={player} onQuitJob={handleQuitJob} onRehearse={handleRehearse} />)}
                     {activePage === Page.IMPROVE && (<ImprovePage player={player} onTrain={()=>{}} onEnroll={(c)=>handleGenericUpdate(p=>{ const previousCommitments = p.commitments; const next: Player = { ...p, money: p.money- (c.upfrontCost||0), commitments: [...p.commitments, {...c, id: `c_${Date.now()}`, weeksCompleted:0}] }; syncWeeklyEnergyForCommitments(next, previousCommitments); return next; })} onCancel={(id)=>handleGenericUpdate(p=>{ const previousCommitments = p.commitments; const next: Player = { ...p, commitments: p.commitments.filter(c=>c.id!==id)}; syncWeeklyEnergyForCommitments(next, previousCommitments); return next; })} onPerformAction={handleImproveAction} />)}
                     {activePage === Page.SOCIAL && (<SocialPage player={player} onInteract={handleSocialInteract} onContinueAsChild={handleContinueAsChild} />)}
@@ -2264,6 +2357,10 @@ export const App: React.FC = () => {
                             onFullBleedChange={setIsFullBleedMobileSurface}
                             initialForbesStudioId={initialForbesStudioId ?? undefined}
                             onInitialForbesStudioConsumed={() => setInitialForbesStudioId(null)}
+                            initialStockId={initialMobileStockId ?? undefined}
+                            onInitialStockConsumed={() => setInitialMobileStockId(null)}
+                            initialAppMode={initialMobileAppMode ?? undefined}
+                            onInitialAppModeConsumed={() => setInitialMobileAppMode(null)}
                             onTriggerBabyNaming={handleSchedulePregnancy}
                             onOpenRightsMarket={(opportunityId) => {
                                 setRightsMarketOpportunityId(opportunityId || null);
@@ -2280,13 +2377,19 @@ export const App: React.FC = () => {
                                 }
 
                                 if (p.instagram.weeklyPostCount >= 3) {
-                                    setToastMessage({ title: "Too Many Posts", subtext: "Posting more will feel spammy. Try again next week." });
+                                    setToastMessage({
+                                        title: tr('app.socialFeedback.tooManyPostsTitle'),
+                                        subtext: tr('app.socialFeedback.tooManyPostsSubtext')
+                                    });
                                     return p;
                                 }
 
                                 const config = INSTAGRAM_POST_CONFIGS[t];
                                 if (p.energy.current < config.energy) {
-                                    setToastMessage({ title: "Not Enough Energy", subtext: `You need ${config.energy} energy to post this.` });
+                                    setToastMessage({
+                                        title: tr('app.feedback.notEnoughEnergyTitle'),
+                                        subtext: tr('app.socialFeedback.needEnergyToPostSubtext', { energy: config.energy.toString() })
+                                    });
                                     return p;
                                 }
 
@@ -2314,8 +2417,10 @@ export const App: React.FC = () => {
                                     contentMediaId: img
                                 };
                                 
-                                const toastMsg = outcome.likes > 10000 ? `Viral! +${actualGain.toLocaleString()} Followers` : `+${actualGain.toLocaleString()} Followers`;
-                                setToastMessage({ title: "Posted", subtext: toastMsg });
+                                const toastMsg = outcome.likes > 10000
+                                    ? tr('app.socialFeedback.viralFollowersSubtext', { followers: actualGain.toLocaleString() })
+                                    : tr('app.socialFeedback.followersSubtext', { followers: actualGain.toLocaleString() });
+                                setToastMessage({ title: tr('app.socialFeedback.postedTitle'), subtext: toastMsg });
                                 
                                 const nextState: Player = { 
                                     ...p, 
@@ -2437,15 +2542,41 @@ export const App: React.FC = () => {
                                         }
                                     ];
                                     const promisedResult = outcome.deliveryType === 'DIRECT_ROLE' ? 'direct role offer' : 'casting audition';
-                                    nextPlayer.logs = [{ week: p.currentWeek, year: p.age, message: `📱 Instagram Referral Accepted: ${npc.name} secured a ${promisedResult} in ${weeksLeft} weeks.`, type: 'positive' as const }, ...nextPlayer.logs].slice(0, 50);
-                                    setToastMessage({ title: 'Referral Accepted', subtext: `A ${promisedResult} will arrive in ${weeksLeft} weeks.` });
+                                    nextPlayer.logs = [{
+                                        week: p.currentWeek,
+                                        year: p.age,
+                                        message: tr('app.socialFeedback.referralAcceptedLog', { name: npc.name, result: promisedResult, weeks: weeksLeft.toString() }),
+                                        type: 'positive' as const
+                                    }, ...nextPlayer.logs].slice(0, 50);
+                                    setToastMessage({
+                                        title: tr('app.socialFeedback.referralAcceptedTitle'),
+                                        subtext: tr('app.socialFeedback.referralAcceptedSubtext', { result: promisedResult, weeks: weeksLeft.toString() })
+                                    });
                                 } else if (accepted && selectedAction?.kind === 'IG_BRAND_OFFER' && selectedAction.payload?.offer) {
                                     nextPlayer.activeSponsorships = [...nextPlayer.activeSponsorships, selectedAction.payload.offer];
-                                    nextPlayer.logs = [{ week: p.currentWeek, year: p.age, message: `📱 Instagram Brand Deal: ${selectedAction.payload.offer.brandName} contract moved to your Team app.`, type: 'positive' as const }, ...nextPlayer.logs].slice(0, 50);
-                                    setToastMessage({ title: 'Brand Deal Accepted', subtext: 'Check Team app to complete the contract.' });
+                                    nextPlayer.logs = [{
+                                        week: p.currentWeek,
+                                        year: p.age,
+                                        message: tr('app.socialFeedback.brandDealAcceptedLog', { brandName: selectedAction.payload.offer.brandName }),
+                                        type: 'positive' as const
+                                    }, ...nextPlayer.logs].slice(0, 50);
+                                    setToastMessage({
+                                        title: tr('app.socialFeedback.brandDealAcceptedTitle'),
+                                        subtext: tr('app.socialFeedback.brandDealAcceptedSubtext')
+                                    });
                                 } else {
-                                    nextPlayer.logs = [{ week: p.currentWeek, year: p.age, message: accepted ? `📱 Instagram DM Accepted: You replied to ${npc.name}.` : `📵 Instagram DM Declined: You passed on ${npc.name}'s message.`, type: (accepted ? 'positive' : 'neutral') as 'positive' | 'neutral' }, ...nextPlayer.logs].slice(0, 50);
-                                    setToastMessage({ title: accepted ? 'DM Accepted' : 'DM Declined', subtext: `${npc.name} saw your reply.` });
+                                    nextPlayer.logs = [{
+                                        week: p.currentWeek,
+                                        year: p.age,
+                                        message: accepted
+                                            ? tr('app.socialFeedback.dmAcceptedLog', { name: npc.name })
+                                            : tr('app.socialFeedback.dmDeclinedLog', { name: npc.name }),
+                                        type: (accepted ? 'positive' : 'neutral') as 'positive' | 'neutral'
+                                    }, ...nextPlayer.logs].slice(0, 50);
+                                    setToastMessage({
+                                        title: accepted ? tr('app.socialFeedback.dmAcceptedTitle') : tr('app.socialFeedback.dmDeclinedTitle'),
+                                        subtext: tr('app.socialFeedback.dmReplySeenSubtext', { name: npc.name })
+                                    });
                                 }
 
                                 return nextPlayer;
@@ -2456,7 +2587,10 @@ export const App: React.FC = () => {
                             onHireAgent={(agent) => {
                                 handleGenericUpdate(p => {
                                     if (p.money < agent.annualFee) {
-                                        setToastMessage({ title: "Not Enough Money", subtext: `You need $${agent.annualFee.toLocaleString()} for the annual fee.` });
+                                        setToastMessage({
+                                            title: tr('app.feedback.notEnoughMoneyTitle'),
+                                            subtext: tr('app.team.needAnnualFeeSubtext', { amount: agent.annualFee.toLocaleString() })
+                                        });
                                         return p;
                                     }
                                     const newRels = [...p.relationships];
@@ -2471,7 +2605,10 @@ export const App: React.FC = () => {
                                             npcId: agent.id
                                         });
                                     }
-                                    setToastMessage({ title: "Agent Hired!", subtext: `${agent.name} is now representing you.` });
+                                    setToastMessage({
+                                        title: tr('app.team.agentHiredTitle'),
+                                        subtext: tr('app.team.agentHiredSubtext', { name: agent.name })
+                                    });
                                     return { 
                                         ...p, 
                                         money: p.money - agent.annualFee,
@@ -2497,7 +2634,10 @@ export const App: React.FC = () => {
                             onHireManager={(manager) => {
                                 handleGenericUpdate(p => {
                                     if (p.money < manager.annualFee) {
-                                        setToastMessage({ title: "Not Enough Money", subtext: `You need $${manager.annualFee.toLocaleString()} for the annual fee.` });
+                                        setToastMessage({
+                                            title: tr('app.feedback.notEnoughMoneyTitle'),
+                                            subtext: tr('app.team.needAnnualFeeSubtext', { amount: manager.annualFee.toLocaleString() })
+                                        });
                                         return p;
                                     }
                                     const newRels = [...p.relationships];
@@ -2512,7 +2652,10 @@ export const App: React.FC = () => {
                                             npcId: manager.id
                                         });
                                     }
-                                    setToastMessage({ title: "Manager Hired!", subtext: `${manager.name} is now managing your career.` });
+                                    setToastMessage({
+                                        title: tr('app.team.managerHiredTitle'),
+                                        subtext: tr('app.team.managerHiredSubtext', { name: manager.name })
+                                    });
                                     return { 
                                         ...p, 
                                         money: p.money - manager.annualFee,
@@ -2535,7 +2678,45 @@ export const App: React.FC = () => {
                                     };
                                 });
                             }}
-                            onAcceptMessage={(msg)=>handleGenericUpdate(p=>({ ...p, inbox: p.inbox.filter(m=>m.id!==msg.id) }))} 
+                            onAcceptMessage={(msg)=>handleGenericUpdate(p=>{
+                                if (msg.type !== 'OFFER_OUTSIDE_PRODUCER_INVESTMENT') {
+                                    return { ...p, inbox: p.inbox.filter(m=>m.id!==msg.id) };
+                                }
+                                const action = msg.data?.action || 'ACCEPT';
+                                if (action === 'PASS') {
+                                    setToastMessage({
+                                        title: tr('app.producerInvestment.passedTitle'),
+                                        subtext: tr('app.producerInvestment.passedSubtext')
+                                    });
+                                    return { ...p, inbox: p.inbox.filter(m=>m.id!==msg.id) };
+                                }
+                                if (action === 'COUNTER') {
+                                    const counterResult = counterOutsideProducerInvestmentOffer(
+                                        p,
+                                        msg.data?.offer || msg.data,
+                                        Number(msg.data?.counterCash || 0),
+                                        Number(msg.data?.counterStake || 0)
+                                    );
+                                    setToastMessage({
+                                        title: counterResult.accepted ? tr('app.producerInvestment.counterAcceptedTitle') : tr('app.producerInvestment.counterDeclinedTitle'),
+                                        subtext: counterResult.accepted
+                                            ? tr('app.producerInvestment.counterAcceptedSubtext')
+                                            : tr('app.producerInvestment.counterDeclinedSubtext')
+                                    });
+                                    return counterResult.player;
+                                }
+                                const result = acceptOutsideProducerInvestmentOffer(p, msg.data);
+                                setToastMessage({
+                                    title: result.accepted ? tr('app.producerInvestment.shareBoughtTitle') : tr('app.producerInvestment.dealBlockedTitle'),
+                                    subtext: result.accepted
+                                        ? tr('app.producerInvestment.shareBoughtSubtext', {
+                                            stake: String(result.investment?.stakePercent ?? 0),
+                                            projectTitle: result.investment?.projectTitle || ''
+                                        })
+                                        : (result.reason || tr('app.producerInvestment.dealBlockedSubtext'))
+                                });
+                                return result.player;
+                            })} 
                             onPerformSponsorship={(id, type)=>handleGenericUpdate(p=>{ const s = p.activeSponsorships.find(x=>x.id===id); if (!s) return p; const next = { ...p }; spendPlayerEnergy(next, s.requirements.energyCost); return next; })}
                             onDeleteMessage={(id)=>handleGenericUpdate(p=>({ ...p, inbox: p.inbox.filter(m=>m.id!==id) }))} 
                             onTradeStock={handleTradeStock} 
@@ -2564,6 +2745,7 @@ export const App: React.FC = () => {
                 </div>
                 {isBottomNavVisible && (
                     <BottomNav
+                        player={player}
                         activePage={activePage}
                         setPage={setActivePage}
                         unreadMessages={player.inbox?.filter(message => !message.isRead).length || 0}

@@ -1,54 +1,62 @@
-import { Player, Commitment, ActorTrait, ProductionCrisis } from '../types';
+import { Player, Commitment, ActorTrait, ProductionCrisis, ProductionCrisisOption } from '../types';
 import { NPC_DATABASE } from './npcLogic';
 
 type CrisisCategory = 'TECHNICAL' | 'INTERPERSONAL' | 'ENVIRONMENTAL' | 'FINANCIAL' | 'CREATIVE' | 'LEGAL';
 
 interface CrisisTemplate {
     title: string;
+    titleKey?: string;
     description: string;
-    options: {
-        label: string;
-        impact: (p: Player, c: Commitment) => { updatedPlayer: Player, updatedProject: Commitment, log: string };
-    }[];
+    descriptionKey?: string;
+    textVars?: Record<string, string | number>;
+    options: ProductionCrisisOption[];
 }
 
 const TECHNICAL_TEMPLATES: CrisisTemplate[] = [
     {
         title: "Corrupted Footage",
+        titleKey: 'production.crisis.corruptedFootage.title',
         description: "A digital error has corrupted several key scenes from yesterday's shoot.",
+        descriptionKey: 'production.crisis.corruptedFootage.description',
         options: [
             {
                 label: "Reshoot ($50k)",
+                labelKey: 'production.crisis.corruptedFootage.reshoot.label',
                 impact: (p, c) => {
                     const updatedPlayer = { ...p, money: p.money - 50000 };
-                    return { updatedPlayer, updatedProject: c, log: "You paid for a quick reshoot. The schedule holds, but the budget takes a hit." };
+                    return { updatedPlayer, updatedProject: c, log: "You paid for a quick reshoot. The schedule holds, but the budget takes a hit.", logKey: 'production.crisis.corruptedFootage.reshoot.log' };
                 }
             },
             {
                 label: "Fix in Post (Quality -5)",
+                labelKey: 'production.crisis.corruptedFootage.fix.label',
                 impact: (p, c) => {
                     const updatedProject = { ...c, productionPerformance: Math.max(0, (c.productionPerformance || 50) - 5) };
-                    return { updatedPlayer: p, updatedProject, log: "The VFX team will try to patch it. It won't be perfect, but it's cheaper than a reshoot." };
+                    return { updatedPlayer: p, updatedProject, log: "The VFX team will try to patch it. It won't be perfect, but it's cheaper than a reshoot.", logKey: 'production.crisis.corruptedFootage.fix.log' };
                 }
             }
         ]
     },
     {
         title: "Equipment Failure",
+        titleKey: 'production.crisis.equipmentFailure.title',
         description: "The high-end anamorphic lenses have been damaged during an action sequence.",
+        descriptionKey: 'production.crisis.equipmentFailure.description',
         options: [
             {
                 label: "Rent Replacements ($30k)",
+                labelKey: 'production.crisis.equipmentFailure.rent.label',
                 impact: (p, c) => {
                     const updatedPlayer = { ...p, money: p.money - 30000 };
-                    return { updatedPlayer, updatedProject: c, log: "You rented replacements immediately. Production continues." };
+                    return { updatedPlayer, updatedProject: c, log: "You rented replacements immediately. Production continues.", logKey: 'production.crisis.equipmentFailure.rent.log' };
                 }
             },
             {
                 label: "Use Backup Lenses (Quality -3)",
+                labelKey: 'production.crisis.equipmentFailure.backup.label',
                 impact: (p, c) => {
                     const updatedProject = { ...c, productionPerformance: Math.max(0, (c.productionPerformance || 50) - 3) };
-                    return { updatedPlayer: p, updatedProject, log: "The backup glass isn't as sharp, but the show must go on." };
+                    return { updatedPlayer: p, updatedProject, log: "The backup glass isn't as sharp, but the show must go on.", logKey: 'production.crisis.equipmentFailure.backup.log' };
                 }
             }
         ]
@@ -58,23 +66,27 @@ const TECHNICAL_TEMPLATES: CrisisTemplate[] = [
 const INTERPERSONAL_TEMPLATES: CrisisTemplate[] = [
     {
         title: "Director vs Star",
+        titleKey: 'production.crisis.directorVsStar.title',
         description: "The Director and the Lead Actor are having a heated argument over a creative choice.",
+        descriptionKey: 'production.crisis.directorVsStar.description',
         options: [
             {
                 label: "Side with Director",
+                labelKey: 'production.crisis.directorVsStar.director.label',
                 impact: (p, c) => {
                     const updatedProject = { ...c, productionPerformance: Math.min(100, (c.productionPerformance || 50) + 5) };
-                    return { updatedPlayer: p, updatedProject, log: "The director's vision is preserved, boosting quality, but the actor is fuming." };
+                    return { updatedPlayer: p, updatedProject, log: "The director's vision is preserved, boosting quality, but the actor is fuming.", logKey: 'production.crisis.directorVsStar.director.log' };
                 }
             },
             {
                 label: "Side with Actor",
+                labelKey: 'production.crisis.directorVsStar.actor.label',
                 impact: (p, c) => {
                     const updatedProject = { ...c };
                     if (updatedProject.projectDetails) {
                         updatedProject.projectDetails.hiddenStats.rawHype = Math.min(100, (updatedProject.projectDetails.hiddenStats.rawHype || 50) + 5);
                     }
-                    return { updatedPlayer: p, updatedProject, log: "The actor is happy and promotes the film more, but the director feels undermined." };
+                    return { updatedPlayer: p, updatedProject, log: "The actor is happy and promotes the film more, but the director feels undermined.", logKey: 'production.crisis.directorVsStar.actor.log' };
                 }
             }
         ]
@@ -84,20 +96,24 @@ const INTERPERSONAL_TEMPLATES: CrisisTemplate[] = [
 const ENVIRONMENTAL_TEMPLATES: CrisisTemplate[] = [
     {
         title: "Sudden Storm",
+        titleKey: 'production.crisis.suddenStorm.title',
         description: "An unpredicted storm has washed out the exterior location.",
+        descriptionKey: 'production.crisis.suddenStorm.description',
         options: [
             {
                 label: "Wait it Out (Delay 1w)",
+                labelKey: 'production.crisis.suddenStorm.wait.label',
                 impact: (p, c) => {
                     const updatedProject = { ...c, phaseWeeksLeft: (c.phaseWeeksLeft || 1) + 1 };
-                    return { updatedPlayer: p, updatedProject, log: "You waited for the sun. One week added to production." };
+                    return { updatedPlayer: p, updatedProject, log: "You waited for the sun. One week added to production.", logKey: 'production.crisis.suddenStorm.wait.log' };
                 }
             },
             {
                 label: "Move to Studio ($40k)",
+                labelKey: 'production.crisis.suddenStorm.studio.label',
                 impact: (p, c) => {
                     const updatedPlayer = { ...p, money: p.money - 40000 };
-                    return { updatedPlayer, updatedProject: c, log: "You moved the shoot to a soundstage. Expensive, but on schedule." };
+                    return { updatedPlayer, updatedProject: c, log: "You moved the shoot to a soundstage. Expensive, but on schedule.", logKey: 'production.crisis.suddenStorm.studio.log' };
                 }
             }
         ]
@@ -107,20 +123,24 @@ const ENVIRONMENTAL_TEMPLATES: CrisisTemplate[] = [
 const FINANCIAL_TEMPLATES: CrisisTemplate[] = [
     {
         title: "Budget Overrun",
+        titleKey: 'production.crisis.budgetOverrun.title',
         description: "The production is running over budget due to unexpected logistics costs.",
+        descriptionKey: 'production.crisis.budgetOverrun.description',
         options: [
             {
                 label: "Inject Cash ($100k)",
+                labelKey: 'production.crisis.budgetOverrun.cash.label',
                 impact: (p, c) => {
                     const updatedPlayer = { ...p, money: p.money - 100000 };
-                    return { updatedPlayer, updatedProject: c, log: "You covered the costs out of pocket to keep things moving." };
+                    return { updatedPlayer, updatedProject: c, log: "You covered the costs out of pocket to keep things moving.", logKey: 'production.crisis.budgetOverrun.cash.log' };
                 }
             },
             {
                 label: "Cut Corners (Quality -10)",
+                labelKey: 'production.crisis.budgetOverrun.cut.label',
                 impact: (p, c) => {
                     const updatedProject = { ...c, productionPerformance: Math.max(0, (c.productionPerformance || 50) - 10) };
-                    return { updatedPlayer: p, updatedProject, log: "You slashed the catering and background actor budget. Morale and quality dropped." };
+                    return { updatedPlayer: p, updatedProject, log: "You slashed the catering and background actor budget. Morale and quality dropped.", logKey: 'production.crisis.budgetOverrun.cut.log' };
                 }
             }
         ]
@@ -130,23 +150,27 @@ const FINANCIAL_TEMPLATES: CrisisTemplate[] = [
 const CREATIVE_TEMPLATES: CrisisTemplate[] = [
     {
         title: "Script Leak",
+        titleKey: 'production.crisis.scriptLeak.title',
         description: "A major plot twist has been leaked online by a disgruntled extra.",
+        descriptionKey: 'production.crisis.scriptLeak.description',
         options: [
             {
                 label: "Rewrite Twist (Delay 1w)",
+                labelKey: 'production.crisis.scriptLeak.rewrite.label',
                 impact: (p, c) => {
                     const updatedProject = { ...c, phaseWeeksLeft: (c.phaseWeeksLeft || 1) + 1 };
-                    return { updatedPlayer: p, updatedProject, log: "The writers scrambled to change the ending. One week delay." };
+                    return { updatedPlayer: p, updatedProject, log: "The writers scrambled to change the ending. One week delay.", logKey: 'production.crisis.scriptLeak.rewrite.log' };
                 }
             },
             {
                 label: "Lean Into It (Hype +10)",
+                labelKey: 'production.crisis.scriptLeak.lean.label',
                 impact: (p, c) => {
                     const updatedProject = { ...c };
                     if (updatedProject.projectDetails) {
                         updatedProject.projectDetails.hiddenStats.rawHype = Math.min(100, (updatedProject.projectDetails.hiddenStats.rawHype || 50) + 10);
                     }
-                    return { updatedPlayer: p, updatedProject, log: "You confirmed the leak and used it for marketing. Hype is through the roof!" };
+                    return { updatedPlayer: p, updatedProject, log: "You confirmed the leak and used it for marketing. Hype is through the roof!", logKey: 'production.crisis.scriptLeak.lean.log' };
                 }
             }
         ]
@@ -156,20 +180,24 @@ const CREATIVE_TEMPLATES: CrisisTemplate[] = [
 const LEGAL_TEMPLATES: CrisisTemplate[] = [
     {
         title: "Copyright Claim",
+        titleKey: 'production.crisis.copyrightClaim.title',
         description: "A local artist claims a mural in the background of a key scene is copyrighted.",
+        descriptionKey: 'production.crisis.copyrightClaim.description',
         options: [
             {
                 label: "Pay Settlement ($20k)",
+                labelKey: 'production.crisis.copyrightClaim.pay.label',
                 impact: (p, c) => {
                     const updatedPlayer = { ...p, money: p.money - 20000 };
-                    return { updatedPlayer, updatedProject: c, log: "You paid the artist to avoid a lawsuit." };
+                    return { updatedPlayer, updatedProject: c, log: "You paid the artist to avoid a lawsuit.", logKey: 'production.crisis.copyrightClaim.pay.log' };
                 }
             },
             {
                 label: "Blur it Out (Quality -2)",
+                labelKey: 'production.crisis.copyrightClaim.blur.label',
                 impact: (p, c) => {
                     const updatedProject = { ...c, productionPerformance: Math.max(0, (c.productionPerformance || 50) - 2) };
-                    return { updatedPlayer: p, updatedProject, log: "The VFX team blurred the mural. It looks a bit distracting." };
+                    return { updatedPlayer: p, updatedProject, log: "The VFX team blurred the mural. It looks a bit distracting.", logKey: 'production.crisis.copyrightClaim.blur.log' };
                 }
             }
         ]
@@ -201,7 +229,10 @@ export const generateRandomCrisis = (project: Commitment, player: Player): Produ
         return {
             id: `crisis_gen_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
             title: template.title,
+            titleKey: template.titleKey,
             description: template.description,
+            descriptionKey: template.descriptionKey,
+            textVars: template.textVars,
             options: template.options
         };
     } else {
@@ -216,20 +247,27 @@ export const generateRandomCrisis = (project: Commitment, player: Player): Produ
         return {
             id: `crisis_gen_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
             title,
+            titleKey: 'production.crisis.generated.title',
             description,
+            descriptionKey: 'production.crisis.generated.description',
+            textVars: { adjective: adj, adjectiveLower: adj.toLowerCase(), noun, nounLower: noun.toLowerCase(), subject, subjectLower: subject.toLowerCase(), project: project.name },
             options: [
                 {
                     label: "Fix with Money ($25k)",
+                    labelKey: 'production.crisis.generated.money.label',
+                    textVars: { subject, subjectLower: subject.toLowerCase() },
                     impact: (p, c) => {
                         const updatedPlayer = { ...p, money: p.money - 25000 };
-                        return { updatedPlayer, updatedProject: c, log: `You threw money at the ${subject.toLowerCase()} problem. It's fixed.` };
+                        return { updatedPlayer, updatedProject: c, log: `You threw money at the ${subject.toLowerCase()} problem. It's fixed.`, logKey: 'production.crisis.generated.money.log', logVars: { subject, subjectLower: subject.toLowerCase() } };
                     }
                 },
                 {
                     label: "Push Through (Quality -4)",
+                    labelKey: 'production.crisis.generated.push.label',
+                    textVars: { subject, subjectLower: subject.toLowerCase() },
                     impact: (p, c) => {
                         const updatedProject = { ...c, productionPerformance: Math.max(0, (c.productionPerformance || 50) - 4) };
-                        return { updatedPlayer: p, updatedProject, log: `You ignored the ${subject.toLowerCase()} issue. Production continued, but quality took a hit.` };
+                        return { updatedPlayer: p, updatedProject, log: `You ignored the ${subject.toLowerCase()} issue. Production continued, but quality took a hit.`, logKey: 'production.crisis.generated.push.log', logVars: { subject, subjectLower: subject.toLowerCase() } };
                     }
                 }
             ]

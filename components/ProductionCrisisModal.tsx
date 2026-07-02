@@ -3,6 +3,8 @@ import { Player, ScheduledEvent } from '../types';
 import { AlertTriangle, Film, ChevronRight, Activity, Clapperboard, PlayCircle, Loader2 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { showAd } from '../services/adLogic';
+import { getPlayerLanguage, t } from '../services/i18n';
+import { LocalizedTextVars } from '../types';
 
 interface ProductionCrisisModalProps {
     player: Player;
@@ -15,6 +17,12 @@ export const ProductionCrisisModal: React.FC<ProductionCrisisModalProps> = ({ pl
     const [resolveError, setResolveError] = useState('');
     const { options = [], projectId } = event.data || {};
     const project = player.commitments.find(c => c.id === projectId);
+    const language = getPlayerLanguage(player);
+    const tr = (key: string, vars?: LocalizedTextVars) => t(language, key, vars);
+    const localizeText = (fallback: string, key?: string, vars?: LocalizedTextVars) => key ? tr(key, vars) : fallback;
+    const eventVars = event.data?.textVars as LocalizedTextVars | undefined;
+    const title = localizeText(event.title, event.data?.titleKey, eventVars);
+    const description = localizeText(event.description || '', event.data?.descriptionKey, eventVars);
 
     if (!project) {
         const handleDismissMissingProject = () => {
@@ -23,17 +31,17 @@ export const ProductionCrisisModal: React.FC<ProductionCrisisModalProps> = ({ pl
                 onChoice(0);
             } catch (error) {
                 console.error('Production event recovery failed:', error);
-                setResolveError('Could not skip this event. Tap Continue again.');
+                setResolveError(tr('production.modal.errorSkip'));
             }
         };
 
         return (
             <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
                 <div className="w-full max-w-sm bg-zinc-900 border border-zinc-800 rounded-3xl shadow-2xl p-5">
-                    <div className="text-[10px] font-black uppercase tracking-[0.24em] text-amber-400 mb-2">Production Update</div>
-                    <h3 className="text-2xl font-black text-white leading-tight mb-3">Issue Settled</h3>
+                    <div className="text-[10px] font-black uppercase tracking-[0.24em] text-amber-400 mb-2">{tr('production.modal.recovery.eyebrow')}</div>
+                    <h3 className="text-2xl font-black text-white leading-tight mb-3">{tr('production.modal.recovery.title')}</h3>
                     <p className="text-sm text-zinc-400 leading-relaxed mb-5">
-                        The production issue was handled off-screen. No major damage, no extra delay.
+                        {tr('production.modal.recovery.description')}
                     </p>
                     {resolveError && <div className="mb-3 text-xs font-bold text-amber-300">{resolveError}</div>}
                     <button
@@ -41,7 +49,7 @@ export const ProductionCrisisModal: React.FC<ProductionCrisisModalProps> = ({ pl
                         onClick={handleDismissMissingProject}
                         className="w-full py-4 bg-amber-500 text-black font-black rounded-2xl"
                     >
-                        Continue
+                        {tr('production.modal.continue')}
                     </button>
                 </div>
             </div>
@@ -59,7 +67,7 @@ export const ProductionCrisisModal: React.FC<ProductionCrisisModalProps> = ({ pl
                         onChoice(opt.index);
                     } catch (error) {
                         console.error('Production event choice failed:', error);
-                        setResolveError('Could not close this event. Try again.');
+                        setResolveError(tr('production.modal.errorClose'));
                     }
                 }
             } catch (error) {
@@ -72,7 +80,7 @@ export const ProductionCrisisModal: React.FC<ProductionCrisisModalProps> = ({ pl
                 onChoice(opt.index);
             } catch (error) {
                 console.error('Production event choice failed:', error);
-                setResolveError('Could not close this event. Try again.');
+                setResolveError(tr('production.modal.errorClose'));
             }
         }
     };
@@ -94,8 +102,8 @@ export const ProductionCrisisModal: React.FC<ProductionCrisisModalProps> = ({ pl
                 {isProcessingAd && (
                     <div className="absolute inset-0 z-[210] bg-black/90 flex flex-col items-center justify-center p-6 text-center">
                         <Loader2 className="w-12 h-12 text-amber-500 animate-spin mb-4" />
-                        <h3 className="text-white font-bold text-lg mb-2">Preparing Golden Option...</h3>
-                        <p className="text-zinc-400 text-sm">Your star power is being summoned.</p>
+                        <h3 className="text-white font-bold text-lg mb-2">{tr('production.modal.preparing.title')}</h3>
+                        <p className="text-zinc-400 text-sm">{tr('production.modal.preparing.description')}</p>
                     </div>
                 )}
 
@@ -114,7 +122,7 @@ export const ProductionCrisisModal: React.FC<ProductionCrisisModalProps> = ({ pl
                         </div>
                         <div>
                             <div className={`text-[10px] font-mono text-${themeColor}-400 uppercase tracking-widest font-bold`}>
-                                {isDirectorDecision ? 'Director Decision' : 'Production Alert'}
+                                {isDirectorDecision ? tr('production.modal.directorDecision') : tr('production.modal.productionAlert')}
                             </div>
                             <div className="text-xs text-zinc-500 font-medium flex items-center gap-1">
                                 <Film size={12} /> {project.name}
@@ -123,7 +131,7 @@ export const ProductionCrisisModal: React.FC<ProductionCrisisModalProps> = ({ pl
                     </div>
                     
                     <h2 className="text-2xl font-black text-white tracking-tight leading-tight relative z-10">
-                        {event.title}
+                        {title}
                     </h2>
                 </div>
 
@@ -133,13 +141,13 @@ export const ProductionCrisisModal: React.FC<ProductionCrisisModalProps> = ({ pl
                         {/* Decorative quotes */}
                         <div className={`absolute -top-3 -left-2 text-4xl text-${themeColor}-500/20 font-serif`}>"</div>
                         <p className="text-sm text-zinc-300 leading-relaxed relative z-10">
-                            {event.description}
+                            {description}
                         </p>
                     </div>
 
                     <div className="space-y-3">
                         <div className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold mb-2 px-2">
-                            {isDirectorDecision ? 'Creative Choice' : 'Select Action'}
+                            {isDirectorDecision ? tr('production.modal.creativeChoice') : tr('production.modal.selectAction')}
                         </div>
                         {resolveError && (
                             <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs font-bold text-amber-200">
@@ -152,7 +160,7 @@ export const ProductionCrisisModal: React.FC<ProductionCrisisModalProps> = ({ pl
                                 onClick={() => handleChoice({ index: 0 })}
                                 className="w-full p-4 bg-zinc-900/80 border border-white/5 hover:bg-zinc-800 text-white rounded-2xl transition-all flex items-center justify-between group relative overflow-hidden"
                             >
-                                <span className="text-sm font-bold tracking-wide">Continue Safely</span>
+                                <span className="text-sm font-bold tracking-wide">{tr('production.modal.continueSafely')}</span>
                                 <ChevronRight size={16} className="text-zinc-500" />
                             </button>
                         )}
@@ -168,7 +176,9 @@ export const ProductionCrisisModal: React.FC<ProductionCrisisModalProps> = ({ pl
                                 
                                 <div className="flex items-center gap-3 relative z-10">
                                     {opt.isGolden && <PlayCircle size={18} className="text-amber-500" />}
-                                    <span className={`text-sm font-bold tracking-wide ${opt.isGolden ? 'text-amber-400' : ''}`}>{opt.label}</span>
+                                    <span className={`text-sm font-bold tracking-wide ${opt.isGolden ? 'text-amber-400' : ''}`}>
+                                        {localizeText(opt.label, opt.labelKey, opt.textVars)}
+                                    </span>
                                 </div>
                                 
                                 <div className={`w-8 h-8 rounded-full bg-black/50 flex items-center justify-center group-hover:bg-${themeColor}-500/20 transition-colors relative z-10`}>

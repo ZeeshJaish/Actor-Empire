@@ -73,6 +73,8 @@ assert(getAcquisitionEligibility(profile).canApproach, 'Open-to-offers studios s
 assert(!getAcquisitionEligibility({ ...profile, acquisitionState: 'NOT_FOR_SALE' }).canApproach, 'Not-for-sale studios should be blocked.');
 assert(!getAcquisitionEligibility({ ...profile, isPlayerOwned: true }).canApproach, 'Player-owned studios should be blocked.');
 assert(getAcquisitionEligibility({ ...profile, acquisitionState: 'PUBLICLY_TRADED' }).allowedOfferTypes.length === 1, 'Public companies should expose minority investment only.');
+const platformEligibility = getAcquisitionEligibility({ ...profile, id: 'NETFLIX', archetype: 'PLATFORM', acquisitionState: 'PUBLICLY_TRADED' });
+assert(!platformEligibility.canApproach && platformEligibility.reason === 'STREAMING_PLATFORM_RESERVED', 'Streaming platforms should be reserved for the future streaming acquisition phase.');
 
 assert(calculateDueDiligenceFee({ valuation: 100_000_000 }) === 250_000, 'Diligence should respect its minimum fee.');
 assert(calculateDueDiligenceFee({ valuation: 100_000_000_000 }) === 25_000_000, 'Diligence should respect its maximum fee.');

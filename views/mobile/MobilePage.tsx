@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { Player, Commitment, InstaPostType, NPCActor, InteractionType, Agent, Manager, Message, SponsorshipActionType, AuditionOpportunity, DatingMatch, InstaPost, Relationship, SponsorshipOffer, NegotiationData, ContractFilm, YoutubeBrandDeal, YoutubeCollabOffer, PregnancyCarrier } from '../../types';
+import { Player, Commitment, InstaPostType, NPCActor, InteractionType, Agent, Manager, Message, SponsorshipActionType, AuditionOpportunity, DatingMatch, InstaPost, Relationship, SponsorshipOffer, NegotiationData, ContractFilm, YoutubeBrandDeal, YoutubeCollabOffer, YoutubeMusicVideoFeatureOffer, PregnancyCarrier } from '../../types';
 import { MessageSquare, Search, BarChart3, Camera, Users, Newspaper, TrendingUp, Activity, Heart, Folder, Flame, Gem, Landmark, X, CheckCircle, AlertCircle, BookOpen, Map } from 'lucide-react';
 import { getPhaseDuration } from '../../services/roleLogic';
 
@@ -26,6 +26,8 @@ import { getAbsoluteWeek } from '../../services/legacyLogic';
 import { spendPlayerEnergy } from '../../services/premiumLogic';
 import { normalizeUniverseMap } from '../../services/universeLogic';
 import { getPlayerLanguage, t } from '../../services/i18n';
+
+type MobileAppMode = 'HOME' | 'CASTLINK' | 'IMDB' | 'BOXOFFICE' | 'INSTAGRAM' | 'X' | 'YOUTUBE' | 'NEWS' | 'TEAM' | 'MESSAGES' | 'FORBES' | 'STOCKS' | 'DATING_FOLDER' | 'SOCIAL_FOLDER' | 'TINDER' | 'LUXE' | 'BANK' | 'GUIDE';
 
 // Helper Component for App Icon
 const AppIcon = ({ icon, color, label, onClick, badge, customContent, customBg }: any) => (
@@ -67,6 +69,10 @@ interface MobilePageProps {
   onFullBleedChange?: (enabled: boolean) => void;
   initialForbesStudioId?: string;
   onInitialForbesStudioConsumed?: () => void;
+  initialStockId?: string;
+  onInitialStockConsumed?: () => void;
+  initialAppMode?: MobileAppMode;
+  onInitialAppModeConsumed?: () => void;
   onTriggerBabyNaming?: (pending: {
       partnerId: string;
       partnerName: string;
@@ -81,10 +87,12 @@ interface MobilePageProps {
 }
 
 export const MobilePage: React.FC<MobilePageProps> = (props) => {
-  const [appMode, setAppMode] = useState<'HOME' | 'CASTLINK' | 'IMDB' | 'BOXOFFICE' | 'INSTAGRAM' | 'X' | 'YOUTUBE' | 'NEWS' | 'TEAM' | 'MESSAGES' | 'FORBES' | 'STOCKS' | 'DATING_FOLDER' | 'SOCIAL_FOLDER' | 'TINDER' | 'LUXE' | 'BANK' | 'GUIDE'>('HOME');
+  const [appMode, setAppMode] = useState<MobileAppMode>('HOME');
   const [toast, setToast] = useState<{msg: string, color: string} | null>(null);
   const [forbesStudioTargetId, setForbesStudioTargetId] = useState<string | null>(null);
+  const [initialStockId, setInitialStockId] = useState<string | null>(null);
   const [isImmersiveForbesScene, setIsImmersiveForbesScene] = useState(false);
+  const [isImmersiveMessageReview, setIsImmersiveMessageReview] = useState(false);
 
   useEffect(() => {
       if (!props.initialForbesStudioId) return;
@@ -94,14 +102,35 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
   }, [props.initialForbesStudioId, props.onInitialForbesStudioConsumed]);
 
   useEffect(() => {
-      const fullBleed = appMode === 'FORBES' && isImmersiveForbesScene;
+      if (!props.initialStockId) return;
+      setInitialStockId(props.initialStockId);
+      setAppMode('STOCKS');
+      props.onInitialStockConsumed?.();
+  }, [props.initialStockId, props.onInitialStockConsumed]);
+
+  useEffect(() => {
+      if (!props.initialAppMode) return;
+      if (props.initialAppMode === 'BOXOFFICE') {
+          setAppMode('BOXOFFICE');
+      } else {
+          setAppMode(props.initialAppMode);
+      }
+      props.onInitialAppModeConsumed?.();
+  }, [props.initialAppMode, props.onInitialAppModeConsumed]);
+
+  useEffect(() => {
+      const fullBleed = (appMode === 'FORBES' && isImmersiveForbesScene) || (appMode === 'MESSAGES' && isImmersiveMessageReview);
       props.onNavVisibilityChange?.(!fullBleed);
       props.onFullBleedChange?.(fullBleed);
       return () => {
           props.onNavVisibilityChange?.(true);
           props.onFullBleedChange?.(false);
       };
-  }, [appMode, isImmersiveForbesScene, props.onFullBleedChange, props.onNavVisibilityChange]);
+  }, [appMode, isImmersiveForbesScene, isImmersiveMessageReview, props.onFullBleedChange, props.onNavVisibilityChange]);
+
+  useEffect(() => {
+      if (appMode !== 'MESSAGES') setIsImmersiveMessageReview(false);
+  }, [appMode]);
 
   if (!props.player) return null; 
 
@@ -109,6 +138,13 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
   const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
   const unreadMessages = props.player.inbox?.filter(m => !m.isRead).length || 0;
   const handleUpdatePlayer = props.onUpdatePlayer || ((p: Player) => {});
+  const formatMoney = (value: number) => {
+      const amount = Math.max(0, Math.round(Number(value) || 0));
+      if (amount >= 1_000_000_000) return `$${(amount / 1_000_000_000).toFixed(1)}B`;
+      if (amount >= 1_000_000) return `$${(amount / 1_000_000).toFixed(amount >= 10_000_000 ? 0 : 1)}M`;
+      if (amount >= 1_000) return `$${Math.round(amount / 1_000)}K`;
+      return `$${amount}`;
+  };
 
   const showToast = (msg: string, color: string = 'bg-emerald-500') => {
       setToast({ msg, color });
@@ -129,6 +165,78 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
       let updatedPlayer = { ...props.player!, inbox: newInbox };
 
       // 2. Process Logic based on Type
+      if (msg.type === 'SYSTEM' && msg.data?.kind === 'FRIEND_FAVOR') {
+          const favor = msg.data || {};
+          const accepted = favor.response !== 'DECLINED';
+          const friendName = msg.sender || 'A friend';
+          const favorType = favor.favorType || 'MONEY';
+          const amount = Math.max(0, Math.round(Number(favor.amount || 0)));
+
+          if (accepted && favorType === 'MONEY' && updatedPlayer.money < amount) {
+              showToast(`Need ${formatMoney(amount)} cash`, "bg-rose-500");
+              return;
+          }
+
+          const closenessDelta = accepted ? (favorType === 'ROLE_HELP' ? 9 : 7) : -5;
+          updatedPlayer.relationships = (updatedPlayer.relationships || []).map(relationship => relationship.id === favor.friendId
+              ? {
+                  ...relationship,
+                  closeness: Math.max(0, Math.min(100, (relationship.closeness || 0) + closenessDelta)),
+                  lastInteractionWeek: updatedPlayer.currentWeek,
+              }
+              : relationship
+          );
+
+          if (accepted && favorType === 'MONEY') {
+              updatedPlayer.money -= amount;
+              updatedPlayer.finance = {
+                  ...updatedPlayer.finance,
+                  history: [
+                      {
+                          id: `tx_friend_favor_${Date.now()}`,
+                          week: updatedPlayer.currentWeek,
+                          year: updatedPlayer.age,
+                          amount: -amount,
+                          category: 'EXPENSE',
+                          description: `Friend favor: ${friendName}`,
+                      },
+                      ...(updatedPlayer.finance?.history || []),
+                  ].slice(0, 200),
+              };
+          }
+
+          if (accepted && favorType === 'ROLE_HELP') {
+              const reputationHit = Math.random() < 0.28 ? 1 : 0;
+              updatedPlayer.stats = {
+                  ...updatedPlayer.stats,
+                  reputation: Math.max(0, Math.min(100, updatedPlayer.stats.reputation - reputationHit)),
+                  experience: Math.max(0, Math.min(100, updatedPlayer.stats.experience + 0.4)),
+              };
+              updatedPlayer.flags = {
+                  ...(updatedPlayer.flags || {}),
+                  lastFriendRoleFavorAbsWeek: favor.createdAbsoluteWeek || updatedPlayer.currentWeek,
+              };
+          }
+
+          updatedPlayer.logs = [
+              {
+                  week: updatedPlayer.currentWeek,
+                  year: updatedPlayer.age,
+                  message: accepted
+                      ? (favorType === 'MONEY'
+                          ? `Helped ${friendName} with ${formatMoney(amount)}.`
+                          : `Put in a quiet word for ${friendName}.`)
+                      : `Passed on ${friendName}'s favor request.`,
+                  type: accepted ? 'positive' : 'neutral',
+              },
+              ...(updatedPlayer.logs || []),
+          ].slice(0, 80);
+
+          handleUpdatePlayer(updatedPlayer);
+          showToast(accepted ? 'Friend helped' : 'Favor declined', accepted ? 'bg-sky-600' : 'bg-slate-500');
+          return;
+      }
+
       if (msg.type === 'OFFER_AUDITION') {
           const opp = msg.data as AuditionOpportunity;
           if (!opp?.project) {
@@ -328,6 +436,61 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
               activeBrandDeals: [...(updatedPlayer.youtube.activeBrandDeals || []), offer]
           };
           updatedPlayer.logs.push({ week: updatedPlayer.currentWeek, year: updatedPlayer.age, message: `Accepted a YouTube integration deal with ${offer.brandName}.`, type: 'positive' });
+      } else if (msg.type === 'OFFER_MUSIC_VIDEO_FEATURE') {
+          const offer = msg.data as YoutubeMusicVideoFeatureOffer;
+          if (!offer) {
+              showToast('Missing music video feature offer', "bg-rose-500");
+              handleUpdatePlayer(updatedPlayer);
+              return;
+          }
+          const messy = Math.random() < Math.min(0.28, offer.reputationRisk / 28);
+          const followerGain = Math.max(0, Math.round(offer.followerGain * (messy ? 0.55 : 1)));
+          updatedPlayer.money += offer.appearanceFee;
+          updatedPlayer.stats = {
+              ...updatedPlayer.stats,
+              fame: Math.max(0, Math.min(100, updatedPlayer.stats.fame + offer.fameBoost)),
+              reputation: Math.max(0, Math.min(100, updatedPlayer.stats.reputation + (messy ? -offer.reputationRisk : 1))),
+              followers: Math.max(0, updatedPlayer.stats.followers + followerGain)
+          };
+          updatedPlayer.x = {
+              ...updatedPlayer.x,
+              followers: Math.max(0, (updatedPlayer.x?.followers || 0) + Math.floor(followerGain * 0.45)),
+              feed: [{
+                  id: `x_music_feature_${Date.now()}`,
+                  authorId: 'music_video_watch',
+                  authorName: 'Music Video Watch',
+                  authorHandle: '@musicvideowatch',
+                  authorAvatar: `https://api.dicebear.com/8.x/pixel-art/svg?seed=${encodeURIComponent(offer.artistName)}`,
+                  content: messy
+                      ? `${updatedPlayer.name}'s cameo in ${offer.artistName}'s "${offer.songTitle}" video is getting mixed reactions. Big reach, debatable fit.`
+                      : `${updatedPlayer.name} shows up in ${offer.artistName}'s "${offer.songTitle}" video and the crossover is landing with fans.`,
+                  timestamp: Date.now(),
+                  likes: Math.max(80, Math.floor(offer.bonusViews * 0.01)),
+                  retweets: Math.max(10, Math.floor(offer.bonusViews * 0.002)),
+                  replies: Math.max(5, Math.floor(offer.bonusViews * 0.001)),
+                  isPlayer: false,
+                  isLiked: false,
+                  isRetweeted: false,
+                  isVerified: true,
+                  postType: 'CAREER',
+                  sentiment: messy ? 'MESSY' : 'SUPPORTIVE'
+              }, ...(updatedPlayer.x?.feed || [])].slice(0, 80)
+          };
+          updatedPlayer.news = [
+              {
+                  id: `news_music_feature_${Date.now()}`,
+                  headline: `${updatedPlayer.name} features in ${offer.artistName}'s music video.`,
+                  subtext: messy
+                      ? `"${offer.songTitle}" brings reach, but fans debate whether the cameo fit the song.`
+                      : `"${offer.songTitle}" gives the actor a clean crossover moment with ${offer.genre} fans.`,
+                  category: 'YOU',
+                  week: updatedPlayer.currentWeek,
+                  year: updatedPlayer.age,
+                  impactLevel: messy ? 'LOW' : 'MEDIUM'
+              },
+              ...(updatedPlayer.news || [])
+          ].slice(0, 50);
+          updatedPlayer.logs.push({ week: updatedPlayer.currentWeek, year: updatedPlayer.age, message: `Featured in ${offer.artistName}'s "${offer.songTitle}" music video for ${formatMoney(offer.appearanceFee)}.`, type: messy ? 'neutral' : 'positive' });
       }
 
       // 3. Update Player
@@ -437,7 +600,7 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
       showToast(tr('mobile.toast.managerHired'), "bg-emerald-500");
   };
 
-  const isFullBleedApp = appMode === 'FORBES' && isImmersiveForbesScene;
+  const isFullBleedApp = (appMode === 'FORBES' && isImmersiveForbesScene) || (appMode === 'MESSAGES' && isImmersiveMessageReview);
 
   return (
     <div className={isFullBleedApp ? "fixed inset-0 z-[120] h-screen w-screen bg-black" : "h-[calc(100vh-8rem)] flex items-center justify-center pt-4 relative"}>
@@ -621,6 +784,11 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
                             setForbesStudioTargetId(studioId);
                             setAppMode('FORBES');
                         }}
+                        onOpenStock={(stockId) => {
+                            setInitialStockId(stockId);
+                            setAppMode('STOCKS');
+                        }}
+                        onImmersiveReviewChange={setIsImmersiveMessageReview}
                     />
                 )}
                 {appMode === 'TEAM' && (
@@ -654,7 +822,19 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
                     />
                 )}
                 {appMode === 'STOCKS' && (
-                    <StocksApp player={props.player} onBack={() => setAppMode('HOME')} onTrade={props.onTradeStock!} />
+                    <StocksApp
+                        player={props.player}
+                        onBack={() => setAppMode('HOME')}
+                        onTrade={props.onTradeStock!}
+                        onUpdatePlayer={handleUpdatePlayer}
+                        onOpenStudioAcquisition={(studioId) => {
+                            showToast('Opening acquisition desk', 'bg-emerald-500');
+                            setForbesStudioTargetId(studioId);
+                            setAppMode('FORBES');
+                        }}
+                        initialStockId={initialStockId || undefined}
+                        onInitialStockConsumed={() => setInitialStockId(null)}
+                    />
                 )}
                 {appMode === 'BANK' && (
                     <BankApp player={props.player} onBack={() => setAppMode('HOME')} onUpdatePlayer={handleUpdatePlayer} />
@@ -693,7 +873,7 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
 
                 {/* GUIDE APP */}
                 {appMode === 'GUIDE' && (
-                    <GuideView onBack={() => setAppMode('HOME')} />
+                    <GuideView player={props.player} onBack={() => setAppMode('HOME')} />
                 )}
 
                 {/* Home Indicator */}

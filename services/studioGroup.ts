@@ -1,4 +1,22 @@
-import type { Business, Player, SubsidiaryOperatingModel } from '../types';
+import type {
+    Business,
+    LogEntry,
+    NewsItem,
+    Player,
+    StudioFinanceEntry,
+    StudioMandateAutoProduction,
+    StudioMandateBudgetAppetite,
+    StudioMandateCreativeAppetite,
+    StudioMandateFocus,
+    StudioMandateIpStrategy,
+    StudioMandateObjective,
+    StudioMandateReleasePace,
+    StudioMandateTalentPolicy,
+    StudioOperatingMandate,
+    SubsidiaryOperatingModel,
+    Transaction,
+} from '../types';
+import { normalizeStudioState } from './businessLogic';
 
 export interface OperatingModelDefinition {
     id: SubsidiaryOperatingModel;
@@ -10,6 +28,88 @@ export interface OperatingModelDefinition {
     tradeoffs: string[];
     accent: 'EMERALD' | 'SKY' | 'AMBER';
 }
+
+export interface StudioMandateOption<T extends string> {
+    id: T;
+    label: string;
+    shortLabel: string;
+    description: string;
+}
+
+export interface StudioMandateOptionGroup<T extends string> {
+    key: keyof StudioOperatingMandate;
+    label: string;
+    commandLabel: string;
+    options: StudioMandateOption<T>[];
+}
+
+export interface SubsidiaryControlProfile {
+    canSetMandate: boolean;
+    canDirectProduce: boolean;
+    canAutoProduce: boolean;
+    controlCopy: string;
+    productionCopy: string;
+}
+
+export type StudioTreasuryAction = 'INJECT' | 'WITHDRAW';
+export type StudioTreasuryCounterparty = 'PERSONAL' | 'HQ';
+
+const uniqueById = <T extends { id: string }>(items: T[]): T[] => {
+    const seen = new Set<string>();
+    return items.filter(item => {
+        if (seen.has(item.id)) return false;
+        seen.add(item.id);
+        return true;
+    });
+};
+
+const uniqueStrings = (items: string[]): string[] => Array.from(new Set(items.filter(Boolean)));
+
+const getParentStudio = (player: Pick<Player, 'businesses'>, excludeStudioId?: string): Business | undefined => {
+    const group = getStudioGroup(player);
+    if (group.parentStudio && group.parentStudio.id !== excludeStudioId) return group.parentStudio;
+    return group.allStudios.find(studio => studio.id !== excludeStudioId && !isAcquiredStudio(studio));
+};
+
+const getMergerIntegrationCost = (studio: Business): number => Math.max(5_000_000, Math.round((studio.stats.valuation || 0) * 0.04));
+
+const createStudioFinanceEntry = ({
+    id,
+    player,
+    amount,
+    type,
+    label,
+}: {
+    id: string;
+    player: Player;
+    amount: number;
+    type: StudioFinanceEntry['type'];
+    label: string;
+}): StudioFinanceEntry => ({
+    id,
+    week: player.currentWeek,
+    year: player.age,
+    amount,
+    type,
+    label,
+});
+
+const createPersonalTransaction = ({
+    player,
+    amount,
+    label,
+}: {
+    player: Player;
+    amount: number;
+    label: string;
+}): Transaction => ({
+    id: `studio_treasury_tx_${player.age}_${player.currentWeek}_${Date.now()}`,
+    week: player.currentWeek,
+    year: player.age,
+    amount,
+    category: amount >= 0 ? 'BUSINESS' : 'ASSET',
+    description: label,
+});
 
 export const OPERATING_MODELS: OperatingModelDefinition[] = [
     {
@@ -44,6 +144,82 @@ export const OPERATING_MODELS: OperatingModelDefinition[] = [
     },
 ];
 
+export const MANDATE_FOCUS_OPTIONS: StudioMandateOption<StudioMandateFocus>[] = [
+    { id: 'MOVIES_FIRST', label: 'Movie First', shortLabel: 'Movies', description: 'Prioritize feature films and theatrical-style projects.' },
+    { id: 'SERIES_FIRST', label: 'Series First', shortLabel: 'Series', description: 'Prioritize episodic projects and longer audience arcs.' },
+    { id: 'BALANCED_SLATE', label: 'Balanced Slate', shortLabel: 'Balanced', description: 'Keep movies and series moving without overcommitting.' },
+    { id: 'FRANCHISE_EXPANSION', label: 'Franchise Expansion', shortLabel: 'Franchise', description: 'Push sequels, universes and recognizable IP plays.' },
+    { id: 'PRESTIGE_AWARDS', label: 'Prestige Awards', shortLabel: 'Prestige', description: 'Favor critic-friendly projects and award momentum.' },
+    { id: 'COMMERCIAL_HITS', label: 'Commercial Hits', shortLabel: 'Hits', description: 'Chase broad audience winners and strong box-office upside.' },
+];
+
+export const MANDATE_BUDGET_OPTIONS: StudioMandateOption<StudioMandateBudgetAppetite>[] = [
+    { id: 'LEAN', label: 'Lean', shortLabel: 'Lean', description: 'Keep spending tight and avoid heavy exposure.' },
+    { id: 'STANDARD', label: 'Standard', shortLabel: 'Standard', description: 'Fund reliable productions at a normal studio pace.' },
+    { id: 'PREMIUM', label: 'Premium', shortLabel: 'Premium', description: 'Authorize bigger swings when the slate deserves it.' },
+];
+
+export const MANDATE_RELEASE_PACE_OPTIONS: StudioMandateOption<StudioMandateReleasePace>[] = [
+    { id: 'CAREFUL', label: 'Careful Pace', shortLabel: 'Careful', description: 'Fewer releases with more time to shape each project.' },
+    { id: 'STEADY', label: 'Steady Pipeline', shortLabel: 'Steady', description: 'Maintain a dependable production rhythm.' },
+    { id: 'AGGRESSIVE', label: 'Aggressive Push', shortLabel: 'Aggressive', description: 'Move fast and accept higher operational pressure.' },
+];
+
+export const MANDATE_IP_OPTIONS: StudioMandateOption<StudioMandateIpStrategy>[] = [
+    { id: 'ORIGINALS', label: 'Original IP', shortLabel: 'Originals', description: 'Build new stories and characters for the catalog.' },
+    { id: 'OWNED_IP', label: 'Owned IP', shortLabel: 'Owned IP', description: 'Use existing rights, catalog and universe assets.' },
+    { id: 'SEQUELS_REBOOTS', label: 'Sequels / Reboots', shortLabel: 'Sequels', description: 'Extend proven titles and revive dormant properties.' },
+    { id: 'MIXED', label: 'Mixed Rights', shortLabel: 'Mixed', description: 'Let the studio balance originals and existing IP.' },
+];
+
+export const MANDATE_TALENT_OPTIONS: StudioMandateOption<StudioMandateTalentPolicy>[] = [
+    { id: 'IN_HOUSE', label: 'In-House Talent', shortLabel: 'In-House', description: 'Favor contracted and retained talent.' },
+    { id: 'RISING_STARS', label: 'Rising Stars', shortLabel: 'Risers', description: 'Give emerging names more chances to break out.' },
+    { id: 'STAR_POWER', label: 'Star Power', shortLabel: 'Stars', description: 'Spend on names that can carry attention.' },
+    { id: 'MIXED', label: 'Flexible Casting', shortLabel: 'Flexible', description: 'Choose talent by fit instead of fixed policy.' },
+];
+
+export const MANDATE_OBJECTIVE_OPTIONS: StudioMandateOption<StudioMandateObjective>[] = [
+    { id: 'PROFIT_FIRST', label: 'Profit First', shortLabel: 'Profit', description: 'Optimize the slate for cash discipline and returns.' },
+    { id: 'PRESTIGE_FIRST', label: 'Prestige First', shortLabel: 'Prestige', description: 'Accept slower money for reputation and awards.' },
+    { id: 'COMMERCIAL_FIRST', label: 'Commercial First', shortLabel: 'Commercial', description: 'Prioritize audience scale and cultural reach.' },
+    { id: 'BALANCED', label: 'Balanced Target', shortLabel: 'Balanced', description: 'Balance profit, prestige and long-term brand health.' },
+];
+
+export const MANDATE_CREATIVE_APPETITE_OPTIONS: StudioMandateOption<StudioMandateCreativeAppetite>[] = [
+    { id: 'SAFE', label: 'Safe Bets', shortLabel: 'Safe', description: 'Avoid volatile experiments and protect the balance sheet.' },
+    { id: 'CALCULATED', label: 'Calculated Swings', shortLabel: 'Calculated', description: 'Take selective chances when upside is clear.' },
+    { id: 'BOLD', label: 'Bold Plays', shortLabel: 'Bold', description: 'Let leadership chase memorable, high-conviction bets.' },
+];
+
+export const MANDATE_AUTO_PRODUCTION_OPTIONS: StudioMandateOption<StudioMandateAutoProduction>[] = [
+    { id: 'PAUSED', label: 'Manual Only', shortLabel: 'Paused', description: 'No automatic projects until the player starts them.' },
+    { id: 'BOARD_REVIEW', label: 'Board Review', shortLabel: 'Review', description: 'The studio may propose projects before spending.' },
+    { id: 'APPROVED', label: 'Auto Approved', shortLabel: 'Auto', description: 'Let the studio create projects within this mandate.' },
+];
+
+export const STUDIO_MANDATE_GROUPS = [
+    { key: 'focus', label: 'Slate Focus', commandLabel: 'What should this studio chase?', options: MANDATE_FOCUS_OPTIONS },
+    { key: 'budgetAppetite', label: 'Budget Appetite', commandLabel: 'How much money can it swing?', options: MANDATE_BUDGET_OPTIONS },
+    { key: 'releasePace', label: 'Release Pace', commandLabel: 'How fast should the pipeline move?', options: MANDATE_RELEASE_PACE_OPTIONS },
+    { key: 'ipStrategy', label: 'IP Strategy', commandLabel: 'What source material should it use?', options: MANDATE_IP_OPTIONS },
+    { key: 'talentPolicy', label: 'Talent Policy', commandLabel: 'Who should carry the slate?', options: MANDATE_TALENT_OPTIONS },
+    { key: 'objective', label: 'Studio Target', commandLabel: 'What is the board measuring?', options: MANDATE_OBJECTIVE_OPTIONS },
+    { key: 'creativeAppetite', label: 'Creative Appetite', commandLabel: 'How daring should leadership be?', options: MANDATE_CREATIVE_APPETITE_OPTIONS },
+    { key: 'autoProduction', label: 'Auto Production', commandLabel: 'Can the studio start work alone?', options: MANDATE_AUTO_PRODUCTION_OPTIONS },
+] as const;
+
+export const DEFAULT_STUDIO_OPERATING_MANDATE: StudioOperatingMandate = {
+    focus: 'BALANCED_SLATE',
+    budgetAppetite: 'STANDARD',
+    releasePace: 'STEADY',
+    ipStrategy: 'MIXED',
+    talentPolicy: 'MIXED',
+    objective: 'BALANCED',
+    creativeAppetite: 'CALCULATED',
+    autoProduction: 'BOARD_REVIEW',
+};
+
 export const isAcquiredStudio = (business: Business): boolean => (
     business.type === 'PRODUCTION_HOUSE'
     && (
@@ -55,12 +231,15 @@ export const isAcquiredStudio = (business: Business): boolean => (
 export const getStudioGroup = (player: Pick<Player, 'businesses'>): {
     parentStudio?: Business;
     subsidiaries: Business[];
+    mergedStudios: Business[];
     allStudios: Business[];
 } => {
     const allStudios = player.businesses.filter(business => business.type === 'PRODUCTION_HOUSE');
+    const acquiredStudios = allStudios.filter(isAcquiredStudio);
     return {
         parentStudio: allStudios.find(business => !isAcquiredStudio(business)) || allStudios[0],
-        subsidiaries: allStudios.filter(isAcquiredStudio),
+        subsidiaries: acquiredStudios.filter(studio => studio.studioState?.operatingModel !== 'FULL_MERGER'),
+        mergedStudios: acquiredStudios.filter(studio => studio.studioState?.operatingModel === 'FULL_MERGER'),
         allStudios,
     };
 };
@@ -68,6 +247,57 @@ export const getStudioGroup = (player: Pick<Player, 'businesses'>): {
 export const getOperatingModelDefinition = (
     model?: SubsidiaryOperatingModel,
 ): OperatingModelDefinition | undefined => OPERATING_MODELS.find(definition => definition.id === model);
+
+export const getStudioOperatingMandate = (studio: Business): StudioOperatingMandate => ({
+    ...DEFAULT_STUDIO_OPERATING_MANDATE,
+    ...(studio.studioState?.operatingMandate || {}),
+});
+
+export const getMandateOptionLabel = (
+    key: keyof StudioOperatingMandate,
+    value: string | undefined,
+): string => {
+    const group = STUDIO_MANDATE_GROUPS.find(optionGroup => optionGroup.key === key);
+    return group?.options.find(option => option.id === value)?.shortLabel || value || 'Unset';
+};
+
+export const getSubsidiaryControlProfile = (studio: Business): SubsidiaryControlProfile => {
+    const model = studio.studioState?.operatingModel;
+    if (model === 'INDEPENDENT_LABEL') {
+        return {
+            canSetMandate: true,
+            canDirectProduce: false,
+            canAutoProduce: true,
+            controlCopy: 'Board mandate only',
+            productionCopy: 'The label runs itself. You set direction and receive results.',
+        };
+    }
+    if (model === 'CONTROLLED_SUBSIDIARY') {
+        return {
+            canSetMandate: true,
+            canDirectProduce: true,
+            canAutoProduce: true,
+            controlCopy: 'Strategic command',
+            productionCopy: 'You can directly develop projects here while routine work stays guided by mandate.',
+        };
+    }
+    if (model === 'FULL_MERGER') {
+        return {
+            canSetMandate: false,
+            canDirectProduce: false,
+            canAutoProduce: false,
+            controlCopy: 'Merged into parent',
+            productionCopy: 'This banner no longer operates as a separate studio.',
+        };
+    }
+    return {
+        canSetMandate: false,
+        canDirectProduce: false,
+        canAutoProduce: false,
+        controlCopy: 'Choose model first',
+        productionCopy: 'Select an operating model before issuing studio strategy.',
+    };
+};
 
 export const setSubsidiaryOperatingModel = ({
     player,
@@ -104,5 +334,358 @@ export const setSubsidiaryOperatingModel = ({
             ...player,
             businesses: player.businesses.map(business => business.id === studioId ? updatedStudio : business),
         },
+    };
+};
+
+export const setStudioOperatingMandate = ({
+    player,
+    studioId,
+    mandate,
+}: {
+    player: Player;
+    studioId: string;
+    mandate: StudioOperatingMandate;
+}): {
+    success: boolean;
+    player: Player;
+    studio?: Business;
+    reason?: 'STUDIO_NOT_FOUND' | 'NOT_ACQUIRED_STUDIO' | 'MERGED_STUDIO';
+} => {
+    const studio = player.businesses.find(business => business.id === studioId && business.type === 'PRODUCTION_HOUSE');
+    if (!studio) return { success: false, player, reason: 'STUDIO_NOT_FOUND' };
+    if (!isAcquiredStudio(studio)) return { success: false, player, studio, reason: 'NOT_ACQUIRED_STUDIO' };
+    if (studio.studioState?.operatingModel === 'FULL_MERGER') {
+        return { success: false, player, studio, reason: 'MERGED_STUDIO' };
+    }
+
+    const updatedMandate: StudioOperatingMandate = {
+        ...DEFAULT_STUDIO_OPERATING_MANDATE,
+        ...mandate,
+        updatedWeek: player.currentWeek,
+        updatedYear: player.age,
+    };
+
+    const updatedStudio: Business = {
+        ...studio,
+        studioState: {
+            ...studio.studioState!,
+            acquisitionOrigin: 'STUDIO_ACQUISITION',
+            operatingMandate: updatedMandate,
+        },
+    };
+
+    return {
+        success: true,
+        studio: updatedStudio,
+        player: {
+            ...player,
+            businesses: player.businesses.map(business => business.id === studioId ? updatedStudio : business),
+        },
+    };
+};
+
+export const performStudioTreasuryTransfer = ({
+    player,
+    studioId,
+    action,
+    counterparty,
+    amount,
+}: {
+    player: Player;
+    studioId: string;
+    action: StudioTreasuryAction;
+    counterparty: StudioTreasuryCounterparty;
+    amount: number;
+}): {
+    success: boolean;
+    player: Player;
+    studio?: Business;
+    parentStudio?: Business;
+    reason?:
+        | 'INVALID_AMOUNT'
+        | 'STUDIO_NOT_FOUND'
+        | 'NOT_ACQUIRED_STUDIO'
+        | 'MERGED_STUDIO'
+        | 'HQ_NOT_FOUND'
+        | 'INSUFFICIENT_PERSONAL_CASH'
+        | 'INSUFFICIENT_HQ_CAPITAL'
+        | 'INSUFFICIENT_STUDIO_CAPITAL';
+} => {
+    const safeAmount = Math.floor(Number(amount) || 0);
+    if (safeAmount <= 0) return { success: false, player, reason: 'INVALID_AMOUNT' };
+
+    const studio = player.businesses.find(business => business.id === studioId && business.type === 'PRODUCTION_HOUSE');
+    if (!studio?.studioState) return { success: false, player, reason: 'STUDIO_NOT_FOUND' };
+    if (!isAcquiredStudio(studio)) return { success: false, player, studio, reason: 'NOT_ACQUIRED_STUDIO' };
+    if (studio.studioState.operatingModel === 'FULL_MERGER') return { success: false, player, studio, reason: 'MERGED_STUDIO' };
+
+    const parentStudio = counterparty === 'HQ' ? getParentStudio(player, studioId) : undefined;
+    if (counterparty === 'HQ' && !parentStudio?.studioState) {
+        return { success: false, player, studio, reason: 'HQ_NOT_FOUND' };
+    }
+    if (action === 'INJECT' && counterparty === 'PERSONAL' && player.money < safeAmount) {
+        return { success: false, player, studio, reason: 'INSUFFICIENT_PERSONAL_CASH' };
+    }
+    if (action === 'INJECT' && counterparty === 'HQ' && (parentStudio?.balance || 0) < safeAmount) {
+        return { success: false, player, studio, parentStudio, reason: 'INSUFFICIENT_HQ_CAPITAL' };
+    }
+    if (action === 'WITHDRAW' && studio.balance < safeAmount) {
+        return { success: false, player, studio, parentStudio, reason: 'INSUFFICIENT_STUDIO_CAPITAL' };
+    }
+
+    const counterpartyLabel = counterparty === 'HQ' ? 'Headquarters' : 'Personal balance';
+    const studioLedgerEntry = createStudioFinanceEntry({
+        id: `studio_treasury_${action.toLowerCase()}_${counterparty.toLowerCase()}_${studio.id}_${player.age}_${player.currentWeek}_${Date.now()}`,
+        player,
+        amount: action === 'INJECT' ? safeAmount : -safeAmount,
+        type: action === 'INJECT' ? 'CAPITAL_INJECTION' : 'CAPITAL_WITHDRAWAL',
+        label: action === 'INJECT'
+            ? `${counterpartyLabel} capital injection`
+            : `Withdrawal to ${counterpartyLabel}`,
+    });
+
+    const updatedStudio: Business = {
+        ...studio,
+        balance: action === 'INJECT' ? studio.balance + safeAmount : studio.balance - safeAmount,
+        studioState: {
+            ...studio.studioState,
+            financeLedger: [
+                studioLedgerEntry,
+                ...((studio.studioState.financeLedger || [])),
+            ].slice(0, 200),
+        },
+    };
+
+    let nextMoney = player.money;
+    let updatedParentStudio = parentStudio;
+    const financeHistory = [...(player.finance?.history || [])];
+
+    if (counterparty === 'PERSONAL') {
+        nextMoney = action === 'INJECT' ? player.money - safeAmount : player.money + safeAmount;
+        financeHistory.unshift(createPersonalTransaction({
+            player,
+            amount: action === 'INJECT' ? -safeAmount : safeAmount,
+            label: action === 'INJECT'
+                ? `${studio.name} capital injection`
+                : `${studio.name} owner withdrawal`,
+        }));
+    }
+
+    if (counterparty === 'HQ' && parentStudio?.studioState) {
+        const hqLedgerEntry = createStudioFinanceEntry({
+            id: `studio_treasury_hq_${action.toLowerCase()}_${studio.id}_${player.age}_${player.currentWeek}_${Date.now()}`,
+            player,
+            amount: action === 'INJECT' ? -safeAmount : safeAmount,
+            type: action === 'INJECT' ? 'CAPITAL_WITHDRAWAL' : 'CAPITAL_INJECTION',
+            label: action === 'INJECT'
+                ? `${studio.name} subsidiary funding`
+                : `${studio.name} remitted earnings`,
+        });
+        updatedParentStudio = {
+            ...parentStudio,
+            balance: action === 'INJECT' ? parentStudio.balance - safeAmount : parentStudio.balance + safeAmount,
+            studioState: {
+                ...parentStudio.studioState,
+                financeLedger: [
+                    hqLedgerEntry,
+                    ...((parentStudio.studioState.financeLedger || [])),
+                ].slice(0, 200),
+            },
+        };
+    }
+
+    const updatedBusinesses = player.businesses.map(business => {
+        if (business.id === updatedStudio.id) return updatedStudio;
+        if (updatedParentStudio && business.id === updatedParentStudio.id) return updatedParentStudio;
+        return business;
+    });
+
+    const logEntry: LogEntry = {
+        week: player.currentWeek,
+        year: player.age,
+        message: action === 'INJECT'
+            ? `💸 ${counterpartyLabel} injected ${safeAmount.toLocaleString()} into ${studio.name}.`
+            : `🏦 ${studio.name} withdrew ${safeAmount.toLocaleString()} to ${counterpartyLabel}.`,
+        type: 'neutral',
+    };
+
+    const nextPlayer: Player = {
+        ...player,
+        money: nextMoney,
+        businesses: updatedBusinesses,
+        finance: player.finance ? {
+            ...player.finance,
+            history: financeHistory.slice(0, 200),
+        } : player.finance,
+        logs: [logEntry, ...(player.logs || [])].slice(0, 50),
+    };
+
+    return {
+        success: true,
+        player: nextPlayer,
+        studio: updatedStudio,
+        parentStudio: updatedParentStudio,
+    };
+};
+
+export const executeFullStudioMerger = ({
+    player,
+    studioId,
+}: {
+    player: Player;
+    studioId: string;
+}): {
+    success: boolean;
+    player: Player;
+    parentStudio?: Business;
+    mergedStudio?: Business;
+    integrationCost?: number;
+    reason?: 'STUDIO_NOT_FOUND' | 'NOT_ACQUIRED_STUDIO' | 'ALREADY_MERGED' | 'HQ_NOT_FOUND';
+} => {
+    const studio = player.businesses.find(business => business.id === studioId && business.type === 'PRODUCTION_HOUSE');
+    if (!studio?.studioState) return { success: false, player, reason: 'STUDIO_NOT_FOUND' };
+    if (!isAcquiredStudio(studio)) return { success: false, player, mergedStudio: studio, reason: 'NOT_ACQUIRED_STUDIO' };
+    if (studio.studioState.operatingModel === 'FULL_MERGER') return { success: false, player, mergedStudio: studio, reason: 'ALREADY_MERGED' };
+    const parentStudio = getParentStudio(player, studioId);
+    if (!parentStudio?.studioState) return { success: false, player, mergedStudio: studio, reason: 'HQ_NOT_FOUND' };
+
+    const parentState = normalizeStudioState(parentStudio.studioState, player.currentWeek);
+    const acquiredState = normalizeStudioState(studio.studioState, player.currentWeek);
+    const integrationCost = getMergerIntegrationCost(studio);
+    const transferredCapital = Math.max(0, studio.balance - integrationCost);
+    const netParentBalance = parentStudio.balance + studio.balance - integrationCost;
+
+    const updatedParentStudio: Business = {
+        ...parentStudio,
+        balance: netParentBalance,
+        staff: uniqueById([...parentStudio.staff, ...studio.staff]),
+        stats: {
+            ...parentStudio.stats,
+            valuation: (parentStudio.stats.valuation || 0) + Math.round((studio.stats.valuation || 0) * 0.65),
+            brandHealth: Math.max(0, Math.min(100, Math.round(((parentStudio.stats.brandHealth || 50) * 0.85) + ((studio.stats.brandHealth || 50) * 0.15)))),
+            studioMomentum: Math.max(parentStudio.stats.studioMomentum || 0, studio.stats.studioMomentum || 0),
+            investorConfidence: Math.max(0, Math.min(100, (parentStudio.stats.investorConfidence || 50) + 3)),
+        },
+        studioState: {
+            ...parentState,
+            scripts: uniqueById([...parentState.scripts, ...acquiredState.scripts]),
+            concepts: uniqueById([...parentState.concepts, ...acquiredState.concepts]),
+            writers: uniqueById([...parentState.writers, ...acquiredState.writers]),
+            talentRoster: uniqueById([...(parentState.talentRoster || []), ...(acquiredState.talentRoster || [])]),
+            purchasedIPTitles: uniqueStrings([...(parentState.purchasedIPTitles || []), ...(acquiredState.purchasedIPTitles || [])]),
+            ownedRights: uniqueById([...(parentState.ownedRights || []), ...(acquiredState.ownedRights || [])]),
+            departments: {
+                writing: Math.max(parentState.departments?.writing || 1, acquiredState.departments?.writing || 1),
+                directing: Math.max(parentState.departments?.directing || 1, acquiredState.departments?.directing || 1),
+                casting: Math.max(parentState.departments?.casting || 1, acquiredState.departments?.casting || 1),
+                production: Math.max(parentState.departments?.production || 1, acquiredState.departments?.production || 1),
+                postProduction: Math.max(parentState.departments?.postProduction || 1, acquiredState.departments?.postProduction || 1),
+            },
+            equipment: {
+                cameras: Math.max(parentState.equipment?.cameras || 1, acquiredState.equipment?.cameras || 1),
+                lighting: Math.max(parentState.equipment?.lighting || 1, acquiredState.equipment?.lighting || 1),
+                sound: Math.max(parentState.equipment?.sound || 1, acquiredState.equipment?.sound || 1),
+                practicalEffects: Math.max(parentState.equipment?.practicalEffects || 0, acquiredState.equipment?.practicalEffects || 0),
+            },
+            financeLedger: [
+                createStudioFinanceEntry({
+                    id: `studio_merger_${studio.id}_${player.age}_${player.currentWeek}_${Date.now()}`,
+                    player,
+                    amount: transferredCapital - integrationCost,
+                    type: 'ACQUISITION_MERGER',
+                    label: `${studio.name} full merger integration`,
+                }),
+                ...((parentState.financeLedger || [])),
+                ...((acquiredState.financeLedger || []).map(entry => ({
+                    ...entry,
+                    id: `${studio.id}_${entry.id}`,
+                    label: `${studio.name}: ${entry.label}`,
+                }))),
+            ].slice(0, 200),
+        },
+    };
+
+    const mergedStudio: Business = {
+        ...studio,
+        balance: 0,
+        isActive: false,
+        studioState: {
+            ...acquiredState,
+            acquisitionOrigin: 'STUDIO_ACQUISITION',
+            operatingModel: 'FULL_MERGER',
+            operatingModelChangedWeek: player.currentWeek,
+            operatingModelChangedYear: player.age,
+            mergedIntoStudioId: parentStudio.id,
+            mergerIntegratedWeek: player.currentWeek,
+            mergerIntegratedYear: player.age,
+            mergerIntegrationCost: integrationCost,
+            subsidiaryProjectProposals: (acquiredState.subsidiaryProjectProposals || []).filter(proposal => proposal.status !== 'PENDING'),
+        },
+    };
+
+    const newsItem: NewsItem = {
+        id: `news_full_merger_${studio.id}_${player.age}_${player.currentWeek}_${Date.now()}`,
+        headline: `${parentStudio.name} absorbs ${studio.name}`,
+        subtext: `${studio.name}'s catalog, production assets and liabilities are being integrated into headquarters after a full merger.`,
+        category: 'INDUSTRY',
+        week: player.currentWeek,
+        year: player.age,
+        impactLevel: 'HIGH',
+    };
+    const logEntry: LogEntry = {
+        week: player.currentWeek,
+        year: player.age,
+        message: `🏛️ ${studio.name} fully merged into ${parentStudio.name}. Integration cost: ${integrationCost.toLocaleString()}.`,
+        type: 'positive',
+    };
+
+    const nextPlayer: Player = {
+        ...player,
+        businesses: player.businesses.map(business => {
+            if (business.id === updatedParentStudio.id) return updatedParentStudio;
+            if (business.id === mergedStudio.id) return mergedStudio;
+            return business;
+        }),
+        commitments: player.commitments.map(commitment => commitment.projectDetails?.studioId === studio.id
+            ? {
+                ...commitment,
+                projectDetails: {
+                    ...commitment.projectDetails,
+                    studioId: parentStudio.id,
+                },
+            }
+            : commitment),
+        activeReleases: player.activeReleases.map(release => release.projectDetails?.studioId === studio.id
+            ? {
+                ...release,
+                projectDetails: {
+                    ...release.projectDetails,
+                    studioId: parentStudio.id,
+                },
+            }
+            : release),
+        pastProjects: player.pastProjects.map(project => project.studioId === studio.id
+            ? {
+                ...project,
+                studioId: parentStudio.id,
+            }
+            : project),
+        world: {
+            ...player.world,
+            universes: Object.fromEntries(Object.entries(player.world?.universes || {}).map(([universeId, universe]) => [
+                universeId,
+                universe?.studioId === studio.id ? { ...universe, studioId: parentStudio.id } : universe,
+            ])),
+        },
+        news: [newsItem, ...(player.news || [])].slice(0, 80),
+        logs: [logEntry, ...(player.logs || [])].slice(0, 50),
+    };
+
+    return {
+        success: true,
+        player: nextPlayer,
+        parentStudio: updatedParentStudio,
+        mergedStudio,
+        integrationCost,
     };
 };

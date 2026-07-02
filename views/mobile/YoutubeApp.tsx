@@ -232,6 +232,13 @@ const VIDEO_COMMENT_BANKS: Record<YoutubeVideoType, string[]> = {
         'This needs cleaner audio but the talent is there.',
         'I did not know you could sing like this.'
     ],
+    MUSIC_VIDEO: [
+        'This cameo fits the song perfectly.',
+        'The visuals are carrying the rollout.',
+        'This feels bigger than a normal upload.',
+        'The artist and actor chemistry works.',
+        'This should be pushed harder on socials.'
+    ],
     STORYTIME: [
         'I stayed for the whole story.',
         'This absolutely needs a part two.',
@@ -1136,6 +1143,7 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
         Q_AND_A: 'bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.2),transparent_24%),linear-gradient(135deg,#2563eb,#06b6d4,#082f49)]',
         TRAILER: 'bg-[radial-gradient(circle_at_18%_18%,rgba(255,255,255,0.18),transparent_24%),linear-gradient(135deg,#111827,#4f46e5,#b91c1c)]',
         COVER: 'bg-[radial-gradient(circle_at_22%_18%,rgba(255,255,255,0.2),transparent_24%),linear-gradient(135deg,#0f766e,#22c55e,#052e16)]',
+        MUSIC_VIDEO: 'bg-[radial-gradient(circle_at_18%_18%,rgba(103,232,249,0.22),transparent_24%),linear-gradient(135deg,#083344,#701a75,#020617)]',
         STORYTIME: 'bg-[radial-gradient(circle_at_18%_18%,rgba(255,255,255,0.2),transparent_24%),linear-gradient(135deg,#92400e,#f59e0b,#7f1d1d)]'
     };
     const selectedThumbnailTheme = thumbnailThemeByType[selectedType] || thumbnailThemeByType.VLOG;

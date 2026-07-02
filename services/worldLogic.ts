@@ -6,6 +6,7 @@ import { generateProjectTitle, getEstimatedBudget, generateProjectDetails } from
 import { initUniverses, normalizeUniverseMap, processUniverseTurn } from './universeLogic';
 import { processNpcVentures, syncNpcVenturesToStudios } from './npcVentureLogic';
 import { ALL_GENRES } from './genreCatalog';
+import { applyPassiveStudioEcosystemTurn, applyStudioProjectOutcome, ensureStudioEcosystem } from './studioEcosystem';
 
 // Helpers
 const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
@@ -115,20 +116,7 @@ export const processWorldTurn = (player: Player): { world: WorldState, news: New
     const logs: string[] = [];
     if (!newWorld.npcVentures) newWorld.npcVentures = {};
     newWorld = syncNpcVenturesToStudios(newWorld);
-    if (!newWorld.studios) newWorld.studios = {};
-    Object.values(STUDIO_CATALOG).forEach(studio => {
-        if (!newWorld.studios![studio.id]) {
-            newWorld.studios![studio.id] = {
-                id: studio.id,
-                name: studio.name,
-                valuation: studio.valuation,
-                reputation: Math.round(Math.min(98, 72 + (studio.qualityBias.script * 8) + (studio.qualityBias.distribution * 5))),
-                cashReserve: Math.round(studio.valuation * 120),
-                recentHits: 0,
-                archetype: studio.archetype
-            };
-        }
-    });
+    newWorld = ensureStudioEcosystem(newWorld);
     newWorld.universes = normalizeUniverseMap(newWorld.universes);
 
     // --- A. MAINTAIN RIVAL SCHEDULE ---
@@ -152,6 +140,7 @@ export const processWorldTurn = (player: Player): { world: WorldState, news: New
     const rivalsToRelease = newWorld.upcomingRivals.filter(r => r.weekReleased === player.currentWeek);
     rivalsToRelease.forEach(project => {
         newWorld.projects.unshift(project);
+        newWorld = applyStudioProjectOutcome(newWorld, project).world;
 
         // Find and Pay the Lead Actor
         const lead = NPC_DATABASE.find(n => n.id === project.leadActorId);
@@ -180,6 +169,28 @@ export const processWorldTurn = (player: Player): { world: WorldState, news: New
             }
 
             lead.netWorth += salary;
+        }
+
+        const directorNpc = NPC_DATABASE.find(n => n.name === project.directorName && n.occupation === 'DIRECTOR');
+        if (directorNpc && directorNpc.stats) {
+            const fameGain = project.budgetTier === 'HIGH' ? 2.2 : project.budgetTier === 'MID' ? 0.8 : 0.2;
+            directorNpc.stats.fame = Math.min(100, (directorNpc.stats.fame || 45) + fameGain);
+
+            let directorFee = 0;
+            if (project.budgetTier === 'HIGH') {
+                directorFee = 4_000_000 + Math.floor(Math.random() * 8_000_000);
+            } else if (project.budgetTier === 'MID') {
+                directorFee = 750_000 + Math.floor(Math.random() * 1_750_000);
+            } else {
+                directorFee = 25_000 + Math.floor(Math.random() * 125_000);
+            }
+
+            const estimatedBudget = getEstimatedBudget(project.budgetTier);
+            if (project.boxOffice > estimatedBudget * 2.5 && project.budgetTier !== 'LOW') {
+                directorFee += Math.floor(project.boxOffice * (0.003 + Math.random() * 0.012));
+            }
+
+            directorNpc.netWorth += directorFee;
         }
 
         const isHit = project.boxOffice > getEstimatedBudget(project.budgetTier) * 3;
@@ -239,22 +250,7 @@ export const processWorldTurn = (player: Player): { world: WorldState, news: New
         });
     }
 
-    if (newWorld.studios) {
-        Object.values(newWorld.studios).forEach(studio => {
-            if (studio.isNpcVenture) return;
-            // Valuation fluctuates
-            const valChange = studio.valuation * (Math.random() * 0.02 - 0.009); // -0.9% to +1.1%
-            studio.valuation = Math.max(1, studio.valuation + valChange);
-            
-            // Cash reserve grows
-            studio.cashReserve += Math.floor(studio.valuation * 0.5);
-            
-            // Decay recent hits
-            if (Math.random() < 0.1 && studio.recentHits > 0) {
-                studio.recentHits--;
-            }
-        });
-    }
+    newWorld = applyPassiveStudioEcosystemTurn(newWorld, player.currentWeek, player.age).world;
 
     const ventureResult = processNpcVentures(player, newWorld);
     newWorld = ventureResult.world;
@@ -274,6 +270,7 @@ export const processWorldTurn = (player: Player): { world: WorldState, news: New
         
         if (res.project) {
             newWorld.projects.unshift(res.project);
+            newWorld = applyStudioProjectOutcome(newWorld, res.project).world;
             news.push({
                 id: `news_uni_rel_${res.project.id}`,
                 headline: `Universe Release: ${res.project.title} lands in theaters.`,
@@ -294,6 +291,7 @@ export const processWorldTurn = (player: Player): { world: WorldState, news: New
     if (Math.random() < 0.7) { 
         const project = generateIndustryProject(player.currentWeek, player.age);
         newWorld.projects.unshift(project);
+        newWorld = applyStudioProjectOutcome(newWorld, project).world;
 
         // Find and Pay the Lead Actor
         const lead = NPC_DATABASE.find(n => n.id === project.leadActorId);
@@ -322,6 +320,28 @@ export const processWorldTurn = (player: Player): { world: WorldState, news: New
             }
 
             lead.netWorth += salary;
+        }
+
+        const directorNpc = NPC_DATABASE.find(n => n.name === project.directorName && n.occupation === 'DIRECTOR');
+        if (directorNpc && directorNpc.stats) {
+            const fameGain = project.budgetTier === 'HIGH' ? 2.2 : project.budgetTier === 'MID' ? 0.8 : 0.2;
+            directorNpc.stats.fame = Math.min(100, (directorNpc.stats.fame || 45) + fameGain);
+
+            let directorFee = 0;
+            if (project.budgetTier === 'HIGH') {
+                directorFee = 4_000_000 + Math.floor(Math.random() * 8_000_000);
+            } else if (project.budgetTier === 'MID') {
+                directorFee = 750_000 + Math.floor(Math.random() * 1_750_000);
+            } else {
+                directorFee = 25_000 + Math.floor(Math.random() * 125_000);
+            }
+
+            const estimatedBudget = getEstimatedBudget(project.budgetTier);
+            if (project.boxOffice > estimatedBudget * 2.5 && project.budgetTier !== 'LOW') {
+                directorFee += Math.floor(project.boxOffice * (0.003 + Math.random() * 0.012));
+            }
+
+            directorNpc.netWorth += directorFee;
         }
 
         const isHit = project.boxOffice > getEstimatedBudget(project.budgetTier) * 3;

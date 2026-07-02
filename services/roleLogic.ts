@@ -12,6 +12,7 @@ import { NPC_DATABASE } from './npcLogic';
 import { createFamousOpportunity, generateFamousMovieOpportunity, generateFamousSeriesOpportunity, getNextFamousMovie } from './famousMovieLogic';
 import { ALL_GENRES } from './genreCatalog';
 import { getAbsoluteWeek } from './legacyLogic';
+import { buildAutomaticProjectMusicPlan } from './musicIndustry';
 
 // --- CONSTANTS ---
 
@@ -752,7 +753,7 @@ export const generateProjectDetails = (tier: BudgetTier, type: ProjectType, used
     const targetAudiences: TargetAudience[] = ['G', 'PG', 'PG-13', 'R', 'NC-17'];
     const targetAudience = targetAudiences[Math.floor(Math.random() * targetAudiences.length)];
 
-    return {
+    const project: ProjectDetails = {
         title,
         type,
         description: `A ${genre.toLowerCase().replace('_', ' ')} ${type === 'MOVIE' ? 'film' : 'series'} about ${pick(['love', 'revenge', 'hope', 'survival'])}.`,
@@ -772,6 +773,8 @@ export const generateProjectDetails = (tier: BudgetTier, type: ProjectType, used
         visibleCastStrength: hidden.castingStrength > 80 ? 'Star-Studded' : hidden.castingStrength > 60 ? 'Solid' : 'Unknown',
         episodes: type === 'SERIES' ? 8 + Math.floor(Math.random() * 5) : undefined
     };
+    project.musicPlan = buildAutomaticProjectMusicPlan(project);
+    return project;
 };
 
 export const generateAudition = (
@@ -1176,6 +1179,11 @@ export const calculateWeeklyBoxOffice = (
     const fameMultiplier = stats.fameMultiplier || 1.0;
     const castDepthScore = stats.castDepthScore ?? 70;
     const studioPrestigeScore = stats.studioPrestigeScore ?? 0;
+    const musicOpeningLiftPct = stats.musicOpeningLiftPct || 0;
+    const musicAudienceReachLiftPct = stats.musicAudienceReachLiftPct || 0;
+    const musicMismatchBacklashRisk = stats.musicMismatchBacklashRisk || 0;
+    const musicControversyRisk = stats.musicControversyRisk || 0;
+    const musicTrailerStrengthLift = stats.musicTrailerStrengthLift || 0;
     const packageStrength = (scriptQuality * 0.35) + (directorQuality * 0.25) + (castingStrength * 0.4);
     const audienceStrength = (qualityScore * 0.55) + (scriptQuality * 0.25) + (directorQuality * 0.2);
     const formatAudienceMod = format === 'ANIMATED' ? 1.08 : format === 'ANIME' ? 0.92 : 1;
@@ -1198,8 +1206,9 @@ export const calculateWeeklyBoxOffice = (
         const packageMod = 0.75 + ((packageStrength - 50) / 100) * 0.8;
         const qualityMod = 0.85 + ((qualityScore - 50) / 100) * 0.45;
         const fameMod = 0.85 + ((fameMultiplier - 1) * 0.7);
+        const musicOpeningMod = Math.max(0.88, Math.min(1.28, 1 + (musicOpeningLiftPct / 100) + (musicTrailerStrengthLift / 250) - (musicMismatchBacklashRisk / 900) - (musicControversyRisk / 1200)));
 
-        let rawOpening = budget * baseMultiplier * distMod * buzzMod * packageMod * qualityMod * fameMod * castDepthMod * studioPrestigeMod * studioReputationMod * formatAudienceMod * marketDemandMod;
+        let rawOpening = budget * baseMultiplier * distMod * buzzMod * packageMod * qualityMod * fameMod * castDepthMod * studioPrestigeMod * studioReputationMod * formatAudienceMod * marketDemandMod * musicOpeningMod;
         rawOpening *= (0.8 + Math.random() * 0.4); // Variance
 
         // Genre Adjustment
@@ -1260,6 +1269,9 @@ export const calculateWeeklyBoxOffice = (
     if (week === 2 && castingStrength - audienceStrength > 18) dropRate += 0.08;
     if (SPECTACLE_GENRES.has(genre) && ['HIGH', 'BLOCKBUSTER'].includes(budgetTier) && castDepthScore < 55) dropRate += 0.1;
     if (castDepthScore > 84 && qualityScore > 75) dropRate -= 0.03;
+    dropRate += musicMismatchBacklashRisk / 520;
+    dropRate += musicControversyRisk / 760;
+    dropRate -= musicAudienceReachLiftPct / 520;
 
     const variance = (Math.random() * 0.1) - 0.05; 
     dropRate += variance;
@@ -1268,7 +1280,8 @@ export const calculateWeeklyBoxOffice = (
     if (week >= 8) dropRate += 0.10;
 
     const retention = Math.max(0.05, 1 - dropRate);
-    return Math.floor(prevGross * retention * formatAudienceMod * marketDemandMod * studioReputationMod);
+    const musicLegsMod = Math.max(0.92, Math.min(1.14, 1 + (musicAudienceReachLiftPct / 260) - (musicMismatchBacklashRisk / 1100) - (musicControversyRisk / 1500)));
+    return Math.floor(prevGross * retention * formatAudienceMod * marketDemandMod * studioReputationMod * musicLegsMod);
 };
 
 export const calculateRunOutcome = (totalGross: number, budget: number, rating: number): { tier: OutcomeTier, score: number } => {
@@ -1463,6 +1476,7 @@ export const generateSequelOffer = (original: ActiveRelease, player: Player): Ne
             prestigeBonus: Math.max(0, original.projectDetails.hiddenStats.prestigeBonus - 1) 
         }
     };
+    project.musicPlan = buildAutomaticProjectMusicPlan(project);
 
     const isRoyaltyEligible = player.stats.fame >= 50 && player.stats.reputation >= 50 && player.stats.experience >= 20; 
     let royaltyPercentage = 0;
@@ -1531,6 +1545,7 @@ export const generateRenewalOffer = (original: ActiveRelease, player: Player): N
             rawHype: Math.min(100, original.projectDetails.hiddenStats.rawHype), 
         }
     };
+    project.musicPlan = buildAutomaticProjectMusicPlan(project);
 
     // TV residuals usually implied in basePay for this game or handled via royalty
     let royaltyPercentage = original.royaltyPercentage || 0;

@@ -5,7 +5,7 @@ import { NPC_DATABASE } from '../../services/npcLogic';
 import { getEnabledGlobalCreatorSocialProfiles } from '../../services/youtubeLogic';
 import { getInstagramPostComments, getInstagramPresetCaption, INSTAGRAM_POST_CONFIGS } from '../../services/instagramLogic';
 import { loadMediaBlob, pruneMediaStore, saveMediaBlob } from '../../services/mediaStorage';
-import { Camera, Heart, MessageCircle, Send, Search, User, Grid, ArrowLeft, Video, Sparkles, Popcorn, Zap, XCircle, Check, Briefcase, Handshake, Smile, Lock, Coffee, Images, Clapperboard, Flame, Shirt, Bookmark, BarChart3, ImagePlus } from 'lucide-react';
+import { Camera, Heart, MessageCircle, Send, Search, User, Grid, ArrowLeft, Video, Sparkles, Popcorn, Zap, XCircle, Check, Briefcase, Handshake, Smile, Lock, Coffee, Images, Clapperboard, Flame, Shirt, Bookmark, BarChart3, ImagePlus, Music2 } from 'lucide-react';
 
 type InstagramFitMode = 'cover' | 'contain';
 const INSTAGRAM_IMAGE_SIZE = 1080;
@@ -908,7 +908,6 @@ export const InstagramApp: React.FC<InstagramAppProps> = ({ player, onBack, onPo
                         {(selectedNPC.id.startsWith('ig_brand_account_') || selectedNPC.forbesCategory === 'Brand') ? 'BRAND' : selectedNPC.occupation} • {selectedNPC.tier.replace('_', ' ')}
                     </div>
                     <div className="text-xs text-zinc-300 mb-4">{selectedNPC.bio}</div>
-
                     <div className="flex gap-2">
                         <button 
                             onClick={() => onFollow(selectedNPC)}

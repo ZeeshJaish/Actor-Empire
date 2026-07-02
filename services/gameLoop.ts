@@ -1,5 +1,5 @@
 
-import { Player, Commitment, ActiveRelease, StreamingState, LogEntry, NegotiationData, ActorSkills, Application, AuditionOpportunity, ProjectDetails, ScheduledEvent, TransactionCategory, Transaction, YearlyFinance, Message, IndustryProject, TeamMember, Business, InstaPost, XPost, WriterStats, DirectorStats, PlatformId, LegalCase, LifeEvent, RoleType, FamilyObligation, FuturePotential, PlayerReturnStatus, SponsorshipCategory, SponsorshipOffer, NewsItem } from '../types';
+import { Player, Commitment, ActiveRelease, StreamingState, LogEntry, NegotiationData, ActorSkills, Application, AuditionOpportunity, ProjectDetails, ScheduledEvent, TransactionCategory, Transaction, YearlyFinance, Message, IndustryProject, TeamMember, Business, InstaPost, XPost, WriterStats, DirectorStats, PlatformId, LegalCase, LifeEvent, RoleType, FamilyObligation, FuturePotential, PlayerReturnStatus, SponsorshipCategory, SponsorshipOffer, NewsItem, PastProject, StreamingDistributionBreakdown, TheatricalDistributionBreakdown, Relationship, MusicCultureMomentRecord } from '../types';
 import { PROPERTY_CATALOG, BUSINESS_CATALOG, CAR_CATALOG, MOTORCYCLE_CATALOG, BOAT_CATALOG, AIRCRAFT_CATALOG, CLOTHING_CATALOG } from './lifestyleLogic';
 import { 
     calculateGlobalTalent, 
@@ -51,13 +51,13 @@ import {
 } from './newsLogic';
 import { generateWeeklyEvent } from './geminiService';
 import { generateLifeEvent, generateLegalHearing, generateLuxeLifeEvent, hasEligibleLuxeEventTarget } from './lifeEventLogic';
-import { generateWeeklyFeed, NPC_DATABASE, calculateProjectFameMultiplier, generateNewUnknowns, updateNPCLives } from './npcLogic';
+import { generateWeeklyFeed, NPC_DATABASE, calculateProjectFameMultiplier, generateNewUnknowns, updateNPCLives, createNPCFromMusicArtist } from './npcLogic';
 import { generateAgentOffers, generateManagerOffer, generateDirectOffer, getRandomAgents, getRandomManagers, getRandomTrainers, getRandomStylists, getRandomTherapists, getRandomPublicists, getRandomWellness, sanitizeTeamPools } from './teamLogic';
 import { processStockMarket, calculatePortfolioValue, getDividendPayout, initializeStocks } from './stockLogic';
 import { AWARD_CALENDAR, checkAwardEligibility, AwardDefinition, generateSeasonWinners, generateFullBallot, getAwardCeremonyYear } from './awardLogic';
 import { processWorldTurn, generateIndustryProject } from './worldLogic'; 
 import { generateFamousMovieOpportunity, generateCameoOffer } from './famousMovieLogic'; 
-import { calculateYoutubeCreatorScore, generateYoutubeBrandDeal, generateYoutubeCollabOffer, getYoutubePublicImageLabel, processYoutubeChannel } from './youtubeLogic';
+import { calculateYoutubeCreatorScore, generateMusicVideoFeatureOffer, generateYoutubeBrandDeal, generateYoutubeCollabOffer, getYoutubePublicImageLabel, processYoutubeChannel } from './youtubeLogic';
 import { getInstagramPostComments, pickInstagramMicroBrand } from './instagramLogic';
 import { checkForDirectorDecision, checkForProductionCrisis } from './productionService';
 import { applyProductionHouseReleaseOutcome, processBusinessWeek, recalculateBusinessValuation } from './businessLogic';
@@ -77,6 +77,22 @@ import { processStreamingFundingContracts } from './streamingFundingLogic';
 import { resolveInstagramReferralOutcome } from './instagramOfferLogic';
 import { resolveYoutubeEventChoice, YoutubeEventResolution } from './youtubeEventLogic';
 import { resolveStudioAcquisitionResponses } from './studioAcquisition';
+import { processSubsidiaryAutonomousOperations } from './subsidiaryOperations';
+import { calculateStreamingDistributionBreakdown, calculateTheatricalDistributionBreakdown } from './distributionRevenue';
+import { processSubsidiaryDecisionEngine } from './subsidiaryDecisions';
+import { processShareholderVoting } from './shareholderVoting';
+import { processStockTakeoverEvents } from './stockTakeover';
+import { processWorldReactions } from './worldReactions';
+import { processAcquisitionDebtService } from './acquisitionDebt';
+import { processRegulatorPressure } from './regulatorPressure';
+import { processTalentInstability } from './talentInstability';
+import { processRivalRetaliation } from './rivalRetaliation';
+import { processAcquisitionMarketPulse } from './acquisitionMarketPulse';
+import { evaluatePostReleaseReality } from './marketingReality';
+import { applyHealthConditionIncident, processHealthConditionsWeek } from './healthConditions';
+import { addMusicCultureMoment, applyMusicImpactToHiddenStats, calculateProjectMusicImpact, calculateWeeklySoundtrackRevenue, createMusicCultureMoment, getMusicArtistCatalog, mergeSoundtrackRevenueBreakdowns, processMusicIndustryWeek, withAutomaticMusicPlan } from './musicIndustry';
+import { applyInvestorPayoutMemory, calculateInvestorPayout, processInvestorLeadershipChanges } from './projectInvestors';
+import { buildOutsideProducerInvestmentMessage, generateOutsideProducerInvestmentOffers, getOutsideProducerOfferCadenceWeeks, processOutsideProductionsWeek } from './outsideProductions';
 
 // --- CONSTANTS ---
 const ANNUAL_TAX_FREE_ALLOWANCE = 25000;
@@ -104,6 +120,295 @@ const formatMoneyShort = (value: number) => {
     if (safeValue >= 1_000_000) return `$${(safeValue / 1_000_000).toFixed(1)}M`;
     if (safeValue >= 1_000) return `$${(safeValue / 1_000).toFixed(0)}k`;
     return `$${safeValue.toLocaleString()}`;
+};
+
+const appendInvestorPayout = (
+    summary: ActiveRelease['investorPayouts'] | undefined,
+    payout: number
+): ActiveRelease['investorPayouts'] => {
+    const safePayout = Math.max(0, Math.round(Number(payout) || 0));
+    return {
+        lifetimeInvestorPayout: Math.max(0, Math.round(Number(summary?.lifetimeInvestorPayout) || 0)) + safePayout,
+        weeklyInvestorPayouts: [...(Array.isArray(summary?.weeklyInvestorPayouts) ? summary!.weeklyInvestorPayouts : []), safePayout].slice(-52)
+    };
+};
+
+const musicArtistNpcId = (artistId: string) => `music_npc_${artistId}`;
+
+const applyMusicArtistNpcEarnings = (
+    player: Player,
+    earnings: { artistId: string; amount: number; followerGain?: number }[]
+): Player => {
+    if (!earnings.length) return player;
+    const totals = new Map<string, { amount: number; followerGain: number }>();
+    earnings.forEach(entry => {
+        const amount = Math.max(0, Math.round(entry.amount || 0));
+        const followerGain = Math.max(0, Math.round(entry.followerGain || 0));
+        if (amount <= 0 && followerGain <= 0) return;
+        const current = totals.get(entry.artistId) || { amount: 0, followerGain: 0 };
+        totals.set(entry.artistId, {
+            amount: current.amount + amount,
+            followerGain: current.followerGain + followerGain
+        });
+    });
+    if (!totals.size) return player;
+
+    const applyToNpc = (npc: any): any => {
+        const match = Array.from(totals.entries()).find(([artistId]) => npc.id === artistId || npc.id === musicArtistNpcId(artistId));
+        if (!match) return npc;
+        const [, payout] = match;
+        const fameGain = Math.min(1.2, payout.amount / 1_500_000 + payout.followerGain / 8_000_000);
+        return {
+            ...npc,
+            netWorth: Math.max(0, Math.round((npc.netWorth || 0) + payout.amount)),
+            followers: Math.max(0, Math.round((npc.followers || 0) + payout.followerGain)),
+            stats: {
+                ...(npc.stats || {}),
+                fame: Math.min(100, Math.round((((npc.stats?.fame || 35) + fameGain) * 10)) / 10)
+            }
+        };
+    };
+
+    NPC_DATABASE.forEach((npc: any, index) => {
+        const updated = applyToNpc(npc);
+        if (updated !== npc) NPC_DATABASE[index] = updated;
+    });
+
+    const extraNPCs = Array.isArray(player.flags?.extraNPCs) ? player.flags.extraNPCs : [];
+    return {
+        ...player,
+        flags: {
+            ...(player.flags || {}),
+            extraNPCs: extraNPCs.map(applyToNpc)
+        }
+    };
+};
+
+const buildSoundtrackCreditEarnings = (
+    project: ProjectDetails | undefined,
+    weeklyStudioSoundtrackRevenue: number
+): { artistId: string; amount: number; followerGain: number }[] => {
+    const credits = project?.musicPlan?.credits || [];
+    const revenue = Math.max(0, Math.round(weeklyStudioSoundtrackRevenue || 0));
+    if (!credits.length || revenue <= 0) return [];
+    const roleWeight = (role: string): number => {
+        if (role === 'PROMO_ALBUM') return 1.35;
+        if (role === 'SOUNDTRACK_EP') return 1.15;
+        if (role === 'LEAD_SINGLE') return 1;
+        if (role === 'MUSIC_VIDEO_TIE_IN') return 0.85;
+        if (role === 'TRAILER_ANTHEM') return 0.75;
+        return 0.7;
+    };
+    const weights = credits.map(credit => roleWeight(credit.role));
+    const totalWeight = weights.reduce((sum, weight) => sum + weight, 0) || 1;
+    const artistRoyaltyPool = revenue * 0.48;
+    return credits.map((credit, index) => {
+        const amount = Math.round((artistRoyaltyPool * weights[index]) / totalWeight);
+        return {
+            artistId: credit.artistId,
+            amount,
+            followerGain: Math.round(Math.max(350, amount / 70))
+        };
+    });
+};
+
+const deterministicCultureRoll = (seed: string): number => {
+    let hash = 2166136261;
+    for (let index = 0; index < seed.length; index += 1) {
+        hash ^= seed.charCodeAt(index);
+        hash = Math.imul(hash, 16777619);
+    }
+    return (hash >>> 0) / 4294967295;
+};
+
+const buildSoundtrackCultureOutcomes = (
+    player: Player,
+    rel: ActiveRelease,
+    weeklySoundtrackRevenue: number,
+    context: {
+        releaseWeek: number;
+        marketPulse: number;
+        source: 'THEATRICAL' | 'STREAMING';
+    }
+): {
+    moments: MusicCultureMomentRecord[];
+    news: NewsItem[];
+    posts: XPost[];
+    logs: string[];
+    artistEarnings: { artistId: string; amount: number; followerGain: number }[];
+    reputationDelta: number;
+    rawHypeDelta: number;
+} => {
+    const revenue = Math.max(0, Math.round(weeklySoundtrackRevenue || 0));
+    const project = rel.projectDetails;
+    const credits = project?.musicPlan?.credits || [];
+    if (!project || !credits.length || revenue <= 0 || context.releaseWeek > 6) {
+        return { moments: [], news: [], posts: [], logs: [], artistEarnings: [], reputationDelta: 0, rawHypeDelta: 0 };
+    }
+
+    const catalog = getMusicArtistCatalog(player.world);
+    const artistById = new Map(catalog.map(artist => [artist.id, artist]));
+    const creditedArtists = credits
+        .map(credit => ({ credit, artist: artistById.get(credit.artistId) }))
+        .filter((entry): entry is { credit: typeof credits[number]; artist: NonNullable<ReturnType<typeof artistById.get>> } => Boolean(entry.artist));
+    if (!creditedArtists.length) {
+        return { moments: [], news: [], posts: [], logs: [], artistEarnings: [], reputationDelta: 0, rawHypeDelta: 0 };
+    }
+
+    const lead = creditedArtists
+        .slice()
+        .sort((left, right) => (right.artist.socialFollowers || 0) - (left.artist.socialFollowers || 0))[0];
+    const musicImpact = calculateProjectMusicImpact(project, project.musicPlan, catalog);
+    const moments: MusicCultureMomentRecord[] = [];
+    const news: NewsItem[] = [];
+    const posts: XPost[] = [];
+    const logs: string[] = [];
+    const artistEarnings: { artistId: string; amount: number; followerGain: number }[] = [];
+    let reputationDelta = 0;
+    let rawHypeDelta = 0;
+    const existingMomentIds = new Set((player.world.musicIndustry?.cultureMoments || []).map(moment => moment.id));
+
+    const pushMoment = (moment: MusicCultureMomentRecord, source: string): void => {
+        if (existingMomentIds.has(moment.id)) return;
+        existingMomentIds.add(moment.id);
+        moments.push(moment);
+        news.push({
+            id: moment.id,
+            headline: moment.headline,
+            subtext: moment.description,
+            category: 'INDUSTRY',
+            week: player.currentWeek,
+            year: player.age,
+            impactLevel: moment.impactLevel
+        });
+        posts.push({
+            id: `x_${moment.id}`,
+            authorId: source,
+            authorName: source === 'music_watch' ? 'Music Watch' : source === 'chart_fans' ? 'Chart Fans' : 'Soundtrack Pulse',
+            authorHandle: source === 'music_watch' ? '@musicwatch' : source === 'chart_fans' ? '@chartfans' : '@soundtrackpulse',
+            authorAvatar: `https://api.dicebear.com/8.x/pixel-art/svg?seed=${encodeURIComponent(moment.headline)}`,
+            content: moment.description,
+            timestamp: Date.now(),
+            likes: Math.max(120, Math.floor(revenue * 0.018)),
+            retweets: Math.max(28, Math.floor(revenue * 0.0032)),
+            replies: Math.max(12, Math.floor(revenue * 0.0018)),
+            isPlayer: false,
+            isLiked: false,
+            isRetweeted: false,
+            isVerified: true,
+            postType: 'FILM_OPINION',
+            sentiment: source === 'music_watch' ? 'MESSY' : 'INDUSTRY'
+        });
+        logs.push(moment.headline);
+    };
+
+    const weekKey = `${rel.id}_${player.age}_${player.currentWeek}_${context.source}`;
+    if (context.releaseWeek <= 3 && (revenue >= 650_000 || musicImpact.score >= 78)) {
+        const moment = createMusicCultureMoment('SOUNDTRACK_TREND', {
+            id: `music_culture_soundtrack_trend_${rel.id}`,
+            headline: `${rel.name} soundtrack starts a ${lead.artist.genre} trend.`,
+            description: `${lead.artist.stageName}'s movie track is turning into edits, covers, trailer clips, and fan-made promo for the film.`,
+            artistIds: creditedArtists.map(entry => entry.artist.id),
+            artistNames: creditedArtists.map(entry => entry.artist.stageName),
+            songTitle: lead.credit.songTitle,
+            projectTitle: rel.name,
+            heat: Math.min(100, Math.round(48 + revenue / 45_000 + musicImpact.socialHypeLift)),
+            week: player.currentWeek,
+            year: player.age,
+            impactLevel: revenue >= 1_800_000 || musicImpact.score >= 86 ? 'HIGH' : 'MEDIUM'
+        });
+        pushMoment(moment, 'soundtrack_pulse');
+        artistEarnings.push({
+            artistId: lead.artist.id,
+            amount: Math.round(revenue * 0.08),
+            followerGain: Math.round(Math.max(4_000, revenue / 35))
+        });
+    }
+
+    const marketPulse = Math.max(1, context.marketPulse || 1);
+    const biggerThanMovie =
+        context.releaseWeek <= 4 &&
+        revenue >= 320_000 &&
+        (
+            revenue >= marketPulse * 0.16 ||
+            (rel.budget > 0 && marketPulse < rel.budget * 0.12 && musicImpact.socialHypeLift >= 12)
+        );
+    if (biggerThanMovie) {
+        const moment = createMusicCultureMoment('SONG_BIGGER_THAN_MOVIE', {
+            id: `music_culture_song_bigger_${rel.id}`,
+            headline: `${lead.credit.songTitle} is getting bigger than ${rel.name}.`,
+            description: `Fans are sharing the soundtrack more than the movie discussion, giving the campaign a strange but useful second life.`,
+            artistIds: [lead.artist.id],
+            artistNames: [lead.artist.stageName],
+            songTitle: lead.credit.songTitle,
+            projectTitle: rel.name,
+            heat: Math.min(100, Math.round(58 + revenue / 38_000)),
+            week: player.currentWeek,
+            year: player.age,
+            impactLevel: revenue >= 1_200_000 ? 'HIGH' : 'MEDIUM'
+        });
+        pushMoment(moment, 'chart_fans');
+        artistEarnings.push({
+            artistId: lead.artist.id,
+            amount: Math.round(revenue * 0.06),
+            followerGain: Math.round(Math.max(6_000, revenue / 28))
+        });
+        rawHypeDelta += 3;
+    }
+
+    const riskyArtist = creditedArtists.find(entry => entry.artist.scandalRisk === 'HIGH')
+        || creditedArtists.find(entry => entry.artist.scandalRisk === 'MEDIUM' && entry.credit.risk >= 18);
+    const controversyChance = Math.min(0.45, Math.max(0.04, (musicImpact.controversyRisk + musicImpact.mismatchBacklashRisk) / 240));
+    if (
+        context.releaseWeek <= 2 &&
+        riskyArtist &&
+        deterministicCultureRoll(`${weekKey}_${riskyArtist.artist.id}_controversy`) < controversyChance
+    ) {
+        const moment = createMusicCultureMoment('CONTROVERSIAL_CAMPAIGN', {
+            id: `music_culture_controversial_campaign_${rel.id}_${riskyArtist.artist.id}`,
+            headline: `${riskyArtist.artist.stageName} controversy clips hit ${rel.name}.`,
+            description: `The soundtrack choice gets dragged into the movie campaign, creating attention but making the rollout messier.`,
+            artistIds: [riskyArtist.artist.id],
+            artistNames: [riskyArtist.artist.stageName],
+            songTitle: riskyArtist.credit.songTitle,
+            projectTitle: rel.name,
+            heat: Math.min(100, Math.round(52 + musicImpact.controversyRisk + riskyArtist.credit.risk)),
+            week: player.currentWeek,
+            year: player.age,
+            impactLevel: musicImpact.controversyRisk >= 30 ? 'HIGH' : 'MEDIUM'
+        });
+        pushMoment(moment, 'music_watch');
+        reputationDelta -= moment.impactLevel === 'HIGH' ? 1.2 : 0.6;
+        rawHypeDelta -= moment.impactLevel === 'HIGH' ? 6 : 3;
+    }
+
+    return { moments, news, posts, logs, artistEarnings, reputationDelta, rawHypeDelta };
+};
+
+const getProductionHealthIncident = (player: Player, commitment: Commitment): 'stunt_fracture' | undefined => {
+    const project = commitment.projectDetails;
+    if (!project) return undefined;
+    const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
+    const lastProductionHealthIncident = Number(player.flags?.lastProductionHealthIncidentAbsoluteWeek || -999);
+    if (absoluteWeek - lastProductionHealthIncident < 16) return undefined;
+
+    const stuntHeavyGenres = ['ACTION', 'ADVENTURE', 'SUPERHERO', 'SCI_FI', 'THRILLER', 'HORROR', 'SPORTS'];
+    const intenseProduction = stuntHeavyGenres.includes(project.genre)
+        || Number(project.estimatedBudget || 0) >= 75_000_000
+        || ['LEAD', 'SUPPORTING'].includes(String(commitment.roleType || ''));
+    if (!intenseProduction) return undefined;
+
+    const body = Number(player.stats.body || 0);
+    const health = Number(player.stats.health || 0);
+    const productionPerformance = Number(commitment.productionPerformance || 0);
+    const risk = Math.min(0.12,
+        0.012
+        + (body < 32 ? 0.035 : 0)
+        + (health < 58 ? 0.025 : 0)
+        + (productionPerformance < 25 ? 0.018 : 0)
+        + (project.genre === 'ACTION' || project.genre === 'SUPERHERO' ? 0.018 : 0)
+    );
+    return Math.random() < risk ? 'stunt_fracture' : undefined;
 };
 
 const adjustPlatformFundingRelationship = (
@@ -251,6 +556,10 @@ const ensureObjectArray = <T extends Record<string, any>>(value: any): T[] => {
     return Array.isArray(value) ? value.filter(item => item && typeof item === 'object') as T[] : [];
 };
 
+const ensureMoneyArray = (value: any): number[] => (
+    Array.isArray(value) ? value.map(amount => ensureFiniteNumber(amount)).filter(amount => amount >= 0) : []
+);
+
 const getStreamingBidProfile = (packageScore: number, isSeries: boolean, runStrength = 1) => {
     let floor = 1.04;
     let ceiling = 1.3;
@@ -380,49 +689,60 @@ export const createYoutubeCopyrightEvent = (
                 id: `yt_copyright_life_${Date.now()}_${Math.random()}`,
                 type: 'LEGAL',
                 title: 'Copyright Claim',
+                titleKey: 'life.event.youtube.copyright.title',
                 description: `"${videoTitle}" has been hit with a copyright claim. Choose between a clean settlement, a quieter edit, or a risky dispute.`,
+                descriptionKey: 'life.event.youtube.copyright.description',
+                textVars: { videoTitle },
                 options: [
                     {
                         id: 'ACCEPT_CLAIM',
                         label: 'Accept Claim',
+                        labelKey: 'life.event.youtube.copyright.accept.label',
                         description: 'Close it immediately. You pay the full claim and lose a little audience trust.',
+                        descriptionKey: 'life.event.youtube.copyright.accept.description',
                         previewEffects: [
-                            { label: 'Cash', value: `-$${claimAmount.toLocaleString()}`, tone: 'negative' },
-                            { label: 'Audience Trust', value: '-2', tone: 'negative' },
-                            { label: 'Risk', value: 'None', tone: 'positive' }
+                            { label: 'Cash', labelKey: 'life.effect.cash', value: `-$${claimAmount.toLocaleString()}`, tone: 'negative' },
+                            { label: 'Audience Trust', labelKey: 'life.effect.audienceTrust', value: '-2', tone: 'negative' },
+                            { label: 'Risk', labelKey: 'life.effect.risk', value: 'None', tone: 'positive' }
                         ],
                         impact: createYoutubeChoiceImpact(resolution, 'ACCEPT_CLAIM')
                     },
                     {
                         id: 'EDIT_UPLOAD',
                         label: 'Edit Upload Quietly',
+                        labelKey: 'life.event.youtube.copyright.edit.label',
                         description: 'Remove the disputed segment. Cheaper than settling, but the audience notices the awkward edit.',
+                        descriptionKey: 'life.event.youtube.copyright.edit.description',
                         previewEffects: [
-                            { label: 'Editing Cost', value: `-$${editingFee.toLocaleString()}`, tone: 'negative' },
-                            { label: 'Controversy', value: '-6', tone: 'positive' },
-                            { label: 'Fan Mood', value: '-1', tone: 'negative' }
+                            { label: 'Editing Cost', labelKey: 'life.effect.editingCost', value: `-$${editingFee.toLocaleString()}`, tone: 'negative' },
+                            { label: 'Controversy', labelKey: 'life.effect.controversy', value: '-6', tone: 'positive' },
+                            { label: 'Fan Mood', labelKey: 'life.effect.fanMood', value: '-1', tone: 'negative' }
                         ],
                         impact: createYoutubeChoiceImpact(resolution, 'EDIT_UPLOAD')
                     },
                     {
                         id: 'DISPUTE_CLAIM',
                         label: 'Risky Dispute',
+                        labelKey: 'life.event.youtube.copyright.dispute.label',
                         description: 'A win boosts trust and reputation. A loss opens a legal case and raises controversy.',
+                        descriptionKey: 'life.event.youtube.copyright.dispute.description',
                         previewEffects: [
-                            { label: 'Upside', value: 'Trust +4', tone: 'positive' },
-                            { label: 'Risk', value: 'Legal case', tone: 'negative' }
+                            { label: 'Upside', labelKey: 'life.effect.upside', value: 'Trust +4', tone: 'positive' },
+                            { label: 'Risk', labelKey: 'life.effect.risk', value: 'Legal case', tone: 'negative' }
                         ],
                         impact: createYoutubeChoiceImpact(resolution, 'DISPUTE_CLAIM')
                     },
                     {
                         id: 'GOLDEN_LEGAL',
                         label: 'Golden Legal Team (Watch Ad)',
+                        labelKey: 'life.event.youtube.copyright.golden.label',
                         isGolden: true,
                         description: 'Platform lawyers clear the claim, recover momentum, and protect your channel.',
+                        descriptionKey: 'life.event.youtube.copyright.golden.description',
                         previewEffects: [
-                            { label: 'Audience Trust', value: '+5', tone: 'positive' },
-                            { label: 'Controversy', value: '-10', tone: 'positive' },
-                            { label: 'Views', value: 'Recovered', tone: 'positive' }
+                            { label: 'Audience Trust', labelKey: 'life.effect.audienceTrust', value: '+5', tone: 'positive' },
+                            { label: 'Controversy', labelKey: 'life.effect.controversy', value: '-10', tone: 'positive' },
+                            { label: 'Views', labelKey: 'life.effect.views', value: 'Recovered', tone: 'positive' }
                         ],
                         impact: createYoutubeChoiceImpact(resolution, 'GOLDEN_LEGAL')
                     }
@@ -453,38 +773,47 @@ export const createYoutubeBacklashEvent = (
                 id: `yt_backlash_life_${Date.now()}_${Math.random()}`,
                 type: 'SCANDAL',
                 title: 'Creator Backlash',
+                titleKey: 'life.event.youtube.backlash.title',
                 description: `The comments around "${videoTitle}" are turning ugly. Fans want a response before this becomes bigger than the video.`,
+                descriptionKey: 'life.event.youtube.backlash.description',
+                textVars: { videoTitle },
                 options: [
                     {
                         id: 'POST_APOLOGY',
                         label: 'Post Apology Video',
+                        labelKey: 'life.event.youtube.backlash.apology.label',
                         description: 'A controlled response that restores trust and cools the backlash.',
+                        descriptionKey: 'life.event.youtube.backlash.apology.description',
                         previewEffects: [
-                            { label: 'Audience Trust', value: '+7', tone: 'positive' },
-                            { label: 'Controversy', value: '-12', tone: 'positive' }
+                            { label: 'Audience Trust', labelKey: 'life.effect.audienceTrust', value: '+7', tone: 'positive' },
+                            { label: 'Controversy', labelKey: 'life.effect.controversy', value: '-12', tone: 'positive' }
                         ],
                         impact: createYoutubeChoiceImpact(resolution, 'POST_APOLOGY')
                     },
                     {
                         id: 'PR_TEAM',
                         label: 'Crisis PR Team (Watch Ad)',
+                        labelKey: 'life.event.youtube.backlash.pr.label',
                         isGolden: true,
                         description: 'Turn outrage into accountability while recovering audience momentum.',
+                        descriptionKey: 'life.event.youtube.backlash.pr.description',
                         previewEffects: [
-                            { label: 'Audience Trust', value: '+9', tone: 'positive' },
-                            { label: 'Controversy', value: '-16', tone: 'positive' },
-                            { label: 'Views', value: 'Recovered', tone: 'positive' }
+                            { label: 'Audience Trust', labelKey: 'life.effect.audienceTrust', value: '+9', tone: 'positive' },
+                            { label: 'Controversy', labelKey: 'life.effect.controversy', value: '-16', tone: 'positive' },
+                            { label: 'Views', labelKey: 'life.effect.views', value: 'Recovered', tone: 'positive' }
                         ],
                         impact: createYoutubeChoiceImpact(resolution, 'PR_TEAM')
                     },
                     {
                         id: 'DOUBLE_DOWN',
                         label: 'Double Down',
+                        labelKey: 'life.event.youtube.backlash.doubleDown.label',
                         description: 'Gain views and fame, but damage trust. Severe backlash may become a legal complaint.',
+                        descriptionKey: 'life.event.youtube.backlash.doubleDown.description',
                         previewEffects: [
-                            { label: 'Views', value: 'Spike', tone: 'positive' },
-                            { label: 'Audience Trust', value: '-8', tone: 'negative' },
-                            { label: 'Legal Risk', value: 'High', tone: 'negative' }
+                            { label: 'Views', labelKey: 'life.effect.views', value: 'Spike', tone: 'positive' },
+                            { label: 'Audience Trust', labelKey: 'life.effect.audienceTrust', value: '-8', tone: 'negative' },
+                            { label: 'Legal Risk', labelKey: 'life.effect.legalRisk', value: 'High', tone: 'negative' }
                         ],
                         impact: createYoutubeChoiceImpact(resolution, 'DOUBLE_DOWN')
                     }
@@ -498,21 +827,27 @@ export const createYoutubeCreatorInviteEvent = (
     player: Player,
     kind: 'PODCAST' | 'CREATOR_GALA' | 'PLATFORM_SUMMIT'
 ): ScheduledEvent => {
-    const eventCopy: Record<typeof kind, { title: string; description: string; venue: string }> = {
+    const eventCopy: Record<typeof kind, { title: string; titleKey: string; description: string; descriptionKey: string; venue: string }> = {
         PODCAST: {
             title: 'Podcast Invite',
+            titleKey: 'life.event.youtube.creatorInvite.PODCAST.title',
             venue: 'The Hot Seat Podcast',
-            description: `${player.name} is invited onto a major creator podcast. One honest answer can build trust, but one messy clip can travel everywhere.`
+            description: `${player.name} is invited onto a major creator podcast. One honest answer can build trust, but one messy clip can travel everywhere.`,
+            descriptionKey: 'life.event.youtube.creatorInvite.PODCAST.description'
         },
         CREATOR_GALA: {
             title: 'Creator Gala',
+            titleKey: 'life.event.youtube.creatorInvite.CREATOR_GALA.title',
             venue: 'Creator Awards Afterparty',
-            description: `${player.name} gets an invite to a private creator gala where brands, streamers, and celebrities trade favors off-camera.`
+            description: `${player.name} gets an invite to a private creator gala where brands, streamers, and celebrities trade favors off-camera.`,
+            descriptionKey: 'life.event.youtube.creatorInvite.CREATOR_GALA.description'
         },
         PLATFORM_SUMMIT: {
             title: 'Platform Summit',
+            titleKey: 'life.event.youtube.creatorInvite.PLATFORM_SUMMIT.title',
             venue: 'YouTube Creator Summit',
-            description: `YouTube wants ${player.name} at a closed-door creator summit. It is polished, powerful, and full of people who can change the channel's ceiling.`
+            description: `YouTube wants ${player.name} at a closed-door creator summit. It is polished, powerful, and full of people who can change the channel's ceiling.`,
+            descriptionKey: 'life.event.youtube.creatorInvite.PLATFORM_SUMMIT.description'
         }
     };
     const copy = eventCopy[kind];
@@ -533,39 +868,48 @@ export const createYoutubeCreatorInviteEvent = (
                 id: `yt_creator_life_${kind}_${Date.now()}_${Math.random()}`,
                 type: kind === 'PODCAST' ? 'NETWORKING' : 'LIFE',
                 title: copy.title,
+                titleKey: `life.event.youtube.creatorInvite.${kind}.title`,
                 description: copy.description,
+                descriptionKey: copy.descriptionKey,
+                textVars: { playerName: player.name },
                 options: [
                     {
                         id: 'STEADY_NETWORK',
                         label: kind === 'PODCAST' ? 'Give A Real Interview' : 'Work The Room',
+                        labelKey: kind === 'PODCAST' ? 'life.event.youtube.creatorInvite.steady.podcast.label' : 'life.event.youtube.creatorInvite.steady.room.label',
                         description: 'Build trust, reputation, and professional reach without chasing drama.',
+                        descriptionKey: 'life.event.youtube.creatorInvite.steady.description',
                         previewEffects: [
-                            { label: 'Audience Trust', value: '+6', tone: 'positive' },
-                            { label: 'Reputation', value: '+3', tone: 'positive' },
-                            { label: 'X Followers', value: kind === 'PLATFORM_SUMMIT' ? '+12K' : '+6K', tone: 'positive' }
+                            { label: 'Audience Trust', labelKey: 'life.effect.audienceTrust', value: '+6', tone: 'positive' },
+                            { label: 'Reputation', labelKey: 'life.effect.reputation', value: '+3', tone: 'positive' },
+                            { label: 'X Followers', labelKey: 'life.effect.xFollowers', value: kind === 'PLATFORM_SUMMIT' ? '+12K' : '+6K', tone: 'positive' }
                         ],
                         impact: createYoutubeChoiceImpact(resolution, 'STEADY_NETWORK')
                     },
                     {
                         id: 'CHASE_VIRAL',
                         label: kind === 'PODCAST' ? 'Chase The Viral Clip' : 'Make A Loud Entrance',
+                        labelKey: kind === 'PODCAST' ? 'life.event.youtube.creatorInvite.viral.podcast.label' : 'life.event.youtube.creatorInvite.viral.entrance.label',
                         description: 'Chase views, subscribers, and fame at the cost of trust and higher controversy.',
+                        descriptionKey: 'life.event.youtube.creatorInvite.viral.description',
                         previewEffects: [
-                            { label: 'Growth', value: 'High', tone: 'positive' },
-                            { label: 'Audience Trust', value: '-4', tone: 'negative' },
-                            { label: 'Controversy', value: '+12', tone: 'negative' }
+                            { label: 'Growth', labelKey: 'life.effect.growth', value: 'High', tone: 'positive' },
+                            { label: 'Audience Trust', labelKey: 'life.effect.audienceTrust', value: '-4', tone: 'negative' },
+                            { label: 'Controversy', labelKey: 'life.effect.controversy', value: '+12', tone: 'negative' }
                         ],
                         impact: createYoutubeChoiceImpact(resolution, 'CHASE_VIRAL')
                     },
                     {
                         id: 'GOLDEN_HANDLER',
                         label: 'Golden Handler (Watch Ad)',
+                        labelKey: 'life.event.youtube.creatorInvite.golden.label',
                         isGolden: true,
                         description: 'Best route. Your team scripts the moment, protects your image, and captures the upside.',
+                        descriptionKey: 'life.event.youtube.creatorInvite.golden.description',
                         previewEffects: [
-                            { label: 'Growth', value: 'Highest', tone: 'positive' },
-                            { label: 'Audience Trust', value: '+8', tone: 'positive' },
-                            { label: 'Controversy', value: '-8', tone: 'positive' }
+                            { label: 'Growth', labelKey: 'life.effect.growth', value: 'Highest', tone: 'positive' },
+                            { label: 'Audience Trust', labelKey: 'life.effect.audienceTrust', value: '+8', tone: 'positive' },
+                            { label: 'Controversy', labelKey: 'life.effect.controversy', value: '-8', tone: 'positive' }
                         ],
                         impact: createYoutubeChoiceImpact(resolution, 'GOLDEN_HANDLER')
                     }
@@ -591,9 +935,14 @@ export const createYoutubeRivalryEvent = (player: Player, random: () => number =
     const creatorScore = calculateYoutubeCreatorScore(player);
     const publicImage = getYoutubePublicImageLabel(player);
     const baseReach = Math.max(25000, player.youtube.subscribers * (0.25 + random() * 0.35));
-    const topic = player.youtube.creatorIdentity === 'CONTROVERSY_MAGNET' || publicImage === 'Volatile'
-        ? 'called your channel manufactured chaos'
+    const topicKey = player.youtube.creatorIdentity === 'CONTROVERSY_MAGNET' || publicImage === 'Volatile'
+        ? 'controversy'
         : player.youtube.creatorIdentity === 'PRESTIGE_FILMMAKER'
+            ? 'polished'
+            : 'copying';
+    const topic = topicKey === 'controversy'
+        ? 'called your channel manufactured chaos'
+        : topicKey === 'polished'
             ? 'said your creator era is too polished to be real'
             : 'accused you of copying their creator lane';
     const resolution: YoutubeEventResolution = {
@@ -613,39 +962,48 @@ export const createYoutubeRivalryEvent = (player: Player, random: () => number =
                 id: `yt_rivalry_life_${Date.now()}_${Math.random()}`,
                 type: 'SCANDAL',
                 title: `${rivalName} Starts Creator Drama`,
+                titleKey: 'life.event.youtube.rivalry.title',
                 description: `${rivalName} just ${topic}. The clip is moving across X and YouTube comments. This can become a growth moment, a messy feud, or a surprisingly valuable bridge.`,
+                descriptionKey: `life.event.youtube.rivalry.description.${topicKey}`,
+                textVars: { rivalName },
                 options: [
                     {
                         id: 'IGNORE_BAIT',
                         label: 'Ignore The Bait',
+                        labelKey: 'life.event.youtube.rivalry.ignore.label',
                         description: 'Avoid drama, protect trust, but lose a little momentum.',
+                        descriptionKey: 'life.event.youtube.rivalry.ignore.description',
                         previewEffects: [
-                            { label: 'Audience Trust', value: '+3', tone: 'positive' },
-                            { label: 'Controversy', value: '-5', tone: 'positive' },
-                            { label: 'Fan Mood', value: '-1', tone: 'negative' }
+                            { label: 'Audience Trust', labelKey: 'life.effect.audienceTrust', value: '+3', tone: 'positive' },
+                            { label: 'Controversy', labelKey: 'life.effect.controversy', value: '-5', tone: 'positive' },
+                            { label: 'Fan Mood', labelKey: 'life.effect.fanMood', value: '-1', tone: 'negative' }
                         ],
                         impact: createYoutubeChoiceImpact(resolution, 'IGNORE_BAIT')
                     },
                     {
                         id: 'CLAP_BACK',
                         label: 'Clap Back Publicly',
+                        labelKey: 'life.event.youtube.rivalry.clapBack.label',
                         description: 'Fast views and fame, but more heat and sponsor risk.',
+                        descriptionKey: 'life.event.youtube.rivalry.clapBack.description',
                         previewEffects: [
-                            { label: 'Views & Subs', value: 'Spike', tone: 'positive' },
-                            { label: 'Audience Trust', value: '-6', tone: 'negative' },
-                            { label: 'Controversy', value: '+16', tone: 'negative' }
+                            { label: 'Views & Subs', labelKey: 'life.effect.viewsSubs', value: 'Spike', tone: 'positive' },
+                            { label: 'Audience Trust', labelKey: 'life.effect.audienceTrust', value: '-6', tone: 'negative' },
+                            { label: 'Controversy', labelKey: 'life.effect.controversy', value: '+16', tone: 'negative' }
                         ],
                         impact: createYoutubeChoiceImpact(resolution, 'CLAP_BACK')
                     },
                     {
                         id: 'MEDIATED_COLLAB',
                         label: 'Golden Mediated Collab (Watch Ad)',
+                        labelKey: 'life.event.youtube.rivalry.golden.label',
                         isGolden: true,
                         description: 'Best route. A mediator turns the feud into a controlled collab without the messy downside.',
+                        descriptionKey: 'life.event.youtube.rivalry.golden.description',
                         previewEffects: [
-                            { label: 'Views & Subs', value: 'Big gain', tone: 'positive' },
-                            { label: 'Audience Trust', value: '+8', tone: 'positive' },
-                            { label: 'Controversy', value: '-12', tone: 'positive' }
+                            { label: 'Views & Subs', labelKey: 'life.effect.viewsSubs', value: 'Big gain', tone: 'positive' },
+                            { label: 'Audience Trust', labelKey: 'life.effect.audienceTrust', value: '+8', tone: 'positive' },
+                            { label: 'Controversy', labelKey: 'life.effect.controversy', value: '-12', tone: 'positive' }
                         ],
                         impact: createYoutubeChoiceImpact(resolution, 'MEDIATED_COLLAB')
                     }
@@ -667,6 +1025,212 @@ const getPlayerProjectRoleType = (roleType: string | undefined, castList?: any[]
     const playerCastEntry = castList?.find((member: any) => member?.actorId === 'PLAYER_SELF');
     if (playerCastEntry?.roleType) return playerCastEntry.roleType as RoleType;
     return (roleType as RoleType) || 'MINOR';
+};
+
+const defaultFuturePotential = (): FuturePotential => ({
+    sequelChance: 0,
+    franchiseChance: 0,
+    rebootChance: 0,
+    renewalChance: 0,
+    isFranchiseStarter: false,
+    isSequelGreenlit: false,
+    isRenewed: false,
+    seriesStatus: 'N/A',
+    playerReturnStatus: undefined,
+    returnStatusNote: undefined
+});
+
+const normalizeReleaseProjectDetails = (details: any): ProjectDetails => {
+    const safeDetails = details && typeof details === 'object' ? details : {};
+    const normalized = {
+        ...safeDetails,
+        title: safeDetails.title || safeDetails.name || 'Untitled Project',
+        type: safeDetails.type || 'MOVIE',
+        description: safeDetails.description || '',
+        studioId: safeDetails.studioId || 'ARTISAN_PICTURES',
+        subtype: safeDetails.subtype || 'STANDALONE',
+        genre: safeDetails.genre || 'DRAMA',
+        budgetTier: safeDetails.budgetTier || 'MID',
+        estimatedBudget: ensureFiniteNumber(safeDetails.estimatedBudget),
+        visibleHype: safeDetails.visibleHype || 'MID',
+        hiddenStats: {
+            ...(safeDetails.hiddenStats || {})
+        },
+        directorName: safeDetails.directorName || 'Unknown Director',
+        visibleDirectorTier: safeDetails.visibleDirectorTier || 'Unknown',
+        visibleScriptBuzz: safeDetails.visibleScriptBuzz || 'Unknown',
+        visibleCastStrength: safeDetails.visibleCastStrength || 'Unknown',
+        castList: ensureObjectArray(safeDetails.castList),
+        reviews: ensureObjectArray(safeDetails.reviews),
+        selectedLocations: Array.isArray(safeDetails.selectedLocations) ? safeDetails.selectedLocations : [],
+        releaseRegionIds: Array.isArray(safeDetails.releaseRegionIds) ? safeDetails.releaseRegionIds : [],
+        releaseChainSelections: safeDetails.releaseChainSelections && typeof safeDetails.releaseChainSelections === 'object'
+            ? safeDetails.releaseChainSelections
+            : {},
+        reservedMarketingBudget: ensureFiniteNumber(safeDetails.reservedMarketingBudget),
+        marketingBudgetSpent: ensureFiniteNumber(safeDetails.marketingBudgetSpent),
+        marketingBudgetRemaining: ensureFiniteNumber(safeDetails.marketingBudgetRemaining),
+        returnedMarketingBudget: ensureFiniteNumber(safeDetails.returnedMarketingBudget),
+        totalCampaignSpend: ensureFiniteNumber(safeDetails.totalCampaignSpend),
+        marketingChannelAllocations: safeDetails.marketingChannelAllocations && typeof safeDetails.marketingChannelAllocations === 'object'
+            ? safeDetails.marketingChannelAllocations
+            : undefined,
+        campaignFitSnapshot: safeDetails.campaignFitSnapshot && typeof safeDetails.campaignFitSnapshot === 'object'
+            ? safeDetails.campaignFitSnapshot
+            : undefined,
+        campaignForecastSnapshot: safeDetails.campaignForecastSnapshot && typeof safeDetails.campaignForecastSnapshot === 'object'
+            ? safeDetails.campaignForecastSnapshot
+            : undefined,
+        campaignRealitySnapshot: safeDetails.campaignRealitySnapshot && typeof safeDetails.campaignRealitySnapshot === 'object'
+            ? safeDetails.campaignRealitySnapshot
+            : undefined,
+        investorPlan: safeDetails.investorPlan && typeof safeDetails.investorPlan === 'object'
+            ? safeDetails.investorPlan
+            : undefined,
+        investorPayouts: safeDetails.investorPayouts && typeof safeDetails.investorPayouts === 'object'
+            ? {
+                lifetimeInvestorPayout: ensureFiniteNumber(safeDetails.investorPayouts.lifetimeInvestorPayout),
+                weeklyInvestorPayouts: ensureMoneyArray(safeDetails.investorPayouts.weeklyInvestorPayouts)
+            }
+            : undefined,
+    } as ProjectDetails;
+    return withAutomaticMusicPlan(normalized);
+};
+
+const createPastProjectArchiveSnapshot = (
+    release: ActiveRelease,
+    options: { player: Player; streamingRevenue?: number; totalViews?: number; weeklyStreamingBreakdowns?: any[]; weeklyViews?: number[] }
+): PastProject => {
+    const projectDetails = normalizeReleaseProjectDetails(release.projectDetails);
+    const weeklyGross = ensureMoneyArray(release.weeklyGross);
+    const weeklyStudioReceipts = ensureMoneyArray(release.weeklyStudioReceipts);
+    const weeklyExhibitorReceipts = ensureMoneyArray(release.weeklyExhibitorReceipts);
+    const weeklyViews = ensureMoneyArray(options.weeklyViews || release.streaming?.weeklyViews);
+    const weeklyDistributionBreakdowns = ensureObjectArray<TheatricalDistributionBreakdown>(release.weeklyDistributionBreakdowns);
+    const weeklyStreamingBreakdowns = ensureObjectArray<StreamingDistributionBreakdown>(options.weeklyStreamingBreakdowns || release.weeklyStreamingBreakdowns);
+    const totalGross = ensureFiniteNumber(release.totalGross, weeklyGross.reduce((sum, value) => sum + value, 0));
+    const streamingRevenue = ensureFiniteNumber(options.streamingRevenue ?? release.streamingRevenue);
+    const soundtrackRevenue = ensureFiniteNumber(release.soundtrackRevenue);
+    const totalStudioReceipts = ensureFiniteNumber(release.totalStudioReceipts, weeklyStudioReceipts.reduce((sum, value) => sum + value, 0));
+    const totalExhibitorReceipts = ensureFiniteNumber(release.totalExhibitorReceipts, weeklyExhibitorReceipts.reduce((sum, value) => sum + value, 0));
+    const qualityScore = ensureFiniteNumber(projectDetails.hiddenStats?.qualityScore, ensureFiniteNumber(release.productionPerformance, 50));
+
+    return {
+        id: release.id,
+        name: release.name,
+        type: 'ACTING_GIG',
+        roleType: getPlayerProjectRoleType(release.roleType, projectDetails.castList),
+        year: release.releaseYear || options.player.age,
+        earnings: 0,
+        rating: ensureFiniteNumber(release.imdbRating),
+        reception: release.status || 'FINISHED',
+        projectQuality: qualityScore,
+        imdbRating: release.imdbRating,
+        boxOfficeResult: `$${(totalGross / 1000000).toFixed(1)}M`,
+        outcomeTier: calculateRunOutcome(totalGross + streamingRevenue + soundtrackRevenue, ensureFiniteNumber(release.budget), release.imdbRating || 5).tier,
+        subtype: projectDetails.subtype,
+        futurePotential: release.futurePotential || defaultFuturePotential(),
+        studioId: projectDetails.studioId,
+        streamingPlatform: release.streaming?.platformId,
+        totalViews: ensureFiniteNumber(options.totalViews ?? release.streaming?.totalViews),
+        weeklyViews,
+        streamingRevenue,
+        weeklyStreamingBreakdowns,
+        soundtrackRevenue,
+        weeklySoundtrackRevenue: ensureMoneyArray(release.weeklySoundtrackRevenue),
+        soundtrackRevenueBreakdown: release.soundtrackRevenueBreakdown,
+        weeklySoundtrackBreakdowns: ensureObjectArray(release.weeklySoundtrackBreakdowns),
+        investorPlan: release.investorPlan || projectDetails.investorPlan,
+        investorPayouts: release.investorPayouts,
+        castList: ensureObjectArray(projectDetails.castList),
+        reviews: ensureObjectArray(projectDetails.reviews),
+        campaignRealitySnapshot: projectDetails.campaignRealitySnapshot,
+        campaignPositioning: projectDetails.campaignPositioning,
+        campaignTimeline: projectDetails.campaignTimeline,
+        campaignFitSnapshot: projectDetails.campaignFitSnapshot,
+        campaignForecastSnapshot: projectDetails.campaignForecastSnapshot,
+        marketingChannelAllocations: projectDetails.marketingChannelAllocations,
+        reservedMarketingBudget: ensureFiniteNumber(projectDetails.reservedMarketingBudget),
+        marketingBudgetSpent: ensureFiniteNumber(projectDetails.marketingBudgetSpent),
+        marketingBudgetRemaining: ensureFiniteNumber(projectDetails.marketingBudgetRemaining),
+        returnedMarketingBudget: ensureFiniteNumber(projectDetails.returnedMarketingBudget),
+        totalCampaignSpend: ensureFiniteNumber(projectDetails.totalCampaignSpend),
+        budget: ensureFiniteNumber(release.budget),
+        gross: totalGross,
+        weeklyGross,
+        weeklyStudioReceipts,
+        totalStudioReceipts,
+        weeklyExhibitorReceipts,
+        totalExhibitorReceipts,
+        weeklyDistributionBreakdowns,
+        releaseRegionIds: Array.isArray(projectDetails.releaseRegionIds) ? projectDetails.releaseRegionIds : [],
+        releaseChainSelections: projectDetails.releaseChainSelections && typeof projectDetails.releaseChainSelections === 'object'
+            ? projectDetails.releaseChainSelections
+            : {},
+        boxOfficeArchiveVersion: 1,
+        genre: projectDetails.genre,
+        format: projectDetails.format,
+        subjectName: projectDetails.subjectName,
+        subjectType: projectDetails.subjectType,
+        description: projectDetails.description,
+        projectType: release.type || projectDetails.type,
+        royaltyPercentage: release.royaltyPercentage,
+        franchiseId: projectDetails.franchiseId,
+        universeId: projectDetails.universeId,
+        universeSagaName: projectDetails.universeSagaName,
+        universePhaseName: projectDetails.universePhaseName,
+        installmentNumber: projectDetails.installmentNumber,
+        directorId: projectDetails.directorId,
+        sourceScriptId: projectDetails.sourceScriptId,
+        isOriginal: projectDetails.isOriginal,
+        releaseWeek: release.releaseWeek,
+        releaseYear: release.releaseYear,
+        releasedAtAbsoluteWeek: release.releasedAtAbsoluteWeek,
+        customPoster: projectDetails.customPoster,
+        musicPlan: projectDetails.musicPlan,
+    };
+};
+
+const buildFriendFavorRequest = (player: Player, absoluteWeek: number): Message | null => {
+    const flags = player.flags || {};
+    const lastFavorWeek = Number(flags.lastFriendFavorAbsWeek || -999);
+    if (absoluteWeek - lastFavorWeek < 14) return null;
+
+    const friends = (player.relationships || []).filter((relationship: Relationship) =>
+        relationship.relation === 'Friend' && (relationship.closeness || 0) >= 35
+    );
+    if (friends.length === 0) return null;
+
+    const fame = Number(player.stats?.fame || 0);
+    const cash = Number(player.money || 0);
+    if (fame < 28 && cash < 150000) return null;
+
+    const chance = Math.min(0.32, 0.08 + Math.max(0, fame - 28) / 280 + Math.max(0, cash - 150000) / 4000000);
+    if (Math.random() > chance) return null;
+
+    const friend = friends[Math.floor(Math.random() * friends.length)];
+    const wantsRoleHelp = fame >= 45 && Math.random() < 0.55;
+    const amount = Math.max(2500, Math.min(250000, Math.round((cash * (0.015 + Math.random() * 0.025)) / 500) * 500));
+
+    return {
+        id: `friend_favor_${friend.id}_${absoluteWeek}_${Date.now()}`,
+        sender: friend.name,
+        subject: wantsRoleHelp ? 'Can you put in a word?' : 'Need a little help',
+        text: wantsRoleHelp
+            ? `${friend.name} saw your career taking off and asks if you can mention them for a small role, cameo, or set introduction. Helping could deepen the friendship, but forcing it may hurt your industry reputation.`
+            : `${friend.name} asks for $${amount.toLocaleString()} to handle a personal problem. Helping can build loyalty; ignoring it may cool the friendship.`,
+        type: 'SYSTEM',
+        data: {
+            kind: 'FRIEND_FAVOR',
+            friendId: friend.id,
+            favorType: wantsRoleHelp ? 'ROLE_HELP' : 'MONEY',
+            amount: wantsRoleHelp ? 0 : amount,
+            createdAbsoluteWeek: absoluteWeek,
+        },
+        isRead: false,
+        weekSent: player.currentWeek,
+        expiresIn: 6,
+    };
 };
 
 // Returns updated player AND a flag if an ad should be triggered
@@ -720,6 +1284,11 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
     if (!Array.isArray(nextPlayer.world.famousMoviesReleased)) nextPlayer.world.famousMoviesReleased = [];
     if (!Array.isArray(nextPlayer.world.awardHistory)) nextPlayer.world.awardHistory = [];
     if (!Array.isArray(nextPlayer.world.upcomingRivals)) nextPlayer.world.upcomingRivals = [];
+    if (nextPlayer.world.musicIndustry && !Array.isArray(nextPlayer.world.musicIndustry.chart)) nextPlayer.world.musicIndustry.chart = [];
+    if (nextPlayer.world.musicIndustry && !Array.isArray(nextPlayer.world.musicIndustry.history)) nextPlayer.world.musicIndustry.history = [];
+    if (nextPlayer.world.musicIndustry && !Array.isArray(nextPlayer.world.musicIndustry.recentReleases)) nextPlayer.world.musicIndustry.recentReleases = [];
+    if (nextPlayer.world.musicIndustry && !Array.isArray(nextPlayer.world.musicIndustry.rivalries)) nextPlayer.world.musicIndustry.rivalries = [];
+    if (nextPlayer.world.musicIndustry && !Array.isArray(nextPlayer.world.musicIndustry.scandals)) nextPlayer.world.musicIndustry.scandals = [];
     if (!nextPlayer.studio) {
         nextPlayer.studio = {
             isUnlocked: false,
@@ -775,38 +1344,44 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
         ...release,
         roleType: getPlayerProjectRoleType(release.roleType, release.projectDetails?.castList),
         weekNum: ensureFiniteNumber(release.weekNum, 1),
-        weeklyGross: Array.isArray(release.weeklyGross) ? release.weeklyGross.map(gross => ensureFiniteNumber(gross)).filter(gross => gross >= 0) : [],
+        weeklyGross: ensureMoneyArray(release.weeklyGross),
         totalGross: ensureFiniteNumber(release.totalGross),
+        weeklyStudioReceipts: ensureMoneyArray(release.weeklyStudioReceipts),
+        totalStudioReceipts: ensureFiniteNumber(release.totalStudioReceipts),
+        weeklyExhibitorReceipts: ensureMoneyArray(release.weeklyExhibitorReceipts),
+        totalExhibitorReceipts: ensureFiniteNumber(release.totalExhibitorReceipts),
+        weeklyDistributionBreakdowns: ensureObjectArray(release.weeklyDistributionBreakdowns),
         budget: ensureFiniteNumber(release.budget),
         imdbRating: release.imdbRating === undefined ? undefined : ensureFiniteNumber(release.imdbRating),
         productionPerformance: ensureFiniteNumber(release.productionPerformance, 50),
         sequelDecisionWeek: release.sequelDecisionWeek === undefined ? undefined : ensureFiniteNumber(release.sequelDecisionWeek),
         promotionalBuzz: ensureFiniteNumber(release.promotionalBuzz),
         streamingRevenue: ensureFiniteNumber(release.streamingRevenue),
+        weeklyStreamingBreakdowns: ensureObjectArray(release.weeklyStreamingBreakdowns),
+        soundtrackRevenue: ensureFiniteNumber(release.soundtrackRevenue),
+        weeklySoundtrackRevenue: ensureMoneyArray(release.weeklySoundtrackRevenue),
+        soundtrackRevenueBreakdown: release.soundtrackRevenueBreakdown && typeof release.soundtrackRevenueBreakdown === 'object'
+            ? mergeSoundtrackRevenueBreakdowns(undefined, release.soundtrackRevenueBreakdown)
+            : undefined,
+        weeklySoundtrackBreakdowns: ensureObjectArray(release.weeklySoundtrackBreakdowns),
+        investorPlan: release.investorPlan || release.projectDetails?.investorPlan,
+        investorPayouts: release.investorPayouts && typeof release.investorPayouts === 'object'
+            ? {
+                lifetimeInvestorPayout: ensureFiniteNumber(release.investorPayouts.lifetimeInvestorPayout),
+                weeklyInvestorPayouts: ensureMoneyArray(release.investorPayouts.weeklyInvestorPayouts)
+            }
+            : undefined,
         royaltyPercentage: release.royaltyPercentage === undefined ? undefined : ensureFiniteNumber(release.royaltyPercentage),
         studioRoyaltyPercentage: release.studioRoyaltyPercentage === undefined ? undefined : ensureFiniteNumber(release.studioRoyaltyPercentage),
         maxTheatricalWeeks: release.maxTheatricalWeeks === undefined ? undefined : ensureFiniteNumber(release.maxTheatricalWeeks),
         generatedNewsKeys: Array.isArray(release.generatedNewsKeys) ? release.generatedNewsKeys.filter(key => typeof key === 'string') : [],
-        projectDetails: release.projectDetails && typeof release.projectDetails === 'object'
-            ? {
-                ...release.projectDetails,
-                hiddenStats: {
-                    ...(release.projectDetails.hiddenStats || {})
-                },
-                castList: ensureObjectArray(release.projectDetails.castList),
-                reviews: ensureObjectArray(release.projectDetails.reviews)
-            }
-            : {
-                hiddenStats: {},
-                castList: [],
-                reviews: []
-            } as any,
+        projectDetails: normalizeReleaseProjectDetails(release.projectDetails),
         streaming: release.streaming && typeof release.streaming === 'object'
             ? {
                 ...release.streaming,
                 weekOnPlatform: ensureFiniteNumber(release.streaming.weekOnPlatform, 1),
                 totalViews: ensureFiniteNumber(release.streaming.totalViews),
-                weeklyViews: Array.isArray(release.streaming.weeklyViews) ? release.streaming.weeklyViews.map(views => ensureFiniteNumber(views)).filter(views => views >= 0) : [],
+                weeklyViews: ensureMoneyArray(release.streaming.weeklyViews),
                 ...(typeof inferStreamingStartWeekAbsolute(release.streaming, nextPlayer.age, nextPlayer.currentWeek) === 'number'
                     ? { startWeekAbsolute: inferStreamingStartWeekAbsolute(release.streaming, nextPlayer.age, nextPlayer.currentWeek) }
                     : {})
@@ -840,6 +1415,7 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
         }
     }));
     nextPlayer.inbox = ensureObjectArray<Message>(nextPlayer.inbox);
+    nextPlayer.outsideProductions = ensureObjectArray(nextPlayer.outsideProductions);
     nextPlayer.news = ensureObjectArray(nextPlayer.news);
     nextPlayer.relationships = ensureObjectArray(nextPlayer.relationships);
     nextPlayer.scheduledEvents = ensureObjectArray<ScheduledEvent>(nextPlayer.scheduledEvents).map(event => ({
@@ -856,6 +1432,8 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
             data: event.data && typeof event.data === 'object' ? event.data : {}
         }))
         .filter(event => typeof event.id === 'string' && typeof event.type === 'string');
+    const outsideProductionResult = processOutsideProductionsWeek(nextPlayer);
+    nextPlayer = outsideProductionResult.player;
     nextPlayer.portfolio = ensureObjectArray(nextPlayer.portfolio).map((holding: any) => ({
         ...holding,
         shares: ensureFiniteNumber(holding.shares)
@@ -1000,6 +1578,14 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
         }
         return true;
     });
+
+    const friendFavorAbsWeek = getAbsoluteWeek(nextPlayer.age, nextPlayer.currentWeek);
+    const friendFavorRequest = buildFriendFavorRequest(nextPlayer, friendFavorAbsWeek);
+    if (friendFavorRequest) {
+        nextPlayer.inbox.unshift(friendFavorRequest);
+        nextPlayer.flags.lastFriendFavorAbsWeek = friendFavorAbsWeek;
+        logsToAdd.push({ msg: `New friend favor request from ${friendFavorRequest.sender}.`, type: 'neutral' });
+    }
     
     // Transaction Helper
     const addTransaction = (amount: number, category: TransactionCategory, description: string) => {
@@ -1153,6 +1739,61 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
             worldResult.logs.forEach(message => logsToAdd.push({ msg: `🏢 ${message}`, type: 'neutral' }));
         }
 
+        const musicResult = processMusicIndustryWeek(nextPlayer);
+        nextPlayer.world = musicResult.world;
+        if (musicResult.news.length > 0) {
+            nextPlayer.news = [...musicResult.news, ...nextPlayer.news].slice(0, 50);
+        }
+        if (musicResult.news.length > 0) {
+            const latestMusicRelease = musicResult.world.musicIndustry?.recentReleases?.[0];
+            const latestRivalry = musicResult.world.musicIndustry?.rivalries?.[0];
+            const latestScandal = musicResult.world.musicIndustry?.scandals?.[0];
+            const musicSocialPosts: XPost[] = musicResult.news.slice(0, 2).map((item, index) => {
+                const isScandal = latestScandal && item.id === latestScandal.id;
+                const isRivalry = /rivalry/i.test(item.headline);
+                const reach = latestMusicRelease?.youtubeViews || latestMusicRelease?.followerGain || 50000;
+                return {
+                    id: `x_music_world_${item.id}_${index}`,
+                    authorId: isScandal ? 'music_watch' : isRivalry ? 'chart_fans' : 'soundtrack_pulse',
+                    authorName: isScandal ? 'Music Watch' : isRivalry ? 'Chart Fans' : 'Soundtrack Pulse',
+                    authorHandle: isScandal ? '@musicwatch' : isRivalry ? '@chartfans' : '@soundtrackpulse',
+                    authorAvatar: `https://api.dicebear.com/8.x/pixel-art/svg?seed=${encodeURIComponent(item.headline)}`,
+                    content: isScandal
+                        ? `${latestScandal?.artistName || 'An artist'} is trending for the wrong reasons. Music Twitter is already dissecting the rollout.`
+                        : isRivalry
+                            ? `${latestRivalry?.artistNames?.join(' vs ') || 'Two fanbases'} just turned the chart into a fight. Numbers, clips, receipts, everything.`
+                            : `${latestMusicRelease?.artistName || 'An artist'} has a new music moment moving through YouTube and social: "${latestMusicRelease?.songTitle || item.headline}".`,
+                    timestamp: Date.now() - index * 5000,
+                    likes: Math.max(40, Math.floor(reach * 0.012)),
+                    retweets: Math.max(8, Math.floor(reach * 0.0025)),
+                    replies: Math.max(3, Math.floor(reach * 0.0014)),
+                    isPlayer: false,
+                    isLiked: false,
+                    isRetweeted: false,
+                    isVerified: true,
+                    postType: 'FILM_OPINION',
+                    sentiment: isScandal ? 'MESSY' : isRivalry ? 'INDUSTRY' : 'SUPPORTIVE'
+                };
+            });
+            if (musicSocialPosts.length) {
+                nextPlayer.x.feed = [...musicSocialPosts, ...(nextPlayer.x.feed || [])].slice(0, 80);
+            }
+        }
+        // Music-world releases and chart movement already feed News and social.
+        // Keep the player live feed for personal career events.
+        if (musicResult.artistEarnings?.length) {
+            nextPlayer = applyMusicArtistNpcEarnings(nextPlayer, musicResult.artistEarnings);
+        }
+        if (musicResult.newArtists?.length) {
+            const extraNPCs = Array.isArray(nextPlayer.flags.extraNPCs) ? nextPlayer.flags.extraNPCs : [];
+            const debutNPCs = musicResult.newArtists
+                .map(artist => createNPCFromMusicArtist(artist))
+                .filter(npc => !NPC_DATABASE.some(existing => existing.id === npc.id) && !extraNPCs.some(existing => existing.id === npc.id));
+            if (debutNPCs.length) {
+                nextPlayer.flags.extraNPCs = [...extraNPCs, ...debutNPCs].slice(-240);
+            }
+        }
+
         Object.values(nextPlayer.world.universes || {}).forEach((universe: any) => {
             if (!universe?.studioId) return;
             const releaseActivity = getUniverseReleaseActivity(nextPlayer, universe, nextPlayer.activeReleases || []);
@@ -1175,15 +1816,33 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
     }
 
     // --- 2. STOCK MARKET UPDATE ---
-    const marketUpdate = processStockMarket(nextPlayer.stocks, nextPlayer.currentWeek);
+    const marketUpdate = processStockMarket(nextPlayer.stocks, nextPlayer.currentWeek, nextPlayer);
     nextPlayer.stocks = marketUpdate.stocks;
+    if (marketUpdate.news.length > 0) {
+        nextPlayer.news = [
+            ...marketUpdate.news,
+            ...(nextPlayer.news || []).filter(existing => !marketUpdate.news.some(item => item.id === existing.id)),
+        ].slice(0, 80);
+    }
+    marketUpdate.notifications.forEach(notification => {
+        logsToAdd.push({ msg: `📈 ${notification}`, type: 'neutral' });
+    });
     
     // Calculate Dividends
-    const dividends = getDividendPayout(nextPlayer.portfolio, nextPlayer.stocks, nextPlayer.currentWeek);
+    const dividends = getDividendPayout(nextPlayer.portfolio, nextPlayer.stocks, nextPlayer.currentWeek, nextPlayer);
     if (dividends > 0) {
         addTransaction(dividends, 'DIVIDEND', 'Stock Dividends');
         logsToAdd.push({ msg: `💰 Stock Dividends Received: $${dividends.toLocaleString()}`, type: 'positive' });
     }
+
+    nextPlayer = processShareholderVoting(nextPlayer);
+    nextPlayer = processStockTakeoverEvents(nextPlayer);
+    nextPlayer = processAcquisitionDebtService(nextPlayer).player;
+    nextPlayer = processRegulatorPressure(nextPlayer);
+    nextPlayer = processWorldReactions(nextPlayer);
+    nextPlayer = processRivalRetaliation(nextPlayer);
+    nextPlayer = processTalentInstability(nextPlayer);
+    nextPlayer = processAcquisitionMarketPulse(nextPlayer);
 
     // --- 3. YOUTUBE & TALENT SIMULATION ---
     try {
@@ -2081,7 +2740,7 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
         const updatedBusinesses: Business[] = [];
         nextPlayer.businesses.forEach(biz => {
             try {
-                const res = processBusinessWeek(biz, nextPlayer.stats.fame, nextPlayer.currentWeek);
+                const res = processBusinessWeek(biz, nextPlayer.stats.fame, nextPlayer.currentWeek, getPlayerLanguage(nextPlayer));
                 updatedBusinesses.push(res.updated);
 
                 res.rightsReportsReady.forEach(report => {
@@ -2290,6 +2949,14 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
     const fameBonus = getBonusGain(publicist);
     if (nextPlayer.stats.fame > 0) {
         nextPlayer.stats.fame = Math.max(0, Math.min(100, nextPlayer.stats.fame - FAME_DECAY + fameBonus));
+    }
+
+    const healthConditionsResult = processHealthConditionsWeek(nextPlayer);
+    nextPlayer = healthConditionsResult.player;
+    nextPlayer.activeHealthConditions = healthConditionsResult.player.activeHealthConditions || [];
+    healthConditionsResult.logs.forEach(log => logsToAdd.push({ msg: log.message, type: log.type }));
+    if (healthConditionsResult.news.length) {
+        nextPlayer.news = [...healthConditionsResult.news, ...(nextPlayer.news || [])].slice(0, 80);
     }
 
     // --- CRITICAL WELLBEING SAFETY NET ---
@@ -2783,12 +3450,21 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                     data: {
                         crisisId: crisis.id,
                         projectId: updatedC.id,
+                        titleKey: crisis.titleKey,
+                        descriptionKey: crisis.descriptionKey,
+                        textVars: crisis.textVars,
                         trait: (crisis as any).trait,
                         npcId: (crisis as any).npcId,
                         isGeneral: (crisis as any).isGeneral,
                         templateIndex: (crisis as any).templateIndex,
                         isGenerative: (crisis as any).isGenerative,
-                        options: crisis.options.map((o, i) => ({ label: o.label, index: i }))
+                        options: crisis.options.map((o, i) => ({
+                            label: o.label,
+                            labelKey: o.labelKey,
+                            textVars: o.textVars,
+                            isGolden: o.isGolden,
+                            index: i
+                        }))
                     }
                 });
                 logsToAdd.push({ msg: `⚠️ CRISIS on the set of "${updatedC.name}"!`, type: 'negative' });
@@ -2807,10 +3483,38 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                     data: {
                         crisisId: decision.id,
                         projectId: updatedC.id,
-                        options: decision.options.map((o, i) => ({ label: o.label, index: i }))
+                        titleKey: decision.titleKey,
+                        descriptionKey: decision.descriptionKey,
+                        textVars: decision.textVars,
+                        options: decision.options.map((o, i) => ({
+                            label: o.label,
+                            labelKey: o.labelKey,
+                            textVars: o.textVars,
+                            isGolden: o.isGolden,
+                            index: i
+                        }))
                     }
                 });
                 logsToAdd.push({ msg: `🎬 Creative Decision needed for "${updatedC.name}"!`, type: 'neutral' });
+            }
+
+            const productionHealthIncident = getProductionHealthIncident(nextPlayer, updatedC);
+            if (productionHealthIncident) {
+                const incident = applyHealthConditionIncident(nextPlayer, productionHealthIncident, {
+                    sourceLabel: `Production on "${updatedC.name}"`,
+                    detail: `A demanding shoot created a medical issue that should be treated in Wellness.`,
+                    publicity: (nextPlayer.stats.fame || 0) >= 45 ? 'PUBLIC_RISK' : 'STANDARD',
+                });
+                nextPlayer = {
+                    ...incident.player,
+                    flags: {
+                        ...(incident.player.flags || {}),
+                        lastProductionHealthIncidentAbsoluteWeek: getAbsoluteWeek(nextPlayer.age, nextPlayer.currentWeek),
+                    },
+                    inbox: [...incident.inbox, ...(incident.player.inbox || [])].slice(0, 120),
+                    news: [...incident.news, ...(incident.player.news || [])].slice(0, 100),
+                };
+                incident.logs.forEach(log => logsToAdd.push({ msg: log.message, type: log.type }));
             }
 
             if (weeksLeft <= 0) {
@@ -2832,6 +3536,10 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                 const budget = updatedC.projectDetails?.estimatedBudget || getEstimatedBudget(updatedC.projectDetails?.budgetTier || 'LOW');
                 const isTV = updatedC.projectDetails?.type === 'SERIES';
                 const isStreamingOnly = isTV || updatedC.projectDetails?.releaseStrategy === 'STREAMING_ONLY';
+
+                let releaseMusicImpact = updatedC.projectDetails
+                    ? calculateProjectMusicImpact(updatedC.projectDetails, updatedC.projectDetails.musicPlan, getMusicArtistCatalog(nextPlayer.world))
+                    : undefined;
 
                 if (updatedC.projectDetails) {
                     if (!updatedC.projectDetails.castList) updatedC.projectDetails.castList = generateCastList(nextPlayer, updatedC.projectDetails, updatedC.roleType || 'MINOR');
@@ -2859,6 +3567,12 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                     );
                     updatedC.projectDetails.hiddenStats.castDepthScore = updatedC.projectDetails.hiddenStats.castDepthScore ?? castDepth.score;
                     updatedC.projectDetails.hiddenStats.castDepthNote = updatedC.projectDetails.hiddenStats.castDepthNote ?? castDepth.note;
+                    releaseMusicImpact = calculateProjectMusicImpact(updatedC.projectDetails, updatedC.projectDetails.musicPlan, getMusicArtistCatalog(nextPlayer.world));
+                    updatedC.projectDetails.hiddenStats = applyMusicImpactToHiddenStats(
+                        updatedC.projectDetails.hiddenStats,
+                        releaseMusicImpact,
+                        updatedC.projectDetails.musicPlan
+                    );
 
                     const quality = updatedC.projectDetails.hiddenStats.qualityScore;
                     const isRecast = updatedC.projectDetails.hiddenStats.isRecast;
@@ -2931,6 +3645,51 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                         updatedC.projectDetails.hiddenStats.prestigeBonus = (updatedC.projectDetails.hiddenStats.prestigeBonus || 0) + 1;
                     }
 
+                    if (releaseMusicImpact && releaseMusicImpact.score > 0) {
+                        accumulatedBuzz += releaseMusicImpact.socialHypeLift + Math.round(releaseMusicImpact.trailerStrengthLift * 0.6);
+                        if (releaseMusicImpact.awardChanceLift > 0) {
+                            updatedC.projectDetails.hiddenStats.prestigeBonus = (updatedC.projectDetails.hiddenStats.prestigeBonus || 0) + (releaseMusicImpact.awardChanceLift / 12);
+                        }
+                        if (releaseMusicImpact.score >= 58) {
+                            const leadCredit = updatedC.projectDetails.musicPlan?.credits?.[0];
+                            const musicCampaignNews: NewsItem = {
+                                id: `music_campaign_${updatedC.id}_${nextPlayer.age}_${nextPlayer.currentWeek}`,
+                                headline: `${updatedC.name} gains music buzz from ${leadCredit?.artistName || 'its soundtrack campaign'}.`,
+                                subtext: releaseMusicImpact.headline,
+                                category: 'INDUSTRY',
+                                week: nextPlayer.currentWeek,
+                                year: nextPlayer.age,
+                                impactLevel: releaseMusicImpact.score >= 76 ? 'HIGH' : 'MEDIUM'
+                            };
+                            nextPlayer.news = [musicCampaignNews, ...(nextPlayer.news || [])].slice(0, 50);
+                        }
+                        if (releaseMusicImpact.mismatchBacklashRisk >= 42 || releaseMusicImpact.controversyRisk >= 42) {
+                            const musicBacklashPost: XPost = {
+                                id: `music_backlash_${updatedC.id}_${nextPlayer.age}_${nextPlayer.currentWeek}`,
+                                authorId: 'film_music_watch',
+                                authorName: 'Film Music Watch',
+                                authorHandle: '@filmmusicwatch',
+                                authorAvatar: 'https://api.dicebear.com/9.x/initials/svg?seed=FMW',
+                                content: `${updatedC.name}'s soundtrack push is getting attention, but fans are arguing whether the artist fit actually matches the movie.`,
+                                timestamp: Date.now(),
+                                likes: 2200 + releaseMusicImpact.socialHypeLift * 120,
+                                retweets: 340 + releaseMusicImpact.mismatchBacklashRisk * 18,
+                                replies: 180 + releaseMusicImpact.controversyRisk * 12,
+                                isPlayer: false,
+                                isLiked: false,
+                                isRetweeted: false,
+                                isVerified: true,
+                                postType: 'FILM_OPINION',
+                                controversyScore: Math.max(releaseMusicImpact.mismatchBacklashRisk, releaseMusicImpact.controversyRisk),
+                                quoteList: releaseMusicImpact.warnings.slice(0, 2)
+                            };
+                            nextPlayer.x = {
+                                ...nextPlayer.x,
+                                feed: [musicBacklashPost, ...(nextPlayer.x?.feed || [])].slice(0, 80)
+                            };
+                        }
+                    }
+
                     // Rival Clash Penalty
                     const rivalsThisWeek = nextPlayer.world.projects.filter(p => p.weekReleased === nextPlayer.currentWeek && p.id !== updatedC.id);
                     const heavyHitters = rivalsThisWeek.filter(r => r.budgetTier === 'HIGH').length;
@@ -2950,6 +3709,14 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                         distributionPhase: isStreamingOnly ? 'STREAMING' : 'THEATRICAL',
                         streaming: streamingState,
                         streamingRevenue: updatedC.projectDetails.streamingRevenue || 0,
+                        soundtrackRevenue: 0,
+                        weeklySoundtrackRevenue: [],
+                        soundtrackRevenueBreakdown: mergeSoundtrackRevenueBreakdowns(),
+                        weeklySoundtrackBreakdowns: [],
+                        investorPlan: updatedC.projectDetails.investorPlan,
+                        investorPayouts: updatedC.projectDetails.investorPlan
+                            ? (updatedC.projectDetails.investorPayouts || { lifetimeInvestorPayout: 0, weeklyInvestorPayouts: [] })
+                            : undefined,
                         royaltyPercentage: updatedC.royaltyPercentage,
                         studioRoyaltyPercentage: updatedC.projectDetails.hiddenStats.backendPct,
                         sequelDecisionWeek: 4 + Math.floor(Math.random() * 7),
@@ -2992,7 +3759,8 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                 rating: rel.imdbRating
             },
             nextPlayer.currentWeek,
-            nextPlayer.age
+            nextPlayer.age,
+            getPlayerLanguage(nextPlayer)
         );
         const revaluedStudio = recalculateBusinessValuation(outcomeResult.business, nextPlayer);
         Object.assign(studio, revaluedStudio);
@@ -3009,7 +3777,61 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
         }
     };
 
-    allRunning.forEach(rel => {
+    const processPostReleaseReality = (rel: ActiveRelease): ActiveRelease => {
+        const hiddenStats = rel.projectDetails.hiddenStats;
+        if (
+            rel.weekNum !== 2 ||
+            hiddenStats.campaignRealityChecked ||
+            !rel.projectDetails.campaignPositioning ||
+            !rel.weeklyGross?.length
+        ) {
+            return rel;
+        }
+
+        const reality = evaluatePostReleaseReality(rel, nextPlayer.currentWeek, nextPlayer.age);
+        const existingReviews = Array.isArray(rel.projectDetails.reviews) ? rel.projectDetails.reviews : [];
+        const hasRealityReview = existingReviews.some(review => review.id === reality.review.id);
+        const nextHiddenStats = {
+            ...hiddenStats,
+            rawHype: Math.max(0, Math.min(100, (hiddenStats.rawHype || 50) + reality.buzzDelta)),
+            campaignRealityChecked: true,
+            campaignRealityOutcome: reality.outcome
+        };
+
+        if (reality.newsItem && !newNews.some(item => item.id === reality.newsItem!.id)) {
+            newNews.unshift(reality.newsItem);
+            newNews = newNews.slice(0, 50);
+        }
+
+        if (reality.socialPost && nextPlayer.x.feed && !nextPlayer.x.feed.some(post => post.id === reality.socialPost!.id)) {
+            nextPlayer.x.feed = [reality.socialPost, ...nextPlayer.x.feed].slice(0, 100);
+        }
+
+        nextPlayer.stats.reputation = Math.max(0, Math.min(100, nextPlayer.stats.reputation + reality.reputationDelta));
+        logsToAdd.push({
+            msg: `Reality Check: ${rel.name} - ${reality.label}`,
+            type: reality.tone === 'NEGATIVE' ? 'negative' : reality.tone === 'POSITIVE' ? 'positive' : 'neutral'
+        });
+        trackGameEvent('marketing_reality', {
+            projectId: rel.id,
+            outcome: reality.outcome,
+            tone: reality.tone,
+            newsworthy: reality.newsworthy
+        });
+
+        return {
+            ...rel,
+            projectDetails: {
+                ...rel.projectDetails,
+                campaignRealitySnapshot: reality,
+                reviews: hasRealityReview ? existingReviews : [reality.review, ...existingReviews].slice(0, 12),
+                hiddenStats: nextHiddenStats
+            }
+        };
+    };
+
+    allRunning.forEach(initialRelease => {
+        let rel = processPostReleaseReality(initialRelease);
         if (rel.imdbRating) {
             const change = (Math.random() * 0.1) - 0.05; 
             rel.imdbRating = Math.max(1.1, Math.min(9.9, rel.imdbRating + change));
@@ -3231,6 +4053,8 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
 	                marketDemand,
 	                studioGenreReputation
 	            );
+            const charityGoodwillMultiplier = Math.max(0, Math.min(0.03, Number(nextPlayer.flags?.charityMovieGoodwillMultiplier || 0)));
+            const goodwillAdjustedRevenue = Math.floor(uncappedRevenue * (1 + charityGoodwillMultiplier));
             const boxOfficeCaps = getBoxOfficeCaps(rel.projectDetails.budgetTier);
             const thinSpectaclePenalty =
                 ['ACTION', 'SCI_FI', 'SUPERHERO', 'ADVENTURE'].includes(rel.projectDetails.genre) &&
@@ -3240,9 +4064,69 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                 ? Math.floor(boxOfficeCaps.total * (0.54 + ((rel.projectDetails.hiddenStats.castDepthScore ?? 45) / 180)))
                 : boxOfficeCaps.total;
             const remainingHeadroom = Math.max(0, effectiveTotalCap - rel.totalGross);
-            const revenue = Math.min(uncappedRevenue, remainingHeadroom);
+            const rawRevenue = Math.min(goodwillAdjustedRevenue, remainingHeadroom);
+            const distributionBreakdown = calculateTheatricalDistributionBreakdown(
+                rel.projectDetails,
+                rawRevenue,
+                rel.weekNum
+            );
+            const revenue = Math.min(distributionBreakdown.gross, remainingHeadroom);
+            const finalDistributionBreakdown = revenue === distributionBreakdown.gross
+                ? distributionBreakdown
+                : calculateTheatricalDistributionBreakdown(rel.projectDetails, revenue, rel.weekNum);
             const newTotal = rel.totalGross + revenue;
             const newWeeklyGross = [...rel.weeklyGross, revenue];
+            const newWeeklyStudioReceipts = [...(rel.weeklyStudioReceipts || []), finalDistributionBreakdown.studioReceipts];
+            const newWeeklyExhibitorReceipts = [...(rel.weeklyExhibitorReceipts || []), finalDistributionBreakdown.exhibitorReceipts];
+            const newWeeklyDistributionBreakdowns = [...(rel.weeklyDistributionBreakdowns || []), finalDistributionBreakdown].slice(-16);
+            const weeklySoundtrackBreakdown = calculateWeeklySoundtrackRevenue(rel.projectDetails, {
+                week: rel.weekNum,
+                theatricalGross: revenue,
+                catalog: getMusicArtistCatalog(nextPlayer.world),
+                seed: `${rel.id}_${nextPlayer.age}_${nextPlayer.currentWeek}_theatrical`
+            });
+            const weeklySoundtrackRevenue = weeklySoundtrackBreakdown.totalRevenue;
+            if (weeklySoundtrackRevenue > 0) {
+                nextPlayer = applyMusicArtistNpcEarnings(
+                    nextPlayer,
+                    buildSoundtrackCreditEarnings(rel.projectDetails, weeklySoundtrackRevenue)
+                );
+                const soundtrackCulture = buildSoundtrackCultureOutcomes(nextPlayer, rel, weeklySoundtrackRevenue, {
+                    releaseWeek: rel.weekNum,
+                    marketPulse: revenue,
+                    source: 'THEATRICAL'
+                });
+                if (soundtrackCulture.moments.length) {
+                    soundtrackCulture.moments.forEach(moment => {
+                        if (nextPlayer.world.musicIndustry) {
+                            nextPlayer.world.musicIndustry = addMusicCultureMoment(nextPlayer.world.musicIndustry, moment);
+                        }
+                    });
+                    newNews = [...soundtrackCulture.news, ...newNews].slice(0, 50);
+                    nextPlayer.x.feed = [...soundtrackCulture.posts, ...(nextPlayer.x.feed || [])].slice(0, 80);
+                    soundtrackCulture.logs.forEach(message => logsToAdd.push({ msg: `🎵 ${message}`, type: 'neutral' }));
+                    if (soundtrackCulture.artistEarnings.length) {
+                        nextPlayer = applyMusicArtistNpcEarnings(nextPlayer, soundtrackCulture.artistEarnings);
+                    }
+                    if (soundtrackCulture.reputationDelta) {
+                        nextPlayer.stats.reputation = Math.max(0, Math.min(100, nextPlayer.stats.reputation + soundtrackCulture.reputationDelta));
+                    }
+                    if (soundtrackCulture.rawHypeDelta) {
+                        rel.projectDetails.hiddenStats.rawHype = Math.max(0, Math.min(100, rel.projectDetails.hiddenStats.rawHype + soundtrackCulture.rawHypeDelta));
+                    }
+                }
+            }
+            const newSoundtrackRevenue = (rel.soundtrackRevenue || 0) + weeklySoundtrackRevenue;
+            const newWeeklySoundtrackRevenue = [...(rel.weeklySoundtrackRevenue || []), weeklySoundtrackRevenue];
+            const newSoundtrackRevenueBreakdown = mergeSoundtrackRevenueBreakdowns(rel.soundtrackRevenueBreakdown, weeklySoundtrackBreakdown);
+            const newWeeklySoundtrackBreakdowns = [...(rel.weeklySoundtrackBreakdowns || []), weeklySoundtrackBreakdown].slice(-24);
+            const activeInvestorPlan = rel.investorPlan || rel.projectDetails.investorPlan;
+            const investorTheatricalPayout = calculateInvestorPayout(activeInvestorPlan, finalDistributionBreakdown.studioReceipts);
+            const investorSoundtrackPayout = calculateInvestorPayout(activeInvestorPlan, weeklySoundtrackRevenue);
+            const weeklyInvestorPayout = investorTheatricalPayout + investorSoundtrackPayout;
+            const newInvestorPayouts = activeInvestorPlan
+                ? appendInvestorPayout(rel.investorPayouts, weeklyInvestorPayout)
+                : rel.investorPayouts;
             const maxWeeks = rel.maxTheatricalWeeks || 12; 
             const isPulledRevenue = rel.weekNum >= 3 && revenue < (rel.budget * 0.05); 
             const isPulledTime = rel.weekNum >= maxWeeks; 
@@ -3262,27 +4146,101 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
             const studioId = rel.projectDetails.studioId;
             const playerStudio = nextPlayer.businesses?.find(b => b.id === studioId);
             if (playerStudio) {
-                const studioShare = Math.floor(revenue * 0.5); // 50% to studio
-                playerStudio.balance += studioShare;
-                playerStudio.stats.weeklyRevenue += studioShare;
-                playerStudio.stats.weeklyProfit += studioShare;
-                playerStudio.stats.lifetimeRevenue += studioShare;
+                const studioShare = finalDistributionBreakdown.studioReceipts;
+                const netStudioShare = Math.max(0, studioShare - investorTheatricalPayout);
+                playerStudio.balance += netStudioShare;
+                playerStudio.stats.weeklyRevenue += netStudioShare;
+                playerStudio.stats.weeklyProfit += netStudioShare;
+                playerStudio.stats.lifetimeRevenue += netStudioShare;
                 if (studioShare > 0) {
                     appendStudioLedgerEntry(playerStudio, {
                         id: `studio_ledger_theatrical_${rel.id}_${nextPlayer.age}_${nextPlayer.currentWeek}`,
                         week: nextPlayer.currentWeek,
                         year: nextPlayer.age,
-                        amount: studioShare,
+                        amount: netStudioShare,
                         type: 'THEATRICAL',
-                        label: `${rel.name} theatrical receipts`,
+                        label: investorTheatricalPayout > 0
+                            ? `${rel.name} theatrical receipts after investor split`
+                            : `${rel.name} theatrical receipts (${Math.round(finalDistributionBreakdown.studioShare * 100)}% studio share)`,
                         projectId: rel.id
                     });
-                    playerStudio.stats.valuation = recalculateBusinessValuation(playerStudio, nextPlayer).stats.valuation;
+                    if (investorTheatricalPayout > 0) {
+                        appendStudioLedgerEntry(playerStudio, {
+                            id: `studio_ledger_investor_payout_theatrical_${rel.id}_${nextPlayer.age}_${nextPlayer.currentWeek}`,
+                            week: nextPlayer.currentWeek,
+                            year: nextPlayer.age,
+                            amount: -investorTheatricalPayout,
+                            type: 'INVESTOR_PAYOUT',
+                            label: `${rel.name} investor theatrical payout`,
+                            projectId: rel.id
+                        });
+                    }
                 }
-            }
+	                if (weeklySoundtrackRevenue > 0) {
+	                    const netSoundtrackRevenue = Math.max(0, weeklySoundtrackRevenue - investorSoundtrackPayout);
+                    playerStudio.balance += netSoundtrackRevenue;
+                    playerStudio.stats.weeklyRevenue += netSoundtrackRevenue;
+                    playerStudio.stats.weeklyProfit += netSoundtrackRevenue;
+                    playerStudio.stats.lifetimeRevenue += netSoundtrackRevenue;
+                    appendStudioLedgerEntry(playerStudio, {
+                        id: `studio_ledger_soundtrack_${rel.id}_${nextPlayer.age}_${nextPlayer.currentWeek}`,
+                        week: nextPlayer.currentWeek,
+                        year: nextPlayer.age,
+                        amount: netSoundtrackRevenue,
+                        type: 'SOUNDTRACK',
+                        label: investorSoundtrackPayout > 0
+                            ? `${rel.name} soundtrack revenue after investor split`
+                            : `${rel.name} soundtrack revenue`,
+                        projectId: rel.id
+                    });
+                    if (investorSoundtrackPayout > 0) {
+                        appendStudioLedgerEntry(playerStudio, {
+                            id: `studio_ledger_investor_payout_soundtrack_${rel.id}_${nextPlayer.age}_${nextPlayer.currentWeek}`,
+                            week: nextPlayer.currentWeek,
+                            year: nextPlayer.age,
+                            amount: -investorSoundtrackPayout,
+                            type: 'INVESTOR_PAYOUT',
+                            label: `${rel.name} investor soundtrack payout`,
+                            projectId: rel.id
+                        });
+	                    }
+	                }
+	                if (weeklyInvestorPayout > 0 && activeInvestorPlan) {
+	                    const rememberedStudio = applyInvestorPayoutMemory({
+	                        studio: playerStudio,
+	                        plan: activeInvestorPlan,
+	                        payout: weeklyInvestorPayout,
+	                        projectId: rel.id,
+	                        projectTitle: rel.name,
+	                        week: nextPlayer.currentWeek,
+	                        year: nextPlayer.age
+	                    });
+	                    if (rememberedStudio?.studioState) {
+	                        playerStudio.studioState = rememberedStudio.studioState;
+	                    }
+	                }
+	                playerStudio.stats.valuation = recalculateBusinessValuation(playerStudio, nextPlayer).stats.valuation;
+	            }
+
+            const theatricalDistributionState = {
+                totalGross: newTotal,
+                weeklyGross: newWeeklyGross,
+                weeklyStudioReceipts: newWeeklyStudioReceipts,
+                totalStudioReceipts: (rel.totalStudioReceipts || 0) + finalDistributionBreakdown.studioReceipts,
+                weeklyExhibitorReceipts: newWeeklyExhibitorReceipts,
+                totalExhibitorReceipts: (rel.totalExhibitorReceipts || 0) + finalDistributionBreakdown.exhibitorReceipts,
+                weeklyDistributionBreakdowns: newWeeklyDistributionBreakdowns,
+                soundtrackRevenue: newSoundtrackRevenue,
+                weeklySoundtrackRevenue: newWeeklySoundtrackRevenue,
+                soundtrackRevenueBreakdown: newSoundtrackRevenueBreakdown,
+                weeklySoundtrackBreakdowns: newWeeklySoundtrackBreakdowns,
+                investorPlan: activeInvestorPlan,
+                investorPayouts: newInvestorPayouts
+            };
 
             if (isPulledRevenue || isPulledTime) {
-                const { tier, score } = calculateRunOutcome(newTotal, rel.budget, rel.imdbRating || 5);
+                const totalProjectRevenue = newTotal + newSoundtrackRevenue;
+                const { tier, score } = calculateRunOutcome(totalProjectRevenue, rel.budget, rel.imdbRating || 5);
                 const memory = nextPlayer.studioMemory[studioId] || { projectOutcomes: [] };
                 const newOutcomes = [...memory.projectOutcomes, score];
                 if (newOutcomes.length > 3) newOutcomes.shift();
@@ -3294,7 +4252,7 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                     nextPlayer.stats.followers += consequences.followerDelta;
                     logsToAdd.push({ msg: `📈 Gained ${consequences.followerDelta.toLocaleString()} followers!`, type: 'positive' });
                 }
-                applyStudioMarketOutcome(playerStudio, rel, newTotal);
+                applyStudioMarketOutcome(playerStudio, rel, totalProjectRevenue);
 
                 if (playerStudio) {
                     // Trigger bidding war for player's studio
@@ -3303,7 +4261,7 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                     // Generate bids
                     if (rel.streaming) {
                         // Already has a streaming deal (accepted while in theaters)
-                        processedReleases.push({ ...rel, distributionPhase: 'STREAMING', totalGross: newTotal, weeklyGross: newWeeklyGross, status: 'FINISHED' });
+                        processedReleases.push({ ...rel, ...theatricalDistributionState, distributionPhase: 'STREAMING', status: 'FINISHED' });
                     } else {
                         const bids: { platformId: PlatformId, upfront: number, royalty: number, duration: number }[] = [];
                         const isSeries = rel.type === 'SERIES';
@@ -3449,7 +4407,7 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                             });
                         }
 
-                        processedReleases.push({ ...rel, distributionPhase: 'STREAMING_BIDDING', totalGross: newTotal, weeklyGross: newWeeklyGross, status: 'FINISHED', bids });
+                        processedReleases.push({ ...rel, ...theatricalDistributionState, distributionPhase: 'STREAMING_BIDDING', status: 'FINISHED', bids });
                     }
                 } else {
                     // NPC studio, just auto-assign
@@ -3465,10 +4423,10 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                         platform.recentHits += 1;
                     }
 
-                    processedReleases.push({ ...rel, distributionPhase: 'STREAMING', totalGross: newTotal, weeklyGross: newWeeklyGross, status: 'FINISHED', streaming: { platformId, weekOnPlatform: 1, totalViews: 0, weeklyViews: [], isLeaving: false } });
+                    processedReleases.push({ ...rel, ...theatricalDistributionState, distributionPhase: 'STREAMING', status: 'FINISHED', streaming: { platformId, weekOnPlatform: 1, totalViews: 0, weeklyViews: [], isLeaving: false } });
                 }
             } else {
-                processedReleases.push({ ...rel, totalGross: newTotal, weeklyGross: newWeeklyGross, weekNum: rel.weekNum + 1 });
+                processedReleases.push({ ...rel, ...theatricalDistributionState, weekNum: rel.weekNum + 1 });
             }
         } 
         else if (rel.distributionPhase === 'STREAMING_BIDDING') {
@@ -3511,33 +4469,151 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
             }
 
             let weeklyStreamingRevenue = 0;
+            let investorStreamingPayout = 0;
             if (rel.studioRoyaltyPercentage) {
                 // Assume $0.10 per view
                 weeklyStreamingRevenue = Math.floor(newViews * 0.10 * (rel.studioRoyaltyPercentage / 100));
                 const studioId = rel.projectDetails.studioId;
                 const playerStudio = nextPlayer.businesses?.find(b => b.id === studioId);
                 if (playerStudio && weeklyStreamingRevenue > 0) {
-                    playerStudio.balance += weeklyStreamingRevenue;
-                    playerStudio.stats.weeklyRevenue += weeklyStreamingRevenue;
-                    playerStudio.stats.weeklyProfit += weeklyStreamingRevenue;
-                    playerStudio.stats.lifetimeRevenue += weeklyStreamingRevenue;
+                    const activeInvestorPlan = rel.investorPlan || rel.projectDetails.investorPlan;
+                    investorStreamingPayout = calculateInvestorPayout(activeInvestorPlan, weeklyStreamingRevenue);
+                    const netStreamingRevenue = Math.max(0, weeklyStreamingRevenue - investorStreamingPayout);
+                    playerStudio.balance += netStreamingRevenue;
+                    playerStudio.stats.weeklyRevenue += netStreamingRevenue;
+                    playerStudio.stats.weeklyProfit += netStreamingRevenue;
+                    playerStudio.stats.lifetimeRevenue += netStreamingRevenue;
                     appendStudioLedgerEntry(playerStudio, {
                         id: `studio_ledger_streaming_${rel.id}_${nextPlayer.age}_${nextPlayer.currentWeek}`,
                         week: nextPlayer.currentWeek,
                         year: nextPlayer.age,
-                        amount: weeklyStreamingRevenue,
+                        amount: netStreamingRevenue,
                         type: 'STREAMING_ROYALTY',
-                        label: `${rel.name} streaming royalties`,
+                        label: investorStreamingPayout > 0
+                            ? `${rel.name} streaming royalties after investor split`
+                            : `${rel.name} streaming royalties`,
                         projectId: rel.id
                     });
+                    if (investorStreamingPayout > 0) {
+                        appendStudioLedgerEntry(playerStudio, {
+                            id: `studio_ledger_investor_payout_streaming_${rel.id}_${nextPlayer.age}_${nextPlayer.currentWeek}`,
+                            week: nextPlayer.currentWeek,
+                            year: nextPlayer.age,
+                            amount: -investorStreamingPayout,
+                            type: 'INVESTOR_PAYOUT',
+                            label: `${rel.name} investor streaming payout`,
+                            projectId: rel.id
+                        });
+                    }
                     playerStudio.stats.valuation = recalculateBusinessValuation(playerStudio, nextPlayer).stats.valuation;
                 }
             }
             const newStreamingRevenue = (rel.streamingRevenue || 0) + weeklyStreamingRevenue;
+            const weeklyStreamingBreakdown = calculateStreamingDistributionBreakdown(
+                rel.projectDetails,
+                rel.streaming.platformId,
+                newViews,
+                weeklyStreamingRevenue,
+                rel.streaming.weekOnPlatform
+            );
+            const newWeeklyStreamingBreakdowns = [
+                ...(rel.weeklyStreamingBreakdowns || []),
+                weeklyStreamingBreakdown
+            ].slice(-24);
+            const weeklySoundtrackBreakdown = calculateWeeklySoundtrackRevenue(rel.projectDetails, {
+                week: rel.streaming.weekOnPlatform,
+                streamingViews: newViews,
+                catalog: getMusicArtistCatalog(nextPlayer.world),
+                seed: `${rel.id}_${nextPlayer.age}_${nextPlayer.currentWeek}_streaming`
+            });
+            const weeklySoundtrackRevenue = weeklySoundtrackBreakdown.totalRevenue;
+            if (weeklySoundtrackRevenue > 0) {
+                nextPlayer = applyMusicArtistNpcEarnings(
+                    nextPlayer,
+                    buildSoundtrackCreditEarnings(rel.projectDetails, weeklySoundtrackRevenue)
+                );
+                const soundtrackCulture = buildSoundtrackCultureOutcomes(nextPlayer, rel, weeklySoundtrackRevenue, {
+                    releaseWeek: rel.streaming.weekOnPlatform,
+                    marketPulse: Math.max(weeklyStreamingRevenue, newViews * 0.1),
+                    source: 'STREAMING'
+                });
+                if (soundtrackCulture.moments.length) {
+                    soundtrackCulture.moments.forEach(moment => {
+                        if (nextPlayer.world.musicIndustry) {
+                            nextPlayer.world.musicIndustry = addMusicCultureMoment(nextPlayer.world.musicIndustry, moment);
+                        }
+                    });
+                    newNews = [...soundtrackCulture.news, ...newNews].slice(0, 50);
+                    nextPlayer.x.feed = [...soundtrackCulture.posts, ...(nextPlayer.x.feed || [])].slice(0, 80);
+                    soundtrackCulture.logs.forEach(message => logsToAdd.push({ msg: `🎵 ${message}`, type: 'neutral' }));
+                    if (soundtrackCulture.artistEarnings.length) {
+                        nextPlayer = applyMusicArtistNpcEarnings(nextPlayer, soundtrackCulture.artistEarnings);
+                    }
+                    if (soundtrackCulture.reputationDelta) {
+                        nextPlayer.stats.reputation = Math.max(0, Math.min(100, nextPlayer.stats.reputation + soundtrackCulture.reputationDelta));
+                    }
+                    if (soundtrackCulture.rawHypeDelta) {
+                        rel.projectDetails.hiddenStats.rawHype = Math.max(0, Math.min(100, rel.projectDetails.hiddenStats.rawHype + soundtrackCulture.rawHypeDelta));
+                    }
+                }
+            }
+            const newSoundtrackRevenue = (rel.soundtrackRevenue || 0) + weeklySoundtrackRevenue;
+            const newWeeklySoundtrackRevenue = [...(rel.weeklySoundtrackRevenue || []), weeklySoundtrackRevenue];
+            const newSoundtrackRevenueBreakdown = mergeSoundtrackRevenueBreakdowns(rel.soundtrackRevenueBreakdown, weeklySoundtrackBreakdown);
+            const newWeeklySoundtrackBreakdowns = [...(rel.weeklySoundtrackBreakdowns || []), weeklySoundtrackBreakdown].slice(-24);
+            const activeInvestorPlan = rel.investorPlan || rel.projectDetails.investorPlan;
+            const investorSoundtrackPayout = calculateInvestorPayout(activeInvestorPlan, weeklySoundtrackRevenue);
+            const streamingInvestorPayouts = activeInvestorPlan
+                ? appendInvestorPayout(rel.investorPayouts, investorStreamingPayout + investorSoundtrackPayout)
+                : rel.investorPayouts;
+            if (streamingStudio && weeklySoundtrackRevenue > 0) {
+                const netSoundtrackRevenue = Math.max(0, weeklySoundtrackRevenue - investorSoundtrackPayout);
+                streamingStudio.balance += netSoundtrackRevenue;
+                streamingStudio.stats.weeklyRevenue += netSoundtrackRevenue;
+                streamingStudio.stats.weeklyProfit += netSoundtrackRevenue;
+                streamingStudio.stats.lifetimeRevenue += netSoundtrackRevenue;
+                appendStudioLedgerEntry(streamingStudio, {
+                    id: `studio_ledger_soundtrack_${rel.id}_${nextPlayer.age}_${nextPlayer.currentWeek}`,
+                    week: nextPlayer.currentWeek,
+                    year: nextPlayer.age,
+                    amount: netSoundtrackRevenue,
+                    type: 'SOUNDTRACK',
+                    label: investorSoundtrackPayout > 0
+                        ? `${rel.name} soundtrack streaming revenue after investor split`
+                        : `${rel.name} soundtrack streaming revenue`,
+                    projectId: rel.id
+                });
+	                if (investorSoundtrackPayout > 0) {
+	                    appendStudioLedgerEntry(streamingStudio, {
+                        id: `studio_ledger_investor_payout_streaming_soundtrack_${rel.id}_${nextPlayer.age}_${nextPlayer.currentWeek}`,
+                        week: nextPlayer.currentWeek,
+                        year: nextPlayer.age,
+                        amount: -investorSoundtrackPayout,
+                        type: 'INVESTOR_PAYOUT',
+                        label: `${rel.name} investor soundtrack payout`,
+	                        projectId: rel.id
+	                    });
+	                }
+	                if ((investorStreamingPayout + investorSoundtrackPayout) > 0 && activeInvestorPlan) {
+	                    const rememberedStudio = applyInvestorPayoutMemory({
+	                        studio: streamingStudio,
+	                        plan: activeInvestorPlan,
+	                        payout: investorStreamingPayout + investorSoundtrackPayout,
+	                        projectId: rel.id,
+	                        projectTitle: rel.name,
+	                        week: nextPlayer.currentWeek,
+	                        year: nextPlayer.age
+	                    });
+	                    if (rememberedStudio?.studioState) {
+	                        streamingStudio.studioState = rememberedStudio.studioState;
+	                    }
+	                }
+	                streamingStudio.stats.valuation = recalculateBusinessValuation(streamingStudio, nextPlayer).stats.valuation;
+	            }
 
             if (shouldExit) {
                 const outcomeStudio = nextPlayer.businesses?.find(b => b.id === rel.projectDetails.studioId && b.type === 'PRODUCTION_HOUSE');
-                applyStudioMarketOutcome(outcomeStudio, rel, rel.totalGross + newStreamingRevenue);
+                applyStudioMarketOutcome(outcomeStudio, rel, rel.totalGross + newStreamingRevenue + newSoundtrackRevenue);
                 logsToAdd.push({ msg: `👋 "${rel.name}" left ${PLATFORMS[rel.streaming.platformId].name}.`, type: 'neutral' });
                 if (rel.royaltyPercentage && rel.royaltyPercentage > 0) {
                     const studioCut = rel.budget * 2; 
@@ -3550,15 +4626,40 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                         }
                     }
                 }
-                    nextPlayer.pastProjects.push({
-                        id: rel.id, name: rel.name, type: 'ACTING_GIG', roleType: getPlayerProjectRoleType(rel.roleType, rel.projectDetails.castList), year: rel.releaseYear || nextPlayer.age,
-                        earnings: 0, rating: rel.imdbRating || 0, reception: rel.status, projectQuality: rel.projectDetails.hiddenStats.qualityScore, imdbRating: rel.imdbRating, boxOfficeResult: `$${(rel.totalGross/1000000).toFixed(1)}M`, outcomeTier: calculateRunOutcome(rel.totalGross + newStreamingRevenue, rel.budget, rel.imdbRating || 5).tier, subtype: rel.projectDetails.subtype, futurePotential: rel.futurePotential || { sequelChance: 0, franchiseChance: 0, rebootChance: 0, renewalChance: 0, isFranchiseStarter: false, isSequelGreenlit: false, isRenewed: false, seriesStatus: 'N/A', playerReturnStatus: undefined, returnStatusNote: undefined }, studioId: rel.projectDetails.studioId, streamingPlatform: rel.streaming.platformId, totalViews, streamingRevenue: newStreamingRevenue, castList: rel.projectDetails.castList, reviews: rel.projectDetails.reviews, budget: rel.budget, gross: rel.totalGross, genre: rel.projectDetails.genre, format: rel.projectDetails.format, subjectName: rel.projectDetails.subjectName, subjectType: rel.projectDetails.subjectType, description: rel.projectDetails.description, projectType: rel.type, royaltyPercentage: rel.royaltyPercentage, franchiseId: rel.projectDetails.franchiseId, universeId: rel.projectDetails.universeId, universeSagaName: rel.projectDetails.universeSagaName, universePhaseName: rel.projectDetails.universePhaseName, installmentNumber: rel.projectDetails.installmentNumber, directorId: rel.projectDetails.directorId, sourceScriptId: rel.projectDetails.sourceScriptId, isOriginal: rel.projectDetails.isOriginal,
-                        releaseWeek: rel.releaseWeek,
-                        releaseYear: rel.releaseYear,
-                        releasedAtAbsoluteWeek: rel.releasedAtAbsoluteWeek
-                    });
+                    nextPlayer.pastProjects.push(createPastProjectArchiveSnapshot({
+                        ...rel,
+                        soundtrackRevenue: newSoundtrackRevenue,
+                        weeklySoundtrackRevenue: newWeeklySoundtrackRevenue,
+                        soundtrackRevenueBreakdown: newSoundtrackRevenueBreakdown,
+                        weeklySoundtrackBreakdowns: newWeeklySoundtrackBreakdowns,
+                        investorPlan: activeInvestorPlan,
+                        investorPayouts: streamingInvestorPayouts
+                    }, {
+                        player: nextPlayer,
+                        totalViews,
+                        streamingRevenue: newStreamingRevenue,
+                        weeklyStreamingBreakdowns: newWeeklyStreamingBreakdowns,
+                        weeklyViews: newWeeklyViews
+                    }));
             } else {
-                processedReleases.push({ ...rel, streamingRevenue: newStreamingRevenue, streaming: { ...rel.streaming, totalViews, weeklyViews: newWeeklyViews, weekOnPlatform: rel.streaming.weekOnPlatform + 1, isLeaving: newWeeklyViews.length > 20 && newViews < 50000 } });
+                processedReleases.push({
+                    ...rel,
+                    streamingRevenue: newStreamingRevenue,
+                    weeklyStreamingBreakdowns: newWeeklyStreamingBreakdowns,
+                    soundtrackRevenue: newSoundtrackRevenue,
+                    weeklySoundtrackRevenue: newWeeklySoundtrackRevenue,
+                    soundtrackRevenueBreakdown: newSoundtrackRevenueBreakdown,
+                    weeklySoundtrackBreakdowns: newWeeklySoundtrackBreakdowns,
+                    investorPlan: activeInvestorPlan,
+                    investorPayouts: streamingInvestorPayouts,
+                    streaming: {
+                        ...rel.streaming,
+                        totalViews,
+                        weeklyViews: newWeeklyViews,
+                        weekOnPlatform: rel.streaming.weekOnPlatform + 1,
+                        isLeaving: newWeeklyViews.length > 20 && newViews < 50000
+                    }
+                });
             }
         }
     });
@@ -3669,20 +4770,33 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                     id: `audit_${Date.now()}`,
                     type: 'SCANDAL',
                     title: "Government Audit!",
+                    titleKey: 'life.event.audit.government.title',
                     description: "The tax authorities have flagged your recent 'Private' performance. They are demanding a full audit of your finances.",
+                    descriptionKey: 'life.event.audit.government.description',
                     options: [
                         {
                             label: `Pay the Penalty ($${penalty.toLocaleString()})`,
+                            labelKey: 'life.event.audit.government.pay.label',
+                            textVars: { penalty: `$${penalty.toLocaleString()}` },
                             impact: (p) => {
                                 p.money -= penalty;
-                                return { updatedPlayer: p, log: "You paid the fine. Your accountant is furious." };
+                                return {
+                                    updatedPlayer: p,
+                                    log: "You paid the fine. Your accountant is furious.",
+                                    logKey: 'life.event.audit.government.pay.log',
+                                };
                             }
                         },
                         {
                             label: "Fight it in Court",
+                            labelKey: 'life.event.audit.government.fight.label',
                             impact: (p) => {
                                 p.stats.reputation -= 15;
-                                return { updatedPlayer: p, log: "You're fighting the audit. The press is having a field day." };
+                                return {
+                                    updatedPlayer: p,
+                                    log: "You're fighting the audit. The press is having a field day.",
+                                    logKey: 'life.event.audit.government.fight.log',
+                                };
                             }
                         }
                     ]
@@ -4003,6 +5117,68 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
         }
     }
 
+    const lastMusicVideoFeatureOfferWeek = nextPlayer.flags.lastMusicVideoFeatureOfferWeek || 0;
+    const musicFeaturePull = (nextPlayer.stats.fame || 0) + (nextPlayer.youtube?.subscribers || 0) / 50000;
+    if (musicFeaturePull >= 35 && nextPlayer.currentWeek - lastMusicVideoFeatureOfferWeek >= 5 + Math.floor(Math.random() * 4)) {
+        try {
+            const featureOffer = generateMusicVideoFeatureOffer(nextPlayer);
+            if (featureOffer) {
+                nextPlayer.inbox.unshift({
+                    id: `musicfeature_${Date.now()}`,
+                    sender: `${featureOffer.artistName} Video Team`,
+                    subject: `Music Video Feature: ${featureOffer.songTitle}`,
+                    text: `${featureOffer.artistName} wants you featured in their new music video.`,
+                    type: 'OFFER_MUSIC_VIDEO_FEATURE',
+                    data: featureOffer,
+                    isRead: false,
+                    weekSent: nextPlayer.currentWeek,
+                    expiresIn: featureOffer.expiresInWeeks
+                });
+                nextPlayer.flags.lastMusicVideoFeatureOfferWeek = nextPlayer.currentWeek;
+                logsToAdd.push({ msg: `🎵 Music Video: ${featureOffer.artistName} wants you in "${featureOffer.songTitle}".`, type: 'positive' });
+            }
+        } catch (error) {
+            console.error('Music video feature generation failed during week processing:', error);
+        }
+    }
+
+    const currentAbsoluteWeekForOutsideDeals = getAbsoluteWeek(nextPlayer.age, nextPlayer.currentWeek);
+    const hasOutsideProducerCadence = Number.isFinite(Number(nextPlayer.flags.lastOutsideProducerOfferWeek))
+        && Number(nextPlayer.flags.lastOutsideProducerOfferWeek) > 0;
+    if (!hasOutsideProducerCadence) {
+        nextPlayer.flags.lastOutsideProducerOfferWeek = currentAbsoluteWeekForOutsideDeals;
+    }
+    const lastOutsideProducerOfferWeek = hasOutsideProducerCadence
+        ? Number(nextPlayer.flags.lastOutsideProducerOfferWeek)
+        : currentAbsoluteWeekForOutsideDeals;
+    const outsideDealGap = currentAbsoluteWeekForOutsideDeals - lastOutsideProducerOfferWeek;
+    const hasPendingOutsideDeal = nextPlayer.inbox.some(message => message.type === 'OFFER_OUTSIDE_PRODUCER_INVESTMENT');
+    const outsideDealCadenceWeeks = getOutsideProducerOfferCadenceWeeks(nextPlayer);
+    const activeOutsideExposure = (nextPlayer.outsideProductions || []).filter(item => !['FINISHED', 'CANCELLED'].includes(item.status)).length;
+    const hotOutsideDealWeek = outsideDealGap >= outsideDealCadenceWeeks
+        && activeOutsideExposure < 5
+        && (currentAbsoluteWeekForOutsideDeals + Math.round(nextPlayer.money / 1_000_000)) % 19 === 0;
+    if (!hasPendingOutsideDeal && (outsideDealGap >= outsideDealCadenceWeeks || hotOutsideDealWeek)) {
+        try {
+            const offerCount = hotOutsideDealWeek ? 2 : 1;
+            const outsideOffers = generateOutsideProducerInvestmentOffers(nextPlayer, offerCount);
+            outsideOffers.forEach(offer => {
+                nextPlayer.inbox.unshift(buildOutsideProducerInvestmentMessage(offer));
+            });
+            if (outsideOffers.length) {
+                nextPlayer.flags.lastOutsideProducerOfferWeek = currentAbsoluteWeekForOutsideDeals;
+                logsToAdd.push({
+                    msg: outsideOffers.length > 1
+                        ? `💰 ${outsideOffers.length} producer investment packages hit your inbox.`
+                        : `💰 Producer Investment: ${outsideOffers[0].projectTitle} is seeking your money.`,
+                    type: 'neutral'
+                });
+            }
+        } catch (error) {
+            console.error('Outside producer investment offer generation failed during week processing:', error);
+        }
+    }
+
     try {
         const usedTitles = [
             ...nextPlayer.commitments.map(commitment => commitment.name),
@@ -4083,10 +5259,36 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
         logsToAdd.push({ msg: "🔄 CastLink updated.", type: 'neutral' });
     }
 
-    nextPlayer.businesses.forEach(business => {
-        if (business.type !== 'PRODUCTION_HOUSE' || !business.studioState) return;
+	nextPlayer.businesses.forEach(business => {
+	    if (business.type !== 'PRODUCTION_HOUSE' || !business.studioState) return;
 
-        const contractResult = processStreamingFundingContracts({
+	    const investorLeadership = processInvestorLeadershipChanges({
+	        studio: business,
+	        week: nextPlayer.currentWeek,
+	        year: nextPlayer.age
+	    });
+	    if (investorLeadership.changes.length) {
+	        business.studioState = investorLeadership.studio.studioState;
+	        investorLeadership.changes.forEach(change => {
+	            const investorName = change.investorId
+	                .replace('investor_', '')
+	                .split('_')
+	                .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+	                .join(' ');
+	            nextPlayer.news.unshift({
+	                id: `news_investor_leadership_${change.investorId}_${nextPlayer.age}_${nextPlayer.currentWeek}`,
+	                headline: `${investorName} appoints ${change.newOwnerName}`,
+	                subtext: `${change.newOwnerName} is now ${change.title}. This stays as an industry item, not a personal live-feed event.`,
+	                category: 'INDUSTRY',
+	                week: nextPlayer.currentWeek,
+	                year: nextPlayer.age,
+	                impactLevel: 'LOW'
+	            });
+	        });
+	        nextPlayer.news = nextPlayer.news.slice(0, 50);
+	    }
+
+	    const contractResult = processStreamingFundingContracts({
             lockedStreamingFunds: business.studioState.lockedStreamingFunds || [],
             platformRelations: business.studioState.platformRelations || {},
             currentWeek: nextPlayer.currentWeek,
@@ -4178,6 +5380,9 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
             });
         });
     });
+
+    nextPlayer = processSubsidiaryAutonomousOperations(nextPlayer);
+    nextPlayer = processSubsidiaryDecisionEngine(nextPlayer);
 
     // Final safety caps keep older saves from becoming too heavy for mobile WebViews.
     nextPlayer.inbox = ensureObjectArray<Message>(nextPlayer.inbox).slice(0, 120);

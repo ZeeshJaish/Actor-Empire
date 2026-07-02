@@ -3,7 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { AuditionOpportunity, ProjectDetails } from '../types';
 import { formatMoney } from '../services/formatUtils';
 import { STUDIO_CATALOG } from '../services/studioLogic';
-import { ArrowLeft, Film, Tv, Info, DollarSign, Crown, CheckCircle, Shield, Zap, User, TrendingUp, Users, Globe, List, Percent, Minus, Plus, Sparkles, Handshake, Calendar, BarChart3, Clock, AlertCircle } from 'lucide-react';
+import { calculateProjectMusicImpact, formatProjectMusicByline, getMusicCreditRoleLabel, getMusicStrategyLabel, getProjectMusicPlan } from '../services/musicIndustry';
+import { ArrowLeft, Film, Tv, Info, DollarSign, Crown, CheckCircle, Shield, Zap, User, TrendingUp, Users, Globe, List, Percent, Minus, Plus, Sparkles, Handshake, Calendar, BarChart3, Clock, AlertCircle, Music2 } from 'lucide-react';
 
 interface ProjectDetailViewProps {
     opportunity: AuditionOpportunity;
@@ -65,6 +66,24 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
     const project = opportunity.project || {} as ProjectDetails;
     const studio = STUDIO_CATALOG[project.studioId] || { name: getProjectStudioDisplayName(project), color: 'text-zinc-400' };
     const universe = opportunity.universeContract;
+    const musicPlan = project.title ? getProjectMusicPlan(project) : undefined;
+    const musicByline = project.title ? formatProjectMusicByline(project) : '';
+    const musicImpact = project.title ? calculateProjectMusicImpact(project, musicPlan) : undefined;
+    const investorPlan = project.investorPlan;
+    const investorNames = investorPlan?.commitments.map(item => item.investorName).slice(0, 2).join(', ') || '';
+    const investorExtraCount = Math.max(0, (investorPlan?.commitments.length || 0) - 2);
+    const investorOwnerNames = investorPlan?.commitments
+        .map(item => item.ownerName)
+        .filter((name): name is string => Boolean(name))
+        .slice(0, 2)
+        .join(', ') || '';
+    const investorOwnerExtraCount = Math.max(0, (investorPlan?.commitments.filter(item => item.ownerName).length || 0) - 2);
+    const investorScopeLabel = project.mediaType === 'SERIES'
+        ? 'This season only'
+        : project.franchiseInfo?.isSequel || investorPlan?.sourceTitle
+            ? 'This project only'
+            : 'Project-only cap table';
+    const investorPayoutTotal = Math.max(0, Number(project.investorPayouts?.lifetimeInvestorPayout || 0));
     
     // Formatting
     const displaySalary = isNegotiating ? currentOffer : opportunity.estimatedIncome;
@@ -254,6 +273,77 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                             </div>
                         </div>
                     </div>
+
+                    {investorPlan && investorPlan.totalRaised > 0 && (
+                        <div className="pt-4 border-t border-zinc-800">
+                            <div className="flex items-start gap-3">
+                                <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-emerald-400 border border-zinc-700 shrink-0">
+                                    <Handshake size={14}/>
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <div className="text-[9px] text-zinc-500 uppercase font-bold">Investor Funding</div>
+                                    <div className="font-bold text-white text-sm leading-tight truncate">
+                                        {investorNames}{investorExtraCount > 0 ? ` +${investorExtraCount}` : ''}
+                                    </div>
+                                    {investorOwnerNames && (
+                                        <div className="mt-0.5 text-[10px] font-bold uppercase tracking-widest text-emerald-200/65 truncate">
+                                            Led by {investorOwnerNames}{investorOwnerExtraCount > 0 ? ` +${investorOwnerExtraCount}` : ''}
+                                        </div>
+                                    )}
+                                    <div className="mt-2 grid grid-cols-3 gap-2">
+                                        <div className="rounded-lg border border-emerald-400/20 bg-emerald-400/10 px-2 py-1.5">
+                                            <div className="text-[8px] uppercase tracking-widest text-emerald-100/60 font-black">Raised</div>
+                                            <div className="font-mono text-xs font-black text-emerald-300">{formatMoney(investorPlan.totalRaised)}</div>
+                                        </div>
+                                        <div className="rounded-lg border border-cyan-400/20 bg-cyan-400/10 px-2 py-1.5">
+                                            <div className="text-[8px] uppercase tracking-widest text-cyan-100/60 font-black">Equity</div>
+                                            <div className="font-mono text-xs font-black text-cyan-300">{investorPlan.investorEquityPercent}%</div>
+                                        </div>
+                                        <div className="rounded-lg border border-white/10 bg-black/25 px-2 py-1.5">
+                                            <div className="text-[8px] uppercase tracking-widest text-zinc-600 font-black">Paid</div>
+                                            <div className="font-mono text-xs font-black text-zinc-300">{formatMoney(investorPayoutTotal)}</div>
+                                        </div>
+                                    </div>
+                                    <div className="mt-2 text-[10px] font-bold text-zinc-500">
+                                        {investorScopeLabel}; sequels or later seasons need fresh financing.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {musicPlan?.credits?.length ? (
+                        <div className="pt-4 border-t border-zinc-800">
+                            <div className="flex items-start gap-3">
+                                <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-cyan-400 border border-zinc-700 shrink-0">
+                                    <Music2 size={14}/>
+                                </div>
+                                <div className="min-w-0">
+                                    <div className="text-[9px] text-zinc-500 uppercase font-bold">Music by</div>
+                                    <div className="font-bold text-white text-sm leading-tight">{musicByline}</div>
+                                    <div className="mt-1 text-[10px] text-cyan-300">
+                                        {getMusicStrategyLabel(musicPlan.strategy)} • {getMusicCreditRoleLabel(musicPlan.credits[0].role)}
+                                    </div>
+                                    {musicImpact && musicImpact.score > 0 && (
+                                        <div className="mt-3 grid grid-cols-3 gap-2">
+                                            <div className="rounded-lg border border-cyan-400/20 bg-cyan-400/10 px-2 py-1.5">
+                                                <div className="text-[8px] uppercase tracking-widest text-cyan-100/60 font-black">Opening</div>
+                                                <div className="font-mono text-xs font-black text-emerald-300">{musicImpact.openingWeekendLiftPct >= 0 ? '+' : ''}{musicImpact.openingWeekendLiftPct}%</div>
+                                            </div>
+                                            <div className="rounded-lg border border-cyan-400/20 bg-cyan-400/10 px-2 py-1.5">
+                                                <div className="text-[8px] uppercase tracking-widest text-cyan-100/60 font-black">Trailer</div>
+                                                <div className="font-mono text-xs font-black text-cyan-300">+{musicImpact.trailerStrengthLift}</div>
+                                            </div>
+                                            <div className="rounded-lg border border-white/10 bg-black/25 px-2 py-1.5">
+                                                <div className="text-[8px] uppercase tracking-widest text-zinc-600 font-black">Risk</div>
+                                                <div className={`font-mono text-xs font-black ${Math.max(musicImpact.mismatchBacklashRisk, musicImpact.controversyRisk) >= 38 ? 'text-amber-300' : 'text-zinc-300'}`}>{Math.max(musicImpact.mismatchBacklashRisk, musicImpact.controversyRisk)}</div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    ) : null}
 
                     <div className="pt-4 border-t border-zinc-800">
                         <div className="text-[9px] text-zinc-500 uppercase font-bold mb-2">Logline</div>

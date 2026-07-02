@@ -2,11 +2,11 @@
 import React, { useEffect, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { ArrowLeft, Twitter, Send, Star, Globe, LogOut, Coffee, Bug, Puzzle, Lock, CheckCircle2, Users, ChevronRight, Sparkles, SlidersHorizontal, ShieldCheck, Gauge, Database, Copy, Smartphone, MessageCircle, LifeBuoy, Bell } from 'lucide-react';
-import { Player } from '../types';
+import { GameLanguage, Player } from '../types';
 import { APP_DISPLAY_VERSION } from '../services/appVersion';
 import { createGlobalActorPackNPCs, GLOBAL_ACTOR_PACKS } from '../services/npcLogic';
 import { getGlobalCreatorCountForPack } from '../services/youtubeLogic';
-import { getPlayerLanguage, t } from '../services/i18n';
+import { getPlayerLanguage, SUPPORTED_LANGUAGES, t } from '../services/i18n';
 import { addBreadcrumb, enableManualPushNotifications, getFirebaseAuthStatus, getFirebasePushStatus, markTraceAction, onFirebaseAuthStatusChanged, onFirebasePushStatusChanged, submitPlayerIssueReport, trackGameEvent } from '../services/firebaseService';
 
 interface SettingsPageProps {
@@ -20,13 +20,13 @@ type SettingsMode = 'SETTINGS' | 'PERFORMANCE' | 'GAMEPLAY' | 'SUPPORT' | 'COMMU
 type SettingsIcon = React.ComponentType<{ size?: number; className?: string }>;
 
 const ISSUE_CATEGORIES = [
-  { id: 'CRASH_RESTART', label: 'Crash / Restart', hint: 'Game closed, restarted, or black-screened.' },
-  { id: 'GREENLIGHT_PRODUCTION', label: 'Greenlight', hint: 'Casting, recast, negotiation, or production house issue.' },
-  { id: 'SAVE_LOAD', label: 'Save / Load', hint: 'Progress missing or save not opening.' },
-  { id: 'PROFILE', label: 'Profile', hint: 'Career/profile page crashes or looks wrong.' },
-  { id: 'AWARDS', label: 'Awards', hint: 'Missing nominations, wrong award dates, or duplicate awards.' },
-  { id: 'LAG_UI', label: 'Lag / UI', hint: 'Slow taps, frozen screen, or broken layout.' },
-  { id: 'OTHER', label: 'Other', hint: 'Anything else that feels broken.' },
+  { id: 'CRASH_RESTART', labelKey: 'settings.issue.crashRestart', hintKey: 'settings.issue.crashRestartHint' },
+  { id: 'GREENLIGHT_PRODUCTION', labelKey: 'settings.issue.greenlight', hintKey: 'settings.issue.greenlightHint' },
+  { id: 'SAVE_LOAD', labelKey: 'settings.issue.saveLoad', hintKey: 'settings.issue.saveLoadHint' },
+  { id: 'PROFILE', labelKey: 'settings.issue.profile', hintKey: 'settings.issue.profileHint' },
+  { id: 'AWARDS', labelKey: 'settings.issue.awards', hintKey: 'settings.issue.awardsHint' },
+  { id: 'LAG_UI', labelKey: 'settings.issue.lagUi', hintKey: 'settings.issue.lagUiHint' },
+  { id: 'OTHER', labelKey: 'settings.issue.other', hintKey: 'settings.issue.otherHint' },
 ];
 
 const SUPPORT_DEVICE_ID_KEY = 'actorEmpire.supportDeviceId.v1';
@@ -72,44 +72,45 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
   const authSetupPending = authStatus.state === 'failed'
     && Boolean(authStatus.error?.includes('CONFIGURATION_NOT_FOUND') || authStatus.error?.includes('OPERATION_NOT_ALLOWED'));
   const supportIdentityLabel = authStatus.state === 'ready' && firebaseAuthUserId
-    ? 'Linked'
+    ? tr('settings.supportIdentity.linked')
     : authStatus.state === 'starting'
-      ? 'Setting Up'
+      ? tr('settings.supportIdentity.settingUp')
       : authStatus.state === 'web_skipped'
-        ? 'Device Only'
+        ? tr('settings.supportIdentity.deviceOnly')
         : authStatus.state === 'failed'
-          ? 'Local'
-          : 'Local';
+          ? tr('settings.supportIdentity.local')
+          : tr('settings.supportIdentity.local');
   const supportIdentitySubtext = authStatus.state === 'ready' && shortAuthId
-    ? `Firebase ${shortAuthId}`
+    ? tr('settings.supportIdentity.firebaseId', { id: shortAuthId })
     : authStatus.state === 'starting'
-      ? 'Anonymous ID starting'
+      ? tr('settings.supportIdentity.anonymousStarting')
       : authStatus.state === 'web_skipped'
-        ? 'Native ID starts on device'
-        : `Player ${shortPlayerId}`;
+        ? tr('settings.supportIdentity.nativeStarts')
+        : tr('settings.supportIdentity.playerId', { id: shortPlayerId });
   const lastIssueReportId = typeof player.flags?.lastIssueReportId === 'string' ? player.flags.lastIssueReportId : null;
   const enabledPackIds = Array.isArray(player.flags?.enabledGlobalActorPacks)
     ? player.flags.enabledGlobalActorPacks as string[]
     : [];
   const selectedIssueCategory = ISSUE_CATEGORIES.find(category => category.id === reportCategory) || ISSUE_CATEGORIES[0];
+  const selectedIssueCategoryLabel = tr(selectedIssueCategory.labelKey);
   const pushStatusLabel = pushStatus.state === 'ready'
-    ? 'On'
+    ? tr('settings.push.on')
     : pushStatus.state === 'denied'
-      ? 'Blocked'
+      ? tr('settings.push.blocked')
       : pushStatus.state === 'prompting'
-        ? 'Asking'
+        ? tr('settings.push.asking')
         : pushStatus.state === 'web_skipped'
-          ? 'Native'
-          : 'Off';
+          ? tr('settings.push.native')
+          : tr('settings.push.off');
   const pushStatusSubtext = pushStatus.state === 'ready'
-    ? 'Manual updates can reach this device.'
+    ? tr('settings.push.readySub')
     : pushStatus.state === 'denied'
-      ? 'Enable in system settings.'
+      ? tr('settings.push.deniedSub')
       : pushStatus.state === 'failed'
-        ? 'Check native logs.'
+        ? tr('settings.push.failedSub')
         : pushStatus.state === 'web_skipped'
-          ? 'Available on iOS and Android builds.'
-          : 'Update alerts only.';
+          ? tr('settings.push.nativeSub')
+          : tr('settings.push.offSub');
 
   useEffect(() => {
     return onFirebaseAuthStatusChanged(setAuthStatus);
@@ -121,7 +122,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
 
   useEffect(() => {
     if (pushStatus.state === 'ready' && supportNotice?.startsWith('Notification setup')) {
-      setSupportNotice('Notifications enabled.');
+      setSupportNotice(tr('settings.support.notice.notificationsEnabled'));
     }
   }, [pushStatus.state, supportNotice]);
 
@@ -190,6 +191,17 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
     }));
   };
 
+  const handleChangeLanguage = (nextLanguage: GameLanguage) => {
+    if (nextLanguage === language) return;
+    onUpdatePlayer(prev => ({
+      ...prev,
+      settings: {
+        ...prev.settings,
+        language: nextLanguage,
+      },
+    }));
+  };
+
   const handleSubmitIssueReport = () => {
     markTraceAction('issue_report_send_tapped', {
       last_screen: 'Settings',
@@ -220,7 +232,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
         {
           week: prev.currentWeek,
           year: prev.age,
-          message: `🛠️ Issue report sent (${issueId}).`,
+          message: tr('settings.support.issueReportLog', { id: issueId }),
           type: 'neutral'
         },
         ...prev.logs
@@ -239,7 +251,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
       : `Player ${shortPlayerId}`;
     try {
       await navigator.clipboard?.writeText(debugId);
-      setSupportNotice('Debug ID copied.');
+      setSupportNotice(tr('settings.support.notice.debugCopied'));
     } catch {
       try {
         const textarea = document.createElement('textarea');
@@ -251,9 +263,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
         textarea.select();
         document.execCommand('copy');
         document.body.removeChild(textarea);
-        setSupportNotice('Debug ID copied.');
+        setSupportNotice(tr('settings.support.notice.debugCopied'));
       } catch {
-        setSupportNotice(`Debug ID: ${visibleDebugId}`);
+        setSupportNotice(tr('settings.support.notice.debugId', { id: visibleDebugId }));
       }
     }
   };
@@ -266,15 +278,15 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
     setIsEnablingPush(false);
 
     if (status.state === 'ready') {
-      setSupportNotice('Notifications enabled.');
+      setSupportNotice(tr('settings.support.notice.notificationsEnabled'));
     } else if (status.state === 'denied') {
-      setSupportNotice('Notifications are blocked in system settings.');
+      setSupportNotice(tr('settings.support.notice.notificationsBlocked'));
     } else if (status.state === 'checking') {
-      setSupportNotice('Notification setup is finishing. Wait a moment.');
+      setSupportNotice(tr('settings.support.notice.notificationsChecking'));
     } else if (status.state === 'web_skipped') {
-      setSupportNotice('Notifications can be tested in the native app.');
+      setSupportNotice(tr('settings.support.notice.notificationsNative'));
     } else {
-      setSupportNotice(status.error ? `Notification setup failed: ${status.error}` : 'Notification setup failed.');
+      setSupportNotice(status.error ? tr('settings.support.notice.notificationsFailedWithError', { error: status.error }) : tr('settings.support.notice.notificationsFailed'));
     }
   };
 
@@ -290,20 +302,20 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
       category: reportCategory,
     });
 
-    const subject = `Actor Empire bug report: ${selectedIssueCategory.label} (${sentIssueId})`;
+    const subject = tr('settings.support.emailSubject', { category: selectedIssueCategoryLabel, id: sentIssueId });
     const body = [
-      'Please attach your screenshot or screen recording to this email.',
+      tr('settings.support.emailAttachPrompt'),
       '',
-      `Report ID: ${sentIssueId}`,
-      `Issue category: ${selectedIssueCategory.label}`,
-      `Player / Support ID: ${playerIdForSupport}`,
-      `Firebase UID: ${firebaseAuthUserId || 'Not ready'}`,
-      `App version: ${APP_DISPLAY_VERSION}`,
-      `Platform: ${Capacitor.getPlatform()}`,
-      `Age / Week: ${player.age} / ${player.currentWeek}`,
-      `Save slot: ${player.flags?.lastLoadedSlot || 'Unknown'}`,
+      tr('settings.support.emailReportId', { id: sentIssueId }),
+      tr('settings.support.emailIssueCategory', { category: selectedIssueCategoryLabel }),
+      tr('settings.support.emailPlayerId', { id: playerIdForSupport }),
+      tr('settings.support.emailFirebaseUid', { id: firebaseAuthUserId || tr('settings.support.notReady') }),
+      tr('settings.support.emailAppVersion', { version: APP_DISPLAY_VERSION }),
+      tr('settings.support.emailPlatform', { platform: Capacitor.getPlatform() }),
+      tr('settings.support.emailAgeWeek', { age: player.age, week: player.currentWeek }),
+      tr('settings.support.emailSaveSlot', { slot: player.flags?.lastLoadedSlot || tr('settings.support.unknown') }),
       '',
-      'Extra notes:',
+      tr('settings.support.emailExtraNotes'),
     ].join('\n');
 
     window.location.href = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
@@ -414,18 +426,18 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
   if (mode === 'PERFORMANCE') {
     return (
       <div className="space-y-5 pb-24 pt-4">
-        {renderSubpageHeader('Display', 'Performance')}
+        {renderSubpageHeader(tr('settings.display'), tr('settings.performance'))}
 
         <div className="glass-card p-5 rounded-3xl space-y-4">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Visual Mode</h3>
+              <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest">{tr('settings.visualMode')}</h3>
               <p className="mt-2 text-sm leading-relaxed text-zinc-400">
-                Keep full visuals by default. Turn on Smooth Mode only if the game feels heavy on Android.
+                {tr('settings.visualModeSub')}
               </p>
             </div>
             <div className={`shrink-0 rounded-2xl px-3 py-2 text-[10px] font-black uppercase tracking-[0.18em] ${smoothModeEnabled ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/25' : 'bg-zinc-900 text-zinc-400 border border-white/10'}`}>
-              {smoothModeEnabled ? 'Smooth' : 'Full'}
+              {tr(smoothModeEnabled ? 'settings.smooth' : 'settings.full')}
             </div>
           </div>
 
@@ -440,8 +452,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
                   <Gauge size={22} />
                 </div>
                 <div>
-                  <div className="font-black text-white">Smooth Mode</div>
-                  <div className="mt-1 text-xs leading-relaxed text-zinc-500">Reduces blur, glow, and heavy motion.</div>
+                  <div className="font-black text-white">{tr('settings.smoothMode')}</div>
+                  <div className="mt-1 text-xs leading-relaxed text-zinc-500">{tr('settings.smoothModeSub')}</div>
                 </div>
               </div>
               <div className={`h-8 w-14 rounded-full p-1 transition-colors ${smoothModeEnabled ? 'bg-emerald-400' : 'bg-zinc-800'}`}>
@@ -457,7 +469,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
   if (mode === 'GAMEPLAY') {
     return (
       <div className="space-y-5 pb-24 pt-4">
-        {renderSubpageHeader('Career Rules', 'Gameplay')}
+        {renderSubpageHeader(tr('settings.careerRules'), tr('settings.gameplay'))}
 
         <div className="space-y-3">
           <button
@@ -468,7 +480,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
               <div className="p-2 bg-amber-500 rounded-lg text-black"><Puzzle size={20}/></div>
               <div className="text-left">
                 <div className="font-bold text-white">{tr('settings.modPacks')}</div>
-                <div className="text-xs text-zinc-400">{enabledPackIds.length} active packs</div>
+                <div className="text-xs text-zinc-400">{tr('settings.activePacks', { count: enabledPackIds.length })}</div>
               </div>
             </div>
             <ChevronRight size={18} className="text-zinc-500"/>
@@ -482,17 +494,33 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
                 <div className="text-xs text-zinc-500 leading-relaxed mt-1">{tr('settings.languagePhaseNote')}</div>
               </div>
             </div>
-            <div className="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <div className="font-black text-white">English</div>
-                  <div className="text-[10px] uppercase tracking-widest text-zinc-500">{tr('settings.defaultLanguage')}</div>
-                </div>
-                <CheckCircle2 size={18} className="text-emerald-300" />
-              </div>
-              <div className="mt-3 rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs font-bold text-amber-200">
-                {tr('settings.languageComingSoon')}
-              </div>
+            <div className="space-y-2">
+              {SUPPORTED_LANGUAGES.map(option => {
+                const isSelected = option.id === language;
+                return (
+                  <button
+                    key={option.id}
+                    type="button"
+                    aria-pressed={isSelected}
+                    onClick={() => handleChangeLanguage(option.id)}
+                    className={`w-full rounded-2xl border p-4 text-left transition-colors ${isSelected ? 'border-emerald-400/30 bg-emerald-500/10' : 'border-white/5 bg-zinc-900/60 hover:bg-zinc-800'}`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="font-black text-white">{option.nativeLabel}</div>
+                        <div className="text-[10px] uppercase tracking-widest text-zinc-500">{option.label}</div>
+                        <div className="mt-2 text-xs leading-relaxed text-zinc-400">{option.coverageSubtext}</div>
+                      </div>
+                      <div className="flex shrink-0 flex-col items-end gap-2">
+                        <span className={`rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-widest ${isSelected ? 'border-emerald-300/30 bg-emerald-400/10 text-emerald-200' : 'border-white/10 bg-black/20 text-zinc-400'}`}>
+                          {isSelected ? tr('settings.defaultLanguage') : option.coverageLabel}
+                        </span>
+                        {isSelected && <CheckCircle2 size={18} className="text-emerald-300" />}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -503,23 +531,23 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
   if (mode === 'SUPPORT') {
     return (
       <div className="space-y-5 pb-24 pt-4">
-        {renderSubpageHeader('Help', 'Support')}
+        {renderSubpageHeader(tr('settings.help'), tr('settings.support'))}
 
         <div className="glass-card p-5 rounded-3xl space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-2xl border border-white/5 bg-zinc-900/60 p-4">
               <div className="flex items-center gap-2 text-zinc-500">
                 <Database size={16}/>
-                <span className="text-[10px] font-black uppercase tracking-widest">Save</span>
+                <span className="text-[10px] font-black uppercase tracking-widest">{tr('settings.support.save')}</span>
               </div>
-              <div className="mt-3 font-black text-white">On Device</div>
-              <div className="mt-1 text-xs text-zinc-500">Player {shortPlayerId}</div>
+              <div className="mt-3 font-black text-white">{tr('settings.support.onDevice')}</div>
+              <div className="mt-1 text-xs text-zinc-500">{tr('settings.support.playerShortId', { id: shortPlayerId })}</div>
             </div>
 
             <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4">
               <div className="flex items-center gap-2 text-emerald-300">
                 <ShieldCheck size={16}/>
-                <span className="text-[10px] font-black uppercase tracking-widest">Support ID</span>
+                <span className="text-[10px] font-black uppercase tracking-widest">{tr('settings.support.supportId')}</span>
               </div>
               <div className="mt-3 font-black text-white">{supportIdentityLabel}</div>
               <div className="mt-1 text-xs text-zinc-500">{supportIdentitySubtext}</div>
@@ -528,7 +556,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
             <div className="rounded-2xl border border-white/5 bg-zinc-900/60 p-4">
               <div className="flex items-center gap-2 text-zinc-500">
                 <Smartphone size={16}/>
-                <span className="text-[10px] font-black uppercase tracking-widest">Build</span>
+                <span className="text-[10px] font-black uppercase tracking-widest">{tr('settings.support.build')}</span>
               </div>
               <div className="mt-3 font-black text-white">v{APP_DISPLAY_VERSION}</div>
               <div className="mt-1 text-xs text-zinc-500">{Capacitor.getPlatform()}</div>
@@ -537,15 +565,15 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
             <div className="rounded-2xl border border-white/5 bg-zinc-900/60 p-4">
               <div className="flex items-center gap-2 text-zinc-500">
                 <Bug size={16}/>
-                <span className="text-[10px] font-black uppercase tracking-widest">Reports</span>
+                <span className="text-[10px] font-black uppercase tracking-widest">{tr('settings.support.reports')}</span>
               </div>
-              <div className="mt-3 font-black text-white">Ready</div>
-              <div className="mt-1 text-xs text-zinc-500">Crashes and context</div>
+              <div className="mt-3 font-black text-white">{tr('settings.support.ready')}</div>
+              <div className="mt-1 text-xs text-zinc-500">{tr('settings.support.crashesContext')}</div>
             </div>
           </div>
 
           <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-xs font-bold text-emerald-100">
-            Progress stays on this device. Purchases restore from the Shop page.
+            {tr('settings.support.localProgressNote')}
           </div>
 
           {supportNotice && (
@@ -556,19 +584,19 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
 
           {authSetupPending && (
             <div className="rounded-2xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-xs font-bold text-amber-100">
-              Support identity is still setting up. Saves continue on this device.
+              {tr('settings.support.identityPending')}
             </div>
           )}
 
           {authStatus.state === 'failed' && authStatus.error && !authSetupPending && (
             <div className="rounded-2xl border border-rose-500/25 bg-rose-500/10 px-4 py-3 text-xs font-bold text-rose-100">
-              Support identity check failed. Saves continue on this device.
+              {tr('settings.support.identityFailed')}
             </div>
           )}
 
           {lastIssueReportId && (
             <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-xs text-rose-100">
-              <span className="font-black uppercase tracking-widest text-rose-300">Last Report</span>
+              <span className="font-black uppercase tracking-widest text-rose-300">{tr('settings.support.lastReport')}</span>
               <span className="ml-2 font-mono">{lastIssueReportId}</span>
             </div>
           )}
@@ -583,8 +611,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
             <div className="flex items-center gap-3">
               <div className="p-2 bg-emerald-500/15 rounded-lg text-emerald-300"><Bell size={20}/></div>
               <div className="text-left">
-                <div className="font-bold text-white">{pushStatus.state === 'ready' ? 'Notifications Enabled' : 'Enable Updates'}</div>
-                <div className="text-xs text-zinc-400">{isEnablingPush ? 'Opening permission prompt.' : pushStatusSubtext}</div>
+                <div className="font-bold text-white">{pushStatus.state === 'ready' ? tr('settings.push.notificationsEnabled') : tr('settings.push.enableUpdates')}</div>
+                <div className="text-xs text-zinc-400">{isEnablingPush ? tr('settings.push.openingPrompt') : pushStatusSubtext}</div>
               </div>
             </div>
             <div className="text-[10px] bg-emerald-500/15 px-2 py-1 rounded text-emerald-300 font-bold uppercase">{pushStatusLabel}</div>
@@ -600,8 +628,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
             <div className="flex items-center gap-3">
               <div className="p-2 bg-rose-500 rounded-lg text-white"><Bug size={20}/></div>
               <div className="text-left">
-                <div className="font-bold text-white">Report Issue</div>
-                <div className="text-xs text-zinc-400">Send game context directly.</div>
+                <div className="font-bold text-white">{tr('settings.support.reportIssue')}</div>
+                <div className="text-xs text-zinc-400">{tr('settings.support.reportIssueSub')}</div>
               </div>
             </div>
             <div className="text-[10px] bg-rose-500/15 px-2 py-1 rounded text-rose-300 font-bold uppercase">Firebase</div>
@@ -611,8 +639,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
             <div className="flex items-center gap-3">
               <div className="p-2 bg-zinc-800 rounded-lg text-zinc-300"><Copy size={20}/></div>
               <div className="text-left">
-                <div className="font-bold text-white">Copy Debug ID</div>
-                <div className="text-xs text-zinc-500">Useful when we debug a save.</div>
+                <div className="font-bold text-white">{tr('settings.support.copyDebugId')}</div>
+                <div className="text-xs text-zinc-500">{tr('settings.support.copyDebugIdSub')}</div>
               </div>
             </div>
           </button>
@@ -628,9 +656,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
             >
               <div className="sticky top-0 z-10 bg-zinc-950/95 backdrop-blur-xl border-b border-white/10 p-5 flex items-start justify-between gap-4">
                 <div>
-                  <div className="text-[10px] font-black uppercase tracking-[0.28em] text-rose-300">Bug Hunter</div>
-                  <h3 className="text-2xl font-black text-white mt-1">Report Issue</h3>
-                  <p className="text-xs text-zinc-500 mt-1">This attaches your version, platform, age/week, and game context.</p>
+                  <div className="text-[10px] font-black uppercase tracking-[0.28em] text-rose-300">{tr('settings.support.bugHunter')}</div>
+                  <h3 className="text-2xl font-black text-white mt-1">{tr('settings.support.reportIssue')}</h3>
+                  <p className="text-xs text-zinc-500 mt-1">{tr('settings.support.reportModalSub')}</p>
                 </div>
                 <button
                   onClick={() => setIsReportOpen(false)}
@@ -648,30 +676,30 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
                         <ShieldCheck size={22}/>
                       </div>
                       <div>
-                        <div className="font-black text-white">Report sent</div>
+                        <div className="font-black text-white">{tr('settings.support.reportSent')}</div>
                         <div className="text-xs text-emerald-200 font-mono mt-1">{sentIssueId}</div>
                       </div>
                     </div>
                     <p className="text-sm text-zinc-300 leading-relaxed mt-4">
-                      Thanks. This gives us a trace in Firebase so we can connect the issue to the exact flow and save state.
+                      {tr('settings.support.reportSentSub')}
                     </p>
                     <div className="mt-4 rounded-2xl border border-white/10 bg-black/25 p-4">
-                      <div className="text-[10px] font-black uppercase tracking-[0.22em] text-zinc-500">Screenshots / video</div>
+                      <div className="text-[10px] font-black uppercase tracking-[0.22em] text-zinc-500">{tr('settings.support.screenshotsVideo')}</div>
                       <p className="mt-2 text-xs leading-relaxed text-zinc-400">
-                        Need to send a screenshot or screen recording? Email it with this Report ID.
+                        {tr('settings.support.screenshotsVideoSub')}
                       </p>
                       <button
                         onClick={handleEmailReportAttachment}
                         className="mt-3 w-full rounded-2xl border border-white/10 bg-zinc-900 py-3 text-xs font-black uppercase tracking-widest text-white hover:bg-zinc-800"
                       >
-                        Email Screenshot
+                        {tr('settings.support.emailScreenshot')}
                       </button>
                     </div>
                     <button
                       onClick={() => setIsReportOpen(false)}
                       className="mt-4 w-full rounded-2xl bg-white text-black py-4 font-black uppercase tracking-widest"
                     >
-                      Close
+                      {tr('common.close')}
                     </button>
                   </div>
                 ) : (
@@ -686,44 +714,44 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
                             className={`rounded-2xl border p-3 text-left transition-all ${isActive ? 'border-rose-400 bg-rose-500/15' : 'border-white/5 bg-zinc-900/70 hover:bg-zinc-900'}`}
                           >
                             <div className={`text-xs font-black uppercase tracking-widest ${isActive ? 'text-rose-200' : 'text-zinc-300'}`}>
-                              {category.label}
+                              {tr(category.labelKey)}
                             </div>
-                            <div className="text-[11px] text-zinc-500 mt-1 leading-snug">{category.hint}</div>
+                            <div className="text-[11px] text-zinc-500 mt-1 leading-snug">{tr(category.hintKey)}</div>
                           </button>
                         );
                       })}
                     </div>
 
                     <div>
-                      <label className="text-[10px] font-black uppercase tracking-[0.28em] text-zinc-500">What happened?</label>
+                      <label className="text-[10px] font-black uppercase tracking-[0.28em] text-zinc-500">{tr('settings.support.whatHappened')}</label>
                       <textarea
                         value={reportDetails}
                         onChange={(event) => setReportDetails(event.target.value)}
                         maxLength={500}
-                        placeholder="Example: Greenlight crashes when I tap Tone & Style, or profile restarts the game..."
+                        placeholder={tr('settings.support.reportPlaceholder')}
                         className="mt-2 w-full min-h-32 rounded-3xl border border-white/10 bg-black p-4 text-sm text-white placeholder:text-zinc-700 outline-none focus:border-rose-400 resize-none"
                       />
                       <div className="text-right text-[10px] text-zinc-600 mt-1">{reportDetails.length}/500</div>
                     </div>
 
                     <div className="rounded-3xl border border-white/5 bg-zinc-900/70 p-4">
-                      <div className="text-[10px] font-black uppercase tracking-[0.28em] text-zinc-500">Auto attached</div>
+                      <div className="text-[10px] font-black uppercase tracking-[0.28em] text-zinc-500">{tr('settings.support.autoAttached')}</div>
                       <div className="grid grid-cols-2 gap-3 mt-3 text-xs">
                         <div>
-                          <div className="text-zinc-500 uppercase font-black">Version</div>
+                          <div className="text-zinc-500 uppercase font-black">{tr('settings.support.version')}</div>
                           <div className="text-white font-mono mt-1">{APP_DISPLAY_VERSION}</div>
                         </div>
                         <div>
-                          <div className="text-zinc-500 uppercase font-black">Platform</div>
+                          <div className="text-zinc-500 uppercase font-black">{tr('settings.support.platform')}</div>
                           <div className="text-white font-mono mt-1">{Capacitor.getPlatform()}</div>
                         </div>
                         <div>
-                          <div className="text-zinc-500 uppercase font-black">Age / Week</div>
+                          <div className="text-zinc-500 uppercase font-black">{tr('settings.support.ageWeek')}</div>
                           <div className="text-white font-mono mt-1">{player.age} / {player.currentWeek}</div>
                         </div>
                         <div>
-                          <div className="text-zinc-500 uppercase font-black">Pending</div>
-                          <div className="text-white font-mono mt-1">{player.pendingEvents?.length || 0} events</div>
+                          <div className="text-zinc-500 uppercase font-black">{tr('settings.support.pending')}</div>
+                          <div className="text-white font-mono mt-1">{tr('settings.support.pendingEvents', { count: player.pendingEvents?.length || 0 })}</div>
                         </div>
                       </div>
                     </div>
@@ -732,7 +760,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
                       onClick={handleSubmitIssueReport}
                       className="w-full rounded-2xl bg-gradient-to-r from-rose-500 to-orange-400 text-white py-4 font-black uppercase tracking-widest shadow-lg shadow-rose-500/20"
                     >
-                      Send Report
+                      {tr('settings.support.sendReport')}
                     </button>
                   </>
                 )}
@@ -927,7 +955,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
           <ArrowLeft size={20} className="text-white"/>
         </button>
         <div>
-          <div className="text-[10px] text-zinc-500 font-black uppercase tracking-[0.28em]">Control Center</div>
+          <div className="text-[10px] text-zinc-500 font-black uppercase tracking-[0.28em]">{tr('settings.controlCenter')}</div>
           <h2 className="text-3xl font-bold text-white">{tr('settings.title')}</h2>
         </div>
       </div>
@@ -935,31 +963,31 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
       <div className="glass-card p-3 rounded-3xl space-y-2">
         <SettingsRow
           icon={Gauge}
-          title="Performance"
-          subtitle={`${smoothModeEnabled ? 'Smooth mode' : 'Full visuals'} · Display options`}
-          value={smoothModeEnabled ? 'Smooth' : 'Full'}
+          title={tr('settings.performance')}
+          subtitle={tr(smoothModeEnabled ? 'settings.performanceSubSmooth' : 'settings.performanceSubFull')}
+          value={tr(smoothModeEnabled ? 'settings.smooth' : 'settings.full')}
           tone="performance"
           onClick={() => setMode('PERFORMANCE')}
         />
         <SettingsRow
           icon={Puzzle}
-          title="Gameplay"
-          subtitle={`Mods, language, content packs · ${enabledPackIds.length} active`}
-          value={`${enabledPackIds.length} active`}
+          title={tr('settings.gameplay')}
+          subtitle={tr('settings.gameplaySub', { count: enabledPackIds.length })}
+          value={tr('settings.activeShort', { count: enabledPackIds.length })}
           onClick={() => setMode('GAMEPLAY')}
         />
         <SettingsRow
           icon={LifeBuoy}
-          title="Support"
-          subtitle="Save status, reports, debug ID"
+          title={tr('settings.support')}
+          subtitle={tr('settings.supportSub')}
           value={`v${APP_DISPLAY_VERSION}`}
           tone="support"
           onClick={() => setMode('SUPPORT')}
         />
         <SettingsRow
           icon={MessageCircle}
-          title="Community"
-          subtitle="Telegram, X, rate app, support dev"
+          title={tr('settings.community')}
+          subtitle={tr('settings.communitySub')}
           tone="community"
           onClick={() => setMode('COMMUNITY')}
         />

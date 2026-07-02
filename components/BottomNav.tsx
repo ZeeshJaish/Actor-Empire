@@ -1,21 +1,24 @@
 import React from 'react';
 import { Home, Briefcase, Dumbbell, Users, ShoppingBag, Smartphone } from 'lucide-react';
-import { Page } from '../types';
+import { Page, Player } from '../types';
+import { getPlayerLanguage, t } from '../services/i18n';
 
 interface BottomNavProps {
+  player: Player;
   activePage: Page;
   setPage: (page: Page) => void;
   unreadMessages?: number;
 }
 
-export const BottomNav: React.FC<BottomNavProps> = ({ activePage, setPage, unreadMessages = 0 }) => {
+export const BottomNav: React.FC<BottomNavProps> = ({ player, activePage, setPage, unreadMessages = 0 }) => {
+  const language = getPlayerLanguage(player);
   const navItems = [
-    { page: Page.HOME, icon: Home, label: 'Home' },
-    { page: Page.CAREER, icon: Briefcase, label: 'Career' },
-    { page: Page.IMPROVE, icon: Dumbbell, label: 'Improve' },
-    { page: Page.SOCIAL, icon: Users, label: 'Social' },
-    { page: Page.LIFESTYLE, icon: ShoppingBag, label: 'Lifestyle' },
-    { page: Page.MOBILE, icon: Smartphone, label: 'Mobile' },
+    { page: Page.HOME, icon: Home, label: t(language, 'nav.home') },
+    { page: Page.CAREER, icon: Briefcase, label: t(language, 'nav.career') },
+    { page: Page.IMPROVE, icon: Dumbbell, label: t(language, 'nav.improve') },
+    { page: Page.SOCIAL, icon: Users, label: t(language, 'nav.social') },
+    { page: Page.LIFESTYLE, icon: ShoppingBag, label: t(language, 'nav.lifestyle') },
+    { page: Page.MOBILE, icon: Smartphone, label: t(language, 'nav.mobile') },
   ];
 
   return (
@@ -30,6 +33,8 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activePage, setPage, unrea
                 <button
                   key={item.page}
                   onClick={() => setPage(item.page)}
+                  aria-label={item.label}
+                  title={item.label}
                   className={`relative flex flex-col items-center justify-center w-full h-full transition-all duration-300 ${
                     isActive ? 'text-amber-400' : 'text-zinc-500 hover:text-zinc-300'
                   }`}

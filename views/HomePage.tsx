@@ -1,6 +1,6 @@
 
 import React, { useRef, useEffect, useState, useMemo } from 'react';
-import { Player, ActorSkills, Commitment, ActiveRelease, ScheduledEvent, Message, AuditionOpportunity, NegotiationData, UniverseContract, UniverseId, Page, Genre, Relationship, LifeEvent, SponsorshipOffer, XPost, Script, RareHollywoodChaosKind } from '../types';
+import { Player, ActorSkills, Commitment, ActiveRelease, ScheduledEvent, Message, AuditionOpportunity, NegotiationData, UniverseContract, UniverseId, Page, Genre, Relationship, LifeEvent, SponsorshipOffer, XPost, Script, RareHollywoodChaosKind, BoxOfficeRegionId, CinemaChainId, PlatformId, MusicCreditRole, OutsideProducerInvestmentOffer, OutsideProductionInvestment } from '../types';
 import { formatMoney } from '../services/formatUtils';
 import { StatsBar } from '../components/StatsBar';
 import { formatRoleRejectionReview, generateProjectDetails, getRoleRejectionFeedback, ROLE_DEFINITIONS } from '../services/roleLogic';
@@ -12,8 +12,20 @@ import { createBusiness } from '../services/businessLogic';
 import { calculateYoutubeCreatorScore, generateYoutubeBrandDeal, generateYoutubeCollabOffer, getYoutubePublicImageLabel } from '../services/youtubeLogic';
 import { ALL_GENRES, formatGenreLabel } from '../services/genreCatalog';
 import { getPlayerLanguage, t } from '../services/i18n';
-import { Heart, Smile, Star, Zap, DollarSign, Brain, Calendar, Activity, TrendingUp, Trophy, X, Sliders, Users, Film, Tv, PlayCircle, Lock, FastForward, Key, AlertTriangle, Mic2, Mail, FileText, Dumbbell, Sparkles, Settings, ShoppingCart, Clapperboard, ZapOff, Crown, Skull, Camera, UploadCloud, Check, MessageSquareQuote, Globe } from 'lucide-react';
+import { Heart, Smile, Star, Zap, DollarSign, Brain, Calendar, Activity, TrendingUp, Trophy, X, Sliders, Users, Film, Tv, PlayCircle, Lock, FastForward, Key, AlertTriangle, Mic2, Mail, FileText, Dumbbell, Sparkles, Settings, ShoppingCart, Clapperboard, ZapOff, Crown, Skull, Camera, UploadCloud, Check, MessageSquareQuote, Globe, BarChart3 } from 'lucide-react';
 import { addBreadcrumb, recordNonFatal, setCrashContext, startPerformanceTrace, stopPerformanceTrace, trackGameEvent } from '../services/firebaseService';
+import { getStockOutstandingShares } from '../services/stockLogic';
+import { processShareholderVoting } from '../services/shareholderVoting';
+import { processStockTakeoverEvents } from '../services/stockTakeover';
+import { processWorldReactions } from '../services/worldReactions';
+import { processAcquisitionDebtService, syncAcquisitionDebtLedger } from '../services/acquisitionDebt';
+import { processRegulatorPressure } from '../services/regulatorPressure';
+import { processTalentInstability } from '../services/talentInstability';
+import { processRivalRetaliation } from '../services/rivalRetaliation';
+import { processAcquisitionMarketPulse } from '../services/acquisitionMarketPulse';
+import { calculateStreamingDistributionBreakdown, calculateTheatricalDistributionBreakdown } from '../services/distributionRevenue';
+import { applyMusicImpactToHiddenStats, buildProjectMusicPlanFromArtists, calculateProjectMusicImpact, calculateWeeklySoundtrackRevenue, getMusicArtistCatalog, mergeSoundtrackRevenueBreakdowns } from '../services/musicIndustry';
+import { buildOutsideProducerInvestmentMessage } from '../services/outsideProductions';
 
 interface HomePageProps {
   player: Player;
@@ -23,6 +35,7 @@ interface HomePageProps {
   setPage?: (page: Page) => void;
   onOpenProductionHouseCheat?: () => void;
   onOpenStudioAcquisitionCheat?: (studioId: string) => void;
+  onOpenBoxOfficeCheat?: () => void;
   onQueueBabyNamingCheat?: () => void;
   onOpenDeathSummaryPreview?: () => void;
   onShowWhatsNewCheat?: () => void;
@@ -32,7 +45,12 @@ const CHEAT_GENRES: Genre[] = ALL_GENRES;
 const DEV_TOOLS_PASSCODE = import.meta.env.VITE_DEV_TOOLS_PASSCODE || 'Kzign@420';
 const LEGACY_DEV_TOOLS_PASSCODES = ['actor-dev'];
 
-export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProcessing, onUpdatePlayer, setPage, onOpenProductionHouseCheat, onOpenStudioAcquisitionCheat, onQueueBabyNamingCheat, onOpenDeathSummaryPreview, onShowWhatsNewCheat }) => {
+const cheatWeekFromAbsolute = (absoluteWeek: number): { year: number; week: number } => ({
+  year: Math.max(18, Math.floor(Math.max(1, absoluteWeek) / 52)),
+  week: Math.max(1, Math.max(1, absoluteWeek) % 52 || 52)
+});
+
+export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProcessing, onUpdatePlayer, setPage, onOpenProductionHouseCheat, onOpenStudioAcquisitionCheat, onOpenBoxOfficeCheat, onQueueBabyNamingCheat, onOpenDeathSummaryPreview, onShowWhatsNewCheat }) => {
   const logContainerRef = useRef<HTMLDivElement>(null);
   const language = getPlayerLanguage(player);
   const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
@@ -52,12 +70,18 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
   const lastClickRef = useRef(0);
   const avatarClickTimeoutRef = useRef<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const liveFeedLogs = useMemo(() => (player.logs || []).filter(log => {
+    const message = String(log.message || '');
+    if (/appointed .+ as (Investor CEO|Managing Partner|Finance CEO|Media President|Regional Chair)/i.test(message)) return false;
+    if (/now leads the music charts|turns ".+" into a culture moment|beats ".+" for #1|became a music-scene rivalry|hit a .+ music scandal/i.test(message)) return false;
+    return true;
+  }), [player.logs]);
 
   useEffect(() => {
     if (logContainerRef.current) {
       logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
     }
-  }, [player.logs]);
+  }, [liveFeedLogs]);
 
   useEffect(() => {
     setSelectedAvatar(player.avatar);
@@ -1637,6 +1661,607 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
       onUpdatePlayer(updatedPlayer);
       setActiveCheatMenu('NONE');
       onOpenProductionHouseCheat?.();
+  };
+
+  const triggerOutsideProducerInvestmentQa = () => {
+      if (!onUpdatePlayer) return;
+
+      const { updatedPlayer: basePlayer } = ensureCheatStudio();
+      const now = Date.now();
+      const currentAbsolute = getAbsoluteWeek(basePlayer.age, basePlayer.currentWeek);
+      const activeRelease = cheatWeekFromAbsolute(currentAbsolute + 4);
+      const nearExitRelease = cheatWeekFromAbsolute(Math.max(1, currentAbsolute - 4));
+      const scoutReport = {
+          scriptQuality: 84,
+          directorQuality: 78,
+          castQuality: 82,
+          budgetDiscipline: 74,
+          marketFit: 86,
+          buzz: 72,
+          risk: 28,
+          roiLowPct: -18,
+          roiHighPct: 122
+      };
+
+      const offer: OutsideProducerInvestmentOffer = {
+          id: `cheat_outside_offer_${now}`,
+          projectId: `cheat_outside_offer_project_${now}`,
+          projectTitle: 'Neon Harbor',
+          producerName: 'Horizon Lantern',
+          studioName: 'Horizon Lantern',
+          producerType: 'Co-production Company',
+          ownerName: 'Priya Senn',
+          trackRecord: 81,
+          genre: 'THRILLER',
+          logline: 'A thriller package looking for outside producer money before cameras roll.',
+          budget: 44_000_000,
+          cashAsk: 6_600_000,
+          offeredStakePercent: 18.5,
+          maxStakePercent: 49,
+          minCashAsk: 3_600_000,
+          maxCashAsk: 11_800_000,
+          flexible: true,
+          finalTerms: false,
+          acceptanceChance: 74,
+          scoutReport,
+          directorName: 'Leena Sato',
+          castNames: ['Maya Stone', 'Omar Vale', 'Kai Brooks'],
+          expectedReleaseWeeks: 9,
+          expectedRunWeeks: 6,
+          releasePath: 'THEATRICAL',
+          createdWeek: basePlayer.currentWeek,
+          createdYear: basePlayer.age,
+          expiresInWeeks: 6
+      };
+
+      const fraudOffer: OutsideProducerInvestmentOffer = {
+          id: `cheat_outside_fraud_offer_${now}`,
+          projectId: `cheat_outside_fraud_offer_project_${now}`,
+          projectTitle: 'Paper Moon Protocol',
+          producerName: 'Spam Forge Capital',
+          studioName: 'Spam Forge',
+          producerType: 'Shell Company',
+          ownerName: 'Unknown beneficial owners',
+          trackRecord: 18,
+          genre: 'CRIME',
+          logline: 'A crime package with unusually generous economics, rushed closing, and a weak financing paper trail.',
+          budget: 52_000_000,
+          cashAsk: 3_900_000,
+          offeredStakePercent: 31.5,
+          maxStakePercent: 49,
+          minCashAsk: 2_200_000,
+          maxCashAsk: 8_600_000,
+          flexible: true,
+          finalTerms: false,
+          acceptanceChance: 82,
+          scoutReport: { ...scoutReport, risk: 36, roiLowPct: -60, roiHighPct: 210, budgetDiscipline: 58, buzz: 80 },
+          directorName: 'Theo Vance',
+          castNames: ['Jules Carter', 'Ava Quinn'],
+          expectedReleaseWeeks: 10,
+          expectedRunWeeks: 5,
+          releasePath: 'STREAMING',
+          fraudRisk: 'HIGH',
+          riskSignals: ['GENEROUS_TERMS', 'UNVERIFIED_FINANCING', 'SHELL_COMPANY', 'RUSHED_CLOSE'],
+          financingStatus: 'UNVERIFIED_FINANCING',
+          legalExposure: 84,
+          createdWeek: basePlayer.currentWeek,
+          createdYear: basePlayer.age,
+          expiresInWeeks: 4
+      };
+
+      const activeInvestment: OutsideProductionInvestment = {
+          id: `cheat_outside_active_${now}`,
+          offerId: `cheat_outside_active_offer_${now}`,
+          projectId: `cheat_outside_active_project_${now}`,
+          projectTitle: 'Silver Signal',
+          producerName: 'Blue Hour Film Fund',
+          studioName: 'Blue Hour',
+          producerType: 'Film Fund',
+          ownerName: 'Tariq Sol',
+          trackRecord: 73,
+          genre: 'DRAMA',
+          logline: 'A prestige drama with a strong director, clean budget discipline, and a realistic award-market lane.',
+          budget: 38_000_000,
+          investedAmount: 7_500_000,
+          stakePercent: 24.5,
+          status: 'FUNDED',
+          scoutReport: { ...scoutReport, marketFit: 76, risk: 34, buzz: 62 },
+          directorName: 'Nora Vale',
+          castNames: ['Ava Quinn', 'Nico Reed'],
+          releasePath: 'FESTIVAL',
+          acceptedWeek: basePlayer.currentWeek,
+          acceptedYear: basePlayer.age,
+          releaseWeek: activeRelease.week,
+          releaseYear: activeRelease.year,
+          eventLog: ['CHEAT: Active outside production seeded for Bank and Production House QA.']
+      };
+
+      const nearExitInvestment: OutsideProductionInvestment = {
+          id: `cheat_outside_exit_${now}`,
+          offerId: `cheat_outside_exit_offer_${now}`,
+          projectId: `cheat_outside_exit_project_${now}`,
+          projectTitle: 'Glass Promise',
+          producerName: 'Crownline Entertainment',
+          studioName: 'Crownline',
+          producerType: 'Commercial Studio',
+          ownerName: 'Nadia Frost',
+          trackRecord: 79,
+          genre: 'ACTION',
+          logline: 'A commercial action package already in release, close enough to settle next week.',
+          budget: 30_000_000,
+          investedAmount: 5_200_000,
+          stakePercent: 22,
+          status: 'RELEASED',
+          scoutReport: { ...scoutReport, scriptQuality: 72, directorQuality: 76, castQuality: 80, marketFit: 88, buzz: 78, risk: 32 },
+          directorName: 'Cole Mercer',
+          castNames: ['Rian Fox', 'Lena Hart'],
+          releasePath: 'THEATRICAL',
+          acceptedWeek: Math.max(1, basePlayer.currentWeek - 2),
+          acceptedYear: basePlayer.age,
+          releaseWeek: nearExitRelease.week,
+          releaseYear: nearExitRelease.year,
+          eventLog: ['CHEAT: Near-exit outside production seeded. Age up once to test payout/result message.']
+      };
+
+      const fraudActiveInvestment: OutsideProductionInvestment = {
+          id: `cheat_outside_fraud_active_${now}`,
+          offerId: `cheat_outside_fraud_active_offer_${now}`,
+          projectId: `cheat_outside_fraud_active_project_${now}`,
+          projectTitle: 'Shell Game Weekend',
+          producerName: 'Spam Forge Capital',
+          studioName: 'Spam Forge',
+          producerType: 'Shell Company',
+          ownerName: 'Unknown beneficial owners',
+          trackRecord: 18,
+          genre: 'CRIME',
+          logline: 'A suspicious producer-finance package close to its verification fallout check.',
+          budget: 48_000_000,
+          investedAmount: 4_400_000,
+          stakePercent: 34,
+          status: 'FUNDED',
+          scoutReport: { ...scoutReport, risk: 38, roiLowPct: -58, roiHighPct: 205, buzz: 76 },
+          directorName: 'Arman Cross',
+          castNames: ['Maya Stone', 'Nico Reed'],
+          releasePath: 'STREAMING',
+          acceptedWeek: basePlayer.currentWeek,
+          acceptedYear: basePlayer.age,
+          releaseWeek: activeRelease.week,
+          releaseYear: activeRelease.year,
+          fraudRisk: 'HIGH',
+          riskSignals: ['GENEROUS_TERMS', 'UNVERIFIED_FINANCING', 'SHELL_COMPANY', 'RUSHED_CLOSE'],
+          financingStatus: 'UNVERIFIED_FINANCING',
+          legalExposure: 88,
+          fraudFalloutAbsoluteWeek: currentAbsolute,
+          eventLog: ['CHEAT: Fraud-risk outside production seeded. Age up once to test legal/fallout branch.']
+      };
+
+      const staleCheatIds = new Set(['cheat_outside_active', 'cheat_outside_exit', 'cheat_outside_fraud_active']);
+      const nextFinanceHistory = [
+          {
+              id: `tx_cheat_outside_active_${now}`,
+              week: basePlayer.currentWeek,
+              year: basePlayer.age,
+              amount: -activeInvestment.investedAmount,
+              category: 'BUSINESS' as const,
+              description: `Producer investment: ${activeInvestment.projectTitle} (${activeInvestment.stakePercent}% share)`
+          },
+          {
+              id: `tx_cheat_outside_exit_${now}`,
+              week: basePlayer.currentWeek,
+              year: basePlayer.age,
+              amount: -nearExitInvestment.investedAmount,
+              category: 'BUSINESS' as const,
+              description: `Producer investment: ${nearExitInvestment.projectTitle} (${nearExitInvestment.stakePercent}% share)`
+          },
+          {
+              id: `tx_cheat_outside_fraud_active_${now}`,
+              week: basePlayer.currentWeek,
+              year: basePlayer.age,
+              amount: -fraudActiveInvestment.investedAmount,
+              category: 'BUSINESS' as const,
+              description: `Producer investment: ${fraudActiveInvestment.projectTitle} (${fraudActiveInvestment.stakePercent}% share)`
+          },
+          ...(basePlayer.finance?.history || []).filter(tx => !String(tx.id).startsWith('tx_cheat_outside_'))
+      ].slice(0, 220);
+
+      const seededPlayer: Player = {
+          ...basePlayer,
+          money: Math.max(basePlayer.money, 250_000_000) - activeInvestment.investedAmount - nearExitInvestment.investedAmount - fraudActiveInvestment.investedAmount,
+          stats: {
+              ...basePlayer.stats,
+              fame: Math.max(basePlayer.stats.fame || 0, 72),
+              reputation: Math.max(basePlayer.stats.reputation || 0, 68)
+          },
+          flags: {
+              ...(basePlayer.flags || {}),
+              lastOutsideProducerOfferWeek: Math.max(0, getAbsoluteWeek(basePlayer.age, basePlayer.currentWeek) - 10)
+          },
+          inbox: [
+              buildOutsideProducerInvestmentMessage(offer),
+              buildOutsideProducerInvestmentMessage(fraudOffer),
+              ...(basePlayer.inbox || []).filter(message =>
+                  !String(message.id).startsWith('cheat_outside_offer_')
+                  && !String(message.id).startsWith('cheat_outside_fraud_offer_')
+                  && !String(message.id).startsWith('outside_result_cheat_outside_')
+              )
+          ].slice(0, 120),
+          outsideProductions: [
+              activeInvestment,
+              nearExitInvestment,
+              fraudActiveInvestment,
+              ...(basePlayer.outsideProductions || []).filter(item => !Array.from(staleCheatIds).some(prefix => String(item.id).startsWith(prefix)))
+          ].slice(0, 60),
+          finance: {
+              ...basePlayer.finance,
+              history: nextFinanceHistory,
+              yearly: basePlayer.finance?.yearly || [],
+              loans: basePlayer.finance?.loans || [],
+              credit: basePlayer.finance?.credit || { successfulPayments: 0, missedPayments: 0, defaults: 0, totalBorrowed: 0, totalRepaid: 0 }
+          },
+          logs: [{
+              week: basePlayer.currentWeek,
+              year: basePlayer.age,
+              message: 'CHEAT: Producer Investment QA seeded: clean offer, fraud-risk offer, live positions, and next-week payout/fallout tests.',
+              type: 'positive'
+          }, ...(basePlayer.logs || [])].slice(0, 50)
+      };
+
+      onUpdatePlayer(seededPlayer);
+      setActiveCheatMenu('NONE');
+      alert('Producer Investment QA ready: open Messages for clean + fraud-risk offers, Bank for ledger, Production House for positions, then Age Up once for settlement/fraud fallout.');
+  };
+
+  const triggerBoxOfficeDepthQa = () => {
+      if (!onUpdatePlayer) return;
+
+      const { updatedPlayer: basePlayer, studio } = ensureCheatStudio();
+      const now = Date.now();
+      const qaPrefix = 'cheat_box_office_depth_';
+      const releaseRegions: BoxOfficeRegionId[] = [
+          'NORTH_AMERICA',
+          'SOUTH_AMERICA',
+          'EUROPE',
+          'ASIA',
+          'AFRICA',
+          'OCEANIA'
+      ];
+      const allChains: CinemaChainId[] = [
+          'EMPIRE_CINEMAS',
+          'Z_CINEMAS',
+          'NOVA_CIRCUIT',
+          'PRISM_HALLS',
+          'ARCLIGHT_GRID',
+          'CROWNSCREEN'
+      ];
+      const releaseChainSelections = releaseRegions.reduce((selections, regionId) => {
+          selections[regionId] = allChains;
+          return selections;
+      }, {} as Partial<Record<BoxOfficeRegionId, CinemaChainId[]>>);
+
+      const theatricalProject = generateProjectDetails('BLOCKBUSTER', 'MOVIE', [], basePlayer);
+      theatricalProject.title = 'Atlas Rising';
+      theatricalProject.studioId = studio.id;
+      theatricalProject.genre = 'SCI_FI';
+      theatricalProject.subtype = 'STANDALONE';
+      theatricalProject.estimatedBudget = 185_000_000;
+      theatricalProject.releaseStrategy = 'THEATRICAL';
+      theatricalProject.releaseScale = 'GLOBAL';
+      theatricalProject.screeningStrategy = 'INTERNATIONAL';
+      theatricalProject.releaseRegionIds = releaseRegions;
+      theatricalProject.releaseChainSelections = releaseChainSelections;
+      theatricalProject.reservedMarketingBudget = 74_000_000;
+      theatricalProject.marketingBudgetSpent = 62_000_000;
+      theatricalProject.marketingBudgetRemaining = 12_000_000;
+      theatricalProject.totalCampaignSpend = 62_000_000;
+      theatricalProject.campaignPositioning = 'MASS_EVENT';
+      theatricalProject.campaignTimeline = 'FRONT_LOADED_OPENING';
+      theatricalProject.releaseDate = Math.max(1, basePlayer.currentWeek - 5);
+      theatricalProject.hiddenStats = {
+          ...theatricalProject.hiddenStats,
+          scriptQuality: 82,
+          directorQuality: 86,
+          castingStrength: 88,
+          distributionPower: 94,
+          rawHype: 91,
+          qualityScore: 84,
+          releaseWeek: Math.max(1, basePlayer.currentWeek - 5),
+          campaignFitScore: 81,
+          campaignPromise: 'MASS_EVENT',
+          campaignTimeline: 'FRONT_LOADED_OPENING',
+          falseMarketingRisk: 'LOW',
+          campaignOverspendRisk: 'MEDIUM'
+      };
+
+      const theatricalDemand = [242_000_000, 154_000_000, 92_000_000, 53_000_000, 31_000_000];
+      const weeklyDistributionBreakdowns = theatricalDemand.map((gross, index) => (
+          calculateTheatricalDistributionBreakdown(theatricalProject, gross, index + 1)
+      ));
+      const weeklyGross = weeklyDistributionBreakdowns.map(breakdown => breakdown.gross);
+      const weeklyStudioReceipts = weeklyDistributionBreakdowns.map(breakdown => breakdown.studioReceipts);
+      const weeklyExhibitorReceipts = weeklyDistributionBreakdowns.map(breakdown => breakdown.exhibitorReceipts);
+
+      const streamingProject = generateProjectDetails('HIGH', 'SERIES', [], basePlayer);
+      const platformId: PlatformId = 'NETFLIX';
+      streamingProject.title = 'Northline: Season 1';
+      streamingProject.studioId = studio.id;
+      streamingProject.genre = 'CRIME';
+      streamingProject.estimatedBudget = 68_000_000;
+      streamingProject.releaseStrategy = 'STREAMING_ONLY';
+      streamingProject.releaseScale = 'GLOBAL';
+      streamingProject.releaseRegionIds = ['NORTH_AMERICA', 'EUROPE', 'ASIA', 'SOUTH_AMERICA'];
+      streamingProject.reservedMarketingBudget = 26_000_000;
+      streamingProject.marketingBudgetSpent = 19_000_000;
+      streamingProject.marketingBudgetRemaining = 7_000_000;
+      streamingProject.totalCampaignSpend = 19_000_000;
+      streamingProject.campaignPositioning = 'SLEEPER_BUILD';
+      streamingProject.campaignTimeline = 'BALANCED_ROLLOUT';
+      streamingProject.releaseDate = Math.max(1, basePlayer.currentWeek - 6);
+      streamingProject.hiddenStats = {
+          ...streamingProject.hiddenStats,
+          scriptQuality: 84,
+          directorQuality: 78,
+          castingStrength: 81,
+          distributionPower: 79,
+          rawHype: 73,
+          qualityScore: 86,
+          platformId,
+          releaseWeek: Math.max(1, basePlayer.currentWeek - 6),
+          campaignFitScore: 88,
+          campaignPromise: 'SLEEPER_BUILD',
+          campaignTimeline: 'BALANCED_ROLLOUT',
+          falseMarketingRisk: 'LOW',
+          campaignOverspendRisk: 'LOW'
+      };
+
+      const weeklyStreamingViews = [14_500_000, 10_800_000, 7_600_000, 5_200_000, 3_400_000, 2_100_000];
+      const weeklyStreamingRevenue = [24_000_000, 18_500_000, 12_600_000, 8_400_000, 5_600_000, 3_200_000];
+      const weeklyStreamingBreakdowns = weeklyStreamingViews.map((views, index) => (
+          calculateStreamingDistributionBreakdown(streamingProject, platformId, views, weeklyStreamingRevenue[index], index + 1)
+      ));
+
+      const theatricalRelease: ActiveRelease = {
+          id: `${qaPrefix}theatrical_${now}`,
+          name: theatricalProject.title,
+          type: 'MOVIE',
+          roleType: 'LEAD',
+          projectDetails: theatricalProject,
+          distributionPhase: 'THEATRICAL',
+          weekNum: weeklyGross.length,
+          weeklyGross,
+          totalGross: weeklyGross.reduce((sum, gross) => sum + gross, 0),
+          weeklyStudioReceipts,
+          totalStudioReceipts: weeklyStudioReceipts.reduce((sum, receipts) => sum + receipts, 0),
+          weeklyExhibitorReceipts,
+          totalExhibitorReceipts: weeklyExhibitorReceipts.reduce((sum, receipts) => sum + receipts, 0),
+          weeklyDistributionBreakdowns,
+          budget: theatricalProject.estimatedBudget,
+          status: 'RUNNING',
+          imdbRating: 8.2,
+          productionPerformance: 86,
+          maxTheatricalWeeks: 14,
+          weeksInTheaters: weeklyGross.length,
+          promotionalBuzz: 91,
+          releaseWeek: Math.max(1, basePlayer.currentWeek - weeklyGross.length),
+          releaseYear: basePlayer.age,
+          releasedAtAbsoluteWeek: Math.max(1, getAbsoluteWeek(basePlayer.age, basePlayer.currentWeek) - weeklyGross.length)
+      };
+
+      const streamingRelease: ActiveRelease = {
+          id: `${qaPrefix}streaming_${now}`,
+          name: streamingProject.title,
+          type: 'SERIES',
+          roleType: 'LEAD',
+          projectDetails: streamingProject,
+          distributionPhase: 'STREAMING',
+          weekNum: weeklyStreamingViews.length,
+          weeklyGross: [],
+          totalGross: 0,
+          budget: streamingProject.estimatedBudget,
+          status: 'RUNNING',
+          imdbRating: 8.4,
+          productionPerformance: 85,
+          streamingRevenue: weeklyStreamingRevenue.reduce((sum, revenue) => sum + revenue, 0),
+          weeklyStreamingBreakdowns,
+          studioRoyaltyPercentage: 18,
+          streaming: {
+              platformId,
+              weekOnPlatform: weeklyStreamingViews.length,
+              totalViews: weeklyStreamingViews.reduce((sum, views) => sum + views, 0),
+              weeklyViews: weeklyStreamingViews,
+              isLeaving: false
+          },
+          promotionalBuzz: 74,
+          releaseWeek: Math.max(1, basePlayer.currentWeek - weeklyStreamingViews.length),
+          releaseYear: basePlayer.age,
+          releasedAtAbsoluteWeek: Math.max(1, getAbsoluteWeek(basePlayer.age, basePlayer.currentWeek) - weeklyStreamingViews.length)
+      };
+
+      onUpdatePlayer({
+          ...basePlayer,
+          activeReleases: [
+              theatricalRelease,
+              streamingRelease,
+              ...basePlayer.activeReleases.filter(release => !String(release.id).startsWith(qaPrefix))
+          ],
+          logs: [{
+              week: basePlayer.currentWeek,
+              year: basePlayer.age,
+              message: 'BOX OFFICE DETAIL QA seeded with regional theatrical receipts and streaming region data.',
+              type: 'positive'
+          }, ...basePlayer.logs].slice(0, 50)
+      });
+      setActiveCheatMenu('NONE');
+      onOpenBoxOfficeCheat?.();
+      alert('Box Office QA loaded. Tap Atlas Rising or Northline in Box Office to test the detailed view.');
+  };
+
+  const triggerSoundtrackRevenueQa = () => {
+      if (!onUpdatePlayer) return;
+
+      const { updatedPlayer: basePlayer, studio } = ensureCheatStudio();
+      const now = Date.now();
+      const qaPrefix = 'cheat_soundtrack_revenue_';
+      const releaseRegions: BoxOfficeRegionId[] = ['NORTH_AMERICA', 'EUROPE', 'ASIA'];
+      const releaseChainSelections = releaseRegions.reduce((selections, regionId) => {
+          selections[regionId] = ['EMPIRE_CINEMAS', 'NOVA_CIRCUIT', 'PRISM_HALLS'];
+          return selections;
+      }, {} as Partial<Record<BoxOfficeRegionId, CinemaChainId[]>>);
+
+      const project = generateProjectDetails('BLOCKBUSTER', 'MOVIE', [], basePlayer);
+      project.title = 'Soundtrack Empire';
+      project.studioId = studio.id;
+      project.genre = 'ACTION';
+      project.subtype = 'STANDALONE';
+      project.estimatedBudget = 155_000_000;
+      project.releaseStrategy = 'THEATRICAL';
+      project.releaseScale = 'GLOBAL';
+      project.screeningStrategy = 'INTERNATIONAL';
+      project.releaseRegionIds = releaseRegions;
+      project.releaseChainSelections = releaseChainSelections;
+      project.reservedMarketingBudget = 48_000_000;
+      project.marketingBudgetSpent = 41_000_000;
+      project.marketingBudgetRemaining = 7_000_000;
+      project.totalCampaignSpend = 41_000_000;
+      project.campaignPositioning = 'MASS_EVENT';
+      project.campaignTimeline = 'FRONT_LOADED_OPENING';
+      project.releaseDate = Math.max(1, basePlayer.currentWeek - 3);
+      project.customPoster = {
+          type: 'CONFIG',
+          bgGradient: 'from-cyan-950 via-fuchsia-900 to-black',
+          icon: 'Film',
+          textColor: 'text-white'
+      } as any;
+
+      const musicRoles: MusicCreditRole[] = [
+          'LEAD_SINGLE',
+          'SOUNDTRACK_EP',
+          'PROMO_ALBUM',
+          'MUSIC_VIDEO_TIE_IN',
+          'TRAILER_ANTHEM'
+      ];
+      const musicCatalog = getMusicArtistCatalog(basePlayer.world);
+      const musicPlan = buildProjectMusicPlanFromArtists(
+          project,
+          'PROMO_ALBUM',
+          [],
+          `${qaPrefix}${now}`,
+          musicRoles.length,
+          musicRoles,
+          true,
+          musicCatalog
+      );
+      const musicImpact = calculateProjectMusicImpact(project, musicPlan, musicCatalog);
+      project.musicPlan = musicPlan;
+      project.hiddenStats = {
+          ...applyMusicImpactToHiddenStats({
+              ...project.hiddenStats,
+              scriptQuality: 82,
+              directorQuality: 84,
+              castingStrength: 87,
+              distributionPower: 88,
+              rawHype: 90,
+              qualityScore: 83,
+              releaseWeek: Math.max(1, basePlayer.currentWeek - 3),
+              campaignFitScore: 86,
+              campaignPromise: 'MASS_EVENT',
+              campaignTimeline: 'FRONT_LOADED_OPENING',
+              falseMarketingRisk: 'LOW',
+              campaignOverspendRisk: 'MEDIUM'
+          }, musicImpact, musicPlan)
+      };
+
+      const weeklyDemand = [132_000_000, 91_000_000, 57_000_000];
+      const weeklyDistributionBreakdowns = weeklyDemand.map((gross, index) => (
+          calculateTheatricalDistributionBreakdown(project, gross, index + 1)
+      ));
+      const weeklyGross = weeklyDistributionBreakdowns.map(breakdown => breakdown.gross);
+      const weeklyStudioReceipts = weeklyDistributionBreakdowns.map(breakdown => breakdown.studioReceipts);
+      const weeklyExhibitorReceipts = weeklyDistributionBreakdowns.map(breakdown => breakdown.exhibitorReceipts);
+      const weeklySoundtrackBreakdowns = weeklyGross.map((gross, index) => (
+          calculateWeeklySoundtrackRevenue(project, {
+              week: index + 1,
+              theatricalGross: gross,
+              catalog: musicCatalog,
+              seed: `${qaPrefix}${now}_${index}`
+          })
+      ));
+      const soundtrackRevenueBreakdown = weeklySoundtrackBreakdowns.reduce(
+          (total, breakdown) => mergeSoundtrackRevenueBreakdowns(total, breakdown),
+          mergeSoundtrackRevenueBreakdowns()
+      );
+      const weeklySoundtrackRevenue = weeklySoundtrackBreakdowns.map(breakdown => breakdown.totalRevenue);
+      const totalSoundtrackRevenue = soundtrackRevenueBreakdown.totalRevenue;
+      const releaseId = `${qaPrefix}${now}`;
+      const release: ActiveRelease = {
+          id: releaseId,
+          name: project.title,
+          type: 'MOVIE',
+          roleType: 'LEAD',
+          projectDetails: project,
+          distributionPhase: 'THEATRICAL',
+          weekNum: weeklyGross.length,
+          weeklyGross,
+          totalGross: weeklyGross.reduce((sum, gross) => sum + gross, 0),
+          weeklyStudioReceipts,
+          totalStudioReceipts: weeklyStudioReceipts.reduce((sum, receipts) => sum + receipts, 0),
+          weeklyExhibitorReceipts,
+          totalExhibitorReceipts: weeklyExhibitorReceipts.reduce((sum, receipts) => sum + receipts, 0),
+          weeklyDistributionBreakdowns,
+          soundtrackRevenue: totalSoundtrackRevenue,
+          weeklySoundtrackRevenue,
+          soundtrackRevenueBreakdown,
+          weeklySoundtrackBreakdowns,
+          budget: project.estimatedBudget,
+          status: 'RUNNING',
+          imdbRating: 8.1,
+          productionPerformance: 86,
+          maxTheatricalWeeks: 12,
+          weeksInTheaters: weeklyGross.length,
+          promotionalBuzz: 93,
+          releaseWeek: Math.max(1, basePlayer.currentWeek - weeklyGross.length),
+          releaseYear: basePlayer.age,
+          releasedAtAbsoluteWeek: Math.max(1, getAbsoluteWeek(basePlayer.age, basePlayer.currentWeek) - weeklyGross.length)
+      };
+      const updatedStudio = {
+          ...studio,
+          balance: (studio.balance || 0) + totalSoundtrackRevenue,
+          stats: {
+              ...studio.stats,
+              weeklyRevenue: (studio.stats.weeklyRevenue || 0) + totalSoundtrackRevenue,
+              weeklyProfit: (studio.stats.weeklyProfit || 0) + totalSoundtrackRevenue,
+              lifetimeRevenue: (studio.stats.lifetimeRevenue || 0) + totalSoundtrackRevenue
+          },
+          financeLedger: [
+              {
+                  id: `${qaPrefix}ledger_${now}`,
+                  week: basePlayer.currentWeek,
+                  year: basePlayer.age,
+                  amount: totalSoundtrackRevenue,
+                  type: 'SOUNDTRACK' as const,
+                  label: `${project.title} soundtrack QA revenue`,
+                  projectId: releaseId
+              },
+              ...(studio.financeLedger || [])
+          ].slice(0, 80)
+      };
+
+      onUpdatePlayer({
+          ...basePlayer,
+          businesses: basePlayer.businesses.map(b => b.id === studio.id ? updatedStudio : b),
+          activeReleases: [
+              release,
+              ...basePlayer.activeReleases.filter(item => !String(item.id).startsWith(qaPrefix))
+          ],
+          logs: [{
+              week: basePlayer.currentWeek,
+              year: basePlayer.age,
+              message: `🎵 CHEAT: Soundtrack revenue QA loaded for ${project.title}. Current soundtrack take: ${formatMoney(totalSoundtrackRevenue)}.`,
+              type: 'positive'
+          }, ...basePlayer.logs].slice(0, 50)
+      });
+      setActiveCheatMenu('NONE');
+      onOpenBoxOfficeCheat?.();
+      alert(`Soundtrack Revenue QA loaded. Open Soundtrack Empire in Box Office, then Age Up once to watch soundtrack revenue increase again.`);
   };
 
   const triggerStudioAcquisitionSigningCheat = () => {
@@ -4071,6 +4696,677 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
       alert("Legacy death test is ready. Press Age Up a few times to trigger the death flow.");
   };
 
+  const triggerPhase9StockQa = () => {
+      if (!onUpdatePlayer) return;
+
+      const ownedStudioIds = new Set((player.businesses || []).map(business => business.id));
+      const targetStock = player.stocks.find(stock => stock.sector === 'MEDIA' && stock.relatedStudioId && !ownedStudioIds.has(stock.relatedStudioId))
+          || player.stocks.find(stock => stock.sector === 'MEDIA' && Boolean(stock.relatedStudioId));
+
+      if (!targetStock) {
+          alert('No entertainment stock is available in this save yet.');
+          return;
+      }
+
+      const outstandingShares = getStockOutstandingShares(targetStock);
+      const targetShares = Math.ceil(outstandingShares * 0.52);
+      const existingHolding = player.portfolio.find(position => position.stockId === targetStock.id);
+      const qaShares = Math.max(existingHolding?.shares || 0, targetShares);
+      const nextHolding = {
+          stockId: targetStock.id,
+          shares: qaShares,
+          averageCost: targetStock.price,
+          totalInvested: qaShares * targetStock.price,
+      };
+      const nextPortfolio = existingHolding
+          ? player.portfolio.map(position => position.stockId === targetStock.id ? nextHolding : position)
+          : [...player.portfolio, nextHolding];
+      const currentDismissals = (player.flags || {}).stockTakeoverEventDismissals || {};
+      const stockTakeoverEventDismissals = { ...currentDismissals };
+      delete stockTakeoverEventDismissals[targetStock.id];
+
+      const seededPlayer: Player = {
+          ...player,
+          money: Math.max(player.money, 5_000_000_000),
+          portfolio: nextPortfolio,
+          shareholderVotes: (player.shareholderVotes || []).filter(vote => vote.stockId !== targetStock.id),
+          inbox: (player.inbox || []).filter(message => message.data?.stockId !== targetStock.id || message.type !== 'SHAREHOLDER_VOTE'),
+          pendingEvents: (player.pendingEvents || []).filter(event => (
+              event.data?.stockId !== targetStock.id
+              || (event.data?.stockDecisionType !== 'SHAREHOLDER_VOTE' && event.data?.stockDecisionType !== 'TAKEOVER_CONTROL')
+          )),
+          flags: {
+              ...(player.flags || {}),
+              stockTakeoverEventDismissals,
+          },
+          logs: [{
+              week: player.currentWeek,
+              year: player.age,
+              message: `📈 CHEAT: Phase 9 stock QA seeded ${targetStock.symbol} at 52% ownership and queued stock decision checks.`,
+              type: 'positive'
+          }, ...player.logs].slice(0, 50),
+      };
+
+      const withShareholderVote = processShareholderVoting(seededPlayer);
+      const withTakeoverEvent = processStockTakeoverEvents(withShareholderVote);
+      const stockDecisionEvents = (withTakeoverEvent.pendingEvents || []).filter(event => (
+          event.data?.stockId === targetStock.id
+          && (event.data?.stockDecisionType === 'SHAREHOLDER_VOTE' || event.data?.stockDecisionType === 'TAKEOVER_CONTROL')
+      ));
+      const otherEvents = (withTakeoverEvent.pendingEvents || []).filter(event => !stockDecisionEvents.some(stockEvent => stockEvent.id === event.id));
+
+      onUpdatePlayer({
+          ...withTakeoverEvent,
+          pendingEvents: [...stockDecisionEvents, ...otherEvents].slice(0, 12),
+      });
+      setActiveCheatMenu('NONE');
+      alert(`Phase 9 Stock Events QA ready for ${targetStock.name}. Resolve the popup, then press the button again if you want the next stock decision immediately.`);
+  };
+
+  const makePhase10Studio = (id: string, name: string, valuation: number) => {
+      const studio = createBusiness(
+          name,
+          'PRODUCTION_HOUSE',
+          'MAJOR_STUDIO',
+          { quality: 'LUXURY', pricing: 'MARKET', marketing: 'HIGH' },
+          'STK',
+          player.currentWeek
+      );
+      return {
+          ...studio,
+          id,
+          name,
+          balance: Math.max(studio.balance, 650_000_000),
+          stats: {
+              ...studio.stats,
+              valuation,
+              weeklyRevenue: Math.max(studio.stats.weeklyRevenue, Math.round(valuation * 0.018 / 52)),
+              weeklyExpenses: Math.max(studio.stats.weeklyExpenses, Math.round(valuation * 0.012 / 52)),
+              weeklyProfit: Math.max(studio.stats.weeklyProfit, Math.round(valuation * 0.006 / 52)),
+              brandHealth: 82,
+              customerSatisfaction: 78,
+              riskLevel: 28,
+              hype: 72,
+              studioMomentum: 74,
+              investorConfidence: 76,
+          },
+          staff: studio.staff.map((staff, index) => ({
+              ...staff,
+              id: `${id}_phase10_staff_${index}`,
+              morale: 72,
+          })),
+      };
+  };
+
+  const triggerPhase10WorldReactionQa = () => {
+      if (!onUpdatePlayer) return;
+      const phase10Studios = [
+          makePhase10Studio('PLAYER_MAIN', 'Player Pictures', 1_200_000_000),
+          makePhase10Studio('WARNER_BROS', 'Warner Bros.', 74_000_000_000),
+          makePhase10Studio('PARAMOUNT', 'Paramount Pictures', 22_000_000_000),
+      ];
+      const studioIds = new Set(phase10Studios.map(studio => studio.id));
+      const seededPlayer: Player = {
+          ...player,
+          money: Math.max(player.money, 2_000_000_000),
+          businesses: [
+              ...phase10Studios,
+              ...(player.businesses || []).filter(business => !studioIds.has(business.id) && business.type !== 'PRODUCTION_HOUSE'),
+          ],
+          stockTakeovers: [{
+              id: `phase10_takeover_wbd_${player.age}_${player.currentWeek}`,
+              stockId: 'stk_wbd',
+              stockSymbol: 'WBD',
+              companyName: 'Warner Bros. Discovery',
+              relatedStudioId: 'WARNER_BROS',
+              route: 'CONTROL_TRANSFER',
+              status: 'CONTROLLED',
+              ownershipPercent: 52,
+              alliedSupportPercent: 0,
+              effectiveControlPercent: 52,
+              supportScore: 100,
+              rivalDefenceRisk: 0,
+              cost: 0,
+              summary: 'Warner Bros. control transferred into the player studio group for Phase 10 testing.',
+              createdWeek: player.currentWeek,
+              createdYear: player.age,
+              resolvedWeek: player.currentWeek,
+              resolvedYear: player.age,
+              acquiredBusinessId: 'WARNER_BROS',
+          }, ...(player.stockTakeovers || []).filter(takeover => takeover.relatedStudioId !== 'WARNER_BROS')],
+          flags: {
+              ...(player.flags || {}),
+              studioAcquisitionCases: [{
+                  studioId: 'PARAMOUNT',
+                  studioName: 'Paramount Pictures',
+                  acquisitionState: 'PUBLICLY_TRADED',
+                  publicValuation: 22_000_000_000,
+                  approachedWeek: player.currentWeek,
+                  approachedYear: player.age,
+                  status: 'ACQUIRED',
+                  closing: {
+                      finalPrice: 0,
+                      acquiredBusinessId: 'PARAMOUNT',
+                      signedWeek: player.currentWeek,
+                      signedYear: player.age,
+                      funding: { source: 'PERSONAL' },
+                      verifiedDebt: 3_800_000_000,
+                      hiddenLiabilities: 900_000_000,
+                      expectedAnnualIncome: 1_400_000_000,
+                      assetSummary: 'public-market control transfer',
+                  },
+              }, ...((player.flags || {}).studioAcquisitionCases || []).filter((entry: any) => entry?.studioId !== 'PARAMOUNT')],
+              worldReactionState: {
+                  ...((player.flags || {}).worldReactionState || {}),
+                  lastProcessedWeek: -1,
+              },
+          },
+          logs: [{
+              week: player.currentWeek,
+              year: player.age,
+              message: '🌍 CHEAT: Phase 10 world reaction empire seeded.',
+              type: 'positive',
+          }, ...(player.logs || [])].slice(0, 50),
+      };
+
+      onUpdatePlayer(processWorldReactions(seededPlayer));
+      setActiveCheatMenu('NONE');
+      alert('Phase 10 World Reactions QA ready: empire pressure, news, social reaction, and balancing state seeded.');
+  };
+
+  const triggerPhase10DebtQa = () => {
+      if (!onUpdatePlayer) return;
+      const phase10Studios = [
+          makePhase10Studio('PLAYER_MAIN', 'Player Pictures', 1_200_000_000),
+          makePhase10Studio('WARNER_BROS', 'Warner Bros.', 74_000_000_000),
+          makePhase10Studio('PARAMOUNT', 'Paramount Pictures', 22_000_000_000),
+      ];
+      const studioIds = new Set(phase10Studios.map(studio => studio.id));
+      const seededPlayer: Player = syncAcquisitionDebtLedger({
+          ...player,
+          money: Math.max(player.money, 320_000_000),
+          businesses: [
+              ...phase10Studios,
+              ...(player.businesses || []).filter(business => !studioIds.has(business.id) && business.type !== 'PRODUCTION_HOUSE'),
+          ],
+          flags: {
+              ...(player.flags || {}),
+              studioAcquisitionCases: [
+                  {
+                      studioId: 'WARNER_BROS',
+                      studioName: 'Warner Bros.',
+                      acquisitionState: 'PUBLICLY_TRADED',
+                      publicValuation: 74_000_000_000,
+                      approachedWeek: player.currentWeek,
+                      approachedYear: player.age,
+                      status: 'ACQUIRED',
+                      closing: {
+                          finalPrice: 0,
+                          acquiredBusinessId: 'WARNER_BROS',
+                          signedWeek: player.currentWeek,
+                          signedYear: player.age,
+                          funding: { source: 'PERSONAL' },
+                          verifiedDebt: 9_500_000_000,
+                          hiddenLiabilities: 2_300_000_000,
+                          expectedAnnualIncome: 3_600_000_000,
+                          assetSummary: 'public-market control transfer with inherited debt',
+                      },
+                  },
+                  {
+                      studioId: 'PARAMOUNT',
+                      studioName: 'Paramount Pictures',
+                      acquisitionState: 'PUBLICLY_TRADED',
+                      publicValuation: 22_000_000_000,
+                      approachedWeek: player.currentWeek,
+                      approachedYear: player.age,
+                      status: 'ACQUIRED',
+                      closing: {
+                          finalPrice: 0,
+                          acquiredBusinessId: 'PARAMOUNT',
+                          signedWeek: player.currentWeek,
+                          signedYear: player.age,
+                          funding: { source: 'PERSONAL' },
+                          verifiedDebt: 4_200_000_000,
+                          hiddenLiabilities: 1_100_000_000,
+                          expectedAnnualIncome: 1_500_000_000,
+                          assetSummary: 'public-market control transfer with inherited debt',
+                      },
+                  },
+                  ...((player.flags || {}).studioAcquisitionCases || []).filter((entry: any) => !studioIds.has(entry?.studioId)),
+              ],
+              worldReactionState: {
+                  ...((player.flags || {}).worldReactionState || {}),
+                  lastProcessedWeek: -1,
+              },
+              acquisitionDebtLastServicedWeekKey: undefined,
+          },
+          logs: [{
+              week: player.currentWeek,
+              year: player.age,
+              message: 'CHEAT: Phase 10 acquisition debt QA empire seeded.',
+              type: 'positive',
+          }, ...(player.logs || [])].slice(0, 50),
+      });
+      const servicedPlayer = processAcquisitionDebtService(seededPlayer).player;
+
+      onUpdatePlayer(processWorldReactions(servicedPlayer));
+      setActiveCheatMenu('NONE');
+      alert('Phase 10 Debt QA ready: inherited acquisition debt, weekly interest service, pressure news, and pay-down controls are seeded.');
+  };
+
+  const triggerPhase10RegulatorQa = () => {
+      if (!onUpdatePlayer) return;
+      const phase10Studios = [
+          makePhase10Studio('PLAYER_MAIN', 'Player Pictures', 1_200_000_000),
+          makePhase10Studio('WARNER_BROS', 'Warner Bros.', 74_000_000_000),
+          makePhase10Studio('PARAMOUNT', 'Paramount Pictures', 22_000_000_000),
+          makePhase10Studio('UNIVERSAL', 'Universal Pictures', 65_000_000_000),
+      ];
+      const studioIds = new Set(phase10Studios.map(studio => studio.id));
+      const seededPlayer: Player = {
+          ...player,
+          money: Math.max(player.money, 5_000_000_000),
+          businesses: [
+              ...phase10Studios,
+              ...(player.businesses || []).filter(business => !studioIds.has(business.id) && business.type !== 'PRODUCTION_HOUSE'),
+          ],
+          stockTakeovers: [
+              {
+                  id: `phase10_reg_takeover_wbd_${player.age}_${player.currentWeek}`,
+                  stockId: 'stk_wbd',
+                  stockSymbol: 'WBD',
+                  companyName: 'Warner Bros. Discovery',
+                  relatedStudioId: 'WARNER_BROS',
+                  route: 'CONTROL_TRANSFER',
+                  status: 'CONTROLLED',
+                  ownershipPercent: 52,
+                  alliedSupportPercent: 0,
+                  effectiveControlPercent: 52,
+                  supportScore: 100,
+                  rivalDefenceRisk: 0,
+                  cost: 0,
+                  summary: 'Warner Bros. control transferred into the player studio group for regulator QA.',
+                  createdWeek: player.currentWeek,
+                  createdYear: player.age,
+                  resolvedWeek: player.currentWeek,
+                  resolvedYear: player.age,
+                  acquiredBusinessId: 'WARNER_BROS',
+              },
+              ...(player.stockTakeovers || []).filter(takeover => takeover.relatedStudioId !== 'WARNER_BROS'),
+          ],
+          flags: {
+              ...(player.flags || {}),
+              studioAcquisitionCases: [
+                  {
+                      studioId: 'PARAMOUNT',
+                      studioName: 'Paramount Pictures',
+                      acquisitionState: 'PUBLICLY_TRADED',
+                      publicValuation: 22_000_000_000,
+                      approachedWeek: player.currentWeek,
+                      approachedYear: player.age,
+                      status: 'ACQUIRED',
+                      closing: {
+                          finalPrice: 0,
+                          acquiredBusinessId: 'PARAMOUNT',
+                          signedWeek: player.currentWeek,
+                          signedYear: player.age,
+                          funding: { source: 'PERSONAL' },
+                          verifiedDebt: 4_000_000_000,
+                          hiddenLiabilities: 1_000_000_000,
+                          expectedAnnualIncome: 1_500_000_000,
+                          assetSummary: 'public-market control transfer',
+                      },
+                  },
+                  ...((player.flags || {}).studioAcquisitionCases || []).filter((entry: any) => entry?.studioId !== 'PARAMOUNT'),
+              ],
+              regulatorPressureState: {
+                  ...((player.flags || {}).regulatorPressureState || {}),
+                  lastProcessedWeek: -1,
+                  acquisitionMoratoriumWeeksRemaining: 0,
+                  conductAgreementWeeksRemaining: 0,
+              },
+              worldReactionState: {
+                  ...((player.flags || {}).worldReactionState || {}),
+                  lastProcessedWeek: -1,
+              },
+          },
+          pendingEvents: (player.pendingEvents || []).filter(event => !event.data?.regulatorPressureEventType),
+          logs: [{
+              week: player.currentWeek,
+              year: player.age,
+              message: 'CHEAT: Phase 10 regulator pressure QA empire seeded.',
+              type: 'positive',
+          }, ...(player.logs || [])].slice(0, 50),
+      };
+      const regulatorPlayer = processRegulatorPressure(seededPlayer);
+
+      onUpdatePlayer(processWorldReactions(regulatorPlayer));
+      setActiveCheatMenu('NONE');
+      alert('Phase 10 Regulator QA ready: antitrust review, acquisition delay, pressure news, and regulator popup seeded.');
+  };
+
+  const triggerPhase10TalentQa = () => {
+      if (!onUpdatePlayer) return;
+      const phase10Studios = [
+          makePhase10Studio('PLAYER_MAIN', 'Player Pictures', 1_200_000_000),
+          makePhase10Studio('WARNER_BROS', 'Warner Bros.', 74_000_000_000),
+          makePhase10Studio('PARAMOUNT', 'Paramount Pictures', 22_000_000_000),
+      ].map(studio => ({
+          ...studio,
+          staff: studio.staff.map((staff, index) => ({
+              ...staff,
+              morale: index === 0 ? 32 : 42,
+              salary: Math.max(staff.salary, index === 0 ? 1_200_000 : 650_000),
+          })),
+      }));
+      const studioIds = new Set(phase10Studios.map(studio => studio.id));
+      const seededPlayer: Player = {
+          ...player,
+          money: Math.max(player.money, 1_250_000_000),
+          businesses: [
+              ...phase10Studios,
+              ...(player.businesses || []).filter(business => !studioIds.has(business.id) && business.type !== 'PRODUCTION_HOUSE'),
+          ],
+          flags: {
+              ...(player.flags || {}),
+              studioAcquisitionCases: [
+                  {
+                      studioId: 'WARNER_BROS',
+                      studioName: 'Warner Bros.',
+                      acquisitionState: 'PUBLICLY_TRADED',
+                      publicValuation: 74_000_000_000,
+                      approachedWeek: player.currentWeek,
+                      approachedYear: player.age,
+                      status: 'ACQUIRED',
+                      closing: {
+                          finalPrice: 0,
+                          acquiredBusinessId: 'WARNER_BROS',
+                          signedWeek: player.currentWeek,
+                          signedYear: player.age,
+                          funding: { source: 'PERSONAL' },
+                          verifiedDebt: 4_000_000_000,
+                          hiddenLiabilities: 900_000_000,
+                          expectedAnnualIncome: 1_500_000_000,
+                          assetSummary: 'public-market control transfer',
+                      },
+                  },
+                  {
+                      studioId: 'PARAMOUNT',
+                      studioName: 'Paramount Pictures',
+                      acquisitionState: 'PUBLICLY_TRADED',
+                      publicValuation: 22_000_000_000,
+                      approachedWeek: player.currentWeek,
+                      approachedYear: player.age,
+                      status: 'ACQUIRED',
+                      closing: {
+                          finalPrice: 0,
+                          acquiredBusinessId: 'PARAMOUNT',
+                          signedWeek: player.currentWeek,
+                          signedYear: player.age,
+                          funding: { source: 'PERSONAL' },
+                          verifiedDebt: 2_200_000_000,
+                          hiddenLiabilities: 600_000_000,
+                          expectedAnnualIncome: 1_000_000_000,
+                          assetSummary: 'public-market control transfer',
+                      },
+                  },
+                  ...((player.flags || {}).studioAcquisitionCases || []).filter((entry: any) => !studioIds.has(entry?.studioId)),
+              ],
+              worldReactionState: {
+                  ...((player.flags || {}).worldReactionState || {}),
+                  lastProcessedWeek: -1,
+                  controlledStudioCount: 3,
+                  controlledMajorStudioCount: 3,
+                  antiMonopolyPressure: 78,
+                  rivalRetaliationRisk: 66,
+                  employeeDepartureRisk: 76,
+                  investorConfidence: 55,
+                  acquisitionDebtPressure: 28,
+                  valuationPressure: 45,
+                  franchiseValuePressure: 42,
+              },
+              regulatorPressureState: {
+                  ...((player.flags || {}).regulatorPressureState || {}),
+                  lastProcessedWeek: -1,
+                  pressureScore: 74,
+                  status: 'REVIEW',
+                  controlledStudioCount: 3,
+                  controlledMajorStudioCount: 3,
+                  controlledTakeoverCount: 1,
+                  acquisitionMoratoriumWeeksRemaining: 1,
+                  conductAgreementWeeksRemaining: 0,
+                  acquisitionCostMultiplier: 1.25,
+                  investorConfidencePenalty: 5,
+                  reviewCount: 1,
+                  finesPaidToDate: 0,
+              },
+              talentInstabilityState: {
+                  ...((player.flags || {}).talentInstabilityState || {}),
+                  lastProcessedWeek: -1,
+                  retentionShieldWeeksRemaining: 0,
+              },
+          },
+          pendingEvents: (player.pendingEvents || []).filter(event => !event.data?.talentInstabilityEventType),
+          logs: [{
+              week: player.currentWeek,
+              year: player.age,
+              message: 'CHEAT: Phase 10 talent instability QA empire seeded.',
+              type: 'positive',
+          }, ...(player.logs || [])].slice(0, 50),
+      };
+      const worldPlayer = processWorldReactions(seededPlayer);
+      const talentPlayer = processTalentInstability(worldPlayer);
+
+      onUpdatePlayer(talentPlayer);
+      setActiveCheatMenu('NONE');
+      alert('Phase 10 Talent QA ready: retention crisis popup, talent news, social reaction, and real departure path seeded.');
+  };
+
+  const triggerPhase10RivalQa = () => {
+      if (!onUpdatePlayer) return;
+      const phase10Studios = [
+          makePhase10Studio('PLAYER_MAIN', 'Player Pictures', 1_200_000_000),
+          makePhase10Studio('WARNER_BROS', 'Warner Bros.', 74_000_000_000),
+          makePhase10Studio('PARAMOUNT', 'Paramount Pictures', 22_000_000_000),
+      ];
+      const studioIds = new Set(phase10Studios.map(studio => studio.id));
+      const seededPlayer: Player = {
+          ...player,
+          money: Math.max(player.money, 4_000_000_000),
+          businesses: [
+              ...phase10Studios,
+              ...(player.businesses || []).filter(business => !studioIds.has(business.id) && business.type !== 'PRODUCTION_HOUSE'),
+          ],
+          flags: {
+              ...(player.flags || {}),
+              studioAcquisitionCases: [
+                  {
+                      studioId: 'ARTISAN_PICTURES',
+                      studioName: 'Artisan Pictures',
+                      acquisitionState: 'OPEN_TO_OFFERS',
+                      publicValuation: 420_000_000,
+                      approachedWeek: player.currentWeek,
+                      approachedYear: player.age,
+                      status: 'COUNTERED',
+                      offer: {
+                          type: 'FAIR',
+                          amount: 435_000_000,
+                          funding: { source: 'PERSONAL' },
+                          complianceRisk: 16,
+                          complianceBand: 'ROUTINE',
+                          submittedWeek: player.currentWeek,
+                          submittedYear: player.age,
+                          round: 1,
+                      },
+                      sellerResponse: {
+                          decision: 'COUNTERED',
+                          counterAmount: 465_000_000,
+                          round: 1,
+                          respondedWeek: player.currentWeek,
+                          respondedYear: player.age,
+                          summary: 'The board wants stronger terms.',
+                      },
+                  },
+                  ...((player.flags || {}).studioAcquisitionCases || []).filter((entry: any) => entry?.studioId !== 'ARTISAN_PICTURES'),
+              ],
+              worldReactionState: {
+                  ...((player.flags || {}).worldReactionState || {}),
+                  lastProcessedWeek: -1,
+                  controlledStudioCount: 3,
+                  controlledMajorStudioCount: 3,
+                  antiMonopolyPressure: 76,
+                  rivalRetaliationRisk: 74,
+                  employeeDepartureRisk: 0,
+                  investorConfidence: 56,
+                  acquisitionDebtPressure: 22,
+                  valuationPressure: 40,
+                  franchiseValuePressure: 38,
+              },
+              regulatorPressureState: {
+                  ...((player.flags || {}).regulatorPressureState || {}),
+                  lastProcessedWeek: -1,
+                  pressureScore: 68,
+                  status: 'REVIEW',
+                  controlledStudioCount: 3,
+                  controlledMajorStudioCount: 3,
+                  controlledTakeoverCount: 1,
+                  acquisitionMoratoriumWeeksRemaining: 0,
+                  conductAgreementWeeksRemaining: 0,
+                  acquisitionCostMultiplier: 1.2,
+                  investorConfidencePenalty: 3,
+                  reviewCount: 1,
+                  finesPaidToDate: 0,
+              },
+              rivalRetaliationState: {
+                  ...((player.flags || {}).rivalRetaliationState || {}),
+                  lastProcessedWeek: -1,
+                  pressureShieldWeeksRemaining: 0,
+              },
+          },
+          pendingEvents: (player.pendingEvents || []).filter(event => !event.data?.rivalRetaliationEventType),
+          logs: [{
+              week: player.currentWeek,
+              year: player.age,
+              message: 'CHEAT: Phase 10 rival retaliation QA seeded.',
+              type: 'positive',
+          }, ...(player.logs || [])].slice(0, 50),
+      };
+      const worldPlayer = processWorldReactions(seededPlayer);
+      const rivalPlayer = processRivalRetaliation(worldPlayer);
+
+      onUpdatePlayer(rivalPlayer);
+      setActiveCheatMenu('NONE');
+      alert('Phase 10 Rival QA ready: rival bid, leaks, defensive alliance pressure, news, and popup decision seeded.');
+  };
+
+  const triggerPhase10MarketPulseQa = () => {
+      if (!onUpdatePlayer) return;
+      const phase10Studios = [
+          makePhase10Studio('PLAYER_MAIN', 'Player Pictures', 1_200_000_000),
+          makePhase10Studio('WARNER_BROS', 'Warner Bros.', 74_000_000_000),
+          makePhase10Studio('PARAMOUNT', 'Paramount Pictures', 22_000_000_000),
+      ];
+      const studioIds = new Set(phase10Studios.map(studio => studio.id));
+      const seededPlayer: Player = {
+          ...player,
+          money: Math.max(player.money, 5_000_000_000),
+          businesses: [
+              ...phase10Studios,
+              ...(player.businesses || []).filter(business => !studioIds.has(business.id) && business.type !== 'PRODUCTION_HOUSE'),
+          ],
+          flags: {
+              ...(player.flags || {}),
+              studioAcquisitionCases: [
+                  {
+                      studioId: 'WARNER_BROS',
+                      studioName: 'Warner Bros.',
+                      acquisitionState: 'PUBLICLY_TRADED',
+                      publicValuation: 74_000_000_000,
+                      approachedWeek: player.currentWeek,
+                      approachedYear: player.age,
+                      status: 'ACQUIRED',
+                      closing: {
+                          finalPrice: 0,
+                          acquiredBusinessId: 'WARNER_BROS',
+                          signedWeek: player.currentWeek,
+                          signedYear: player.age,
+                          funding: { source: 'PERSONAL' },
+                          verifiedDebt: 2_500_000_000,
+                          hiddenLiabilities: 400_000_000,
+                          expectedAnnualIncome: 2_200_000_000,
+                          assetSummary: 'public-market control transfer with franchise catalog',
+                      },
+                  },
+                  {
+                      studioId: 'PARAMOUNT',
+                      studioName: 'Paramount Pictures',
+                      acquisitionState: 'PUBLICLY_TRADED',
+                      publicValuation: 22_000_000_000,
+                      approachedWeek: player.currentWeek,
+                      approachedYear: player.age,
+                      status: 'ACQUIRED',
+                      closing: {
+                          finalPrice: 0,
+                          acquiredBusinessId: 'PARAMOUNT',
+                          signedWeek: player.currentWeek,
+                          signedYear: player.age,
+                          funding: { source: 'PERSONAL' },
+                          verifiedDebt: 1_400_000_000,
+                          hiddenLiabilities: 200_000_000,
+                          expectedAnnualIncome: 900_000_000,
+                          assetSummary: 'public-market control transfer with library rights',
+                      },
+                  },
+                  ...((player.flags || {}).studioAcquisitionCases || []).filter((entry: any) => !studioIds.has(entry?.studioId)),
+              ],
+              worldReactionState: {
+                  ...((player.flags || {}).worldReactionState || {}),
+                  lastProcessedWeek: -1,
+                  controlledStudioCount: 3,
+                  controlledMajorStudioCount: 3,
+                  antiMonopolyPressure: 62,
+                  rivalRetaliationRisk: 54,
+                  employeeDepartureRisk: 0,
+                  investorConfidence: 65,
+                  acquisitionDebtPressure: 18,
+                  valuationPressure: 30,
+                  franchiseValuePressure: 34,
+              },
+              regulatorPressureState: {
+                  ...((player.flags || {}).regulatorPressureState || {}),
+                  lastProcessedWeek: -1,
+                  pressureScore: 45,
+                  status: 'MONITORING',
+                  controlledStudioCount: 3,
+                  controlledMajorStudioCount: 3,
+                  controlledTakeoverCount: 1,
+                  acquisitionMoratoriumWeeksRemaining: 0,
+                  conductAgreementWeeksRemaining: 0,
+                  acquisitionCostMultiplier: 1.15,
+                  investorConfidencePenalty: 1,
+                  reviewCount: 0,
+                  finesPaidToDate: 0,
+              },
+              acquisitionMarketPulseState: {
+                  ...((player.flags || {}).acquisitionMarketPulseState || {}),
+                  lastProcessedWeek: -1,
+                  processedCaseIds: [],
+              },
+          },
+          logs: [{
+              week: player.currentWeek,
+              year: player.age,
+              message: 'CHEAT: Phase 10 acquisition market pulse QA seeded.',
+              type: 'positive',
+          }, ...(player.logs || [])].slice(0, 50),
+      };
+      const pulsePlayer = processAcquisitionMarketPulse(seededPlayer);
+
+      onUpdatePlayer(pulsePlayer);
+      setActiveCheatMenu('NONE');
+      alert('Phase 10 Market Pulse QA ready: acquisition news chain, fan/social reaction, investor confidence, and franchise value movement seeded.');
+  };
+
   // Calculate energy drain: Exclude ACTING_GIG as per new game rules
   const commitmentDrain = player.commitments.reduce((sum, c) => {
       // Movies do not drain weekly energy passively
@@ -4156,6 +5452,15 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                                   <button onClick={triggerFilmographySortQa} className="col-span-2 bg-pink-900/30 hover:bg-pink-900/50 border border-pink-500/30 text-xs font-bold py-3 rounded-lg text-pink-300">
                                       Add Filmography Sort QA Library
                                   </button>
+                                  <button onClick={triggerBoxOfficeDepthQa} className="col-span-2 bg-sky-900/30 hover:bg-sky-900/50 border border-sky-400/40 text-xs font-bold py-3 rounded-lg text-sky-300 flex items-center justify-center gap-2">
+                                      <BarChart3 size={14}/> Box Office Detail QA
+                                  </button>
+                                  <button onClick={triggerSoundtrackRevenueQa} className="col-span-2 bg-cyan-900/30 hover:bg-cyan-900/50 border border-cyan-400/40 text-xs font-bold py-3 rounded-lg text-cyan-200 flex items-center justify-center gap-2">
+                                      <Mic2 size={14}/> Soundtrack Revenue QA
+                                  </button>
+                                  <button onClick={triggerOutsideProducerInvestmentQa} className="col-span-2 bg-emerald-950/40 hover:bg-emerald-900/60 border border-emerald-400/40 text-xs font-bold py-3 rounded-lg text-emerald-200 flex items-center justify-center gap-2">
+                                      <DollarSign size={14}/> Producer Investment QA
+                                  </button>
                                   <button onClick={triggerVaultSortingQa} className="col-span-2 bg-blue-900/30 hover:bg-blue-900/50 border border-blue-500/30 text-xs font-bold py-3 rounded-lg text-blue-300">
                                       Add Vault Sorting QA Kit
                                   </button>
@@ -4187,6 +5492,38 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                                       Streaming to Library
                                   </button>
                               </div>
+                          </div>
+                      )}
+
+                      {activeCheatMenu === 'DEV' && (
+                          <div className="space-y-2">
+                              <h4 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest border-b border-zinc-800 pb-1 flex items-center gap-2">
+                                 <TrendingUp size={10} /> Stocks QA
+                              </h4>
+                              <div className="rounded-xl bg-zinc-950 border border-zinc-800 p-3 text-[10px] text-zinc-400">
+                                  Seeds 52% ownership in one entertainment stock, then queues the real shareholder and acquisition popup checks.
+                              </div>
+                              <button onClick={triggerPhase9StockQa} className="w-full bg-emerald-900/30 hover:bg-emerald-900/50 border border-emerald-500/30 text-xs font-bold py-3 rounded-lg text-emerald-300 flex items-center justify-center gap-2">
+                                  <TrendingUp size={14}/> Phase 9 Stock Events QA
+                              </button>
+                              <button onClick={triggerPhase10WorldReactionQa} className="w-full bg-sky-900/30 hover:bg-sky-900/50 border border-sky-500/30 text-xs font-bold py-3 rounded-lg text-sky-300 flex items-center justify-center gap-2">
+                                  <Globe size={14}/> Phase 10 World Reactions QA
+                              </button>
+                              <button onClick={triggerPhase10DebtQa} className="w-full bg-amber-900/30 hover:bg-amber-900/50 border border-amber-500/30 text-xs font-bold py-3 rounded-lg text-amber-300 flex items-center justify-center gap-2">
+                                  <DollarSign size={14}/> Phase 10 Debt QA
+                              </button>
+                              <button onClick={triggerPhase10RegulatorQa} className="w-full bg-rose-900/30 hover:bg-rose-900/50 border border-rose-500/30 text-xs font-bold py-3 rounded-lg text-rose-300 flex items-center justify-center gap-2">
+                                  <AlertTriangle size={14}/> Phase 10 Regulator QA
+                              </button>
+                              <button onClick={triggerPhase10TalentQa} className="w-full bg-fuchsia-900/30 hover:bg-fuchsia-900/50 border border-fuchsia-500/30 text-xs font-bold py-3 rounded-lg text-fuchsia-300 flex items-center justify-center gap-2">
+                                  <Users size={14}/> Phase 10 Talent QA
+                              </button>
+                              <button onClick={triggerPhase10RivalQa} className="w-full bg-red-900/30 hover:bg-red-900/50 border border-red-500/30 text-xs font-bold py-3 rounded-lg text-red-300 flex items-center justify-center gap-2">
+                                  <Crown size={14}/> Phase 10 Rival QA
+                              </button>
+                              <button onClick={triggerPhase10MarketPulseQa} className="w-full bg-cyan-900/30 hover:bg-cyan-900/50 border border-cyan-500/30 text-xs font-bold py-3 rounded-lg text-cyan-300 flex items-center justify-center gap-2">
+                                  <Activity size={14}/> Phase 10 Market Pulse QA
+                              </button>
                           </div>
                       )}
 
@@ -4854,7 +6191,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
             <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div> {tr('home.liveFeed')}
         </h3>
         <div ref={logContainerRef} className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar mask-image-gradient">
-            {player.logs.map((log, idx) => (
+            {liveFeedLogs.map((log, idx) => (
                 <div key={idx} className={`text-sm leading-relaxed border-l-2 pl-3 ${
                     log.type === 'positive' ? 'border-emerald-500/50 text-emerald-100' : 
                     log.type === 'negative' ? 'border-rose-500/50 text-rose-100' : 'border-zinc-700 text-zinc-400'

@@ -1,13 +1,14 @@
 
 // ... existing imports
 import React, { useState } from 'react';
-import { Player, PastProject, ActiveRelease, CastMember, Review, Award, Universe, UniverseId, IndustryProject, CustomPoster } from '../../types';
+import { Player, PastProject, ActiveRelease, CastMember, Review, Award, Universe, UniverseId, IndustryProject, CustomPoster, CampaignRealitySnapshot, ProjectDetails, ProjectMusicPlan, BudgetTier } from '../../types';
 import { formatMoney } from '../../services/formatUtils';
 import { getProjectIdentityLabel } from '../../services/genreCatalog';
 import { getProjectReleaseLabel, getProjectReleaseTiming } from '../../services/releaseTiming';
 import { AWARD_CALENDAR, AWARD_SHOW_DB, AwardShowLore, AwardDefinition, Nomination, sanitizeAwardRecords, getAwardCeremonyYear } from '../../services/awardLogic';
-import { ArrowLeft, Star, Film, ChevronRight, User, TrendingUp, DollarSign, Eye, Award as AwardIcon, Calendar, BookOpen, Clock, List, MessageSquare, Users, Globe, Zap, LayoutGrid, Shield, ArrowRight, Tv } from 'lucide-react';
+import { ArrowLeft, Star, Film, ChevronRight, User, TrendingUp, DollarSign, Eye, Award as AwardIcon, Calendar, BookOpen, Clock, List, MessageSquare, Users, Globe, Zap, LayoutGrid, Shield, ArrowRight, Tv, Music2, Handshake } from 'lucide-react';
 import { buildUniverseRoster, calculateUniverseProductWeeklyRevenue, getFallbackCharacterName, getUniverseDashboardProjects, getUniverseReleaseActivity, normalizeUniverseForSave, normalizeUniverseMap } from '../../services/universeLogic';
+import { calculateProjectMusicImpact, getMusicCreditRoleLabel, getMusicStrategyLabel, getProjectMusicPlan } from '../../services/musicIndustry';
 
 interface ImdbAppProps {
   player: Player;
@@ -32,9 +33,11 @@ interface DisplayProject {
     originalObject: PastProject | ActiveRelease;
     mediaType: 'MOVIE' | 'SERIES';
     customPoster?: CustomPoster;
+    campaignRealitySnapshot?: CampaignRealitySnapshot;
     identityLabel: string;
     releaseLabel: string;
     releaseDetailLabel: string;
+    musicPlan?: ProjectMusicPlan;
 }
 
 type Tab = 'PROFILE' | 'FILMOGRAPHY' | 'AWARDS' | 'FRANCHISES' | 'SEASON'; // Added SEASON
@@ -126,6 +129,43 @@ const getReturnStatusMeta = (status?: 'RETURNING' | 'WRITTEN_OFF' | 'KILLED_OFF'
     }
 };
 
+const inferBudgetTierFromBudget = (budget = 0): BudgetTier => {
+    if (budget > 50_000_000) return 'BLOCKBUSTER';
+    if (budget > 10_000_000) return 'HIGH';
+    if (budget > 2_000_000) return 'MID';
+    return 'LOW';
+};
+
+const getArchivedProjectMusicPlan = (project: PastProject): ProjectMusicPlan | undefined => {
+    if (project.musicPlan?.credits?.length) return project.musicPlan;
+    const inferredProject: ProjectDetails = {
+        title: project.name,
+        type: project.projectType || 'MOVIE',
+        description: project.description || '',
+        studioId: project.studioId || 'ARTISAN_PICTURES',
+        subtype: project.subtype || 'STANDALONE',
+        genre: project.genre || 'DRAMA',
+        budgetTier: inferBudgetTierFromBudget(project.budget),
+        estimatedBudget: project.budget || 0,
+        visibleHype: 'MID',
+        hiddenStats: {
+            scriptQuality: project.projectQuality || 50,
+            directorQuality: project.projectQuality || 50,
+            castingStrength: 50,
+            distributionPower: 50,
+            rawHype: 50,
+            qualityScore: project.projectQuality || 50,
+            prestigeBonus: 0
+        },
+        directorName: 'Unknown Director',
+        visibleDirectorTier: 'Unknown',
+        visibleScriptBuzz: 'Unknown',
+        visibleCastStrength: 'Unknown',
+        targetAudience: 'PG-13'
+    };
+    return getProjectMusicPlan(inferredProject);
+};
+
 export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
   const [activeTab, setActiveTab] = useState<Tab>('PROFILE');
   const [awardView, setAwardView] = useState<AwardView>('HOME');
@@ -152,6 +192,8 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
           gross: r.totalGross, budget: r.budget, description: r.projectDetails.description, cast: r.projectDetails.castList,
           reviews: r.projectDetails.reviews, streamingViews: r.streaming?.totalViews, originalObject: r,
           mediaType: r.type, customPoster: r.projectDetails.customPoster, identityLabel: getProjectIdentityLabel(r.projectDetails),
+          musicPlan: getProjectMusicPlan(r.projectDetails),
+          campaignRealitySnapshot: r.projectDetails.campaignRealitySnapshot,
           releaseLabel: getProjectReleaseLabel(r, releaseFallback),
           releaseDetailLabel: getProjectReleaseLabel(r, releaseFallback, { includeWeek: true })
       };
@@ -163,6 +205,8 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
           id: p.id, name: p.name, year: timing.releaseYear || p.year, role: p.roleType || 'Role', rating: p.imdbRating || 0, status: 'ARCHIVED' as const,
           gross: p.gross, budget: p.budget, description: p.description, cast: p.castList, reviews: p.reviews, streamingViews: p.totalViews, awards: p.awards, originalObject: p,
           mediaType: p.projectType || 'MOVIE', customPoster: p.customPoster, identityLabel: getProjectIdentityLabel(p),
+          musicPlan: getArchivedProjectMusicPlan(p),
+          campaignRealitySnapshot: p.campaignRealitySnapshot,
           releaseLabel: getProjectReleaseLabel(p, releaseFallback),
           releaseDetailLabel: getProjectReleaseLabel(p, releaseFallback, { includeWeek: true })
       };
@@ -180,6 +224,12 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
   const cleanedAwards: Award[] = sanitizeAwardRecords(player.awards || []);
   const awardsWon = cleanedAwards.filter(a => a.outcome === 'WON');
   const awardsNom = cleanedAwards.filter(a => a.outcome === 'NOMINATED');
+  const musicHeavyProjects = fullList.filter(project => project.musicPlan?.credits?.length);
+  const totalSoundtrackRevenue = fullList.reduce((sum, project) => {
+      const original = project.originalObject as PastProject | ActiveRelease;
+      return sum + ((original as any).soundtrackRevenue || 0);
+  }, 0);
+  const musicAwardWins = awardsWon.filter(award => /song|score|soundtrack|music video|trailer/i.test(`${award.category || ''} ${award.name || ''}`));
 
   const filteredCredits = fullList.filter(p => {
       if (creditFilter === 'ALL') return true;
@@ -264,6 +314,27 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
                                 </div>
                             ))}
                         </div>
+                        {(musicHeavyProjects.length > 0 || totalSoundtrackRevenue > 0 || musicAwardWins.length > 0) && (
+                            <div className="mt-3 rounded-2xl border border-cyan-300/20 bg-cyan-950/20 p-3">
+                                <div className="mb-2 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.18em] text-cyan-200">
+                                    <Music2 size={13}/> Music Legacy
+                                </div>
+                                <div className="grid grid-cols-3 gap-2">
+                                    <div className="rounded-xl bg-black/35 p-2 text-center">
+                                        <div className="text-lg font-black text-white">{musicHeavyProjects.length}</div>
+                                        <div className="text-[8px] uppercase tracking-widest text-zinc-500">Credits</div>
+                                    </div>
+                                    <div className="rounded-xl bg-black/35 p-2 text-center">
+                                        <div className="text-sm font-black text-emerald-300 truncate">{formatMoney(totalSoundtrackRevenue)}</div>
+                                        <div className="text-[8px] uppercase tracking-widest text-zinc-500">Soundtrack</div>
+                                    </div>
+                                    <div className="rounded-xl bg-black/35 p-2 text-center">
+                                        <div className="text-lg font-black text-amber-300">{musicAwardWins.length}</div>
+                                        <div className="text-[8px] uppercase tracking-widest text-zinc-500">Music Wins</div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                   );
               })}
@@ -736,6 +807,29 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
   // --- MAIN APP STRUCTURE ---
   if (selectedProject) {
     const futurePotential = (selectedProject.originalObject as ActiveRelease | PastProject).futurePotential;
+    const selectedProjectMusicDetails = ((selectedProject.originalObject as ActiveRelease).projectDetails || selectedProject.originalObject) as ProjectDetails;
+    const selectedProjectMusicImpact = selectedProject.musicPlan?.credits?.length
+        ? calculateProjectMusicImpact({ ...selectedProjectMusicDetails, musicPlan: selectedProject.musicPlan }, selectedProject.musicPlan)
+        : undefined;
+    const selectedProjectSoundtrackRevenue = Math.max(0, Number((selectedProject.originalObject as any).soundtrackRevenue || 0));
+    const selectedInvestorPlan = selectedProjectMusicDetails.investorPlan || (selectedProject.originalObject as any).investorPlan;
+    const selectedInvestorPayouts = selectedProjectMusicDetails.investorPayouts || (selectedProject.originalObject as any).investorPayouts;
+    const selectedInvestorNames = selectedInvestorPlan?.commitments?.map((item: any) => item.investorName).slice(0, 2).join(', ') || '';
+    const selectedInvestorExtra = Math.max(0, (selectedInvestorPlan?.commitments?.length || 0) - 2);
+    const selectedInvestorOwnerNames = selectedInvestorPlan?.commitments
+        ?.map((item: any) => item.ownerName)
+        .filter((name: unknown): name is string => typeof name === 'string' && Boolean(name))
+        .slice(0, 2)
+        .join(', ') || '';
+    const selectedInvestorOwnerExtra = Math.max(0, (selectedInvestorPlan?.commitments?.filter((item: any) => item.ownerName).length || 0) - 2);
+    const selectedInvestorScopeLabel = selectedProject.mediaType === 'SERIES' ? 'Season-only cap table' : 'Project-only cap table';
+    const selectedInvestorPayoutTotal = Math.max(0, Number(selectedInvestorPayouts?.lifetimeInvestorPayout || 0));
+    const selectedProjectMusicMoments = (player.world.musicIndustry?.cultureMoments || [])
+        .filter(moment => moment.projectTitle === selectedProject.name)
+        .slice(0, 2);
+    const selectedProjectMusicRisk = selectedProjectMusicImpact
+        ? Math.max(selectedProjectMusicImpact.controversyRisk, selectedProjectMusicImpact.mismatchBacklashRisk)
+        : 0;
     const returnStatusMeta = getReturnStatusMeta(futurePotential?.playerReturnStatus);
      return (
         <div className="absolute inset-0 bg-zinc-950 flex flex-col z-50 text-white animate-in slide-in-from-right duration-300">
@@ -836,6 +930,110 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
                     </p>
                 </div>
 
+                {selectedProject.musicPlan?.credits?.length ? (
+                    <div className="px-4 py-3 border-b border-zinc-800 bg-gradient-to-br from-cyan-950/20 via-zinc-950 to-zinc-950">
+                        <div className="flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                                <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.22em] text-cyan-200">
+                                    <Music2 size={13} className="shrink-0"/> Soundtrack Desk
+                                </div>
+                                <div className="mt-1 truncate text-sm font-black text-white">
+                                    {getMusicStrategyLabel(selectedProject.musicPlan.strategy)}
+                                </div>
+                            </div>
+                            <div className="shrink-0 rounded-2xl border border-cyan-300/20 bg-black/35 px-3 py-2 text-right">
+                                <div className="text-[8px] font-black uppercase tracking-widest text-zinc-500">Revenue</div>
+                                <div className="text-xs font-black text-emerald-300">{formatMoney(selectedProjectSoundtrackRevenue)}</div>
+                            </div>
+                        </div>
+
+                        <div className="mt-3 flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                            {selectedProject.musicPlan.credits.map((credit, index) => (
+                                <div key={`${credit.artistId}_${credit.role}_${index}`} className="min-w-[168px] max-w-[190px] rounded-2xl border border-white/10 bg-black/35 p-3">
+                                    <div className="truncate text-[9px] font-black uppercase tracking-[0.2em] text-cyan-300">
+                                        {getMusicCreditRoleLabel(credit.role)}
+                                    </div>
+                                    <div className="mt-1 truncate text-sm font-black text-white">{credit.artistName}</div>
+                                    <div className="mt-0.5 truncate text-[11px] text-zinc-400">{credit.songTitle}</div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {selectedProjectMusicImpact && selectedProjectMusicImpact.score > 0 && (
+                            <div className="mt-3 grid grid-cols-4 gap-2">
+                                <div className="rounded-xl bg-black/35 p-2 text-center">
+                                    <div className="text-[8px] uppercase tracking-widest text-zinc-500">Open</div>
+                                    <div className="text-xs font-black text-emerald-300">+{selectedProjectMusicImpact.openingWeekendLiftPct}%</div>
+                                </div>
+                                <div className="rounded-xl bg-black/35 p-2 text-center">
+                                    <div className="text-[8px] uppercase tracking-widest text-zinc-500">Reach</div>
+                                    <div className="text-xs font-black text-cyan-200">+{selectedProjectMusicImpact.audienceReachLiftPct}%</div>
+                                </div>
+                                <div className="rounded-xl bg-black/35 p-2 text-center">
+                                    <div className="text-[8px] uppercase tracking-widest text-zinc-500">Awards</div>
+                                    <div className="text-xs font-black text-violet-200">+{selectedProjectMusicImpact.awardChanceLift}</div>
+                                </div>
+                                <div className="rounded-xl bg-black/35 p-2 text-center">
+                                    <div className="text-[8px] uppercase tracking-widest text-zinc-500">Risk</div>
+                                    <div className={`text-xs font-black ${selectedProjectMusicRisk >= 38 ? 'text-amber-300' : 'text-zinc-300'}`}>{selectedProjectMusicRisk}</div>
+                                </div>
+                            </div>
+                        )}
+
+                        {selectedProjectMusicMoments.length > 0 && (
+                            <div className="mt-3 space-y-2">
+                                {selectedProjectMusicMoments.map(moment => (
+                                    <div key={moment.id} className="rounded-2xl border border-cyan-300/15 bg-cyan-300/5 px-3 py-2">
+                                        <div className="truncate text-[10px] font-black uppercase tracking-[0.18em] text-cyan-200">{moment.type.replace(/_/g, ' ')}</div>
+                                        <div className="mt-0.5 line-clamp-2 text-xs font-bold text-zinc-200">{moment.headline}</div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                ) : null}
+
+                {selectedInvestorPlan && selectedInvestorPlan.totalRaised > 0 && (
+                    <div className="px-4 py-3 border-b border-zinc-800 bg-gradient-to-br from-emerald-950/20 via-zinc-950 to-zinc-950">
+                        <div className="flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                                <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.22em] text-emerald-200">
+                                    <Handshake size={13} className="shrink-0"/> Investor Funding
+                                </div>
+                                <div className="mt-1 truncate text-sm font-black text-white">
+                                    {selectedInvestorNames}{selectedInvestorExtra > 0 ? ` +${selectedInvestorExtra}` : ''}
+                                </div>
+                                {selectedInvestorOwnerNames && (
+                                    <div className="mt-1 truncate text-[10px] font-bold uppercase tracking-widest text-emerald-100/55">
+                                        Owners: {selectedInvestorOwnerNames}{selectedInvestorOwnerExtra > 0 ? ` +${selectedInvestorOwnerExtra}` : ''}
+                                    </div>
+                                )}
+                            </div>
+                            <div className="shrink-0 rounded-2xl border border-emerald-300/20 bg-black/35 px-3 py-2 text-right">
+                                <div className="text-[8px] font-black uppercase tracking-widest text-zinc-500">Studio Keeps</div>
+                                <div className="text-xs font-black text-emerald-300">{selectedInvestorPlan.studioEquityPercent}%</div>
+                            </div>
+                        </div>
+                        <div className="mt-3 grid grid-cols-3 gap-2">
+                            <div className="rounded-xl bg-black/35 p-2 text-center">
+                                <div className="text-[8px] uppercase tracking-widest text-zinc-500">Raised</div>
+                                <div className="text-xs font-black text-emerald-300">{formatMoney(selectedInvestorPlan.totalRaised)}</div>
+                            </div>
+                            <div className="rounded-xl bg-black/35 p-2 text-center">
+                                <div className="text-[8px] uppercase tracking-widest text-zinc-500">Investor Cut</div>
+                                <div className="text-xs font-black text-cyan-200">{selectedInvestorPlan.investorEquityPercent}%</div>
+                            </div>
+                            <div className="rounded-xl bg-black/35 p-2 text-center">
+                                <div className="text-[8px] uppercase tracking-widest text-zinc-500">Paid Out</div>
+                                <div className="text-xs font-black text-zinc-200">{formatMoney(selectedInvestorPayoutTotal)}</div>
+                            </div>
+                        </div>
+                        <div className="mt-3 text-xs font-bold text-zinc-400">
+                            {selectedInvestorScopeLabel}; sequels or later seasons need fresh financing.
+                        </div>
+                    </div>
+                )}
+
                 {returnStatusMeta && (
                     <div className="p-4 border-b border-zinc-800 bg-zinc-900/40">
                         <h3 className="text-white font-bold text-sm mb-3 flex items-center gap-2">
@@ -902,6 +1100,45 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
                         {selectedProject.streamingViews && (<div><div className="text-zinc-500 text-xs">Streaming Views</div><div className="text-indigo-400 font-mono font-bold">{formatViews(selectedProject.streamingViews)}</div></div>)}
                     </div>
                 </div>
+
+                {selectedProject.campaignRealitySnapshot && (() => {
+                    const reality = selectedProject.campaignRealitySnapshot;
+                    const realityTone = reality.tone === 'POSITIVE'
+                        ? 'border-emerald-500/30 bg-emerald-950/20 text-emerald-200'
+                        : reality.tone === 'NEGATIVE'
+                            ? 'border-rose-500/30 bg-rose-950/20 text-rose-200'
+                            : 'border-amber-500/30 bg-amber-950/20 text-amber-200';
+                    return (
+                        <div className="p-4 border-b border-zinc-800 bg-zinc-950/70">
+                            <div className={`reality-tone rounded-2xl border p-4 ${realityTone}`}>
+                                <div className="flex items-start justify-between gap-3 mb-3">
+                                    <div>
+                                        <div className="text-[10px] uppercase tracking-[0.24em] text-zinc-500 font-black mb-1">Campaign Reality</div>
+                                        <div className="text-xl font-black text-white">{reality.label}</div>
+                                    </div>
+                                    <div className="rounded-full border border-white/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em]">
+                                        {reality.tone}
+                                    </div>
+                                </div>
+                                <p className="text-sm leading-relaxed text-zinc-300 mb-4">{reality.summary}</p>
+                                <div className="grid grid-cols-2 gap-2 text-xs">
+                                    <div className="rounded-xl bg-black/30 border border-white/10 p-3">
+                                        <div className="text-[9px] uppercase tracking-[0.18em] text-zinc-500 font-black mb-1">Promise</div>
+                                        <div className="font-bold text-white">{reality.promised}</div>
+                                    </div>
+                                    <div className="rounded-xl bg-black/30 border border-white/10 p-3">
+                                        <div className="text-[9px] uppercase tracking-[0.18em] text-zinc-500 font-black mb-1">Audience Read</div>
+                                        <div className="font-bold text-white">{reality.audienceScore}/100</div>
+                                    </div>
+                                    <div className="col-span-2 rounded-xl bg-black/30 border border-white/10 p-3">
+                                        <div className="text-[9px] uppercase tracking-[0.18em] text-zinc-500 font-black mb-1">Forecast Shift</div>
+                                        <div className="text-zinc-300 leading-relaxed">{reality.forecastShift}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })()}
 
                 {/* Reviews */}
                 {selectedProject.reviews && selectedProject.reviews.length > 0 && (

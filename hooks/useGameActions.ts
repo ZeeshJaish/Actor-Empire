@@ -8,6 +8,7 @@ import { createBusiness } from '../services/businessLogic';
 import { getAbsoluteWeek } from '../services/legacyLogic';
 import { hasOwnedPremiumAssetInCollection, spendPlayerEnergy } from '../services/premiumLogic';
 import { applyParenthoodAbandonment, applyPartnerBreakup, applyDivorceOutcome, getPregnancyCarrier, getPregnancyFeedbackCopy, reconnectWithChild } from '../services/familyLogic';
+import { getPlayerLanguage, t } from '../services/i18n';
 
 interface GameActionsProps {
     player: Player;
@@ -30,16 +31,19 @@ interface GameActionsProps {
 }
 
 export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePressEvent, setShowProtectionPrompt, setActiveSocialEvent, setPendingBabyNaming }: GameActionsProps) => {
+    const language = getPlayerLanguage(player);
+    const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
     const familyRelations: Relationship['relation'][] = ['Parent', 'Deceased Parent', 'Sibling', 'Child'];
     const isFamilyRelation = (relation?: Relationship['relation']) => !!relation && familyRelations.includes(relation);
     const PREGNANCY_TERM_WEEKS = 39;
+    type SocialInteractionType = 'CALL' | 'HANGOUT' | 'GIFT' | 'NETWORK' | 'DATE' | 'PROPOSE' | 'INTIMACY' | 'CLUBBING' | 'TRIP' | 'ESTATE_DATE' | 'YACHT_DATE' | 'JET_ESCAPE' | 'LUXURY_GIFT' | 'ABANDON_CHILD' | 'RECONNECT_CHILD' | 'BREAK_UP' | 'DIVORCE_SETTLE' | 'DIVORCE_FIGHT_BUDGET' | 'DIVORCE_FIGHT_ESTABLISHED' | 'DIVORCE_FIGHT_ELITE' | 'PET_FEED' | 'PET_PLAY' | 'PET_GROOM' | 'PET_VET';
 
     const intimacyDeclines = [
-        'They are not in the mood tonight and want space.',
-        'The connection feels off right now, so they say no.',
-        'They are stressed and ask you to slow down.',
-        'They want the relationship to feel stronger before getting intimate.',
-        'They had a rough week and are not feeling it tonight.',
+        'actions.intimacy.decline.space',
+        'actions.intimacy.decline.connectionOff',
+        'actions.intimacy.decline.stressed',
+        'actions.intimacy.decline.strongerFirst',
+        'actions.intimacy.decline.roughWeek',
     ];
 
     const getWeeksSinceContact = (state: Player, partner: Relationship) => {
@@ -52,7 +56,7 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
 
     const getIntimacyDeclineReason = (state: Player, partner: Relationship): string | null => {
         if (partner.relation !== 'Partner' && partner.relation !== 'Spouse') {
-            return 'That kind of relationship is not romantic.';
+            return tr('actions.intimacy.decline.notRomantic');
         }
 
         const weeksSinceContact = getWeeksSinceContact(state, partner);
@@ -67,9 +71,9 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
             : 0.72;
 
         if (Math.random() >= declineChance) return null;
-        if (partner.closeness < 35) return `${partner.name} does not feel close enough to you right now.`;
-        if (weeksSinceContact > 10) return `${partner.name} feels distant because you have not been present lately.`;
-        return intimacyDeclines[Math.floor(Math.random() * intimacyDeclines.length)];
+        if (partner.closeness < 35) return tr('actions.intimacy.decline.notClose', { partnerName: partner.name });
+        if (weeksSinceContact > 10) return tr('actions.intimacy.decline.distant', { partnerName: partner.name });
+        return tr(intimacyDeclines[Math.floor(Math.random() * intimacyDeclines.length)]);
     };
 
     const recordIntimacyDecline = (partnerId: string, reason: string) => {
@@ -100,7 +104,7 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
             spendPlayerEnergy(nextState, Math.min(8, prev.energy.current));
             return nextState;
         });
-        setToastMessage({ title: 'Not Tonight', subtext: reason });
+        setToastMessage({ title: tr('actions.intimacy.notTonightTitle'), subtext: reason });
     };
 
     const schedulePregnancy = (
@@ -366,17 +370,17 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
                 rewardGenreExperience(newPlayer, genre, 1);
                 newPlayer.logs.push({
                     week: prev.currentWeek, year: prev.age, 
-                    message: `Practiced ${genre} techniques. Skill improved.`, type: 'neutral'
+                    message: tr('actions.improve.genreLog', { genre }), type: 'neutral'
                 });
                 newPlayer.logs = newPlayer.logs.slice(-50);
-                setToastMessage({ title: "Genre Training", subtext: `${genre} proficiency increased.` });
+                setToastMessage({ title: tr('actions.improve.genreTrainingTitle'), subtext: tr('actions.improve.genreTrainingSubtext', { genre }) });
                 return newPlayer;
             }
 
             const newStats = { ...prev.stats, skills: { ...prev.stats.skills } };
             const newWriterStats = prev.writerStats ? { ...prev.writerStats } : { creativity: 0, dialogue: 0, structure: 0 };
-            let msg = `You completed ${option.label}.`;
-            let toastType = "Activity Complete";
+            let msg = tr('actions.improve.completedLog', { label: option.label });
+            let toastType = tr('actions.improve.activityCompleteTitle');
             
             Object.entries(option.gains).forEach(([key, val]) => {
                 if (typeof val !== 'number') return; 
@@ -409,8 +413,8 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
             const roll = Math.random() * 100;
             if (roll < option.risk) {
                 newStats.happiness = Math.max(0, newStats.happiness - 5);
-                msg = `Ouch! ${option.label} was tough. You feel drained.`;
-                toastType = "Minor Setback";
+                msg = tr('actions.improve.setbackLog', { label: option.label });
+                toastType = tr('actions.improve.minorSetbackTitle');
             } else if (roll > 90) {
                 Object.keys(option.gains).forEach(key => {
                     if (key in newStats && key !== 'skills') {
@@ -425,8 +429,8 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
                         newWriterStats[statKey] = Math.min(100, newWriterStats[statKey] + 1);
                     });
                 }
-                msg = `Amazing session at ${activityName}! Feeling unstoppable.`;
-                toastType = "Great Progress!";
+                msg = tr('actions.improve.greatProgressLog', { activityName });
+                toastType = tr('actions.improve.greatProgressTitle');
             }
 
             const newState = {
@@ -449,11 +453,11 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
           if (idx === -1) return prev;
           const partner = prev.relationships[idx];
           if (partner.relation === 'Deceased Parent') {
-              setToastMessage({ title: "In Memory", subtext: "That bond is preserved and no longer needs maintenance." });
+              setToastMessage({ title: tr('actions.relationship.inMemoryTitle'), subtext: tr('actions.relationship.inMemorySubtext') });
               return prev;
           }
           if (['DATE', 'PROPOSE', 'INTIMACY', 'CLUBBING', 'TRIP', 'ESTATE_DATE', 'YACHT_DATE', 'JET_ESCAPE', 'LUXURY_GIFT'].includes(action) && isFamilyRelation(partner.relation)) {
-              setToastMessage({ title: "Blocked", subtext: "Family members cannot be used for romantic actions." });
+              setToastMessage({ title: tr('actions.relationship.blockedTitle'), subtext: tr('actions.relationship.familyRomanceBlockedSubtext') });
               return prev;
           }
           
@@ -515,11 +519,11 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
                   moneyCost = 5000;
                   if (newCloseness >= 90 && Math.random() > 0.3) {
                       newRelation = 'Spouse'; newCloseness = 100;
-                      logMsg = `💍 Proposed to ${partner.name}... YES! You are now married.`;
-                      setToastMessage({ title: "Just Married!", subtext: `Congratulations to you and ${partner.name}!` });
+                      logMsg = tr('actions.relationship.proposalAcceptedLog', { partnerName: partner.name });
+                      setToastMessage({ title: tr('actions.relationship.justMarriedTitle'), subtext: tr('actions.relationship.justMarriedSubtext', { partnerName: partner.name }) });
                   } else {
                       newCloseness -= 20;
-                      logMsg = `Proposed to ${partner.name}, but they said it's too soon.`;
+                      logMsg = tr('actions.relationship.proposalRejectedLog', { partnerName: partner.name });
                   }
               }
               else if (action === 'INTIMACY') {
@@ -581,26 +585,26 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
           if (action === 'ESTATE_DATE') {
               pushLifestyleHeadline(
                   nextState,
-                  `${prev.name} is rumored to be hosting ultra-private nights at a luxury estate`,
-                  `${partner.name} is the latest name linked to the property, and insiders say the atmosphere is doing half the flirting.`
+                  tr('actions.generated.estateDate.headline', { name: prev.name }),
+                  tr('actions.generated.estateDate.subtext', { partnerName: partner.name })
               );
           } else if (action === 'YACHT_DATE') {
               pushLifestyleHeadline(
                   nextState,
-                  `${prev.name} and ${partner.name} are spotted on open water`,
-                  `The yacht outing is already fueling romance talk across fan pages and celebrity watch accounts.`
+                  tr('actions.generated.yachtDate.headline', { name: prev.name, partnerName: partner.name }),
+                  tr('actions.generated.yachtDate.subtext')
               );
           } else if (action === 'JET_ESCAPE') {
               pushLifestyleHeadline(
                   nextState,
-                  `${prev.name} disappears for a jet-set escape with ${partner.name}`,
-                  `The private flight has people convinced this relationship is operating on a different level now.`
+                  tr('actions.generated.jetEscape.headline', { name: prev.name, partnerName: partner.name }),
+                  tr('actions.generated.jetEscape.subtext')
               );
           } else if (action === 'LUXURY_GIFT') {
               pushLifestyleHeadline(
                   nextState,
-                  `${prev.name}'s latest gift to ${partner.name} has luxury blogs guessing the price`,
-                  `Style accounts are already arguing over whether it was romantic, strategic, or both.`
+                  tr('actions.generated.luxuryGift.headline', { name: prev.name, partnerName: partner.name }),
+                  tr('actions.generated.luxuryGift.subtext')
               );
           }
           spendPlayerEnergy(nextState, energyCost);
@@ -609,48 +613,111 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
       });
     };
 
-    const handleSocialInteract = (id: string, type: 'CALL' | 'HANGOUT' | 'GIFT' | 'NETWORK' | 'DATE' | 'PROPOSE' | 'INTIMACY' | 'CLUBBING' | 'TRIP' | 'ESTATE_DATE' | 'YACHT_DATE' | 'JET_ESCAPE' | 'LUXURY_GIFT' | 'ABANDON_CHILD' | 'RECONNECT_CHILD' | 'BREAK_UP' | 'DIVORCE_SETTLE' | 'DIVORCE_FIGHT_BUDGET' | 'DIVORCE_FIGHT_ESTABLISHED' | 'DIVORCE_FIGHT_ELITE') => {
+    const handleSocialInteract = (id: string, type: SocialInteractionType) => {
         const partner = player.relationships.find(r => r.id === id);
+        if (partner?.relation === 'Pet' && ['PET_FEED', 'PET_PLAY', 'PET_GROOM', 'PET_VET'].includes(type)) {
+            const action = type as 'PET_FEED' | 'PET_PLAY' | 'PET_GROOM' | 'PET_VET';
+            setPlayer(prev => {
+                const idx = prev.relationships.findIndex(rel => rel.id === id && rel.relation === 'Pet');
+                if (idx === -1) return prev;
+                const pet = prev.relationships[idx];
+                const multiplier = pet.petRarity === 'endangered' ? 8
+                    : pet.petRarity === 'exotic' ? 4
+                    : pet.petRarity === 'premium' ? 2
+                    : 1;
+                const config = {
+                    PET_FEED: { label: tr('actions.pet.feed.label'), logKey: 'actions.pet.feed.log', cost: Math.round(150 * multiplier), energy: 4, closeness: 4, health: 0.2, happiness: 0.4, reputation: 0 },
+                    PET_PLAY: { label: tr('actions.pet.play.label'), logKey: 'actions.pet.play.log', cost: 0, energy: 10, closeness: 7, health: 0.2, happiness: 1, reputation: 0 },
+                    PET_GROOM: { label: tr('actions.pet.groom.label'), logKey: 'actions.pet.groom.log', cost: Math.round(450 * multiplier), energy: 5, closeness: 5, health: 0, happiness: 0.5, reputation: pet.petRarity === 'endangered' ? 0.3 : 0 },
+                    PET_VET: { label: tr('actions.pet.vet.label'), logKey: 'actions.pet.vet.log', cost: Math.round(1200 * multiplier), energy: 3, closeness: 6, health: 1, happiness: 0.4, reputation: pet.petRarity === 'endangered' ? 0.5 : 0 },
+                }[action];
+
+                if (prev.money < config.cost) {
+                    setToastMessage({ title: tr('actions.pet.notEnoughCashTitle'), subtext: tr('actions.pet.notEnoughCashSubtext', { label: config.label, cost: config.cost.toLocaleString() }) });
+                    return prev;
+                }
+                if (prev.energy.current < config.energy) {
+                    setToastMessage({ title: tr('actions.pet.notEnoughEnergyTitle'), subtext: tr('actions.pet.notEnoughEnergySubtext') });
+                    return prev;
+                }
+
+                const relationships = [...prev.relationships];
+                relationships[idx] = {
+                    ...pet,
+                    closeness: Math.min(100, (pet.closeness || 0) + config.closeness),
+                    lastInteractionWeek: prev.currentWeek,
+                    lastInteractionAbsolute: getAbsoluteWeek(prev.age, prev.currentWeek),
+                };
+                const nextState = {
+                    ...prev,
+                    money: Math.max(0, prev.money - config.cost),
+                    stats: {
+                        ...prev.stats,
+                        happiness: Math.min(100, Math.max(0, prev.stats.happiness + config.happiness)),
+                        health: Math.min(100, Math.max(0, prev.stats.health + config.health)),
+                        reputation: Math.min(100, Math.max(0, prev.stats.reputation + config.reputation)),
+                    },
+                    relationships,
+                    logs: [
+                        ...prev.logs,
+                        {
+                            week: prev.currentWeek,
+                            year: prev.age,
+                            message: `${pet.petEmoji || '🐾'} ${tr(config.logKey, { petName: pet.name })}`,
+                            type: 'positive' as const,
+                        },
+                    ].slice(-50),
+                };
+                spendPlayerEnergy(nextState, config.energy);
+                setToastMessage({ title: config.label, subtext: tr('actions.pet.bondImprovedSubtext', { petName: pet.name }) });
+                return nextState;
+            });
+            return;
+        }
+        if (partner?.relation === 'Pet') {
+            setToastMessage({ title: tr('actions.pet.careTitle'), subtext: tr('actions.pet.careSubtext') });
+            return;
+        }
         if (type === 'BREAK_UP') {
             setPlayer(prev => applyPartnerBreakup(prev, id));
-            setToastMessage({ title: "Breakup Finalized", subtext: "The relationship is over, and any family fallout now follows you." });
+            setToastMessage({ title: tr('actions.relationship.breakupTitle'), subtext: tr('actions.relationship.breakupSubtext') });
             return;
         }
         if (type === 'DIVORCE_SETTLE') {
             setPlayer(prev => applyDivorceOutcome(prev, id, 'SETTLE'));
-            setToastMessage({ title: "Divorce Settled", subtext: "The split is done. The financial aftermath starts now." });
+            setToastMessage({ title: tr('actions.relationship.divorceSettledTitle'), subtext: tr('actions.relationship.divorceSettledSubtext') });
             return;
         }
         if (type === 'DIVORCE_FIGHT_BUDGET' || type === 'DIVORCE_FIGHT_ESTABLISHED' || type === 'DIVORCE_FIGHT_ELITE') {
             const lawyerTier = type === 'DIVORCE_FIGHT_ELITE' ? 'ELITE' : type === 'DIVORCE_FIGHT_ESTABLISHED' ? 'ESTABLISHED' : 'BUDGET';
             setPlayer(prev => applyDivorceOutcome(prev, id, 'FIGHT', lawyerTier));
-            setToastMessage({ title: "Court Fight Resolved", subtext: `The divorce battle is over. ${lawyerTier.toLowerCase()} counsel changed the stakes.` });
+            setToastMessage({ title: tr('actions.relationship.courtFightTitle'), subtext: tr('actions.relationship.courtFightSubtext', { lawyerTier: lawyerTier.toLowerCase() }) });
             return;
         }
         if (type === 'ABANDON_CHILD') {
             setPlayer(prev => applyParenthoodAbandonment(prev, { childId: id }));
-            setToastMessage({ title: "Child Abandoned", subtext: "Your choice will carry financial and social consequences." });
+            setToastMessage({ title: tr('actions.relationship.childAbandonedTitle'), subtext: tr('actions.relationship.childAbandonedSubtext') });
             return;
         }
         if (type === 'RECONNECT_CHILD') {
             setPlayer(prev => reconnectWithChild(prev, id));
-            setToastMessage({ title: "Reconnection Started", subtext: "Repairing family damage will take time, but the first step is made." });
+            setToastMessage({ title: tr('actions.relationship.reconnectionTitle'), subtext: tr('actions.relationship.reconnectionSubtext') });
             return;
         }
         if (partner && ['DATE', 'PROPOSE', 'INTIMACY', 'CLUBBING', 'TRIP', 'ESTATE_DATE', 'YACHT_DATE', 'JET_ESCAPE', 'LUXURY_GIFT'].includes(type) && isFamilyRelation(partner.relation)) {
-            setToastMessage({ title: "Blocked", subtext: "Family members cannot be used for romantic actions." });
+            setToastMessage({ title: tr('actions.relationship.blockedTitle'), subtext: tr('actions.relationship.familyRomanceBlockedSubtext') });
             return;
         }
         if (type === 'ESTATE_DATE' && !hasOwnedPremiumAssetInCollection(player, 'bundle_luxury_homes')) {
-            setToastMessage({ title: "Locked", subtext: "Own a premium home first to host estate dates." });
+            setToastMessage({ title: tr('actions.relationship.lockedTitle'), subtext: tr('actions.relationship.lockedHomeSubtext') });
             return;
         }
         if ((type === 'YACHT_DATE' || type === 'JET_ESCAPE') && !hasOwnedPremiumAssetInCollection(player, 'bundle_sky_sea')) {
-            setToastMessage({ title: "Locked", subtext: "Own a Sky & Sea asset first to unlock that lifestyle move." });
+            setToastMessage({ title: tr('actions.relationship.lockedTitle'), subtext: tr('actions.relationship.lockedSkySeaSubtext') });
             return;
         }
         if (type === 'LUXURY_GIFT' && !hasOwnedPremiumAssetInCollection(player, 'bundle_ultimate_lifestyle')) {
-            setToastMessage({ title: "Locked", subtext: "Own an Ultimate Lifestyle item first to pull off that flex." });
+            setToastMessage({ title: tr('actions.relationship.lockedTitle'), subtext: tr('actions.relationship.lockedUltimateSubtext') });
             return;
         }
         if (type === 'INTIMACY') {
@@ -729,7 +796,7 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
         handleGenericUpdate(prev => {
             const res = calculateInteraction(prev, npc, type);
             if (prev.energy.current < res.energyCost) {
-                setToastMessage({ title: "Not Enough Energy", subtext: `You need ${res.energyCost} energy for this.` });
+                setToastMessage({ title: tr('actions.npc.notEnoughEnergyTitle'), subtext: tr('actions.npc.notEnoughEnergySubtext', { energy: res.energyCost.toString() }) });
                 return prev;
             }
 
@@ -765,7 +832,7 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
             if (!oldState.isFollowing && newState.isFollowing) {
                 // NPC just followed player!
                 followerGain = Math.floor(npc.stats.fame * 100 * (0.01 + Math.random() * 0.02));
-                setToastMessage({ title: "New Follower!", subtext: `${npc.name} started following you! (+${followerGain} followers)` });
+                setToastMessage({ title: tr('actions.npc.newFollowerTitle'), subtext: tr('actions.npc.newFollowerSubtext', { npcName: npc.name, followerGain: followerGain.toString() }) });
             }
 
             let updatedRelationships = [...prev.relationships];
@@ -779,7 +846,7 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
                     lastInteractionWeek: prev.currentWeek,
                     npcId: npc.id
                 });
-                setToastMessage({ title: "New Connection!", subtext: `${npc.name} is now in your network.` });
+                setToastMessage({ title: tr('actions.npc.newConnectionTitle'), subtext: tr('actions.npc.newConnectionSubtext', { npcName: npc.name }) });
             } else if (res.success) {
                 // Update closeness if already in relationships
                 updatedRelationships = updatedRelationships.map(r => 
@@ -788,7 +855,7 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
             }
 
             if (res.relationshipDelta > 0 && !res.isBefriended) {
-                setToastMessage({ title: "Relationship Improved", subtext: `Your bond with ${npc.name} increased! (+${res.relationshipDelta})` });
+                setToastMessage({ title: tr('actions.npc.relationshipImprovedTitle'), subtext: tr('actions.npc.relationshipImprovedSubtext', { npcName: npc.name, delta: res.relationshipDelta.toString() }) });
             }
 
             const nextState = { 

@@ -130,7 +130,7 @@ export const getOwnedIpPerformance = ({
             title: release.name,
             projectType: release.type,
             state: getActiveReleaseState(release),
-            gross: Math.max(0, Number(release.totalGross || 0)) + Math.max(0, Number(release.streamingRevenue || 0)),
+            gross: Math.max(0, Number(release.totalGross || 0)) + Math.max(0, Number(release.streamingRevenue || 0)) + Math.max(0, Number(release.soundtrackRevenue || 0)),
             rating: typeof release.imdbRating === 'number' ? release.imdbRating : null,
             totalViews: Math.max(0, Number(release.streaming?.totalViews || 0)),
             awardsWon: 0,
@@ -142,7 +142,7 @@ export const getOwnedIpPerformance = ({
             title: project.name,
             projectType: project.projectType,
             state: 'RELEASED' as const,
-            gross: Math.max(0, Number(project.gross || 0)) + Math.max(0, Number(project.streamingRevenue || 0)),
+            gross: Math.max(0, Number(project.gross || 0)) + Math.max(0, Number(project.streamingRevenue || 0)) + Math.max(0, Number(project.soundtrackRevenue || 0)),
             rating: typeof project.imdbRating === 'number'
                 ? project.imdbRating
                 : typeof project.rating === 'number' ? project.rating : null,

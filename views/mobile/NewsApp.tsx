@@ -31,8 +31,10 @@ const isProjectStory = (item: NewsItem) => {
     || /project|studio|greenlight|production|box office|opening|weekend|sequel|franchise|universe|streaming|netflix|hulu|youtube|apple|disney|release|critics|audience|season/.test(text);
 };
 
+const isMusicStory = (item: NewsItem) => /music|song|single|album|chart|artist|soundtrack|rivalry|youtube premiere|video|fanbase|fanbases/i.test(`${item.headline} ${item.subtext || ''}`);
+
 const getFilteredNews = (items: NewsItem[], tab: NewsViewTab) => {
-  if (tab === 'TOP') return items.filter(n => n.category === 'TOP_STORY');
+  if (tab === 'TOP') return items.filter(n => n.category === 'TOP_STORY' || (isMusicStory(n) && n.impactLevel === 'HIGH'));
   if (tab === 'YOU') return items.filter(n => n.category === 'YOU');
   if (tab === 'INDUSTRY') return items.filter(n => n.category === 'INDUSTRY');
   return items.filter(isProjectStory);
@@ -52,6 +54,7 @@ const getSource = (item: NewsItem, language: GameLanguage) => {
   if (/scandal|backlash|controversy|brands distance|caught/.test(text)) return t(language, 'news.source.pop');
   if (/legal|court|audit|case|verdict/.test(text)) return t(language, 'news.source.court');
   if (/award|oscar|emmy|bafta|globes|nomination|snub/.test(text)) return t(language, 'news.source.awards');
+  if (/music|song|single|album|chart|soundtrack|artist|fanbase/.test(text)) return 'Music Desk';
   if (/streaming|netflix|hulu|youtube|apple|disney/.test(text)) return t(language, 'news.source.streaming');
   if (/sequel|franchise|universe|phase|saga/.test(text)) return t(language, 'news.source.franchise');
   if (/casting|attached|role|cast/.test(text)) return t(language, 'news.source.casting');
@@ -68,6 +71,7 @@ const getTags = (item: NewsItem, player: Player, language: GameLanguage) => {
   if (/scandal|legal|court|backlash|controversy|audit/.test(text)) tags.push(t(language, 'news.tag.risk'));
   if (/box office|gross|opening|weekend|audience|critics/.test(text)) tags.push(t(language, 'news.tag.audience'));
   if (/streaming|netflix|hulu|youtube|apple|disney/.test(text)) tags.push(t(language, 'news.tag.streaming'));
+  if (/music|song|single|album|chart|soundtrack|artist|fanbase/.test(text)) tags.push('Music');
   if (/award|oscar|emmy|bafta|globes|nomination|snub/.test(text)) tags.push(t(language, 'news.tag.awards'));
   if (/studio|greenlight|production|venture|banner/.test(text)) tags.push(t(language, 'news.tag.studio'));
   if (/sequel|franchise|universe|phase|saga/.test(text)) tags.push(t(language, 'news.tag.franchise'));
@@ -94,6 +98,7 @@ const getImpactChips = (item: NewsItem, language: GameLanguage) => {
   if (item.impactLevel === 'HIGH') chips.push({ label: t(language, 'news.chip.heat'), value: t(language, 'news.value.high'), className: 'text-rose-300' });
   if (/box office|gross|opening|weekend/.test(text)) chips.push({ label: t(language, 'news.chip.market'), value: t(language, 'news.value.moving'), className: 'text-emerald-300' });
   if (/streaming|netflix|hulu|youtube|apple|disney/.test(text)) chips.push({ label: t(language, 'news.chip.bids'), value: t(language, 'news.value.watch'), className: 'text-sky-300' });
+  if (/music|song|single|album|chart|soundtrack|artist|fanbase/.test(text)) chips.push({ label: 'Music', value: 'Live', className: 'text-cyan-300' });
   if (/award|oscar|emmy|bafta|globes|nomination/.test(text)) chips.push({ label: t(language, 'news.chip.prestige'), value: '+', className: 'text-amber-300' });
   if (/scandal|legal|court|backlash|controversy/.test(text)) chips.push({ label: t(language, 'news.chip.risk'), value: t(language, 'news.value.active'), className: 'text-red-300' });
   if (/sequel|franchise|universe|phase|saga/.test(text)) chips.push({ label: t(language, 'news.chip.future'), value: t(language, 'news.value.open'), className: 'text-violet-300' });
@@ -242,7 +247,9 @@ const NewsAppLegacy: React.FC<NewsAppProps> = ({ player, onBack }) => {
   const [tab, setTab] = useState<NewsCategory>('TOP_STORY');
   const language = getPlayerLanguage(player);
   const newsItems = player.news || [];
-  const filteredNews = newsItems.filter(n => n.category === tab);
+  const filteredNews = tab === 'TOP_STORY'
+      ? newsItems.filter(n => n.category === 'TOP_STORY' || (isMusicStory(n) && n.impactLevel === 'HIGH'))
+      : newsItems.filter(n => n.category === tab);
 
   return (
     <div className="absolute inset-0 bg-zinc-950 flex flex-col z-40 text-white font-serif animate-in slide-in-from-right duration-300">

@@ -1,9 +1,10 @@
 
 import React, { useEffect, useState } from 'react';
 import { Player, Property, Vehicle, ClothingItem, SettableClothingStyle } from '../types';
-import { CreditCard, Store, Briefcase, ChevronRight, Lock, Clapperboard, Tv, Star } from 'lucide-react';
+import { CalendarDays, CreditCard, Store, Briefcase, ChevronRight, Lock, Clapperboard, Tv, Star } from 'lucide-react';
 import { LifestyleAssets } from './lifestyle/LifestyleAssets';
 import { LifestyleBusiness } from './lifestyle/LifestyleBusiness';
+import { LifestyleActivities } from './lifestyle/LifestyleActivities';
 import { ProductionWizard } from './lifestyle/business/ProductionWizard';
 import { ProductionHouseGame } from './lifestyle/business/ProductionHouseGame';
 import { PROPERTY_CUSTOMIZATIONS, VEHICLE_CUSTOMIZATIONS } from '../services/lifestyleLogic';
@@ -21,14 +22,14 @@ interface LifestylePageProps {
   onUpdatePlayer?: (player: Player) => void; 
   onPremiumPurchase: (productId: PremiumProductId) => void;
   onNavVisibilityChange?: (visible: boolean) => void;
-  initialView?: 'MAIN' | 'ASSETS' | 'BUSINESS' | 'PRODUCTION_WIZARD' | 'PRODUCTION_GAME';
+  initialView?: 'MAIN' | 'ASSETS' | 'ACTIVITIES' | 'BUSINESS' | 'PRODUCTION_WIZARD' | 'PRODUCTION_GAME';
   onInitialViewConsumed?: () => void;
   initialRightsMarketOpportunityId?: string;
   onRightsMarketTargetConsumed?: () => void;
 }
 
 export const LifestylePage: React.FC<LifestylePageProps> = ({ player, onBuyItem, onSellItem, onSetResidence, onSetActiveStyle, onUpdatePlayer, onPremiumPurchase, onNavVisibilityChange, initialView, onInitialViewConsumed, initialRightsMarketOpportunityId, onRightsMarketTargetConsumed }) => {
-  const [view, setView] = useState<'MAIN' | 'ASSETS' | 'BUSINESS' | 'PRODUCTION_WIZARD' | 'PRODUCTION_GAME'>('MAIN');
+  const [view, setView] = useState<'MAIN' | 'ASSETS' | 'ACTIVITIES' | 'BUSINESS' | 'PRODUCTION_WIZARD' | 'PRODUCTION_GAME'>('MAIN');
   const [customizationItem, setCustomizationItem] = useState<Property | Vehicle | null>(null);
   const [selectedCustomizations, setSelectedCustomizations] = useState<any[]>([]);
   const language = getPlayerLanguage(player);
@@ -153,6 +154,8 @@ export const LifestylePage: React.FC<LifestylePageProps> = ({ player, onBuyItem,
   }
 
   if (view === 'ASSETS') return <LifestyleAssets player={player} onBack={() => setView('MAIN')} onBuy={onBuyItem} onSell={onSellItem} onSetResidence={onSetResidence} onInitiateCustomization={handleInitiateCustomization} onPremiumPurchase={onPremiumPurchase} />;
+
+  if (view === 'ACTIVITIES') return <LifestyleActivities player={player} onBack={() => setView('MAIN')} onUpdatePlayer={onUpdatePlayer} />;
   
   if (view === 'BUSINESS') return <LifestyleBusiness player={player} onBack={() => setView('MAIN')} onUpdatePlayer={onUpdatePlayer!} />;
   
@@ -190,7 +193,7 @@ export const LifestylePage: React.FC<LifestylePageProps> = ({ player, onBuyItem,
                     <div className={`p-3 rounded-2xl ${productionStudio ? 'bg-amber-500 text-black' : 'bg-amber-500/10 text-amber-400'}`}>
                         <Clapperboard size={24}/>
                     </div>
-                    <div>
+                    <div className="min-w-0 flex-1 pr-2">
                         <div className="font-bold text-xl text-white flex items-center gap-2">
                             {productionStudio ? productionStudio.name : tr('lifestyle.productionHouse')}
                             {productionStudio && <Star size={12} className="text-amber-500 fill-amber-500"/>}
@@ -199,20 +202,23 @@ export const LifestylePage: React.FC<LifestylePageProps> = ({ player, onBuyItem,
                             {productionStudio ? tr('lifestyle.manageStudioSlate') : tr('lifestyle.createBlockbusters')}
                         </div>
                     </div>
+                    <ChevronRight className="shrink-0 text-zinc-700 group-hover:text-zinc-400 transition-colors"/>
                 </div>
-                <ChevronRight className="absolute top-1/2 -translate-y-1/2 right-6 text-zinc-700 group-hover:text-zinc-400 transition-colors"/>
             </button>
 
             {/* Standard Assets */}
             <button onClick={() => setView('ASSETS')} className="glass-card p-6 rounded-3xl text-left hover:bg-white/5 transition-all group relative">
-                <div className="flex items-center gap-4"><div className="p-3 rounded-2xl bg-blue-500/10 text-blue-400"><Store size={24}/></div><div><div className="font-bold text-xl text-white">{tr('lifestyle.assetsTitle')}</div><div className="text-sm text-zinc-400">{tr('lifestyle.assetsSub')}</div></div></div>
-                <ChevronRight className="absolute top-1/2 -translate-y-1/2 right-6 text-zinc-700 group-hover:text-zinc-400 transition-colors"/>
+                <div className="flex items-center gap-4"><div className="p-3 rounded-2xl bg-blue-500/10 text-blue-400"><Store size={24}/></div><div className="min-w-0 flex-1 pr-2"><div className="font-bold text-xl text-white">{tr('lifestyle.assetsTitle')}</div><div className="text-sm text-zinc-400">{tr('lifestyle.assetsSub')}</div></div><ChevronRight className="shrink-0 text-zinc-700 group-hover:text-zinc-400 transition-colors"/></div>
+            </button>
+
+            {/* Activities */}
+            <button onClick={() => setView('ACTIVITIES')} className="glass-card p-6 rounded-3xl text-left hover:bg-white/5 transition-all group relative">
+                <div className="flex items-center gap-4"><div className="p-3 rounded-2xl bg-sky-500/10 text-sky-300"><CalendarDays size={24}/></div><div className="min-w-0 flex-1 pr-2"><div className="font-bold text-xl text-white">{tr('lifestyle.activitiesTitle')}</div><div className="text-sm text-zinc-400">{tr('lifestyle.activitiesSub')}</div></div><ChevronRight className="shrink-0 text-zinc-700 group-hover:text-zinc-400 transition-colors"/></div>
             </button>
 
             {/* Business Empire (Excluding Production House) */}
             <button onClick={() => setView('BUSINESS')} className="glass-card p-6 rounded-3xl text-left hover:bg-white/5 transition-all group relative">
-                <div className="flex items-center gap-4"><div className="p-3 rounded-2xl bg-emerald-500/10 text-emerald-400"><Briefcase size={24}/></div><div><div className="font-bold text-xl text-white">{tr('lifestyle.businessEmpire')}</div><div className="text-sm text-zinc-400">{tr('lifestyle.businessSub')}</div></div></div>
-                <ChevronRight className="absolute top-1/2 -translate-y-1/2 right-6 text-zinc-700 group-hover:text-zinc-400 transition-colors"/>
+                <div className="flex items-center gap-4"><div className="p-3 rounded-2xl bg-emerald-500/10 text-emerald-400"><Briefcase size={24}/></div><div className="min-w-0 flex-1 pr-2"><div className="font-bold text-xl text-white">{tr('lifestyle.businessEmpire')}</div><div className="text-sm text-zinc-400">{tr('lifestyle.businessSub')}</div></div><ChevronRight className="shrink-0 text-zinc-700 group-hover:text-zinc-400 transition-colors"/></div>
             </button>
 
             {/* Locked Content */}

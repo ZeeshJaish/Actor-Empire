@@ -1,9 +1,10 @@
 
-import { Business, BusinessType, BusinessSubtype, BusinessConfig, BusinessStaff, BusinessProduct, Player, EmployeeCandidate, StudioState, NewsItem, RightsNegotiation, RightsOpportunity } from '../types';
+import { Business, BusinessType, BusinessSubtype, BusinessConfig, BusinessStaff, BusinessProduct, GameLanguage, Player, EmployeeCandidate, StudioState, NewsItem, RightsNegotiation, RightsOpportunity } from '../types';
 import { generateWriters, generateIPMarket } from '../src/data/generators';
 import { createMarketTrends } from './marketTrends';
 import { advanceRightsInvestigations, RIGHTS_MARKET_CYCLE_WEEKS } from './rightsMarket';
 import { advanceRightsNegotiations } from './rightsNegotiation';
+import { t } from './i18n';
 
 export interface BusinessBlueprint {
     type: BusinessType;
@@ -242,18 +243,20 @@ const getProductionHouseLibraryValue = (business: Business, player?: Player): nu
     const releasedValue = releasedProjects.reduce((sum, project) => {
         const gross = Math.max(0, project.gross || 0);
         const streamingRevenue = Math.max(0, project.streamingRevenue || 0);
+        const soundtrackRevenue = Math.max(0, project.soundtrackRevenue || 0);
         const rating = Math.max(0, project.imdbRating || project.rating || 0);
         const qualityPremium = rating >= 8 ? 0.24 : rating >= 7 ? 0.16 : rating >= 6 ? 0.09 : 0.04;
         const franchisePremium = project.franchiseId || project.universeId ? 0.08 : 0;
-        return sum + Math.floor((gross * (0.08 + qualityPremium + franchisePremium)) + (streamingRevenue * 1.4));
+        return sum + Math.floor((gross * (0.08 + qualityPremium + franchisePremium)) + (streamingRevenue * 1.4) + (soundtrackRevenue * 1.15));
     }, 0);
 
     const activeValue = activeReleases.reduce((sum, release) => {
         const totalGross = Math.max(0, release.totalGross || 0);
         const streamingRevenue = Math.max(0, release.streamingRevenue || 0);
+        const soundtrackRevenue = Math.max(0, release.soundtrackRevenue || 0);
         const rating = Math.max(0, release.imdbRating || 0);
         const livePremium = rating >= 8 ? 0.18 : rating >= 7 ? 0.12 : 0.06;
-        return sum + Math.floor((totalGross * livePremium) + (streamingRevenue * 1.2));
+        return sum + Math.floor((totalGross * livePremium) + (streamingRevenue * 1.2) + soundtrackRevenue);
     }, 0);
 
     return releasedValue + activeValue;
@@ -273,6 +276,10 @@ const getStudioOutcome = (totalRevenue: number, budget: number, rating: number):
     if (ratio >= 0.55 || rating >= 5.5) return 'FLOP';
     return 'BOMB';
 };
+
+const getStudioOutcomeLabel = (language: GameLanguage, outcome: StudioReleaseOutcome): string => (
+    t(language, `services.business.releaseOutcome.label.${outcome}`)
+);
 
 const getOutcomePressure = (outcome: StudioReleaseOutcome, totalRevenue: number, budget: number) => {
     const lossRatio = Math.max(0, (budget - totalRevenue) / Math.max(1, budget));
@@ -300,7 +307,8 @@ const makeStudioOutcomeNews = (
     flopStreak: number,
     hitStreak: number,
     week: number,
-    year: number
+    year: number,
+    language: GameLanguage = 'en'
 ): NewsItem | null => {
     const name = business.name;
     let headline = '';
@@ -309,31 +317,31 @@ const makeStudioOutcomeNews = (
 
     if (outcome === 'BOMB') {
         headline = flopStreak >= 2
-            ? `${name} faces pressure after another costly box office bomb`
-            : `${name} takes a valuation hit after ${projectName} bombs`;
-        subtext = 'Industry confidence cooled as the latest release missed both audience and financial expectations.';
+            ? t(language, 'services.business.releaseOutcome.news.bombStreak', { name })
+            : t(language, 'services.business.releaseOutcome.news.bomb', { name, projectName });
+        subtext = t(language, 'services.business.releaseOutcome.subtext.bomb');
         impactLevel = 'HIGH';
     } else if (outcome === 'FLOP') {
         headline = flopStreak >= 2
-            ? `${name} under scrutiny after back-to-back flops`
-            : `${projectName} disappoints, putting pressure on ${name}`;
-        subtext = 'Analysts are watching whether the studio can steady its next slate.';
+            ? t(language, 'services.business.releaseOutcome.news.flopStreak', { name })
+            : t(language, 'services.business.releaseOutcome.news.flop', { name, projectName });
+        subtext = t(language, 'services.business.releaseOutcome.subtext.flop');
     } else if (outcome === 'MISS') {
-        headline = `${projectName} underperforms for ${name}`;
-        subtext = 'The release avoided disaster, but market confidence slipped.';
+        headline = t(language, 'services.business.releaseOutcome.news.miss', { name, projectName });
+        subtext = t(language, 'services.business.releaseOutcome.subtext.miss');
         impactLevel = 'LOW';
     } else if (outcome === 'HIT') {
         headline = hitStreak >= 2
-            ? `${name} builds momentum with another hit`
-            : `${projectName} strengthens ${name}'s studio valuation`;
-        subtext = 'The strong run lifted investor confidence around the studio slate.';
+            ? t(language, 'services.business.releaseOutcome.news.hitStreak', { name })
+            : t(language, 'services.business.releaseOutcome.news.hit', { name, projectName });
+        subtext = t(language, 'services.business.releaseOutcome.subtext.hit');
     } else if (outcome === 'MEGA_HIT') {
-        headline = `${projectName} becomes a breakout win for ${name}`;
-        subtext = 'The blockbuster result sharply improved studio momentum and deal leverage.';
+        headline = t(language, 'services.business.releaseOutcome.news.megaHit', { name, projectName });
+        subtext = t(language, 'services.business.releaseOutcome.subtext.megaHit');
         impactLevel = 'HIGH';
     } else if (hitStreak >= 2) {
-        headline = `${name} keeps its slate steady with ${projectName}`;
-        subtext = 'The release added modest confidence without changing the market overnight.';
+        headline = t(language, 'services.business.releaseOutcome.news.solidStreak', { name, projectName });
+        subtext = t(language, 'services.business.releaseOutcome.subtext.solid');
         impactLevel = 'LOW';
     }
 
@@ -354,7 +362,8 @@ export const applyProductionHouseReleaseOutcome = (
     business: Business,
     release: { id: string; name: string; totalRevenue: number; budget: number; rating?: number },
     week: number,
-    year: number
+    year: number,
+    language: GameLanguage = 'en'
 ): { business: Business; news: NewsItem | null; log: string | null } => {
     if (business.type !== 'PRODUCTION_HOUSE') return { business, news: null, log: null };
 
@@ -387,12 +396,12 @@ export const applyProductionHouseReleaseOutcome = (
         }
     };
 
-    const news = makeStudioOutcomeNews(updatedBusiness, release.name, outcome, flopStreak, hitStreak, week, year);
-    const readableOutcome = outcome.replace('_', ' ').toLowerCase();
+    const news = makeStudioOutcomeNews(updatedBusiness, release.name, outcome, flopStreak, hitStreak, week, year, language);
+    const readableOutcome = getStudioOutcomeLabel(language, outcome);
     const log = isBad
-        ? `${updatedBusiness.name} valuation pressure increased after ${release.name} became a ${readableOutcome}.`
+        ? t(language, 'services.business.releaseOutcome.log.bad', { name: updatedBusiness.name, releaseName: release.name, outcomeLabel: readableOutcome })
         : isGood
-            ? `${updatedBusiness.name} investor confidence rose after ${release.name} became a ${readableOutcome}.`
+            ? t(language, 'services.business.releaseOutcome.log.good', { name: updatedBusiness.name, releaseName: release.name, outcomeLabel: readableOutcome })
             : null;
 
     return { business: updatedBusiness, news, log };
@@ -608,6 +617,9 @@ export const createDefaultStudioState = (currentWeek: number): StudioState => ({
     rightsMarketNotices: [],
     rightsNegotiations: [],
     ownedRights: [],
+    subsidiaryProjectProposals: [],
+    subsidiaryDecisions: [],
+    activeDecisionArcs: [],
 });
 
 export const sanitizeReturningTalentList = (talentList: any[] = []) => {
@@ -695,6 +707,15 @@ export const normalizeStudioState = (studioState: Partial<StudioState> | undefin
         ownedRights: Array.isArray(studioState?.ownedRights)
             ? studioState.ownedRights
             : defaults.ownedRights,
+        subsidiaryProjectProposals: Array.isArray(studioState?.subsidiaryProjectProposals)
+            ? studioState.subsidiaryProjectProposals
+            : defaults.subsidiaryProjectProposals,
+        subsidiaryDecisions: Array.isArray(studioState?.subsidiaryDecisions)
+            ? studioState.subsidiaryDecisions
+            : defaults.subsidiaryDecisions,
+        activeDecisionArcs: Array.isArray(studioState?.activeDecisionArcs)
+            ? studioState.activeDecisionArcs
+            : defaults.activeDecisionArcs,
         departments: {
             ...defaults.departments,
             ...(studioState?.departments || {}),
@@ -706,6 +727,10 @@ export const normalizeStudioState = (studioState: Partial<StudioState> | undefin
         lastMarketRefreshWeek: typeof studioState?.lastMarketRefreshWeek === 'number' ? studioState.lastMarketRefreshWeek : defaults.lastMarketRefreshWeek,
         lastWriterRefreshWeek: typeof studioState?.lastWriterRefreshWeek === 'number' ? studioState.lastWriterRefreshWeek : defaults.lastWriterRefreshWeek,
         lastTalentRefreshWeek: typeof studioState?.lastTalentRefreshWeek === 'number' ? studioState.lastTalentRefreshWeek : defaults.lastTalentRefreshWeek,
+        lastSubsidiaryOperationWeek: typeof studioState?.lastSubsidiaryOperationWeek === 'number' ? studioState.lastSubsidiaryOperationWeek : defaults.lastSubsidiaryOperationWeek,
+        lastSubsidiaryOperationYear: typeof studioState?.lastSubsidiaryOperationYear === 'number' ? studioState.lastSubsidiaryOperationYear : defaults.lastSubsidiaryOperationYear,
+        lastSubsidiaryDecisionWeek: typeof studioState?.lastSubsidiaryDecisionWeek === 'number' ? studioState.lastSubsidiaryDecisionWeek : defaults.lastSubsidiaryDecisionWeek,
+        lastSubsidiaryDecisionYear: typeof studioState?.lastSubsidiaryDecisionYear === 'number' ? studioState.lastSubsidiaryDecisionYear : defaults.lastSubsidiaryDecisionYear,
         productionFund: typeof studioState?.productionFund === 'number' ? studioState.productionFund : defaults.productionFund,
     };
 };
@@ -750,6 +775,7 @@ export const processBusinessWeek = (
     business: Business,
     playerFame: number,
     week: number,
+    language: GameLanguage = 'en',
 ): {
     updated: Business;
     alerts: string[];
@@ -837,7 +863,7 @@ export const processBusinessWeek = (
     const totalDemand = Math.floor(baseFootfall * hypeMod * fameMod * qualityMod * locations * appealMod * amenityMods.traffic);
 
     if (totalDemand < 10 && totalMarketingSpend === 0 && b.stats.brandHealth < 50) {
-         alerts.push(`📉 Low traffic at ${b.name}. Boost Marketing!`);
+         alerts.push(t(language, 'services.business.weekly.lowTrafficAlert', { businessName: b.name }));
     }
 
     // 3. REVENUE LOGIC
@@ -877,7 +903,7 @@ export const processBusinessWeek = (
         let operationalStability = 0.45;
         if (workers.length === 0) {
             operationalStability = managers.length > 0 ? 0.4 : 0.25;
-            alerts.push(`⛔ ${b.name} is understaffed. Income is reduced until you hire staff.`);
+            alerts.push(t(language, 'services.business.weekly.understaffedIncomeAlert', { businessName: b.name }));
         } else {
             operationalStability = Math.max(0.65, Math.min(1.15, 0.55 + (demandCoverage * 0.45) + (avgSkill / 250)));
         }
@@ -897,7 +923,7 @@ export const processBusinessWeek = (
         if (workers.length > 0 && totalDemand > effectiveCapacity * 1.4) {
             b.stats.customerSatisfaction = Math.max(0, b.stats.customerSatisfaction - 2);
             b.stats.brandHealth = Math.max(0, b.stats.brandHealth - 1);
-            alerts.push(`📉 ${b.name} is understaffed! Turning away customers hurts reviews.`);
+            alerts.push(t(language, 'services.business.weekly.understaffedDemandAlert', { businessName: b.name }));
         } else if (avgSkill > 70 || managers.length > 0) {
             b.stats.customerSatisfaction = Math.min(100, b.stats.customerSatisfaction + 1);
             b.stats.brandHealth = Math.min(100, b.stats.brandHealth + 0.5);
@@ -965,7 +991,7 @@ export const processBusinessWeek = (
                  // Check inventory
                  const available = prod.inventory || 0;
                  if (available <= 0) {
-                     alerts.push(`📦 ${prod.name} is Sold Out! Restock to sell.`);
+                     alerts.push(t(language, 'services.business.weekly.productSoldOutAlert', { productName: prod.name }));
                      return;
                  }
                  
@@ -992,9 +1018,9 @@ export const processBusinessWeek = (
                  if (prod.quality < 40) b.stats.brandHealth = Math.max(0, b.stats.brandHealth - 0.5);
 
                  if (markupRatio > (b.subtype === 'LUXURY_BRAND' ? 8.5 : 6.5) && actualSales < Math.max(5, demandPerProduct * 0.25)) {
-                    alerts.push(`💸 ${prod.name} is overpriced for the current demand. Lower the price or improve quality.`);
+                    alerts.push(t(language, 'services.business.weekly.productOverpricedAlert', { productName: prod.name }));
                  } else if (markupRatio < 1.5 && actualSales > 0) {
-                    alerts.push(`🧾 ${prod.name} is moving fast, but margins are thin. You can raise the price a little.`);
+                    alerts.push(t(language, 'services.business.weekly.productThinMarginAlert', { productName: prod.name }));
                  }
              });
         }
@@ -1078,7 +1104,7 @@ export const processBusinessWeek = (
                         originality: blendSubStat('originality'),
                     };
                     
-                    alerts.push(`🎬 Script Finished: "${script.title}" is ready for production! (Quality: ${finalQuality})`);
+                    alerts.push(t(language, 'services.business.weekly.scriptFinishedAlert', { scriptTitle: script.title, quality: finalQuality }));
 
                     return {
                         ...script,
@@ -1152,7 +1178,7 @@ export const processBusinessWeek = (
 
     // 7. BANKRUPTCY CHECK
     if (b.balance < 0) {
-        alerts.push(`⚠️ ${b.name} funds negative! Inject capital.`);
+        alerts.push(t(language, 'services.business.weekly.negativeFundsAlert', { businessName: b.name }));
     }
 
     b.history.unshift({ week: 0, profit }); 
@@ -1162,8 +1188,8 @@ export const processBusinessWeek = (
 };
 
 // ... (Keep existing helpers: promoteBusiness, injectCapital, withdrawCapital, sellBusiness, liquidateBusiness, restockProduct, updateProductPrice, expandBusiness, hireEmployee) ...
-export const promoteBusiness = (business: Business, campaignId: string): { updated: Business, success: boolean, msg: string, cost: number } => {
-    return { updated: business, success: false, msg: "Deprecated", cost: 0 };
+export const promoteBusiness = (business: Business, campaignId: string, language: GameLanguage = 'en'): { updated: Business, success: boolean, msg: string, cost: number } => {
+    return { updated: business, success: false, msg: t(language, 'services.business.action.promoteDeprecated'), cost: 0 };
 };
 
 export const injectCapital = (business: Business, amount: number): Business => {
@@ -1179,9 +1205,9 @@ export const withdrawCapital = (business: Business, amount: number): { updated: 
     return { updated: b, success: true };
 };
 
-export const sellBusiness = (business: Business): { success: boolean, payout: number, msg: string } => {
+export const sellBusiness = (business: Business, language: GameLanguage = 'en'): { success: boolean, payout: number, msg: string } => {
     if (!business.history || business.history.length < 2) {
-        return { success: false, payout: 0, msg: "Business must be active for 2+ weeks to sell." };
+        return { success: false, payout: 0, msg: t(language, 'services.business.action.sellTooNew') };
     }
     const blueprint = BUSINESS_BLUEPRINTS[business.type];
     const stats = business.stats || { locations: 1, valuation: 0, weeklyProfit: 0 };
@@ -1190,7 +1216,7 @@ export const sellBusiness = (business: Business): { success: boolean, payout: nu
     const avgProfit = recentHistory.length > 0 ? recentHistory.reduce((sum, h) => sum + h.profit, 0) / recentHistory.length : stats.weeklyProfit;
 
     if (stats.valuation <= assetValue && avgProfit <= 0) {
-         return { success: false, payout: 0, msg: "Investors are not interested. The business is not profitable enough to sell." };
+         return { success: false, payout: 0, msg: t(language, 'services.business.action.sellNotProfitable') };
     }
     const maturityTarget =
         business.type === 'PRODUCTION_HOUSE' ? 12 :
@@ -1201,19 +1227,25 @@ export const sellBusiness = (business: Business): { success: boolean, payout: nu
     const payout = business.type === 'PRODUCTION_HOUSE'
         ? Math.floor(strategicValue)
         : Math.floor(strategicValue + Math.max(0, business.balance || 0));
-    return { success: true, payout, msg: `Sold ${business.name} for $${payout.toLocaleString()}.` };
+    return { success: true, payout, msg: t(language, 'services.business.action.sellSuccess', { businessName: business.name, payout: payout.toLocaleString() }) };
 };
 
-export const liquidateBusiness = (business: Business): { payout: number, msg: string } => {
+export const liquidateBusiness = (business: Business, language: GameLanguage = 'en'): { payout: number, msg: string } => {
     const blueprint = BUSINESS_BLUEPRINTS[business.type];
     const stats = business.stats || { locations: 1 };
     const scrapValue = (blueprint.baseCost * (stats.locations || 1)) * 0.25;
     const netTotal = Math.floor((business.balance || 0) + scrapValue);
-    return { payout: netTotal, msg: `Liquidated assets for $${scrapValue.toLocaleString()}. Net result: $${netTotal.toLocaleString()}.` };
+    return {
+        payout: netTotal,
+        msg: t(language, 'services.business.action.liquidateSuccess', {
+            scrapValue: scrapValue.toLocaleString(),
+            netTotal: netTotal.toLocaleString()
+        })
+    };
 };
 
 export const createProduct = (
-    business: Business, name: string, catalogId: string, quantity: number, baseUnitCost: number, customPrice?: number, options?: { material: string, process: string, packaging: string }
+    business: Business, name: string, catalogId: string, quantity: number, baseUnitCost: number, customPrice?: number, options?: { material: string, process: string, packaging: string }, language: GameLanguage = 'en'
 ): { updated: Business, success: boolean, msg: string, energyCost?: number } => {
     const b = { ...business };
     let unitCostMultiplier = 1.0;
@@ -1234,7 +1266,7 @@ export const createProduct = (
     const totalCashNeeded = totalProductionCost + rndCost;
 
     if (b.balance < totalCashNeeded) {
-        return { updated: b, success: false, msg: `Insufficient funds. Need $${totalCashNeeded.toLocaleString()} (incl. R&D).` };
+        return { updated: b, success: false, msg: t(language, 'services.business.action.createProductInsufficientFunds', { amount: totalCashNeeded.toLocaleString() }) };
     }
     
     b.balance -= totalCashNeeded;
@@ -1264,20 +1296,20 @@ export const createProduct = (
     b.stats.inventory = (b.stats.inventory || 0) + quantity;
     b.stats.hype = Math.min(100, b.stats.hype + 20);
     
-    return { updated: b, success: true, msg: `Developed ${name} (Quality: ${finalQuality}/100).`, energyCost: 25 };
+    return { updated: b, success: true, msg: t(language, 'services.business.action.createProductSuccess', { productName: name, quality: finalQuality }), energyCost: 25 };
 };
 
-export const restockProduct = (business: Business, productId: string, quantity: number): { updated: Business, success: boolean, msg: string } => {
+export const restockProduct = (business: Business, productId: string, quantity: number, language: GameLanguage = 'en'): { updated: Business, success: boolean, msg: string } => {
     const b = { ...business };
     const prod = b.products.find(p => p.id === productId);
-    if (!prod) return { updated: b, success: false, msg: "Product not found." };
+    if (!prod) return { updated: b, success: false, msg: t(language, 'services.business.action.productNotFound') };
     const totalCost = quantity * prod.productionCost;
-    if (b.balance < totalCost) return { updated: b, success: false, msg: "Insufficient funds for restock." };
+    if (b.balance < totalCost) return { updated: b, success: false, msg: t(language, 'services.business.action.restockInsufficientFunds') };
 
     b.balance -= totalCost;
     prod.inventory = (prod.inventory || 0) + quantity;
     b.stats.inventory = (b.stats.inventory || 0) + quantity;
-    return { updated: b, success: true, msg: `Restocked ${quantity} units of ${prod.name}.` };
+    return { updated: b, success: true, msg: t(language, 'services.business.action.restockSuccess', { quantity, productName: prod.name }) };
 };
 
 export const updateProductPrice = (business: Business, productId: string, newPrice: number): Business => {
@@ -1290,7 +1322,7 @@ export const updateProductPrice = (business: Business, productId: string, newPri
     return b;
 };
 
-export const expandBusiness = (business: Business): { updated: Business, success: boolean, msg: string } => {
+export const expandBusiness = (business: Business, language: GameLanguage = 'en'): { updated: Business, success: boolean, msg: string } => {
     const b = { ...business };
     const currentLocs = b.stats.locations || 1;
     const expansionBase =
@@ -1307,11 +1339,11 @@ export const expandBusiness = (business: Business): { updated: Business, success
         1.6;
     const expansionCost = Math.floor(expansionBase * typeMultiplier); 
     
-    if (b.balance < expansionCost) return { updated: b, success: false, msg: `Need $${expansionCost.toLocaleString()} to expand.` };
+    if (b.balance < expansionCost) return { updated: b, success: false, msg: t(language, 'services.business.action.expandInsufficientFunds', { amount: expansionCost.toLocaleString() }) };
 
     b.balance -= expansionCost;
     b.stats.locations = currentLocs + 1;
-    return { updated: b, success: true, msg: `Opened location #${b.stats.locations}!` };
+    return { updated: b, success: true, msg: t(language, 'services.business.action.expandSuccess', { locationCount: b.stats.locations }) };
 };
 
 export const hireEmployee = (business: Business, name: string, role: 'MANAGER'|'STAFF'|'SALESPERSON', skill: number, salary: number): Business => {

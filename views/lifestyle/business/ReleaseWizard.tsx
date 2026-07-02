@@ -1,11 +1,19 @@
 import React, { useState, useMemo } from 'react';
-import { Player, PendingEvent, ScreeningStrategy, CampaignItem, ProjectHiddenStats, NextSeasonFundingTier } from '../../../types';
+import { Player, PendingEvent, ScreeningStrategy, ProjectHiddenStats, NextSeasonFundingTier, CampaignPositioning, CampaignTimeline, MarketingChannelAllocations, MarketingChannelId, BoxOfficeRegionId, CinemaChainId, CinemaChain, CinemaChainRegionalTerms } from '../../../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowLeft, Film, Tv, Calendar, TrendingUp, CheckCircle2, Camera, Star, Globe, Youtube, Share2 } from 'lucide-react';
+import { ArrowLeft, Film, Tv, Calendar, TrendingUp, CheckCircle2, Camera, Star, Globe, Youtube, Share2, Megaphone, Music2 } from 'lucide-react';
 import { FESTIVALS, CALENDAR_EVENTS } from '../../../services/worldLogic';
 import { mergeUniverseRosterWithProject, normalizeUniverseMap } from '../../../services/universeLogic';
 import { getAbsoluteWeek } from '../../../services/legacyLogic';
 import { calculateBalancedNextSeasonFundingCap, getPlatformFundingRelationshipMultiplier } from '../../../services/streamingFundingLogic';
+import { CAMPAIGN_POSITIONING_OPTIONS, CAMPAIGN_TIMELINE_OPTIONS, MARKETING_CHANNEL_OPTIONS, calculateCampaignFit, calculateCampaignForecast, normalizeMarketingChannelAllocations } from '../../../services/marketingStrategy';
+import { BOX_OFFICE_REGIONS, getCinemaChainById, getCinemaChainTerms, getCinemaChainsForRegion } from '../../../services/cinemaChains';
+import { getDefaultReleaseRegionIds, getRegionMapSummary, normalizeReleaseRegionIds } from '../../../services/regionMap';
+import { getBoxOfficeCaps } from '../../../services/roleLogic';
+import { applyMusicImpactToHiddenStats, calculateProjectMusicImpact } from '../../../services/musicIndustry';
+import { CinemaChainLogo } from './components/CinemaChainLogo';
+import { InteractiveRegionMap } from './components/InteractiveRegionMap';
+import { applyInvestorPayoutMemory, calculateInvestorPayout } from '../../../services/projectInvestors';
 
 interface ReleaseWizardProps {
     player: Player;
@@ -17,20 +25,52 @@ interface ReleaseWizardProps {
     isPostTheatricalBidding?: boolean;
 }
 
-const CAMPAIGN_OPTIONS: CampaignItem[] = [
-    { id: 'red_carpet', name: 'Red Carpet Premiere', cost: 250000, buzzImpact: 20, description: 'Grand event with press and celebrities.', type: 'PREMIERE' },
-    { id: 'exclusive_screening', name: 'Exclusive Celeb Screening', cost: 150000, buzzImpact: 12, description: 'Private screening for A-list influencers.', type: 'EVENT' },
-    { id: 'social_ads', name: 'Social Media Blitz', cost: 100000, buzzImpact: 15, description: 'Targeted ads on Instagram, X, and TikTok.', type: 'SOCIAL' },
-    { id: 'youtube_trailer', name: 'YouTube Trailer Launch', cost: 50000, buzzImpact: 10, description: 'Promoted trailer on YouTube trending.', type: 'SOCIAL' },
-    { id: 'tv_spots', name: 'TV Talk Show Tour', cost: 300000, buzzImpact: 25, description: 'Cast appearances on major late-night shows.', type: 'TV' },
-    { id: 'billboards', name: 'Times Square Billboards', cost: 200000, buzzImpact: 18, description: 'Massive physical presence in major cities.', type: 'OTHER' }
-];
+const appendInvestorPayoutSummary = (summary: any, payout: number) => {
+    const safePayout = Math.max(0, Math.round(Number(payout) || 0));
+    return {
+        lifetimeInvestorPayout: Math.max(0, Math.round(Number(summary?.lifetimeInvestorPayout) || 0)) + safePayout,
+        weeklyInvestorPayouts: [...(Array.isArray(summary?.weeklyInvestorPayouts) ? summary.weeklyInvestorPayouts : []), safePayout].slice(-52)
+    };
+};
 
-const SCREENING_STRATEGIES = [
-    { id: 'REGIONAL', name: 'Regional Release', screens: 500, cut: 35, description: 'Limited to specific territories. Low risk.' },
-    { id: 'NATIONAL', name: 'National Release', screens: 3000, cut: 45, description: 'Full domestic coverage. Standard for major films.' },
-    { id: 'INTERNATIONAL', name: 'International Mass', screens: 12000, cut: 55, description: 'Global saturation. Highest potential, highest cut taken.' }
-];
+const CAMPAIGN_POSITIONING_ACCENTS: Record<CampaignPositioning, { icon: React.ReactNode; tone: string; bar: string }> = {
+    MASS_EVENT: {
+        icon: <Megaphone size={18} />,
+        tone: 'border-amber-500/50 bg-amber-500/10 text-amber-300',
+        bar: 'bg-amber-400'
+    },
+    PRESTIGE_PUSH: {
+        icon: <Star size={18} />,
+        tone: 'border-purple-400/50 bg-purple-500/10 text-purple-200',
+        bar: 'bg-purple-300'
+    },
+    FANBASE_MOBILIZATION: {
+        icon: <Globe size={18} />,
+        tone: 'border-sky-400/50 bg-sky-500/10 text-sky-200',
+        bar: 'bg-sky-300'
+    },
+    VIRAL_HEAT: {
+        icon: <Share2 size={18} />,
+        tone: 'border-rose-400/50 bg-rose-500/10 text-rose-200',
+        bar: 'bg-rose-300'
+    },
+    SLEEPER_BUILD: {
+        icon: <TrendingUp size={18} />,
+        tone: 'border-emerald-400/50 bg-emerald-500/10 text-emerald-200',
+        bar: 'bg-emerald-300'
+    }
+};
+
+const MARKETING_CHANNEL_ICONS: Record<MarketingChannelId, React.ReactNode> = {
+    TRAILER_LAUNCH: <Youtube size={16} />,
+    SOCIAL_DIGITAL: <Share2 size={16} />,
+    TV_OUTDOOR: <Tv size={16} />,
+    RED_CARPET: <Camera size={16} />,
+    CRITIC_SCREENINGS: <Star size={16} />,
+    INFLUENCER_PUSH: <Megaphone size={16} />,
+    INTERNATIONAL: <Globe size={16} />,
+    FAN_EVENTS: <Film size={16} />
+};
 
 const PLATFORMS = [
     { id: 'NETFLIX', name: 'Netflix', baseBid: 12000000, qualityReq: 72, color: '#E50914', maxBudget: 420000000 },
@@ -39,6 +79,28 @@ const PLATFORMS = [
     { id: 'HULU', name: 'Hulu', baseBid: 7500000, qualityReq: 58, color: '#1CE783', maxBudget: 180000000 },
     { id: 'YOUTUBE', name: 'YouTube Premium', baseBid: 3000000, qualityReq: 38, color: '#FF0000', maxBudget: 80000000 }
 ];
+
+const normalizeDistributionChainSelectionRecord = (rawSelections: unknown): Partial<Record<BoxOfficeRegionId, CinemaChainId[]>> => {
+    if (!rawSelections || typeof rawSelections !== 'object') return {};
+
+    return Object.entries(rawSelections as Record<string, CinemaChainId | CinemaChainId[]>).reduce((normalized, [regionId, chainSelection]) => {
+        const chainIds = (Array.isArray(chainSelection) ? chainSelection : [chainSelection])
+            .filter((chainId): chainId is CinemaChainId => Boolean(chainId));
+        const uniqueChainIds = Array.from(new Set(chainIds));
+
+        if (uniqueChainIds.length > 0) {
+            normalized[regionId as BoxOfficeRegionId] = uniqueChainIds;
+        }
+
+        return normalized;
+    }, {} as Partial<Record<BoxOfficeRegionId, CinemaChainId[]>>);
+};
+
+const inferScreeningStrategyFromRegionCount = (regionCount: number): ScreeningStrategy => {
+    if (regionCount <= 2) return 'REGIONAL';
+    if (regionCount <= 4) return 'NATIONAL';
+    return 'INTERNATIONAL';
+};
 
 export const getStreamingBidProfile = (packageScore: number, isSeries: boolean, isPostTheatricalBidding?: boolean, runStrength = 0) => {
     let floor = 1.04;
@@ -292,8 +354,16 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
     const [releaseType, setReleaseType] = useState<'THEATRICAL' | 'STREAMING_ONLY' | null>(
         isPostTheatricalBidding ? 'STREAMING_ONLY' : (project.projectDetails?.type === 'SERIES' ? 'STREAMING_ONLY' : null)
     );
-    const [screeningStrategy, setScreeningStrategy] = useState<ScreeningStrategy | null>(null);
-    const [selectedCampaigns, setSelectedCampaigns] = useState<string[]>([]);
+    const [screeningStrategy, setScreeningStrategy] = useState<ScreeningStrategy | null>(project.projectDetails?.screeningStrategy || null);
+    const [selectedRegionIds, setSelectedRegionIds] = useState<BoxOfficeRegionId[]>(
+        normalizeReleaseRegionIds(project.projectDetails?.releaseRegionIds || [])
+    );
+    const [distributionChainSelections, setDistributionChainSelections] = useState<Partial<Record<BoxOfficeRegionId, CinemaChainId[]>>>(
+        normalizeDistributionChainSelectionRecord(project.projectDetails?.releaseChainSelections)
+    );
+    const [campaignPositioning, setCampaignPositioning] = useState<CampaignPositioning>(project.projectDetails?.campaignPositioning || 'MASS_EVENT');
+    const [campaignTimeline, setCampaignTimeline] = useState<CampaignTimeline>(project.projectDetails?.campaignTimeline || 'BALANCED_ROLLOUT');
+    const [channelAllocations, setChannelAllocations] = useState<MarketingChannelAllocations>(project.projectDetails?.marketingChannelAllocations || {});
     const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
     const [festivalPremiere, setFestivalPremiere] = useState<string | null>(null);
     const [releaseWeek, setReleaseWeek] = useState<number>(player.currentWeek + 4); 
@@ -321,6 +391,16 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
             timestamp: Date.now()
         }
         : null;
+    const normalizedSelectedRegionIds = useMemo(() => normalizeReleaseRegionIds(selectedRegionIds), [selectedRegionIds]);
+    const regionMapSummary = useMemo(() => getRegionMapSummary(normalizedSelectedRegionIds), [normalizedSelectedRegionIds]);
+    const inferredScreeningStrategy = useMemo(
+        () => inferScreeningStrategyFromRegionCount(normalizedSelectedRegionIds.length),
+        [normalizedSelectedRegionIds.length]
+    );
+    const effectiveScreeningStrategy = screeningStrategy || inferredScreeningStrategy;
+    const boxOfficeRegionById = useMemo(() => (
+        Object.fromEntries(BOX_OFFICE_REGIONS.map(region => [region.id, region])) as Record<BoxOfficeRegionId, typeof BOX_OFFICE_REGIONS[number]>
+    ), []);
     
     // Bidding State
     const [auctionState, setAuctionState] = useState<'IDLE' | 'ACTIVE' | 'FINISHED'>('IDLE');
@@ -551,6 +631,12 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
         const updatedPlayer = { ...player };
         const platformName = PLATFORMS.find(p => p.id === bid.platformId)?.name || 'Platform';
         const isSeriesDeal = (project.projectDetails?.type || project.type) === 'SERIES';
+        const investorPlan = project.investorPlan || project.projectDetails?.investorPlan;
+        const investorStreamingDealPayout = calculateInvestorPayout(investorPlan, bid.amount);
+        const netStreamingDealAmount = Math.max(0, bid.amount - investorStreamingDealPayout);
+        const nextInvestorPayouts = investorPlan
+            ? appendInvestorPayoutSummary(project.investorPayouts || project.projectDetails?.investorPayouts, investorStreamingDealPayout)
+            : project.investorPayouts || project.projectDetails?.investorPayouts;
         const lockedFunding = isSeriesDeal && bid.fundingAmount
             ? {
                 id: `stream_fund_${project.id}_${bid.platformId}_${Date.now()}`,
@@ -572,21 +658,51 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
         if (studio) {
             const b = updatedPlayer.businesses.find(b => b.id === studio.id);
             if (b) {
-                b.balance += bid.amount;
-                b.stats.lifetimeRevenue += bid.amount;
+                b.balance += netStreamingDealAmount;
+                b.stats.weeklyRevenue += netStreamingDealAmount;
+                b.stats.weeklyProfit += netStreamingDealAmount;
+                b.stats.lifetimeRevenue += netStreamingDealAmount;
                 if (!b.studioState) b.studioState = {} as any;
                 const ledger = Array.isArray(b.studioState.financeLedger) ? b.studioState.financeLedger : [];
-                b.studioState.financeLedger = [{
-                    id: `studio_ledger_bid_${project.id}_${player.age}_${player.currentWeek}`,
-                    week: player.currentWeek,
-                    year: player.age,
-                    amount: bid.amount,
-                    type: 'STREAMING_DEAL',
-                    label: `${project.name} ${platformName} deal`,
-                    projectId: project.id
-                }, ...ledger].slice(0, 40);
-                
-                // Series renewal funding is locked to the next season. Other greenlight money remains a generic production fund.
+	                b.studioState.financeLedger = [
+                    {
+                        id: `studio_ledger_bid_${project.id}_${player.age}_${player.currentWeek}`,
+                        week: player.currentWeek,
+                        year: player.age,
+                        amount: netStreamingDealAmount,
+                        type: 'STREAMING_DEAL',
+                        label: investorStreamingDealPayout > 0
+                            ? `${project.name} ${platformName} deal after investor split`
+                            : `${project.name} ${platformName} deal`,
+                        projectId: project.id
+                    },
+                    ...(investorStreamingDealPayout > 0 ? [{
+                        id: `studio_ledger_investor_payout_deal_${project.id}_${player.age}_${player.currentWeek}`,
+                        week: player.currentWeek,
+                        year: player.age,
+                        amount: -investorStreamingDealPayout,
+                        type: 'INVESTOR_PAYOUT' as const,
+                        label: `${project.name} investor streaming deal payout`,
+                        projectId: project.id
+                    }] : []),
+	                    ...ledger
+	                ].slice(0, 40);
+	                if (investorStreamingDealPayout > 0 && investorPlan) {
+	                    const rememberedStudio = applyInvestorPayoutMemory({
+	                        studio: b,
+	                        plan: investorPlan,
+	                        payout: investorStreamingDealPayout,
+	                        projectId: project.id,
+	                        projectTitle: project.name,
+	                        week: player.currentWeek,
+	                        year: player.age
+	                    });
+	                    if (rememberedStudio?.studioState) {
+	                        b.studioState = rememberedStudio.studioState;
+	                    }
+	                }
+	                
+	                // Series renewal funding is locked to the next season. Other greenlight money remains a generic production fund.
                 if (lockedFunding) {
                     b.studioState.lockedStreamingFunds = [lockedFunding, ...(b.studioState.lockedStreamingFunds || [])].slice(0, 20);
                 } else if (bid.fundingAmount) {
@@ -595,14 +711,16 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
             }
         } else {
             // Add upfront cash to player's money if no studio
-            updatedPlayer.money += bid.amount;
+            updatedPlayer.money += netStreamingDealAmount;
             updatedPlayer.finance.history.unshift({
                 id: Math.random().toString(),
                 week: updatedPlayer.currentWeek,
                 year: updatedPlayer.age,
-                amount: bid.amount,
+                amount: netStreamingDealAmount,
                 category: 'BUSINESS',
-                description: `Streaming Rights: ${project.name} (${platformName})`
+                description: investorStreamingDealPayout > 0
+                    ? `Streaming Rights: ${project.name} (${platformName}) after investor split`
+                    : `Streaming Rights: ${project.name} (${platformName})`
             });
         }
 
@@ -626,6 +744,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                     releaseStrategy: 'STREAMING_ONLY',
                     releaseDate: player.currentWeek + 1,
                     streamingRevenue: bid.amount,
+                    investorPayouts: nextInvestorPayouts,
                     hiddenStats: {
                         ...commitment.projectDetails.hiddenStats,
                         platformId: bid.platformId,
@@ -662,6 +781,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                     // Only switch phase if not theatrical, otherwise gameLoop will handle the transition
                     distributionPhase: isStillTheatrical ? 'THEATRICAL' : 'STREAMING',
                     streamingRevenue: (release.streamingRevenue || 0) + bid.amount,
+                    investorPayouts: nextInvestorPayouts,
                     streaming: {
                         platformId: bid.platformId as any,
                         weekOnPlatform: 1,
@@ -674,6 +794,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                     studioRoyaltyPercentage: bid.backendPct || 0,
                     projectDetails: {
                         ...release.projectDetails,
+                        investorPayouts: nextInvestorPayouts,
                         hiddenStats: {
                             ...release.projectDetails.hiddenStats,
                             platformId: bid.platformId,
@@ -700,14 +821,266 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
         }
     };
 
-    const totalCampaignCost = useMemo(() => {
-        return selectedCampaigns.reduce((sum, id) => {
-            const item = CAMPAIGN_OPTIONS.find(c => c.id === id);
-            return sum + (item?.cost || 0);
-        }, 0);
-    }, [selectedCampaigns]);
+    const reservedMarketingBudget = Math.max(0, Number(project.projectDetails?.reservedMarketingBudget || 0));
+    const hasReservedMarketingPool = reservedMarketingBudget > 0;
+    const projectBudgetForCampaignCap = Math.max(1_000_000, Number(project.projectDetails?.estimatedBudget || project.budget || 0) || 5_000_000);
+    const legacyCampaignBudgetCeiling = Math.max(500_000, Math.round(projectBudgetForCampaignCap * 0.65));
+    const legacyCampaignBudgetCap = hasReservedMarketingPool ? reservedMarketingBudget : Math.min(Math.max(0, player.money), legacyCampaignBudgetCeiling);
+    const normalizedChannelMix = useMemo(() => {
+        return normalizeMarketingChannelAllocations(channelAllocations, legacyCampaignBudgetCap);
+    }, [channelAllocations, legacyCampaignBudgetCap]);
+    const totalCampaignCost = normalizedChannelMix.totalSpent;
+    const campaignBudgetRemaining = normalizedChannelMix.remaining;
+    const activeCampaignChannels = MARKETING_CHANNEL_OPTIONS.filter(channel => (normalizedChannelMix.allocations[channel.id] || 0) > 0);
+    const campaignFitSpend = Math.max(totalCampaignCost, reservedMarketingBudget);
+    const campaignFit = useMemo(() => {
+        return calculateCampaignFit(project.projectDetails || project, campaignPositioning, campaignFitSpend);
+    }, [project, campaignPositioning, campaignFitSpend]);
+    const campaignForecast = useMemo(() => {
+        return calculateCampaignForecast(project.projectDetails || project, campaignPositioning, normalizedChannelMix.allocations, campaignFit, campaignTimeline);
+    }, [project, campaignPositioning, normalizedChannelMix.allocations, campaignFit, campaignTimeline]);
+    const musicImpact = useMemo(() => {
+        const details = project.projectDetails || project;
+        return calculateProjectMusicImpact(details, details?.musicPlan);
+    }, [project]);
+    const forecastGaugeScore = useMemo(() => {
+        const confidenceWeight = campaignForecast.confidenceLabel === 'Market Read'
+            ? 14
+            : campaignForecast.confidenceLabel === 'Early Estimate'
+                ? 8
+                : 2;
+        const score = (campaignForecast.breakEvenChance * 0.48)
+            + ((100 - campaignForecast.weekTwoDropRisk) * 0.26)
+            + (campaignForecast.streamingBidBoost * 0.12)
+            + (campaignForecast.awardsVisibility * 0.08)
+            + (Math.max(-15, Math.min(25, campaignForecast.franchiseValueImpact)) * 0.22)
+            + confidenceWeight;
 
+        return Math.round(Math.max(0, Math.min(100, score)));
+    }, [campaignForecast]);
+    const forecastGaugeLabel = forecastGaugeScore >= 72 ? 'Strong Read' : forecastGaugeScore >= 42 ? 'Early Read' : 'Volatile';
+    const forecastGaugeWord = forecastGaugeScore >= 72 ? 'STRONG' : forecastGaugeScore >= 42 ? 'EARLY' : 'VOLATILE';
+    const forecastGaugeTone = forecastGaugeScore >= 72
+        ? 'text-emerald-300 border-emerald-300/30 bg-emerald-400/10'
+        : forecastGaugeScore >= 42
+            ? 'text-amber-300 border-amber-300/30 bg-amber-400/10'
+            : 'text-rose-300 border-rose-300/30 bg-rose-400/10';
+    const forecastGaugeAccent = forecastGaugeScore >= 72
+            ? '#34d399'
+            : forecastGaugeScore >= 42
+                ? '#facc15'
+                : '#fb7185';
+    const forecastGaugeRingOffset = 100 - forecastGaugeScore;
+    const allocationStep = Math.max(50_000, Math.round(Math.max(legacyCampaignBudgetCap * 0.1, 250_000) / 50_000) * 50_000);
+    const formatCampaignMillions = (value: number) => {
+        const millions = Math.max(0, value) / 1000000;
+        if (millions >= 100) return millions.toFixed(0);
+        if (millions >= 10) return millions.toFixed(1);
+        return millions.toFixed(2);
+    };
+    const getAllocationTotal = (allocations: MarketingChannelAllocations, excludeChannelId?: MarketingChannelId) => {
+        return MARKETING_CHANNEL_OPTIONS.reduce((sum, channel) => {
+            if (channel.id === excludeChannelId) return sum;
+            return sum + Math.max(0, Number(allocations[channel.id] || 0));
+        }, 0);
+    };
+    const setChannelAllocationAmount = (channelId: MarketingChannelId, amount: number) => {
+        setChannelAllocations(prev => {
+            const otherSpend = getAllocationTotal(prev, channelId);
+            const maxForChannel = Math.max(0, legacyCampaignBudgetCap - otherSpend);
+            const nextValue = Math.min(maxForChannel, Math.max(0, Math.floor(Number(amount) || 0)));
+            return normalizeMarketingChannelAllocations({ ...prev, [channelId]: nextValue }, legacyCampaignBudgetCap).allocations;
+        });
+    };
+    const updateChannelAllocation = (channelId: MarketingChannelId, delta: number) => {
+        setChannelAllocations(prev => {
+            const current = Math.max(0, Number(prev[channelId] || 0));
+            const otherSpend = getAllocationTotal(prev, channelId);
+            const maxForChannel = Math.max(0, legacyCampaignBudgetCap - otherSpend);
+            const nextValue = Math.min(maxForChannel, Math.max(0, current + delta));
+            return normalizeMarketingChannelAllocations({ ...prev, [channelId]: nextValue }, legacyCampaignBudgetCap).allocations;
+        });
+    };
+    const selectedCampaignPosition = CAMPAIGN_POSITIONING_OPTIONS.find(option => option.id === campaignPositioning) || CAMPAIGN_POSITIONING_OPTIONS[0];
+    const selectedCampaignTimeline = CAMPAIGN_TIMELINE_OPTIONS.find(option => option.id === campaignTimeline) || CAMPAIGN_TIMELINE_OPTIONS[1];
     const getWeekOfYear = (week: number) => ((week - 1) % 52) + 1;
+    const formatDealMoney = (value: number) => {
+        const absValue = Math.max(0, Number(value) || 0);
+        if (absValue >= 1_000_000_000) return `$${(absValue / 1_000_000_000).toFixed(1)}B`;
+        if (absValue >= 1_000_000) return `$${(absValue / 1_000_000).toFixed(1)}M`;
+        if (absValue >= 1_000) return `$${Math.round(absValue / 1_000)}k`;
+        return `$${Math.round(absValue)}`;
+    };
+    const formatFootfall = (value: number) => {
+        const safeValue = Math.max(0, Number(value) || 0);
+        if (safeValue >= 1_000_000) return `${(safeValue / 1_000_000).toFixed(1)}M`;
+        if (safeValue >= 1_000) return `${Math.round(safeValue / 1_000)}k`;
+        return `${Math.round(safeValue)}`;
+    };
+    const getRecommendedDistributionChainIds = (regionId: BoxOfficeRegionId, strategyId: ScreeningStrategy | null = effectiveScreeningStrategy): CinemaChainId[] => {
+        const hiddenStats = project.projectDetails?.hiddenStats || {};
+        const qualityScore = Number(hiddenStats.qualityScore || 50);
+        const rawHype = Number(hiddenStats.rawHype || 50);
+        const hasFranchiseSignal = Boolean(project.projectDetails?.franchiseId || project.projectDetails?.universeId || project.projectDetails?.subtype === 'SEQUEL' || project.projectDetails?.subtype === 'SPINOFF' || project.projectDetails?.subtype === 'UNIVERSE_EVENT');
+
+        if (strategyId === 'REGIONAL') {
+            if (qualityScore >= 74 && ['NORTH_AMERICA', 'EUROPE'].includes(regionId)) return ['ARCLIGHT_GRID'];
+            if (regionId === 'ASIA' || regionId === 'SOUTH_AMERICA') return ['PRISM_HALLS'];
+            return ['NOVA_CIRCUIT'];
+        }
+
+        if (strategyId === 'NATIONAL') {
+            if (hasFranchiseSignal || rawHype >= 78) return regionId === 'ASIA' ? ['Z_CINEMAS', 'CROWNSCREEN'] : ['CROWNSCREEN', 'NOVA_CIRCUIT'];
+            if (qualityScore >= 76 && ['EUROPE', 'NORTH_AMERICA'].includes(regionId)) return ['EMPIRE_CINEMAS'];
+            return ['NOVA_CIRCUIT'];
+        }
+
+        if (regionId === 'ASIA' || regionId === 'SOUTH_AMERICA') return rawHype >= 70 ? ['Z_CINEMAS', 'PRISM_HALLS'] : ['PRISM_HALLS', 'NOVA_CIRCUIT'];
+        if (regionId === 'NORTH_AMERICA' || regionId === 'EUROPE') return hasFranchiseSignal ? ['CROWNSCREEN', 'EMPIRE_CINEMAS'] : ['EMPIRE_CINEMAS', 'NOVA_CIRCUIT'];
+        if (regionId === 'OCEANIA') return ['NOVA_CIRCUIT'];
+        return qualityScore >= 70 ? ['EMPIRE_CINEMAS'] : ['NOVA_CIRCUIT'];
+    };
+    const normalizedDistributionChainSelections = useMemo(() => {
+        return normalizedSelectedRegionIds.reduce((selections, regionId) => {
+            const selectedChainIds = distributionChainSelections[regionId] || [];
+            selections[regionId] = selectedChainIds.length > 0
+                ? selectedChainIds
+                : getRecommendedDistributionChainIds(regionId);
+            return selections;
+        }, {} as Partial<Record<BoxOfficeRegionId, CinemaChainId[]>>);
+    }, [distributionChainSelections, effectiveScreeningStrategy, normalizedSelectedRegionIds, project.projectDetails]);
+    const selectedDistributionRows = useMemo(() => (
+        normalizedSelectedRegionIds.map(regionId => {
+            const chainIds = normalizedDistributionChainSelections[regionId] || getRecommendedDistributionChainIds(regionId);
+            const chains = chainIds
+                .map(chainId => getCinemaChainById(chainId))
+                .filter((chain): chain is CinemaChain => Boolean(chain));
+            const termsList = chainIds
+                .map(chainId => getCinemaChainTerms(chainId, regionId))
+                .filter((terms): terms is CinemaChainRegionalTerms => Boolean(terms));
+            const region = boxOfficeRegionById[regionId];
+            if (chains.length === 0 || termsList.length === 0 || !region) return null;
+
+            const totalScreens = termsList.reduce((sum, terms) => sum + terms.screens, 0);
+            const bookingCost = termsList.reduce((sum, terms) => sum + terms.bookingCost, 0);
+            const exhibitorCut = totalScreens > 0
+                ? termsList.reduce((sum, terms) => sum + (terms.exhibitorCut * terms.screens), 0) / totalScreens
+                : 0;
+            const footfallPower = totalScreens > 0
+                ? termsList.reduce((sum, terms) => sum + (terms.footfallPower * terms.screens), 0) / totalScreens
+                : 0;
+            const expectedFootfall = Math.round(totalScreens * footfallPower * region.marketWeight * 680);
+            return {
+                regionId,
+                region,
+                chainIds,
+                chains,
+                terms: {
+                    screens: totalScreens,
+                    bookingCost,
+                    exhibitorCut,
+                    footfallPower
+                },
+                expectedFootfall
+            };
+        }).filter(Boolean)
+    ), [boxOfficeRegionById, normalizedDistributionChainSelections, normalizedSelectedRegionIds, project.projectDetails, effectiveScreeningStrategy]);
+    const distributionDealSummary = useMemo(() => {
+        const rows = selectedDistributionRows as Array<NonNullable<typeof selectedDistributionRows[number]>>;
+        const releaseReach = rows.reduce((sum, row) => sum + row.region.marketWeight, 0);
+        const totalScreens = rows.reduce((sum, row) => sum + row.terms.screens, 0);
+        const bookingCost = rows.reduce((sum, row) => sum + row.terms.bookingCost, 0);
+        const expectedFootfall = rows.reduce((sum, row) => sum + row.expectedFootfall, 0);
+        const weightedCut = releaseReach > 0
+            ? rows.reduce((sum, row) => sum + (row.terms.exhibitorCut * row.region.marketWeight), 0) / releaseReach
+            : 0;
+        const studioShare = Math.max(0, 1 - weightedCut);
+        const budget = Math.max(1_000_000, Number(project.projectDetails?.estimatedBudget || project.budget || 0) || 1_000_000);
+        const hiddenStats = project.projectDetails?.hiddenStats || {};
+        const quality = Number(hiddenStats.qualityScore || 50);
+        const scriptQuality = Number(hiddenStats.scriptQuality || quality);
+        const directorQuality = Number(hiddenStats.directorQuality || quality);
+        const castingStrength = Number(hiddenStats.castingStrength || 50);
+        const rawHype = Number(hiddenStats.rawHype || 50);
+        const fameMultiplier = Number(hiddenStats.fameMultiplier || 1);
+        const packageScore = (scriptQuality * 0.32) + (directorQuality * 0.24) + (castingStrength * 0.26) + (quality * 0.18);
+        const genreEventMultiplier = ['SUPERHERO', 'SCI_FI', 'ADVENTURE', 'ACTION', 'FANTASY', 'ANIMATION'].includes(project.projectDetails?.genre)
+            ? 1.12
+            : ['DRAMA', 'BIOPIC', 'DOCUMENTARY', 'ROMANCE'].includes(project.projectDetails?.genre)
+                ? 0.72
+                : 0.92;
+        const screenReach = 1 - Math.exp(-totalScreens / 14500);
+        const regionReach = 1 - Math.exp(-releaseReach / 2.75);
+        const footfallSignal = Math.min(1.28, expectedFootfall / 18_000_000);
+        const distributionPower = Math.max(35, Math.min(98, 42 + (screenReach * 34) + (releaseReach * 4) + (footfallSignal * 7)));
+        const campaignLift = Math.min(0.38, totalCampaignCost / Math.max(1, budget * 2.4));
+        const qualityLift = 0.72 + (packageScore / 100) * 0.64;
+        const hypeLift = 0.78 + (rawHype / 100) * 0.55;
+        const fameLift = 0.92 + Math.min(0.32, Math.max(0, fameMultiplier - 1) * 0.28);
+        const distributionLift = Math.pow(distributionPower / 50, 0.72);
+        const musicOpeningMod = Math.max(0.9, Math.min(1.32, 1 + (musicImpact.openingWeekendLiftPct / 100) + (musicImpact.trailerStrengthLift / 260) - (musicImpact.mismatchBacklashRisk / 1000)));
+        const grossDemand = budget * (0.28 + screenReach * 0.34 + regionReach * 0.26 + footfallSignal * 0.14 + campaignLift) * qualityLift * hypeLift * fameLift * genreEventMultiplier * distributionLift * musicOpeningMod;
+        const caps = getBoxOfficeCaps(project.projectDetails?.budgetTier || 'MID');
+        const openingCap = caps.opening * (quality >= 88 && rawHype >= 82 ? 1.08 : 0.92);
+        const midpoint = Math.min(openingCap, grossDemand);
+        const uncertainty = quality < 55
+            ? 0.34
+            : quality >= 82
+                ? 0.18
+                : 0.25;
+        const openingLow = Math.round(midpoint * (1 - uncertainty));
+        const openingHigh = Math.round(Math.max(openingLow + 1, midpoint * (1 + uncertainty)));
+        const studioOpeningLow = Math.round(openingLow * studioShare);
+        const studioOpeningHigh = Math.round(openingHigh * studioShare);
+        const partnerExampleShare = Math.round(100 * weightedCut);
+        const studioExampleShare = Math.round(100 * studioShare);
+
+        return {
+            regionCount: rows.length,
+            releaseReach,
+            totalScreens,
+            bookingCost,
+            expectedFootfall,
+            weightedCut,
+            studioShare,
+            openingLow,
+            openingHigh,
+            studioOpeningLow,
+            studioOpeningHigh,
+            partnerExampleShare,
+            studioExampleShare,
+            distributionPower
+        };
+    }, [project.budget, project.projectDetails, selectedDistributionRows, totalCampaignCost, musicImpact]);
+    const toggleDistributionChain = (regionId: BoxOfficeRegionId, chainId: CinemaChainId) => {
+        setDistributionChainSelections(currentSelections => {
+            const currentChainIds = currentSelections[regionId] || [];
+            const nextChainIds = currentChainIds.includes(chainId)
+                ? currentChainIds.filter(currentChainId => currentChainId !== chainId)
+                : [...currentChainIds, chainId];
+
+            return {
+                ...currentSelections,
+                [regionId]: nextChainIds.length > 0 ? nextChainIds : [chainId]
+            };
+        });
+    };
+    const selectAllDistributionChainsForRegion = (regionId: BoxOfficeRegionId) => {
+        setDistributionChainSelections(currentSelections => ({
+            ...currentSelections,
+            [regionId]: getCinemaChainsForRegion(regionId).map(chain => chain.id)
+        }));
+    };
+    const applyRecommendedDistributionDesk = (strategyId: ScreeningStrategy | null = effectiveScreeningStrategy) => {
+        const resolvedStrategy = strategyId || effectiveScreeningStrategy;
+        const defaultRegions = getDefaultReleaseRegionIds(resolvedStrategy);
+        setSelectedRegionIds(defaultRegions);
+        setScreeningStrategy(resolvedStrategy);
+        setDistributionChainSelections(defaultRegions.reduce((selections, regionId) => {
+            selections[regionId] = getRecommendedDistributionChainIds(regionId, resolvedStrategy);
+            return selections;
+        }, {} as Partial<Record<BoxOfficeRegionId, CinemaChainId[]>>));
+    };
     const getFestivalTimingMeta = (festivalWeeks: number[], targetWeekOfYear: number) => {
         const sortedWeeks = [...festivalWeeks].sort((a, b) => a - b);
         const firstWeek = sortedWeeks[0];
@@ -742,24 +1115,61 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
 
     const handleComplete = () => {
         const updatedPlayer = { ...player };
-        let totalCost = totalCampaignCost;
+        let festivalCost = 0;
 
         if (festivalPremiere) {
             const fest = FESTIVALS.find(f => f.id === festivalPremiere);
-            if (fest) totalCost += fest.cost;
+            if (fest) festivalCost += fest.cost;
         }
 
-        updatedPlayer.money -= totalCost;
-        updatedPlayer.finance.history.unshift({
-            id: Math.random().toString(),
-            week: updatedPlayer.currentWeek,
-            year: updatedPlayer.age,
-            amount: -totalCost,
-            category: 'BUSINESS',
-            description: `Release Campaign: ${project.name}`
-        });
+        const campaignSpend = totalCampaignCost;
+        const unusedCampaignReserve = hasReservedMarketingPool ? campaignBudgetRemaining : 0;
 
-        if (selectedCampaigns.includes('red_carpet')) {
+        if (!hasReservedMarketingPool) {
+            if (campaignSpend > 0) {
+                updatedPlayer.money -= campaignSpend;
+                updatedPlayer.finance.history.unshift({
+                    id: Math.random().toString(),
+                    week: updatedPlayer.currentWeek,
+                    year: updatedPlayer.age,
+                    amount: -campaignSpend,
+                    category: 'BUSINESS',
+                    description: `Release Campaign: ${project.name}`
+                });
+            }
+        }
+
+        if (festivalCost > 0) {
+            updatedPlayer.money -= festivalCost;
+            updatedPlayer.finance.history.unshift({
+                id: Math.random().toString(),
+                week: updatedPlayer.currentWeek,
+                year: updatedPlayer.age,
+                amount: -festivalCost,
+                category: 'BUSINESS',
+                description: `Festival Premiere: ${project.name}`
+            });
+        }
+
+        if (unusedCampaignReserve > 0 && studio) {
+            const b = updatedPlayer.businesses.find(b => b.id === studio.id);
+            if (b) {
+                b.balance += unusedCampaignReserve;
+                if (!b.studioState) b.studioState = {} as any;
+                const ledger = Array.isArray(b.studioState.financeLedger) ? b.studioState.financeLedger : [];
+                b.studioState.financeLedger = [{
+                    id: `studio_ledger_campaign_return_${project.id}_${player.age}_${player.currentWeek}`,
+                    week: player.currentWeek,
+                    year: player.age,
+                    amount: unusedCampaignReserve,
+                    type: 'FUNDING_SURPLUS',
+                    label: `${project.name} unused campaign reserve returned`,
+                    projectId: project.id
+                }, ...ledger].slice(0, 40);
+            }
+        }
+
+        if ((normalizedChannelMix.allocations.RED_CARPET || 0) > 0) {
             const premiereEvent: PendingEvent = {
                 id: `premiere_${project.id}`,
                 week: player.currentWeek,
@@ -782,14 +1192,33 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                 projectDetails: commitment.projectDetails ? {
                     ...commitment.projectDetails,
                     releaseStrategy: releaseType as any,
-                    screeningStrategy: screeningStrategy as any,
-                    campaignItems: selectedCampaigns,
-                    totalCampaignSpend: totalCampaignCost,
+                    screeningStrategy: effectiveScreeningStrategy as any,
+                    releaseRegionIds: releaseType === 'THEATRICAL'
+                        ? (normalizedSelectedRegionIds.length > 0 ? normalizedSelectedRegionIds : getDefaultReleaseRegionIds(effectiveScreeningStrategy))
+                        : undefined,
+                    releaseChainSelections: releaseType === 'THEATRICAL'
+                        ? normalizedDistributionChainSelections
+                        : undefined,
+                    campaignPositioning,
+                    campaignTimeline,
+                    campaignFitSnapshot: campaignFit,
+                    campaignForecastSnapshot: campaignForecast,
+                    marketingChannelAllocations: normalizedChannelMix.allocations,
+                    marketingBudgetSpent: campaignSpend,
+                    marketingBudgetRemaining: 0,
+                    returnedMarketingBudget: unusedCampaignReserve,
+                    campaignItems: activeCampaignChannels.map(channel => channel.id),
+                    totalCampaignSpend: campaignSpend,
                     releaseDate: releaseWeek,
                     hiddenStats: {
-                        ...commitment.projectDetails.hiddenStats,
-                        redCarpetHype: selectedCampaigns.includes('red_carpet') ? 20 : 0,
-                        festivalPremiere: festivalPremiere || undefined
+                        ...applyMusicImpactToHiddenStats(commitment.projectDetails.hiddenStats, musicImpact, commitment.projectDetails.musicPlan),
+                        redCarpetHype: (normalizedChannelMix.allocations.RED_CARPET || 0) > 0 ? 20 : 0,
+                        festivalPremiere: festivalPremiere || undefined,
+                        campaignFitScore: campaignFit.fitScore,
+                        falseMarketingRisk: campaignFit.falseMarketingRisk,
+                        campaignOverspendRisk: campaignFit.overspendRisk,
+                        campaignPromise: campaignPositioning,
+                        campaignTimeline
                     }
                 } : undefined
             };
@@ -827,6 +1256,25 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
         } else {
             setStep(step - 1);
         }
+    };
+    const toggleSelectedRegion = (regionId: BoxOfficeRegionId) => {
+        setSelectedRegionIds(currentRegionIds => {
+            if (currentRegionIds.includes(regionId)) {
+                if (currentRegionIds.length <= 1) return currentRegionIds;
+                setDistributionChainSelections(currentSelections => {
+                    const nextSelections = { ...currentSelections };
+                    delete nextSelections[regionId];
+                    return nextSelections;
+                });
+                return currentRegionIds.filter(currentRegionId => currentRegionId !== regionId);
+            }
+
+            setDistributionChainSelections(currentSelections => ({
+                ...currentSelections,
+                [regionId]: currentSelections[regionId] || getRecommendedDistributionChainIds(regionId)
+            }));
+            return [...currentRegionIds, regionId];
+        });
     };
 
     const handleBack = () => {
@@ -952,39 +1400,178 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                         {step === 2 && releaseType === 'THEATRICAL' && (
                             <motion.div key="step2t" initial={{ opacity: 0, scale: 0.95, filter: 'blur(10px)' }} animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }} exit={{ opacity: 0, scale: 1.05, filter: 'blur(10px)' }} transition={{ duration: 0.4 }} className="space-y-12">
                                 <div className="text-center space-y-4">
-                                    <h2 className="text-5xl md:text-7xl font-serif font-light tracking-tight text-white/90">Scale</h2>
-                                    <p className="text-lg text-white/50 font-light tracking-wide">Choose your distribution scale and partner cinemas.</p>
+                                    <h2 className="text-5xl md:text-7xl font-serif font-light tracking-tight text-white/90">Distribution Desk</h2>
+                                    <p className="text-lg text-white/50 font-light tracking-wide">Choose regions, cinema partners, and the shape of the theatrical run.</p>
+                                    <button
+                                        onClick={() => {
+                                            const recommendedStrategy = normalizedSelectedRegionIds.length > 0 ? effectiveScreeningStrategy : 'NATIONAL';
+                                            setScreeningStrategy(recommendedStrategy);
+                                            applyRecommendedDistributionDesk(recommendedStrategy);
+                                        }}
+                                        className="inline-flex items-center gap-2 rounded-full border border-emerald-300/35 bg-emerald-400/10 px-5 py-2 text-[10px] font-black uppercase tracking-[0.22em] text-emerald-100 transition-colors hover:bg-emerald-400/20"
+                                    >
+                                        <CheckCircle2 size={14} />
+                                        Auto Build Footprint
+                                    </button>
                                 </div>
 
-                                <div className="grid grid-cols-1 gap-4">
-                                    {SCREENING_STRATEGIES.map(strategy => (
-                                        <button 
-                                            key={strategy.id}
-                                            onClick={() => setScreeningStrategy(strategy.id)}
-                                            className={`group relative p-6 rounded-3xl border transition-all duration-500 text-left overflow-hidden ${screeningStrategy === strategy.id ? 'bg-amber-500/10 border-amber-500/50 shadow-[0_0_30px_rgba(245,158,11,0.1)]' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
-                                        >
-                                            <div className="relative z-10 flex justify-between items-center">
-                                                <div className="flex items-center gap-6">
-                                                    <div className={`w-12 h-12 rounded-full flex items-center justify-center border transition-colors ${screeningStrategy === strategy.id ? 'bg-amber-500/20 border-amber-500/50 text-amber-400' : 'bg-black/50 border-white/10 text-white/50'}`}>
-                                                        <Globe size={20} />
-                                                    </div>
-                                                    <div>
-                                                        <div className="font-serif text-xl text-white/90 mb-1">{strategy.name}</div>
-                                                        <p className="text-sm text-white/50">{strategy.description}</p>
-                                                    </div>
+                                <div className="rounded-[2rem] border border-amber-400/20 bg-black/30 p-4 shadow-[0_0_45px_rgba(245,158,11,0.08)]">
+                                    <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+                                        <div>
+                                            <div className="text-[10px] font-black uppercase tracking-[0.3em] text-amber-300">Distribution map</div>
+                                            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-white/55">
+                                                Tap regions to choose where the theatrical run opens. After that, choose which cinema partners carry each region.
+                                            </p>
+                                        </div>
+                                        <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3">
+                                            <div className="text-[9px] font-black uppercase tracking-[0.22em] text-white/35">Region preview</div>
+                                            <div className="mt-1 text-lg font-black text-white">
+                                                {regionMapSummary.regionCount || 0} region{regionMapSummary.regionCount === 1 ? '' : 's'}
+                                            </div>
+                                            <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-200/80">
+                                                {distributionDealSummary.totalScreens.toLocaleString()} screens planned
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <InteractiveRegionMap
+                                        selectedRegionIds={normalizedSelectedRegionIds}
+                                        onSelectRegion={toggleSelectedRegion}
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.25fr_0.75fr]">
+                                    <div className="rounded-[2rem] border border-amber-300/20 bg-white/[0.04] p-5 shadow-[0_20px_60px_rgba(0,0,0,0.22)]">
+                                        <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                                            <div>
+                                                <div className="text-[10px] font-black uppercase tracking-[0.3em] text-amber-300">Selected region partners</div>
+                                                <p className="mt-2 text-sm leading-relaxed text-white/50">
+                                                    Pick one partner for a focused deal, or stack multiple partners for more screens. More reach usually means more booking cost and a different weighted cut.
+                                                </p>
+                                            </div>
+                                            <div className="rounded-full border border-white/10 bg-black/25 px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.18em] text-white/45">
+                                                {normalizedSelectedRegionIds.length} active
+                                            </div>
+                                        </div>
+
+                                        {selectedDistributionRows.length === 0 ? (
+                                            <div className="rounded-2xl border border-dashed border-white/15 bg-black/25 p-5 text-sm font-semibold text-white/45">
+                                                Tap regions on the map to build the release footprint.
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-3">
+                                                {selectedDistributionRows.map((row: any) => {
+                                                    const chains = getCinemaChainsForRegion(row.regionId);
+                                                    const allChainsSelected = row.chainIds.length === chains.length;
+                                                    return (
+                                                        <div key={row.regionId} className="rounded-2xl border border-white/10 bg-black/25 p-3">
+                                                            <div className="mb-3 flex items-center justify-between gap-3">
+                                                                <div>
+                                                                    <div className="font-serif text-lg text-white/90">{row.region.label}</div>
+                                                                    <div className="text-[9px] font-black uppercase tracking-[0.18em] text-white/35">
+                                                                        {row.chainIds.length} partner{row.chainIds.length === 1 ? '' : 's'} • {row.terms.screens.toLocaleString()} screens • {(row.terms.exhibitorCut * 100).toFixed(0)}% cut • {formatDealMoney(row.terms.bookingCost)}
+                                                                    </div>
+                                                                </div>
+                                                                <div className="flex -space-x-2">
+                                                                    {row.chains.slice(0, 3).map((chain: any) => (
+                                                                        <CinemaChainLogo key={chain.id} chain={chain} size="sm" />
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+
+                                                            <button
+                                                                onClick={() => selectAllDistributionChainsForRegion(row.regionId)}
+                                                                className={`mb-2 w-full rounded-xl border px-3 py-2 text-left transition-all ${
+                                                                    allChainsSelected
+                                                                        ? 'border-emerald-300/60 bg-emerald-400/10 text-emerald-100'
+                                                                        : 'border-white/10 bg-white/[0.03] text-white/65 hover:border-emerald-300/35 hover:bg-emerald-400/10'
+                                                                }`}
+                                                            >
+                                                                <div className="flex items-center justify-between gap-3">
+                                                                    <div className="text-[10px] font-black uppercase tracking-[0.18em]">All partners</div>
+                                                                    <div className="text-[9px] font-bold uppercase tracking-[0.14em] opacity-70">Max screens</div>
+                                                                </div>
+                                                            </button>
+
+                                                            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                                                                {chains.map(chain => {
+                                                                    const terms = getCinemaChainTerms(chain.id, row.regionId);
+                                                                    const isSelected = row.chainIds.includes(chain.id);
+                                                                    return (
+                                                                        <button
+                                                                            key={chain.id}
+                                                                            onClick={() => toggleDistributionChain(row.regionId, chain.id)}
+                                                                            className={`rounded-xl border p-2 text-left transition-all ${
+                                                                                isSelected
+                                                                                    ? 'border-amber-300/60 bg-amber-400/10 shadow-[0_0_18px_rgba(245,158,11,0.12)]'
+                                                                                    : 'border-white/10 bg-white/[0.03] hover:border-white/25 hover:bg-white/[0.06]'
+                                                                            }`}
+                                                                        >
+                                                                            <div className="flex items-center gap-2">
+                                                                                <CinemaChainLogo chain={chain} size="sm" />
+                                                                                <div className="min-w-0">
+                                                                                    <div className="truncate text-[10px] font-black text-white">{chain.name}</div>
+                                                                                    <div className="text-[8px] font-bold uppercase tracking-[0.12em] text-white/35">
+                                                                                        {terms?.screens.toLocaleString()} screens • {terms ? (terms.exhibitorCut * 100).toFixed(0) : 0}% cut
+                                                                                    </div>
+                                                                                </div>
+                                                                            </div>
+                                                                        </button>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="rounded-[2rem] border border-emerald-300/20 bg-emerald-950/10 p-5">
+                                        <div className="text-[10px] font-black uppercase tracking-[0.3em] text-emerald-200">Deal summary</div>
+                                        <div className="mt-4 grid grid-cols-2 gap-3">
+                                            <div className="rounded-2xl border border-white/10 bg-black/25 p-3">
+                                                <div className="text-[8px] font-black uppercase tracking-[0.18em] text-white/35">Screens</div>
+                                                <div className="mt-1 font-mono text-xl text-white">{distributionDealSummary.totalScreens.toLocaleString()}</div>
+                                            </div>
+                                            <div className="rounded-2xl border border-white/10 bg-black/25 p-3">
+                                                <div className="text-[8px] font-black uppercase tracking-[0.18em] text-white/35">Booking cost</div>
+                                                <div className="mt-1 font-mono text-xl text-amber-300">{formatDealMoney(distributionDealSummary.bookingCost)}</div>
+                                            </div>
+                                            <div className="rounded-2xl border border-white/10 bg-black/25 p-3">
+                                                <div className="text-[8px] font-black uppercase tracking-[0.18em] text-white/35">Audience pull</div>
+                                                <div className="mt-1 font-mono text-xl text-sky-200">{formatFootfall(distributionDealSummary.expectedFootfall)}</div>
+                                            </div>
+                                            <div className="rounded-2xl border border-white/10 bg-black/25 p-3">
+                                                <div className="text-[8px] font-black uppercase tracking-[0.18em] text-white/35">Partner cut</div>
+                                                <div className="mt-1 font-mono text-xl text-rose-200">{(distributionDealSummary.weightedCut * 100).toFixed(0)}%</div>
+                                            </div>
+                                        </div>
+                                        <div className="mt-3 rounded-2xl border border-emerald-300/20 bg-emerald-400/10 p-4">
+                                            <div className="grid gap-4 sm:grid-cols-[0.8fr_1.2fr]">
+                                                <div>
+                                                    <div className="text-[8px] font-black uppercase tracking-[0.2em] text-emerald-100/70">Studio share</div>
+                                                    <div className="mt-1 font-mono text-3xl text-emerald-200">{(distributionDealSummary.studioShare * 100).toFixed(0)}%</div>
                                                 </div>
-                                                <div className="text-right">
-                                                    <div className="text-2xl font-light text-white/90">{strategy.screens.toLocaleString()}</div>
-                                                    <div className="text-[10px] text-amber-500/80 uppercase tracking-widest font-bold">Screens</div>
+                                                <div className="sm:text-right">
+                                                    <div className="text-[8px] font-black uppercase tracking-[0.2em] text-white/35">Gross opening estimate</div>
+                                                    <div className="mt-1 font-mono text-lg text-white">
+                                                        {formatDealMoney(distributionDealSummary.openingLow)}-{formatDealMoney(distributionDealSummary.openingHigh)}
+                                                    </div>
+                                                    <div className="mt-1 text-[9px] font-black uppercase tracking-[0.15em] text-emerald-100/70">
+                                                        Studio receipts {formatDealMoney(distributionDealSummary.studioOpeningLow)}-{formatDealMoney(distributionDealSummary.studioOpeningHigh)}
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </button>
-                                    ))}
+                                            <p className="mt-3 text-[10px] leading-relaxed text-emerald-50/60">
+                                                If the run sells $100 in tickets, your studio keeps about ${distributionDealSummary.studioExampleShare} and cinema partners take about ${distributionDealSummary.partnerExampleShare}. Final weekly results can move with audience reaction and box-office variance.
+                                            </p>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <div className="flex justify-between items-center pt-8">
                                     <button onClick={prevStep} className="px-8 py-4 text-white/50 hover:text-white transition-colors text-xs font-bold tracking-widest uppercase">Back</button>
-                                    <button disabled={!screeningStrategy} onClick={nextStep} className="px-12 py-4 bg-white text-black rounded-full font-bold tracking-widest uppercase text-xs hover:scale-105 transition-all disabled:opacity-30 disabled:hover:scale-100">
+                                    <button disabled={normalizedSelectedRegionIds.length === 0} onClick={nextStep} className="px-12 py-4 bg-white text-black rounded-full font-bold tracking-widest uppercase text-xs hover:scale-105 transition-all disabled:opacity-30 disabled:hover:scale-100">
                                         Continue
                                     </button>
                                 </div>
@@ -1149,43 +1736,314 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                             <motion.div key="step3" initial={{ opacity: 0, scale: 0.95, filter: 'blur(10px)' }} animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }} exit={{ opacity: 0, scale: 1.05, filter: 'blur(10px)' }} transition={{ duration: 0.4 }} className="space-y-12">
                                 <div className="text-center space-y-4">
                                     <h2 className="text-5xl md:text-7xl font-serif font-light tracking-tight text-white/90">Campaign</h2>
-                                    <p className="text-lg text-white/50 font-light tracking-wide">Build buzz and anticipation.</p>
+                                    <p className="text-lg text-white/50 font-light tracking-wide">Position the promise before you spend.</p>
                                 </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {CAMPAIGN_OPTIONS.map(option => {
-                                        const isSelected = selectedCampaigns.includes(option.id);
-                                        return (
-                                            <button 
-                                                key={option.id}
-                                                onClick={() => {
-                                                    if (isSelected) setSelectedCampaigns(selectedCampaigns.filter(id => id !== option.id));
-                                                    else setSelectedCampaigns([...selectedCampaigns, option.id]);
-                                                }}
-                                                className={`p-6 rounded-3xl border transition-all duration-300 flex flex-col justify-between min-h-[160px] ${isSelected ? 'bg-amber-500/10 border-amber-500/50 shadow-[0_0_20px_rgba(245,158,11,0.1)]' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
-                                            >
-                                                <div className="flex justify-between items-start w-full">
-                                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center border ${isSelected ? 'bg-amber-500/20 border-amber-500/50 text-amber-400' : 'bg-black/50 border-white/10 text-white/50'}`}>
-                                                        {option.id === 'red_carpet' ? <Camera size={16} /> : 
-                                                         option.id === 'exclusive_screening' ? <Star size={16} /> :
-                                                         option.id === 'social_ads' ? <Share2 size={16} /> :
-                                                         option.id === 'youtube_trailer' ? <Youtube size={16} /> :
-                                                         <Tv size={16} />}
+                                <div className="space-y-5">
+                                    <div className="flex items-center justify-between gap-4">
+                                        <div>
+                                            <div className="text-[10px] text-amber-500/80 uppercase tracking-[0.3em] font-bold">Campaign Position</div>
+                                            <div className="text-white/50 text-sm mt-1">Marketing can amplify demand, but it cannot repair weak reception.</div>
+                                        </div>
+                                        <div className={`hidden sm:flex items-center gap-2 px-4 py-2 rounded-full border text-xs uppercase tracking-widest font-bold ${CAMPAIGN_POSITIONING_ACCENTS[campaignPositioning].tone}`}>
+                                            {CAMPAIGN_POSITIONING_ACCENTS[campaignPositioning].icon}
+                                            {selectedCampaignPosition.shortLabel}
+                                        </div>
+                                    </div>
+
+                                    <div className="flex gap-3 overflow-x-auto pb-2 -mx-2 px-2">
+                                        {CAMPAIGN_POSITIONING_OPTIONS.map(option => {
+                                            const isSelected = campaignPositioning === option.id;
+                                            const accent = CAMPAIGN_POSITIONING_ACCENTS[option.id];
+                                            return (
+                                                <button
+                                                    key={option.id}
+                                                    onClick={() => setCampaignPositioning(option.id)}
+                                                    className={`min-w-[154px] md:min-w-0 md:flex-1 p-3 rounded-2xl border transition-all duration-300 text-left ${isSelected ? `${accent.tone} shadow-[0_0_18px_rgba(245,158,11,0.12)]` : 'bg-white/5 border-white/10 hover:bg-white/10 text-white/60'}`}
+                                                >
+                                                    <div className="flex items-center gap-3">
+                                                        <div className={`w-9 h-9 rounded-xl border flex items-center justify-center shrink-0 ${isSelected ? 'bg-black/30 border-current' : 'bg-black/40 border-white/10'}`}>
+                                                            {accent.icon}
+                                                        </div>
+                                                        <div className="min-w-0">
+                                                            <div className="text-[8px] uppercase tracking-widest font-bold opacity-60 truncate">{option.promise}</div>
+                                                            <div className="font-serif text-base text-white/90 leading-tight truncate">{option.label}</div>
+                                                        </div>
                                                     </div>
-                                                    <div className="font-mono text-sm text-white/70">${(option.cost / 1000).toFixed(0)}k</div>
-                                                </div>
-                                                <div className="text-left mt-4">
-                                                    <div className="font-serif text-lg text-white/90 mb-1">{option.name}</div>
-                                                    <div className="text-[10px] text-amber-500/80 uppercase tracking-widest font-bold">+{option.buzzImpact} Buzz</div>
-                                                </div>
-                                            </button>
-                                        );
-                                    })}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
                                 </div>
 
-                                <div className="flex justify-between items-center p-6 rounded-full border border-white/10 bg-black/40 backdrop-blur-md">
-                                    <span className="text-xs text-white/50 uppercase tracking-widest font-bold">Total Spend</span>
-                                    <span className="text-2xl font-light text-white/90">${(totalCampaignCost / 1000).toFixed(0)}k</span>
+                                <div className="campaign-meaning-card rounded-3xl border border-white/10 bg-black/50 backdrop-blur-md p-4 md:p-5">
+                                    <div className="flex items-start gap-4">
+                                        <div className={`w-12 h-12 rounded-2xl border flex items-center justify-center shrink-0 ${CAMPAIGN_POSITIONING_ACCENTS[campaignPositioning].tone}`}>
+                                            {CAMPAIGN_POSITIONING_ACCENTS[campaignPositioning].icon}
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <div className="text-[10px] text-amber-500/80 uppercase tracking-[0.3em] font-bold">Campaign Meaning</div>
+                                                <div className={`text-[9px] uppercase tracking-widest font-bold px-2 py-1 rounded-full border ${CAMPAIGN_POSITIONING_ACCENTS[campaignPositioning].tone}`}>
+                                                    {selectedCampaignPosition.promise}
+                                                </div>
+                                            </div>
+                                            <div className="font-serif text-2xl text-white/90 mt-2">{selectedCampaignPosition.label}</div>
+                                            <p className="text-sm text-white/50 leading-relaxed mt-2">{selectedCampaignPosition.description}</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="timeline-selector rounded-3xl border border-white/10 bg-black/45 backdrop-blur-md p-4 md:p-5">
+                                    <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3 mb-4">
+                                        <div>
+                                            <div className="text-[10px] text-amber-500/80 uppercase tracking-[0.3em] font-bold">Campaign Timeline</div>
+                                            <p className="text-sm text-white/45 mt-1">{selectedCampaignTimeline.description}</p>
+                                        </div>
+                                        <div className="text-[9px] uppercase tracking-widest font-bold text-white/45 border border-white/10 rounded-full px-3 py-1 w-fit">
+                                            {selectedCampaignTimeline.promise}
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                                        {CAMPAIGN_TIMELINE_OPTIONS.map(option => {
+                                            const isSelected = campaignTimeline === option.id;
+                                            return (
+                                                <button
+                                                    key={option.id}
+                                                    onClick={() => setCampaignTimeline(option.id)}
+                                                    className={`min-h-[82px] rounded-2xl border p-3 text-left transition-all ${isSelected ? 'border-amber-400/70 bg-amber-400/10 shadow-[0_0_18px_rgba(245,158,11,0.14)]' : 'border-white/10 bg-white/[0.04] hover:bg-white/[0.07]'}`}
+                                                >
+                                                    <div className={`text-[8px] uppercase tracking-widest font-bold ${isSelected ? 'text-amber-300' : 'text-white/35'}`}>{option.promise}</div>
+                                                    <div className="font-serif text-base leading-tight text-white/90 mt-1">{option.shortLabel}</div>
+                                                    <div className="text-[11px] leading-snug text-white/40 mt-1 line-clamp-2">{option.description}</div>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+
+                                <div className="rounded-3xl border border-white/10 bg-black/45 backdrop-blur-md overflow-hidden">
+                                    <div className="p-4 md:p-5 border-b border-white/10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                        <div>
+                                            <div className="text-[10px] text-amber-500/80 uppercase tracking-[0.3em] font-bold">Studio Forecast</div>
+                                            <p className="text-xs text-white/45 mt-1">Audience reaction can rewrite this after week one.</p>
+                                        </div>
+                                        <div
+                                            className={`forecast-speedometer flex items-center gap-3 rounded-2xl border bg-white/[0.04] px-3 py-2 shadow-[0_0_28px_rgba(0,0,0,0.25)] ${forecastGaugeTone}`}
+                                            aria-label={`Studio forecast confidence ${forecastGaugeScore} out of 100, ${forecastGaugeLabel}`}
+                                        >
+                                            <div className="forecast-gauge-shell relative h-16 w-28 shrink-0">
+                                                <svg viewBox="0 0 120 76" className="absolute inset-0 h-full w-full overflow-visible" role="img" aria-hidden="true">
+                                                    <path
+                                                        className="forecast-gauge-track"
+                                                        d="M 16 64 A 44 44 0 0 1 104 64"
+                                                        pathLength="100"
+                                                        fill="none"
+                                                        stroke="rgba(255,255,255,0.13)"
+                                                        strokeWidth="13"
+                                                        strokeLinecap="round"
+                                                    />
+                                                    <path
+                                                        className="forecast-gauge-fill transition-all duration-700 ease-out"
+                                                        d="M 16 64 A 44 44 0 0 1 104 64"
+                                                        pathLength="100"
+                                                        fill="none"
+                                                        stroke={forecastGaugeAccent}
+                                                        strokeWidth="13"
+                                                        strokeLinecap="round"
+                                                        strokeDasharray="100"
+                                                        strokeDashoffset={forecastGaugeRingOffset}
+                                                        style={{ filter: `drop-shadow(0 0 10px ${forecastGaugeAccent}88)` }}
+                                                    />
+                                                </svg>
+                                                <div className="absolute inset-x-0 bottom-0 text-center">
+                                                    <div className="font-mono text-xl leading-none text-white">{forecastGaugeScore}</div>
+                                                    <div className="mt-1 text-[9px] uppercase tracking-[0.2em] font-black" style={{ color: forecastGaugeAccent }}>
+                                                        {forecastGaugeWord}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="min-w-[4.5rem]">
+                                                <div className="text-[9px] uppercase tracking-widest font-bold text-white/35">Forecast Read</div>
+                                                <div className="font-mono text-lg leading-none text-white/90 mt-1">{forecastGaugeLabel}</div>
+                                                <div className="text-[9px] uppercase tracking-widest font-bold text-white/35 mt-1">Market signal</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 md:grid-cols-4">
+                                        <div className="p-4 border-r border-b md:border-b-0 border-white/10">
+                                            <div className="text-[9px] text-white/40 uppercase tracking-widest font-bold">Opening Weekend</div>
+                                            <div className="font-mono text-lg text-white/90 mt-2">
+                                                ${formatCampaignMillions(campaignForecast.openingWeekendLow)}M-{formatCampaignMillions(campaignForecast.openingWeekendHigh)}M
+                                            </div>
+                                        </div>
+                                        <div className="p-4 border-r-0 md:border-r border-b md:border-b-0 border-white/10">
+                                            <div className="text-[9px] text-white/40 uppercase tracking-widest font-bold">Total Revenue</div>
+                                            <div className="font-mono text-lg text-white/90 mt-2">
+                                                ${formatCampaignMillions(campaignForecast.totalRevenueLow)}M-{formatCampaignMillions(campaignForecast.totalRevenueHigh)}M
+                                            </div>
+                                        </div>
+                                        <div className="p-4 border-r border-white/10">
+                                            <div className="text-[9px] text-white/40 uppercase tracking-widest font-bold">Break-even</div>
+                                            <div className="font-mono text-lg text-emerald-300 mt-2">{campaignForecast.breakEvenChance}%</div>
+                                        </div>
+                                        <div className="p-4">
+                                            <div className="text-[9px] text-white/40 uppercase tracking-widest font-bold">Week-two Drop</div>
+                                            <div className="font-mono text-lg text-amber-300 mt-2">{campaignForecast.weekTwoDropRisk}%</div>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-3 border-t border-white/10">
+                                        <div className="p-4 border-r border-white/10">
+                                            <div className="text-[9px] text-white/40 uppercase tracking-widest font-bold">Streaming Bid</div>
+                                            <div className="font-mono text-base text-sky-300 mt-1">+{campaignForecast.streamingBidBoost}%</div>
+                                        </div>
+                                        <div className="p-4 border-r border-white/10">
+                                            <div className="text-[9px] text-white/40 uppercase tracking-widest font-bold">Awards</div>
+                                            <div className="font-mono text-base text-purple-200 mt-1">{campaignForecast.awardsVisibility}%</div>
+                                        </div>
+                                        <div className="p-4">
+                                            <div className="text-[9px] text-white/40 uppercase tracking-widest font-bold">Franchise</div>
+                                            <div className="font-mono text-base text-amber-300 mt-1">{campaignForecast.franchiseValueImpact >= 0 ? '+' : ''}{campaignForecast.franchiseValueImpact}%</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {musicImpact.score > 0 && (
+                                    <div className="rounded-[1.5rem] border border-cyan-300/20 bg-cyan-300/[0.06] p-4">
+                                        <div className="mb-3 flex items-center justify-between gap-3">
+                                            <div className="min-w-0">
+                                                <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.24em] text-cyan-200/75">
+                                                    <Music2 size={14} /> Soundtrack Impact
+                                                </div>
+                                                <div className="mt-1 truncate text-sm font-black text-white">{musicImpact.label}</div>
+                                            </div>
+                                            <div className={`shrink-0 rounded-full border px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.16em] ${
+                                                musicImpact.mismatchBacklashRisk >= 38 || musicImpact.controversyRisk >= 36
+                                                    ? 'border-amber-300/40 bg-amber-400/10 text-amber-200'
+                                                    : 'border-cyan-200/40 bg-cyan-300/10 text-cyan-100'
+                                            }`}>
+                                                Score {musicImpact.score}
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                            <div className="rounded-xl border border-white/10 bg-black/25 p-3">
+                                                <div className="text-[8px] font-black uppercase tracking-[0.18em] text-white/35">Opening</div>
+                                                <div className="mt-1 font-mono text-base font-black text-emerald-300">{musicImpact.openingWeekendLiftPct >= 0 ? '+' : ''}{musicImpact.openingWeekendLiftPct}%</div>
+                                            </div>
+                                            <div className="rounded-xl border border-white/10 bg-black/25 p-3">
+                                                <div className="text-[8px] font-black uppercase tracking-[0.18em] text-white/35">Trailer</div>
+                                                <div className="mt-1 font-mono text-base font-black text-cyan-300">+{musicImpact.trailerStrengthLift}</div>
+                                            </div>
+                                            <div className="rounded-xl border border-white/10 bg-black/25 p-3">
+                                                <div className="text-[8px] font-black uppercase tracking-[0.18em] text-white/35">Awards</div>
+                                                <div className="mt-1 font-mono text-base font-black text-purple-200">+{musicImpact.awardChanceLift}</div>
+                                            </div>
+                                            <div className="rounded-xl border border-white/10 bg-black/25 p-3">
+                                                <div className="text-[8px] font-black uppercase tracking-[0.18em] text-white/35">Backlash</div>
+                                                <div className={`mt-1 font-mono text-base font-black ${musicImpact.mismatchBacklashRisk >= 38 ? 'text-amber-300' : 'text-zinc-300'}`}>{musicImpact.mismatchBacklashRisk}</div>
+                                            </div>
+                                        </div>
+                                        <div className="mt-3 truncate text-xs font-bold text-zinc-400">
+                                            {musicImpact.headline}
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="rounded-[2rem] border border-white/10 bg-white/[0.04] overflow-hidden">
+                                    <div className="p-5 md:p-6 border-b border-white/10 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+                                        <div>
+                                            <div className="text-[10px] text-amber-500/80 uppercase tracking-[0.3em] font-bold">Marketing Channel Mix</div>
+                                            <p className="text-sm text-white/45 mt-1">
+                                                Spend from the reserved pool. Unused campaign money returns to the studio wallet when locked.
+                                            </p>
+                                        </div>
+                                        <div className="text-left sm:text-right">
+                                            <div className="text-[10px] text-white/40 uppercase tracking-widest font-bold">Step</div>
+                                            <div className="font-mono text-white/80">${(allocationStep / 1000000).toFixed(allocationStep >= 1000000 ? 1 : 2)}M</div>
+                                        </div>
+                                    </div>
+
+                                    <div className="divide-y divide-white/10">
+                                        {MARKETING_CHANNEL_OPTIONS.map(channel => {
+                                            const amount = normalizedChannelMix.allocations[channel.id] || 0;
+                                            const canIncrease = campaignBudgetRemaining > 0;
+                                            const maxForChannel = amount + campaignBudgetRemaining;
+                                            const amountInMillions = amount / 1000000;
+                                            const amountDisplay = formatCampaignMillions(amount);
+                                            const meterFill = legacyCampaignBudgetCap > 0 ? Math.min(4, Math.ceil((amount / legacyCampaignBudgetCap) * 4)) : 0;
+                                            return (
+                                                <div key={channel.id} className="channel-minimal-row channel-grid-row p-4 md:p-5">
+                                                    <div className="grid grid-cols-[44px_minmax(0,1fr)] md:grid-cols-[44px_minmax(0,1fr)_236px] gap-x-3 gap-y-3 items-center">
+                                                        <div className="w-11 h-11 rounded-2xl bg-black/40 border border-white/10 text-amber-300 flex items-center justify-center">
+                                                            {MARKETING_CHANNEL_ICONS[channel.id]}
+                                                        </div>
+                                                        <div className="min-w-0">
+                                                            <div className="font-serif text-xl md:text-lg text-white/90 leading-tight">{channel.label}</div>
+                                                            <div className="text-xs text-white/45 leading-relaxed mt-1">{channel.description}</div>
+                                                        </div>
+                                                        <div className="channel-control-dock channel-control-cluster col-span-2 md:col-span-1 grid grid-cols-[38px_minmax(0,1fr)_38px] gap-2 items-center">
+                                                            <button
+                                                                onClick={() => updateChannelAllocation(channel.id, -allocationStep)}
+                                                                disabled={amount <= 0}
+                                                                className="h-10 rounded-xl border border-white/10 bg-black/40 text-white/70 disabled:opacity-25 disabled:cursor-not-allowed"
+                                                            >
+                                                                -
+                                                            </button>
+                                                            <label className="channel-input-shell relative block">
+                                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] text-white/35 font-mono">$</span>
+                                                                <input
+                                                                    type="number"
+                                                                    inputMode="decimal"
+                                                                    aria-label={`${channel.label} custom spend in millions`}
+                                                                    min={0}
+                                                                    max={maxForChannel / 1000000}
+                                                                    step={0.05}
+                                                                    value={amountDisplay}
+                                                                    onChange={(event) => setChannelAllocationAmount(channel.id, Number(event.target.value) * 1000000)}
+                                                                    className="channel-amount-input w-full h-10 rounded-xl border border-white/10 bg-black/45 pl-6 pr-7 text-center font-mono tabular-nums text-sm text-white/90 focus:outline-none focus:border-amber-400/60"
+                                                                />
+                                                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-white/35 font-mono">M</span>
+                                                            </label>
+                                                            <button
+                                                                onClick={() => updateChannelAllocation(channel.id, allocationStep)}
+                                                                disabled={!canIncrease}
+                                                                className="h-10 rounded-xl border border-amber-500/40 bg-amber-500/10 text-amber-300 disabled:opacity-25 disabled:cursor-not-allowed"
+                                                            >
+                                                                +
+                                                            </button>
+                                                        </div>
+
+                                                        <div className="channel-mini-meter col-span-2 md:col-start-2 md:col-span-2 flex items-center justify-between gap-3">
+                                                            <div className="grid grid-cols-4 gap-1.5 w-28">
+                                                                {[0, 1, 2, 3].map(segment => (
+                                                                    <button
+                                                                        key={segment}
+                                                                        onClick={() => setChannelAllocationAmount(channel.id, maxForChannel * ((segment + 1) / 4))}
+                                                                        className={`h-2 rounded-full transition-colors ${segment < meterFill ? 'bg-amber-400' : 'bg-white/10 hover:bg-white/20'}`}
+                                                                        aria-label={`${channel.label} quick allocation ${segment + 1}`}
+                                                                    />
+                                                                ))}
+                                                            </div>
+                                                            <div className="text-[8px] uppercase tracking-widest text-white/25 font-bold">
+                                                                ${formatCampaignMillions(maxForChannel)}M available
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+
+                                    <div className="grid grid-cols-2 border-t border-white/10">
+                                        <div className="p-5 border-r border-white/10">
+                                            <div className="text-[10px] text-white/40 uppercase tracking-widest font-bold">Pool Used</div>
+                                            <div className="font-mono text-2xl text-amber-300 mt-1">${(totalCampaignCost / 1000000).toFixed(1)}M</div>
+                                        </div>
+                                        <div className="p-5">
+                                            <div className="text-[10px] text-white/40 uppercase tracking-widest font-bold">Pool Remaining</div>
+                                            <div className="font-mono text-2xl text-emerald-300 mt-1">${(campaignBudgetRemaining / 1000000).toFixed(1)}M</div>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <div className="flex justify-between items-center pt-4">
@@ -1365,15 +2223,33 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                                         </div>
                                         
                                         {releaseType === 'THEATRICAL' && (
-                                            <div className="flex justify-between items-end pb-6 border-b border-white/10">
-                                                <div className="text-[10px] text-white/40 uppercase tracking-widest font-bold mb-1">Scale</div>
-                                                <div className="font-serif text-2xl text-white/90">{SCREENING_STRATEGIES.find(s => s.id === screeningStrategy)?.name}</div>
+                                            <div className="flex justify-between items-end pb-6 border-b border-white/10 gap-6">
+                                                <div>
+                                                    <div className="text-[10px] text-white/40 uppercase tracking-widest font-bold mb-1">Footprint</div>
+                                                    <div className="text-[10px] uppercase tracking-widest font-bold text-white/35">
+                                                        {normalizedSelectedRegionIds.length} regions · {distributionDealSummary.totalScreens.toLocaleString()} screens
+                                                    </div>
+                                                </div>
+                                                <div className="font-serif text-2xl text-white/90 text-right">{formatDealMoney(distributionDealSummary.studioOpeningLow)}-{formatDealMoney(distributionDealSummary.studioOpeningHigh)}</div>
                                             </div>
                                         )}
                                         
                                         <div className="flex justify-between items-end pb-6 border-b border-white/10">
-                                            <div className="text-[10px] text-white/40 uppercase tracking-widest font-bold mb-1">Marketing</div>
-                                            <div className="font-serif text-2xl text-white/90">{selectedCampaigns.length} Campaigns</div>
+                                            <div>
+                                                <div className="text-[10px] text-white/40 uppercase tracking-widest font-bold mb-1">Marketing</div>
+                                                <div className="text-[10px] text-emerald-300 uppercase tracking-widest font-bold">
+                                                    ${((hasReservedMarketingPool ? campaignBudgetRemaining : 0) / 1000000).toFixed(1)}M returns
+                                                </div>
+                                            </div>
+                                            <div className="font-serif text-2xl text-white/90">{activeCampaignChannels.length} Channels</div>
+                                        </div>
+
+                                        <div className="flex justify-between items-end pb-6 border-b border-white/10 gap-6">
+                                            <div>
+                                                <div className="text-[10px] text-white/40 uppercase tracking-widest font-bold mb-1">Campaign Position</div>
+                                                <div className="text-[10px] uppercase tracking-widest font-bold text-white/35">{selectedCampaignPosition.promise}</div>
+                                            </div>
+                                            <div className="font-serif text-2xl text-white/90 text-right">{selectedCampaignPosition.label}</div>
                                         </div>
                                         
                                         {festivalPremiere && (
@@ -1389,8 +2265,11 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                                         </div>
 
                                         <div className="flex justify-between items-end pt-4">
-                                            <div className="text-[10px] text-amber-500/80 uppercase tracking-widest font-bold mb-1">Total Investment</div>
-                                            <div className="font-mono text-4xl font-light text-amber-400">${(totalCampaignCost / 1000).toFixed(0)}k</div>
+                                            <div>
+                                                <div className="text-[10px] text-amber-500/80 uppercase tracking-widest font-bold mb-1">Campaign Spend</div>
+                                                <div className="text-xs text-white/35">{hasReservedMarketingPool ? 'From reserved pool' : 'Legacy cash spend'}</div>
+                                            </div>
+                                            <div className="font-mono text-4xl font-light text-amber-400">${(totalCampaignCost / 1000000).toFixed(1)}M</div>
                                         </div>
                                     </div>
                                 </div>

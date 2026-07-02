@@ -2,9 +2,9 @@
 import { GameLanguage, Player, NewsItem, NewsCategory, ActiveRelease, Commitment, ProjectType, BudgetTier, RightsDealType } from '../types';
 import { NPC_DATABASE } from './npcLogic';
 import { STUDIO_CATALOG } from './studioLogic';
-import { AWARD_GOSSIP_TEMPLATES, SNUB_TEMPLATES } from './awardLogic'; // Import templates
+import { getAwardGossipTemplate, getAwardSnubTemplate } from './awardLogic';
 import { normalizeUniverseMap } from './universeLogic';
-import { getPlayerLanguage } from './i18n';
+import { getPlayerLanguage, t } from './i18n';
 
 // ... (Keep existing TEMPLATES arrays like INDUSTRY_TEMPLATES, NPC_HEADLINES, etc.)
 const INDUSTRY_TEMPLATES = [
@@ -591,7 +591,7 @@ const generateIndustryNews = (player: Player): NewsItem[] => {
     const pendingCeremony = player.scheduledEvents.find(e => e.type === 'AWARD_CEREMONY');
     if (pendingCeremony) {
         if (Math.random() < 0.6) { // High chance during season
-            const template = Math.random() > 0.3 ? pick(AWARD_GOSSIP_TEMPLATES) : pick(SNUB_TEMPLATES);
+            const template = Math.random() > 0.3 ? getAwardGossipTemplate(language) : getAwardSnubTemplate(language);
             // Replace placeholders
             const rival = pick(NPC_DATABASE);
             const awardName = pendingCeremony.title;
@@ -606,7 +606,7 @@ const generateIndustryNews = (player: Player): NewsItem[] => {
                 category: 'INDUSTRY',
                 week, year,
                 impactLevel: 'MEDIUM',
-                subtext: usePortuguese(language) ? "A máquina de rumores está girando conforme a cerimônia se aproxima." : "The rumor mill is spinning as the ceremony approaches."
+                subtext: t(language, 'award.gossip.subtext')
             });
         }
     }

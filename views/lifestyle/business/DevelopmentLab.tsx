@@ -30,9 +30,12 @@ interface DevelopmentLabProps {
     onOpenProject?: (projectId: string) => void;
     initialRightsMarketOpportunityId?: string;
     onRightsMarketTargetConsumed?: () => void;
+    initialTab?: DevelopmentLabInitialTab;
+    initialProjectType?: ProjectType;
 }
 
-type DevTab = 'VAULT' | 'NEW_CONCEPT' | 'IP_MARKET' | 'FRANCHISES' | 'UNIVERSE';
+export type DevelopmentLabInitialTab = 'VAULT' | 'NEW_CONCEPT' | 'IP_MARKET' | 'FRANCHISES' | 'UNIVERSE';
+type DevTab = DevelopmentLabInitialTab;
 type FranchiseCommissionMode = 'SEQUEL' | 'SPINOFF' | 'FINALE' | 'REBOOT';
 
 // --- Helpers ---
@@ -236,12 +239,13 @@ const getUniverseCharacterTimelineParts = (char: any) => {
     };
 };
 
-export const DevelopmentLab: React.FC<DevelopmentLabProps> = ({ player, studio, onBack, onUpdatePlayer, onOpenProject, initialRightsMarketOpportunityId, onRightsMarketTargetConsumed }) => {
-    const [activeTab, setActiveTab] = useState<DevTab>('VAULT');
+export const DevelopmentLab: React.FC<DevelopmentLabProps> = ({ player, studio, onBack, onUpdatePlayer, onOpenProject, initialRightsMarketOpportunityId, onRightsMarketTargetConsumed, initialTab, initialProjectType }) => {
+    const [activeTab, setActiveTab] = useState<DevTab>(initialRightsMarketOpportunityId ? 'IP_MARKET' : initialTab || 'VAULT');
 
     useEffect(() => {
         if (initialRightsMarketOpportunityId) setActiveTab('IP_MARKET');
-    }, [initialRightsMarketOpportunityId]);
+        else if (initialTab) setActiveTab(initialTab);
+    }, [initialRightsMarketOpportunityId, initialTab, studio.id]);
     
     // Initialize Studio State if missing
     const studioState = normalizeStudioState(studio.studioState, player.currentWeek) as typeof studio.studioState & {
@@ -537,7 +541,7 @@ export const DevelopmentLab: React.FC<DevelopmentLabProps> = ({ player, studio, 
                         });
                     }}
                 />}
-                {activeTab === 'NEW_CONCEPT' && <ScriptWizard onComplete={(script) => {
+                {activeTab === 'NEW_CONCEPT' && <ScriptWizard key={`${studio.id}_${initialProjectType || 'ANY'}`} initialProjectType={initialProjectType} onComplete={(script) => {
                     handleUpdateStudioState({ scripts: [...studioState.scripts, { ...script, createdAtWeek: player.currentWeek }] });
                     setActiveTab('VAULT');
                 }} />}
@@ -1473,11 +1477,11 @@ const ScriptDoctorPanel: React.FC<{
 
 type ScriptBuilderStep = 'IDEA' | 'IDENTITY' | 'STORY' | 'DRAFT';
 
-const ScriptWizard: React.FC<{ onComplete: (script: Script) => void, initialScript?: Script }> = ({ onComplete, initialScript }) => {
+const ScriptWizard: React.FC<{ onComplete: (script: Script) => void, initialScript?: Script, initialProjectType?: ProjectType }> = ({ onComplete, initialScript, initialProjectType }) => {
     const [step, setStep] = useState<ScriptBuilderStep>(initialScript ? 'STORY' : 'IDEA');
     const [storyIndex, setStoryIndex] = useState(0);
     const [title, setTitle] = useState(initialScript?.title || '');
-    const [projectType, setProjectType] = useState<ProjectType>(initialScript?.projectType || 'MOVIE');
+    const [projectType, setProjectType] = useState<ProjectType>(initialScript?.projectType || initialProjectType || 'MOVIE');
     const [format, setFormat] = useState<ProjectFormat>(initialScript?.format || 'LIVE_ACTION');
     const [targetAudience, setTargetAudience] = useState<TargetAudience>(initialScript?.targetAudience || 'PG-13');
     const [episodes, setEpisodes] = useState(initialScript?.episodes || 8);

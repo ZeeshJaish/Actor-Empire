@@ -144,8 +144,20 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
     const budget = project.budget || project.projectDetails?.estimatedBudget || 0;
     const actualGross = project.gross || project.totalGross || 0;
     const streamingRevenue = project.streamingRevenue || project.projectDetails?.streamingRevenue || 0;
-    const projectRevenue = actualGross + streamingRevenue;
-    const studioReceipts = Math.floor(actualGross * 0.5) + streamingRevenue;
+    const soundtrackRevenue = project.soundtrackRevenue || 0;
+    const projectRevenue = actualGross + streamingRevenue + soundtrackRevenue;
+    const studioReceipts = Math.floor(actualGross * 0.5) + streamingRevenue + soundtrackRevenue;
+    const investorPlan = project.investorPlan || project.projectDetails?.investorPlan;
+    const investorPayouts = project.investorPayouts || project.projectDetails?.investorPayouts;
+    const investorPayoutTotal = Math.max(0, Number(investorPayouts?.lifetimeInvestorPayout || 0));
+    const studioNetAfterInvestors = Math.max(0, studioReceipts - investorPayoutTotal);
+    const investorOwnerNames = investorPlan?.commitments
+        ?.map(item => item.ownerName)
+        .filter((name): name is string => Boolean(name))
+        .slice(0, 2)
+        .join(', ') || '';
+    const investorOwnerExtraCount = Math.max(0, (investorPlan?.commitments?.filter(item => item.ownerName).length || 0) - 2);
+    const investorScopeLabel = project.projectDetails?.mediaType === 'SERIES' ? 'Season only' : 'Project only';
 
     const getDynamicBuzz = () => {
         if (relatedNews.length > 0) return relatedNews;
@@ -662,6 +674,10 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                                         <span className="text-zinc-400">Streaming:</span>
                                                         <span className="text-white font-mono">{formatMoney(streamingRevenue)}</span>
                                                     </div>
+                                                    <div className="flex justify-between items-center text-xs mt-1">
+                                                        <span className="text-zinc-400">Soundtrack:</span>
+                                                        <span className="text-cyan-300 font-mono">{formatMoney(soundtrackRevenue)}</span>
+                                                    </div>
                                                 </div>
                                             </div>
                                             <div className="p-5 sm:p-6 bg-blue-500/5 rounded-3xl border border-blue-500/10 backdrop-blur-sm flex flex-col justify-center h-[120px]">
@@ -670,6 +686,23 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                                     {formatMoney(studioReceipts)}
                                                 </div>
                                             </div>
+                                            {investorPlan && investorPlan.totalRaised > 0 && (
+                                                <div className="p-5 sm:p-6 bg-emerald-500/5 rounded-3xl border border-emerald-500/10 backdrop-blur-sm flex flex-col justify-center h-[120px]">
+                                                    <div className="text-[10px] font-black uppercase tracking-widest text-emerald-400/70 mb-2">Investor Split</div>
+                                                    <div className="flex items-baseline gap-2">
+                                                        <div className="text-2xl sm:text-3xl font-bold tracking-tight text-emerald-300">
+                                                            {formatMoney(studioNetAfterInvestors)}
+                                                        </div>
+                                                        <div className="text-[10px] font-black uppercase tracking-widest text-zinc-600">net</div>
+                                                    </div>
+                                                    <div className="mt-1 text-[10px] font-black uppercase tracking-widest text-zinc-600">
+                                                        Paid {formatMoney(investorPayoutTotal)} • Keeps {investorPlan.studioEquityPercent}%
+                                                    </div>
+                                                    <div className="mt-1 truncate text-[10px] font-bold uppercase tracking-widest text-emerald-300/50">
+                                                        {investorScopeLabel}{investorOwnerNames ? ` • ${investorOwnerNames}${investorOwnerExtraCount > 0 ? ` +${investorOwnerExtraCount}` : ''}` : ''}
+                                                    </div>
+                                                </div>
+                                            )}
                                             <div className="p-5 sm:p-6 bg-amber-500/5 rounded-3xl border border-amber-500/10 backdrop-blur-sm flex flex-col justify-center h-[120px]">
                                                 <div className="text-[10px] font-black uppercase tracking-widest text-amber-500/60 mb-2">ROI</div>
                                                 <div className={`text-2xl sm:text-3xl font-bold tracking-tight ${(projectRevenue - budget) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
@@ -686,6 +719,12 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                                     <span>Streaming</span>
                                                     <span className="font-mono text-white">{formatMoney(streamingRevenue)}</span>
                                                 </div>
+                                                {soundtrackRevenue > 0 && (
+                                                    <div className="mt-1 flex items-center justify-between gap-3 text-xs font-bold text-zinc-300">
+                                                        <span>Soundtrack</span>
+                                                        <span className="font-mono text-cyan-300">{formatMoney(soundtrackRevenue)}</span>
+                                                    </div>
+                                                )}
                                             </div>
                                         </>
                                     )}

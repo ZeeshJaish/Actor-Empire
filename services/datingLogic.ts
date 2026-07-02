@@ -270,7 +270,7 @@ export const getLuxeCandidates = (player: Player, limit = 5, rotationSeed = 0): 
                 name: npc.name,
                 age,
                 gender: npc.gender,
-                job: npc.occupation === 'ACTOR' ? 'Actor' : 'Director',
+                job: npc.occupation === 'ACTOR' ? 'Actor' : npc.occupation === 'DIRECTOR' ? 'Director' : 'Music Artist',
                 image: npc.avatar,
                 type: 'NPC' as const,
                 npcId: npc.id,

@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Player, BudgetTier, Genre, ProjectDetails, ActiveRelease, Commitment, Business, LocationDetails, NewsItem, XPost, StudioEquipment, CrewMember, Universe, UniverseId } from '../../../types';
-import { ArrowLeft, Film, DollarSign, Users, TrendingUp, Calendar, Check, Plus, Star, Award, Zap, Briefcase, LayoutGrid, MapPin, PenTool, Globe, Camera, Clapperboard, ChevronRight, Lock, Building2, BarChart3, ShieldAlert, Crown, LogOut, AlertTriangle, Sparkles, BookOpen, Video, X, Clock, Palette, Lightbulb, Mic, Box, Info, CheckCircle, XCircle, Layers, Loader2 } from 'lucide-react';
+import { Player, BudgetTier, Genre, ProjectDetails, ActiveRelease, Commitment, Business, LocationDetails, NewsItem, XPost, StudioEquipment, CrewMember, Universe, UniverseId, BoxOfficeRegionId, ProjectMusicStrategy, MusicCreditRole, MusicArtist, ProjectInvestorFundingMode } from '../../../types';
+import { ArrowLeft, Film, DollarSign, Users, TrendingUp, Calendar, Check, Plus, Star, Award, Zap, Briefcase, LayoutGrid, MapPin, PenTool, Globe, Camera, Clapperboard, ChevronRight, Lock, Building2, BarChart3, ShieldAlert, Crown, LogOut, AlertTriangle, Sparkles, BookOpen, Video, X, Clock, Palette, Lightbulb, Mic, Box, Info, CheckCircle, XCircle, Layers, Loader2, Search } from 'lucide-react';
 import { NPC_DATABASE, getAvailableTalent, calculateProjectFameMultiplier } from '../../../services/npcLogic';
 import { calculateCastDepthScore, getDirectorTalent } from '../../../services/roleLogic';
 import { buildUniverseRoster, getFallbackCharacterName, getUniverseCharacterKeyAliases, getUniverseDashboardProjects, normalizeUniverseCharacterKey, normalizeUniverseForSave, normalizeUniverseMap } from '../../../services/universeLogic';
@@ -11,6 +11,29 @@ import { hasNoAds } from '../../../services/premiumLogic';
 import { formatProjectFormatLabel } from '../../../services/genreCatalog';
 import { addBreadcrumb, markGameCheckpoint, markTraceAction, setCrashContext, startPerformanceTrace, stopPerformanceTrace, trackGameEvent } from '../../../services/firebaseService';
 import { applyLockedSeasonFunding, markHiddenSeasonFundingUsed } from '../../../services/streamingFundingLogic';
+import { InteractiveRegionMap, RegionMapLocationPin } from './components/InteractiveRegionMap';
+import {
+    calculateProjectMusicImpact,
+    buildProjectMusicPlanFromArtists,
+    estimateMusicArtistProjectCost,
+    formatProjectMusicByline,
+    getDefaultMusicArtistCount,
+    getMusicArtistCountBounds,
+    getMusicArtistCatalog,
+    getMusicCreditRoleLabel,
+    getMusicStrategyCreditRoles,
+    getMusicStrategyCreditCount,
+    getMusicStrategyLabel,
+    getRecommendedMusicArtistsForProject
+} from '../../../services/musicIndustry';
+import {
+    buildProjectInvestorPlan,
+    describeInvestorKind,
+    generateProjectInvestorOffers,
+    getMaxInvestorRaise,
+    normalizeInvestorRaiseAmount,
+    updateInvestorRelationshipsForPlan
+} from '../../../services/projectInvestors';
 
 type ConnectedProjectIntent = 'AUTO' | 'SOLO' | 'CROSSOVER' | 'EVENT' | 'REBOOT';
 
@@ -23,6 +46,94 @@ export const formatMoney = (val: number) => {
 };
 
 const clampStat = (value: number, min = 0, max = 100) => Math.max(min, Math.min(max, value));
+
+type MarketingBudgetPreset = 'LEAN' | 'STANDARD' | 'HEAVY' | 'EVENT' | 'CUSTOM';
+
+const MARKETING_BUDGET_PRESETS: { id: MarketingBudgetPreset; label: string; note: string; percent: number }[] = [
+    { id: 'LEAN', label: 'Lean', note: 'Trailer and digital essentials.', percent: 0.08 },
+    { id: 'STANDARD', label: 'Standard', note: 'Balanced awareness push.', percent: 0.15 },
+    { id: 'HEAVY', label: 'Heavy', note: 'Wide-release pressure.', percent: 0.25 },
+    { id: 'EVENT', label: 'Event', note: 'Tentpole-level launch reserve.', percent: 0.40 },
+];
+
+const getMarketingBudgetForPreset = (preset: MarketingBudgetPreset, productionBudget: number) => {
+    if (preset === 'CUSTOM') return 0;
+    const option = MARKETING_BUDGET_PRESETS.find(item => item.id === preset) || MARKETING_BUDGET_PRESETS[1];
+    const floor = preset === 'LEAN' ? 250_000 : preset === 'STANDARD' ? 750_000 : preset === 'HEAVY' ? 1_500_000 : 3_000_000;
+    return Math.round(Math.max(floor, productionBudget * option.percent) / 50_000) * 50_000;
+};
+
+const getBudgetTierForAmount = (amount: number): BudgetTier => {
+    if (amount > 50_000_000) return 'BLOCKBUSTER';
+    if (amount > 10_000_000) return 'HIGH';
+    if (amount > 2_000_000) return 'MID';
+    return 'LOW';
+};
+
+const MUSIC_DELIVERABLE_ROLES: MusicCreditRole[] = [
+    'LEAD_SINGLE',
+    'MUSIC_VIDEO_TIE_IN',
+    'PROMO_ALBUM',
+    'SOUNDTRACK_EP',
+    'TRAILER_ANTHEM',
+    'END_CREDIT_SONG'
+];
+
+type MusicArtistSortOption = 'RECOMMENDED' | 'RATING' | 'COST_LOW' | 'COST_HIGH' | 'FAME' | 'FOLLOWERS' | 'AVAILABILITY';
+
+const MUSIC_ARTIST_SORT_OPTIONS: { id: MusicArtistSortOption; label: string }[] = [
+    { id: 'RECOMMENDED', label: 'Best Fit' },
+    { id: 'RATING', label: 'Rating' },
+    { id: 'COST_LOW', label: 'Cost Low' },
+    { id: 'COST_HIGH', label: 'Cost High' },
+    { id: 'FAME', label: 'Fame' },
+    { id: 'FOLLOWERS', label: 'Followers' },
+    { id: 'AVAILABILITY', label: 'Available' },
+];
+
+const MUSIC_FAME_SORT_SCORE: Record<MusicArtist['fameTier'], number> = {
+    EMERGING: 1,
+    KNOWN: 2,
+    STAR: 3,
+    SUPERSTAR: 4,
+    LEGEND: 5,
+};
+
+const MUSIC_AVAILABILITY_SORT_SCORE: Record<MusicArtist['availability'], number> = {
+    COMMON: 3,
+    SELECTIVE: 2,
+    RARE: 1,
+};
+
+const getInitialMusicArtistTargetCount = (concept?: any): number => {
+    const strategy = (concept?.musicStrategy || concept?.musicPlan?.strategy || 'LEAD_SINGLE') as ProjectMusicStrategy;
+    const savedCount = Number(concept?.selectedMusicArtistTargetCount ?? concept?.musicPlan?.artistTargetCount);
+    if (Number.isFinite(savedCount)) {
+        const bounds = getMusicArtistCountBounds(strategy);
+        return Math.min(bounds.max, Math.max(bounds.min, Math.round(savedCount)));
+    }
+    return getDefaultMusicArtistCount(strategy);
+};
+
+const getInitialSelectedMusicCreditRoles = (concept?: any): MusicCreditRole[] | null => {
+    if (Array.isArray(concept?.selectedMusicCreditRoles)) {
+        return Array.from(new Set(concept.selectedMusicCreditRoles.filter(Boolean))) as MusicCreditRole[];
+    }
+    const roles = Array.isArray(concept?.musicPlan?.selectedCreditRoles)
+        ? concept.musicPlan.selectedCreditRoles
+        : [];
+    const cleanRoles = Array.from(new Set(roles.filter(Boolean))) as MusicCreditRole[];
+    return cleanRoles.length ? cleanRoles : [];
+};
+
+const getMusicStrategyForSelectedRoles = (roles: MusicCreditRole[], fallback: ProjectMusicStrategy): ProjectMusicStrategy => {
+    if (roles.length === 0) return 'COMPOSER_ONLY';
+    if (roles.includes('PROMO_ALBUM')) return 'PROMO_ALBUM';
+    if (roles.includes('MUSIC_VIDEO_TIE_IN')) return 'MUSIC_VIDEO_TIE_IN';
+    if (roles.includes('SOUNDTRACK_EP')) return 'SOUNDTRACK_EP';
+    if (roles.includes('LEAD_SINGLE') || roles.includes('TRAILER_ANTHEM') || roles.includes('END_CREDIT_SONG')) return 'LEAD_SINGLE';
+    return fallback;
+};
 
 const returningCrewRoleToStateKey = (role?: string): 'director' | 'cinematographer' | 'composer' | 'lineProducer' | 'vfx' | null => {
     if (!role) return null;
@@ -373,99 +484,84 @@ const LocationSelector: React.FC<{
     onSelect: (id: string) => void;
     locations: Record<string, any[]>;
     findLocation: (id: string | null) => any;
-}> = ({ selectedIds, onSelect, locations, findLocation }) => {
+}> = ({ selectedIds, onSelect, locations }) => {
     const [selectedContinent, setSelectedContinent] = useState<string | null>(null);
 
     const continents = [
-        { id: 'NA', name: 'North America', x: 20, y: 30 },
-        { id: 'EU', name: 'Europe', x: 52, y: 25 },
-        { id: 'AS', name: 'Asia', x: 75, y: 35 },
-        { id: 'SA', name: 'South America', x: 28, y: 65 },
-        { id: 'AF', name: 'Africa', x: 52, y: 55 },
-        { id: 'OC', name: 'Oceania', x: 85, y: 75 },
+        { id: 'NA', name: 'North America', regionId: 'NORTH_AMERICA' as BoxOfficeRegionId },
+        { id: 'SA', name: 'South America', regionId: 'SOUTH_AMERICA' as BoxOfficeRegionId },
+        { id: 'EU', name: 'Europe', regionId: 'EUROPE' as BoxOfficeRegionId },
+        { id: 'AS', name: 'Asia', regionId: 'ASIA' as BoxOfficeRegionId },
+        { id: 'AF', name: 'Africa', regionId: 'AFRICA' as BoxOfficeRegionId },
+        { id: 'OC', name: 'Oceania', regionId: 'OCEANIA' as BoxOfficeRegionId },
     ];
+    const continentToRegion = Object.fromEntries(continents.map(continent => [continent.id, continent.regionId])) as Record<string, BoxOfficeRegionId>;
+    const regionToContinent = Object.fromEntries(continents.map(continent => [continent.regionId, continent.id])) as Record<BoxOfficeRegionId, string>;
+
+    const locationPins = useMemo<RegionMapLocationPin[]>(() => (
+        Object.entries(locations).flatMap(([continent, locs]) => (
+            (locs as any[]).map(loc => ({
+                id: loc.id,
+                name: loc.name,
+                x: loc.x,
+                y: loc.y,
+                longitude: loc.longitude,
+                latitude: loc.latitude,
+                selected: selectedIds.includes(loc.id),
+                regionId: continentToRegion[continent]
+            }))
+        ))
+    ), [locations, selectedIds]);
+
+    const selectedRegionIds = useMemo<BoxOfficeRegionId[]>(() => {
+        const regionIds = new Set<BoxOfficeRegionId>();
+        if (selectedContinent && continentToRegion[selectedContinent]) {
+            regionIds.add(continentToRegion[selectedContinent]);
+        }
+
+        Object.entries(locations).forEach(([continent, locs]) => {
+            const regionId = continentToRegion[continent];
+            if (!regionId) return;
+            if ((locs as any[]).some(loc => selectedIds.includes(loc.id))) {
+                regionIds.add(regionId);
+            }
+        });
+
+        return Array.from(regionIds);
+    }, [continentToRegion, locations, selectedContinent, selectedIds]);
+
+    const selectLocation = (id: string, regionId?: BoxOfficeRegionId) => {
+        if (regionId && regionToContinent[regionId]) {
+            setSelectedContinent(regionToContinent[regionId]);
+        }
+        onSelect(id);
+    };
+
+    const selectRegion = (regionId: BoxOfficeRegionId) => {
+        if (regionToContinent[regionId]) {
+            setSelectedContinent(regionToContinent[regionId]);
+        }
+    };
 
     return (
         <div className="space-y-4 animate-in slide-in-from-bottom-2 duration-500">
-            {/* Map View */}
-            <div className="bg-[#0077be] border border-zinc-800 rounded-xl overflow-hidden relative h-72 w-full group flex items-center justify-center shadow-2xl">
-                {/* 2D Flat Map SVG */}
-                <div className="relative w-full h-full bg-[#0077be]/30">
-                    <svg viewBox="0 0 1000 500" className="w-full h-full drop-shadow-2xl" style={{ filter: 'drop-shadow(0px 8px 16px rgba(0,0,0,0.4))' }}>
-                        {/* Simplified World Map Paths */}
-                        <path d="M150,50 L250,50 L280,150 L200,200 L100,150 Z" fill="#4ade80" opacity="0.4" /> {/* NA */}
-                        <path d="M220,220 L280,220 L300,350 L250,450 L200,350 Z" fill="#4ade80" opacity="0.4" /> {/* SA */}
-                        <path d="M450,50 L550,50 L550,120 L450,120 Z" fill="#4ade80" opacity="0.4" /> {/* EU */}
-                        <path d="M450,150 L580,150 L600,300 L500,400 L420,250 Z" fill="#4ade80" opacity="0.4" /> {/* AF */}
-                        <path d="M600,50 L850,50 L900,200 L750,250 L600,150 Z" fill="#4ade80" opacity="0.4" /> {/* AS */}
-                        <path d="M750,300 L900,300 L900,450 L750,450 Z" fill="#4ade80" opacity="0.4" /> {/* OC */}
-
-                        {/* Location Dots */}
-                        {Object.entries(locations).map(([continent, locs]) => (
-                            (locs as any[]).map(loc => {
-                                const isSelected = selectedIds.includes(loc.id);
-                                return (
-                                    <g key={loc.id} className="cursor-pointer group/loc" onClick={() => { onSelect(loc.id); setSelectedContinent(continent); }}>
-                                        <circle
-                                            cx={loc.x * 10}
-                                            cy={loc.y * 5}
-                                            r={isSelected ? 8 : 4}
-                                            fill={isSelected ? '#fbbf24' : '#ffffff'}
-                                            className="transition-all duration-300 group-hover/loc:r-10"
-                                        />
-                                        {isSelected && (
-                                            <circle
-                                                cx={loc.x * 10}
-                                                cy={loc.y * 5}
-                                                r={12}
-                                                fill="none"
-                                                stroke="#fbbf24"
-                                                strokeWidth="2"
-                                                className="animate-ping"
-                                            />
-                                        )}
-                                        <text
-                                            x={loc.x * 10}
-                                            y={loc.y * 5 - 12}
-                                            textAnchor="middle"
-                                            className={`text-[10px] font-bold fill-white pointer-events-none transition-opacity duration-300 ${isSelected ? 'opacity-100' : 'opacity-0 group-hover/loc:opacity-100'}`}
-                                            style={{ textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}
-                                        >
-                                            {loc.name}
-                                        </text>
-                                    </g>
-                                );
-                            })
-                        ))}
-                    </svg>
-
-                    {/* Continent Labels (Overlay) */}
-                    {continents.map(c => (
-                        <button
-                            key={c.id}
-                            className={`absolute px-2 py-1 rounded-md text-[9px] font-black uppercase tracking-tighter transition-all duration-300 z-10 ${
-                                selectedContinent === c.id
-                                ? 'bg-amber-500 text-black scale-110 shadow-lg'
-                                : 'bg-black/40 text-white/60 hover:bg-black/60 hover:text-white'
-                            }`}
-                            style={{ left: `${c.x}%`, top: `${c.y}%`, transform: 'translate(-50%, -50%)' }}
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedContinent(c.id);
-                            }}
-                        >
-                            {c.name}
-                        </button>
-                    ))}
-                </div>
+            <div className="relative overflow-hidden rounded-3xl border border-sky-200/30 bg-sky-400/10 p-4 shadow-2xl shadow-sky-950/35">
+                <InteractiveRegionMap
+                    selectedRegionIds={selectedRegionIds}
+                    onSelectRegion={selectRegion}
+                    locationPins={locationPins}
+                    onSelectLocation={selectLocation}
+                    visualTone="production"
+                    compact
+                />
 
                 <div className="absolute top-4 left-4 bg-black/60 backdrop-blur-md px-4 py-2 rounded-xl border border-white/10 text-[10px] font-black text-white flex items-center gap-2 shadow-xl">
-                    <Globe size={14} className="text-emerald-400 animate-pulse" />
+                    <Globe size={14} className="text-sky-200" />
                     <span className="tracking-widest">GLOBAL PRODUCTION NETWORK</span>
                 </div>
 
                 {selectedIds.length > 0 && (
-                    <div className="absolute bottom-4 right-4 bg-emerald-500 text-black px-4 py-2 rounded-xl text-[10px] font-black shadow-2xl animate-in fade-in slide-in-from-right-4">
+                    <div className="absolute bottom-4 right-4 bg-emerald-400 text-black px-4 py-2 rounded-xl text-[10px] font-black shadow-2xl animate-in fade-in slide-in-from-right-4">
                         SELECTED: {selectedIds.length} LOCATIONS
                     </div>
                 )}
@@ -515,13 +611,40 @@ const LocationSelector: React.FC<{
 
 export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, studio, initialConcept, onBack, onUpdatePlayer, onComplete }) => {
     const [selectedScriptId, setSelectedScriptId] = useState<string | null>(initialConcept?.scriptId || null);
-    const [step, setStep] = useState<'SELECT_SCRIPT' | 'DIRECTOR' | 'CAST' | 'CREW' | 'EQUIPMENT' | 'LOCATION' | 'TONE' | 'CONFIRM' | 'BUZZ'>(initialConcept?.lastStep || (initialConcept ? 'DIRECTOR' : 'SELECT_SCRIPT'));
+    type GreenlightStep = 'SELECT_SCRIPT' | 'DIRECTOR' | 'CAST' | 'CREW' | 'EQUIPMENT' | 'LOCATION' | 'SETUP' | 'CONFIRM' | 'BUZZ';
+    const initialStep = initialConcept?.lastStep === 'TONE' ? 'SETUP' : (initialConcept?.lastStep || (initialConcept ? 'DIRECTOR' : 'SELECT_SCRIPT'));
+    const [step, setStep] = useState<GreenlightStep>(initialStep);
     const isInternallyControlledTalent = (id?: string | null) => id === 'PLAYER_SELF' || id === 'STUDIO_STAFF';
 
     // Setup State
     const [tone, setTone] = useState(initialConcept?.tone || 50); // 0 = Practical, 100 = CGI
     const [visualStyle, setVisualStyle] = useState<'REALISTIC' | 'STYLISTIC' | 'GRITTY' | 'VIBRANT'>('REALISTIC');
     const [pacing, setPacing] = useState<'SLOW' | 'MODERATE' | 'FAST' | 'FRENETIC'>('MODERATE');
+    const [marketingBudgetPreset, setMarketingBudgetPreset] = useState<MarketingBudgetPreset>(initialConcept?.reservedMarketingBudget !== undefined ? 'CUSTOM' : 'STANDARD');
+    const [reservedMarketingBudget, setReservedMarketingBudget] = useState(Math.max(0, Math.round(Number(initialConcept?.reservedMarketingBudget || 0))));
+    const [musicStrategy, setMusicStrategy] = useState<ProjectMusicStrategy>(initialConcept?.musicStrategy || initialConcept?.musicPlan?.strategy || 'LEAD_SINGLE');
+    const [musicArtistTargetCount, setMusicArtistTargetCount] = useState<number>(getInitialMusicArtistTargetCount(initialConcept));
+    const [selectedMusicCreditRoles, setSelectedMusicCreditRoles] = useState<MusicCreditRole[] | null>(getInitialSelectedMusicCreditRoles(initialConcept));
+    const [selectedMusicArtistIds, setSelectedMusicArtistIds] = useState<string[]>(
+        Array.isArray(initialConcept?.selectedMusicArtistIds)
+            ? initialConcept.selectedMusicArtistIds
+            : Array.isArray(initialConcept?.musicPlan?.credits)
+                ? initialConcept.musicPlan.credits.map((credit: any) => credit.artistId).filter(Boolean)
+                : []
+    );
+    const [activeMusicSlotIndex, setActiveMusicSlotIndex] = useState(0);
+    const [activeMusicSearchRole, setActiveMusicSearchRole] = useState<MusicCreditRole | null>(null);
+    const [musicRoleSearchQueries, setMusicRoleSearchQueries] = useState<Record<string, string>>({});
+    const [musicRoleSortOptions, setMusicRoleSortOptions] = useState<Record<string, MusicArtistSortOption>>({});
+    const [investorRaiseAmount, setInvestorRaiseAmount] = useState<number>(Math.max(0, Math.round(Number(initialConcept?.investorRaiseAmount || initialConcept?.investorPlan?.targetRaise || 0))));
+    const [investorFundingMode, setInvestorFundingMode] = useState<ProjectInvestorFundingMode>(initialConcept?.investorFundingMode || initialConcept?.investorPlan?.fundingMode || 'SYNDICATE');
+    const [selectedInvestorIds, setSelectedInvestorIds] = useState<string[]>(
+        Array.isArray(initialConcept?.selectedInvestorIds)
+            ? initialConcept.selectedInvestorIds
+            : Array.isArray(initialConcept?.investorPlan?.commitments)
+                ? initialConcept.investorPlan.commitments.map((commitment: any) => commitment.investorId).filter(Boolean)
+                : []
+    );
 
     // Crew State
     const [crewModes, setCrewModes] = useState<Record<string, 'HIRE' | 'SELF' | 'IN_HOUSE'>>(initialConcept?.crewModes || {
@@ -681,6 +804,17 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             tone,
             visualStyle,
             pacing,
+            reservedMarketingBudget,
+            marketingBudgetSpent: 0,
+            marketingBudgetRemaining: reservedMarketingBudget,
+            musicStrategy: effectiveMusicStrategy,
+            selectedMusicArtistTargetCount: effectiveMusicArtistCount,
+            selectedMusicCreditRoles: selectedMusicCreditRoles || undefined,
+            selectedMusicArtistIds,
+            investorRaiseAmount,
+            investorFundingMode,
+            selectedInvestorIds,
+            investorPlan: selectedInvestorPlan,
             universeId: selectedUniverseId,
             lockedStreamingFunding: selectedScript?.lockedStreamingFunding || initialConcept?.lockedStreamingFunding,
             newUniverseName: selectedUniverseId === 'NEW' ? newUniverseName : undefined,
@@ -1086,6 +1220,29 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                 setTone(existingConcept.tone ?? 50);
                 setVisualStyle(existingConcept.visualStyle || 'REALISTIC');
                 setPacing(existingConcept.pacing || 'MODERATE');
+                const existingMusicStrategy = existingConcept.musicStrategy || existingConcept.musicPlan?.strategy || 'LEAD_SINGLE';
+                setMusicStrategy(existingMusicStrategy);
+                setMusicArtistTargetCount(getInitialMusicArtistTargetCount(existingConcept));
+                setSelectedMusicCreditRoles(getInitialSelectedMusicCreditRoles(existingConcept));
+                setSelectedMusicArtistIds(
+                    Array.isArray(existingConcept.selectedMusicArtistIds)
+                        ? existingConcept.selectedMusicArtistIds
+                        : Array.isArray(existingConcept.musicPlan?.credits)
+                            ? existingConcept.musicPlan.credits.map((credit: any) => credit.artistId).filter(Boolean)
+                            : []
+                );
+                setActiveMusicSearchRole(null);
+                setMusicRoleSearchQueries({});
+                setMusicRoleSortOptions({});
+                setInvestorRaiseAmount(Math.max(0, Math.round(Number(existingConcept.investorRaiseAmount || existingConcept.investorPlan?.targetRaise || 0))));
+                setInvestorFundingMode(existingConcept.investorFundingMode || existingConcept.investorPlan?.fundingMode || 'SYNDICATE');
+                setSelectedInvestorIds(
+                    Array.isArray(existingConcept.selectedInvestorIds)
+                        ? existingConcept.selectedInvestorIds
+                        : Array.isArray(existingConcept.investorPlan?.commitments)
+                            ? existingConcept.investorPlan.commitments.map((commitment: any) => commitment.investorId).filter(Boolean)
+                            : []
+                );
             } else {
                 // Reset to default
                 setCrewModes({
@@ -1120,6 +1277,16 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                 setTone(50);
                 setVisualStyle('REALISTIC');
                 setPacing('MODERATE');
+                setMusicStrategy('LEAD_SINGLE');
+                setMusicArtistTargetCount(getDefaultMusicArtistCount('LEAD_SINGLE'));
+                setSelectedMusicCreditRoles(null);
+                setSelectedMusicArtistIds([]);
+                setActiveMusicSearchRole(null);
+                setMusicRoleSearchQueries({});
+                setMusicRoleSortOptions({});
+                setInvestorRaiseAmount(0);
+                setInvestorFundingMode('SYNDICATE');
+                setSelectedInvestorIds([]);
             }
         }
     }, [selectedScriptId, conceptByScriptId, initialConcept?.scriptId]);
@@ -1447,45 +1614,45 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
 
     const mockLocations = useMemo<Record<string, any[]>>(() => ({
         'NA': [
-            { id: 'LA', name: 'Los Angeles', desc: 'The heart of Hollywood. Expensive but high quality.', cost: 15000000, quality: 10, x: 15, y: 35 },
-            { id: 'ATL', name: 'Atlanta', desc: 'Generous tax credits. Good facilities.', cost: 5000000, quality: 5, x: 22, y: 38 },
-            { id: 'NYC', name: 'New York', desc: 'Iconic urban scenery. Very expensive.', cost: 20000000, quality: 9, x: 25, y: 32 },
-            { id: 'VAN', name: 'Vancouver', desc: 'Versatile and budget friendly.', cost: 3000000, quality: 6, x: 12, y: 28 },
-            { id: 'MEX', name: 'Mexico City', desc: 'Vibrant culture and unique architecture.', cost: 4000000, quality: 7, x: 18, y: 45 },
-            { id: 'TOR', name: 'Toronto', desc: 'Urban double for NYC/Chicago.', cost: 3500000, quality: 6, x: 20, y: 30 },
+            { id: 'LA', name: 'Los Angeles', desc: 'The heart of Hollywood. Expensive but high quality.', cost: 15000000, quality: 10, x: 15, y: 35, longitude: -118.2437, latitude: 34.0522 },
+            { id: 'ATL', name: 'Atlanta', desc: 'Generous tax credits. Good facilities.', cost: 5000000, quality: 5, x: 22, y: 38, longitude: -84.388, latitude: 33.749 },
+            { id: 'NYC', name: 'New York', desc: 'Iconic urban scenery. Very expensive.', cost: 20000000, quality: 9, x: 25, y: 32, longitude: -74.006, latitude: 40.7128 },
+            { id: 'VAN', name: 'Vancouver', desc: 'Versatile and budget friendly.', cost: 3000000, quality: 6, x: 12, y: 28, longitude: -123.1207, latitude: 49.2827 },
+            { id: 'MEX', name: 'Mexico City', desc: 'Vibrant culture and unique architecture.', cost: 4000000, quality: 7, x: 18, y: 45, longitude: -99.1332, latitude: 19.4326 },
+            { id: 'TOR', name: 'Toronto', desc: 'Urban double for NYC/Chicago.', cost: 3500000, quality: 6, x: 20, y: 30, longitude: -79.3832, latitude: 43.6532 },
         ],
         'EU': [
-            { id: 'LDN', name: 'London', desc: 'World-class studios and talent.', cost: 12000000, quality: 9, x: 48, y: 28 },
-            { id: 'PAR', name: 'Paris', desc: 'Romantic and historic.', cost: 10000000, quality: 8, x: 50, y: 32 },
-            { id: 'PRG', name: 'Prague', desc: 'Old world charm on a budget.', cost: 2000000, quality: 7, x: 54, y: 30 },
-            { id: 'ROM', name: 'Rome', desc: 'Eternal city with epic scale.', cost: 9000000, quality: 9, x: 53, y: 36 },
-            { id: 'BER', name: 'Berlin', desc: 'Gritty urban and modern tech.', cost: 7000000, quality: 8, x: 53, y: 28 },
-            { id: 'MAD', name: 'Madrid', desc: 'Sunny and historic.', cost: 5000000, quality: 7, x: 46, y: 38 },
+            { id: 'LDN', name: 'London', desc: 'World-class studios and talent.', cost: 12000000, quality: 9, x: 48, y: 28, longitude: -0.1276, latitude: 51.5072 },
+            { id: 'PAR', name: 'Paris', desc: 'Romantic and historic.', cost: 10000000, quality: 8, x: 50, y: 32, longitude: 2.3522, latitude: 48.8566 },
+            { id: 'PRG', name: 'Prague', desc: 'Old world charm on a budget.', cost: 2000000, quality: 7, x: 54, y: 30, longitude: 14.4378, latitude: 50.0755 },
+            { id: 'ROM', name: 'Rome', desc: 'Eternal city with epic scale.', cost: 9000000, quality: 9, x: 53, y: 36, longitude: 12.4964, latitude: 41.9028 },
+            { id: 'BER', name: 'Berlin', desc: 'Gritty urban and modern tech.', cost: 7000000, quality: 8, x: 53, y: 28, longitude: 13.405, latitude: 52.52 },
+            { id: 'MAD', name: 'Madrid', desc: 'Sunny and historic.', cost: 5000000, quality: 7, x: 46, y: 38, longitude: -3.7038, latitude: 40.4168 },
         ],
         'AS': [
-            { id: 'TOK', name: 'Tokyo', desc: 'Neon futuristic vibes.', cost: 14000000, quality: 9, x: 88, y: 35 },
-            { id: 'SEO', name: 'Seoul', desc: 'Modern and efficient.', cost: 8000000, quality: 8, x: 84, y: 34 },
-            { id: 'BOM', name: 'Mumbai', desc: 'The home of Bollywood.', cost: 6000000, quality: 7, x: 72, y: 48 },
-            { id: 'HKG', name: 'Hong Kong', desc: 'Dense urban neon.', cost: 11000000, quality: 9, x: 80, y: 42 },
-            { id: 'BEI', name: 'Beijing', desc: 'Grand scale and history.', cost: 12000000, quality: 8, x: 78, y: 32 },
-            { id: 'BKK', name: 'Bangkok', desc: 'Chaotic energy and temples.', cost: 3000000, quality: 6, x: 75, y: 45 },
+            { id: 'TOK', name: 'Tokyo', desc: 'Neon futuristic vibes.', cost: 14000000, quality: 9, x: 88, y: 35, longitude: 139.6503, latitude: 35.6762 },
+            { id: 'SEO', name: 'Seoul', desc: 'Modern and efficient.', cost: 8000000, quality: 8, x: 84, y: 34, longitude: 126.978, latitude: 37.5665 },
+            { id: 'BOM', name: 'Mumbai', desc: 'The home of Bollywood.', cost: 6000000, quality: 7, x: 72, y: 48, longitude: 72.8777, latitude: 19.076 },
+            { id: 'HKG', name: 'Hong Kong', desc: 'Dense urban neon.', cost: 11000000, quality: 9, x: 80, y: 42, longitude: 114.1694, latitude: 22.3193 },
+            { id: 'BEI', name: 'Beijing', desc: 'Grand scale and history.', cost: 12000000, quality: 8, x: 78, y: 32, longitude: 116.4074, latitude: 39.9042 },
+            { id: 'BKK', name: 'Bangkok', desc: 'Chaotic energy and temples.', cost: 3000000, quality: 6, x: 75, y: 45, longitude: 100.5018, latitude: 13.7563 },
         ],
         'SA': [
-            { id: 'RIO', name: 'Rio de Janeiro', desc: 'Stunning natural beauty.', cost: 5000000, quality: 8, x: 32, y: 72 },
-            { id: 'BUE', name: 'Buenos Aires', desc: 'European flair in South America.', cost: 4000000, quality: 7, x: 30, y: 85 },
-            { id: 'BOG', name: 'Bogota', desc: 'High altitude urban grit.', cost: 2000000, quality: 6, x: 25, y: 58 },
-            { id: 'LIM', name: 'Lima', desc: 'Coastal desert city.', cost: 2500000, quality: 6, x: 22, y: 65 },
+            { id: 'RIO', name: 'Rio de Janeiro', desc: 'Stunning natural beauty.', cost: 5000000, quality: 8, x: 32, y: 72, longitude: -43.1729, latitude: -22.9068 },
+            { id: 'BUE', name: 'Buenos Aires', desc: 'European flair in South America.', cost: 4000000, quality: 7, x: 30, y: 85, longitude: -58.3816, latitude: -34.6037 },
+            { id: 'BOG', name: 'Bogota', desc: 'High altitude urban grit.', cost: 2000000, quality: 6, x: 25, y: 58, longitude: -74.0721, latitude: 4.711 },
+            { id: 'LIM', name: 'Lima', desc: 'Coastal desert city.', cost: 2500000, quality: 6, x: 22, y: 65, longitude: -77.0428, latitude: -12.0464 },
         ],
         'AF': [
-            { id: 'CPT', name: 'Cape Town', desc: 'Diverse landscapes and great light.', cost: 4000000, quality: 8, x: 53, y: 82 },
-            { id: 'CAI', name: 'Cairo', desc: 'Ancient wonders and desert heat.', cost: 7000000, quality: 7, x: 56, y: 42 },
-            { id: 'MAR', name: 'Marrakesh', desc: 'Exotic colors and textures.', cost: 3000000, quality: 8, x: 46, y: 42 },
-            { id: 'LAG', name: 'Lagos', desc: 'Bustling energy.', cost: 2000000, quality: 5, x: 48, y: 55 },
+            { id: 'CPT', name: 'Cape Town', desc: 'Diverse landscapes and great light.', cost: 4000000, quality: 8, x: 53, y: 82, longitude: 18.4241, latitude: -33.9249 },
+            { id: 'CAI', name: 'Cairo', desc: 'Ancient wonders and desert heat.', cost: 7000000, quality: 7, x: 56, y: 42, longitude: 31.2357, latitude: 30.0444 },
+            { id: 'MAR', name: 'Marrakesh', desc: 'Exotic colors and textures.', cost: 3000000, quality: 8, x: 46, y: 42, longitude: -7.9811, latitude: 31.6295 },
+            { id: 'LAG', name: 'Lagos', desc: 'Bustling energy.', cost: 2000000, quality: 5, x: 48, y: 55, longitude: 3.3792, latitude: 6.5244 },
         ],
         'OC': [
-            { id: 'SYD', name: 'Sydney', desc: 'Modern harbor and coastal beauty.', cost: 10000000, quality: 9, x: 88, y: 82 },
-            { id: 'MEL', name: 'Melbourne', desc: 'Arts and culture hub.', cost: 8000000, quality: 8, x: 86, y: 86 },
-            { id: 'AKL', name: 'Auckland', desc: 'Middle-earth landscapes.', cost: 6000000, quality: 10, x: 94, y: 88 },
+            { id: 'SYD', name: 'Sydney', desc: 'Modern harbor and coastal beauty.', cost: 10000000, quality: 9, x: 88, y: 82, longitude: 151.2093, latitude: -33.8688 },
+            { id: 'MEL', name: 'Melbourne', desc: 'Arts and culture hub.', cost: 8000000, quality: 8, x: 86, y: 86, longitude: 144.9631, latitude: -37.8136 },
+            { id: 'AKL', name: 'Auckland', desc: 'Middle-earth landscapes.', cost: 6000000, quality: 10, x: 94, y: 88, longitude: 174.7633, latitude: -36.8485 },
         ]
     }), []);
 
@@ -1918,6 +2085,317 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         };
     }, [selectedCrew, crewModes, castList, selectedLocations, availableActors, availableDirectors, player, equipmentChoices, studio, mockLocations, mockCrew]);
 
+    const musicPreviewProject = useMemo<ProjectDetails | null>(() => {
+        if (!selectedScript) return null;
+        const previewBudget = Math.max(1_000_000, budgetBreakdown.total || 1_000_000);
+        const previewTier = getBudgetTierForAmount(previewBudget);
+        return {
+            title: selectedScript.title,
+            sourceScriptId: selectedScript.id,
+            isOriginal: selectedScript.isOriginal,
+            type: selectedScript.projectType,
+            format: selectedScript.format || 'LIVE_ACTION',
+            episodes: selectedScript.episodes,
+            description: `A ${selectedScript.genres.join('/')} ${selectedScript.projectType === 'SERIES' ? 'series' : 'film'} produced by ${studio.name}.`,
+            studioId: studio.id as any,
+            subtype: 'STANDALONE',
+            genre: selectedScript.genres[0],
+            subjectName: selectedScript.subjectName,
+            subjectType: selectedScript.subjectType,
+            targetAudience: selectedScript.targetAudience || 'PG-13',
+            budgetTier: previewTier,
+            estimatedBudget: previewBudget,
+            visibleHype: 'LOW',
+            hiddenStats: {
+                scriptQuality: selectedScript.quality || 50,
+                directorQuality: 50,
+                castingStrength: 50,
+                distributionPower: 50,
+                rawHype: selectedScript.hype || 20,
+                qualityScore: selectedScript.quality || 50,
+                prestigeBonus: 0
+            },
+            directorName: getCrewData('director').name,
+            visibleDirectorTier: getCrewData('director').tier,
+            visibleScriptBuzz: 'High',
+            visibleCastStrength: 'TBD'
+        };
+    }, [selectedScript, budgetBreakdown.total, studio.id, studio.name, selectedCrew.director, crewModes.director, availableDirectors]);
+
+    const recommendedMusicArtists = useMemo(() => (
+        musicPreviewProject ? getRecommendedMusicArtistsForProject(musicPreviewProject, 12, getMusicArtistCatalog(player.world)) : []
+    ), [musicPreviewProject, player.world]);
+
+    const musicCatalogArtists = useMemo(() => (
+        musicPreviewProject
+            ? getRecommendedMusicArtistsForProject(musicPreviewProject, getMusicArtistCatalog(player.world).length, getMusicArtistCatalog(player.world))
+            : getMusicArtistCatalog(player.world)
+    ), [musicPreviewProject, player.world]);
+
+    const recommendedMusicArtistIds = useMemo(() => recommendedMusicArtists.map(artist => artist.id).join('|'), [recommendedMusicArtists]);
+    const musicArtistCountBounds = useMemo(() => getMusicArtistCountBounds(musicStrategy), [musicStrategy]);
+    const boundedMusicArtistTargetCount = Math.min(
+        musicArtistCountBounds.max,
+        Math.max(musicArtistCountBounds.min, Math.round(Number(musicArtistTargetCount) || 0))
+    );
+
+    useEffect(() => {
+        if (musicArtistTargetCount !== boundedMusicArtistTargetCount) {
+            setMusicArtistTargetCount(boundedMusicArtistTargetCount);
+        }
+    }, [musicArtistTargetCount, boundedMusicArtistTargetCount]);
+
+    const allMusicDeliverableRoles = MUSIC_DELIVERABLE_ROLES;
+
+    const musicStrategyRoles = useMemo(
+        () => getMusicStrategyCreditRoles(musicStrategy, musicPreviewProject || undefined, boundedMusicArtistTargetCount),
+        [musicStrategy, musicPreviewProject, boundedMusicArtistTargetCount]
+    );
+
+    const activeMusicCreditRoles = useMemo(() => {
+        if (selectedMusicCreditRoles === null) return musicStrategyRoles;
+        const availableRoles = new Set(allMusicDeliverableRoles);
+        const cleanRoles = selectedMusicCreditRoles.filter(role => availableRoles.has(role));
+        return allMusicDeliverableRoles.filter(role => cleanRoles.includes(role));
+    }, [selectedMusicCreditRoles, allMusicDeliverableRoles, musicStrategyRoles]);
+
+    const requiredMusicSlots = useMemo(
+        () => activeMusicCreditRoles.length,
+        [activeMusicCreditRoles]
+    );
+
+    const effectiveMusicArtistCount = requiredMusicSlots;
+    const isStudioDecidedMusicPlan = selectedMusicCreditRoles === null;
+    const isCustomMusicPlan = !isStudioDecidedMusicPlan;
+    const effectiveMusicStrategy = useMemo(
+        () => getMusicStrategyForSelectedRoles(activeMusicCreditRoles, musicStrategy),
+        [activeMusicCreditRoles, musicStrategy]
+    );
+
+    const focusMusicCreditRole = (role: MusicCreditRole) => {
+        if (musicStrategy === 'COMPOSER_ONLY') return;
+        setSelectedMusicCreditRoles(current => {
+            const baseRoles = (current === null ? activeMusicCreditRoles : current).filter(item => allMusicDeliverableRoles.includes(item));
+            const nextRoles = baseRoles.includes(role) ? baseRoles : [...baseRoles, role];
+            return allMusicDeliverableRoles.filter(item => nextRoles.includes(item));
+        });
+        const existingIndex = activeMusicCreditRoles.indexOf(role);
+        setActiveMusicSlotIndex(existingIndex >= 0 ? existingIndex : activeMusicCreditRoles.length);
+        setActiveMusicSearchRole(role);
+    };
+
+    const removeMusicCreditRole = (role: MusicCreditRole) => {
+        const removedIndex = activeMusicCreditRoles.indexOf(role);
+        setSelectedMusicCreditRoles(current => {
+            const baseRoles = (current === null ? activeMusicCreditRoles : current).filter(item => allMusicDeliverableRoles.includes(item));
+            const nextRoles = baseRoles.filter(item => item !== role);
+            return allMusicDeliverableRoles.filter(item => nextRoles.includes(item));
+        });
+        if (removedIndex >= 0) {
+            setSelectedMusicArtistIds(current => current.filter((_, index) => index !== removedIndex));
+        }
+        setMusicRoleSearchQueries(current => {
+            const next = { ...current };
+            delete next[role];
+            return next;
+        });
+        setMusicRoleSortOptions(current => {
+            const next = { ...current };
+            delete next[role];
+            return next;
+        });
+        setActiveMusicSearchRole(current => current === role ? null : current);
+        setActiveMusicSlotIndex(0);
+    };
+
+    useEffect(() => {
+        setSelectedMusicArtistIds(current => {
+            if (requiredMusicSlots <= 0) return current.length ? [] : current;
+            if (!isStudioDecidedMusicPlan) {
+                const manualIds = current.slice(0, requiredMusicSlots);
+                const changed = manualIds.length !== current.length || manualIds.some((id, index) => id !== current[index]);
+                return changed ? manualIds : current;
+            }
+
+            const filled = current.filter(Boolean).slice(0, requiredMusicSlots);
+            recommendedMusicArtists.forEach(artist => {
+                if (filled.length >= requiredMusicSlots) return;
+                if (!filled.includes(artist.id)) filled.push(artist.id);
+            });
+
+            const changed = filled.length !== current.length || filled.some((id, index) => id !== current[index]);
+            return changed ? filled : current;
+        });
+    }, [requiredMusicSlots, recommendedMusicArtistIds, musicStrategy, boundedMusicArtistTargetCount, selectedMusicCreditRoles, selectedScript?.id, isStudioDecidedMusicPlan]);
+
+    useEffect(() => {
+        setActiveMusicSlotIndex(current => Math.min(Math.max(0, current), Math.max(0, requiredMusicSlots - 1)));
+    }, [requiredMusicSlots]);
+
+    const selectedMusicPlan = useMemo(() => (
+        musicPreviewProject
+            ? buildProjectMusicPlanFromArtists(musicPreviewProject, effectiveMusicStrategy, selectedMusicArtistIds, `${selectedScript?.id || selectedScript?.title || 'project'}_${effectiveMusicStrategy}_${effectiveMusicArtistCount}_${activeMusicCreditRoles.join('_')}`, effectiveMusicArtistCount, activeMusicCreditRoles, isStudioDecidedMusicPlan, musicCatalogArtists)
+            : undefined
+    ), [musicPreviewProject, effectiveMusicStrategy, selectedMusicArtistIds, selectedScript?.id, selectedScript?.title, effectiveMusicArtistCount, activeMusicCreditRoles, isStudioDecidedMusicPlan, musicCatalogArtists]);
+
+    const musicBudget = selectedMusicPlan?.musicBudget || 0;
+    const musicBuzzBonus = selectedMusicPlan?.credits?.length ? Math.min(18, Math.round((selectedMusicPlan.musicBuzz || 0) * 0.25)) : 0;
+    const selectedMusicImpact = useMemo(() => (
+        musicPreviewProject && selectedMusicPlan
+            ? calculateProjectMusicImpact({ ...musicPreviewProject, musicPlan: selectedMusicPlan }, selectedMusicPlan, musicCatalogArtists)
+            : undefined
+    ), [musicPreviewProject, selectedMusicPlan, musicCatalogArtists]);
+    const selectedMusicByline = musicPreviewProject && selectedMusicPlan
+        ? formatProjectMusicByline({ ...musicPreviewProject, musicPlan: selectedMusicPlan }, 3)
+        : '';
+
+    const getMusicArtistSearchMatches = (role: MusicCreditRole): MusicArtist[] => {
+        const query = (musicRoleSearchQueries[role] || '').trim().toLowerCase();
+        const sortOption = musicRoleSortOptions[role] || 'RECOMMENDED';
+        const roleIndex = activeMusicCreditRoles.indexOf(role);
+        const assignedArtistId = roleIndex >= 0 ? selectedMusicArtistIds[roleIndex] : undefined;
+        return musicCatalogArtists
+            .filter(artist => {
+                if (!query) return true;
+                const haystack = [
+                    artist.stageName,
+                    artist.realName,
+                    artist.genre,
+                    artist.subgenre,
+                    artist.audience,
+                    artist.region,
+                    artist.soundtrackFitTags.join(' '),
+                    artist.strengths.join(' ')
+                ].join(' ').toLowerCase();
+                return haystack.includes(query);
+            })
+            .map((artist, index) => ({ artist, index }))
+            .sort((left, right) => {
+                if (left.artist.id === assignedArtistId) return -1;
+                if (right.artist.id === assignedArtistId) return 1;
+                if (sortOption === 'RATING') return right.artist.reputation - left.artist.reputation;
+                if (sortOption === 'COST_LOW') return left.artist.costLow - right.artist.costLow;
+                if (sortOption === 'COST_HIGH') return right.artist.costHigh - left.artist.costHigh;
+                if (sortOption === 'FAME') return MUSIC_FAME_SORT_SCORE[right.artist.fameTier] - MUSIC_FAME_SORT_SCORE[left.artist.fameTier];
+                if (sortOption === 'FOLLOWERS') return right.artist.socialFollowers - left.artist.socialFollowers;
+                if (sortOption === 'AVAILABILITY') return MUSIC_AVAILABILITY_SORT_SCORE[right.artist.availability] - MUSIC_AVAILABILITY_SORT_SCORE[left.artist.availability];
+                return left.index - right.index;
+            })
+            .map(entry => entry.artist)
+            .slice(0, 80);
+    };
+
+    const assignMusicArtistToRole = (role: MusicCreditRole, artistId: string) => {
+        const roleIndex = activeMusicCreditRoles.indexOf(role);
+        if (roleIndex < 0) return;
+        setSelectedMusicArtistIds(current => {
+            if (requiredMusicSlots <= 0) return [];
+            const next = activeMusicCreditRoles.map((_, index) => current[index] || '');
+            next[roleIndex] = artistId;
+            return next.slice(0, requiredMusicSlots);
+        });
+        setMusicRoleSearchQueries(current => ({ ...current, [role]: '' }));
+        setActiveMusicSearchRole(null);
+        setActiveMusicSlotIndex(roleIndex);
+    };
+
+    const availableGreenlightFunds = useMemo(() => (
+        Math.max(0, Math.round((studio.balance || 0) + (studio.studioState?.productionFund || 0) + lockedStreamingFundingAmount))
+    ), [studio.balance, studio.studioState?.productionFund, lockedStreamingFundingAmount]);
+
+    const maxMarketingBudget = useMemo(() => (
+        Math.max(0, Math.floor((availableGreenlightFunds - (budgetBreakdown.total || 0) - musicBudget) / 50_000) * 50_000)
+    ), [availableGreenlightFunds, budgetBreakdown.total, musicBudget]);
+
+    useEffect(() => {
+        if (marketingBudgetPreset === 'CUSTOM') {
+            setReservedMarketingBudget(current => Math.min(current, maxMarketingBudget));
+            return;
+        }
+        setReservedMarketingBudget(Math.min(getMarketingBudgetForPreset(marketingBudgetPreset, budgetBreakdown.total), maxMarketingBudget));
+    }, [marketingBudgetPreset, budgetBreakdown.total, maxMarketingBudget]);
+
+    const packageBudget = useMemo(() => (
+        Math.max(0, Math.round((budgetBreakdown.total || 0) + musicBudget + reservedMarketingBudget))
+    ), [budgetBreakdown.total, musicBudget, reservedMarketingBudget]);
+
+    const maxInvestorRaise = useMemo(() => (
+        getMaxInvestorRaise(packageBudget, lockedStreamingFundingAmount)
+    ), [packageBudget, lockedStreamingFundingAmount]);
+
+    const normalizedInvestorRaise = useMemo(() => (
+        normalizeInvestorRaiseAmount(investorRaiseAmount, packageBudget, lockedStreamingFundingAmount)
+    ), [investorRaiseAmount, packageBudget, lockedStreamingFundingAmount]);
+
+    const investorRaisePercent = useMemo(() => (
+        maxInvestorRaise > 0
+            ? Math.round((normalizedInvestorRaise / maxInvestorRaise) * 100)
+            : 0
+    ), [maxInvestorRaise, normalizedInvestorRaise]);
+
+    const setInvestorRaisePercent = (percent: number) => {
+        const clamped = Math.max(0, Math.min(100, Math.round(Number(percent) || 0)));
+        const amount = Math.round((maxInvestorRaise * clamped / 100) / 100_000) * 100_000;
+        setInvestorRaiseAmount(amount);
+        if (amount <= 0) setSelectedInvestorIds([]);
+    };
+
+    useEffect(() => {
+        const normalized = normalizeInvestorRaiseAmount(investorRaiseAmount, packageBudget, lockedStreamingFundingAmount);
+        if (normalized !== investorRaiseAmount) {
+            setInvestorRaiseAmount(normalized);
+        }
+    }, [investorRaiseAmount, packageBudget, lockedStreamingFundingAmount]);
+
+    const investorPreviewProject = useMemo(() => (
+        musicPreviewProject
+            ? { ...musicPreviewProject, musicPlan: selectedMusicPlan }
+            : undefined
+    ), [musicPreviewProject, selectedMusicPlan]);
+
+    const investorOffers = useMemo(() => (
+        generateProjectInvestorOffers({
+            project: investorPreviewProject,
+            studio,
+            player,
+            targetRaise: normalizedInvestorRaise,
+            packageBudget,
+            lockedExternalFunding: lockedStreamingFundingAmount,
+            fundingMode: investorFundingMode
+        })
+    ), [investorPreviewProject, studio, player, normalizedInvestorRaise, packageBudget, lockedStreamingFundingAmount, investorFundingMode]);
+
+    useEffect(() => {
+        setSelectedInvestorIds(current => current.filter(id => investorOffers.some(offer => offer.investorId === id)));
+    }, [investorOffers]);
+
+    useEffect(() => {
+        if (investorFundingMode === 'LEAD') {
+            setSelectedInvestorIds(current => current.slice(0, 1));
+        }
+    }, [investorFundingMode]);
+
+    const selectedInvestorPlan = useMemo(() => (
+        buildProjectInvestorPlan({
+            offers: investorOffers,
+            selectedInvestorIds,
+            targetRaise: normalizedInvestorRaise,
+            packageBudget,
+            lockedExternalFunding: lockedStreamingFundingAmount,
+            fundingMode: investorFundingMode,
+            sourceProjectId: selectedScript?.id,
+            sourceTitle: selectedScript?.title,
+            week: player.currentWeek,
+            year: player.age
+        })
+    ), [investorOffers, selectedInvestorIds, normalizedInvestorRaise, packageBudget, lockedStreamingFundingAmount, investorFundingMode, selectedScript?.id, selectedScript?.title, player.currentWeek, player.age]);
+
+    const investorRaisedAmount = selectedInvestorPlan?.totalRaised || 0;
+    const netGreenlightCashRequirement = Math.max(0, packageBudget - investorRaisedAmount);
+    const investorFundingShortfall = Math.max(0, normalizedInvestorRaise - investorRaisedAmount);
+    const investorFundingOverage = Math.max(0, investorRaisedAmount - normalizedInvestorRaise);
+    const effectiveStudioFundingPool = studio.balance + (studio.studioState?.productionFund || 0) + lockedStreamingFundingAmount;
+
     const unresolvedReturningTalent = useMemo(() => {
         if (currentReturningTalent.length === 0) return [];
 
@@ -2003,13 +2481,12 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             errors.push(`Returning talent negotiations pending: ${names.join(', ')}${suffix}`);
         }
 
-        const productionFund = studio.studioState?.productionFund || 0;
-        if (studio.balance + productionFund + lockedStreamingFundingAmount < budgetBreakdown.total) {
-            errors.push("Insufficient studio funds for production");
+        if (effectiveStudioFundingPool < netGreenlightCashRequirement) {
+            errors.push("Insufficient studio funds for this project plan");
         }
 
         return { can: errors.length === 0, errors };
-    }, [selectedScript, selectedLocations, crewModes, selectedCrew, castList, studio.balance, studio.studioState?.productionFund, lockedStreamingFundingAmount, budgetBreakdown.total, unresolvedReturningTalent, effectiveConnectedIntent, linkedUniverseCastCount, selectedUniverseId, selectedFranchiseId]);
+    }, [selectedScript, selectedLocations, crewModes, selectedCrew, castList, effectiveStudioFundingPool, netGreenlightCashRequirement, unresolvedReturningTalent, effectiveConnectedIntent, linkedUniverseCastCount, selectedUniverseId, selectedFranchiseId]);
 
     const canGreenlight = greenlightStatus.can;
 
@@ -2104,6 +2581,17 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
 
         // Calculate Budget
         const estimatedBudget = budgetBreakdown.total;
+        const marketingReserve = Math.max(0, Math.round(reservedMarketingBudget || 0));
+        const soundtrackPlan = selectedMusicPlan || (musicPreviewProject ? buildProjectMusicPlanFromArtists(musicPreviewProject, effectiveMusicStrategy, selectedMusicArtistIds, `${selectedScript?.id || selectedScript?.title || 'project'}_${effectiveMusicStrategy}_${effectiveMusicArtistCount}_${activeMusicCreditRoles.join('_')}`, effectiveMusicArtistCount, activeMusicCreditRoles, isStudioDecidedMusicPlan, musicCatalogArtists) : undefined);
+        const soundtrackBudget = soundtrackPlan?.musicBudget || 0;
+        const soundtrackImpact = musicPreviewProject
+            ? calculateProjectMusicImpact({ ...musicPreviewProject, musicPlan: soundtrackPlan }, soundtrackPlan, musicCatalogArtists)
+            : undefined;
+        const productionBudgetWithMusic = estimatedBudget + soundtrackBudget;
+        const greenlightPackageBudget = productionBudgetWithMusic + marketingReserve;
+        const finalInvestorPlan = selectedInvestorPlan;
+        const finalInvestorRaised = finalInvestorPlan?.totalRaised || 0;
+        const studioCashRequirement = Math.max(0, greenlightPackageBudget - finalInvestorRaised);
 
         // Location Cost & Stats
         let locationQualityBonus = 0;
@@ -2141,7 +2629,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         }
 
         const fameMultiplier = calculateProjectFameMultiplier(castIds, directorData.name as string, player.stats.fame, player.stats.talent, extraFame);
-        const finalBudgetTier = estimatedBudget > 50000000 ? 'BLOCKBUSTER' : estimatedBudget > 10000000 ? 'HIGH' : 'MID';
+        const finalBudgetTier = getBudgetTierForAmount(productionBudgetWithMusic);
         const castDepth = calculateCastDepthScore(castList.length, selectedScript.genres[0], finalBudgetTier, currentCastingStrength);
 
         // Calculate Actual Quality (Hidden)
@@ -2287,7 +2775,10 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                 connectedProjectIntent: effectiveConnectedIntent,
                 targetAudience: selectedScript.targetAudience || 'PG-13',
                 budgetTier: finalBudgetTier,
-                estimatedBudget: estimatedBudget,
+                estimatedBudget: productionBudgetWithMusic,
+                reservedMarketingBudget: marketingReserve,
+                marketingBudgetSpent: 0,
+                marketingBudgetRemaining: marketingReserve,
                 visibleHype: 'LOW',
                 hiddenStats: {
                     scriptQuality: selectedScript.quality,
@@ -2300,6 +2791,18 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                     fameMultiplier: fameMultiplier,
                     castDepthScore: castDepth.score,
                     castDepthNote: castDepth.note,
+                    musicBuzz: soundtrackPlan?.musicBuzz || 0,
+                    musicRisk: soundtrackPlan?.musicRisk || 0,
+                    musicBudget: soundtrackBudget,
+                    musicOpeningLiftPct: soundtrackImpact?.openingWeekendLiftPct || 0,
+                    musicAudienceReachLiftPct: soundtrackImpact?.audienceReachLiftPct || 0,
+                    musicSocialHypeLift: soundtrackImpact?.socialHypeLift || 0,
+                    musicTrailerStrengthLift: soundtrackImpact?.trailerStrengthLift || 0,
+                    musicControversyRisk: soundtrackImpact?.controversyRisk || 0,
+                    musicMismatchBacklashRisk: soundtrackImpact?.mismatchBacklashRisk || 0,
+                    musicAwardChanceLift: soundtrackImpact?.awardChanceLift || 0,
+                    musicStreamingInterestLiftPct: soundtrackImpact?.streamingInterestLiftPct || 0,
+                    musicImpactLabel: soundtrackImpact?.label,
                     studioPrestigeScore,
                     isRecast: isRecast,
                     connectedProjectIntent: effectiveConnectedIntent,
@@ -2329,7 +2832,9 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                 tone: tone,
                 visualStyle: visualStyle,
                 pacing: pacing,
-                equipmentChoices: equipmentChoices
+                equipmentChoices: equipmentChoices,
+                musicPlan: soundtrackPlan,
+                investorPlan: finalInvestorPlan
             }
         };
 
@@ -2381,6 +2886,15 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         if (premiumEquip.length > 0) {
             const equipNames = premiumEquip.map(([id]) => id === 'cameras' ? 'custom IMAX rigs' : id === 'lighting' ? 'stadium-grade lighting' : id === 'sound' ? 'Dolby Atmos gear' : 'massive practical sets');
             headlineSub += ` Studio is sparing no expense, renting ${equipNames.join(' and ')}.`;
+        }
+
+        if (soundtrackPlan?.credits?.length) {
+            const leadCredit = soundtrackPlan.credits[0];
+            headlineSub += ` Music push led by ${leadCredit.artistName} with "${leadCredit.songTitle}".`;
+        }
+
+        if (finalInvestorPlan?.totalRaised) {
+            headlineSub += ` Outside investors covered ${formatMoney(finalInvestorPlan.totalRaised)} for ${finalInvestorPlan.investorEquityPercent}% project equity.`;
         }
 
         const newsItem: NewsItem = {
@@ -2563,6 +3077,29 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             generatedBuzz.push({ type: 'TWEET', data: xPost });
         }
 
+        if (soundtrackPlan?.credits?.length) {
+            const leadCredit = soundtrackPlan.credits[0];
+            generatedBuzz.push({
+                type: 'TWEET',
+                data: {
+                    id: `x_music_${Date.now()}`,
+                    authorId: 'npc_musicwire',
+                    authorName: 'MusicWire',
+                    authorHandle: '@MusicWire',
+                    authorAvatar: `https://api.dicebear.com/8.x/avataaars/svg?seed=MusicWire`,
+                    content: `${leadCredit.artistName} is attached to "${selectedScript.title}" music. "${leadCredit.songTitle}" could push this movie way outside normal film circles.`,
+                    timestamp: Date.now(),
+                    likes: Math.floor(5000 + (soundtrackPlan.musicBuzz || 0) * 240),
+                    retweets: Math.floor(800 + (soundtrackPlan.musicBuzz || 0) * 60),
+                    replies: Math.floor(100 + (soundtrackPlan.musicRisk || 0) * 12),
+                    isPlayer: false,
+                    isLiked: false,
+                    isRetweeted: false,
+                    isVerified: true
+                } as XPost
+            });
+        }
+
         setBuzzItems(generatedBuzz);
 
         // --- UPDATE PLAYER STATE ---
@@ -2573,7 +3110,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             .concat(player.x.feed);
 
         const fundingResult = applyLockedSeasonFunding({
-            budget: estimatedBudget,
+            budget: studioCashRequirement,
             lockedFunding: lockedStreamingFunding,
             lockedStreamingFunds: studio.studioState?.lockedStreamingFunds || [],
             projectId: newCommitment.id,
@@ -2667,32 +3204,52 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                 ...player.studio,
                 talentRoster: updatedPlayerTalentRoster
             },
-            businesses: player.businesses.map(b => b.id === studio.id ? {
-                ...b,
-                balance: newStudioBalance,
-                studioState: {
-                    ...studio.studioState!,
-                    scripts: updatedScripts,
-                    concepts: updatedConcepts,
-                    talentRoster: updatedStudioTalentRoster,
-                    productionFund: newProductionFund,
-                    lockedStreamingFunds: updatedLockedStreamingFunds,
-                    financeLedger: [
-                        ...fundingResult.ledgerEntries.map(entry => ({
-                            ...entry,
-                            label: entry.type === 'PRODUCTION_SPEND' && lockedFundApplied > 0
-                                ? `${newCommitment.name} greenlight spend (${formatMoney(lockedFundApplied)} renewal cap used${unusedFundingReturned > 0 ? `, ${formatMoney(unusedFundingReturned)} unused returned` : ''})`
-                                : entry.label
-                        })),
-                        ...((studio.studioState?.financeLedger || []))
-                    ].slice(0, 200)
-                }
-            } : b)
+            businesses: player.businesses.map(b => {
+                if (b.id !== studio.id) return b;
+                const studioAfterSpend = {
+                    ...b,
+                    balance: newStudioBalance,
+                    studioState: {
+                        ...studio.studioState!,
+                        scripts: updatedScripts,
+                        concepts: updatedConcepts,
+                        talentRoster: updatedStudioTalentRoster,
+                        productionFund: newProductionFund,
+                        lockedStreamingFunds: updatedLockedStreamingFunds,
+                        financeLedger: [
+                            ...(finalInvestorPlan?.commitments || []).map(commitment => ({
+                                id: `studio_ledger_investor_${newCommitment.id}_${commitment.investorId}_${player.age}_${player.currentWeek}`,
+                                week: player.currentWeek,
+                                year: player.age,
+                                amount: commitment.amount,
+                                type: 'INVESTOR_FUNDING' as const,
+                                label: `${commitment.investorName} funded ${formatMoney(commitment.amount)} for ${commitment.equityPercent}% of ${newCommitment.name}`,
+                                projectId: newCommitment.id
+                            })),
+                            ...fundingResult.ledgerEntries.map(entry => ({
+                                ...entry,
+                                label: entry.type === 'PRODUCTION_SPEND' && lockedFundApplied > 0
+                                    ? `${newCommitment.name} greenlight spend (${formatMoney(lockedFundApplied)} renewal cap used${unusedFundingReturned > 0 ? `, ${formatMoney(unusedFundingReturned)} unused returned` : ''})`
+                                    : entry.label
+                            })),
+                            ...((studio.studioState?.financeLedger || []))
+                        ].slice(0, 200)
+                    }
+                };
+                return updateInvestorRelationshipsForPlan({
+                    studio: studioAfterSpend,
+                    plan: finalInvestorPlan,
+                    projectId: newCommitment.id,
+                    projectTitle: newCommitment.name,
+                    week: player.currentWeek,
+                    year: player.age
+                });
+            })
         });
         addBreadcrumb('greenlight:success', {
             title: newCommitment.name,
             commitmentId: newCommitment.id,
-            budget: Math.round(estimatedBudget || 0),
+            budget: Math.round(greenlightPackageBudget || 0),
         });
         markTraceAction('greenlight_completed', {
             greenlight_step: 'BUZZ',
@@ -2706,14 +3263,14 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             commitment_id: newCommitment.id,
             project_type: selectedScript?.projectType || 'unknown',
             genre: selectedScript?.genre || 'unknown',
-            budget_m: Math.round((estimatedBudget || 0) / 1000000),
+            budget_m: Math.round((greenlightPackageBudget || 0) / 1000000),
             cast_count: castList.filter(c => c.actorId).length,
             crew_count: Object.values(selectedCrew).filter(Boolean).length,
         });
         trackGameEvent('greenlight_completed', {
             project_type: selectedScript?.projectType || 'unknown',
             genre: selectedScript?.genre || 'unknown',
-            budget_m: Math.round((estimatedBudget || 0) / 1000000),
+            budget_m: Math.round((greenlightPackageBudget || 0) / 1000000),
             cast_count: castList.filter(c => c.actorId).length,
             crew_count: Object.values(selectedCrew).filter(Boolean).length,
         });
@@ -2722,7 +3279,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
     };
 
     // Real-time Budget Calculation for UI
-    const currentEstimatedBudget = budgetBreakdown.total;
+    const currentEstimatedBudget = budgetBreakdown.total + musicBudget;
 
     const currentEstimatedBuzz = useMemo(() => {
         let buzz = 0;
@@ -2748,8 +3305,10 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             buzz += (maxFame * 0.3);
         }
 
+        buzz += musicBuzzBonus;
+
         return Math.min(100, Math.max(0, Math.floor(buzz || 0)));
-    }, [selectedScript, selectedCrew, castList, player, availableActors]);
+    }, [selectedScript, selectedCrew, castList, player, availableActors, musicBuzzBonus]);
 
     const currentCastingStrength = useMemo(() => {
         const assignedCast = castList.filter(c => c.actorId);
@@ -2943,15 +3502,23 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                                     <span className="text-zinc-500 uppercase">Equipment</span>
                                                     <span className="text-white font-mono">{formatMoney(budgetBreakdown.equipmentCost)}</span>
                                                 </div>
+                                                <div className="flex justify-between text-[9px]">
+                                                    <span className="text-zinc-500 uppercase">Soundtrack Artists</span>
+                                                    <span className="text-cyan-300 font-mono">{formatMoney(musicBudget)}</span>
+                                                </div>
+                                                <div className="flex justify-between text-[9px]">
+                                                    <span className="text-zinc-500 uppercase">Reserved Campaign Budget</span>
+                                                    <span className="text-amber-300 font-mono">{formatMoney(reservedMarketingBudget)}</span>
+                                                </div>
                                                 <div className="pt-1.5 border-t border-zinc-800 flex justify-between text-[10px] font-bold">
-                                                    <span className="text-zinc-400 uppercase">Current Total</span>
-                                                    <span className="text-emerald-400 font-mono">{formatMoney(budgetBreakdown.total)}</span>
+                                                    <span className="text-zinc-400 uppercase">Total Package</span>
+                                                    <span className="text-emerald-400 font-mono">{formatMoney(packageBudget)}</span>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
-                                    <span className={`text-sm sm:text-xl font-mono font-black tracking-tighter ${currentEstimatedBudget > (studio.balance + (studio.studioState?.productionFund || 0) + lockedStreamingFundingAmount) ? 'text-rose-500' : 'text-emerald-400'}`}>
-                                        {formatMoney(currentEstimatedBudget)}
+                                    <span className={`text-sm sm:text-xl font-mono font-black tracking-tighter ${packageBudget > (studio.balance + (studio.studioState?.productionFund || 0) + lockedStreamingFundingAmount) ? 'text-rose-500' : 'text-emerald-400'}`}>
+                                        {formatMoney(packageBudget)}
                                     </span>
                                 </div>
                                 <div className="flex items-center gap-2 w-full justify-end border-t border-white/5 pt-1 sm:pt-2">
@@ -2970,11 +3537,11 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                             {/* Track Line */}
                             <div className="absolute left-0 right-0 top-[14px] h-0.5 bg-zinc-900/50 -z-10 rounded-full"></div>
                             <div className="absolute left-0 top-[14px] h-0.5 bg-emerald-500 -z-10 transition-all duration-700 ease-out rounded-full shadow-[0_0_10px_rgba(16,185,129,0.5)]"
-                                style={{ width: `${(['SELECT_SCRIPT', 'DIRECTOR', 'CAST', 'CREW', 'EQUIPMENT', 'LOCATION', 'TONE', 'CONFIRM', 'BUZZ'].indexOf(step) / 7) * 100}%` }}>
+                                style={{ width: `${(['SELECT_SCRIPT', 'DIRECTOR', 'CAST', 'CREW', 'EQUIPMENT', 'LOCATION', 'SETUP', 'CONFIRM', 'BUZZ'].indexOf(step) / 7) * 100}%` }}>
                             </div>
 
-                            {['Script', 'Director', 'Cast', 'Crew', 'Gear', 'Loc', 'Tone', 'Go'].map((s, idx) => {
-                                const stepIdx = ['SELECT_SCRIPT', 'DIRECTOR', 'CAST', 'CREW', 'EQUIPMENT', 'LOCATION', 'TONE', 'CONFIRM', 'BUZZ'].indexOf(step);
+                            {['Script', 'Director', 'Cast', 'Crew', 'Gear', 'Loc', 'Setup', 'Go'].map((s, idx) => {
+                                const stepIdx = ['SELECT_SCRIPT', 'DIRECTOR', 'CAST', 'CREW', 'EQUIPMENT', 'LOCATION', 'SETUP', 'CONFIRM', 'BUZZ'].indexOf(step);
                                 const isActive = idx === stepIdx;
                                 const isCompleted = idx < stepIdx;
                                 const canNavigate = selectedScriptId !== null && step !== 'BUZZ'; // Lock nav during BUZZ
@@ -2984,7 +3551,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                         key={s}
                                         onClick={() => {
                                             if (canNavigate) {
-                                                const steps = ['SELECT_SCRIPT', 'DIRECTOR', 'CAST', 'CREW', 'EQUIPMENT', 'LOCATION', 'TONE', 'CONFIRM'];
+                                                const steps: GreenlightStep[] = ['SELECT_SCRIPT', 'DIRECTOR', 'CAST', 'CREW', 'EQUIPMENT', 'LOCATION', 'SETUP', 'CONFIRM'];
                                                 setStep(steps[idx] as any);
                                             }
                                         }}
@@ -3747,7 +4314,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                     onClick={() => {
                                         if (selectedLocations.length === 0) return;
                                         saveDraft();
-                                        setStep('TONE');
+                                        setStep('SETUP');
                                     }}
                                     disabled={selectedLocations.length === 0}
                                     className={`flex-[2] font-black uppercase tracking-wider py-4 rounded-xl shadow-[0_0_30px_rgba(16,185,129,0.4)] transition-all duration-300 hover:scale-105 ${
@@ -3756,19 +4323,19 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                         : 'bg-emerald-500 hover:bg-emerald-400 text-black'
                                     }`}
                                 >
-                                    Next: Tone & Style
+                                    Next: Movie Setup
                                 </button>
                             </div>
                         </div>
                     </div>
                 )}
 
-                {/* TONE STEP */}
-                {step === 'TONE' && (
+                {/* SETUP STEP */}
+                {step === 'SETUP' && (
                     <div className="space-y-8 animate-in slide-in-from-right-4 duration-300 flex flex-col h-full max-w-4xl mx-auto px-4 pt-6 pb-44 overflow-y-auto custom-scrollbar">
                         <div className="bg-zinc-900/80 backdrop-blur-md border border-zinc-800 rounded-xl p-6 mb-2 shrink-0 shadow-lg">
-                            <h2 className="text-xl font-bold text-white mb-2">Tone & Style</h2>
-                            <p className="text-zinc-400 text-sm">Define the artistic vision for your project.</p>
+                            <h2 className="text-xl font-bold text-white mb-2">Movie Setup</h2>
+                            <p className="text-zinc-400 text-sm">Define the artistic vision and reserve the campaign pool for release.</p>
                         </div>
 
                         <div className="space-y-8 pb-20">
@@ -3849,7 +4416,318 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                 <div className="mt-4 text-center text-xs text-zinc-400">
                                     {tone < 30 ? 'Focus on practical sets and stunts.' :
                                      tone > 70 ? 'Heavy reliance on visual effects.' :
-                                     'Balanced approach.'}
+                                    'Balanced approach.'}
+                                </div>
+                            </div>
+
+                            {/* Soundtrack Desk */}
+                            <div className="bg-zinc-950/80 border border-cyan-500/20 rounded-2xl p-4 sm:p-5 space-y-4 shadow-[0_0_24px_rgba(34,211,238,0.08)]">
+                                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                                    <div className="min-w-0">
+                                        <h3 className="text-sm font-black text-cyan-300 uppercase tracking-[0.2em] flex items-center gap-2">
+                                            <Mic size={16} /> Soundtrack Desk
+                                        </h3>
+                                        <div className="mt-2 text-lg sm:text-xl font-black text-white truncate">
+                                            {effectiveMusicArtistCount > 0 ? `${effectiveMusicArtistCount} content type${effectiveMusicArtistCount === 1 ? '' : 's'} planned` : 'Composer score only'}
+                                        </div>
+                                        <div className="mt-1 truncate text-xs font-bold text-zinc-500">
+                                            {selectedMusicByline || (isCustomMusicPlan ? 'Choose the music work and assign artists.' : 'Let the studio choose the music work.')}
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-2 min-w-full lg:min-w-[310px]">
+                                        <div className="rounded-xl bg-black/35 border border-white/10 p-3">
+                                            <div className="text-[8px] font-black uppercase tracking-[0.2em] text-zinc-600">Budget</div>
+                                            <div className="mt-1 text-sm font-black text-cyan-300 font-mono">{formatMoney(musicBudget)}</div>
+                                        </div>
+                                        <div className="rounded-xl bg-black/35 border border-white/10 p-3">
+                                            <div className="text-[8px] font-black uppercase tracking-[0.2em] text-zinc-600">Buzz</div>
+                                            <div className="mt-1 text-sm font-black text-emerald-300">+{musicBuzzBonus}</div>
+                                        </div>
+                                        <div className="rounded-xl bg-black/35 border border-white/10 p-3">
+                                            <div className="text-[8px] font-black uppercase tracking-[0.2em] text-zinc-600">Risk</div>
+                                            <div className={`mt-1 text-sm font-black ${(selectedMusicPlan?.musicRisk || 0) > 28 ? 'text-rose-300' : (selectedMusicPlan?.musicRisk || 0) > 16 ? 'text-amber-300' : 'text-cyan-300'}`}>
+                                                {selectedMusicPlan?.musicRisk || 0}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {selectedMusicImpact && selectedMusicImpact.score > 0 && (
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                        <div className="rounded-xl border border-cyan-300/20 bg-cyan-300/[0.06] p-3">
+                                            <div className="text-[8px] font-black uppercase tracking-[0.18em] text-cyan-100/55">Opening</div>
+                                            <div className="mt-1 font-mono text-sm font-black text-emerald-300">
+                                                {selectedMusicImpact.openingWeekendLiftPct >= 0 ? '+' : ''}{selectedMusicImpact.openingWeekendLiftPct}%
+                                            </div>
+                                        </div>
+                                        <div className="rounded-xl border border-cyan-300/20 bg-cyan-300/[0.06] p-3">
+                                            <div className="text-[8px] font-black uppercase tracking-[0.18em] text-cyan-100/55">Trailer</div>
+                                            <div className="mt-1 font-mono text-sm font-black text-cyan-300">+{selectedMusicImpact.trailerStrengthLift}</div>
+                                        </div>
+                                        <div className="rounded-xl border border-cyan-300/20 bg-cyan-300/[0.06] p-3">
+                                            <div className="text-[8px] font-black uppercase tracking-[0.18em] text-cyan-100/55">Awards</div>
+                                            <div className="mt-1 font-mono text-sm font-black text-purple-200">+{selectedMusicImpact.awardChanceLift}</div>
+                                        </div>
+                                        <div className="rounded-xl border border-white/10 bg-black/25 p-3">
+                                            <div className="text-[8px] font-black uppercase tracking-[0.18em] text-zinc-600">Backlash</div>
+                                            <div className={`mt-1 font-mono text-sm font-black ${selectedMusicImpact.mismatchBacklashRisk >= 38 || selectedMusicImpact.controversyRisk >= 36 ? 'text-amber-300' : 'text-zinc-300'}`}>
+                                                {Math.max(selectedMusicImpact.mismatchBacklashRisk, selectedMusicImpact.controversyRisk)}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/[0.04] p-3 space-y-3">
+                                    <div className="mb-3 flex items-center justify-between gap-3">
+                                        <div className="min-w-0">
+                                            <div className="text-[9px] font-black uppercase tracking-[0.2em] text-cyan-200/60">Content Types</div>
+                                            <div className="mt-0.5 truncate text-sm font-black text-white">
+                                                {isStudioDecidedMusicPlan
+                                                    ? `Studio decides · ${effectiveMusicArtistCount} planned`
+                                                    : effectiveMusicArtistCount > 0
+                                                        ? 'Toggle what you want, then assign artists'
+                                                        : 'All music content is off'}
+                                            </div>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setSelectedMusicCreditRoles(null);
+                                                setActiveMusicSlotIndex(0);
+                                                setActiveMusicSearchRole(null);
+                                                setMusicRoleSearchQueries({});
+                                                setMusicRoleSortOptions({});
+                                            }}
+                                            className={`shrink-0 rounded-xl border px-4 py-3 text-[10px] font-black uppercase tracking-[0.16em] transition-colors ${
+                                                !isCustomMusicPlan
+                                                    ? 'border-cyan-200 bg-cyan-300 text-black shadow-[0_0_18px_rgba(34,211,238,0.16)]'
+                                                    : 'border-cyan-400/30 bg-cyan-400/10 text-cyan-200 hover:bg-cyan-300 hover:text-black'
+                                            }`}
+                                        >
+                                            Let Studio Decide
+                                        </button>
+                                    </div>
+                                    <div className="space-y-2">
+                                        {allMusicDeliverableRoles.map((role) => {
+                                            const roleIndex = activeMusicCreditRoles.indexOf(role);
+                                            const isIncluded = roleIndex >= 0;
+                                            const credit = isIncluded ? selectedMusicPlan?.credits?.[roleIndex] : undefined;
+                                            const isActiveSlot = isIncluded && (activeMusicSlotIndex === roleIndex || activeMusicSearchRole === role);
+                                            const roleQuery = musicRoleSearchQueries[role] || '';
+                                            const roleSort = musicRoleSortOptions[role] || 'RECOMMENDED';
+                                            const searchMatches = isIncluded ? getMusicArtistSearchMatches(role) : [];
+                                            return (
+                                                <div
+                                                    key={`plan_${role}`}
+                                                    className={`min-w-0 rounded-xl border p-3 transition-all ${
+                                                        isActiveSlot
+                                                            ? 'border-cyan-300 bg-cyan-400/[0.08] shadow-[0_0_18px_rgba(34,211,238,0.12)]'
+                                                            : isIncluded
+                                                                ? 'border-cyan-400/40 bg-cyan-400/10 hover:border-cyan-300'
+                                                                : 'border-zinc-800 bg-black/20 opacity-70 hover:opacity-100 hover:border-cyan-400/40'
+                                                    }`}
+                                                >
+                                                    <div className="flex items-start justify-between gap-3">
+                                                        <div className="min-w-0">
+                                                            <div className={`text-[9px] font-black uppercase tracking-[0.16em] ${isIncluded ? 'text-cyan-200/60' : 'text-zinc-600'}`}>
+                                                                {getMusicCreditRoleLabel(role)}
+                                                            </div>
+                                                            <div className="mt-1 truncate text-sm font-black text-white">
+                                                                {isIncluded ? (credit?.artistName || 'Choose artist') : 'Not producing this'}
+                                                            </div>
+                                                            <div className="mt-1 truncate text-[10px] font-bold text-zinc-500">
+                                                                {isIncluded ? (credit?.songTitle || 'Artist not assigned yet') : 'Toggle on to add artist'}
+                                                            </div>
+                                                        </div>
+                                                        <button
+                                                            type="button"
+                                                            onClick={(event) => {
+                                                                event.stopPropagation();
+                                                                if (isIncluded) removeMusicCreditRole(role);
+                                                                else focusMusicCreditRole(role);
+                                                            }}
+                                                            className={`shrink-0 rounded-full px-3 py-2 text-[9px] font-black uppercase tracking-[0.14em] ${
+                                                                isIncluded
+                                                                    ? 'bg-cyan-300 text-black hover:bg-cyan-200'
+                                                                    : 'bg-zinc-900 text-zinc-500 hover:bg-cyan-400/10 hover:text-cyan-200'
+                                                            }`}
+                                                        >
+                                                            {isIncluded ? 'On' : 'Off'}
+                                                        </button>
+                                                    </div>
+                                                    {isIncluded && (
+                                                        <div className="mt-3 space-y-2">
+                                                            <div className="grid grid-cols-1 sm:grid-cols-[1fr_132px] gap-2">
+                                                                <div className="relative">
+                                                                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-cyan-200/50" />
+                                                                    <input
+                                                                        value={roleQuery}
+                                                                        onFocus={() => {
+                                                                            setActiveMusicSearchRole(role);
+                                                                            setActiveMusicSlotIndex(roleIndex);
+                                                                        }}
+                                                                        onChange={(event) => {
+                                                                            setMusicRoleSearchQueries(current => ({ ...current, [role]: event.target.value }));
+                                                                            setActiveMusicSearchRole(role);
+                                                                            setActiveMusicSlotIndex(roleIndex);
+                                                                        }}
+                                                                        placeholder={credit?.artistName ? `Change ${credit.artistName}` : `Search artist for ${getMusicCreditRoleLabel(role).toLowerCase()}`}
+                                                                        className="w-full rounded-xl border border-zinc-800 bg-black/35 py-2.5 pl-9 pr-3 text-xs font-bold text-white outline-none transition-colors placeholder:text-zinc-600 focus:border-cyan-300"
+                                                                    />
+                                                                </div>
+                                                                <select
+                                                                    value={roleSort}
+                                                                    onFocus={() => {
+                                                                        setActiveMusicSearchRole(role);
+                                                                        setActiveMusicSlotIndex(roleIndex);
+                                                                    }}
+                                                                    onChange={(event) => {
+                                                                        setMusicRoleSortOptions(current => ({ ...current, [role]: event.target.value as MusicArtistSortOption }));
+                                                                        setActiveMusicSearchRole(role);
+                                                                        setActiveMusicSlotIndex(roleIndex);
+                                                                    }}
+                                                                    className="rounded-xl border border-zinc-800 bg-black/35 px-3 py-2.5 text-[10px] font-black uppercase tracking-[0.12em] text-cyan-100 outline-none transition-colors focus:border-cyan-300"
+                                                                    aria-label={`Sort artists for ${getMusicCreditRoleLabel(role)}`}
+                                                                >
+                                                                    {MUSIC_ARTIST_SORT_OPTIONS.map(option => (
+                                                                        <option key={option.id} value={option.id}>{option.label}</option>
+                                                                    ))}
+                                                                </select>
+                                                            </div>
+                                                            {activeMusicSearchRole === role && (
+                                                                <div className="rounded-xl border border-zinc-800 bg-zinc-950/85 p-2">
+                                                                    {searchMatches.length === 0 ? (
+                                                                        <div className="p-3 text-xs font-bold text-zinc-500">
+                                                                            No artists match this search.
+                                                                        </div>
+                                                                    ) : (
+                                                                        <div className="flex gap-2 overflow-x-auto pb-1 custom-scrollbar">
+                                                                            {searchMatches.map((artist) => {
+                                                                                const displayedCost = musicPreviewProject ? estimateMusicArtistProjectCost(artist, musicPreviewProject) : artist.costLow;
+                                                                                const isAssigned = credit?.artistId === artist.id;
+                                                                                return (
+                                                                                    <button
+                                                                                        key={`${role}_${artist.id}`}
+                                                                                        type="button"
+                                                                                        onClick={() => assignMusicArtistToRole(role, artist.id)}
+                                                                                        className={`min-w-[180px] max-w-[180px] rounded-xl border p-3 text-left transition-colors ${
+                                                                                            isAssigned
+                                                                                                ? 'border-cyan-200 bg-cyan-300 text-black'
+                                                                                                : 'border-zinc-800 bg-black/35 hover:border-cyan-300/70 hover:bg-cyan-400/10'
+                                                                                        }`}
+                                                                                    >
+                                                                                        <div className={`truncate text-xs font-black ${isAssigned ? 'text-black' : 'text-white'}`}>{artist.stageName}</div>
+                                                                                        <div className={`mt-1 truncate text-[9px] font-black uppercase tracking-[0.14em] ${isAssigned ? 'text-black/55' : 'text-cyan-200/55'}`}>
+                                                                                            {artist.genre} • {artist.fameTier}
+                                                                                        </div>
+                                                                                        <div className="mt-3 grid grid-cols-2 gap-2">
+                                                                                            <div>
+                                                                                                <div className={`text-[8px] font-black uppercase tracking-[0.16em] ${isAssigned ? 'text-black/45' : 'text-zinc-600'}`}>Rating</div>
+                                                                                                <div className={`mt-0.5 text-sm font-black ${isAssigned ? 'text-black' : 'text-emerald-300'}`}>{artist.reputation}/100</div>
+                                                                                            </div>
+                                                                                            <div className="text-right">
+                                                                                                <div className={`text-[8px] font-black uppercase tracking-[0.16em] ${isAssigned ? 'text-black/45' : 'text-zinc-600'}`}>Cost</div>
+                                                                                                <div className={`mt-0.5 font-mono text-sm font-black ${isAssigned ? 'text-black' : 'text-cyan-300'}`}>{formatMoney(displayedCost)}</div>
+                                                                                            </div>
+                                                                                        </div>
+                                                                                        <div className={`mt-2 truncate text-[9px] font-black uppercase tracking-[0.12em] ${isAssigned ? 'text-black/50' : 'text-zinc-500'}`}>
+                                                                                            {artist.availability} • {artist.audience}
+                                                                                        </div>
+                                                                                    </button>
+                                                                                );
+                                                                            })}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Marketing Budget Allotment */}
+                            <div className="bg-zinc-950/70 border border-amber-500/20 rounded-2xl p-5 space-y-5 shadow-[0_0_24px_rgba(245,158,11,0.08)]">
+                                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                                    <div>
+                                        <h3 className="text-sm font-bold text-amber-300 uppercase tracking-wider flex items-center gap-2">
+                                            <DollarSign size={16} /> Reserved Campaign Budget
+                                        </h3>
+                                        <p className="mt-1 text-xs text-zinc-500 leading-relaxed">
+                                            Set aside marketing money now. Release Strategy will spend this pool later, and unused campaign money returns to the studio wallet.
+                                        </p>
+                                    </div>
+                                    <div className="text-left sm:text-right">
+                                        <div className="text-[10px] font-black uppercase tracking-[0.18em] text-zinc-600">Reserved</div>
+                                        <div className="font-mono text-3xl font-black text-amber-300">{formatMoney(reservedMarketingBudget)}</div>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                    {MARKETING_BUDGET_PRESETS.map(option => {
+                                        const amount = getMarketingBudgetForPreset(option.id, budgetBreakdown.total);
+                                        const isSelected = marketingBudgetPreset === option.id;
+                                        return (
+                                            <button
+                                                key={option.id}
+                                                onClick={() => {
+                                                    setMarketingBudgetPreset(option.id);
+                                                    setReservedMarketingBudget(amount);
+                                                }}
+                                                className={`p-4 rounded-xl border text-left transition-all ${
+                                                    isSelected
+                                                        ? 'bg-amber-500/10 border-amber-400 text-white shadow-[0_0_20px_rgba(245,158,11,0.18)]'
+                                                        : 'bg-zinc-900/80 border-zinc-800 text-zinc-400 hover:border-amber-500/40 hover:text-white'
+                                                }`}
+                                            >
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <div className="text-[11px] font-black uppercase tracking-widest">{option.label}</div>
+                                                    <div className="font-mono text-xs font-black text-amber-300">{formatMoney(amount)}</div>
+                                                </div>
+                                                <div className="mt-2 text-[10px] text-zinc-500 leading-tight">{option.note}</div>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+
+                                <div className={`rounded-xl border p-4 transition-all ${
+                                    marketingBudgetPreset === 'CUSTOM'
+                                        ? 'border-amber-500/50 bg-amber-500/5'
+                                        : 'border-zinc-800 bg-black/25'
+                                }`}>
+                                    <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                                        <button
+                                            onClick={() => setMarketingBudgetPreset('CUSTOM')}
+                                            className={`shrink-0 px-4 py-3 rounded-lg border text-[10px] font-black uppercase tracking-widest transition-colors ${
+                                                marketingBudgetPreset === 'CUSTOM'
+                                                    ? 'border-amber-400 bg-amber-400 text-black'
+                                                    : 'border-zinc-700 bg-zinc-900 text-zinc-400 hover:text-white'
+                                            }`}
+                                        >
+                                            Custom
+                                        </button>
+                                        <div className="flex-1">
+                                            <input
+                                                type="range"
+                                                min="0"
+                                                max={maxMarketingBudget}
+                                                step="50000"
+                                                value={reservedMarketingBudget}
+                                                onChange={(event) => {
+                                                    setMarketingBudgetPreset('CUSTOM');
+                                                    setReservedMarketingBudget(Math.min(maxMarketingBudget, Math.max(0, Number(event.target.value) || 0)));
+                                                }}
+                                                className="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-amber-400"
+                                            />
+                                            <div className="mt-2 flex justify-between text-[9px] font-bold uppercase tracking-widest text-zinc-600">
+                                                <span>No reserve</span>
+                                                <span>Max {formatMoney(maxMarketingBudget)}</span>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
@@ -4101,7 +4979,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                     }}
                                     className="flex-[2] bg-emerald-500 hover:bg-emerald-400 text-black font-black uppercase tracking-wider py-4 rounded-xl shadow-[0_0_30px_rgba(16,185,129,0.4)] transition-all duration-300 hover:scale-105"
                                 >
-                                    Review Package
+                                    Review Project
                                 </button>
                             </div>
                         </div>
@@ -4252,21 +5130,69 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                     </div>
                                 </div>
 
+                                {/* Soundtrack Desk */}
+                                {selectedMusicPlan && (
+                                    <div>
+                                        <h3 className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest mb-3 border-b border-cyan-500/20 pb-1">Soundtrack Desk</h3>
+                                        <div className="space-y-2 text-sm">
+                                            <div className="flex justify-between items-center gap-4">
+                                                <span className="text-zinc-300">
+                                                    {getMusicStrategyLabel(selectedMusicPlan.strategy)}
+                                                    {selectedMusicPlan.artistTargetCount ? ` • ${selectedMusicPlan.artistTargetCount} artists` : ''}
+                                                </span>
+                                                <span className="font-mono text-cyan-300">{formatMoney(musicBudget)}</span>
+                                            </div>
+                                            {selectedMusicPlan.credits.map(credit => (
+                                                <div key={`${credit.artistId}_${credit.role}`} className="flex justify-between items-center gap-4 text-xs">
+                                                    <span className="min-w-0 truncate text-zinc-500">{credit.artistName} • {getMusicCreditRoleLabel(credit.role)}</span>
+                                                    <span className="font-mono text-zinc-400">{formatMoney(credit.estimatedCost)}</span>
+                                                </div>
+                                            ))}
+                                            <p className="text-[10px] text-zinc-500 leading-relaxed">
+                                                Music can add social reach and soundtrack buzz, with some image risk if the artist or campaign feels mismatched.
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Campaign Reserve */}
+                                <div>
+                                    <h3 className="text-[10px] font-bold text-amber-500 uppercase tracking-widest mb-3 border-b border-amber-500/20 pb-1">Release Reserve</h3>
+                                    <div className="space-y-2 text-sm">
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-zinc-300">Production Budget</span>
+                                            <span className="font-mono text-white">{formatMoney(budgetBreakdown.total + musicBudget)}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-zinc-300">Campaign Pool</span>
+                                            <span className="font-mono text-amber-300">{formatMoney(reservedMarketingBudget)}</span>
+                                        </div>
+                                        <p className="text-[10px] text-zinc-500 leading-relaxed">
+                                            This pool is reserved for Release Strategy. Any unspent campaign budget returns to the studio wallet after the campaign is locked.
+                                        </p>
+                                    </div>
+                                </div>
+
                                 {/* Total */}
                                 <div className="bg-zinc-950 rounded-lg p-4 flex justify-between items-center border border-zinc-800 mt-4">
                                     <div>
-                                        <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Total Estimated Budget</div>
-                                        <div className="text-xs text-zinc-600">Subject to variance during production</div>
+                                        <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Total Package</div>
+                                        <div className="text-xs text-zinc-600">Production, music, and reserved marketing</div>
                                     </div>
                                     <div className="text-right">
-                                        <div className={`text-2xl font-black font-mono ${budgetBreakdown.total > (studio.balance + (studio.studioState?.productionFund || 0) + lockedStreamingFundingAmount) ? 'text-rose-500' : 'text-emerald-400'}`}>
-                                            {formatMoney(budgetBreakdown.total)}
+                                        <div className={`text-2xl font-black font-mono ${netGreenlightCashRequirement > effectiveStudioFundingPool ? 'text-rose-500' : 'text-emerald-400'}`}>
+                                            {formatMoney(packageBudget)}
                                         </div>
+                                        {investorRaisedAmount > 0 && (
+                                            <div className="text-[10px] font-mono text-emerald-300 mt-1 uppercase">
+                                                Studio Cash Need: {formatMoney(netGreenlightCashRequirement)}
+                                            </div>
+                                        )}
                                         {previousInstallmentCost && (
                                             <div className="text-[10px] font-mono text-zinc-500 mt-1 uppercase">
                                                 Last Part: {formatMoney(previousInstallmentCost)}
-                                                <span className={`ml-2 ${budgetBreakdown.total > previousInstallmentCost ? 'text-rose-400' : 'text-emerald-400'}`}>
-                                                    ({budgetBreakdown.total > previousInstallmentCost ? '+' : ''}{(((budgetBreakdown.total - previousInstallmentCost) / previousInstallmentCost) * 100).toFixed(1)}%)
+                                                <span className={`ml-2 ${packageBudget > previousInstallmentCost ? 'text-rose-400' : 'text-emerald-400'}`}>
+                                                    ({packageBudget > previousInstallmentCost ? '+' : ''}{(((packageBudget - previousInstallmentCost) / previousInstallmentCost) * 100).toFixed(1)}%)
                                                 </span>
                                             </div>
                                         )}
@@ -4299,6 +5225,359 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                         </div>
                                     </div>
                                 )}
+
+                                {/* Investor Financing */}
+                                <div className="bg-zinc-950/70 rounded-xl border border-zinc-800 p-4 space-y-4">
+                                    <div className="flex items-start justify-between gap-4">
+                                        <div>
+                                            <h3 className="text-[10px] font-bold text-emerald-300 uppercase tracking-widest flex items-center gap-2">
+                                                <Building2 size={13} /> Investor Financing
+                                            </h3>
+                                            <p className="text-[10px] text-zinc-500 mt-1 leading-relaxed">
+                                                Set a target, then pick one lead investor or a syndicate. You can raise more than target, but the extra dilution is shown before confirm.
+                                            </p>
+                                        </div>
+                                        <button
+                                            onClick={() => {
+                                                setInvestorRaiseAmount(0);
+                                                setSelectedInvestorIds([]);
+                                            }}
+                                            className="shrink-0 rounded-full border border-zinc-700 px-3 py-1 text-[9px] font-black uppercase tracking-widest text-zinc-400 hover:text-white hover:border-zinc-500"
+                                        >
+                                            No Investor
+                                        </button>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                        <div className="rounded-lg bg-black/35 border border-white/5 p-3">
+                                            <div className="text-[8px] font-black uppercase tracking-widest text-zinc-500">Target Raise</div>
+                                            <div className="mt-2 flex items-center gap-1">
+                                                <span className="text-zinc-500 font-mono text-sm">$</span>
+                                                <input
+                                                    type="number"
+                                                    min={0}
+                                                    max={Math.round(maxInvestorRaise / 1_000_000)}
+                                                    step={0.1}
+                                                    value={Math.round(normalizedInvestorRaise / 100_000) / 10}
+                                                    onChange={(event) => setInvestorRaiseAmount(Math.round((Number(event.target.value) || 0) * 1_000_000))}
+                                                    className="w-full bg-transparent text-xl font-black font-mono text-white focus:outline-none"
+                                                    aria-label="Investor raise amount in millions"
+                                                />
+                                                <span className="text-zinc-500 font-black text-xs">M</span>
+                                            </div>
+                                            <div className="text-[8px] font-bold uppercase tracking-widest text-zinc-600 mt-1">Max {formatMoney(maxInvestorRaise)}</div>
+                                        </div>
+                                        <div className="rounded-lg bg-black/35 border border-white/5 p-3">
+                                            <div className="text-[8px] font-black uppercase tracking-widest text-zinc-500">Selected</div>
+                                            <div className="text-xl font-black font-mono text-emerald-300 mt-2">{formatMoney(investorRaisedAmount)}</div>
+                                            <div className={`text-[8px] font-bold uppercase tracking-widest mt-1 ${
+                                                investorFundingOverage > 0 ? 'text-cyan-300' : investorFundingShortfall > 0 ? 'text-amber-300' : 'text-zinc-600'
+                                            }`}>
+                                                {investorFundingOverage > 0
+                                                    ? `${formatMoney(investorFundingOverage)} over`
+                                                    : investorFundingShortfall > 0
+                                                        ? `${formatMoney(investorFundingShortfall)} short`
+                                                        : 'Target met'}
+                                            </div>
+                                        </div>
+                                        <div className="rounded-lg bg-black/35 border border-white/5 p-3">
+                                            <div className="text-[8px] font-black uppercase tracking-widest text-zinc-500">Investors Own</div>
+                                            <div className="text-xl font-black font-mono text-cyan-300 mt-2">{selectedInvestorPlan?.investorEquityPercent || 0}%</div>
+                                            <div className="text-[8px] font-bold uppercase tracking-widest text-zinc-600 mt-1">Deal terms</div>
+                                        </div>
+                                        <div className="rounded-lg bg-black/35 border border-white/5 p-3">
+                                            <div className="text-[8px] font-black uppercase tracking-widest text-zinc-500">Studio Need</div>
+                                            <div className={`text-xl font-black font-mono mt-2 ${effectiveStudioFundingPool >= netGreenlightCashRequirement ? 'text-white' : 'text-rose-400'}`}>
+                                                {formatMoney(netGreenlightCashRequirement)}
+                                            </div>
+                                            <div className="text-[8px] font-bold uppercase tracking-widest text-zinc-600 mt-1">After investors</div>
+                                        </div>
+                                    </div>
+
+                                    {normalizedInvestorRaise > 0 && investorRaisedAmount > 0 && (
+                                        <div className={`rounded-xl border p-3 ${
+                                            investorFundingOverage > 0
+                                                ? 'border-cyan-400/25 bg-cyan-400/10'
+                                                : investorFundingShortfall > 0
+                                                    ? 'border-amber-400/25 bg-amber-400/10'
+                                                    : 'border-emerald-400/25 bg-emerald-400/10'
+                                        }`}>
+                                            <div className="flex items-center justify-between gap-3">
+                                                <div>
+                                                    <div className="text-[9px] font-black uppercase tracking-[0.2em] text-zinc-400">
+                                                        Funding Read
+                                                    </div>
+                                                    <div className="mt-1 text-sm font-black text-white">
+                                                        {investorFundingOverage > 0
+                                                            ? `You are raising ${formatMoney(investorFundingOverage)} more than target.`
+                                                            : investorFundingShortfall > 0
+                                                                ? `${formatMoney(investorFundingShortfall)} still needs studio cash or another investor.`
+                                                                : 'Target is fully covered.'}
+                                                    </div>
+                                                </div>
+                                                <div className="shrink-0 rounded-full border border-white/10 bg-black/30 px-3 py-2 text-right">
+                                                    <div className="text-[8px] font-black uppercase tracking-widest text-zinc-500">Studio Keeps</div>
+                                                    <div className="text-sm font-black text-emerald-200">{selectedInvestorPlan?.studioEquityPercent || 100}%</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <div className="rounded-xl border border-zinc-800 bg-black/25 p-3 space-y-3">
+                                        <div className="flex items-center justify-between gap-3">
+                                            <div>
+                                                <div className="text-[9px] font-black uppercase tracking-[0.2em] text-zinc-500">Raise Target</div>
+                                                <div className="text-[10px] text-zinc-500 mt-1">Exact percent of available project gap.</div>
+                                            </div>
+                                            <div className="flex items-center rounded-xl border border-cyan-400/25 bg-cyan-400/10 overflow-hidden">
+                                                <button
+                                                    onClick={() => setInvestorRaisePercent(investorRaisePercent - 1)}
+                                                    className="h-10 w-10 text-lg font-black text-cyan-100 hover:bg-white/10"
+                                                    aria-label="Decrease investor raise percent"
+                                                >
+                                                    -
+                                                </button>
+                                                <div className="h-10 min-w-[88px] border-x border-cyan-400/20 flex items-center justify-center gap-1 px-3">
+                                                    <input
+                                                        type="number"
+                                                        min={0}
+                                                        max={100}
+                                                        step={1}
+                                                        value={investorRaisePercent}
+                                                        onChange={(event) => setInvestorRaisePercent(Number(event.target.value))}
+                                                        className="w-11 bg-transparent text-center text-lg font-black font-mono text-cyan-100 focus:outline-none"
+                                                        aria-label="Investor raise percent"
+                                                    />
+                                                    <span className="text-xs font-black text-cyan-200">%</span>
+                                                </div>
+                                                <button
+                                                    onClick={() => setInvestorRaisePercent(investorRaisePercent + 1)}
+                                                    className="h-10 w-10 text-lg font-black text-cyan-100 hover:bg-white/10"
+                                                    aria-label="Increase investor raise percent"
+                                                >
+                                                    +
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-4 gap-2">
+                                            {[0, 25, 50, 100].map((percent) => {
+                                                const active = investorRaisePercent === percent || (percent === 100 && normalizedInvestorRaise === maxInvestorRaise);
+                                                return (
+                                                    <button
+                                                        key={percent}
+                                                        onClick={() => setInvestorRaisePercent(percent)}
+                                                        className={`rounded-lg border px-2 py-2 text-[9px] font-black uppercase tracking-widest transition-colors ${
+                                                            active
+                                                                ? 'bg-emerald-400 text-black border-emerald-300'
+                                                                : 'bg-black/25 text-zinc-400 border-zinc-800 hover:border-zinc-600'
+                                                        }`}
+                                                    >
+                                                        {percent === 0 ? 'None' : percent === 100 ? 'Max' : `${percent}%`}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+
+                                    {normalizedInvestorRaise > 0 && (
+                                        <div className="grid grid-cols-2 gap-2">
+                                            {([
+                                                {
+                                                    id: 'LEAD' as ProjectInvestorFundingMode,
+                                                    label: 'Lead Deal',
+                                                    stat: 'Single',
+                                                    note: 'Cleaner cap table. If capacity is low, the rest stays studio-funded.'
+                                                },
+                                                {
+                                                    id: 'SYNDICATE' as ProjectInvestorFundingMode,
+                                                    label: 'Syndicate',
+                                                    stat: 'Multi',
+                                                    note: 'Each investor fills the leftover ask, then extras show as over-target.'
+                                                }
+                                            ]).map(option => {
+                                                const active = investorFundingMode === option.id;
+                                                return (
+                                                    <button
+                                                        key={option.id}
+                                                        onClick={() => {
+                                                            setInvestorFundingMode(option.id);
+                                                            if (option.id === 'LEAD') setSelectedInvestorIds(current => current.slice(0, 1));
+                                                        }}
+                                                        className={`min-h-[116px] rounded-xl border p-3 text-left transition-all cursor-pointer flex flex-col justify-between ${
+                                                            active
+                                                                ? 'border-emerald-400 bg-emerald-400/10 shadow-[0_0_18px_rgba(16,185,129,0.14)]'
+                                                                : 'border-zinc-800 bg-black/25 hover:border-zinc-600'
+                                                        }`}
+                                                    >
+                                                        <div>
+                                                            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
+                                                                <span className="min-w-0 text-sm font-black text-white leading-tight">{option.label}</span>
+                                                                <span className={`shrink-0 rounded-md px-1.5 py-1 text-[7px] font-black uppercase tracking-[0.14em] whitespace-nowrap ${
+                                                                    active ? 'bg-emerald-300 text-black' : 'bg-white/5 text-zinc-500'
+                                                                }`}>
+                                                                    {option.stat}
+                                                                </span>
+                                                            </div>
+                                                            <p className="mt-2 text-[9px] leading-relaxed text-zinc-500">{option.note}</p>
+                                                        </div>
+                                                        <div className={`mt-3 h-1 rounded-full ${
+                                                            active ? 'bg-emerald-300' : 'bg-zinc-800'
+                                                            }`}>
+                                                        </div>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+
+                                    {normalizedInvestorRaise > 0 && (
+                                        <div className="space-y-2">
+                                            <div className="flex items-center justify-between gap-3">
+                                                <div className="text-[9px] font-black uppercase tracking-[0.2em] text-zinc-500">
+                                                    {investorFundingMode === 'LEAD' ? 'Lead Investor Offers' : 'Syndicate Offers'}
+                                                </div>
+                                                <div className="text-[9px] font-black uppercase tracking-[0.2em] text-zinc-600">
+                                                    {selectedInvestorPlan?.commitments.length || 0} selected
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                {investorOffers.map(offer => {
+                                                    const selected = selectedInvestorIds.includes(offer.investorId);
+                                                    const commitment = selectedInvestorPlan?.commitments.find(item => item.investorId === offer.investorId);
+                                                    const previewInvestorIds = selected
+                                                        ? selectedInvestorIds
+                                                        : investorFundingMode === 'LEAD'
+                                                            ? [offer.investorId]
+                                                            : [...selectedInvestorIds, offer.investorId];
+                                                    const previewPlan = buildProjectInvestorPlan({
+                                                        offers: investorOffers,
+                                                        selectedInvestorIds: previewInvestorIds,
+                                                        targetRaise: normalizedInvestorRaise,
+                                                        packageBudget,
+                                                        lockedExternalFunding: lockedStreamingFundingAmount,
+                                                        fundingMode: investorFundingMode,
+                                                        sourceProjectId: selectedScript?.id,
+                                                        sourceTitle: selectedScript?.title,
+                                                        week: player.currentWeek,
+                                                        year: player.age
+                                                    });
+                                                    const previewCommitment = previewPlan?.commitments.find(item => item.investorId === offer.investorId);
+                                                    const displayCommitment = selected ? commitment : previewCommitment;
+                                                    const displayAmount = displayCommitment?.amount || 0;
+                                                    const unusedCapacity = Math.max(0, offer.amount - displayAmount);
+                                                    const dealEquity = displayCommitment?.equityPercent || offer.equityPercent || 0;
+                                                    const cleanEquity = displayCommitment?.cleanEquityPercent || offer.cleanEquityPercent || 0;
+                                                    const equitySpread = Math.round((dealEquity - cleanEquity) * 10) / 10;
+                                                    const cardRole = displayCommitment?.targetRole === 'LEAD'
+                                                        ? 'Lead Investor'
+                                                        : displayCommitment?.targetRole === 'EXCESS'
+                                                            ? 'Extra Raise'
+                                                            : displayCommitment?.targetRole === 'SYNDICATE'
+                                                                ? 'Syndicate'
+                                                                : offer.fitLabel || 'Investor';
+                                                    const amountLabel = selected
+                                                        ? 'Committed'
+                                                        : displayCommitment?.targetRole === 'EXCESS'
+                                                            ? 'Would Add'
+                                                            : 'Would Commit';
+                                                    return (
+                                                        <button
+                                                            key={offer.investorId}
+                                                            onClick={() => setSelectedInvestorIds(current => (
+                                                                investorFundingMode === 'LEAD'
+                                                                    ? current.includes(offer.investorId) ? [] : [offer.investorId]
+                                                                    : current.includes(offer.investorId)
+                                                                        ? current.filter(id => id !== offer.investorId)
+                                                                        : [...current, offer.investorId]
+                                                            ))}
+                                                            className={`rounded-xl border p-3 text-left transition-all cursor-pointer min-h-[196px] flex flex-col ${
+                                                                selected
+                                                                    ? 'bg-emerald-500/10 border-emerald-400 shadow-[0_0_18px_rgba(16,185,129,0.16)]'
+                                                                    : 'bg-black/25 border-zinc-800 hover:border-zinc-600'
+                                                            }`}
+                                                        >
+                                                            <div className="flex items-start justify-between gap-3">
+                                                                <div className="min-w-0">
+                                                                    <div className="text-sm font-black text-white truncate">{offer.investorName}</div>
+                                                                    <div className="text-[8px] font-black uppercase tracking-widest text-zinc-500">
+                                                                        {describeInvestorKind(offer.kind)} • Rep {offer.reputation} • {offer.relationshipLabel}
+                                                                    </div>
+                                                                    {offer.ownerName && (
+                                                                        <div className="mt-1 text-[9px] font-bold text-zinc-500 truncate">
+                                                                            Owner: {offer.ownerName}{offer.headquarters ? ` • ${offer.headquarters}` : ''}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                                <div className={`w-6 h-6 rounded-full border flex items-center justify-center shrink-0 ${
+                                                                    selected ? 'bg-emerald-400 border-emerald-300 text-black' : 'border-zinc-700 text-zinc-600'
+                                                                }`}>
+                                                                    {selected && <Check size={14} />}
+                                                                </div>
+                                                            </div>
+                                                            <div className="mt-3 grid grid-cols-[1fr_auto] items-end gap-2">
+                                                                <div>
+                                                                    <div className="text-[8px] font-black uppercase tracking-widest text-zinc-500">
+                                                                        {amountLabel}
+                                                                    </div>
+                                                                    <span className="text-lg font-black font-mono text-emerald-300">
+                                                                        {formatMoney(displayAmount || offer.amount)}
+                                                                    </span>
+                                                                </div>
+                                                                <span className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2 py-1 text-[8px] font-black uppercase tracking-widest text-cyan-200 whitespace-nowrap">
+                                                                    {dealEquity}% equity
+                                                                </span>
+                                                            </div>
+                                                            <div className="mt-2 flex items-center justify-between gap-2">
+                                                                <span className={`rounded-full px-2 py-1 text-[8px] font-black uppercase tracking-widest ${
+                                                                    selected
+                                                                        ? 'bg-emerald-400/15 text-emerald-200 border border-emerald-400/25'
+                                                                        : 'bg-white/5 text-zinc-500 border border-white/10'
+                                                                }`}>
+                                                                    {cardRole}
+                                                                </span>
+                                                                <span className={`text-[8px] font-bold uppercase tracking-widest ${
+                                                                    equitySpread > 0.2 ? 'text-amber-300' : equitySpread < -0.2 ? 'text-emerald-300' : 'text-zinc-500'
+                                                                }`}>
+                                                                    {equitySpread > 0.2
+                                                                        ? `+${equitySpread}% premium`
+                                                                        : equitySpread < -0.2
+                                                                            ? `${equitySpread}% discount`
+                                                                            : 'clean terms'}
+                                                                </span>
+                                                            </div>
+                                                            <div className="mt-2 flex items-center justify-between gap-2">
+                                                                <span className="text-[8px] font-bold uppercase tracking-widest text-zinc-600">
+                                                                    Clean {cleanEquity}%
+                                                                </span>
+                                                                {unusedCapacity > 0 && (
+                                                                    <span className="text-[8px] font-bold uppercase tracking-widest text-zinc-500">
+                                                                        {formatMoney(unusedCapacity)} unused cap
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            <div className="mt-2 flex flex-wrap gap-1">
+                                                                {offer.investorTags.slice(0, 3).map(tag => (
+                                                                    <span
+                                                                        key={tag}
+                                                                        className="rounded-md border border-white/10 bg-white/5 px-1.5 py-1 text-[7px] font-black uppercase tracking-[0.12em] text-zinc-500"
+                                                                    >
+                                                                        {tag}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                            <p className="mt-auto pt-2 text-[10px] text-zinc-500 leading-relaxed line-clamp-2">{offer.note}</p>
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                            {investorOffers.length === 0 && (
+                                                <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 text-[10px] text-amber-100/70 leading-relaxed">
+                                                    No serious investor wants this raise yet. Lower the amount, improve the package, or rebuild studio confidence with stronger releases.
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
                             </div>
 
                             {/* Footer / Signature */}

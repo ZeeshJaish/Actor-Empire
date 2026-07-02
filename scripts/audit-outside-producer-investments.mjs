@@ -1,0 +1,126 @@
+import fs from 'node:fs';
+import path from 'node:path';
+
+const root = process.cwd();
+const read = file => fs.readFileSync(path.join(root, file), 'utf8');
+const assertIncludes = (file, text, label = text) => {
+    const source = read(file);
+    if (!source.includes(text)) {
+        throw new Error(`${file} is missing ${label}`);
+    }
+};
+
+assertIncludes('types.ts', 'OutsideProducerInvestmentOffer');
+assertIncludes('types.ts', 'OutsideProductionInvestment');
+assertIncludes('types.ts', 'outsideProductions?: OutsideProductionInvestment[];');
+assertIncludes('types.ts', "'OFFER_OUTSIDE_PRODUCER_INVESTMENT'");
+
+assertIncludes('services/outsideProductions.ts', 'generateOutsideProducerInvestmentOffers');
+assertIncludes('services/outsideProductions.ts', 'calculateOutsideInvestmentAcceptanceChance');
+assertIncludes('services/outsideProductions.ts', 'acceptOutsideProducerInvestmentOffer');
+assertIncludes('services/outsideProductions.ts', 'counterOutsideProducerInvestmentOffer');
+assertIncludes('services/outsideProductions.ts', 'processOutsideProductionsWeek');
+assertIncludes('services/outsideProductions.ts', 'hasOutsideProductionExposure');
+assertIncludes('services/outsideProductions.ts', 'producerReceipts');
+assertIncludes('services/outsideProductions.ts', 'playerPayout');
+assertIncludes('services/outsideProductions.ts', 'counterUsed');
+assertIncludes('services/outsideProductions.ts', 'Producer investment:');
+assertIncludes('services/outsideProductions.ts', 'Producer payout:');
+assertIncludes('services/outsideProductions.ts', "category: 'BUSINESS'");
+assertIncludes('services/outsideProductions.ts', 'buildOutsideProductionResultMessage');
+assertIncludes('services/outsideProductions.ts', 'OUTSIDE_PRODUCER_RESULT');
+assertIncludes('services/outsideProductions.ts', 'releaseWeek: item.releaseWeek');
+assertIncludes('services/outsideProductions.ts', 'acceptedWeek: item.acceptedWeek');
+assertIncludes('services/outsideProductions.ts', 'finishWeek: item.finishWeek');
+assertIncludes('services/outsideProductions.ts', 'getOutsideProducerOfferCadenceWeeks');
+assertIncludes('services/outsideProductions.ts', 'recognition >= 78 ? 8');
+assertIncludes('services/outsideProductions.ts', 'recognition >= 58 ? 12 : 15');
+assertIncludes('services/outsideProductions.ts', 'outside-cadence');
+assertIncludes('services/outsideProductions.ts', 'clamp(base + exposureDelay + jitter - winPullForward, 8, 18)');
+assertIncludes('services/outsideProductions.ts', 'reputationImpact');
+assertIncludes('services/outsideProductions.ts', 'producerType');
+assertIncludes('services/outsideProductions.ts', 'ownerName');
+assertIncludes('services/outsideProductions.ts', 'Producer Result:');
+assertIncludes('services/outsideProductions.ts', 'Fraud-Risk Producer Investment Offers');
+assertIncludes('services/outsideProductions.ts', 'fraudRisk');
+assertIncludes('services/outsideProductions.ts', 'GENEROUS_TERMS');
+assertIncludes('services/outsideProductions.ts', 'UNVERIFIED_FINANCING');
+assertIncludes('services/outsideProductions.ts', 'createOutsideProductionLegalCase');
+assertIncludes('services/outsideProductions.ts', 'Shell company producer disappeared');
+assertIncludes('services/outsideProductions.ts', 'Producer legal fees:');
+assertIncludes('services/outsideProductions.ts', 'FRAUD_CASE');
+
+assertIncludes('services/gameLoop.ts', 'generateOutsideProducerInvestmentOffers');
+assertIncludes('services/gameLoop.ts', 'processOutsideProductionsWeek');
+assertIncludes('services/gameLoop.ts', 'getOutsideProducerOfferCadenceWeeks');
+assertIncludes('services/gameLoop.ts', 'lastOutsideProducerOfferWeek');
+assertIncludes('services/gameLoop.ts', 'hasOutsideProducerCadence');
+assertIncludes('services/gameLoop.ts', 'OFFER_OUTSIDE_PRODUCER_INVESTMENT');
+
+assertIncludes('views/mobile/MessagesApp.tsx', 'OutsideProducerInvestmentOffer');
+assertIncludes('views/mobile/MessagesApp.tsx', 'onImmersiveReviewChange');
+assertIncludes('views/mobile/MessagesApp.tsx', 'Counter Desk');
+assertIncludes('views/mobile/MessagesApp.tsx', 'Their Ask');
+assertIncludes('views/mobile/MessagesApp.tsx', 'Your Counter');
+assertIncludes('views/mobile/MessagesApp.tsx', 'Make your terms');
+assertIncludes('views/mobile/MessagesApp.tsx', 'Final terms');
+assertIncludes('views/mobile/MessagesApp.tsx', 'outsideInvestmentReview');
+assertIncludes('views/mobile/MessagesApp.tsx', 'Review Investment');
+assertIncludes('views/mobile/MessagesApp.tsx', 'Investment Review');
+assertIncludes('views/mobile/MessagesApp.tsx', 'Project Lane');
+assertIncludes('views/mobile/MessagesApp.tsx', 'Generous Terms');
+assertIncludes('views/mobile/MessagesApp.tsx', 'Verification weak');
+assertIncludes('views/mobile/MessagesApp.tsx', 'Unverified financing');
+assertIncludes('views/mobile/MessagesApp.tsx', 'Producer Return');
+assertIncludes('views/mobile/MessagesApp.tsx', 'Settlement');
+assertIncludes('views/mobile/MessagesApp.tsx', 'Releases in ~');
+assertIncludes('views/mobile/MessagesApp.tsx', 'outsideTimeline');
+assertIncludes('views/mobile/MessagesApp.tsx', 'getAbsoluteMessageWeek');
+assertIncludes('views/mobile/MessagesApp.tsx', 'The payout arrives only after the movie finishes its run or platform settlement.');
+assertIncludes('views/mobile/MessagesApp.tsx', 'fixed inset-0');
+assertIncludes('views/mobile/MessagesApp.tsx', 'z-[9999]');
+assertIncludes('views/mobile/MessagesApp.tsx', 'bottom-0');
+assertIncludes('views/mobile/MessagesApp.tsx', 'rounded-[2rem]');
+assertIncludes('views/mobile/MobilePage.tsx', 'isImmersiveMessageReview');
+assertIncludes('views/mobile/MobilePage.tsx', 'onImmersiveReviewChange={setIsImmersiveMessageReview}');
+assertIncludes('views/mobile/MobilePage.tsx', "appMode === 'MESSAGES' && isImmersiveMessageReview");
+
+assertIncludes('App.tsx', 'acceptOutsideProducerInvestmentOffer');
+assertIncludes('App.tsx', 'counterOutsideProducerInvestmentOffer');
+assertIncludes('App.tsx', 'OFFER_OUTSIDE_PRODUCER_INVESTMENT');
+
+assertIncludes('views/lifestyle/business/ProductionHouseGame.tsx', 'Outside Productions');
+assertIncludes('views/mobile/BankApp.tsx', 'Producer Investments');
+assertIncludes('views/mobile/BankApp.tsx', "detailView === 'PRODUCER_INVESTMENTS'");
+assertIncludes('views/mobile/BankApp.tsx', 'Latest 5 positions');
+assertIncludes('views/mobile/BankApp.tsx', 'See More');
+assertIncludes('views/mobile/BankApp.tsx', 'All movie stakes');
+assertIncludes('views/mobile/BankApp.tsx', 'BankMiniMetric');
+assertIncludes('views/mobile/BankApp.tsx', 'outsideProductions');
+assertIncludes('views/mobile/BankApp.tsx', 'outsideInvestmentLedger');
+assertIncludes('views/mobile/BankApp.tsx', 'Receipts');
+assertIncludes('views/mobile/BankApp.tsx', 'Release Y');
+assertIncludes('views/mobile/BankApp.tsx', 'Profit');
+assertIncludes('views/mobile/BankApp.tsx', 'Unverified');
+assertIncludes('views/mobile/BankApp.tsx', 'Legal');
+assertIncludes('views/mobile/BankApp.tsx', 'getOutsidePositionWeek');
+assertIncludes('views/mobile/BankApp.tsx', 'outsidePortfolioEntries.slice(0, 5)');
+assertIncludes('views/mobile/BankApp.tsx', 'ROI');
+assertIncludes('views/mobile/BoxOfficeApp.tsx', 'getOutsideProducerWeeklyEntries');
+assertIncludes('views/mobile/BoxOfficeApp.tsx', "source: 'OUTSIDE'");
+assertIncludes('views/mobile/BoxOfficeApp.tsx', 'Producer Stake');
+assertIncludes('views/HomePage.tsx', 'liveFeedLogs');
+assertIncludes('views/HomePage.tsx', 'now leads the music charts');
+assertIncludes('services/gameLoop.ts', 'news_investor_leadership');
+assertIncludes('services/gameLoop.ts', 'Music-world releases and chart movement already feed News and social');
+assertIncludes('views/lifestyle/business/ProductionHouseGame.tsx', 'Reputation');
+assertIncludes('views/lifestyle/business/ProductionHouseGame.tsx', 'Owner');
+assertIncludes('views/HomePage.tsx', 'triggerOutsideProducerInvestmentQa');
+assertIncludes('views/HomePage.tsx', 'Producer Investment QA');
+assertIncludes('views/HomePage.tsx', 'cheat_outside_offer');
+assertIncludes('views/HomePage.tsx', 'cheat_outside_active');
+assertIncludes('views/HomePage.tsx', 'cheat_outside_exit');
+assertIncludes('views/HomePage.tsx', 'cheat_outside_fraud_offer');
+assertIncludes('views/HomePage.tsx', 'cheat_outside_fraud_active');
+
+console.log('Outside producer investment audit passed.');

@@ -2,6 +2,7 @@ import {
     EventImpactSignal,
     LegalCase,
     LifeEventImpactResult,
+    LocalizedTextVars,
     Player,
     XPost
 } from '../types';
@@ -86,6 +87,19 @@ const toneForDelta = (value: number, positiveIsGood = true): EventImpactSignal['
     return (value > 0) === positiveIsGood ? 'positive' : 'negative';
 };
 
+const YOUTUBE_EFFECT_LABEL_KEYS: Record<string, string> = {
+    Cash: 'life.effect.cash',
+    'Channel Views': 'life.effect.channelViews',
+    Subscribers: 'life.effect.subscribers',
+    'Audience Trust': 'life.effect.audienceTrust',
+    'Fan Mood': 'life.effect.fanMood',
+    Controversy: 'life.effect.controversy',
+    Fame: 'life.effect.fame',
+    Reputation: 'life.effect.reputation',
+    'X Followers': 'life.effect.xFollowers',
+    'Legal Case': 'life.effect.legalCase',
+};
+
 const buildImpactSignals = (
     before: YoutubeImpactSnapshot,
     after: YoutubeImpactSnapshot
@@ -100,6 +114,7 @@ const buildImpactSignals = (
         if (!delta) return;
         effects.push({
             label,
+            labelKey: YOUTUBE_EFFECT_LABEL_KEYS[label],
             value: signed(delta, format),
             tone: toneForDelta(delta, positiveIsGood)
         });
@@ -118,12 +133,61 @@ const buildImpactSignals = (
     if (after.legalCases > before.legalCases) {
         effects.push({
             label: 'Legal Case',
+            labelKey: 'life.effect.legalCase',
             value: 'Opened',
             tone: 'negative'
         });
     }
 
     return effects;
+};
+
+const firstNumberFromLog = (log: string) => log.match(/[\d,]+/)?.[0] || '';
+
+const getYoutubeLogRef = (
+    resolution: YoutubeEventResolution,
+    choiceId: string,
+    log: string
+): { logKey?: string; logVars?: LocalizedTextVars } => {
+    switch (resolution.kind) {
+        case 'COPYRIGHT': {
+            const { claimAmount } = resolution.payload;
+            if (choiceId === 'ACCEPT_CLAIM') return { logKey: 'life.event.youtube.log.copyright.accept', logVars: { amount: `$${claimAmount.toLocaleString()}` } };
+            if (choiceId === 'EDIT_UPLOAD') return { logKey: 'life.event.youtube.log.copyright.edit', logVars: { amount: `$${Math.max(100, Math.round(claimAmount * 0.35)).toLocaleString()}` } };
+            if (choiceId === 'DISPUTE_CLAIM') return { logKey: log.includes('won') ? 'life.event.youtube.log.copyright.disputeWon' : 'life.event.youtube.log.copyright.disputeCase' };
+            if (choiceId === 'GOLDEN_LEGAL') return { logKey: 'life.event.youtube.log.copyright.golden' };
+            return {};
+        }
+        case 'BACKLASH':
+            if (choiceId === 'POST_APOLOGY') return { logKey: 'life.event.youtube.log.backlash.apology' };
+            if (choiceId === 'PR_TEAM') return { logKey: 'life.event.youtube.log.backlash.pr', logVars: { views: firstNumberFromLog(log) } };
+            if (choiceId === 'DOUBLE_DOWN') {
+                return {
+                    logKey: log.includes('legal complaint') ? 'life.event.youtube.log.backlash.doubleLegal' : 'life.event.youtube.log.backlash.doubleTrust',
+                    logVars: { views: firstNumberFromLog(log) },
+                };
+            }
+            return {};
+        case 'CREATOR_INVITE': {
+            const { venue } = resolution.payload;
+            if (choiceId === 'STEADY_NETWORK') return { logKey: 'life.event.youtube.log.invite.steady', logVars: { venue } };
+            if (choiceId === 'CHASE_VIRAL') return { logKey: 'life.event.youtube.log.invite.viral', logVars: { venue, views: firstNumberFromLog(log) } };
+            if (choiceId === 'GOLDEN_HANDLER') return { logKey: 'life.event.youtube.log.invite.golden', logVars: { venue, views: firstNumberFromLog(log) } };
+            return {};
+        }
+        case 'RIVALRY': {
+            const { rivalName } = resolution.payload;
+            if (choiceId === 'IGNORE_BAIT') return { logKey: 'life.event.youtube.log.rivalry.ignore', logVars: { rivalName } };
+            if (choiceId === 'CLAP_BACK') {
+                const matches = [...log.matchAll(/[\d,]+/g)].map(match => match[0]);
+                return { logKey: 'life.event.youtube.log.rivalry.clapBack', logVars: { rivalName, views: matches[0] || '', subscribers: matches[1] || '' } };
+            }
+            if (choiceId === 'MEDIATED_COLLAB') return { logKey: 'life.event.youtube.log.rivalry.golden', logVars: { rivalName, views: firstNumberFromLog(log) } };
+            return {};
+        }
+        default:
+            return {};
+    }
 };
 
 const getNextWeekNumber = (week: number): number => week >= 52 ? 1 : week + 1;
@@ -463,9 +527,12 @@ export const resolveYoutubeEventChoice = (
             break;
     }
 
+    const logRef = getYoutubeLogRef(resolution, choiceId, log);
+
     return {
         updatedPlayer: player,
         log,
+        ...logRef,
         effects: buildImpactSignals(before, snapshotYoutubeImpact(player))
     };
 };

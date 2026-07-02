@@ -23,6 +23,7 @@ import {
     acceptAcquisitionCounter,
     beatAcquisitionRivalBid,
     completeStudioAcquisition,
+    completeStockControlAcquisition,
     getAcquisitionCase,
     reviseAcquisitionOffer,
     runDueDiligence,
@@ -199,7 +200,7 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePl
                       title: project.name,
                       year: project.releaseYear || project.year,
                       week: project.releaseWeek || 1,
-                      revenue: Math.max(0, (project.gross || 0) + (project.streamingRevenue || 0)),
+                      revenue: Math.max(0, (project.gross || 0) + (project.streamingRevenue || 0) + (project.soundtrackRevenue || 0)),
                       quality: project.imdbRating ? project.imdbRating * 10 : project.projectQuality || 0,
                       outcome: project.outcomeTier || project.boxOfficeResult || 'RELEASED',
                   })),
@@ -209,7 +210,7 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePl
                       title: release.name,
                       year: release.projectDetails.releaseYear || player.age,
                       week: release.projectDetails.releaseDate || player.currentWeek,
-                      revenue: Math.max(0, (release.totalGross || 0) + (release.streamingRevenue || 0)),
+                      revenue: Math.max(0, (release.totalGross || 0) + (release.streamingRevenue || 0) + (release.soundtrackRevenue || 0)),
                       quality: release.imdbRating ? release.imdbRating * 10 : release.productionPerformance || 0,
                       outcome: release.status,
                   })),
@@ -384,6 +385,24 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePl
                             acquisitionState: 'NOT_FOR_SALE',
                             capital: result.acquiredBusiness?.balance ?? current.capital,
                             ownershipStructure: 'Privately held · Player controlled',
+                            assetDataSource: 'SAVE_DATA',
+                        } : current);
+                    }
+                    return result;
+                }}
+                onCompleteStockControl={() => {
+                    const result = completeStockControlAcquisition({
+                        player,
+                        profile: selectedStudioProfile,
+                    });
+                    if (result.success) {
+                        onUpdatePlayer(result.player);
+                        setSelectedStudioProfile(current => current ? {
+                            ...current,
+                            isPlayerOwned: true,
+                            acquisitionState: 'NOT_FOR_SALE',
+                            capital: result.acquiredBusiness?.balance ?? current.capital,
+                            ownershipStructure: 'Public-market control · Player controlled',
                             assetDataSource: 'SAVE_DATA',
                         } : current);
                     }

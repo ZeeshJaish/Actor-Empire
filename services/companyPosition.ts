@@ -1,6 +1,6 @@
 import type { Player } from '../types';
 import type { ForbesStudioProfile } from './forbesStudioProfile';
-import { getStockOutstandingShares } from './stockLogic';
+import { getStockOwnershipPercent } from './stockLogic';
 
 export interface CompanyEquityPosition {
     studioId: string;
@@ -73,8 +73,7 @@ export const getCompanyPosition = (
         : undefined;
     const shares = Math.max(0, holding?.shares || 0);
     const stockValue = linkedStock ? shares * Math.max(0, linkedStock.price || 0) : 0;
-    const outstandingShares = linkedStock ? getStockOutstandingShares(linkedStock) : 0;
-    const stockPercent = linkedStock ? roundPercent((shares / outstandingShares) * 100) : 0;
+    const stockPercent = linkedStock ? getStockOwnershipPercent(shares, linkedStock) : 0;
     const negotiatedPositions = getCompanyEquityPositions(player).filter(position => position.studioId === profile.id);
     const negotiatedPercent = roundPercent(negotiatedPositions.reduce((sum, position) => sum + position.percent, 0));
     const investedValue = negotiatedPositions.reduce((sum, position) => sum + Math.max(0, position.investedAmount || 0), 0);

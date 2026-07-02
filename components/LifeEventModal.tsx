@@ -1,10 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { EventImpactSignal, Player, ScheduledEvent, LifeEvent, LifeEventImpactResult, LifeEventOption } from '../types';
+import { EventImpactSignal, Player, ScheduledEvent, LifeEvent, LifeEventImpactResult, LifeEventOption, LocalizedTextVars } from '../types';
 import { AlertTriangle, ShieldAlert, Scale, User, Zap, ChevronRight, PlayCircle, Loader2, CheckCircle, Activity, Newspaper } from 'lucide-react';
 import { motion } from 'motion/react';
 import { showAd } from '../services/adLogic';
 import { addBreadcrumb, recordNonFatal, setCrashContext, trackGameEvent } from '../services/firebaseService';
 import { resolveYoutubeEventChoice, YoutubeEventResolution } from '../services/youtubeEventLogic';
+import { getPlayerLanguage, t } from '../services/i18n';
 
 interface LifeEventModalProps {
     player: Player;
@@ -13,10 +14,15 @@ interface LifeEventModalProps {
 }
 
 export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, onChoice }) => {
+    const language = getPlayerLanguage(player);
+    const tr = (key: string, vars?: LocalizedTextVars) => t(language, key, vars);
+    const localizeText = (fallback: string | undefined, key?: string, vars?: LocalizedTextVars) =>
+        key ? tr(key, vars) : (fallback || '');
     const [isProcessingAd, setIsProcessingAd] = useState(false);
     const [feedback, setFeedback] = useState<{
         updatedPlayer: Player;
         log: string;
+        rawLog: string;
         optionLabel: string;
         wasGolden: boolean;
         effects?: EventImpactSignal[];
@@ -33,6 +39,18 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
     
     // Extract the actual LifeEvent data
     const lifeEvent: LifeEvent = event.data?.lifeEvent;
+    const getLifeEventTitle = (targetEvent: LifeEvent | undefined = lifeEvent) =>
+        localizeText(targetEvent?.title, targetEvent?.titleKey, targetEvent?.textVars);
+    const getLifeEventDescription = () =>
+        localizeText(lifeEvent?.description, lifeEvent?.descriptionKey, lifeEvent?.textVars);
+    const getOptionLabel = (option: LifeEventOption) =>
+        localizeText(option.label, option.labelKey, option.textVars);
+    const getOptionDescription = (option: LifeEventOption) =>
+        localizeText(option.description, option.descriptionKey, option.textVars);
+    const getSignalLabel = (effect: EventImpactSignal) =>
+        localizeText(effect.label, effect.labelKey, effect.textVars);
+    const getImpactLog = (impactResult: LifeEventImpactResult) =>
+        localizeText(impactResult.log, impactResult.logKey, impactResult.logVars);
 
     const executeOptionImpact = (
         option: LifeEventOption,
@@ -75,9 +93,9 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
             flow: 'life_event_choice',
             event_id: event.id,
             event_type: event.type,
-            event_title: lifeEvent?.title || 'missing_life_event',
+            event_title: getLifeEventTitle() || 'missing_life_event',
             option_index: idx,
-            option_label: option.label,
+            option_label: getOptionLabel(option),
         });
         addBreadcrumb('life_event:choice_selected', {
             eventId: event.id,
@@ -127,6 +145,7 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
 
         if (impactResult) {
             const { updatedPlayer, log, feedbackDelay, feedbackType, effects } = impactResult;
+            const localizedLog = getImpactLog(impactResult);
             
             // Handle delayed feedback if any
             if (feedbackDelay && feedbackType) {
@@ -140,8 +159,9 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
             
             setFeedback({
                 updatedPlayer,
-                log,
-                optionLabel: option.label,
+                log: localizedLog || log,
+                rawLog: log,
+                optionLabel: getOptionLabel(option),
                 wasGolden: !!option.isGolden,
                 effects,
             });
@@ -154,17 +174,17 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
         const isGolden = !!option?.isGolden;
         const isRisky = event.type === 'SCANDAL' || event.type === 'CRIME' || event.type === 'LEGAL' || optionText.includes('double') || optionText.includes('clap') || optionText.includes('refuse') || optionText.includes('ignore') || optionText.includes('risk');
         const isPositive = isGolden || optionText.includes('apolog') || optionText.includes('help') || optionText.includes('honest') || optionText.includes('professional') || optionText.includes('settle') || optionText.includes('accept');
-        const eventTitle = event.title || 'The Moment';
+        const eventTitle = getLifeEventTitle(event) || tr('life.modal.fallback.momentTitle');
         
         // Specific fallbacks for common events to ensure game balance isn't broken
         if (eventTitle === "The Side Hustle") {
             if (optionIdx === 0) {
                 p.money += 2000;
                 p.energy.current = Math.max(0, p.energy.current - 10);
-                return { updatedPlayer: p, log: "You worked the side hustle. Bills are paid." };
+                return { updatedPlayer: p, log: tr('life.modal.fallback.sideHustleWorkLog') };
             } else if (optionIdx === 1) {
                 p.stats.experience += 5;
-                return { updatedPlayer: p, log: "You focused on auditions and gained experience." };
+                return { updatedPlayer: p, log: tr('life.modal.fallback.sideHustleAuditionLog') };
             }
         }
 
@@ -173,7 +193,7 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
             p.stats.fame = Math.min(100, (p.stats.fame || 0) + 1);
             return {
                 updatedPlayer: p,
-                log: `${eventTitle} was handled cleanly. Your team turned the moment into a controlled win: +3 reputation, +1 fame.`
+                log: tr('life.modal.fallback.goldenLog', { title: eventTitle })
             };
         }
 
@@ -182,7 +202,7 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
             p.stats.fame = Math.min(100, (p.stats.fame || 0) + 1);
             return {
                 updatedPlayer: p,
-                log: `${eventTitle} created visible fallout. People noticed the choice: +1 fame, -2 reputation.`
+                log: tr('life.modal.fallback.riskyLog', { title: eventTitle })
             };
         }
 
@@ -190,13 +210,13 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
             p.stats.reputation = Math.min(100, (p.stats.reputation || 0) + 1);
             return {
                 updatedPlayer: p,
-                log: `${eventTitle} landed well enough. The choice kept things steady: +1 reputation.`
+                log: tr('life.modal.fallback.positiveLog', { title: eventTitle })
             };
         }
 
         return {
             updatedPlayer: p,
-            log: `${eventTitle} moved forward without major damage. The result was neutral, but the story continued.`
+            log: tr('life.modal.fallback.neutralLog', { title: eventTitle })
         };
     };
 
@@ -222,29 +242,29 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
         const lower = log.toLowerCase();
         if (feedback?.wasGolden) {
             return {
-                eyebrow: 'Golden Outcome',
-                title: 'Handled Like A Pro',
-                tone: 'The premium route turned the moment into controlled damage control and cleaner upside.'
+                eyebrow: tr('life.modal.outcome.golden.eyebrow'),
+                title: tr('life.modal.outcome.golden.title'),
+                tone: tr('life.modal.outcome.golden.tone')
             };
         }
         if (lower.includes('legal') || lower.includes('case') || lower.includes('complaint') || lower.includes('backlash') || lower.includes('heat rose') || lower.includes('hit')) {
             return {
-                eyebrow: 'Fallout',
-                title: 'The World Reacted',
-                tone: 'Your choice created visible consequences. Fans, press, and industry people are already reading the move.'
+                eyebrow: tr('life.modal.outcome.fallout.eyebrow'),
+                title: tr('life.modal.outcome.fallout.title'),
+                tone: tr('life.modal.outcome.fallout.tone')
             };
         }
         if (lower.includes('won') || lower.includes('boost') || lower.includes('gained') || lower.includes('hit collab') || lower.includes('praised') || lower.includes('win')) {
             return {
-                eyebrow: 'Momentum',
-                title: 'The Move Landed',
-                tone: 'The decision created momentum, and the career machine is already absorbing the result.'
+                eyebrow: tr('life.modal.outcome.momentum.eyebrow'),
+                title: tr('life.modal.outcome.momentum.title'),
+                tone: tr('life.modal.outcome.momentum.tone')
             };
         }
         return {
-            eyebrow: 'Aftermath',
-            title: 'Choice Locked In',
-            tone: 'The story moved forward. This result will now feed into your reputation, money, relationships, or public image.'
+            eyebrow: tr('life.modal.outcome.aftermath.eyebrow'),
+            title: tr('life.modal.outcome.aftermath.title'),
+            tone: tr('life.modal.outcome.aftermath.tone')
         };
     };
 
@@ -270,7 +290,7 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
             flow: 'life_event_continue',
             event_id: event.id,
             event_type: event.type,
-            event_title: lifeEvent?.title || 'missing_life_event',
+            event_title: getLifeEventTitle() || 'missing_life_event',
         });
         addBreadcrumb('life_event:continue_pressed', {
             eventId: event.id,
@@ -286,7 +306,7 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
             window.setTimeout(() => {
                 if (!mountedRef.current) return;
                 setIsResolvingFeedback(false);
-                setResolveError('Still here? Tap Continue again. The event will safely retry.');
+                setResolveError(tr('life.modal.error.retryContinue'));
             }, 1800);
         } catch (error) {
             console.error('LifeEvent continue failed:', error);
@@ -296,7 +316,7 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
                 event_title: lifeEvent?.title || 'missing_life_event',
             });
             setIsResolvingFeedback(false);
-            setResolveError('Could not close this event. Tap Continue again.');
+            setResolveError(tr('life.modal.error.closeFailed'));
         }
     };
 
@@ -312,11 +332,11 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
             });
             addBreadcrumb('life_event:invalid_dismiss', { eventId: event.id, eventType: event.type });
             try {
-                onChoice(player, 'The moment passed without major damage. Your team kept the story moving and the career stayed on track.');
+                onChoice(player, tr('life.modal.invalid.log'));
                 window.setTimeout(() => {
                     if (!mountedRef.current) return;
                     setIsResolvingFeedback(false);
-                    setResolveError('Still here? Tap Continue again. The event will safely retry.');
+                    setResolveError(tr('life.modal.error.retryContinue'));
                 }, 1800);
             } catch (error) {
                 console.error('Invalid life event dismiss failed:', error);
@@ -325,17 +345,17 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
                     event_type: event.type,
                 });
                 setIsResolvingFeedback(false);
-                setResolveError('Could not skip this event. Tap Continue again.');
+                setResolveError(tr('life.modal.error.skipFailed'));
             }
         };
 
         return (
             <div className="fixed inset-0 z-[200] bg-black/85 backdrop-blur-md flex items-end sm:items-center justify-center p-3 sm:p-4">
                 <div className="w-full max-w-sm bg-zinc-900 border border-zinc-800 rounded-3xl shadow-2xl p-5">
-                    <div className="text-[10px] font-black uppercase tracking-[0.24em] text-amber-400 mb-2">Aftermath</div>
-                    <h3 className="text-2xl font-black text-white leading-tight mb-3">Moment Handled</h3>
+                    <div className="text-[10px] font-black uppercase tracking-[0.24em] text-amber-400 mb-2">{tr('life.modal.invalid.eyebrow')}</div>
+                    <h3 className="text-2xl font-black text-white leading-tight mb-3">{tr('life.modal.invalid.title')}</h3>
                     <p className="text-sm text-zinc-400 leading-relaxed mb-5">
-                        The details were unclear, so your team handled it quietly and kept the career moving.
+                        {tr('life.modal.invalid.description')}
                     </p>
                     {resolveError && <div className="mb-3 text-xs font-bold text-amber-300">{resolveError}</div>}
                     <button
@@ -344,7 +364,7 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
                         disabled={isResolvingFeedback}
                         className="w-full py-4 bg-amber-500 text-black font-black rounded-2xl disabled:opacity-60"
                     >
-                        {isResolvingFeedback ? 'Continuing...' : 'Continue'}
+                        {isResolvingFeedback ? tr('life.modal.button.continuing') : tr('life.modal.button.continue')}
                     </button>
                 </div>
             </div>
@@ -352,7 +372,7 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
     }
 
     if (feedback) {
-        const outcomeCopy = getOutcomeCopy(feedback.log);
+        const outcomeCopy = getOutcomeCopy(feedback.rawLog);
         const structuredEffects = feedback.effects || [];
         const fallbackSignals = structuredEffects.length > 0 ? [] : extractOutcomeSignals(feedback.log);
 
@@ -376,13 +396,13 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
                                     {outcomeCopy.eyebrow}
                                 </div>
                                 <h3 className="text-2xl font-black text-white leading-tight">{outcomeCopy.title}</h3>
-                                <div className="text-xs text-zinc-500 mt-1">Decision: {feedback.optionLabel.replace(' (Watch Ad)', '')}</div>
+                                <div className="text-xs text-zinc-500 mt-1">{tr('life.modal.feedback.decision', { option: feedback.optionLabel.replace(` (${tr('common.watchAd')})`, '').replace(' (Watch Ad)', '') })}</div>
                             </div>
                         </div>
 
                         <div className="rounded-3xl border border-white/10 bg-black/30 p-4 mb-4">
                             <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-3">
-                                <Newspaper size={13} /> What Happened
+                                <Newspaper size={13} /> {tr('life.modal.feedback.whatHappened')}
                             </div>
                             <p className="text-base font-bold text-white leading-relaxed">{feedback.log}</p>
                             <p className="text-sm text-zinc-400 leading-relaxed mt-3">{outcomeCopy.tone}</p>
@@ -391,15 +411,15 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
                         {(structuredEffects.length > 0 || fallbackSignals.length > 0) && (
                             <div className="rounded-3xl border border-white/10 bg-zinc-950/70 p-4">
                                 <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-3">
-                                    <Activity size={13} /> Visible Impact
+                                    <Activity size={13} /> {tr('life.modal.feedback.visibleImpact')}
                                 </div>
                                 <div className="flex flex-wrap gap-2">
                                     {structuredEffects.map(effect => (
                                         <span
-                                            key={`${effect.label}-${effect.value}`}
+                                            key={`${getSignalLabel(effect)}-${effect.value}`}
                                             className={`rounded-full border px-3 py-1.5 text-xs font-black ${getSignalClasses(effect.tone)}`}
                                         >
-                                            {effect.label} {effect.value}
+                                            {getSignalLabel(effect)} {effect.value}
                                         </span>
                                     ))}
                                     {fallbackSignals.map(signal => (
@@ -424,7 +444,7 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
                             disabled={isResolvingFeedback}
                             className={`w-full py-4 bg-gradient-to-r ${accentGradient} text-white font-bold rounded-2xl shadow-lg hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-60`}
                         >
-                            {isResolvingFeedback ? 'Continuing...' : resolveError ? 'Retry Continue' : 'Continue'}
+                            {isResolvingFeedback ? tr('life.modal.button.continuing') : resolveError ? tr('life.modal.button.retryContinue') : tr('life.modal.button.continue')}
                         </button>
                     </div>
                 </motion.div>
@@ -443,8 +463,8 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
                 {isProcessingAd && (
                     <div className="absolute inset-0 z-[210] bg-black/90 flex flex-col items-center justify-center p-6 text-center">
                         <Loader2 className="w-12 h-12 text-amber-500 animate-spin mb-4" />
-                        <h3 className="text-white font-bold text-lg mb-2">Preparing Golden Option...</h3>
-                        <p className="text-zinc-400 text-sm">Your star power is being summoned.</p>
+                        <h3 className="text-white font-bold text-lg mb-2">{tr('life.modal.goldenPreparing.title')}</h3>
+                        <p className="text-zinc-400 text-sm">{tr('life.modal.goldenPreparing.description')}</p>
                     </div>
                 )}
 
@@ -463,16 +483,16 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
                         </div>
                         <div>
                             <div className={`text-[10px] font-mono text-${themeColor}-400 uppercase tracking-widest font-bold`}>
-                                {lifeEvent.type.replace('_', ' ')} EVENT
+                                {tr('life.modal.eventType', { type: tr(`life.type.${lifeEvent.type}`) })}
                             </div>
                             <div className="text-xs text-zinc-500 font-medium flex items-center gap-1">
-                                <User size={12} /> Life Story
+                                <User size={12} /> {tr('life.modal.lifeStory')}
                             </div>
                         </div>
                     </div>
                     
                     <h2 className="text-2xl font-black text-white tracking-tight leading-tight relative z-10">
-                        {lifeEvent.title}
+                        {getLifeEventTitle()}
                     </h2>
                 </div>
 
@@ -482,13 +502,13 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
                         {/* Decorative quotes */}
                         <div className={`absolute -top-3 -left-2 text-4xl text-${themeColor}-500/20 font-serif`}>"</div>
                         <p className="text-sm text-zinc-300 leading-relaxed relative z-10">
-                            {lifeEvent.description}
+                            {getLifeEventDescription()}
                         </p>
                     </div>
 
                     <div className="space-y-3">
                         <div className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold mb-2 px-2">
-                            Select Action
+                            {tr('life.modal.selectAction')}
                         </div>
                         {lifeEvent.options.map((opt, idx) => (
                             <motion.button 
@@ -504,26 +524,26 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
                                 <div className="flex items-center justify-between w-full relative z-10">
                                     <div className="flex items-center gap-3">
                                         {opt.isGolden && <PlayCircle size={18} className="text-amber-500 flex-shrink-0" />}
-                                        <span className={`text-sm font-bold tracking-wide ${opt.isGolden ? 'text-amber-400' : ''}`}>{opt.label}</span>
+                                        <span className={`text-sm font-bold tracking-wide ${opt.isGolden ? 'text-amber-400' : ''}`}>{getOptionLabel(opt)}</span>
                                     </div>
                                     
                                     <div className={`w-8 h-8 rounded-full bg-black/50 flex items-center justify-center group-hover:bg-${themeColor}-500/20 transition-colors flex-shrink-0 ml-2`}>
                                         <ChevronRight size={16} className={`text-zinc-500 group-hover:text-${themeColor}-400`} />
                                     </div>
                                 </div>
-                                {opt.description && (
+                                {getOptionDescription(opt) && (
                                     <div className="mt-2 text-xs text-zinc-500 font-medium italic relative z-10 pr-10">
-                                        {opt.description}
+                                        {getOptionDescription(opt)}
                                     </div>
                                 )}
                                 {!!opt.previewEffects?.length && (
                                     <div className="mt-3 flex flex-wrap gap-1.5 relative z-10 pr-8">
                                         {opt.previewEffects.slice(0, 3).map(effect => (
                                             <span
-                                                key={`${effect.label}-${effect.value}`}
+                                                key={`${getSignalLabel(effect)}-${effect.value}`}
                                                 className={`rounded-full border px-2.5 py-1 text-[10px] font-black ${getSignalClasses(effect.tone)}`}
                                             >
-                                                {effect.label} {effect.value}
+                                                {getSignalLabel(effect)} {effect.value}
                                             </span>
                                         ))}
                                     </div>

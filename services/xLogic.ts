@@ -1,7 +1,7 @@
 
 import { Player, XPost, NPCActor } from '../types';
 import { NPC_DATABASE } from './npcLogic';
-import { AWARD_GOSSIP_TEMPLATES } from './awardLogic';
+import { getAwardGossipTemplate } from './awardLogic';
 import { getEnabledGlobalCreatorProfiles } from './youtubeLogic';
 import { normalizeUniverseMap } from './universeLogic';
 import { getPlayerLanguage } from './i18n';
@@ -105,7 +105,8 @@ const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
 
 export const generateXFeed = (player: Player): XPost[] => {
     const feed: XPost[] = [];
-    const isPt = getPlayerLanguage(player) === 'pt-BR';
+    const language = getPlayerLanguage(player);
+    const isPt = language === 'pt-BR';
     const creatorProfiles = getEnabledGlobalCreatorProfiles(player).map(creator => ({
         ...creator,
         tier: 'A_LIST' as const
@@ -135,7 +136,7 @@ export const generateXFeed = (player: Player): XPost[] => {
 
         if (isAwardGossip && pendingCeremony) {
              const rival = pick(npcMap);
-             content = pick(AWARD_GOSSIP_TEMPLATES)
+             content = getAwardGossipTemplate(language)
                 .replace('{Player}', player.name)
                 .replace('{Rival}', rival.name)
                 .replace('{Award}', pendingCeremony.title);

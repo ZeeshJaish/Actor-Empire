@@ -32,8 +32,8 @@ export type SponsorshipActionType = 'POST' | 'SHOOT';
 export type SponsorshipFrequency = 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY';
 export type InstaPostType = 'ANNOUNCEMENT' | 'BTS' | 'CELEBRATION' | 'LIFESTYLE' | 'SELFIE' | 'INDUSTRY_NEWS' | 'REEL' | 'CAROUSEL' | 'RED_CARPET' | 'COUPLE_POST' | 'BRAND_FIT' | 'CONTROVERSIAL';
 export type InteractionType = 'GREET' | 'COMPLIMENT' | 'COFFEE' | 'COLLAB' | 'BEFRIEND';
-export type YoutubeVideoType = 'VLOG' | 'SKIT' | 'Q_AND_A' | 'TRAILER' | 'COVER' | 'STORYTIME';
-export type YoutubeMessageType = 'OFFER_YOUTUBE_COLLAB' | 'OFFER_YOUTUBE_BRAND';
+export type YoutubeVideoType = 'VLOG' | 'SKIT' | 'Q_AND_A' | 'TRAILER' | 'COVER' | 'STORYTIME' | 'MUSIC_VIDEO';
+export type YoutubeMessageType = 'OFFER_YOUTUBE_COLLAB' | 'OFFER_YOUTUBE_BRAND' | 'OFFER_MUSIC_VIDEO_FEATURE';
 export type YoutubeUploadPlan = 'SAFE' | 'VIRAL_BAIT' | 'BTS' | 'PROJECT_PROMO' | 'SPONSOR_HEAVY';
 export type YoutubeMerchTier = 'BASIC' | 'PREMIUM' | 'LUXURY';
 export type YoutubeCreatorIdentity = 'ACTOR_VLOGGER' | 'CHAOS_CREATOR' | 'PRESTIGE_FILMMAKER' | 'LIFESTYLE_ICON' | 'CONTROVERSY_MAGNET';
@@ -45,6 +45,183 @@ export type PlatformId = 'NETFLIX' | 'APPLE_TV' | 'DISNEY_PLUS' | 'HULU' | 'YOUT
 export type ReleaseScale = 'GLOBAL' | 'MASS' | 'LIMITED';
 export type ReleaseStrategy = 'THEATRICAL' | 'STREAMING_ONLY';
 export type ScreeningStrategy = 'REGIONAL' | 'NATIONAL' | 'INTERNATIONAL';
+export type BoxOfficeRegionId =
+    | 'NORTH_AMERICA'
+    | 'SOUTH_AMERICA'
+    | 'EUROPE'
+    | 'ASIA'
+    | 'AFRICA'
+    | 'OCEANIA';
+export type CinemaChainId =
+    | 'EMPIRE_CINEMAS'
+    | 'Z_CINEMAS'
+    | 'NOVA_CIRCUIT'
+    | 'PRISM_HALLS'
+    | 'ARCLIGHT_GRID'
+    | 'CROWNSCREEN';
+export type CinemaChainAudienceStrength = 'MASS' | 'PREMIUM' | 'FAMILY' | 'STAR_DRIVEN' | 'PRESTIGE' | 'FRANCHISE' | 'YOUTH' | 'URBAN';
+export type MusicArtistFameTier = 'EMERGING' | 'KNOWN' | 'STAR' | 'SUPERSTAR' | 'LEGEND';
+export type MusicArtistAvailability = 'COMMON' | 'SELECTIVE' | 'RARE';
+export type MusicArtistScandalRisk = 'LOW' | 'MEDIUM' | 'HIGH';
+export type MusicArtistGender = 'MALE' | 'FEMALE' | 'GROUP' | 'UNKNOWN';
+export type MusicCreditRole = 'LEAD_SINGLE' | 'END_CREDIT_SONG' | 'SOUNDTRACK_EP' | 'PROMO_ALBUM' | 'TRAILER_ANTHEM' | 'MUSIC_VIDEO_TIE_IN';
+export type ProjectMusicStrategy = 'COMPOSER_ONLY' | 'LEAD_SINGLE' | 'SOUNDTRACK_EP' | 'PROMO_ALBUM' | 'MUSIC_VIDEO_TIE_IN';
+export type CampaignPositioning = 'MASS_EVENT' | 'PRESTIGE_PUSH' | 'FANBASE_MOBILIZATION' | 'VIRAL_HEAT' | 'SLEEPER_BUILD';
+export type CampaignTimeline = 'FRONT_LOADED_OPENING' | 'BALANCED_ROLLOUT' | 'SLOW_BURN_WOM' | 'LAST_WEEK_BLITZ';
+export type CampaignRiskLevel = 'LOW' | 'MEDIUM' | 'HIGH' | 'SEVERE';
+export type CampaignRealityOutcome =
+    | 'CAMPAIGN_DELIVERED'
+    | 'OVERHYPED'
+    | 'HIDDEN_GEM'
+    | 'MISPOSITIONED'
+    | 'PRESTIGE_REJECTED'
+    | 'VIRAL_BACKLASH'
+    | 'WORD_OF_MOUTH_BREAKOUT'
+    | 'EVENT_DROP_OFF';
+export type MarketingChannelId =
+    | 'TRAILER_LAUNCH'
+    | 'SOCIAL_DIGITAL'
+    | 'TV_OUTDOOR'
+    | 'RED_CARPET'
+    | 'CRITIC_SCREENINGS'
+    | 'INFLUENCER_PUSH'
+    | 'INTERNATIONAL'
+    | 'FAN_EVENTS';
+export type MarketingChannelAllocations = Partial<Record<MarketingChannelId, number>>;
+
+export interface BoxOfficeRegion {
+    id: BoxOfficeRegionId;
+    label: string;
+    shortLabel: string;
+    marketWeight: number;
+}
+
+export interface CinemaChainRegionalTerms {
+    screens: number;
+    exhibitorCut: number;
+    bookingCost: number;
+    footfallPower: number;
+    prestigeSupport: number;
+    volatility: number;
+    note: string;
+}
+
+export interface CinemaChain {
+    id: CinemaChainId;
+    name: string;
+    logoMark: string;
+    brandColor: string;
+    personality: string;
+    globalReputation: number;
+    audienceStrengths: CinemaChainAudienceStrength[];
+    regionalTerms: Record<BoxOfficeRegionId, CinemaChainRegionalTerms>;
+}
+
+export interface TheatricalChainReceipt {
+    chainId: CinemaChainId;
+    chainName: string;
+    gross: number;
+    studioReceipts: number;
+    exhibitorReceipts: number;
+    screens: number;
+    expectedFootfall: number;
+    exhibitorCut: number;
+}
+
+export interface TheatricalRegionReceipt {
+    regionId: BoxOfficeRegionId;
+    regionLabel: string;
+    regionShortLabel: string;
+    gross: number;
+    studioReceipts: number;
+    exhibitorReceipts: number;
+    screens: number;
+    expectedFootfall: number;
+    averageExhibitorCut: number;
+    holdModifier: number;
+    chainReceipts: TheatricalChainReceipt[];
+}
+
+export interface TheatricalDistributionBreakdown {
+    week: number;
+    gross: number;
+    studioReceipts: number;
+    exhibitorReceipts: number;
+    totalScreens: number;
+    expectedFootfall: number;
+    averageExhibitorCut: number;
+    studioShare: number;
+    distributionModifier: number;
+    overscreeningPenalty: number;
+    underReleasePenalty: number;
+    regionReceipts: TheatricalRegionReceipt[];
+}
+
+export interface StreamingRegionBreakdown {
+    regionId: BoxOfficeRegionId;
+    regionLabel: string;
+    regionShortLabel: string;
+    views: number;
+    revenue: number;
+    audienceShare: number;
+    retentionModifier: number;
+}
+
+export interface StreamingDistributionBreakdown {
+    week: number;
+    platformId: PlatformId;
+    views: number;
+    revenue: number;
+    primaryRegionId: BoxOfficeRegionId;
+    globalReachScore: number;
+    regionBreakdowns: StreamingRegionBreakdown[];
+}
+
+export interface CampaignFitSnapshot {
+    positioning: CampaignPositioning;
+    fitScore: number;
+    falseMarketingRisk: CampaignRiskLevel;
+    overspendRisk: CampaignRiskLevel;
+    audienceMatch: number;
+    criticMatch: number;
+    recommendedSpendCap: number;
+    warning: string;
+    strengths: string[];
+    risks: string[];
+}
+
+export interface CampaignForecastSnapshot {
+    timeline: CampaignTimeline;
+    openingWeekendLow: number;
+    openingWeekendHigh: number;
+    totalRevenueLow: number;
+    totalRevenueHigh: number;
+    breakEvenChance: number;
+    weekTwoDropRisk: number;
+    streamingBidBoost: number;
+    awardsVisibility: number;
+    franchiseValueImpact: number;
+    confidenceLabel: 'Early Estimate' | 'Volatile Estimate' | 'Market Read';
+}
+
+export interface CampaignRealitySnapshot {
+    outcome: CampaignRealityOutcome;
+    label: string;
+    tone: 'POSITIVE' | 'MIXED' | 'NEGATIVE';
+    promised: string;
+    audienceRead: string;
+    criticRead: string;
+    summary: string;
+    forecastShift: string;
+    audienceScore: number;
+    criticScore: number;
+    buzzDelta: number;
+    reputationDelta: number;
+    franchiseValueDelta: number;
+    newsworthy: boolean;
+    checkedWeek: number;
+    checkedYear: number;
+}
 
 export interface CampaignItem {
     id: string;
@@ -271,8 +448,20 @@ export interface ProjectConcept {
     }[];
     selectedLocations: string[]; // Changed from selectedLocation: string | null
     tone: number;
+    reservedMarketingBudget?: number;
+    marketingBudgetSpent?: number;
+    marketingBudgetRemaining?: number;
     equipmentChoices?: Record<string, string>;
-    lastStep?: 'SELECT_SCRIPT' | 'DIRECTOR' | 'CAST' | 'CREW' | 'EQUIPMENT' | 'LOCATION' | 'TONE' | 'CONFIRM';
+    musicStrategy?: ProjectMusicStrategy;
+    selectedMusicArtistTargetCount?: number;
+    selectedMusicCreditRoles?: MusicCreditRole[];
+    selectedMusicArtistIds?: string[];
+    musicPlan?: ProjectMusicPlan;
+    investorRaiseAmount?: number;
+    investorFundingMode?: ProjectInvestorFundingMode;
+    selectedInvestorIds?: string[];
+    investorPlan?: ProjectInvestorPlan;
+    lastStep?: 'SELECT_SCRIPT' | 'DIRECTOR' | 'CAST' | 'CREW' | 'EQUIPMENT' | 'LOCATION' | 'SETUP' | 'TONE' | 'CONFIRM';
     customPoster?: CustomPoster;
     lockedStreamingFunding?: LockedStreamingFunding;
     format?: ProjectFormat;
@@ -447,6 +636,123 @@ export interface OwnedRight {
 
 export type OwnedRightDevelopmentStrategy = 'FRESH_ADAPTATION' | 'REBOOT';
 export type SubsidiaryOperatingModel = 'INDEPENDENT_LABEL' | 'CONTROLLED_SUBSIDIARY' | 'FULL_MERGER';
+export type StudioMandateFocus = 'MOVIES_FIRST' | 'SERIES_FIRST' | 'BALANCED_SLATE' | 'FRANCHISE_EXPANSION' | 'PRESTIGE_AWARDS' | 'COMMERCIAL_HITS';
+export type StudioMandateBudgetAppetite = 'LEAN' | 'STANDARD' | 'PREMIUM';
+export type StudioMandateReleasePace = 'CAREFUL' | 'STEADY' | 'AGGRESSIVE';
+export type StudioMandateIpStrategy = 'ORIGINALS' | 'OWNED_IP' | 'SEQUELS_REBOOTS' | 'MIXED';
+export type StudioMandateTalentPolicy = 'IN_HOUSE' | 'RISING_STARS' | 'STAR_POWER' | 'MIXED';
+export type StudioMandateObjective = 'PROFIT_FIRST' | 'PRESTIGE_FIRST' | 'COMMERCIAL_FIRST' | 'BALANCED';
+export type StudioMandateCreativeAppetite = 'SAFE' | 'CALCULATED' | 'BOLD';
+export type StudioMandateAutoProduction = 'PAUSED' | 'BOARD_REVIEW' | 'APPROVED';
+export type SubsidiaryProjectProposalStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'AUTO_STARTED';
+export type SubsidiaryProjectSource = 'ORIGINAL' | 'OWNED_IP' | 'FRANCHISE' | 'UNIVERSE';
+export type SubsidiaryPersonality = 'Commercial' | 'Prestige-focused' | 'Franchise-driven' | 'Experimental' | 'Conservative' | 'Aggressive' | 'Streaming-first';
+export type SubsidiaryDecisionType = 'RISKY_PRODUCTION' | 'EMERGENCY_CAPITAL' | 'LEADERSHIP_CHANGE' | 'RIGHTS_ACQUISITION' | 'DORMANT_FRANCHISE' | 'PARTNERSHIP' | 'FLOP_RESPONSE' | 'INDEPENDENCE_REQUEST';
+export type SubsidiaryDecisionStatus = 'PENDING' | 'RESOLVED' | 'DISMISSED';
+export type SubsidiaryDecisionArcStatus = 'ACTIVE' | 'COMPLETED';
+
+export interface StudioOperatingMandate {
+    focus: StudioMandateFocus;
+    budgetAppetite: StudioMandateBudgetAppetite;
+    releasePace: StudioMandateReleasePace;
+    ipStrategy: StudioMandateIpStrategy;
+    talentPolicy: StudioMandateTalentPolicy;
+    objective: StudioMandateObjective;
+    creativeAppetite: StudioMandateCreativeAppetite;
+    autoProduction: StudioMandateAutoProduction;
+    updatedWeek?: number;
+    updatedYear?: number;
+}
+
+export interface SubsidiaryProjectProposal {
+    id: string;
+    studioId: string;
+    studioName: string;
+    title: string;
+    projectType: ProjectType;
+    genre: Genre;
+    budgetTier: BudgetTier;
+    estimatedBudget: number;
+    source: SubsidiaryProjectSource;
+    sourceLabel?: string;
+    franchiseId?: string;
+    universeId?: UniverseId;
+    installmentNumber?: number;
+    logline: string;
+    mandateSnapshot: StudioOperatingMandate;
+    logic: string[];
+    status: SubsidiaryProjectProposalStatus;
+    createdWeek: number;
+    createdYear: number;
+    decidedWeek?: number;
+    decidedYear?: number;
+    startedScriptId?: string;
+    startedConceptId?: string;
+}
+
+export interface SubsidiaryDecisionOption {
+    id: 'APPROVE' | 'DECLINE';
+    label: string;
+    description: string;
+    preview: string;
+    tone: 'positive' | 'negative' | 'neutral';
+}
+
+export interface SubsidiaryDecision {
+    id: string;
+    studioId: string;
+    studioName: string;
+    type: SubsidiaryDecisionType;
+    status: SubsidiaryDecisionStatus;
+    title: string;
+    summary: string;
+    personality: SubsidiaryPersonality;
+    recommendedAmount?: number;
+    relatedTitle?: string;
+    followUp?: {
+        label: string;
+        effect: string;
+    };
+    stakes: string[];
+    logic: string[];
+    options: SubsidiaryDecisionOption[];
+    createdWeek: number;
+    createdYear: number;
+    dueWeek?: number;
+    selectedOptionId?: SubsidiaryDecisionOption['id'];
+    resolvedWeek?: number;
+    resolvedYear?: number;
+    outcomeSummary?: string;
+}
+
+export interface SubsidiaryDecisionArcBeat {
+    label: string;
+    effect: string;
+    pulseWeek: number;
+    pulseYear: number;
+    resolvedWeek?: number;
+    resolvedYear?: number;
+}
+
+export interface SubsidiaryDecisionArc {
+    id: string;
+    studioId: string;
+    studioName: string;
+    sourceDecisionId: string;
+    sourceDecisionType: SubsidiaryDecisionType;
+    title: string;
+    summary: string;
+    tone: SubsidiaryDecisionOption['tone'];
+    status: SubsidiaryDecisionArcStatus;
+    beats: SubsidiaryDecisionArcBeat[];
+    beatsResolved: number;
+    nextPulseWeek?: number;
+    nextPulseYear?: number;
+    createdWeek: number;
+    createdYear: number;
+    completedWeek?: number;
+    completedYear?: number;
+}
 
 export interface OwnedRightDevelopmentChoice {
     format: Extract<ProjectType, 'MOVIE' | 'SERIES'>;
@@ -468,6 +774,8 @@ export interface StudioState {
     productionFund?: number; // NEW: Funds provided by a streaming platform for the next project
     lockedStreamingFunds?: LockedStreamingFunding[];
     platformRelations?: Record<string, PlatformFundingRelationship>;
+    investorRelationships?: ProjectInvestorRelationship[];
+    investorLeadershipChanges?: ProjectInvestorLeadershipChange[];
     financeLedger?: StudioFinanceEntry[];
     genreReputation?: Record<string, number>;
     marketTrends?: GenreMarketTrend[];
@@ -484,6 +792,19 @@ export interface StudioState {
     operatingModel?: SubsidiaryOperatingModel;
     operatingModelChangedWeek?: number;
     operatingModelChangedYear?: number;
+    operatingMandate?: StudioOperatingMandate;
+    subsidiaryProjectProposals?: SubsidiaryProjectProposal[];
+    lastSubsidiaryOperationWeek?: number;
+    lastSubsidiaryOperationYear?: number;
+    subsidiaryPersonality?: SubsidiaryPersonality;
+    subsidiaryDecisions?: SubsidiaryDecision[];
+    activeDecisionArcs?: SubsidiaryDecisionArc[];
+    lastSubsidiaryDecisionWeek?: number;
+    lastSubsidiaryDecisionYear?: number;
+    mergedIntoStudioId?: StudioId;
+    mergerIntegratedWeek?: number;
+    mergerIntegratedYear?: number;
+    mergerIntegrationCost?: number;
 }
 
 export interface GenreMarketTrend {
@@ -526,7 +847,7 @@ export interface StudioFinanceEntry {
     week: number;
     year: number;
     amount: number;
-    type: 'THEATRICAL' | 'STREAMING_DEAL' | 'STREAMING_ROYALTY' | 'UNIVERSE' | 'CAPITAL_INJECTION' | 'CAPITAL_WITHDRAWAL' | 'PRODUCTION_SPEND' | 'FUNDING_SURPLUS';
+    type: 'THEATRICAL' | 'STREAMING_DEAL' | 'STREAMING_ROYALTY' | 'SOUNDTRACK' | 'UNIVERSE' | 'CAPITAL_INJECTION' | 'CAPITAL_WITHDRAWAL' | 'PRODUCTION_SPEND' | 'FUNDING_SURPLUS' | 'INVESTOR_FUNDING' | 'INVESTOR_PAYOUT' | 'ACQUISITION_MERGER' | 'IP_ACQUISITION';
     label: string;
     projectId?: string;
 }
@@ -550,7 +871,26 @@ export interface ProjectHiddenStats {
     platformId?: string | null;
     festivalPremiere?: string | null;
     redCarpetHype?: number;
+    campaignFitScore?: number;
+    falseMarketingRisk?: CampaignRiskLevel;
+    campaignOverspendRisk?: CampaignRiskLevel;
+    campaignPromise?: CampaignPositioning;
+    campaignTimeline?: CampaignTimeline;
+    campaignRealityChecked?: boolean;
+    campaignRealityOutcome?: CampaignRealityOutcome;
     backendPct?: number;
+    musicBuzz?: number;
+    musicRisk?: number;
+    musicBudget?: number;
+    musicOpeningLiftPct?: number;
+    musicAudienceReachLiftPct?: number;
+    musicSocialHypeLift?: number;
+    musicTrailerStrengthLift?: number;
+    musicControversyRisk?: number;
+    musicMismatchBacklashRisk?: number;
+    musicAwardChanceLift?: number;
+    musicStreamingInterestLiftPct?: number;
+    musicImpactLabel?: string;
     nextSeasonFundingAmount?: number;
     nextSeasonFundingPlatformId?: string | null;
     nextSeasonFundingSourceProjectId?: string;
@@ -634,6 +974,287 @@ export interface CustomPoster {
     };
 }
 
+export interface MusicArtist {
+    id: string;
+    stageName: string;
+    realName: string;
+    genre: string;
+    gender: MusicArtistGender;
+    subgenre: string;
+    fameTier: MusicArtistFameTier;
+    reputation: number;
+    audience: string;
+    region: string;
+    costLow: number;
+    costHigh: number;
+    socialFollowers: number;
+    soundtrackFitTags: string[];
+    strengths: string[];
+    risks: string[];
+    scandalRisk: MusicArtistScandalRisk;
+    availability: MusicArtistAvailability;
+    personality: string;
+    dealPreference: string;
+}
+
+export interface ProjectMusicCredit {
+    artistId: string;
+    artistName: string;
+    genre: string;
+    role: MusicCreditRole;
+    songTitle: string;
+    dealType: string;
+    estimatedCost: number;
+    buzz: number;
+    risk: number;
+}
+
+export interface ProjectMusicPlan {
+    strategy: ProjectMusicStrategy;
+    artistTargetCount?: number;
+    selectedCreditRoles?: MusicCreditRole[];
+    credits: ProjectMusicCredit[];
+    musicBudget: number;
+    musicBuzz: number;
+    musicRisk: number;
+    soundtrackTitle?: string;
+    generatedWeek?: number;
+}
+
+export interface ProjectMusicImpact {
+    openingWeekendLiftPct: number;
+    audienceReachLiftPct: number;
+    socialHypeLift: number;
+    trailerStrengthLift: number;
+    controversyRisk: number;
+    mismatchBacklashRisk: number;
+    awardChanceLift: number;
+    streamingInterestLiftPct: number;
+    score: number;
+    label: string;
+    headline: string;
+    strengths: string[];
+    warnings: string[];
+}
+
+export interface ProjectSoundtrackRevenueBreakdown {
+    albumRevenue: number;
+    leadSingleRevenue: number;
+    musicVideoRevenue: number;
+    streamingBuzzRevenue: number;
+    viralSongRevenue: number;
+    totalRevenue: number;
+}
+
+export type ProjectInvestorKind =
+    | 'PRODUCER'
+    | 'FILM_FUND'
+    | 'PRIVATE_INVESTOR'
+    | 'COPRODUCTION_COMPANY'
+    | 'REGIONAL_COMPANY'
+    | 'STREAMING_FINANCE'
+    | 'BRAND_MEDIA';
+
+export type ProjectInvestorFundingMode = 'LEAD' | 'SYNDICATE';
+
+export interface ProjectInvestorRelationship {
+    investorId: string;
+    trustScore: number;
+    totalFunded: number;
+    totalPayout: number;
+    projectsBacked: number;
+    profitableProjects: number;
+    failedProjects: number;
+    lastProjectTitle?: string;
+    lastProjectId?: string;
+    lastInteractionWeek?: number;
+    lastInteractionYear?: number;
+}
+
+export interface ProjectInvestorLeadershipChange {
+    investorId: string;
+    previousOwnerName?: string;
+    newOwnerName: string;
+    newOwnerNpcId: string;
+    title: string;
+    reason: string;
+    week: number;
+    year: number;
+}
+
+export interface ProjectInvestor {
+    id: string;
+    name: string;
+    kind: ProjectInvestorKind;
+    source?: 'NPC' | 'COMPANY' | 'FUND';
+    sourceNpcId?: string;
+    ownerNpcId?: string;
+    ownerName?: string;
+    ownerTitle?: string;
+    headquarters?: string;
+    investorTags: string[];
+    personality: string;
+    profile: string;
+    preferredFundingModes?: ProjectInvestorFundingMode[];
+    reputation: number;
+    cashCapacity: number;
+    minInvestment: number;
+    maxInvestment: number;
+    preferredGenres: Genre[];
+    riskTolerance: number;
+    relationshipBias?: number;
+    description: string;
+}
+
+export interface ProjectInvestorOffer {
+    investorId: string;
+    investorName: string;
+    kind: ProjectInvestorKind;
+    fundingMode?: ProjectInvestorFundingMode;
+    ownerNpcId?: string;
+    ownerName?: string;
+    ownerTitle?: string;
+    headquarters?: string;
+    investorTags: string[];
+    personality: string;
+    relationshipScore?: number;
+    relationshipLabel?: string;
+    amount: number;
+    cleanEquityPercent?: number;
+    equityPercent: number;
+    equityPremiumPercent?: number;
+    confidence: number;
+    reputation: number;
+    fitLabel?: 'Lead Investor' | 'Partial Investor' | 'Risk Money' | 'Strategic Partner';
+    note: string;
+}
+
+export interface ProjectInvestorCommitment {
+    investorId: string;
+    investorName: string;
+    kind: ProjectInvestorKind;
+    ownerNpcId?: string;
+    ownerName?: string;
+    ownerTitle?: string;
+    investorTags?: string[];
+    amount: number;
+    equityPercent: number;
+    cleanEquityPercent?: number;
+    offeredAmount?: number;
+    targetRole?: 'LEAD' | 'SYNDICATE' | 'EXCESS';
+}
+
+export interface ProjectInvestorPlan {
+    fundingMode?: ProjectInvestorFundingMode;
+    sourceProjectId?: string;
+    sourceTitle?: string;
+    targetRaise: number;
+    totalRaised: number;
+    investorEquityPercent: number;
+    studioEquityPercent: number;
+    commitments: ProjectInvestorCommitment[];
+    createdWeek?: number;
+    createdYear?: number;
+}
+
+export interface ProjectInvestorPayoutSummary {
+    lifetimeInvestorPayout: number;
+    weeklyInvestorPayouts?: number[];
+}
+
+export type OutsideProductionStatus = 'INVITED' | 'FUNDED' | 'RELEASED' | 'STREAMING' | 'FINISHED' | 'CANCELLED';
+
+export interface OutsideProductionScoutReport {
+    scriptQuality: number;
+    directorQuality: number;
+    castQuality: number;
+    budgetDiscipline: number;
+    marketFit: number;
+    buzz: number;
+    risk: number;
+    roiLowPct: number;
+    roiHighPct: number;
+}
+
+export interface OutsideProducerInvestmentOffer {
+    id: string;
+    projectId: string;
+    projectTitle: string;
+    producerName: string;
+    studioName: string;
+    producerType?: string;
+    ownerName?: string;
+    trackRecord?: number;
+    genre: Genre;
+    logline: string;
+    budget: number;
+    cashAsk: number;
+    offeredStakePercent: number;
+    maxStakePercent: number;
+    minCashAsk: number;
+    maxCashAsk: number;
+    flexible: boolean;
+    finalTerms: boolean;
+    acceptanceChance: number;
+    scoutReport: OutsideProductionScoutReport;
+    directorName: string;
+    castNames: string[];
+    expectedReleaseWeeks: number;
+    expectedRunWeeks: number;
+    releasePath: 'THEATRICAL' | 'STREAMING' | 'FESTIVAL';
+    counterUsed?: boolean;
+    fraudRisk?: 'NONE' | 'LOW' | 'MEDIUM' | 'HIGH';
+    riskSignals?: Array<'GENEROUS_TERMS' | 'UNVERIFIED_FINANCING' | 'SHELL_COMPANY' | 'RUSHED_CLOSE'>;
+    financingStatus?: 'VERIFIED' | 'UNVERIFIED_FINANCING' | 'SHELL_COMPANY';
+    legalExposure?: number;
+    createdWeek: number;
+    createdYear: number;
+    expiresInWeeks: number;
+}
+
+export interface OutsideProductionInvestment {
+    id: string;
+    offerId: string;
+    projectId: string;
+    projectTitle: string;
+    producerName: string;
+    studioName: string;
+    producerType?: string;
+    ownerName?: string;
+    trackRecord?: number;
+    genre: Genre;
+    logline: string;
+    budget: number;
+    investedAmount: number;
+    stakePercent: number;
+    status: OutsideProductionStatus;
+    scoutReport: OutsideProductionScoutReport;
+    directorName: string;
+    castNames: string[];
+    releasePath: 'THEATRICAL' | 'STREAMING' | 'FESTIVAL';
+    acceptedWeek: number;
+    acceptedYear: number;
+    releaseWeek: number;
+    releaseYear: number;
+    finishWeek?: number;
+    finishYear?: number;
+    grossRevenue?: number;
+    producerReceipts?: number;
+    playerPayout?: number;
+    profit?: number;
+    reputationImpact?: number;
+    resultSummary?: string;
+    finalOutcome?: 'HIT' | 'PROFIT' | 'BREAK_EVEN' | 'LOSS' | 'CANCELLED' | 'FRAUD_CASE';
+    fraudRisk?: 'NONE' | 'LOW' | 'MEDIUM' | 'HIGH';
+    riskSignals?: Array<'GENEROUS_TERMS' | 'UNVERIFIED_FINANCING' | 'SHELL_COMPANY' | 'RUSHED_CLOSE'>;
+    financingStatus?: 'VERIFIED' | 'UNVERIFIED_FINANCING' | 'SHELL_COMPANY';
+    legalExposure?: number;
+    fraudFalloutAbsoluteWeek?: number;
+    fraudFalloutResolved?: boolean;
+    legalFees?: number;
+    eventLog?: string[];
+}
+
 export interface ProjectDetails {
     title: string;
     sourceScriptId?: string;
@@ -673,15 +1294,30 @@ export interface ProjectDetails {
     tone?: number; // 0 = Practical, 100 = CGI
     visualStyle?: 'REALISTIC' | 'STYLISTIC' | 'GRITTY' | 'VIBRANT';
     pacing?: 'SLOW' | 'MODERATE' | 'FAST' | 'FRENETIC';
+    reservedMarketingBudget?: number;
+    marketingBudgetSpent?: number;
+    marketingBudgetRemaining?: number;
     equipmentChoices?: Record<string, string>;
     franchiseId?: string;
     installmentNumber?: number;
     screeningStrategy?: ScreeningStrategy;
+    releaseRegionIds?: BoxOfficeRegionId[];
+    releaseChainSelections?: Partial<Record<BoxOfficeRegionId, CinemaChainId[]>>;
+    campaignPositioning?: CampaignPositioning;
+    campaignTimeline?: CampaignTimeline;
+    campaignFitSnapshot?: CampaignFitSnapshot;
+    campaignForecastSnapshot?: CampaignForecastSnapshot;
+    campaignRealitySnapshot?: CampaignRealitySnapshot;
+    marketingChannelAllocations?: MarketingChannelAllocations;
+    returnedMarketingBudget?: number;
     campaignItems?: string[]; // IDs of selected campaign items
     totalCampaignSpend?: number;
     releaseDate?: number; // Week of release
     streamingRevenue?: number;
     customPoster?: CustomPoster;
+    musicPlan?: ProjectMusicPlan;
+    investorPlan?: ProjectInvestorPlan;
+    investorPayouts?: ProjectInvestorPayoutSummary;
 }
 
 export interface CrewMember {
@@ -754,6 +1390,11 @@ export interface ActiveRelease {
     weekNum: number;
     weeklyGross: number[];
     totalGross: number;
+    weeklyStudioReceipts?: number[];
+    totalStudioReceipts?: number;
+    weeklyExhibitorReceipts?: number[];
+    totalExhibitorReceipts?: number;
+    weeklyDistributionBreakdowns?: TheatricalDistributionBreakdown[];
     budget: number;
     status: 'RUNNING' | 'BLOCKBUSTER_TRACK' | 'FLOP_WARNING' | 'FINISHED';
     imdbRating?: number;
@@ -762,6 +1403,13 @@ export interface ActiveRelease {
     weeksInTheaters?: number;
     streaming?: StreamingState;
     streamingRevenue?: number;
+    weeklyStreamingBreakdowns?: StreamingDistributionBreakdown[];
+    soundtrackRevenue?: number;
+    weeklySoundtrackRevenue?: number[];
+    soundtrackRevenueBreakdown?: ProjectSoundtrackRevenueBreakdown;
+    weeklySoundtrackBreakdowns?: ProjectSoundtrackRevenueBreakdown[];
+    investorPlan?: ProjectInvestorPlan;
+    investorPayouts?: ProjectInvestorPayoutSummary;
     studioRoyaltyPercentage?: number;
     bids?: { platformId: PlatformId, upfront: number, royalty: number, duration: number, fundingAmount?: number }[];
     sequelDecisionWeek?: number;
@@ -805,11 +1453,39 @@ export interface PastProject {
     studioId: StudioId;
     streamingPlatform?: PlatformId;
     totalViews?: number;
+    weeklyViews?: number[];
     streamingRevenue?: number;
+    weeklyStreamingBreakdowns?: StreamingDistributionBreakdown[];
+    soundtrackRevenue?: number;
+    weeklySoundtrackRevenue?: number[];
+    soundtrackRevenueBreakdown?: ProjectSoundtrackRevenueBreakdown;
+    weeklySoundtrackBreakdowns?: ProjectSoundtrackRevenueBreakdown[];
+    investorPlan?: ProjectInvestorPlan;
+    investorPayouts?: ProjectInvestorPayoutSummary;
     castList?: CastMember[];
     reviews?: Review[];
+    campaignRealitySnapshot?: CampaignRealitySnapshot;
+    campaignPositioning?: CampaignPositioning;
+    campaignTimeline?: CampaignTimeline;
+    campaignFitSnapshot?: CampaignFitSnapshot;
+    campaignForecastSnapshot?: CampaignForecastSnapshot;
+    marketingChannelAllocations?: MarketingChannelAllocations;
+    reservedMarketingBudget?: number;
+    marketingBudgetSpent?: number;
+    marketingBudgetRemaining?: number;
+    returnedMarketingBudget?: number;
+    totalCampaignSpend?: number;
     budget: number;
     gross: number;
+    weeklyGross?: number[];
+    weeklyStudioReceipts?: number[];
+    totalStudioReceipts?: number;
+    weeklyExhibitorReceipts?: number[];
+    totalExhibitorReceipts?: number;
+    weeklyDistributionBreakdowns?: TheatricalDistributionBreakdown[];
+    releaseRegionIds?: BoxOfficeRegionId[];
+    releaseChainSelections?: Partial<Record<BoxOfficeRegionId, CinemaChainId[]>>;
+    boxOfficeArchiveVersion?: number;
     genre: Genre;
     format?: ProjectFormat;
     subjectName?: string;
@@ -828,6 +1504,7 @@ export interface PastProject {
     releaseYear?: number;
     releasedAtAbsoluteWeek?: number;
     customPoster?: CustomPoster;
+    musicPlan?: ProjectMusicPlan;
     sourceScriptId?: string;
     isOriginal?: boolean;
 }
@@ -953,14 +1630,21 @@ export interface YoutubeBrandDeal {
     expiresInWeeks: number;
 }
 
-export interface ProductionCrisis {
+export interface YoutubeMusicVideoFeatureOffer {
     id: string;
-    title: string;
+    artistId: string;
+    artistName: string;
+    artistHandle: string;
+    songTitle: string;
+    genre: string;
     description: string;
-    options: {
-        label: string;
-        impact: (player: Player, project: Commitment) => { updatedPlayer: Player, updatedProject: Commitment, log: string };
-    }[];
+    appearanceFee: number;
+    energyCost: number;
+    bonusViews: number;
+    followerGain: number;
+    fameBoost: number;
+    reputationRisk: number;
+    expiresInWeeks: number;
 }
 
 export interface Festival {
@@ -982,7 +1666,35 @@ export interface RedCarpetInterview {
     }[];
 }
 
-export type ScheduledEventType = 'AWARD_CEREMONY' | 'PREMIERE' | 'PARTY' | 'PRODUCTION_CRISIS' | 'DIRECTOR_DECISION' | 'LIFE_EVENT' | 'LEGAL_HEARING' | 'SCANDAL' | 'UNDERWORLD_OFFER';
+export type ScheduledEventType = 'AWARD_CEREMONY' | 'PREMIERE' | 'PARTY' | 'PRODUCTION_CRISIS' | 'DIRECTOR_DECISION' | 'LIFE_EVENT' | 'LEGAL_HEARING' | 'SCANDAL' | 'UNDERWORLD_OFFER' | 'STOCK_CONTROL';
+
+export type LocalizedTextVars = Record<string, string | number>;
+
+export interface ProductionCrisisImpactResult {
+    updatedPlayer: Player;
+    updatedProject: Commitment;
+    log: string;
+    logKey?: string;
+    logVars?: LocalizedTextVars;
+}
+
+export interface ProductionCrisisOption {
+    label: string;
+    labelKey?: string;
+    textVars?: LocalizedTextVars;
+    isGolden?: boolean;
+    impact: (player: Player, project: Commitment) => ProductionCrisisImpactResult;
+}
+
+export interface ProductionCrisis {
+    id: string;
+    title: string;
+    titleKey?: string;
+    description: string;
+    descriptionKey?: string;
+    textVars?: LocalizedTextVars;
+    options: ProductionCrisisOption[];
+}
 
 export interface LegalCase {
     id: string;
@@ -996,7 +1708,10 @@ export interface LegalCase {
 export interface LifeEventOption {
     id?: string;
     label: string;
+    labelKey?: string;
     description?: string;
+    descriptionKey?: string;
+    textVars?: LocalizedTextVars;
     isGolden?: boolean; // Requires Ad
     previewEffects?: EventImpactSignal[];
     impact?: (player: Player) => LifeEventImpactResult;
@@ -1004,6 +1719,8 @@ export interface LifeEventOption {
 
 export interface EventImpactSignal {
     label: string;
+    labelKey?: string;
+    textVars?: LocalizedTextVars;
     value: string;
     tone?: 'positive' | 'negative' | 'neutral';
 }
@@ -1011,6 +1728,8 @@ export interface EventImpactSignal {
 export interface LifeEventImpactResult {
     updatedPlayer: Player;
     log: string;
+    logKey?: string;
+    logVars?: LocalizedTextVars;
     effects?: EventImpactSignal[];
     feedbackDelay?: number;
     feedbackType?: string;
@@ -1020,7 +1739,10 @@ export interface LifeEvent {
     id: string;
     type: 'LIFE' | 'POLITICS' | 'CRIME' | 'SCANDAL' | 'LEGAL' | 'NETWORKING' | 'CONFLICT' | 'EARLY_LIFE';
     title: string;
+    titleKey?: string;
     description: string;
+    descriptionKey?: string;
+    textVars?: LocalizedTextVars;
     options: LifeEventOption[];
     image?: string;
     category?: string;
@@ -1069,6 +1791,10 @@ export interface YoutubeVideo {
     trustImpact?: number;
     weeklyHistory: number[];
     comments: string[];
+    sourceArtistId?: string;
+    sourceArtistName?: string;
+    songTitle?: string;
+    isMusicVideo?: boolean;
 }
 
 export interface YoutubeChannel {
@@ -1108,8 +1834,8 @@ export interface Message {
     sender: string;
     subject: string;
     text: string;
-    type: 'OFFER_ROLE' | 'OFFER_AUDITION' | 'OFFER_SPONSORSHIP' | 'OFFER_NEGOTIATION' | 'OFFER_EVENT' | YoutubeMessageType | 'TEXT' | 'SYSTEM' | 'CASTING_FEEDBACK' | 'RIGHTS_REPORT' | 'RIGHTS_NEGOTIATION' | 'STUDIO_ACQUISITION';
-    data?: AuditionOpportunity | SponsorshipOffer | NegotiationData | ScheduledEvent | YoutubeCollabOffer | YoutubeBrandDeal | any;
+    type: 'OFFER_ROLE' | 'OFFER_AUDITION' | 'OFFER_SPONSORSHIP' | 'OFFER_NEGOTIATION' | 'OFFER_EVENT' | 'OFFER_OUTSIDE_PRODUCER_INVESTMENT' | YoutubeMessageType | 'TEXT' | 'SYSTEM' | 'CASTING_FEEDBACK' | 'RIGHTS_REPORT' | 'RIGHTS_NEGOTIATION' | 'STUDIO_ACQUISITION' | 'SHAREHOLDER_VOTE';
+    data?: AuditionOpportunity | SponsorshipOffer | NegotiationData | ScheduledEvent | YoutubeCollabOffer | YoutubeBrandDeal | YoutubeMusicVideoFeatureOffer | any;
     isRead: boolean;
     weekSent: number;
     expiresIn?: number;
@@ -1239,7 +1965,7 @@ export interface NPCActor {
     openness: number;
     followers: number;
     netWorth: number;
-    occupation: 'ACTOR' | 'DIRECTOR';
+    occupation: 'ACTOR' | 'DIRECTOR' | 'MUSIC_ARTIST' | 'INVESTOR';
     bio: string;
     age?: number;
     forbesCategory?: string;
@@ -1320,6 +2046,8 @@ export interface Stock {
     sector: 'TECH' | 'MEDIA' | 'FASHION' | 'BEVERAGE' | 'AUTOMOTIVE';
     price: number;
     outstandingShares?: number;
+    publicFloatPercent?: number;
+    lastShareIssueWeek?: number;
     volatility: number;
     dividendYield: number;
     relatedBrandName?: string;
@@ -1328,9 +2056,80 @@ export interface Stock {
     lastDividendPayoutWeek: number;
 }
 
+export type ShareholderInfluenceLevel =
+    | 'PASSIVE_INVESTOR'
+    | 'SHAREHOLDER_VOTER'
+    | 'STRATEGIC_INFLUENCE'
+    | 'BOARD_SEAT'
+    | 'CONTROLLING_OWNER';
+
+export type ShareholderVoteType =
+    | 'DIVIDEND_POLICY'
+    | 'SLATE_APPROVAL'
+    | 'CEO_CONFIDENCE'
+    | 'CAPITAL_RAISE';
+
+export interface ShareholderVote {
+    id: string;
+    stockId: string;
+    stockSymbol: string;
+    companyName: string;
+    type: ShareholderVoteType;
+    title: string;
+    summary: string;
+    stakes: string[];
+    status: 'OPEN' | 'RESOLVED';
+    playerVotingPower: number;
+    expectedSupport: number;
+    createdWeek: number;
+    createdYear: number;
+    dueWeek: number;
+    selectedVote?: 'FOR' | 'AGAINST';
+    outcomeSummary?: string;
+    resolvedWeek?: number;
+    resolvedYear?: number;
+}
+
+export type StockTakeoverRoute =
+    | 'FRIENDLY_TAKEOVER'
+    | 'SHAREHOLDER_ALLIANCE'
+    | 'HOSTILE_TAKEOVER'
+    | 'CONTROL_TRANSFER';
+
+export type StockTakeoverStatus =
+    | 'ACTIVE'
+    | 'READY_FOR_CONTROL'
+    | 'RIVAL_DEFENCE'
+    | 'CONTROLLED'
+    | 'FAILED';
+
+export interface StockTakeoverCase {
+    id: string;
+    stockId: string;
+    stockSymbol: string;
+    companyName: string;
+    relatedStudioId?: StudioId;
+    route: StockTakeoverRoute;
+    status: StockTakeoverStatus;
+    ownershipPercent: number;
+    alliedSupportPercent: number;
+    effectiveControlPercent: number;
+    supportScore: number;
+    rivalDefenceRisk: number;
+    cost: number;
+    summary: string;
+    createdWeek: number;
+    createdYear: number;
+    resolvedWeek?: number;
+    resolvedYear?: number;
+    acquiredBusinessId?: string;
+}
+
 export interface PortfolioItem {
     stockId: string;
     shares: number;
+    averageCost?: number;
+    totalInvested?: number;
 }
 
 export interface Transaction {
@@ -1467,6 +2266,122 @@ export interface Universe {
     lifecycleHistory?: UniverseLifecycleEvent[];
 }
 
+export interface MusicArtistWorldState {
+    artistId: string;
+    artistName: string;
+    genre: string;
+    rank: number;
+    momentum: number;
+    followers: number;
+    followersLastWeek?: number;
+    weeklyFollowerGain?: number;
+    socialGrowthPct?: number;
+    youtubeViews?: number;
+    peakRank?: number;
+    chartMovement?: number;
+    scandalHeat?: number;
+    rivalryHeat?: number;
+    lastReleaseWeek?: number;
+    lastReleaseYear?: number;
+    lastScandalWeek?: number;
+    lastScandalYear?: number;
+    currentSingle?: string;
+    rivalArtistId?: string;
+}
+
+export interface MusicChartEntry {
+    artistId: string;
+    artistName: string;
+    songTitle: string;
+    genre: string;
+    score: number;
+    week: number;
+    year: number;
+    previousRank?: number;
+    currentRank?: number;
+    movement?: number;
+}
+
+export type MusicReleaseKind = 'SINGLE' | 'VIDEO' | 'REMIX' | 'EP' | 'ALBUM';
+
+export interface MusicReleaseRecord {
+    id: string;
+    artistId: string;
+    artistName: string;
+    songTitle: string;
+    genre: string;
+    kind: MusicReleaseKind;
+    score: number;
+    week: number;
+    year: number;
+    previousRank?: number;
+    currentRank?: number;
+    movement?: number;
+    followerGain: number;
+    socialGrowthPct: number;
+    youtubeViews: number;
+}
+
+export interface MusicRivalryRecord {
+    id: string;
+    artistIds: string[];
+    artistNames: string[];
+    reason: string;
+    heat: number;
+    startedWeek: number;
+    startedYear: number;
+    lastEventWeek: number;
+    lastEventYear: number;
+    status: 'ACTIVE' | 'COOLING' | 'ENDED';
+}
+
+export interface MusicScandalRecord {
+    id: string;
+    artistId: string;
+    artistName: string;
+    headline: string;
+    severity: 'LOW' | 'MEDIUM' | 'HIGH';
+    week: number;
+    year: number;
+    momentumHit: number;
+    followerLoss: number;
+}
+
+export type MusicCultureMomentType =
+    | 'FANBASE_WAR'
+    | 'SONG_BEATS_SONG'
+    | 'ARTIST_BREAKOUT'
+    | 'SOUNDTRACK_TREND'
+    | 'CONTROVERSIAL_CAMPAIGN'
+    | 'SONG_BIGGER_THAN_MOVIE';
+
+export interface MusicCultureMomentRecord {
+    id: string;
+    type: MusicCultureMomentType;
+    headline: string;
+    description: string;
+    artistIds: string[];
+    artistNames: string[];
+    songTitle?: string;
+    projectTitle?: string;
+    heat: number;
+    week: number;
+    year: number;
+    impactLevel: 'LOW' | 'MEDIUM' | 'HIGH';
+}
+
+export interface MusicIndustryState {
+    artists: Record<string, MusicArtistWorldState>;
+    generatedArtists?: MusicArtist[];
+    chart: MusicChartEntry[];
+    recentReleases?: MusicReleaseRecord[];
+    rivalries?: MusicRivalryRecord[];
+    scandals?: MusicScandalRecord[];
+    cultureMoments?: MusicCultureMomentRecord[];
+    lastProcessedWeek?: number;
+    history: string[];
+}
+
 export interface AwardHistoryEntry {
     year: number;
     type: AwardType;
@@ -1498,6 +2413,15 @@ export interface NPCStudioState {
     cashReserve: number; // in millions
     recentHits: number;
     archetype: string;
+    projectsReleased?: number;
+    hits?: number;
+    flops?: number;
+    slateMomentum?: number;
+    lastReleaseTitle?: string;
+    lastReleaseWeek?: number;
+    lastReleaseYear?: number;
+    lifetimeBoxOffice?: number;
+    lifetimeProfit?: number;
     ownerNpcId?: string;
     ownerName?: string;
     isNpcVenture?: boolean;
@@ -1552,6 +2476,7 @@ export interface WorldState {
     platforms?: Record<PlatformId, PlatformState>;
     studios?: Record<StudioId, NPCStudioState>;
     npcVentures?: Record<string, NpcVentureState>;
+    musicIndustry?: MusicIndustryState;
 }
 
 export interface LogEntry {
@@ -1640,7 +2565,8 @@ export interface Studio {
 export interface Relationship {
     id: string;
     name: string;
-    relation: 'Parent' | 'Friend' | 'Partner' | 'Spouse' | 'Ex-Partner' | 'Ex-Spouse' | 'Child' | 'Connection' | 'Agent' | 'Director' | 'Manager' | 'Colleague' | 'Networking' | 'Deceased Parent' | 'Sibling';
+    relation: 'Parent' | 'Friend' | 'Partner' | 'Spouse' | 'Ex-Partner' | 'Ex-Spouse' | 'Child' | 'Pet' | 'Connection' | 'Agent' | 'Director' | 'Manager' | 'Colleague' | 'Networking' | 'Deceased Parent' | 'Sibling';
+    familyTitle?: 'Child' | 'Son' | 'Daughter' | 'Heir';
     closeness: number;
     image: string;
     lastInteractionWeek: number;
@@ -1649,6 +2575,15 @@ export interface Relationship {
     age?: number;
     gender?: Gender;
     birthWeekAbsolute?: number;
+    petSpecies?: string;
+    petBreed?: string;
+    petEmoji?: string;
+    petAcquisition?: 'shelter' | 'breeder' | 'endangered' | 'exotic';
+    petRarity?: 'common' | 'premium' | 'endangered' | 'exotic';
+    petStoreName?: string;
+    petHomeSetup?: string;
+    petAccessory?: string;
+    petCustomization?: string;
 }
 
 export interface ImprovementOption {
@@ -1668,6 +2603,151 @@ export interface ImprovementActivity {
     name: string;
     description: string;
     options: ImprovementOption[];
+}
+
+export type LifestyleActivityCategory = 'TRAVEL' | 'NIGHTLIFE' | 'FAMILY' | 'WELLNESS' | 'IMAGE' | 'LEGACY' | 'COMPANION';
+
+export type LifestyleActivityChoiceKind = 'SCALE' | 'PRIVACY' | 'INVITE' | 'DURATION' | 'EXTRA' | 'DESTINATION' | 'CITY' | 'STAY' | 'TRAVEL_MODE' | 'TRIP_ACTIVITY' | 'NIGHTLIFE_TYPE' | 'NIGHTLIFE_VENUE' | 'NIGHTLIFE_GUEST' | 'NIGHTLIFE_CROWD' | 'NIGHTLIFE_CONTROL' | 'WELLNESS_PROGRAM' | 'WELLNESS_PROVIDER' | 'WELLNESS_FOCUS' | 'WELLNESS_SUPPORT' | 'ADOPTION_CHILD' | 'ADOPTION_ROUTE' | 'ADOPTION_HOME_PREP' | 'ADOPTION_SUPPORT' | 'INDUSTRY_EVENT' | 'INDUSTRY_VENUE' | 'INDUSTRY_INVITE_GROUP' | 'INDUSTRY_GUEST' | 'INDUSTRY_HOSTING_STYLE' | 'INDUSTRY_SERVICE' | 'INDUSTRY_ADDON' | 'CHARITY_CAUSE' | 'CHARITY_FORMAT' | 'CHARITY_DONATION' | 'CHARITY_GUEST_CIRCLE' | 'CHARITY_PRESS' | 'CHARITY_ADDON' | 'COMPANION_STORE' | 'COMPANION_CATEGORY' | 'COMPANION_PET' | 'COMPANION_CARE' | 'COMPANION_HOME' | 'COMPANION_ACCESSORY' | 'COMPANION_CUSTOMIZATION' | 'COMPANION_PERMIT';
+
+export interface LifestyleActivityChoice {
+    id: string;
+    label: string;
+    description: string;
+    kind: LifestyleActivityChoiceKind;
+    costMultiplier?: number;
+    flatCost?: number;
+    statEffects?: Partial<Stats>;
+    riskShift?: number;
+    memoryTag?: string;
+}
+
+export interface LifestyleActivityDefinition {
+    id: string;
+    category: LifestyleActivityCategory;
+    name: string;
+    shortDescription: string;
+    longDescription: string;
+    baseCost: number;
+    baseRisk: number;
+    baseEffects: Partial<Stats>;
+    cooldownWeeks: number;
+    recommendedWhen?: string;
+    scales: LifestyleActivityChoice[];
+    privacyOptions: LifestyleActivityChoice[];
+    inviteOptions: LifestyleActivityChoice[];
+    durationOptions: LifestyleActivityChoice[];
+    extras?: LifestyleActivityChoice[];
+}
+
+export interface LifestyleActivitySelections {
+    scaleId: string;
+    privacyId: string;
+    inviteId: string;
+    durationId: string;
+    extraIds: string[];
+    tripDestinationId?: string;
+    tripCityId?: string;
+    tripDurationDays?: number;
+    tripStayId?: string;
+    tripTravelId?: string;
+    tripActivityIds?: string[];
+    nightlifeTypeId?: string;
+    nightlifeVenueId?: string;
+    nightlifeGuestId?: string;
+    nightlifeCrowdId?: string;
+    nightlifeControlId?: string;
+    wellnessProgramId?: string;
+    wellnessProviderId?: string;
+    wellnessFocusId?: string;
+    wellnessSupportId?: string;
+    adoptionChildId?: string;
+    adoptionRouteId?: string;
+    adoptionHomePrepId?: string;
+    adoptionSupportId?: string;
+    adoptionCustomName?: string;
+    adoptionTitle?: 'Child' | 'Son' | 'Daughter' | 'Heir';
+    industryEventId?: string;
+    industryVenueId?: string;
+    industryInviteGroupIds?: string[];
+    industryGuestIds?: string[];
+    industryHostingStyleId?: string;
+    industryServiceId?: string;
+    industryAddonIds?: string[];
+    charityCauseId?: string;
+    charityFormatId?: string;
+    charityDonationId?: string;
+    charityCustomDonationAmount?: number;
+    charityGuestCircleId?: string;
+    charityPressId?: string;
+    charityAddonIds?: string[];
+    companionStoreId?: string;
+    companionCategoryId?: string;
+    companionPetId?: string;
+    companionCareId?: string;
+    companionHomeId?: string;
+    companionAccessoryId?: string;
+    companionCustomizationId?: string;
+    companionPermitId?: string;
+    companionCustomName?: string;
+}
+
+export interface LifestyleActivityQuote {
+    totalCost: number;
+    risk: number;
+    statEffects: Partial<Stats>;
+    effectSummary: string[];
+    selectedLabels: string[];
+}
+
+export interface LifestyleActivityMemory {
+    id: string;
+    activityId: string;
+    title: string;
+    summary: string;
+    category: LifestyleActivityCategory;
+    cost: number;
+    risk: number;
+    year: number;
+    week: number;
+    createdAbsoluteWeek: number;
+    selections: LifestyleActivitySelections;
+    effectSummary: string[];
+    socialMoment?: string;
+}
+
+export type HealthConditionSeverity = 'MINOR' | 'MODERATE' | 'SEVERE' | 'CRITICAL';
+export type HealthConditionSource = 'WORKLOAD' | 'PRODUCTION' | 'NIGHTLIFE' | 'ILLNESS' | 'OLD_AGE' | 'LIFESTYLE';
+
+export interface HealthConditionState {
+    id: string;
+    conditionId: string;
+    label: string;
+    severity: HealthConditionSeverity;
+    source: HealthConditionSource;
+    startedWeekAbsolute: number;
+    expectedRecoveryWeekAbsolute?: number;
+    healthCap: number;
+    weeklyHealthDrain: number;
+    workPenalty: number;
+    treatmentTags: string[];
+    treatedWeeks: number;
+    ignoredWeeks: number;
+    isPublic?: boolean;
+    deathRisk?: number;
+    lastProgressWeekAbsolute?: number;
+}
+
+export interface LifestyleActivityState {
+    memories: LifestyleActivityMemory[];
+    cooldowns: Record<string, number>;
+    totalSpent: number;
+    lifetimeActivityCounts?: Record<string, number>;
+    lifetimeCategoryCounts?: Partial<Record<LifestyleActivityCategory, number>>;
+    lifetimeTripDays?: number;
+    lifetimeCharityGiven?: number;
+    lifetimeFriendEncounters?: number;
+    lifestyleIdentity?: string;
+    lastActivityWeek?: number;
 }
 
 export interface BloodlineMember {
@@ -1724,6 +2804,7 @@ export interface Player {
     commitments: Commitment[];
     activeReleases: ActiveRelease[];
     pastProjects: PastProject[];
+    outsideProductions?: OutsideProductionInvestment[];
     applications: Application[];
     relationships: Relationship[];
     bloodline?: BloodlineMember[];
@@ -1784,10 +2865,14 @@ export interface Player {
         loans: PlayerLoan[];
         credit: CreditHistory;
     };
+    lifestyleActivities?: LifestyleActivityState;
+    activeHealthConditions?: HealthConditionState[];
     businesses: Business[];
     activeSponsorships: SponsorshipOffer[];
     stocks: Stock[];
     portfolio: PortfolioItem[];
+    shareholderVotes: ShareholderVote[];
+    stockTakeovers: StockTakeoverCase[];
     world: WorldState;
     flags: Record<string, any>;
     weeklyOpportunities: {
@@ -1849,6 +2934,7 @@ export const INITIAL_PLAYER: Player = {
     commitments: [],
     activeReleases: [],
     pastProjects: [],
+    outsideProductions: [],
     applications: [],
     relationships: [
         { id: 'rel_mom', name: 'Mom', relation: 'Parent', closeness: 85, image: 'https://api.dicebear.com/8.x/pixel-art/svg?seed=Sophie', lastInteractionWeek: 0, lastInteractionAbsolute: 0, age: 46, gender: 'FEMALE' },
@@ -1888,10 +2974,17 @@ export const INITIAL_PLAYER: Player = {
             totalRepaid: 0
         }
     },
+    lifestyleActivities: {
+        memories: [],
+        cooldowns: {},
+        totalSpent: 0
+    },
     businesses: [],
     activeSponsorships: [],
     stocks: [],
     portfolio: [],
+    shareholderVotes: [],
+    stockTakeovers: [],
     world: { 
         projects: [], 
         trendingGenre: 'ACTION', 
