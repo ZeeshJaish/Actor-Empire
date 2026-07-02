@@ -29,6 +29,7 @@ const xLogicSource = read('services/xLogic.ts');
 const redCarpetSource = read('views/RedCarpetEvent.tsx');
 const businessLogicSource = read('services/businessLogic.ts');
 const businessDashboardSource = read('views/lifestyle/business/BusinessDashboard.tsx');
+const businessWizardSource = read('views/lifestyle/business/BusinessWizard.tsx');
 const productionHouseSource = read('views/lifestyle/business/ProductionHouseGame.tsx');
 const regulatorPressureSource = read('services/regulatorPressure.ts');
 const talentInstabilitySource = read('services/talentInstability.ts');
@@ -1024,6 +1025,58 @@ const missingBusinessDashboardCatalogDisplayRefs = phase5BusinessDashboardCatalo
 
 if (missingBusinessDashboardCatalogDisplayRefs.length > 0) {
   failures.push(`business dashboard catalog display localization refs are missing: ${missingBusinessDashboardCatalogDisplayRefs.join(', ')}`);
+}
+
+const phase5BusinessWizardHardcodedMarkers = [
+  'Insufficient funds!',
+  'Founded ${newBiz.name}',
+  'Total Capital',
+  'New Venture',
+  'Select Industry',
+  'Business Model',
+  'Next Step',
+  'Interior Vibe',
+  'Included',
+  'Facilities',
+  'Setup</div>',
+  'Production Quality',
+  'Brand Name',
+  'e.g. Luxe & Co.',
+  'Summary includes',
+  'custom interior',
+  'standard setup',
+  'Launch Venture',
+  '{bp.name}',
+  '{bp.description}',
+  '{theme.label}',
+  '{amen.label}',
+  '{prod.label}',
+  '{prod.description}',
+].filter((marker) => businessWizardSource.includes(marker));
+
+if (phase5BusinessWizardHardcodedMarkers.length > 0) {
+  failures.push(`business wizard setup/catalog UI is still hard-coded: ${phase5BusinessWizardHardcodedMarkers.join(', ')}`);
+}
+
+const phase5BusinessWizardRefs = [
+  [businessWizardSource, "import { getPlayerLanguage, t } from '../../../services/i18n'", 'business wizard t import'],
+  [businessWizardSource, "tr('services.business.wizard.newVenture')", 'wizard title localization'],
+  [businessWizardSource, "tr('services.business.wizard.summary'", 'summary localization'],
+  [businessWizardSource, "getBusinessBlueprintName(bp.type)", 'blueprint name localization'],
+  [businessWizardSource, "getBusinessBlueprintDescription(bp.type)", 'blueprint description localization'],
+  [businessWizardSource, "getBusinessSubtypeLabel(sub)", 'business subtype localization'],
+  [businessWizardSource, "getBusinessThemeLabel(theme.id)", 'theme label localization'],
+  [businessWizardSource, "getBusinessAmenityLabel(amen.id)", 'amenity label localization'],
+  [businessWizardSource, "getBusinessProductionTypeLabel(prod.id)", 'production type label localization'],
+  [businessWizardSource, "getBusinessProductionTypeDescription(prod.id)", 'production type description localization'],
+];
+
+const missingBusinessWizardRefs = phase5BusinessWizardRefs
+  .filter(([source, marker]) => !source.includes(marker))
+  .map(([, , label]) => label);
+
+if (missingBusinessWizardRefs.length > 0) {
+  failures.push(`business wizard localization refs are missing: ${missingBusinessWizardRefs.join(', ')}`);
 }
 
 const playerFacingFiles = [
