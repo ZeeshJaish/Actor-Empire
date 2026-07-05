@@ -1,6 +1,7 @@
-import type { Business, BusinessStaff, LifeEvent, LifeEventImpactResult, NewsItem, Player, ScheduledEvent, XPost } from '../types';
+import type { Business, BusinessStaff, GameLanguage, LifeEvent, LifeEventImpactResult, NewsItem, Player, ScheduledEvent, XPost } from '../types';
 import { queueAcquisitionPressureEvent } from './acquisitionEventCadence';
 import { getWorldReactionState } from './worldReactions';
+import { getPlayerLanguage, t } from './i18n';
 
 export type TalentInstabilityEventType = 'RETENTION_CRISIS' | 'KEY_STAFF_EXIT_RISK';
 
@@ -237,27 +238,31 @@ const makeChoiceImpact = (
     return { updatedPlayer, log, logKey, logVars: { staff: (updatedPlayer as any).lastDepartedStaff || '' }, effects };
 };
 
-const makeTalentNews = (player: Player, state: TalentInstabilityState): NewsItem => ({
+const makeTalentNews = (player: Player, state: TalentInstabilityState, language: GameLanguage): NewsItem => ({
     id: `news_talent_instability_${player.age}_${player.currentWeek}`,
-    headline: state.departureRisk >= 65
-        ? `${player.name}'s studio group faces talent retention pressure`
-        : `${player.name}'s acquisitions put staff stability in focus`,
-    subtext: `${state.controlledStudioCount} controlled studios, ${state.acquiredStudioCount} acquired labels, and ${state.averageMorale}% average morale are becoming an industry story.`,
+    headline: t(language, state.departureRisk >= 65
+        ? 'services.talentInstability.news.highHeadline'
+        : 'services.talentInstability.news.mediumHeadline', { player: player.name }),
+    subtext: t(language, 'services.talentInstability.news.subtext', {
+        controlledStudios: state.controlledStudioCount,
+        acquiredLabels: state.acquiredStudioCount,
+        morale: state.averageMorale,
+    }),
     category: 'INDUSTRY',
     week: player.currentWeek,
     year: player.age,
     impactLevel: state.departureRisk >= 65 ? 'HIGH' : 'MEDIUM',
 });
 
-const makeTalentPost = (player: Player, state: TalentInstabilityState): XPost => ({
+const makeTalentPost = (player: Player, state: TalentInstabilityState, language: GameLanguage): XPost => ({
     id: `x_talent_instability_${player.age}_${player.currentWeek}`,
     authorId: 'below_the_line',
     authorName: 'Below The Line Watch',
     authorHandle: '@btlinewatch',
     authorAvatar: 'BTL',
-    content: state.departureRisk >= 65
-        ? `Staff inside ${player.name}'s studio empire are talking retention packages, exit clauses, and who still has power after the acquisitions.`
-        : `${player.name}'s studio group is big enough now that talent stability is its own storyline.`,
+    content: t(language, state.departureRisk >= 65
+        ? 'services.talentInstability.social.high'
+        : 'services.talentInstability.social.medium', { player: player.name }),
     timestamp: Date.now(),
     likes: 1_800 + state.departureRisk * 70,
     retweets: 220 + state.pressureScore * 12,
@@ -273,18 +278,21 @@ const makeTalentPost = (player: Player, state: TalentInstabilityState): XPost =>
 const createTalentInstabilityEvent = (
     player: Player,
     state: TalentInstabilityState,
+    language: GameLanguage,
 ): ScheduledEvent | null => {
     if (state.departureRisk < 45 || state.controlledStudioCount < 2) return null;
     const type: TalentInstabilityEventType = state.departureRisk >= 65 ? 'KEY_STAFF_EXIT_RISK' : 'RETENTION_CRISIS';
+    const titleKey = type === 'KEY_STAFF_EXIT_RISK' ? 'life.event.talent.exitRisk.title' : 'life.event.talent.retention.title';
+    const textVars = { morale: state.averageMorale };
     const lifeEvent: LifeEvent = {
         id: `life_talent_instability_${type.toLowerCase()}_${player.age}_${player.currentWeek}`,
         type: 'NETWORKING',
-        title: type === 'KEY_STAFF_EXIT_RISK' ? 'Key Staff May Walk' : 'Acquired Teams Want Reassurance',
-        titleKey: type === 'KEY_STAFF_EXIT_RISK' ? 'life.event.talent.exitRisk.title' : 'life.event.talent.retention.title',
-        category: 'Talent Instability',
-        description: `Acquisition pressure is spreading through your studio group. Average morale is ${state.averageMorale}%, and insiders expect key employees to ask for protection or leave.`,
+        title: t(language, titleKey),
+        titleKey,
+        category: t(language, 'life.event.talent.category'),
+        description: t(language, 'life.event.talent.description', textVars),
         descriptionKey: 'life.event.talent.description',
-        textVars: { morale: state.averageMorale },
+        textVars,
         options: [
             {
                 id: 'RETENTION_PACKAGE',
@@ -330,8 +338,8 @@ const createTalentInstabilityEvent = (
         id: `event_talent_instability_${type.toLowerCase()}_${player.age}_${player.currentWeek}`,
         week: player.currentWeek,
         type: 'LIFE_EVENT',
-        title: lifeEvent.title,
-        description: lifeEvent.description,
+        title: t(language, titleKey),
+        description: t(language, 'life.event.talent.description', textVars),
         data: {
             talentInstabilityEventType: type,
             lifeEvent,
@@ -352,6 +360,7 @@ export const processTalentInstability = (player: Player): Player => {
     }
 
     const state = getTalentInstabilityState(player);
+    const language = getPlayerLanguage(player);
     const decayedShield = Math.max(0, state.retentionShieldWeeksRemaining - 1);
     const nextState: TalentInstabilityState = {
         ...state,
@@ -360,9 +369,9 @@ export const processTalentInstability = (player: Player): Player => {
         lastTalentInstabilityEventWeek: state.departureRisk >= 45 ? player.currentWeek : state.lastTalentInstabilityEventWeek,
     };
     const shouldPublish = state.departureRisk >= 42 && state.controlledStudioCount >= 2;
-    const news = shouldPublish ? makeTalentNews(player, state) : undefined;
-    const xPost = shouldPublish ? makeTalentPost(player, state) : undefined;
-    const event = shouldPublish ? createTalentInstabilityEvent(player, state) : null;
+    const news = shouldPublish ? makeTalentNews(player, state, language) : undefined;
+    const xPost = shouldPublish ? makeTalentPost(player, state, language) : undefined;
+    const event = shouldPublish ? createTalentInstabilityEvent(player, state, language) : null;
     const existingPendingEvents = Array.isArray(player.pendingEvents) ? player.pendingEvents : [];
     const cadence = queueAcquisitionPressureEvent(
         player,
@@ -392,7 +401,10 @@ export const processTalentInstability = (player: Player): Player => {
         logs: [{
             week: player.currentWeek,
             year: player.age,
-            message: `Talent Instability: ${state.departureRisk}% departure risk across ${state.controlledStudioCount} studios.`,
+            message: t(language, 'services.talentInstability.log.weekly', {
+                risk: state.departureRisk,
+                studios: state.controlledStudioCount,
+            }),
             type: state.departureRisk >= 65 ? 'negative' as const : 'neutral' as const,
         }, ...(player.logs || [])].slice(0, 50),
     };

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Player, ActiveRelease, OutsideProductionInvestment } from '../../types';
+import { Player, ActiveRelease, OutsideProductionInvestment, BoxOfficeRegionId, CinemaChainId } from '../../types';
 import { PLATFORMS } from '../../services/streamingLogic';
-import { getCinemaChainById } from '../../services/cinemaChains';
+import { getBoxOfficeRegionLabel, getBoxOfficeRegionShortLabel, getCinemaChainById } from '../../services/cinemaChains';
 import { getProjectIdentityLabel } from '../../services/genreCatalog';
 import { getProjectReleaseLabel } from '../../services/releaseTiming';
 import { getPlayerLanguage, t } from '../../services/i18n';
@@ -165,8 +165,8 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
           breakdown.regionReceipts.forEach(region => {
               const current = totals.get(region.regionId) || {
                   id: region.regionId,
-                  label: region.regionLabel,
-                  shortLabel: region.regionShortLabel,
+                  label: getBoxOfficeRegionLabel(language, region.regionId as BoxOfficeRegionId),
+                  shortLabel: getBoxOfficeRegionShortLabel(language, region.regionId as BoxOfficeRegionId),
                   gross: 0,
                   studioReceipts: 0,
                   exhibitorReceipts: 0,
@@ -202,7 +202,7 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
               region.chainReceipts.forEach(chain => {
                   const current = totals.get(chain.chainId) || {
                       id: chain.chainId,
-                      name: chain.chainName,
+                      name: getCinemaChainById(chain.chainId as CinemaChainId, language)?.name || chain.chainName,
                       gross: 0,
                       studioReceipts: 0,
                       exhibitorReceipts: 0,
@@ -344,7 +344,7 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
       if (entry.runWeek <= 2 && grossToBudget >= 0.25) return tr('box.status.breakout');
       if (entry.runWeek >= 2 && grossToBudget < 0.08) return tr('box.status.flopWatch');
       if (entry.source === 'PLAYER') return tr('box.yourRelease');
-      if (entry.source === 'OUTSIDE') return 'Producer-backed';
+      if (entry.source === 'OUTSIDE') return tr('box.producerBacked');
       return tr('box.marketFilm');
   };
 
@@ -599,8 +599,7 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
   };
 
   const getCompactReleaseLabel = (rel: ActiveRelease) => (
-      getProjectReleaseLabel(rel, releaseFallback, { includeWeek: true })
-          .replace(/^Age\s+(\d+),\s+Week\s+(\d+)$/i, 'Age $1 W$2')
+      getProjectReleaseLabel(rel, releaseFallback, { includeWeek: true, language, compact: true })
   );
 
   const getProjectMetaTags = (rel: ActiveRelease) => [
@@ -816,7 +815,7 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
                                       className={`w-full rounded-t-md transition-all duration-500 ${isStreamingRelease ? (isLatest ? 'bg-indigo-500' : 'bg-indigo-500/40') : (isLatest ? 'bg-emerald-500' : 'bg-emerald-500/40')}`}
                                   />
                               </div>
-                              <span className="mt-1 text-[9px] text-zinc-600">W{idx + 1}</span>
+                              <span className="mt-1 text-[9px] text-zinc-600">{tr('box.weekCompact', { week: idx + 1 })}</span>
                           </div>
                       );
                   })}
@@ -832,16 +831,18 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
                           : rel.weeklyExhibitorReceipts?.[idx] || (breakdown && 'exhibitorReceipts' in breakdown ? breakdown.exhibitorReceipts : 0);
                       return (
                           <div key={`${rel.id}-week-row-${idx}`} className="grid grid-cols-[3rem_1fr_auto] items-center gap-3 rounded-xl bg-black/25 p-3">
-                              <div className="font-mono text-xs font-black text-zinc-500">W{idx + 1}</div>
+                              <div className="font-mono text-xs font-black text-zinc-500">{tr('box.weekCompact', { week: idx + 1 })}</div>
                               <div className="min-w-0">
                                   <div className="font-mono text-sm font-black text-white">{isStreamingRelease ? formatViews(value) : formatMoney(value)}</div>
                                   <div className="mt-0.5 text-[9px] font-black uppercase tracking-[0.12em] text-zinc-500">
-                                      {isStreamingRelease ? `Revenue ${formatMoney(studioValue)}` : `Studio ${formatMoney(studioValue)}`}
+                                      {isStreamingRelease
+                                          ? tr('box.revenueAmount', { amount: formatMoney(studioValue) })
+                                          : tr('box.studioAmount', { amount: formatMoney(studioValue) })}
                                   </div>
                               </div>
                               {!isStreamingRelease && (
                                   <div className="text-right text-[10px] font-black uppercase tracking-[0.1em] text-rose-300">
-                                      Partner {formatMoney(partnerValue)}
+                                      {tr('box.partnerAmount', { amount: formatMoney(partnerValue) })}
                                   </div>
                               )}
                           </div>
@@ -858,7 +859,7 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
                   <div className={`mb-3 text-[10px] font-black uppercase tracking-[0.18em] ${isStreamingRelease ? 'text-indigo-300' : 'text-emerald-300'}`}>{isStreamingRelease ? tr('box.streamingRegions') : tr('box.detail.regions')}</div>
                   {regions.length === 0 ? (
                       <div className="rounded-xl border border-dashed border-zinc-700 bg-black/20 p-4 text-sm text-zinc-500">
-                          Regional data appears after the next weekly tick for this title.
+                          {tr('box.regionalDataPending')}
                       </div>
                   ) : (
                       <div className="space-y-2">
@@ -874,7 +875,11 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
                                       <div className="shrink-0 text-right">
                                           <div className="font-mono text-sm text-white">{isStreamingRelease && 'views' in region ? formatViews(region.views) : 'gross' in region ? formatMoney(region.gross) : '-'}</div>
                                           <div className={`text-[10px] font-bold ${isStreamingRelease ? 'text-indigo-300' : 'text-emerald-300'}`}>
-                                              {isStreamingRelease && 'revenue' in region ? formatMoney(region.revenue) : 'studioReceipts' in region ? `Studio ${formatMoney(region.studioReceipts)}` : ''}
+                                              {isStreamingRelease && 'revenue' in region
+                                                  ? formatMoney(region.revenue)
+                                                  : 'studioReceipts' in region
+                                                      ? tr('box.studioAmount', { amount: formatMoney(region.studioReceipts) })
+                                                      : ''}
                                           </div>
                                       </div>
                                   </div>
@@ -905,29 +910,31 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
                       </div>
                       <div className="mt-3 grid grid-cols-2 gap-2">
                           {renderMetric(tr('box.studioRoyalty'), formatMoney(rel.streamingRevenue || 0), 'text-emerald-300')}
-                          {renderMetric('Revenue / View', `$${((rel.streamingRevenue || 0) / Math.max(1, rel.streaming!.totalViews)).toFixed(2)}`, 'text-indigo-300')}
+                          {renderMetric(tr('box.revenuePerView'), `$${((rel.streamingRevenue || 0) / Math.max(1, rel.streaming!.totalViews)).toFixed(2)}`, 'text-indigo-300')}
                       </div>
                   </div>
               ) : theatricalChains.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-zinc-700 bg-black/20 p-4 text-sm text-zinc-500">
-                      Cinema partner data appears once the release reports a regional split.
+                      {tr('box.cinemaPartnerDataPending')}
                   </div>
               ) : (
                   <div className="space-y-2">
                       {theatricalChains.map(chain => {
-                          const chainProfile = getCinemaChainById(chain.id as any);
+                          const chainProfile = getCinemaChainById(chain.id as CinemaChainId, language);
                           return (
                               <div key={chain.id} className="flex items-center justify-between gap-3 rounded-xl bg-black/25 p-3">
                                   <div className="flex min-w-0 items-center gap-3">
                                       {chainProfile && <CinemaChainLogo chain={chainProfile} size="sm" />}
                                       <div className="min-w-0">
                                           <div className="truncate font-bold text-white">{chain.name}</div>
-                                          <div className="text-[10px] uppercase tracking-widest text-zinc-500">{chain.screens.toLocaleString()} screens · {formatPercent(chain.exhibitorCut)} cut</div>
+                                          <div className="text-[10px] uppercase tracking-widest text-zinc-500">
+                                              {tr('box.partnerScreensCut', { screens: chain.screens.toLocaleString(), cut: formatPercent(chain.exhibitorCut) })}
+                                          </div>
                                       </div>
                                   </div>
                                   <div className="shrink-0 text-right">
                                       <div className="font-mono text-sm text-white">{formatMoney(chain.gross)}</div>
-                                      <div className="text-[10px] font-bold text-rose-300">Cut {formatMoney(chain.exhibitorReceipts)}</div>
+                                      <div className="text-[10px] font-bold text-rose-300">{tr('box.cutAmount', { amount: formatMoney(chain.exhibitorReceipts) })}</div>
                                   </div>
                               </div>
                           );
@@ -1073,7 +1080,7 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
                                                           ? 'rounded-md bg-amber-500/15 px-2 py-1 text-amber-200'
                                                           : 'rounded-md bg-white/5 px-2 py-1 text-zinc-400'
                                               }>
-	                                                  {entry.source === 'PLAYER' ? tr('box.yourRelease') : entry.source === 'OUTSIDE' ? 'Producer Stake' : tr('box.marketFilm')}
+		                                                  {entry.source === 'PLAYER' ? tr('box.yourRelease') : entry.source === 'OUTSIDE' ? tr('box.producerStake') : tr('box.marketFilm')}
                                               </span>
                                               <span className="rounded-md bg-amber-500/10 px-2 py-1 text-amber-200">{entry.statusTag}</span>
                                           </div>
@@ -1094,7 +1101,7 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
                               <div className="rounded-xl bg-black/25 p-2">
 	                                  <div className="text-[8px] font-black uppercase tracking-widest text-zinc-500">{tr('box.runWeekShort')}</div>
                                   <div className={`mt-1 font-mono text-xs font-black ${entry.change !== null && entry.change >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>
-                                      {entry.runWeek} · {entry.change === null ? 'NEW' : `${entry.change > 0 ? '+' : ''}${entry.change}%`}
+	                                      {tr('box.weekNumberShort', { week: entry.runWeek })} · {entry.change === null ? tr('box.newRank') : `${entry.change > 0 ? '+' : ''}${entry.change}%`}
                                   </div>
                               </div>
                           </div>
@@ -1185,11 +1192,11 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
               <div className="space-y-3">
                   {entries.length === 0 && (
                       <div className="rounded-2xl border border-dashed border-zinc-700 bg-zinc-800/60 p-5 text-center text-sm text-zinc-500">
-                          Cinema partner data appears once theatrical releases report a regional split.
+                          {tr('box.cinemaPartnerDataPendingTheatrical')}
                       </div>
                   )}
                   {entries.map(entry => {
-                      const chainProfile = getCinemaChainById(entry.id as any);
+                      const chainProfile = getCinemaChainById(entry.id as CinemaChainId, language);
                       return (
                           <div key={entry.id} className="rounded-2xl border border-zinc-700 bg-zinc-800 p-4">
                               <div className="flex items-center justify-between gap-3">
@@ -1197,12 +1204,14 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
                                       {chainProfile && <CinemaChainLogo chain={chainProfile} size="sm" />}
                                       <div className="min-w-0">
                                           <div className="truncate font-bold text-white">{entry.name}</div>
-                                          <div className="text-[10px] font-black uppercase tracking-[0.14em] text-zinc-500">{entry.screens.toLocaleString()} screens</div>
+                                          <div className="text-[10px] font-black uppercase tracking-[0.14em] text-zinc-500">
+                                              {tr('box.records.screens', { count: entry.screens.toLocaleString() })}
+                                          </div>
                                       </div>
                                   </div>
                                   <div className="text-right">
                                       <div className="font-mono text-sm font-black text-white">{formatMoney(entry.gross)}</div>
-                                      <div className="text-[10px] font-black text-rose-300">{formatPercent(entry.exhibitorCut)} cut</div>
+                                      <div className="text-[10px] font-black text-rose-300">{tr('box.percentCut', { percent: formatPercent(entry.exhibitorCut) })}</div>
                                   </div>
                               </div>
                               <div className="mt-3 grid grid-cols-2 gap-2">
@@ -1306,7 +1315,9 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
                                             <div className="font-bold text-lg leading-tight break-words">{rel.name}</div>
                                         </div>
                                         <div className="flex shrink-0 items-center gap-2">
-                                            <div className="text-xs bg-emerald-900 text-emerald-400 px-2 py-1 rounded font-mono font-bold">Run W{rel.weekNum}</div>
+                                            <div className="text-xs bg-emerald-900 text-emerald-400 px-2 py-1 rounded font-mono font-bold">
+                                                {tr('box.runWeekCompact', { week: rel.weekNum })}
+                                            </div>
                                             <ChevronRight size={16} className="text-zinc-500" />
                                         </div>
                                     </div>
@@ -1345,7 +1356,7 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
                                                             className={`w-full rounded-t-md transition-all duration-500 ${isLatest ? 'bg-emerald-500' : 'bg-emerald-500/40'}`}
                                                          ></div>
                                                     </div>
-                                                    <span className="text-[9px] text-zinc-600 mt-1">W{idx+1}</span>
+                                                    <span className="text-[9px] text-zinc-600 mt-1">{tr('box.weekCompact', { week: idx + 1 })}</span>
                                                 </div>
                                             )
                                         })}
@@ -1430,7 +1441,7 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
                                                             className={`w-full rounded-t-md transition-all duration-500 ${isLatest ? 'bg-indigo-500' : 'bg-indigo-500/40'}`}
                                                          ></div>
                                                     </div>
-                                                    <span className="text-[9px] text-zinc-600 mt-1">W{idx+1}</span>
+                                                    <span className="text-[9px] text-zinc-600 mt-1">{tr('box.weekCompact', { week: idx + 1 })}</span>
                                                 </div>
                                             )
                                         })}

@@ -4,74 +4,76 @@ import { generateAudition } from './roleLogic'; // We will export this helper fr
 import { getNextFamousMovie, createFamousOpportunity } from './famousMovieLogic';
 import { generateRandomUniverseOpportunity } from './universeLogic';
 import { calculateYoutubeCreatorScore, getYoutubePublicImageLabel } from './youtubeLogic';
+import { getPlayerLanguage } from './i18n';
+import { getAbsoluteWeek } from './legacyLogic';
 
 // --- AGENT CATALOG ---
 export const AGENT_CATALOG: Agent[] = [
     // ROOKIE
     {
         id: 'agent_rookie_1', name: 'Barney "Big Shot" Miller', 
-        description: 'Works out of his garage. Eager but inexperienced.',
+        description: '', descriptionKey: 'services.teamLogic.agent.agent_rookie_1.description',
         annualFee: 50000, commission: 0.18, specialty: 'BALANCED', tier: 'ROOKIE', studioAccess: 'LOW'
     },
     {
         id: 'agent_rookie_2', name: 'Stacy from High School', 
-        description: 'She has an IMDB Pro account and a lot of energy.',
+        description: '', descriptionKey: 'services.teamLogic.agent.agent_rookie_2.description',
         annualFee: 40000, commission: 0.20, specialty: 'TV', tier: 'ROOKIE', studioAccess: 'LOW'
     },
     {
         id: 'agent_rookie_3', name: 'Gary "The Hustler"', 
-        description: 'Primarily books mattress commercials, but he tries.',
+        description: '', descriptionKey: 'services.teamLogic.agent.agent_rookie_3.description',
         annualFee: 60000, commission: 0.15, specialty: 'BALANCED', tier: 'ROOKIE', studioAccess: 'LOW'
     },
 
     // STANDARD
     {
         id: 'agent_std_1', name: 'Sarah Jenkins', 
-        description: 'Solid connections in TV networks. Great for steady series work.',
+        description: '', descriptionKey: 'services.teamLogic.agent.agent_std_1.description',
         annualFee: 250000, commission: 0.12, specialty: 'TV', tier: 'STANDARD', studioAccess: 'MID'
     },
     {
         id: 'agent_std_2', name: 'Marcus Kane', 
-        description: 'Focuses on indie films and festival darlings.',
+        description: '', descriptionKey: 'services.teamLogic.agent.agent_std_2.description',
         annualFee: 300000, commission: 0.12, specialty: 'FILM', tier: 'STANDARD', studioAccess: 'MID'
     },
     {
         id: 'agent_std_3', name: 'Javier & Associates', 
-        description: 'A boutique agency with a reputation for finding diverse roles.',
+        description: '', descriptionKey: 'services.teamLogic.agent.agent_std_3.description',
         annualFee: 280000, commission: 0.13, specialty: 'BALANCED', tier: 'STANDARD', studioAccess: 'MID'
     },
     {
         id: 'agent_std_4', name: 'Lisa Vance', 
-        description: 'Former casting director turned agent. She knows everyone.',
+        description: '', descriptionKey: 'services.teamLogic.agent.agent_std_4.description',
         annualFee: 350000, commission: 0.11, specialty: 'BALANCED', tier: 'STANDARD', studioAccess: 'MID'
     },
 
     // ELITE
     {
         id: 'agent_elite_1', name: 'Vantage Talent', 
-        description: 'High-end corporate agency. They get you in the room.',
+        description: '', descriptionKey: 'services.teamLogic.agent.agent_elite_1.description',
         annualFee: 1500000, commission: 0.10, specialty: 'BALANCED', tier: 'ELITE', studioAccess: 'HIGH'
     },
     {
         id: 'agent_elite_2', name: 'Creative Artists United', 
-        description: 'The machine. You are just a number, but a rich number.',
+        description: '', descriptionKey: 'services.teamLogic.agent.agent_elite_2.description',
         annualFee: 2000000, commission: 0.10, specialty: 'FILM', tier: 'ELITE', studioAccess: 'HIGH'
     },
     {
         id: 'agent_elite_3', name: 'Samantha Power', 
-        description: 'Ruthless negotiator. Known for getting back-end points.',
+        description: '', descriptionKey: 'services.teamLogic.agent.agent_elite_3.description',
         annualFee: 1800000, commission: 0.11, specialty: 'BALANCED', tier: 'ELITE', studioAccess: 'HIGH'
     },
 
     // LEGEND
     {
         id: 'agent_legend_1', name: 'Ari Golding', 
-        description: 'The shark. If he calls, you pick up. Only for stars.',
+        description: '', descriptionKey: 'services.teamLogic.agent.agent_legend_1.description',
         annualFee: 10000000, commission: 0.10, specialty: 'BALANCED', tier: 'LEGEND', studioAccess: 'HIGH'
     },
     {
         id: 'agent_legend_2', name: 'The Agency', 
-        description: 'An invite-only collective of the industry\'s top power brokers.',
+        description: '', descriptionKey: 'services.teamLogic.agent.agent_legend_2.description',
         annualFee: 12000000, commission: 0.08, specialty: 'BALANCED', tier: 'LEGEND', studioAccess: 'HIGH'
     }
 ];
@@ -81,46 +83,46 @@ export const MANAGER_CATALOG: Manager[] = [
     // ROOKIE
     {
         id: 'mgr_rookie_1', name: 'Cousin Vinny', 
-        description: 'He managed a band once in the 90s.',
+        description: '', descriptionKey: 'services.teamLogic.manager.mgr_rookie_1.description',
         annualFee: 75000, commission: 0.20, tier: 'ROOKIE', sponsorshipPower: 2
     },
     {
         id: 'mgr_rookie_2', name: 'Momager Karen', 
-        description: 'She means well, but sends emails in Comic Sans.',
+        description: '', descriptionKey: 'services.teamLogic.manager.mgr_rookie_2.description',
         annualFee: 50000, commission: 0.20, tier: 'ROOKIE', sponsorshipPower: 1
     },
     
     // STANDARD
     {
         id: 'mgr_std_1', name: 'PR Solutions', 
-        description: 'Professional representation for working actors.',
+        description: '', descriptionKey: 'services.teamLogic.manager.mgr_std_1.description',
         annualFee: 200000, commission: 0.15, tier: 'STANDARD', sponsorshipPower: 5
     },
     {
         id: 'mgr_std_2', name: 'Image Craft', 
-        description: 'Good at cleaning up scandals and booking local ads.',
+        description: '', descriptionKey: 'services.teamLogic.manager.mgr_std_2.description',
         annualFee: 180000, commission: 0.16, tier: 'STANDARD', sponsorshipPower: 4
     },
     {
         id: 'mgr_std_3', name: 'Michael Scott Mgmt', 
-        description: 'Passionate about branding. Very hands-on.',
+        description: '', descriptionKey: 'services.teamLogic.manager.mgr_std_3.description',
         annualFee: 220000, commission: 0.15, tier: 'STANDARD', sponsorshipPower: 6
     },
 
     // ELITE
     {
         id: 'mgr_elite_1', name: 'Icon Management', 
-        description: 'They turn actors into global brands.',
+        description: '', descriptionKey: 'services.teamLogic.manager.mgr_elite_1.description',
         annualFee: 800000, commission: 0.10, tier: 'ELITE', sponsorshipPower: 9
     },
     {
         id: 'mgr_elite_2', name: 'Alpha Strategies', 
-        description: 'Focuses on long-term wealth and luxury partnerships.',
+        description: '', descriptionKey: 'services.teamLogic.manager.mgr_elite_2.description',
         annualFee: 950000, commission: 0.10, tier: 'ELITE', sponsorshipPower: 8
     },
     {
         id: 'mgr_elite_3', name: 'Elena "The Fixer" Cruz', 
-        description: 'She can get you a Vogue cover and a coffee deal in one afternoon.',
+        description: '', descriptionKey: 'services.teamLogic.manager.mgr_elite_3.description',
         annualFee: 1200000, commission: 0.12, tier: 'ELITE', sponsorshipPower: 10
     }
 ];
@@ -129,19 +131,19 @@ export const MANAGER_CATALOG: Manager[] = [
 export const TRAINER_CATALOG: TeamMember[] = [
     {
         id: 'train_rookie', name: 'Iron Gym Basics', type: 'TRAINER', tier: 'ROOKIE', weeklyCost: 200, 
-        description: 'A local gym trainer. Prevents minor decay.', perks: 'Stops 50% Body decay'
+        description: '', descriptionKey: 'services.teamLogic.member.train_rookie.description', perks: '', perksKey: 'services.teamLogic.member.train_rookie.perks'
     },
     {
         id: 'train_std', name: 'Celebrity Fitness', type: 'TRAINER', tier: 'STANDARD', weeklyCost: 1000, 
-        description: 'Works with TV stars. Keeps you in shape.', perks: 'Stops 100% Body decay'
+        description: '', descriptionKey: 'services.teamLogic.member.train_std.description', perks: '', perksKey: 'services.teamLogic.member.train_std.perks'
     },
     {
         id: 'train_elite', name: 'Spartan Elite', type: 'TRAINER', tier: 'ELITE', weeklyCost: 3500, 
-        description: 'Transformation specialists for blockbusters.', perks: 'Stops decay + Adds Body Stat'
+        description: '', descriptionKey: 'services.teamLogic.member.train_elite.description', perks: '', perksKey: 'services.teamLogic.member.train_elite.perks'
     },
     {
         id: 'train_legend', name: 'Gunnar P.', type: 'TRAINER', tier: 'LEGEND', weeklyCost: 10000, 
-        description: 'The guy who trains superheroes.', perks: 'Max Stats + High Energy'
+        description: '', descriptionKey: 'services.teamLogic.member.train_legend.description', perks: '', perksKey: 'services.teamLogic.member.train_legend.perks'
     }
 ];
 
@@ -149,15 +151,15 @@ export const TRAINER_CATALOG: TeamMember[] = [
 export const THERAPIST_CATALOG: TeamMember[] = [
     {
         id: 'ther_rookie', name: 'BetterHelp App', type: 'THERAPIST', tier: 'ROOKIE', weeklyCost: 100, 
-        description: 'Online counseling.', perks: 'Stops 50% Happiness decay'
+        description: '', descriptionKey: 'services.teamLogic.member.ther_rookie.description', perks: '', perksKey: 'services.teamLogic.member.ther_rookie.perks'
     },
     {
         id: 'ther_std', name: 'Mindful Space', type: 'THERAPIST', tier: 'STANDARD', weeklyCost: 800, 
-        description: 'Private practice in Silver Lake.', perks: 'Stops 100% Happiness decay'
+        description: '', descriptionKey: 'services.teamLogic.member.ther_std.description', perks: '', perksKey: 'services.teamLogic.member.ther_std.perks'
     },
     {
         id: 'ther_elite', name: 'Dr. Sterling', type: 'THERAPIST', tier: 'ELITE', weeklyCost: 2500, 
-        description: 'Renowned psychologist to the stars.', perks: 'Stops decay + Adds Happiness'
+        description: '', descriptionKey: 'services.teamLogic.member.ther_elite.description', perks: '', perksKey: 'services.teamLogic.member.ther_elite.perks'
     }
 ];
 
@@ -165,15 +167,15 @@ export const THERAPIST_CATALOG: TeamMember[] = [
 export const STYLIST_CATALOG: TeamMember[] = [
     {
         id: 'style_rookie', name: 'Stitch Fix', type: 'STYLIST', tier: 'ROOKIE', weeklyCost: 150, 
-        description: 'Box subscription styling.', perks: 'Stops 50% Looks decay'
+        description: '', descriptionKey: 'services.teamLogic.member.style_rookie.description', perks: '', perksKey: 'services.teamLogic.member.style_rookie.perks'
     },
     {
         id: 'style_std', name: 'Vogue Vision', type: 'STYLIST', tier: 'STANDARD', weeklyCost: 1200, 
-        description: 'Red carpet ready looks.', perks: 'Stops 100% Looks decay'
+        description: '', descriptionKey: 'services.teamLogic.member.style_std.description', perks: '', perksKey: 'services.teamLogic.member.style_std.perks'
     },
     {
         id: 'style_elite', name: 'Law Roach-ish', type: 'STYLIST', tier: 'ELITE', weeklyCost: 5000, 
-        description: 'Image architect. Changes careers.', perks: 'Stops decay + Adds Looks + Rep'
+        description: '', descriptionKey: 'services.teamLogic.member.style_elite.description', perks: '', perksKey: 'services.teamLogic.member.style_elite.perks'
     }
 ];
 
@@ -181,15 +183,15 @@ export const STYLIST_CATALOG: TeamMember[] = [
 export const PUBLICIST_CATALOG: TeamMember[] = [
     {
         id: 'pub_rookie', name: 'Spin Doctors', type: 'PUBLICIST', tier: 'ROOKIE', weeklyCost: 300, 
-        description: 'Gets your name in local papers.', perks: 'Stops 50% Fame decay'
+        description: '', descriptionKey: 'services.teamLogic.member.pub_rookie.description', perks: '', perksKey: 'services.teamLogic.member.pub_rookie.perks'
     },
     {
         id: 'pub_std', name: 'Global PR', type: 'PUBLICIST', tier: 'STANDARD', weeklyCost: 1500, 
-        description: 'Solid damage control and booking.', perks: 'Stops 100% Fame decay'
+        description: '', descriptionKey: 'services.teamLogic.member.pub_std.description', perks: '', perksKey: 'services.teamLogic.member.pub_std.perks'
     },
     {
         id: 'pub_elite', name: 'Sunshine Sachs', type: 'PUBLICIST', tier: 'ELITE', weeklyCost: 6000, 
-        description: 'They control the narrative completely.', perks: 'Stops decay + Passive Fame'
+        description: '', descriptionKey: 'services.teamLogic.member.pub_elite.description', perks: '', perksKey: 'services.teamLogic.member.pub_elite.perks'
     }
 ];
 
@@ -197,19 +199,19 @@ export const PUBLICIST_CATALOG: TeamMember[] = [
 export const WELLNESS_CATALOG: TeamMember[] = [
     {
         id: 'well_rookie', name: 'Meal Prep Coach', type: 'WELLNESS', tier: 'ROOKIE', weeklyCost: 250,
-        description: 'Simple diet planning and weekly check-ins. Keeps early health decay manageable.', perks: 'Slows Health decay'
+        description: '', descriptionKey: 'services.teamLogic.member.well_rookie.description', perks: '', perksKey: 'services.teamLogic.member.well_rookie.perks'
     },
     {
         id: 'well_std', name: 'Private Nutritionist', type: 'WELLNESS', tier: 'STANDARD', weeklyCost: 1200,
-        description: 'Builds your meals, sleep routine, and recovery plan around your schedule.', perks: 'Stops Health decay'
+        description: '', descriptionKey: 'services.teamLogic.member.well_std.description', perks: '', perksKey: 'services.teamLogic.member.well_std.perks'
     },
     {
         id: 'well_elite', name: 'Medical Concierge', type: 'WELLNESS', tier: 'ELITE', weeklyCost: 4500,
-        description: 'A private wellness team for scans, recovery, supplements, and crisis prevention.', perks: 'Health recovery + lower hospital bills'
+        description: '', descriptionKey: 'services.teamLogic.member.well_elite.description', perks: '', perksKey: 'services.teamLogic.member.well_elite.perks'
     },
     {
         id: 'well_legend', name: 'Longevity Doctor', type: 'WELLNESS', tier: 'LEGEND', weeklyCost: 14000,
-        description: 'Elite long-term health management for stars who cannot afford to crash.', perks: 'Strong Health recovery + crisis shield'
+        description: '', descriptionKey: 'services.teamLogic.member.well_legend.description', perks: '', perksKey: 'services.teamLogic.member.well_legend.perks'
     }
 ];
 
@@ -330,7 +332,7 @@ export const generateAgentOffers = (player: Player): AuditionOpportunity | null 
             if (Math.random() < 0.6) {
                 const famousMovie = getNextFamousMovie(player);
                 if (famousMovie) {
-                    return createFamousOpportunity(famousMovie, 'SUPPORTING', 'AGENT'); // Agents usually get supporting in these big ones first
+                    return createFamousOpportunity(famousMovie, 'SUPPORTING', 'AGENT', getPlayerLanguage(player)); // Agents usually get supporting in these big ones first
                 }
             } 
             // 2. Try Universe Role
@@ -508,8 +510,9 @@ export const generateDirectOffer = (player: Player): AuditionOpportunity | null 
     if (player.stats.fame < 50 && player.stats.reputation < 60 && !creatorOpensDoors) return null;
 
     // Cooldown Check (9 Weeks)
-    const lastOffer = player.flags.lastDirectOfferWeek || 0;
-    if (player.currentWeek - lastOffer < 9) return null;
+    const currentAbsoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
+    const lastOffer = Number(player.flags.lastDirectOfferAbsoluteWeek || 0);
+    if (currentAbsoluteWeek - lastOffer < 9) return null;
 
     // --- DYNAMIC AVAILABILITY CHECK ---
     const hasActiveBlockbuster = player.commitments.some(c => 
@@ -532,7 +535,7 @@ export const generateDirectOffer = (player: Player): AuditionOpportunity | null 
              if (Math.random() < 0.5) {
                 const famousMovie = getNextFamousMovie(player);
                 if (famousMovie) {
-                    return createFamousOpportunity(famousMovie, 'LEAD', 'DIRECT'); // Direct offers are usually Lead
+                    return createFamousOpportunity(famousMovie, 'LEAD', 'DIRECT', getPlayerLanguage(player)); // Direct offers are usually Lead
                 }
             } 
             // 2. Try Universe Role

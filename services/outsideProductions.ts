@@ -1,4 +1,5 @@
 import {
+    GameLanguage,
     Genre,
     LegalCase,
     Message,
@@ -7,6 +8,7 @@ import {
     OutsideProductionScoutReport,
     Player
 } from '../types';
+import { getPlayerLanguage, t } from './i18n';
 
 // Fraud-Risk Producer Investment Offers: suspicious deals stay in the same outside-producer flow,
 // but carry tempting terms, weak verification, and delayed legal fallout risk.
@@ -55,6 +57,14 @@ const hashString = (value: string): number => {
 
 const randomFrom = <T>(items: T[], seed: number): T => items[seed % items.length];
 
+const getGenreLabel = (language: GameLanguage, genre: Genre): string => (
+    t(language, `services.outsideProducer.genre.${genre}`)
+);
+
+const getOutcomeLabel = (language: GameLanguage, outcome?: OutsideProductionInvestment['finalOutcome'] | OutsideProductionInvestment['status']): string => (
+    t(language, `services.outsideProducer.outcome.${outcome || 'FINISHED'}`)
+);
+
 const formatMoneyShort = (value: number): string => {
     const safe = Math.max(0, Math.round(value || 0));
     if (safe >= 1_000_000_000) return `$${(safe / 1_000_000_000).toFixed(1)}B`;
@@ -100,21 +110,27 @@ const createOutsideProductionLegalCase = (
     player: Player,
     item: OutsideProductionInvestment,
     evidenceStrength: number
-): LegalCase => ({
-    id: `outside_fraud_case_${item.projectId}_${player.age}_${player.currentWeek}`,
-    title: `${item.projectTitle} financing investigation`,
-    description: `${item.producerName} is under investigation after unverified financing surfaced on ${item.projectTitle}. You are being questioned as an outside producer investor.`,
-    weeksRemaining: 0,
-    severity: evidenceStrength >= 72 ? 'HIGH' : evidenceStrength >= 52 ? 'MEDIUM' : 'LOW',
-    evidence: evidenceStrength,
-    currentHearing: 1,
-    totalHearings: evidenceStrength >= 70 ? 4 : 3,
-    nextHearingWeek: getNextWeekNumber(player.currentWeek),
-    evidenceStrength,
-    playerDefense: clamp(55 + (player.stats?.reputation || 0) * 0.25 - evidenceStrength * 0.2, 18, 82),
-    status: 'ACTIVE',
-    history: []
-});
+): LegalCase => {
+    const language = getPlayerLanguage(player);
+    return {
+        id: `outside_fraud_case_${item.projectId}_${player.age}_${player.currentWeek}`,
+        title: t(language, 'services.outsideProducer.legalCase.title', { title: item.projectTitle }),
+        description: t(language, 'services.outsideProducer.legalCase.description', {
+            producer: item.producerName,
+            title: item.projectTitle,
+        }),
+        weeksRemaining: 0,
+        severity: evidenceStrength >= 72 ? 'HIGH' : evidenceStrength >= 52 ? 'MEDIUM' : 'LOW',
+        evidence: evidenceStrength,
+        currentHearing: 1,
+        totalHearings: evidenceStrength >= 70 ? 4 : 3,
+        nextHearingWeek: getNextWeekNumber(player.currentWeek),
+        evidenceStrength,
+        playerDefense: clamp(55 + (player.stats?.reputation || 0) * 0.25 - evidenceStrength * 0.2, 18, 82),
+        status: 'ACTIVE',
+        history: []
+    };
+};
 
 const getFraudRiskOutcome = (item: OutsideProductionInvestment): 'LEGIT' | 'MESSY_DELAY' | 'FRAUD_CASE' | 'BIG_UPSIDE' => {
     if (String(item.projectId).includes('cheat_outside_fraud_active')) return 'FRAUD_CASE';
@@ -203,6 +219,7 @@ export const calculateOutsideInvestmentAcceptanceChance = ({
 };
 
 export const generateOutsideProducerInvestmentOffers = (player: Player, count = 1): OutsideProducerInvestmentOffer[] => {
+    const language = getPlayerLanguage(player);
     const recognition = getPlayerRecognitionScore(player);
     if (recognition < 38 || player.money < 1_500_000) return [];
     const absolute = absoluteWeek(player.age, player.currentWeek);
@@ -246,8 +263,8 @@ export const generateOutsideProducerInvestmentOffers = (player: Player, count = 
             trackRecord: producer.trackRecord,
             genre,
             logline: isFraudRiskOffer
-                ? `A ${genre.toLowerCase().replace(/_/g, ' ')} package with unusually generous economics and a rushed financing window.`
-                : `A ${genre.toLowerCase().replace(/_/g, ' ')} film package looking for outside producer money before cameras roll.`,
+                ? t(language, 'services.outsideProducer.offer.logline.fraud', { genre: getGenreLabel(language, genre) })
+                : t(language, 'services.outsideProducer.offer.logline.clean', { genre: getGenreLabel(language, genre) }),
             budget,
             cashAsk,
             offeredStakePercent,
@@ -281,11 +298,12 @@ export const acceptOutsideProducerInvestmentOffer = (
     offer: OutsideProducerInvestmentOffer,
     override?: { cashAmount?: number; stakePercent?: number }
 ): { player: Player; accepted: boolean; reason?: string; investment?: OutsideProductionInvestment } => {
+    const language = getPlayerLanguage(player);
     const investedAmount = Math.max(0, Math.round(override?.cashAmount ?? offer.cashAsk));
     const stakePercent = Math.round(clamp(override?.stakePercent ?? offer.offeredStakePercent, 0, MAX_OUTSIDE_STAKE) * 10) / 10;
-    if (hasOutsideProductionExposure(player, offer.projectId, offer.id)) return { player, accepted: false, reason: 'Already exposed to this project.' };
-    if (investedAmount <= 0 || stakePercent <= 0 || stakePercent > MAX_OUTSIDE_STAKE) return { player, accepted: false, reason: 'Invalid stake.' };
-    if (investedAmount > player.money) return { player, accepted: false, reason: 'Not enough cash.' };
+    if (hasOutsideProductionExposure(player, offer.projectId, offer.id)) return { player, accepted: false, reason: t(language, 'services.outsideProducer.reason.alreadyExposed') };
+    if (investedAmount <= 0 || stakePercent <= 0 || stakePercent > MAX_OUTSIDE_STAKE) return { player, accepted: false, reason: t(language, 'services.outsideProducer.reason.invalidStake') };
+    if (investedAmount > player.money) return { player, accepted: false, reason: t(language, 'services.outsideProducer.reason.notEnoughCash') };
 
     const releaseAt = fromAbsoluteWeek(absoluteWeek(player.age, player.currentWeek) + offer.expectedReleaseWeeks);
     const fraudRisk = offer.fraudRisk || 'NONE';
@@ -322,8 +340,12 @@ export const acceptOutsideProducerInvestmentOffer = (
         legalExposure: offer.legalExposure || 0,
         fraudFalloutAbsoluteWeek,
         eventLog: [
-            `Accepted ${formatMoneyShort(investedAmount)} for ${stakePercent}% of ${offer.projectTitle}.`,
-            ...(fraudRisk !== 'NONE' ? ['Terms were unusually generous. Financing verification remained weak.'] : [])
+            t(language, 'services.outsideProducer.event.accepted', {
+                amount: formatMoneyShort(investedAmount),
+                stake: stakePercent,
+                title: offer.projectTitle,
+            }),
+            ...(fraudRisk !== 'NONE' ? [t(language, 'services.outsideProducer.event.weakVerification')] : [])
         ]
     };
 
@@ -340,11 +362,18 @@ export const acceptOutsideProducerInvestmentOffer = (
                 {
                     week: player.currentWeek,
                     year: player.age,
-                    message: `🎬 Producer Investment: You backed ${offer.projectTitle} for ${formatMoneyShort(investedAmount)} and ${stakePercent}% producer share.`,
+                    message: t(language, 'services.outsideProducer.accept.log', {
+                        title: offer.projectTitle,
+                        amount: formatMoneyShort(investedAmount),
+                        stake: stakePercent,
+                    }),
                     type: 'neutral' as const
                 }
             ].slice(-80)
-        }, -investedAmount, `Producer investment: ${offer.projectTitle} (${stakePercent}% share)`)
+        }, -investedAmount, t(language, 'services.outsideProducer.finance.investment', {
+            title: offer.projectTitle,
+            stake: stakePercent,
+        }))
     };
 };
 
@@ -354,6 +383,7 @@ export const counterOutsideProducerInvestmentOffer = (
     cashAmount: number,
     stakePercent: number
 ): { player: Player; accepted: boolean; declined: boolean; chance: number; reason?: string; investment?: OutsideProductionInvestment } => {
+    const language = getPlayerLanguage(player);
     const chance = calculateOutsideInvestmentAcceptanceChance({ offer, cashAmount, stakePercent, player });
     if (offer.finalTerms || offer.counterUsed || chance <= 0) {
         return {
@@ -364,7 +394,7 @@ export const counterOutsideProducerInvestmentOffer = (
             accepted: false,
             declined: true,
             chance,
-            reason: 'They declined the counter.'
+            reason: t(language, 'services.outsideProducer.reason.counterDeclined')
         };
     }
     const roll = hashString(`${offer.id}:${cashAmount}:${stakePercent}:${player.age}:${player.currentWeek}`) % 100;
@@ -378,7 +408,11 @@ export const counterOutsideProducerInvestmentOffer = (
                     {
                         week: player.currentWeek,
                         year: player.age,
-                        message: `📉 ${offer.producerName} declined your ${stakePercent}% counter on ${offer.projectTitle}.`,
+                        message: t(language, 'services.outsideProducer.counter.declinedLog', {
+                            producer: offer.producerName,
+                            stake: stakePercent,
+                            title: offer.projectTitle,
+                        }),
                         type: 'neutral' as const
                     }
                 ].slice(-80)
@@ -386,18 +420,28 @@ export const counterOutsideProducerInvestmentOffer = (
             accepted: false,
             declined: true,
             chance,
-            reason: 'They declined the counter.'
+            reason: t(language, 'services.outsideProducer.reason.counterDeclined')
         };
     }
     const result = acceptOutsideProducerInvestmentOffer(player, { ...offer, counterUsed: true }, { cashAmount, stakePercent });
     return { ...result, declined: false, chance };
 };
 
-export const buildOutsideProducerInvestmentMessage = (offer: OutsideProducerInvestmentOffer): Message => ({
+export const buildOutsideProducerInvestmentMessage = (offer: OutsideProducerInvestmentOffer, language: GameLanguage = 'en'): Message => ({
     id: offer.id,
-    sender: `${offer.producerName} Finance`,
-    subject: `Producer Investment: ${offer.projectTitle}`,
-    text: `${offer.producerName} is raising ${formatMoneyShort(offer.cashAsk)} for ${offer.offeredStakePercent}% of ${offer.projectTitle}. ${offer.ownerName ? `${offer.ownerName} is the controlling producer. ` : ''}${offer.fraudRisk && offer.fraudRisk !== 'NONE' ? 'The terms are unusually generous, but financing verification is weak. ' : ''}${offer.finalTerms ? 'Final terms; they are not looking to bargain.' : 'They may consider one counter if the economics make sense.'}`,
+    sender: t(language, 'services.outsideProducer.offer.sender', { producer: offer.producerName }),
+    subject: t(language, 'services.outsideProducer.offer.subject', { title: offer.projectTitle }),
+    text: t(language, 'services.outsideProducer.offer.text', {
+        producer: offer.producerName,
+        amount: formatMoneyShort(offer.cashAsk),
+        stake: offer.offeredStakePercent,
+        title: offer.projectTitle,
+        ownerLine: offer.ownerName ? t(language, 'services.outsideProducer.offer.ownerLine', { owner: offer.ownerName }) : '',
+        fraudLine: offer.fraudRisk && offer.fraudRisk !== 'NONE' ? t(language, 'services.outsideProducer.offer.fraudLine') : '',
+        termsLine: offer.finalTerms
+            ? t(language, 'services.outsideProducer.offer.finalTermsLine')
+            : t(language, 'services.outsideProducer.offer.counterLine'),
+    }),
     type: 'OFFER_OUTSIDE_PRODUCER_INVESTMENT',
     data: offer,
     isRead: false,
@@ -423,21 +467,36 @@ const getOutsideOutcomeReputationImpact = (item: OutsideProductionInvestment): n
     }
 };
 
-const buildOutsideOutcomeSummary = (item: OutsideProductionInvestment): string => {
+const buildOutsideOutcomeSummary = (item: OutsideProductionInvestment, language: GameLanguage): string => {
     const { payout, profit, roi } = getOutsideOutcomeEconomics(item);
-    const label = (item.finalOutcome || item.status).replace(/_/g, ' ').toLowerCase();
-    const direction = profit >= 0 ? 'profit' : 'loss';
-    return `${item.projectTitle} closed as ${label}. You invested ${formatMoneyShort(item.investedAmount)}, received ${formatMoneyShort(payout)}, and booked a ${direction} of ${formatMoneyShort(Math.abs(profit))} (${roi}% ROI).`;
+    return t(language, 'services.outsideProducer.result.summary', {
+        title: item.projectTitle,
+        outcome: getOutcomeLabel(language, item.finalOutcome || item.status),
+        invested: formatMoneyShort(item.investedAmount),
+        payout: formatMoneyShort(payout),
+        direction: t(language, profit >= 0 ? 'services.outsideProducer.result.profit' : 'services.outsideProducer.result.loss'),
+        profit: formatMoneyShort(Math.abs(profit)),
+        roi,
+    });
 };
 
 export const buildOutsideProductionResultMessage = (item: OutsideProductionInvestment, player: Player): Message => {
+    const language = getPlayerLanguage(player);
     const { payout, profit, roi } = getOutsideOutcomeEconomics(item);
-    const outcome = (item.finalOutcome || 'FINISHED').replace(/_/g, ' ');
     return {
         id: `outside_result_${item.projectId}_${player.age}_${player.currentWeek}`,
-        sender: `${item.studioName} Settlement`,
-        subject: `Producer Result: ${item.projectTitle}`,
-        text: `${outcome}: ${item.producerName} reported ${formatMoneyShort(item.producerReceipts || 0)} in producer receipts. Your ${item.stakePercent}% share paid ${formatMoneyShort(payout)} for ${profit >= 0 ? 'a profit' : 'a loss'} of ${formatMoneyShort(Math.abs(profit))} (${roi}% ROI).`,
+        sender: t(language, 'services.outsideProducer.result.sender', { studio: item.studioName }),
+        subject: t(language, 'services.outsideProducer.result.subject', { title: item.projectTitle }),
+        text: t(language, 'services.outsideProducer.result.text', {
+            outcome: getOutcomeLabel(language, item.finalOutcome || 'FINISHED'),
+            producer: item.producerName,
+            receipts: formatMoneyShort(item.producerReceipts || 0),
+            stake: item.stakePercent,
+            payout: formatMoneyShort(payout),
+            direction: t(language, profit >= 0 ? 'services.outsideProducer.result.aProfit' : 'services.outsideProducer.result.aLoss'),
+            profit: formatMoneyShort(Math.abs(profit)),
+            roi,
+        }),
         type: 'SYSTEM',
         data: {
             kind: 'OUTSIDE_PRODUCER_RESULT',
@@ -467,6 +526,7 @@ export const buildOutsideProductionResultMessage = (item: OutsideProductionInves
 };
 
 const resolveOutsideProduction = (player: Player, item: OutsideProductionInvestment): OutsideProductionInvestment => {
+    const language = getPlayerLanguage(player);
     const seed = hashString(`${item.projectId}:${item.acceptedYear}:${item.investedAmount}`);
     const quality = item.scoutReport.scriptQuality * 0.26
         + item.scoutReport.directorQuality * 0.18
@@ -485,8 +545,8 @@ const resolveOutsideProduction = (player: Player, item: OutsideProductionInvestm
             playerPayout: Math.round(item.investedAmount * 0.18),
             profit: Math.round(item.investedAmount * -0.82),
             reputationImpact: -2,
-            resultSummary: `${item.projectTitle} collapsed before release. Insurance and asset recovery returned a small amount.`,
-            eventLog: [...(item.eventLog || []), `${item.projectTitle} collapsed before release. Insurance and asset recovery returned a small amount.`]
+            resultSummary: t(language, 'services.outsideProducer.result.cancelledSummary', { title: item.projectTitle }),
+            eventLog: [...(item.eventLog || []), t(language, 'services.outsideProducer.result.cancelledSummary', { title: item.projectTitle })]
         };
     }
     const multiplier = Math.max(0.12, (quality + 48 + (seed % 45)) / 100);
@@ -512,8 +572,12 @@ const resolveOutsideProduction = (player: Player, item: OutsideProductionInvestm
         playerPayout,
         profit,
         reputationImpact: getOutsideOutcomeReputationImpact({ ...item, finalOutcome, playerPayout, profit }),
-        resultSummary: buildOutsideOutcomeSummary({ ...item, finalOutcome, producerReceipts, playerPayout, profit }),
-        eventLog: [...(item.eventLog || []), `${item.projectTitle} finished its ${item.releasePath.toLowerCase()} run and paid ${formatMoneyShort(playerPayout)} to your producer share.`]
+        resultSummary: buildOutsideOutcomeSummary({ ...item, finalOutcome, producerReceipts, playerPayout, profit }, language),
+        eventLog: [...(item.eventLog || []), t(language, 'services.outsideProducer.result.eventPaid', {
+            title: item.projectTitle,
+            releasePath: t(language, `services.outsideProducer.releasePath.${item.releasePath}`),
+            payout: formatMoneyShort(playerPayout),
+        })]
     };
 };
 
@@ -523,23 +587,16 @@ const buildOutsideFraudFalloutMessage = (
     outcome: 'MESSY_DELAY' | 'FRAUD_CASE' | 'BIG_UPSIDE' | 'LEGIT',
     legalFees = 0
 ): Message => {
-    const subject = outcome === 'FRAUD_CASE'
-        ? `Fraud Investigation: ${item.projectTitle}`
-        : outcome === 'MESSY_DELAY'
-            ? `Financing Trouble: ${item.projectTitle}`
-            : outcome === 'BIG_UPSIDE'
-                ? `Risk Paid Off: ${item.projectTitle}`
-                : `Verification Cleared: ${item.projectTitle}`;
-    const text = outcome === 'FRAUD_CASE'
-        ? `Shell company producer disappeared from ${item.projectTitle}. Investigators are reviewing money movement and your outside producer stake. Legal counsel opened a case and billed ${formatMoneyShort(legalFees)}.`
-        : outcome === 'MESSY_DELAY'
-            ? `${item.projectTitle} hit financing delays after unverified money sources failed checks. The movie is not dead, but the paper trail is messy and the release moved back.`
-            : outcome === 'BIG_UPSIDE'
-                ? `${item.projectTitle}'s strange financing checked out, and the aggressive terms turned into real leverage. Buzz improved because the campaign suddenly has cash.`
-                : `${item.projectTitle}'s financing documents finally checked out. The generous terms were real, but the offer still looked unusual.`;
+    const language = getPlayerLanguage(player);
+    const outcomeKey = outcome.toLowerCase();
+    const subject = t(language, `services.outsideProducer.fraud.subject.${outcomeKey}`, { title: item.projectTitle });
+    const text = t(language, `services.outsideProducer.fraud.text.${outcomeKey}`, {
+        title: item.projectTitle,
+        legalFees: formatMoneyShort(legalFees),
+    });
     return {
         id: `outside_fraud_${item.projectId}_${player.age}_${player.currentWeek}`,
-        sender: `${item.studioName} Legal Desk`,
+        sender: t(language, 'services.outsideProducer.fraud.sender', { studio: item.studioName }),
         subject,
         text,
         type: 'SYSTEM',
@@ -551,11 +608,12 @@ const buildOutsideFraudFalloutMessage = (
 };
 
 export const processOutsideProductionsWeek = (player: Player): { player: Player; logs: string[]; payouts: number } => {
+    const language = getPlayerLanguage(player);
     const currentAbsolute = absoluteWeek(player.age, player.currentWeek);
     let payouts = 0;
     let legalFees = 0;
     let reputationImpact = 0;
-    const logs: string[] = [];
+    const logs: Array<{ message: string; type: 'positive' | 'neutral' | 'negative' }> = [];
     const resultMessages: Message[] = [];
     const legalCases: LegalCase[] = [];
     const nextItems = (player.outsideProductions || []).map(item => {
@@ -575,7 +633,10 @@ export const processOutsideProductionsWeek = (player: Player): { player: Player;
                 reputationImpact -= 4.5;
                 legalCases.push(createOutsideProductionLegalCase(player, item, evidenceStrength));
                 resultMessages.push(buildOutsideFraudFalloutMessage(item, player, 'FRAUD_CASE', fee));
-                logs.push(`${item.projectTitle}: fraud case opened • legal fees ${formatMoneyShort(fee)}.`);
+                logs.push({
+                    message: t(language, 'services.outsideProducer.weekly.fraudCase', { title: item.projectTitle, fee: formatMoneyShort(fee) }),
+                    type: 'negative',
+                });
                 const finish = fromAbsoluteWeek(currentAbsolute);
                 return {
                     ...item,
@@ -590,15 +651,18 @@ export const processOutsideProductionsWeek = (player: Player): { player: Player;
                     fraudFalloutResolved: true,
                     finishWeek: finish.week,
                     finishYear: finish.year,
-                    resultSummary: `${item.projectTitle} became a financing fraud case. Your investment was wiped out and legal fees were billed.`,
-                    eventLog: [...(item.eventLog || []), `Shell company producer disappeared. Fraud investigation opened and legal fees hit ${formatMoneyShort(fee)}.`]
+                    resultSummary: t(language, 'services.outsideProducer.fraud.summary.fraudCase', { title: item.projectTitle }),
+                    eventLog: [...(item.eventLog || []), t(language, 'services.outsideProducer.fraud.event.fraudCase', { fee: formatMoneyShort(fee) })]
                 };
             }
             if (fraudOutcome === 'MESSY_DELAY') {
                 const delayedRelease = fromAbsoluteWeek(currentAbsolute + 7);
                 reputationImpact -= 0.8;
                 resultMessages.push(buildOutsideFraudFalloutMessage(item, player, 'MESSY_DELAY'));
-                logs.push(`${item.projectTitle}: unverified financing delayed release.`);
+                logs.push({
+                    message: t(language, 'services.outsideProducer.weekly.messyDelay', { title: item.projectTitle }),
+                    type: 'neutral',
+                });
                 return {
                     ...item,
                     status: 'FUNDED' as const,
@@ -606,25 +670,31 @@ export const processOutsideProductionsWeek = (player: Player): { player: Player;
                     releaseYear: delayedRelease.year,
                     fraudFalloutResolved: true,
                     scoutReport: { ...item.scoutReport, risk: clamp(item.scoutReport.risk + 8, 0, 100), buzz: clamp(item.scoutReport.buzz - 6, 0, 100) },
-                    eventLog: [...(item.eventLog || []), 'Financing checks delayed the movie and increased risk.']
+                    eventLog: [...(item.eventLog || []), t(language, 'services.outsideProducer.fraud.event.messyDelay')]
                 };
             }
             if (fraudOutcome === 'BIG_UPSIDE') {
                 resultMessages.push(buildOutsideFraudFalloutMessage(item, player, 'BIG_UPSIDE'));
-                logs.push(`${item.projectTitle}: generous financing checked out and boosted buzz.`);
+                logs.push({
+                    message: t(language, 'services.outsideProducer.weekly.bigUpside', { title: item.projectTitle }),
+                    type: 'positive',
+                });
                 return {
                     ...item,
                     fraudFalloutResolved: true,
                     scoutReport: { ...item.scoutReport, buzz: clamp(item.scoutReport.buzz + 14, 0, 100), marketFit: clamp(item.scoutReport.marketFit + 7, 0, 100) },
-                    eventLog: [...(item.eventLog || []), 'Risky financing checked out. Buzz improved.']
+                    eventLog: [...(item.eventLog || []), t(language, 'services.outsideProducer.fraud.event.bigUpside')]
                 };
             }
             resultMessages.push(buildOutsideFraudFalloutMessage(item, player, 'LEGIT'));
-            logs.push(`${item.projectTitle}: suspicious financing cleared.`);
+            logs.push({
+                message: t(language, 'services.outsideProducer.weekly.legit', { title: item.projectTitle }),
+                type: 'positive',
+            });
             return {
                 ...item,
                 fraudFalloutResolved: true,
-                eventLog: [...(item.eventLog || []), 'Financing verification cleared after extra checks.']
+                eventLog: [...(item.eventLog || []), t(language, 'services.outsideProducer.fraud.event.legit')]
             };
         }
         const finishAbsolute = releaseAbsolute + Math.max(1, Math.round((item.budget / 15_000_000) % 5) + 3);
@@ -639,12 +709,19 @@ export const processOutsideProductionsWeek = (player: Player): { player: Player;
         payouts += Math.max(0, resolved.playerPayout || 0);
         reputationImpact += resolved.reputationImpact || 0;
         resultMessages.push(buildOutsideProductionResultMessage(resolved, player));
-        logs.push(`${resolved.projectTitle}: ${resolved.finalOutcome?.replace(/_/g, ' ').toLowerCase()} • payout ${formatMoneyShort(resolved.playerPayout || 0)}.`);
+        logs.push({
+            message: t(language, 'services.outsideProducer.weekly.resolved', {
+                title: resolved.projectTitle,
+                outcome: getOutcomeLabel(language, resolved.finalOutcome),
+                payout: formatMoneyShort(resolved.playerPayout || 0),
+            }),
+            type: 'positive',
+        });
         const finish = fromAbsoluteWeek(currentAbsolute);
         return { ...resolved, finishWeek: finish.week, finishYear: finish.year };
     });
 
-    if (!payouts && !legalFees && !logs.length) return { player, logs, payouts };
+    if (!payouts && !legalFees && !logs.length) return { player, logs: logs.map(entry => entry.message), payouts };
     let nextPlayer: Player = {
             ...player,
             money: player.money + payouts - legalFees,
@@ -661,23 +738,23 @@ export const processOutsideProductionsWeek = (player: Player): { player: Player;
             },
             logs: [
                 ...(player.logs || []),
-                ...logs.map(message => ({
+                ...logs.map(entry => ({
                     week: player.currentWeek,
                     year: player.age,
-                    message: `🎞️ Outside Production: ${message}`,
-                    type: message.includes('fraud') || message.includes('legal') ? 'negative' as const : 'positive' as const
+                    message: t(language, 'services.outsideProducer.weekly.logPrefix', { message: entry.message }),
+                    type: entry.type
                 }))
             ].slice(-80)
         };
     if (payouts) {
-        nextPlayer = withOutsideInvestmentTransaction(nextPlayer, payouts, `Producer payout: outside productions producer receipts`);
+        nextPlayer = withOutsideInvestmentTransaction(nextPlayer, payouts, t(language, 'services.outsideProducer.finance.payout'));
     }
     if (legalFees) {
-        nextPlayer = withOutsideInvestmentTransaction(nextPlayer, -legalFees, `Producer legal fees: outside production fraud case`);
+        nextPlayer = withOutsideInvestmentTransaction(nextPlayer, -legalFees, t(language, 'services.outsideProducer.finance.legalFees'));
     }
     return {
         payouts,
-        logs,
+        logs: logs.map(entry => entry.message),
         player: nextPlayer
     };
 };

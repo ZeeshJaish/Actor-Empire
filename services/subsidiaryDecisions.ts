@@ -1,10 +1,12 @@
 import type {
     Business,
     LogEntry,
+    GameLanguage,
     Message,
     NewsItem,
     Player,
     StudioFinanceEntry,
+    StudioOperatingMandate,
     SubsidiaryDecision,
     SubsidiaryDecisionArc,
     SubsidiaryDecisionOption,
@@ -15,11 +17,13 @@ import type {
 } from '../types';
 import { normalizeStudioState } from './businessLogic';
 import {
+    getMandateOptionLabel,
     getStudioOperatingMandate,
     isAcquiredStudio,
     performStudioTreasuryTransfer,
 } from './studioGroup';
 import { planSubsidiaryProject } from './subsidiaryOperations';
+import { getPlayerLanguage, t } from './i18n';
 
 const formatMoneyShort = (value: number) => {
     const safe = Math.max(0, Math.floor(Number(value) || 0));
@@ -60,18 +64,26 @@ const updateStudioOnPlayer = (player: Player, studio: Business): Player => ({
 });
 
 const createDecisionOption = (
+    language: GameLanguage,
+    type: SubsidiaryDecisionType,
     id: SubsidiaryDecisionOption['id'],
-    label: string,
-    description: string,
-    preview: string,
     tone: SubsidiaryDecisionOption['tone'],
-): SubsidiaryDecisionOption => ({
-    id,
-    label,
-    description,
-    preview,
-    tone,
-});
+): SubsidiaryDecisionOption => {
+    const title = getDecisionTitle(type, language);
+    return {
+        id,
+        label: t(language, `services.subsidiaryDecisions.option.${id}.label`),
+        description: t(language, `services.subsidiaryDecisions.option.${id}.description`, { title }),
+        preview: t(language, `services.subsidiaryDecisions.option.${id}.preview`, { title }),
+        tone,
+    };
+};
+
+const getLocalizedMandateLabel = (
+    language: GameLanguage,
+    key: keyof StudioOperatingMandate,
+    value: string | undefined,
+) => getMandateOptionLabel(key, value, language).toLowerCase();
 
 export const getSubsidiaryPersonality = (studio: Business): SubsidiaryPersonality => {
     if (studio.studioState?.subsidiaryPersonality) return studio.studioState.subsidiaryPersonality;
@@ -113,19 +125,13 @@ const getDecisionPriority = (studio: Business, personality: SubsidiaryPersonalit
     return 'RISKY_PRODUCTION';
 };
 
-const getDecisionTitle = (type: SubsidiaryDecisionType) => {
-    if (type === 'EMERGENCY_CAPITAL') return 'Emergency Capital Request';
-    if (type === 'LEADERSHIP_CHANGE') return 'Leadership Replacement Vote';
-    if (type === 'RIGHTS_ACQUISITION') return 'Internal Rights Acquisition';
-    if (type === 'DORMANT_FRANCHISE') return 'Dormant Franchise Call';
-    if (type === 'PARTNERSHIP') return 'Strategic Partnership Offer';
-    if (type === 'FLOP_RESPONSE') return 'Consecutive Flops Response';
-    if (type === 'INDEPENDENCE_REQUEST') return 'Independence Request';
-    return 'Risky Production Approval';
-};
+const getDecisionTitle = (type: SubsidiaryDecisionType, language: GameLanguage) => (
+    t(language, `services.subsidiaryDecisions.title.${type}`)
+);
 
 const createDecision = (player: Player, studio: Business): SubsidiaryDecision | null => {
     if (!isAcquiredStudio(studio) || studio.studioState?.operatingModel === 'FULL_MERGER') return null;
+    const language = getPlayerLanguage(player);
     const personality = getSubsidiaryPersonality(studio);
     const type = getDecisionPriority(studio, personality);
     const mandate = getStudioOperatingMandate(studio);
@@ -145,191 +151,58 @@ const createDecision = (player: Player, studio: Business): SubsidiaryDecision | 
         : undefined;
     const commonId = `${studio.id}_${player.age}_${player.currentWeek}_${seedNumber(`${studio.id}:${type}:${player.age}:${player.currentWeek}`)}`;
 
-    const decisionCopy: Record<SubsidiaryDecisionType, {
+    const textVars = {
+        studio: studio.name,
+        title: getDecisionTitle(type, language),
+        amount: formatMoneyShort(recommendedAmount || 0),
+        personality,
+        budgetAppetite: getLocalizedMandateLabel(language, 'budgetAppetite', mandate.budgetAppetite),
+        releasePace: getLocalizedMandateLabel(language, 'releasePace', mandate.releasePace),
+        balance: formatMoneyShort(studio.balance),
+        weeklyResult: formatMoneyShort(studio.stats.weeklyProfit || 0),
+        flopStreak: studio.stats.recentFlopStreak || 0,
+        ipStrategy: getLocalizedMandateLabel(language, 'ipStrategy', mandate.ipStrategy),
+        focus: getLocalizedMandateLabel(language, 'focus', mandate.focus),
+        relatedTitle: relatedTitle || '',
+        dormantFranchiseTitle: dormantFranchiseTitle || '',
+        investorConfidence: studio.stats.investorConfidence || 0,
+    };
+    const declineTone: Record<SubsidiaryDecisionType, SubsidiaryDecisionOption['tone']> = {
+        RISKY_PRODUCTION: 'negative',
+        EMERGENCY_CAPITAL: 'negative',
+        LEADERSHIP_CHANGE: 'negative',
+        RIGHTS_ACQUISITION: 'neutral',
+        DORMANT_FRANCHISE: 'neutral',
+        PARTNERSHIP: 'neutral',
+        FLOP_RESPONSE: 'negative',
+        INDEPENDENCE_REQUEST: 'negative',
+    };
+    const copy: {
         summary: string;
         stakes: string[];
         logic: string[];
         followUp: SubsidiaryDecision['followUp'];
         options: SubsidiaryDecisionOption[];
-    }> = {
-        RISKY_PRODUCTION: {
-            summary: `${studio.name} wants permission to take a bigger creative swing under its current mandate.`,
-            stakes: [
-                `${formatMoneyShort(recommendedAmount || 0)} exposure if the project moves forward`,
-                'Could create a strong new studio-side slate proposal',
-                'Declining protects capital but slows momentum',
-            ],
-            logic: [
-                `${personality} management is pushing for a bolder slate moment.`,
-                `${mandate.budgetAppetite.toLowerCase()} budget appetite and ${mandate.releasePace.toLowerCase()} pace support a board-level approval.`,
-                `${studio.name} has ${formatMoneyShort(studio.balance)} available capital before commitment.`,
-            ],
-            followUp: {
-                label: 'Slate pressure',
-                effect: 'Approval creates a board-reviewed project package; decline slows momentum.',
-            },
-            options: [
-                createDecisionOption('APPROVE', 'Authorize Swing', 'Let the studio assemble the project package.', 'Creates a real subsidiary project proposal.', 'positive'),
-                createDecisionOption('DECLINE', 'Hold Capital', 'Tell leadership to wait for a cleaner project.', 'Protects cash but cools studio momentum.', 'negative'),
-            ],
+    } = {
+        summary: t(language, `services.subsidiaryDecisions.${type}.summary`, textVars),
+        stakes: [1, 2, 3].map(index => t(language, `services.subsidiaryDecisions.stake.${index}`, textVars)),
+        logic: [1, 2, 3].map(index => t(language, `services.subsidiaryDecisions.logic.${index}`, textVars)),
+        followUp: {
+            label: t(language, `services.subsidiaryDecisions.followUp.${type}.label`, textVars),
+            effect: t(language, `services.subsidiaryDecisions.followUp.${type}.effect`, textVars),
         },
-        EMERGENCY_CAPITAL: {
-            summary: `${studio.name} is asking the group for emergency capital support.`,
-            stakes: [
-                `${formatMoneyShort(recommendedAmount || 0)} capital injection requested`,
-                'Protects confidence and keeps the label stable',
-                'Declining may trigger investor and employee pressure',
-            ],
-            logic: [
-                `Weekly result is ${formatMoneyShort(studio.stats.weeklyProfit || 0)}, so liquidity pressure is visible.`,
-                `${studio.name} has ${formatMoneyShort(studio.balance)} cash against its operating slate.`,
-                'The request uses the existing HQ treasury transfer system.',
-            ],
-            followUp: {
-                label: 'Liquidity watch',
-                effect: 'The label stabilizes if funded, or investor confidence drops if refused.',
-            },
-            options: [
-                createDecisionOption('APPROVE', 'Inject Capital', 'Fund the studio from headquarters if available.', 'Stabilizes confidence and adds studio cash.', 'positive'),
-                createDecisionOption('DECLINE', 'Refuse Bailout', 'Force management to absorb the pressure.', 'Saves HQ cash but damages confidence.', 'negative'),
-            ],
-        },
-        LEADERSHIP_CHANGE: {
-            summary: `${studio.name} wants authority to replace its current studio chief.`,
-            stakes: [
-                'Can reset confidence after repeated weak performance',
-                'May unsettle staff and creative partners',
-                'Leaving leadership in place avoids disruption',
-            ],
-            logic: [
-                `${studio.stats.recentFlopStreak || 0} recent flop streak is forcing a governance review.`,
-                `${personality} company culture affects how quickly leadership pushes for change.`,
-                'A leadership change updates studio health without creating a new duplicate management screen.',
-            ],
-            followUp: {
-                label: 'Leadership reset',
-                effect: 'A reset clears flop pressure but may bruise culture.',
-            },
-            options: [
-                createDecisionOption('APPROVE', 'Replace CEO', 'Install a new operator and reset confidence.', 'Boosts confidence with some culture friction.', 'positive'),
-                createDecisionOption('DECLINE', 'Retain CEO', 'Keep the current management team in charge.', 'Avoids disruption but investors lose faith.', 'negative'),
-            ],
-        },
-        RIGHTS_ACQUISITION: {
-            summary: `${studio.name} wants to acquire ${relatedTitle} for its internal slate.`,
-            stakes: [
-                `${formatMoneyShort(recommendedAmount || 0)} rights purchase from studio capital`,
-                'Expands catalog/IP available to this subsidiary',
-                'Declining keeps the slate focused on current assets',
-            ],
-            logic: [
-                `${mandate.ipStrategy.replaceAll('_', ' ').toLowerCase()} strategy points leadership toward owned-IP expansion.`,
-                `${personality} profile makes this studio more likely to pitch catalog plays.`,
-                'If approved, the title enters the same studio IP/catolog area already used by Development Lab.',
-            ],
-            followUp: {
-                label: 'Catalog expansion',
-                effect: 'The new rights package becomes usable by this studio.',
-            },
-            options: [
-                createDecisionOption('APPROVE', 'Buy Rights', 'Let the subsidiary acquire the package.', 'Adds the title to this studio’s IP vault.', 'positive'),
-                createDecisionOption('DECLINE', 'Pass', 'Keep current catalog discipline.', 'No spend, but franchise momentum softens.', 'neutral'),
-            ],
-        },
-        DORMANT_FRANCHISE: {
-            summary: `${studio.name} wants to decide what happens to ${relatedTitle}, a dormant franchise lane in its catalog.`,
-            stakes: [
-                'Reviving the franchise can lift momentum and create sequel appetite',
-                'Selling or shelving protects cash but may weaken catalog value',
-                'Fans and trade press will read this as a strategic signal',
-            ],
-            logic: [
-                `${mandate.focus.replaceAll('_', ' ').toLowerCase()} focus makes recognizable IP more valuable.`,
-                `${personality} management is more likely to push old brands back into motion.`,
-                dormantFranchiseTitle ? `${dormantFranchiseTitle} already exists in this studio’s release history.` : 'The studio has a dormant franchise-style package ready for review.',
-            ],
-            followUp: {
-                label: 'Franchise watch',
-                effect: 'Approval raises momentum and future sequel pressure; decline cools the catalog lane.',
-            },
-            options: [
-                createDecisionOption('APPROVE', 'Retain & Revive', 'Keep the franchise and prepare a revival lane.', 'Boosts momentum and catalog value.', 'positive'),
-                createDecisionOption('DECLINE', 'Shelve Asset', 'Keep the banner quiet and avoid near-term spend.', 'Protects focus but lowers franchise heat.', 'neutral'),
-            ],
-        },
-        PARTNERSHIP: {
-            summary: `${studio.name} has a partnership offer that could co-finance its next slate move.`,
-            stakes: [
-                'Partner money reduces exposure',
-                'Creative control may become less clean',
-                'Streaming-first labels can convert this into steady pipeline strength',
-            ],
-            logic: [
-                `${mandate.focus.replaceAll('_', ' ').toLowerCase()} focus makes outside platform alignment attractive.`,
-                `${personality} studios tend to trade exclusivity for pipeline speed.`,
-                `${studio.name} has ${formatMoneyShort(studio.balance)} capital, so the partnership is strategic rather than desperate.`,
-            ],
-            followUp: {
-                label: 'Partner obligations',
-                effect: 'Approval boosts capital and future activity; decline keeps full control.',
-            },
-            options: [
-                createDecisionOption('APPROVE', 'Accept Partner', 'Take the strategic partner and co-finance the slate.', 'Adds capital and social buzz.', 'positive'),
-                createDecisionOption('DECLINE', 'Stay Solo', 'Keep the studio fully independent on this slate.', 'Keeps control but loses partner momentum.', 'neutral'),
-            ],
-        },
-        FLOP_RESPONSE: {
-            summary: `${studio.name} needs a response plan after consecutive underperformers.`,
-            stakes: [
-                'A public reset can protect investor confidence',
-                'A patient response preserves creative trust',
-                'Doing nothing risks the studio becoming a problem child',
-            ],
-            logic: [
-                `${studio.stats.recentFlopStreak || 0} consecutive flops triggered this decision.`,
-                `${personality} leadership changes how harsh the response should be.`,
-                'The response affects future confidence and momentum without forcing busywork.',
-            ],
-            followUp: {
-                label: 'Recovery arc',
-                effect: 'Approval starts a turnaround posture; decline keeps current culture but hurts confidence.',
-            },
-            options: [
-                createDecisionOption('APPROVE', 'Order Reset', 'Cut the slate, reset leadership pressure and rebuild trust.', 'Clears flop streak and steadies investors.', 'positive'),
-                createDecisionOption('DECLINE', 'Stay Course', 'Let the team recover without a public reset.', 'Protects creatives but investors worry.', 'negative'),
-            ],
-        },
-        INDEPENDENCE_REQUEST: {
-            summary: `${studio.name} is asking for more autonomy after strong internal confidence.`,
-            stakes: [
-                'More independence can improve morale and label identity',
-                'Less control means fewer direct interventions',
-                'This can turn a controlled subsidiary into a stronger self-running label',
-            ],
-            logic: [
-                `${studio.stats.investorConfidence || 0}/100 investor confidence makes the board comfortable asking for freedom.`,
-                `${personality} culture prefers prestige identity over tight HQ command.`,
-                'Operating-model pressure now responds to studio performance instead of being a static button.',
-            ],
-            followUp: {
-                label: 'Autonomy pressure',
-                effect: 'Approval grants independence; decline keeps control with a morale cost.',
-            },
-            options: [
-                createDecisionOption('APPROVE', 'Grant Independence', 'Let the studio operate as an independent label.', 'Changes model to Independent Label.', 'positive'),
-                createDecisionOption('DECLINE', 'Keep Control', 'Keep strategic command under HQ.', 'Keeps control but confidence dips.', 'negative'),
-            ],
-        },
+        options: [
+            createDecisionOption(language, type, 'APPROVE', 'positive'),
+            createDecisionOption(language, type, 'DECLINE', declineTone[type]),
+        ],
     };
-
-    const copy = decisionCopy[type];
     return {
         id: `sub_decision_${commonId}`,
         studioId: studio.id,
         studioName: studio.name,
         type,
         status: 'PENDING',
-        title: getDecisionTitle(type),
+        title: getDecisionTitle(type, language),
         summary: copy.summary,
         personality,
         recommendedAmount,
@@ -345,19 +218,33 @@ const createDecision = (player: Player, studio: Business): SubsidiaryDecision | 
 };
 
 const createDecisionMedia = (
-    player: Player,
-    studio: Business,
-    decision: SubsidiaryDecision,
-    action: 'CREATED' | 'APPROVE' | 'DECLINE',
+    language: GameLanguage,
+    {
+        player,
+        studio,
+        decision,
+        action,
+    }: {
+        player: Player;
+        studio: Business;
+        decision: SubsidiaryDecision;
+        action: 'CREATED' | 'APPROVE' | 'DECLINE';
+    },
 ): Player => {
-    const verb = action === 'CREATED' ? 'faces' : action === 'APPROVE' ? 'approves' : 'declines';
-    const headline = `${studio.name} ${verb} ${decision.title}`;
+    const vars = {
+        studio: studio.name,
+        title: decision.title,
+        personality: decision.personality,
+        summary: decision.outcomeSummary || decision.summary,
+        followUp: decision.followUp?.effect || '',
+        amount: decision.recommendedAmount ? formatMoneyShort(decision.recommendedAmount) : '',
+    };
     const newsItem: NewsItem = {
         id: `news_sub_decision_${decision.id}_${action}`,
-        headline,
+        headline: t(language, 'services.subsidiaryDecisions.media.news.headline', { ...vars, action: t(language, `services.subsidiaryDecisions.media.action.${action}`) }),
         subtext: action === 'CREATED'
-            ? `${decision.personality} leadership has sent a board-level decision to the group.`
-            : `${decision.outcomeSummary || decision.summary}${decision.followUp ? ` Follow-up: ${decision.followUp.effect}` : ''}`,
+            ? t(language, 'services.subsidiaryDecisions.media.news.createdSubtext', vars)
+            : t(language, decision.followUp ? 'services.subsidiaryDecisions.media.news.resolvedFollowUpSubtext' : 'services.subsidiaryDecisions.media.news.resolvedSubtext', vars),
         category: 'INDUSTRY',
         week: player.currentWeek,
         year: player.age,
@@ -371,12 +258,12 @@ const createDecisionMedia = (
         const post: XPost = {
             id: `x_sub_decision_${decision.id}_${action}`,
             authorId: 'studio_board_watch',
-            authorName: 'Studio Board Watch',
+            authorName: t(language, 'services.subsidiaryDecisions.media.social.authorName'),
             authorHandle: '@boardwatch',
-            authorAvatar: '🏛️',
+            authorAvatar: 'HQ',
             content: action === 'CREATED'
-                ? `${studio.name} board docket: ${decision.title}. ${decision.personality} labels are becoming more assertive.`
-                : `${studio.name} ${verb} ${decision.title}. ${decision.recommendedAmount ? `${formatMoneyShort(decision.recommendedAmount)} decision.` : 'Governance call.'}`,
+                ? t(language, 'services.subsidiaryDecisions.media.social.created', vars)
+                : t(language, decision.recommendedAmount ? 'services.subsidiaryDecisions.media.social.resolvedAmount' : 'services.subsidiaryDecisions.media.social.resolvedGovernance', { ...vars, action: t(language, `services.subsidiaryDecisions.media.action.${action}`) }),
             timestamp: player.currentWeek,
             likes: action === 'CREATED' ? 1200 : action === 'APPROVE' ? 3400 : 900,
             retweets: action === 'CREATED' ? 90 : action === 'APPROVE' ? 260 : 64,
@@ -402,33 +289,29 @@ const getArcTone = (
     return optionId === 'APPROVE' ? 'positive' : 'neutral';
 };
 
-const getArcTitle = (decision: SubsidiaryDecision, optionId: SubsidiaryDecisionOption['id']) => {
-    if (decision.type === 'PARTNERSHIP') return optionId === 'APPROVE' ? 'Partner Obligations' : 'Solo Slate Pressure';
-    if (decision.type === 'DORMANT_FRANCHISE') return optionId === 'APPROVE' ? 'Franchise Revival Watch' : 'Dormant Catalog Watch';
-    if (decision.type === 'FLOP_RESPONSE') return optionId === 'APPROVE' ? 'Turnaround Plan' : 'Flop Pressure Watch';
-    if (decision.type === 'INDEPENDENCE_REQUEST') return optionId === 'APPROVE' ? 'Autonomy Transition' : 'Control Tension';
-    if (decision.type === 'EMERGENCY_CAPITAL') return optionId === 'APPROVE' ? 'Liquidity Stabilization' : 'Cash Pressure Watch';
-    if (decision.type === 'RIGHTS_ACQUISITION') return optionId === 'APPROVE' ? 'Catalog Integration' : 'Missed Rights Heat';
-    if (decision.type === 'LEADERSHIP_CHANGE') return optionId === 'APPROVE' ? 'New Leadership Honeymoon' : 'Leadership Scrutiny';
-    return optionId === 'APPROVE' ? 'Approved Slate Pressure' : 'Paused Slate Heat';
-};
+const getArcTitle = (
+    decision: SubsidiaryDecision,
+    optionId: SubsidiaryDecisionOption['id'],
+    language: GameLanguage,
+) => t(language, `services.subsidiaryDecisions.arc.title.${decision.type}.${optionId}`);
 
 const buildArcBeats = (
     player: Player,
     decision: SubsidiaryDecision,
     optionId: SubsidiaryDecisionOption['id'],
+    language: GameLanguage,
 ): SubsidiaryDecisionArc['beats'] => {
     const firstPulse = futureWeek(player.age, player.currentWeek, 4);
     const secondPulse = futureWeek(player.age, player.currentWeek, 10);
-    const label = decision.followUp?.label || getArcTitle(decision, optionId);
+    const label = decision.followUp?.label || getArcTitle(decision, optionId, language);
     const positive = optionId === 'APPROVE';
 
     const firstEffect = positive
-        ? decision.followUp?.effect || 'The approved board action begins shaping studio behavior.'
-        : `Declining ${decision.title} leaves management watching the consequences.`;
+        ? decision.followUp?.effect || t(language, 'services.subsidiaryDecisions.arc.effect.approvedFallback')
+        : t(language, 'services.subsidiaryDecisions.arc.effect.declinedFirst', { title: decision.title });
     const secondEffect = positive
-        ? `The ${label.toLowerCase()} creates measurable studio momentum and trade chatter.`
-        : `The ${label.toLowerCase()} settles, but confidence remains sensitive.`;
+        ? t(language, 'services.subsidiaryDecisions.arc.effect.approvedSecond', { label: label.toLowerCase() })
+        : t(language, 'services.subsidiaryDecisions.arc.effect.declinedSecond', { label: label.toLowerCase() });
 
     return [
         {
@@ -438,7 +321,7 @@ const buildArcBeats = (
             pulseYear: firstPulse.year,
         },
         {
-            label: positive ? 'Industry Readout' : 'Pressure Readout',
+            label: t(language, positive ? 'services.subsidiaryDecisions.arc.beat.industryReadout' : 'services.subsidiaryDecisions.arc.beat.pressureReadout'),
             effect: secondEffect,
             pulseWeek: secondPulse.week,
             pulseYear: secondPulse.year,
@@ -452,16 +335,17 @@ const createDecisionArc = (
     decision: SubsidiaryDecision,
     optionId: SubsidiaryDecisionOption['id'],
     outcomeSummary: string,
+    language: GameLanguage,
 ): SubsidiaryDecisionArc | null => {
     if (!decision.followUp && optionId !== 'DECLINE') return null;
-    const beats = buildArcBeats(player, decision, optionId);
+    const beats = buildArcBeats(player, decision, optionId, language);
     return {
         id: `sub_arc_${decision.id}_${optionId.toLowerCase()}`,
         studioId: studio.id,
         studioName: studio.name,
         sourceDecisionId: decision.id,
         sourceDecisionType: decision.type,
-        title: getArcTitle(decision, optionId),
+        title: getArcTitle(decision, optionId, language),
         summary: outcomeSummary || decision.summary,
         tone: getArcTone(decision, optionId),
         status: 'ACTIVE',
@@ -480,9 +364,10 @@ const attachDecisionArc = (
     decision: SubsidiaryDecision,
     optionId: SubsidiaryDecisionOption['id'],
     outcomeSummary: string,
+    language: GameLanguage,
 ): Business => {
     const studioState = normalizeStudioState(studio.studioState, player.currentWeek);
-    const arc = createDecisionArc(player, studio, decision, optionId, outcomeSummary);
+    const arc = createDecisionArc(player, studio, decision, optionId, outcomeSummary, language);
     if (!arc) return studio;
     const existingArcs = studioState.activeDecisionArcs || [];
     if (existingArcs.some(candidate => candidate.id === arc.id)) return studio;
@@ -558,10 +443,11 @@ const createArcPulseMedia = (
     arc: SubsidiaryDecisionArc,
     beat: SubsidiaryDecisionArc['beats'][number],
 ): Player => {
+    const language = getPlayerLanguage(player);
     const newsItem: NewsItem = {
         id: `news_sub_arc_${arc.id}_${arc.beatsResolved}_${player.age}_${player.currentWeek}`,
-        headline: `${studio.name} Storyline: ${arc.title}`,
-        subtext: `${beat.label}: ${beat.effect}`,
+        headline: t(language, 'services.subsidiaryDecisions.arc.news.headline', { studio: studio.name, title: arc.title }),
+        subtext: t(language, 'services.subsidiaryDecisions.arc.news.subtext', { label: beat.label, effect: beat.effect }),
         category: 'INDUSTRY',
         week: player.currentWeek,
         year: player.age,
@@ -570,7 +456,7 @@ const createArcPulseMedia = (
     const logEntry: LogEntry = {
         week: player.currentWeek,
         year: player.age,
-        message: `📌 ${studio.name} storyline advanced: ${arc.title} — ${beat.label}.`,
+        message: t(language, 'services.subsidiaryDecisions.arc.log.advanced', { studio: studio.name, title: arc.title, label: beat.label }),
         type: arc.tone === 'negative' ? 'neutral' : 'positive',
     };
     const nextPlayer: Player = {
@@ -582,10 +468,10 @@ const createArcPulseMedia = (
         const post: XPost = {
             id: `x_sub_arc_${arc.id}_${arc.beatsResolved}_${player.age}_${player.currentWeek}`,
             authorId: 'studio_board_watch',
-            authorName: 'Studio Board Watch',
+            authorName: t(language, 'services.subsidiaryDecisions.media.social.authorName'),
             authorHandle: '@boardwatch',
-            authorAvatar: '🏛️',
-            content: `${studio.name} update: ${arc.title}. ${beat.effect}`,
+            authorAvatar: 'HQ',
+            content: t(language, 'services.subsidiaryDecisions.arc.social.update', { studio: studio.name, title: arc.title, effect: beat.effect }),
             timestamp: player.currentWeek,
             likes: arc.tone === 'positive' ? 2600 : 1100,
             retweets: arc.tone === 'positive' ? 190 : 72,
@@ -692,11 +578,15 @@ export const processSubsidiaryDecisionEngine = (player: Player): Player => {
             },
         };
         nextPlayer = updateStudioOnPlayer({ ...nextPlayer }, updatedStudio);
+        const language = getPlayerLanguage(nextPlayer);
         const message: Message = {
             id: `msg_sub_decision_${decision.id}`,
-            sender: `${studio.name} Board`,
-            subject: `Board Decision: ${decision.title}`,
-            text: `${decision.summary} Stakes: ${decision.stakes.join(' ')}`,
+            sender: t(language, 'services.subsidiaryDecisions.inbox.sender', { studio: studio.name }),
+            subject: t(language, 'services.subsidiaryDecisions.inbox.subject', { title: decision.title }),
+            text: t(language, 'services.subsidiaryDecisions.inbox.text', {
+                summary: decision.summary,
+                stakes: decision.stakes.join(' '),
+            }),
             type: 'SYSTEM',
             data: {
                 studioId: studio.id,
@@ -710,14 +600,22 @@ export const processSubsidiaryDecisionEngine = (player: Player): Player => {
         const logEntry: LogEntry = {
             week: player.currentWeek,
             year: player.age,
-            message: `🏛️ ${currentStudio.name} submitted ${decision.title} for ownership approval.`,
+            message: t(language, 'services.subsidiaryDecisions.log.submitted', {
+                studio: currentStudio.name,
+                title: decision.title,
+            }),
             type: 'neutral',
         };
-        nextPlayer = createDecisionMedia({
-            ...nextPlayer,
-            inbox: [message, ...(nextPlayer.inbox || [])].slice(0, 120),
-            logs: [logEntry, ...(nextPlayer.logs || [])].slice(0, 50),
-        }, updatedStudio, decision, 'CREATED');
+        nextPlayer = createDecisionMedia(language, {
+            player: {
+                ...nextPlayer,
+                inbox: [message, ...(nextPlayer.inbox || [])].slice(0, 120),
+                logs: [logEntry, ...(nextPlayer.logs || [])].slice(0, 50),
+            },
+            studio: updatedStudio,
+            decision,
+            action: 'CREATED',
+        });
     });
 
     return nextPlayer;
@@ -795,9 +693,19 @@ export const resolveSubsidiaryDecision = ({
     if (decision.status !== 'PENDING') return { success: false, player, decision, reason: 'DECISION_CLOSED' };
     if (!decision.options.some(option => option.id === optionId)) return { success: false, player, decision, reason: 'OPTION_NOT_FOUND' };
 
+    const language = getPlayerLanguage(player);
     let nextPlayer = player;
     let updatedStudio: Business = { ...studio, studioState };
     let outcomeSummary = '';
+    const resolveVars = (extra: Record<string, string | number> = {}) => ({
+        studio: updatedStudio.name,
+        title: decision.title,
+        amount: decision.recommendedAmount ? formatMoneyShort(decision.recommendedAmount) : '',
+        relatedTitle: decision.relatedTitle || '',
+        rightsTitle: decision.relatedTitle || t(language, 'services.subsidiaryDecisions.resolve.fallback.rightsPackage'),
+        dormantTitle: decision.relatedTitle || t(language, 'services.subsidiaryDecisions.resolve.fallback.dormantFranchise'),
+        ...extra,
+    });
 
     if (optionId === 'APPROVE') {
         if (decision.type === 'RISKY_PRODUCTION') {
@@ -805,7 +713,7 @@ export const resolveSubsidiaryDecision = ({
             const proposalWithDecision: SubsidiaryProjectProposal | null = proposal ? {
                 ...proposal,
                 logic: [
-                    `Ownership approved ${decision.title} before this package entered the slate.`,
+                    t(language, 'services.subsidiaryDecisions.resolve.RISKY_PRODUCTION.APPROVE.logic', { title: decision.title }),
                     ...proposal.logic,
                 ],
             } : null;
@@ -816,8 +724,8 @@ export const resolveSubsidiaryDecision = ({
                     : studioState.subsidiaryProjectProposals,
             };
             outcomeSummary = proposalWithDecision
-                ? `${proposalWithDecision.title} has been submitted as a real subsidiary project proposal.`
-                : 'Leadership received approval, but no viable project package was ready yet.';
+                ? t(language, 'services.subsidiaryDecisions.resolve.RISKY_PRODUCTION.APPROVE.proposal', resolveVars({ proposalTitle: proposalWithDecision.title }))
+                : t(language, 'services.subsidiaryDecisions.resolve.RISKY_PRODUCTION.APPROVE.noProposal', resolveVars());
             updatedStudio = resolveDecisionOnStudio(updatedStudio, player, decision, optionId, outcomeSummary, nextState, {
                 stats: {
                     ...updatedStudio.stats,
@@ -837,7 +745,7 @@ export const resolveSubsidiaryDecision = ({
             if (!transfer.success) return { success: false, player, decision, reason: 'TREASURY_FAILED' };
             nextPlayer = transfer.player;
             const studioAfterTransfer = nextPlayer.businesses.find(business => business.id === studioId) || updatedStudio;
-            outcomeSummary = `${formatMoneyShort(amount)} emergency support was injected from headquarters.`;
+            outcomeSummary = t(language, 'services.subsidiaryDecisions.resolve.EMERGENCY_CAPITAL.APPROVE.summary', resolveVars({ amount: formatMoneyShort(amount) }));
             updatedStudio = resolveDecisionOnStudio(studioAfterTransfer, nextPlayer, decision, optionId, outcomeSummary, undefined, {
                 stats: {
                     ...studioAfterTransfer.stats,
@@ -846,7 +754,7 @@ export const resolveSubsidiaryDecision = ({
                 },
             });
         } else if (decision.type === 'LEADERSHIP_CHANGE') {
-            outcomeSummary = 'A new studio chief has been authorized to reset the company rhythm.';
+            outcomeSummary = t(language, 'services.subsidiaryDecisions.resolve.LEADERSHIP_CHANGE.APPROVE.summary', resolveVars());
             updatedStudio = resolveDecisionOnStudio(updatedStudio, player, decision, optionId, outcomeSummary, undefined, {
                 stats: {
                     ...updatedStudio.stats,
@@ -857,7 +765,7 @@ export const resolveSubsidiaryDecision = ({
             });
         } else if (decision.type === 'RIGHTS_ACQUISITION') {
             const amount = Math.min(decision.recommendedAmount || 30_000_000, Math.max(0, updatedStudio.balance));
-            const rightsTitle = decision.relatedTitle || 'Untitled Rights Package';
+            const rightsTitle = decision.relatedTitle || t(language, 'services.subsidiaryDecisions.resolve.fallback.rightsPackage');
             const ledgerState = addFinanceEntry({
                 ...studioState,
                 purchasedIPTitles: [rightsTitle, ...(studioState.purchasedIPTitles || [])].filter((title, index, titles) => titles.indexOf(title) === index),
@@ -865,9 +773,9 @@ export const resolveSubsidiaryDecision = ({
                 id: `sub_rights_buy_${studio.id}_${player.age}_${player.currentWeek}_${Date.now()}`,
                 amount: -amount,
                 type: 'IP_ACQUISITION',
-                label: `${rightsTitle} internal rights acquisition`,
+                label: t(language, 'services.subsidiaryDecisions.resolve.RIGHTS_ACQUISITION.APPROVE.ledger', { rightsTitle }),
             });
-            outcomeSummary = `${rightsTitle} has been added to ${studio.name}'s IP vault.`;
+            outcomeSummary = t(language, 'services.subsidiaryDecisions.resolve.RIGHTS_ACQUISITION.APPROVE.summary', resolveVars({ rightsTitle }));
             updatedStudio = resolveDecisionOnStudio(updatedStudio, player, decision, optionId, outcomeSummary, ledgerState, {
                 balance: updatedStudio.balance - amount,
                 stats: {
@@ -876,7 +784,9 @@ export const resolveSubsidiaryDecision = ({
                 },
             });
         } else if (decision.type === 'DORMANT_FRANCHISE') {
-            outcomeSummary = `Franchise ${decision.relatedTitle || 'asset'} stays with ${studio.name} and enters a revival watch.`;
+            outcomeSummary = t(language, 'services.subsidiaryDecisions.resolve.DORMANT_FRANCHISE.APPROVE.summary', resolveVars({
+                dormantTitle: decision.relatedTitle || t(language, 'services.subsidiaryDecisions.resolve.fallback.asset'),
+            }));
             updatedStudio = resolveDecisionOnStudio(updatedStudio, player, decision, optionId, outcomeSummary, undefined, {
                 stats: {
                     ...updatedStudio.stats,
@@ -891,9 +801,11 @@ export const resolveSubsidiaryDecision = ({
                 id: `sub_partner_${studio.id}_${player.age}_${player.currentWeek}_${Date.now()}`,
                 amount: partnerCapital,
                 type: 'CAPITAL_INJECTION',
-                label: 'Strategic slate partnership advance',
+                label: t(language, 'services.subsidiaryDecisions.resolve.PARTNERSHIP.APPROVE.ledger'),
             });
-            outcomeSummary = `${studio.name} accepted a strategic partner and added ${formatMoneyShort(partnerCapital)} to its slate capacity.`;
+            outcomeSummary = t(language, 'services.subsidiaryDecisions.resolve.PARTNERSHIP.APPROVE.summary', resolveVars({
+                partnerCapital: formatMoneyShort(partnerCapital),
+            }));
             updatedStudio = resolveDecisionOnStudio(updatedStudio, player, decision, optionId, outcomeSummary, ledgerState, {
                 balance: updatedStudio.balance + partnerCapital,
                 stats: {
@@ -903,7 +815,7 @@ export const resolveSubsidiaryDecision = ({
                 },
             });
         } else if (decision.type === 'FLOP_RESPONSE') {
-            outcomeSummary = `${studio.name} ordered a slate reset after the flop streak.`;
+            outcomeSummary = t(language, 'services.subsidiaryDecisions.resolve.FLOP_RESPONSE.APPROVE.summary', resolveVars());
             updatedStudio = resolveDecisionOnStudio(updatedStudio, player, decision, optionId, outcomeSummary, undefined, {
                 stats: {
                     ...updatedStudio.stats,
@@ -914,7 +826,7 @@ export const resolveSubsidiaryDecision = ({
                 },
             });
         } else if (decision.type === 'INDEPENDENCE_REQUEST') {
-            outcomeSummary = `${studio.name} was granted more independence and now operates as an independent label.`;
+            outcomeSummary = t(language, 'services.subsidiaryDecisions.resolve.INDEPENDENCE_REQUEST.APPROVE.summary', resolveVars());
             updatedStudio = resolveDecisionOnStudio(updatedStudio, player, decision, optionId, outcomeSummary, {
                 ...studioState,
                 operatingModel: 'INDEPENDENT_LABEL',
@@ -930,21 +842,7 @@ export const resolveSubsidiaryDecision = ({
         }
     } else {
         const confidenceDrop = decision.type === 'EMERGENCY_CAPITAL' ? 8 : decision.type === 'LEADERSHIP_CHANGE' ? 5 : 3;
-        outcomeSummary = decision.type === 'EMERGENCY_CAPITAL'
-            ? 'Emergency support was declined. Management must absorb the cash pressure.'
-            : decision.type === 'RIGHTS_ACQUISITION'
-                ? `${decision.relatedTitle || 'The rights package'} was passed on for now.`
-                : decision.type === 'DORMANT_FRANCHISE'
-                    ? `${decision.relatedTitle || 'The dormant franchise'} stays shelved for now.`
-                    : decision.type === 'PARTNERSHIP'
-                        ? 'The strategic partner was declined, keeping full control inside the group.'
-                        : decision.type === 'FLOP_RESPONSE'
-                            ? 'The studio will stay the course despite flop pressure.'
-                            : decision.type === 'INDEPENDENCE_REQUEST'
-                                ? 'The studio remains under controlled subsidiary command.'
-                : decision.type === 'RISKY_PRODUCTION'
-                    ? 'The risky slate swing was paused until leadership brings a cleaner package.'
-                    : 'The current leadership team remains in place.';
+        outcomeSummary = t(language, `services.subsidiaryDecisions.resolve.${decision.type}.DECLINE.summary`, resolveVars());
         updatedStudio = resolveDecisionOnStudio(updatedStudio, player, decision, optionId, outcomeSummary, undefined, {
             stats: {
                 ...updatedStudio.stats,
@@ -954,18 +852,23 @@ export const resolveSubsidiaryDecision = ({
         });
     }
 
-    updatedStudio = attachDecisionArc(nextPlayer, updatedStudio, decision, optionId, outcomeSummary);
+    updatedStudio = attachDecisionArc(nextPlayer, updatedStudio, decision, optionId, outcomeSummary, language);
     nextPlayer = updateStudioOnPlayer({ ...nextPlayer }, updatedStudio);
-    nextPlayer = createDecisionMedia(nextPlayer, updatedStudio, {
-        ...decision,
-        outcomeSummary,
-    }, optionId);
+    nextPlayer = createDecisionMedia(language, {
+        player: nextPlayer,
+        studio: updatedStudio,
+        decision: {
+            ...decision,
+            outcomeSummary,
+        },
+        action: optionId,
+    });
     const logEntry: LogEntry = {
         week: nextPlayer.currentWeek,
         year: nextPlayer.age,
         message: optionId === 'APPROVE'
-            ? `✅ ${updatedStudio.name} board approved ${decision.title}.`
-            : `🛑 ${updatedStudio.name} board declined ${decision.title}.`,
+            ? t(language, 'services.subsidiaryDecisions.resolve.log.approved', { studio: updatedStudio.name, title: decision.title })
+            : t(language, 'services.subsidiaryDecisions.resolve.log.declined', { studio: updatedStudio.name, title: decision.title }),
         type: optionId === 'APPROVE' ? 'positive' : 'neutral',
     };
     nextPlayer.logs = [logEntry, ...(nextPlayer.logs || [])].slice(0, 50);

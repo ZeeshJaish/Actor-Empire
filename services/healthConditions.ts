@@ -1,10 +1,13 @@
-import { HealthConditionSeverity, HealthConditionSource, HealthConditionState, LogEntry, Message, NewsItem, Player } from '../types';
+import { GameLanguage, HealthConditionSeverity, HealthConditionSource, HealthConditionState, LogEntry, Message, NewsItem, Player } from '../types';
+import { getPlayerLanguage, t } from './i18n';
 import { getAbsoluteWeek } from './legacyLogic';
 
 export interface HealthConditionDefinition {
     id: string;
-    label: string;
-    summary: string;
+    labelKey: string;
+    summaryKey: string;
+    fallbackLabel: string;
+    fallbackSummary: string;
     severity: HealthConditionSeverity;
     source: HealthConditionSource;
     healthCap: number;
@@ -46,8 +49,10 @@ interface HealthConditionIncidentResult {
 export const HEALTH_CONDITION_REGISTRY: Record<string, HealthConditionDefinition> = {
     workload_headache: {
         id: 'workload_headache',
-        label: 'Workload Headache',
-        summary: 'Too many stressful weeks are causing headaches and poor focus.',
+        labelKey: 'services.health.condition.workload_headache.label',
+        summaryKey: 'services.health.condition.workload_headache.summary',
+        fallbackLabel: 'Workload Headache',
+        fallbackSummary: 'Too many stressful weeks are causing headaches and poor focus.',
         severity: 'MINOR',
         source: 'WORKLOAD',
         healthCap: 90,
@@ -61,8 +66,10 @@ export const HEALTH_CONDITION_REGISTRY: Record<string, HealthConditionDefinition
     },
     flu_bug: {
         id: 'flu_bug',
-        label: 'Flu / Minor Illness',
-        summary: 'A minor illness is dragging down your energy.',
+        labelKey: 'services.health.condition.flu_bug.label',
+        summaryKey: 'services.health.condition.flu_bug.summary',
+        fallbackLabel: 'Flu / Minor Illness',
+        fallbackSummary: 'A minor illness is dragging down your energy.',
         severity: 'MINOR',
         source: 'ILLNESS',
         healthCap: 78,
@@ -76,8 +83,10 @@ export const HEALTH_CONDITION_REGISTRY: Record<string, HealthConditionDefinition
     },
     burnout_spiral: {
         id: 'burnout_spiral',
-        label: 'Burnout Spiral',
-        summary: 'Work pressure, poor sleep, and public stress are turning into real burnout.',
+        labelKey: 'services.health.condition.burnout_spiral.label',
+        summaryKey: 'services.health.condition.burnout_spiral.summary',
+        fallbackLabel: 'Burnout Spiral',
+        fallbackSummary: 'Work pressure, poor sleep, and public stress are turning into real burnout.',
         severity: 'MODERATE',
         source: 'WORKLOAD',
         healthCap: 70,
@@ -92,8 +101,10 @@ export const HEALTH_CONDITION_REGISTRY: Record<string, HealthConditionDefinition
     },
     party_accident: {
         id: 'party_accident',
-        label: 'Nightlife Accident',
-        summary: 'A rough night created an injury and public-image risk.',
+        labelKey: 'services.health.condition.party_accident.label',
+        summaryKey: 'services.health.condition.party_accident.summary',
+        fallbackLabel: 'Nightlife Accident',
+        fallbackSummary: 'A rough night created an injury and public-image risk.',
         severity: 'MODERATE',
         source: 'NIGHTLIFE',
         healthCap: 72,
@@ -108,8 +119,10 @@ export const HEALTH_CONDITION_REGISTRY: Record<string, HealthConditionDefinition
     },
     stunt_fracture: {
         id: 'stunt_fracture',
-        label: 'Fracture / Stunt Injury',
-        summary: 'A physical injury is limiting roles, stunts, travel, and public energy.',
+        labelKey: 'services.health.condition.stunt_fracture.label',
+        summaryKey: 'services.health.condition.stunt_fracture.summary',
+        fallbackLabel: 'Fracture / Stunt Injury',
+        fallbackSummary: 'A physical injury is limiting roles, stunts, travel, and public energy.',
         severity: 'SEVERE',
         source: 'PRODUCTION',
         healthCap: 62,
@@ -124,8 +137,10 @@ export const HEALTH_CONDITION_REGISTRY: Record<string, HealthConditionDefinition
     },
     respiratory_complication: {
         id: 'respiratory_complication',
-        label: 'Respiratory Complication',
-        summary: 'An untreated illness has become a serious medical complication.',
+        labelKey: 'services.health.condition.respiratory_complication.label',
+        summaryKey: 'services.health.condition.respiratory_complication.summary',
+        fallbackLabel: 'Respiratory Complication',
+        fallbackSummary: 'An untreated illness has become a serious medical complication.',
         severity: 'SEVERE',
         source: 'ILLNESS',
         healthCap: 55,
@@ -140,8 +155,10 @@ export const HEALTH_CONDITION_REGISTRY: Record<string, HealthConditionDefinition
     },
     cancer_scare: {
         id: 'cancer_scare',
-        label: 'Cancer Scare',
-        summary: 'A serious screening result needs specialist follow-up before it becomes life-threatening.',
+        labelKey: 'services.health.condition.cancer_scare.label',
+        summaryKey: 'services.health.condition.cancer_scare.summary',
+        fallbackLabel: 'Cancer Scare',
+        fallbackSummary: 'A serious screening result needs specialist follow-up before it becomes life-threatening.',
         severity: 'CRITICAL',
         source: 'ILLNESS',
         healthCap: 48,
@@ -156,8 +173,10 @@ export const HEALTH_CONDITION_REGISTRY: Record<string, HealthConditionDefinition
     },
     chronic_pain: {
         id: 'chronic_pain',
-        label: 'Chronic Pain',
-        summary: 'A neglected injury is turning into a long-term body issue.',
+        labelKey: 'services.health.condition.chronic_pain.label',
+        summaryKey: 'services.health.condition.chronic_pain.summary',
+        fallbackLabel: 'Chronic Pain',
+        fallbackSummary: 'A neglected injury is turning into a long-term body issue.',
         severity: 'MODERATE',
         source: 'PRODUCTION',
         healthCap: 74,
@@ -171,8 +190,10 @@ export const HEALTH_CONDITION_REGISTRY: Record<string, HealthConditionDefinition
     },
     exhaustion_collapse: {
         id: 'exhaustion_collapse',
-        label: 'Exhaustion Collapse',
-        summary: 'Burnout has become a serious physical crash.',
+        labelKey: 'services.health.condition.exhaustion_collapse.label',
+        summaryKey: 'services.health.condition.exhaustion_collapse.summary',
+        fallbackLabel: 'Exhaustion Collapse',
+        fallbackSummary: 'Burnout has become a serious physical crash.',
         severity: 'SEVERE',
         source: 'WORKLOAD',
         healthCap: 52,
@@ -187,8 +208,10 @@ export const HEALTH_CONDITION_REGISTRY: Record<string, HealthConditionDefinition
     },
     old_age_complication: {
         id: 'old_age_complication',
-        label: 'Old Age Complication',
-        summary: 'Age-related health complications are narrowing the margin for mistakes.',
+        labelKey: 'services.health.condition.old_age_complication.label',
+        summaryKey: 'services.health.condition.old_age_complication.summary',
+        fallbackLabel: 'Old Age Complication',
+        fallbackSummary: 'Age-related health complications are narrowing the margin for mistakes.',
         severity: 'CRITICAL',
         source: 'OLD_AGE',
         healthCap: 58,
@@ -201,6 +224,20 @@ export const HEALTH_CONDITION_REGISTRY: Record<string, HealthConditionDefinition
         deathRisk: 0.028,
         publicRisk: 0.06,
     },
+};
+
+export const getHealthConditionLabel = (conditionOrId: HealthConditionState | string, language: GameLanguage = 'en') => {
+    const conditionId = typeof conditionOrId === 'string' ? conditionOrId : conditionOrId.conditionId;
+    const definition = HEALTH_CONDITION_REGISTRY[conditionId];
+    if (!definition) return typeof conditionOrId === 'string' ? conditionOrId : conditionOrId.label;
+    return t(language, definition.labelKey);
+};
+
+export const getHealthConditionSummary = (conditionOrId: HealthConditionState | string, language: GameLanguage = 'en') => {
+    const conditionId = typeof conditionOrId === 'string' ? conditionOrId : conditionOrId.conditionId;
+    const definition = HEALTH_CONDITION_REGISTRY[conditionId];
+    if (!definition) return '';
+    return t(language, definition.summaryKey);
 };
 
 const clamp = (value: number, min = 0, max = 100) => Math.max(min, Math.min(max, Number.isFinite(value) ? value : min));
@@ -224,10 +261,13 @@ export const createHealthCondition = (
 ): HealthConditionState | null => {
     const definition = HEALTH_CONDITION_REGISTRY[conditionId];
     if (!definition) return null;
+    const language = getPlayerLanguage(player);
     return {
         id: `${conditionId}_${absoluteWeek}`,
         conditionId,
-        label: definition.label,
+        label: getHealthConditionLabel(conditionId, language),
+        labelKey: definition.labelKey,
+        summaryKey: definition.summaryKey,
         severity: definition.severity,
         source: definition.source,
         startedWeekAbsolute: absoluteWeek,
@@ -296,8 +336,11 @@ export const applyHealthConditionIncident = (
     });
     if (!condition) return { player, logs: [], news: [], inbox: [] };
 
+    const language = getPlayerLanguage(player);
+    const conditionLabel = getHealthConditionLabel(condition, language);
+    const conditionSummary = getHealthConditionSummary(condition, language);
     const sourceLabel = options.sourceLabel || definition.source.toLowerCase();
-    const detail = options.detail || definition.summary;
+    const detail = options.detail || conditionSummary;
     const isSerious = condition.severity === 'SEVERE' || condition.severity === 'CRITICAL';
     const shouldCreateInbox = condition.severity !== 'MINOR';
     const shouldCreateNews = options.forcePublic
@@ -307,15 +350,15 @@ export const applyHealthConditionIncident = (
     const logs: LogEntry[] = [{
         week: player.currentWeek,
         year: player.age,
-        message: `🩺 ${condition.label} added from ${sourceLabel}. ${detail}`,
+        message: t(language, 'services.health.incident.log.added', { condition: conditionLabel, source: sourceLabel, detail }),
         type: condition.severity === 'MINOR' ? 'neutral' : 'negative',
     }];
 
     const inbox: Message[] = shouldCreateInbox ? [{
         id: `msg_health_${condition.conditionId}_${absoluteWeek}_${Date.now()}`,
-        sender: 'Medical Team',
-        subject: `${condition.label} needs attention`,
-        text: `${detail} Wellness now has treatment routes that match this condition. Stronger care can clear it faster; private care keeps it quieter.`,
+        sender: t(language, 'services.health.inbox.sender'),
+        subject: t(language, 'services.health.inbox.subject', { condition: conditionLabel }),
+        text: t(language, 'services.health.inbox.text', { detail }),
         type: 'SYSTEM',
         data: { conditionId: condition.conditionId, condition },
         isRead: false,
@@ -325,8 +368,8 @@ export const applyHealthConditionIncident = (
 
     const news: NewsItem[] = shouldCreateNews ? [{
         id: `news_health_incident_${condition.conditionId}_${absoluteWeek}_${Date.now()}`,
-        headline: `${player.name || 'Actor'} dealing with ${condition.label.toLowerCase()}`,
-        subtext: `${sourceLabel} has created visible health concern around upcoming commitments.`,
+        headline: t(language, 'services.health.news.incidentHeadline', { playerName: player.name || t(language, 'services.health.fallback.actor'), condition: conditionLabel.toLowerCase() }),
+        subtext: t(language, 'services.health.news.incidentSubtext', { source: sourceLabel }),
         category: 'YOU',
         week: player.currentWeek,
         year: player.age,
@@ -352,6 +395,7 @@ export const applyHealthConditionIncident = (
 
 export const processHealthConditionsWeek = (player: Player): HealthConditionWeekResult => {
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
+    const language = getPlayerLanguage(player);
     const logs: LogEntry[] = [];
     const news: NewsItem[] = [];
     let conditions = getActiveHealthConditions(player);
@@ -395,10 +439,12 @@ export const processHealthConditionsWeek = (player: Player): HealthConditionWeek
     conditions = [...newConditions, ...conditions];
     if (newConditions.length) {
         newConditions.forEach((condition) => {
+            const conditionLabel = getHealthConditionLabel(condition, language);
+            const summary = getHealthConditionSummary(condition, language) || t(language, 'services.health.weekly.medicalAttentionFallback');
             logs.push({
                 week: player.currentWeek,
                 year: player.age,
-                message: `🩺 ${condition.label}: ${HEALTH_CONDITION_REGISTRY[condition.conditionId]?.summary || 'Medical attention may be needed.'}`,
+                message: t(language, 'services.health.weekly.newCondition', { condition: conditionLabel, summary }),
                 type: condition.severity === 'MINOR' ? 'neutral' : 'negative',
             });
         });
@@ -418,10 +464,11 @@ export const processHealthConditionsWeek = (player: Player): HealthConditionWeek
             && conditionSeed(player, absoluteWeek, conditionAge + condition.conditionId.length) < definition.naturalRecoveryChance;
 
         if (recoveredNaturally) {
+            const conditionLabel = getHealthConditionLabel(condition, language);
             logs.push({
                 week: player.currentWeek,
                 year: player.age,
-                message: `✅ ${condition.label} cleared after recovery time.`,
+                message: t(language, 'services.health.weekly.recovered', { condition: conditionLabel }),
                 type: 'positive',
             });
             return [];
@@ -434,10 +481,12 @@ export const processHealthConditionsWeek = (player: Player): HealthConditionWeek
                 ignoredWeeks: 0,
             });
             if (worsened) {
+                const conditionLabel = getHealthConditionLabel(condition, language);
+                const worsenedLabel = getHealthConditionLabel(worsened, language);
                 logs.push({
                     week: player.currentWeek,
                     year: player.age,
-                    message: `⚠️ ${condition.label} worsened into ${worsened.label}.`,
+                    message: t(language, 'services.health.weekly.worsened', { condition: conditionLabel, worsened: worsenedLabel }),
                     type: 'negative',
                 });
                 return [worsened];
@@ -449,10 +498,11 @@ export const processHealthConditionsWeek = (player: Player): HealthConditionWeek
         if (!condition.isPublic && fame >= 40 && publicChance > 0 && conditionSeed(player, absoluteWeek, condition.id.length) < publicChance) {
             condition.isPublic = true;
             nextReputation = clamp(nextReputation - (condition.severity === 'SEVERE' || condition.severity === 'CRITICAL' ? 1.5 : 0.5));
+            const conditionLabel = getHealthConditionLabel(condition, language);
             news.push({
                 id: `news_condition_${condition.conditionId}_${absoluteWeek}`,
-                headline: `${player.name} faces ${condition.label.toLowerCase()} concerns`,
-                subtext: 'The story is spreading because the health issue is starting to affect public commitments.',
+                headline: t(language, 'services.health.news.publicHeadline', { playerName: player.name, condition: conditionLabel.toLowerCase() }),
+                subtext: t(language, 'services.health.news.publicSubtext'),
                 category: 'YOU',
                 week: player.currentWeek,
                 year: player.age,
@@ -499,7 +549,7 @@ export const processHealthConditionsWeek = (player: Player): HealthConditionWeek
         logs.push({
             week: player.currentWeek,
             year: player.age,
-            message: '🕊️ A severe untreated health condition became fatal.',
+            message: t(language, 'services.health.weekly.fatal'),
             type: 'negative',
         });
     }

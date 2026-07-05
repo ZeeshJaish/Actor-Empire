@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { Player, Business, StudioDepartments, StudioEquipment } from '../../../types';
 import { formatMoney } from '../../../services/formatUtils';
+import { getPlayerLanguage, t } from '../../../services/i18n';
 import { ArrowLeft, Building2, PenTool, Video, Users, Clapperboard, MonitorPlay, Camera, Lightbulb, Mic, Box, Zap } from 'lucide-react';
 
 interface FacilitiesViewProps {
@@ -67,6 +68,8 @@ export const getEquipmentStageName = (id: string, level: number) => {
 
 export const FacilitiesView: React.FC<FacilitiesViewProps> = ({ player, studio, onBack, onUpdatePlayer }) => {
     const [activeTab, setActiveTab] = useState<'DEPARTMENTS' | 'EQUIPMENT'>('DEPARTMENTS');
+    const language = getPlayerLanguage(player);
+    const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
 
 
     const handleUpgrade = (id: string, isDept: boolean) => {
@@ -79,7 +82,7 @@ export const FacilitiesView: React.FC<FacilitiesViewProps> = ({ player, studio, 
 
         const cost = getUpgradeCost(currentLevel, isDept);
         if (studio.balance < cost) {
-            alert("Not enough studio funds!");
+            alert(tr('facilities.alert.notEnoughFunds'));
             return;
         }
 

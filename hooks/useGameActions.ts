@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Player, Commitment, LogEntry, InstaPost, XPost, NewsItem, Stats, ImprovementOption, SocialEventOption, SocialEvent, Relationship, SponsorshipActionType, Message, AuditionOpportunity, NegotiationData, ScheduledEvent, PressInteraction, WriterStats, NPCActor, InteractionType, NPCState, PregnancyCarrier } from '../types';
 import { calculateAuditionGain, calculateProductionGain, generateReleasePressQuestions, rewardGenreExperience } from '../services/roleLogic';
 import { calculateInteraction, getGenderedAvatar } from '../services/npcLogic';
-import { SOCIAL_EVENTS_DB, FLAVOR_TEXTS } from '../services/socialEvents';
+import { getFlavorTexts, getSocialEvents } from '../services/socialEvents';
 import { createBusiness } from '../services/businessLogic';
 import { getAbsoluteWeek } from '../services/legacyLogic';
 import { hasOwnedPremiumAssetInCollection, spendPlayerEnergy } from '../services/premiumLogic';
@@ -36,7 +36,8 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
     const familyRelations: Relationship['relation'][] = ['Parent', 'Deceased Parent', 'Sibling', 'Child'];
     const isFamilyRelation = (relation?: Relationship['relation']) => !!relation && familyRelations.includes(relation);
     const PREGNANCY_TERM_WEEKS = 39;
-    type SocialInteractionType = 'CALL' | 'HANGOUT' | 'GIFT' | 'NETWORK' | 'DATE' | 'PROPOSE' | 'INTIMACY' | 'CLUBBING' | 'TRIP' | 'ESTATE_DATE' | 'YACHT_DATE' | 'JET_ESCAPE' | 'LUXURY_GIFT' | 'ABANDON_CHILD' | 'RECONNECT_CHILD' | 'BREAK_UP' | 'DIVORCE_SETTLE' | 'DIVORCE_FIGHT_BUDGET' | 'DIVORCE_FIGHT_ESTABLISHED' | 'DIVORCE_FIGHT_ELITE' | 'PET_FEED' | 'PET_PLAY' | 'PET_GROOM' | 'PET_VET';
+    type GiftInteractionType = 'GIFT_THOUGHTFUL' | 'GIFT_LUXURY' | 'GIFT_APOLOGY' | 'GIFT_FAMILY_SUPPORT' | 'GIFT_INDUSTRY_FAVOR';
+    type SocialInteractionType = 'CALL' | 'CHECK_IN' | 'DEEP_TALK' | 'FAMILY_DINNER' | 'INDUSTRY_LUNCH' | 'HANGOUT' | 'GIFT' | GiftInteractionType | 'NETWORK' | 'DATE' | 'PROPOSE' | 'INTIMACY' | 'CLUBBING' | 'TRIP' | 'ESTATE_DATE' | 'YACHT_DATE' | 'JET_ESCAPE' | 'LUXURY_GIFT' | 'ABANDON_CHILD' | 'RECONNECT_CHILD' | 'BREAK_UP' | 'DIVORCE_SETTLE' | 'DIVORCE_FIGHT_BUDGET' | 'DIVORCE_FIGHT_ESTABLISHED' | 'DIVORCE_FIGHT_ELITE' | 'PET_FEED' | 'PET_PLAY' | 'PET_GROOM' | 'PET_VET';
 
     const intimacyDeclines = [
         'actions.intimacy.decline.space',
@@ -480,16 +481,16 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
               delete (statsUpdate as any).money;
           } 
           else {
-              const flavorPool = FLAVOR_TEXTS[action] || [];
+              const flavorPool = getFlavorTexts(language, action);
               const flavorText = flavorPool.length > 0 ? flavorPool[Math.floor(Math.random() * flavorPool.length)] : "";
 
-              if (action === 'DATE') {
-                  energyCost = 20; moneyCost = 200; newCloseness = Math.min(100, newCloseness + 10);
-                  logMsg = `Went on a date with ${partner.name}. ${flavorText}`;
-              } 
-              else if (action === 'CLUBBING') {
-                  energyCost = 40; moneyCost = 500; newCloseness = Math.min(100, newCloseness + 8);
-                  logMsg = `Partied with ${partner.name}. ${flavorText}`;
+	              if (action === 'DATE') {
+	                  energyCost = 20; moneyCost = 200; newCloseness = Math.min(100, newCloseness + 10);
+	                  logMsg = tr('services.socialEvents.actionLog.DATE', { partnerName: partner.name, flavor: flavorText });
+	              } 
+	              else if (action === 'CLUBBING') {
+	                  energyCost = 40; moneyCost = 500; newCloseness = Math.min(100, newCloseness + 8);
+	                  logMsg = tr('services.socialEvents.actionLog.CLUBBING', { partnerName: partner.name, flavor: flavorText });
               }
               else if (action === 'TRIP') {
                   moneyCost = 5000; newCloseness = 100;
@@ -511,9 +512,9 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
                   energyCost = 4; moneyCost = 8000; newCloseness = Math.min(100, newCloseness + 9);
                   logMsg = `Dropped a serious luxury gift on ${partner.name}. It landed somewhere between romance and extravagant obsession.`;
               }
-              else if (action === 'HANGOUT') {
-                  energyCost = 15; moneyCost = 50; newCloseness = Math.min(100, newCloseness + 5);
-                  logMsg = `Hung out with ${partner.name}. ${flavorText}`;
+	              else if (action === 'HANGOUT') {
+	                  energyCost = 15; moneyCost = 50; newCloseness = Math.min(100, newCloseness + 5);
+	                  logMsg = tr('services.socialEvents.actionLog.HANGOUT', { partnerName: partner.name, flavor: flavorText });
               }
               else if (action === 'PROPOSE') {
                   moneyCost = 5000;
@@ -531,24 +532,73 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
                   logMsg = `Intimacy with ${partner.name}.`;
                   const pregnancyCarrier = getPregnancyCarrier(prev.gender, partner.gender);
                   if (pregnancyCarrier === 'NONE') {
-                      const feedback = getPregnancyFeedbackCopy('NONE', partner.name);
+                      const feedback = getPregnancyFeedbackCopy('NONE', partner.name, prev);
                       setToastMessage({ title: feedback.title, subtext: feedback.toast });
                       logMsg = feedback.log;
                   } else if (!prev.activePregnancy && Math.random() < 0.15) {
                       const scheduledPregnancy = schedulePregnancy(prev, partner, false);
                       if (scheduledPregnancy.scheduled) {
                           scheduledActivePregnancy = scheduledPregnancy.next.activePregnancy;
-                          const feedback = getPregnancyFeedbackCopy(scheduledActivePregnancy?.pregnancyCarrier || 'PARTNER', partner.name);
+                          const feedback = getPregnancyFeedbackCopy(scheduledActivePregnancy?.pregnancyCarrier || 'PARTNER', partner.name, prev);
                           setToastMessage({ title: feedback.title, subtext: feedback.toast });
                           logMsg += ` 🍼 ${feedback.log}`;
                       }
                   }
               }
-              else if (['CALL', 'GIFT', 'NETWORK'].includes(action)) {
-                   if (action === 'CALL') { energyCost = 5; newCloseness += 2; logMsg = `Called ${partner.name}.`; }
-                   if (action === 'GIFT') { moneyCost = 250; newCloseness += 5; logMsg = `Sent gift to ${partner.name}.`; }
-                   if (action === 'NETWORK') { energyCost = 25; newCloseness += 5; logMsg = `Networked with ${partner.name}.`; }
-              }
+              else if (['CALL', 'CHECK_IN', 'DEEP_TALK', 'FAMILY_DINNER', 'INDUSTRY_LUNCH', 'GIFT', 'GIFT_THOUGHTFUL', 'GIFT_LUXURY', 'GIFT_APOLOGY', 'GIFT_FAMILY_SUPPORT', 'GIFT_INDUSTRY_FAVOR', 'NETWORK'].includes(action)) {
+		                   if (action === 'CALL') { energyCost = 5; newCloseness += 2; logMsg = `Called ${partner.name}.`; }
+		                   if (action === 'CHECK_IN') {
+		                       energyCost = 3;
+		                       newCloseness += 1;
+		                       logMsg = `Sent ${partner.name} a quick check-in. Small contact, but it kept the bond alive.`;
+		                   }
+		                   if (action === 'DEEP_TALK') {
+		                       energyCost = 12;
+		                       newCloseness += 4;
+		                       logMsg = `Had a real conversation with ${partner.name}. It helped the relationship feel less neglected.`;
+		                   }
+		                   if (action === 'FAMILY_DINNER') {
+		                       energyCost = 18;
+		                       moneyCost = prev.stats.fame > 75 ? 1500 : 800;
+		                       newCloseness += 7;
+		                       logMsg = `Made time for a family dinner with ${partner.name}. It felt grounded and needed.`;
+		                   }
+		                   if (action === 'INDUSTRY_LUNCH') {
+		                       energyCost = 18;
+		                       moneyCost = prev.stats.fame > 75 ? 2500 : 1200;
+		                       newCloseness += 6;
+		                       statsUpdate = { ...statsUpdate, reputation: 1 };
+		                       logMsg = `Took ${partner.name} for an industry lunch. Good taste, no hard sell, and the connection warmed up.`;
+		                   }
+		                   if (action === 'GIFT') { moneyCost = 250; newCloseness += 5; logMsg = `Sent gift to ${partner.name}.`; }
+	                   if (action === 'GIFT_THOUGHTFUL') {
+	                       moneyCost = prev.stats.fame > 75 ? 1400 : 175;
+	                       newCloseness += 4;
+	                       logMsg = `Sent ${partner.name} a thoughtful gift that felt personal instead of showy.`;
+	                   }
+	                   if (action === 'GIFT_APOLOGY') {
+	                       moneyCost = prev.stats.fame > 75 ? 3600 : 600;
+	                       newCloseness += partner.closeness < 45 ? 9 : 6;
+	                       logMsg = `Sent ${partner.name} an apology gift with a private note. It helped repair the mood.`;
+	                   }
+	                   if (action === 'GIFT_FAMILY_SUPPORT') {
+	                       moneyCost = prev.stats.fame > 75 ? 8000 : 2500;
+	                       newCloseness += 9;
+	                       logMsg = `Quietly supported ${partner.name} with family money. It felt more meaningful than flashy.`;
+	                   }
+	                   if (action === 'GIFT_INDUSTRY_FAVOR') {
+	                       moneyCost = prev.stats.fame > 75 ? 10000 : 5000;
+	                       newCloseness += 8;
+	                       statsUpdate = { ...statsUpdate, reputation: 1 };
+	                       logMsg = `Sent ${partner.name} an industry-friendly gift and kept the professional door warm.`;
+	                   }
+	                   if (action === 'GIFT_LUXURY') {
+	                       moneyCost = prev.stats.fame > 75 ? 16000 : 8000;
+	                       newCloseness += partner.relation === 'Partner' || partner.relation === 'Spouse' ? 11 : 8;
+	                       logMsg = `Sent ${partner.name} a luxury gift. Expensive, obvious, and hard to ignore.`;
+	                   }
+	                   if (action === 'NETWORK') { energyCost = 25; newCloseness += 5; logMsg = `Networked with ${partner.name}.`; }
+	              }
           }
 
           if (prev.money < moneyCost || prev.energy.current < energyCost) return prev; 
@@ -571,7 +621,7 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
               moneyCost -= (eventOutcome?.impact as any).money; 
           }
 
-          newRelationships[idx] = { ...partner, closeness: newCloseness, relation: newRelation, lastInteractionWeek: prev.currentWeek, lastInteractionAbsolute: getAbsoluteWeek(prev.age, prev.currentWeek) };
+	          newRelationships[idx] = { ...partner, closeness: Math.max(0, Math.min(100, newCloseness)), relation: newRelation, lastInteractionWeek: prev.currentWeek, lastInteractionAbsolute: getAbsoluteWeek(prev.age, prev.currentWeek) };
 
           const nextState = {
               ...prev,
@@ -734,7 +784,7 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
             }
         }
         if (['DATE', 'CLUBBING', 'HANGOUT'].includes(type) && Math.random() < 0.4) {
-            const potentialEvents = SOCIAL_EVENTS_DB[type];
+            const potentialEvents = getSocialEvents(language, type);
             if (potentialEvents && potentialEvents.length > 0) {
                 const evt = potentialEvents[Math.floor(Math.random() * potentialEvents.length)];
                 setActiveSocialEvent({ 
@@ -765,14 +815,14 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
           const pregnancyCarrier = getPregnancyCarrier(prev.gender, partner.gender);
 
           if (pregnancyCarrier === 'NONE') {
-              const feedback = getPregnancyFeedbackCopy('NONE', partner.name);
+              const feedback = getPregnancyFeedbackCopy('NONE', partner.name, prev);
               setToastMessage({ title: feedback.title, subtext: feedback.toast });
               logMsg = feedback.log;
           } else if (!prev.activePregnancy && Math.random() < chance) {
               const scheduledPregnancy = schedulePregnancy(prev, partner, partner.relation !== 'Spouse' && prev.stats.fame > 20);
               if (scheduledPregnancy.scheduled) {
                   scheduledActivePregnancy = scheduledPregnancy.next.activePregnancy;
-                  const feedback = getPregnancyFeedbackCopy(scheduledActivePregnancy?.pregnancyCarrier || 'PARTNER', partner.name);
+                  const feedback = getPregnancyFeedbackCopy(scheduledActivePregnancy?.pregnancyCarrier || 'PARTNER', partner.name, prev);
                   setToastMessage({ title: feedback.title, subtext: feedback.toast });
                   logMsg += ` 🍼 ${feedback.log}`;
               }

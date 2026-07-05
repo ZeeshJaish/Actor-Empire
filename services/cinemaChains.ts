@@ -5,16 +5,18 @@ import type {
     CinemaChainAudienceStrength,
     CinemaChainId,
     CinemaChainRegionalTerms,
+    GameLanguage,
     ScreeningStrategy
 } from '../types';
+import { t } from './i18n';
 
 export const BOX_OFFICE_REGIONS: BoxOfficeRegion[] = [
-    { id: 'NORTH_AMERICA', label: 'North America', shortLabel: 'NA', marketWeight: 1.18 },
-    { id: 'SOUTH_AMERICA', label: 'South America', shortLabel: 'SA', marketWeight: 0.76 },
-    { id: 'EUROPE', label: 'Europe', shortLabel: 'EU', marketWeight: 0.86 },
-    { id: 'ASIA', label: 'Asia', shortLabel: 'AS', marketWeight: 1.32 },
-    { id: 'AFRICA', label: 'Africa', shortLabel: 'AF', marketWeight: 0.56 },
-    { id: 'OCEANIA', label: 'Oceania', shortLabel: 'OC', marketWeight: 0.3 }
+    { id: 'NORTH_AMERICA', label: '', shortLabel: 'NA', marketWeight: 1.18 },
+    { id: 'SOUTH_AMERICA', label: '', shortLabel: 'SA', marketWeight: 0.76 },
+    { id: 'EUROPE', label: '', shortLabel: 'EU', marketWeight: 0.86 },
+    { id: 'ASIA', label: '', shortLabel: 'AS', marketWeight: 1.32 },
+    { id: 'AFRICA', label: '', shortLabel: 'AF', marketWeight: 0.56 },
+    { id: 'OCEANIA', label: '', shortLabel: 'OC', marketWeight: 0.3 }
 ];
 
 const REGION_BASE_TERMS: Record<BoxOfficeRegionId, Omit<CinemaChainRegionalTerms, 'note'>> = {
@@ -91,73 +93,111 @@ export const CINEMA_CHAINS: CinemaChain[] = [
         'Empire Cinemas',
         'crown-gate',
         '#f6c85f',
-        'Premium flagship circuit with polished lobbies, strong urban reach, and the highest trust with event audiences.',
+        'Premium flagship chain with glossy city-center halls, franchise muscle, and first-night spectacle.',
         92,
         ['PREMIUM', 'FRANCHISE', 'URBAN'],
-        { screenMultiplier: 1.08, cutShift: 0.035, bookingMultiplier: 1.22, footfallShift: 0.08, prestigeShift: 0.1, volatilityShift: -0.05, note: 'Premium access, high trust, higher exhibitor share.' }
+        { screenMultiplier: 1.08, cutShift: 0.035, bookingMultiplier: 1.22, footfallShift: 0.08, prestigeShift: 0.1, volatilityShift: -0.05, note: '' }
     ),
     makeChain(
         'Z_CINEMAS',
         'Z Cinemas',
         'bolt-z',
         '#44d7ff',
-        'Fast, loud, mass-market chain that can flood screens quickly but creates sharper week-two pressure.',
+        'Youth-heavy mass circuit built for loud openings, fan clubs, and star-driven repeat footfall.',
         84,
         ['MASS', 'YOUTH', 'STAR_DRIVEN'],
-        { screenMultiplier: 1.2, cutShift: -0.015, bookingMultiplier: 0.9, footfallShift: 0.1, prestigeShift: -0.12, volatilityShift: 0.12, note: 'Huge mass reach with more volatile holds.' }
+        { screenMultiplier: 1.2, cutShift: -0.015, bookingMultiplier: 0.9, footfallShift: 0.1, prestigeShift: -0.12, volatilityShift: 0.12, note: '' }
     ),
     makeChain(
         'NOVA_CIRCUIT',
         'Nova Circuit',
         'orbit',
         '#7cffe2',
-        'Balanced global circuit built for reliable commercial coverage and clean reporting across territories.',
+        'Balanced family-friendly network with dependable suburban reach and steady mainstream demand.',
         80,
         ['MASS', 'FAMILY', 'URBAN'],
-        { screenMultiplier: 1, cutShift: 0, bookingMultiplier: 1, footfallShift: 0.02, prestigeShift: 0.02, volatilityShift: -0.02, note: 'Balanced reach and predictable terms.' }
+        { screenMultiplier: 1, cutShift: 0, bookingMultiplier: 1, footfallShift: 0.02, prestigeShift: 0.02, volatilityShift: -0.02, note: '' }
     ),
     makeChain(
         'PRISM_HALLS',
         'Prism Halls',
         'prism',
         '#ff7ad9',
-        'Family-forward and star-driven circuit with strong matinee traffic and broad public appeal.',
+        'Colorful mall-first chain that turns broad releases into accessible weekend events.',
         76,
         ['FAMILY', 'STAR_DRIVEN', 'MASS'],
-        { screenMultiplier: 0.9, cutShift: -0.01, bookingMultiplier: 0.88, footfallShift: 0.04, prestigeShift: -0.02, volatilityShift: 0.02, note: 'Efficient family and star-driven footprint.' }
+        { screenMultiplier: 0.9, cutShift: -0.01, bookingMultiplier: 0.88, footfallShift: 0.04, prestigeShift: -0.02, volatilityShift: 0.02, note: '' }
     ),
     makeChain(
         'ARCLIGHT_GRID',
         'ArcLight Grid',
         'arc-grid',
         '#bba5ff',
-        'Prestige-leaning urban network that gives smaller runs credibility and strong critic-facing placement.',
+        'Prestige urban circuit for critics, auteur launches, awards buzz, and premium limited runs.',
         74,
         ['PRESTIGE', 'URBAN', 'PREMIUM'],
-        { screenMultiplier: 0.62, cutShift: -0.035, bookingMultiplier: 0.72, footfallShift: -0.03, prestigeShift: 0.22, volatilityShift: -0.12, note: 'Lower screen count, cleaner prestige signal.' }
+        { screenMultiplier: 0.62, cutShift: -0.035, bookingMultiplier: 0.72, footfallShift: -0.03, prestigeShift: 0.22, volatilityShift: -0.12, note: '' }
     ),
     makeChain(
         'CROWNSCREEN',
         'CrownScreen',
         'split-crown',
         '#76ff8a',
-        'Event-friendly circuit with strong premium large-format rooms and dependable franchise traffic.',
+        'Big-ticket franchise operator with premium screens, fan marathons, and event-style programming.',
         86,
         ['FRANCHISE', 'PREMIUM', 'MASS'],
-        { screenMultiplier: 1.05, cutShift: 0.02, bookingMultiplier: 1.08, footfallShift: 0.06, prestigeShift: 0.04, volatilityShift: 0, note: 'Event-friendly premium rooms and strong franchise traffic.' }
+        { screenMultiplier: 1.05, cutShift: 0.02, bookingMultiplier: 1.08, footfallShift: 0.06, prestigeShift: 0.04, volatilityShift: 0, note: '' }
     )
 ];
 
-export const getCinemaChainById = (chainId: CinemaChainId): CinemaChain | undefined => (
-    CINEMA_CHAINS.find(chain => chain.id === chainId)
+export const getBoxOfficeRegionLabel = (language: GameLanguage, regionId: BoxOfficeRegionId): string => (
+    t(language, `services.cinema.region.${regionId}.label`)
 );
 
-export const getCinemaChainsForRegion = (regionId: BoxOfficeRegionId): CinemaChain[] => (
-    CINEMA_CHAINS.filter(chain => Boolean(chain.regionalTerms[regionId]))
+export const getBoxOfficeRegionShortLabel = (language: GameLanguage, regionId: BoxOfficeRegionId): string => (
+    t(language, `services.cinema.region.${regionId}.shortLabel`)
 );
 
-export const getCinemaChainTerms = (chainId: CinemaChainId, regionId: BoxOfficeRegionId): CinemaChainRegionalTerms | undefined => (
-    getCinemaChainById(chainId)?.regionalTerms[regionId]
+export const getCinemaChainName = (language: GameLanguage, chainId: CinemaChainId): string => (
+    t(language, `services.cinema.chain.${chainId}.name`)
+);
+
+export const getCinemaChainPersonality = (language: GameLanguage, chainId: CinemaChainId): string => (
+    t(language, `services.cinema.chain.${chainId}.personality`)
+);
+
+export const getCinemaChainTermsNote = (language: GameLanguage, chainId: CinemaChainId): string => (
+    t(language, `services.cinema.chain.${chainId}.termsNote`)
+);
+
+const localizeCinemaChain = (chain: CinemaChain, language: GameLanguage): CinemaChain => ({
+    ...chain,
+    name: getCinemaChainName(language, chain.id),
+    personality: getCinemaChainPersonality(language, chain.id),
+    regionalTerms: Object.fromEntries(
+        Object.entries(chain.regionalTerms).map(([regionId, terms]) => [
+            regionId,
+            {
+                ...terms,
+                note: getCinemaChainTermsNote(language, chain.id)
+            }
+        ])
+    ) as Record<BoxOfficeRegionId, CinemaChainRegionalTerms>
+});
+
+export const getCinemaChainById = (chainId: CinemaChainId, language: GameLanguage = 'en'): CinemaChain | undefined => {
+    const chain = CINEMA_CHAINS.find(candidate => candidate.id === chainId);
+    return chain ? localizeCinemaChain(chain, language) : undefined;
+};
+
+export const getCinemaChainsForRegion = (regionId: BoxOfficeRegionId, language: GameLanguage = 'en'): CinemaChain[] => (
+    CINEMA_CHAINS
+        .filter(chain => Boolean(chain.regionalTerms[regionId]))
+        .map(chain => localizeCinemaChain(chain, language))
+);
+
+export const getCinemaChainTerms = (chainId: CinemaChainId, regionId: BoxOfficeRegionId, language: GameLanguage = 'en'): CinemaChainRegionalTerms | undefined => (
+    getCinemaChainById(chainId, language)?.regionalTerms[regionId]
 );
 
 export const getScreeningStrategyChainPreview = (strategy: ScreeningStrategy): CinemaChain[] => {

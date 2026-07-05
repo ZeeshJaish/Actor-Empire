@@ -19,14 +19,16 @@ import { CreationMenu } from './views/CreationMenu';
 import { DeathScreen } from './views/DeathScreen';
 import { RedCarpetEvent } from './views/RedCarpetEvent';
 import { PressConferenceEvent } from './views/PressConferenceEvent';
+import { ActorEmpireIntroStyle, ActorEmpireLoadingScreen, EmpireStudioBumper } from './components/ActorEmpireIntro';
+import type { NewCareerData } from './components/types';
 import { processGameWeek } from './services/gameLoop';
 import { generateAuditions, generatePartTimeJobs, rewardGenreExperience } from './services/roleLogic';
 import { generateWeeklyFeed, calculateInteraction, getGenderedAvatar } from './services/npcLogic';
 import { getRandomAgents, getRandomManagers, getRandomTrainers, getRandomStylists, getRandomTherapists, getRandomPublicists, getRandomWellness, sanitizeTeamPools } from './services/teamLogic';
 import { createBusiness, normalizeStudioState } from './services/businessLogic';
-import { CheckCircle, Heart, ShieldAlert, AlertTriangle, PlayCircle, Loader2, Skull, Briefcase, Baby } from 'lucide-react'; 
+import { CheckCircle, Heart, ShieldAlert, AlertTriangle, PlayCircle, Skull, Briefcase, Baby } from 'lucide-react'; 
 import { useGameActions } from './hooks/useGameActions';
-import { PROPERTY_CATALOG, CAR_CATALOG, CLOTHING_CATALOG } from './services/lifestyleLogic';
+import { PROPERTY_CATALOG, CAR_CATALOG, MOTORCYCLE_CATALOG, BOAT_CATALOG, AIRCRAFT_CATALOG, CLOTHING_CATALOG } from './services/lifestyleLogic';
 import { showAd, initAds } from './services/adLogic';
 import { ensureTrackingPermission } from './services/trackingService';
 import { saveGameData, loadGameData, deleteGameData } from './services/storage';
@@ -43,6 +45,7 @@ import { hydrateGenreXP } from './services/genreCatalog';
 import { createInstagramReferralOutcome } from './services/instagramOfferLogic';
 import { executeStockTrade } from './services/stockLogic';
 import { migratePlayerSave } from './services/saveMigration';
+import { externalizeCustomPostersInPlayer, stripEmbeddedPosterImageDataForPersistence } from './services/customPosterMedia';
 import { acceptOutsideProducerInvestmentOffer, counterOutsideProducerInvestmentOffer } from './services/outsideProductions';
 import { getPlayerLanguage, isSupportedGameLanguage, t } from './services/i18n';
 import {
@@ -78,6 +81,16 @@ const RECENT_TIMELINE_WEEKS = 104;
 const RECENT_TIMELINE_MAX_ITEMS = 180;
 const LEGACY_HIGHLIGHT_MAX_ITEMS = 80;
 const FULL_LOCAL_MIRROR_BUDGET_BYTES = 3_500_000;
+const STARTUP_STUDIO_BUMPER_MS = 2400;
+const STARTUP_LOADING_MIN_MS = 8600;
+const STARTUP_LOADING_LINE_KEYS = [
+  'startup.loadingLine.actors',
+  'startup.loadingLine.cinema',
+  'startup.loadingLine.casting',
+  'startup.loadingLine.lights',
+  'startup.loadingLine.redCarpet',
+  'startup.loadingLine.saves',
+];
 
 type CompactTimelineEntry = {
   id: string;
@@ -157,6 +170,7 @@ const normalizeProjectDetails = (details: Partial<ProjectDetails> | undefined): 
         castList: Array.isArray(details?.castList) ? details!.castList : [],
         crewList: Array.isArray(details?.crewList) ? details!.crewList : [],
         reviews: Array.isArray(details?.reviews) ? details!.reviews : [],
+        audienceReception: details?.audienceReception && typeof details.audienceReception === 'object' ? details.audienceReception : undefined,
         campaignItems: Array.isArray(details?.campaignItems) ? details!.campaignItems : [],
         hiddenStats,
     });
@@ -224,6 +238,7 @@ const normalizeActiveRelease = (release: Partial<ActiveRelease>, playerAge: numb
         ...(release.promotionalBuzz !== undefined ? { promotionalBuzz: release.promotionalBuzz } : {}),
         ...(release.royaltyPercentage !== undefined ? { royaltyPercentage: release.royaltyPercentage } : {}),
         ...(release.previousBestBidValue !== undefined ? { previousBestBidValue: release.previousBestBidValue } : {}),
+        ...(release.audienceReception !== undefined ? { audienceReception: release.audienceReception } : {}),
         ...(distributionPhase === 'STREAMING' ? { streaming: normalizeStreamingState(release.streaming, projectDetails, playerAge, currentWeek) } : {}),
     };
 };
@@ -261,6 +276,7 @@ const normalizePastProject = (project: Partial<PastProject>): PastProject => ({
     awards: dedupeAwards(project.awards || []),
     castList: Array.isArray(project.castList) ? project.castList : [],
     reviews: Array.isArray(project.reviews) ? project.reviews : [],
+    audienceReception: project.audienceReception,
     ...project,
 });
 
@@ -347,16 +363,21 @@ class GameErrorBoundary extends React.Component<GameErrorBoundaryProps, GameErro
 export const App: React.FC = () => {
   const [player, setPlayer] = useState<Player>(() => migratePlayerSave(INITIAL_PLAYER));
   const [activePage, setActivePage] = useState<Page>(Page.HOME);
-  const [lifestyleInitialView, setLifestyleInitialView] = useState<'MAIN' | 'ASSETS' | 'ACTIVITIES' | 'BUSINESS' | 'PRODUCTION_WIZARD' | 'PRODUCTION_GAME' | null>(null);
+  const [lifestyleInitialView, setLifestyleInitialView] = useState<'MAIN' | 'ASSETS' | 'ACTIVITIES' | 'BUSINESS' | 'PRODUCTION_WIZARD' | 'PRODUCTION_GAME' | 'STREAMING_PLATFORM' | null>(null);
   const [rightsMarketOpportunityId, setRightsMarketOpportunityId] = useState<string | null>(null);
   const [initialForbesStudioId, setInitialForbesStudioId] = useState<string | null>(null);
   const [initialMobileStockId, setInitialMobileStockId] = useState<string | null>(null);
   const [initialMobileAppMode, setInitialMobileAppMode] = useState<'BOXOFFICE' | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [gameStatus, setGameStatus] = useState<GameStatus>('START_MENU');
+  const [skipStartMenuIntro, setSkipStartMenuIntro] = useState(true);
   const [saveSlots, setSaveSlots] = useState<Record<number, Player | null>>({ 1: null, 2: null, 3: null });
   const [currentSlot, setCurrentSlot] = useState<number | null>(null);
   const [isInitializing, setIsInitializing] = useState(true); // Loading state for async storage
+  const [startupStudioBumperElapsed, setStartupStudioBumperElapsed] = useState(false);
+  const [startupMinimumElapsed, setStartupMinimumElapsed] = useState(false);
+  const [startupLoadingLineIndex, setStartupLoadingLineIndex] = useState(0);
+  const [startupLoadingProgress, setStartupLoadingProgress] = useState(0);
   
   // UI States
   const [toastMessage, setToastMessage] = useState<{title: string, subtext: string} | null>(null);
@@ -371,6 +392,7 @@ export const App: React.FC = () => {
   const [deathScreenPreviewPlayer, setDeathScreenPreviewPlayer] = useState<Player | null>(null);
   const language = getPlayerLanguage(player);
   const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
+  const isStartupLoadingVisible = isInitializing || !startupMinimumElapsed;
   const [showWhatsNewModal, setShowWhatsNewModal] = useState(false);
   const [showPreviousWhatsNewNotes, setShowPreviousWhatsNewNotes] = useState(false);
   
@@ -382,6 +404,52 @@ export const App: React.FC = () => {
   const autosaveTimerRef = useRef<number | null>(null);
 
   const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setStartupMinimumElapsed(true), STARTUP_LOADING_MIN_MS);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setStartupStudioBumperElapsed(true), STARTUP_STUDIO_BUMPER_MS);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!isStartupLoadingVisible) return;
+    const interval = window.setInterval(() => {
+      setStartupLoadingLineIndex(prev => (prev + 1) % STARTUP_LOADING_LINE_KEYS.length);
+    }, 420);
+    return () => window.clearInterval(interval);
+  }, [isStartupLoadingVisible]);
+
+  useEffect(() => {
+    if (!isStartupLoadingVisible) {
+      setStartupLoadingProgress(100);
+      return;
+    }
+
+    if (!startupStudioBumperElapsed) {
+      setStartupLoadingProgress(0);
+      return;
+    }
+
+    const startedAt = performance.now();
+    const duration = Math.max(1400, STARTUP_LOADING_MIN_MS - STARTUP_STUDIO_BUMPER_MS - 260);
+    let frame = 0;
+
+    const tick = (now: number) => {
+      const elapsed = now - startedAt;
+      const ratio = Math.min(0.985, elapsed / duration);
+      const eased = 1 - Math.pow(1 - ratio, 1.45);
+      setStartupLoadingProgress(Math.min(99, Math.round(eased * 100)));
+      frame = requestAnimationFrame(tick);
+    };
+
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [isStartupLoadingVisible, startupStudioBumperElapsed]);
+
   const preparePlayerForPersistence = (nextPlayer: Player): Player => {
       const currentAbsoluteWeek = getApproxAbsoluteWeek(nextPlayer.age, nextPlayer.currentWeek);
       const recentCutoff = currentAbsoluteWeek - RECENT_TIMELINE_WEEKS;
@@ -426,7 +494,7 @@ export const App: React.FC = () => {
       const legacyHighlights = Array.from(highlightById.values())
           .sort((a, b) => b.absoluteWeek - a.absoluteWeek)
           .slice(0, LEGACY_HIGHLIGHT_MAX_ITEMS);
-      const safePlayer: any = {
+      const safePlayer: any = stripEmbeddedPosterImageDataForPersistence({
           ...nextPlayer,
           logs: Array.isArray(nextPlayer.logs) ? nextPlayer.logs.slice(-50) : [],
           news: Array.isArray(nextPlayer.news) ? nextPlayer.news.slice(0, 80) : [],
@@ -439,7 +507,7 @@ export const App: React.FC = () => {
               legacyHighlights,
               persistenceOptimizedAtWeek: currentAbsoluteWeek,
           },
-      };
+      } as Player);
 
       if (safePlayer.instagram) {
           safePlayer.instagram = {
@@ -538,6 +606,32 @@ export const App: React.FC = () => {
       if (!currentSlot) return;
       setSaveSlots(prev => ({ ...prev, [currentSlot]: nextPlayer }));
       persistSlotSave(currentSlot, nextPlayer);
+  };
+
+  const prepareLoadedPlayerSave = async (slot: number, savedData: Player): Promise<{ player: Player; shouldPersist: boolean }> => {
+      const migrated = migratePlayerSave(savedData);
+      let optimized = migrated;
+      let posterMediaMigrated = false;
+
+      try {
+          const posterResult = await externalizeCustomPostersInPlayer(optimized);
+          optimized = posterResult.player;
+          posterMediaMigrated = posterResult.migratedCount > 0 || posterResult.bytesRemoved > 0;
+          if (posterMediaMigrated) {
+              addBreadcrumb('custom_posters:externalized', {
+                  slot,
+                  migratedCount: posterResult.migratedCount,
+                  bytesRemoved: posterResult.bytesRemoved,
+              });
+          }
+      } catch (error) {
+          recordNonFatal(error, 'custom_poster_externalize_failed', { slot });
+      }
+
+      return {
+          player: optimized,
+          shouldPersist: ((savedData as Player)?.flags?.saveMigrationVersion !== optimized.flags?.saveMigrationVersion) || posterMediaMigrated,
+      };
   };
 
   useEffect(() => {
@@ -729,10 +823,10 @@ export const App: React.FC = () => {
             for (let i = 1; i <= 3; i++) {
                 const savedData = await loadGameData(`actorEmpireSave_${i}`);
                 if (savedData) {
-                    const migrated = migratePlayerSave(savedData);
-                    slots[i] = migrated;
-                    if ((savedData as Player)?.flags?.saveMigrationVersion !== migrated.flags?.saveMigrationVersion) {
-                        persistSlotSave(i, migrated);
+                    const prepared = await prepareLoadedPlayerSave(i, savedData);
+                    slots[i] = prepared.player;
+                    if (prepared.shouldPersist) {
+                        persistSlotSave(i, prepared.player);
                     }
                 }
             }
@@ -744,19 +838,19 @@ export const App: React.FC = () => {
                 const legacyIndexedDbSave = await loadGameData('actorEmpireSave');
                 if (legacyIndexedDbSave) {
                     console.log("Migrating legacy IndexedDB save to Slot 1...");
-                    const migrated = migratePlayerSave(legacyIndexedDbSave);
-                    persistSlotSave(1, migrated);
-                    slots[1] = migrated;
+                    const prepared = await prepareLoadedPlayerSave(1, legacyIndexedDbSave);
+                    persistSlotSave(1, prepared.player);
+                    slots[1] = prepared.player;
                 } else {
                     for (let i = 1; i <= 3; i++) {
                         const legacySlotSave = localStorage.getItem(`actorEmpireSave_${i}`);
                         if (!legacySlotSave) continue;
                         try {
                             const savedData = JSON.parse(legacySlotSave);
-                            const migrated = migratePlayerSave(savedData);
+                            const prepared = await prepareLoadedPlayerSave(i, savedData);
                             console.log(`Migrating localStorage slot ${i} to IndexedDB...`);
-                            persistSlotSave(i, migrated);
-                            slots[i] = migrated;
+                            persistSlotSave(i, prepared.player);
+                            slots[i] = prepared.player;
                         } catch (e) {
                             console.error(`Legacy slot ${i} corrupt`, e);
                             recordNonFatal(e, 'legacy_slot_migration_failed', { slot: i });
@@ -769,10 +863,10 @@ export const App: React.FC = () => {
                         if (legacySave) {
                             try {
                                 const savedData = JSON.parse(legacySave);
-                                const migrated = migratePlayerSave(savedData);
+                                const prepared = await prepareLoadedPlayerSave(1, savedData);
                                 console.log("Migrating legacy save to Slot 1...");
-                                persistSlotSave(1, migrated);
-                                slots[1] = migrated;
+                                persistSlotSave(1, prepared.player);
+                                slots[1] = prepared.player;
                             } catch (e) {
                                 console.error("Legacy save corrupt", e);
                                 recordNonFatal(e, 'legacy_save_migration_failed');
@@ -823,9 +917,11 @@ export const App: React.FC = () => {
         const migrated = migratePlayerSave(existingSave);
         setSaveSlots(prev => ({ ...prev, [slot]: migrated }));
         setPlayer(migrated);
+        setSkipStartMenuIntro(false);
         setGameStatus('PLAYING');
     } else {
         setPlayer(migratePlayerSave(INITIAL_PLAYER));
+        setSkipStartMenuIntro(false);
         setGameStatus('CREATION');
     }
   };
@@ -844,6 +940,7 @@ export const App: React.FC = () => {
     setShowProtectionPrompt(null);
     setActiveSocialEvent(null);
     setActivePage(Page.HOME);
+    setSkipStartMenuIntro(true);
     setGameStatus('START_MENU');
   };
 
@@ -934,6 +1031,26 @@ export const App: React.FC = () => {
           // Ensure Arrays
           if (!Array.isArray(safePlayer.commitments)) safePlayer.commitments = [];
           safePlayer.commitments = safePlayer.commitments.map((commitment: any) => normalizeCommitment(commitment));
+          if (!Array.isArray(safePlayer.assetStates)) safePlayer.assetStates = [];
+          safePlayer.assetStates = safePlayer.assetStates
+              .filter((state: any) => typeof state?.assetId === 'string')
+              .map((state: any) => ({
+                  assetId: state.assetId,
+                  condition: Math.max(0, Math.min(100, Math.round(Number(state.condition ?? 100)))),
+                  currentValue: Math.max(0, Math.round(Number(state.currentValue || 0))),
+                  valueTrend: Number.isFinite(Number(state.valueTrend)) ? Number(state.valueTrend) : 0,
+                  marketCycle: typeof state.marketCycle === 'string' ? state.marketCycle : undefined,
+                  neighborhoodTier: typeof state.neighborhoodTier === 'string' ? state.neighborhoodTier : undefined,
+                  rentDemand: Math.max(0, Math.min(100, Math.round(Number(state.rentDemand || 0)))),
+                  vacancyChance: Math.max(0, Math.min(1, Number(state.vacancyChance || 0))),
+                  vacancyWeeks: Math.max(0, Math.round(Number(state.vacancyWeeks || 0))),
+                  rentalListed: Boolean(state.rentalListed),
+                  weeklyRent: Math.max(0, Math.round(Number(state.weeklyRent || 0))),
+                  lifetimeRevenue: Math.max(0, Math.round(Number(state.lifetimeRevenue || 0))),
+                  listedWeek: Math.max(0, Math.round(Number(state.listedWeek || 0))),
+                  lastMaintainedWeek: Math.max(0, Math.round(Number(state.lastMaintainedWeek || 0))),
+              }));
+          if (typeof safePlayer.activeVehicleId !== 'string') safePlayer.activeVehicleId = null;
           if (!Array.isArray(safePlayer.activeReleases)) safePlayer.activeReleases = [];
           safePlayer.activeReleases = safePlayer.activeReleases.map((release: any) => normalizeActiveRelease(release, safePlayer.age, safePlayer.currentWeek));
           if (!Array.isArray(safePlayer.pastProjects)) safePlayer.pastProjects = [];
@@ -1047,7 +1164,7 @@ export const App: React.FC = () => {
               });
           }
 
-          if (safePlayer.weeklyOpportunities.jobs.length === 0) {
+          if (safePlayer.weeklyOpportunities.jobs.length === 0 || safePlayer.weeklyOpportunities.auditions.length === 0) {
               const usedTitles = [...safePlayer.commitments.map((c: any) => c.name), ...safePlayer.activeReleases.map((r: any) => r.name), ...safePlayer.pastProjects.map((p: any) => p.name)];
               safePlayer.weeklyOpportunities = { auditions: generateAuditions(safePlayer, usedTitles), jobs: generatePartTimeJobs() };
           }
@@ -1198,8 +1315,9 @@ export const App: React.FC = () => {
                   shouldCreateScandalNews: request.shouldCreateScandalNews,
               },
           };
-      }, `🍼 ${getPregnancyFeedbackCopy(request.pregnancyCarrier || 'PARTNER', request.partnerName).log}`);
-      setToastMessage({ title: tr('app.feedback.pregnancyConfirmedTitle'), subtext: getPregnancyFeedbackCopy(request.pregnancyCarrier || 'PARTNER', request.partnerName).toast });
+      }, `🍼 ${getPregnancyFeedbackCopy(request.pregnancyCarrier || 'PARTNER', request.partnerName, language).log}`);
+      const pregnancyFeedback = getPregnancyFeedbackCopy(request.pregnancyCarrier || 'PARTNER', request.partnerName, language);
+      setToastMessage({ title: pregnancyFeedback.title, subtext: pregnancyFeedback.toast });
   };
 
   const handleNextWeek = async () => {
@@ -1537,19 +1655,23 @@ export const App: React.FC = () => {
 
       handleGenericUpdate(prev => {
           const p = JSON.parse(JSON.stringify(prev)) as Player;
-          const message = applyPremiumPurchase(p, productId);
+          const message = applyPremiumPurchase(p, productId, getPlayerLanguage(p));
           setToastMessage({ title: tr('app.purchases.confirmedTitle'), subtext: message });
           return p;
       });
   };
 
-  const handleBuyLifestyleItem = (item: any) => {
+	  const handleBuyLifestyleItem = (item: any) => {
       handleGenericUpdate(p => {
           const nextPlayer = {
               ...p,
               money: p.money - item.price,
               assets: [...p.assets, item.id],
               customItems: item.id.includes('_cust_') ? [...p.customItems, item as any] : p.customItems,
+              assetStates: [
+                  ...(p.assetStates || []).filter(state => state.assetId !== item.id),
+                  { assetId: item.id, condition: 100, currentValue: item.price, valueTrend: 0, rentDemand: 0, vacancyChance: 0, vacancyWeeks: 0, rentalListed: false, weeklyRent: 0, lifetimeRevenue: 0, listedWeek: 0, lastMaintainedWeek: 0 },
+              ],
           };
 
           const premiumCollection = getRequiredPremiumProductForAsset(item.id);
@@ -1633,10 +1755,28 @@ export const App: React.FC = () => {
 
           nextPlayer.logs = [...nextPlayer.logs, { week: nextPlayer.currentWeek, year: nextPlayer.age, message: logMessage, type: 'positive' as const }].slice(-50);
           return nextPlayer;
-      });
-  };
+	      });
+	  };
 
-  const handleRestorePurchases = async () => {
+	  const handleSellLifestyleItem = (id: string) => {
+	      handleGenericUpdate(p => {
+	          const allMarketItems = [...PROPERTY_CATALOG, ...CAR_CATALOG, ...MOTORCYCLE_CATALOG, ...BOAT_CATALOG, ...AIRCRAFT_CATALOG, ...CLOTHING_CATALOG];
+	          const item = p.customItems.find(customItem => customItem.id === id) || allMarketItems.find(marketItem => marketItem.id === id);
+              const state = (p.assetStates || []).find(assetState => assetState.assetId === id);
+	          const saleValue = item ? Math.floor(Math.max(item.price, Number(state?.currentValue || 0)) * 0.5) : 0;
+	          return {
+	              ...p,
+	              money: p.money + saleValue,
+	              assets: p.assets.filter(assetId => assetId !== id),
+	              customItems: p.customItems.filter(customItem => customItem.id !== id),
+	              assetStates: (p.assetStates || []).filter(state => state.assetId !== id),
+	              residenceId: p.residenceId === id ? null : p.residenceId,
+	              activeVehicleId: p.activeVehicleId === id ? null : p.activeVehicleId,
+	          };
+	      });
+	  };
+
+	  const handleRestorePurchases = async () => {
       const result = await restorePremiumPurchases();
       if (!result.success) {
           setToastMessage({ title: tr('app.purchases.restoreFailedTitle'), subtext: result.message });
@@ -1651,7 +1791,7 @@ export const App: React.FC = () => {
       handleGenericUpdate(prev => {
           const p = JSON.parse(JSON.stringify(prev)) as Player;
           result.restoredProductIds.forEach(productId => {
-              applyPremiumPurchase(p, productId);
+              applyPremiumPurchase(p, productId, getPlayerLanguage(p));
           });
           setToastMessage({
               title: tr('app.purchases.restoredTitle'),
@@ -1662,7 +1802,7 @@ export const App: React.FC = () => {
   };
 
   // --- HANDLERS ---
-  const handleStartGame = (name: string, age: number, gender: any, avatar: string, handle: string) => { 
+  const handleStartGame = (name: string, age: number, gender: any, avatar: string, handle: string, slotOverride?: number) => { 
       const parentRelationships = INITIAL_PLAYER.relationships.map((rel, index) => ({
           ...rel,
           age: age + (index === 0 ? 28 : 31),
@@ -1680,11 +1820,21 @@ export const App: React.FC = () => {
           youtube: { ...INITIAL_PLAYER.youtube, handle: handle }
       };
       const migratedNewPlayer = migratePlayerSave(newPlayer);
-      if (currentSlot) {
-          setSaveSlots(prev => ({ ...prev, [currentSlot]: migratedNewPlayer }));
+      const targetSlot = slotOverride ?? currentSlot;
+      if (targetSlot) {
+          setSaveSlots(prev => ({ ...prev, [targetSlot]: migratedNewPlayer }));
       }
       setPlayer(migratedNewPlayer); 
       setGameStatus('PLAYING'); 
+  };
+
+  const handleStartGameFromIntro = (data: NewCareerData, slot: number) => {
+      const name = data.stageName.trim() || 'Rising Star';
+      const introGender = data.gender === 'Female' ? 'FEMALE' : data.gender === 'Non-Binary' ? 'NON_BINARY' : 'MALE';
+      const rawHandle = data.handle.trim() || name.toLowerCase().replace(/\s+/g, '');
+      const handle = rawHandle.startsWith('@') ? rawHandle : `@${rawHandle}`;
+      setCurrentSlot(slot);
+      handleStartGame(name, data.age, introGender, getGenderedAvatar(introGender as any, `${name}-${data.presetIndex}`), handle, slot);
   };
 
   const handleOpenDeathSummaryPreview = () => {
@@ -1755,7 +1905,9 @@ export const App: React.FC = () => {
           money: inheritancePreview.inheritedMoney,
           assets: [...player.assets],
           customItems: clone(player.customItems),
+          assetStates: clone(player.assetStates || []),
           residenceId: player.residenceId,
+          activeVehicleId: player.activeVehicleId,
           businesses: clone(player.businesses || []),
           studio: player.studio ? clone(player.studio) : undefined,
           stocks: clone(player.stocks),
@@ -1940,11 +2092,20 @@ export const App: React.FC = () => {
       });
   };
 
-  if (isInitializing) {
+  if (isStartupLoadingVisible) {
+      const loadingLineKey = STARTUP_LOADING_LINE_KEYS[startupLoadingLineIndex % STARTUP_LOADING_LINE_KEYS.length];
+      const showStudioBumper = !startupStudioBumperElapsed;
       return (
-          <div className="h-screen bg-black flex flex-col items-center justify-center text-white">
-              <Loader2 size={48} className="animate-spin text-amber-500 mb-4" />
-              <div className="text-sm font-bold uppercase tracking-widest text-zinc-500">Loading Career...</div>
+          <div className="relative h-screen overflow-hidden bg-[#050505] text-white">
+              <ActorEmpireIntroStyle />
+              {showStudioBumper ? (
+                  <EmpireStudioBumper />
+              ) : (
+                  <ActorEmpireLoadingScreen
+                      progress={startupLoadingProgress}
+                      status={tr(loadingLineKey)}
+                  />
+              )}
           </div>
       );
   }
@@ -2338,6 +2499,8 @@ export const App: React.FC = () => {
                 saveSlots={saveSlots}
                 onSelectSlot={handleSelectSlot}
                 onDeleteSlot={handleDeleteSlot}
+                onCreateCareerFromIntro={handleStartGameFromIntro}
+                skipIntro={skipStartMenuIntro}
             />
         )}
         {gameStatus === 'CREATION' && <CreationMenu onStartGame={handleStartGame} />}
@@ -2348,7 +2511,7 @@ export const App: React.FC = () => {
                     {activePage === Page.CAREER && (<CareerPage player={player} onQuitJob={handleQuitJob} onRehearse={handleRehearse} />)}
                     {activePage === Page.IMPROVE && (<ImprovePage player={player} onTrain={()=>{}} onEnroll={(c)=>handleGenericUpdate(p=>{ const previousCommitments = p.commitments; const next: Player = { ...p, money: p.money- (c.upfrontCost||0), commitments: [...p.commitments, {...c, id: `c_${Date.now()}`, weeksCompleted:0}] }; syncWeeklyEnergyForCommitments(next, previousCommitments); return next; })} onCancel={(id)=>handleGenericUpdate(p=>{ const previousCommitments = p.commitments; const next: Player = { ...p, commitments: p.commitments.filter(c=>c.id!==id)}; syncWeeklyEnergyForCommitments(next, previousCommitments); return next; })} onPerformAction={handleImproveAction} />)}
                     {activePage === Page.SOCIAL && (<SocialPage player={player} onInteract={handleSocialInteract} onContinueAsChild={handleContinueAsChild} />)}
-                    {activePage === Page.LIFESTYLE && (<LifestylePage player={player} onBuyItem={handleBuyLifestyleItem} onSellItem={(id)=>handleGenericUpdate(p=>{ const it = [...PROPERTY_CATALOG, ...CAR_CATALOG, ...CLOTHING_CATALOG].find(x=>x.id===id); return { ...p, money: p.money + (it ? it.price*0.5 : 0), assets: p.assets.filter(a=>a!==id) }; })} onSetResidence={(id)=>handleGenericUpdate(p=>({ ...p, residenceId: id }))} onSetActiveStyle={(s)=>handleGenericUpdate(p=>({ ...p, activeClothingStyle: s }))} onStartBusiness={()=>{}} onShutdownBusiness={()=>{}} onUpdatePlayer={handleUpdatePlayer} onPremiumPurchase={handlePremiumPurchase} onNavVisibilityChange={setIsBottomNavVisible} initialView={lifestyleInitialView ?? undefined} onInitialViewConsumed={() => setLifestyleInitialView(null)} initialRightsMarketOpportunityId={rightsMarketOpportunityId ?? undefined} onRightsMarketTargetConsumed={() => setRightsMarketOpportunityId(null)} />)}
+                    {activePage === Page.LIFESTYLE && (<LifestylePage player={player} onBuyItem={handleBuyLifestyleItem} onSellItem={handleSellLifestyleItem} onSetResidence={(id)=>handleGenericUpdate(p=>({ ...p, residenceId: id }))} onStartBusiness={()=>{}} onShutdownBusiness={()=>{}} onUpdatePlayer={handleUpdatePlayer} onPremiumPurchase={handlePremiumPurchase} onNavVisibilityChange={setIsBottomNavVisible} initialView={lifestyleInitialView ?? undefined} onInitialViewConsumed={() => setLifestyleInitialView(null)} initialRightsMarketOpportunityId={rightsMarketOpportunityId ?? undefined} onRightsMarketTargetConsumed={() => setRightsMarketOpportunityId(null)} />)}
                     {activePage === Page.MOBILE && (
                         <MobilePage 
                             player={player} 
@@ -2728,6 +2891,7 @@ export const App: React.FC = () => {
                             onUpdatePlayer={handleGenericUpdate}
                             onBack={() => setActivePage(Page.HOME)} 
                             onMainMenu={() => {
+                                setSkipStartMenuIntro(true);
                                 setGameStatus('START_MENU');
                                 setActivePage(Page.HOME);
                             }}

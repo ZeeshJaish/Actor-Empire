@@ -1,5 +1,7 @@
 import React from 'react';
 import { DatingPreferences } from '../../types';
+import type { GameLanguage } from '../../types';
+import { t } from '../../services/i18n';
 import { SlidersHorizontal, X } from 'lucide-react';
 
 interface DatingPreferencesSheetProps {
@@ -7,23 +9,27 @@ interface DatingPreferencesSheetProps {
     onChange: (preferences: DatingPreferences) => void;
     onClose: () => void;
     onSave: () => void;
+    language?: GameLanguage;
     tone?: 'tinder' | 'luxe';
 }
 
-const genderOptions: { value: DatingPreferences['gender']; label: string }[] = [
-    { value: 'MALE', label: 'Men' },
-    { value: 'FEMALE', label: 'Women' },
-    { value: 'ALL', label: 'Everyone' },
+const genderOptions: { value: DatingPreferences['gender']; labelKey: string }[] = [
+    { value: 'MALE', labelKey: 'dating.preferences.gender.men' },
+    { value: 'FEMALE', labelKey: 'dating.preferences.gender.women' },
+    { value: 'ALL', labelKey: 'dating.preferences.gender.everyone' },
 ];
 
-export const preferenceLabel = (preferences: DatingPreferences) => {
-    const genderLabel =
-        preferences.gender === 'MALE'
-            ? 'Men'
-            : preferences.gender === 'FEMALE'
-                ? 'Women'
-                : 'Everyone';
-    return `${genderLabel}, ${preferences.minAge}-${preferences.maxAge}`;
+export const preferenceLabel = (preferences: DatingPreferences, language: GameLanguage = 'en') => {
+    const genderKey = preferences.gender === 'MALE'
+        ? 'dating.preferences.gender.men'
+        : preferences.gender === 'FEMALE'
+            ? 'dating.preferences.gender.women'
+            : 'dating.preferences.gender.everyone';
+    return t(language, 'dating.preferences.summary', {
+        gender: t(language, genderKey),
+        minAge: preferences.minAge,
+        maxAge: preferences.maxAge
+    });
 };
 
 export const DatingPreferencesSheet: React.FC<DatingPreferencesSheetProps> = ({
@@ -31,8 +37,10 @@ export const DatingPreferencesSheet: React.FC<DatingPreferencesSheetProps> = ({
     onChange,
     onClose,
     onSave,
+    language: selectedLanguage = 'en',
     tone = 'tinder',
 }) => {
+    const language = selectedLanguage as GameLanguage;
     const isLuxe = tone === 'luxe';
     const accentText = isLuxe ? 'text-amber-200' : 'text-rose-500';
     const activeButton = isLuxe ? 'bg-amber-400 text-black shadow-lg' : 'bg-gray-900 text-white shadow-md';
@@ -52,11 +60,11 @@ export const DatingPreferencesSheet: React.FC<DatingPreferencesSheetProps> = ({
                 <div className="flex items-start justify-between gap-4">
                     <div>
                         <div className={`flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] ${accentText}`}>
-                            <SlidersHorizontal size={14} /> Preferences
+	                            <SlidersHorizontal size={14} /> {t(language, 'dating.preferences.eyebrow')}
                         </div>
-                        <h3 className="mt-2 text-2xl font-black">Dating Filters</h3>
+                        <h3 className="mt-2 text-2xl font-black">{t(language, 'dating.preferences.title')}</h3>
                         <p className={isLuxe ? 'mt-1 text-sm text-zinc-400' : 'mt-1 text-sm text-gray-500'}>
-                            Change who appears in Tinder and Luxe.
+                            {t(language, 'dating.preferences.subtitle')}
                         </p>
                     </div>
                     <button
@@ -64,7 +72,7 @@ export const DatingPreferencesSheet: React.FC<DatingPreferencesSheetProps> = ({
                         className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
                             isLuxe ? 'bg-white/[0.06] text-zinc-300' : 'bg-gray-100 text-gray-500'
                         }`}
-                        aria-label="Close dating preferences"
+                        aria-label={t(language, 'dating.preferences.closeAria')}
                     >
                         <X size={18} />
                     </button>
@@ -73,7 +81,7 @@ export const DatingPreferencesSheet: React.FC<DatingPreferencesSheetProps> = ({
                 <div className="mt-6 space-y-6">
                     <div>
                         <label className={isLuxe ? 'text-[10px] font-black uppercase tracking-[0.18em] text-zinc-500' : 'text-[10px] font-black uppercase tracking-[0.18em] text-gray-400'}>
-                            Interested In
+                            {t(language, 'dating.preferences.interestedIn')}
                         </label>
                         <div className="mt-3 grid grid-cols-3 gap-2">
                             {genderOptions.map(option => (
@@ -84,7 +92,7 @@ export const DatingPreferencesSheet: React.FC<DatingPreferencesSheetProps> = ({
                                         preferences.gender === option.value ? activeButton : inactiveButton
                                     }`}
                                 >
-                                    {option.label}
+                                    {t(language, option.labelKey)}
                                 </button>
                             ))}
                         </div>
@@ -93,7 +101,7 @@ export const DatingPreferencesSheet: React.FC<DatingPreferencesSheetProps> = ({
                     <div>
                         <div className="mb-4 flex items-end justify-between gap-3">
                             <label className={isLuxe ? 'text-[10px] font-black uppercase tracking-[0.18em] text-zinc-500' : 'text-[10px] font-black uppercase tracking-[0.18em] text-gray-400'}>
-                                Age Range
+                                {t(language, 'dating.preferences.ageRange')}
                             </label>
                             <span className={`font-mono text-lg font-black ${isLuxe ? 'text-amber-100' : 'text-gray-950'}`}>
                                 {preferences.minAge} - {preferences.maxAge}
@@ -103,7 +111,7 @@ export const DatingPreferencesSheet: React.FC<DatingPreferencesSheetProps> = ({
                         <div className="space-y-6">
                             <div>
                                 <div className={isLuxe ? 'mb-2 text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500' : 'mb-2 text-[10px] font-bold uppercase tracking-[0.16em] text-gray-400'}>
-                                    Min Age
+                                    {t(language, 'dating.preferences.minAge')}
                                 </div>
                                 <input
                                     type="range"
@@ -119,7 +127,7 @@ export const DatingPreferencesSheet: React.FC<DatingPreferencesSheetProps> = ({
                             </div>
                             <div>
                                 <div className={isLuxe ? 'mb-2 text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500' : 'mb-2 text-[10px] font-bold uppercase tracking-[0.16em] text-gray-400'}>
-                                    Max Age
+                                    {t(language, 'dating.preferences.maxAge')}
                                 </div>
                                 <input
                                     type="range"
@@ -145,7 +153,7 @@ export const DatingPreferencesSheet: React.FC<DatingPreferencesSheetProps> = ({
                             : 'bg-[linear-gradient(135deg,#f43f5e,#f97316)] text-white'
                     }`}
                 >
-                    Save Filters
+                    {t(language, 'dating.preferences.save')}
                 </button>
             </div>
         </div>

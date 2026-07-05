@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { DatingMatch, DatingPreferences, NewsItem, Player, Relationship, XPost } from '../../types';
+import { DatingMatch, DatingPreferences, GameLanguage, NewsItem, Player, Relationship, XPost } from '../../types';
 import {
     calculateSwipeSuccess,
     getLuxeCandidates,
@@ -11,6 +11,7 @@ import {
 import { getEstimatedNetWorth } from '../../services/loanLogic';
 import { getAbsoluteWeek } from '../../services/legacyLogic';
 import { DatingPreferencesSheet, preferenceLabel } from './DatingPreferencesSheet';
+import { getPlayerLanguage, t } from '../../services/i18n';
 import {
     ArrowLeft,
     Camera,
@@ -44,40 +45,40 @@ const LUXE_INTIMACY_ENERGY_COST = 8;
 const CHAT_OPTIONS = [
     {
         id: 'SMALL_TALK',
-        label: 'Small Talk',
-        lines: [
-            'You have expensive taste. I respect that.',
-            'What does a calm week look like in your world?',
-            'You seem too polished to be boring.',
-            'Tell me something real that never makes it into interviews.',
-            'What kind of places make you actually want to stay longer than five minutes?',
-            'I feel like your profile is leaving out the interesting part on purpose.',
+        labelKey: 'luxe.chat.smallTalk.label',
+        lineKeys: [
+            'luxe.chat.smallTalk.line.0',
+            'luxe.chat.smallTalk.line.1',
+            'luxe.chat.smallTalk.line.2',
+            'luxe.chat.smallTalk.line.3',
+            'luxe.chat.smallTalk.line.4',
+            'luxe.chat.smallTalk.line.5',
         ],
         chemistryGain: 2,
     },
     {
         id: 'DEEP_TALK',
-        label: 'Deep Talk',
-        lines: [
-            'What part of your life still feels real when everything else is a performance?',
-            'When people talk about you, what do they always get wrong?',
-            'What are you still chasing even after all this success?',
-            'What kind of person actually gets past your public armor?',
-            'What do you protect most fiercely these days?',
-            'Has fame made you softer, colder, or just harder to surprise?',
+        labelKey: 'luxe.chat.deepTalk.label',
+        lineKeys: [
+            'luxe.chat.deepTalk.line.0',
+            'luxe.chat.deepTalk.line.1',
+            'luxe.chat.deepTalk.line.2',
+            'luxe.chat.deepTalk.line.3',
+            'luxe.chat.deepTalk.line.4',
+            'luxe.chat.deepTalk.line.5',
         ],
         chemistryGain: 3,
     },
     {
         id: 'CAREER_TALK',
-        label: 'Career Talk',
-        lines: [
-            'Tell me what you are building right now that people still underestimate.',
-            'What move are you making next that nobody sees coming?',
-            'You strike me as someone who plays a very long game.',
-            'What kind of legacy are you actually interested in leaving behind?',
-            'Which room still excites you when you walk into it?',
-            'What project are you waiting for the world to catch up to?',
+        labelKey: 'luxe.chat.careerTalk.label',
+        lineKeys: [
+            'luxe.chat.careerTalk.line.0',
+            'luxe.chat.careerTalk.line.1',
+            'luxe.chat.careerTalk.line.2',
+            'luxe.chat.careerTalk.line.3',
+            'luxe.chat.careerTalk.line.4',
+            'luxe.chat.careerTalk.line.5',
         ],
         chemistryGain: 2,
     },
@@ -86,104 +87,106 @@ const CHAT_OPTIONS = [
 const FLIRT_OPTIONS = [
     {
         id: 'TEASE',
-        label: 'Tease',
-        lines: [
-            'You look like a very bad idea in the best possible way.',
-            'You have the kind of face that starts expensive problems.',
-            'You seem suspiciously aware of your own effect on people.',
-            'You definitely enjoy being trouble.',
-            'You are either a masterpiece or a warning sign.',
-            'This level of charm usually comes with fine print.',
+        labelKey: 'luxe.flirt.tease.label',
+        lineKeys: [
+            'luxe.flirt.tease.line.0',
+            'luxe.flirt.tease.line.1',
+            'luxe.flirt.tease.line.2',
+            'luxe.flirt.tease.line.3',
+            'luxe.flirt.tease.line.4',
+            'luxe.flirt.tease.line.5',
         ],
         chemistryGain: 3,
     },
     {
         id: 'COMPLIMENT',
-        label: 'Compliment',
-        lines: [
-            'You wear status well. Most people cannot pull that off.',
-            'You have a very unfair amount of presence.',
-            'You make confidence look effortless.',
-            'There is something dangerously elegant about your whole energy.',
-            'You have the kind of face people remember in the wrong moments.',
-            'You somehow manage to look both unreachable and inviting.',
+        labelKey: 'luxe.flirt.compliment.label',
+        lineKeys: [
+            'luxe.flirt.compliment.line.0',
+            'luxe.flirt.compliment.line.1',
+            'luxe.flirt.compliment.line.2',
+            'luxe.flirt.compliment.line.3',
+            'luxe.flirt.compliment.line.4',
+            'luxe.flirt.compliment.line.5',
         ],
         chemistryGain: 4,
     },
     {
         id: 'TURN_UP_HEAT',
-        label: 'Turn Up Heat',
-        lines: [
-            'You and I would either become iconic or scandalous.',
-            'I can already tell the gossip blogs would hate us.',
-            'The chemistry here feels more expensive than it should.',
-            'If we meet in person, subtlety probably dies first.',
-            'This is starting to feel like the kind of mistake I would enjoy.',
-            'You seem like the sort of person who ruins self-control on contact.',
+        labelKey: 'luxe.flirt.turnUpHeat.label',
+        lineKeys: [
+            'luxe.flirt.turnUpHeat.line.0',
+            'luxe.flirt.turnUpHeat.line.1',
+            'luxe.flirt.turnUpHeat.line.2',
+            'luxe.flirt.turnUpHeat.line.3',
+            'luxe.flirt.turnUpHeat.line.4',
+            'luxe.flirt.turnUpHeat.line.5',
         ],
         chemistryGain: 5,
     },
 ];
 
-const WARM_RESPONSES = [
-    'That was smoother than I expected.',
-    'You might actually be interesting.',
-    'I like this energy.',
-    'Keep going. I am listening.',
+const LUXE_WARM_RESPONSE_KEYS = [
+    'luxe.response.warm.0',
+    'luxe.response.warm.1',
+    'luxe.response.warm.2',
+    'luxe.response.warm.3',
 ];
 
-const COOL_RESPONSES = [
-    'Bold.',
-    'Maybe.',
-    'Convince me.',
-    'You are trying. I appreciate the effort.',
+const LUXE_COOL_RESPONSE_KEYS = [
+    'luxe.response.cool.0',
+    'luxe.response.cool.1',
+    'luxe.response.cool.2',
+    'luxe.response.cool.3',
 ];
 
 const INVITE_OPTIONS: Array<{
     kind: InviteKind;
-    label: string;
+    labelKey: string;
     icon: React.ReactNode;
-    description: string;
-    bestFor: string;
+    descriptionKey: string;
+    bestForKey: string;
 }> = [
     {
         kind: 'PRIVATE_DINNER',
-        label: 'Private Dinner',
+        labelKey: 'luxe.invite.privateDinner.label',
         icon: <Martini size={15} />,
-        description: 'A discreet chemistry test with no cameras.',
-        bestFor: 'Private romance',
+        descriptionKey: 'luxe.invite.privateDinner.description',
+        bestForKey: 'luxe.invite.privateDinner.bestFor',
     },
     {
         kind: 'ART_GALA',
-        label: 'Art Gala',
+        labelKey: 'luxe.invite.artGala.label',
         icon: <Sparkles size={15} />,
-        description: 'Prestige-heavy and tasteful with soft buzz.',
-        bestFor: 'Prestige matches',
+        descriptionKey: 'luxe.invite.artGala.description',
+        bestForKey: 'luxe.invite.artGala.bestFor',
     },
     {
         kind: 'YACHT_ESCAPE',
-        label: 'Yacht Escape',
+        labelKey: 'luxe.invite.yachtEscape.label',
         icon: <ShipWheel size={15} />,
-        description: 'Ultra-luxury intimacy and status flex.',
-        bestFor: 'Power players',
+        descriptionKey: 'luxe.invite.yachtEscape.description',
+        bestForKey: 'luxe.invite.yachtEscape.bestFor',
     },
     {
         kind: 'RED_CARPET',
-        label: 'Red Carpet',
+        labelKey: 'luxe.invite.redCarpet.label',
         icon: <Camera size={15} />,
-        description: 'Maximum optics, maximum gossip potential.',
-        bestFor: 'Public-facing matches',
+        descriptionKey: 'luxe.invite.redCarpet.description',
+        bestForKey: 'luxe.invite.redCarpet.bestFor',
     },
     {
         kind: 'FASHION_WEEK',
-        label: 'Fashion Week',
+        labelKey: 'luxe.invite.fashionWeek.label',
         icon: <Crown size={15} />,
-        description: 'Style spectacle with premium attention.',
-        bestFor: 'Media magnets',
+        descriptionKey: 'luxe.invite.fashionWeek.description',
+        bestForKey: 'luxe.invite.fashionWeek.bestFor',
     },
 ];
 
 export const LuxeApp: React.FC<LuxeAppProps> = ({ player, onBack, onUpdatePlayer }) => {
+    const language = getPlayerLanguage(player);
+    const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
     const [view, setView] = useState<LuxeView>('GATE');
     const [candidates, setCandidates] = useState<DatingMatch[]>([]);
     const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
@@ -213,6 +216,27 @@ export const LuxeApp: React.FC<LuxeAppProps> = ({ player, onBack, onUpdatePlayer
     const canAskToDate = !!activeChatMatch && activeChatMatch.officialStatus !== 'GHOSTED' && activeChatMatch.officialStatus !== 'DATING' && ((activeChatMatch.dateCount || 0) >= 1 || activeChatMatch.hasGoneOnDate || activeChatMatch.inviteHistory?.some(entry => entry.outcome === 'SUCCESS'));
     const canBeIntimate = !!activeChatMatch && activeChatMatch.officialStatus !== 'GHOSTED' && (((activeChatMatch.dateCount || 0) >= 1) || activeChatMatch.officialStatus === 'SEEING');
     const nextFreeRefreshInWeeks = Math.max(0, cycleStartAbsoluteWeek + LUXE_REFRESH_CYCLE_WEEKS - currentAbsoluteWeek);
+    const getLuxeResponseBank = (tone: 'warm' | 'cool') => (
+        tone === 'warm' ? LUXE_WARM_RESPONSE_KEYS : LUXE_COOL_RESPONSE_KEYS
+    ).map(key => tr(key));
+    const warmResponses = getLuxeResponseBank('warm');
+    const coolResponses = getLuxeResponseBank('cool');
+    const localizedChatOptions = CHAT_OPTIONS.map(option => ({
+        ...option,
+        label: tr(option.labelKey),
+        lines: option.lineKeys.map(key => tr(key)),
+    }));
+    const localizedFlirtOptions = FLIRT_OPTIONS.map(option => ({
+        ...option,
+        label: tr(option.labelKey),
+        lines: option.lineKeys.map(key => tr(key)),
+    }));
+    const localizedInviteOptions = INVITE_OPTIONS.map(option => ({
+        ...option,
+        label: tr(option.labelKey),
+        description: tr(option.descriptionKey),
+        bestFor: tr(option.bestForKey),
+    }));
     useEffect(() => {
         if (!player.dating.isLuxeActive) {
             setView('GATE');
@@ -326,7 +350,7 @@ export const LuxeApp: React.FC<LuxeAppProps> = ({ player, onBack, onUpdatePlayer
         setCandidates(nextCandidates);
         setSelectedCandidateId(nextCandidates[0]?.id || null);
         setShowPreferencesSheet(false);
-        pushFeedback(`Luxe filters updated: ${preferenceLabel(preferences)}.`, 'success');
+        pushFeedback(tr('dating.preferences.luxeSaved', { preferences: preferenceLabel(preferences, language) }), 'success');
     };
 
     const handlePaidRefresh = () => {
@@ -382,8 +406,8 @@ export const LuxeApp: React.FC<LuxeAppProps> = ({ player, onBack, onUpdatePlayer
                       news: [
                           {
                               id: `news_luxe_signal_${Date.now()}`,
-                              headline: `${candidate.name} notices ${player.name} sliding into elite DMs`,
-                              subtext: `Insiders are whispering that ${player.name} tried to make a discreet Luxe connection with ${candidate.name}.`,
+	                              headline: tr('luxe.signal.news.headline', { name: candidate.name, playerName: player.name }),
+	                              subtext: tr('luxe.signal.news.subtext', { name: candidate.name, playerName: player.name }),
                               category: 'YOU',
                               week: player.currentWeek,
                               year: player.age,
@@ -395,7 +419,7 @@ export const LuxeApp: React.FC<LuxeAppProps> = ({ player, onBack, onUpdatePlayer
                           {
                               week: player.currentWeek,
                               year: player.age,
-                              message: `🗞️ Your Luxe signal to ${candidate.name} stirred a little chatter.`,
+	                              message: tr('luxe.signal.log', { name: candidate.name }),
                               type: 'neutral' as const,
                           },
                           ...player.logs,
@@ -459,7 +483,7 @@ export const LuxeApp: React.FC<LuxeAppProps> = ({ player, onBack, onUpdatePlayer
             return;
         }
         const playerText = pick(lines);
-        const responseText = pick((activeChatMatch.compatibility || activeChatMatch.chemistry) >= 74 ? responsePool : COOL_RESPONSES);
+        const responseText = pick((activeChatMatch.compatibility || activeChatMatch.chemistry) >= 74 ? responsePool : coolResponses);
         const historyBase = liveChatHistory?.length ? liveChatHistory : activeChatMatch.chatHistory || [];
         const immediateHistory = [
             ...historyBase,
@@ -525,7 +549,7 @@ export const LuxeApp: React.FC<LuxeAppProps> = ({ player, onBack, onUpdatePlayer
         }
 
         const outcome = getLuxeInviteOutcome(player, activeChatMatch, inviteKind, inviteMode);
-        const option = INVITE_OPTIONS.find(entry => entry.kind === inviteKind)!;
+        const option = localizedInviteOptions.find(entry => entry.kind === inviteKind)!;
         const historyBase = liveChatHistory?.length ? liveChatHistory : activeChatMatch.chatHistory || [];
         const immediateHistory = [
             ...historyBase,
@@ -599,7 +623,7 @@ export const LuxeApp: React.FC<LuxeAppProps> = ({ player, onBack, onUpdatePlayer
             return;
         }
 
-        const updatedPlayer = buildPostInvitePlayer(player, activeChatMatch, finalHistory, option.label, inviteMode, cost, outcome);
+        const updatedPlayer = buildPostInvitePlayer(player, activeChatMatch, finalHistory, option.label, inviteMode, cost, outcome, language);
         onUpdatePlayer({
             ...updatedPlayer,
             energy: {
@@ -954,8 +978,8 @@ export const LuxeApp: React.FC<LuxeAppProps> = ({ player, onBack, onUpdatePlayer
                             className="mt-5 flex w-full items-center justify-between gap-3 rounded-[24px] border border-amber-400/15 bg-amber-500/10 px-4 py-3 text-left font-sans"
                         >
                             <div>
-                                <div className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-200/80">Dating Filters</div>
-                                <div className="mt-1 text-sm font-bold text-white">{preferenceLabel(preferences)}</div>
+	                                <div className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-200/80">{tr('dating.preferences.title')}</div>
+                                <div className="mt-1 text-sm font-bold text-white">{preferenceLabel(preferences, language)}</div>
                             </div>
                             <SlidersHorizontal size={18} className="text-amber-200" />
                         </button>
@@ -989,6 +1013,7 @@ export const LuxeApp: React.FC<LuxeAppProps> = ({ player, onBack, onUpdatePlayer
                             setShowPreferencesSheet(false);
                         }}
                         onSave={saveDatingPreferences}
+                        language={language}
                         tone="luxe"
                     />
                 )}
@@ -1017,7 +1042,7 @@ export const LuxeApp: React.FC<LuxeAppProps> = ({ player, onBack, onUpdatePlayer
                         onClick={() => setShowPreferencesSheet(true)}
                         className="rounded-full border border-amber-400/20 bg-amber-500/10 px-3 py-1.5 font-sans text-[10px] font-black uppercase tracking-[0.14em] text-amber-100"
                     >
-                        {preferenceLabel(preferences)}
+                        {preferenceLabel(preferences, language)}
                     </button>
                 </div>
             </div>
@@ -1130,8 +1155,8 @@ export const LuxeApp: React.FC<LuxeAppProps> = ({ player, onBack, onUpdatePlayer
                             className="mt-4 flex w-full items-center justify-between gap-3 rounded-[22px] border border-white/7 bg-white/[0.03] px-4 py-3 text-left font-sans"
                         >
                             <div>
-                                <div className="text-[10px] font-black uppercase tracking-[0.18em] text-zinc-500">Filters</div>
-                                <div className="mt-1 text-sm font-bold text-zinc-200">{preferenceLabel(preferences)}</div>
+	                                <div className="text-[10px] font-black uppercase tracking-[0.18em] text-zinc-500">{tr('dating.preferences.filtersShort')}</div>
+                                <div className="mt-1 text-sm font-bold text-zinc-200">{preferenceLabel(preferences, language)}</div>
                             </div>
                             <SlidersHorizontal size={17} className="text-amber-200" />
                         </button>
@@ -1485,10 +1510,10 @@ export const LuxeApp: React.FC<LuxeAppProps> = ({ player, onBack, onUpdatePlayer
 
                             {chatActionMode === 'CHAT' && (
                                 <div className="flex gap-2 overflow-x-auto no-scrollbar">
-                                    {CHAT_OPTIONS.map(option => (
+                                    {localizedChatOptions.map(option => (
                                         <button
                                             key={option.id}
-                                            onClick={() => sendChatOption(option.label, option.lines, option.chemistryGain, WARM_RESPONSES)}
+                                            onClick={() => sendChatOption(option.label, option.lines, option.chemistryGain, warmResponses)}
                                             disabled={player.energy.current < LUXE_CHAT_ACTION_ENERGY_COST || isAwaitingReply}
                                             className="shrink-0 min-w-[148px] rounded-[18px] border border-white/8 bg-black/35 px-4 py-3 text-left hover:border-amber-500/30 hover:bg-black/55 disabled:opacity-40 disabled:cursor-not-allowed"
                                         >
@@ -1506,10 +1531,10 @@ export const LuxeApp: React.FC<LuxeAppProps> = ({ player, onBack, onUpdatePlayer
 
                             {chatActionMode === 'FLIRT' && (
                                 <div className="flex gap-2 overflow-x-auto no-scrollbar">
-                                    {FLIRT_OPTIONS.map(option => (
+                                    {localizedFlirtOptions.map(option => (
                                         <button
                                             key={option.id}
-                                            onClick={() => sendChatOption(option.label, option.lines, option.chemistryGain, WARM_RESPONSES)}
+                                            onClick={() => sendChatOption(option.label, option.lines, option.chemistryGain, warmResponses)}
                                             disabled={player.energy.current < LUXE_CHAT_ACTION_ENERGY_COST || isAwaitingReply}
                                             className="shrink-0 min-w-[148px] rounded-[18px] border border-amber-500/15 bg-amber-500/6 px-4 py-3 text-left hover:border-amber-500/35 hover:bg-amber-500/10 disabled:opacity-40 disabled:cursor-not-allowed"
                                         >
@@ -1557,7 +1582,7 @@ export const LuxeApp: React.FC<LuxeAppProps> = ({ player, onBack, onUpdatePlayer
                                     </div>
 
                                     <div className="flex gap-2 overflow-x-auto no-scrollbar">
-                                        {INVITE_OPTIONS.map(option => (
+                                        {localizedInviteOptions.map(option => (
                                             <button
                                                 key={option.kind}
                                                 onClick={() => handleInvite(option.kind)}
@@ -1654,6 +1679,7 @@ export const LuxeApp: React.FC<LuxeAppProps> = ({ player, onBack, onUpdatePlayer
                         setShowPreferencesSheet(false);
                     }}
                     onSave={saveDatingPreferences}
+                    language={language}
                     tone="luxe"
                 />
             )}
@@ -1810,7 +1836,8 @@ const buildPostInvitePlayer = (
     inviteLabel: string,
     inviteMode: InviteMode,
     cost: number,
-    outcome: ReturnType<typeof getLuxeInviteOutcome>
+    outcome: ReturnType<typeof getLuxeInviteOutcome>,
+    language: GameLanguage
 ): Player => {
     const romanticRelations = player.relationships.filter(rel => rel.relation === 'Partner' || rel.relation === 'Spouse');
     const isAffair = romanticRelations.length > 0;
@@ -1824,11 +1851,11 @@ const buildPostInvitePlayer = (
         newsItems.push({
             id: `news_luxe_${Date.now()}`,
             headline: isSameGenderPublic
-                ? `${player.name}'s new public romance sparks intense speculation online`
-                : `${player.name} steps out publicly with ${match.name}`,
+                ? t(language, 'luxe.outcome.news.publicSameGender.headline', { playerName: player.name })
+                : t(language, 'luxe.outcome.news.publicDifferentGender.headline', { playerName: player.name, name: match.name }),
             subtext: isSameGenderPublic
-                ? 'Fans, tabloids, and insiders are all trying to decode the relationship and what it means for the star’s public image.'
-                : 'The pairing is already generating buzz in fan circles and entertainment media.',
+                ? t(language, 'luxe.outcome.news.publicSameGender.subtext')
+                : t(language, 'luxe.outcome.news.publicDifferentGender.subtext'),
             category: 'YOU',
             week: player.currentWeek,
             year: player.age,
@@ -1842,8 +1869,8 @@ const buildPostInvitePlayer = (
             authorHandle: '@fanwire',
             authorAvatar: 'https://api.dicebear.com/8.x/shapes/svg?seed=fanwire',
             content: isSameGenderPublic
-                ? `${player.name} just went public with ${match.name} and the timeline is absolutely spiraling with speculation.`
-                : `${player.name} and ${match.name} were just seen together and the chemistry looked very real.`,
+                ? t(language, 'luxe.outcome.x.publicSameGender', { playerName: player.name, name: match.name })
+                : t(language, 'luxe.outcome.x.publicDifferentGender', { playerName: player.name, name: match.name }),
             timestamp: Date.now(),
             likes: 1200 + Math.floor((match.followers || 0) * 0.0001),
             retweets: 160 + Math.floor((match.followers || 0) * 0.00002),
@@ -1858,8 +1885,8 @@ const buildPostInvitePlayer = (
     if (isAffair) {
         newsItems.push({
             id: `news_affair_${Date.now()}`,
-            headline: `${player.name} faces affair whispers after luxe outing`,
-            subtext: 'Observers are connecting dots between the public appearance and an existing relationship.',
+            headline: t(language, 'luxe.outcome.news.affair.headline', { playerName: player.name }),
+            subtext: t(language, 'luxe.outcome.news.affair.subtext'),
             category: 'YOU',
             week: player.currentWeek,
             year: player.age,

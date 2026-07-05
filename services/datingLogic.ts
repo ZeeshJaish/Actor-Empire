@@ -2,6 +2,7 @@ import { DatingMatch, DatingPreferences, NPCActor, Player } from '../types';
 import { NPC_DATABASE, getGenderedAvatar } from './npcLogic';
 import { getEstimatedNetWorth } from './loanLogic';
 import { getAbsoluteWeek } from './legacyLogic';
+import { getPlayerLanguage, t } from './i18n';
 
 const RANDOM_JOBS = [
     'Actor', 'Assistant Director', 'Barista', 'Chef', 'Choreographer', 'Creative Producer', 'Dancer', 'Designer',
@@ -459,6 +460,7 @@ export const advanceLuxeConnections = (player: Player): Player => {
     const premiumMatches = player.dating.matches.filter(match => match.isPremium);
     if (premiumMatches.length === 0) return player;
 
+    const language = getPlayerLanguage(player);
     const currentAbsoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
     const newsToAdd = [...player.news];
     const xFeedToAdd = [...player.x.feed];
@@ -480,7 +482,7 @@ export const advanceLuxeConnections = (player: Player): Player => {
             logsToAdd.unshift({
                 week: player.currentWeek,
                 year: player.age,
-                message: `❄️ ${updated.name} has gone a little cold. Luxe chemistry is cooling off.`,
+                message: t(language, 'services.dating.luxe.cooldown.log', { name: updated.name }),
                 type: 'neutral',
             });
         }
@@ -490,7 +492,7 @@ export const advanceLuxeConnections = (player: Player): Player => {
             logsToAdd.unshift({
                 week: player.currentWeek,
                 year: player.age,
-                message: `👻 ${updated.name} has gone ghost for now. You may need something bigger to revive this.`,
+                message: t(language, 'services.dating.luxe.ghosted.log', { name: updated.name }),
                 type: 'negative',
             });
         }
@@ -500,7 +502,7 @@ export const advanceLuxeConnections = (player: Player): Player => {
             logsToAdd.unshift({
                 week: player.currentWeek,
                 year: player.age,
-                message: `💬 ${updated.name} dropped back into your orbit this week.`,
+                message: t(language, 'services.dating.luxe.orbit.log', { name: updated.name }),
                 type: 'positive',
             });
         }
@@ -508,8 +510,8 @@ export const advanceLuxeConnections = (player: Player): Player => {
         if ((updated.scandalHeat || 0) > 0 && Math.random() < Math.min(0.35, (updated.scandalHeat || 0) / 100)) {
             newsToAdd.unshift({
                 id: `news_luxe_heat_${updated.id}_${Date.now()}`,
-                headline: `${player.name} and ${updated.name} spark fresh Luxe whispers`,
-                subtext: 'The gossip cycle is picking up on the chemistry, secrecy, and strange timing of this connection.',
+                headline: t(language, 'services.dating.luxe.heat.news.headline', { playerName: player.name, name: updated.name }),
+                subtext: t(language, 'services.dating.luxe.heat.news.subtext'),
                 category: 'YOU',
                 week: player.currentWeek,
                 year: player.age,
@@ -521,7 +523,7 @@ export const advanceLuxeConnections = (player: Player): Player => {
                 authorName: 'FanWire',
                 authorHandle: '@fanwire',
                 authorAvatar: 'https://api.dicebear.com/8.x/shapes/svg?seed=luxeheat',
-                content: `${player.name} and ${updated.name} are back in rumor circulation. Luxe watchers think something is definitely happening.`,
+                content: t(language, 'services.dating.luxe.heat.x.content', { playerName: player.name, name: updated.name }),
                 timestamp: Date.now(),
                 likes: 800 + Math.floor((updated.followers || 0) * 0.00005),
                 retweets: 120 + Math.floor((updated.followers || 0) * 0.00001),

@@ -1,11 +1,11 @@
 
 import React, { useState } from 'react';
 import { Player, Commitment, ActorSkills, Stats, Genre, ImprovementActivity, ImprovementOption, WriterStats, DirectorStats } from '../types';
-import { WORKSHOP_CATALOG, IMPROVEMENT_CATALOG, ImproveCategory, GENRE_TRAINING_CATALOG } from '../services/lifestyleLogic';
+import { WORKSHOP_CATALOG, IMPROVEMENT_CATALOG, ImproveCategory, GENRE_TRAINING_CATALOG, GenreTrainingOption } from '../services/lifestyleLogic';
 import { rewardGenreExperience, calculateGlobalTalent } from '../services/roleLogic';
 import { formatGenreLabel } from '../services/genreCatalog';
 import { getPlayerLanguage, t } from '../services/i18n';
-import { Dumbbell, BookOpen, Brain, Drama, Check, ChevronDown, ChevronUp, Zap, DollarSign, Activity, Smile, Heart, Lock, Sparkles, HeartPulse, X, Clapperboard, Monitor, Skull, Ghost, Sword, Rocket, Map, Shield, Mic, Camera, FlaskConical, Award, Users, Search } from 'lucide-react';
+import { Dumbbell, BookOpen, Brain, Drama, Check, ChevronDown, ChevronUp, Zap, DollarSign, Activity, Smile, Heart, Lock, Sparkles, HeartPulse, X, Clapperboard, Monitor, Skull, Ghost, Sword, Rocket, Map, Shield, Mic, Camera, FlaskConical, Award, Users, Search, Trophy, FileText } from 'lucide-react';
 
 interface ImprovePageProps {
   player: Player;
@@ -26,6 +26,13 @@ export const ImprovePage: React.FC<ImprovePageProps> = ({ player, onEnroll, onCa
       const translated = tr(key);
       return translated === key ? fallback : translated;
   };
+  const getActivityName = (activity: ImprovementActivity) => trFallback(activity.nameKey || `improve.activity.${activity.id}.name`, activity.name);
+  const getActivityDescription = (activity: ImprovementActivity) => trFallback(activity.descriptionKey || `improve.activity.${activity.id}.desc`, activity.description);
+  const getOptionName = (option: ImprovementOption) => trFallback(option.nameKey || `improve.option.${option.id}.name`, option.label);
+  const getOptionDescription = (option: ImprovementOption) => trFallback(option.descriptionKey || `improve.option.${option.id}.desc`, option.description);
+  const getGenreTrainingName = (training: GenreTrainingOption) => trFallback(training.labelKey, training.label);
+  const getGenreTrainingDescription = (training: GenreTrainingOption) => trFallback(training.descriptionKey, training.desc);
+  const getWorkshopName = (course: Commitment) => trFallback(course.nameKey || `improve.workshop.${course.id}`, course.name);
   
   // Wellbeing State
   const [selectedCategory, setSelectedCategory] = useState<ImproveCategory>('BODY');
@@ -71,11 +78,18 @@ export const ImprovePage: React.FC<ImprovePageProps> = ({ player, onEnroll, onCa
           case 'ROMANCE': return <Heart size={18} className="text-pink-500" />;
           case 'THRILLER': return <Activity size={18} className="text-blue-500" />;
           case 'MYSTERY': return <Search size={18} className="text-indigo-400" />;
-          case 'HORROR': return <Ghost size={18} className="text-zinc-400" />;
-          case 'SCI_FI': return <Monitor size={18} className="text-cyan-400" />;
+          case 'HORROR': return <Ghost size={18} className="text-zinc-300" />;
+          case 'SCI_FI': return <Rocket size={18} className="text-cyan-400" />;
           case 'ADVENTURE': return <Map size={18} className="text-emerald-500" />;
           case 'SUPERHERO': return <Shield size={18} className="text-red-500" />;
-          default: return <Clapperboard size={18} />;
+          case 'MUSICAL': return <Mic size={18} className="text-fuchsia-400" />;
+          case 'BIOPIC': return <Users size={18} className="text-amber-300" />;
+          case 'SPORTS': return <Trophy size={18} className="text-lime-400" />;
+          case 'ANIMATION': return <Monitor size={18} className="text-sky-400" />;
+          case 'FANTASY': return <Sparkles size={18} className="text-violet-400" />;
+          case 'CRIME': return <Skull size={18} className="text-rose-400" />;
+          case 'DOCUMENTARY': return <FileText size={18} className="text-stone-300" />;
+          default: return <Clapperboard size={18} className="text-zinc-300" />;
       }
   };
 
@@ -229,8 +243,8 @@ export const ImprovePage: React.FC<ImprovePageProps> = ({ player, onEnroll, onCa
                   {IMPROVEMENT_CATALOG[selectedCategory].map(act => (
                       <div key={act.id} onClick={() => setSelectedActivity(act)} className="glass-card p-4 rounded-2xl flex items-center justify-between cursor-pointer hover:bg-white/5 transition-colors group">
                           <div>
-                              <div className="font-bold text-white group-hover:text-indigo-400 transition-colors">{trFallback(`improve.activity.${act.id}.name`, act.name)}</div>
-                              <div className="text-xs text-zinc-500">{trFallback(`improve.activity.${act.id}.desc`, act.description)}</div>
+                              <div className="font-bold text-white group-hover:text-indigo-400 transition-colors">{getActivityName(act)}</div>
+                              <div className="text-xs text-zinc-500">{getActivityDescription(act)}</div>
                           </div>
                           <div className="bg-zinc-800 p-2 rounded-full text-zinc-400 group-hover:bg-indigo-500 group-hover:text-white transition-all">
                               <ChevronDown size={16} />
@@ -247,8 +261,8 @@ export const ImprovePage: React.FC<ImprovePageProps> = ({ player, onEnroll, onCa
                           {/* Header */}
                           <div className="p-5 border-b border-zinc-800 flex justify-between items-center bg-zinc-800/50 shrink-0">
                               <div>
-                                  <h3 className="font-bold text-xl text-white">{trFallback(`improve.activity.${selectedActivity.id}.name`, selectedActivity.name)}</h3>
-                                  <p className="text-xs text-zinc-400">{trFallback(`improve.activity.${selectedActivity.id}.desc`, selectedActivity.description)}</p>
+                                  <h3 className="font-bold text-xl text-white">{getActivityName(selectedActivity)}</h3>
+                                  <p className="text-xs text-zinc-400">{getActivityDescription(selectedActivity)}</p>
                               </div>
                               <button onClick={() => setSelectedActivity(null)} className="p-2 bg-zinc-800 rounded-full text-zinc-400 hover:text-white"><X size={20}/></button>
                           </div>
@@ -262,13 +276,13 @@ export const ImprovePage: React.FC<ImprovePageProps> = ({ player, onEnroll, onCa
                                   return (
                                       <div key={opt.id} className="bg-zinc-950 p-4 rounded-2xl border border-zinc-800">
                                           <div className="flex justify-between items-start mb-2">
-                                              <div className="font-bold text-white">{trFallback(`improve.option.${opt.id}.name`, opt.label)}</div>
+                                              <div className="font-bold text-white">{getOptionName(opt)}</div>
                                               <div className="flex gap-2 text-xs font-mono">
                                                   <span className={canAffordMoney ? "text-emerald-400" : "text-rose-500"}>${opt.moneyCost}</span>
                                                   <span className={canAffordEnergy ? "text-amber-400" : "text-rose-500"}>{opt.energyCost}E</span>
                                               </div>
                                           </div>
-                                          <p className="text-xs text-zinc-500 mb-3 italic">{trFallback(`improve.option.${opt.id}.desc`, opt.description)}</p>
+                                          <p className="text-xs text-zinc-500 mb-3 italic">{getOptionDescription(opt)}</p>
                                           
                                           {/* Stats Badge */}
                                           <div className="flex gap-2 mb-4">
@@ -290,10 +304,10 @@ export const ImprovePage: React.FC<ImprovePageProps> = ({ player, onEnroll, onCa
                                           <button 
                                               onClick={() => {
                                                   if(onPerformAction) {
-                                                      onPerformAction(selectedCategory, trFallback(`improve.activity.${selectedActivity.id}.name`, selectedActivity.name), {
+                                                      onPerformAction(selectedCategory, getActivityName(selectedActivity), {
                                                           ...opt,
-                                                          label: trFallback(`improve.option.${opt.id}.name`, opt.label),
-                                                          description: trFallback(`improve.option.${opt.id}.desc`, opt.description)
+                                                          label: getOptionName(opt),
+                                                          description: getOptionDescription(opt)
                                                       });
                                                       setSelectedActivity(null);
                                                   }
@@ -354,7 +368,7 @@ export const ImprovePage: React.FC<ImprovePageProps> = ({ player, onEnroll, onCa
                       if (workshopFilter === 'DIRECTING') return !!course.directorGains;
                       return true;
                   }).map(course => {
-                      const enrolledCourse = player.commitments.find(c => c.name === course.name && c.type === 'COURSE'); 
+                      const enrolledCourse = player.commitments.find(c => c.type === 'COURSE' && (c.nameKey === course.nameKey || c.name === course.name)); 
                       const isEnrolled = !!enrolledCourse;
                       const canAfford = player.money >= (course.upfrontCost || 0);
                       const hasEnergySpace = remainingEnergyCapacity >= course.energyCost;
@@ -382,7 +396,7 @@ export const ImprovePage: React.FC<ImprovePageProps> = ({ player, onEnroll, onCa
                                       </div>
                                       <div className="flex-1">
                                           <div className="flex justify-between items-start">
-                                              <h3 className="font-bold text-white text-lg leading-tight">{trFallback(`improve.workshop.${course.id}`, course.name)}</h3>
+                                              <h3 className="font-bold text-white text-lg leading-tight">{getWorkshopName(course)}</h3>
                                               {isEnrolled && (
                                                   <div className="bg-indigo-500/20 text-indigo-400 text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider">
                                                       {tr('improve.active')}
@@ -507,6 +521,13 @@ export const ImprovePage: React.FC<ImprovePageProps> = ({ player, onEnroll, onCa
                               {/* Label */}
                               <div className={`text-[10px] font-bold uppercase tracking-wide mb-2 ${isMastered ? 'text-amber-400' : 'text-zinc-300'}`}>
                                   {formatGenreLabel(training.genre)}
+                              </div>
+
+                              <div className="mb-1 min-h-[30px] text-center text-[10px] font-black leading-tight text-white">
+                                  {getGenreTrainingName(training)}
+                              </div>
+                              <div className="mb-2 min-h-[28px] text-center text-[8px] font-bold leading-tight text-zinc-500 line-clamp-2">
+                                  {getGenreTrainingDescription(training)}
                               </div>
 
                               {/* Progress Bar */}

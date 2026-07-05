@@ -804,6 +804,7 @@ try {
     platform: 'node',
     format: 'esm',
     target: 'node20',
+    loader: { '.csv': 'text' },
     logLevel: 'silent',
     external: ['@google/genai'],
   });

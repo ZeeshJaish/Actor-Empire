@@ -1,5 +1,6 @@
-import type { Message, Player } from '../types';
+import type { GameLanguage, Message, Player } from '../types';
 import type { ForbesStudioProfile, StudioAcquisitionState } from './forbesStudioProfile';
+import { getPlayerLanguage, t } from './i18n';
 
 export type ForbesOwnershipAction =
     | 'MONITOR_STUDIO'
@@ -35,33 +36,6 @@ export interface ApplyForbesOwnershipDiscoveryResult {
     reason?: 'PLAYER_OWNED' | 'ALREADY_RECORDED' | 'NO_COMMAND';
 }
 
-const COMMANDS: Record<ForbesOwnershipAction, ForbesOwnershipCommand> = {
-    MONITOR_STUDIO: {
-        action: 'MONITOR_STUDIO',
-        label: 'Monitor Studio',
-        completedLabel: 'Studio Monitored',
-        description: 'Track ownership pressure and receive future company alerts.',
-    },
-    EXPRESS_INTEREST: {
-        action: 'EXPRESS_INTEREST',
-        label: 'Express Interest',
-        completedLabel: 'Interest Registered',
-        description: 'Quietly tell the ownership group that your studio wants a conversation.',
-    },
-    VIEW_INVESTMENT: {
-        action: 'VIEW_INVESTMENT',
-        label: 'View Investment Opportunity',
-        completedLabel: 'Opportunity Requested',
-        description: 'Request the company’s investment brief through Forbes Business Desk.',
-    },
-    PREPARE_ACQUISITION: {
-        action: 'PREPARE_ACQUISITION',
-        label: 'Prepare Acquisition',
-        completedLabel: 'Acquisition Prepared',
-        description: 'Open an internal acquisition watch before the company reaches market.',
-    },
-};
-
 const STATE_ACTIONS: Record<StudioAcquisitionState, ForbesOwnershipAction> = {
     NOT_FOR_SALE: 'MONITOR_STUDIO',
     PUBLICLY_TRADED: 'MONITOR_STUDIO',
@@ -71,12 +45,21 @@ const STATE_ACTIONS: Record<StudioAcquisitionState, ForbesOwnershipAction> = {
     AUCTION_EXPECTED: 'PREPARE_ACQUISITION',
 };
 
+const buildForbesOwnershipCommand = (action: ForbesOwnershipAction, language: GameLanguage): ForbesOwnershipCommand => ({
+    action,
+    label: t(language, `services.forbesOwnership.command.${action}.label`),
+    completedLabel: t(language, `services.forbesOwnership.command.${action}.completedLabel`),
+    description: t(language, `services.forbesOwnership.command.${action}.description`),
+});
+
 export const getForbesOwnershipCommand = (
     acquisitionState: StudioAcquisitionState,
     isPlayerOwned: boolean,
+    language: GameLanguage = 'en',
 ): ForbesOwnershipCommand | null => {
     if (isPlayerOwned) return null;
-    return COMMANDS[STATE_ACTIONS[acquisitionState]] || null;
+    const action = STATE_ACTIONS[acquisitionState];
+    return action ? buildForbesOwnershipCommand(action, language) : null;
 };
 
 export const getForbesOwnershipDiscoveries = (player: Player): ForbesOwnershipDiscoveryRecord[] => (
@@ -88,28 +71,11 @@ export const getForbesOwnershipDiscoveries = (player: Player): ForbesOwnershipDi
 const getMessageCopy = (
     profile: ApplyForbesOwnershipDiscoveryInput['profile'],
     command: ForbesOwnershipCommand,
+    language: GameLanguage,
 ) => {
-    if (command.action === 'MONITOR_STUDIO') {
-        return {
-            subject: `${profile.name} added to company watch`,
-            text: `Forbes Business Desk is now monitoring ${profile.name}. Material ownership changes, distress signals or a sale process will be routed here.`,
-        };
-    }
-    if (command.action === 'EXPRESS_INTEREST') {
-        return {
-            subject: `Interest registered with ${profile.name}`,
-            text: `Your confidential interest in ${profile.name} has been recorded. The ownership group now knows your studio is open to a future conversation.`,
-        };
-    }
-    if (command.action === 'VIEW_INVESTMENT') {
-        return {
-            subject: `${profile.name} investment brief requested`,
-            text: `Forbes Business Desk recorded your request for ${profile.name}'s investment opportunity. Detailed capital terms will be handled in the ownership negotiation phase.`,
-        };
-    }
     return {
-        subject: `Acquisition watch opened: ${profile.name}`,
-        text: `Your team has started preliminary acquisition monitoring for ${profile.name}. This preserves the opportunity without committing capital before a formal process exists.`,
+        subject: t(language, `services.forbesOwnership.message.${command.action}.subject`, { studio: profile.name }),
+        text: t(language, `services.forbesOwnership.message.${command.action}.text`, { studio: profile.name }),
     };
 };
 
@@ -117,7 +83,8 @@ export const applyForbesOwnershipDiscovery = ({
     player,
     profile,
 }: ApplyForbesOwnershipDiscoveryInput): ApplyForbesOwnershipDiscoveryResult => {
-    const command = getForbesOwnershipCommand(profile.acquisitionState, Boolean(profile.isPlayerOwned));
+    const language = getPlayerLanguage(player);
+    const command = getForbesOwnershipCommand(profile.acquisitionState, Boolean(profile.isPlayerOwned), language);
     if (profile.isPlayerOwned) return { success: false, player, command: null, reason: 'PLAYER_OWNED' };
     if (!command) return { success: false, player, command: null, reason: 'NO_COMMAND' };
 
@@ -134,10 +101,10 @@ export const applyForbesOwnershipDiscovery = ({
         recordedWeek: player.currentWeek,
         recordedYear: player.age,
     };
-    const copy = getMessageCopy(profile, command);
+    const copy = getMessageCopy(profile, command, language);
     const message: Message = {
         id: `forbes_ownership_${profile.id}_${player.age}_${player.currentWeek}`,
-        sender: 'Forbes Business Desk',
+        sender: t(language, 'services.forbesOwnership.sender'),
         subject: copy.subject,
         text: copy.text,
         type: 'SYSTEM',
@@ -166,7 +133,10 @@ export const applyForbesOwnershipDiscovery = ({
             logs: [{
                 week: player.currentWeek,
                 year: player.age,
-                message: `Forbes ownership command: ${command.label} — ${profile.name}.`,
+                message: t(language, 'services.forbesOwnership.commandLog', {
+                    command: t(language, `services.forbesOwnership.command.${command.action}.label`),
+                    studio: profile.name,
+                }),
                 type: 'neutral' as const,
             }, ...(player.logs || [])].slice(0, 50),
         },

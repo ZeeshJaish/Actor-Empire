@@ -1,13 +1,16 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Film, Tv, Users, DollarSign, Star, TrendingUp, Calendar, Check, Activity, Layers, Zap, Info, ChevronRight, Play, Settings, Camera, Award, BarChart3, Globe, BookOpen, Edit3, Sparkles } from 'lucide-react';
-import { Player, Studio, CustomPoster, PlatformId } from '../../../../types';
+import { Player, Studio, CustomPoster, PlatformId, SeasonEpisodeRatings } from '../../../../types';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
 import { getAbsoluteWeek } from '../../../../services/legacyLogic';
 import { canRenameProjectTitle } from '../../../../services/projectNaming';
 import { WorkingTitleDialog } from './WorkingTitleDialog';
 import { getContinuationEligibility } from '../../../../services/sequelFlow';
 import { getProjectReleaseLabel, getProjectReleaseTiming } from '../../../../services/releaseTiming';
+import { getPlayerLanguage, t } from '../../../../services/i18n';
+import { createCustomPosterBlobFromFile, saveCustomPosterMedia } from '../../../../services/customPosterMedia';
+import { CustomPosterImage } from '../../../../components/CustomPosterImage';
 
 const formatMoney = (val: number) => {
     if (val >= 1_000_000_000_000) return `$${(val/1_000_000_000_000).toFixed(2)}T`;
@@ -17,17 +20,17 @@ const formatMoney = (val: number) => {
 };
 
 const PHASES = [
-    { id: 'CONCEPT', label: 'Concept', icon: <Zap size={14} /> },
-    { id: 'DEVELOPMENT', label: 'Development', icon: <BookOpen size={14} /> },
-    { id: 'PLANNING', label: 'Planning', icon: <Layers size={14} /> },
-    { id: 'PRE-PRODUCTION', label: 'Pre-Prod', icon: <Settings size={14} /> },
-    { id: 'PRODUCTION', label: 'Production', icon: <Camera size={14} /> },
-    { id: 'POST-PRODUCTION', label: 'Post-Prod', icon: <Activity size={14} /> },
-    { id: 'AWAITING RELEASE', label: 'Release', icon: <Play size={14} /> },
-    { id: 'PLANNED RELEASE', label: 'Planned', icon: <Calendar size={14} /> },
-    { id: 'RELEASED', label: 'Archived', icon: <Award size={14} /> },
-    { id: 'IN THEATERS', label: 'Theaters', icon: <Globe size={14} /> },
-    { id: 'STREAMING', label: 'Streaming', icon: <Tv size={14} /> }
+    { id: 'CONCEPT', icon: <Zap size={14} /> },
+    { id: 'DEVELOPMENT', icon: <BookOpen size={14} /> },
+    { id: 'PLANNING', icon: <Layers size={14} /> },
+    { id: 'PRE-PRODUCTION', icon: <Settings size={14} /> },
+    { id: 'PRODUCTION', icon: <Camera size={14} /> },
+    { id: 'POST-PRODUCTION', icon: <Activity size={14} /> },
+    { id: 'AWAITING RELEASE', icon: <Play size={14} /> },
+    { id: 'PLANNED RELEASE', icon: <Calendar size={14} /> },
+    { id: 'RELEASED', icon: <Award size={14} /> },
+    { id: 'IN THEATERS', icon: <Globe size={14} /> },
+    { id: 'STREAMING', icon: <Tv size={14} /> }
 ];
 
 const PLATFORMS = [
@@ -37,6 +40,140 @@ const PLATFORMS = [
     { id: 'HULU', name: 'Hulu', baseBid: 8000000, qualityReq: 60, color: '#1CE783', maxBudget: 80000000 },
     { id: 'YOUTUBE', name: 'YouTube Premium', baseBid: 3000000, qualityReq: 40, color: '#FF0000', maxBudget: 30000000 }
 ];
+
+const getSeriesScorecardTone = (rating: number) => {
+    if (rating >= 9.2) return 'bg-emerald-400 text-emerald-950';
+    if (rating >= 8.2) return 'bg-green-500 text-green-950';
+    if (rating >= 7.0) return 'bg-lime-400 text-lime-950';
+    if (rating >= 5.8) return 'bg-amber-400 text-amber-950';
+    if (rating >= 4.5) return 'bg-rose-500 text-white';
+    return 'bg-fuchsia-700 text-white';
+};
+
+const normalizeScorecardSeriesTitle = (value: string = '') => value
+    .replace(/\s*[:\-]?\s*season\s+\d+\b/ig, '')
+    .replace(/\s+s\d+\b/ig, '')
+    .trim()
+    .toLowerCase();
+
+const getScorecardSeriesKey = (project: any) => {
+    const details = project?.projectDetails || project || {};
+    return details.franchiseId
+        || details.sourceScriptId
+        || project?.franchiseId
+        || project?.sourceScriptId
+        || normalizeScorecardSeriesTitle(project?.name || project?.title || details.title || '');
+};
+
+const SeriesScorecardPanel: React.FC<{
+    ratings: SeasonEpisodeRatings[];
+    tr: (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => string;
+}> = ({ ratings, tr }) => {
+    const sortedRatings = [...ratings].sort((a, b) => a.season - b.season);
+    const maxEpisodes = Math.max(...sortedRatings.map(season => season.episodes.length), 0);
+    const allEpisodes = sortedRatings.flatMap(season =>
+        season.episodes.map(episode => ({ ...episode, season: season.season }))
+    );
+
+    if (!sortedRatings.length || maxEpisodes === 0 || !allEpisodes.length) return null;
+
+    const averageRating = allEpisodes.reduce((sum, episode) => sum + episode.rating, 0) / allEpisodes.length;
+    const bestEpisode = allEpisodes.reduce((best, episode) => episode.rating > best.rating ? episode : best, allEpisodes[0]);
+    const weakestEpisode = allEpisodes.reduce((weakest, episode) => episode.rating < weakest.rating ? episode : weakest, allEpisodes[0]);
+    const scorecardSeasonColumnWidth = '44px';
+    const scorecardGridMinWidth = `calc(28px + (${sortedRatings.length} * ${scorecardSeasonColumnWidth}) + (${sortedRatings.length} * 0.25rem))`;
+    const renewalSignalKey = averageRating >= 8.4
+        ? 'services.business.productionDashboard.scorecard.signal.strong'
+        : averageRating >= 7.2
+            ? 'services.business.productionDashboard.scorecard.signal.viable'
+            : averageRating >= 6
+                ? 'services.business.productionDashboard.scorecard.signal.risky'
+                : 'services.business.productionDashboard.scorecard.signal.weak';
+    const renewalTone = averageRating >= 8.4 ? 'text-emerald-300' : averageRating >= 7.2 ? 'text-lime-300' : averageRating >= 6 ? 'text-amber-300' : 'text-rose-300';
+
+    return (
+        <div className="md:col-span-2 rounded-[28px] border border-emerald-500/10 bg-emerald-500/[0.035] p-5 sm:p-6">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                    <div className="flex items-center gap-3">
+                        <div className="w-8 h-[1px] bg-emerald-400"></div>
+                        <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-emerald-300">{tr('services.business.productionDashboard.scorecard.title')}</h3>
+                    </div>
+                    <p className="mt-2 max-w-xl text-xs font-medium leading-relaxed text-zinc-400">
+                        {tr('services.business.productionDashboard.scorecard.description')}
+                    </p>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 text-center">
+                    <div className="rounded-2xl border border-white/5 bg-black/20 px-3 py-2">
+                        <div className="text-[7px] font-black uppercase tracking-widest text-zinc-500">{tr('services.business.productionDashboard.scorecard.renewalSignal')}</div>
+                        <div className={`mt-1 text-sm font-black ${renewalTone}`}>{tr(renewalSignalKey)}</div>
+                    </div>
+                    <div className="rounded-2xl border border-white/5 bg-black/20 px-3 py-2">
+                        <div className="text-[7px] font-black uppercase tracking-widest text-zinc-500">{tr('services.business.productionDashboard.scorecard.bestEpisode')}</div>
+                        <div className="mt-1 text-sm font-black text-white">
+                            {tr('services.business.productionDashboard.scorecard.episodeRef', { season: bestEpisode.season, episode: bestEpisode.episode })}
+                        </div>
+                    </div>
+                    <div className="rounded-2xl border border-white/5 bg-black/20 px-3 py-2">
+                        <div className="text-[7px] font-black uppercase tracking-widest text-zinc-500">{tr('services.business.productionDashboard.scorecard.weakestEpisode')}</div>
+                        <div className="mt-1 text-sm font-black text-white">
+                            {tr('services.business.productionDashboard.scorecard.episodeRef', { season: weakestEpisode.season, episode: weakestEpisode.episode })}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div className="scorecard-season-scroll mt-4 overflow-x-auto no-scrollbar pb-1">
+                <div
+                    className="grid gap-1 min-w-max"
+                    style={{
+                        gridTemplateColumns: `28px repeat(${sortedRatings.length}, minmax(38px, ${scorecardSeasonColumnWidth}))`,
+                        minWidth: scorecardGridMinWidth,
+                    }}
+                >
+                    <div />
+                    {sortedRatings.map(season => (
+                        <div key={`scorecard_head_${season.season}`} className="text-center">
+                            <div className="text-[8px] font-black uppercase tracking-widest text-zinc-300">
+                                {tr('services.business.productionDashboard.scorecard.seasonShort', { season: season.season })}
+                            </div>
+                            <div className="mt-0.5 text-[8px] font-mono font-black text-emerald-300">{season.averageRating.toFixed(1)}</div>
+                        </div>
+                    ))}
+
+                    {Array.from({ length: maxEpisodes }, (_, index) => {
+                        const episodeNumber = index + 1;
+                        return (
+                            <React.Fragment key={`scorecard_episode_${episodeNumber}`}>
+                                <div className="h-6 flex items-center justify-end pr-1 text-[8px] font-black text-zinc-500">
+                                    {tr('services.business.productionDashboard.scorecard.episodeShort', { episode: episodeNumber })}
+                                </div>
+                                {sortedRatings.map(season => {
+                                    const episode = season.episodes.find(item => item.episode === episodeNumber);
+                                    return episode ? (
+                                        <div
+                                            key={`scorecard_s${season.season}_e${episodeNumber}`}
+                                            className={`h-6 rounded flex items-center justify-center text-[10px] font-black ${getSeriesScorecardTone(episode.rating)}`}
+                                        >
+                                            {episode.rating.toFixed(1)}
+                                        </div>
+                                    ) : (
+                                        <div key={`scorecard_s${season.season}_e${episodeNumber}_empty`} className="h-6 rounded border border-zinc-800 bg-zinc-900/50" />
+                                    );
+                                })}
+                            </React.Fragment>
+                        );
+                    })}
+                </div>
+            </div>
+
+            <div className="mt-3 text-[9px] font-black uppercase tracking-[0.18em] text-zinc-500">
+                {tr('services.business.productionDashboard.scorecard.average', { rating: averageRating.toFixed(1) })}
+            </div>
+        </div>
+    );
+};
 
 interface ProjectDashboardModalProps {
     project: any;
@@ -54,16 +191,33 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
     const [view, setView] = useState<'DETAILS'>('DETAILS');
     const [isRenamingTitle, setIsRenamingTitle] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const displayTitle = project.name || project.title || project.projectDetails?.title || 'Untitled Project';
+    const language = getPlayerLanguage(player);
+    const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
+    const displayTitle = project.name || project.title || project.projectDetails?.title || tr('projectDashboard.untitledProject');
     const canRenameTitle = !!onRenameProject && canRenameProjectTitle(project.phase);
     const isReleaseHistoryPhase = ['RELEASED', 'STREAMING', 'IN THEATERS', 'BIDDING'].includes(project.phase) || Boolean(project.gross || project.totalGross || project.streamingRevenue);
     const releaseFallback = isReleaseHistoryPhase ? { currentAge: player.age, currentWeek: player.currentWeek } : {};
     const releaseTiming = getProjectReleaseTiming(project, releaseFallback);
-    const releaseSummaryLabel = getProjectReleaseLabel(project, releaseFallback, { emptyLabel: 'TBA' });
+    const releaseSummaryLabel = getProjectReleaseLabel(project, releaseFallback, { emptyLabel: tr('projectDashboard.tba') });
     const runWeek = Number(project.weekNum || project.projectDetails?.weekNum || 0);
-    const currentPhaseLabel = PHASES.find(p => p.id === project.phase)?.label || String(project.phase || 'Planning').replace(/[_-]/g, ' ');
-    const timelineValue = runWeek > 0 ? `Run W${runWeek}` : releaseTiming.releaseWeek ? `Week ${releaseTiming.releaseWeek}` : currentPhaseLabel;
-    const timelineCaption = runWeek > 0 ? currentPhaseLabel : releaseTiming.releaseWeek ? releaseSummaryLabel : 'Current stage';
+    const phaseKey = PHASES.find(p => p.id === project.phase)?.id;
+    const currentPhaseLabel = phaseKey ? tr(`projectDashboard.phase.${phaseKey}`) : String(project.phase || tr('projectDashboard.phase.PLANNING')).replace(/[_-]/g, ' ');
+    const timelineValue = runWeek > 0 ? tr('projectDashboard.timeline.runWeek', { week: runWeek }) : releaseTiming.releaseWeek ? tr('projectDashboard.timeline.week', { week: releaseTiming.releaseWeek }) : currentPhaseLabel;
+    const timelineCaption = runWeek > 0 ? currentPhaseLabel : releaseTiming.releaseWeek ? releaseSummaryLabel : tr('projectDashboard.timeline.currentStage');
+    const isSeriesProject = project.type === 'SERIES' || project.projectDetails?.type === 'SERIES' || project.projectType === 'SERIES' || project.projectDetails?.mediaType === 'SERIES';
+    const selectedScorecardKey = getScorecardSeriesKey(project);
+    const scorecardRatingMap = new Map<number, SeasonEpisodeRatings>();
+    if (isSeriesProject) {
+        [project, ...player.pastProjects, ...player.activeReleases]
+            .filter(item => item && getScorecardSeriesKey(item) === selectedScorecardKey)
+            .flatMap(item => item.projectDetails?.episodeRatings || item.episodeRatings || [])
+            .forEach(rating => {
+                if (!scorecardRatingMap.has(rating.season)) {
+                    scorecardRatingMap.set(rating.season, rating);
+                }
+            });
+    }
+    const scorecardRatings = [...scorecardRatingMap.values()].sort((a, b) => a.season - b.season);
 
     const sequelEligibility = React.useMemo(() => getContinuationEligibility({
         player,
@@ -78,18 +232,29 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
         mode: 'SPINOFF',
     }), [player, project, studio.studioState?.scripts]);
 
-    const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const [isPosterUploading, setIsPosterUploading] = useState(false);
+    const [posterUploadError, setPosterUploadError] = useState('');
+
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                const base64String = reader.result as string;
+            setIsPosterUploading(true);
+            setPosterUploadError('');
+            try {
+                const posterBlob = await createCustomPosterBlobFromFile(file);
+                const media = await saveCustomPosterMedia(project.id || project.name || 'project', posterBlob.blob, {
+                    width: posterBlob.width,
+                    height: posterBlob.height,
+                });
                 savePoster({
                     type: 'IMAGE',
-                    imageData: base64String
+                    posterMediaId: media.id,
                 });
-            };
-            reader.readAsDataURL(file);
+            } catch (error) {
+                setPosterUploadError(error instanceof Error ? error.message : tr('projectDashboard.poster.saveError'));
+            } finally {
+                setIsPosterUploading(false);
+            }
         }
         e.target.value = '';
     };
@@ -157,13 +322,13 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
         .slice(0, 2)
         .join(', ') || '';
     const investorOwnerExtraCount = Math.max(0, (investorPlan?.commitments?.filter(item => item.ownerName).length || 0) - 2);
-    const investorScopeLabel = project.projectDetails?.mediaType === 'SERIES' ? 'Season only' : 'Project only';
+    const investorScopeLabel = project.projectDetails?.mediaType === 'SERIES' ? tr('projectDashboard.revenue.seasonOnly') : tr('projectDashboard.revenue.projectOnly');
 
     const getDynamicBuzz = () => {
         if (relatedNews.length > 0) return relatedNews;
 
-        const title = project.name || project.title || "Untitled Project";
-        const genre = (project.genre || 'Drama').toLowerCase();
+        const title = project.name || project.title || tr('projectDashboard.untitledProject');
+        const genre = (project.genre || tr('projectDashboard.genre.drama')).toLowerCase();
         const phase = project.phase;
         const quality = project.projectDetails?.hiddenStats?.qualityScore || 50;
         const hype = project.promotionalBuzz || 50;
@@ -173,162 +338,162 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
 
         if (phase === 'CONCEPT' || phase === 'DEVELOPMENT' || phase === 'PLANNING') {
             buzzItems.push({
-                week: 'Current',
-                headline: `Rumors: ${title} in early development`,
-                subtext: `Industry insiders are buzzing about a new ${genre} project titled "${title}".`,
+                week: tr('projectDashboard.news.week.current'),
+                headline: tr('projectDashboard.news.earlyDevelopment.headline', { title }),
+                subtext: tr('projectDashboard.news.earlyDevelopment.subtext', { title, genre }),
                 impactLevel: 'LOW'
             });
             if (hype > 40) {
                 buzzItems.push({
-                    week: 'Current',
-                    headline: `High interest in ${title}`,
-                    subtext: `Fans are already speculating about the cast for this upcoming ${genre} film.`,
+                    week: tr('projectDashboard.news.week.current'),
+                    headline: tr('projectDashboard.news.highInterest.headline', { title }),
+                    subtext: tr('projectDashboard.news.highInterest.subtext', { genre }),
                     impactLevel: 'MEDIUM'
                 });
             }
         } else if (phase === 'PRE-PRODUCTION') {
             buzzItems.push({
-                week: 'Current',
-                headline: `${title} enters pre-production`,
-                subtext: `The production team is finalizing locations and sets for the highly anticipated ${genre} epic.`,
+                week: tr('projectDashboard.news.week.current'),
+                headline: tr('projectDashboard.news.preProduction.headline', { title }),
+                subtext: tr('projectDashboard.news.preProduction.subtext', { genre }),
                 impactLevel: 'MEDIUM'
             });
             buzzItems.push({
-                week: 'Current',
-                headline: `Casting rumors for ${title}`,
-                subtext: `Several A-list stars are reportedly being considered for key roles in "${title}".`,
+                week: tr('projectDashboard.news.week.current'),
+                headline: tr('projectDashboard.news.castingRumors.headline', { title }),
+                subtext: tr('projectDashboard.news.castingRumors.subtext', { title }),
                 impactLevel: 'LOW'
             });
             if (hype > 60) {
                 buzzItems.push({
-                    week: 'Current',
-                    headline: `Social media hype for ${title}`,
-                    subtext: `Fans are creating fan art and theories for "${title}" even before filming starts.`,
+                    week: tr('projectDashboard.news.week.current'),
+                    headline: tr('projectDashboard.news.socialHype.headline', { title }),
+                    subtext: tr('projectDashboard.news.socialHype.subtext', { title }),
                     impactLevel: 'HIGH'
                 });
             }
         } else if (phase === 'PRODUCTION') {
             buzzItems.push({
-                week: 'Current',
-                headline: `First look at ${title} set`,
-                subtext: `Leaked photos from the set of "${title}" show impressive production value and scale.`,
+                week: tr('projectDashboard.news.week.current'),
+                headline: tr('projectDashboard.news.firstLook.headline', { title }),
+                subtext: tr('projectDashboard.news.firstLook.subtext', { title }),
                 impactLevel: 'MEDIUM'
             });
             if (quality > 70) {
                 buzzItems.push({
-                    week: 'Current',
-                    headline: `Production on ${title} going smoothly`,
-                    subtext: `Sources say the chemistry between the cast is "electric" on the set of "${title}".`,
+                    week: tr('projectDashboard.news.week.current'),
+                    headline: tr('projectDashboard.news.productionSmooth.headline', { title }),
+                    subtext: tr('projectDashboard.news.productionSmooth.subtext', { title }),
                     impactLevel: 'HIGH'
                 });
             }
             buzzItems.push({
-                week: 'Current',
-                headline: `Director shares update on ${title}`,
-                subtext: `The director took to social media to praise the hard work of the crew on "${title}".`,
+                week: tr('projectDashboard.news.week.current'),
+                headline: tr('projectDashboard.news.directorUpdate.headline', { title }),
+                subtext: tr('projectDashboard.news.directorUpdate.subtext', { title }),
                 impactLevel: 'LOW'
             });
         } else if (phase === 'POST-PRODUCTION') {
             buzzItems.push({
-                week: 'Current',
-                headline: `${title} enters post-production`,
-                subtext: `The editing and VFX teams are now working to bring the vision of "${title}" to life.`,
+                week: tr('projectDashboard.news.week.current'),
+                headline: tr('projectDashboard.news.postProduction.headline', { title }),
+                subtext: tr('projectDashboard.news.postProduction.subtext', { title }),
                 impactLevel: 'MEDIUM'
             });
             buzzItems.push({
-                week: 'Current',
-                headline: `Early test screenings for ${title}`,
-                subtext: `Initial reactions to early cuts of "${title}" are reportedly very positive.`,
+                week: tr('projectDashboard.news.week.current'),
+                headline: tr('projectDashboard.news.testScreenings.headline', { title }),
+                subtext: tr('projectDashboard.news.testScreenings.subtext', { title }),
                 impactLevel: 'HIGH'
             });
             if (quality > 80) {
                 buzzItems.push({
-                    week: 'Current',
-                    headline: `Oscar buzz for ${title}?`,
-                    subtext: `Early whispers suggest "${title}" could be a strong contender in the upcoming awards season.`,
+                    week: tr('projectDashboard.news.week.current'),
+                    headline: tr('projectDashboard.news.awardsBuzz.headline', { title }),
+                    subtext: tr('projectDashboard.news.awardsBuzz.subtext', { title }),
                     impactLevel: 'HIGH'
                 });
             }
         } else if (phase === 'AWAITING RELEASE' || phase === 'PLANNED RELEASE') {
             buzzItems.push({
-                week: 'Current',
-                headline: `Marketing blitz for ${title} begins`,
-                subtext: `Trailers and posters for "${title}" are appearing everywhere as the release date approaches.`,
+                week: tr('projectDashboard.news.week.current'),
+                headline: tr('projectDashboard.news.marketingBlitz.headline', { title }),
+                subtext: tr('projectDashboard.news.marketingBlitz.subtext', { title }),
                 impactLevel: 'HIGH'
             });
             buzzItems.push({
-                week: 'Current',
-                headline: `Fans count down to ${title}`,
-                subtext: `Social media is flooded with excitement for the upcoming release of this ${genre} film.`,
+                week: tr('projectDashboard.news.week.current'),
+                headline: tr('projectDashboard.news.countdown.headline', { title }),
+                subtext: tr('projectDashboard.news.countdown.subtext', { genre }),
                 impactLevel: 'MEDIUM'
             });
             buzzItems.push({
-                week: 'Current',
-                headline: `World Premiere announced for ${title}`,
-                subtext: `The red carpet event for "${title}" is set to be one of the biggest of the year.`,
+                week: tr('projectDashboard.news.week.current'),
+                headline: tr('projectDashboard.news.worldPremiere.headline', { title }),
+                subtext: tr('projectDashboard.news.worldPremiere.subtext', { title }),
                 impactLevel: 'HIGH'
             });
         } else if (phase === 'IN THEATERS' || phase === 'STREAMING' || phase === 'RELEASED') {
             if (quality > 80) {
                 buzzItems.push({
-                    week: 'Release',
-                    headline: `Critics hail ${title} as a masterpiece`,
-                    subtext: `"${title}" is receiving rave reviews for its direction, acting, and stunning visuals.`,
+                    week: tr('projectDashboard.news.week.release'),
+                    headline: tr('projectDashboard.news.masterpiece.headline', { title }),
+                    subtext: tr('projectDashboard.news.masterpiece.subtext', { title }),
                     impactLevel: 'HIGH'
                 });
             } else if (quality < 40) {
                 buzzItems.push({
-                    week: 'Release',
-                    headline: `${title} fails to impress critics`,
-                    subtext: `Reviews for "${title}" have been harsh, citing a weak script and uninspired performances.`,
+                    week: tr('projectDashboard.news.week.release'),
+                    headline: tr('projectDashboard.news.criticalMiss.headline', { title }),
+                    subtext: tr('projectDashboard.news.criticalMiss.subtext', { title }),
                     impactLevel: 'MEDIUM'
                 });
             } else {
                 buzzItems.push({
-                    week: 'Release',
-                    headline: `${title} receives mixed reviews`,
-                    subtext: `Critics are divided on "${title}", praising some aspects while finding others lacking.`,
+                    week: tr('projectDashboard.news.week.release'),
+                    headline: tr('projectDashboard.news.mixedReviews.headline', { title }),
+                    subtext: tr('projectDashboard.news.mixedReviews.subtext', { title }),
                     impactLevel: 'LOW'
                 });
             }
 
             if (roi > 2 && sequelEligibility.weeksElapsed >= 2) {
                 buzzItems.push({
-                    week: 'Current',
-                    headline: `${title} is a box office juggernaut`,
-                    subtext: `The film has exceeded all financial expectations, becoming a massive hit for the studio.`,
+                    week: tr('projectDashboard.news.week.current'),
+                    headline: tr('projectDashboard.news.juggernaut.headline', { title }),
+                    subtext: tr('projectDashboard.news.juggernaut.subtext'),
                     impactLevel: 'HIGH'
                 });
                 buzzItems.push({
-                    week: 'Current',
-                    headline: `Fans demand a sequel to ${title}`,
-                    subtext: `Social media campaigns are already calling for a follow-up to the successful ${genre} film.`,
+                    week: tr('projectDashboard.news.week.current'),
+                    headline: tr('projectDashboard.news.sequelDemand.headline', { title }),
+                    subtext: tr('projectDashboard.news.sequelDemand.subtext', { genre }),
                     impactLevel: 'MEDIUM'
                 });
                 buzzItems.push({
-                    week: 'Current',
-                    headline: `Sequel rumors for ${title}`,
-                    subtext: `Insiders claim the studio is already fast-tracking a sequel to "${title}".`,
+                    week: tr('projectDashboard.news.week.current'),
+                    headline: tr('projectDashboard.news.sequelRumors.headline', { title }),
+                    subtext: tr('projectDashboard.news.sequelRumors.subtext', { title }),
                     impactLevel: 'HIGH'
                 });
             } else if (roi < -0.5) {
                 buzzItems.push({
-                    week: 'Current',
-                    headline: `${title} struggles at the box office`,
-                    subtext: `Despite high expectations, "${title}" has failed to find an audience in its opening weeks.`,
+                    week: tr('projectDashboard.news.week.current'),
+                    headline: tr('projectDashboard.news.boxOfficeStruggle.headline', { title }),
+                    subtext: tr('projectDashboard.news.boxOfficeStruggle.subtext', { title }),
                     impactLevel: 'MEDIUM'
                 });
             } else if (roi > 0.5) {
                 buzzItems.push({
-                    week: 'Current',
-                    headline: `${title} is a solid performer`,
-                    subtext: `The film is holding steady at the box office, proving to be a reliable hit for the studio.`,
+                    week: tr('projectDashboard.news.week.current'),
+                    headline: tr('projectDashboard.news.solidPerformer.headline', { title }),
+                    subtext: tr('projectDashboard.news.solidPerformer.subtext'),
                     impactLevel: 'LOW'
                 });
                 buzzItems.push({
-                    week: 'Current',
-                    headline: `Audience asking for more ${title}`,
-                    subtext: `Fans are discussing potential spin-offs and sequels for the "${title}" universe.`,
+                    week: tr('projectDashboard.news.week.current'),
+                    headline: tr('projectDashboard.news.audienceMore.headline', { title }),
+                    subtext: tr('projectDashboard.news.audienceMore.subtext', { title }),
                     impactLevel: 'MEDIUM'
                 });
             }
@@ -404,10 +569,10 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
     };
 
     const renderPosterPreview = () => {
-        if (activePoster?.imageData) {
+        if ((activePoster?.type === 'IMAGE' || activePoster?.type === 'CANVA') && (activePoster.imageData || activePoster.posterMediaId)) {
             return (
                 <div className="w-full aspect-[2/3] bg-zinc-900 rounded-2xl overflow-hidden relative group shadow-2xl border border-white/10">
-                    <img src={activePoster.imageData} alt="Custom Poster" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                    <CustomPosterImage poster={activePoster} alt={tr('projectDashboard.poster.alt')} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-60"></div>
                 </div>
             );
@@ -437,11 +602,11 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
     ];
 
     const radarData = [
-        { subject: 'Script', A: project.projectDetails?.hiddenStats?.scriptQuality || project.hiddenStats?.scriptQuality || 70, fullMark: 100 },
-        { subject: 'Direction', A: project.projectDetails?.hiddenStats?.directionQuality || 85, fullMark: 100 },
-        { subject: 'Acting', A: project.projectDetails?.hiddenStats?.actingQuality || 80, fullMark: 100 },
-        { subject: 'Visuals', A: project.projectDetails?.hiddenStats?.visualQuality || 75, fullMark: 100 },
-        { subject: 'Buzz', A: project.promotionalBuzz || 50, fullMark: 100 },
+        { subject: tr('projectDashboard.radar.script'), A: project.projectDetails?.hiddenStats?.scriptQuality || project.hiddenStats?.scriptQuality || 70, fullMark: 100 },
+        { subject: tr('projectDashboard.radar.direction'), A: project.projectDetails?.hiddenStats?.directionQuality || 85, fullMark: 100 },
+        { subject: tr('projectDashboard.radar.acting'), A: project.projectDetails?.hiddenStats?.actingQuality || 80, fullMark: 100 },
+        { subject: tr('projectDashboard.radar.visuals'), A: project.projectDetails?.hiddenStats?.visualQuality || 75, fullMark: 100 },
+        { subject: tr('projectDashboard.radar.buzz'), A: project.promotionalBuzz || 50, fullMark: 100 },
     ];
 
     // Get all staff
@@ -451,22 +616,22 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
     const allStaff = [
         ...(director ? [{ 
             ...director, 
-            role: 'Director', 
+            role: tr('projectDashboard.talent.director'), 
             isDirector: true, 
             isInHouse: director.id === 'STUDIO_STAFF',
             isPlayer: director.id === 'PLAYER_SELF'
         }] : []),
         ...cast.map((c: any) => ({ 
             ...c, 
-            name: c.name || c.actorName || 'Unknown',
-            role: c.role || c.roleName || 'Cast',
+            name: c.name || c.actorName || tr('projectDashboard.talent.unknown'),
+            role: c.role || c.roleName || tr('projectDashboard.talent.cast'),
             isContracted: (studio.studioState?.talentRoster?.some(t => t.npcId === c.actorId) || 
                            player.studio?.talentRoster?.some(t => t.npcId === c.actorId)),
             isPlayer: c.actorId === 'PLAYER_SELF'
         })),
         ...crew.map((c: any) => ({ 
             ...c, 
-            role: c.role || 'Crew',
+            role: c.role || tr('projectDashboard.talent.crew'),
             isInHouse: c.id === 'STUDIO_STAFF',
             isPlayer: c.id === 'PLAYER_SELF'
         }))
@@ -486,8 +651,8 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
 
             {/* Atmospheric Background Layer */}
             <div className="absolute inset-0 z-0 opacity-20 pointer-events-none">
-                {activePoster?.imageData ? (
-                    <img src={activePoster.imageData} className="w-full h-full object-cover blur-[100px] scale-150" alt="" />
+                {(activePoster?.type === 'IMAGE' || activePoster?.type === 'CANVA') && (activePoster.imageData || activePoster.posterMediaId) ? (
+                    <CustomPosterImage poster={activePoster} alt="" className="w-full h-full object-cover blur-[100px] scale-150" />
                 ) : (
                     <div className={`w-full h-full bg-gradient-to-br ${getPosterBg(project.name)} blur-[100px] scale-150`}></div>
                 )}
@@ -524,7 +689,7 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                 {/* Floating Badge */}
                                 <div className="absolute top-6 left-6 flex flex-col gap-2">
                                     <div className="px-4 py-1.5 bg-amber-500 text-black text-[10px] font-black uppercase tracking-[0.2em] rounded-full shadow-lg">
-                                        {project.phase}
+                                        {phaseKey ? tr(`projectDashboard.phase.${phaseKey}`) : project.phase}
                                     </div>
                                     {project.phase === 'RELEASED' && (
                                         <div className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[0.2em] shadow-lg backdrop-blur-md border ${
@@ -533,9 +698,9 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                             actualGross < (project.budget || 0) ? 'bg-rose-500/80 text-white border-rose-400/50' :
                                             'bg-zinc-500/80 text-white border-zinc-400/50'
                                         }`}>
-                                            {actualGross > (project.budget || 0) * 5 ? 'Blockbuster' :
-                                             actualGross > (project.budget || 0) * 2 ? 'Box Office Hit' :
-                                             actualGross < (project.budget || 0) ? 'Box Office Flop' : 'Average Performer'}
+                                            {actualGross > (project.budget || 0) * 5 ? tr('projectDashboard.performance.blockbuster') :
+                                             actualGross > (project.budget || 0) * 2 ? tr('projectDashboard.performance.boxOfficeHit') :
+                                             actualGross < (project.budget || 0) ? tr('projectDashboard.performance.boxOfficeFlop') : tr('projectDashboard.performance.averagePerformer')}
                                         </div>
                                     )}
                                     {project.imdbRating && (
@@ -552,9 +717,9 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                         {displayTitle}
                                     </h1>
                                     <div className="flex items-center gap-3 text-xs font-bold text-zinc-400 uppercase tracking-widest">
-                                        <span>{project.type === 'SERIES' ? 'Original Series' : 'Feature Film'}</span>
+                                        <span>{project.type === 'SERIES' ? tr('projectDashboard.type.originalSeries') : tr('projectDashboard.type.featureFilm')}</span>
                                         <span className="w-1 h-1 bg-zinc-600 rounded-full"></span>
-                                        <span>{project.genre || 'Drama'}</span>
+                                        <span>{project.genre || tr('projectDashboard.genre.drama')}</span>
                                     </div>
                                     {canRenameTitle && (
                                         <button
@@ -563,7 +728,7 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                             className="mt-4 inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/40 px-3 py-2 text-[10px] font-black uppercase tracking-[0.16em] text-white backdrop-blur-md transition-colors hover:border-amber-400/60 hover:text-amber-300"
                                         >
                                             <Edit3 size={13} />
-                                            Edit Working Title
+                                            {tr('projectDashboard.action.editWorkingTitle')}
                                         </button>
                                     )}
                                 </div>
@@ -583,9 +748,9 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                     {displayTitle}
                                 </motion.h1>
                                 <div className="flex items-center gap-4 text-sm font-bold text-zinc-500 uppercase tracking-[0.3em]">
-                                    <span>{project.type === 'SERIES' ? 'Original Series' : 'Feature Film'}</span>
+                                    <span>{project.type === 'SERIES' ? tr('projectDashboard.type.originalSeries') : tr('projectDashboard.type.featureFilm')}</span>
                                     <span className="w-1.5 h-1.5 bg-amber-500 rounded-full"></span>
-                                    <span>{project.genre || 'Drama'}</span>
+                                    <span>{project.genre || tr('projectDashboard.genre.drama')}</span>
                                     {(project.rating || project.imdbRating) && (
                                         <>
                                             <span className="w-1.5 h-1.5 bg-zinc-700 rounded-full"></span>
@@ -600,7 +765,7 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                         className="mt-5 inline-flex items-center gap-2 rounded-full border border-zinc-700 bg-zinc-900 px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.18em] text-zinc-300 transition-colors hover:border-amber-500/50 hover:bg-amber-500/10 hover:text-amber-300"
                                     >
                                         <Edit3 size={14} />
-                                        Edit Working Title
+                                        {tr('projectDashboard.action.editWorkingTitle')}
                                     </button>
                                 )}
                             </div>
@@ -612,23 +777,23 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                 <div className="md:col-span-2">
                                     <div className="flex items-center gap-3 mb-4">
                                         <div className="w-8 h-[1px] bg-amber-500"></div>
-                                        <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-500">Executive Summary</h3>
+                                        <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-500">{tr('projectDashboard.summary.title')}</h3>
                                     </div>
                                     <p className="text-xl lg:text-2xl font-light text-zinc-300 leading-relaxed font-serif italic" style={{ fontFamily: "'Playfair Display', serif" }}>
-                                        {project.description || project.concept?.description || "A highly anticipated production currently in development. Our studio is dedicating top-tier resources to ensure this meets market expectations and delivers a profound cinematic experience."}
+                                        {project.description || project.concept?.description || tr('projectDashboard.summary.fallback')}
                                     </p>
                                 </div>
 
                                  {/* Quick Stats */}
                                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:col-span-2">
                                     <div className="p-5 sm:p-6 bg-white/[0.03] rounded-3xl border border-white/5 backdrop-blur-sm flex flex-col justify-center h-[120px]">
-                                        <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Production Cost</div>
+                                        <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">{tr('projectDashboard.metric.productionCost')}</div>
                                         <div className="text-2xl sm:text-3xl font-bold text-white tracking-tight truncate">
                                             {formatMoney(project.projectDetails?.estimatedBudget || project.budget || 0)}
                                         </div>
                                     </div>
                                     <div className="p-5 sm:p-6 bg-white/[0.03] rounded-3xl border border-white/5 backdrop-blur-sm flex flex-col justify-center h-[120px]">
-                                        <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Buzz Level</div>
+                                        <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">{tr('projectDashboard.metric.buzzLevel')}</div>
                                         <div className="flex items-baseline gap-1 overflow-hidden">
                                             <div className="text-2xl sm:text-3xl font-bold text-amber-500 tracking-tight">
                                                 {Math.round(project.promotionalBuzz || project.projectDetails?.hiddenStats?.qualityScore || 50)}
@@ -637,16 +802,16 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                         </div>
                                     </div>
                                     <div className="p-5 sm:p-6 bg-white/[0.03] rounded-3xl border border-white/5 backdrop-blur-sm flex flex-col justify-center h-[120px]">
-                                        <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Release</div>
+                                        <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">{tr('projectDashboard.metric.release')}</div>
                                         <div className="text-2xl sm:text-3xl font-bold text-white tracking-tight truncate">
                                             {releaseSummaryLabel}
                                         </div>
                                         <div className="mt-1 text-[10px] font-black uppercase tracking-widest text-zinc-600">
-                                            {releaseTiming.releaseWeek ? `Week ${releaseTiming.releaseWeek}` : 'History'}
+                                            {releaseTiming.releaseWeek ? tr('projectDashboard.timeline.week', { week: releaseTiming.releaseWeek }) : tr('projectDashboard.timeline.history')}
                                         </div>
                                     </div>
                                     <div className="p-5 sm:p-6 bg-white/[0.03] rounded-3xl border border-white/5 backdrop-blur-sm flex flex-col justify-center h-[120px]">
-                                        <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Timeline</div>
+                                        <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">{tr('projectDashboard.metric.timeline')}</div>
                                         <div className="text-2xl sm:text-3xl font-bold text-white tracking-tight truncate">
                                             {timelineValue}
                                         </div>
@@ -659,7 +824,7 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                     {['RELEASED', 'STREAMING', 'IN THEATERS', 'BIDDING'].includes(project.phase) && (
                                         <>
                                             <div className="p-5 sm:p-6 bg-emerald-500/5 rounded-3xl border border-emerald-500/10 backdrop-blur-sm flex flex-col justify-center h-[120px] relative overflow-hidden group">
-                                                <div className="text-[10px] font-black uppercase tracking-widest text-emerald-500/60 mb-2 relative z-10">Project Revenue</div>
+                                                <div className="text-[10px] font-black uppercase tracking-widest text-emerald-500/60 mb-2 relative z-10">{tr('projectDashboard.revenue.projectRevenue')}</div>
                                                 <div className="text-2xl sm:text-3xl font-bold text-white tracking-tight truncate relative z-10">
                                                     {formatMoney(projectRevenue)}
                                                 </div>
@@ -667,36 +832,36 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                                 {/* Revenue Breakdown on Hover */}
                                                 <div className="absolute inset-0 bg-zinc-900 p-4 flex flex-col justify-center opacity-0 group-hover:opacity-100 transition-opacity z-20">
                                                     <div className="flex justify-between items-center text-xs mb-1">
-                                                        <span className="text-zinc-400">Theatrical:</span>
+                                                        <span className="text-zinc-400">{tr('projectDashboard.revenue.theatrical')}:</span>
                                                         <span className="text-white font-mono">{formatMoney(actualGross)}</span>
                                                     </div>
                                                     <div className="flex justify-between items-center text-xs">
-                                                        <span className="text-zinc-400">Streaming:</span>
+                                                        <span className="text-zinc-400">{tr('projectDashboard.revenue.streaming')}:</span>
                                                         <span className="text-white font-mono">{formatMoney(streamingRevenue)}</span>
                                                     </div>
                                                     <div className="flex justify-between items-center text-xs mt-1">
-                                                        <span className="text-zinc-400">Soundtrack:</span>
+                                                        <span className="text-zinc-400">{tr('projectDashboard.revenue.soundtrack')}:</span>
                                                         <span className="text-cyan-300 font-mono">{formatMoney(soundtrackRevenue)}</span>
                                                     </div>
                                                 </div>
                                             </div>
                                             <div className="p-5 sm:p-6 bg-blue-500/5 rounded-3xl border border-blue-500/10 backdrop-blur-sm flex flex-col justify-center h-[120px]">
-                                                <div className="text-[10px] font-black uppercase tracking-widest text-blue-400/70 mb-2">Studio Receipts</div>
+                                                <div className="text-[10px] font-black uppercase tracking-widest text-blue-400/70 mb-2">{tr('projectDashboard.revenue.studioReceipts')}</div>
                                                 <div className="text-2xl sm:text-3xl font-bold tracking-tight text-blue-300">
                                                     {formatMoney(studioReceipts)}
                                                 </div>
                                             </div>
                                             {investorPlan && investorPlan.totalRaised > 0 && (
                                                 <div className="p-5 sm:p-6 bg-emerald-500/5 rounded-3xl border border-emerald-500/10 backdrop-blur-sm flex flex-col justify-center h-[120px]">
-                                                    <div className="text-[10px] font-black uppercase tracking-widest text-emerald-400/70 mb-2">Investor Split</div>
+                                                    <div className="text-[10px] font-black uppercase tracking-widest text-emerald-400/70 mb-2">{tr('projectDashboard.revenue.investorSplit')}</div>
                                                     <div className="flex items-baseline gap-2">
                                                         <div className="text-2xl sm:text-3xl font-bold tracking-tight text-emerald-300">
                                                             {formatMoney(studioNetAfterInvestors)}
                                                         </div>
-                                                        <div className="text-[10px] font-black uppercase tracking-widest text-zinc-600">net</div>
+                                                        <div className="text-[10px] font-black uppercase tracking-widest text-zinc-600">{tr('projectDashboard.revenue.net')}</div>
                                                     </div>
                                                     <div className="mt-1 text-[10px] font-black uppercase tracking-widest text-zinc-600">
-                                                        Paid {formatMoney(investorPayoutTotal)} • Keeps {investorPlan.studioEquityPercent}%
+                                                        {tr('projectDashboard.revenue.investorPaidKeeps', { paid: formatMoney(investorPayoutTotal), percent: investorPlan.studioEquityPercent })}
                                                     </div>
                                                     <div className="mt-1 truncate text-[10px] font-bold uppercase tracking-widest text-emerald-300/50">
                                                         {investorScopeLabel}{investorOwnerNames ? ` • ${investorOwnerNames}${investorOwnerExtraCount > 0 ? ` +${investorOwnerExtraCount}` : ''}` : ''}
@@ -710,18 +875,18 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                                 </div>
                                             </div>
                                             <div className="p-5 sm:p-6 bg-white/[0.03] rounded-3xl border border-white/5 backdrop-blur-sm flex flex-col justify-center h-[120px]">
-                                                <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Sources</div>
+                                                <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">{tr('projectDashboard.revenue.sources')}</div>
                                                 <div className="flex items-center justify-between gap-3 text-xs font-bold text-zinc-300">
-                                                    <span>Theaters</span>
+                                                    <span>{tr('projectDashboard.revenue.theaters')}</span>
                                                     <span className="font-mono text-white">{formatMoney(actualGross)}</span>
                                                 </div>
                                                 <div className="mt-1 flex items-center justify-between gap-3 text-xs font-bold text-zinc-300">
-                                                    <span>Streaming</span>
+                                                    <span>{tr('projectDashboard.revenue.streaming')}</span>
                                                     <span className="font-mono text-white">{formatMoney(streamingRevenue)}</span>
                                                 </div>
                                                 {soundtrackRevenue > 0 && (
                                                     <div className="mt-1 flex items-center justify-between gap-3 text-xs font-bold text-zinc-300">
-                                                        <span>Soundtrack</span>
+                                                        <span>{tr('projectDashboard.revenue.soundtrack')}</span>
                                                         <span className="font-mono text-cyan-300">{formatMoney(soundtrackRevenue)}</span>
                                                     </div>
                                                 )}
@@ -729,7 +894,7 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                         </>
                                     )}
 
-                                    {/* Release Strategy Section */}
+                                    {/* Release rollout section */}
                                     {(project.projectDetails?.releaseStrategy || project.releaseStrategy) && (
                                         <div className="col-span-2 md:col-span-2 lg:col-span-4 p-4 sm:p-8 bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-transparent rounded-[28px] sm:rounded-[40px] border border-amber-500/20 shadow-2xl shadow-amber-500/5 overflow-hidden relative group">
                                             <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity hidden sm:block">
@@ -743,11 +908,11 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                                         <Globe size={40} className="hidden sm:block" />
                                                     </div>
                                                     <div className="flex-1 min-w-0">
-                                                        <div className="text-[7px] sm:text-[12px] font-black uppercase tracking-[0.2em] sm:tracking-[0.4em] text-amber-500/80 mb-0.5 sm:mb-2">Release Strategy</div>
+                                                        <div className="text-[7px] sm:text-[12px] font-black uppercase tracking-[0.2em] sm:tracking-[0.4em] text-amber-500/80 mb-0.5 sm:mb-2">{tr('projectDashboard.releaseStrategy.title')}</div>
                                                         <div className="text-lg sm:text-4xl font-serif italic text-white leading-tight sm:leading-tight tracking-tight truncate" style={{ fontFamily: "'Playfair Display', serif" }}>
-                                                            {project.projectDetails?.releaseStrategy === 'THEATRICAL' ? 'Theatrical Release' : 
-                                                             project.projectDetails?.releaseStrategy === 'STREAMING_ONLY' ? 'Streaming Premiere' : 
-                                                             project.projectDetails?.releaseStrategy === 'HYBRID' ? 'Hybrid Release' : 'Standard Release'}
+                                                            {project.projectDetails?.releaseStrategy === 'THEATRICAL' ? tr('projectDashboard.releaseStrategy.theatrical') : 
+                                                             project.projectDetails?.releaseStrategy === 'STREAMING_ONLY' ? tr('projectDashboard.releaseStrategy.streaming') : 
+                                                             project.projectDetails?.releaseStrategy === 'HYBRID' ? tr('projectDashboard.releaseStrategy.hybrid') : tr('projectDashboard.releaseStrategy.standard')}
                                                         </div>
                                                     </div>
                                                 </div>
@@ -755,20 +920,20 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                                 {/* Stats Grid */}
                                                 <div className="grid grid-cols-2 sm:flex sm:flex-wrap justify-start lg:justify-end gap-y-4 gap-x-4 sm:gap-16 w-full lg:w-auto border-t border-white/5 pt-4 sm:pt-8 lg:border-0 lg:pt-0">
                                                     <div className="flex flex-col items-start lg:items-end">
-                                                        <div className="text-[7px] sm:text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-0.5 sm:mb-2">Planned Week</div>
-                                                        <div className="text-sm sm:text-3xl font-bold text-white tracking-tighter">Week {project.projectDetails?.releaseDate || project.releaseDate || 'TBD'}</div>
+                                                        <div className="text-[7px] sm:text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-0.5 sm:mb-2">{tr('projectDashboard.releaseStrategy.plannedWeek')}</div>
+                                                        <div className="text-sm sm:text-3xl font-bold text-white tracking-tighter">{tr('projectDashboard.timeline.week', { week: project.projectDetails?.releaseDate || project.releaseDate || tr('projectDashboard.tba') })}</div>
                                                     </div>
                                                     
                                                     {project.projectDetails?.screeningStrategy && (
                                                         <div className="flex flex-col items-start lg:items-end">
-                                                            <div className="text-[7px] sm:text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-0.5 sm:mb-2">Scale</div>
+                                                            <div className="text-[7px] sm:text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-0.5 sm:mb-2">{tr('projectDashboard.releaseStrategy.scale')}</div>
                                                             <div className="text-sm sm:text-3xl font-bold text-white tracking-tighter">{project.projectDetails.screeningStrategy.replace('_', ' ')}</div>
                                                         </div>
                                                     )}
 
                                                     {project.projectDetails?.hiddenStats?.platformId && (
                                                         <div className="flex flex-col items-start lg:items-end col-span-2 sm:col-span-1">
-                                                            <div className="text-[7px] sm:text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-0.5 sm:mb-2">Platform</div>
+                                                            <div className="text-[7px] sm:text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-0.5 sm:mb-2">{tr('projectDashboard.releaseStrategy.platform')}</div>
                                                             <div className="text-sm sm:text-3xl font-bold text-amber-500 tracking-tighter">{PLATFORMS.find(p => p.id === project.projectDetails?.hiddenStats?.platformId)?.name || project.projectDetails?.hiddenStats?.platformId}</div>
                                                         </div>
                                                     )}
@@ -778,10 +943,14 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                     )}
                                 </div>
 
+                                {isSeriesProject && scorecardRatings.length > 0 && (
+                                    <SeriesScorecardPanel ratings={scorecardRatings} tr={tr} />
+                                )}
+
                                 {/* Timeline */}
                                 <div className="md:col-span-2 bg-white/[0.02] rounded-[32px] p-6 sm:p-8 border border-white/5">
                                     <div className="flex items-center justify-between mb-8">
-                                        <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Production Journey</h3>
+                                        <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">{tr('projectDashboard.timeline.productionJourney')}</h3>
                                         <div className="px-3 py-1 bg-zinc-800 rounded-full text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
                                             {PHASES.findIndex(p => p.id === project.phase) + 1} / {PHASES.length}
                                         </div>
@@ -789,20 +958,20 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                     <div className="relative">
                                         <div className="flex items-center justify-between relative px-1 overflow-x-auto no-scrollbar gap-2 sm:gap-0">
                                             <div className="absolute left-4 right-4 top-4 sm:top-5 h-[1px] bg-zinc-800 z-0 hidden sm:block"></div>
-                                            {PHASES.map((phase, index) => {
-                                                const isActive = project.phase === phase.id;
-                                                const isPast = PHASES.findIndex(p => p.id === project.phase) > index;
+                                            {PHASES.map((p, index) => {
+                                                const isActive = project.phase === p.id;
+                                                const isPast = PHASES.findIndex(phase => phase.id === project.phase) > index;
                                                 return (
-                                                    <div key={phase.id} className="relative z-10 flex flex-col items-center shrink-0 sm:shrink">
+                                                    <div key={p.id} className="relative z-10 flex flex-col items-center shrink-0 sm:shrink">
                                                         <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all duration-700 ${
                                                             isActive ? 'bg-amber-500 text-black shadow-[0_0_30px_rgba(245,158,11,0.4)] scale-110 sm:scale-125' : 
                                                             isPast ? 'bg-zinc-800 text-zinc-400' : 
                                                             'bg-zinc-900 text-zinc-700'
                                                         }`}>
-                                                            {isActive ? <div className="animate-pulse">{phase.icon}</div> : phase.icon}
+                                                            {isActive ? <div className="animate-pulse">{p.icon}</div> : p.icon}
                                                         </div>
                                                         <span className={`hidden md:block text-[8px] font-black uppercase tracking-widest absolute -bottom-8 whitespace-nowrap ${isActive ? 'text-amber-500' : isPast ? 'text-zinc-500' : 'text-zinc-700'}`}>
-                                                            {phase.label}
+                                                            {tr(`projectDashboard.phase.${p.id}`)}
                                                         </span>
                                                     </div>
                                                 );
@@ -816,10 +985,10 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                     <div className="flex items-center justify-between mb-6">
                                         <div className="flex items-center gap-3">
                                             <div className="w-8 h-[1px] bg-amber-500"></div>
-                                            <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-500">Production Team</h3>
+                                            <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-500">{tr('projectDashboard.talent.productionTeam')}</h3>
                                         </div>
                                         <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
-                                            {allStaff.length} Members
+                                            {tr('projectDashboard.talent.members', { count: allStaff.length })}
                                         </div>
                                     </div>
                                     <div className="space-y-3 max-h-[250px] overflow-y-auto pr-2 custom-scrollbar">
@@ -837,9 +1006,9 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                                     <div>
                                                         <div className="text-xs font-bold text-white flex items-center gap-2">
                                                             {staff.name}
-                                                            {staff.isPlayer && <span className="text-[7px] px-1.5 py-0.5 bg-amber-500/20 text-amber-400 rounded-full font-black uppercase tracking-widest">You</span>}
-                                                            {staff.isContracted && <span className="text-[7px] px-1.5 py-0.5 bg-emerald-500/20 text-emerald-400 rounded-full font-black uppercase tracking-widest">Contract</span>}
-                                                            {staff.isInHouse && <span className="text-[7px] px-1.5 py-0.5 bg-blue-500/20 text-blue-400 rounded-full font-black uppercase tracking-widest">In-House</span>}
+                                                            {staff.isPlayer && <span className="text-[7px] px-1.5 py-0.5 bg-amber-500/20 text-amber-400 rounded-full font-black uppercase tracking-widest">{tr('projectDashboard.talent.you')}</span>}
+                                                            {staff.isContracted && <span className="text-[7px] px-1.5 py-0.5 bg-emerald-500/20 text-emerald-400 rounded-full font-black uppercase tracking-widest">{tr('projectDashboard.talent.contract')}</span>}
+                                                            {staff.isInHouse && <span className="text-[7px] px-1.5 py-0.5 bg-blue-500/20 text-blue-400 rounded-full font-black uppercase tracking-widest">{tr('projectDashboard.talent.inHouse')}</span>}
                                                         </div>
                                                         <div className="text-[8px] font-black uppercase tracking-widest text-zinc-500">{staff.role}</div>
                                                     </div>
@@ -847,7 +1016,7 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                                 {staff.isDirector && <Star size={12} className="text-amber-500 fill-amber-500" />}
                                             </div>
                                         )) : (
-                                            <div className="text-center py-8 text-zinc-600 text-xs italic">No staff assigned yet.</div>
+                                            <div className="text-center py-8 text-zinc-600 text-xs italic">{tr('projectDashboard.talent.noStaff')}</div>
                                         )}
                                     </div>
                                 </div>
@@ -857,7 +1026,7 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                     <div className="flex items-center justify-between mb-8">
                                         <div className="flex items-center gap-3">
                                             <div className="w-8 h-[1px] bg-purple-500"></div>
-                                            <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-500">Project DNA</h3>
+                                            <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-500">{tr('projectDashboard.radar.title')}</h3>
                                         </div>
                                     </div>
                                     <div className="h-[200px] w-full">
@@ -867,7 +1036,7 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                                 <PolarAngleAxis dataKey="subject" tick={{ fill: '#52525b', fontSize: 10, fontWeight: 'bold' }} />
                                                 <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
                                                 <Radar
-                                                    name="Project"
+                                                    name={tr('projectDashboard.radar.project')}
                                                     dataKey="A"
                                                     stroke="#8b5cf6"
                                                     fill="#8b5cf6"
@@ -882,7 +1051,7 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                 <div className="md:col-span-2">
                                     <div className="flex items-center gap-3 mb-6">
                                         <div className="w-8 h-[1px] bg-purple-500"></div>
-                                        <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-500">Key Talent</h3>
+                                        <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-500">{tr('projectDashboard.talent.keyTalent')}</h3>
                                     </div>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                         {/* Director */}
@@ -893,7 +1062,7 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                                 </div>
                                                 <div>
                                                     <div className="text-lg font-bold text-white leading-tight">{project.projectDetails.director.name}</div>
-                                                    <div className="text-[10px] font-black uppercase tracking-widest text-purple-400">Director</div>
+                                                    <div className="text-[10px] font-black uppercase tracking-widest text-purple-400">{tr('projectDashboard.talent.director')}</div>
                                                 </div>
                                             </div>
                                         )}
@@ -906,9 +1075,9 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                                 <div>
                                                     <div className="text-lg font-bold text-white leading-tight flex items-center gap-2">
                                                         {actor.name || actor.actorName}
-                                                        {actor.isReturning && <span className="text-[9px] font-black text-purple-400 uppercase tracking-widest bg-purple-500/10 px-2 py-0.5 rounded-full border border-purple-500/20">Returning</span>}
+                                                        {actor.isReturning && <span className="text-[9px] font-black text-purple-400 uppercase tracking-widest bg-purple-500/10 px-2 py-0.5 rounded-full border border-purple-500/20">{tr('projectDashboard.talent.returning')}</span>}
                                                     </div>
-                                                    <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500">{actor.role || actor.roleName || 'Lead Cast'}</div>
+                                                    <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500">{actor.role || actor.roleName || tr('projectDashboard.talent.leadCast')}</div>
                                                 </div>
                                             </div>
                                         ))}
@@ -923,7 +1092,7 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                             onClick={() => onStartStreamingBidding(project)}
                                             className="flex-1 py-5 bg-amber-500 hover:bg-amber-400 text-black font-black uppercase tracking-[0.2em] rounded-2xl transition-all shadow-xl hover:shadow-amber-500/20 flex items-center justify-center gap-3 active:scale-95 animate-pulse"
                                         >
-                                            <TrendingUp size={20} /> Continue Bidding War
+                                            <TrendingUp size={20} /> {tr('projectDashboard.action.continueBiddingWar')}
                                         </button>
                                     )}
                                     {['RELEASED', 'IN THEATERS'].includes(project.phase) && !project.streaming && !project.streamingPlatform && onStartStreamingBidding && (
@@ -931,7 +1100,7 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                             onClick={() => onStartStreamingBidding(project)}
                                             className="flex-1 py-5 bg-blue-600 hover:bg-blue-500 text-white font-black uppercase tracking-[0.2em] rounded-2xl transition-all shadow-xl hover:shadow-blue-500/20 flex items-center justify-center gap-3 active:scale-95"
                                         >
-                                            <Tv size={20} /> Bid to Platforms
+                                            <Tv size={20} /> {tr('projectDashboard.action.bidToPlatforms')}
                                         </button>
                                     )}
                                     {project.streaming && (() => {
@@ -948,10 +1117,10 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                         return (
                                         <div className="flex-1 p-5 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex flex-col justify-center items-center text-center">
                                             <div className="flex items-center gap-2 text-amber-500 font-black text-[10px] uppercase tracking-widest mb-1">
-                                                <Tv size={14} /> Streaming Deal Secured
+                                                <Tv size={14} /> {tr('projectDashboard.action.streamingDealSecured')}
                                             </div>
                                             <div className="text-white font-bold text-sm">
-                                                Live on {PLATFORMS.find(p => p.id === project.streaming.platformId)?.name || 'Platform'} in {weeksUntilStreaming} weeks
+                                                {tr('projectDashboard.action.liveOnPlatformInWeeks', { platform: PLATFORMS.find(p => p.id === project.streaming.platformId)?.name || tr('projectDashboard.releaseStrategy.platform'), weeks: weeksUntilStreaming })}
                                             </div>
                                         </div>
                                         );
@@ -963,7 +1132,7 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                                 disabled={!sequelEligibility.eligible}
                                                 className="w-full py-5 bg-amber-500 hover:bg-amber-400 text-black font-black uppercase tracking-[0.2em] rounded-2xl transition-all shadow-xl hover:shadow-amber-500/20 flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50 disabled:grayscale disabled:cursor-not-allowed"
                                             >
-                                                <Sparkles size={20} /> {sequelEligibility.reason === 'ALREADY_IN_DEVELOPMENT' ? 'Sequel in Dev' : 'Develop Sequel'}
+                                                <Sparkles size={20} /> {sequelEligibility.reason === 'ALREADY_IN_DEVELOPMENT' ? tr('projectDashboard.action.sequelInDev') : tr('projectDashboard.action.developSequel')}
                                             </button>
                                             {!sequelEligibility.eligible && (
                                                 <p className="text-[8px] text-amber-500/60 font-black uppercase tracking-widest text-center">{sequelEligibility.message}</p>
@@ -977,7 +1146,7 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                                 disabled={!spinoffEligibility.eligible}
                                                 className="w-full py-5 bg-white/5 hover:bg-white/10 text-white font-black uppercase tracking-[0.2em] rounded-2xl transition-all border border-white/10 flex items-center justify-center gap-3 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
                                             >
-                                                <Layers size={20} /> {spinoffEligibility.reason === 'ALREADY_IN_DEVELOPMENT' ? 'Spin-off in Dev' : 'Develop Spin-off'}
+                                                <Layers size={20} /> {spinoffEligibility.reason === 'ALREADY_IN_DEVELOPMENT' ? tr('projectDashboard.action.spinoffInDev') : tr('projectDashboard.action.developSpinoff')}
                                             </button>
                                             {!spinoffEligibility.eligible && (
                                                 <p className="text-[8px] text-zinc-600 font-black uppercase tracking-widest text-center">{spinoffEligibility.message}</p>
@@ -986,31 +1155,37 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                     )}
                                     <button 
                                         onClick={() => fileInputRef.current?.click()}
-                                        className="sm:w-auto px-8 py-5 bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white font-black uppercase tracking-[0.2em] rounded-2xl transition-all border border-zinc-800 flex items-center justify-center gap-3 active:scale-95"
+                                        disabled={isPosterUploading}
+                                        className="sm:w-auto px-8 py-5 bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white font-black uppercase tracking-[0.2em] rounded-2xl transition-all border border-zinc-800 flex items-center justify-center gap-3 active:scale-95 disabled:cursor-wait disabled:opacity-60"
                                     >
-                                        <Edit3 size={20} /> Edit Poster
+                                        <Edit3 size={20} /> {isPosterUploading ? tr('projectDashboard.action.saving') : tr('projectDashboard.action.editPoster')}
                                     </button>
                                 </div>
+                                {posterUploadError && (
+                                    <div className="md:col-span-2 mt-3 rounded-2xl border border-rose-500/20 bg-rose-500/10 p-3 text-xs font-bold text-rose-200">
+                                        {posterUploadError}
+                                    </div>
+                                )}
 
                                 {/* News Section */}
                                 <div className="md:col-span-2 mt-8">
                                     <div className="flex items-center justify-between mb-6">
                                         <div className="flex items-center gap-3">
                                             <div className="w-8 h-[1px] bg-zinc-700"></div>
-                                            <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-500">Media Coverage & Buzz</h3>
+                                            <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-500">{tr('projectDashboard.news.mediaCoverage')}</h3>
                                         </div>
                                         <div className="flex items-center gap-2">
                                             <Sparkles size={12} className="text-amber-500" />
-                                            <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Live Feed</span>
+                                            <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">{tr('projectDashboard.news.liveFeed')}</span>
                                         </div>
                                     </div>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         {dynamicBuzz.length > 0 ? dynamicBuzz.slice(0, 4).map((news: any, idx: number) => (
                                             <div key={idx} className="p-6 bg-white/[0.02] rounded-3xl border border-white/5 flex flex-col gap-2 hover:bg-white/[0.04] transition-all group">
                                                 <div className="flex items-center justify-between mb-1">
-                                                    <div className="px-2 py-0.5 bg-zinc-800 rounded text-[8px] font-black text-zinc-400 uppercase tracking-widest">{news.week === 'Current' ? 'Latest' : news.week === 'Release' ? 'Review' : `Week ${news.week}`}</div>
+                                                    <div className="px-2 py-0.5 bg-zinc-800 rounded text-[8px] font-black text-zinc-400 uppercase tracking-widest">{news.week === tr('projectDashboard.news.week.current') ? tr('projectDashboard.news.latest') : news.week === tr('projectDashboard.news.week.release') ? tr('projectDashboard.news.review') : tr('projectDashboard.timeline.week', { week: news.week })}</div>
                                                     <div className={`text-[8px] font-bold uppercase tracking-widest transition-colors ${news.impactLevel === 'HIGH' ? 'text-rose-500' : news.impactLevel === 'MEDIUM' ? 'text-amber-500' : 'text-zinc-500'}`}>
-                                                        {news.impactLevel === 'HIGH' ? 'Breaking' : news.impactLevel === 'MEDIUM' ? 'Trending' : 'Industry'}
+                                                        {news.impactLevel === 'HIGH' ? tr('projectDashboard.news.breaking') : news.impactLevel === 'MEDIUM' ? tr('projectDashboard.news.trending') : tr('projectDashboard.news.industry')}
                                                     </div>
                                                 </div>
                                                 <div className="text-lg font-bold text-white leading-tight group-hover:text-amber-500 transition-colors">{news.headline}</div>
@@ -1019,8 +1194,8 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                         )) : (
                                             <div className="sm:col-span-2 p-12 bg-white/[0.01] rounded-[32px] border border-dashed border-white/5 flex flex-col items-center justify-center text-center">
                                                 <Info size={32} className="text-zinc-800 mb-4" />
-                                                <div className="text-zinc-500 font-serif italic text-lg">"The quiet before the storm. No major headlines yet."</div>
-                                                <div className="text-[10px] font-black uppercase tracking-widest text-zinc-700 mt-2">Awaiting Production Milestones</div>
+                                                <div className="text-zinc-500 font-serif italic text-lg">{tr('projectDashboard.news.emptyQuote')}</div>
+                                                <div className="text-[10px] font-black uppercase tracking-widest text-zinc-700 mt-2">{tr('projectDashboard.news.awaitingMilestones')}</div>
                                             </div>
                                         )}
                                     </div>
@@ -1033,12 +1208,12 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                 {isRenamingTitle && (
                     <WorkingTitleDialog
                         mode="RENAME"
-                        eyebrow="Project Details"
-                        title="Edit Working Title"
-                        description="Update the title everywhere this production appears."
+                        eyebrow={tr('projectDashboard.dialog.projectDetails')}
+                        title={tr('projectDashboard.action.editWorkingTitle')}
+                        description={tr('projectDashboard.dialog.description')}
                         initialTitle={displayTitle}
-                        helperText="The working title remains editable until filming begins."
-                        infoText="Once production starts, the title locks to keep news, cast records, releases, and franchise history consistent."
+                        helperText={tr('projectDashboard.dialog.helper')}
+                        infoText={tr('projectDashboard.dialog.info')}
                         onClose={() => setIsRenamingTitle(false)}
                         onConfirm={(title) => {
                             onRenameProject?.(title);

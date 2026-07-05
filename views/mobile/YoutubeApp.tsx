@@ -1,9 +1,12 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Player, YoutubeBrandDeal, YoutubeCollabOffer, YoutubeCreatorIdentity, YoutubeMerchTier, YoutubeUploadPlan, YoutubeVideo, YoutubeVideoType } from '../../types';
+import { ClothingItem, Player, Property, Vehicle, YoutubeBrandDeal, YoutubeCollabOffer, YoutubeCreatorIdentity, YoutubeMerchTier, YoutubeUploadPlan, YoutubeVideo, YoutubeVideoType } from '../../types';
 import { calculateYoutubeCreatorScore, generateYoutubeFeed, getWeeksSinceYoutubeUpload, getYoutubePublicImageLabel, YOUTUBE_MONETIZATION_SUBS, YOUTUBE_MONETIZATION_VIEWS } from '../../services/youtubeLogic';
 import { spendPlayerEnergy } from '../../services/premiumLogic';
 import { loadMediaBlob, pruneMediaStore, saveMediaBlob } from '../../services/mediaStorage';
+import { AIRCRAFT_CATALOG, BOAT_CATALOG, CAR_CATALOG, CLOTHING_CATALOG, MOTORCYCLE_CATALOG, PROPERTY_CATALOG } from '../../services/lifestyleLogic';
+import { getLifestyleAssetImageInfo } from '../../services/lifestyleAssetImages';
+import { getPlayerLanguage, t } from '../../services/i18n';
 import { ArrowLeft, Play, TrendingUp, DollarSign, Users, Plus, Lock, Home, Layout, Search, Bell, MonitorPlay, Sparkles, Handshake, ShieldCheck, Flame, MessageCircle, Trophy, ShoppingBag, Radio, ImagePlus, ThumbsUp, ThumbsDown, Share2, MoreHorizontal } from 'lucide-react';
 
 interface YoutubeAppProps {
@@ -12,13 +15,13 @@ interface YoutubeAppProps {
   onUpdatePlayer: (p: Player) => void;
 }
 
-const VIDEO_TYPES: { type: YoutubeVideoType, label: string, cost: number, energy: number }[] = [
-    { type: 'VLOG', label: 'Daily Vlog', cost: 0, energy: 15 },
-    { type: 'SKIT', label: 'Comedy Skit', cost: 50, energy: 25 },
-    { type: 'Q_AND_A', label: 'Q&A', cost: 0, energy: 10 },
-    { type: 'TRAILER', label: 'Project Teaser', cost: 0, energy: 20 },
-    { type: 'COVER', label: 'Song Cover', cost: 20, energy: 20 },
-    { type: 'STORYTIME', label: 'Storytime', cost: 0, energy: 15 },
+const VIDEO_TYPES: { type: YoutubeVideoType, labelKey: string, cost: number, energy: number }[] = [
+    { type: 'VLOG', labelKey: 'youtube.videoType.VLOG.label', cost: 0, energy: 15 },
+    { type: 'SKIT', labelKey: 'youtube.videoType.SKIT.label', cost: 50, energy: 25 },
+    { type: 'Q_AND_A', labelKey: 'youtube.videoType.Q_AND_A.label', cost: 0, energy: 10 },
+    { type: 'TRAILER', labelKey: 'youtube.videoType.TRAILER.label', cost: 0, energy: 20 },
+    { type: 'COVER', labelKey: 'youtube.videoType.COVER.label', cost: 20, energy: 20 },
+    { type: 'STORYTIME', labelKey: 'youtube.videoType.STORYTIME.label', cost: 0, energy: 15 },
 ];
 
 const THUMBNAIL_WIDTH = 1280;
@@ -26,6 +29,30 @@ const THUMBNAIL_HEIGHT = 720;
 const MAX_THUMBNAIL_SOURCE_SIZE = 12 * 1024 * 1024;
 type ThumbnailFitMode = 'cover' | 'contain';
 type YoutubeVideoReaction = 'LIKE' | 'DISLIKE';
+type YoutubeContentAsset = Property | Vehicle | ClothingItem;
+type YoutubeAssetFilter = 'ALL' | 'PROPERTY' | 'VEHICLE' | 'CLOTHING';
+
+const YoutubeAssetImageTile: React.FC<{ item: YoutubeContentAsset; selected?: boolean }> = ({ item, selected = false }) => {
+    const imageInfo = getLifestyleAssetImageInfo(item);
+    const [failed, setFailed] = useState(false);
+
+    useEffect(() => {
+        setFailed(false);
+    }, [item.id]);
+
+    return (
+        <div className={`relative h-16 w-16 shrink-0 overflow-hidden rounded-2xl border bg-black ${selected ? 'border-cyan-300' : 'border-zinc-800'}`}>
+            <img
+                src={failed ? imageInfo.fallbackSrc : imageInfo.src}
+                alt={imageInfo.alt}
+                onError={() => setFailed(true)}
+                className="h-full w-full object-cover [image-rendering:pixelated]"
+                draggable={false}
+            />
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-white/5" />
+        </div>
+    );
+};
 
 const loadImageElement = (src: string): Promise<HTMLImageElement> =>
     new Promise((resolve, reject) => {
@@ -122,168 +149,168 @@ const YoutubeThumbnail: React.FC<{ video: YoutubeVideo; className?: string; chil
 };
 
 const UPLOAD_PLANS: Record<YoutubeUploadPlan, {
-    label: string;
-    description: string;
+    labelKey: string;
+    descriptionKey: string;
     viewBoost: number;
     qualityBoost: number;
     trust: number;
     mood: number;
     controversy: number;
-    comments: string[];
+    commentKeys: string[];
 }> = {
     SAFE: {
-        label: 'Safe Upload',
-        description: 'Reliable, polished, and brand-friendly.',
+        labelKey: 'youtube.plan.SAFE.label',
+        descriptionKey: 'youtube.plan.SAFE.description',
         viewBoost: 0,
         qualityBoost: 5,
         trust: 4,
         mood: 1,
         controversy: -2,
-        comments: ['This felt polished.', 'Reliable upload week.', 'Clean content, no drama.']
+        commentKeys: ['youtube.plan.SAFE.comment.0', 'youtube.plan.SAFE.comment.1', 'youtube.plan.SAFE.comment.2']
     },
     VIRAL_BAIT: {
-        label: 'Viral Bait',
-        description: 'Bigger spike chance, bigger backlash risk.',
+        labelKey: 'youtube.plan.VIRAL_BAIT.label',
+        descriptionKey: 'youtube.plan.VIRAL_BAIT.description',
         viewBoost: 900,
         qualityBoost: -2,
         trust: -5,
         mood: 4,
         controversy: 10,
-        comments: ['This title is wild.', 'I clicked so fast.', 'This better not be staged.']
+        commentKeys: ['youtube.plan.VIRAL_BAIT.comment.0', 'youtube.plan.VIRAL_BAIT.comment.1', 'youtube.plan.VIRAL_BAIT.comment.2']
     },
     BTS: {
-        label: 'Behind Scenes',
-        description: 'Intimate career access fans love.',
+        labelKey: 'youtube.plan.BTS.label',
+        descriptionKey: 'youtube.plan.BTS.description',
         viewBoost: 450,
         qualityBoost: 4,
         trust: 3,
         mood: 3,
         controversy: 0,
-        comments: ['More set life please.', 'This made me root for you.', 'Love seeing the work behind it.']
+        commentKeys: ['youtube.plan.BTS.comment.0', 'youtube.plan.BTS.comment.1', 'youtube.plan.BTS.comment.2']
     },
     PROJECT_PROMO: {
-        label: 'Project Promo',
-        description: 'Turns movie/series buzz into channel growth.',
+        labelKey: 'youtube.plan.PROJECT_PROMO.label',
+        descriptionKey: 'youtube.plan.PROJECT_PROMO.description',
         viewBoost: 650,
         qualityBoost: 2,
         trust: 0,
         mood: 2,
         controversy: 2,
-        comments: ['Now I want to watch the project.', 'Trailer energy is strong.', 'This promo actually worked.']
+        commentKeys: ['youtube.plan.PROJECT_PROMO.comment.0', 'youtube.plan.PROJECT_PROMO.comment.1', 'youtube.plan.PROJECT_PROMO.comment.2']
     },
     SPONSOR_HEAVY: {
-        label: 'Sponsor Heavy',
-        description: 'More money energy, lower audience patience.',
+        labelKey: 'youtube.plan.SPONSOR_HEAVY.label',
+        descriptionKey: 'youtube.plan.SPONSOR_HEAVY.description',
         viewBoost: 300,
         qualityBoost: -1,
         trust: -6,
         mood: -2,
         controversy: 5,
-        comments: ['Feels like an ad but okay.', 'Secure the bag, I guess.', 'Too much sponsor talk today.']
+        commentKeys: ['youtube.plan.SPONSOR_HEAVY.comment.0', 'youtube.plan.SPONSOR_HEAVY.comment.1', 'youtube.plan.SPONSOR_HEAVY.comment.2']
     }
 };
 
 const CREATOR_MILESTONES = [
-    { id: 'subs_10000', label: '10K Breakout', target: 10000, type: 'subs' },
-    { id: 'subs_100000', label: 'Silver Play Button', target: 100000, type: 'subs' },
-    { id: 'views_1000000', label: '1M Channel Views', target: 1000000, type: 'views' },
-    { id: 'subs_1000000', label: 'Gold Play Button', target: 1000000, type: 'subs' },
+    { id: 'subs_10000', labelKey: 'youtube.milestone.subs_10000.label', target: 10000, type: 'subs' },
+    { id: 'subs_100000', labelKey: 'youtube.milestone.subs_100000.label', target: 100000, type: 'subs' },
+    { id: 'views_1000000', labelKey: 'youtube.milestone.views_1000000.label', target: 1000000, type: 'views' },
+    { id: 'subs_1000000', labelKey: 'youtube.milestone.subs_1000000.label', target: 1000000, type: 'subs' },
 ];
 
-const MERCH_TIERS: Record<YoutubeMerchTier, { label: string; cost: number; energy: number; trustReq: number; margin: number; heat: number }> = {
-    BASIC: { label: 'Basic Merch', cost: 5000, energy: 14, trustReq: 35, margin: 0.28, heat: 1 },
-    PREMIUM: { label: 'Premium Drop', cost: 25000, energy: 22, trustReq: 50, margin: 0.42, heat: 4 },
-    LUXURY: { label: 'Luxury Capsule', cost: 100000, energy: 34, trustReq: 68, margin: 0.62, heat: 8 },
+const MERCH_TIERS: Record<YoutubeMerchTier, { labelKey: string; cost: number; energy: number; trustReq: number; margin: number; heat: number }> = {
+    BASIC: { labelKey: 'youtube.merch.BASIC.label', cost: 5000, energy: 14, trustReq: 35, margin: 0.28, heat: 1 },
+    PREMIUM: { labelKey: 'youtube.merch.PREMIUM.label', cost: 25000, energy: 22, trustReq: 50, margin: 0.42, heat: 4 },
+    LUXURY: { labelKey: 'youtube.merch.LUXURY.label', cost: 100000, energy: 34, trustReq: 68, margin: 0.62, heat: 8 },
 };
 
-const VIDEO_COMMENT_BANKS: Record<YoutubeVideoType, string[]> = {
+const VIDEO_COMMENT_BANK_KEYS: Record<YoutubeVideoType, string[]> = {
     VLOG: [
-        'This felt weirdly real, like I was actually there.',
-        'The chill parts are better than the dramatic parts.',
-        'Daily life content hits when it feels this honest.',
-        'The editing is getting smoother every upload.',
-        'I came for the title but stayed for the personality.'
+        'youtube.comment.video.VLOG.0',
+        'youtube.comment.video.VLOG.1',
+        'youtube.comment.video.VLOG.2',
+        'youtube.comment.video.VLOG.3',
+        'youtube.comment.video.VLOG.4'
     ],
     SKIT: [
-        'The timing on that joke was actually perfect.',
-        'This should become a recurring series.',
-        'That punchline caught me off guard.',
-        'The acting in a comedy skit matters and you nailed it.',
-        'Lowkey funnier than half the big channels.'
+        'youtube.comment.video.SKIT.0',
+        'youtube.comment.video.SKIT.1',
+        'youtube.comment.video.SKIT.2',
+        'youtube.comment.video.SKIT.3',
+        'youtube.comment.video.SKIT.4'
     ],
     Q_AND_A: [
-        'Finally someone asked the question I had.',
-        'Respect for answering this honestly.',
-        'This made the channel feel more personal.',
-        'The casual format works for you.',
-        'Need a part two with spicier questions.'
+        'youtube.comment.video.Q_AND_A.0',
+        'youtube.comment.video.Q_AND_A.1',
+        'youtube.comment.video.Q_AND_A.2',
+        'youtube.comment.video.Q_AND_A.3',
+        'youtube.comment.video.Q_AND_A.4'
     ],
     TRAILER: [
-        'This actually made me want to watch the project.',
-        'The hype is real if the final thing looks like this.',
-        'That last shot sold the whole trailer.',
-        'This promo feels way bigger than the channel size.',
-        'Smart move dropping this before release.'
+        'youtube.comment.video.TRAILER.0',
+        'youtube.comment.video.TRAILER.1',
+        'youtube.comment.video.TRAILER.2',
+        'youtube.comment.video.TRAILER.3',
+        'youtube.comment.video.TRAILER.4'
     ],
     COVER: [
-        'Your voice fits this song better than expected.',
-        'The emotion carried the rough parts.',
-        'Acoustic version next please.',
-        'This needs cleaner audio but the talent is there.',
-        'I did not know you could sing like this.'
+        'youtube.comment.video.COVER.0',
+        'youtube.comment.video.COVER.1',
+        'youtube.comment.video.COVER.2',
+        'youtube.comment.video.COVER.3',
+        'youtube.comment.video.COVER.4'
     ],
     MUSIC_VIDEO: [
-        'This cameo fits the song perfectly.',
-        'The visuals are carrying the rollout.',
-        'This feels bigger than a normal upload.',
-        'The artist and actor chemistry works.',
-        'This should be pushed harder on socials.'
+        'youtube.comment.video.MUSIC_VIDEO.0',
+        'youtube.comment.video.MUSIC_VIDEO.1',
+        'youtube.comment.video.MUSIC_VIDEO.2',
+        'youtube.comment.video.MUSIC_VIDEO.3',
+        'youtube.comment.video.MUSIC_VIDEO.4'
     ],
     STORYTIME: [
-        'I stayed for the whole story.',
-        'This absolutely needs a part two.',
-        'The way you told this made it feel cinematic.',
-        'Not me getting invested in channel lore.',
-        'The pacing made this easy to watch.'
+        'youtube.comment.video.STORYTIME.0',
+        'youtube.comment.video.STORYTIME.1',
+        'youtube.comment.video.STORYTIME.2',
+        'youtube.comment.video.STORYTIME.3',
+        'youtube.comment.video.STORYTIME.4'
     ]
 };
 
-const QUALITY_COMMENT_BANKS = {
+const QUALITY_COMMENT_BANK_KEYS = {
     high: [
-        'This is the upload where the channel leveled up.',
-        'Production quality jumped a lot here.',
-        'You can tell real effort went into this.',
-        'This deserves more attention than it is getting.'
+        'youtube.comment.quality.high.0',
+        'youtube.comment.quality.high.1',
+        'youtube.comment.quality.high.2',
+        'youtube.comment.quality.high.3'
     ],
     mid: [
-        'Solid upload, just needs a tighter edit.',
-        'Good idea, a few slow moments.',
-        'The concept is stronger than the execution, but I liked it.',
-        'Keep going, the channel is finding its lane.'
+        'youtube.comment.quality.mid.0',
+        'youtube.comment.quality.mid.1',
+        'youtube.comment.quality.mid.2',
+        'youtube.comment.quality.mid.3'
     ],
     low: [
-        'Audio is rough but the idea is there.',
-        'This needed one more editing pass.',
-        'Not the best upload, but I respect the attempt.',
-        'The pacing lost me a little.'
+        'youtube.comment.quality.low.0',
+        'youtube.comment.quality.low.1',
+        'youtube.comment.quality.low.2',
+        'youtube.comment.quality.low.3'
     ],
     heated: [
-        'The comments are about to be a war zone.',
-        'I get why people are mad, but this was entertaining.',
-        'This title is doing too much.',
-        'Views are views, I guess.'
+        'youtube.comment.quality.heated.0',
+        'youtube.comment.quality.heated.1',
+        'youtube.comment.quality.heated.2',
+        'youtube.comment.quality.heated.3'
     ],
     small: [
-        'Here before this channel blows up.',
-        'Underrated channel honestly.',
-        'Algorithm is hiding this from people.',
-        'Small creator energy, but in a good way.'
+        'youtube.comment.quality.small.0',
+        'youtube.comment.quality.small.1',
+        'youtube.comment.quality.small.2',
+        'youtube.comment.quality.small.3'
     ],
     big: [
-        'Every upload feels like an event now.',
-        'The fanbase showed up fast.',
-        'Brands are definitely watching this channel.',
-        'Here before trending.'
+        'youtube.comment.quality.big.0',
+        'youtube.comment.quality.big.1',
+        'youtube.comment.quality.big.2',
+        'youtube.comment.quality.big.3'
     ]
 };
 
@@ -296,9 +323,9 @@ const hashString = (value: string) => {
 };
 
 const CREATOR_IDENTITIES: Record<YoutubeCreatorIdentity, {
-    label: string;
-    description: string;
-    uploadNote: string;
+    labelKey: string;
+    descriptionKey: string;
+    uploadNoteKey: string;
     qualityBoost: number;
     viewMultiplier: number;
     trust: number;
@@ -310,9 +337,9 @@ const CREATOR_IDENTITIES: Record<YoutubeCreatorIdentity, {
     accent: string;
 }> = {
     ACTOR_VLOGGER: {
-        label: 'Actor Vlogger',
-        description: 'Clean fame, set access, and reliable fan trust.',
-        uploadNote: 'Balanced creator growth',
+        labelKey: 'youtube.identity.ACTOR_VLOGGER.label',
+        descriptionKey: 'youtube.identity.ACTOR_VLOGGER.description',
+        uploadNoteKey: 'youtube.identity.ACTOR_VLOGGER.uploadNote',
         qualityBoost: 2,
         viewMultiplier: 1.02,
         trust: 1,
@@ -324,9 +351,9 @@ const CREATOR_IDENTITIES: Record<YoutubeCreatorIdentity, {
         accent: 'text-blue-300 border-blue-500/30 bg-blue-500/10'
     },
     CHAOS_CREATOR: {
-        label: 'Chaos Creator',
-        description: 'Huge spikes, messy clips, and higher backlash risk.',
-        uploadNote: 'Viral spikes, risky trust',
+        labelKey: 'youtube.identity.CHAOS_CREATOR.label',
+        descriptionKey: 'youtube.identity.CHAOS_CREATOR.description',
+        uploadNoteKey: 'youtube.identity.CHAOS_CREATOR.uploadNote',
         qualityBoost: -1,
         viewMultiplier: 1.14,
         trust: -1,
@@ -338,9 +365,9 @@ const CREATOR_IDENTITIES: Record<YoutubeCreatorIdentity, {
         accent: 'text-red-300 border-red-500/30 bg-red-500/10'
     },
     PRESTIGE_FILMMAKER: {
-        label: 'Prestige Filmmaker',
-        description: 'Slower channel growth, stronger reputation, better trust.',
-        uploadNote: 'Quality and reputation',
+        labelKey: 'youtube.identity.PRESTIGE_FILMMAKER.label',
+        descriptionKey: 'youtube.identity.PRESTIGE_FILMMAKER.description',
+        uploadNoteKey: 'youtube.identity.PRESTIGE_FILMMAKER.uploadNote',
         qualityBoost: 5,
         viewMultiplier: 0.92,
         trust: 2,
@@ -352,9 +379,9 @@ const CREATOR_IDENTITIES: Record<YoutubeCreatorIdentity, {
         accent: 'text-amber-300 border-amber-500/30 bg-amber-500/10'
     },
     LIFESTYLE_ICON: {
-        label: 'Lifestyle Icon',
-        description: 'Stronger memberships, merch, and luxury-audience pull.',
-        uploadNote: 'Members and merch magnet',
+        labelKey: 'youtube.identity.LIFESTYLE_ICON.label',
+        descriptionKey: 'youtube.identity.LIFESTYLE_ICON.description',
+        uploadNoteKey: 'youtube.identity.LIFESTYLE_ICON.uploadNote',
         qualityBoost: 1,
         viewMultiplier: 1.03,
         trust: 1,
@@ -366,9 +393,9 @@ const CREATOR_IDENTITIES: Record<YoutubeCreatorIdentity, {
         accent: 'text-emerald-300 border-emerald-500/30 bg-emerald-500/10'
     },
     CONTROVERSY_MAGNET: {
-        label: 'Controversy Magnet',
-        description: 'Maximum attention, fragile trust, constant heat.',
-        uploadNote: 'Attention at a cost',
+        labelKey: 'youtube.identity.CONTROVERSY_MAGNET.label',
+        descriptionKey: 'youtube.identity.CONTROVERSY_MAGNET.description',
+        uploadNoteKey: 'youtube.identity.CONTROVERSY_MAGNET.uploadNote',
         qualityBoost: -2,
         viewMultiplier: 1.2,
         trust: -2,
@@ -382,6 +409,39 @@ const CREATOR_IDENTITIES: Record<YoutubeCreatorIdentity, {
 };
 
 export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdatePlayer }) => {
+    const language = getPlayerLanguage(player);
+    const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
+    const getVideoTypeConfig = (videoType: YoutubeVideoType) => {
+        const config = VIDEO_TYPES.find(item => item.type === videoType) || VIDEO_TYPES[0];
+        return { ...config, label: tr(config.labelKey) };
+    };
+    const getUploadPlanConfig = (planKey: YoutubeUploadPlan) => {
+        const config = UPLOAD_PLANS[planKey];
+        return {
+            ...config,
+            label: tr(config.labelKey),
+            description: tr(config.descriptionKey),
+            comments: config.commentKeys.map(key => tr(key)),
+        };
+    };
+    const getCreatorIdentityConfig = (identityKey: YoutubeCreatorIdentity) => {
+        const config = CREATOR_IDENTITIES[identityKey];
+        return {
+            ...config,
+            label: tr(config.labelKey),
+            description: tr(config.descriptionKey),
+            uploadNote: tr(config.uploadNoteKey),
+        };
+    };
+    const getMerchTierConfig = (tierKey: YoutubeMerchTier) => {
+        const config = MERCH_TIERS[tierKey];
+        return { ...config, label: tr(config.labelKey) };
+    };
+    const getMilestoneConfig = (milestone: typeof CREATOR_MILESTONES[number]) => ({
+        ...milestone,
+        label: tr(milestone.labelKey),
+    });
+    const getCommentBank = (keys: string[]) => keys.map(key => tr(key));
     const [activeTab, setActiveTab] = useState<'HOME' | 'STUDIO'>('HOME');
     const [studioSection, setStudioSection] = useState<'OVERVIEW' | 'IDENTITY' | 'MONETIZE' | 'DEALS' | 'CONTENT'>('OVERVIEW');
     const [view, setView] = useState<'MAIN' | 'UPLOAD' | 'WATCH'>('MAIN');
@@ -391,6 +451,8 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
     const [title, setTitle] = useState('');
     const [selectedType, setSelectedType] = useState<YoutubeVideoType>('VLOG');
     const [selectedPlan, setSelectedPlan] = useState<YoutubeUploadPlan>('SAFE');
+    const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
+    const [assetFilter, setAssetFilter] = useState<YoutubeAssetFilter>('ALL');
     const [thumbnailSourceUrl, setThumbnailSourceUrl] = useState<string | null>(null);
     const [thumbnailZoom, setThumbnailZoom] = useState(1);
     const [thumbnailOffsetX, setThumbnailOffsetX] = useState(0);
@@ -435,6 +497,7 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
         if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
         return Math.floor(num).toLocaleString();
     };
+    const moneyShort = (value: number) => `$${formatNumber(value)}`;
 
     const unlockedMilestones = Array.isArray(player.flags?.youtubeMilestonesUnlocked)
         ? player.flags.youtubeMilestonesUnlocked
@@ -444,28 +507,94 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
     const canMerchDrop = absoluteWeek - (channel.lastMerchDropWeek || 0) >= 6;
     const canEarnLivestreamDonations = channel.isMonetized && channel.subscribers >= 1000;
     const currentIdentityKey = channel.creatorIdentity || 'ACTOR_VLOGGER';
-    const currentIdentity = CREATOR_IDENTITIES[currentIdentityKey];
+    const currentIdentity = getCreatorIdentityConfig(currentIdentityKey);
     const identityCooldownWeeks = 12;
     const identityWeeksRemaining = Math.max(0, identityCooldownWeeks - (absoluteWeek - (channel.lastIdentityChangeWeek || 0)));
     const canChangeIdentity = identityWeeksRemaining === 0 || !channel.lastIdentityChangeWeek;
     const creatorScore = calculateYoutubeCreatorScore(player);
     const publicImage = getYoutubePublicImageLabel(player);
     const studioSections: { key: typeof studioSection; label: string; hint: string; metric?: string }[] = [
-        { key: 'OVERVIEW', label: 'Overview', hint: 'Score + analytics', metric: `${creatorScore}` },
-        { key: 'IDENTITY', label: 'Identity', hint: 'Creator lane', metric: canChangeIdentity ? 'Ready' : `${identityWeeksRemaining}w` },
-        { key: 'MONETIZE', label: 'Money', hint: 'Members + merch', metric: `$${formatNumber(channel.lifetimeEarnings)}` },
-        { key: 'DEALS', label: 'Offers', hint: 'Collabs + brands', metric: `${channel.activeCollabs.length + channel.activeBrandDeals.length}` },
-        { key: 'CONTENT', label: 'Content', hint: 'Uploads', metric: `${channel.videos.length}` }
+        { key: 'OVERVIEW', label: tr('youtube.studio.section.overview.label'), hint: tr('youtube.studio.section.overview.hint'), metric: `${creatorScore}` },
+        { key: 'IDENTITY', label: tr('youtube.studio.section.identity.label'), hint: tr('youtube.studio.section.identity.hint'), metric: canChangeIdentity ? tr('youtube.ready') : tr('youtube.weeksShort', { weeks: identityWeeksRemaining }) },
+        { key: 'MONETIZE', label: tr('youtube.studio.section.money.label'), hint: tr('youtube.studio.section.money.hint'), metric: `$${formatNumber(channel.lifetimeEarnings)}` },
+        { key: 'DEALS', label: tr('youtube.studio.section.offers.label'), hint: tr('youtube.studio.section.offers.hint'), metric: `${channel.activeCollabs.length + channel.activeBrandDeals.length}` },
+        { key: 'CONTENT', label: tr('youtube.studio.section.content.label'), hint: tr('youtube.studio.section.content.hint'), metric: `${channel.videos.length}` }
     ];
     const watchableVideos = useMemo(() => {
         const playerIds = new Set(channel.videos.map(video => video.id));
         return [...channel.videos, ...homeFeed.filter(video => !playerIds.has(video.id))];
     }, [channel.videos, homeFeed]);
     const selectedVideo = watchableVideos.find(video => video.id === selectedVideoId) || null;
+    const contentAssetCatalog = useMemo<YoutubeContentAsset[]>(() => {
+        const marketAssets: YoutubeContentAsset[] = [
+            ...PROPERTY_CATALOG,
+            ...CAR_CATALOG,
+            ...MOTORCYCLE_CATALOG,
+            ...BOAT_CATALOG,
+            ...AIRCRAFT_CATALOG,
+            ...CLOTHING_CATALOG
+        ];
+        const customAssets = (Array.isArray(player.customItems) ? player.customItems : [])
+            .filter((item): item is YoutubeContentAsset => item?.type === 'Property' || item?.type === 'Vehicle' || item?.type === 'Clothing');
+        return [...marketAssets, ...customAssets];
+    }, [player.customItems]);
+    const contentAssetsById = useMemo(() => new Map(contentAssetCatalog.map(item => [item.id, item])), [contentAssetCatalog]);
+    const ownedContentAssets = useMemo(() => {
+        return (player.assets || [])
+            .map(assetId => contentAssetsById.get(assetId))
+            .filter((item): item is YoutubeContentAsset => Boolean(item))
+            .sort((a, b) => b.price - a.price);
+    }, [player.assets, contentAssetsById]);
+    const eligibleContentAssets = useMemo(() => {
+        const highProductionTypes: YoutubeVideoType[] = ['SKIT', 'TRAILER', 'MUSIC_VIDEO'];
+        const propertyFirst = highProductionTypes.includes(selectedType);
+        return ownedContentAssets
+            .filter(item => {
+                if (item.type === 'Property') return true;
+                if (item.type === 'Vehicle') return selectedType !== 'Q_AND_A' && selectedType !== 'COVER';
+                return selectedType !== 'TRAILER';
+            })
+            .sort((a, b) => {
+                if (propertyFirst && a.type !== b.type) return a.type === 'Property' ? -1 : 1;
+                return b.price - a.price;
+            })
+            .slice(0, 8);
+    }, [ownedContentAssets, selectedType]);
+    const selectedContentAsset = eligibleContentAssets.find(item => item.id === selectedAssetId) || null;
+    const filteredContentAssets = eligibleContentAssets
+        .filter(item => assetFilter === 'ALL' || item.type.toUpperCase() === assetFilter);
+    const baseAssetFilterOptions: { id: YoutubeAssetFilter; label: string }[] = [
+        { id: 'ALL', label: tr('youtube.assetFilter.all') },
+        { id: 'PROPERTY', label: tr('youtube.assetFilter.homes') },
+        { id: 'VEHICLE', label: tr('youtube.assetFilter.vehicles') },
+        { id: 'CLOTHING', label: tr('youtube.assetFilter.wardrobe') },
+    ];
+    const assetFilterOptions = baseAssetFilterOptions
+        .filter(option => option.id === 'ALL' || eligibleContentAssets.some(item => item.type.toUpperCase() === option.id));
+    const getAssetContext = (item: YoutubeContentAsset): NonNullable<YoutubeVideo['assetContext']> => {
+        const priceBoost = Math.min(7, Math.max(1, Math.floor(Math.log10(Math.max(10_000, item.price)) - 3)));
+        const typeBoost = item.type === 'Property' ? 2 : item.type === 'Vehicle' ? 1 : 0;
+        const label = item.type === 'Property' ? tr('youtube.assetContext.shootLocation') : item.type === 'Vehicle' ? tr('youtube.assetContext.featuredAsset') : tr('youtube.assetContext.wardrobe');
+        return {
+            assetId: item.id,
+            assetName: item.name,
+            assetType: item.type,
+            label,
+            qualityBonus: Math.min(10, priceBoost + typeBoost),
+            viewBoost: Math.round((250 + priceBoost * 180 + (item.type === 'Vehicle' ? 250 : 0)) / 50) * 50
+        };
+    };
+    const selectedAssetContext = selectedContentAsset ? getAssetContext(selectedContentAsset) : undefined;
+
+    useEffect(() => {
+        if (selectedAssetId && !eligibleContentAssets.some(item => item.id === selectedAssetId)) {
+            setSelectedAssetId(null);
+        }
+    }, [eligibleContentAssets, selectedAssetId]);
 
     const getVideoAgeLabel = (video: YoutubeVideo) => {
         const weeksAgo = getWeeksSinceYoutubeUpload(player.age, player.currentWeek, video.weekUploaded, video.yearUploaded);
-        return weeksAgo === 0 ? 'Just now' : `${weeksAgo}w ago`;
+        return weeksAgo === 0 ? tr('youtube.justNow') : tr('youtube.weeksAgo', { weeks: weeksAgo });
     };
 
     const getWatchComments = (video: YoutubeVideo) => {
@@ -480,10 +609,10 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
         const sizeKey = video.views >= 100000 || channel.subscribers >= 100000 ? 'big' : 'small';
         const rawComments = [
             ...(video.comments || []),
-            ...VIDEO_COMMENT_BANKS[video.type],
-            ...QUALITY_COMMENT_BANKS[qualityKey],
-            ...QUALITY_COMMENT_BANKS[sizeKey],
-            ...(video.uploadPlan ? UPLOAD_PLANS[video.uploadPlan]?.comments || [] : [])
+            ...getCommentBank(VIDEO_COMMENT_BANK_KEYS[video.type]),
+            ...getCommentBank(QUALITY_COMMENT_BANK_KEYS[qualityKey]),
+            ...getCommentBank(QUALITY_COMMENT_BANK_KEYS[sizeKey]),
+            ...(video.uploadPlan ? getUploadPlanConfig(video.uploadPlan).comments : [])
         ];
         const uniqueComments = Array.from(new Set(rawComments.filter(Boolean)));
         const commentCount = Math.min(14, Math.max(7, uniqueComments.length));
@@ -497,7 +626,7 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
                 author: ['clipwatcher', 'filmnerd', 'tinyfan', 'uploadregular', 'commentarykid', 'nightviewer', 'setlife', 'algorithmghost'][(seed + index) % 8],
                 text,
                 likes,
-                age: index < 2 ? 'now' : `${Math.max(1, ((seed + index) % 9) + 1)}w ago`,
+                age: index < 2 ? tr('youtube.now') : tr('youtube.weeksAgo', { weeks: Math.max(1, ((seed + index) % 9) + 1) }),
                 avatar: `https://api.dicebear.com/8.x/pixel-art/svg?seed=${encodeURIComponent(avatarSeed)}`
             };
         });
@@ -621,18 +750,19 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
         seededViews = 0,
         uploadPlan: YoutubeUploadPlan = 'SAFE',
         extraComments: string[] = [],
-        thumbnailMediaId?: string
+        thumbnailMediaId?: string,
+        assetContext?: YoutubeVideo['assetContext']
     ): YoutubeVideo => {
-        const plan = UPLOAD_PLANS[uploadPlan];
-        const identity = CREATOR_IDENTITIES[currentIdentityKey];
+        const plan = getUploadPlanConfig(uploadPlan);
+        const identity = getCreatorIdentityConfig(currentIdentityKey);
         const improv = player.stats.skills.improvisation || 0;
         const charisma = player.stats.skills.charisma || 0;
         const baseQuality = (improv + charisma) / 2;
         const variance = Math.random() * 20;
-        const qualityScore = Math.min(100, baseQuality + variance + qualityBoost + plan.qualityBoost + identity.qualityBoost);
+        const qualityScore = Math.min(100, baseQuality + variance + qualityBoost + plan.qualityBoost + identity.qualityBoost + (assetContext?.qualityBonus || 0));
         const colors = ['bg-red-500', 'bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-yellow-500', 'bg-pink-500', 'bg-indigo-500'];
         const thumbnailColor = colors[Math.floor(Math.random() * colors.length)];
-        const finalSeededViews = Math.floor((seededViews + Math.floor(plan.viewBoost * (0.75 + Math.random() * 0.6))) * identity.viewMultiplier);
+        const finalSeededViews = Math.floor((seededViews + (assetContext?.viewBoost || 0) + Math.floor(plan.viewBoost * (0.75 + Math.random() * 0.6))) * identity.viewMultiplier);
 
         return {
             id: `vid_${Date.now()}_${Math.random()}`,
@@ -648,11 +778,12 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
             authorName: player.name,
             qualityScore,
             thumbnailMediaId,
+            assetContext,
             uploadPlan,
             controversyScore: Math.max(0, plan.controversy + identity.heat),
             trustImpact: plan.trust + identity.trust,
             weeklyHistory: finalSeededViews > 0 ? [finalSeededViews] : [],
-            comments: [identity.uploadNote, ...plan.comments, ...extraComments].slice(0, 5)
+            comments: [identity.uploadNote, ...(assetContext ? [tr('youtube.comment.assetContext', { label: assetContext.label })] : []), ...plan.comments, ...extraComments].slice(0, 5)
         };
     };
 
@@ -677,39 +808,39 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
         const chemistryRoll = video.qualityScore + Math.random() * 28;
         if (chemistryRoll >= 105) {
             return {
-                label: 'Breakout Collab',
+                label: tr('youtube.outcome.collab.breakout.label'),
                 bonusViews: Math.floor(collab.bonusViews * 0.55),
                 bonusSubs: Math.floor(collab.bonusSubscribers * 0.65),
                 fame: 2,
                 reputation: 2,
                 logType: 'positive' as const,
-                log: `${collab.creatorName} collab became a breakout creator moment.`,
-                social: `The chemistry between ${player.name} and ${collab.creatorName} is carrying timelines today. That collab did not feel forced.`,
-                news: `${player.name} and ${collab.creatorName} turn a YouTube collab into a viral industry moment.`
+                log: tr('youtube.outcome.collab.breakout.log', { creator: collab.creatorName }),
+                social: tr('youtube.outcome.collab.breakout.social', { player: player.name, creator: collab.creatorName }),
+                news: tr('youtube.outcome.collab.breakout.news', { player: player.name, creator: collab.creatorName })
             };
         }
         if (chemistryRoll < 58) {
             return {
-                label: 'Awkward Collab',
+                label: tr('youtube.outcome.collab.awkward.label'),
                 bonusViews: 0,
                 bonusSubs: -Math.floor(collab.bonusSubscribers * 0.25),
                 fame: 0,
                 reputation: -2,
                 logType: 'negative' as const,
-                log: `${collab.creatorName} collab felt awkward and viewers noticed.`,
-                social: `${player.name}'s collab with ${collab.creatorName} has people asking if creators should rehearse chemistry first.`,
-                news: `${player.name}'s latest creator collab divides viewers.`
+                log: tr('youtube.outcome.collab.awkward.log', { creator: collab.creatorName }),
+                social: tr('youtube.outcome.collab.awkward.social', { player: player.name, creator: collab.creatorName }),
+                news: tr('youtube.outcome.collab.awkward.news', { player: player.name })
             };
         }
         return {
-            label: 'Solid Collab',
+            label: tr('youtube.outcome.collab.solid.label'),
             bonusViews: Math.floor(collab.bonusViews * 0.18),
             bonusSubs: Math.floor(collab.bonusSubscribers * 0.22),
             fame: 1,
             reputation: 1,
             logType: 'positive' as const,
-            log: `${collab.creatorName} collab landed well with both audiences.`,
-            social: `${player.name} and ${collab.creatorName} just dropped an easy creator win.`,
+            log: tr('youtube.outcome.collab.solid.log', { creator: collab.creatorName }),
+            social: tr('youtube.outcome.collab.solid.social', { player: player.name, creator: collab.creatorName }),
             news: ''
         };
     };
@@ -718,36 +849,36 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
         const audienceTrust = (video.qualityScore * 0.55) + (player.stats.reputation * 0.35) + Math.random() * 25;
         if (audienceTrust >= 88) {
             return {
-                label: 'Clean Integration',
+                label: tr('youtube.outcome.brand.clean.label'),
                 payoutMultiplier: 1.18,
                 bonusViews: Math.floor(deal.bonusViews * 0.3),
                 reputation: 2,
                 logType: 'positive' as const,
-                log: `${deal.brandName} integration felt natural and the brand wants another call.`,
-                social: `${player.name} made a ${deal.brandName} ad feel like content. Rare creator skill.`,
+                log: tr('youtube.outcome.brand.clean.log', { brand: deal.brandName }),
+                social: tr('youtube.outcome.brand.clean.social', { player: player.name, brand: deal.brandName }),
                 news: ''
             };
         }
         if (audienceTrust < 45) {
             return {
-                label: 'Sponsor Backlash',
+                label: tr('youtube.outcome.brand.backlash.label'),
                 payoutMultiplier: 0.85,
                 bonusViews: 0,
                 reputation: -4,
                 logType: 'negative' as const,
-                log: `${deal.brandName} integration was called too forced by viewers.`,
-                social: `${player.name}'s ${deal.brandName} integration is getting roasted for feeling too scripted.`,
-                news: `${player.name} faces creator backlash after a heavy-handed brand integration.`
+                log: tr('youtube.outcome.brand.backlash.log', { brand: deal.brandName }),
+                social: tr('youtube.outcome.brand.backlash.social', { player: player.name, brand: deal.brandName }),
+                news: tr('youtube.outcome.brand.backlash.news', { player: player.name })
             };
         }
         return {
-            label: 'Paid Upload',
+            label: tr('youtube.outcome.brand.paid.label'),
             payoutMultiplier: 1,
             bonusViews: Math.floor(deal.bonusViews * 0.12),
             reputation: 0,
             logType: 'positive' as const,
-            log: `${deal.brandName} integration performed cleanly.`,
-            social: `${player.name} posted a ${deal.brandName} integration and the audience mostly bought in.`,
+            log: tr('youtube.outcome.brand.paid.log', { brand: deal.brandName }),
+            social: tr('youtube.outcome.brand.paid.social', { player: player.name, brand: deal.brandName }),
             news: ''
         };
     };
@@ -755,11 +886,11 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
     const handleChangeIdentity = (identityKey: YoutubeCreatorIdentity) => {
         if (identityKey === currentIdentityKey) return;
         if (!canChangeIdentity) {
-            alert(`Creator identity can change again in ${identityWeeksRemaining} weeks.`);
+            alert(tr('youtube.alert.identityCooldown', { weeks: identityWeeksRemaining }));
             return;
         }
 
-        const identity = CREATOR_IDENTITIES[identityKey];
+        const identity = getCreatorIdentityConfig(identityKey);
         const nextTrust = Math.max(0, Math.min(100, (channel.audienceTrust ?? 55) + identity.trust));
         const nextMood = Math.max(0, Math.min(100, (channel.fanMood ?? 55) + identity.mood));
         const nextHeat = Math.max(0, Math.min(100, (channel.controversy ?? 0) + identity.heat));
@@ -777,7 +908,7 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
             logs: [...player.logs, {
                 week: player.currentWeek,
                 year: player.age,
-                message: `You repositioned the channel as ${identity.label}.`,
+                message: tr('youtube.log.identityChanged', { identity: identity.label }),
                 type: identity.heat > 2 ? 'neutral' : 'positive'
             }]
         });
@@ -785,7 +916,7 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
 
     const handleEnableMemberships = () => {
         if (!channel.isMonetized || channel.subscribers < 10000) {
-            alert("Memberships unlock at 10K subscribers after monetization.");
+            alert(tr('youtube.alert.membershipsLocked'));
             return;
         }
         if (!beginYoutubeMoneyAction('memberships')) return;
@@ -799,22 +930,22 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
                 members: Math.max(channel.members || 0, startingMembers),
                 audienceTrust: Math.min(100, (channel.audienceTrust ?? 55) + 2)
             },
-            logs: [...player.logs, { week: player.currentWeek, year: player.age, message: `You launched channel memberships with ${startingMembers.toLocaleString()} founding members.`, type: 'positive' }]
+            logs: [...player.logs, { week: player.currentWeek, year: player.age, message: tr('youtube.log.membershipsLaunched', { members: startingMembers.toLocaleString() }), type: 'positive' }]
         });
     };
 
     const handleLivestream = () => {
         const energyCost = 18;
         if (!canLivestream) {
-            alert("You already streamed this week.");
+            alert(tr('youtube.alert.streamedThisWeek'));
             return;
         }
         if (player.energy.current < energyCost) {
-            alert("Not enough energy!");
+            alert(tr('youtube.alert.notEnoughEnergy'));
             return;
         }
         if (!canEarnLivestreamDonations) {
-            alert("Livestream donations unlock after YouTube monetization and 1K subscribers.");
+            alert(tr('youtube.alert.livestreamDonationsLocked'));
             return;
         }
         if (!beginYoutubeMoneyAction('livestream')) return;
@@ -844,8 +975,8 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
                 ...player.x,
                 followers: player.x.followers + Math.floor(liveViews * 0.01),
                 feed: [createXPost(messy
-                    ? `${player.name}'s livestream got clipped instantly. Fans are debating every sentence.`
-                    : `${player.name}'s livestream felt intimate, generous, and weirdly addictive.`,
+                    ? tr('youtube.x.livestreamMessy', { name: player.name })
+                    : tr('youtube.x.livestreamWin', { name: player.name }),
                     liveViews
                 ), ...player.x.feed].slice(0, 50)
             },
@@ -853,8 +984,8 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
                 week: player.currentWeek,
                 year: player.age,
                 message: messy
-                    ? `Livestream got messy: +${formatNumber(liveViews)} views, $${donations.toLocaleString()} donations, but controversy rose.`
-                    : `Livestream win: +${formatNumber(liveViews)} views, +${subs.toLocaleString()} subs, $${donations.toLocaleString()} donations.`,
+                    ? tr('youtube.log.livestreamMessy', { views: formatNumber(liveViews), donations: donations.toLocaleString() })
+                    : tr('youtube.log.livestreamWin', { views: formatNumber(liveViews), subs: subs.toLocaleString(), donations: donations.toLocaleString() }),
                 type: messy ? 'negative' as const : 'positive' as const
             }]
         };
@@ -863,23 +994,23 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
     };
 
     const handleMerchDrop = (tierKey: YoutubeMerchTier) => {
-        const tier = MERCH_TIERS[tierKey];
+        const tier = getMerchTierConfig(tierKey);
         const trust = channel.audienceTrust ?? 55;
         const mood = channel.fanMood ?? 55;
         if (!canMerchDrop) {
-            alert("Merch drops need a 6 week cooldown.");
+            alert(tr('youtube.alert.merchCooldown'));
             return;
         }
         if (trust < tier.trustReq) {
-            alert(`Audience trust must be ${tier.trustReq}+ for this drop.`);
+            alert(tr('youtube.alert.audienceTrustRequired', { trust: tier.trustReq }));
             return;
         }
         if (player.energy.current < tier.energy) {
-            alert("Not enough energy!");
+            alert(tr('youtube.alert.notEnoughEnergy'));
             return;
         }
         if (player.money < tier.cost) {
-            alert("Not enough money!");
+            alert(tr('youtube.alert.notEnoughMoney'));
             return;
         }
         if (!beginYoutubeMoneyAction(`merch_${tierKey}`)) return;
@@ -889,7 +1020,7 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
         const profit = gross - tier.cost;
         const soldOut = profit > tier.cost * 1.2;
         const flop = profit < 0;
-        const result = soldOut ? `${tier.label} sold out` : flop ? `${tier.label} underperformed` : `${tier.label} turned a profit`;
+        const result = soldOut ? tr('youtube.merch.result.soldOut', { tier: tier.label }) : flop ? tr('youtube.merch.result.underperformed', { tier: tier.label }) : tr('youtube.merch.result.profit', { tier: tier.label });
 
         const nextPlayer = {
             ...player,
@@ -906,7 +1037,7 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
             logs: [...player.logs, {
                 week: player.currentWeek,
                 year: player.age,
-                message: `${result}: gross $${gross.toLocaleString()}, profit $${profit.toLocaleString()}.`,
+                message: tr('youtube.log.merchResult', { result, gross: gross.toLocaleString(), profit: profit.toLocaleString() }),
                 type: flop ? 'negative' as const : 'positive' as const
             }]
         };
@@ -918,15 +1049,15 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
         if (isThumbnailProcessing) return;
         if (!title.trim()) return;
         
-        const typeConfig = VIDEO_TYPES.find(t => t.type === selectedType);
+        const typeConfig = getVideoTypeConfig(selectedType);
         if (!typeConfig) return;
 
         if (player.energy.current < typeConfig.energy) {
-            alert("Not enough energy!");
+            alert(tr('youtube.alert.notEnoughEnergy'));
             return;
         }
         if (player.money < typeConfig.cost) {
-            alert("Not enough money!");
+            alert(tr('youtube.alert.notEnoughMoney'));
             return;
         }
 
@@ -945,13 +1076,13 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
             }
         } catch (err) {
             console.error('Thumbnail processing failed', err);
-            setThumbnailError('Could not save that thumbnail. Try another image.');
+            setThumbnailError(tr('youtube.thumbnail.saveError'));
             setIsThumbnailProcessing(false);
             return;
         }
 
-        const newVideo = createYoutubeVideo(title, selectedType, 0, 0, selectedPlan, [], thumbnailMediaId);
-        const plan = UPLOAD_PLANS[selectedPlan];
+        const newVideo = createYoutubeVideo(title, selectedType, 0, 0, selectedPlan, [], thumbnailMediaId, selectedAssetContext);
+        const plan = getUploadPlanConfig(selectedPlan);
 
         const updatedChannel = {
             ...channel,
@@ -966,7 +1097,7 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
             ...player,
             money: player.money - typeConfig.cost,
             youtube: updatedChannel,
-            logs: [...player.logs, { week: player.currentWeek, year: player.age, message: `Uploaded ${plan.label}: ${title}`, type: selectedPlan === 'VIRAL_BAIT' || selectedPlan === 'SPONSOR_HEAVY' ? 'neutral' : 'positive' }]
+            logs: [...player.logs, { week: player.currentWeek, year: player.age, message: selectedAssetContext ? tr('youtube.log.uploadedWithAsset', { plan: plan.label, title, asset: selectedAssetContext.assetName }) : tr('youtube.log.uploaded', { plan: plan.label, title }), type: selectedPlan === 'VIRAL_BAIT' || selectedPlan === 'SPONSOR_HEAVY' ? 'neutral' : 'positive' }]
         };
         spendPlayerEnergy(nextPlayer, typeConfig.energy);
         onUpdatePlayer(nextPlayer);
@@ -974,6 +1105,7 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
         setView('MAIN');
         setTitle('');
         setSelectedPlan('SAFE');
+        setSelectedAssetId(null);
         resetThumbnailEditor();
         setIsThumbnailProcessing(false);
         setActiveTab('STUDIO'); // Switch to studio to see new video
@@ -982,14 +1114,14 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
     const handleCompleteCollab = (collab: YoutubeCollabOffer) => {
         if (!channel.activeCollabs.some(item => item.id === collab.id)) return;
         if (player.energy.current < collab.energyCost) {
-            alert("Not enough energy!");
+            alert(tr('youtube.alert.notEnoughEnergy'));
             return;
         }
         if (!beginYoutubeMoneyAction(`collab_${collab.id}`)) return;
 
         const realizedBaseViews = Math.floor(collab.bonusViews * (0.85 + Math.random() * 0.35));
         const realizedBaseSubscribers = Math.floor(collab.bonusSubscribers * (0.85 + Math.random() * 0.35));
-        const newVideo = createYoutubeVideo(collab.conceptTitle, collab.requiredType, collab.qualityBonus, realizedBaseViews, 'BTS', [`${collab.creatorName} carried this too.`, 'This duo needs another episode.']);
+        const newVideo = createYoutubeVideo(collab.conceptTitle, collab.requiredType, collab.qualityBonus, realizedBaseViews, 'BTS', [tr('youtube.comment.collab.carried', { creator: collab.creatorName }), tr('youtube.comment.collab.duo')]);
         const outcome = getCollabOutcome(newVideo, collab);
         const finalBonusViews = Math.max(0, outcome.bonusViews);
         const finalBonusSubscribers = outcome.bonusSubs;
@@ -1034,7 +1166,7 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
             },
             youtube: updatedChannel,
             news: nextNews,
-            logs: [...player.logs, { week: player.currentWeek, year: player.age, message: `${outcome.label}: ${outcome.log}`, type: outcome.logType }]
+            logs: [...player.logs, { week: player.currentWeek, year: player.age, message: tr('youtube.log.collabOutcome', { label: outcome.label, log: outcome.log }), type: outcome.logType }]
         };
         spendPlayerEnergy(nextPlayer, collab.energyCost);
         onUpdatePlayer(nextPlayer);
@@ -1043,14 +1175,14 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
     const handleCompleteBrandDeal = (deal: YoutubeBrandDeal) => {
         if (!channel.activeBrandDeals.some(item => item.id === deal.id)) return;
         if (player.energy.current < deal.energyCost) {
-            alert("Not enough energy!");
+            alert(tr('youtube.alert.notEnoughEnergy'));
             return;
         }
         if (!beginYoutubeMoneyAction(`brand_${deal.id}`)) return;
 
         const titleForVideo = `${deal.brandName} x ${player.name} - ${deal.requiredType.replace(/_/g, ' ')}`;
         const realizedBaseViews = Math.floor(deal.bonusViews * (0.85 + Math.random() * 0.35));
-        const newVideo = createYoutubeVideo(titleForVideo, deal.requiredType, 6, realizedBaseViews, 'SPONSOR_HEAVY', [`${deal.brandName} placement was loud.`, 'The production value is there though.']);
+        const newVideo = createYoutubeVideo(titleForVideo, deal.requiredType, 6, realizedBaseViews, 'SPONSOR_HEAVY', [tr('youtube.comment.brand.loud', { brand: deal.brandName }), tr('youtube.comment.brand.production')]);
         const outcome = getBrandOutcome(newVideo, deal);
         const finalPayout = Math.floor(deal.payout * outcome.payoutMultiplier);
         newVideo.views += outcome.bonusViews;
@@ -1093,7 +1225,7 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
             },
             youtube: updatedChannel,
             news: nextNews,
-            logs: [...player.logs, { week: player.currentWeek, year: player.age, message: `${outcome.label}: ${outcome.log} Payout: $${finalPayout.toLocaleString()}.`, type: outcome.logType }]
+            logs: [...player.logs, { week: player.currentWeek, year: player.age, message: tr('youtube.log.brandOutcome', { label: outcome.label, log: outcome.log, payout: finalPayout.toLocaleString() }), type: outcome.logType }]
         };
         spendPlayerEnergy(nextPlayer, deal.energyCost);
         onUpdatePlayer(nextPlayer);
@@ -1106,7 +1238,7 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
                 {/* Center Format Text */}
                 <div className="relative z-10 text-center transform group-hover:scale-105 transition-transform duration-300">
                     <span className="block text-white/90 font-black text-3xl uppercase tracking-tighter drop-shadow-lg scale-y-110">
-                        {video.type.replace(/_/g, ' ')}
+                        {getVideoTypeConfig(video.type).label}
                     </span>
                 </div>
 
@@ -1125,8 +1257,13 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
                             <>
                     <div className="font-bold text-sm text-white leading-tight mb-1 line-clamp-2 group-hover:text-red-500 transition-colors">{video.title}</div>
                     <div className="text-xs text-zinc-400">
-                        {video.authorName} • {formatNumber(video.views)} views • {timeLabel}
+                        {video.authorName} • {tr('youtube.viewsCount', { count: formatNumber(video.views) })} • {timeLabel}
                     </div>
+                    {video.assetContext && (
+                        <div className="mt-1 text-[10px] font-black uppercase tracking-[0.14em] text-cyan-300 line-clamp-1">
+                            {video.assetContext.label}: {video.assetContext.assetName}
+                        </div>
+                    )}
                             </>
                         );
                     })()}
@@ -1135,8 +1272,8 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
         </button>
     );
 
-    const selectedVideoType = VIDEO_TYPES.find(type => type.type === selectedType) || VIDEO_TYPES[0];
-    const selectedUploadPlan = UPLOAD_PLANS[selectedPlan];
+    const selectedVideoType = getVideoTypeConfig(selectedType);
+    const selectedUploadPlan = getUploadPlanConfig(selectedPlan);
     const thumbnailThemeByType: Record<YoutubeVideoType, string> = {
         VLOG: 'bg-[radial-gradient(circle_at_18%_18%,rgba(255,255,255,0.22),transparent_24%),linear-gradient(135deg,#dc2626,#f97316,#451a03)]',
         SKIT: 'bg-[radial-gradient(circle_at_22%_18%,rgba(255,255,255,0.2),transparent_24%),linear-gradient(135deg,#7c3aed,#ec4899,#111827)]',
@@ -1148,9 +1285,9 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
     };
     const selectedThumbnailTheme = thumbnailThemeByType[selectedType] || thumbnailThemeByType.VLOG;
     const strategySignal = [
-        { label: 'Views', value: selectedUploadPlan.viewBoost > 600 ? 'High' : selectedUploadPlan.viewBoost > 0 ? 'Medium' : 'Steady', color: 'text-red-300' },
-        { label: 'Trust', value: `${selectedUploadPlan.trust >= 0 ? '+' : ''}${selectedUploadPlan.trust}`, color: selectedUploadPlan.trust >= 0 ? 'text-emerald-300' : 'text-rose-300' },
-        { label: 'Heat', value: selectedUploadPlan.controversy > 6 ? 'Risky' : selectedUploadPlan.controversy > 0 ? 'Warm' : 'Low', color: selectedUploadPlan.controversy > 0 ? 'text-orange-300' : 'text-blue-300' }
+        { label: tr('youtube.forecast.views'), value: selectedUploadPlan.viewBoost > 600 ? tr('youtube.value.high') : selectedUploadPlan.viewBoost > 0 ? tr('youtube.value.medium') : tr('youtube.value.steady'), color: 'text-red-300' },
+        { label: tr('youtube.forecast.trust'), value: `${selectedUploadPlan.trust >= 0 ? '+' : ''}${selectedUploadPlan.trust}`, color: selectedUploadPlan.trust >= 0 ? 'text-emerald-300' : 'text-rose-300' },
+        { label: tr('youtube.forecast.heat'), value: selectedUploadPlan.controversy > 6 ? tr('youtube.value.risky') : selectedUploadPlan.controversy > 0 ? tr('youtube.value.warm') : tr('youtube.value.low'), color: selectedUploadPlan.controversy > 0 ? 'text-orange-300' : 'text-blue-300' }
     ];
 
     return (
@@ -1179,8 +1316,8 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
                             <ArrowLeft size={20}/>
                         </button>
                         <div className="text-center">
-                            <h2 className="font-black text-lg leading-tight">Creator Studio</h2>
-                            <div className="text-[9px] text-red-400 font-black uppercase tracking-[0.25em]">Upload Video</div>
+                            <h2 className="font-black text-lg leading-tight">{tr('youtube.creatorStudio')}</h2>
+                            <div className="text-[9px] text-red-400 font-black uppercase tracking-[0.25em]">{tr('youtube.uploadVideo')}</div>
                         </div>
                         <div className="w-10" />
                     </div>
@@ -1207,16 +1344,16 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
                                     {!thumbnailSourceUrl && (
                                         <div className="relative z-10 text-center px-6">
                                             <span className="block text-white/95 font-black text-4xl uppercase tracking-tighter drop-shadow-xl scale-y-110">
-                                                {selectedVideoType.type.replace(/_/g, ' ')}
+                                                {selectedVideoType.label}
                                             </span>
                                             <span className="mt-2 inline-flex rounded-full bg-black/40 border border-white/10 px-3 py-1 text-[9px] font-black uppercase tracking-widest text-white/70">
-                                                Generated thumbnail
+                                                {tr('youtube.generatedThumbnail')}
                                             </span>
                                         </div>
                                     )}
                                     <div className="absolute left-3 top-3 z-20 flex items-center gap-2 rounded-full bg-black/75 backdrop-blur px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white shadow-lg">
                                         <ImagePlus size={14} />
-                                        {thumbnailSourceUrl ? 'Change' : 'Upload'}
+                                        {thumbnailSourceUrl ? tr('youtube.change') : tr('youtube.upload')}
                                     </div>
                                     <div className="absolute bottom-3 right-3 bg-black/80 text-white text-[10px] font-bold px-2 py-1 rounded">12:34</div>
                                 </button>
@@ -1225,9 +1362,9 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
                                         {player.avatar ? <img src={player.avatar} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center font-black">{player.name[0]}</div>}
                                     </div>
                                     <div className="min-w-0 flex-1">
-                                        <div className="font-black text-white text-base leading-tight line-clamp-2">{title || 'Your Video Title Here...'}</div>
+                                        <div className="font-black text-white text-base leading-tight line-clamp-2">{title || tr('youtube.titlePlaceholderPreview')}</div>
                                         <div className="text-xs text-zinc-500 mt-1">
-                                            {player.name} • Draft • {selectedUploadPlan.label}
+                                            {player.name} • {tr('youtube.draft')} • {selectedUploadPlan.label}
                                         </div>
                                     </div>
                                 </div>
@@ -1235,16 +1372,16 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
 
                             <div className="rounded-[1.5rem] border border-zinc-800 bg-zinc-950 p-3">
                                 <div className="flex items-center justify-between mb-2">
-                                    <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Video Title</label>
+                                    <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">{tr('youtube.videoTitle')}</label>
                                     <div className={`text-[10px] font-black uppercase tracking-widest ${title.trim() ? 'text-emerald-400' : 'text-zinc-600'}`}>
-                                        {title.trim() ? 'Ready' : 'Required'}
+                                        {title.trim() ? tr('youtube.ready') : tr('youtube.required')}
                                     </div>
                                 </div>
                                 <input
                                     type="text"
                                     value={title}
                                     onChange={(e) => setTitle(e.target.value)}
-                                    placeholder="Enter a catchy title..."
+                                    placeholder={tr('youtube.titlePlaceholder')}
                                     className="w-full bg-black border border-zinc-800 rounded-2xl p-4 text-white focus:border-red-500 focus:outline-none text-lg font-black placeholder:font-normal placeholder:text-zinc-700"
                                 />
                             </div>
@@ -1261,15 +1398,17 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
                         <div className="space-y-3">
                             <div className="flex items-end justify-between gap-3 px-1">
                                 <div>
-                                    <label className="text-xs font-black text-zinc-400 uppercase tracking-[0.22em]">Video Type</label>
-                                    <div className="text-[11px] text-zinc-600 mt-1">Pick what kind of upload this is.</div>
+                                    <label className="text-xs font-black text-zinc-400 uppercase tracking-[0.22em]">{tr('youtube.videoType')}</label>
+                                    <div className="text-[11px] text-zinc-600 mt-1">{tr('youtube.videoTypeSub')}</div>
                                 </div>
                                 <div className="text-[10px] text-zinc-500 font-black uppercase tracking-widest shrink-0">
                                     -{selectedVideoType.energy}E • ${selectedVideoType.cost}
                                 </div>
                             </div>
                             <div className="grid grid-cols-2 gap-2">
-                                {VIDEO_TYPES.map(vt => (
+                                {VIDEO_TYPES.map(vtBase => {
+                                    const vt = getVideoTypeConfig(vtBase.type);
+                                    return (
                                     <button 
                                         key={vt.type}
                                         onClick={() => setSelectedType(vt.type)}
@@ -1281,18 +1420,19 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
                                         </div>
                                         {selectedType === vt.type && <div className="absolute right-3 top-3 text-emerald-500"><div className="w-2 h-2 bg-emerald-500 rounded-full"></div></div>}
                                     </button>
-                                ))}
+                                    );
+                                })}
                             </div>
                         </div>
 
                         <div className="space-y-3">
                             <div className="px-1">
-                                <label className="text-xs font-black text-zinc-400 uppercase tracking-[0.22em]">Strategy</label>
-                                <div className="text-[11px] text-zinc-600 mt-1">Choose the tone: safe growth, hype, access, or risk.</div>
+                                <label className="text-xs font-black text-zinc-400 uppercase tracking-[0.22em]">{tr('youtube.strategy')}</label>
+                                <div className="text-[11px] text-zinc-600 mt-1">{tr('youtube.strategySub')}</div>
                             </div>
                             <div className="space-y-2">
                                 {(Object.keys(UPLOAD_PLANS) as YoutubeUploadPlan[]).map(planKey => {
-                                    const plan = UPLOAD_PLANS[planKey];
+                                    const plan = getUploadPlanConfig(planKey);
                                     const isSelected = selectedPlan === planKey;
                                     return (
                                         <button
@@ -1306,7 +1446,7 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
                                                     <div className={`text-xs mt-1 ${isSelected ? 'text-red-100' : 'text-zinc-500'}`}>{plan.description}</div>
                                                 </div>
                                                 <div className={`text-[10px] font-mono shrink-0 ${isSelected ? 'text-white' : 'text-zinc-500'}`}>
-                                                    {plan.trust >= 0 ? '+' : ''}{plan.trust} trust
+                                                    {tr('youtube.trustValue', { value: `${plan.trust >= 0 ? '+' : ''}${plan.trust}` })}
                                                 </div>
                                             </div>
                                         </button>
@@ -1315,13 +1455,93 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
                             </div>
                         </div>
 
+                        {eligibleContentAssets.length > 0 && (
+                            <div className="space-y-3">
+                                <div className="flex items-start justify-between gap-3 px-1">
+                                    <div>
+                                        <label className="text-xs font-black text-zinc-400 uppercase tracking-[0.22em]">{tr('youtube.assetSetting')}</label>
+                                        <div className="text-[11px] text-zinc-600 mt-1">{tr('youtube.assetSettingSub')}</div>
+                                    </div>
+                                    {selectedAssetContext && (
+                                        <div className="rounded-full border border-cyan-400/25 bg-cyan-400/10 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-cyan-300 shrink-0">
+                                            {tr('youtube.qualityPlus', { value: selectedAssetContext.qualityBonus })}
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="flex gap-2 overflow-x-auto pb-1 custom-scrollbar">
+                                    {assetFilterOptions.map(option => (
+                                        <button
+                                            key={option.id}
+                                            type="button"
+                                            onClick={() => setAssetFilter(option.id)}
+                                            className={`shrink-0 rounded-full border px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.16em] transition-all ${assetFilter === option.id ? 'border-cyan-300 bg-cyan-300 text-black' : 'border-zinc-800 bg-zinc-950 text-zinc-500'}`}
+                                        >
+                                            {option.label}
+                                        </button>
+                                    ))}
+                                </div>
+                                <div className="-mx-4 overflow-x-auto px-4 pb-1 custom-scrollbar">
+                                    <div className="flex gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => setSelectedAssetId(null)}
+                                        className={`min-h-[112px] w-[150px] shrink-0 rounded-[1.35rem] border p-4 text-left transition-all ${!selectedAssetId ? 'border-white bg-white text-black' : 'border-zinc-800 bg-zinc-950 text-zinc-400'}`}
+                                    >
+                                        <div className="text-[10px] font-black uppercase tracking-[0.18em]">{tr('youtube.none')}</div>
+                                        <div className="mt-3 text-sm font-black leading-tight opacity-80">{tr('youtube.cleanUpload')}</div>
+                                    </button>
+                                    {filteredContentAssets.map(item => {
+                                            const context = getAssetContext(item);
+                                            const isSelected = selectedAssetId === item.id;
+                                            return (
+                                                <button
+                                                    key={item.id}
+                                                    type="button"
+                                                    onClick={() => setSelectedAssetId(item.id)}
+                                                    className={`min-h-[118px] w-[270px] shrink-0 rounded-[1.35rem] border p-4 text-left transition-all ${isSelected ? 'border-cyan-300 bg-cyan-400/15 text-white shadow-[0_0_24px_rgba(34,211,238,0.12)]' : 'border-zinc-800 bg-zinc-950 text-zinc-300'}`}
+                                                >
+                                                    <div className="flex items-start gap-3">
+                                                        <YoutubeAssetImageTile item={item} selected={isSelected} />
+                                                        <div className="min-w-0 flex-1">
+                                                            <div className="line-clamp-2 text-base font-black leading-tight">{item.name}</div>
+                                                            <div className="mt-2 flex items-center justify-between gap-3">
+                                                                <div className="min-w-0 line-clamp-1 text-[10px] font-black uppercase tracking-[0.16em] text-cyan-300">{context.label}</div>
+                                                                <div className="shrink-0 rounded-full bg-black/55 px-2.5 py-1 text-[10px] font-black text-zinc-200">{moneyShort(item.price)}</div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="mt-3 grid grid-cols-2 gap-2">
+                                                        <div className="rounded-xl bg-black/45 px-2 py-1.5">
+                                                            <div className="text-[8px] font-black uppercase tracking-[0.14em] text-zinc-600">{tr('youtube.quality')}</div>
+                                                            <div className="text-[11px] font-black text-cyan-200">+{context.qualityBonus}</div>
+                                                        </div>
+                                                        <div className="rounded-xl bg-black/45 px-2 py-1.5">
+                                                            <div className="text-[8px] font-black uppercase tracking-[0.14em] text-zinc-600">{tr('youtube.views')}</div>
+                                                            <div className="text-[11px] font-black text-zinc-200">+{formatNumber(context.viewBoost)}</div>
+                                                        </div>
+                                                    </div>
+                                                </button>
+                                            );
+                                        })}
+                                    {filteredContentAssets.length === 0 && (
+                                        <div className="min-h-[112px] w-[244px] shrink-0 rounded-[1.35rem] border border-zinc-800 bg-zinc-950 p-4 text-[11px] font-bold text-zinc-600">
+                                            {tr('youtube.noOwnedAssetsFilter')}
+                                        </div>
+                                    )}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         <div className="rounded-[1.5rem] border border-zinc-800 bg-gradient-to-br from-zinc-950 to-black p-4">
                             <div className="flex items-start gap-3">
                                 <div className="p-2 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-300"><TrendingUp size={17}/></div>
                                 <div className="min-w-0 flex-1">
-                                    <div className="text-sm font-black text-white">Upload Forecast</div>
+                                    <div className="text-sm font-black text-white">{tr('youtube.uploadForecast')}</div>
                                     <div className="text-[11px] text-zinc-500 mt-1 leading-relaxed">
-                                        {selectedUploadPlan.description} Performance scales with <span className="text-indigo-300">Improv</span>, <span className="text-indigo-300">Charisma</span>, channel trust, and video quality.
+                                        {selectedAssetContext
+                                            ? tr('youtube.uploadForecastSubWithAsset', { description: selectedUploadPlan.description, asset: selectedAssetContext.assetName })
+                                            : tr('youtube.uploadForecastSub', { description: selectedUploadPlan.description })}
                                     </div>
                                 </div>
                             </div>
@@ -1343,7 +1563,7 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
                             disabled={!title.trim() || isThumbnailProcessing}
                             className="pointer-events-auto w-full py-4 bg-gradient-to-r from-red-600 to-orange-500 text-white font-black rounded-[1.4rem] disabled:opacity-50 disabled:from-zinc-800 disabled:to-zinc-800 disabled:text-zinc-500 transition-colors shadow-[0_18px_45px_rgba(220,38,38,0.28)] flex items-center justify-center gap-2 active:scale-[0.99]"
                         >
-                            <MonitorPlay size={20} /> {isThumbnailProcessing ? 'Saving Thumbnail...' : 'Publish Video'}
+                            <MonitorPlay size={20} /> {isThumbnailProcessing ? tr('youtube.savingThumbnail') : tr('youtube.publishVideo')}
                         </button>
                     </div>
                 </div>
@@ -1353,11 +1573,11 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
             {view === 'WATCH' && selectedVideo && (
                 <div className="absolute inset-0 flex flex-col bg-zinc-950 z-50 animate-in slide-in-from-right duration-200">
                     <div className="p-4 pt-12 border-b border-zinc-900 bg-zinc-950/95 backdrop-blur flex items-center gap-4 shrink-0">
-                        <button onClick={() => setView('MAIN')} className="p-2 -ml-2 hover:bg-zinc-900 rounded-full" aria-label="Back to YouTube">
+                        <button onClick={() => setView('MAIN')} className="p-2 -ml-2 hover:bg-zinc-900 rounded-full" aria-label={tr('youtube.backToYoutube')}>
                             <ArrowLeft size={20}/>
                         </button>
                         <div className="min-w-0">
-                            <div className="text-[10px] uppercase tracking-[0.22em] text-red-400 font-black">Now Watching</div>
+                            <div className="text-[10px] uppercase tracking-[0.22em] text-red-400 font-black">{tr('youtube.nowWatching')}</div>
                             <div className="text-sm font-black text-white truncate">{selectedVideo.authorName}</div>
                         </div>
                     </div>
@@ -1373,12 +1593,24 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
                         <div className="p-4 border-b border-zinc-900">
                             <h2 className="text-xl font-black leading-tight text-white">{selectedVideo.title}</h2>
                             <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-zinc-400">
-                                <span>{formatNumber(selectedVideo.views)} views</span>
+                                <span>{tr('youtube.viewsCount', { count: formatNumber(selectedVideo.views) })}</span>
                                 <span>•</span>
                                 <span>{getVideoAgeLabel(selectedVideo)}</span>
                                 <span>•</span>
-                                <span>{selectedVideo.type.replace(/_/g, ' ')}</span>
+                                <span>{getVideoTypeConfig(selectedVideo.type).label}</span>
                             </div>
+                            {selectedVideo.assetContext && (() => {
+                                const videoAsset = contentAssetsById.get(selectedVideo.assetContext.assetId);
+                                return (
+                                    <div className="mt-3 flex items-center gap-3 rounded-2xl border border-cyan-500/20 bg-cyan-500/10 p-2.5">
+                                        {videoAsset && <YoutubeAssetImageTile item={videoAsset} selected />}
+                                        <div className="min-w-0">
+                                            <div className="text-[9px] font-black uppercase tracking-[0.18em] text-cyan-300">{selectedVideo.assetContext.label}</div>
+                                            <div className="mt-0.5 truncate text-sm font-black text-white">{selectedVideo.assetContext.assetName}</div>
+                                        </div>
+                                    </div>
+                                );
+                            })()}
 
                             <div className="mt-4 flex items-center gap-3">
                                 <div className={`h-11 w-11 rounded-full ${selectedVideo.isPlayer ? 'bg-indigo-500' : 'bg-zinc-700'} flex items-center justify-center font-black text-white border border-zinc-800 overflow-hidden`}>
@@ -1391,12 +1623,12 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
                                 <div className="min-w-0 flex-1">
                                     <div className="font-black text-white truncate">{selectedVideo.authorName}</div>
                                     <div className="text-xs text-zinc-500">
-                                        {selectedVideo.isPlayer ? `${formatNumber(channel.subscribers)} subscribers` : 'Recommended creator'}
+                                        {selectedVideo.isPlayer ? tr('youtube.subscriberCount', { count: formatNumber(channel.subscribers) }) : tr('youtube.recommendedCreator')}
                                     </div>
                                 </div>
                                 {selectedVideo.isPlayer && (
                                     <div className="rounded-full bg-white px-4 py-2 text-xs font-black text-black">
-                                        Your Video
+                                        {tr('youtube.yourVideo')}
                                     </div>
                                 )}
                             </div>
@@ -1426,23 +1658,23 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
                                 </div>
                                 <div className="rounded-2xl bg-zinc-900 border border-zinc-800 p-3 text-center">
                                     <Share2 size={17} className="mx-auto mb-1 text-zinc-200"/>
-                                    <div className="text-[11px] font-black">Share</div>
+                                    <div className="text-[11px] font-black">{tr('youtube.share')}</div>
                                 </div>
                             </div>
 
                             {selectedVideo.isPlayer && (
                                 <div className="mt-4 grid grid-cols-3 gap-2">
                                     <div className="rounded-2xl bg-red-600/10 border border-red-500/20 p-3">
-                                        <div className="text-[9px] uppercase tracking-[0.16em] text-red-300 font-black">Quality</div>
+                                        <div className="text-[9px] uppercase tracking-[0.16em] text-red-300 font-black">{tr('youtube.quality')}</div>
                                         <div className="mt-1 text-lg font-black">{Math.floor(selectedVideo.qualityScore)}</div>
                                     </div>
                                     <div className="rounded-2xl bg-zinc-900 border border-zinc-800 p-3">
-                                        <div className="text-[9px] uppercase tracking-[0.16em] text-zinc-500 font-black">Earned</div>
+                                        <div className="text-[9px] uppercase tracking-[0.16em] text-zinc-500 font-black">{tr('youtube.earned')}</div>
                                         <div className="mt-1 text-lg font-black">${formatNumber(selectedVideo.earnings)}</div>
                                     </div>
                                     <div className="rounded-2xl bg-zinc-900 border border-zinc-800 p-3">
-                                        <div className="text-[9px] uppercase tracking-[0.16em] text-zinc-500 font-black">Angle</div>
-                                        <div className="mt-1 text-[11px] font-black leading-4">{selectedVideo.uploadPlan ? UPLOAD_PLANS[selectedVideo.uploadPlan]?.label : 'Upload'}</div>
+                                        <div className="text-[9px] uppercase tracking-[0.16em] text-zinc-500 font-black">{tr('youtube.angle')}</div>
+                                        <div className="mt-1 text-[11px] font-black leading-4">{selectedVideo.uploadPlan ? getUploadPlanConfig(selectedVideo.uploadPlan).label : tr('youtube.upload')}</div>
                                     </div>
                                 </div>
                             )}
@@ -1452,8 +1684,8 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
                             <div className="mb-4 rounded-3xl border border-zinc-800 bg-zinc-900/70 p-4">
                                 <div className="flex items-center justify-between gap-3">
                                     <div>
-                                        <div className="font-black text-white">Comments</div>
-                                        <div className="text-xs text-zinc-500 mt-1">Audience reaction to this upload</div>
+                                        <div className="font-black text-white">{tr('youtube.comments')}</div>
+                                        <div className="text-xs text-zinc-500 mt-1">{tr('youtube.commentsSub')}</div>
                                     </div>
                                     <MoreHorizontal size={20} className="text-zinc-500"/>
                                 </div>
@@ -1472,7 +1704,7 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
                                             <div className="mt-2 flex items-center gap-4 text-[11px] text-zinc-500">
                                                 <span className="flex items-center gap-1"><ThumbsUp size={12}/> {formatNumber(comment.likes)}</span>
                                                 <span className="flex items-center gap-1"><ThumbsDown size={12}/></span>
-                                                <span>Reply</span>
+                                                <span>{tr('youtube.reply')}</span>
                                             </div>
                                         </div>
                                     </div>
@@ -1492,10 +1724,10 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
                         <div>
                             {/* Categories */}
                             <div className="flex gap-2 mb-4 overflow-x-auto no-scrollbar pb-2">
-                                <button className="bg-white text-black px-3 py-1.5 rounded-lg text-xs font-bold shrink-0">All</button>
-                                <button className="bg-zinc-900 border border-zinc-800 text-white px-3 py-1.5 rounded-lg text-xs font-bold shrink-0">Acting</button>
-                                <button className="bg-zinc-900 border border-zinc-800 text-white px-3 py-1.5 rounded-lg text-xs font-bold shrink-0">Vlogs</button>
-                                <button className="bg-zinc-900 border border-zinc-800 text-white px-3 py-1.5 rounded-lg text-xs font-bold shrink-0">Gaming</button>
+                                <button className="bg-white text-black px-3 py-1.5 rounded-lg text-xs font-bold shrink-0">{tr('youtube.category.all')}</button>
+                                <button className="bg-zinc-900 border border-zinc-800 text-white px-3 py-1.5 rounded-lg text-xs font-bold shrink-0">{tr('youtube.category.acting')}</button>
+                                <button className="bg-zinc-900 border border-zinc-800 text-white px-3 py-1.5 rounded-lg text-xs font-bold shrink-0">{tr('youtube.category.vlogs')}</button>
+                                <button className="bg-zinc-900 border border-zinc-800 text-white px-3 py-1.5 rounded-lg text-xs font-bold shrink-0">{tr('youtube.category.gaming')}</button>
                             </div>
 
                             {/* Feed */}
@@ -1520,24 +1752,24 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
                                         <div className="min-w-0 flex-1 pr-12">
                                             <div className="font-black text-lg leading-tight truncate">{channel.handle}</div>
                                             <div className="text-zinc-400 text-[11px] mt-1 leading-4">
-                                                {formatNumber(channel.subscribers)} subs • {publicImage}
+                                                {tr('youtube.channelHeaderStats', { subs: formatNumber(channel.subscribers), image: publicImage })}
                                             </div>
                                         </div>
                                         <button
                                             onClick={() => setView('UPLOAD')}
                                             className="absolute right-0 top-0 h-11 w-11 rounded-2xl bg-red-600 text-white flex items-center justify-center shadow-lg shadow-red-950/40"
-                                            aria-label="Create content"
+                                            aria-label={tr('youtube.createContent')}
                                         >
                                             <Plus size={20}/>
                                         </button>
                                     </div>
                                     <div className="grid grid-cols-2 gap-2 mt-3">
                                         <div className="rounded-2xl bg-red-600/12 border border-red-500/25 px-3 py-2 min-w-0">
-                                            <div className="text-[9px] font-black text-red-200 uppercase tracking-[0.18em]">Score</div>
+                                            <div className="text-[9px] font-black text-red-200 uppercase tracking-[0.18em]">{tr('youtube.score')}</div>
                                             <div className="text-lg font-black text-white leading-none mt-1">{creatorScore}</div>
                                         </div>
                                         <div className="rounded-2xl bg-zinc-950/80 border border-zinc-800 px-3 py-2 min-w-0">
-                                            <div className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.18em]">Lane</div>
+                                            <div className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.18em]">{tr('youtube.lane')}</div>
                                             <div className="text-[11px] font-black text-zinc-200 leading-4 mt-1">{currentIdentity.label}</div>
                                         </div>
                                     </div>
@@ -1635,7 +1867,7 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
                                         <div className="text-[11px] text-zinc-500 mt-1">Your channel personality changes growth, trust, heat, merch, and event risk.</div>
                                     </div>
                                     <div className={`text-[10px] font-black uppercase tracking-[0.14em] rounded-full border px-2 py-1 ${currentIdentity.accent}`}>
-                                        {canChangeIdentity ? 'Ready' : `${identityWeeksRemaining}w`}
+                                        {canChangeIdentity ? tr('youtube.ready') : tr('youtube.weeksShort', { weeks: identityWeeksRemaining })}
                                     </div>
                                 </div>
 
@@ -1647,7 +1879,7 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
 
                                 <div className="grid grid-cols-1 gap-2">
                                     {(Object.keys(CREATOR_IDENTITIES) as YoutubeCreatorIdentity[]).map(identityKey => {
-                                        const identity = CREATOR_IDENTITIES[identityKey];
+                                        const identity = getCreatorIdentityConfig(identityKey);
                                         const selected = identityKey === currentIdentityKey;
                                         return (
                                             <button
@@ -1662,7 +1894,7 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
                                                         <div className="text-[11px] text-zinc-500 mt-1">{identity.uploadNote}</div>
                                                     </div>
                                                     <div className="text-[10px] font-mono text-zinc-400">
-                                                        {identity.viewMultiplier > 1 ? '+' : ''}{Math.round((identity.viewMultiplier - 1) * 100)}% views
+                                                        {tr('youtube.viewsPercent', { value: `${identity.viewMultiplier > 1 ? '+' : ''}${Math.round((identity.viewMultiplier - 1) * 100)}` })}
                                                     </div>
                                                 </div>
                                             </button>
@@ -1677,7 +1909,8 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
                                     <div className="text-[10px] text-zinc-500 font-bold uppercase">{unlockedMilestones.length}/{CREATOR_MILESTONES.length}</div>
                                 </div>
                                 <div className="space-y-2">
-                                    {CREATOR_MILESTONES.map(milestone => {
+                                    {CREATOR_MILESTONES.map(baseMilestone => {
+                                        const milestone = getMilestoneConfig(baseMilestone);
                                         const value = milestone.type === 'subs' ? channel.subscribers : (channel.totalChannelViews || 0);
                                         const progress = Math.min(100, (value / milestone.target) * 100);
                                         const isUnlocked = unlockedMilestones.includes(milestone.id);
@@ -1744,7 +1977,7 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
 
                                 <div className="grid grid-cols-3 gap-2">
                                     {(Object.keys(MERCH_TIERS) as YoutubeMerchTier[]).map(tierKey => {
-                                        const tier = MERCH_TIERS[tierKey];
+                                        const tier = getMerchTierConfig(tierKey);
                                         const disabled = !canMerchDrop || !!youtubeActionInProgress || player.money < tier.cost || player.energy.current < tier.energy || (channel.audienceTrust ?? 55) < tier.trustReq;
                                         return (
                                             <button
@@ -1905,7 +2138,12 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
                                                 </div>
                                                 {video.uploadPlan && (
                                                     <div className="mt-2 inline-flex text-[9px] uppercase tracking-[0.18em] font-bold text-red-300 bg-red-950/30 border border-red-900/40 rounded-full px-2 py-1">
-                                                        {UPLOAD_PLANS[video.uploadPlan]?.label || video.uploadPlan}
+                                                        {video.uploadPlan ? getUploadPlanConfig(video.uploadPlan).label : video.uploadPlan}
+                                                    </div>
+                                                )}
+                                                {video.assetContext && (
+                                                    <div className="mt-2 inline-flex max-w-full text-[9px] uppercase tracking-[0.14em] font-bold text-cyan-300 bg-cyan-950/30 border border-cyan-900/40 rounded-full px-2 py-1">
+                                                        <span className="truncate">{video.assetContext.assetName}</span>
                                                     </div>
                                                 )}
                                                 {video.comments?.[0] && (

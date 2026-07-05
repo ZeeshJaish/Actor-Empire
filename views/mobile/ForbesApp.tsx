@@ -1,8 +1,8 @@
 
 import React, { useEffect, useState } from 'react';
-import { Business, Player } from '../../types';
+import { Business, NPCActor, Player } from '../../types';
 import { formatMoney } from '../../services/formatUtils';
-import { NPC_DATABASE } from '../../services/npcLogic';
+import { getGenderedAvatar, NPC_DATABASE } from '../../services/npcLogic';
 import { getEnabledGlobalCreatorSocialProfiles } from '../../services/youtubeLogic';
 import { STUDIO_CATALOG } from '../../services/studioLogic';
 import { PLATFORMS, PlatformProfile } from '../../services/streamingLogic';
@@ -44,6 +44,20 @@ interface ForbesAppProps {
 
 type Tab = 'ACTORS' | 'STUDIOS' | 'STREAMING' | 'MY_RANK';
 
+const FORBES_CELEB_OCCUPATIONS = new Set<NPCActor['occupation']>(['ACTOR', 'DIRECTOR', 'MUSIC_ARTIST', 'INVESTOR']);
+const FORBES_PERSON_CATEGORY_PATTERN = /\b(actor|director|artist|creator|influencer|icon|mogul|investor|producer|writer|filmmaker)\b/i;
+const FORBES_BRAND_CATEGORY_PATTERN = /\b(brand|company|corporation|label|product)\b/i;
+
+const isForbesBrandCategory = (category?: string): boolean => FORBES_BRAND_CATEGORY_PATTERN.test(category || '');
+
+const isForbesCelebRankingEntry = (npc: Pick<NPCActor, 'occupation' | 'forbesCategory'>): boolean => {
+    const category = npc.forbesCategory || npc.occupation;
+    if (isForbesBrandCategory(category)) return false;
+    return FORBES_CELEB_OCCUPATIONS.has(npc.occupation) || FORBES_PERSON_CATEGORY_PATTERN.test(category);
+};
+
+const getForbesCelebAvatar = (npc: Pick<NPCActor, 'gender' | 'name'>): string => getGenderedAvatar(npc.gender, npc.name);
+
 export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePlayer, onOpenStocks, onImmersiveChange, initialStudioId, onInitialStudioConsumed }) => {
   const [tab, setTab] = useState<Tab>('ACTORS');
   const [selectedStudioProfile, setSelectedStudioProfile] = useState<ForbesStudioProfileData | null>(null);
@@ -73,13 +87,13 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePl
   
   // ACTORS
   const actorRanking = [
-      ...actorPool.map(npc => ({
+      ...actorPool.filter(isForbesCelebRankingEntry).map(npc => ({
           id: npc.id,
           name: npc.name,
           netWorth: npc.netWorth,
           isPlayer: false,
           tier: npc.tier,
-          avatar: npc.avatar,
+          avatar: getForbesCelebAvatar(npc),
           forbesCategory: npc.forbesCategory || npc.occupation
       })),
       {
@@ -309,6 +323,7 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePl
                 acquisitionCase={getAcquisitionCase(player, selectedStudioProfile.id)}
                 onApproachStudio={() => setAcquisitionDeskOpen(true)}
                 onOpenStocks={onOpenStocks}
+                language={language}
             />
         )}
         {selectedStudioProfile && acquisitionDeskOpen && (

@@ -1,12 +1,52 @@
 
 import React, { useState, useRef, useMemo } from 'react';
-import { User, Calendar, Check, ArrowRight, Camera, UploadCloud, AtSign } from 'lucide-react';
+import { User, Calendar, Check, ArrowRight, UploadCloud, AtSign, X, Shuffle } from 'lucide-react';
 import { Gender } from '../types';
-import { MALE_AVATAR_SEEDS, FEMALE_AVATAR_SEEDS } from '../services/npcLogic';
+import { ProfilePictureBuilder } from './avatar/ProfilePictureBuilder';
+import {
+  ProfileBuilderGender,
+  ProfileBuilderSelection,
+  createDefaultProfileSelection,
+  createSeededProfileSelection,
+} from '../services/profileBuilder';
+import { exportProfilePortrait } from './avatar/profilePortraitRenderer';
 
 interface CreationMenuProps {
   onStartGame: (name: string, age: number, gender: Gender, avatar: string, handle: string) => void;
 }
+
+interface PortraitPreset {
+  id: string;
+  label: string;
+  selection: ProfileBuilderSelection;
+  thumbnail: string;
+}
+
+const PROFILE_PRESET_SEEDS = [
+  'Opening Night',
+  'Casting Call',
+  'Studio Breakout',
+  'Award Season',
+  'Indie Darling',
+  'Action Lead',
+  'Press Tour',
+  'Festival Face',
+  'Streaming Star',
+  'Teen Idol',
+  'Prestige Role',
+  'Red Carpet Debut',
+];
+
+const toProfileGender = (gender: Gender): ProfileBuilderGender => {
+  if (gender === 'FEMALE') return 'FEMALE';
+  if (gender === 'NON_BINARY') return 'NON_BINARY';
+  return 'MALE';
+};
+
+const safeExportProfilePortrait = (selection: ProfileBuilderSelection, exportScale = 3): string => {
+  if (typeof document === 'undefined') return '';
+  return exportProfilePortrait(selection, exportScale);
+};
 
 export const CreationMenu: React.FC<CreationMenuProps> = ({ onStartGame }) => {
   const [name, setName] = useState('');
@@ -14,22 +54,29 @@ export const CreationMenu: React.FC<CreationMenuProps> = ({ onStartGame }) => {
   const [isHandleEdited, setIsHandleEdited] = useState(false);
   const [age, setAge] = useState<number | string>(18);
   const [gender, setGender] = useState<Gender>('MALE');
-  const [selectedAvatar, setSelectedAvatar] = useState(`https://api.dicebear.com/8.x/pixel-art/svg?seed=${MALE_AVATAR_SEEDS[0]}`);
+  const initialProfileGender = toProfileGender('MALE');
+  const initialSelection = createDefaultProfileSelection(initialProfileGender);
+  const [selectedProfileSelection, setSelectedProfileSelection] = useState<ProfileBuilderSelection | null>(initialSelection);
+  const [selectedAvatar, setSelectedAvatar] = useState(() => safeExportProfilePortrait(initialSelection, 3));
   const [isCustomUpload, setIsCustomUpload] = useState(false);
   const [isCompressing, setIsCompressing] = useState(false);
+  const [showPortraitBuilder, setShowPortraitBuilder] = useState(false);
   const [error, setError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Filter avatars based on gender
-  const currentAvatarList = useMemo(() => {
-      const seeds = gender === 'MALE' 
-        ? MALE_AVATAR_SEEDS 
-        : gender === 'FEMALE' 
-            ? FEMALE_AVATAR_SEEDS 
-            : [...MALE_AVATAR_SEEDS, ...FEMALE_AVATAR_SEEDS].sort(() => 0.5 - Math.random());
-      
-      return seeds.slice(0, 30).map(seed => `https://api.dicebear.com/8.x/pixel-art/svg?seed=${seed}`);
-  }, [gender]);
+  const profileGender = useMemo(() => toProfileGender(gender), [gender]);
+
+  const portraitPresets = useMemo<PortraitPreset[]>(() => {
+      return PROFILE_PRESET_SEEDS.map((seed, index) => {
+          const selection = createSeededProfileSelection(profileGender, `${profileGender}:${seed}:${index}`);
+          return {
+              id: `${profileGender}-${seed}`,
+              label: seed,
+              selection,
+              thumbnail: safeExportProfilePortrait(selection, 1),
+          };
+      });
+  }, [profileGender]);
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       const newName = e.target.value;
@@ -133,6 +180,7 @@ export const CreationMenu: React.FC<CreationMenuProps> = ({ onStartGame }) => {
       try {
           const compressed = await compressImage(file);
           setSelectedAvatar(compressed);
+          setSelectedProfileSelection(null);
           setIsCustomUpload(true);
       } catch (err) {
           console.error("Image processing failed", err);
@@ -149,15 +197,28 @@ export const CreationMenu: React.FC<CreationMenuProps> = ({ onStartGame }) => {
     fileInputRef.current?.click();
   };
 
-  // Reset avatar when gender changes if not uploaded
+  const applyProfileSelection = (selection: ProfileBuilderSelection) => {
+      setSelectedProfileSelection(selection);
+      setSelectedAvatar(safeExportProfilePortrait(selection, 3));
+      setIsCustomUpload(false);
+      setError('');
+  };
+
+  const randomizePortrait = () => {
+      const currentSignature = selectedProfileSelection ? Object.values(selectedProfileSelection).join('|') : 'custom';
+      const randomSeed = `${profileGender}:${currentSignature}:${Date.now()}:${Math.random().toString(36).slice(2)}`;
+      applyProfileSelection(createSeededProfileSelection(profileGender, randomSeed));
+  };
+
+  // Reset modular avatar when gender changes, while preserving manual uploads.
   React.useEffect(() => {
-      if (!isCustomUpload) {
-          setSelectedAvatar(currentAvatarList[0]);
+      if (!isCustomUpload && portraitPresets[0]) {
+          applyProfileSelection(portraitPresets[0].selection);
       }
-  }, [gender, currentAvatarList]);
+  }, [profileGender, portraitPresets, isCustomUpload]);
 
   return (
-    <div className="h-full relative flex flex-col bg-black overflow-hidden font-sans">
+    <div className="h-full relative flex flex-col bg-black overflow-hidden overflow-x-hidden font-sans">
         {/* Custom CSS for blob animations */}
         <style>{`
             @keyframes float-slow {
@@ -173,82 +234,142 @@ export const CreationMenu: React.FC<CreationMenuProps> = ({ onStartGame }) => {
 
         {/* Background Atmosphere */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-            <div className="absolute top-[-20%] right-[-20%] w-[600px] h-[600px] bg-indigo-900/20 rounded-full blur-[100px] animate-blob-slow" />
-            <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-amber-900/10 rounded-full blur-[80px] animate-blob-slow" style={{ animationDelay: '2s' }} />
+            <div className="absolute top-[-18%] right-[-8rem] h-96 w-96 bg-indigo-900/20 rounded-full blur-[100px] animate-blob-slow" />
+            <div className="absolute bottom-[-10%] left-[-8rem] h-80 w-80 bg-amber-900/10 rounded-full blur-[80px] animate-blob-slow" style={{ animationDelay: '2s' }} />
             <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-10"></div>
         </div>
 
-      <div className="flex-1 flex flex-col justify-center p-6 relative z-10 overflow-y-auto custom-scrollbar">
+      <div className="flex-1 min-h-0 flex flex-col justify-start px-6 pb-12 pt-8 relative z-10 overflow-y-auto custom-scrollbar">
         
         {/* Header */}
-        <div className="text-center mb-6 animate-in slide-in-from-top duration-700">
-          <div className="inline-flex items-center justify-center p-3 bg-zinc-900/50 rounded-2xl mb-4 border border-zinc-800 shadow-xl backdrop-blur-sm">
-             <User size={32} className="text-white" />
+        <div className="mb-5 animate-in slide-in-from-top duration-700">
+          <div className="mx-auto w-full max-w-sm rounded-[1.35rem] border border-zinc-800 bg-black/55 p-4 shadow-xl backdrop-blur-sm">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div className="text-[10px] font-black uppercase tracking-[0.24em] text-amber-400">New Career File</div>
+              <div className="rounded-md border border-zinc-700 px-2 py-1 text-[9px] font-black uppercase tracking-[0.16em] text-zinc-500">Slot Setup</div>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-zinc-700 bg-zinc-900 text-white shadow-inner">
+                <User size={28} />
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-3xl font-black leading-none tracking-tight text-white">Create Your Star</h1>
+                <p className="mt-1 text-xs font-bold uppercase tracking-[0.12em] text-zinc-500">Build the playable actor file.</p>
+              </div>
+            </div>
           </div>
-          <h1 className="text-4xl font-black tracking-tighter text-white mb-2">Create Your Star</h1>
-          <p className="text-zinc-400 text-sm tracking-wide">Define the face of the next generation.</p>
         </div>
 
         <div className="w-full max-w-sm mx-auto space-y-6">
           
           {/* AVATAR SECTION */}
           <div className="space-y-4">
-              {/* Selected Preview */}
-              <div className="flex flex-col items-center justify-center mb-2">
-                  <div className="relative group cursor-pointer" onClick={triggerFileUpload}>
-                      <div className="w-32 h-32 rounded-full p-1 bg-gradient-to-tr from-amber-300 via-amber-500 to-amber-700 shadow-[0_0_30px_rgba(245,158,11,0.2)] transition-transform duration-300 group-hover:scale-105 relative z-10">
-                          {isCompressing ? (
-                              <div className="w-full h-full rounded-full bg-zinc-900 flex items-center justify-center border-4 border-black">
-                                  <div className="w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
+              <div className="relative overflow-hidden rounded-[1.5rem] border border-amber-500/25 bg-[linear-gradient(180deg,rgba(24,24,27,0.96),rgba(0,0,0,0.98))] p-4 shadow-[0_0_32px_rgba(245,158,11,0.06)]">
+                  <div className="absolute left-0 right-0 top-0 h-px bg-amber-400/50" />
+                  <div className="absolute inset-x-4 top-16 h-px bg-white/5" />
+                  <div className="relative flex flex-col items-center">
+                      <div className="mb-3 grid w-full grid-cols-[1fr_auto] items-center gap-3">
+                          <div>
+                              <div className="text-[10px] font-black uppercase tracking-[0.22em] text-amber-400">Portrait Rig</div>
+                              <div className="mt-1 text-[9px] font-black uppercase tracking-[0.16em] text-zinc-500">Modular actor build</div>
+                          </div>
+                          <div className="rounded-lg border border-zinc-700 bg-black px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.16em] text-zinc-400">
+                              PXL-01
+                          </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setShowPortraitBuilder(true)}
+                        className="group relative"
+                        aria-label="Build pixel portrait"
+                      >
+                          <div className="relative z-10 h-44 w-44 rounded-[1.35rem] border-2 border-black bg-black p-2 shadow-2xl shadow-black/60 transition-transform duration-300 group-hover:scale-[1.03]">
+                              <div className="h-full w-full overflow-hidden rounded-[1rem] bg-zinc-950 ring-1 ring-white/10">
+                                  {isCompressing ? (
+                                      <div className="flex h-full w-full items-center justify-center">
+                                          <div className="h-9 w-9 rounded-full border-2 border-amber-500 border-t-transparent animate-spin"></div>
+                                      </div>
+                                  ) : selectedAvatar ? (
+                                      <img
+                                        src={selectedAvatar}
+                                        alt="Selected portrait"
+                                        className="h-full w-full object-cover [image-rendering:pixelated]"
+                                      />
+                                  ) : (
+                                      <div className="flex h-full w-full items-center justify-center text-zinc-700">
+                                          <User size={38} />
+                                      </div>
+                                  )}
                               </div>
-                          ) : (
-                              <img 
-                                src={selectedAvatar} 
-                                alt="Selected Avatar" 
-                                className="w-full h-full rounded-full bg-zinc-900 object-cover border-4 border-black" 
-                              />
-                          )}
+                              <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 rounded-lg border border-amber-300/40 bg-black px-3 py-1 text-[9px] font-black uppercase tracking-[0.18em] text-amber-300">
+                                  {isCustomUpload ? 'Custom Photo' : 'Modular Build'}
+                              </div>
+                          </div>
+                          <div className="absolute inset-4 rounded-[1.35rem] bg-amber-500/14 blur-2xl transition-opacity group-hover:opacity-80" />
+                      </button>
+
+                      <div className="mt-7 grid w-full grid-cols-2 gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setShowPortraitBuilder(true)}
+                            className="rounded-xl border border-amber-300 bg-amber-500 py-3 text-[11px] font-black uppercase tracking-[0.16em] text-black shadow-[0_0_20px_rgba(245,158,11,0.16)] transition-colors hover:bg-amber-400"
+                          >
+                              Build
+                          </button>
+                          <button
+                            type="button"
+                            onClick={randomizePortrait}
+                            className="inline-flex items-center justify-center gap-2 rounded-xl border border-zinc-700 bg-zinc-950 py-3 text-[11px] font-black uppercase tracking-[0.14em] text-white transition-colors hover:border-amber-400/40 hover:text-amber-200"
+                          >
+                              <Shuffle size={14} /> Random
+                          </button>
                       </div>
-                      {/* Upload Badge Overlay */}
-                      <div className="absolute bottom-0 right-0 bg-white text-black p-2 rounded-full border-4 border-black shadow-xl z-20 group-hover:bg-amber-100 transition-colors">
-                          <Camera size={18} />
-                      </div>
-                      
-                      {/* 
-                          iPad Crash Fix: 
-                          Do not use className="hidden" or display: none.
-                          Use opacity-0 and dimensions to keep it in layout for popover anchoring.
-                      */}
-                      <input 
-                        type="file" 
-                        ref={fileInputRef} 
-                        className="absolute opacity-0 w-1 h-1 -z-10 overflow-hidden top-0 left-0" 
-                        accept="image/*" 
+
+                      <button
+                        type="button"
+                        onClick={triggerFileUpload}
+                        className="mt-3 inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 transition-colors hover:text-white"
+                      >
+                          <UploadCloud size={12}/> Upload custom photo
+                      </button>
+
+                      <input
+                        type="file"
+                        ref={fileInputRef}
+                        className="absolute opacity-0 w-1 h-1 -z-10 overflow-hidden top-0 left-0"
+                        accept="image/*"
                         onChange={handleImageUpload}
                       />
                   </div>
-                  <button onClick={triggerFileUpload} className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mt-3 hover:text-white transition-colors flex items-center gap-1">
-                      <UploadCloud size={12}/> Tap to Upload Photo
-                  </button>
               </div>
 
-              {/* Preset Grid (Scrollable) */}
-              <div className="bg-zinc-900/40 backdrop-blur-md rounded-3xl p-4 border border-white/5">
-                  <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] mb-3 block px-1">Choose Preset</label>
-                  <div className="grid grid-cols-5 gap-3 max-h-40 overflow-y-auto custom-scrollbar pr-1">
-                      {currentAvatarList.map((avatarUrl, idx) => {
-                          const isSelected = selectedAvatar === avatarUrl;
+              <div className="rounded-[1.35rem] border border-zinc-800 bg-black/65 p-4 backdrop-blur-md">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                      <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em]">Preset Bench</label>
+                      <button
+                        type="button"
+                        onClick={randomizePortrait}
+                        className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-[0.14em] text-amber-400 hover:text-amber-200"
+                      >
+                          Reroll Face
+                      </button>
+                  </div>
+                  <div className="grid grid-cols-4 gap-3 max-h-48 overflow-y-auto custom-scrollbar pr-1">
+                      {portraitPresets.map(preset => {
+                          const isSelected = selectedProfileSelection === preset.selection;
                           return (
-                            <button 
-                                key={idx}
+                            <button
+                                key={preset.id}
                                 type="button"
-                                onClick={() => { setSelectedAvatar(avatarUrl); setIsCustomUpload(false); }}
-                                className={`aspect-square rounded-xl overflow-hidden relative transition-all duration-300 ${isSelected ? 'ring-2 ring-amber-500 scale-110 z-10 shadow-lg' : 'opacity-60 hover:opacity-100 hover:scale-105'}`}
+                                onClick={() => applyProfileSelection(preset.selection)}
+                                className={`relative aspect-square overflow-hidden rounded-2xl border bg-zinc-900 transition-all duration-300 ${isSelected ? 'border-amber-400 shadow-[0_0_0_2px_rgba(245,158,11,0.25)] scale-[1.04] z-10' : 'border-white/5 opacity-75 hover:opacity-100 hover:border-zinc-600'}`}
+                                title={preset.label}
                             >
-                                <img src={avatarUrl} alt="avatar" className="w-full h-full bg-zinc-800 object-cover" />
+                                <img src={preset.thumbnail} alt={preset.label} className="h-full w-full object-cover [image-rendering:pixelated]" />
                                 {isSelected && (
                                     <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
-                                        <Check size={14} className="text-white drop-shadow-md" strokeWidth={3}/>
+                                        <Check size={16} className="text-white drop-shadow-md" strokeWidth={3}/>
                                     </div>
                                 )}
                             </button>
@@ -359,6 +480,29 @@ export const CreationMenu: React.FC<CreationMenuProps> = ({ onStartGame }) => {
           </button>
         </div>
       </div>
+      {showPortraitBuilder && (
+        <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200">
+          <div className="relative w-full max-w-md max-h-[100dvh] overflow-x-hidden overflow-y-auto rounded-t-[2rem] sm:rounded-[2rem] border border-zinc-800 bg-black p-5 custom-scrollbar">
+            <button
+              type="button"
+              onClick={() => setShowPortraitBuilder(false)}
+              className="absolute right-4 top-4 rounded-full bg-zinc-900 p-2 text-zinc-400 hover:text-white transition-colors"
+            >
+              <X size={18} />
+            </button>
+            <ProfilePictureBuilder
+              gender={gender}
+              initialSelection={selectedProfileSelection}
+              onApply={(avatarDataUrl, selection) => {
+                setSelectedAvatar(avatarDataUrl);
+                setSelectedProfileSelection(selection || null);
+                setIsCustomUpload(false);
+                setShowPortraitBuilder(false);
+              }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };

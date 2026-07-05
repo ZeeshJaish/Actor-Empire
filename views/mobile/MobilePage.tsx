@@ -198,7 +198,7 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
                           year: updatedPlayer.age,
                           amount: -amount,
                           category: 'EXPENSE',
-                          description: `Friend favor: ${friendName}`,
+	                          description: tr('mobile.finance.friendFavor', { friendName }),
                       },
                       ...(updatedPlayer.finance?.history || []),
                   ].slice(0, 200),

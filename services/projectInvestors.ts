@@ -1,5 +1,6 @@
 import {
     Business,
+    GameLanguage,
     Genre,
     Player,
     ProjectDetails,
@@ -11,6 +12,7 @@ import {
     ProjectInvestorPlan,
     ProjectInvestorRelationship
 } from '../types';
+import { getPlayerLanguage, t } from './i18n';
 
 const clamp = (value: number, min = 0, max = 100) => Math.max(min, Math.min(max, value));
 
@@ -385,13 +387,25 @@ export const getInvestorRelationship = (
     studio?.studioState?.investorRelationships?.find(item => item.investorId === investorId)
 );
 
-const getInvestorRelationshipLabel = (relationship: ProjectInvestorRelationship | undefined): string => {
-    if (!relationship) return 'New money';
-    if (relationship.trustScore >= 78) return 'Trusted backer';
-    if (relationship.trustScore >= 58) return 'Warm history';
-    if (relationship.trustScore <= 28) return 'Burned before';
-    return 'Known backer';
+const getInvestorRelationshipLabel = (relationship: ProjectInvestorRelationship | undefined, language: GameLanguage): string => {
+    if (!relationship) return t(language, 'services.projectInvestors.relationship.newMoney');
+    if (relationship.trustScore >= 78) return t(language, 'services.projectInvestors.relationship.trustedBacker');
+    if (relationship.trustScore >= 58) return t(language, 'services.projectInvestors.relationship.warmHistory');
+    if (relationship.trustScore <= 28) return t(language, 'services.projectInvestors.relationship.burnedBefore');
+    return t(language, 'services.projectInvestors.relationship.knownBacker');
 };
+
+export const getProjectInvestorPersonality = (investor: ProjectInvestor, language: GameLanguage = 'en'): string => (
+    t(language, `services.projectInvestors.investor.${investor.id}.personality`)
+);
+
+export const getProjectInvestorProfile = (investor: ProjectInvestor, language: GameLanguage = 'en'): string => (
+    t(language, `services.projectInvestors.investor.${investor.id}.profile`)
+);
+
+export const getProjectInvestorDescription = (investor: ProjectInvestor, language: GameLanguage = 'en'): string => (
+    t(language, `services.projectInvestors.investor.${investor.id}.description`)
+);
 
 const getInvestorRelationshipBias = (relationship: ProjectInvestorRelationship | undefined): number => {
     if (!relationship) return 0;
@@ -468,6 +482,7 @@ export const generateProjectInvestorOffers = ({
     const raise = normalizeInvestorRaiseAmount(targetRaise, packageBudget, lockedExternalFunding);
     if (!project || raise <= 0 || packageBudget <= 0) return [];
 
+    const language = getPlayerLanguage(player);
     const score = getStudioInvestorScore(studio, player);
     const budgetPressure = clamp((packageBudget / 100_000_000) * 12, 0, 16);
     const maxRaise = getMaxInvestorRaise(packageBudget, lockedExternalFunding);
@@ -515,13 +530,13 @@ export const generateProjectInvestorOffers = ({
             const termMultiplier = getInvestorTermMultiplier(confidence, investor, score);
             const equityPercent = Math.min(85, Math.round(cleanEquityPercent * termMultiplier * 10) / 10);
             const equityPremiumPercent = Math.round((equityPercent - cleanEquityPercent) * 10) / 10;
-            const fitLabel: ProjectInvestorOffer['fitLabel'] = amount >= raise
-                ? 'Lead Investor'
+            const fitLabel = amount >= raise
+                ? t(language, 'services.projectInvestors.fit.leadInvestor')
                 : confidence < 48 && investor.riskTolerance >= 68
-                    ? 'Risk Money'
+                    ? t(language, 'services.projectInvestors.fit.riskMoney')
                     : ['COPRODUCTION_COMPANY', 'STREAMING_FINANCE', 'BRAND_MEDIA'].includes(investor.kind)
-                        ? 'Strategic Partner'
-                        : 'Partial Investor';
+                        ? t(language, 'services.projectInvestors.fit.strategicPartner')
+                        : t(language, 'services.projectInvestors.fit.partialInvestor');
             return {
                 investorId: investor.id,
                 investorName: investor.name,
@@ -532,9 +547,9 @@ export const generateProjectInvestorOffers = ({
                 ownerTitle: leadership?.title || investor.ownerTitle,
                 headquarters: investor.headquarters,
                 investorTags: investor.investorTags,
-                personality: investor.personality,
+                personality: getProjectInvestorPersonality(investor, language),
                 relationshipScore,
-                relationshipLabel: getInvestorRelationshipLabel(relationship),
+                relationshipLabel: getInvestorRelationshipLabel(relationship, language),
                 amount,
                 cleanEquityPercent,
                 equityPercent,
@@ -543,12 +558,12 @@ export const generateProjectInvestorOffers = ({
                 reputation: investor.reputation,
                 fitLabel,
                 note: confidence >= 72
-                    ? amount >= raise ? 'Can lead this raise alone.' : 'Strong fit for this package.'
+                    ? amount >= raise ? t(language, 'services.projectInvestors.offer.canLeadAlone') : t(language, 'services.projectInvestors.offer.strongFit')
                     : confidence >= 54
-                        ? amount >= raise ? 'Can cover the target, but will watch execution.' : 'Interested, but staying disciplined.'
+                        ? amount >= raise ? t(language, 'services.projectInvestors.offer.coverTargetWatchExecution') : t(language, 'services.projectInvestors.offer.interestedDisciplined')
                         : investor.riskTolerance >= 68
-                            ? 'Risk-tolerant capital, but the reputation hit is real.'
-                            : 'Limited appetite because the package looks risky.'
+                            ? t(language, 'services.projectInvestors.offer.riskTolerant')
+                            : t(language, 'services.projectInvestors.offer.limitedAppetite')
             } as ProjectInvestorOffer;
         })
         .filter((offer): offer is ProjectInvestorOffer => Boolean(offer))
@@ -805,12 +820,6 @@ export const calculateInvestorPayout = (
     return Math.round(receiptAmount * (plan.investorEquityPercent / 100));
 };
 
-export const describeInvestorKind = (kind: ProjectInvestor['kind']): string => {
-    if (kind === 'FILM_FUND') return 'Film Fund';
-    if (kind === 'PRIVATE_INVESTOR') return 'Private Investor';
-    if (kind === 'COPRODUCTION_COMPANY') return 'Co-Production';
-    if (kind === 'REGIONAL_COMPANY') return 'Regional Company';
-    if (kind === 'STREAMING_FINANCE') return 'Streaming Finance';
-    if (kind === 'BRAND_MEDIA') return 'Brand Media';
-    return 'Producer';
+export const describeInvestorKind = (kind: ProjectInvestor['kind'], language: GameLanguage = 'en'): string => {
+    return t(language, `services.projectInvestors.kind.${kind}`);
 };

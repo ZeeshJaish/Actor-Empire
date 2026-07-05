@@ -1159,6 +1159,7 @@ export const processBusinessWeek = (
                 0,
                 Math.min(100, Math.round(b.stats.brandHealth || b.stats.customerSatisfaction || 25)),
             ),
+            language,
         });
         if (negotiationAdvance.newResponses.length > 0) {
             const responseIds = new Set(negotiationAdvance.newResponses.map(item => item.id));

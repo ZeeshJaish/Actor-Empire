@@ -7,13 +7,14 @@ import { mergeUniverseRosterWithProject, normalizeUniverseMap } from '../../../s
 import { getAbsoluteWeek } from '../../../services/legacyLogic';
 import { calculateBalancedNextSeasonFundingCap, getPlatformFundingRelationshipMultiplier } from '../../../services/streamingFundingLogic';
 import { CAMPAIGN_POSITIONING_OPTIONS, CAMPAIGN_TIMELINE_OPTIONS, MARKETING_CHANNEL_OPTIONS, calculateCampaignFit, calculateCampaignForecast, normalizeMarketingChannelAllocations } from '../../../services/marketingStrategy';
-import { BOX_OFFICE_REGIONS, getCinemaChainById, getCinemaChainTerms, getCinemaChainsForRegion } from '../../../services/cinemaChains';
+import { BOX_OFFICE_REGIONS, getBoxOfficeRegionLabel, getBoxOfficeRegionShortLabel, getCinemaChainById, getCinemaChainTerms, getCinemaChainsForRegion } from '../../../services/cinemaChains';
 import { getDefaultReleaseRegionIds, getRegionMapSummary, normalizeReleaseRegionIds } from '../../../services/regionMap';
 import { getBoxOfficeCaps } from '../../../services/roleLogic';
 import { applyMusicImpactToHiddenStats, calculateProjectMusicImpact } from '../../../services/musicIndustry';
 import { CinemaChainLogo } from './components/CinemaChainLogo';
 import { InteractiveRegionMap } from './components/InteractiveRegionMap';
 import { applyInvestorPayoutMemory, calculateInvestorPayout } from '../../../services/projectInvestors';
+import { getPlayerLanguage, t } from '../../../services/i18n';
 
 interface ReleaseWizardProps {
     player: Player;
@@ -367,6 +368,28 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
     const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
     const [festivalPremiere, setFestivalPremiere] = useState<string | null>(null);
     const [releaseWeek, setReleaseWeek] = useState<number>(player.currentWeek + 4); 
+    const language = getPlayerLanguage(player);
+    const tr = (key: string, vars?: Record<string, string | number>) => t(language, key, vars);
+    const trFallback = (key: string, fallback: string) => {
+        const translated = tr(key);
+        return translated === key ? fallback : translated;
+    };
+    const getCampaignPositionLabel = (option: typeof CAMPAIGN_POSITIONING_OPTIONS[number]) => trFallback(`release.campaign.position.${option.id}.label`, option.label);
+    const getCampaignPositionShortLabel = (option: typeof CAMPAIGN_POSITIONING_OPTIONS[number]) => trFallback(`release.campaign.position.${option.id}.shortLabel`, option.shortLabel);
+    const getCampaignPositionDescription = (option: typeof CAMPAIGN_POSITIONING_OPTIONS[number]) => trFallback(`release.campaign.position.${option.id}.description`, option.description);
+    const getCampaignPositionPromise = (option: typeof CAMPAIGN_POSITIONING_OPTIONS[number]) => trFallback(`release.campaign.position.${option.id}.promise`, option.promise);
+    const getCampaignTimelineShortLabel = (option: typeof CAMPAIGN_TIMELINE_OPTIONS[number]) => trFallback(`release.campaign.timeline.${option.id}.shortLabel`, option.shortLabel);
+    const getCampaignTimelineDescription = (option: typeof CAMPAIGN_TIMELINE_OPTIONS[number]) => trFallback(`release.campaign.timeline.${option.id}.description`, option.description);
+    const getCampaignTimelinePromise = (option: typeof CAMPAIGN_TIMELINE_OPTIONS[number]) => trFallback(`release.campaign.timeline.${option.id}.promise`, option.promise);
+    const getMarketingChannelLabel = (channel: typeof MARKETING_CHANNEL_OPTIONS[number]) => trFallback(`release.campaign.channel.${channel.id}.label`, channel.label);
+    const getMarketingChannelDescription = (channel: typeof MARKETING_CHANNEL_OPTIONS[number]) => trFallback(`release.campaign.channel.${channel.id}.description`, channel.description);
+    const getFestivalName = (festival: typeof FESTIVALS[number]) => festival.nameKey ? tr(festival.nameKey) : festival.name;
+    const getFestivalDescription = (festival: typeof FESTIVALS[number]) => festival.descriptionKey ? tr(festival.descriptionKey) : festival.description;
+    const getCalendarEventName = (event: typeof CALENDAR_EVENTS[number]) => event.nameKey ? tr(event.nameKey) : event.name;
+    const getSeasonLabel = (weekOfYear: number) => {
+        const season = weekOfYear <= 13 ? 'spring' : weekOfYear <= 26 ? 'summer' : weekOfYear <= 39 ? 'fall' : 'winter';
+        return tr(`services.worldLogic.season.${season}`);
+    };
     const projectHiddenStats = project.projectDetails?.hiddenStats || {};
     const lockedPremierePlatformId = projectHiddenStats.nextSeasonFundingUsedByProjectId === project.id
         ? (projectHiddenStats.nextSeasonFundingPlatformId || projectHiddenStats.platformId || null)
@@ -399,8 +422,15 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
     );
     const effectiveScreeningStrategy = screeningStrategy || inferredScreeningStrategy;
     const boxOfficeRegionById = useMemo(() => (
-        Object.fromEntries(BOX_OFFICE_REGIONS.map(region => [region.id, region])) as Record<BoxOfficeRegionId, typeof BOX_OFFICE_REGIONS[number]>
-    ), []);
+        Object.fromEntries(BOX_OFFICE_REGIONS.map(region => [
+            region.id,
+            {
+                ...region,
+                label: getBoxOfficeRegionLabel(language, region.id),
+                shortLabel: getBoxOfficeRegionShortLabel(language, region.id)
+            }
+        ])) as Record<BoxOfficeRegionId, typeof BOX_OFFICE_REGIONS[number]>
+    ), [language]);
     
     // Bidding State
     const [auctionState, setAuctionState] = useState<'IDLE' | 'ACTIVE' | 'FINISHED'>('IDLE');
@@ -719,8 +749,8 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                 amount: netStreamingDealAmount,
                 category: 'BUSINESS',
                 description: investorStreamingDealPayout > 0
-                    ? `Streaming Rights: ${project.name} (${platformName}) after investor split`
-                    : `Streaming Rights: ${project.name} (${platformName})`
+                    ? tr('release.generated.streamingRightsInvestorSplit', { project: project.name, platform: platformName })
+                    : tr('release.generated.streamingRights', { project: project.name, platform: platformName })
             });
         }
 
@@ -953,10 +983,10 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
         normalizedSelectedRegionIds.map(regionId => {
             const chainIds = normalizedDistributionChainSelections[regionId] || getRecommendedDistributionChainIds(regionId);
             const chains = chainIds
-                .map(chainId => getCinemaChainById(chainId))
+                .map(chainId => getCinemaChainById(chainId, language))
                 .filter((chain): chain is CinemaChain => Boolean(chain));
             const termsList = chainIds
-                .map(chainId => getCinemaChainTerms(chainId, regionId))
+                .map(chainId => getCinemaChainTerms(chainId, regionId, language))
                 .filter((terms): terms is CinemaChainRegionalTerms => Boolean(terms));
             const region = boxOfficeRegionById[regionId];
             if (chains.length === 0 || termsList.length === 0 || !region) return null;
@@ -984,7 +1014,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                 expectedFootfall
             };
         }).filter(Boolean)
-    ), [boxOfficeRegionById, normalizedDistributionChainSelections, normalizedSelectedRegionIds, project.projectDetails, effectiveScreeningStrategy]);
+    ), [boxOfficeRegionById, language, normalizedDistributionChainSelections, normalizedSelectedRegionIds, project.projectDetails, effectiveScreeningStrategy]);
     const distributionDealSummary = useMemo(() => {
         const rows = selectedDistributionRows as Array<NonNullable<typeof selectedDistributionRows[number]>>;
         const releaseReach = rows.reduce((sum, row) => sum + row.region.marketWeight, 0);
@@ -1068,7 +1098,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
     const selectAllDistributionChainsForRegion = (regionId: BoxOfficeRegionId) => {
         setDistributionChainSelections(currentSelections => ({
             ...currentSelections,
-            [regionId]: getCinemaChainsForRegion(regionId).map(chain => chain.id)
+            [regionId]: getCinemaChainsForRegion(regionId, language).map(chain => chain.id)
         }));
     };
     const applyRecommendedDistributionDesk = (strategyId: ScreeningStrategy | null = effectiveScreeningStrategy) => {
@@ -1134,7 +1164,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                     year: updatedPlayer.age,
                     amount: -campaignSpend,
                     category: 'BUSINESS',
-                    description: `Release Campaign: ${project.name}`
+                    description: tr('release.generated.releaseCampaign', { project: project.name })
                 });
             }
         }
@@ -1147,7 +1177,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                 year: updatedPlayer.age,
                 amount: -festivalCost,
                 category: 'BUSINESS',
-                description: `Festival Premiere: ${project.name}`
+                description: tr('release.generated.festivalPremiere', { project: project.name })
             });
         }
 
@@ -1163,7 +1193,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                     year: player.age,
                     amount: unusedCampaignReserve,
                     type: 'FUNDING_SURPLUS',
-                    label: `${project.name} unused campaign reserve returned`,
+                    label: tr('release.generated.unusedCampaignReserveReturned', { project: project.name }),
                     projectId: project.id
                 }, ...ledger].slice(0, 40);
             }
@@ -1174,8 +1204,8 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                 id: `premiere_${project.id}`,
                 week: player.currentWeek,
                 type: 'PREMIERE',
-                title: `${project.name} Premiere`,
-                description: `The grand red carpet premiere for your latest film, ${project.name}.`,
+                title: tr('release.generated.premiereTitle', { project: project.name }),
+                description: tr('release.generated.premiereDescription', { project: project.name }),
                 data: { projectId: project.id }
             };
             updatedPlayer.pendingEvent = premiereEvent;
@@ -1227,7 +1257,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
         // Update Universe Stats if applicable
         if (project.projectDetails?.universeId) {
             const universeId = project.projectDetails.universeId;
-            updatedPlayer.world.universes = normalizeUniverseMap(updatedPlayer.world?.universes || {});
+            updatedPlayer.world.universes = normalizeUniverseMap(updatedPlayer.world?.universes || {}, language);
             if (updatedPlayer.world.universes[universeId]) {
                 const universe = updatedPlayer.world.universes[universeId];
                 const quality = project.projectDetails.hiddenStats?.qualityScore || 50;
@@ -1235,7 +1265,8 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                     universe,
                     project.name,
                     project.projectDetails.castList,
-                    player.name
+                    player.name,
+                    language
                 );
                 
                 // Increase Brand Power and Momentum
@@ -1460,7 +1491,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                                         ) : (
                                             <div className="space-y-3">
                                                 {selectedDistributionRows.map((row: any) => {
-                                                    const chains = getCinemaChainsForRegion(row.regionId);
+                                                    const chains = getCinemaChainsForRegion(row.regionId, language);
                                                     const allChainsSelected = row.chainIds.length === chains.length;
                                                     return (
                                                         <div key={row.regionId} className="rounded-2xl border border-white/10 bg-black/25 p-3">
@@ -1494,7 +1525,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
 
                                                             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                                                                 {chains.map(chain => {
-                                                                    const terms = getCinemaChainTerms(chain.id, row.regionId);
+                                                                    const terms = getCinemaChainTerms(chain.id, row.regionId, language);
                                                                     const isSelected = row.chainIds.includes(chain.id);
                                                                     return (
                                                                         <button
@@ -1747,7 +1778,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                                         </div>
                                         <div className={`hidden sm:flex items-center gap-2 px-4 py-2 rounded-full border text-xs uppercase tracking-widest font-bold ${CAMPAIGN_POSITIONING_ACCENTS[campaignPositioning].tone}`}>
                                             {CAMPAIGN_POSITIONING_ACCENTS[campaignPositioning].icon}
-                                            {selectedCampaignPosition.shortLabel}
+                                            {getCampaignPositionShortLabel(selectedCampaignPosition)}
                                         </div>
                                     </div>
 
@@ -1766,8 +1797,8 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                                                             {accent.icon}
                                                         </div>
                                                         <div className="min-w-0">
-                                                            <div className="text-[8px] uppercase tracking-widest font-bold opacity-60 truncate">{option.promise}</div>
-                                                            <div className="font-serif text-base text-white/90 leading-tight truncate">{option.label}</div>
+                                                            <div className="text-[8px] uppercase tracking-widest font-bold opacity-60 truncate">{getCampaignPositionPromise(option)}</div>
+                                                            <div className="font-serif text-base text-white/90 leading-tight truncate">{getCampaignPositionLabel(option)}</div>
                                                         </div>
                                                     </div>
                                                 </button>
@@ -1785,11 +1816,11 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                                             <div className="flex flex-wrap items-center gap-2">
                                                 <div className="text-[10px] text-amber-500/80 uppercase tracking-[0.3em] font-bold">Campaign Meaning</div>
                                                 <div className={`text-[9px] uppercase tracking-widest font-bold px-2 py-1 rounded-full border ${CAMPAIGN_POSITIONING_ACCENTS[campaignPositioning].tone}`}>
-                                                    {selectedCampaignPosition.promise}
+                                                    {getCampaignPositionPromise(selectedCampaignPosition)}
                                                 </div>
                                             </div>
-                                            <div className="font-serif text-2xl text-white/90 mt-2">{selectedCampaignPosition.label}</div>
-                                            <p className="text-sm text-white/50 leading-relaxed mt-2">{selectedCampaignPosition.description}</p>
+                                            <div className="font-serif text-2xl text-white/90 mt-2">{getCampaignPositionLabel(selectedCampaignPosition)}</div>
+                                            <p className="text-sm text-white/50 leading-relaxed mt-2">{getCampaignPositionDescription(selectedCampaignPosition)}</p>
                                         </div>
                                     </div>
                                 </div>
@@ -1798,10 +1829,10 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                                     <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3 mb-4">
                                         <div>
                                             <div className="text-[10px] text-amber-500/80 uppercase tracking-[0.3em] font-bold">Campaign Timeline</div>
-                                            <p className="text-sm text-white/45 mt-1">{selectedCampaignTimeline.description}</p>
+                                            <p className="text-sm text-white/45 mt-1">{getCampaignTimelineDescription(selectedCampaignTimeline)}</p>
                                         </div>
                                         <div className="text-[9px] uppercase tracking-widest font-bold text-white/45 border border-white/10 rounded-full px-3 py-1 w-fit">
-                                            {selectedCampaignTimeline.promise}
+                                            {getCampaignTimelinePromise(selectedCampaignTimeline)}
                                         </div>
                                     </div>
                                     <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
@@ -1813,9 +1844,9 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                                                     onClick={() => setCampaignTimeline(option.id)}
                                                     className={`min-h-[82px] rounded-2xl border p-3 text-left transition-all ${isSelected ? 'border-amber-400/70 bg-amber-400/10 shadow-[0_0_18px_rgba(245,158,11,0.14)]' : 'border-white/10 bg-white/[0.04] hover:bg-white/[0.07]'}`}
                                                 >
-                                                    <div className={`text-[8px] uppercase tracking-widest font-bold ${isSelected ? 'text-amber-300' : 'text-white/35'}`}>{option.promise}</div>
-                                                    <div className="font-serif text-base leading-tight text-white/90 mt-1">{option.shortLabel}</div>
-                                                    <div className="text-[11px] leading-snug text-white/40 mt-1 line-clamp-2">{option.description}</div>
+                                                    <div className={`text-[8px] uppercase tracking-widest font-bold ${isSelected ? 'text-amber-300' : 'text-white/35'}`}>{getCampaignTimelinePromise(option)}</div>
+                                                    <div className="font-serif text-base leading-tight text-white/90 mt-1">{getCampaignTimelineShortLabel(option)}</div>
+                                                    <div className="text-[11px] leading-snug text-white/40 mt-1 line-clamp-2">{getCampaignTimelineDescription(option)}</div>
                                                 </button>
                                             );
                                         })}
@@ -1978,8 +2009,8 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                                                             {MARKETING_CHANNEL_ICONS[channel.id]}
                                                         </div>
                                                         <div className="min-w-0">
-                                                            <div className="font-serif text-xl md:text-lg text-white/90 leading-tight">{channel.label}</div>
-                                                            <div className="text-xs text-white/45 leading-relaxed mt-1">{channel.description}</div>
+                                                            <div className="font-serif text-xl md:text-lg text-white/90 leading-tight">{getMarketingChannelLabel(channel)}</div>
+                                                            <div className="text-xs text-white/45 leading-relaxed mt-1">{getMarketingChannelDescription(channel)}</div>
                                                         </div>
                                                         <div className="channel-control-dock channel-control-cluster col-span-2 md:col-span-1 grid grid-cols-[38px_minmax(0,1fr)_38px] gap-2 items-center">
                                                             <button
@@ -1994,7 +2025,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                                                                 <input
                                                                     type="number"
                                                                     inputMode="decimal"
-                                                                    aria-label={`${channel.label} custom spend in millions`}
+                                                                    aria-label={tr('release.campaign.channel.customSpendAria', { channel: getMarketingChannelLabel(channel) })}
                                                                     min={0}
                                                                     max={maxForChannel / 1000000}
                                                                     step={0.05}
@@ -2020,7 +2051,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                                                                         key={segment}
                                                                         onClick={() => setChannelAllocationAmount(channel.id, maxForChannel * ((segment + 1) / 4))}
                                                                         className={`h-2 rounded-full transition-colors ${segment < meterFill ? 'bg-amber-400' : 'bg-white/10 hover:bg-white/20'}`}
-                                                                        aria-label={`${channel.label} quick allocation ${segment + 1}`}
+                                                                        aria-label={tr('release.campaign.channel.quickAllocationAria', { channel: getMarketingChannelLabel(channel), segment: segment + 1 })}
                                                                     />
                                                                 ))}
                                                             </div>
@@ -2068,8 +2099,8 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                                         onClick={() => setFestivalPremiere(null)}
                                         className={`w-full p-6 rounded-3xl border transition-all duration-300 text-left ${festivalPremiere === null ? 'bg-amber-500/10 border-amber-500/50 shadow-[0_0_20px_rgba(245,158,11,0.1)]' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
                                     >
-                                        <div className="font-serif text-xl text-white/90 mb-1">Skip Festivals</div>
-                                        <p className="text-sm text-white/50">Go straight to general release.</p>
+                                        <div className="font-serif text-xl text-white/90 mb-1">{tr('release.festival.skipTitle')}</div>
+                                        <p className="text-sm text-white/50">{tr('release.festival.skipDescription')}</p>
                                     </button>
 
                                     {FESTIVALS.map(fest => {
@@ -2091,11 +2122,11 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                                             >
                                                 <div className="flex justify-between items-start mb-4">
                                                     <div>
-                                                        <div className="font-serif text-xl text-white/90 mb-1">{fest.name}</div>
-                                                        <p className="text-sm text-white/50 italic">{fest.description}</p>
+                                                        <div className="font-serif text-xl text-white/90 mb-1">{getFestivalName(fest)}</div>
+                                                        <p className="text-sm text-white/50 italic">{getFestivalDescription(fest)}</p>
                                                         <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/30 px-3 py-1.5">
                                                             <Calendar size={12} className="text-amber-400" />
-                                                            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/50">Festival Window</span>
+                                                            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/50">{tr('release.festival.window')}</span>
                                                             <span className="text-xs font-bold text-white/80">{timingMeta.weekLabel}</span>
                                                         </div>
                                                     </div>
@@ -2103,11 +2134,11 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                                                 </div>
                                                 <div className="flex gap-6">
                                                     <div className="flex flex-col gap-1">
-                                                        <span className="text-[9px] text-white/40 uppercase tracking-widest font-bold">Quality Req</span>
-                                                        <span className={`text-xs font-bold ${hasPrestige ? 'text-emerald-400' : 'text-rose-400'}`}>{fest.prestigeReq} (Yours: {displayQualityScore})</span>
+                                                        <span className="text-[9px] text-white/40 uppercase tracking-widest font-bold">{tr('release.festival.qualityReq')}</span>
+                                                        <span className={`text-xs font-bold ${hasPrestige ? 'text-emerald-400' : 'text-rose-400'}`}>{tr('release.festival.qualityScore', { req: fest.prestigeReq, score: displayQualityScore })}</span>
                                                     </div>
                                                     <div className="flex flex-col gap-1">
-                                                        <span className="text-[9px] text-white/40 uppercase tracking-widest font-bold">Timing</span>
+                                                        <span className="text-[9px] text-white/40 uppercase tracking-widest font-bold">{tr('release.festival.timing')}</span>
                                                         <span className={`text-xs font-bold ${timingMeta.statusTone}`}>{timingMeta.statusLabel}</span>
                                                     </div>
                                                 </div>
@@ -2129,8 +2160,8 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                         {step === 5 && (
                             <motion.div key="step5" initial={{ opacity: 0, scale: 0.95, filter: 'blur(10px)' }} animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }} exit={{ opacity: 0, scale: 1.05, filter: 'blur(10px)' }} transition={{ duration: 0.4 }} className="space-y-12">
                                 <div className="text-center space-y-4">
-                                    <h2 className="text-5xl md:text-7xl font-serif font-light tracking-tight text-white/90">Calendar</h2>
-                                    <p className="text-lg text-white/50 font-light tracking-wide">Select your opening weekend.</p>
+                                    <h2 className="text-5xl md:text-7xl font-serif font-light tracking-tight text-white/90">{tr('release.calendar.title')}</h2>
+                                    <p className="text-lg text-white/50 font-light tracking-wide">{tr('release.calendar.subtitle')}</p>
                                 </div>
 
                                 <div className="grid grid-cols-1 gap-4 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
@@ -2139,7 +2170,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                                         const rivals = upcomingRivals.filter(r => r.weekReleased === week);
                                         const isSelected = releaseWeek === week;
                                         const weekOfYear = getWeekOfYear(week);
-                                        const season = weekOfYear <= 13 ? 'Spring' : weekOfYear <= 26 ? 'Summer' : weekOfYear <= 39 ? 'Fall' : 'Winter';
+                                        const season = getSeasonLabel(weekOfYear);
                                         const calendarEvent = CALENDAR_EVENTS.find(e => e.week === weekOfYear);
                                         
                                         return (
@@ -2155,19 +2186,19 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                                                 )}
                                                 
                                                 <div className="flex items-center gap-4 mb-6">
-                                                    <div className={`font-serif text-3xl ${isSelected ? 'text-amber-400' : 'text-white/90'}`}>Week {week}</div>
+                                                    <div className={`font-serif text-3xl ${isSelected ? 'text-amber-400' : 'text-white/90'}`}>{tr('release.calendar.week', { week })}</div>
                                                     <div className="flex gap-2">
                                                         <span className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[10px] font-bold text-white/50 uppercase tracking-widest">{season}</span>
                                                         {calendarEvent && (
                                                             <span className="px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-[10px] font-bold text-amber-500 uppercase tracking-widest flex items-center gap-1">
-                                                                <Calendar size={10} /> {calendarEvent.name}
+                                                                <Calendar size={10} /> {getCalendarEventName(calendarEvent)}
                                                             </span>
                                                         )}
                                                     </div>
                                                 </div>
                                                 
                                                 <div className="space-y-3">
-                                                    <div className="text-[10px] font-bold text-white/30 uppercase tracking-widest">Box Office Competition</div>
+                                                    <div className="text-[10px] font-bold text-white/30 uppercase tracking-widest">{tr('release.calendar.competition')}</div>
                                                     {rivals.length > 0 ? (
                                                         <div className="grid grid-cols-1 gap-2">
                                                             {rivals.map(rival => (
@@ -2247,21 +2278,21 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                                         <div className="flex justify-between items-end pb-6 border-b border-white/10 gap-6">
                                             <div>
                                                 <div className="text-[10px] text-white/40 uppercase tracking-widest font-bold mb-1">Campaign Position</div>
-                                                <div className="text-[10px] uppercase tracking-widest font-bold text-white/35">{selectedCampaignPosition.promise}</div>
+                                                <div className="text-[10px] uppercase tracking-widest font-bold text-white/35">{getCampaignPositionPromise(selectedCampaignPosition)}</div>
                                             </div>
-                                            <div className="font-serif text-2xl text-white/90 text-right">{selectedCampaignPosition.label}</div>
+                                            <div className="font-serif text-2xl text-white/90 text-right">{getCampaignPositionLabel(selectedCampaignPosition)}</div>
                                         </div>
                                         
                                         {festivalPremiere && (
                                             <div className="flex justify-between items-end pb-6 border-b border-white/10">
-                                                <div className="text-[10px] text-white/40 uppercase tracking-widest font-bold mb-1">Festival</div>
-                                                <div className="font-serif text-2xl text-white/90">{FESTIVALS.find(f => f.id === festivalPremiere)?.name}</div>
+                                                <div className="text-[10px] text-white/40 uppercase tracking-widest font-bold mb-1">{tr('release.festival.summaryLabel')}</div>
+                                                <div className="font-serif text-2xl text-white/90">{getFestivalName(FESTIVALS.find(f => f.id === festivalPremiere) || FESTIVALS[0])}</div>
                                             </div>
                                         )}
                                         
                                         <div className="flex justify-between items-end pb-6 border-b border-white/10">
-                                            <div className="text-[10px] text-white/40 uppercase tracking-widest font-bold mb-1">Release Date</div>
-                                            <div className="font-serif text-2xl text-white/90">Week {releaseWeek}</div>
+                                            <div className="text-[10px] text-white/40 uppercase tracking-widest font-bold mb-1">{tr('release.calendar.releaseDate')}</div>
+                                            <div className="font-serif text-2xl text-white/90">{tr('release.calendar.week', { week: releaseWeek })}</div>
                                         </div>
 
                                         <div className="flex justify-between items-end pt-4">

@@ -32,6 +32,7 @@ import {
     LifestyleActivityChoice,
     LifestyleActivityDefinition,
     LifestyleActivitySelections,
+    GameLanguage,
     HealthConditionState,
     LogEntry,
     Player,
@@ -41,10 +42,10 @@ import {
     AdoptionChildProfile,
     buildLifestyleActivityQuote,
     ADOPTION_CHILD_PROFILES,
-    ADOPTION_HOME_PREP_OPTIONS,
     ADOPTION_ROUTE_OPTIONS,
     ADOPTION_SUPPORT_OPTIONS,
     COMPANION_ACCESSORY_OPTIONS,
+    COMPANION_CATEGORY_OPTIONS,
     COMPANION_CUSTOMIZATION_OPTIONS,
     COMPANION_HOME_OPTIONS,
     COMPANION_STORE_OPTIONS,
@@ -55,6 +56,8 @@ import {
     getAvailableNightlifeGuestOptions,
     getAvailableIndustryGuestOptions,
     getAvailableNightlifeVenueOptions,
+    getAvailableCharityFormatOptions,
+    getAvailableAdoptionHomePrepOptions,
     getAvailableAdoptionChildOptions,
     getAvailableAdoptionChildProfiles,
     getAvailableInviteOptions,
@@ -63,7 +66,6 @@ import {
     getAdoptionChildProfile,
     CHARITY_CAUSE_OPTIONS,
     CHARITY_DONATION_OPTIONS,
-    CHARITY_FORMAT_OPTIONS,
     CHARITY_GUEST_CIRCLE_OPTIONS,
     CHARITY_PRESS_OPTIONS,
     getCompanionCareOptionsForPet,
@@ -80,10 +82,10 @@ import {
     LIFESTYLE_ACTIVITY_CATALOG,
     INDUSTRY_ADDON_OPTIONS,
     INDUSTRY_EVENT_OPTIONS,
+    getAvailableIndustryVenueOptions,
     INDUSTRY_HOSTING_STYLE_OPTIONS,
     INDUSTRY_INVITE_GROUP_OPTIONS,
     INDUSTRY_SERVICE_OPTIONS,
-    INDUSTRY_VENUE_OPTIONS,
     NIGHTLIFE_CONTROL_OPTIONS,
     NIGHTLIFE_CROWD_OPTIONS,
     NIGHTLIFE_TYPE_OPTIONS,
@@ -98,7 +100,7 @@ import {
     WELLNESS_PROVIDER_OPTIONS,
     WELLNESS_SUPPORT_OPTIONS,
 } from '../../services/lifestyleActivities';
-import { getHealthConditionTreatmentTags } from '../../services/healthConditions';
+import { getHealthConditionLabel, getHealthConditionTreatmentTags } from '../../services/healthConditions';
 import { getPlayerLanguage, t } from '../../services/i18n';
 import { getGenderedAvatar } from '../../services/npcLogic';
 
@@ -111,6 +113,82 @@ interface LifestyleActivitiesProps {
 type CategoryFilter = 'ALL' | LifestyleActivityCategory;
 type PetStage = 'brief' | 'stores' | 'categories' | 'pets' | 'checkout';
 
+const ActivityLanguageContext = React.createContext<GameLanguage>('en');
+
+const getChoiceLabel = (choice: LifestyleActivityChoice, language: GameLanguage) => (
+    choice.labelKey ? t(language, choice.labelKey) : choice.label
+);
+
+const getChoiceDescription = (choice: LifestyleActivityChoice, language: GameLanguage) => (
+    choice.descriptionKey ? t(language, choice.descriptionKey) : choice.description
+);
+
+const getActivityName = (activity: LifestyleActivityDefinition, language: GameLanguage) => (
+    t(language, `services.lifestyle.activity.${activity.id}.name`)
+);
+
+const getActivityShortDescription = (activity: LifestyleActivityDefinition, language: GameLanguage) => {
+    const key = `services.lifestyle.activity.${activity.id}.shortDescription`;
+    const translated = t(language, key);
+    return translated === key ? activity.shortDescription : translated;
+};
+
+const getActivityLongDescription = (activity: LifestyleActivityDefinition, language: GameLanguage) => {
+    const key = `services.lifestyle.activity.${activity.id}.longDescription`;
+    const translated = t(language, key);
+    return translated === key ? activity.longDescription : translated;
+};
+
+const getAdoptionProfilePersonality = (profile: AdoptionChildProfile, language: GameLanguage) => (
+    profile.personalityKey ? t(language, profile.personalityKey) : profile.personality
+);
+
+const getAdoptionProfileNeeds = (profile: AdoptionChildProfile, language: GameLanguage) => (
+    profile.needsKey ? t(language, profile.needsKey) : profile.needs
+);
+
+const getAdoptionAgeLabel = (profile: AdoptionChildProfile, language: GameLanguage) => (
+    profile.age === 0
+        ? t(language, 'services.lifestyle.adoption.age.infant')
+        : t(language, 'services.lifestyle.adoption.age.yearsOld', { age: profile.age })
+);
+
+const getPetStoreName = (store: ReturnType<typeof getPetCompanionStore>, language: GameLanguage) => (
+    store.nameKey ? t(language, store.nameKey) : store.name
+);
+
+const getPetStoreDescription = (store: ReturnType<typeof getPetCompanionStore>, language: GameLanguage) => (
+    store.descriptionKey ? t(language, store.descriptionKey) : store.description
+);
+
+const getPetStorePriceTone = (store: ReturnType<typeof getPetCompanionStore>, language: GameLanguage) => (
+    store.priceToneKey ? t(language, store.priceToneKey) : store.priceTone
+);
+
+const getPetProfileSpecies = (profile: PetCompanionProfile, language: GameLanguage) => (
+    profile.speciesKey ? t(language, profile.speciesKey) : profile.species
+);
+
+const getPetProfileBreed = (profile: PetCompanionProfile, language: GameLanguage) => (
+    profile.breedKey ? t(language, profile.breedKey) : profile.breed
+);
+
+const getPetProfileListingTitle = (profile: PetCompanionProfile, language: GameLanguage) => (
+    profile.listingTitleKey ? t(language, profile.listingTitleKey) : (profile.listingTitle || `${getPetProfileBreed(profile, language)} ${getPetProfileSpecies(profile, language)}`)
+);
+
+const getPetProfilePersonality = (profile: PetCompanionProfile, language: GameLanguage) => (
+    profile.personalityKey ? t(language, profile.personalityKey) : profile.personality
+);
+
+const getPetProfileCareNeeds = (profile: PetCompanionProfile, language: GameLanguage) => (
+    profile.careNeedsKey ? t(language, profile.careNeedsKey) : profile.careNeeds
+);
+
+const getPetProfileLegalNote = (profile: PetCompanionProfile, language: GameLanguage) => (
+    profile.legalNoteKey ? t(language, profile.legalNoteKey) : profile.legalNote
+);
+
 type ActivityResultState = {
     activityName: string;
     message: string;
@@ -122,25 +200,25 @@ type ActivityResultState = {
     playerAfter: Player;
 };
 
-const categoryMeta: Record<LifestyleActivityCategory, { label: string; icon: LucideIcon; accent: string; bg: string }> = {
-    TRAVEL: { label: 'Travel', icon: Plane, accent: 'text-sky-300', bg: 'bg-sky-500/10 border-sky-500/30' },
-    NIGHTLIFE: { label: 'Nightlife', icon: Martini, accent: 'text-fuchsia-300', bg: 'bg-fuchsia-500/10 border-fuchsia-500/30' },
-    FAMILY: { label: 'Family', icon: Heart, accent: 'text-rose-300', bg: 'bg-rose-500/10 border-rose-500/30' },
-    WELLNESS: { label: 'Wellness', icon: Stethoscope, accent: 'text-emerald-300', bg: 'bg-emerald-500/10 border-emerald-500/30' },
-    IMAGE: { label: 'Image', icon: Handshake, accent: 'text-amber-300', bg: 'bg-amber-500/10 border-amber-500/30' },
-    LEGACY: { label: 'Legacy', icon: Landmark, accent: 'text-yellow-300', bg: 'bg-yellow-500/10 border-yellow-500/30' },
-    COMPANION: { label: 'Companion', icon: PawPrint, accent: 'text-lime-300', bg: 'bg-lime-500/10 border-lime-500/30' },
+const categoryMeta: Record<LifestyleActivityCategory, { labelKey: Parameters<typeof t>[1]; icon: LucideIcon; accent: string; bg: string }> = {
+    TRAVEL: { labelKey: 'activities.category.TRAVEL', icon: Plane, accent: 'text-sky-300', bg: 'bg-sky-500/10 border-sky-500/30' },
+    NIGHTLIFE: { labelKey: 'activities.category.NIGHTLIFE', icon: Martini, accent: 'text-fuchsia-300', bg: 'bg-fuchsia-500/10 border-fuchsia-500/30' },
+    FAMILY: { labelKey: 'activities.category.FAMILY', icon: Heart, accent: 'text-rose-300', bg: 'bg-rose-500/10 border-rose-500/30' },
+    WELLNESS: { labelKey: 'activities.category.WELLNESS', icon: Stethoscope, accent: 'text-emerald-300', bg: 'bg-emerald-500/10 border-emerald-500/30' },
+    IMAGE: { labelKey: 'activities.category.IMAGE', icon: Handshake, accent: 'text-amber-300', bg: 'bg-amber-500/10 border-amber-500/30' },
+    LEGACY: { labelKey: 'activities.category.LEGACY', icon: Landmark, accent: 'text-yellow-300', bg: 'bg-yellow-500/10 border-yellow-500/30' },
+    COMPANION: { labelKey: 'activities.category.COMPANION', icon: PawPrint, accent: 'text-lime-300', bg: 'bg-lime-500/10 border-lime-500/30' },
 };
 
-const categoryFilters: { id: CategoryFilter; label: string }[] = [
-    { id: 'ALL', label: 'All' },
-    { id: 'TRAVEL', label: 'Travel' },
-    { id: 'NIGHTLIFE', label: 'Nightlife' },
-    { id: 'FAMILY', label: 'Family' },
-    { id: 'WELLNESS', label: 'Wellness' },
-    { id: 'IMAGE', label: 'Image' },
-    { id: 'LEGACY', label: 'Legacy' },
-    { id: 'COMPANION', label: 'Companion' },
+const categoryFilters: { id: CategoryFilter; labelKey: Parameters<typeof t>[1] }[] = [
+    { id: 'ALL', labelKey: 'activities.category.ALL' },
+    { id: 'TRAVEL', labelKey: 'activities.category.TRAVEL' },
+    { id: 'NIGHTLIFE', labelKey: 'activities.category.NIGHTLIFE' },
+    { id: 'FAMILY', labelKey: 'activities.category.FAMILY' },
+    { id: 'WELLNESS', labelKey: 'activities.category.WELLNESS' },
+    { id: 'IMAGE', labelKey: 'activities.category.IMAGE' },
+    { id: 'LEGACY', labelKey: 'activities.category.LEGACY' },
+    { id: 'COMPANION', labelKey: 'activities.category.COMPANION' },
 ];
 
 const activityIconOverrides: Record<string, LucideIcon> = {
@@ -231,32 +309,36 @@ const OptionGroup: React.FC<{
     selectedIds?: string[];
     onSelect: (id: string) => void;
     multi?: boolean;
-}> = ({ title, choices, selectedId, selectedIds = [], onSelect, multi = false }) => (
-    <div className="space-y-2">
-        <div className="text-[10px] font-black uppercase tracking-[0.25em] text-zinc-500">{title}</div>
-        <div className="grid grid-cols-2 gap-2">
-            {choices.map(choice => {
-                const isSelected = multi ? selectedIds.includes(choice.id) : selectedId === choice.id;
-                return (
-                    <button
-                        key={choice.id}
-                        onClick={() => onSelect(choice.id)}
-                        className={`min-h-[76px] rounded-2xl border p-3 text-left transition-all ${isSelected ? 'border-emerald-400 bg-emerald-500/15 shadow-[0_0_20px_rgba(16,185,129,0.12)]' : 'border-zinc-800 bg-zinc-950/70 hover:border-zinc-600'}`}
-                    >
-                        <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0">
-                                <div className="text-sm font-black leading-tight text-white">{choice.label}</div>
-                                <ChoiceCostChip choice={choice} className="mt-2" />
+}> = ({ title, choices, selectedId, selectedIds = [], onSelect, multi = false }) => {
+    const language = React.useContext(ActivityLanguageContext);
+
+    return (
+        <div className="space-y-2">
+            <div className="text-[10px] font-black uppercase tracking-[0.25em] text-zinc-500">{title}</div>
+            <div className="grid grid-cols-2 gap-2">
+                {choices.map(choice => {
+                    const isSelected = multi ? selectedIds.includes(choice.id) : selectedId === choice.id;
+                    return (
+                        <button
+                            key={choice.id}
+                            onClick={() => onSelect(choice.id)}
+                            className={`min-h-[76px] rounded-2xl border p-3 text-left transition-all ${isSelected ? 'border-emerald-400 bg-emerald-500/15 shadow-[0_0_20px_rgba(16,185,129,0.12)]' : 'border-zinc-800 bg-zinc-950/70 hover:border-zinc-600'}`}
+                        >
+                            <div className="flex items-start justify-between gap-2">
+                                <div className="min-w-0">
+                                    <div className="text-sm font-black leading-tight text-white">{getChoiceLabel(choice, language)}</div>
+                                    <ChoiceCostChip choice={choice} className="mt-2" />
+                                </div>
+                                {isSelected && <BadgeCheck size={16} className="shrink-0 text-emerald-300" />}
                             </div>
-                            {isSelected && <BadgeCheck size={16} className="shrink-0 text-emerald-300" />}
-                        </div>
-                        <div className="mt-1 text-[11px] leading-snug text-zinc-500">{choice.description}</div>
-                    </button>
-                );
-            })}
+                            <div className="mt-1 text-[11px] leading-snug text-zinc-500">{getChoiceDescription(choice, language)}</div>
+                        </button>
+                    );
+                })}
+            </div>
         </div>
-    </div>
-);
+    );
+};
 
 const CompactOptionRail: React.FC<{
     title?: string;
@@ -267,105 +349,120 @@ const CompactOptionRail: React.FC<{
     multi?: boolean;
     tone?: 'default' | 'nightlife' | 'industry';
     density?: 'compact' | 'roomy';
-}> = ({ title, choices, selectedId, selectedIds = [], onSelect, multi = false, tone = 'default', density = 'compact' }) => (
-    <div className="space-y-2">
-        {title && <div className="text-[10px] font-black uppercase tracking-[0.25em] text-zinc-500">{title}</div>}
-        <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 custom-scrollbar">
-            {choices.map(choice => {
-                const isSelected = multi ? selectedIds.includes(choice.id) : selectedId === choice.id;
-                const selectedClass = tone === 'nightlife'
-                    ? 'border-fuchsia-300 bg-fuchsia-500/15 shadow-[0_0_22px_rgba(217,70,239,0.16)]'
-                    : tone === 'industry'
-                        ? 'border-amber-300 bg-amber-400/15 shadow-[0_0_22px_rgba(251,191,36,0.14)]'
-                    : 'border-emerald-400 bg-emerald-500/15 shadow-[0_0_20px_rgba(16,185,129,0.14)]';
-                return (
-                    <button
-                        key={choice.id}
-                        onClick={() => onSelect(choice.id)}
-                        className={`${density === 'roomy' ? 'min-h-[124px] w-[242px] p-4' : 'min-h-[82px] w-[176px] p-3'} shrink-0 rounded-2xl border text-left transition-all ${isSelected ? selectedClass : 'border-zinc-800 bg-zinc-950/70 hover:border-zinc-600'}`}
-                    >
-                        <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0">
-                                <div className={`${density === 'roomy' ? 'line-clamp-2 text-base leading-tight' : 'truncate text-sm'} font-black text-white`}>{choice.label}</div>
-                                <ChoiceCostChip choice={choice} className="mt-2" />
+}> = ({ title, choices, selectedId, selectedIds = [], onSelect, multi = false, tone = 'default', density = 'compact' }) => {
+    const language = React.useContext(ActivityLanguageContext);
+
+    return (
+        <div className="space-y-2">
+            {title && <div className="text-[10px] font-black uppercase tracking-[0.25em] text-zinc-500">{title}</div>}
+            <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 custom-scrollbar">
+                {choices.map(choice => {
+                    const isSelected = multi ? selectedIds.includes(choice.id) : selectedId === choice.id;
+                    const selectedClass = tone === 'nightlife'
+                        ? 'border-fuchsia-300 bg-fuchsia-500/15 shadow-[0_0_22px_rgba(217,70,239,0.16)]'
+                        : tone === 'industry'
+                            ? 'border-amber-300 bg-amber-400/15 shadow-[0_0_22px_rgba(251,191,36,0.14)]'
+                        : 'border-emerald-400 bg-emerald-500/15 shadow-[0_0_20px_rgba(16,185,129,0.14)]';
+                    return (
+                        <button
+                            key={choice.id}
+                            onClick={() => onSelect(choice.id)}
+                            className={`${density === 'roomy' ? 'min-h-[124px] w-[242px] p-4' : 'min-h-[82px] w-[176px] p-3'} shrink-0 rounded-2xl border text-left transition-all ${isSelected ? selectedClass : 'border-zinc-800 bg-zinc-950/70 hover:border-zinc-600'}`}
+                        >
+                            <div className="flex items-start justify-between gap-2">
+                                <div className="min-w-0">
+                                    <div className={`${density === 'roomy' ? 'line-clamp-2 text-base leading-tight' : 'truncate text-sm'} font-black text-white`}>{getChoiceLabel(choice, language)}</div>
+                                    <ChoiceCostChip choice={choice} className="mt-2" />
+                                </div>
+                                {isSelected && <BadgeCheck size={16} className={`shrink-0 ${tone === 'nightlife' ? 'text-fuchsia-200' : tone === 'industry' ? 'text-amber-200' : 'text-emerald-300'}`} />}
                             </div>
-                            {isSelected && <BadgeCheck size={16} className={`shrink-0 ${tone === 'nightlife' ? 'text-fuchsia-200' : tone === 'industry' ? 'text-amber-200' : 'text-emerald-300'}`} />}
-                        </div>
-                        <div className={`mt-2 ${density === 'roomy' ? 'text-xs font-bold leading-relaxed' : 'line-clamp-2 text-[11px] leading-snug'} text-zinc-500`}>{choice.description}</div>
-                    </button>
-                );
-            })}
+                            <div className={`mt-2 ${density === 'roomy' ? 'text-xs font-bold leading-relaxed' : 'line-clamp-2 text-[11px] leading-snug'} text-zinc-500`}>{getChoiceDescription(choice, language)}</div>
+                        </button>
+                    );
+                })}
+            </div>
         </div>
-    </div>
-);
+    );
+};
 
 const CountryPicker: React.FC<{
     countries: LifestyleActivityChoice[];
     selectedId?: string;
     onSelect: (id: string) => void;
-}> = ({ countries, selectedId, onSelect }) => (
-    <div className="space-y-2">
-        <div className="flex items-center justify-between">
-            <div className="text-[10px] font-black uppercase tracking-[0.25em] text-zinc-500">Country</div>
-            <div className="text-[9px] font-black uppercase tracking-widest text-zinc-600">Swipe</div>
+}> = ({ countries, selectedId, onSelect }) => {
+    const language = React.useContext(ActivityLanguageContext);
+
+    return (
+        <div className="space-y-2">
+            <div className="flex items-center justify-between">
+                <div className="text-[10px] font-black uppercase tracking-[0.25em] text-zinc-500">Country</div>
+                <div className="text-[9px] font-black uppercase tracking-widest text-zinc-600">Swipe</div>
+            </div>
+            <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 custom-scrollbar">
+                {countries.map(country => {
+                    const isSelected = selectedId === country.id;
+                    return (
+                        <button
+                            key={country.id}
+                            onClick={() => onSelect(country.id)}
+                            className={`shrink-0 rounded-full border px-4 py-2 text-xs font-black transition-all ${isSelected ? 'border-emerald-300 bg-emerald-400 text-black' : 'border-zinc-800 bg-zinc-950 text-zinc-400'}`}
+                        >
+                            {getChoiceLabel(country, language)}
+                        </button>
+                    );
+                })}
+            </div>
         </div>
-        <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 custom-scrollbar">
-            {countries.map(country => {
-                const isSelected = selectedId === country.id;
-                return (
-                    <button
-                        key={country.id}
-                        onClick={() => onSelect(country.id)}
-                        className={`shrink-0 rounded-full border px-4 py-2 text-xs font-black transition-all ${isSelected ? 'border-emerald-300 bg-emerald-400 text-black' : 'border-zinc-800 bg-zinc-950 text-zinc-400'}`}
-                    >
-                        {country.label}
-                    </button>
-                );
-            })}
-        </div>
-    </div>
-);
+    );
+};
 
 const CityPostcardRail: React.FC<{
     country?: LifestyleActivityChoice;
     cities: LifestyleActivityChoice[];
     selectedId?: string;
     onSelect: (id: string) => void;
-}> = ({ country, cities, selectedId, onSelect }) => (
-    <div className="space-y-2">
-        <div className="text-[10px] font-black uppercase tracking-[0.25em] text-zinc-500">City</div>
-        <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1 custom-scrollbar">
-            {cities.map(city => {
-                const isSelected = selectedId === city.id;
-                const initials = getDestinationInitials(city.label);
-                return (
-                    <button
-                        key={city.id}
-                        onClick={() => onSelect(city.id)}
-                        className={`relative h-36 w-56 shrink-0 overflow-hidden rounded-3xl border text-left transition-all ${isSelected ? 'border-emerald-300 shadow-[0_0_24px_rgba(52,211,153,0.22)]' : 'border-zinc-800 opacity-80 hover:opacity-100'}`}
-                    >
-                        <div className={`absolute inset-0 bg-gradient-to-br ${getVisualTheme(city.id)} opacity-95`} />
-                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(255,255,255,0.36),transparent_25%),radial-gradient(circle_at_88%_12%,rgba(255,255,255,0.2),transparent_22%),linear-gradient(to_top,rgba(0,0,0,0.84),rgba(0,0,0,0.12)_62%,rgba(255,255,255,0.08))]" />
-                        <div className="absolute -right-8 -top-10 h-28 w-28 rounded-full border border-white/25 bg-white/10 blur-[1px]" />
-                        <div className="absolute -bottom-10 -left-8 h-24 w-40 rounded-full bg-black/25 blur-xl" />
-                        <div className="absolute bottom-4 right-4 text-5xl font-black tracking-tighter text-white/10">{initials}</div>
-                        <div className="relative flex h-full flex-col justify-between p-4">
-                            <div className="flex items-start justify-between gap-2">
-                                <ChoiceCostChip choice={city} className="bg-black/35 text-white" />
-                                {isSelected && <BadgeCheck size={18} className="text-white drop-shadow" />}
+}> = ({ country, cities, selectedId, onSelect }) => {
+    const language = React.useContext(ActivityLanguageContext);
+    const countryLabel = country ? getChoiceLabel(country, language) : undefined;
+
+    return (
+        <div className="space-y-2">
+            <div className="text-[10px] font-black uppercase tracking-[0.25em] text-zinc-500">City</div>
+            <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1 custom-scrollbar">
+                {cities.map(city => {
+                    const isSelected = selectedId === city.id;
+                    const cityLabel = getChoiceLabel(city, language);
+                    const cityDescription = getChoiceDescription(city, language);
+                    const initials = getDestinationInitials(cityLabel);
+                    return (
+                        <button
+                            key={city.id}
+                            onClick={() => onSelect(city.id)}
+                            className={`relative h-36 w-56 shrink-0 overflow-hidden rounded-3xl border text-left transition-all ${isSelected ? 'border-emerald-300 shadow-[0_0_24px_rgba(52,211,153,0.22)]' : 'border-zinc-800 opacity-80 hover:opacity-100'}`}
+                        >
+                            <div className={`absolute inset-0 bg-gradient-to-br ${getVisualTheme(city.id)} opacity-95`} />
+                            <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(255,255,255,0.36),transparent_25%),radial-gradient(circle_at_88%_12%,rgba(255,255,255,0.2),transparent_22%),linear-gradient(to_top,rgba(0,0,0,0.84),rgba(0,0,0,0.12)_62%,rgba(255,255,255,0.08))]" />
+                            <div className="absolute -right-8 -top-10 h-28 w-28 rounded-full border border-white/25 bg-white/10 blur-[1px]" />
+                            <div className="absolute -bottom-10 -left-8 h-24 w-40 rounded-full bg-black/25 blur-xl" />
+                            <div className="absolute bottom-4 right-4 text-5xl font-black tracking-tighter text-white/10">{initials}</div>
+                            <div className="relative flex h-full flex-col justify-between p-4">
+                                <div className="flex items-start justify-between gap-2">
+                                    <ChoiceCostChip choice={city} className="bg-black/35 text-white" />
+                                    {isSelected && <BadgeCheck size={18} className="text-white drop-shadow" />}
+                                </div>
+                                <div>
+                                    <div className="text-xl font-black leading-tight text-white drop-shadow">{cityLabel}</div>
+                                    <div className="mt-0.5 text-[9px] font-black uppercase tracking-[0.24em] text-white/55">{countryLabel}</div>
+                                    <div className="mt-1 line-clamp-2 text-[11px] font-bold leading-snug text-white/75">{cityDescription}</div>
+                                </div>
                             </div>
-                            <div>
-                                <div className="text-xl font-black leading-tight text-white drop-shadow">{city.label}</div>
-                                <div className="mt-0.5 text-[9px] font-black uppercase tracking-[0.24em] text-white/55">{country?.label}</div>
-                                <div className="mt-1 line-clamp-2 text-[11px] font-bold leading-snug text-white/75">{city.description}</div>
-                            </div>
-                        </div>
-                    </button>
-                );
-            })}
+                        </button>
+                    );
+                })}
+            </div>
         </div>
-    </div>
-);
+    );
+};
 
 const TripPreviewCard: React.FC<{
     country?: LifestyleActivityChoice;
@@ -374,35 +471,47 @@ const TripPreviewCard: React.FC<{
     stay?: LifestyleActivityChoice;
     travel?: LifestyleActivityChoice;
     totalCost: number;
-}> = ({ country, city, days, stay, travel, totalCost }) => (
-    <div className="relative overflow-hidden rounded-[2rem] border border-emerald-400/30 bg-zinc-950 shadow-[0_20px_70px_rgba(0,0,0,0.35)]">
-        <div className={`absolute inset-0 bg-gradient-to-br ${getVisualTheme(`${country?.id}-${city?.id}`)} opacity-80`} />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(255,255,255,0.35),transparent_24%),radial-gradient(circle_at_88%_10%,rgba(255,255,255,0.18),transparent_22%),linear-gradient(to_top,rgba(0,0,0,0.88),rgba(0,0,0,0.18)_64%,rgba(255,255,255,0.08))]" />
-        <div className="absolute -right-12 -top-16 h-44 w-44 rounded-full border border-white/25 bg-white/10" />
-        <div className="absolute -bottom-14 -left-10 h-32 w-56 rounded-full bg-black/25 blur-2xl" />
-        <div className="absolute bottom-8 right-8 text-7xl font-black tracking-tighter text-white/10">{getDestinationInitials(city?.label)}</div>
-        <div className="relative p-5">
-            <div className="flex items-start justify-between gap-3">
-                <div>
-                    <div className="text-[10px] font-black uppercase tracking-[0.3em] text-white/70">Trip Preview</div>
-                    <div className="mt-8 text-3xl font-black leading-none text-white drop-shadow">{city?.label || 'Pick a city'}</div>
-                    <div className="mt-2 text-xs font-black uppercase tracking-[0.24em] text-white/75">{country?.label || 'Destination'} • {days} days</div>
+}> = ({ country, city, days, stay, travel, totalCost }) => {
+    const language = React.useContext(ActivityLanguageContext);
+    const cityLabel = city ? getChoiceLabel(city, language) : t(language, 'activities.tripPreview.pickCity');
+    const cityInitials = city ? getDestinationInitials(cityLabel) : '';
+    const travelChips = [stay, travel].filter((choice): choice is LifestyleActivityChoice => Boolean(choice));
+
+    return (
+        <div className="relative overflow-hidden rounded-[2rem] border border-emerald-400/30 bg-zinc-950 shadow-[0_20px_70px_rgba(0,0,0,0.35)]">
+            <div className={`absolute inset-0 bg-gradient-to-br ${getVisualTheme(`${country?.id}-${city?.id}`)} opacity-80`} />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(255,255,255,0.35),transparent_24%),radial-gradient(circle_at_88%_10%,rgba(255,255,255,0.18),transparent_22%),linear-gradient(to_top,rgba(0,0,0,0.88),rgba(0,0,0,0.18)_64%,rgba(255,255,255,0.08))]" />
+            <div className="absolute -right-12 -top-16 h-44 w-44 rounded-full border border-white/25 bg-white/10" />
+            <div className="absolute -bottom-14 -left-10 h-32 w-56 rounded-full bg-black/25 blur-2xl" />
+            <div className="absolute bottom-8 right-8 text-7xl font-black tracking-tighter text-white/10">{cityInitials}</div>
+            <div className="relative p-5">
+                <div className="flex items-start justify-between gap-3">
+                    <div>
+                        <div className="text-[10px] font-black uppercase tracking-[0.3em] text-white/70">{t(language, 'activities.tripPreview.title')}</div>
+                        <div className="mt-8 text-3xl font-black leading-none text-white drop-shadow">{cityLabel}</div>
+                        <div className="mt-2 text-xs font-black uppercase tracking-[0.24em] text-white/75">
+                            {t(language, 'activities.tripPreview.destinationDays', {
+                                destination: country ? getChoiceLabel(country, language) : t(language, 'activities.tripPreview.destination'),
+                                days,
+                            })}
+                        </div>
+                    </div>
+                    <div className="rounded-2xl bg-black/45 px-4 py-3 text-right backdrop-blur">
+                        <div className="text-[9px] font-black uppercase tracking-widest text-emerald-200">{t(language, 'activities.tripPreview.cost')}</div>
+                        <div className="text-xl font-black text-white">{formatMoney(totalCost)}</div>
+                    </div>
                 </div>
-                <div className="rounded-2xl bg-black/45 px-4 py-3 text-right backdrop-blur">
-                    <div className="text-[9px] font-black uppercase tracking-widest text-emerald-200">Trip Cost</div>
-                    <div className="text-xl font-black text-white">{formatMoney(totalCost)}</div>
+                <div className="mt-10 flex flex-wrap gap-2">
+                    {travelChips.map(choice => (
+                        <span key={choice.id} className="rounded-full bg-black/45 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white/85 backdrop-blur">
+                            {getChoiceLabel(choice, language)}
+                        </span>
+                    ))}
                 </div>
-            </div>
-            <div className="mt-10 flex flex-wrap gap-2">
-                {[stay?.label, travel?.label].filter(Boolean).map(label => (
-                    <span key={label} className="rounded-full bg-black/45 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white/85 backdrop-blur">
-                        {label}
-                    </span>
-                ))}
             </div>
         </div>
-    </div>
-);
+    );
+};
 
 const NightlifePreviewCard: React.FC<{
     eventType?: LifestyleActivityChoice;
@@ -413,8 +522,19 @@ const NightlifePreviewCard: React.FC<{
     totalCost: number;
     risk: number;
 }> = ({ eventType, venue, guest, crowd, control, totalCost, risk }) => {
-    const guestText = guest?.id === 'no_guest' ? 'No headline guest' : `${guest?.label || 'Guest'} invited`;
-    const reliability = guest?.id === 'global_heartthrob' ? 'Volatile RSVP' : guest?.id === 'chart_star' ? 'Busy schedule' : guest?.id === 'no_guest' ? 'No RSVP risk' : 'Likely arrival';
+    const language = React.useContext(ActivityLanguageContext);
+    const guestLabel = guest ? getChoiceLabel(guest, language) : t(language, 'activities.nightlifePreview.guest');
+    const guestText = guest?.id === 'no_guest'
+        ? t(language, 'activities.nightlifePreview.noHeadlineGuest')
+        : t(language, 'activities.nightlifePreview.guestInvited', { guest: guestLabel });
+    const reliability = guest?.id === 'global_heartthrob'
+        ? t(language, 'activities.nightlifePreview.reliability.volatileRsvp')
+        : guest?.id === 'chart_star'
+            ? t(language, 'activities.nightlifePreview.reliability.busySchedule')
+            : guest?.id === 'no_guest'
+                ? t(language, 'activities.nightlifePreview.reliability.noRsvpRisk')
+                : t(language, 'activities.nightlifePreview.reliability.likelyArrival');
+    const chips = [crowd, control].filter((choice): choice is LifestyleActivityChoice => Boolean(choice));
     return (
         <div className="relative overflow-hidden rounded-[2rem] border border-fuchsia-300/30 bg-zinc-950 shadow-[0_20px_70px_rgba(0,0,0,0.38)]">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_16%_8%,rgba(217,70,239,0.42),transparent_26%),radial-gradient(circle_at_88%_12%,rgba(245,158,11,0.26),transparent_24%),linear-gradient(135deg,rgba(88,28,135,0.8),rgba(9,9,11,0.94)_48%,rgba(112,26,117,0.58))]" />
@@ -423,29 +543,29 @@ const NightlifePreviewCard: React.FC<{
             <div className="relative p-5">
                 <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                        <div className="text-[10px] font-black uppercase tracking-[0.3em] text-fuchsia-100/75">Night Preview</div>
-                        <div className="mt-5 text-3xl font-black leading-none text-white drop-shadow">{eventType?.label || 'Nightlife'}</div>
-                        <div className="mt-2 text-xs font-black uppercase tracking-[0.22em] text-white/65">{venue?.label || 'Venue'} • {guestText}</div>
+                        <div className="text-[10px] font-black uppercase tracking-[0.3em] text-fuchsia-100/75">{t(language, 'activities.nightlifePreview.title')}</div>
+                        <div className="mt-5 text-3xl font-black leading-none text-white drop-shadow">{eventType ? getChoiceLabel(eventType, language) : t(language, 'activities.nightlifePreview.fallbackTitle')}</div>
+                        <div className="mt-2 text-xs font-black uppercase tracking-[0.22em] text-white/65">{venue ? getChoiceLabel(venue, language) : t(language, 'activities.nightlifePreview.venue')} • {guestText}</div>
                     </div>
                     <div className="rounded-2xl bg-black/45 px-4 py-3 text-right backdrop-blur">
-                        <div className="text-[9px] font-black uppercase tracking-widest text-fuchsia-100">Night Cost</div>
+                        <div className="text-[9px] font-black uppercase tracking-widest text-fuchsia-100">{t(language, 'activities.nightlifePreview.cost')}</div>
                         <div className="text-xl font-black text-white">{formatMoney(totalCost)}</div>
                     </div>
                 </div>
                 <div className="mt-8 grid grid-cols-2 gap-2">
                     <div className="rounded-2xl bg-black/40 p-3">
-                        <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Guest Read</div>
+                        <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">{t(language, 'activities.nightlifePreview.guestRead')}</div>
                         <div className="mt-1 text-sm font-black text-fuchsia-100">{reliability}</div>
                     </div>
                     <div className="rounded-2xl bg-black/40 p-3">
-                        <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Image Risk</div>
+                        <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">{t(language, 'activities.nightlifePreview.imageRisk')}</div>
                         <div className={`mt-1 text-sm font-black ${getRiskTone(risk)}`}>{risk}%</div>
                     </div>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
-                    {[crowd?.label, control?.label].filter(Boolean).map(label => (
-                        <span key={label} className="rounded-full bg-black/45 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white/85 backdrop-blur">
-                            {label}
+                    {chips.map(choice => (
+                        <span key={choice.id} className="rounded-full bg-black/45 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white/85 backdrop-blur">
+                            {getChoiceLabel(choice, language)}
                         </span>
                     ))}
                 </div>
@@ -464,8 +584,13 @@ const IndustryConnectionsPreviewCard: React.FC<{
     totalCost: number;
     risk: number;
 }> = ({ event, venue, groups, guests, style, service, totalCost, risk }) => {
+    const language = React.useContext(ActivityLanguageContext);
     const inviteCount = groups.length + guests.length;
-    const signal = totalCost >= 500_000 ? 'Power room' : totalCost >= 200_000 ? 'Serious room' : 'Selective room';
+    const signal = totalCost >= 500_000
+        ? t(language, 'activities.industryPreview.signal.power')
+        : totalCost >= 200_000
+            ? t(language, 'activities.industryPreview.signal.serious')
+            : t(language, 'activities.industryPreview.signal.selective');
     return (
         <div className="relative overflow-hidden rounded-[2rem] border border-amber-300/25 bg-zinc-950 shadow-[0_20px_70px_rgba(0,0,0,0.38)]">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_12%_10%,rgba(251,191,36,0.35),transparent_24%),radial-gradient(circle_at_85%_18%,rgba(56,189,248,0.18),transparent_24%),linear-gradient(135deg,rgba(69,26,3,0.78),rgba(9,9,11,0.96)_54%,rgba(12,74,110,0.24))]" />
@@ -476,31 +601,31 @@ const IndustryConnectionsPreviewCard: React.FC<{
                     <div className="min-w-0">
                         <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.3em] text-amber-100/75">
                             <Sparkles size={13} />
-                            Industry Room
+                            {t(language, 'activities.industryPreview.title')}
                         </div>
-                        <div className="mt-5 text-3xl font-black leading-none text-white drop-shadow">{event?.label || 'Industry Connections'}</div>
-                        <div className="mt-2 text-xs font-black uppercase tracking-[0.2em] text-white/65">{venue?.label || 'Venue'} • {style?.label || 'Hosting style'}</div>
+                        <div className="mt-5 text-3xl font-black leading-none text-white drop-shadow">{event ? getChoiceLabel(event, language) : t(language, 'activities.industryPreview.fallbackTitle')}</div>
+                        <div className="mt-2 text-xs font-black uppercase tracking-[0.2em] text-white/65">{venue ? getChoiceLabel(venue, language) : t(language, 'activities.industryPreview.venue')} • {style ? getChoiceLabel(style, language) : t(language, 'activities.industryPreview.hostingStyle')}</div>
                     </div>
                     <div className="rounded-2xl bg-black/45 px-4 py-3 text-right backdrop-blur">
-                        <div className="text-[9px] font-black uppercase tracking-widest text-amber-100">Room Cost</div>
+                        <div className="text-[9px] font-black uppercase tracking-widest text-amber-100">{t(language, 'activities.industryPreview.cost')}</div>
                         <div className="text-xl font-black text-white">{formatMoney(totalCost)}</div>
                     </div>
                 </div>
                 <div className="mt-8 grid grid-cols-2 gap-2">
                     <div className="rounded-2xl bg-black/40 p-3">
-                        <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Invite Signal</div>
-                        <div className="mt-1 text-sm font-black text-amber-100">{inviteCount || 0} target{inviteCount === 1 ? '' : 's'}</div>
+                        <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">{t(language, 'activities.industryPreview.inviteSignal')}</div>
+                        <div className="mt-1 text-sm font-black text-amber-100">{t(language, 'activities.industryPreview.targets', { count: inviteCount || 0 })}</div>
                     </div>
                     <div className="rounded-2xl bg-black/40 p-3">
-                        <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Room Read</div>
+                        <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">{t(language, 'activities.industryPreview.roomRead')}</div>
                         <div className="mt-1 text-sm font-black text-sky-100">{signal}</div>
                     </div>
                     <div className="rounded-2xl bg-black/40 p-3">
-                        <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Service</div>
-                        <div className="mt-1 text-sm font-black text-white">{service?.label || 'Service'}</div>
+                        <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">{t(language, 'activities.industryPreview.service')}</div>
+                        <div className="mt-1 text-sm font-black text-white">{service ? getChoiceLabel(service, language) : t(language, 'activities.industryPreview.service')}</div>
                     </div>
                     <div className="rounded-2xl bg-black/40 p-3">
-                        <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Social Risk</div>
+                        <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">{t(language, 'activities.industryPreview.socialRisk')}</div>
                         <div className={`mt-1 text-sm font-black ${getRiskTone(risk)}`}>{risk}%</div>
                     </div>
                 </div>
@@ -508,7 +633,7 @@ const IndustryConnectionsPreviewCard: React.FC<{
                     <div className="flex items-start gap-2">
                         <Handshake size={16} className="mt-0.5 shrink-0 text-amber-200" />
                         <p className="text-xs font-bold leading-relaxed text-zinc-300">
-                            Named people receive real invites, not paid appearance bookings. They may come, ignore it, joke about it, or turn into warmer Connections.
+                            {t(language, 'activities.industryPreview.inviteNote')}
                         </p>
                     </div>
                 </div>
@@ -526,13 +651,18 @@ const CharityGalaPreviewCard: React.FC<{
     totalCost: number;
     risk: number;
 }> = ({ cause, format, donation, guestCircle, press, totalCost, risk }) => {
+    const language = React.useContext(ActivityLanguageContext);
     const donationAmount = donation?.flatCost || 0;
     const hasProof = press?.id === 'quiet_receipts' || donationAmount >= 350_000 || ['college_scholarships', 'campus_building_fund', 'medical_relief', 'film_workers_fund'].includes(cause?.id || '');
     const taxStructured = donationAmount >= 1_000_000;
     const educationGift = ['children_education', 'college_scholarships', 'campus_building_fund', 'film_school_endowment'].includes(cause?.id || '');
     const namedBuilding = educationGift && (cause?.id === 'campus_building_fund' || donation?.id === 'named_wing_grant' || donation?.id === 'legacy_endowment' || donationAmount >= 2_500_000);
     const taxShield = Math.round((donation?.flatCost || 0) * (taxStructured ? 0.29 : 0.18));
-    const posture = press?.id === 'quiet_receipts' ? 'Trust-first' : press?.id === 'red_carpet_cause' || press?.id === 'viral_challenge' ? 'High visibility' : 'Controlled';
+    const posture = press?.id === 'quiet_receipts'
+        ? t(language, 'activities.charityPreview.posture.trustFirst')
+        : press?.id === 'red_carpet_cause' || press?.id === 'viral_challenge'
+            ? t(language, 'activities.charityPreview.posture.highVisibility')
+            : t(language, 'activities.charityPreview.posture.controlled');
     return (
         <div className="overflow-hidden rounded-[2rem] border border-yellow-300/25 bg-[linear-gradient(135deg,rgba(113,63,18,0.42),rgba(9,9,11,0.96)_55%,rgba(22,78,99,0.22))] p-4 shadow-[0_20px_70px_rgba(0,0,0,0.38)]">
             <div className="flex items-start justify-between gap-3">
@@ -541,44 +671,46 @@ const CharityGalaPreviewCard: React.FC<{
                         <Landmark size={23} />
                     </div>
                     <div className="min-w-0">
-                        <div className="text-[10px] font-black uppercase tracking-[0.28em] text-yellow-100/70">Charity Gala</div>
-                        <div className="mt-1 text-2xl font-black leading-tight text-white">{cause?.label || 'Choose Cause'}</div>
-                        <div className="mt-1 text-xs font-bold text-zinc-400">{format?.label || 'Format'} • {donation?.label || 'Donation'}</div>
+                        <div className="text-[10px] font-black uppercase tracking-[0.28em] text-yellow-100/70">{t(language, 'activities.charityPreview.title')}</div>
+                        <div className="mt-1 text-2xl font-black leading-tight text-white">{cause ? getChoiceLabel(cause, language) : t(language, 'activities.charityPreview.chooseCause')}</div>
+                        <div className="mt-1 text-xs font-bold text-zinc-400">{format ? getChoiceLabel(format, language) : t(language, 'activities.charityPreview.format')} • {donation ? getChoiceLabel(donation, language) : t(language, 'activities.charityPreview.donation')}</div>
                     </div>
                 </div>
                 <div className="shrink-0 rounded-2xl bg-black/35 px-3 py-2 text-right">
-                    <div className="text-[9px] font-black uppercase tracking-widest text-yellow-100/70">Cost</div>
+                    <div className="text-[9px] font-black uppercase tracking-widest text-yellow-100/70">{t(language, 'activities.charityPreview.cost')}</div>
                     <div className="text-lg font-black text-white">{formatMoney(totalCost)}</div>
                 </div>
             </div>
             <div className="mt-4 grid grid-cols-2 gap-2">
                 <div className="rounded-2xl bg-black/30 p-3">
-                    <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Public Read</div>
+                    <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">{t(language, 'activities.charityPreview.publicRead')}</div>
                     <div className="mt-1 text-sm font-black text-yellow-100">{posture}</div>
                 </div>
                 <div className="rounded-2xl bg-black/30 p-3">
-                    <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Proof</div>
-                    <div className={`mt-1 text-sm font-black ${hasProof ? 'text-emerald-200' : 'text-amber-200'}`}>{hasProof ? 'Credible' : 'Needs proof'}</div>
+                    <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">{t(language, 'activities.charityPreview.proof')}</div>
+                    <div className={`mt-1 text-sm font-black ${hasProof ? 'text-emerald-200' : 'text-amber-200'}`}>{hasProof ? t(language, 'activities.charityPreview.proof.credible') : t(language, 'activities.charityPreview.proof.needsProof')}</div>
                 </div>
                 <div className="rounded-2xl bg-black/30 p-3">
-                    <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Guest Circle</div>
-                    <div className="mt-1 text-sm font-black text-white">{guestCircle?.label || 'Guests'}</div>
+                    <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">{t(language, 'activities.charityPreview.guestCircle')}</div>
+                    <div className="mt-1 text-sm font-black text-white">{guestCircle ? getChoiceLabel(guestCircle, language) : t(language, 'activities.charityPreview.guests')}</div>
                 </div>
                 <div className="rounded-2xl bg-black/30 p-3">
-                    <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Tax Shield</div>
+                    <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">{t(language, 'activities.charityPreview.taxShield')}</div>
                     <div className="mt-1 text-sm font-black text-cyan-100">{formatMoney(taxShield)}</div>
                 </div>
                 <div className="rounded-2xl bg-black/30 p-3">
-                    <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Image Cleanup</div>
-                    <div className="mt-1 text-sm font-black text-emerald-200">{hasProof ? 'Strong' : 'Medium'}</div>
+                    <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">{t(language, 'activities.charityPreview.imageCleanup')}</div>
+                    <div className="mt-1 text-sm font-black text-emerald-200">{hasProof ? t(language, 'activities.charityPreview.cleanup.strong') : t(language, 'activities.charityPreview.cleanup.medium')}</div>
                 </div>
                 <div className="rounded-2xl bg-black/30 p-3">
-                    <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Optics Risk</div>
+                    <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">{t(language, 'activities.charityPreview.opticsRisk')}</div>
                     <div className={`mt-1 text-sm font-black ${getRiskTone(risk)}`}>{risk}%</div>
                 </div>
             </div>
             <p className="mt-3 text-sm font-bold leading-relaxed text-zinc-400">
-                The public judges whether the donation feels real. Big gifts can clean image, create a tiny movie goodwill lift, or trigger tax scrutiny. {namedBuilding ? 'This setup can put your name on a college building.' : 'College gifts can unlock named-building legacy when the amount is huge.'}
+                {namedBuilding
+                    ? t(language, 'activities.charityPreview.summary.namedBuilding')
+                    : t(language, 'activities.charityPreview.summary.generic')}
             </p>
         </div>
     );
@@ -590,19 +722,23 @@ const WellnessPreviewCard: React.FC<{
     focus?: LifestyleActivityChoice;
     support?: LifestyleActivityChoice;
     activeCondition?: HealthConditionState;
+    language: GameLanguage;
     treatmentMatch: string;
     totalCost: number;
     risk: number;
     health: number;
     mood: number;
-}> = ({ program, provider, focus, support, activeCondition, treatmentMatch, totalCost, risk, health, mood }) => {
-    const safetyLabel = risk <= 8 ? 'Low risk' : risk <= 18 ? 'Watchful' : 'High touch';
+}> = ({ program, provider, focus, support, activeCondition, language, treatmentMatch, totalCost, risk, health, mood }) => {
     const careTone = program?.id === 'cancer_screening' || program?.id === 'addiction_rehab'
         ? 'border-rose-300/30 bg-rose-500/10 text-rose-100'
         : program?.id === 'camera_ready_care'
             ? 'border-sky-300/30 bg-sky-500/10 text-sky-100'
             : 'border-emerald-300/30 bg-emerald-500/10 text-emerald-100';
-    const careLabel = program?.id === 'camera_ready_care' ? 'Looks Care' : program?.id === 'regular_checkup' ? 'Preventive' : 'Medical Care';
+    const careLabel = program?.id === 'camera_ready_care'
+        ? t(language, 'activities.wellnessPreview.care.looks')
+        : program?.id === 'regular_checkup'
+            ? t(language, 'activities.wellnessPreview.care.preventive')
+            : t(language, 'activities.wellnessPreview.care.medical');
     return (
         <div className="overflow-hidden rounded-[2rem] border border-cyan-300/20 bg-[linear-gradient(135deg,rgba(6,78,59,0.34),rgba(9,9,11,0.96)_56%,rgba(8,47,73,0.34))] p-4 shadow-[0_20px_70px_rgba(0,0,0,0.36)]">
             <div className="flex items-start justify-between gap-3">
@@ -612,29 +748,29 @@ const WellnessPreviewCard: React.FC<{
                     </div>
                     <div className="min-w-0">
                         <div className="text-[10px] font-black uppercase tracking-[0.28em] text-cyan-100/70">{careLabel}</div>
-                        <div className="mt-1 text-2xl font-black leading-tight text-white">{program?.label || 'Care Plan'}</div>
-                        <div className="mt-1 text-xs font-bold text-zinc-400">{provider?.label || 'Provider'} • {focus?.label || 'Treatment'}</div>
+                        <div className="mt-1 text-2xl font-black leading-tight text-white">{program ? getChoiceLabel(program, language) : t(language, 'activities.wellnessPreview.carePlan')}</div>
+                        <div className="mt-1 text-xs font-bold text-zinc-400">{provider ? getChoiceLabel(provider, language) : t(language, 'activities.wellnessPreview.provider')} • {focus ? getChoiceLabel(focus, language) : t(language, 'activities.wellnessPreview.treatment')}</div>
                     </div>
                 </div>
                 <div className="shrink-0 rounded-2xl bg-black/35 px-3 py-2 text-right">
-                    <div className="text-[9px] font-black uppercase tracking-widest text-cyan-100/70">Cost</div>
+                    <div className="text-[9px] font-black uppercase tracking-widest text-cyan-100/70">{t(language, 'activities.wellnessPreview.cost')}</div>
                     <div className="text-lg font-black text-white">{formatMoney(totalCost)}</div>
                 </div>
             </div>
 
             <div className="mt-4 rounded-3xl border border-white/10 bg-black/30 p-4">
                 <div className="text-[10px] font-black uppercase tracking-[0.26em] text-zinc-500">
-                    {activeCondition ? 'Active Medical Issue' : 'Care Path'}
+                    {activeCondition ? t(language, 'activities.wellnessPreview.activeIssue') : t(language, 'activities.wellnessPreview.carePath')}
                 </div>
                 {activeCondition && (
                     <div className="mt-3 rounded-2xl border border-rose-300/20 bg-rose-500/10 p-3">
                         <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
-                                <div className="text-sm font-black text-white">{activeCondition.label}</div>
+                                <div className="text-sm font-black text-white">{getHealthConditionLabel(activeCondition, language)}</div>
                                 <div className="mt-1 text-[10px] font-black uppercase tracking-widest text-rose-100/70">{activeCondition.severity} • {activeCondition.source}</div>
                             </div>
                             <div className="text-right">
-                                <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Health cap</div>
+                                <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">{t(language, 'activities.wellnessPreview.healthCap')}</div>
                                 <div className="text-lg font-black text-rose-100">{activeCondition.healthCap}</div>
                             </div>
                         </div>
@@ -642,27 +778,27 @@ const WellnessPreviewCard: React.FC<{
                 )}
                 <div className="mt-3 grid grid-cols-2 gap-2">
                     <div className="rounded-2xl bg-black/35 p-3">
-                        <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Treatment match</div>
+                        <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">{t(language, 'activities.wellnessPreview.treatmentMatch')}</div>
                         <div className="mt-1 text-sm font-black text-cyan-100">{treatmentMatch}</div>
                     </div>
                     <div className="rounded-2xl bg-black/35 p-3">
-                        <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Aftercare</div>
-                        <div className="mt-1 text-sm font-black text-white">{support?.label || 'Follow-up'}</div>
+                        <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">{t(language, 'activities.wellnessPreview.aftercare')}</div>
+                        <div className="mt-1 text-sm font-black text-white">{support ? getChoiceLabel(support, language) : t(language, 'activities.wellnessPreview.followUp')}</div>
                     </div>
                 </div>
             </div>
 
             <div className="mt-3 grid grid-cols-3 gap-2">
                 <div className="rounded-2xl bg-black/30 p-3">
-                    <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Health</div>
+                    <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">{t(language, 'activities.wellnessPreview.health')}</div>
                     <div className="mt-1 text-lg font-black text-emerald-200">{formatStat(health)}</div>
                 </div>
                 <div className="rounded-2xl bg-black/30 p-3">
-                    <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Mood</div>
+                    <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">{t(language, 'activities.wellnessPreview.mood')}</div>
                     <div className="mt-1 text-lg font-black text-yellow-200">{formatStat(mood)}</div>
                 </div>
                 <div className="rounded-2xl bg-black/30 p-3">
-                    <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Risk</div>
+                    <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">{t(language, 'activities.wellnessPreview.risk')}</div>
                     <div className={`mt-1 text-lg font-black ${getRiskTone(risk)}`}>{risk}%</div>
                 </div>
             </div>
@@ -673,10 +809,11 @@ const WellnessPreviewCard: React.FC<{
 type AdoptionStage = 'eligibility' | 'children' | 'paperwork';
 
 const AdoptionStagePills: React.FC<{ stage: AdoptionStage; onStage: (stage: AdoptionStage) => void; canViewChildren: boolean; hasChild: boolean }> = ({ stage, onStage, canViewChildren, hasChild }) => {
+    const language = React.useContext(ActivityLanguageContext);
     const stages: { id: AdoptionStage; label: string }[] = [
-        { id: 'eligibility', label: 'Criteria' },
-        { id: 'children', label: 'Children' },
-        { id: 'paperwork', label: 'Docs' },
+        { id: 'eligibility', label: t(language, 'activities.adoption.stage.criteria') },
+        { id: 'children', label: t(language, 'activities.adoption.stage.children') },
+        { id: 'paperwork', label: t(language, 'activities.adoption.stage.docs') },
     ];
     return (
         <div className="grid grid-cols-3 gap-2">
@@ -701,91 +838,97 @@ const AdoptionStagePills: React.FC<{ stage: AdoptionStage; onStage: (stage: Adop
 const AdoptionEligibilityCard: React.FC<{
     eligibility: ReturnType<typeof getAdoptionEligibility>;
     availableCount: number;
-}> = ({ eligibility, availableCount }) => (
-    <div className="overflow-hidden rounded-[2rem] border border-rose-300/20 bg-[linear-gradient(135deg,rgba(86,18,55,0.36),rgba(9,9,11,0.96)_58%,rgba(55,36,12,0.28))] p-4 shadow-[0_20px_70px_rgba(0,0,0,0.36)]">
-        <div className="flex items-start justify-between gap-3">
-            <div className="flex min-w-0 items-start gap-3">
-                <div className={`grid h-12 w-12 shrink-0 place-items-center rounded-2xl border ${eligibility.qualifies ? 'border-emerald-300/40 bg-emerald-400/10 text-emerald-200' : 'border-amber-300/40 bg-amber-400/10 text-amber-200'}`}>
-                    <ClipboardCheck size={23} />
-                </div>
-                <div className="min-w-0">
-                    <div className="text-[10px] font-black uppercase tracking-[0.28em] text-rose-100/70">Adoption Criteria</div>
-                    <div className="mt-1 text-2xl font-black leading-tight text-white">{eligibility.statusLabel}</div>
-                    <div className="mt-1 text-xs font-bold text-zinc-400">{availableCount} child profiles available after clearance.</div>
-                </div>
-            </div>
-            <div className="shrink-0 rounded-2xl bg-black/35 px-3 py-2 text-right">
-                <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Readiness</div>
-                <div className={`text-lg font-black ${eligibility.qualifies ? 'text-emerald-200' : 'text-amber-200'}`}>{eligibility.score}%</div>
-            </div>
-        </div>
-        <div className="mt-4 grid grid-cols-1 gap-2">
-            {eligibility.checks.map(check => (
-                <div key={check.id} className={`rounded-2xl border px-3 py-3 ${check.passed ? 'border-emerald-400/20 bg-emerald-400/7' : check.required ? 'border-rose-400/25 bg-rose-500/8' : 'border-zinc-800 bg-black/25'}`}>
-                    <div className="flex items-center justify-between gap-3">
-                        <div className="min-w-0">
-                            <div className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">{check.required ? 'Required' : 'Helpful'}</div>
-                            <div className="mt-1 text-sm font-black text-white">{check.label}</div>
-                            <div className="mt-0.5 text-xs font-bold text-zinc-400">{check.detail}</div>
-                        </div>
-                        <CheckCircle2 className={check.passed ? 'text-emerald-300' : 'text-zinc-700'} size={20} />
+}> = ({ eligibility, availableCount }) => {
+    const language = React.useContext(ActivityLanguageContext);
+    return (
+        <div className="overflow-hidden rounded-[2rem] border border-rose-300/20 bg-[linear-gradient(135deg,rgba(86,18,55,0.36),rgba(9,9,11,0.96)_58%,rgba(55,36,12,0.28))] p-4 shadow-[0_20px_70px_rgba(0,0,0,0.36)]">
+            <div className="flex items-start justify-between gap-3">
+                <div className="flex min-w-0 items-start gap-3">
+                    <div className={`grid h-12 w-12 shrink-0 place-items-center rounded-2xl border ${eligibility.qualifies ? 'border-emerald-300/40 bg-emerald-400/10 text-emerald-200' : 'border-amber-300/40 bg-amber-400/10 text-amber-200'}`}>
+                        <ClipboardCheck size={23} />
+                    </div>
+                    <div className="min-w-0">
+                        <div className="text-[10px] font-black uppercase tracking-[0.28em] text-rose-100/70">{t(language, 'activities.adoption.eligibility.title')}</div>
+                        <div className="mt-1 text-2xl font-black leading-tight text-white">{eligibility.statusLabel}</div>
+                        <div className="mt-1 text-xs font-bold text-zinc-400">{t(language, 'activities.adoption.eligibility.availableProfiles', { count: availableCount })}</div>
                     </div>
                 </div>
-            ))}
-        </div>
-        {!eligibility.qualifies && (
-            <div className="mt-3 rounded-2xl border border-rose-400/25 bg-rose-500/10 px-3 py-2 text-xs font-black text-rose-100">
-                Fix {eligibility.blockers.join(', ')} before submitting an application.
+                <div className="shrink-0 rounded-2xl bg-black/35 px-3 py-2 text-right">
+                    <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">{t(language, 'activities.adoption.eligibility.readiness')}</div>
+                    <div className={`text-lg font-black ${eligibility.qualifies ? 'text-emerald-200' : 'text-amber-200'}`}>{eligibility.score}%</div>
+                </div>
             </div>
-        )}
-    </div>
-);
+            <div className="mt-4 grid grid-cols-1 gap-2">
+                {eligibility.checks.map(check => (
+                    <div key={check.id} className={`rounded-2xl border px-3 py-3 ${check.passed ? 'border-emerald-400/20 bg-emerald-400/7' : check.required ? 'border-rose-400/25 bg-rose-500/8' : 'border-zinc-800 bg-black/25'}`}>
+                        <div className="flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                                <div className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">{t(language, check.required ? 'activities.adoption.eligibility.required' : 'activities.adoption.eligibility.helpful')}</div>
+                                <div className="mt-1 text-sm font-black text-white">{check.label}</div>
+                                <div className="mt-0.5 text-xs font-bold text-zinc-400">{check.detail}</div>
+                            </div>
+                            <CheckCircle2 className={check.passed ? 'text-emerald-300' : 'text-zinc-700'} size={20} />
+                        </div>
+                    </div>
+                ))}
+            </div>
+            {!eligibility.qualifies && (
+                <div className="mt-3 rounded-2xl border border-rose-400/25 bg-rose-500/10 px-3 py-2 text-xs font-black text-rose-100">
+                    {t(language, 'activities.adoption.eligibility.fixBlockers', { blockers: eligibility.blockers.join(', ') })}
+                </div>
+            )}
+        </div>
+    );
+};
 
 const AdoptionChildProfileCard: React.FC<{
     profile: AdoptionChildProfile;
     selected: boolean;
     onSelect: () => void;
-}> = ({ profile, selected, onSelect }) => (
-    <button
-        type="button"
-        onClick={onSelect}
-        className={`w-[17.5rem] shrink-0 overflow-hidden rounded-[1.7rem] border p-4 text-left transition active:scale-[0.99] ${selected ? 'border-rose-200 bg-rose-300/16 shadow-[0_18px_50px_rgba(251,113,133,0.16)]' : 'border-zinc-800 bg-black/35'}`}
-    >
-        <div className="flex items-start gap-3">
-            <img
-                src={getGenderedAvatar(profile.gender, profile.name)}
-                alt={profile.name}
-                className="h-16 w-16 shrink-0 rounded-2xl border border-white/10 bg-zinc-900 object-cover"
-            />
-            <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                    <h4 className="truncate text-xl font-black text-white">{profile.name}</h4>
-                    {selected && <BadgeCheck className="shrink-0 text-rose-100" size={18} />}
+}> = ({ profile, selected, onSelect }) => {
+    const language = React.useContext(ActivityLanguageContext);
+    return (
+        <button
+            type="button"
+            onClick={onSelect}
+            className={`w-[17.5rem] shrink-0 overflow-hidden rounded-[1.7rem] border p-4 text-left transition active:scale-[0.99] ${selected ? 'border-rose-200 bg-rose-300/16 shadow-[0_18px_50px_rgba(251,113,133,0.16)]' : 'border-zinc-800 bg-black/35'}`}
+        >
+            <div className="flex items-start gap-3">
+                <img
+                    src={getGenderedAvatar(profile.gender, profile.name)}
+                    alt={profile.name}
+                    className="h-16 w-16 shrink-0 rounded-2xl border border-white/10 bg-zinc-900 object-cover"
+                />
+                <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                        <h4 className="truncate text-xl font-black text-white">{profile.name}</h4>
+                        {selected && <BadgeCheck className="shrink-0 text-rose-100" size={18} />}
+                    </div>
+                    <div className="mt-1 text-[10px] font-black uppercase tracking-[0.22em] text-rose-100/70">
+                        {getAdoptionAgeLabel(profile, language)}
+                    </div>
+                    <p className="mt-2 line-clamp-2 text-xs font-bold leading-relaxed text-zinc-400">{getAdoptionProfilePersonality(profile, language)}</p>
                 </div>
-                <div className="mt-1 text-[10px] font-black uppercase tracking-[0.22em] text-rose-100/70">
-                    {profile.age === 0 ? 'Infant' : `${profile.age} years old`}
-                </div>
-                <p className="mt-2 line-clamp-2 text-xs font-bold leading-relaxed text-zinc-400">{profile.personality}</p>
             </div>
-        </div>
-        <div className="mt-4 grid grid-cols-4 gap-2">
-            {[
-                ['Trust', profile.stats.trust],
-                ['Health', profile.stats.health],
-                ['School', profile.stats.school],
-                ['Settle', profile.stats.adjustment],
-            ].map(([label, value]) => (
-                <div key={label} className="rounded-2xl bg-black/35 p-2">
-                    <div className="text-[8px] font-black uppercase tracking-widest text-zinc-500">{label}</div>
-                    <div className="mt-1 text-sm font-black text-white">{value}</div>
-                </div>
-            ))}
-        </div>
-        <div className="mt-3 rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2 text-xs font-bold text-zinc-300">
-            {profile.needs}
-        </div>
-    </button>
-);
+            <div className="mt-4 grid grid-cols-4 gap-2">
+                {[
+                    [t(language, 'activities.adoptionProfile.stat.trust'), profile.stats.trust],
+                    [t(language, 'activities.adoptionProfile.stat.health'), profile.stats.health],
+                    [t(language, 'activities.adoptionProfile.stat.school'), profile.stats.school],
+                    [t(language, 'activities.adoptionProfile.stat.settle'), profile.stats.adjustment],
+                ].map(([label, value]) => (
+                    <div key={label} className="rounded-2xl bg-black/35 p-2">
+                        <div className="text-[8px] font-black uppercase tracking-widest text-zinc-500">{label}</div>
+                        <div className="mt-1 text-sm font-black text-white">{value}</div>
+                    </div>
+                ))}
+            </div>
+            <div className="mt-3 rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2 text-xs font-bold text-zinc-300">
+                {getAdoptionProfileNeeds(profile, language)}
+            </div>
+        </button>
+    );
+};
 
 const AdoptionPaperworkPanel: React.FC<{
     profile?: AdoptionChildProfile;
@@ -794,37 +937,42 @@ const AdoptionPaperworkPanel: React.FC<{
     support?: LifestyleActivityChoice;
     totalCost: number;
     risk: number;
-}> = ({ profile, route, homePrep, support, totalCost, risk }) => (
-    <div className="rounded-[2rem] border border-amber-300/20 bg-[linear-gradient(135deg,rgba(72,40,10,0.34),rgba(9,9,11,0.92)_60%,rgba(78,22,54,0.24))] p-4">
-        <div className="flex items-start gap-3">
-            <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-amber-300/30 bg-amber-300/10 text-amber-100">
-                <FileText size={23} />
+}> = ({ profile, route, homePrep, support, totalCost, risk }) => {
+    const language = React.useContext(ActivityLanguageContext);
+    return (
+        <div className="rounded-[2rem] border border-amber-300/20 bg-[linear-gradient(135deg,rgba(72,40,10,0.34),rgba(9,9,11,0.92)_60%,rgba(78,22,54,0.24))] p-4">
+            <div className="flex items-start gap-3">
+                <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-amber-300/30 bg-amber-300/10 text-amber-100">
+                    <FileText size={23} />
+                </div>
+                <div className="min-w-0">
+                    <div className="text-[10px] font-black uppercase tracking-[0.28em] text-amber-100/70">{t(language, 'activities.adoptionPaperwork.title')}</div>
+                    <div className="mt-1 text-2xl font-black leading-tight text-white">{profile?.name || t(language, 'activities.adoptionPaperwork.selectedChild')}</div>
+                    <div className="mt-1 text-xs font-bold text-zinc-400">
+                        {route ? getChoiceLabel(route, language) : t(language, 'activities.adoptionPaperwork.agency')} - {homePrep ? getChoiceLabel(homePrep, language) : t(language, 'activities.adoptionPaperwork.homePrep')} - {support ? getChoiceLabel(support, language) : t(language, 'activities.adoptionPaperwork.support')}
+                    </div>
+                </div>
             </div>
-            <div className="min-w-0">
-                <div className="text-[10px] font-black uppercase tracking-[0.28em] text-amber-100/70">Documentation</div>
-                <div className="mt-1 text-2xl font-black leading-tight text-white">{profile?.name || 'Selected Child'}</div>
-                <div className="mt-1 text-xs font-bold text-zinc-400">{route?.label || 'Agency'} - {homePrep?.label || 'Home prep'} - {support?.label || 'Support'}</div>
+            <div className="mt-4 grid grid-cols-3 gap-2">
+                <div className="rounded-2xl bg-black/35 p-3">
+                    <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">{t(language, 'activities.adoptionPaperwork.fees')}</div>
+                    <div className="mt-1 text-lg font-black text-white">{formatMoney(totalCost)}</div>
+                </div>
+                <div className="rounded-2xl bg-black/35 p-3">
+                    <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">{t(language, 'activities.adoptionPaperwork.risk')}</div>
+                    <div className={`mt-1 text-lg font-black ${getRiskTone(risk)}`}>{risk}%</div>
+                </div>
+                <div className="rounded-2xl bg-black/35 p-3">
+                    <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">{t(language, 'activities.adoptionPaperwork.result')}</div>
+                    <div className="mt-1 text-sm font-black text-emerald-200">{t(language, 'activities.adoptionPaperwork.connections')}</div>
+                </div>
             </div>
+            <p className="mt-3 text-sm font-bold leading-relaxed text-zinc-400">
+                {t(language, 'activities.adoptionPaperwork.description')}
+            </p>
         </div>
-        <div className="mt-4 grid grid-cols-3 gap-2">
-            <div className="rounded-2xl bg-black/35 p-3">
-                <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Fees</div>
-                <div className="mt-1 text-lg font-black text-white">{formatMoney(totalCost)}</div>
-            </div>
-            <div className="rounded-2xl bg-black/35 p-3">
-                <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Risk</div>
-                <div className={`mt-1 text-lg font-black ${getRiskTone(risk)}`}>{risk}%</div>
-            </div>
-            <div className="rounded-2xl bg-black/35 p-3">
-                <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Result</div>
-                <div className="mt-1 text-sm font-black text-emerald-200">Connections</div>
-            </div>
-        </div>
-        <p className="mt-3 text-sm font-bold leading-relaxed text-zinc-400">
-            Submit the home study, agency documents, and transition support plan. If approved, the child is added as a normal child relationship.
-        </p>
-    </div>
-);
+    );
+};
 
 const AdoptionNameModal: React.FC<{
     pending: {
@@ -843,7 +991,13 @@ const AdoptionNameModal: React.FC<{
     }, [pending?.child.id]);
 
     if (!pending) return null;
-    const titleOptions: Relationship['familyTitle'][] = ['Child', 'Son', 'Daughter', 'Heir'];
+    const language = getPlayerLanguage(pending.player);
+    const titleOptions: { value: Relationship['familyTitle']; labelKey: string }[] = [
+        { value: 'Child', labelKey: 'activities.adoptionNameModal.familyTitle.Child' },
+        { value: 'Son', labelKey: 'activities.adoptionNameModal.familyTitle.Son' },
+        { value: 'Daughter', labelKey: 'activities.adoptionNameModal.familyTitle.Daughter' },
+        { value: 'Heir', labelKey: 'activities.adoptionNameModal.familyTitle.Heir' },
+    ];
     return (
         <div className="fixed inset-0 z-[80] grid place-items-end bg-black/75 p-4 backdrop-blur-sm">
             <div className="w-full overflow-hidden rounded-[2rem] border border-rose-200/25 bg-zinc-950 shadow-[0_25px_90px_rgba(0,0,0,0.55)]">
@@ -851,13 +1005,13 @@ const AdoptionNameModal: React.FC<{
                     <div className="flex items-center gap-4">
                         <img src={pending.child.image} alt={pending.child.name} className="h-16 w-16 rounded-2xl border border-white/10 bg-zinc-900 object-cover" />
                         <div>
-                            <div className="text-[10px] font-black uppercase tracking-[0.28em] text-rose-100/70">Adoption Complete</div>
-                            <div className="mt-1 text-2xl font-black text-white">Welcome {pending.child.name}</div>
-                            <div className="mt-1 text-xs font-bold text-zinc-400">Choose how this child appears in your family.</div>
+                            <div className="text-[10px] font-black uppercase tracking-[0.28em] text-rose-100/70">{t(language, 'activities.adoptionNameModal.title')}</div>
+                            <div className="mt-1 text-2xl font-black text-white">{t(language, 'activities.adoptionNameModal.welcome', { name: pending.child.name })}</div>
+                            <div className="mt-1 text-xs font-bold text-zinc-400">{t(language, 'activities.adoptionNameModal.description')}</div>
                         </div>
                     </div>
                     <div className="mt-5">
-                        <div className="text-[10px] font-black uppercase tracking-[0.28em] text-zinc-500">Name</div>
+                        <div className="text-[10px] font-black uppercase tracking-[0.28em] text-zinc-500">{t(language, 'activities.adoptionNameModal.name')}</div>
                         <input
                             value={name}
                             onChange={(event) => setName(event.target.value)}
@@ -867,22 +1021,22 @@ const AdoptionNameModal: React.FC<{
                     <div className="mt-4 grid grid-cols-4 gap-2">
                         {titleOptions.map(option => (
                             <button
-                                key={option}
+                                key={option.value}
                                 type="button"
-                                onClick={() => setTitle(option)}
-                                className={`rounded-2xl border px-2 py-3 text-[10px] font-black uppercase tracking-[0.12em] ${title === option ? 'border-rose-200 bg-rose-300/20 text-white' : 'border-zinc-800 bg-black/30 text-zinc-500'}`}
+                                onClick={() => setTitle(option.value)}
+                                className={`rounded-2xl border px-2 py-3 text-[10px] font-black uppercase tracking-[0.12em] ${title === option.value ? 'border-rose-200 bg-rose-300/20 text-white' : 'border-zinc-800 bg-black/30 text-zinc-500'}`}
                             >
-                                {option}
+                                {t(language, option.labelKey)}
                             </button>
                         ))}
                     </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3 p-4">
                     <button onClick={onKeep} className="rounded-2xl border border-zinc-800 bg-black/35 px-4 py-3 text-sm font-black uppercase tracking-[0.16em] text-zinc-300">
-                        Keep As Is
+                        {t(language, 'activities.adoptionNameModal.keep')}
                     </button>
                     <button onClick={() => onSave(name, title)} className="rounded-2xl bg-gradient-to-r from-rose-200 via-pink-200 to-amber-200 px-4 py-3 text-sm font-black uppercase tracking-[0.16em] text-black">
-                        Save Family
+                        {t(language, 'activities.adoptionNameModal.save')}
                     </button>
                 </div>
             </div>
@@ -895,6 +1049,13 @@ const PetCompanionProfileCard: React.FC<{
     selected: boolean;
     onSelect: () => void;
 }> = ({ profile, selected, onSelect }) => {
+    const language = React.useContext(ActivityLanguageContext);
+    const listingTitle = getPetProfileListingTitle(profile, language);
+    const breed = getPetProfileBreed(profile, language);
+    const species = getPetProfileSpecies(profile, language);
+    const rarityLabel = profile.acquisition === 'endangered'
+        ? t(language, 'activities.petListing.rarity.sanctuary')
+        : t(language, `activities.petListing.rarity.${profile.rarity}`);
     const rarityTone = profile.rarity === 'endangered'
         ? 'border-yellow-300/40 bg-yellow-300/10 text-yellow-100'
         : profile.rarity === 'exotic'
@@ -918,26 +1079,26 @@ const PetCompanionProfileCard: React.FC<{
                         {selected && <BadgeCheck className="shrink-0 text-lime-100" size={18} />}
                     </div>
                     <div className="mt-1 line-clamp-2 text-[10px] font-black uppercase tracking-[0.16em] text-lime-100/70">
-                        {profile.listingTitle || `${profile.breed} ${profile.species}`} • {profile.breed}
+                        {listingTitle || `${breed} ${species}`} • {breed}
                     </div>
                     <div className={`mt-2 inline-flex rounded-full border px-2 py-0.5 text-[9px] font-black uppercase tracking-widest ${rarityTone}`}>
-                        {profile.acquisition === 'endangered' ? 'Sanctuary' : profile.rarity}
+                        {rarityLabel}
                     </div>
                 </div>
             </div>
-            <p className="mt-4 line-clamp-2 text-xs font-bold leading-relaxed text-zinc-400">{profile.personality}</p>
+            <p className="mt-4 line-clamp-2 text-xs font-bold leading-relaxed text-zinc-400">{getPetProfilePersonality(profile, language)}</p>
             <div className="mt-3 grid grid-cols-2 gap-2">
                 <div className="rounded-2xl bg-black/35 p-2">
-                    <div className="text-[8px] font-black uppercase tracking-widest text-zinc-500">Base</div>
+                    <div className="text-[8px] font-black uppercase tracking-widest text-zinc-500">{t(language, 'activities.petListing.base')}</div>
                     <div className="mt-1 text-sm font-black text-white">{formatMoney(profile.baseCost)}</div>
                 </div>
                 <div className="rounded-2xl bg-black/35 p-2">
-                    <div className="text-[8px] font-black uppercase tracking-widest text-zinc-500">Bond</div>
+                    <div className="text-[8px] font-black uppercase tracking-widest text-zinc-500">{t(language, 'activities.petListing.bond')}</div>
                     <div className="mt-1 text-sm font-black text-lime-200">{Math.round(profile.bondBase)}%</div>
                 </div>
             </div>
             <div className="mt-3 rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2 text-xs font-bold text-zinc-300">
-                {profile.legalNote}
+                {getPetProfileLegalNote(profile, language)}
             </div>
         </button>
     );
@@ -948,6 +1109,7 @@ const PetStoreCard: React.FC<{
     selected: boolean;
     onSelect: () => void;
 }> = ({ storeChoice, selected, onSelect }) => {
+    const language = React.useContext(ActivityLanguageContext);
     const store = getPetCompanionStore(storeChoice.id);
     return (
         <button
@@ -961,50 +1123,72 @@ const PetStoreCard: React.FC<{
                 </div>
                 <div className="min-w-0 flex-1">
                     <div className="flex items-start justify-between gap-2">
-                        <div className="text-lg font-black leading-tight text-white">{store.name}</div>
+                        <div className="text-lg font-black leading-tight text-white">{getPetStoreName(store, language)}</div>
                         {selected && <BadgeCheck className="shrink-0 text-lime-100" size={18} />}
                     </div>
-                    <div className="mt-1 text-[9px] font-black uppercase tracking-[0.22em] text-lime-100/70">{store.priceTone}</div>
+                    <div className="mt-1 text-[9px] font-black uppercase tracking-[0.22em] text-lime-100/70">{getPetStorePriceTone(store, language)}</div>
                 </div>
             </div>
-            <p className="mt-3 text-xs font-bold leading-relaxed text-zinc-400">{store.description}</p>
+            <p className="mt-3 text-xs font-bold leading-relaxed text-zinc-400">{getPetStoreDescription(store, language)}</p>
             <div className="mt-3 flex flex-wrap gap-2">
-                {store.categoryIds.map(categoryId => (
+                {store.categoryIds.map(categoryId => {
+                    const category = COMPANION_CATEGORY_OPTIONS.find(option => option.id === categoryId);
+                    return (
                     <span key={categoryId} className="rounded-full border border-zinc-700 bg-black/35 px-2 py-1 text-[9px] font-black uppercase tracking-widest text-zinc-400">
-                        {categoryId.replace(/_/g, ' ')}
+                        {category ? getChoiceLabel(category, language) : categoryId.replace(/_/g, ' ')}
                     </span>
-                ))}
+                    );
+                })}
             </div>
         </button>
     );
 };
 
-const PetCompanionBriefCard: React.FC = () => (
-    <div className="overflow-hidden rounded-[2rem] border border-lime-300/20 bg-[linear-gradient(135deg,rgba(132,204,22,0.22),rgba(9,9,11,0.96)_58%,rgba(20,184,166,0.16))] p-5 shadow-[0_20px_70px_rgba(0,0,0,0.34)]">
-        <div className="flex items-start gap-4">
-            <div className="grid h-16 w-16 shrink-0 place-items-center rounded-3xl border border-lime-200/25 bg-lime-300/10 text-4xl">
-                <span>🐾</span>
-            </div>
-            <div className="min-w-0">
-                <div className="text-[10px] font-black uppercase tracking-[0.28em] text-lime-100/70">Pet Companion Center</div>
-                <div className="mt-1 text-3xl font-black leading-tight text-white">Choose a companion properly</div>
-                <p className="mt-3 text-sm font-bold leading-relaxed text-zinc-300">
-                    Visit a store, pick the category they sell, choose from available pets, then buy the right home, care, accessories, and customization before naming them.
-                </p>
-            </div>
-        </div>
-        <div className="mt-5 grid grid-cols-3 gap-2">
-            {['Stores', 'Categories', 'Checkout'].map(label => (
-                <div key={label} className="rounded-2xl border border-white/8 bg-black/30 p-3">
-                    <div className="text-[9px] font-black uppercase tracking-widest text-lime-100/60">{label}</div>
-                    <div className="mt-1 text-xs font-black text-white">
-                        {label === 'Stores' ? 'Pick seller' : label === 'Categories' ? 'Dogs, cats, birds...' : 'Home + style'}
-                    </div>
+const PetCompanionBriefCard: React.FC = () => {
+    const language = React.useContext(ActivityLanguageContext);
+    const steps = [
+        {
+            id: 'stores',
+            label: t(language, 'activities.petBrief.step.stores.label'),
+            description: t(language, 'activities.petBrief.step.stores.description'),
+        },
+        {
+            id: 'categories',
+            label: t(language, 'activities.petBrief.step.categories.label'),
+            description: t(language, 'activities.petBrief.step.categories.description'),
+        },
+        {
+            id: 'checkout',
+            label: t(language, 'activities.petBrief.step.checkout.label'),
+            description: t(language, 'activities.petBrief.step.checkout.description'),
+        },
+    ];
+
+    return (
+        <div className="overflow-hidden rounded-[2rem] border border-lime-300/20 bg-[linear-gradient(135deg,rgba(132,204,22,0.22),rgba(9,9,11,0.96)_58%,rgba(20,184,166,0.16))] p-5 shadow-[0_20px_70px_rgba(0,0,0,0.34)]">
+            <div className="flex items-start gap-4">
+                <div className="grid h-16 w-16 shrink-0 place-items-center rounded-3xl border border-lime-200/25 bg-lime-300/10 text-4xl">
+                    <span>🐾</span>
                 </div>
-            ))}
+                <div className="min-w-0">
+                    <div className="text-[10px] font-black uppercase tracking-[0.28em] text-lime-100/70">{t(language, 'activities.petBrief.eyebrow')}</div>
+                    <div className="mt-1 text-3xl font-black leading-tight text-white">{t(language, 'activities.petBrief.title')}</div>
+                    <p className="mt-3 text-sm font-bold leading-relaxed text-zinc-300">
+                        {t(language, 'activities.petBrief.description')}
+                    </p>
+                </div>
+            </div>
+            <div className="mt-5 grid grid-cols-3 gap-2">
+                {steps.map(step => (
+                    <div key={step.id} className="rounded-2xl border border-white/8 bg-black/30 p-3">
+                        <div className="text-[9px] font-black uppercase tracking-widest text-lime-100/60">{step.label}</div>
+                        <div className="mt-1 text-xs font-black text-white">{step.description}</div>
+                    </div>
+                ))}
+            </div>
         </div>
-    </div>
-);
+    );
+};
 
 const PetStagePills: React.FC<{
     stage: PetStage;
@@ -1047,7 +1231,17 @@ const PetWelcomePreviewCard: React.FC<{
     totalCost: number;
     risk: number;
 }> = ({ profile, care, home, accessory, customization, permit, totalCost, risk }) => {
-    const title = profile?.acquisition === 'endangered' ? 'Sanctuary Sponsorship' : profile?.acquisition === 'exotic' ? 'Licensed Companion' : 'New Companion';
+    const language = React.useContext(ActivityLanguageContext);
+    const breed = profile ? getPetProfileBreed(profile, language) : undefined;
+    const species = profile ? getPetProfileSpecies(profile, language) : undefined;
+    const listingTitle = profile ? getPetProfileListingTitle(profile, language) : undefined;
+    const title = profile?.acquisition === 'endangered'
+        ? t(language, 'activities.petPreview.title.sanctuary')
+        : profile?.acquisition === 'exotic'
+            ? t(language, 'activities.petPreview.title.licensed')
+            : t(language, 'activities.petPreview.title.new');
+    const unknownBreed = t(language, 'activities.petPreview.breed');
+    const unknownSpecies = t(language, 'activities.petPreview.species');
     return (
         <div className="overflow-hidden rounded-[2rem] border border-lime-300/20 bg-[linear-gradient(135deg,rgba(22,101,52,0.34),rgba(9,9,11,0.96)_56%,rgba(63,98,18,0.26))] p-4 shadow-[0_20px_70px_rgba(0,0,0,0.36)]">
             <div className="flex items-start justify-between gap-3">
@@ -1057,35 +1251,39 @@ const PetWelcomePreviewCard: React.FC<{
                     </div>
                     <div className="min-w-0">
                         <div className="text-[10px] font-black uppercase tracking-[0.28em] text-lime-100/70">{title}</div>
-                        <div className="mt-1 text-3xl font-black leading-tight text-white">{profile?.name || 'Choose Pet'}</div>
-                        <div className="mt-1 text-xs font-bold text-zinc-400">{profile?.listingTitle || profile?.breed || 'Breed'} • {profile?.breed || 'Breed'} • {profile?.species || 'Species'}</div>
+                        <div className="mt-1 text-3xl font-black leading-tight text-white">{profile?.name || t(language, 'activities.petPreview.choosePet')}</div>
+                        <div className="mt-1 text-xs font-bold text-zinc-400">{listingTitle || breed || unknownBreed} • {breed || unknownBreed} • {species || unknownSpecies}</div>
                     </div>
                 </div>
                 <div className="shrink-0 rounded-2xl bg-black/35 px-3 py-2 text-right">
-                    <div className="text-[9px] font-black uppercase tracking-widest text-lime-100/70">Cost</div>
+                    <div className="text-[9px] font-black uppercase tracking-widest text-lime-100/70">{t(language, 'activities.petPreview.cost')}</div>
                     <div className="text-lg font-black text-white">{formatMoney(totalCost)}</div>
                 </div>
             </div>
             <div className="mt-4 grid grid-cols-2 gap-2">
                 <div className="rounded-2xl bg-black/30 p-3">
-                    <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Home</div>
-                    <div className="mt-1 text-sm font-black text-white">{home?.label || 'Home setup'}</div>
+                    <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">{t(language, 'activities.petPreview.home')}</div>
+                    <div className="mt-1 text-sm font-black text-white">{home ? getChoiceLabel(home, language) : t(language, 'activities.petPreview.homeSetup')}</div>
                 </div>
                 <div className="rounded-2xl bg-black/30 p-3">
-                    <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Accessory</div>
-                    <div className="mt-1 text-sm font-black text-lime-100">{accessory?.label || 'Accessory'}</div>
+                    <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">{t(language, 'activities.petPreview.accessory')}</div>
+                    <div className="mt-1 text-sm font-black text-lime-100">{accessory ? getChoiceLabel(accessory, language) : t(language, 'activities.petPreview.accessory')}</div>
                 </div>
                 <div className="rounded-2xl bg-black/30 p-3">
-                    <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Custom</div>
-                    <div className="mt-1 text-sm font-black text-white">{customization?.label || 'Customization'}</div>
+                    <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">{t(language, 'activities.petPreview.custom')}</div>
+                    <div className="mt-1 text-sm font-black text-white">{customization ? getChoiceLabel(customization, language) : t(language, 'activities.petPreview.customization')}</div>
                 </div>
                 <div className="rounded-2xl bg-black/30 p-3">
-                    <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Risk</div>
+                    <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">{t(language, 'activities.petPreview.risk')}</div>
                     <div className={`mt-1 text-lg font-black ${getRiskTone(risk)}`}>{risk}%</div>
                 </div>
             </div>
             <p className="mt-3 text-sm font-bold leading-relaxed text-zinc-400">
-                {profile?.careNeeds || 'Choose a pet to see care needs.'} {care?.label || 'Care plan'} and {permit?.label || 'papers'} are included before this companion appears in Connections.
+                {t(language, 'activities.petPreview.careSummary', {
+                    needs: profile ? getPetProfileCareNeeds(profile, language) : t(language, 'activities.petPreview.chooseCareNeeds'),
+                    care: care ? getChoiceLabel(care, language) : t(language, 'activities.petPreview.carePlan'),
+                    permit: permit ? getChoiceLabel(permit, language) : t(language, 'activities.petPreview.papers'),
+                })}
             </p>
         </div>
     );
@@ -1106,6 +1304,7 @@ const PetNameModal: React.FC<{
     }, [pending?.pet.id]);
 
     if (!pending) return null;
+    const language = getPlayerLanguage(pending.player);
     return (
         <div className="fixed inset-0 z-[80] grid place-items-end bg-black/75 p-4 backdrop-blur-sm">
             <div className="w-full overflow-hidden rounded-[2rem] border border-lime-200/25 bg-zinc-950 shadow-[0_25px_90px_rgba(0,0,0,0.55)]">
@@ -1115,9 +1314,15 @@ const PetNameModal: React.FC<{
                             <span>{pending.pet.petEmoji || '🐾'}</span>
                         </div>
                         <div>
-                            <div className="text-[10px] font-black uppercase tracking-[0.28em] text-lime-100/70">Companion Added</div>
-                            <div className="mt-1 text-2xl font-black text-white">Welcome {pending.pet.name}</div>
-                            <div className="mt-1 text-xs font-bold text-zinc-400">{pending.pet.petBreed} {pending.pet.petSpecies} from {pending.pet.petStoreName || 'Companion Center'} now appears in Connections.</div>
+                            <div className="text-[10px] font-black uppercase tracking-[0.28em] text-lime-100/70">{t(language, 'activities.petNameModal.title')}</div>
+                            <div className="mt-1 text-2xl font-black text-white">{t(language, 'activities.petNameModal.welcome', { name: pending.pet.name })}</div>
+                            <div className="mt-1 text-xs font-bold text-zinc-400">
+                                {t(language, 'activities.petNameModal.details', {
+                                    breed: pending.pet.petBreed || t(language, 'activities.petPreview.breed'),
+                                    species: pending.pet.petSpecies || t(language, 'activities.petPreview.species'),
+                                    store: pending.pet.petStoreName || t(language, 'activities.petNameModal.companionCenter'),
+                                })}
+                            </div>
                         </div>
                     </div>
                     <div className="mt-4 grid grid-cols-3 gap-2">
@@ -1128,7 +1333,7 @@ const PetNameModal: React.FC<{
                         ))}
                     </div>
                     <div className="mt-5">
-                        <div className="text-[10px] font-black uppercase tracking-[0.28em] text-zinc-500">Name</div>
+                        <div className="text-[10px] font-black uppercase tracking-[0.28em] text-zinc-500">{t(language, 'activities.petNameModal.name')}</div>
                         <input
                             value={name}
                             onChange={(event) => setName(event.target.value)}
@@ -1138,10 +1343,10 @@ const PetNameModal: React.FC<{
                 </div>
                 <div className="grid grid-cols-2 gap-3 p-4">
                     <button onClick={onKeep} className="rounded-2xl border border-zinc-800 bg-black/35 px-4 py-3 text-sm font-black uppercase tracking-[0.16em] text-zinc-300">
-                        Keep Name
+                        {t(language, 'activities.petNameModal.keepName')}
                     </button>
                     <button onClick={() => onSave(name)} className="rounded-2xl bg-gradient-to-r from-lime-200 via-emerald-200 to-cyan-200 px-4 py-3 text-sm font-black uppercase tracking-[0.16em] text-black">
-                        Save Pet
+                        {t(language, 'activities.petNameModal.savePet')}
                     </button>
                 </div>
             </div>
@@ -1155,18 +1360,19 @@ const ActivityResultModal: React.FC<{
     onAddFriend: (encounter: LifestyleFriendEncounter, playerAfter: Player) => void;
 }> = ({ result, onClose, onAddFriend }) => {
     if (!result) return null;
+    const language = getPlayerLanguage(result.playerAfter);
     return (
         <div className="fixed inset-0 z-[85] grid place-items-end bg-black/75 p-4 backdrop-blur-sm">
             <div className="w-full overflow-hidden rounded-[2rem] border border-emerald-200/25 bg-zinc-950 shadow-[0_25px_90px_rgba(0,0,0,0.55)]">
                 <div className="bg-[linear-gradient(135deg,rgba(16,185,129,0.22),rgba(250,204,21,0.12),rgba(9,9,11,0.96))] p-5">
                     <div className="flex items-start justify-between gap-4">
                         <div>
-                            <div className="text-[10px] font-black uppercase tracking-[0.28em] text-emerald-100/70">Activity Result</div>
+                            <div className="text-[10px] font-black uppercase tracking-[0.28em] text-emerald-100/70">{t(language, 'activities.resultModal.title')}</div>
                             <div className="mt-1 text-2xl font-black text-white">{result.memory?.title || result.activityName}</div>
                             <p className="mt-2 text-sm font-bold leading-relaxed text-zinc-300">{result.memory?.summary || result.message}</p>
                         </div>
                         <div className="shrink-0 rounded-2xl bg-black/35 px-3 py-2 text-right">
-                            <div className="text-[9px] font-black uppercase tracking-widest text-emerald-100/70">Cost</div>
+                            <div className="text-[9px] font-black uppercase tracking-widest text-emerald-100/70">{t(language, 'activities.resultModal.cost')}</div>
                             <div className="text-lg font-black text-white">{formatMoney(result.totalCost)}</div>
                         </div>
                     </div>
@@ -1174,26 +1380,26 @@ const ActivityResultModal: React.FC<{
                         {result.effectSummary.length ? result.effectSummary.map(effect => (
                             <span key={effect} className="rounded-full border border-emerald-300/25 bg-emerald-300/10 px-3 py-1 text-xs font-black text-emerald-100">{effect}</span>
                         )) : (
-                            <span className="rounded-full border border-zinc-700 bg-black/30 px-3 py-1 text-xs font-black text-zinc-400">Memory created</span>
+                            <span className="rounded-full border border-zinc-700 bg-black/30 px-3 py-1 text-xs font-black text-zinc-400">{t(language, 'activities.resultModal.memoryCreated')}</span>
                         )}
-                        <span className={`rounded-full border border-white/10 bg-black/30 px-3 py-1 text-xs font-black ${getRiskTone(result.risk)}`}>Risk {result.risk}%</span>
+                        <span className={`rounded-full border border-white/10 bg-black/30 px-3 py-1 text-xs font-black ${getRiskTone(result.risk)}`}>{t(language, 'activities.resultModal.risk', { risk: result.risk })}</span>
                     </div>
                     {result.friendEncounter && (
                         <div className="mt-4 rounded-3xl border border-sky-300/20 bg-sky-400/10 p-4">
                             <div className="flex items-start gap-3">
                                 <img src={result.friendEncounter.relationship.image} alt={result.friendEncounter.relationship.name} className="h-12 w-12 rounded-2xl border border-white/10 bg-zinc-900 object-cover" />
                                 <div className="min-w-0 flex-1">
-                                    <div className="text-[10px] font-black uppercase tracking-[0.24em] text-sky-100/70">New Encounter</div>
+                                    <div className="text-[10px] font-black uppercase tracking-[0.24em] text-sky-100/70">{t(language, 'activities.resultModal.newEncounter')}</div>
                                     <div className="mt-1 text-lg font-black text-white">{result.friendEncounter.headline}</div>
                                     <p className="mt-1 text-xs font-bold leading-relaxed text-zinc-300">{result.friendEncounter.summary}</p>
                                 </div>
                             </div>
                             <div className="mt-3 grid grid-cols-2 gap-2">
                                 <button onClick={() => onAddFriend(result.friendEncounter!, result.playerAfter)} className="rounded-2xl bg-sky-200 px-3 py-3 text-xs font-black uppercase tracking-[0.14em] text-black">
-                                    Add Friend
+                                    {t(language, 'activities.resultModal.addFriend')}
                                 </button>
                                 <button onClick={onClose} className="rounded-2xl border border-zinc-700 bg-black/35 px-3 py-3 text-xs font-black uppercase tracking-[0.14em] text-zinc-300">
-                                    Just Memory
+                                    {t(language, 'activities.resultModal.justMemory')}
                                 </button>
                             </div>
                         </div>
@@ -1201,7 +1407,7 @@ const ActivityResultModal: React.FC<{
                 </div>
                 <div className="p-4">
                     <button onClick={onClose} className="w-full rounded-2xl border border-zinc-800 bg-black/35 px-4 py-3 text-sm font-black uppercase tracking-[0.16em] text-zinc-300">
-                        Close
+                        {t(language, 'activities.resultModal.close')}
                     </button>
                 </div>
             </div>
@@ -1258,6 +1464,7 @@ const ActivityCard: React.FC<{
     activity: LifestyleActivityDefinition;
     onClick: () => void;
 }> = ({ activity, onClick }) => {
+    const language = React.useContext(ActivityLanguageContext);
     const meta = getActivityVisual(activity);
     const Icon = meta.icon;
     return (
@@ -1270,8 +1477,8 @@ const ActivityCard: React.FC<{
                     <Icon size={22} className={meta.accent} />
                 </div>
                 <div className="min-w-0 flex-1">
-                    <div className="truncate text-lg font-black text-white">{activity.name}</div>
-                    <div className="mt-1 line-clamp-2 text-xs leading-snug text-zinc-400">{activity.shortDescription}</div>
+                    <div className="truncate text-lg font-black text-white">{getActivityName(activity, language)}</div>
+                    <div className="mt-1 line-clamp-2 text-xs leading-snug text-zinc-400">{getActivityShortDescription(activity, language)}</div>
                 </div>
                 <ChevronRight size={18} className="shrink-0 text-zinc-600" />
             </div>
@@ -1323,7 +1530,8 @@ export const LifestyleActivities: React.FC<LifestyleActivitiesProps> = ({ player
         ? selections.inviteId
         : availableInviteOptions[0]?.id || 'solo';
     const selectedIndustryEvent = INDUSTRY_EVENT_OPTIONS.find(option => option.id === selections.industryEventId) || INDUSTRY_EVENT_OPTIONS[0];
-    const selectedIndustryVenue = INDUSTRY_VENUE_OPTIONS.find(option => option.id === selections.industryVenueId) || INDUSTRY_VENUE_OPTIONS[0];
+    const industryVenueOptions = getAvailableIndustryVenueOptions(player);
+    const selectedIndustryVenue = industryVenueOptions.find(option => option.id === selections.industryVenueId) || industryVenueOptions[0];
     const selectedIndustryGroupIds = selections.industryInviteGroupIds || [];
     const selectedIndustryGroups = INDUSTRY_INVITE_GROUP_OPTIONS.filter(option => selectedIndustryGroupIds.includes(option.id));
     const industryGuestOptions = getAvailableIndustryGuestOptions(player, industryGuestQuery, selections.industryGuestIds || []);
@@ -1333,7 +1541,8 @@ export const LifestyleActivities: React.FC<LifestyleActivitiesProps> = ({ player
     const selectedIndustryService = INDUSTRY_SERVICE_OPTIONS.find(option => option.id === selections.industryServiceId) || INDUSTRY_SERVICE_OPTIONS[1];
     const selectedIndustryAddonIds = selections.industryAddonIds || [];
     const selectedCharityCause = CHARITY_CAUSE_OPTIONS.find(option => option.id === selections.charityCauseId) || CHARITY_CAUSE_OPTIONS[2];
-    const selectedCharityFormat = CHARITY_FORMAT_OPTIONS.find(option => option.id === selections.charityFormatId) || CHARITY_FORMAT_OPTIONS[1];
+    const charityFormatOptions = getAvailableCharityFormatOptions(player);
+    const selectedCharityFormat = charityFormatOptions.find(option => option.id === selections.charityFormatId) || charityFormatOptions[1];
     const charityCustomDonationAmount = Math.max(0, Math.round(Number(selections.charityCustomDonationAmount || 0)));
     const selectedBaseCharityDonation = CHARITY_DONATION_OPTIONS.find(option => option.id === selections.charityDonationId) || CHARITY_DONATION_OPTIONS[1];
     const selectedCharityDonation: LifestyleActivityChoice = charityCustomDonationAmount > 0
@@ -1365,22 +1574,27 @@ export const LifestyleActivities: React.FC<LifestyleActivitiesProps> = ({ player
         || ADOPTION_CHILD_PROFILES[0];
     const selectedAdoptionRoute = ADOPTION_ROUTE_OPTIONS.find(option => option.id === selections.adoptionRouteId)
         || ADOPTION_ROUTE_OPTIONS[0];
-    const selectedAdoptionHomePrep = ADOPTION_HOME_PREP_OPTIONS.find(option => option.id === selections.adoptionHomePrepId)
-        || ADOPTION_HOME_PREP_OPTIONS[1];
+    const adoptionHomePrepOptions = getAvailableAdoptionHomePrepOptions(player);
+    const selectedAdoptionHomePrep = adoptionHomePrepOptions.find(option => option.id === selections.adoptionHomePrepId)
+        || adoptionHomePrepOptions[1];
     const selectedAdoptionSupport = ADOPTION_SUPPORT_OPTIONS.find(option => option.id === selections.adoptionSupportId)
         || ADOPTION_SUPPORT_OPTIONS[1];
     const selectedPetStoreId = selections.companionStoreId || COMPANION_STORE_OPTIONS[0]?.id;
     const selectedPetStore = getPetCompanionStore(selectedPetStoreId);
+    const selectedPetStoreName = getPetStoreName(selectedPetStore, language);
     const petCategoryOptions = getPetCompanionCategoryOptions(selectedPetStore.id);
     const selectedPetCategoryId = petCategoryOptions.some(option => option.id === selections.companionCategoryId)
         ? selections.companionCategoryId
         : petCategoryOptions[0]?.id;
     const selectedPetCategory = petCategoryOptions.find(option => option.id === selectedPetCategoryId)
         || petCategoryOptions[0];
+    const selectedPetCategoryLabel = selectedPetCategory ? getChoiceLabel(selectedPetCategory, language) : tr('activities.chooseCategory');
     const filteredPetProfiles = getFilteredPetCompanionProfiles(player, selectedPetStore.id, selectedPetCategory?.id);
     const petPoolCycle = getPetCompanionPoolCycle(player);
     const selectedPetProfile = getPetCompanionProfile(selections.companionPetId, player)
         || filteredPetProfiles[0];
+    const selectedPetBreed = selectedPetProfile ? getPetProfileBreed(selectedPetProfile, language) : undefined;
+    const selectedPetSpecies = selectedPetProfile ? getPetProfileSpecies(selectedPetProfile, language) : undefined;
     const petCareOptions = getCompanionCareOptionsForPet(selectedPetProfile);
     const petPermitOptions = getCompanionPermitOptionsForPet(selectedPetProfile);
     const selectedPetCare = petCareOptions.find(option => option.id === selections.companionCareId)
@@ -1405,17 +1619,17 @@ export const LifestyleActivities: React.FC<LifestyleActivitiesProps> = ({ player
         ? activeHealthCondition.treatmentTags.filter(tag => selectedWellnessTags.includes(tag)).length
         : 0;
     const treatmentMatch = activeHealthCondition
-        ? treatmentMatchCount >= 2 ? 'Strong' : treatmentMatchCount === 1 ? 'Partial' : 'Poor'
-        : 'Preventive';
+        ? treatmentMatchCount >= 2 ? t(language, 'activities.treatmentMatch.strong') : treatmentMatchCount === 1 ? t(language, 'activities.treatmentMatch.partial') : t(language, 'activities.treatmentMatch.poor')
+        : t(language, 'activities.treatmentMatch.preventive');
     const adoptionEligibility = getAdoptionEligibility(player, quote);
     const filteredActivities = category === 'ALL'
         ? LIFESTYLE_ACTIVITY_CATALOG
         : LIFESTYLE_ACTIVITY_CATALOG.filter(activity => activity.category === category);
     const statSummary = [
-        { label: 'Mood', value: formatStat(player.stats.happiness), color: 'text-yellow-300' },
-        { label: 'Health', value: formatStat(player.stats.health), color: 'text-emerald-300' },
-        { label: 'Rep', value: formatStat(player.stats.reputation), color: 'text-sky-300' },
-        { label: 'Spent', value: formatMoney(state.totalSpent), color: 'text-white' },
+        { label: t(language, 'activities.stat.mood'), value: formatStat(player.stats.happiness), color: 'text-yellow-300' },
+        { label: t(language, 'activities.stat.health'), value: formatStat(player.stats.health), color: 'text-emerald-300' },
+        { label: t(language, 'activities.stat.rep'), value: formatStat(player.stats.reputation), color: 'text-sky-300' },
+        { label: t(language, 'activities.stat.spent'), value: formatMoney(state.totalSpent), color: 'text-white' },
     ];
     const currentYearMemories = state.memories.filter(memory => memory.year === player.age);
 
@@ -1749,9 +1963,9 @@ export const LifestyleActivities: React.FC<LifestyleActivitiesProps> = ({ player
 	    const petPrimarySubLabel = petStage === 'brief'
 	        ? tr('activities.startCompanionShopping')
 	        : petStage === 'stores'
-	        ? selectedPetStore.name
+	        ? selectedPetStoreName
 	        : petStage === 'categories'
-	            ? selectedPetCategory?.label || tr('activities.chooseCategory')
+	            ? selectedPetCategoryLabel
 	            : petStage === 'pets'
 	                ? selectedPetProfile?.name || tr('activities.choosePet')
 	                : tr('activities.buySetupAndName');
@@ -1840,6 +2054,7 @@ export const LifestyleActivities: React.FC<LifestyleActivitiesProps> = ({ player
     };
 
     return (
+        <ActivityLanguageContext.Provider value={language}>
         <div className="space-y-5 pb-28 pt-3">
             <div className="flex items-center gap-4">
                 <button onClick={onBack} className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-zinc-800 bg-zinc-950 text-white">
@@ -1879,7 +2094,7 @@ export const LifestyleActivities: React.FC<LifestyleActivitiesProps> = ({ player
                         onClick={() => setCategory(filter.id)}
                         className={`shrink-0 rounded-full border px-4 py-2 text-xs font-black uppercase tracking-widest transition-all ${category === filter.id ? 'border-emerald-400 bg-emerald-400 text-black' : 'border-zinc-800 bg-zinc-950 text-zinc-400'}`}
                     >
-                        {filter.label}
+                        {t(language, filter.labelKey)}
                     </button>
                 ))}
             </div>
@@ -1917,7 +2132,7 @@ export const LifestyleActivities: React.FC<LifestyleActivitiesProps> = ({ player
                                     </div>
                                     <div className="min-w-0 flex-1">
 	                                        <div className={`text-[10px] font-black uppercase tracking-[0.28em] ${isNightlifePlanner ? 'text-fuchsia-200' : isCharityPlanner ? 'text-yellow-200' : 'text-emerald-300'}`}>{tr('activities.experienceBuilder')}</div>
-                                        <p className="mt-2 text-sm leading-relaxed text-zinc-400">{selectedActivity.longDescription}</p>
+                                        <p className="mt-2 text-sm leading-relaxed text-zinc-400">{getActivityLongDescription(selectedActivity, language)}</p>
                                     </div>
                                 </div>
 
@@ -2005,7 +2220,7 @@ export const LifestyleActivities: React.FC<LifestyleActivitiesProps> = ({ player
                                             risk={quote.risk}
                                         />
 	                                        <CompactOptionRail tone="industry" title={tr('activities.eventType')} choices={INDUSTRY_EVENT_OPTIONS} selectedId={selectedIndustryEvent?.id} onSelect={(id) => updateIndustrySelection('industryEventId', id)} />
-	                                        <CompactOptionRail tone="industry" title={tr('activities.venue')} choices={INDUSTRY_VENUE_OPTIONS} selectedId={selectedIndustryVenue?.id} onSelect={(id) => updateIndustrySelection('industryVenueId', id)} />
+	                                        <CompactOptionRail tone="industry" title={tr('activities.venue')} choices={industryVenueOptions} selectedId={selectedIndustryVenue?.id} onSelect={(id) => updateIndustrySelection('industryVenueId', id)} />
 	                                        <CompactOptionRail tone="industry" title={tr('activities.inviteGroups')} choices={INDUSTRY_INVITE_GROUP_OPTIONS} selectedIds={selectedIndustryGroupIds} onSelect={toggleIndustryGroup} multi />
                                         <div className="space-y-2">
                                             <div className="flex items-center justify-between gap-3">
@@ -2026,7 +2241,7 @@ export const LifestyleActivities: React.FC<LifestyleActivitiesProps> = ({ player
                                                 <div className="flex flex-wrap gap-2">
                                                     {selectedIndustryGuests.map(guest => (
                                                         <span key={guest.id} className="rounded-full border border-amber-300/25 bg-amber-300/10 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-amber-100">
-                                                            {guest.label}
+                                                            {getChoiceLabel(guest, language)}
                                                         </span>
                                                     ))}
                                                 </div>
@@ -2048,7 +2263,7 @@ export const LifestyleActivities: React.FC<LifestyleActivitiesProps> = ({ player
                                             risk={quote.risk}
                                         />
 	                                        <CompactOptionRail tone="industry" title={tr('activities.cause')} choices={CHARITY_CAUSE_OPTIONS} selectedId={selectedCharityCause?.id} onSelect={(id) => updateCharitySelection('charityCauseId', id)} />
-	                                        <CompactOptionRail tone="industry" title={tr('activities.galaFormat')} choices={CHARITY_FORMAT_OPTIONS} selectedId={selectedCharityFormat?.id} onSelect={(id) => updateCharitySelection('charityFormatId', id)} />
+	                                        <CompactOptionRail tone="industry" title={tr('activities.galaFormat')} choices={charityFormatOptions} selectedId={selectedCharityFormat?.id} onSelect={(id) => updateCharitySelection('charityFormatId', id)} />
 	                                        <CompactOptionRail tone="industry" title={tr('activities.donationLevel')} choices={CHARITY_DONATION_OPTIONS} selectedId={charityCustomDonationAmount > 0 ? undefined : selectedBaseCharityDonation?.id} onSelect={(id) => updateCharitySelection('charityDonationId', id)} />
                                         <div className={`rounded-3xl border p-4 ${charityCustomDonationAmount > 0 ? 'border-yellow-300 bg-yellow-300/10' : 'border-zinc-800 bg-black/30'}`}>
                                             <div className="flex items-start justify-between gap-3">
@@ -2086,6 +2301,7 @@ export const LifestyleActivities: React.FC<LifestyleActivitiesProps> = ({ player
                                             focus={selectedWellnessFocus}
                                             support={selectedWellnessSupport}
                                             activeCondition={activeHealthCondition}
+                                            language={language}
                                             treatmentMatch={treatmentMatch}
                                             totalCost={quote.totalCost}
                                             risk={quote.risk}
@@ -2144,7 +2360,7 @@ export const LifestyleActivities: React.FC<LifestyleActivitiesProps> = ({ player
                                                     risk={quote.risk}
                                                 />
 	                                                <CompactOptionRail title={tr('activities.agencyRoute')} choices={ADOPTION_ROUTE_OPTIONS} selectedId={selectedAdoptionRoute?.id} onSelect={(id) => updateAdoptionSelection('adoptionRouteId', id)} />
-	                                                <CompactOptionRail title={tr('activities.homeStudy')} choices={ADOPTION_HOME_PREP_OPTIONS} selectedId={selectedAdoptionHomePrep?.id} onSelect={(id) => updateAdoptionSelection('adoptionHomePrepId', id)} />
+	                                                <CompactOptionRail title={tr('activities.homeStudy')} choices={adoptionHomePrepOptions} selectedId={selectedAdoptionHomePrep?.id} onSelect={(id) => updateAdoptionSelection('adoptionHomePrepId', id)} />
 	                                                <CompactOptionRail title={tr('activities.transitionSupport')} choices={ADOPTION_SUPPORT_OPTIONS} selectedId={selectedAdoptionSupport?.id} onSelect={(id) => updateAdoptionSelection('adoptionSupportId', id)} />
 	                                                <CompactOptionRail title={tr('activities.familySetup')} choices={availableInviteOptions} selectedId={selectedInviteId} onSelect={(id) => updateSelection('inviteId', id)} />
 	                                                <CompactOptionRail title={tr('activities.privacy')} choices={selectedActivity.privacyOptions} selectedId={selections.privacyId} onSelect={(id) => updateSelection('privacyId', id)} />
@@ -2208,7 +2424,7 @@ export const LifestyleActivities: React.FC<LifestyleActivitiesProps> = ({ player
                                                 <div className="flex items-center justify-between gap-3">
                                                     <div>
 	                                                        <div className="text-[10px] font-black uppercase tracking-[0.28em] text-lime-100/70">{tr('activities.petCategory')}</div>
-                                                        <div className="mt-1 text-lg font-black text-white">{selectedPetStore.name}</div>
+                                                        <div className="mt-1 text-lg font-black text-white">{selectedPetStoreName}</div>
                                                     </div>
                                                     <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-lime-200/20 bg-lime-300/10 text-2xl">
                                                         <span>{selectedPetStore.icon}</span>
@@ -2222,7 +2438,7 @@ export const LifestyleActivities: React.FC<LifestyleActivitiesProps> = ({ player
                                                 <div className="flex items-center justify-between gap-3">
                                                     <div>
 	                                                        <div className="text-[10px] font-black uppercase tracking-[0.28em] text-lime-100/70">{tr('activities.availablePets')}</div>
-	                                                        <div className="mt-1 text-lg font-black text-white">{tr('activities.petCategoryAtStore', { category: selectedPetCategory?.label || tr('activities.chooseCategory'), store: selectedPetStore.name })}</div>
+	                                                        <div className="mt-1 text-lg font-black text-white">{tr('activities.petCategoryAtStore', { category: selectedPetCategory ? getChoiceLabel(selectedPetCategory, language) : tr('activities.chooseCategory'), store: selectedPetStoreName })}</div>
                                                     </div>
                                                     <div className="shrink-0 rounded-2xl bg-lime-300/10 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-lime-100">
 	                                                        {tr('activities.pool', { number: petPoolCycle + 1 })}
@@ -2251,7 +2467,7 @@ export const LifestyleActivities: React.FC<LifestyleActivitiesProps> = ({ player
 	                                                    <div className="text-[10px] font-black uppercase tracking-[0.28em] text-lime-100/70">{tr('activities.checkoutSetup')}</div>
 	                                                    <div className="mt-1 text-lg font-black text-white">{tr('activities.prepareHomeBeforeNaming')}</div>
                                                     <div className="mt-1 text-xs font-bold leading-relaxed text-zinc-500">
-	                                                        {selectedPetStore.name} • {selectedPetCategory?.label || tr('activities.pet')} • {selectedPetProfile?.breed || tr('activities.breed')} {selectedPetProfile?.species || tr('activities.species')}
+                                                        {selectedPetStoreName} • {selectedPetCategoryLabel || tr('activities.pet')} • {selectedPetBreed || tr('activities.breed')} {selectedPetSpecies || tr('activities.species')}
                                                     </div>
                                                 </div>
 	                                                <CompactOptionRail title={tr('activities.petHome')} choices={COMPANION_HOME_OPTIONS} selectedId={selectedPetHome?.id} onSelect={(id) => updatePetSelection('companionHomeId', id)} />
@@ -2286,6 +2502,19 @@ export const LifestyleActivities: React.FC<LifestyleActivitiesProps> = ({ player
 	                                            <span className="rounded-full border border-zinc-700 px-3 py-1 text-xs font-black text-zinc-500">{tr('activities.memoryOnly')}</span>
                                         )}
                                     </div>
+                                    {!!quote.assetSignals?.length && (
+                                        <div className="mt-3 grid gap-2">
+                                            {quote.assetSignals.map(signal => (
+                                                <div key={`${signal.label}-${signal.description}`} className="flex items-start gap-3 rounded-2xl border border-cyan-300/20 bg-cyan-300/10 px-3 py-2">
+                                                    <Sparkles size={15} className="mt-0.5 shrink-0 text-cyan-200" />
+                                                    <div className="min-w-0">
+                                                        <div className="text-[10px] font-black uppercase tracking-[0.2em] text-cyan-100">{signal.label}</div>
+                                                        <div className="mt-0.5 text-xs font-bold leading-snug text-zinc-300">{signal.description}</div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
                                     {status && <div className={`mt-3 rounded-2xl border px-3 py-2 text-sm font-black ${status.tone === 'good' ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200' : 'border-rose-500/30 bg-rose-500/10 text-rose-200'}`}>{status.text}</div>}
 	                                    {!canAfford && <div className="mt-3 text-xs font-bold text-rose-300">{tr('activities.needMoreCash', { amount: formatMoney(quote.totalCost - player.money) })}</div>}
                                 </div>
@@ -2376,5 +2605,6 @@ export const LifestyleActivities: React.FC<LifestyleActivitiesProps> = ({ player
                 )}
             </div>
         </div>
+        </ActivityLanguageContext.Provider>
     );
 };

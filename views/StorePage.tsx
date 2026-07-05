@@ -3,9 +3,10 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Player, ActorSkills, Genre, Stats } from '../types';
 import { formatMoney } from '../services/formatUtils';
 import { ArrowLeft, Zap, DollarSign, Heart, Brain, Clapperboard, PlayCircle, ShieldAlert, Crown, Gem, Home, CarFront, Plane, CheckCircle2 } from 'lucide-react';
-import { hasPremiumProduct, PREMIUM_PRODUCTS, PremiumProductId } from '../services/premiumLogic';
+import { getLocalizedPremiumProducts, hasPremiumProduct, PremiumProductId } from '../services/premiumLogic';
 import { getPremiumCatalogProducts } from '../services/iapService';
 import { ALL_GENRES, formatGenreLabel } from '../services/genreCatalog';
+import { getPlayerLanguage, t } from '../services/i18n';
 
 const PREMIUM_STORE_ENABLED = true;
 
@@ -28,10 +29,13 @@ export const StorePage: React.FC<StorePageProps> = ({ player, onBack, onWatchAd,
         (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
     );
     const showPremiumStore = PREMIUM_STORE_ENABLED && (isIOSDevice || import.meta.env.DEV);
+    const language = getPlayerLanguage(player);
+    const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
 
     const GENRES: Genre[] = ALL_GENRES;
     const SKILLS: (keyof ActorSkills)[] = ['delivery', 'memorization', 'expression', 'improvisation', 'discipline', 'presence', 'charisma'];
     const bonusEnergy = player.flags?.bonusEnergyBank || 0;
+    const premiumProducts = useMemo(() => getLocalizedPremiumProducts(language), [language]);
     useEffect(() => {
         if (!showPremiumStore) return;
 
@@ -46,33 +50,33 @@ export const StorePage: React.FC<StorePageProps> = ({ player, onBack, onWatchAd,
     }, [showPremiumStore]);
 
     const premiumProductsById = useMemo(() => {
-        const map = new Map<PremiumProductId, typeof PREMIUM_PRODUCTS[number]>();
-        PREMIUM_PRODUCTS.forEach(product => {
+        const map = new Map<PremiumProductId, typeof premiumProducts[number]>();
+        premiumProducts.forEach(product => {
             map.set(product.id, product);
         });
         return map;
-    }, []);
+    }, [premiumProducts]);
 
     const premiumSections = [
         {
-            title: 'Ad-Free',
+            title: tr('store.premium.section.adFree'),
             icon: ShieldAlert,
-            products: PREMIUM_PRODUCTS.filter(product => product.category === 'ad_free')
+            products: premiumProducts.filter(product => product.category === 'ad_free')
         },
         {
-            title: 'Energy Boosts',
+            title: tr('store.premium.section.energy'),
             icon: Zap,
-            products: PREMIUM_PRODUCTS.filter(product => product.category === 'energy')
+            products: premiumProducts.filter(product => product.category === 'energy')
         },
         {
-            title: 'Cash Boosts',
+            title: tr('store.premium.section.cash'),
             icon: DollarSign,
-            products: PREMIUM_PRODUCTS.filter(product => product.category === 'cash')
+            products: premiumProducts.filter(product => product.category === 'cash')
         },
         {
-            title: 'Collections',
+            title: tr('store.premium.section.collections'),
             icon: Crown,
-            products: PREMIUM_PRODUCTS.filter(product => product.category === 'collection')
+            products: premiumProducts.filter(product => product.category === 'collection')
         }
     ];
 
@@ -134,7 +138,7 @@ export const StorePage: React.FC<StorePageProps> = ({ player, onBack, onWatchAd,
                             onClick={() => setActiveTab('PREMIUM')}
                             className={`py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'PREMIUM' ? 'bg-white text-black' : 'text-zinc-400 hover:text-white'}`}
                         >
-                            Premium
+                            {tr('store.premium.tab')}
                         </button>
                     </div>
 
@@ -143,7 +147,7 @@ export const StorePage: React.FC<StorePageProps> = ({ player, onBack, onWatchAd,
                         className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-zinc-900 border border-zinc-700 text-sm font-bold text-white hover:bg-zinc-800 transition-colors"
                     >
                         <CheckCircle2 size={16}/>
-                        Restore Purchases
+                        {tr('store.premium.restorePurchases')}
                     </button>
                 </div>
             )}
@@ -155,16 +159,16 @@ export const StorePage: React.FC<StorePageProps> = ({ player, onBack, onWatchAd,
                             <Crown size={20}/>
                         </div>
                         <div>
-                            <h3 className="font-bold text-white text-lg">Premium</h3>
+                            <h3 className="font-bold text-white text-lg">{tr('store.premium.title')}</h3>
                             <p className="text-xs text-zinc-500">
-                                {isIOSDevice ? 'iOS-only purchase catalog.' : 'Developer preview of the iOS purchase catalog.'}
+                                {isIOSDevice ? tr('store.premium.iosCatalog') : tr('store.premium.devCatalog')}
                             </p>
                         </div>
                         <button
                             onClick={onRestorePurchases}
                             className="ml-auto px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-xs font-bold text-zinc-300 hover:text-white hover:bg-zinc-800 transition-colors"
                         >
-                            Restore Purchases
+                            {tr('store.premium.restorePurchases')}
                         </button>
                     </div>
 
@@ -192,7 +196,7 @@ export const StorePage: React.FC<StorePageProps> = ({ player, onBack, onWatchAd,
                                                         <div className="font-bold text-white">{product.title}</div>
                                                             {product.kind === 'non_consumable' && owned && (
                                                                 <div className="inline-flex items-center gap-1 text-[10px] font-bold uppercase px-2 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-300">
-                                                                    <CheckCircle2 size={12}/> Owned
+                                                                    <CheckCircle2 size={12}/> {tr('store.premium.owned')}
                                                                 </div>
                                                             )}
                                                         </div>
@@ -209,7 +213,7 @@ export const StorePage: React.FC<StorePageProps> = ({ player, onBack, onWatchAd,
                                                                     : 'bg-white text-black hover:bg-zinc-200'
                                                             }`}
                                                         >
-                                                            {product.kind === 'consumable' ? 'Add' : owned ? 'Unlocked' : 'Unlock'}
+                                                            {product.kind === 'consumable' ? tr('store.premium.add') : owned ? tr('store.premium.unlocked') : tr('store.premium.unlock')}
                                                         </button>
                                                     </div>
                                                 </div>
@@ -332,20 +336,20 @@ export const StorePage: React.FC<StorePageProps> = ({ player, onBack, onWatchAd,
             {pendingProduct && (
                 <div className="fixed inset-0 z-[160] bg-black/80 backdrop-blur-md flex items-center justify-center p-6">
                     <div className="w-full max-w-sm rounded-3xl border border-zinc-800 bg-zinc-950 p-6 space-y-4 shadow-2xl">
-                        <div className="text-xl font-black text-white">Confirm Purchase</div>
+                        <div className="text-xl font-black text-white">{tr('store.premium.confirmPurchase')}</div>
                         <div className="text-sm text-zinc-400 leading-relaxed">
-                            Buy <span className="text-white font-bold">{PREMIUM_PRODUCTS.find(product => product.id === pendingProduct)?.title}</span>?
+                            {tr('store.premium.confirmBuyPrefix')} <span className="text-white font-bold">{premiumProductsById.get(pendingProduct)?.title}</span>?
                             {(pendingProduct && (catalogPrices[pendingProduct] || premiumProductsById.get(pendingProduct)?.priceLabel)) ? (
-                                <> Apple will charge <span className="text-white font-bold">{catalogPrices[pendingProduct] || premiumProductsById.get(pendingProduct)?.priceLabel}</span> if the purchase is approved.</>
+                                <> {tr('store.premium.appleChargePrefix')} <span className="text-white font-bold">{catalogPrices[pendingProduct] || premiumProductsById.get(pendingProduct)?.priceLabel}</span> {tr('store.premium.appleChargeSuffix')}</>
                             ) : null}
-                            Your reward will only be granted after iOS confirms the purchase.
+                            {tr('store.premium.rewardAfterConfirm')}
                         </div>
                         <div className="flex gap-3">
                             <button
                                 onClick={() => setPendingProduct(null)}
                                 className="flex-1 py-3 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-300 font-bold hover:bg-zinc-800"
                             >
-                                Cancel
+                                {tr('store.premium.cancel')}
                             </button>
                             <button
                                 onClick={() => {
@@ -354,7 +358,7 @@ export const StorePage: React.FC<StorePageProps> = ({ player, onBack, onWatchAd,
                                 }}
                                 className="flex-1 py-3 rounded-xl bg-white text-black font-bold hover:bg-zinc-200"
                             >
-                                Continue
+                                {tr('store.premium.continue')}
                             </button>
                         </div>
                     </div>

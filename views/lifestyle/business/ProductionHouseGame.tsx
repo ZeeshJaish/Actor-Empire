@@ -23,6 +23,7 @@ import { getProjectReleaseLabel, getProjectReleaseSortValue, getProjectReleaseTi
 import { createContinuationScript, getContinuationEligibility } from '../../../services/sequelFlow';
 import { getStudioGroup } from '../../../services/studioGroup';
 import { StudioGroupView } from './StudioGroupView';
+import { CustomPosterImage } from '../../../components/CustomPosterImage';
 
 interface ProductionHouseGameProps {
     player: Player;
@@ -116,8 +117,12 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
     // Prestige Score (0-100): rewards quality, awards, consistency, and credible hits.
     const prestigeScore = Math.min(100, Math.floor((avgRating * 6) + (awardsWon * 2.5) + (library.length * 0.8) + (breakoutCount * 1.2) + consistencyBonus));
     const groupValuation = studioGroup.allStudios.reduce((total, groupStudio) => total + (groupStudio.stats.valuation || 0), 0);
-    const outsideProductions = (player.outsideProductions || []).slice(0, 8);
-    const outsideProducerProfit = outsideProductions.reduce((sum, item) => sum + (item.profit || 0), 0);
+    const getStudioSubtypeLabel = (subtype?: string) => subtype === 'MAJOR_STUDIO'
+        ? tr('services.business.productionDashboard.studioType.major')
+        : tr('services.business.productionDashboard.studioType.indie');
+    const getStudioLocationLabel = (subtype?: string) => subtype === 'MAJOR_STUDIO'
+        ? tr('services.business.productionDashboard.location.hollywood')
+        : tr('services.business.productionDashboard.location.burbank');
 
     // Active Slate List (Combined for the Netflix-style row)
     const activeSlate = [
@@ -801,12 +806,12 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
                             <div className="flex items-center gap-2">
                                 <span className="font-serif font-black uppercase tracking-tight text-xl text-white drop-shadow-md">{studio.name}</span>
                                 <span className="text-[9px] bg-amber-500/20 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded uppercase font-bold tracking-wider shadow-[0_0_10px_rgba(245,158,11,0.2)]">
-                                    {studio.subtype === 'MAJOR_STUDIO' ? 'Major' : 'Indie'}
+                                    {getStudioSubtypeLabel(studio.subtype)}
                                 </span>
                             </div>
                             <div className="flex items-center gap-1 text-[10px] text-zinc-400 mt-0.5">
                                 <MapPin size={10} />
-                                <span>{studio.subtype === 'MAJOR_STUDIO' ? 'Hollywood, CA' : 'Burbank, CA'}</span>
+                                <span>{getStudioLocationLabel(studio.subtype)}</span>
                             </div>
                         </div>
                     </div>
@@ -815,19 +820,19 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
                 {/* Valuation & Cash (The "Wow" Factor) */}
                 <div className="relative px-6 pb-6 flex justify-between items-end">
                     <div>
-                        <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mb-1">Studio Valuation</div>
+                        <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mb-1">{tr('services.business.productionDashboard.studioValuation')}</div>
                         <div className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-200 to-amber-500 drop-shadow-sm tracking-tight">
                             {formatMoney(studio.stats.valuation)}
                         </div>
                     </div>
                     <div className="text-right flex flex-col items-end">
-                        <div className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest mb-1">Studio Capital</div>
+                        <div className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest mb-1">{tr('services.business.productionFinance.shared.studioCapital')}</div>
                         <div className="text-lg font-mono font-bold text-emerald-400 drop-shadow-sm">
                             {formatMoney(studio.balance)}
                         </div>
                         {(studio.studioState?.productionFund || 0) > 0 && (
                             <div className="text-[9px] text-emerald-500/70 font-bold uppercase mt-1">
-                                + {formatMoney(studio.studioState!.productionFund!)} Prod. Fund
+                                + {formatMoney(studio.studioState!.productionFund!)} {tr('services.business.productionFinance.shared.prodFund')}
                             </div>
                         )}
                     </div>
@@ -837,27 +842,27 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
                 <div className="relative bg-black/40 backdrop-blur-md border-t border-white/5">
                     <div className="flex overflow-x-auto no-scrollbar py-3 px-6 gap-8">
                         <div className="flex flex-col shrink-0">
-                            <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest flex items-center gap-1.5 mb-0.5"><Star size={10} className="text-yellow-500"/> Avg Rating</span>
+                            <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest flex items-center gap-1.5 mb-0.5"><Star size={10} className="text-yellow-500"/> {tr('services.business.productionDashboard.metric.avgRating')}</span>
                             <span className="text-white font-bold text-sm">{avgRating > 0 ? avgRating.toFixed(1) : '-.--'}</span>
                         </div>
                         <div className="w-px h-8 bg-zinc-800 shrink-0"></div>
                         <div className="flex flex-col shrink-0">
-                            <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest flex items-center gap-1.5 mb-0.5"><Award size={10} className="text-amber-500"/> Awards Won</span>
+                            <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest flex items-center gap-1.5 mb-0.5"><Award size={10} className="text-amber-500"/> {tr('services.business.productionDashboard.metric.awardsWon')}</span>
                             <span className="text-white font-bold text-sm">{awardsWon}</span>
                         </div>
                         <div className="w-px h-8 bg-zinc-800 shrink-0"></div>
                         <div className="flex flex-col shrink-0">
-                            <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest flex items-center gap-1.5 mb-0.5"><Film size={10} className="text-blue-400"/> Total Films</span>
+                            <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest flex items-center gap-1.5 mb-0.5"><Film size={10} className="text-blue-400"/> {tr('services.business.productionDashboard.metric.totalFilms')}</span>
                             <span className="text-white font-bold text-sm">{library.length}</span>
                         </div>
                         <div className="w-px h-8 bg-zinc-800 shrink-0"></div>
                         <div className="flex flex-col shrink-0">
-                            <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest flex items-center gap-1.5 mb-0.5"><TrendingUp size={10} className="text-emerald-500"/> Lifetime B.O.</span>
+                            <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest flex items-center gap-1.5 mb-0.5"><TrendingUp size={10} className="text-emerald-500"/> {tr('services.business.productionDashboard.metric.lifetimeBoxOffice')}</span>
                             <span className="text-emerald-400 font-mono font-bold text-sm">{formatMoney(totalGross)}</span>
                         </div>
                         <div className="w-px h-8 bg-zinc-800 shrink-0"></div>
                         <div className="flex flex-col shrink-0">
-                            <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest flex items-center gap-1.5 mb-0.5"><Crown size={10} className="text-purple-500"/> Prestige</span>
+                            <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest flex items-center gap-1.5 mb-0.5"><Crown size={10} className="text-purple-500"/> {tr('services.business.productionDashboard.metric.prestige')}</span>
                             <span className="text-white font-bold text-sm">{prestigeScore}/100</span>
                         </div>
                     </div>
@@ -905,64 +910,6 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
                     </div>
                 </div>
 
-                {outsideProductions.length > 0 && (
-                    <div className="pt-2 pb-6">
-                        <div className="px-4 mb-3 flex items-end justify-between gap-3">
-                            <div>
-                                <h2 className="text-lg font-bold text-white tracking-tight">Outside Productions</h2>
-                                <p className="mt-0.5 text-xs font-semibold text-zinc-500">Producer shares you bought in other companies' films.</p>
-                            </div>
-                            <div className={`shrink-0 rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-widest ${outsideProducerProfit >= 0 ? 'border-emerald-400/20 bg-emerald-400/10 text-emerald-300' : 'border-rose-400/20 bg-rose-400/10 text-rose-300'}`}>
-                                Net {formatMoney(outsideProducerProfit)}
-                            </div>
-                        </div>
-                        <div className="flex gap-3 overflow-x-auto px-4 pb-4 no-scrollbar">
-                            {outsideProductions.map(item => (
-                                <div key={item.id} className="min-w-[220px] rounded-3xl border border-emerald-400/15 bg-zinc-950 p-4 shadow-xl">
-                                    <div className="mb-3 flex items-start justify-between gap-3">
-                                        <div className="min-w-0">
-                                            <div className="truncate text-base font-black text-white">{item.projectTitle}</div>
-                                            <div className="mt-1 truncate text-[10px] font-black uppercase tracking-[0.18em] text-emerald-300/70">
-                                                {item.stakePercent}% share • {item.status}
-                                            </div>
-                                        </div>
-                                        <div className={`rounded-full px-2 py-1 text-[9px] font-black uppercase tracking-widest ${item.finalOutcome === 'HIT' || item.finalOutcome === 'PROFIT' ? 'bg-emerald-400 text-black' : item.finalOutcome === 'LOSS' || item.finalOutcome === 'CANCELLED' ? 'bg-rose-500 text-white' : 'bg-zinc-800 text-zinc-300'}`}>
-                                            {item.finalOutcome || item.releasePath}
-                                        </div>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-2">
-                                        <div className="rounded-2xl bg-black/40 p-3">
-                                            <div className="text-[8px] font-black uppercase tracking-widest text-zinc-500">Invested</div>
-                                            <div className="mt-1 font-mono text-sm font-black text-zinc-100">{formatMoney(item.investedAmount)}</div>
-                                        </div>
-                                        <div className="rounded-2xl bg-black/40 p-3">
-                                            <div className="text-[8px] font-black uppercase tracking-widest text-zinc-500">Payout</div>
-                                            <div className="mt-1 font-mono text-sm font-black text-emerald-300">{formatMoney(item.playerPayout || 0)}</div>
-                                        </div>
-                                    </div>
-                                    <div className="mt-2 grid grid-cols-2 gap-2">
-                                        <div className="rounded-2xl bg-black/40 p-3">
-                                            <div className="text-[8px] font-black uppercase tracking-widest text-zinc-500">Owner</div>
-                                            <div className="mt-1 truncate text-xs font-black text-zinc-100">{item.ownerName || item.producerName}</div>
-                                        </div>
-                                        <div className="rounded-2xl bg-black/40 p-3">
-                                            <div className="text-[8px] font-black uppercase tracking-widest text-zinc-500">Reputation</div>
-                                            <div className={`mt-1 font-mono text-sm font-black ${(item.reputationImpact || 0) >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>
-                                                {(item.reputationImpact || 0) >= 0 ? '+' : ''}{(item.reputationImpact || 0).toFixed(1)}
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="mt-3 text-xs font-semibold leading-relaxed text-zinc-500">
-                                        {item.status === 'FINISHED' || item.status === 'CANCELLED'
-                                            ? item.resultSummary || `Profit ${formatMoney(item.profit || 0)} from producer receipts.`
-                                            : `Expected release: Y${item.releaseYear} W${item.releaseWeek}.`}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
                 {/* RECENT ARCHIVE (Past Projects) */}
                 {pastProjectsSlate.length > 0 && (
                     <div className="pt-2 pb-6">
@@ -994,7 +941,7 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
                 <div className="px-4 pb-8">
                     <div className="mb-3 px-1">
                         <div>
-                            <div className="text-[7px] font-black uppercase tracking-[0.28em] text-amber-300">Studio Control Console</div>
+                            <div className="text-[7px] font-black uppercase tracking-[0.28em] text-amber-300">{tr('services.business.productionDashboard.console.eyebrow')}</div>
                             <h2 className="mt-1 text-lg font-black uppercase tracking-tight text-white">{tr('studio.corporateDivisions')}</h2>
                         </div>
                     </div>
@@ -1005,11 +952,11 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
                         {/* Development Division */}
                         <DivisionCard 
                             title={tr('studio.devLab')}
-                            subtitle="Scripts & IP"
+                            subtitle={tr('services.business.productionDashboard.division.devSubtitle')}
                             icon={<PenTool size={20}/>}
                             accent="BLUE"
                             stats={[
-                                { label: "Scripts", value: studio.studioState?.scripts.length.toString() || "0" }
+                                { label: tr('services.business.productionDashboard.division.scripts'), value: studio.studioState?.scripts.length.toString() || "0" }
                             ]}
                             onClick={() => {
                                 setSubsidiaryLaunch(null);
@@ -1020,11 +967,11 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
                         {/* Production Infrastructure */}
                         <DivisionCard 
                             title={tr('studio.facilities')}
-                            subtitle="Upgrades"
+                            subtitle={tr('services.business.productionDashboard.division.facilitiesSubtitle')}
                             icon={<Building2 size={20}/>}
                             accent="EMERALD"
                             stats={[
-                                { label: "Tier", value: studio.subtype === 'MAJOR_STUDIO' ? 'Major' : 'Indie' }
+                                { label: tr('services.business.productionDashboard.division.tier'), value: getStudioSubtypeLabel(studio.subtype) }
                             ]}
                             onClick={() => setView('OFFICE')}
                         />
@@ -1032,11 +979,11 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
                         {/* Talent Division */}
                         <DivisionCard 
                             title={tr('studio.talent')}
-                            subtitle="Farm System"
+                            subtitle={tr('services.business.productionDashboard.division.talentSubtitle')}
                             icon={<Users size={20}/>}
                             accent="PURPLE"
                             stats={[
-                                { label: "Stars", value: (player.studio?.talentRoster?.length || 0).toString() }
+                                { label: tr('services.business.productionDashboard.division.stars'), value: (player.studio?.talentRoster?.length || 0).toString() }
                             ]}
                             onClick={() => setView('TALENT')}
                         />
@@ -1044,25 +991,25 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
                         {/* Finance Division */}
                         <DivisionCard 
                             title={tr('studio.finance')}
-                            subtitle="P&L & Capital"
+                            subtitle={tr('services.business.productionDashboard.division.financeSubtitle')}
                             icon={<DollarSign size={20}/>}
                             accent="ORANGE"
                             stats={[
-                                { label: "Capital", value: formatMoney(studio.balance) }
+                                { label: tr('services.business.productionDashboard.division.capital'), value: formatMoney(studio.balance) }
                             ]}
                             onClick={() => setView('FINANCE')}
                         />
 
                         <DivisionCard
                             wide
-                            eyebrow="Group Command"
-                            title="Studio Group"
-                            subtitle="Manage Subsidiaries"
+                            eyebrow={tr('services.business.productionDashboard.division.groupEyebrow')}
+                            title={tr('services.business.productionDashboard.division.groupTitle')}
+                            subtitle={tr('services.business.productionDashboard.division.groupSubtitle')}
                             icon={<Landmark size={22}/>}
                             accent="GOLD"
                             stats={[
-                                { label: "Owned Studios", value: studioGroup.subsidiaries.length.toString() },
-                                { label: "Group Value", value: formatMoney(groupValuation) }
+                                { label: tr('services.business.productionDashboard.division.ownedStudios'), value: studioGroup.subsidiaries.length.toString() },
+                                { label: tr('services.business.productionDashboard.division.groupValue'), value: formatMoney(groupValuation) }
                             ]}
                             onClick={() => setView('STUDIO_GROUP')}
                         />
@@ -1094,14 +1041,16 @@ const FinanceModal: React.FC<{
     const [amountStr, setAmountStr] = useState('');
     const [errorMsg, setErrorMsg] = useState('');
     const amount = parseInt(amountStr.replace(/[^\d]/g, ''), 10) || 0;
+    const language = getPlayerLanguage(player);
+    const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
 
     const handleInject = () => {
         if (amount <= 0) {
-            setErrorMsg('Enter a valid amount to inject.');
+            setErrorMsg(tr('services.business.productionFinance.error.invalidInject'));
             return;
         }
         if (amount > player.money) {
-            setErrorMsg('Not enough personal cash to inject that amount.');
+            setErrorMsg(tr('services.business.productionFinance.error.notEnoughPersonalCash'));
             return;
         }
         const updatedStudio = { 
@@ -1115,7 +1064,7 @@ const FinanceModal: React.FC<{
                     year: player.age,
                     amount,
                     type: 'CAPITAL_INJECTION',
-                    label: 'Owner capital injection'
+                    label: tr('services.business.productionFinance.ledger.ownerInjection')
                 }, ...((studio.studioState?.financeLedger || []))].slice(0, 200)
             }
         };
@@ -1131,11 +1080,11 @@ const FinanceModal: React.FC<{
 
     const handleWithdraw = () => {
         if (amount <= 0) {
-            setErrorMsg('Enter a valid amount to withdraw.');
+            setErrorMsg(tr('services.business.productionFinance.error.invalidWithdraw'));
             return;
         }
         if (amount > studio.balance) {
-            setErrorMsg('Studio capital is lower than that withdrawal amount.');
+            setErrorMsg(tr('services.business.productionFinance.error.notEnoughStudioCapital'));
             return;
         }
         const updatedStudio = { 
@@ -1149,7 +1098,7 @@ const FinanceModal: React.FC<{
                     year: player.age,
                     amount: -amount,
                     type: 'CAPITAL_WITHDRAWAL',
-                    label: 'Owner withdrawal'
+                    label: tr('services.business.productionFinance.ledger.ownerWithdrawal')
                 }, ...((studio.studioState?.financeLedger || []))].slice(0, 200)
             }
         };
@@ -1176,30 +1125,30 @@ const FinanceModal: React.FC<{
         <div className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
             <div className="bg-zinc-950 border border-zinc-800 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
                 <div className="p-4 border-b border-zinc-800 flex justify-between items-center bg-zinc-900">
-                    <h3 className="font-bold text-white">Manage Studio Funds</h3>
+                    <h3 className="font-bold text-white">{tr('services.business.productionFinance.modal.title')}</h3>
                     <button onClick={onClose} className="text-zinc-400 hover:text-white"><ArrowLeft size={20} className="rotate-180" /></button>
                 </div>
                 
                 <div className="p-6 space-y-6">
                     <div className="flex justify-between items-center bg-zinc-900 p-4 rounded-xl border border-zinc-800">
                         <div>
-                            <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Personal Cash</div>
+                            <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">{tr('services.business.productionFinance.modal.personalCash')}</div>
                             <div className="text-lg font-mono font-bold text-white">{formatMoney(player.money)}</div>
                         </div>
                         <ArrowLeft size={20} className="text-zinc-600 rotate-180" />
                         <div className="text-right">
-                            <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Studio Capital</div>
+                            <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">{tr('services.business.productionFinance.shared.studioCapital')}</div>
                             <div className="text-lg font-mono font-bold text-emerald-400">{formatMoney(studio.balance)}</div>
                             {(studio.studioState?.productionFund || 0) > 0 && (
                                 <div className="text-[9px] text-emerald-500/70 font-bold uppercase mt-1">
-                                    + {formatMoney(studio.studioState!.productionFund!)} Prod. Fund
+                                    + {formatMoney(studio.studioState!.productionFund!)} {tr('services.business.productionFinance.shared.prodFund')}
                                 </div>
                             )}
                         </div>
                     </div>
 
                     <div>
-                        <label className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-2 block">Amount</label>
+                        <label className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-2 block">{tr('services.business.productionFinance.modal.amount')}</label>
                         <div className="relative">
                             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 font-bold">$</span>
                             <input 
@@ -1215,8 +1164,8 @@ const FinanceModal: React.FC<{
                             />
                         </div>
                         <div className="mt-2 flex items-center justify-between text-[10px] font-bold uppercase tracking-widest">
-                            <span className="text-zinc-500">Available: {formatMoney(player.money)} personal / {formatMoney(studio.balance)} studio</span>
-                            {amount > 0 && <span className="text-zinc-600">Parsed: {formatMoney(amount)}</span>}
+                            <span className="text-zinc-500">{tr('services.business.productionFinance.modal.available', { personal: formatMoney(player.money), studio: formatMoney(studio.balance) })}</span>
+                            {amount > 0 && <span className="text-zinc-600">{tr('services.business.productionFinance.modal.parsed', { amount: formatMoney(amount) })}</span>}
                         </div>
                         {errorMsg && (
                             <div className="mt-3 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs font-medium text-rose-300">
@@ -1231,14 +1180,14 @@ const FinanceModal: React.FC<{
                             disabled={amount <= 0 || amount > studio.balance}
                             className="bg-zinc-800 hover:bg-zinc-700 text-white font-bold py-3 rounded-xl disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
                         >
-                            <ArrowLeft size={16} /> Withdraw
+                            <ArrowLeft size={16} /> {tr('services.business.productionFinance.modal.withdraw')}
                         </button>
                         <button 
                             onClick={handleInject}
                             disabled={amount <= 0 || amount > player.money}
                             className="bg-amber-600 hover:bg-amber-500 text-black font-bold py-3 rounded-xl disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
                         >
-                            Inject <ArrowLeft size={16} className="rotate-180" />
+                            {tr('services.business.productionFinance.modal.inject')} <ArrowLeft size={16} className="rotate-180" />
                         </button>
                     </div>
                 </div>
@@ -1259,6 +1208,7 @@ const StudioFinanceView: React.FC<{
     const [ledgerRange, setLedgerRange] = useState<'12W' | '52W' | 'ALL'>('12W');
     const [visibleLedgerEntries, setVisibleLedgerEntries] = useState(12);
     const language = getPlayerLanguage(player);
+    const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
     const studioActiveReleases = useMemo(() => player.activeReleases.filter(r => r.projectDetails?.studioId === studio.id), [player.activeReleases, studio.id]);
     const studioLibrary = useMemo(() => player.pastProjects.filter(p => p.studioId === studio.id), [player.pastProjects, studio.id]);
     const totalProjectGross = useMemo(() => studioActiveReleases.reduce((sum, r) => sum + (r.totalGross || 0), 0) + studioLibrary.reduce((sum, p) => sum + (p.gross || 0), 0), [studioActiveReleases, studioLibrary]);
@@ -1279,7 +1229,8 @@ const StudioFinanceView: React.FC<{
                 year: project.year || player.age,
                 amount: Math.floor((project.gross || 0) * 0.5) + (project.streamingRevenue || 0) + (project.soundtrackRevenue || 0),
                 type: 'THEATRICAL' as const,
-                label: `${project.name} studio receipts`,
+                label: project.name,
+                projectName: project.name,
                 projectId: project.id
             }))
             .filter(entry => entry.amount !== 0);
@@ -1306,16 +1257,27 @@ const StudioFinanceView: React.FC<{
 
     const getLedgerTypeLabel = (type: string) => {
         switch (type) {
-            case 'THEATRICAL': return 'Theatrical';
-            case 'STREAMING': return 'Streaming';
-            case 'STREAMING_DEAL': return 'Platform Deal';
-            case 'MERCH': return 'Universe';
-            case 'CAPITAL_INJECTION': return 'Injection';
-            case 'CAPITAL_WITHDRAWAL': return 'Withdrawal';
-            case 'PRODUCTION_SPEND': return 'Production';
-            case 'FUNDING_SURPLUS': return 'Surplus';
-            default: return 'Studio';
+            case 'THEATRICAL': return tr('services.business.productionFinance.ledger.type.theatrical');
+            case 'STREAMING': return tr('services.business.productionFinance.ledger.type.streaming');
+            case 'STREAMING_DEAL': return tr('services.business.productionFinance.ledger.type.platformDeal');
+            case 'MERCH': return tr('services.business.productionFinance.ledger.type.universe');
+            case 'CAPITAL_INJECTION': return tr('services.business.productionFinance.ledger.type.injection');
+            case 'CAPITAL_WITHDRAWAL': return tr('services.business.productionFinance.ledger.type.withdrawal');
+            case 'PRODUCTION_SPEND': return tr('services.business.productionFinance.ledger.type.production');
+            case 'FUNDING_SURPLUS': return tr('services.business.productionFinance.ledger.type.surplus');
+            default: return tr('services.business.productionFinance.ledger.type.studio');
         }
+    };
+
+    const getLedgerEntryLabel = (entry: any) => {
+        const legacyOwnerInjectionLabel = ['Owner', 'capital', 'injection'].join(' ');
+        const legacyOwnerWithdrawalLabel = ['Owner', 'withdrawal'].join(' ');
+        if (entry.id?.startsWith('derived_receipt_')) {
+            return tr('services.business.productionFinance.ledger.studioReceipts', { projectName: entry.projectName || entry.label });
+        }
+        if (entry.label === legacyOwnerInjectionLabel) return tr('services.business.productionFinance.ledger.ownerInjection');
+        if (entry.label === legacyOwnerWithdrawalLabel) return tr('services.business.productionFinance.ledger.ownerWithdrawal');
+        return entry.label || tr('services.business.productionFinance.ledger.cashEntry');
     };
 
     const getLedgerTypeTone = (entry: any) => {
@@ -1327,8 +1289,8 @@ const StudioFinanceView: React.FC<{
     const formatLedgerDate = (entry: any) => {
         const year = entry.year || player.age;
         const week = entry.week || 0;
-        if (week > 0) return `Y${year} • W${week}`;
-        return `Y${year} • Archive`;
+        if (week > 0) return tr('services.business.productionFinance.ledger.date.week', { year, week });
+        return tr('services.business.productionFinance.ledger.date.archive', { year });
     };
 
     const formatMoney = (val: number | undefined | null) => {
@@ -1384,20 +1346,20 @@ const StudioFinanceView: React.FC<{
                 <div className="flex items-center justify-between mb-6">
                     <button onClick={onBack} className="bg-black/40 hover:bg-black/60 p-2 rounded-full backdrop-blur-md transition-colors border border-white/5"><ArrowLeft size={18} /></button>
                     <div className="flex gap-2">
-                        <button onClick={() => setShowFinanceModal(true)} className="bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 px-3 py-1.5 rounded-full text-[10px] font-bold border border-amber-500/20 transition-colors">Manage Funds</button>
+                        <button onClick={() => setShowFinanceModal(true)} className="bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 px-3 py-1.5 rounded-full text-[10px] font-bold border border-amber-500/20 transition-colors">{tr('services.business.productionFinance.header.manageFunds')}</button>
                     </div>
                 </div>
                 <div className="flex items-end justify-between">
                     <div>
-                        <h1 className="text-2xl font-black tracking-tight leading-none mb-1">Finance Dept</h1>
-                        <div className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest flex items-center gap-1.5">Corporate Accounting</div>
+                        <h1 className="text-2xl font-black tracking-tight leading-none mb-1">{tr('services.business.productionFinance.header.title')}</h1>
+                        <div className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest flex items-center gap-1.5">{tr('services.business.productionFinance.header.subtitle')}</div>
                     </div>
                     <div className="text-right">
-                        <div className="text-[10px] text-zinc-500 font-bold uppercase mb-0.5">Studio Capital</div>
+                        <div className="text-[10px] text-zinc-500 font-bold uppercase mb-0.5">{tr('services.business.productionFinance.shared.studioCapital')}</div>
                         <div className="font-mono font-bold text-emerald-400 text-lg">{formatMoney(studio.balance)}</div>
                         {(studio.studioState?.productionFund || 0) > 0 && (
                             <div className="text-[9px] text-emerald-500/70 font-bold uppercase mt-1">
-                                + {formatMoney(studio.studioState!.productionFund!)} Prod. Fund
+                                + {formatMoney(studio.studioState!.productionFund!)} {tr('services.business.productionFinance.shared.prodFund')}
                             </div>
                         )}
                     </div>
@@ -1410,51 +1372,51 @@ const StudioFinanceView: React.FC<{
                 {/* P&L Statement */}
                 <div className="bg-zinc-900 border border-zinc-800 rounded-[2rem] overflow-hidden">
                     <div className="bg-zinc-900/50 p-4 border-b border-zinc-800 flex justify-between items-center">
-                        <h3 className="font-bold text-white text-sm uppercase tracking-wide">P&L Statement</h3>
-                        <div className="text-[10px] font-bold bg-zinc-800 px-2 py-1 rounded text-zinc-400">This Week</div>
+                        <h3 className="font-bold text-white text-sm uppercase tracking-wide">{tr('services.business.productionFinance.pnl.title')}</h3>
+                        <div className="text-[10px] font-bold bg-zinc-800 px-2 py-1 rounded text-zinc-400">{tr('services.business.productionFinance.pnl.thisWeek')}</div>
                     </div>
                     <div className="p-6 space-y-4">
                         <div className="flex justify-between items-center">
-                            <div className="text-xs text-zinc-400 font-bold uppercase">Studio Receipts</div>
+                            <div className="text-xs text-zinc-400 font-bold uppercase">{tr('services.business.productionFinance.pnl.studioReceipts')}</div>
                             <div className="font-mono font-bold text-emerald-400">{formatMoney(studio.stats?.weeklyRevenue || 0)}</div>
                         </div>
                         <div className="flex justify-between items-center">
-                            <div className="text-xs text-zinc-400 font-bold uppercase">Operating Costs</div>
+                            <div className="text-xs text-zinc-400 font-bold uppercase">{tr('services.business.productionFinance.pnl.operatingCosts')}</div>
                             <div className="font-mono font-bold text-rose-500">-{formatMoney(studio.stats?.weeklyExpenses || 0)}</div>
                         </div>
                         <div className="h-px bg-zinc-800 w-full"></div>
                         <div className="flex justify-between items-center">
-                            <div className="text-sm text-white font-bold uppercase">Net Profit</div>
+                            <div className="text-sm text-white font-bold uppercase">{tr('services.business.productionFinance.pnl.netProfit')}</div>
                             <div className={`font-mono font-bold text-lg ${(studio.stats?.weeklyProfit || 0) >= 0 ? 'text-emerald-400' : 'text-rose-500'}`}>
                                 {formatMoney(studio.stats?.weeklyProfit || 0)}
                             </div>
                         </div>
                         <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-[11px] text-zinc-300 leading-relaxed">
-                            Project tiles show <span className="text-white font-semibold">project revenue</span>. Detailed studio receipts and cash movement live in the ledger and project detail views.
+                            {tr('services.business.productionFinance.pnl.detailHint')}
                         </div>
                     </div>
                 </div>
 
                 {/* Revenue Breakdown */}
                 <div className="bg-zinc-900 border border-zinc-800 rounded-[2rem] p-6">
-                    <h3 className="font-bold text-white text-sm uppercase tracking-wide mb-4">Revenue Breakdown</h3>
+                    <h3 className="font-bold text-white text-sm uppercase tracking-wide mb-4">{tr('services.business.productionFinance.breakdown.title')}</h3>
                     <div className="grid grid-cols-2 gap-4">
                         <div className="bg-black/40 p-4 rounded-xl border border-zinc-800">
-                            <div className="text-[10px] text-zinc-500 font-bold uppercase mb-1">Project Gross</div>
+                            <div className="text-[10px] text-zinc-500 font-bold uppercase mb-1">{tr('services.business.productionFinance.breakdown.projectGross')}</div>
                             <div className="font-mono font-bold text-white">{formatMoney(totalProjectGross)}</div>
                         </div>
                         <div className="bg-black/40 p-4 rounded-xl border border-zinc-800">
-                            <div className="text-[10px] text-zinc-500 font-bold uppercase mb-1">Streaming Revenue</div>
+                            <div className="text-[10px] text-zinc-500 font-bold uppercase mb-1">{tr('services.business.productionFinance.breakdown.streamingRevenue')}</div>
                             <div className="font-mono font-bold text-emerald-400">{formatMoney(totalStreamingRevenue)}</div>
                         </div>
                         <div className="bg-black/40 p-4 rounded-xl border border-zinc-800">
-                            <div className="text-[10px] text-zinc-500 font-bold uppercase mb-1">Estimated Studio Receipts</div>
+                            <div className="text-[10px] text-zinc-500 font-bold uppercase mb-1">{tr('services.business.productionFinance.breakdown.estimatedReceipts')}</div>
                             <div className="font-mono font-bold text-amber-300">{formatMoney(estimatedStudioReceipts)}</div>
                         </div>
                         <div className="bg-black/40 p-4 rounded-xl border border-zinc-800">
-                            <div className="text-[10px] text-zinc-500 font-bold uppercase mb-1">Library ROI</div>
+                            <div className="text-[10px] text-zinc-500 font-bold uppercase mb-1">{tr('services.business.productionFinance.breakdown.libraryRoi')}</div>
                             <div className={`font-mono font-bold ${totalProductionBudget > 0 && estimatedStudioReceipts >= totalProductionBudget ? 'text-emerald-400' : 'text-zinc-300'}`}>
-                                {totalProductionBudget > 0 ? `${(((estimatedStudioReceipts - totalProductionBudget) / Math.max(1, totalProductionBudget)) * 100).toFixed(0)}%` : 'N/A'}
+                                {totalProductionBudget > 0 ? `${(((estimatedStudioReceipts - totalProductionBudget) / Math.max(1, totalProductionBudget)) * 100).toFixed(0)}%` : tr('services.business.productionFinance.shared.notAvailable')}
                             </div>
                         </div>
                     </div>
@@ -1462,22 +1424,22 @@ const StudioFinanceView: React.FC<{
 
                 {/* Balance Sheet */}
                 <div className="bg-zinc-900 border border-zinc-800 rounded-[2rem] p-6">
-                    <h3 className="font-bold text-white text-sm uppercase tracking-wide mb-4">Balance Sheet</h3>
+                    <h3 className="font-bold text-white text-sm uppercase tracking-wide mb-4">{tr('services.business.productionFinance.balance.title')}</h3>
                     <div className="grid grid-cols-2 gap-4">
                         <div className="bg-black/40 p-4 rounded-xl border border-zinc-800">
-                            <div className="text-[10px] text-zinc-500 font-bold uppercase mb-1">Cash</div>
+                            <div className="text-[10px] text-zinc-500 font-bold uppercase mb-1">{tr('services.business.productionFinance.balance.cash')}</div>
                             <div className="font-mono font-bold text-white">{formatMoney(studio.balance)}</div>
                         </div>
                         <div className="bg-black/40 p-4 rounded-xl border border-zinc-800">
-                            <div className="text-[10px] text-zinc-500 font-bold uppercase mb-1">Total Valuation</div>
+                            <div className="text-[10px] text-zinc-500 font-bold uppercase mb-1">{tr('services.business.productionFinance.balance.totalValuation')}</div>
                             <div className="font-mono font-bold text-white">{formatMoney(studio.stats?.valuation || 0)}</div>
                         </div>
                         <div className="bg-black/40 p-4 rounded-xl border border-zinc-800">
-                            <div className="text-[10px] text-zinc-500 font-bold uppercase mb-1">Production Fund</div>
+                            <div className="text-[10px] text-zinc-500 font-bold uppercase mb-1">{tr('services.business.productionFinance.balance.productionFund')}</div>
                             <div className="font-mono font-bold text-white">{formatMoney(studio.studioState?.productionFund || 0)}</div>
                         </div>
                         <div className="bg-black/40 p-4 rounded-xl border border-zinc-800">
-                            <div className="text-[10px] text-zinc-500 font-bold uppercase mb-1">Lifetime Revenue</div>
+                            <div className="text-[10px] text-zinc-500 font-bold uppercase mb-1">{tr('services.business.productionFinance.balance.lifetimeRevenue')}</div>
                             <div className="font-mono font-bold text-white">{formatMoney(studio.stats?.lifetimeRevenue || 0)}</div>
                         </div>
                     </div>
@@ -1490,15 +1452,15 @@ const StudioFinanceView: React.FC<{
                             <div>
                                 <div className="flex items-center gap-2 mb-1">
                                     <WalletCards size={16} className="text-amber-400" />
-                                    <h3 className="font-bold text-white text-sm uppercase tracking-wide">Studio Passbook</h3>
+                                    <h3 className="font-bold text-white text-sm uppercase tracking-wide">{tr('services.business.productionFinance.passbook.title')}</h3>
                                 </div>
-                                <div className="text-[11px] text-zinc-500">Cash movement by period. Tap through newer and older receipts like a bank ledger.</div>
+                                <div className="text-[11px] text-zinc-500">{tr('services.business.productionFinance.passbook.subtitle')}</div>
                             </div>
                             <div className="flex rounded-full border border-zinc-800 bg-black/30 p-1 shrink-0">
                                 {[
-                                    { id: '12W', label: '3 Mo' },
-                                    { id: '52W', label: '1 Yr' },
-                                    { id: 'ALL', label: 'All' }
+                                    { id: '12W', label: tr('services.business.productionFinance.passbook.range.threeMonths') },
+                                    { id: '52W', label: tr('services.business.productionFinance.passbook.range.oneYear') },
+                                    { id: 'ALL', label: tr('services.business.productionFinance.passbook.range.all') }
                                 ].map(option => (
                                     <button
                                         key={option.id}
@@ -1514,15 +1476,15 @@ const StudioFinanceView: React.FC<{
                         </div>
                         <div className="grid grid-cols-3 gap-3 mt-4">
                             <div className="rounded-2xl border border-zinc-800 bg-black/30 px-4 py-3">
-                                <div className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-1">Money In</div>
+                                <div className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-1">{tr('services.business.productionFinance.passbook.moneyIn')}</div>
                                 <div className="font-mono font-bold text-emerald-400">{formatMoney(ledgerInflows)}</div>
                             </div>
                             <div className="rounded-2xl border border-zinc-800 bg-black/30 px-4 py-3">
-                                <div className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-1">Money Out</div>
+                                <div className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-1">{tr('services.business.productionFinance.passbook.moneyOut')}</div>
                                 <div className="font-mono font-bold text-rose-400">{formatMoney(ledgerOutflows)}</div>
                             </div>
                             <div className="rounded-2xl border border-zinc-800 bg-black/30 px-4 py-3">
-                                <div className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-1">Net Flow</div>
+                                <div className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-1">{tr('services.business.productionFinance.passbook.netFlow')}</div>
                                 <div className={`font-mono font-bold ${ledgerNet >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{ledgerNet >= 0 ? '+' : '-'}{formatMoney(Math.abs(ledgerNet))}</div>
                             </div>
                         </div>
@@ -1539,9 +1501,9 @@ const StudioFinanceView: React.FC<{
                                             </span>
                                             <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">{formatLedgerDate(entry)}</span>
                                         </div>
-                                        <div className="text-sm font-bold text-white leading-tight">{entry.label}</div>
+                                        <div className="text-sm font-bold text-white leading-tight">{getLedgerEntryLabel(entry)}</div>
                                         <div className="mt-1 text-[11px] text-zinc-500">
-                                            {entry.projectId ? `Project Ref • ${entry.projectId}` : 'Studio cash entry'}
+                                            {entry.projectId ? tr('services.business.productionFinance.ledger.projectRef', { projectId: entry.projectId }) : tr('services.business.productionFinance.ledger.cashEntry')}
                                         </div>
                                     </div>
                                     <div className="text-right shrink-0">
@@ -1549,15 +1511,15 @@ const StudioFinanceView: React.FC<{
                                             {entry.amount >= 0 ? '+' : '-'}{formatMoney(Math.abs(entry.amount))}
                                         </div>
                                         <div className="text-[10px] font-bold uppercase tracking-widest text-zinc-600">
-                                            {entry.amount >= 0 ? 'Credit' : 'Debit'}
+                                            {entry.amount >= 0 ? tr('services.business.productionFinance.passbook.credit') : tr('services.business.productionFinance.passbook.debit')}
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         )) : (
                             <div className="rounded-[1.4rem] border border-zinc-800 bg-black/30 px-4 py-6 text-center">
-                                <div className="text-sm font-bold text-zinc-400 mb-1">No ledger entries in this period</div>
-                                <div className="text-[11px] text-zinc-600">Try switching to a wider range to view older studio activity.</div>
+                                <div className="text-sm font-bold text-zinc-400 mb-1">{tr('services.business.productionFinance.passbook.emptyTitle')}</div>
+                                <div className="text-[11px] text-zinc-600">{tr('services.business.productionFinance.passbook.emptySubtext')}</div>
                             </div>
                         )}
                         {visibleLedgerEntries < filteredLedger.length && (
@@ -1565,7 +1527,7 @@ const StudioFinanceView: React.FC<{
                                 onClick={() => setVisibleLedgerEntries(prev => prev + 12)}
                                 className="w-full rounded-[1.2rem] border border-zinc-800 bg-zinc-950/60 px-4 py-3 text-xs font-bold uppercase tracking-widest text-zinc-300 hover:bg-zinc-900 transition-colors"
                             >
-                                Load Older Entries
+                                {tr('services.business.productionFinance.passbook.loadOlder')}
                             </button>
                         )}
                     </div>
@@ -1574,7 +1536,7 @@ const StudioFinanceView: React.FC<{
                 {/* EXIT STRATEGY SECTION */}
                 <div className="bg-red-950/20 border border-red-500/20 rounded-[2rem] p-6 relative overflow-hidden">
                     <div className="relative z-10">
-                        <h3 className="font-bold text-white text-sm uppercase tracking-wide mb-4 flex items-center gap-2"><LogOut size={16} className="text-red-500"/> Exit Strategy</h3>
+                        <h3 className="font-bold text-white text-sm uppercase tracking-wide mb-4 flex items-center gap-2"><LogOut size={16} className="text-red-500"/> {tr('services.business.productionFinance.exit.title')}</h3>
                         <div className="space-y-3">
                             {/* Sell Option */}
                             <button 
@@ -1587,8 +1549,8 @@ const StudioFinanceView: React.FC<{
                                 }`}
                             >
                                 <div className="flex justify-between items-center w-full">
-                                    <div className={`font-bold text-sm ${sellCheck.success ? 'text-emerald-400' : 'text-zinc-500'}`}>Sell Studio</div>
-                                    {sellCheck.success && <div className="text-xs font-mono font-bold text-white">Est. {formatMoney(sellCheck.payout)}</div>}
+                                    <div className={`font-bold text-sm ${sellCheck.success ? 'text-emerald-400' : 'text-zinc-500'}`}>{tr('services.business.productionFinance.exit.sellStudio')}</div>
+                                    {sellCheck.success && <div className="text-xs font-mono font-bold text-white">{tr('services.business.productionFinance.exit.estimated', { amount: formatMoney(sellCheck.payout) })}</div>}
                                 </div>
                                 {!sellCheck.success && <div className="text-[10px] text-zinc-500 font-normal">{sellCheck.msg}</div>}
                             </button>
@@ -1599,10 +1561,10 @@ const StudioFinanceView: React.FC<{
                                 className="w-full p-4 rounded-xl border border-rose-500/30 bg-rose-950/10 hover:bg-rose-950/30 transition-all flex flex-col gap-1 text-left"
                             >
                                 <div className="flex justify-between items-center w-full">
-                                    <div className="font-bold text-sm text-rose-400">Shut Down & Liquidate</div>
-                                    <div className="text-xs font-mono font-bold text-zinc-400">Est. {formatMoney(liquidateCheck.payout)}</div>
+                                    <div className="font-bold text-sm text-rose-400">{tr('services.business.productionFinance.exit.shutDownLiquidate')}</div>
+                                    <div className="text-xs font-mono font-bold text-zinc-400">{tr('services.business.productionFinance.exit.estimated', { amount: formatMoney(liquidateCheck.payout) })}</div>
                                 </div>
-                                <div className="text-[10px] text-zinc-500 font-normal">Close operations. Assets sold for scrap.</div>
+                                <div className="text-[10px] text-zinc-500 font-normal">{tr('services.business.productionFinance.exit.liquidateHelper')}</div>
                             </button>
                         </div>
                     </div>
@@ -1625,28 +1587,30 @@ const StudioFinanceView: React.FC<{
                         <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-500/40">
                              <AlertTriangle size={32} className="text-red-500"/>
                         </div>
-                        <h3 className="text-2xl font-black text-white mb-2 uppercase tracking-tight">{showExitModal === 'SELL' ? 'Sell Studio' : 'Shut Down'}</h3>
+                        <h3 className="text-2xl font-black text-white mb-2 uppercase tracking-tight">
+                            {showExitModal === 'SELL' ? tr('services.business.productionFinance.exit.sellStudio') : tr('services.business.productionFinance.exit.shutDown')}
+                        </h3>
                         <p className="text-sm text-zinc-400 mb-6 leading-relaxed">
                             {showExitModal === 'SELL' 
-                                ? `Are you sure you want to sell ${studio.name}? Studio cash is already included in valuation, and early exits are discounted.`
-                                : `Are you sure you want to shut down? Assets will be liquidated for scrap value. This cannot be undone.`
+                                ? tr('services.business.productionFinance.exit.confirmSell', { studioName: studio.name })
+                                : tr('services.business.productionFinance.exit.confirmLiquidate')
                             }
                         </p>
                         
                         <div className="bg-black/40 p-4 rounded-xl border border-zinc-800 mb-6">
                             <div className="flex justify-between items-center mb-2 text-xs">
-                                <span className="text-zinc-500 font-bold uppercase">Cash Balance</span>
+                                <span className="text-zinc-500 font-bold uppercase">{tr('services.business.productionFinance.exit.cashBalance')}</span>
                                 <span className={studio.balance >= 0 ? 'text-white' : 'text-rose-500'}>{formatMoney(studio.balance)}</span>
                             </div>
                             <div className="flex justify-between items-center mb-2 text-xs">
-                                <span className="text-zinc-500 font-bold uppercase">{showExitModal === 'SELL' ? 'Valuation' : 'Scrap Value'}</span>
+                                <span className="text-zinc-500 font-bold uppercase">{showExitModal === 'SELL' ? tr('services.business.productionFinance.exit.valuation') : tr('services.business.productionFinance.exit.scrapValue')}</span>
                                 <span className="text-white">
                                     {showExitModal === 'SELL' ? formatMoney(studio.stats.valuation) : formatMoney(liquidateCheck.payout - studio.balance)}
                                 </span>
                             </div>
                             <div className="border-t border-zinc-700 my-2"></div>
                             <div className="flex justify-between items-center text-sm font-bold">
-                                <span className="text-white uppercase">Net Payout</span>
+                                <span className="text-white uppercase">{tr('services.business.productionFinance.exit.netPayout')}</span>
                                 <span className={showExitModal === 'SELL' ? 'text-emerald-400' : 'text-zinc-200'}>
                                     {showExitModal === 'SELL' ? formatMoney(sellCheck.payout) : formatMoney(liquidateCheck.payout)}
                                 </span>
@@ -1654,8 +1618,8 @@ const StudioFinanceView: React.FC<{
                         </div>
 
                         <div className="grid grid-cols-2 gap-3">
-                            <button onClick={() => setShowExitModal(null)} className="py-3 bg-zinc-800 text-zinc-300 font-bold rounded-xl hover:bg-zinc-700">Cancel</button>
-                            <button onClick={executeExit} className="py-3 bg-red-600 text-white font-bold rounded-xl hover:bg-red-500 shadow-lg shadow-red-900/20">Confirm</button>
+                            <button onClick={() => setShowExitModal(null)} className="py-3 bg-zinc-800 text-zinc-300 font-bold rounded-xl hover:bg-zinc-700">{tr('services.business.productionFinance.exit.cancel')}</button>
+                            <button onClick={executeExit} className="py-3 bg-red-600 text-white font-bold rounded-xl hover:bg-red-500 shadow-lg shadow-red-900/20">{tr('services.business.productionFinance.exit.confirm')}</button>
                         </div>
                     </div>
                 </div>
@@ -1682,6 +1646,13 @@ const getPosterBg = (title: string = '') => {
 const getCustomPoster = (project: any) => {
     return project.customPoster || project.projectDetails?.customPoster || project.concept?.customPoster;
 };
+
+const hasCustomPosterMedia = (customPoster: any): boolean => (
+    Boolean(
+        (customPoster?.type === 'IMAGE' || customPoster?.type === 'CANVA') &&
+        (customPoster.imageData || customPoster.posterMediaId)
+    )
+);
 
 const getStudioArchiveRevenue = (project: any) => {
     return (project.gross || 0) + (project.streamingRevenue || project.projectDetails?.streamingRevenue || 0) + (project.soundtrackRevenue || 0);
@@ -1870,8 +1841,8 @@ const FilmographyProjectRow: React.FC<{ project: any; language: GameLanguage; on
         >
             <div className="flex gap-3">
                 <div className="relative h-24 w-16 shrink-0 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900 shadow-lg">
-                    {(customPoster?.type === 'IMAGE' || customPoster?.type === 'CANVA') && customPoster.imageData ? (
-                        <img src={customPoster.imageData} alt={project.name} className="h-full w-full object-cover" />
+                    {hasCustomPosterMedia(customPoster) ? (
+                        <CustomPosterImage poster={customPoster} alt={project.name} className="h-full w-full object-cover" />
                     ) : (
                         <div className={`h-full w-full bg-gradient-to-br ${customPoster?.bgGradient || getPosterBg(project.name)} flex items-center justify-center p-1`}>
                             <div className="text-center font-serif text-lg font-black uppercase leading-none tracking-tighter text-white/25 -rotate-6">
@@ -1991,10 +1962,10 @@ const ActiveProjectCard: React.FC<{ project: any, onClick?: () => void, onDelete
             {/* Poster Area (Full Cover) */}
             {(() => {
                 const customPoster = getCustomPoster(project);
-                if ((customPoster?.type === 'IMAGE' || customPoster?.type === 'CANVA') && customPoster.imageData) {
+                if (hasCustomPosterMedia(customPoster)) {
                     return (
                         <div className="absolute inset-0 bg-zinc-900">
-                            <img src={customPoster.imageData} alt={project.name} className="w-full h-full object-cover" />
+                            <CustomPosterImage poster={customPoster} alt={project.name} className="w-full h-full object-cover" />
                         </div>
                     );
                 }
@@ -2059,10 +2030,12 @@ const ActiveProjectCard: React.FC<{ project: any, onClick?: () => void, onDelete
 
 const ArchiveProjectCard: React.FC<{ project: any, isLatestInstallment?: boolean, onClick?: () => void }> = ({ project, isLatestInstallment, onClick }) => {
     const formatMoney = (val: number) => {
-        if (val >= 1_000_000_000_000) return `$${(val/1_000_000_000_000).toFixed(2)}T`;
-        if (val >= 1_000_000_000) return `$${(val/1_000_000_000).toFixed(2)}B`;
-        if (val >= 1_000_000) return `$${(val/1_000_000).toFixed(1)}M`;
-        return `$${(val/1_000).toFixed(0)}k`;
+        const prefix = val < 0 ? '-$' : '$';
+        const abs = Math.abs(val);
+        if (abs >= 1_000_000_000_000) return `${prefix}${(abs/1_000_000_000_000).toFixed(2)}T`;
+        if (abs >= 1_000_000_000) return `${prefix}${(abs/1_000_000_000).toFixed(2)}B`;
+        if (abs >= 1_000_000) return `${prefix}${(abs/1_000_000).toFixed(1)}M`;
+        return `${prefix}${(abs/1_000).toFixed(0)}k`;
     };
 
     const hasAwards = project.awards && project.awards.filter((a: any) => a.outcome === 'WON').length > 0;
@@ -2073,7 +2046,7 @@ const ArchiveProjectCard: React.FC<{ project: any, isLatestInstallment?: boolean
 
     let outcomeLabel = null;
     let outcomeColor = "";
-    const projectRevenue = (project.gross || 0) + (project.streamingRevenue || project.projectDetails?.streamingRevenue || 0) + (project.soundtrackRevenue || 0);
+    const projectRevenue = getStudioArchiveRevenue(project);
     if (projectRevenue > (project.budget || 0) * 5) {
         outcomeLabel = "BLOCKBUSTER";
         outcomeColor = "bg-purple-500 text-white";
@@ -2096,10 +2069,10 @@ const ArchiveProjectCard: React.FC<{ project: any, isLatestInstallment?: boolean
             {/* Poster Area */}
             {(() => {
                 const customPoster = getCustomPoster(project);
-                if ((customPoster?.type === 'IMAGE' || customPoster?.type === 'CANVA') && customPoster.imageData) {
+                if (hasCustomPosterMedia(customPoster)) {
                     return (
                         <div className="absolute inset-0 bg-zinc-900">
-                            <img src={customPoster.imageData} alt={project.name} className="w-full h-full object-cover" />
+                            <CustomPosterImage poster={customPoster} alt={project.name} className="w-full h-full object-cover" />
                         </div>
                     );
                 }

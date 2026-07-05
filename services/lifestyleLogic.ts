@@ -240,14 +240,14 @@ export const CLOTHING_CATALOG: ClothingItem[] = [
 export const WORKSHOP_CATALOG: Commitment[] = [
     // BASIC
     { 
-        id: 'ws_intro_acting', name: 'Intro to Acting', type: 'COURSE', 
+        id: 'ws_intro_acting', nameKey: 'improve.workshop.ws_intro_acting', name: 'Intro to Acting', type: 'COURSE', 
         energyCost: 15, income: 0, weeklyCost: 0, upfrontCost: 400, 
         totalDuration: 4, weeksCompleted: 0,
         skillGains: { discipline: 0.2, memorization: 0.2 },
         payoutType: 'WEEKLY'
     },
     { 
-        id: 'ws_vocal', name: 'Vocal Control', type: 'COURSE', 
+        id: 'ws_vocal', nameKey: 'improve.workshop.ws_vocal', name: 'Vocal Control', type: 'COURSE', 
         energyCost: 15, income: 0, weeklyCost: 0, upfrontCost: 800, 
         totalDuration: 4, weeksCompleted: 0,
         skillGains: { delivery: 0.4, presence: 0.1 },
@@ -255,14 +255,14 @@ export const WORKSHOP_CATALOG: Commitment[] = [
     },
     // INTERMEDIATE
     { 
-        id: 'ws_dialogue', name: 'Scene Study', type: 'COURSE', 
+        id: 'ws_dialogue', nameKey: 'improve.workshop.ws_dialogue', name: 'Scene Study', type: 'COURSE', 
         energyCost: 20, weeklyCost: 0, income: 0, upfrontCost: 1500, 
         totalDuration: 6, weeksCompleted: 0,
         skillGains: { delivery: 0.3, expression: 0.3 },
         payoutType: 'WEEKLY'
     },
     { 
-        id: 'ws_improv_club', name: 'Improv Troupe', type: 'COURSE', 
+        id: 'ws_improv_club', nameKey: 'improve.workshop.ws_improv_club', name: 'Improv Troupe', type: 'COURSE', 
         energyCost: 25, weeklyCost: 0, income: 0, upfrontCost: 1200, 
         totalDuration: 8, weeksCompleted: 0,
         skillGains: { improvisation: 0.5, charisma: 0.2 },
@@ -270,14 +270,14 @@ export const WORKSHOP_CATALOG: Commitment[] = [
     },
     // ADVANCED
     { 
-        id: 'ws_media_training', name: 'Media Training', type: 'COURSE', 
+        id: 'ws_media_training', nameKey: 'improve.workshop.ws_media_training', name: 'Media Training', type: 'COURSE', 
         energyCost: 15, weeklyCost: 0, income: 0, upfrontCost: 2500, 
         totalDuration: 4, weeksCompleted: 0,
         skillGains: { charisma: 0.6, presence: 0.2 },
         payoutType: 'WEEKLY'
     },
     { 
-        id: 'ws_advanced_lab', name: 'Advanced Lab', type: 'COURSE', 
+        id: 'ws_advanced_lab', nameKey: 'improve.workshop.ws_advanced_lab', name: 'Advanced Lab', type: 'COURSE', 
         energyCost: 30, weeklyCost: 0, income: 0, upfrontCost: 4500, 
         totalDuration: 10, weeksCompleted: 0,
         skillGains: { expression: 0.4, improvisation: 0.3, presence: 0.2 },
@@ -285,14 +285,14 @@ export const WORKSHOP_CATALOG: Commitment[] = [
     },
     // MASTER
     { 
-        id: 'ws_masterclass', name: 'Legend Masterclass', type: 'COURSE', 
+        id: 'ws_masterclass', nameKey: 'improve.workshop.ws_masterclass', name: 'Legend Masterclass', type: 'COURSE', 
         energyCost: 20, weeklyCost: 0, income: 0, upfrontCost: 10000, 
         totalDuration: 6, weeksCompleted: 0,
         skillGains: { presence: 0.8, discipline: 0.4 },
         payoutType: 'WEEKLY'
     },
     { 
-        id: 'ws_method_intensive', name: 'The Method', type: 'COURSE', 
+        id: 'ws_method_intensive', nameKey: 'improve.workshop.ws_method_intensive', name: 'The Method', type: 'COURSE', 
         energyCost: 40, weeklyCost: 0, income: 0, upfrontCost: 8000, 
         totalDuration: 12, weeksCompleted: 0,
         skillGains: { expression: 0.8, delivery: 0.3 },
@@ -300,28 +300,28 @@ export const WORKSHOP_CATALOG: Commitment[] = [
     },
     // WRITER WORKSHOPS (NEW)
     { 
-        id: 'ws_creative_writing', name: 'Creative Writing Seminar', type: 'COURSE', 
+        id: 'ws_creative_writing', nameKey: 'improve.workshop.ws_creative_writing', name: 'Creative Writing Seminar', type: 'COURSE', 
         energyCost: 20, weeklyCost: 0, income: 0, upfrontCost: 2000, 
         totalDuration: 6, weeksCompleted: 0,
         writerGains: { creativity: 0.5 },
         payoutType: 'WEEKLY'
     },
     { 
-        id: 'ws_dialogue_masterclass', name: 'Dialogue Masterclass', type: 'COURSE', 
+        id: 'ws_dialogue_masterclass', nameKey: 'improve.workshop.ws_dialogue_masterclass', name: 'Dialogue Masterclass', type: 'COURSE', 
         energyCost: 25, weeklyCost: 0, income: 0, upfrontCost: 3500, 
         totalDuration: 8, weeksCompleted: 0,
         writerGains: { dialogue: 0.6 },
         payoutType: 'WEEKLY'
     },
     { 
-        id: 'ws_story_structure', name: 'Story Structure Workshop', type: 'COURSE', 
+        id: 'ws_story_structure', nameKey: 'improve.workshop.ws_story_structure', name: 'Story Structure Workshop', type: 'COURSE', 
         energyCost: 30, weeklyCost: 0, income: 0, upfrontCost: 5000, 
         totalDuration: 10, weeksCompleted: 0,
         writerGains: { structure: 0.7 },
         payoutType: 'WEEKLY'
     },
     { 
-        id: 'ws_pacing_workshop', name: 'Pacing & Rhythm Workshop', type: 'COURSE', 
+        id: 'ws_pacing_workshop', nameKey: 'improve.workshop.ws_pacing_workshop', name: 'Pacing & Rhythm Workshop', type: 'COURSE', 
         energyCost: 25, weeklyCost: 0, income: 0, upfrontCost: 4000, 
         totalDuration: 8, weeksCompleted: 0,
         writerGains: { pacing: 0.6 },
@@ -329,28 +329,28 @@ export const WORKSHOP_CATALOG: Commitment[] = [
     },
     // DIRECTOR WORKSHOPS (NEW)
     { 
-        id: 'ws_directing_basics', name: 'Directing Basics', type: 'COURSE', 
+        id: 'ws_directing_basics', nameKey: 'improve.workshop.ws_directing_basics', name: 'Directing Basics', type: 'COURSE', 
         energyCost: 20, weeklyCost: 0, income: 0, upfrontCost: 1500, 
         totalDuration: 4, weeksCompleted: 0,
         directorGains: { vision: 0.4, technical: 0.2 },
         payoutType: 'WEEKLY'
     },
     { 
-        id: 'ws_cinematography_lab', name: 'Visual Storytelling', type: 'COURSE', 
+        id: 'ws_cinematography_lab', nameKey: 'improve.workshop.ws_cinematography_lab', name: 'Visual Storytelling', type: 'COURSE', 
         energyCost: 25, weeklyCost: 0, income: 0, upfrontCost: 3000, 
         totalDuration: 6, weeksCompleted: 0,
         directorGains: { style: 0.5, technical: 0.3 },
         payoutType: 'WEEKLY'
     },
     { 
-        id: 'ws_leadership_set', name: 'Set Leadership', type: 'COURSE', 
+        id: 'ws_leadership_set', nameKey: 'improve.workshop.ws_leadership_set', name: 'Set Leadership', type: 'COURSE', 
         energyCost: 30, weeklyCost: 0, income: 0, upfrontCost: 5000, 
         totalDuration: 8, weeksCompleted: 0,
         directorGains: { leadership: 0.6, vision: 0.2 },
         payoutType: 'WEEKLY'
     },
     { 
-        id: 'ws_auteur_masterclass', name: 'Auteur Masterclass', type: 'COURSE', 
+        id: 'ws_auteur_masterclass', nameKey: 'improve.workshop.ws_auteur_masterclass', name: 'Auteur Masterclass', type: 'COURSE', 
         energyCost: 35, weeklyCost: 0, income: 0, upfrontCost: 12000, 
         totalDuration: 12, weeksCompleted: 0,
         directorGains: { vision: 0.8, style: 0.6, leadership: 0.4 },
@@ -358,24 +358,35 @@ export const WORKSHOP_CATALOG: Commitment[] = [
     }
 ];
 
-export const GENRE_TRAINING_CATALOG: { genre: Genre, label: string, desc: string, cost: number, energy: number, gain: number }[] = [
-    { genre: 'ACTION', label: 'Stunt Choreography', desc: 'Learn combat and falls.', cost: 25, energy: 10, gain: 1 },
-    { genre: 'DRAMA', label: 'Method Acting Lab', desc: 'Emotional depth practice.', cost: 25, energy: 10, gain: 1 },
-    { genre: 'COMEDY', label: 'Improv Club', desc: 'Timing and wit.', cost: 25, energy: 10, gain: 1 },
-    { genre: 'ROMANCE', label: 'Screen Chemistry', desc: 'Intimacy coordination.', cost: 25, energy: 10, gain: 1 },
-    { genre: 'THRILLER', label: 'Tension Workshop', desc: 'Pacing and suspense.', cost: 25, energy: 10, gain: 1 },
-    { genre: 'MYSTERY', label: 'Mystery Room', desc: 'Practice clue work, restraint, and reveals.', cost: 25, energy: 10, gain: 1 },
-    { genre: 'HORROR', label: 'Scream Queen 101', desc: 'Fear reactions.', cost: 25, energy: 10, gain: 1 },
-    { genre: 'SCI_FI', label: 'Green Screen Tech', desc: 'Acting with nothing.', cost: 25, energy: 10, gain: 1 },
-    { genre: 'ADVENTURE', label: 'Parkour & Movement', desc: 'Running and jumping.', cost: 25, energy: 10, gain: 1 },
-    { genre: 'SUPERHERO', label: 'Wire Work', desc: 'Flying on cables.', cost: 25, energy: 10, gain: 1 },
-    { genre: 'MUSICAL', label: 'Musical Theatre', desc: 'Sing, move, and sell emotion.', cost: 30, energy: 10, gain: 1 },
-    { genre: 'BIOPIC', label: 'Character Study', desc: 'Research real lives and mannerisms.', cost: 30, energy: 10, gain: 1 },
-    { genre: 'SPORTS', label: 'Athletic Screen Test', desc: 'Train like a believable competitor.', cost: 30, energy: 10, gain: 1 },
-    { genre: 'ANIMATION', label: 'Voice Acting Booth', desc: 'Build animated character energy.', cost: 25, energy: 10, gain: 1 },
-    { genre: 'FANTASY', label: 'Mythic Performance', desc: 'Ground big worlds in real emotion.', cost: 30, energy: 10, gain: 1 },
-    { genre: 'CRIME', label: 'Crime Procedural Lab', desc: 'Study detectives, suspects, and pressure.', cost: 25, energy: 10, gain: 1 },
-    { genre: 'DOCUMENTARY', label: 'Documentary Presence', desc: 'Practice natural, unscripted delivery.', cost: 20, energy: 10, gain: 1 },
+export interface GenreTrainingOption {
+    genre: Genre;
+    labelKey: string;
+    label: string;
+    descriptionKey: string;
+    desc: string;
+    cost: number;
+    energy: number;
+    gain: number;
+}
+
+export const GENRE_TRAINING_CATALOG: GenreTrainingOption[] = [
+    { genre: 'ACTION', labelKey: 'improve.genreTraining.ACTION.name', label: 'Stunt Choreography', descriptionKey: 'improve.genreTraining.ACTION.desc', desc: 'Learn combat and falls.', cost: 25, energy: 10, gain: 1 },
+    { genre: 'DRAMA', labelKey: 'improve.genreTraining.DRAMA.name', label: 'Method Acting Lab', descriptionKey: 'improve.genreTraining.DRAMA.desc', desc: 'Emotional depth practice.', cost: 25, energy: 10, gain: 1 },
+    { genre: 'COMEDY', labelKey: 'improve.genreTraining.COMEDY.name', label: 'Improv Club', descriptionKey: 'improve.genreTraining.COMEDY.desc', desc: 'Timing and wit.', cost: 25, energy: 10, gain: 1 },
+    { genre: 'ROMANCE', labelKey: 'improve.genreTraining.ROMANCE.name', label: 'Screen Chemistry', descriptionKey: 'improve.genreTraining.ROMANCE.desc', desc: 'Intimacy coordination.', cost: 25, energy: 10, gain: 1 },
+    { genre: 'THRILLER', labelKey: 'improve.genreTraining.THRILLER.name', label: 'Tension Workshop', descriptionKey: 'improve.genreTraining.THRILLER.desc', desc: 'Pacing and suspense.', cost: 25, energy: 10, gain: 1 },
+    { genre: 'MYSTERY', labelKey: 'improve.genreTraining.MYSTERY.name', label: 'Mystery Room', descriptionKey: 'improve.genreTraining.MYSTERY.desc', desc: 'Practice clue work, restraint, and reveals.', cost: 25, energy: 10, gain: 1 },
+    { genre: 'HORROR', labelKey: 'improve.genreTraining.HORROR.name', label: 'Scream Queen 101', descriptionKey: 'improve.genreTraining.HORROR.desc', desc: 'Fear reactions.', cost: 25, energy: 10, gain: 1 },
+    { genre: 'SCI_FI', labelKey: 'improve.genreTraining.SCI_FI.name', label: 'Green Screen Tech', descriptionKey: 'improve.genreTraining.SCI_FI.desc', desc: 'Acting with nothing.', cost: 25, energy: 10, gain: 1 },
+    { genre: 'ADVENTURE', labelKey: 'improve.genreTraining.ADVENTURE.name', label: 'Parkour & Movement', descriptionKey: 'improve.genreTraining.ADVENTURE.desc', desc: 'Running and jumping.', cost: 25, energy: 10, gain: 1 },
+    { genre: 'SUPERHERO', labelKey: 'improve.genreTraining.SUPERHERO.name', label: 'Wire Work', descriptionKey: 'improve.genreTraining.SUPERHERO.desc', desc: 'Flying on cables.', cost: 25, energy: 10, gain: 1 },
+    { genre: 'MUSICAL', labelKey: 'improve.genreTraining.MUSICAL.name', label: 'Musical Theatre', descriptionKey: 'improve.genreTraining.MUSICAL.desc', desc: 'Sing, move, and sell emotion.', cost: 30, energy: 10, gain: 1 },
+    { genre: 'BIOPIC', labelKey: 'improve.genreTraining.BIOPIC.name', label: 'Character Study', descriptionKey: 'improve.genreTraining.BIOPIC.desc', desc: 'Research real lives and mannerisms.', cost: 30, energy: 10, gain: 1 },
+    { genre: 'SPORTS', labelKey: 'improve.genreTraining.SPORTS.name', label: 'Athletic Screen Test', descriptionKey: 'improve.genreTraining.SPORTS.desc', desc: 'Train like a believable competitor.', cost: 30, energy: 10, gain: 1 },
+    { genre: 'ANIMATION', labelKey: 'improve.genreTraining.ANIMATION.name', label: 'Voice Acting Booth', descriptionKey: 'improve.genreTraining.ANIMATION.desc', desc: 'Build animated character energy.', cost: 25, energy: 10, gain: 1 },
+    { genre: 'FANTASY', labelKey: 'improve.genreTraining.FANTASY.name', label: 'Mythic Performance', descriptionKey: 'improve.genreTraining.FANTASY.desc', desc: 'Ground big worlds in real emotion.', cost: 30, energy: 10, gain: 1 },
+    { genre: 'CRIME', labelKey: 'improve.genreTraining.CRIME.name', label: 'Crime Procedural Lab', descriptionKey: 'improve.genreTraining.CRIME.desc', desc: 'Study detectives, suspects, and pressure.', cost: 25, energy: 10, gain: 1 },
+    { genre: 'DOCUMENTARY', labelKey: 'improve.genreTraining.DOCUMENTARY.name', label: 'Documentary Presence', descriptionKey: 'improve.genreTraining.DOCUMENTARY.desc', desc: 'Practice natural, unscripted delivery.', cost: 20, energy: 10, gain: 1 },
 ];
 
 export type ImproveCategory = 'BODY' | 'HEALTH' | 'LOOKS' | 'MOOD';
@@ -384,128 +395,162 @@ export const IMPROVEMENT_CATALOG: Record<ImproveCategory, ImprovementActivity[]>
     BODY: [
         {
             id: 'act_gym_local',
+            nameKey: 'improve.activity.act_gym_local.name',
             name: 'Local Gym',
+            descriptionKey: 'improve.activity.act_gym_local.desc',
             description: 'Basic equipment, no frills.',
             options: [
-                { id: 'opt_cardio', label: 'Cardio Session', energyCost: 15, moneyCost: 15, gains: { body: 0.5, health: 0.2 }, risk: 5, description: 'Treadmill and bikes.' },
-                { id: 'opt_weights', label: 'Weight Training', energyCost: 25, moneyCost: 15, gains: { body: 0.8 }, risk: 10, description: 'Free weights and machines.' },
+                { id: 'opt_cardio', nameKey: 'improve.option.opt_cardio.name', label: 'Cardio Session', energyCost: 15, moneyCost: 15, gains: { body: 0.5, health: 0.2 }, risk: 5, descriptionKey: 'improve.option.opt_cardio.desc', description: 'Treadmill and bikes.' },
+                { id: 'opt_weights', nameKey: 'improve.option.opt_weights.name', label: 'Weight Training', energyCost: 25, moneyCost: 15, gains: { body: 0.8 }, risk: 10, descriptionKey: 'improve.option.opt_weights.desc', description: 'Free weights and machines.' },
             ]
         },
         {
             id: 'act_gym_crossfit',
+            nameKey: 'improve.activity.act_gym_crossfit.name',
             name: 'CrossFit Box',
+            descriptionKey: 'improve.activity.act_gym_crossfit.desc',
             description: 'High intensity, high community.',
             options: [
-                { id: 'opt_wod', label: 'WOD (Workout of Day)', energyCost: 35, moneyCost: 30, gains: { body: 1.2, health: 0.3 }, risk: 20, description: 'Grueling circuit training.' },
+                { id: 'opt_wod', nameKey: 'improve.option.opt_wod.name', label: 'WOD (Workout of Day)', energyCost: 35, moneyCost: 30, gains: { body: 1.2, health: 0.3 }, risk: 20, descriptionKey: 'improve.option.opt_wod.desc', description: 'Grueling circuit training.' },
             ]
         },
         {
             id: 'act_outdoor',
+            nameKey: 'improve.activity.act_outdoor.name',
             name: 'Outdoors',
+            descriptionKey: 'improve.activity.act_outdoor.desc',
             description: 'Fresh air and movement.',
             options: [
-                { id: 'opt_jog', label: 'Morning Jog', energyCost: 10, moneyCost: 0, gains: { body: 0.3, health: 0.1, happiness: 0.2 }, risk: 2, description: 'A run around the block.' },
-                { id: 'opt_hike', label: 'Runyon Canyon Hike', energyCost: 20, moneyCost: 5, gains: { body: 0.6, happiness: 0.5 }, risk: 5, description: 'See and be seen.' },
+                { id: 'opt_jog', nameKey: 'improve.option.opt_jog.name', label: 'Morning Jog', energyCost: 10, moneyCost: 0, gains: { body: 0.3, health: 0.1, happiness: 0.2 }, risk: 2, descriptionKey: 'improve.option.opt_jog.desc', description: 'A run around the block.' },
+                { id: 'opt_hike', nameKey: 'improve.option.opt_hike.name', label: 'Runyon Canyon Hike', energyCost: 20, moneyCost: 5, gains: { body: 0.6, happiness: 0.5 }, risk: 5, descriptionKey: 'improve.option.opt_hike.desc', description: 'See and be seen.' },
             ]
         }
     ],
     HEALTH: [
         {
             id: 'act_medical',
+            nameKey: 'improve.activity.act_medical.name',
             name: 'Medical Center',
+            descriptionKey: 'improve.activity.act_medical.desc',
             description: 'Professional healthcare.',
             options: [
-                { id: 'opt_checkup', label: 'General Checkup', energyCost: 10, moneyCost: 150, gains: { health: 2.0 }, risk: 0, description: 'Routine physical.' },
-                { id: 'opt_physio', label: 'Physiotherapy', energyCost: 15, moneyCost: 200, gains: { health: 1.5, body: 0.2 }, risk: 0, description: 'Treat aches and pains.' },
+                { id: 'opt_checkup', nameKey: 'improve.option.opt_checkup.name', label: 'General Checkup', energyCost: 10, moneyCost: 150, gains: { health: 2.0 }, risk: 0, descriptionKey: 'improve.option.opt_checkup.desc', description: 'Routine physical.' },
+                { id: 'opt_physio', nameKey: 'improve.option.opt_physio.name', label: 'Physiotherapy', energyCost: 15, moneyCost: 200, gains: { health: 1.5, body: 0.2 }, risk: 0, descriptionKey: 'improve.option.opt_physio.desc', description: 'Treat aches and pains.' },
             ]
         },
         {
             id: 'act_recovery',
+            nameKey: 'improve.activity.act_recovery.name',
             name: 'Recovery Spa',
+            descriptionKey: 'improve.activity.act_recovery.desc',
             description: 'Rest and recuperation.',
             options: [
-                { id: 'opt_massage', label: 'Deep Tissue Massage', energyCost: 5, moneyCost: 120, gains: { health: 0.8, happiness: 0.5 }, risk: 0, description: 'Relieve muscle tension.' },
-                { id: 'opt_icebath', label: 'Ice Bath', energyCost: 15, moneyCost: 40, gains: { health: 1.0, discipline: 0.2 }, risk: 5, description: 'Brutal but effective.' },
+                { id: 'opt_massage', nameKey: 'improve.option.opt_massage.name', label: 'Deep Tissue Massage', energyCost: 5, moneyCost: 120, gains: { health: 0.8, happiness: 0.5 }, risk: 0, descriptionKey: 'improve.option.opt_massage.desc', description: 'Relieve muscle tension.' },
+                { id: 'opt_icebath', nameKey: 'improve.option.opt_icebath.name', label: 'Ice Bath', energyCost: 15, moneyCost: 40, gains: { health: 1.0, discipline: 0.2 }, risk: 5, descriptionKey: 'improve.option.opt_icebath.desc', description: 'Brutal but effective.' },
             ]
         }
     ],
     LOOKS: [
         {
             id: 'act_salon',
+            nameKey: 'improve.activity.act_salon.name',
             name: 'Salon & Grooming',
+            descriptionKey: 'improve.activity.act_salon.desc',
             description: 'Hair, skin, and nails.',
             options: [
-                { id: 'opt_haircut', label: 'Fresh Haircut', energyCost: 10, moneyCost: 80, gains: { looks: 1.0, happiness: 0.5 }, risk: 5, description: 'New style.' },
-                { id: 'opt_facial', label: 'Facial Treatment', energyCost: 5, moneyCost: 150, gains: { looks: 1.5 }, risk: 0, description: 'Deep cleansing.' },
+                { id: 'opt_haircut', nameKey: 'improve.option.opt_haircut.name', label: 'Fresh Haircut', energyCost: 10, moneyCost: 80, gains: { looks: 1.0, happiness: 0.5 }, risk: 5, descriptionKey: 'improve.option.opt_haircut.desc', description: 'New style.' },
+                { id: 'opt_facial', nameKey: 'improve.option.opt_facial.name', label: 'Facial Treatment', energyCost: 5, moneyCost: 150, gains: { looks: 1.5 }, risk: 0, descriptionKey: 'improve.option.opt_facial.desc', description: 'Deep cleansing.' },
             ]
         },
         {
             id: 'act_stylist',
+            nameKey: 'improve.activity.act_stylist.name',
             name: 'Image Consulting',
+            descriptionKey: 'improve.activity.act_stylist.desc',
             description: 'Professional styling.',
             options: [
-                { id: 'opt_wardrobe', label: 'Wardrobe Consult', energyCost: 20, moneyCost: 300, gains: { looks: 0.5, reputation: 0.5 }, risk: 10, description: 'Update your style.' },
+                { id: 'opt_wardrobe', nameKey: 'improve.option.opt_wardrobe.name', label: 'Wardrobe Consult', energyCost: 20, moneyCost: 300, gains: { looks: 0.5, reputation: 0.5 }, risk: 10, descriptionKey: 'improve.option.opt_wardrobe.desc', description: 'Update your style.' },
             ]
         }
     ],
     MOOD: [
         {
             id: 'act_leisure',
+            nameKey: 'improve.activity.act_leisure.name',
             name: 'Leisure Time',
+            descriptionKey: 'improve.activity.act_leisure.desc',
             description: 'Relax and unwind.',
             options: [
-                { id: 'opt_meditate', label: 'Meditation', energyCost: 5, moneyCost: 0, gains: { happiness: 1.0, discipline: 0.1 }, risk: 0, description: 'Find your center.' },
-                { id: 'opt_gaming', label: 'Video Games', energyCost: 10, moneyCost: 0, gains: { happiness: 1.5 }, risk: 5, description: 'Escape reality.' },
-                { id: 'opt_nightout', label: 'Night Out', energyCost: 30, moneyCost: 200, gains: { happiness: 3.0, reputation: 0.2 }, risk: 25, description: 'Party in the city.' },
+                { id: 'opt_meditate', nameKey: 'improve.option.opt_meditate.name', label: 'Meditation', energyCost: 5, moneyCost: 0, gains: { happiness: 1.0, discipline: 0.1 }, risk: 0, descriptionKey: 'improve.option.opt_meditate.desc', description: 'Find your center.' },
+                { id: 'opt_gaming', nameKey: 'improve.option.opt_gaming.name', label: 'Video Games', energyCost: 10, moneyCost: 0, gains: { happiness: 1.5 }, risk: 5, descriptionKey: 'improve.option.opt_gaming.desc', description: 'Escape reality.' },
+                { id: 'opt_nightout', nameKey: 'improve.option.opt_nightout.name', label: 'Night Out', energyCost: 30, moneyCost: 200, gains: { happiness: 3.0, reputation: 0.2 }, risk: 25, descriptionKey: 'improve.option.opt_nightout.desc', description: 'Party in the city.' },
             ]
         },
         {
             id: 'act_therapy',
+            nameKey: 'improve.activity.act_therapy.name',
             name: 'Therapy',
+            descriptionKey: 'improve.activity.act_therapy.desc',
             description: 'Mental health maintenance.',
             options: [
-                { id: 'opt_counseling', label: 'Counseling Session', energyCost: 10, moneyCost: 150, gains: { happiness: 2.0, health: 0.5 }, risk: 0, description: 'Talk it out.' },
+                { id: 'opt_counseling', nameKey: 'improve.option.opt_counseling.name', label: 'Counseling Session', energyCost: 10, moneyCost: 150, gains: { happiness: 2.0, health: 0.5 }, risk: 0, descriptionKey: 'improve.option.opt_counseling.desc', description: 'Talk it out.' },
             ]
         }
     ]
 };
 
 export interface BusinessStartupOption {
+    id: string;
     type: BusinessType;
+    nameKey: string;
     name: string;
+    descriptionKey: string;
     description: string;
     startupCost: number;
     weeklyExpense: number;
     riskLevel: 'Low' | 'Medium' | 'High';
+    riskLevelKey: string;
     energyDrain: number;
 }
 
 export const BUSINESS_CATALOG: BusinessStartupOption[] = [
     {
+        id: 'startup_local_cafe',
         type: 'CAFE',
+        nameKey: 'services.lifestyle.businessStartup.startup_local_cafe.name',
         name: 'Local Café',
+        descriptionKey: 'services.lifestyle.businessStartup.startup_local_cafe.description',
         description: 'A cozy spot for coffee lovers. Low risk, slow growth.',
         startupCost: 20000,
         weeklyExpense: 500,
         riskLevel: 'Low',
+        riskLevelKey: 'services.lifestyle.businessStartup.risk.low',
         energyDrain: 15,
     },
     {
+        id: 'startup_online_brand',
         type: 'MERCH',
+        nameKey: 'services.lifestyle.businessStartup.startup_online_brand.name',
         name: 'Online Brand',
+        descriptionKey: 'services.lifestyle.businessStartup.startup_online_brand.description',
         description: 'Sell merch to your followers. Scalable but volatile.',
         startupCost: 5000,
         weeklyExpense: 100,
         riskLevel: 'Medium',
+        riskLevelKey: 'services.lifestyle.businessStartup.risk.medium',
         energyDrain: 10,
     },
     {
+        id: 'startup_indie_production_house',
         type: 'MERCH',
+        nameKey: 'services.lifestyle.businessStartup.startup_indie_production_house.name',
         name: 'Indie Production House',
+        descriptionKey: 'services.lifestyle.businessStartup.startup_indie_production_house.description',
         description: 'Create your own content. High risk, high reward. (Fame > 30 Locked)',
         startupCost: 100000,
         weeklyExpense: 2000,
         riskLevel: 'High',
+        riskLevelKey: 'services.lifestyle.businessStartup.risk.high',
         energyDrain: 25,
     }
 ];

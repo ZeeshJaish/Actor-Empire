@@ -1,6 +1,7 @@
-import { FamilyObligation, Gender, NewsItem, Player, PregnancyCarrier, Relationship } from '../types';
+import { FamilyObligation, GameLanguage, Gender, NewsItem, Player, PregnancyCarrier, Relationship } from '../types';
 import { getAbsoluteWeek, getRelationshipAge } from './legacyLogic';
 import { getGenderedAvatar } from './npcLogic';
+import { getPlayerLanguage, t } from './i18n';
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 const sample = <T,>(items: T[]): T => items[Math.floor(Math.random() * items.length)];
@@ -16,30 +17,33 @@ export const getPregnancyCarrier = (
 
 export const getPregnancyFeedbackCopy = (
     carrier: PregnancyCarrier,
-    partnerName: string
+    partnerName: string,
+    languageOrPlayer: GameLanguage | Player = 'en'
 ) => {
-    const firstName = (partnerName || 'Your partner').split(' ')[0];
+    const language = typeof languageOrPlayer === 'string' ? languageOrPlayer : getPlayerLanguage(languageOrPlayer);
+    const fallbackPartner = t(language, 'services.family.pregnancy.partnerFallback');
+    const firstName = (partnerName || fallbackPartner).split(' ')[0];
     if (carrier === 'PLAYER') {
         return {
-            title: 'Pregnancy Confirmed',
-            body: "You're pregnant. The baby is due in about 9 months, and naming will happen when the baby is born.",
-            log: 'You are pregnant. Due in about 9 months.',
-            toast: "You're pregnant. Naming comes when the baby is born.",
+            title: t(language, 'services.family.pregnancy.confirmed.title'),
+            body: t(language, 'services.family.pregnancy.player.body'),
+            log: t(language, 'services.family.pregnancy.player.log'),
+            toast: t(language, 'services.family.pregnancy.player.toast'),
         };
     }
     if (carrier === 'PARTNER') {
         return {
-            title: 'Pregnancy Confirmed',
-            body: `${firstName} is pregnant. The baby is due in about 9 months, and naming will happen when the baby is born.`,
-            log: `${partnerName} is pregnant. Due in about 9 months.`,
-            toast: `${partnerName} is pregnant. Naming comes when the baby is born.`,
+            title: t(language, 'services.family.pregnancy.confirmed.title'),
+            body: t(language, 'services.family.pregnancy.partner.body', { firstName }),
+            log: t(language, 'services.family.pregnancy.partner.log', { partnerName: partnerName || fallbackPartner }),
+            toast: t(language, 'services.family.pregnancy.partner.toast', { partnerName: partnerName || fallbackPartner }),
         };
     }
     return {
-        title: 'Intimacy Locked',
-        body: `You and ${firstName} had a great time together, but biologically this intimacy cannot lead to pregnancy.`,
-        log: `You and ${partnerName} had a great time together, but pregnancy is not possible from this intimacy.`,
-        toast: `You and ${firstName} had a great time. Pregnancy is not biologically possible here.`,
+        title: t(language, 'services.family.pregnancy.none.title'),
+        body: t(language, 'services.family.pregnancy.none.body', { firstName }),
+        log: t(language, 'services.family.pregnancy.none.log', { partnerName: partnerName || fallbackPartner }),
+        toast: t(language, 'services.family.pregnancy.none.toast', { firstName }),
     };
 };
 

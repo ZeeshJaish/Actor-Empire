@@ -1,6 +1,7 @@
 import type { Business, LifeEvent, LifeEventImpactResult, NewsItem, Player, ScheduledEvent, XPost } from '../types';
 import { queueAcquisitionPressureEvent } from './acquisitionEventCadence';
 import { getAcquisitionDebtSummary } from './acquisitionDebt';
+import { getPlayerLanguage, t } from './i18n';
 
 export interface WorldReactionState {
     lastProcessedWeek: number;
@@ -94,27 +95,31 @@ export const getWorldReactionState = (player: Player): WorldReactionState => {
     };
 };
 
-const makeReactionNews = (player: Player, state: WorldReactionState): NewsItem => ({
+const makeReactionNews = (player: Player, state: WorldReactionState, language = getPlayerLanguage(player)): NewsItem => ({
     id: `news_world_reaction_${player.age}_${player.currentWeek}`,
     headline: state.antiMonopolyPressure >= 60
-        ? `${player.name}'s empire draws industry scrutiny`
-        : `${player.name}'s studio consolidation becomes a market story`,
-    subtext: `${state.controlledStudioCount} controlled studios, ${state.controlledMajorStudioCount} major labels, and ${state.acquisitionDebtPressure}% debt pressure are reshaping investor confidence and rival behavior.`,
+        ? t(language, 'services.worldReactions.news.scrutiny.headline', { player: player.name })
+        : t(language, 'services.worldReactions.news.marketStory.headline', { player: player.name }),
+    subtext: t(language, 'services.worldReactions.news.subtext', {
+        controlledStudios: state.controlledStudioCount,
+        majorStudios: state.controlledMajorStudioCount,
+        debtPressure: state.acquisitionDebtPressure
+    }),
     category: 'INDUSTRY',
     week: player.currentWeek,
     year: player.age,
     impactLevel: state.antiMonopolyPressure >= 60 ? 'HIGH' : 'MEDIUM',
 });
 
-const makeFanReaction = (player: Player, state: WorldReactionState): XPost => ({
+const makeFanReaction = (player: Player, state: WorldReactionState, language = getPlayerLanguage(player)): XPost => ({
     id: `x_world_reaction_${player.age}_${player.currentWeek}`,
     authorId: 'industry_audience',
-    authorName: 'Audience Pulse',
+    authorName: t(language, 'services.worldReactions.social.audiencePulse.name'),
     authorHandle: '@audiencepulse',
     authorAvatar: '📣',
     content: state.antiMonopolyPressure >= 60
-        ? `${player.name} has too much power in Hollywood now. Great for big swings, scary for everyone else.`
-        : `${player.name}'s studio empire is becoming impossible to ignore. Fans are watching the next move.`,
+        ? t(language, 'services.worldReactions.social.scrutiny.content', { player: player.name })
+        : t(language, 'services.worldReactions.social.marketStory.content', { player: player.name }),
     timestamp: Date.now(),
     likes: 3_000 + (state.antiMonopolyPressure * 120),
     retweets: 500 + (state.rivalRetaliationRisk * 18),
@@ -165,11 +170,14 @@ const makeImpact = (
     type: WorldReactionEventType,
     mode: 'SAFE' | 'AGGRESSIVE' | 'GOLDEN',
 ): ((player: Player) => LifeEventImpactResult) => (player: Player) => {
+    const language = getPlayerLanguage(player);
     const state = (player.flags?.worldReactionState || getWorldReactionState(player)) as WorldReactionState;
     let updatedPlayer = player;
-    let log = 'World Reaction handled.';
+    let log = t(language, 'life.event.world.log.default');
     let logKey = 'life.event.world.log.default';
     const effects = [];
+    const effectLabel = (key: string) => t(language, key);
+    const safestPathValue = t(language, 'life.effect.value.safestPath');
 
     if (type === 'ANTI_MONOPOLY_PRESSURE') {
         if (mode === 'SAFE') {
@@ -179,10 +187,10 @@ const makeImpact = (
                 money: player.money - cost,
                 stats: { ...player.stats, reputation: clamp((player.stats.reputation || 0) + 1) },
             }, { antiMonopolyPressure: state.antiMonopolyPressure - 8 });
-            log = `World Reaction: You cooperated with regulators and lowered scrutiny.`;
             logKey = 'life.event.world.log.antitrust.safe';
-            effects.push({ label: 'Scrutiny', labelKey: 'life.effect.scrutiny', value: '-8', tone: 'positive' as const });
-            effects.push({ label: 'Legal spend', labelKey: 'life.effect.legalSpend', value: `$${cost.toLocaleString()}`, tone: 'negative' as const });
+            log = t(language, logKey);
+            effects.push({ label: effectLabel('life.effect.scrutiny'), labelKey: 'life.effect.scrutiny', value: '-8', tone: 'positive' as const });
+            effects.push({ label: effectLabel('life.effect.legalSpend'), labelKey: 'life.effect.legalSpend', value: `$${cost.toLocaleString()}`, tone: 'negative' as const });
         } else if (mode === 'AGGRESSIVE') {
             updatedPlayer = updateWorldReactionPressure({
                 ...player,
@@ -192,10 +200,10 @@ const makeImpact = (
                     reputation: clamp((player.stats.reputation || 0) - 3),
                 },
             }, { antiMonopolyPressure: state.antiMonopolyPressure + 6, rivalRetaliationRisk: state.rivalRetaliationRisk + 4 });
-            log = `World Reaction: You fought the scrutiny in public. The noise got louder.`;
             logKey = 'life.event.world.log.antitrust.aggressive';
-            effects.push({ label: 'Fame', labelKey: 'life.effect.fame', value: '+2', tone: 'positive' as const });
-            effects.push({ label: 'Scrutiny', labelKey: 'life.effect.scrutiny', value: '+6', tone: 'negative' as const });
+            log = t(language, logKey);
+            effects.push({ label: effectLabel('life.effect.fame'), labelKey: 'life.effect.fame', value: '+2', tone: 'positive' as const });
+            effects.push({ label: effectLabel('life.effect.scrutiny'), labelKey: 'life.effect.scrutiny', value: '+6', tone: 'negative' as const });
         } else {
             const cost = Math.min(player.money, 30_000_000);
             updatedPlayer = updateWorldReactionPressure({
@@ -203,57 +211,57 @@ const makeImpact = (
                 money: player.money - cost,
                 stats: { ...player.stats, reputation: clamp((player.stats.reputation || 0) + 3) },
             }, { antiMonopolyPressure: state.antiMonopolyPressure - 16, rivalRetaliationRisk: state.rivalRetaliationRisk - 6 });
-            log = `World Reaction: Advisors built a clean compliance firewall. Pressure cooled fast.`;
             logKey = 'life.event.world.log.antitrust.golden';
-            effects.push({ label: 'Scrutiny', labelKey: 'life.effect.scrutiny', value: '-16', tone: 'positive' as const });
-            effects.push({ label: 'Reward Ad', labelKey: 'life.effect.rewardAd', value: 'Safest path', tone: 'positive' as const });
+            log = t(language, logKey);
+            effects.push({ label: effectLabel('life.effect.scrutiny'), labelKey: 'life.effect.scrutiny', value: '-16', tone: 'positive' as const });
+            effects.push({ label: effectLabel('life.effect.rewardAd'), labelKey: 'life.effect.rewardAd', value: safestPathValue, tone: 'positive' as const });
         }
     } else if (type === 'RIVAL_RETALIATION') {
         if (mode === 'SAFE') {
             const cost = Math.min(player.money, 10_000_000);
             updatedPlayer = updateWorldReactionPressure({ ...player, money: player.money - cost }, { rivalRetaliationRisk: state.rivalRetaliationRisk - 8 });
-            log = `World Reaction: You cooled rival retaliation with quiet dealmaking.`;
             logKey = 'life.event.world.log.rival.safe';
-            effects.push({ label: 'Rival Risk', labelKey: 'life.effect.rivalRisk', value: '-8', tone: 'positive' as const });
+            log = t(language, logKey);
+            effects.push({ label: effectLabel('life.effect.rivalRisk'), labelKey: 'life.effect.rivalRisk', value: '-8', tone: 'positive' as const });
         } else if (mode === 'AGGRESSIVE') {
             updatedPlayer = updateWorldReactionPressure({
                 ...player,
                 heat: clamp((player.heat || 0) + 4),
                 stats: { ...player.stats, fame: clamp((player.stats.fame || 0) + 1) },
             }, { rivalRetaliationRisk: state.rivalRetaliationRisk + 8, antiMonopolyPressure: state.antiMonopolyPressure + 3 });
-            log = `World Reaction: You answered rivals with a show of force. The industry noticed.`;
             logKey = 'life.event.world.log.rival.aggressive';
-            effects.push({ label: 'Heat', labelKey: 'life.effect.heat', value: '+4', tone: 'negative' as const });
-            effects.push({ label: 'Fame', labelKey: 'life.effect.fame', value: '+1', tone: 'positive' as const });
+            log = t(language, logKey);
+            effects.push({ label: effectLabel('life.effect.heat'), labelKey: 'life.effect.heat', value: '+4', tone: 'negative' as const });
+            effects.push({ label: effectLabel('life.effect.fame'), labelKey: 'life.effect.fame', value: '+1', tone: 'positive' as const });
         } else {
             const cost = Math.min(player.money, 22_000_000);
             updatedPlayer = updateWorldReactionPressure({ ...player, money: player.money - cost }, { rivalRetaliationRisk: state.rivalRetaliationRisk - 16, antiMonopolyPressure: state.antiMonopolyPressure - 4 });
-            log = `World Reaction: Advisors neutralized the rival pressure before it became a public fight.`;
             logKey = 'life.event.world.log.rival.golden';
-            effects.push({ label: 'Rival Risk', labelKey: 'life.effect.rivalRisk', value: '-16', tone: 'positive' as const });
-            effects.push({ label: 'Reward Ad', labelKey: 'life.effect.rewardAd', value: 'Safest path', tone: 'positive' as const });
+            log = t(language, logKey);
+            effects.push({ label: effectLabel('life.effect.rivalRisk'), labelKey: 'life.effect.rivalRisk', value: '-16', tone: 'positive' as const });
+            effects.push({ label: effectLabel('life.effect.rewardAd'), labelKey: 'life.effect.rewardAd', value: safestPathValue, tone: 'positive' as const });
         }
     } else {
         if (mode === 'SAFE') {
             const cost = Math.min(player.money, 12_000_000);
             updatedPlayer = applyStudioMorale(updateWorldReactionPressure({ ...player, money: player.money - cost }, { employeeDepartureRisk: state.employeeDepartureRisk - 8 }), 4);
-            log = `World Reaction: Retention bonuses steadied nervous studio teams.`;
             logKey = 'life.event.world.log.employee.safe';
-            effects.push({ label: 'Employee Risk', labelKey: 'life.effect.employeeRisk', value: '-8', tone: 'positive' as const });
-            effects.push({ label: 'Morale', labelKey: 'life.effect.morale', value: '+4', tone: 'positive' as const });
+            log = t(language, logKey);
+            effects.push({ label: effectLabel('life.effect.employeeRisk'), labelKey: 'life.effect.employeeRisk', value: '-8', tone: 'positive' as const });
+            effects.push({ label: effectLabel('life.effect.morale'), labelKey: 'life.effect.morale', value: '+4', tone: 'positive' as const });
         } else if (mode === 'AGGRESSIVE') {
             updatedPlayer = applyStudioMorale(updateWorldReactionPressure(player, { employeeDepartureRisk: state.employeeDepartureRisk + 7 }), -5);
-            log = `World Reaction: You held the line on costs, but staff confidence slipped.`;
             logKey = 'life.event.world.log.employee.aggressive';
-            effects.push({ label: 'Employee Risk', labelKey: 'life.effect.employeeRisk', value: '+7', tone: 'negative' as const });
-            effects.push({ label: 'Morale', labelKey: 'life.effect.morale', value: '-5', tone: 'negative' as const });
+            log = t(language, logKey);
+            effects.push({ label: effectLabel('life.effect.employeeRisk'), labelKey: 'life.effect.employeeRisk', value: '+7', tone: 'negative' as const });
+            effects.push({ label: effectLabel('life.effect.morale'), labelKey: 'life.effect.morale', value: '-5', tone: 'negative' as const });
         } else {
             const cost = Math.min(player.money, 25_000_000);
             updatedPlayer = applyStudioMorale(updateWorldReactionPressure({ ...player, money: player.money - cost }, { employeeDepartureRisk: state.employeeDepartureRisk - 15, antiMonopolyPressure: state.antiMonopolyPressure - 3 }), 7);
-            log = `World Reaction: Advisors handled retention packages and internal messaging cleanly.`;
             logKey = 'life.event.world.log.employee.golden';
-            effects.push({ label: 'Employee Risk', labelKey: 'life.effect.employeeRisk', value: '-15', tone: 'positive' as const });
-            effects.push({ label: 'Reward Ad', labelKey: 'life.effect.rewardAd', value: 'Safest path', tone: 'positive' as const });
+            log = t(language, logKey);
+            effects.push({ label: effectLabel('life.effect.employeeRisk'), labelKey: 'life.effect.employeeRisk', value: '-15', tone: 'positive' as const });
+            effects.push({ label: effectLabel('life.effect.rewardAd'), labelKey: 'life.effect.rewardAd', value: safestPathValue, tone: 'positive' as const });
         }
     }
 
@@ -272,51 +280,57 @@ const createWorldReactionLifeEvent = (
     state: WorldReactionState,
     type: WorldReactionEventType,
 ): LifeEvent => {
+    const language = getPlayerLanguage(player);
+    const tr = (key: string, vars?: Record<string, string | number>) => t(language, key, vars);
+    const category = tr('life.event.world.category');
+    const effectLabel = (key: string) => tr(key);
+    const legalSpendValue = tr('life.effect.value.legalSpend');
+    const safestPathValue = tr('life.effect.value.safestPath');
     if (type === 'ANTI_MONOPOLY_PRESSURE') {
         return {
             id: `life_world_reaction_antitrust_${player.age}_${player.currentWeek}`,
             type: 'LEGAL',
-            title: 'Industry Scrutiny Builds',
+            title: t(language, 'life.event.world.antitrust.title'),
             titleKey: 'life.event.world.antitrust.title',
-            category: 'World Reaction',
-            description: `Your studio group now controls ${state.controlledStudioCount} studios. Regulators and trade press are asking whether your empire has too much leverage.`,
+            category,
+            description: t(language, 'life.event.world.antitrust.description', { controlled: state.controlledStudioCount }),
             descriptionKey: 'life.event.world.antitrust.description',
             textVars: { controlled: state.controlledStudioCount },
             options: [
                 {
                     id: 'COOPERATE',
-                    label: 'Cooperate With Review',
+                    label: tr('life.event.world.antitrust.cooperate.label'),
                     labelKey: 'life.event.world.antitrust.cooperate.label',
-                    description: 'Spend on lawyers, share documents, and lower pressure without escalating the story.',
+                    description: tr('life.event.world.antitrust.cooperate.description'),
                     descriptionKey: 'life.event.world.antitrust.cooperate.description',
                     previewEffects: [
-                        { label: 'Scrutiny', labelKey: 'life.effect.scrutiny', value: '-8', tone: 'positive' },
-                        { label: 'Cost', labelKey: 'life.effect.cost', value: 'Legal spend', tone: 'negative' },
+                        { label: effectLabel('life.effect.scrutiny'), labelKey: 'life.effect.scrutiny', value: '-8', tone: 'positive' },
+                        { label: effectLabel('life.effect.cost'), labelKey: 'life.effect.cost', value: legalSpendValue, tone: 'negative' },
                     ],
                     impact: makeImpact(type, 'SAFE'),
                 },
                 {
                     id: 'FIGHT_PUBLICLY',
-                    label: 'Fight Publicly',
+                    label: tr('life.event.world.antitrust.fight.label'),
                     labelKey: 'life.event.world.antitrust.fight.label',
-                    description: 'Frame the pressure as jealousy from weaker rivals. Fame rises, scrutiny gets worse.',
+                    description: tr('life.event.world.antitrust.fight.description'),
                     descriptionKey: 'life.event.world.antitrust.fight.description',
                     previewEffects: [
-                        { label: 'Fame', labelKey: 'life.effect.fame', value: '+2', tone: 'positive' },
-                        { label: 'Scrutiny', labelKey: 'life.effect.scrutiny', value: '+6', tone: 'negative' },
+                        { label: effectLabel('life.effect.fame'), labelKey: 'life.effect.fame', value: '+2', tone: 'positive' },
+                        { label: effectLabel('life.effect.scrutiny'), labelKey: 'life.effect.scrutiny', value: '+6', tone: 'negative' },
                     ],
                     impact: makeImpact(type, 'AGGRESSIVE'),
                 },
                 {
                     id: 'GOLDEN_COMPLIANCE',
-                    label: 'Clean Compliance Task Force',
+                    label: tr('life.event.world.antitrust.golden.label'),
                     labelKey: 'life.event.world.antitrust.golden.label',
-                    description: 'Reward ad: advisors build the safest review response and calm the market.',
+                    description: tr('life.event.world.antitrust.golden.description'),
                     descriptionKey: 'life.event.world.antitrust.golden.description',
                     isGolden: true,
                     previewEffects: [
-                        { label: 'Scrutiny', labelKey: 'life.effect.scrutiny', value: '-16', tone: 'positive' },
-                        { label: 'Risk', labelKey: 'life.effect.risk', value: 'Safest path', tone: 'positive' },
+                        { label: effectLabel('life.effect.scrutiny'), labelKey: 'life.effect.scrutiny', value: '-16', tone: 'positive' },
+                        { label: effectLabel('life.effect.risk'), labelKey: 'life.effect.risk', value: safestPathValue, tone: 'positive' },
                     ],
                     impact: makeImpact(type, 'GOLDEN'),
                 },
@@ -328,41 +342,41 @@ const createWorldReactionLifeEvent = (
         return {
             id: `life_world_reaction_rival_${player.age}_${player.currentWeek}`,
             type: 'CONFLICT',
-            title: 'Rivals Start Moving Against You',
+            title: tr('life.event.world.rival.title'),
             titleKey: 'life.event.world.rival.title',
-            category: 'World Reaction',
-            description: 'Competing studios are calling talent, leaking stories, and trying to slow your acquisition momentum.',
+            category,
+            description: tr('life.event.world.rival.description'),
             descriptionKey: 'life.event.world.rival.description',
             options: [
                 {
                     id: 'QUIET_DEALS',
-                    label: 'Quiet Deal-Making',
+                    label: tr('life.event.world.rival.quiet.label'),
                     labelKey: 'life.event.world.rival.quiet.label',
-                    description: 'Spend money behind the scenes to cool the retaliation.',
+                    description: tr('life.event.world.rival.quiet.description'),
                     descriptionKey: 'life.event.world.rival.quiet.description',
-                    previewEffects: [{ label: 'Rival Risk', labelKey: 'life.effect.rivalRisk', value: '-8', tone: 'positive' }],
+                    previewEffects: [{ label: effectLabel('life.effect.rivalRisk'), labelKey: 'life.effect.rivalRisk', value: '-8', tone: 'positive' }],
                     impact: makeImpact(type, 'SAFE'),
                 },
                 {
                     id: 'COUNTERPUNCH',
-                    label: 'Counterpunch',
+                    label: tr('life.event.world.rival.counter.label'),
                     labelKey: 'life.event.world.rival.counter.label',
-                    description: 'Answer pressure with a public show of strength.',
+                    description: tr('life.event.world.rival.counter.description'),
                     descriptionKey: 'life.event.world.rival.counter.description',
                     previewEffects: [
-                        { label: 'Heat', labelKey: 'life.effect.heat', value: '+4', tone: 'negative' },
-                        { label: 'Fame', labelKey: 'life.effect.fame', value: '+1', tone: 'positive' },
+                        { label: effectLabel('life.effect.heat'), labelKey: 'life.effect.heat', value: '+4', tone: 'negative' },
+                        { label: effectLabel('life.effect.fame'), labelKey: 'life.effect.fame', value: '+1', tone: 'positive' },
                     ],
                     impact: makeImpact(type, 'AGGRESSIVE'),
                 },
                 {
                     id: 'GOLDEN_SETTLEMENT',
-                    label: 'Advisor Backchannel',
+                    label: tr('life.event.world.rival.golden.label'),
                     labelKey: 'life.event.world.rival.golden.label',
-                    description: 'Reward ad: let advisors neutralize the fight before it becomes public.',
+                    description: tr('life.event.world.rival.golden.description'),
                     descriptionKey: 'life.event.world.rival.golden.description',
                     isGolden: true,
-                    previewEffects: [{ label: 'Rival Risk', labelKey: 'life.effect.rivalRisk', value: '-16', tone: 'positive' }],
+                    previewEffects: [{ label: effectLabel('life.effect.rivalRisk'), labelKey: 'life.effect.rivalRisk', value: '-16', tone: 'positive' }],
                     impact: makeImpact(type, 'GOLDEN'),
                 },
             ],
@@ -372,46 +386,46 @@ const createWorldReactionLifeEvent = (
     return {
         id: `life_world_reaction_employee_${player.age}_${player.currentWeek}`,
         type: 'NETWORKING',
-        title: 'Key Employees Get Nervous',
+        title: tr('life.event.world.employee.title'),
         titleKey: 'life.event.world.employee.title',
-        category: 'World Reaction',
-        description: 'Acquisition pressure is making executives, producers, and senior staff wonder whether they still have a future inside the group.',
+        category,
+        description: tr('life.event.world.employee.description'),
         descriptionKey: 'life.event.world.employee.description',
         options: [
             {
                 id: 'RETENTION_BONUS',
-                label: 'Retention Bonuses',
+                label: tr('life.event.world.employee.retention.label'),
                 labelKey: 'life.event.world.employee.retention.label',
-                description: 'Spend money to calm teams and protect morale.',
+                description: tr('life.event.world.employee.retention.description'),
                 descriptionKey: 'life.event.world.employee.retention.description',
                 previewEffects: [
-                    { label: 'Employee Risk', labelKey: 'life.effect.employeeRisk', value: '-8', tone: 'positive' },
-                    { label: 'Morale', labelKey: 'life.effect.morale', value: '+4', tone: 'positive' },
+                    { label: effectLabel('life.effect.employeeRisk'), labelKey: 'life.effect.employeeRisk', value: '-8', tone: 'positive' },
+                    { label: effectLabel('life.effect.morale'), labelKey: 'life.effect.morale', value: '+4', tone: 'positive' },
                 ],
                 impact: makeImpact(type, 'SAFE'),
             },
             {
                 id: 'HOLD_COSTS',
-                label: 'Hold Costs',
+                label: tr('life.event.world.employee.hold.label'),
                 labelKey: 'life.event.world.employee.hold.label',
-                description: 'Save cash now, but risk staff confidence slipping.',
+                description: tr('life.event.world.employee.hold.description'),
                 descriptionKey: 'life.event.world.employee.hold.description',
                 previewEffects: [
-                    { label: 'Employee Risk', labelKey: 'life.effect.employeeRisk', value: '+7', tone: 'negative' },
-                    { label: 'Morale', labelKey: 'life.effect.morale', value: '-5', tone: 'negative' },
+                    { label: effectLabel('life.effect.employeeRisk'), labelKey: 'life.effect.employeeRisk', value: '+7', tone: 'negative' },
+                    { label: effectLabel('life.effect.morale'), labelKey: 'life.effect.morale', value: '-5', tone: 'negative' },
                 ],
                 impact: makeImpact(type, 'AGGRESSIVE'),
             },
             {
                 id: 'GOLDEN_RETENTION',
-                label: 'Clean Retention Plan',
+                label: tr('life.event.world.employee.golden.label'),
                 labelKey: 'life.event.world.employee.golden.label',
-                description: 'Reward ad: advisors handle packages and internal messaging safely.',
+                description: tr('life.event.world.employee.golden.description'),
                 descriptionKey: 'life.event.world.employee.golden.description',
                 isGolden: true,
                 previewEffects: [
-                    { label: 'Employee Risk', labelKey: 'life.effect.employeeRisk', value: '-15', tone: 'positive' },
-                    { label: 'Risk', labelKey: 'life.effect.risk', value: 'Safest path', tone: 'positive' },
+                    { label: effectLabel('life.effect.employeeRisk'), labelKey: 'life.effect.employeeRisk', value: '-15', tone: 'positive' },
+                    { label: effectLabel('life.effect.risk'), labelKey: 'life.effect.risk', value: safestPathValue, tone: 'positive' },
                 ],
                 impact: makeImpact(type, 'GOLDEN'),
             },
@@ -463,6 +477,7 @@ const rebalanceStudios = (studios: Business[], state: WorldReactionState) => (
 );
 
 export const processWorldReactions = (player: Player): Player => {
+    const language = getPlayerLanguage(player);
     const state = getWorldReactionState(player);
     const previousState = player.flags?.worldReactionState as WorldReactionState | undefined;
     if (previousState?.lastProcessedWeek === player.currentWeek) {
@@ -476,8 +491,8 @@ export const processWorldReactions = (player: Player): Player => {
     }
 
     const shouldPublish = state.antiMonopolyPressure >= 28 && state.controlledStudioCount >= 2;
-    const news = shouldPublish ? makeReactionNews(player, state) : undefined;
-    const xPost = shouldPublish ? makeFanReaction(player, state) : undefined;
+    const news = shouldPublish ? makeReactionNews(player, state, language) : undefined;
+    const xPost = shouldPublish ? makeFanReaction(player, state, language) : undefined;
     const reactionEvent = shouldPublish ? createWorldReactionEvent(player, state) : null;
     const existingPendingEvents = Array.isArray(player.pendingEvents) ? player.pendingEvents : [];
     const cadence = queueAcquisitionPressureEvent(
@@ -514,7 +529,11 @@ export const processWorldReactions = (player: Player): Player => {
         logs: [{
             week: player.currentWeek,
             year: player.age,
-            message: `World Reaction: ${state.antiMonopolyPressure}% scrutiny, ${state.rivalRetaliationRisk}% rival risk, ${state.employeeDepartureRisk}% employee risk.`,
+            message: t(language, 'services.worldReactions.log.weekly', {
+                scrutiny: state.antiMonopolyPressure,
+                rivalRisk: state.rivalRetaliationRisk,
+                employeeRisk: state.employeeDepartureRisk
+            }),
             type: state.antiMonopolyPressure >= 60 ? 'negative' as const : 'neutral' as const,
         }, ...(player.logs || [])].slice(0, 50),
     };

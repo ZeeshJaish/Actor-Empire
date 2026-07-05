@@ -6,7 +6,9 @@ const productionHouse = readFileSync('views/lifestyle/business/ProductionHouseGa
 const acquisitionDesk = readFileSync('views/mobile/components/StudioAcquisitionDesk.tsx', 'utf8');
 const forbes = readFileSync('views/mobile/ForbesApp.tsx', 'utf8');
 const groupLogic = readFileSync('services/studioGroup.ts', 'utf8');
-const source = `${groupView}\n${commandCenter}\n${productionHouse}\n${acquisitionDesk}\n${forbes}\n${groupLogic}`;
+const englishLocale = readFileSync('services/localization/locales/en.ts', 'utf8');
+const portugueseLocale = readFileSync('services/localization/locales/pt-BR.ts', 'utf8');
+const source = `${groupView}\n${commandCenter}\n${productionHouse}\n${acquisitionDesk}\n${forbes}\n${groupLogic}\n${englishLocale}\n${portugueseLocale}`;
 
 for (const [needle, description] of [
     ['Studio Group', 'the Studio Group navigation and title'],
@@ -35,7 +37,7 @@ for (const [needle, description] of [
     ['Financial Position', 'the existing financial system readout'],
     ['Active Slate', 'the existing studio project slate'],
     ['Catalog & IP', 'the existing catalog and rights readout'],
-    ['Facilities & Talent', 'the existing production asset readout'],
+    ['Talent Stability', 'the existing production asset readout'],
     ['Acquisition Record', 'the existing acquisition closing history'],
     ['Change Operating Model', 'the command-center model action'],
     ['Operating Mandate', 'the owned-studio strategy mandate surface'],

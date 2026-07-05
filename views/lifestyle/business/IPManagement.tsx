@@ -3,6 +3,7 @@ import { Player, Business, Universe, Script } from '../../../types';
 import { Globe, Layers, Sparkles, Star, ChevronRight, Check, Crosshair } from 'lucide-react';
 import { normalizeUniverseForSave, normalizeUniverseMap } from '../../../services/universeLogic';
 import { RightsMarket } from './components/RightsMarket';
+import { getPlayerLanguage, t } from '../../../services/i18n';
 
 interface IPManagementProps {
     player: Player;
@@ -22,6 +23,13 @@ const formatCurrency = (amount: number): string => {
 
 export const IPManagement: React.FC<IPManagementProps> = ({ player, studio, onUpdatePlayer, onBack }) => {
     const [activeTab, setActiveTab] = useState<IPTab>('UNIVERSES');
+    const language = getPlayerLanguage(player);
+    const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
+    const tabs: { id: IPTab; label: string; icon: React.ReactNode }[] = [
+        { id: 'UNIVERSES', label: tr('ipManagement.tab.universes'), icon: <Globe size={14} /> },
+        { id: 'FRANCHISES', label: tr('ipManagement.tab.franchises'), icon: <Layers size={14} /> },
+        { id: 'RIGHTS_MARKET', label: tr('ipManagement.tab.rightsMarket'), icon: <Crosshair size={14} /> }
+    ];
 
     return (
         <div className="h-full flex flex-col bg-black text-white overflow-hidden">
@@ -31,21 +39,17 @@ export const IPManagement: React.FC<IPManagementProps> = ({ player, studio, onUp
                     <div>
                         {onBack && (
                             <button onClick={onBack} className="mb-4 text-zinc-500 hover:text-white transition-colors flex items-center gap-2 text-sm font-bold uppercase tracking-wider">
-                                <ChevronRight className="rotate-180" size={16} /> Back to Dashboard
+                                <ChevronRight className="rotate-180" size={16} /> {tr('ipManagement.backToDashboard')}
                             </button>
                         )}
-                        <h1 className="text-4xl font-black uppercase tracking-tighter mb-2">IP & Universes</h1>
-                        <p className="text-zinc-400 text-sm">Build worlds, manage franchises, and watch the industry's most valuable rights.</p>
+                        <h1 className="text-4xl font-black uppercase tracking-tighter mb-2">{tr('ipManagement.title')}</h1>
+                        <p className="text-zinc-400 text-sm">{tr('ipManagement.subtitle')}</p>
                     </div>
                 </div>
 
                 {/* Tabs */}
                 <div className="flex flex-wrap gap-1 border-b border-zinc-800">
-                    {[
-                        { id: 'UNIVERSES', label: 'Universes', icon: <Globe size={14} /> },
-                        { id: 'FRANCHISES', label: 'My Franchises', icon: <Layers size={14} /> },
-                        { id: 'RIGHTS_MARKET', label: 'Rights Market', icon: <Crosshair size={14} /> }
-                    ].map(tab => (
+                    {tabs.map(tab => (
                         <button
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id as IPTab)}

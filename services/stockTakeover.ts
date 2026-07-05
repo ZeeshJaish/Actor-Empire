@@ -1,6 +1,7 @@
 import type {
     Business,
     BusinessStaff,
+    GameLanguage,
     NewsItem,
     Player,
     ScheduledEvent,
@@ -12,6 +13,7 @@ import { createDefaultStudioState } from './businessLogic';
 import { getEntertainmentStockSnapshot } from './entertainmentStockMarket';
 import { getStockOutstandingShares, getStockOwnershipPercent } from './stockLogic';
 import { isStreamingPlatformStudio } from './studioClassification';
+import { getPlayerLanguage, t } from './i18n';
 
 export interface StockTakeoverSnapshot {
     stockId: string;
@@ -73,17 +75,18 @@ const getAvailableRoutes = (
     return routes;
 };
 
-const getNextUnlockLabel = (ownershipPercent: number, effectiveControlPercent: number) => {
-    if (effectiveControlPercent >= 51) return 'Control Transfer ready';
-    if (ownershipPercent < 20) return '20% unlocks Shareholder Alliance';
-    if (ownershipPercent < 30) return '30% unlocks Friendly and Hostile Takeover';
-    if (ownershipPercent < 51) return '51% effective control unlocks Control Transfer';
-    return 'Control Transfer ready';
+const getNextUnlockLabel = (language: GameLanguage, ownershipPercent: number, effectiveControlPercent: number) => {
+    if (effectiveControlPercent >= 51) return t(language, 'services.stockTakeover.nextUnlock.ready');
+    if (ownershipPercent < 20) return t(language, 'services.stockTakeover.nextUnlock.shareholderAlliance');
+    if (ownershipPercent < 30) return t(language, 'services.stockTakeover.nextUnlock.friendlyHostile');
+    if (ownershipPercent < 51) return t(language, 'services.stockTakeover.nextUnlock.controlTransfer');
+    return t(language, 'services.stockTakeover.nextUnlock.ready');
 };
 
 export const getStockTakeoverSnapshot = (
     player: Player,
     stock: Stock,
+    language: GameLanguage = getPlayerLanguage(player),
 ): StockTakeoverSnapshot => {
     const holdingShares = getHoldingShares(player, stock.id);
     const ownershipPercent = getStockOwnershipPercent(holdingShares, stock);
@@ -100,7 +103,9 @@ export const getStockTakeoverSnapshot = (
         availableRoutes,
         activeCase,
         canTransferControl: availableRoutes.includes('CONTROL_TRANSFER'),
-        nextUnlockLabel: reservedPlatform ? 'Streaming Phase acquisition later' : getNextUnlockLabel(ownershipPercent, effectiveControlPercent),
+        nextUnlockLabel: reservedPlatform
+            ? t(language, 'services.stockTakeover.nextUnlock.streamingReserved')
+            : getNextUnlockLabel(language, ownershipPercent, effectiveControlPercent),
     };
 };
 
@@ -156,9 +161,13 @@ const getSupportAndRisk = (
 const createTakeoverNews = (
     player: Player,
     takeoverCase: StockTakeoverCase,
+    language: GameLanguage,
 ): NewsItem => ({
     id: `news_stock_takeover_${takeoverCase.id}`,
-    headline: `${player.name} launches ${takeoverCase.companyName} takeover route`,
+    headline: t(language, 'services.stockTakeover.news.headline', {
+        playerName: player.name,
+        company: takeoverCase.companyName,
+    }),
     subtext: takeoverCase.summary,
     category: 'INDUSTRY',
     week: player.currentWeek,
@@ -177,6 +186,7 @@ const persistTakeoverCase = (player: Player, takeoverCase: StockTakeoverCase): P
 const buildStockControlledStudio = (
     player: Player,
     stock: Stock,
+    language: GameLanguage,
 ): Business => {
     const studioId = stock.relatedStudioId || stock.id;
     const worldStudio = player.world.studios?.[studioId];
@@ -261,7 +271,7 @@ const buildStockControlledStudio = (
                 year: player.age,
                 amount: cashReserve,
                 type: 'ACQUISITION_MERGER',
-                label: `${stock.name} control transferred through public shares`,
+                label: t(language, 'services.stockTakeover.finance.controlTransferred', { company: stock.name }),
             }],
         },
     };
@@ -273,6 +283,7 @@ export const executeStockTakeoverAction = (
     route: StockTakeoverRoute,
     options: { golden?: boolean } = {},
 ): StockTakeoverResult => {
+    const language = getPlayerLanguage(player);
     const stock = player.stocks.find(candidate => candidate.id === stockId);
     if (!stock) return { success: false, player, reason: 'STOCK_NOT_FOUND' };
     if (!stock.relatedStudioId || stock.sector !== 'MEDIA') {
@@ -285,7 +296,7 @@ export const executeStockTakeoverAction = (
         return { success: false, player, reason: 'ALREADY_CONTROLLED' };
     }
 
-    const snapshot = getStockTakeoverSnapshot(player, stock);
+    const snapshot = getStockTakeoverSnapshot(player, stock, language);
     if (!snapshot.availableRoutes.includes(route)) {
         return { success: false, player, reason: route === 'CONTROL_TRANSFER' ? 'CONTROL_NOT_READY' : 'ROUTE_LOCKED' };
     }
@@ -294,7 +305,7 @@ export const executeStockTakeoverAction = (
     if (player.money < cost) return { success: false, player, reason: 'INSUFFICIENT_CASH' };
 
     if (route === 'CONTROL_TRANSFER') {
-        const acquiredBusiness = buildStockControlledStudio(player, stock);
+        const acquiredBusiness = buildStockControlledStudio(player, stock, language);
         const controlledCase: StockTakeoverCase = {
             id: `takeover_${stock.id}_control_${player.age}_${player.currentWeek}`,
             stockId: stock.id,
@@ -310,8 +321,8 @@ export const executeStockTakeoverAction = (
             rivalDefenceRisk: 0,
             cost,
             summary: options.golden
-                ? `${stock.name} control transferred through a clean advisor-led board transition.`
-                : `${stock.name} control transferred into your studio group through public-market ownership.`,
+                ? t(language, 'services.stockTakeover.summary.controlGolden', { company: stock.name })
+                : t(language, 'services.stockTakeover.summary.control', { company: stock.name }),
             createdWeek: player.currentWeek,
             createdYear: player.age,
             resolvedWeek: player.currentWeek,
@@ -323,7 +334,7 @@ export const executeStockTakeoverAction = (
             money: player.money - cost,
             businesses: [...player.businesses, acquiredBusiness],
         }, controlledCase);
-        const newsItem = createTakeoverNews(player, controlledCase);
+        const newsItem = createTakeoverNews(player, controlledCase, language);
         return {
             success: true,
             case: controlledCase,
@@ -335,8 +346,8 @@ export const executeStockTakeoverAction = (
                     week: player.currentWeek,
                     year: player.age,
                     message: options.golden
-                        ? `Golden Control Transfer: ${stock.name} joined your studio group through a cleaner board process.`
-                        : `Control Transfer: ${stock.name} is now part of your studio group.`,
+                        ? t(language, 'services.stockTakeover.log.controlGolden', { company: stock.name })
+                        : t(language, 'services.stockTakeover.log.control', { company: stock.name }),
                     type: 'positive' as const,
                 }, ...(withCase.logs || [])].slice(0, 50),
             },
@@ -366,10 +377,13 @@ export const executeStockTakeoverAction = (
         rivalDefenceRisk: routeMath.rivalDefenceRisk,
         cost,
         summary: status === 'RIVAL_DEFENCE'
-            ? `${stock.name}'s board and rival holders are mounting a Rival Defence against your pressure campaign.`
+            ? t(language, 'services.stockTakeover.summary.rivalDefence', { company: stock.name })
             : effectiveControlPercent >= 51
-                ? `${stock.name} shareholder support is ready for a Control Transfer.`
-                : `${stock.name} takeover pressure is active with ${effectiveControlPercent.toFixed(2)}% effective support.`,
+                ? t(language, 'services.stockTakeover.summary.readyForControl', { company: stock.name })
+                : t(language, 'services.stockTakeover.summary.activePressure', {
+                    company: stock.name,
+                    effectiveControl: effectiveControlPercent.toFixed(2),
+                }),
         createdWeek: player.currentWeek,
         createdYear: player.age,
     };
@@ -389,7 +403,7 @@ export const executeStockTakeoverAction = (
             }
             : candidate),
     }, takeoverCase);
-    const newsItem = createTakeoverNews(player, takeoverCase);
+    const newsItem = createTakeoverNews(player, takeoverCase, language);
 
     return {
         success: true,
@@ -400,19 +414,22 @@ export const executeStockTakeoverAction = (
             logs: [{
                 week: player.currentWeek,
                 year: player.age,
-                message: `${route.replaceAll('_', ' ')}: ${takeoverCase.summary}`,
+                message: t(language, 'services.stockTakeover.log.routeResolved', {
+                    route: t(language, `services.stockTakeover.route.${route}`),
+                    summary: takeoverCase.summary,
+                }),
                 type: status === 'RIVAL_DEFENCE' ? 'neutral' as const : 'positive' as const,
             }, ...(withCase.logs || [])].slice(0, 50),
         },
     };
 };
 
-const createTakeoverControlEvent = (stock: Stock, snapshot: StockTakeoverSnapshot, player: Player): ScheduledEvent => ({
+const createTakeoverControlEvent = (stock: Stock, snapshot: StockTakeoverSnapshot, player: Player, language: GameLanguage): ScheduledEvent => ({
     id: `event_stock_control_${stock.id}_${player.age}_${player.currentWeek}`,
     week: player.currentWeek,
     type: 'STOCK_CONTROL',
-    title: `Majority Control: ${stock.symbol}`,
-    description: `Your ${snapshot.effectiveControlPercent.toFixed(2)}% effective control gives you the power to open the acquisition process.`,
+    title: t(language, 'services.stockTakeover.controlEvent.title', { symbol: stock.symbol }),
+    description: t(language, 'services.stockTakeover.controlEvent.description', { control: snapshot.effectiveControlPercent.toFixed(2) }),
     data: {
         stockDecisionType: 'TAKEOVER_CONTROL',
         stockId: stock.id,
@@ -422,12 +439,13 @@ const createTakeoverControlEvent = (stock: Stock, snapshot: StockTakeoverSnapsho
         ownershipPercent: snapshot.ownershipPercent,
         alliedSupportPercent: snapshot.alliedSupportPercent,
         effectiveControlPercent: snapshot.effectiveControlPercent,
-        routeLabel: 'Public-market control transfer',
-        primaryActionLabel: 'Open Acquisition Desk',
+        routeLabel: t(language, 'services.stockTakeover.controlEvent.routeLabel'),
+        primaryActionLabel: t(language, 'services.stockTakeover.controlEvent.primaryAction'),
     },
 });
 
 export const processStockTakeoverEvents = (player: Player): Player => {
+    const language = getPlayerLanguage(player);
     const pendingEvents = Array.isArray(player.pendingEvents) ? player.pendingEvents : [];
     const dismissed = (player.flags || {}).stockTakeoverEventDismissals || {};
     let nextPendingEvents = pendingEvents;
@@ -439,9 +457,9 @@ export const processStockTakeoverEvents = (player: Player): Player => {
             if (player.businesses.some(business => business.id === stock.relatedStudioId)) return;
             if (dismissed[stock.id]) return;
             if (nextPendingEvents.some(event => event.data?.stockDecisionType === 'TAKEOVER_CONTROL' && event.data?.stockId === stock.id)) return;
-            const snapshot = getStockTakeoverSnapshot(player, stock);
+            const snapshot = getStockTakeoverSnapshot(player, stock, language);
             if (!snapshot.canTransferControl) return;
-            nextPendingEvents = [...nextPendingEvents, createTakeoverControlEvent(stock, snapshot, player)].slice(0, 12);
+            nextPendingEvents = [...nextPendingEvents, createTakeoverControlEvent(stock, snapshot, player, language)].slice(0, 12);
         });
 
     return nextPendingEvents === pendingEvents

@@ -1,9 +1,13 @@
-import { AuditionOpportunity, BudgetTier, Genre, IndustryProject, NewsItem, NpcVentureArchetype, NpcVentureState, Player, ProjectType, RoleType, WorldState } from '../types';
+import { AuditionOpportunity, BudgetTier, GameLanguage, Genre, IndustryProject, NewsItem, NpcVentureArchetype, NpcVentureState, Player, ProjectType, RoleType, WorldState } from '../types';
 import { NPC_DATABASE, calculateProjectFameMultiplier } from './npcLogic';
 import { calculateProjectPay, generateProjectDetails, generateProjectTitle, getEstimatedBudget } from './roleLogic';
 import { getEnabledGlobalCreatorSocialProfiles } from './youtubeLogic';
+import { getPlayerLanguage, t } from './i18n';
 
 const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
+const VENTURE_VARIANT_SEPARATOR = ' || ';
+const pickVentureVariant = (language: GameLanguage, key: string, vars: Record<string, string | number> = {}) =>
+    pick(t(language, key, vars).split(VENTURE_VARIANT_SEPARATOR));
 const absWeek = (year: number, week: number) => (year * 52) + week;
 
 const MAX_ACTIVE_VENTURES = 12;
@@ -13,56 +17,6 @@ const PREFIXES = ['Northstar', 'Silverline', 'Velvet', 'Ironwood', 'Sable', 'Gol
 const SUFFIXES = ['Pictures', 'Studios', 'Media', 'Films', 'Entertainment', 'Storyworks', 'Motion Group', 'Creative House', 'Productions', 'Picture Company'];
 const CREATOR_PREFIXES = ['Pulse', 'Viral', 'Glowline', 'Signal', 'Hypewell', 'Loopline', 'Framehouse', 'Neon Row'];
 const GENRE_PREFIXES = ['Midnight', 'Black Door', 'Graveyard', 'Voltage', 'Afterlight', 'Red Signal', 'Wild Cut'];
-
-const LAUNCH_HEADLINES = [
-    '{Owner} launches {Venture}, a new {Archetype} with serious industry ambitions.',
-    'New Player: {Owner}-backed {Venture} enters the production race.',
-    '{Venture} opens its doors as {Owner} makes a bigger bet on ownership.',
-    'Industry Watch: {Owner} quietly builds {Venture} into a new Hollywood vehicle.',
-];
-
-const DEVELOPMENT_HEADLINES = [
-    '{Venture} is packaging {Title}, with insiders calling it a calculated swing.',
-    '{Venture} begins development on {Title} as rivals watch the newcomer closely.',
-    '{Owner}\'s {Venture} starts chasing talent for {Title}.',
-    'Bidding chatter builds around {Title}, the latest move from {Venture}.',
-];
-
-const HIT_HEADLINES = [
-    '{Venture} scores a breakout hit with {Title}.',
-    '{Title} turns {Venture} from vanity project into real contender.',
-    'Industry Surprise: {Venture} lands a major win with {Title}.',
-    '{Owner}\'s ownership gamble pays off as {Title} overperforms.',
-];
-
-const FLOP_HEADLINES = [
-    '{Venture} takes a costly hit after {Title} misses expectations.',
-    '{Title} stumbles, putting pressure on {Owner}\'s {Venture}.',
-    'Rough Week: {Venture} faces questions after {Title} underperforms.',
-    'Insiders wonder if {Venture} moved too fast after {Title} flops.',
-];
-
-const CLOSURE_HEADLINES = [
-    '{Venture} shuts down after a difficult run of projects.',
-    '{Owner} closes {Venture} as losses mount.',
-    'End of the Line: {Venture} quietly winds down operations.',
-    '{Venture} exits the market after failing to build sustainable momentum.',
-];
-
-const OFFER_INTROS = [
-    'We are putting together a focused package and think you fit the role.',
-    'This is a leaner project, but the team believes it can travel.',
-    'Our studio is moving fast and wants you attached before the town catches up.',
-    'We are building the next slate around talent with heat, and your name came up.',
-];
-
-const ARCHETYPE_LABELS: Record<NpcVentureArchetype, string> = {
-    PRESTIGE_LABEL: 'prestige label',
-    COMMERCIAL_STUDIO: 'commercial studio',
-    GENRE_HOUSE: 'genre house',
-    CREATOR_MEDIA: 'creator media company',
-    AWARDS_BOUTIQUE: 'awards boutique',
-};
 
 const ARCHETYPE_BUDGETS: Record<NpcVentureArchetype, BudgetTier[]> = {
     PRESTIGE_LABEL: ['LOW', 'MID'],
@@ -79,6 +33,12 @@ const ARCHETYPE_GENRES: Record<NpcVentureArchetype, Genre[]> = {
     CREATOR_MEDIA: ['COMEDY', 'HORROR', 'ACTION'],
     AWARDS_BOUTIQUE: ['DRAMA', 'ROMANCE', 'THRILLER', 'MYSTERY'],
 };
+
+const getArchetypeLabel = (language: GameLanguage, archetype: NpcVentureArchetype): string =>
+    t(language, `services.npcVenture.archetype.${archetype}`);
+
+const getGenreLabel = (language: GameLanguage, genre: Genre): string =>
+    t(language, `services.npcVenture.genre.${genre}`);
 
 const getTalentPool = (player: Player) => {
     const extraNPCs = Array.isArray(player.flags?.extraNPCs) ? player.flags.extraNPCs : [];
@@ -140,14 +100,15 @@ const makeNews = (
     impactLevel,
 });
 
-const fill = (template: string, venture: NpcVentureState, extra: Record<string, string> = {}) =>
+const fill = (template: string, venture: NpcVentureState, language: GameLanguage, extra: Record<string, string> = {}) =>
     template
         .replace(/{Owner}/g, venture.ownerName)
         .replace(/{Venture}/g, venture.name)
-        .replace(/{Archetype}/g, ARCHETYPE_LABELS[venture.archetype])
+        .replace(/{Archetype}/g, getArchetypeLabel(language, venture.archetype))
         .replace(/{Title}/g, extra.Title || '');
 
 export const createNpcVenture = (player: Player, world: WorldState): { venture: NpcVentureState; news: NewsItem } | null => {
+    const language = getPlayerLanguage(player);
     if (!world.npcVentures) world.npcVentures = {};
     const activeCount = Object.values(world.npcVentures).filter(v => v.status === 'ACTIVE').length;
     if (activeCount >= MAX_ACTIVE_VENTURES) return null;
@@ -190,7 +151,15 @@ export const createNpcVenture = (player: Player, world: WorldState): { venture: 
     world.npcVentures[venture.id] = venture;
     return {
         venture,
-        news: makeNews(fill(pick(LAUNCH_HEADLINES), venture), player, fame > 80 ? 'HIGH' : 'MEDIUM', `${venture.name} begins with roughly $${venture.cashReserve.toFixed(0)}M in launch capital.`),
+        news: makeNews(
+            fill(pickVentureVariant(language, 'services.npcVenture.launch.headline'), venture, language),
+            player,
+            fame > 80 ? 'HIGH' : 'MEDIUM',
+            t(language, 'services.npcVenture.launch.subtext', {
+                ventureName: venture.name,
+                capital: venture.cashReserve.toFixed(0),
+            })
+        ),
     };
 };
 
@@ -262,7 +231,7 @@ export const syncNpcVenturesToStudios = (world: WorldState): WorldState => {
             reputation: venture.reputation,
             cashReserve: Math.max(0, Math.floor(venture.cashReserve)),
             recentHits: venture.hits,
-            archetype: ARCHETYPE_LABELS[venture.archetype].toUpperCase(),
+            archetype: getArchetypeLabel('en', venture.archetype).toUpperCase(),
             ownerNpcId: venture.ownerNpcId,
             ownerName: venture.ownerName,
             isNpcVenture: true,
@@ -273,6 +242,7 @@ export const syncNpcVenturesToStudios = (world: WorldState): WorldState => {
 };
 
 export const processNpcVentures = (player: Player, world: WorldState): { world: WorldState; news: NewsItem[]; logs: string[] } => {
+    const language = getPlayerLanguage(player);
     if (!world.npcVentures) world.npcVentures = {};
     const news: NewsItem[] = [];
     const logs: string[] = [];
@@ -286,7 +256,10 @@ export const processNpcVentures = (player: Player, world: WorldState): { world: 
         const created = createNpcVenture(player, world);
         if (created) {
             news.push(created.news);
-            logs.push(`${created.venture.ownerName} launched ${created.venture.name}.`);
+            logs.push(t(language, 'services.npcVenture.log.launch', {
+                ownerName: created.venture.ownerName,
+                ventureName: created.venture.name,
+            }));
         }
     }
 
@@ -329,20 +302,46 @@ export const processNpcVentures = (player: Player, world: WorldState): { world: 
             world.projects.unshift(project);
 
             if (outcome === 'HIT') {
-                news.push(makeNews(fill(pick(HIT_HEADLINES), venture, { Title: project.title }), player, 'HIGH', `Starring ${project.leadActorName}. Directed by ${project.directorName}.`));
+                news.push(makeNews(
+                    fill(pickVentureVariant(language, 'services.npcVenture.hit.headline'), venture, language, { Title: project.title }),
+                    player,
+                    'HIGH',
+                    t(language, 'services.npcVenture.hit.subtext', {
+                        leadActorName: project.leadActorName,
+                        directorName: project.directorName,
+                    })
+                ));
             } else if (outcome === 'FLOP') {
-                news.push(makeNews(fill(pick(FLOP_HEADLINES), venture, { Title: project.title }), player, 'MEDIUM', `The miss cut into ${venture.name}'s cash reserves.`));
+                news.push(makeNews(
+                    fill(pickVentureVariant(language, 'services.npcVenture.flop.headline'), venture, language, { Title: project.title }),
+                    player,
+                    'MEDIUM',
+                    t(language, 'services.npcVenture.flop.subtext', { ventureName: venture.name })
+                ));
             } else if (Math.random() < 0.35) {
-                news.push(makeNews(fill(pick(DEVELOPMENT_HEADLINES), venture, { Title: project.title }), player, 'LOW', `${venture.name} is still building its slate.`));
+                news.push(makeNews(
+                    fill(pickVentureVariant(language, 'services.npcVenture.development.headline'), venture, language, { Title: project.title }),
+                    player,
+                    'LOW',
+                    t(language, 'services.npcVenture.development.subtext', { ventureName: venture.name })
+                ));
             }
         }
 
         const shouldClose = venture.projectsReleased >= 2 && (venture.cashReserve < 0 || (venture.flops >= 3 && venture.hits === 0) || venture.valuation < 0.025);
         if (shouldClose) {
             venture.status = 'CLOSED';
-            venture.closureReason = venture.cashReserve < 0 ? 'Cash reserves collapsed.' : 'The slate failed to gain traction.';
-            news.push(makeNews(fill(pick(CLOSURE_HEADLINES), venture), player, 'HIGH', venture.closureReason));
-            logs.push(`${venture.name} closed after ${venture.projectsReleased} releases.`);
+            venture.closureReason = t(language, venture.cashReserve < 0 ? 'services.npcVenture.closure.reason.cash' : 'services.npcVenture.closure.reason.slate');
+            news.push(makeNews(
+                fill(pickVentureVariant(language, 'services.npcVenture.closure.headline'), venture, language),
+                player,
+                'HIGH',
+                venture.closureReason
+            ));
+            logs.push(t(language, 'services.npcVenture.log.closure', {
+                ventureName: venture.name,
+                count: venture.projectsReleased,
+            }));
         }
     });
 
@@ -361,6 +360,7 @@ export const processNpcVentures = (player: Player, world: WorldState): { world: 
 };
 
 export const generateNpcVentureRoleOffer = (player: Player): { opportunity: AuditionOpportunity; venture: NpcVentureState } | null => {
+    const language = getPlayerLanguage(player);
     const ventures = Object.values(player.world.npcVentures || {})
         .filter(v => v.status === 'ACTIVE' && v.cashReserve > 8 && v.reputation >= 20)
         .sort((a, b) => (b.hype + b.reputation + b.valuation * 10) - (a.hype + a.reputation + a.valuation * 10));
@@ -382,7 +382,14 @@ export const generateNpcVentureRoleOffer = (player: Player): { opportunity: Audi
     ];
     const project = generateProjectDetails(budgetTier, type, usedTitles, player);
     project.studioId = venture.id;
-    project.description = `${venture.name} is producing a ${project.genre.toLowerCase().replace('_', ' ')} ${type === 'MOVIE' ? 'film' : 'series'} backed by ${venture.ownerName}.`;
+    project.description = t(language, 'services.npcVenture.project.description', {
+        ventureName: venture.name,
+        genre: getGenreLabel(language, project.genre),
+        projectType: type === 'MOVIE'
+            ? t(language, 'services.npcVenture.project.type.movie')
+            : t(language, 'services.npcVenture.project.type.series'),
+        ownerName: venture.ownerName,
+    });
     project.visibleHype = venture.hype >= 75 ? 'HIGH' : venture.hype >= 45 ? 'MID' : 'LOW';
     project.hiddenStats.rawHype = Math.max(project.hiddenStats.rawHype, Math.round(venture.hype));
     project.hiddenStats.distributionPower = Math.max(25, Math.min(100, Math.round((project.hiddenStats.distributionPower + venture.reputation) / 2)));
@@ -410,6 +417,13 @@ export const generateNpcVentureRoleOffer = (player: Player): { opportunity: Audi
     return { opportunity, venture };
 };
 
-export const getNpcVentureOfferText = (venture: NpcVentureState, opportunity: AuditionOpportunity): string => (
-    `${pick(OFFER_INTROS)}\n\nProject: ${opportunity.projectName}\nStudio: ${venture.name}\nFounder: ${venture.ownerName}\nRole: ${opportunity.roleType}\nEstimated pay: $${opportunity.estimatedIncome.toLocaleString()}\n\nThis is a real company in the market now. If the project hits, the studio gains momentum. If it misses, the risk is on them.`
+export const getNpcVentureOfferText = (venture: NpcVentureState, opportunity: AuditionOpportunity, language: GameLanguage = 'en'): string => (
+    t(language, 'services.npcVenture.offer.text', {
+        intro: pickVentureVariant(language, 'services.npcVenture.offer.intro'),
+        projectName: opportunity.projectName,
+        studioName: venture.name,
+        founderName: venture.ownerName,
+        roleType: opportunity.roleType,
+        estimatedPay: opportunity.estimatedIncome.toLocaleString(),
+    })
 );

@@ -2,6 +2,7 @@ import { Player, LifeEvent, LifeEventOption, LegalCase, ScheduledEvent, DatingMa
 import { spendPlayerEnergy } from './premiumLogic';
 import { NPC_DATABASE } from './npcLogic';
 import { applyDivorceOutcome, applyPartnerBreakup } from './familyLogic';
+import { getPlayerLanguage, t } from './i18n';
 
 // --- HELPERS ---
 const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
@@ -15,15 +16,17 @@ const isEliteNpc = (npcId?: string) => {
 
 const pushRomanceCoverage = (
     player: Player,
-    headline: string,
-    subtext: string,
+    headlineKey: string,
+    subtextKey: string,
+    textVars: Record<string, string | number>,
     tone: 'MESS' | 'SCANDAL' | 'BREAKUP' = 'MESS'
 ) => {
+    const language = getPlayerLanguage(player);
     const impactLevel: NewsItem['impactLevel'] = tone === 'SCANDAL' ? 'HIGH' : 'MEDIUM';
     player.news.unshift({
         id: `news_relationship_${Date.now()}_${Math.random()}`,
-        headline,
-        subtext,
+        headline: t(language, headlineKey, textVars),
+        subtext: t(language, subtextKey, textVars),
         category: 'TOP_STORY',
         week: player.currentWeek,
         year: player.age,
@@ -37,12 +40,7 @@ const pushRomanceCoverage = (
         authorName: tone === 'BREAKUP' ? 'SplitWatch' : tone === 'SCANDAL' ? 'TabloidWire' : 'PopPulse',
         authorHandle: tone === 'BREAKUP' ? '@splitwatch' : tone === 'SCANDAL' ? '@tabloidwire' : '@poppulse',
         authorAvatar: `https://api.dicebear.com/8.x/pixel-art/svg?seed=${tone}`,
-        content:
-            tone === 'BREAKUP'
-                ? `${player.name}'s relationship update just turned painfully public.`
-                : tone === 'SCANDAL'
-                    ? `${player.name}'s romantic life is turning into scandal bait again.`
-                    : `${player.name}'s love life is suddenly the timeline's favorite mess.`,
+        content: t(language, `services.lifeEvent.relationship.coverage.x.${tone}`, { playerName: player.name }),
         timestamp: Date.now(),
         likes: tone === 'SCANDAL' ? 38000 : 14000,
         retweets: tone === 'SCANDAL' ? 9500 : 2600,
@@ -386,8 +384,9 @@ export const generateLifeEvent = (player: Player): LifeEvent | null => {
                         if (p.stats.fame > 35) {
                             pushRomanceCoverage(
                                 p,
-                                `${p.name}'s love life turns into a two-name problem`,
-                                `Sources say ${partner.name} is furious after spotting signs that ${hottestSideConnection.name} was never as harmless as claimed.`,
+                                'services.lifeEvent.relationship.coverage.jealousyAdmit.headline',
+                                'services.lifeEvent.relationship.coverage.jealousyAdmit.subtext',
+                                { playerName: p.name, partner: partner.name, connection: hottestSideConnection.name },
                                 'MESS'
                             );
                         }
@@ -415,8 +414,9 @@ export const generateLifeEvent = (player: Player): LifeEvent | null => {
                         );
                         pushRomanceCoverage(
                             p,
-                            `${p.name} is accused of keeping multiple romances alive at once`,
-                            `${partner.name} and ${hottestSideConnection.name} are now both being discussed in the same whispers, which is never a good sign.`,
+                            'services.lifeEvent.relationship.coverage.jealousyLie.headline',
+                            'services.lifeEvent.relationship.coverage.jealousyLie.subtext',
+                            { playerName: p.name, partner: partner.name, connection: hottestSideConnection.name },
                             'SCANDAL'
                         );
                         return {
@@ -494,8 +494,9 @@ export const generateLifeEvent = (player: Player): LifeEvent | null => {
                         nextPlayer.stats.reputation = Math.max(0, nextPlayer.stats.reputation - 8);
                         pushRomanceCoverage(
                             nextPlayer,
-                            `${nextPlayer.name} turns a private split into public theater`,
-                            `${partner.name} and ${nextPlayer.name} are now locked in the kind of breakup coverage that stains everything around it.`,
+                            'services.lifeEvent.relationship.coverage.breakingPointPublicWar.headline',
+                            'services.lifeEvent.relationship.coverage.breakingPointPublicWar.subtext',
+                            { playerName: nextPlayer.name, partner: partner.name },
                             'BREAKUP'
                         );
                         return {
@@ -553,8 +554,9 @@ export const generateLifeEvent = (player: Player): LifeEvent | null => {
                         if (p.stats.fame > 28) {
                             pushRomanceCoverage(
                                 p,
-                                `${p.name} is seen reconnecting with ex ${exPartner.name}`,
-                                `${partner.name} is now being dragged into fresh speculation after the private meetup was no longer private.`,
+                                'services.lifeEvent.relationship.coverage.exReturnMeet.headline',
+                                'services.lifeEvent.relationship.coverage.exReturnMeet.subtext',
+                                { playerName: p.name, partner: partner.name, ex: exPartner.name },
                                 'MESS'
                             );
                         }
@@ -614,8 +616,9 @@ export const generateLifeEvent = (player: Player): LifeEvent | null => {
                         );
                         pushRomanceCoverage(
                             p,
-                            `${p.name} leans into dating rumors instead of denying them`,
-                            `${leakedMatch.name} is now central to a fresh cycle of speculation, fan edits, and gossip accounts.`,
+                            'services.lifeEvent.relationship.coverage.screenshotOwn.headline',
+                            'services.lifeEvent.relationship.coverage.screenshotOwn.subtext',
+                            { playerName: p.name, match: leakedMatch.name },
                             'SCANDAL'
                         );
                         return {
@@ -668,8 +671,9 @@ export const generateLifeEvent = (player: Player): LifeEvent | null => {
                         }
                         pushRomanceCoverage(
                             p,
-                            `${p.name}'s denial only fuels the dating leak harder`,
-                            `The attempt to wave off the screenshots made gossip pages treat the whole thing like open season.`,
+                            'services.lifeEvent.relationship.coverage.screenshotBlame.headline',
+                            'services.lifeEvent.relationship.coverage.screenshotBlame.subtext',
+                            { playerName: p.name },
                             'SCANDAL'
                         );
                         return {
@@ -1460,6 +1464,7 @@ export const generateLegalHearing = (player: Player, caseId: string): LifeEvent 
     if (!activeCase) return null;
 
     const advanceCase = (p: Player, c: LegalCase) => {
+        const language = getPlayerLanguage(p);
         if (c.currentHearing >= c.totalHearings) {
             const won = c.playerDefense >= c.evidenceStrength;
             c.status = won ? 'WON' : 'LOST';
@@ -1467,8 +1472,8 @@ export const generateLegalHearing = (player: Player, caseId: string): LifeEvent 
                 p.stats.reputation = Math.min(100, p.stats.reputation + 3);
                 p.news.unshift({
                     id: `news_case_won_${Date.now()}`,
-                    headline: `${p.name} wins ${c.title}.`,
-                    subtext: 'The courtroom drama ends in their favor.',
+                    headline: t(language, 'services.lifeEvent.legal.news.wonHeadline', { playerName: p.name, caseTitle: c.title }),
+                    subtext: t(language, 'services.lifeEvent.legal.news.wonSubtext'),
                     category: 'YOU',
                     week: p.currentWeek,
                     year: p.age,
@@ -1480,8 +1485,8 @@ export const generateLegalHearing = (player: Player, caseId: string): LifeEvent 
                 p.stats.reputation = Math.max(0, p.stats.reputation - 8);
                 p.news.unshift({
                     id: `news_case_lost_${Date.now()}`,
-                    headline: `${p.name} loses ${c.title}.`,
-                    subtext: `The judgment costs $${penalty.toLocaleString()} and serious reputation damage.`,
+                    headline: t(language, 'services.lifeEvent.legal.news.lostHeadline', { playerName: p.name, caseTitle: c.title }),
+                    subtext: t(language, 'services.lifeEvent.legal.news.lostSubtext', { penalty: `$${penalty.toLocaleString()}` }),
                     category: 'YOU',
                     week: p.currentWeek,
                     year: p.age,

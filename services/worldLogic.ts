@@ -7,26 +7,58 @@ import { initUniverses, normalizeUniverseMap, processUniverseTurn } from './univ
 import { processNpcVentures, syncNpcVenturesToStudios } from './npcVentureLogic';
 import { ALL_GENRES } from './genreCatalog';
 import { applyPassiveStudioEcosystemTurn, applyStudioProjectOutcome, ensureStudioEcosystem } from './studioEcosystem';
+import { getPlayerLanguage, t } from './i18n';
 
 // Helpers
 const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
 const GENRES: Genre[] = ALL_GENRES;
 
 export const FESTIVALS: Festival[] = [
-    { id: 'sundance', name: 'Sundance Film Festival', weeks: [3, 4], prestigeReq: 60, cost: 100000, description: 'Best for Indie/Limited releases. High prestige boost.' },
-    { id: 'cannes', name: 'Cannes Film Festival', weeks: [19, 20, 21], prestigeReq: 80, cost: 500000, description: 'The most prestigious festival in the world. High quality required.' },
-    { id: 'tiff', name: 'Toronto International Film Festival', weeks: [36, 37, 38], prestigeReq: 70, cost: 250000, description: 'The Oscar Launchpad. Great for building awards buzz.' }
+    { id: 'sundance', name: '', nameKey: 'services.worldLogic.festival.sundance.name', weeks: [3, 4], prestigeReq: 60, cost: 100000, description: '', descriptionKey: 'services.worldLogic.festival.sundance.description' },
+    { id: 'cannes', name: '', nameKey: 'services.worldLogic.festival.cannes.name', weeks: [19, 20, 21], prestigeReq: 80, cost: 500000, description: '', descriptionKey: 'services.worldLogic.festival.cannes.description' },
+    { id: 'tiff', name: '', nameKey: 'services.worldLogic.festival.tiff.name', weeks: [36, 37, 38], prestigeReq: 70, cost: 250000, description: '', descriptionKey: 'services.worldLogic.festival.tiff.description' }
 ];
 
 export const CALENDAR_EVENTS = [
-    { week: 1, name: 'New Year Weekend', impact: 1.2, description: 'High attendance for family films.' },
-    { week: 7, name: 'Valentines Day', impact: 1.3, description: 'Massive boost for Romances.' },
-    { week: 18, name: 'Summer Kickoff', impact: 1.4, description: 'Blockbuster season begins.' },
-    { week: 26, name: 'July 4th Weekend', impact: 1.5, description: 'Peak summer attendance.' },
-    { week: 44, name: 'Halloween', impact: 1.4, description: 'Horror movies dominate.' },
-    { week: 47, name: 'Thanksgiving', impact: 1.3, description: 'Family movie peak.' },
-    { week: 51, name: 'Christmas Week', impact: 1.6, description: 'The biggest week of the year.' }
+    { week: 1, name: '', nameKey: 'services.worldLogic.calendar.newYear.name', impact: 1.2, description: '', descriptionKey: 'services.worldLogic.calendar.newYear.description' },
+    { week: 7, name: '', nameKey: 'services.worldLogic.calendar.valentines.name', impact: 1.3, description: '', descriptionKey: 'services.worldLogic.calendar.valentines.description' },
+    { week: 18, name: '', nameKey: 'services.worldLogic.calendar.summerKickoff.name', impact: 1.4, description: '', descriptionKey: 'services.worldLogic.calendar.summerKickoff.description' },
+    { week: 26, name: '', nameKey: 'services.worldLogic.calendar.july4.name', impact: 1.5, description: '', descriptionKey: 'services.worldLogic.calendar.july4.description' },
+    { week: 44, name: '', nameKey: 'services.worldLogic.calendar.halloween.name', impact: 1.4, description: '', descriptionKey: 'services.worldLogic.calendar.halloween.description' },
+    { week: 47, name: '', nameKey: 'services.worldLogic.calendar.thanksgiving.name', impact: 1.3, description: '', descriptionKey: 'services.worldLogic.calendar.thanksgiving.description' },
+    { week: 51, name: '', nameKey: 'services.worldLogic.calendar.christmas.name', impact: 1.6, description: '', descriptionKey: 'services.worldLogic.calendar.christmas.description' }
 ];
+
+const getIndustryReleaseNews = (project: IndustryProject, player: Player, language = getPlayerLanguage(player)): NewsItem | null => {
+    const isHit = project.boxOffice > getEstimatedBudget(project.budgetTier) * 3;
+    const isFlop = project.boxOffice < getEstimatedBudget(project.budgetTier) * 0.8;
+
+    if (!(project.budgetTier === 'HIGH' || isHit || isFlop || project.directorName === "Nyanika Mishra")) {
+        return null;
+    }
+
+    let headline = t(language, 'services.worldLogic.news.industryRelease.default.headline', { title: project.title });
+    if (isHit) headline = t(language, 'services.worldLogic.news.industryRelease.hit.headline', { title: project.title });
+    if (isFlop) headline = t(language, 'services.worldLogic.news.industryRelease.flop.headline', { title: project.title });
+    if (project.quality > 90) headline = t(language, 'services.worldLogic.news.industryRelease.masterpiece.headline', { title: project.title });
+
+    if (project.directorName === "Nyanika Mishra") {
+        headline = t(language, 'services.worldLogic.news.industryRelease.visionary.headline', { title: project.title });
+    }
+
+    return {
+        id: `news_world_${project.id}`,
+        headline,
+        subtext: t(language, 'services.worldLogic.news.industryRelease.subtext', {
+            leadActorName: project.leadActorName,
+            directorName: project.directorName
+        }),
+        category: 'INDUSTRY',
+        week: player.currentWeek,
+        year: player.age,
+        impactLevel: isHit || isFlop ? 'HIGH' : 'MEDIUM'
+    };
+};
 
 // 1. Generate an Industry Project
 export const generateIndustryProject = (
@@ -111,13 +143,14 @@ export const generateIndustryProject = (
 
 // 2. Process World Turn (Runs Weekly)
 export const processWorldTurn = (player: Player): { world: WorldState, news: NewsItem[], logs: string[] } => {
+    const language = getPlayerLanguage(player);
     let newWorld = { ...player.world };
     const news: NewsItem[] = [];
     const logs: string[] = [];
     if (!newWorld.npcVentures) newWorld.npcVentures = {};
     newWorld = syncNpcVenturesToStudios(newWorld);
     newWorld = ensureStudioEcosystem(newWorld);
-    newWorld.universes = normalizeUniverseMap(newWorld.universes);
+    newWorld.universes = normalizeUniverseMap(newWorld.universes, language);
 
     // --- A. MAINTAIN RIVAL SCHEDULE ---
     // Ensure we have at least 12 weeks of upcoming rivals
@@ -193,29 +226,8 @@ export const processWorldTurn = (player: Player): { world: WorldState, news: New
             directorNpc.netWorth += directorFee;
         }
 
-        const isHit = project.boxOffice > getEstimatedBudget(project.budgetTier) * 3;
-        const isFlop = project.boxOffice < getEstimatedBudget(project.budgetTier) * 0.8;
-        
-        if (project.budgetTier === 'HIGH' || isHit || isFlop || project.directorName === "Nyanika Mishra") {
-            let headline = `'${project.title}' releases this week.`;
-            if (isHit) headline = `Global Smash: '${project.title}' dominates box office.`;
-            if (isFlop) headline = `Box Office Disaster: '${project.title}' flops hard.`;
-            if (project.quality > 90) headline = `Masterpiece: Critics hail '${project.title}' as best of year.`;
-            
-            if (project.directorName === "Nyanika Mishra") {
-                headline = `Visionary Nyanika Mishra delivers another hit with '${project.title}'.`;
-            }
-
-            news.push({
-                id: `news_world_${project.id}`,
-                headline,
-                subtext: `Starring ${project.leadActorName}. Directed by ${project.directorName}.`,
-                category: 'INDUSTRY',
-                week: player.currentWeek,
-                year: player.age,
-                impactLevel: isHit || isFlop ? 'HIGH' : 'MEDIUM'
-            });
-        }
+        const releaseNews = getIndustryReleaseNews(project, player, language);
+        if (releaseNews) news.push(releaseNews);
     });
 
     // --- C. SIMULATE NPC ECONOMY (Passive) ---
@@ -256,10 +268,10 @@ export const processWorldTurn = (player: Player): { world: WorldState, news: New
     newWorld = ventureResult.world;
     news.push(...ventureResult.news);
     logs.push(...ventureResult.logs);
-    newWorld.universes = normalizeUniverseMap(newWorld.universes);
+    newWorld.universes = normalizeUniverseMap(newWorld.universes, language);
 
     if (!newWorld.universes || Object.keys(newWorld.universes).length === 0) {
-        newWorld.universes = initUniverses();
+        newWorld.universes = initUniverses(language);
     }
 
     (Object.keys(newWorld.universes) as UniverseId[]).forEach(uid => {
@@ -273,7 +285,7 @@ export const processWorldTurn = (player: Player): { world: WorldState, news: New
             newWorld = applyStudioProjectOutcome(newWorld, res.project).world;
             news.push({
                 id: `news_uni_rel_${res.project.id}`,
-                headline: `Universe Release: ${res.project.title} lands in theaters.`,
+                headline: t(language, 'services.worldLogic.news.universeRelease.headline', { title: res.project.title }),
                 category: 'UNIVERSE',
                 week: player.currentWeek,
                 year: player.age,
@@ -344,29 +356,8 @@ export const processWorldTurn = (player: Player): { world: WorldState, news: New
             directorNpc.netWorth += directorFee;
         }
 
-        const isHit = project.boxOffice > getEstimatedBudget(project.budgetTier) * 3;
-        const isFlop = project.boxOffice < getEstimatedBudget(project.budgetTier) * 0.8;
-        
-        if (project.budgetTier === 'HIGH' || isHit || isFlop || project.directorName === "Nyanika Mishra") {
-            let headline = `'${project.title}' releases this week.`;
-            if (isHit) headline = `Global Smash: '${project.title}' dominates box office.`;
-            if (isFlop) headline = `Box Office Disaster: '${project.title}' flops hard.`;
-            if (project.quality > 90) headline = `Masterpiece: Critics hail '${project.title}' as best of year.`;
-            
-            if (project.directorName === "Nyanika Mishra") {
-                headline = `Visionary Nyanika Mishra delivers another hit with '${project.title}'.`;
-            }
-
-            news.push({
-                id: `news_world_${project.id}`,
-                headline,
-                subtext: `Starring ${project.leadActorName}. Directed by ${project.directorName}.`,
-                category: 'INDUSTRY',
-                week: player.currentWeek,
-                year: player.age,
-                impactLevel: isHit || isFlop ? 'HIGH' : 'MEDIUM'
-            });
-        }
+        const releaseNews = getIndustryReleaseNews(project, player, language);
+        if (releaseNews) news.push(releaseNews);
     }
 
     return { world: newWorld, news, logs };

@@ -28,11 +28,11 @@ import {
     getMandateOptionLabel,
     getOperatingModelDefinition,
     getStudioGroup,
+    getStudioMandateGroups,
     getStudioOperatingMandate,
     getSubsidiaryControlProfile,
     performStudioTreasuryTransfer,
     setStudioOperatingMandate,
-    STUDIO_MANDATE_GROUPS,
     type StudioTreasuryAction,
     type StudioTreasuryCounterparty,
 } from '../../../services/studioGroup';
@@ -43,6 +43,7 @@ import {
 import { resolveSubsidiaryDecision } from '../../../services/subsidiaryDecisions';
 import type { DevelopmentLabInitialTab } from './DevelopmentLab';
 import { getTalentInstabilityState } from '../../../services/talentInstability';
+import { getPlayerLanguage, t } from '../../../services/i18n';
 
 interface OwnedStudioCommandCenterProps {
     player: Player;
@@ -100,17 +101,17 @@ const Meter: React.FC<{ label: string; value: number; color: string }> = ({ labe
     </div>
 );
 
-const proposalStatusCopy: Record<SubsidiaryProjectProposal['status'], { label: string; tone: string }> = {
-    PENDING: { label: 'Board Review', tone: 'border-amber-300/35 bg-amber-300/[0.08] text-amber-200' },
-    APPROVED: { label: 'Approved', tone: 'border-emerald-300/35 bg-emerald-300/[0.08] text-emerald-200' },
-    AUTO_STARTED: { label: 'Auto Started', tone: 'border-sky-300/35 bg-sky-300/[0.08] text-sky-200' },
-    REJECTED: { label: 'Rejected', tone: 'border-zinc-600 bg-zinc-900 text-zinc-500' },
+const proposalStatusTone: Record<SubsidiaryProjectProposal['status'], string> = {
+    PENDING: 'border-amber-300/35 bg-amber-300/[0.08] text-amber-200',
+    APPROVED: 'border-emerald-300/35 bg-emerald-300/[0.08] text-emerald-200',
+    AUTO_STARTED: 'border-sky-300/35 bg-sky-300/[0.08] text-sky-200',
+    REJECTED: 'border-zinc-600 bg-zinc-900 text-zinc-500',
 };
 
-const decisionStatusCopy: Record<SubsidiaryDecision['status'], { label: string; tone: string }> = {
-    PENDING: { label: 'Action Needed', tone: 'border-amber-300/40 bg-amber-300/[0.08] text-amber-200' },
-    RESOLVED: { label: 'Resolved', tone: 'border-emerald-300/35 bg-emerald-300/[0.08] text-emerald-200' },
-    DISMISSED: { label: 'Dismissed', tone: 'border-zinc-600 bg-zinc-900 text-zinc-500' },
+const decisionStatusTone: Record<SubsidiaryDecision['status'], string> = {
+    PENDING: 'border-amber-300/40 bg-amber-300/[0.08] text-amber-200',
+    RESOLVED: 'border-emerald-300/35 bg-emerald-300/[0.08] text-emerald-200',
+    DISMISSED: 'border-zinc-600 bg-zinc-900 text-zinc-500',
 };
 
 export const OwnedStudioCommandCenter: React.FC<OwnedStudioCommandCenterProps> = ({
@@ -122,9 +123,12 @@ export const OwnedStudioCommandCenter: React.FC<OwnedStudioCommandCenterProps> =
     onGreenlightProject,
     onOpenWorkbench,
 }) => {
+    const language = getPlayerLanguage(player);
+    const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
     const acquisitionCase = getAcquisitionCase(player, studio.id);
-    const model = getOperatingModelDefinition(studio.studioState?.operatingModel);
-    const controlProfile = getSubsidiaryControlProfile(studio);
+    const model = getOperatingModelDefinition(studio.studioState?.operatingModel, language);
+    const controlProfile = getSubsidiaryControlProfile(studio, language);
+    const studioMandateGroups = getStudioMandateGroups(language);
     const mandate = getStudioOperatingMandate(studio);
     const [draftMandate, setDraftMandate] = React.useState<StudioOperatingMandate>(mandate);
     const [mandateSaved, setMandateSaved] = React.useState(false);
@@ -331,29 +335,29 @@ export const OwnedStudioCommandCenter: React.FC<OwnedStudioCommandCenterProps> =
                         <ArrowLeft size={18} />
                     </button>
                     <div className="min-w-0 flex-1">
-                        <div className="text-[7px] font-black uppercase tracking-[0.27em] text-amber-300">Studio Command Center</div>
+                        <div className="text-[7px] font-black uppercase tracking-[0.27em] text-amber-300">{tr('ownedStudio.header.title')}</div>
                         <h1 className="mt-1 truncate font-serif text-2xl font-black uppercase italic tracking-tight">{studio.name}</h1>
                         <div className="mt-2 flex items-center gap-2">
                             <span className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[6px] font-black uppercase tracking-[0.14em] text-zinc-400">
-                                Owned Studio
+                                {tr('ownedStudio.header.ownedStudio')}
                             </span>
                             <span className={`rounded-full border px-2.5 py-1 text-[6px] font-black uppercase tracking-[0.14em] ${model ? 'border-amber-300/25 bg-amber-300/[0.08] text-amber-200' : 'border-rose-300/25 bg-rose-300/[0.08] text-rose-200'}`}>
-                                {model?.label || 'Decision Required'}
+                                {model?.label || tr('ownedStudio.header.decisionRequired')}
                             </span>
                         </div>
                     </div>
                 </div>
                 <div className="relative mt-5 grid grid-cols-3 overflow-hidden rounded-[18px] border-2 border-[#29251f] bg-black shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
                     <div className="border-r border-[#29251f] p-3">
-                        <div className="text-[5px] font-black uppercase tracking-widest text-zinc-600">Valuation</div>
+                        <div className="text-[5px] font-black uppercase tracking-widest text-zinc-600">{tr('ownedStudio.metric.valuation')}</div>
                         <div className="mt-1 font-mono text-[12px] font-black text-white">{formatMoney(studio.stats.valuation)}</div>
                     </div>
                     <div className="border-r border-[#29251f] p-3">
-                        <div className="text-[5px] font-black uppercase tracking-widest text-zinc-600">Capital</div>
+                        <div className="text-[5px] font-black uppercase tracking-widest text-zinc-600">{tr('ownedStudio.metric.capital')}</div>
                         <div className="mt-1 font-mono text-[12px] font-black text-emerald-300">{formatMoney(studio.balance)}</div>
                     </div>
                     <div className="p-3">
-                        <div className="text-[5px] font-black uppercase tracking-widest text-zinc-600">Weekly</div>
+                        <div className="text-[5px] font-black uppercase tracking-widest text-zinc-600">{tr('ownedStudio.metric.weekly')}</div>
                         <div className={`mt-1 flex items-center gap-1 font-mono text-[12px] font-black ${weeklyResult >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>
                             {weeklyResult >= 0 ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
                             {formatMoney(weeklyResult)}
@@ -366,12 +370,12 @@ export const OwnedStudioCommandCenter: React.FC<OwnedStudioCommandCenterProps> =
                 <div className="mx-auto max-w-3xl space-y-4">
                     <nav className="grid grid-cols-5 gap-1 rounded-[18px] border-2 border-[#29251f] bg-[#0b0a09] p-1 shadow-[0_5px_0_#020202]">
                         {[
-                            ['COMMAND', 'Command Deck'],
-                            ['MANDATE', 'Mandate'],
-                            ['SLATE', 'Studio Slate'],
-                            ['IP', 'Catalog/IP'],
-                            ['FINANCE', 'Finance'],
-                        ].map(([id, label]) => (
+                            'COMMAND',
+                            'MANDATE',
+                            'SLATE',
+                            'IP',
+                            'FINANCE',
+                        ].map((id) => (
                             <button
                                 key={id}
                                 type="button"
@@ -382,7 +386,7 @@ export const OwnedStudioCommandCenter: React.FC<OwnedStudioCommandCenterProps> =
                                         : 'text-zinc-600'
                                 }`}
                             >
-                                {label}
+                                {tr(`ownedStudio.deck.${id}`)}
                             </button>
                         ))}
                     </nav>
@@ -390,7 +394,7 @@ export const OwnedStudioCommandCenter: React.FC<OwnedStudioCommandCenterProps> =
                     {activeDeck === 'COMMAND' ? (
                         <>
                             {activeDecisionArcs.length ? (
-                                <CommandSection eyebrow="Live Consequences" title="Active Storylines" icon={<Sparkles size={19} />}>
+                                <CommandSection eyebrow={tr('ownedStudio.section.liveConsequences')} title={tr('ownedStudio.section.activeStorylines')} icon={<Sparkles size={19} />}>
                                     <div className="space-y-2.5">
                                         {activeDecisionArcs.slice(0, 3).map(arc => {
                                             const nextBeat = arc.beats[arc.beatsResolved] || arc.beats[arc.beats.length - 1];
@@ -435,7 +439,7 @@ export const OwnedStudioCommandCenter: React.FC<OwnedStudioCommandCenterProps> =
                                     </div>
                                 </CommandSection>
                             ) : null}
-                            <CommandSection eyebrow="People Risk" title="Talent Stability" icon={<Users size={19} />}>
+                            <CommandSection eyebrow={tr('ownedStudio.section.peopleRisk')} title={tr('ownedStudio.section.talentStability')} icon={<Users size={19} />}>
                                 <div className={`rounded-[18px] border-2 p-3 shadow-[0_5px_0_#020202] ${talentTone}`}>
                                     <div className="grid grid-cols-3 overflow-hidden rounded-[14px] border border-white/[0.08] bg-black/35">
                                         <div className="border-r border-white/[0.08] p-3">
@@ -481,8 +485,8 @@ export const OwnedStudioCommandCenter: React.FC<OwnedStudioCommandCenterProps> =
                                                             </div>
                                                             <h3 className="mt-1 text-[18px] font-black uppercase leading-none text-white">{decision.title}</h3>
                                                         </div>
-                                                        <span className={`shrink-0 rounded-full border px-2 py-1 text-[5px] font-black uppercase tracking-[0.12em] ${decisionStatusCopy[decision.status].tone}`}>
-                                                            {decisionStatusCopy[decision.status].label}
+                                                        <span className={`shrink-0 rounded-full border px-2 py-1 text-[5px] font-black uppercase tracking-[0.12em] ${decisionStatusTone[decision.status]}`}>
+                                                            {tr(`ownedStudio.status.decision.${decision.status}`)}
                                                         </span>
                                                     </div>
                                                     <p className="mt-3 text-[9px] font-bold leading-relaxed text-zinc-400">{decision.summary}</p>
@@ -568,8 +572,8 @@ export const OwnedStudioCommandCenter: React.FC<OwnedStudioCommandCenterProps> =
                                                         {decision.selectedOptionId === 'APPROVE' ? 'Approved' : 'Declined'} · {decision.outcomeSummary || decision.personality}
                                                     </div>
                                                 </div>
-                                                <span className={`shrink-0 rounded-full border px-2 py-1 text-[5px] font-black uppercase tracking-[0.11em] ${decisionStatusCopy[decision.status].tone}`}>
-                                                    {decisionStatusCopy[decision.status].label}
+                                                <span className={`shrink-0 rounded-full border px-2 py-1 text-[5px] font-black uppercase tracking-[0.11em] ${decisionStatusTone[decision.status]}`}>
+                                                    {tr(`ownedStudio.status.decision.${decision.status}`)}
                                                 </span>
                                             </div>
                                         ))}
@@ -589,8 +593,8 @@ export const OwnedStudioCommandCenter: React.FC<OwnedStudioCommandCenterProps> =
                                                             </div>
                                                             <h3 className="mt-1 line-clamp-2 text-[16px] font-black uppercase leading-none text-white">{proposal.title}</h3>
                                                         </div>
-                                                        <span className={`shrink-0 rounded-full border px-2 py-1 text-[5px] font-black uppercase tracking-[0.12em] ${proposalStatusCopy[proposal.status].tone}`}>
-                                                            {proposalStatusCopy[proposal.status].label}
+                                                        <span className={`shrink-0 rounded-full border px-2 py-1 text-[5px] font-black uppercase tracking-[0.12em] ${proposalStatusTone[proposal.status]}`}>
+                                                            {tr(`ownedStudio.status.proposal.${proposal.status}`)}
                                                         </span>
                                                     </div>
                                                     <div className="mt-3 grid grid-cols-3 overflow-hidden rounded-[13px] border border-white/[0.07] bg-black/35">
@@ -654,8 +658,8 @@ export const OwnedStudioCommandCenter: React.FC<OwnedStudioCommandCenterProps> =
                                                         {proposal.genre.replaceAll('_', ' ')} · {formatMoney(proposal.estimatedBudget)}
                                                     </div>
                                                 </div>
-                                                <span className={`shrink-0 rounded-full border px-2 py-1 text-[5px] font-black uppercase tracking-[0.11em] ${proposalStatusCopy[proposal.status].tone}`}>
-                                                    {proposalStatusCopy[proposal.status].label}
+                                                <span className={`shrink-0 rounded-full border px-2 py-1 text-[5px] font-black uppercase tracking-[0.11em] ${proposalStatusTone[proposal.status]}`}>
+                                                    {tr(`ownedStudio.status.proposal.${proposal.status}`)}
                                                 </span>
                                             </div>
                                         ))}
@@ -676,10 +680,10 @@ export const OwnedStudioCommandCenter: React.FC<OwnedStudioCommandCenterProps> =
                                     onClick={onChangeOperatingModel}
                                     className="mt-3 flex min-h-11 w-full items-center justify-between rounded-[14px] border-2 border-amber-300/30 bg-[#2a1b06] px-3 text-[8px] font-black uppercase tracking-[0.15em] text-amber-100 shadow-[0_4px_0_#120a01] active:translate-y-0.5 active:shadow-[0_2px_0_#120a01]"
                                 >
-                                    Change Operating Model <ChevronRight size={14} />
+                                    {tr('ownedStudio.command.changeOperatingModel')} <ChevronRight size={14} />
                                 </button>
                             </CommandSection>
-                            <CommandSection eyebrow="Model-Aware Command" title={controlProfile.canDirectProduce ? 'Direct Production Console' : controlProfile.canAutoProduce ? 'Autonomous Label Board' : 'Integrated Assets'} icon={<Clapperboard size={19} />}>
+                            <CommandSection eyebrow={tr('ownedStudio.command.modelAware')} title={controlProfile.canDirectProduce ? tr('ownedStudio.command.directProductionConsole') : controlProfile.canAutoProduce ? tr('ownedStudio.command.autonomousLabelBoard') : tr('ownedStudio.command.integratedAssets')} icon={<Clapperboard size={19} />}>
                                 <div className="rounded-[17px] border border-white/[0.08] bg-black/35 p-4">
                                     <div className="text-[7px] font-black uppercase tracking-[0.2em] text-amber-300">{controlProfile.controlCopy}</div>
                                     <p className="mt-2 text-[10px] font-bold leading-relaxed text-zinc-400">{controlProfile.productionCopy}</p>
@@ -691,40 +695,40 @@ export const OwnedStudioCommandCenter: React.FC<OwnedStudioCommandCenterProps> =
                                                 className="flex min-h-16 w-full items-center justify-between rounded-[18px] border-2 border-amber-300 bg-amber-300 px-4 text-left text-black shadow-[0_6px_0_#6b4304] active:translate-y-0.5 active:shadow-[0_3px_0_#6b4304]"
                                             >
                                                 <div>
-                                                    <div className="text-[11px] font-black uppercase tracking-[0.16em]">Greenlight Project</div>
-                                                    <div className="mt-1 text-[7px] font-black uppercase tracking-[0.14em] text-black/55">Existing full wizard · {studio.name}</div>
+                                                    <div className="text-[11px] font-black uppercase tracking-[0.16em]">{tr('ownedStudio.command.greenlightProject')}</div>
+                                                    <div className="mt-1 text-[7px] font-black uppercase tracking-[0.14em] text-black/55">{tr('ownedStudio.command.existingWizard', { studio: studio.name })}</div>
                                                 </div>
                                                 <Clapperboard size={20} />
                                             </button>
                                             <div className="grid grid-cols-2 gap-2">
                                                 {[
-                                                    ['Open Development Lab', 'VAULT'],
-                                                    ['Browse Catalog/IP', 'IP_MARKET'],
-                                                    ['Franchise Command', 'FRANCHISES'],
-                                                    ['Universe Command', 'UNIVERSE'],
-                                                ].map(([label, tab]) => (
+                                                    'VAULT',
+                                                    'IP_MARKET',
+                                                    'FRANCHISES',
+                                                    'UNIVERSE',
+                                                ].map((tab) => (
                                                     <button
-                                                        key={label}
+                                                        key={tab}
                                                         type="button"
                                                         onClick={() => onOpenWorkbench(tab as DevelopmentLabInitialTab)}
                                                         className="min-h-11 rounded-[14px] border border-white/[0.08] bg-black/35 px-3 text-left text-[7px] font-black uppercase tracking-[0.12em] text-zinc-300"
                                                     >
-                                                        {label}
+                                                        {tr(`ownedStudio.workbench.${tab}`)}
                                                     </button>
                                                 ))}
                                             </div>
                                             <div className="hidden">
                                                 {/* Audit anchors: script and IP still route through existing studio-scoped systems. */}
-                                                Open Development Lab Browse Catalog/IP Franchise Command Universe Command
+                                                ownedStudio.workbench.VAULT ownedStudio.workbench.IP_MARKET ownedStudio.workbench.FRANCHISES ownedStudio.workbench.UNIVERSE
                                             </div>
                                             <div className="sr-only">Controlled subsidiary greenlight uses existing Greenlight Wizard.</div>
                                         </div>
                                     ) : controlProfile.canAutoProduce ? (
                                         <div className="mt-4 grid grid-cols-3 gap-2">
                                             {[
-                                                ['Focus', getMandateOptionLabel('focus', draftMandate.focus)],
-                                                ['Pace', getMandateOptionLabel('releasePace', draftMandate.releasePace)],
-                                                ['Auto', getMandateOptionLabel('autoProduction', draftMandate.autoProduction)],
+                                                ['Focus', getMandateOptionLabel('focus', draftMandate.focus, language)],
+                                                ['Pace', getMandateOptionLabel('releasePace', draftMandate.releasePace, language)],
+                                                ['Auto', getMandateOptionLabel('autoProduction', draftMandate.autoProduction, language)],
                                             ].map(([label, value]) => (
                                                 <div key={label} className="rounded-[13px] border border-emerald-300/15 bg-emerald-300/[0.05] p-2">
                                                     <div className="text-[5px] font-black uppercase tracking-wider text-zinc-600">{label}</div>
@@ -754,8 +758,8 @@ export const OwnedStudioCommandCenter: React.FC<OwnedStudioCommandCenterProps> =
                                 <div className="mt-3 grid grid-cols-2 gap-2">
                                     {(['focus', 'budgetAppetite', 'ipStrategy', 'autoProduction'] as const).map(key => (
                                         <div key={key} className="rounded-[12px] border border-white/[0.06] bg-black/35 p-2">
-                                            <div className="text-[5px] font-black uppercase tracking-wider text-zinc-600">{STUDIO_MANDATE_GROUPS.find(group => group.key === key)?.label}</div>
-                                            <div className="mt-1 truncate text-[9px] font-black uppercase text-amber-100">{getMandateOptionLabel(key, draftMandate[key])}</div>
+                                            <div className="text-[5px] font-black uppercase tracking-wider text-zinc-600">{studioMandateGroups.find(group => group.key === key)?.label}</div>
+                                            <div className="mt-1 truncate text-[9px] font-black uppercase text-amber-100">{getMandateOptionLabel(key, draftMandate[key], language)}</div>
                                         </div>
                                     ))}
                                 </div>
@@ -763,7 +767,7 @@ export const OwnedStudioCommandCenter: React.FC<OwnedStudioCommandCenterProps> =
 
                             {controlProfile.canSetMandate ? (
                                 <div className="mt-3 space-y-3">
-                                    {STUDIO_MANDATE_GROUPS.map(group => (
+                                    {studioMandateGroups.map(group => (
                                         <div key={group.key} className="rounded-[15px] border border-white/[0.06] bg-black/30 p-3">
                                             <div className="flex items-center justify-between gap-3">
                                                 <div>
@@ -771,7 +775,7 @@ export const OwnedStudioCommandCenter: React.FC<OwnedStudioCommandCenterProps> =
                                                     <div className="mt-0.5 text-[8px] font-bold text-zinc-400">{group.commandLabel}</div>
                                                 </div>
                                                 <div className="shrink-0 rounded-full border border-amber-300/25 bg-amber-300/[0.06] px-2 py-1 text-[6px] font-black uppercase tracking-wider text-amber-200">
-                                                    {getMandateOptionLabel(group.key, draftMandate[group.key])}
+                                                    {getMandateOptionLabel(group.key, draftMandate[group.key], language)}
                                                 </div>
                                             </div>
                                             <div className="mt-2 flex gap-2 overflow-x-auto pb-1 custom-scrollbar">
@@ -842,8 +846,8 @@ export const OwnedStudioCommandCenter: React.FC<OwnedStudioCommandCenterProps> =
                                                             Y{proposal.createdYear} · W{proposal.createdWeek} · {proposal.projectType} · {proposal.sourceLabel || proposal.source}
                                                         </div>
                                                     </div>
-                                                    <span className={`shrink-0 rounded-full border px-2 py-1 text-[5px] font-black uppercase tracking-[0.11em] ${proposalStatusCopy[proposal.status].tone}`}>
-                                                        {proposalStatusCopy[proposal.status].label}
+                                                    <span className={`shrink-0 rounded-full border px-2 py-1 text-[5px] font-black uppercase tracking-[0.11em] ${proposalStatusTone[proposal.status]}`}>
+                                                        {tr(`ownedStudio.status.proposal.${proposal.status}`)}
                                                     </span>
                                                 </div>
                                                 <div className="mt-2 text-[7px] font-bold leading-relaxed text-zinc-500">{proposal.logic[0]}</div>
@@ -887,11 +891,11 @@ export const OwnedStudioCommandCenter: React.FC<OwnedStudioCommandCenterProps> =
 
                     {activeDeck === 'IP' ? (
                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                            <CommandSection eyebrow="Rights Vault" title="Catalog & IP" icon={<Layers3 size={19} />}>
+                            <CommandSection eyebrow={tr('ownedStudio.ip.rightsVault')} title={tr('ownedStudio.ip.catalogIp')} icon={<Layers3 size={19} />}>
                                 <div className="flex items-end justify-between">
                                     <div>
                                         <div className="font-mono text-3xl font-black text-amber-200">{rightsTitles.length}</div>
-                                        <div className="text-[6px] font-black uppercase tracking-[0.16em] text-zinc-600">Controlled titles</div>
+                                        <div className="text-[6px] font-black uppercase tracking-[0.16em] text-zinc-600">{tr('ownedStudio.ip.controlledTitles')}</div>
                                     </div>
                                     <FileKey2 size={24} className="text-zinc-700" />
                                 </div>
@@ -899,7 +903,7 @@ export const OwnedStudioCommandCenter: React.FC<OwnedStudioCommandCenterProps> =
                                     {rightsTitles.slice(0, 3).map(title => (
                                         <div key={title} className="truncate border-l-2 border-amber-300/35 pl-2 text-[8px] font-bold text-zinc-400">{title}</div>
                                     ))}
-                                    {!rightsTitles.length ? <div className="text-[8px] font-bold text-zinc-600">No catalog records yet.</div> : null}
+                                    {!rightsTitles.length ? <div className="text-[8px] font-bold text-zinc-600">{tr('ownedStudio.ip.noCatalog')}</div> : null}
                                 </div>
                             </CommandSection>
                         </div>

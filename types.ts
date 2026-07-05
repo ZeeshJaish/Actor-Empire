@@ -944,6 +944,42 @@ export interface Review {
     rating: number;
 }
 
+export interface AudienceReactionQuote {
+    id: string;
+    author: string;
+    text: string;
+    sentiment: 'POSITIVE' | 'MIXED' | 'NEGATIVE';
+    rating: number;
+    week: number;
+    year: number;
+}
+
+export interface AudienceReception {
+    openingScore: number;
+    currentScore: number;
+    previousScore?: number;
+    trend: 'RISING' | 'STEADY' | 'FALLING';
+    label: string;
+    summary: string;
+    sampleSize: number;
+    updatedWeek: number;
+    updatedYear: number;
+    isFinal: boolean;
+    quotes: AudienceReactionQuote[];
+}
+
+export interface EpisodeRating {
+    episode: number;
+    rating: number;
+}
+
+export interface SeasonEpisodeRatings {
+    season: number;
+    episodes: EpisodeRating[];
+    averageRating: number;
+    verdict: 'AWESOME' | 'GREAT' | 'GOOD' | 'REGULAR' | 'BAD' | 'GARBAGE';
+}
+
 export interface PosterElement {
     id: string;
     type: 'TEXT' | 'ICON' | 'IMAGE';
@@ -963,6 +999,7 @@ export interface CustomPoster {
     bgGradient?: string;
     icon?: string;
     textColor?: string;
+    posterMediaId?: string;
     imageData?: string; // base64 compressed image
     layout?: 'CENTER' | 'TOP' | 'BOTTOM' | 'MINIMAL';
     tagline?: string;
@@ -1125,7 +1162,7 @@ export interface ProjectInvestorOffer {
     equityPremiumPercent?: number;
     confidence: number;
     reputation: number;
-    fitLabel?: 'Lead Investor' | 'Partial Investor' | 'Risk Money' | 'Strategic Partner';
+    fitLabel?: string;
     note: string;
 }
 
@@ -1290,6 +1327,8 @@ export interface ProjectDetails {
     crewList?: CrewMember[]; // NEW: Crew roster
     location?: LocationDetails; // NEW: Filming location
     reviews?: Review[];
+    audienceReception?: AudienceReception;
+    episodeRatings?: SeasonEpisodeRatings[];
     episodes?: number;
     tone?: number; // 0 = Practical, 100 = CGI
     visualStyle?: 'REALISTIC' | 'STYLISTIC' | 'GRITTY' | 'VIBRANT';
@@ -1410,6 +1449,7 @@ export interface ActiveRelease {
     weeklySoundtrackBreakdowns?: ProjectSoundtrackRevenueBreakdown[];
     investorPlan?: ProjectInvestorPlan;
     investorPayouts?: ProjectInvestorPayoutSummary;
+    audienceReception?: AudienceReception;
     studioRoyaltyPercentage?: number;
     bids?: { platformId: PlatformId, upfront: number, royalty: number, duration: number, fundingAmount?: number }[];
     sequelDecisionWeek?: number;
@@ -1464,6 +1504,8 @@ export interface PastProject {
     investorPayouts?: ProjectInvestorPayoutSummary;
     castList?: CastMember[];
     reviews?: Review[];
+    audienceReception?: AudienceReception;
+    episodeRatings?: SeasonEpisodeRatings[];
     campaignRealitySnapshot?: CampaignRealitySnapshot;
     campaignPositioning?: CampaignPositioning;
     campaignTimeline?: CampaignTimeline;
@@ -1512,6 +1554,7 @@ export interface PastProject {
 export interface Commitment {
     id: string;
     name: string;
+    nameKey?: string;
     type: 'ACTING_GIG' | 'JOB' | 'COURSE' | 'GYM' | 'DIRECTOR_GIG' | 'WRITER_GIG';
     roleType?: RoleType;
     energyCost: number;
@@ -1650,10 +1693,12 @@ export interface YoutubeMusicVideoFeatureOffer {
 export interface Festival {
     id: string;
     name: string;
+    nameKey?: string;
     weeks: number[]; // Week of the year (1-52)
     prestigeReq: number;
     cost: number;
     description: string;
+    descriptionKey?: string;
 }
 
 export interface RedCarpetInterview {
@@ -1722,6 +1767,7 @@ export interface EventImpactSignal {
     labelKey?: string;
     textVars?: LocalizedTextVars;
     value: string;
+    valueKey?: string;
     tone?: 'positive' | 'negative' | 'neutral';
 }
 
@@ -1795,6 +1841,14 @@ export interface YoutubeVideo {
     sourceArtistName?: string;
     songTitle?: string;
     isMusicVideo?: boolean;
+    assetContext?: {
+        assetId: string;
+        assetName: string;
+        assetType: 'Property' | 'Vehicle' | 'Clothing';
+        label: string;
+        qualityBonus: number;
+        viewBoost: number;
+    };
 }
 
 export interface YoutubeChannel {
@@ -1865,6 +1919,7 @@ export interface Agent {
     id: string;
     name: string;
     description: string;
+    descriptionKey?: string;
     annualFee: number;
     commission: number;
     specialty: 'FILM' | 'TV' | 'BALANCED';
@@ -1876,6 +1931,7 @@ export interface Manager {
     id: string;
     name: string;
     description: string;
+    descriptionKey?: string;
     annualFee: number;
     commission: number;
     tier: 'ROOKIE' | 'STANDARD' | 'ELITE';
@@ -1889,7 +1945,9 @@ export interface TeamMember {
     tier: 'ROOKIE' | 'STANDARD' | 'ELITE' | 'LEGEND';
     weeklyCost: number;
     description: string;
+    descriptionKey?: string;
     perks: string;
+    perksKey?: string;
 }
 
 export interface InstaPost {
@@ -2519,6 +2577,7 @@ export interface SocialEvent {
 
 export interface Property {
     id: string;
+    baseAssetId?: string;
     name: string;
     type: 'Property';
     price: number;
@@ -2531,6 +2590,7 @@ export interface Property {
 
 export interface Vehicle {
     id: string;
+    baseAssetId?: string;
     name: string;
     type: 'Vehicle';
     vehicleType: 'Car' | 'Motorcycle' | 'Boat' | 'Aircraft';
@@ -2589,6 +2649,7 @@ export interface Relationship {
 export interface ImprovementOption {
     id: string;
     label: string;
+    nameKey?: string;
     energyCost: number;
     moneyCost: number;
     gains: Partial<Stats> & Partial<ActorSkills>; 
@@ -2596,12 +2657,15 @@ export interface ImprovementOption {
     directorGains?: Partial<DirectorStats>;
     risk: number; 
     description: string;
+    descriptionKey?: string;
 }
 
 export interface ImprovementActivity {
     id: string;
     name: string;
+    nameKey?: string;
     description: string;
+    descriptionKey?: string;
     options: ImprovementOption[];
 }
 
@@ -2612,7 +2676,9 @@ export type LifestyleActivityChoiceKind = 'SCALE' | 'PRIVACY' | 'INVITE' | 'DURA
 export interface LifestyleActivityChoice {
     id: string;
     label: string;
+    labelKey?: string;
     description: string;
+    descriptionKey?: string;
     kind: LifestyleActivityChoiceKind;
     costMultiplier?: number;
     flatCost?: number;
@@ -2697,6 +2763,7 @@ export interface LifestyleActivityQuote {
     statEffects: Partial<Stats>;
     effectSummary: string[];
     selectedLabels: string[];
+    assetSignals?: { label: string; description: string }[];
 }
 
 export interface LifestyleActivityMemory {
@@ -2722,6 +2789,8 @@ export interface HealthConditionState {
     id: string;
     conditionId: string;
     label: string;
+    labelKey?: string;
+    summaryKey?: string;
     severity: HealthConditionSeverity;
     source: HealthConditionSource;
     startedWeekAbsolute: number;
@@ -2777,11 +2846,28 @@ export interface FamilyObligation {
     reason: 'ABANDONMENT' | 'DIVORCE';
 }
 
-export type GameLanguage = 'en' | 'pt-BR';
+export type GameLanguage = 'en' | 'pt-BR' | 'fr' | 'es' | 'tr' | 'de';
 
 export interface PlayerSettings {
     language: GameLanguage;
     smoothMode?: boolean;
+}
+
+export interface PlayerAssetState {
+    assetId: string;
+    condition: number;
+    currentValue?: number;
+    valueTrend?: number;
+    marketCycle?: string;
+    neighborhoodTier?: string;
+    rentDemand?: number;
+    vacancyChance?: number;
+    vacancyWeeks?: number;
+    rentalListed?: boolean;
+    weeklyRent?: number;
+    lifetimeRevenue?: number;
+    listedWeek?: number;
+    lastMaintainedWeek?: number;
 }
 
 export interface Player {
@@ -2799,8 +2885,9 @@ export interface Player {
     currentWeek: number;
     assets: string[];
     customItems: (Property | Vehicle)[];
+    assetStates: PlayerAssetState[];
     residenceId: string | null;
-    activeClothingStyle: SettableClothingStyle;
+    activeVehicleId: string | null;
     commitments: Commitment[];
     activeReleases: ActiveRelease[];
     pastProjects: PastProject[];
@@ -2929,8 +3016,9 @@ export const INITIAL_PLAYER: Player = {
     currentWeek: 1,
     assets: [],
     customItems: [], // NEW
+    assetStates: [],
     residenceId: null,
-    activeClothingStyle: 'Casual',
+    activeVehicleId: null,
     commitments: [],
     activeReleases: [],
     pastProjects: [],
@@ -3058,7 +3146,14 @@ export const INITIAL_PLAYER: Player = {
             YOUTUBE: { id: 'YOUTUBE', name: 'YouTube', valuation: 1800, reputation: 60, cashReserve: 15000, recentHits: 0, archetype: 'PLATFORM' },
             MARVEL_STUDIOS: { id: 'MARVEL_STUDIOS', name: 'Marvel Studios', valuation: 50, reputation: 90, cashReserve: 6000, recentHits: 0, archetype: 'FRANCHISE' },
             DC_STUDIOS: { id: 'DC_STUDIOS', name: 'DC Studios', valuation: 30, reputation: 80, cashReserve: 4000, recentHits: 0, archetype: 'FRANCHISE' },
-            LUCASFILM: { id: 'LUCASFILM', name: 'Lucasfilm', valuation: 40, reputation: 85, cashReserve: 5000, recentHits: 0, archetype: 'FRANCHISE' }
+            LUCASFILM: { id: 'LUCASFILM', name: 'Lucasfilm', valuation: 40, reputation: 85, cashReserve: 5000, recentHits: 0, archetype: 'FRANCHISE' },
+            SONY_PICTURES: { id: 'SONY_PICTURES', name: 'Sony Pictures', valuation: 45, reputation: 84, cashReserve: 3500, recentHits: 0, archetype: 'LEGACY' },
+            LIONSGATE: { id: 'LIONSGATE', name: 'Lionsgate', valuation: 7, reputation: 76, cashReserve: 900, recentHits: 0, archetype: 'LEGACY' },
+            MGM: { id: 'MGM', name: 'MGM', valuation: 8, reputation: 82, cashReserve: 1200, recentHits: 0, archetype: 'LEGACY' },
+            DREAMWORKS: { id: 'DREAMWORKS', name: 'DreamWorks Pictures', valuation: 15, reputation: 83, cashReserve: 2200, recentHits: 0, archetype: 'LEGACY' },
+            PIXAR: { id: 'PIXAR', name: 'Pixar', valuation: 20, reputation: 96, cashReserve: 3000, recentHits: 0, archetype: 'PRESTIGE' },
+            SEARCHLIGHT: { id: 'SEARCHLIGHT', name: 'Searchlight Pictures', valuation: 5, reputation: 93, cashReserve: 650, recentHits: 0, archetype: 'PRESTIGE' },
+            AMAZON_STUDIOS: { id: 'AMAZON_STUDIOS', name: 'Amazon Studios', valuation: 150, reputation: 82, cashReserve: 8000, recentHits: 0, archetype: 'PLATFORM' }
         },
         npcVentures: {}
     },

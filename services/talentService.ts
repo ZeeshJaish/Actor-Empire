@@ -1,4 +1,5 @@
-import { NPCActor, StudioContract, ContractType, PaymentMode, NPCTier } from '../types';
+import { GameLanguage, NPCActor, StudioContract, ContractType, PaymentMode, NPCTier } from '../types';
+import { t } from './i18n';
 
 const TIER_BASE_VALUE: Record<NPCTier, number> = {
     'ICON': 40_000_000,
@@ -47,53 +48,53 @@ export interface TalentOfferEvaluation {
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
-export const getTalentNegotiationProfile = (npc: NPCActor): NegotiationProfile => {
+export const getTalentNegotiationProfile = (npc: NPCActor, language: GameLanguage = 'en'): NegotiationProfile => {
     const traits = new Set(npc.traits || []);
 
     if (traits.has('DIVA') || traits.has('UNRELIABLE')) {
         return {
             id: 'EGO',
-            label: 'Ego Driven',
-            summary: 'Needs a premium or a very convincing studio pitch.'
+            label: t(language, 'services.talentService.profile.EGO.label'),
+            summary: t(language, 'services.talentService.profile.EGO.summary')
         };
     }
 
     if (npc.isIndependent && npc.tier !== 'UNKNOWN') {
         return {
             id: 'INDEPENDENT',
-            label: 'Independent',
-            summary: 'Harder to lock down, especially for long commitments.'
+            label: t(language, 'services.talentService.profile.INDEPENDENT.label'),
+            summary: t(language, 'services.talentService.profile.INDEPENDENT.summary')
         };
     }
 
     if (npc.prestigeBias === 'PRESTIGE' || traits.has('METHOD')) {
         return {
             id: 'PRESTIGE',
-            label: 'Prestige Driven',
-            summary: 'Cares about studio reputation as much as money.'
+            label: t(language, 'services.talentService.profile.PRESTIGE.label'),
+            summary: t(language, 'services.talentService.profile.PRESTIGE.summary')
         };
     }
 
     if ((npc.tier === 'UNKNOWN' || npc.tier === 'INDIE' || npc.tier === 'RISING') && (npc.potential || 0) >= 80) {
         return {
             id: 'BREAKOUT',
-            label: 'Breakout Hungry',
-            summary: 'May accept a leaner deal if the opportunity feels real.'
+            label: t(language, 'services.talentService.profile.BREAKOUT.label'),
+            summary: t(language, 'services.talentService.profile.BREAKOUT.summary')
         };
     }
 
     if (npc.prestigeBias === 'COMMERCIAL' || (npc.netWorth || 0) < 15_000_000) {
         return {
             id: 'MONEY',
-            label: 'Money Motivated',
-            summary: 'A stronger number can quickly change the mood.'
+            label: t(language, 'services.talentService.profile.MONEY.label'),
+            summary: t(language, 'services.talentService.profile.MONEY.summary')
         };
     }
 
     return {
         id: 'PROFESSIONAL',
-        label: 'Professional',
-        summary: 'Usually responds to fair money and reasonable terms.'
+        label: t(language, 'services.talentService.profile.PROFESSIONAL.label'),
+        summary: t(language, 'services.talentService.profile.PROFESSIONAL.summary')
     };
 };
 
@@ -127,51 +128,63 @@ const buildNegotiationMessage = (
     offerRatio: number,
     paymentMode: PaymentMode,
     offeredAmount: number,
-    studioPull: number
+    studioPull: number,
+    language: GameLanguage = 'en'
 ) => {
     const amount = `$${offeredAmount.toLocaleString()}${paymentMode === 'WEEKLY_INSTALLMENTS' ? '/wk' : ''}`;
+    let messageKey = 'standardReject';
 
     if (success) {
         if (offerRatio >= 2) {
-            return `That number changes things. I accept ${amount}.`;
+            messageKey = 'hugeAccept';
+            return t(language, `services.talentService.negotiation.${messageKey}`, { amount });
         }
 
         if (offerRatio < 0.8) {
-            return `I believe in what your studio is building. I will take the chance at ${amount}.`;
+            messageKey = 'leanStudioAccept';
+            return t(language, `services.talentService.negotiation.${messageKey}`, { amount });
         }
 
         if (profile.id === 'PRESTIGE' && studioPull >= 14) {
-            return `The money is fair, and the studio momentum makes it worth it. I am in.`;
+            messageKey = 'prestigeMomentumAccept';
+            return t(language, `services.talentService.negotiation.${messageKey}`, { amount });
         }
 
         if (profile.id === 'INDEPENDENT') {
-            return `I usually stay independent, but this deal makes sense. I accept.`;
+            messageKey = 'independentAccept';
+            return t(language, `services.talentService.negotiation.${messageKey}`, { amount });
         }
 
-        return `I accept your offer of ${amount}. Let's make something great.`;
+        messageKey = 'standardAccept';
+        return t(language, `services.talentService.negotiation.${messageKey}`, { amount });
     }
 
     if (offerRatio >= 2.5) {
-        return `The offer is huge, but the timing and commitment still do not feel right for me.`;
+        messageKey = 'hugeReject';
+        return t(language, `services.talentService.negotiation.${messageKey}`, { amount });
     }
 
     if (profile.id === 'INDEPENDENT') {
-        return `I would consider something shorter or richer, but I am not ready to be locked in like that.`;
+        messageKey = 'independentReject';
+        return t(language, `services.talentService.negotiation.${messageKey}`, { amount });
     }
 
     if (profile.id === 'PRESTIGE' && studioPull < 12) {
-        return `The money helps, but I am chasing the right project and reputation right now.`;
+        messageKey = 'prestigeReject';
+        return t(language, `services.talentService.negotiation.${messageKey}`, { amount });
     }
 
     if (profile.id === 'EGO') {
-        return `For a long-term deal, I need an undeniable number.`;
+        messageKey = 'egoReject';
+        return t(language, `services.talentService.negotiation.${messageKey}`, { amount });
     }
 
     if (offerRatio < 0.7) {
-        return `That is too far below my market. I cannot take it seriously.`;
+        messageKey = 'lowReject';
+        return t(language, `services.talentService.negotiation.${messageKey}`, { amount });
     }
 
-    return `It is close, but not enough for me to sign this commitment.`;
+    return t(language, `services.talentService.negotiation.${messageKey}`, { amount });
 };
 
 export const evaluateOffer = (
@@ -180,18 +193,19 @@ export const evaluateOffer = (
     offeredAmount: number,
     paymentMode: PaymentMode,
     playerFame: number,
-    studioValuation: number
+    studioValuation: number,
+    language: GameLanguage = 'en'
 ): TalentOfferEvaluation => {
     if (duration > 10) {
-        return { success: false, message: "A deal for that many movies is unrealistic. I'm not signing my life away.", maintenanceFee: 0, totalContractValue: 0 };
+        return { success: false, message: t(language, 'services.talentService.validation.tooManyMovies'), maintenanceFee: 0, totalContractValue: 0 };
     }
     if (duration < 1) {
-        return { success: false, message: "I need at least a one-movie commitment.", maintenanceFee: 0, totalContractValue: 0 };
+        return { success: false, message: t(language, 'services.talentService.validation.tooFewMovies'), maintenanceFee: 0, totalContractValue: 0 };
     }
 
     const ask = calculateNPCAsk(npc, duration);
     const baseAsk = paymentMode === 'UPFRONT' ? ask.totalAmount : ask.weeklyInstallment;
-    const profile = getTalentNegotiationProfile(npc);
+    const profile = getTalentNegotiationProfile(npc, language);
     const offerRatio = baseAsk > 0 ? offeredAmount / baseAsk : 0;
     const totalContractValue = paymentMode === 'UPFRONT' ? offeredAmount : offeredAmount * 52;
     const traits = new Set(npc.traits || []);
@@ -224,7 +238,7 @@ export const evaluateOffer = (
 
     return {
         success,
-        message: buildNegotiationMessage(npc, profile, success, offerRatio, paymentMode, offeredAmount, studioPull),
+        message: buildNegotiationMessage(npc, profile, success, offerRatio, paymentMode, offeredAmount, studioPull, language),
         maintenanceFee: ask.maintenanceFee,
         totalContractValue: success ? totalContractValue : 0,
         acceptanceChance,

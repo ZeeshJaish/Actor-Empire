@@ -21,6 +21,7 @@ import { OwnedRightDevelopmentBrief } from './components/OwnedRightDevelopmentBr
 import { OwnedIpDossier } from './components/OwnedIpDossier';
 import { getOwnedIpPerformance } from '../../../services/ownedIpPerformance';
 import { deriveStudioOriginalRights } from '../../../services/studioOriginalIp';
+import { getPlayerLanguage, t } from '../../../services/i18n';
 
 interface DevelopmentLabProps {
     player: Player;
@@ -199,16 +200,16 @@ const formatCurrency = (amount: number): string => {
     return `$${amount}`;
 };
 
-const getOwnedIpTypePresentation = (type: OwnedRight['propertyType']) => {
+const getOwnedIpTypePresentation = (type: OwnedRight['propertyType'], language: ReturnType<typeof getPlayerLanguage>) => {
     switch (type) {
         case 'CHARACTER':
-            return { label: 'Character IP', Icon: Users, tone: 'border-sky-400/35 bg-sky-400/10 text-sky-300' };
+            return { label: t(language, 'developmentLab.ipType.CHARACTER'), Icon: Users, tone: 'border-sky-400/35 bg-sky-400/10 text-sky-300' };
         case 'STORY_WORLD':
-            return { label: 'Story World IP', Icon: Globe, tone: 'border-violet-400/35 bg-violet-400/10 text-violet-300' };
+            return { label: t(language, 'developmentLab.ipType.STORY_WORLD'), Icon: Globe, tone: 'border-violet-400/35 bg-violet-400/10 text-violet-300' };
         case 'FRANCHISE':
-            return { label: 'Franchise IP', Icon: Layers, tone: 'border-amber-400/35 bg-amber-400/10 text-amber-300' };
+            return { label: t(language, 'developmentLab.ipType.FRANCHISE'), Icon: Layers, tone: 'border-amber-400/35 bg-amber-400/10 text-amber-300' };
         case 'CATALOG':
-            return { label: 'Catalog IP', Icon: Archive, tone: 'border-teal-400/35 bg-teal-400/10 text-teal-300' };
+            return { label: t(language, 'developmentLab.ipType.CATALOG'), Icon: Archive, tone: 'border-teal-400/35 bg-teal-400/10 text-teal-300' };
     }
 };
 
@@ -241,6 +242,8 @@ const getUniverseCharacterTimelineParts = (char: any) => {
 
 export const DevelopmentLab: React.FC<DevelopmentLabProps> = ({ player, studio, onBack, onUpdatePlayer, onOpenProject, initialRightsMarketOpportunityId, onRightsMarketTargetConsumed, initialTab, initialProjectType }) => {
     const [activeTab, setActiveTab] = useState<DevTab>(initialRightsMarketOpportunityId ? 'IP_MARKET' : initialTab || 'VAULT');
+    const language = getPlayerLanguage(player);
+    const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
 
     useEffect(() => {
         if (initialRightsMarketOpportunityId) setActiveTab('IP_MARKET');
@@ -278,7 +281,7 @@ export const DevelopmentLab: React.FC<DevelopmentLabProps> = ({ player, studio, 
     const handleRefreshMarket = () => {
         if (studio.balance >= 250000) {
             const newMarket = generateIPMarket(6, studioState.purchasedIPTitles || [], player.currentWeek);
-            const marketTrends = createMarketTrends(player.currentWeek);
+            const marketTrends = createMarketTrends(player.currentWeek, language);
             const newWriters = generateWriters(10);
             
             const updatedStudio = { 
@@ -327,7 +330,7 @@ export const DevelopmentLab: React.FC<DevelopmentLabProps> = ({ player, studio, 
             updatedState = { 
                 ...updatedState,
                 ipMarket: newMarket,
-                marketTrends: createMarketTrends(player.currentWeek),
+                marketTrends: createMarketTrends(player.currentWeek, language),
                 writers: newWriters,
                 lastMarketRefreshWeek: player.currentWeek,
                 lastWriterRefreshWeek: player.currentWeek
@@ -367,8 +370,8 @@ export const DevelopmentLab: React.FC<DevelopmentLabProps> = ({ player, studio, 
                             <ArrowLeft size={20} />
                         </button>
                         <div>
-                            <h1 className="text-xl font-black tracking-tight leading-none">Development Lab</h1>
-	                            <p className="text-[10px] text-zinc-400 mt-1 uppercase tracking-wider">Where ideas become scripts</p>
+                            <h1 className="text-xl font-black tracking-tight leading-none">{tr('developmentLab.title')}</h1>
+	                            <p className="text-[10px] text-zinc-400 mt-1 uppercase tracking-wider">{tr('developmentLab.subtitle')}</p>
                         </div>
                     </div>
                 </div>
@@ -376,11 +379,11 @@ export const DevelopmentLab: React.FC<DevelopmentLabProps> = ({ player, studio, 
                 {/* Tabs */}
                 <div className="flex overflow-x-auto no-scrollbar border-b border-zinc-800/30 bg-zinc-950/50 px-2">
                     {[
-                        { id: 'VAULT', label: 'Vault', icon: <BookOpen size={14} /> },
-                        { id: 'NEW_CONCEPT', label: 'Concept', icon: <Sparkles size={14} /> },
-                        { id: 'IP_MARKET', label: 'Market', icon: <ShoppingCart size={14} /> },
-                        { id: 'FRANCHISES', label: 'Franchise', icon: <Layers size={14} /> },
-                        { id: 'UNIVERSE', label: 'Universe', icon: <Globe size={14} /> }
+                        { id: 'VAULT', labelKey: 'developmentLab.tab.vault', icon: <BookOpen size={14} /> },
+                        { id: 'NEW_CONCEPT', labelKey: 'developmentLab.tab.concept', icon: <Sparkles size={14} /> },
+                        { id: 'IP_MARKET', labelKey: 'developmentLab.tab.market', icon: <ShoppingCart size={14} /> },
+                        { id: 'FRANCHISES', labelKey: 'developmentLab.tab.franchise', icon: <Layers size={14} /> },
+                        { id: 'UNIVERSE', labelKey: 'developmentLab.tab.universe', icon: <Globe size={14} /> }
                     ].map(tab => {
                         const isActive = activeTab === tab.id;
                         return (
@@ -395,7 +398,7 @@ export const DevelopmentLab: React.FC<DevelopmentLabProps> = ({ player, studio, 
                                     {tab.icon}
                                 </div>
                                 <span className={`text-[10px] font-black uppercase tracking-widest text-center ${isActive ? 'opacity-100' : 'opacity-60'}`}>
-                                    {tab.label}
+                                    {tr(tab.labelKey)}
                                 </span>
                                 {isActive && (
                                     <motion.div 
@@ -541,7 +544,7 @@ export const DevelopmentLab: React.FC<DevelopmentLabProps> = ({ player, studio, 
                         });
                     }}
                 />}
-                {activeTab === 'NEW_CONCEPT' && <ScriptWizard key={`${studio.id}_${initialProjectType || 'ANY'}`} initialProjectType={initialProjectType} onComplete={(script) => {
+                {activeTab === 'NEW_CONCEPT' && <ScriptWizard key={`${studio.id}_${initialProjectType || 'ANY'}`} language={language} initialProjectType={initialProjectType} onComplete={(script) => {
                     handleUpdateStudioState({ scripts: [...studioState.scripts, { ...script, createdAtWeek: player.currentWeek }] });
                     setActiveTab('VAULT');
                 }} />}
@@ -554,7 +557,8 @@ export const DevelopmentLab: React.FC<DevelopmentLabProps> = ({ player, studio, 
 	                    onRightsMarketTargetConsumed={onRightsMarketTargetConsumed}
 	                    playerMoney={studio.balance}
 	                    currentWeek={player.currentWeek}
-	                    marketTrends={studioState.marketTrends || createMarketTrends(player.currentWeek)}
+	                    marketTrends={studioState.marketTrends || createMarketTrends(player.currentWeek, language)}
+                        language={language}
                     weeksUntilRefresh={3 - (player.currentWeek % 3)}
                     onRefresh={handleRefreshMarket}
                     onBuy={(script, cost) => {
@@ -618,6 +622,8 @@ const ScriptVault: React.FC<{
     onDeductEnergy: (amount: number) => void,
     onDeductMoney: (amount: number) => void
 }> = ({ scripts, writers, studioBalance, studioId, player, ownedRights, onOpenProject, onOpenFranchise, onOpenUniverse, onRenewRight, onDevelopRight, onAssign, onUpdateScript, onDelete, onRename, onDeductEnergy, onDeductMoney }) => {
+    const language = getPlayerLanguage(player);
+    const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
     const [selectedScriptForAssignment, setSelectedScriptForAssignment] = useState<string | null>(null);
     const [assignmentMode, setAssignmentMode] = useState<'CHOICE' | 'HIRE' | 'WIZARD' | 'DOCTOR'>('CHOICE');
     const [confirmation, setConfirmation] = useState<string | null>(null);
@@ -699,6 +705,7 @@ const ScriptVault: React.FC<{
                         </div>
                     </div>
                     <ScriptWizard 
+                        language={language}
                         initialScript={script}
                         onComplete={(updatedScript) => {
                             onUpdateScript(updatedScript);
@@ -1150,8 +1157,8 @@ const ScriptVault: React.FC<{
         <div className="space-y-6">
             <div className="grid grid-cols-2 rounded-xl border border-zinc-800 bg-zinc-950 p-1">
                 {[
-                    { id: 'SCRIPTS', label: 'Scripts', icon: <BookOpen size={14} /> },
-                        { id: 'RIGHTS', label: 'IP', icon: <Archive size={14} /> },
+                    { id: 'SCRIPTS', labelKey: 'developmentLab.vault.scripts', icon: <BookOpen size={14} /> },
+                        { id: 'RIGHTS', labelKey: 'developmentLab.vault.ip', icon: <Archive size={14} /> },
                 ].map(lane => (
                     <button
                         key={lane.id}
@@ -1163,7 +1170,7 @@ const ScriptVault: React.FC<{
                         }`}
                     >
                         {lane.icon}
-                        {lane.label}
+                        {tr(lane.labelKey)}
                     </button>
                 ))}
             </div>
@@ -1171,25 +1178,25 @@ const ScriptVault: React.FC<{
             {vaultLane === 'RIGHTS' ? ownedRights.length === 0 ? (
                 <div className="flex min-h-64 flex-col items-center justify-center rounded-2xl border border-dashed border-zinc-800 bg-zinc-950/60 px-6 text-center">
                     <Archive size={42} className="mb-4 text-amber-400/35" />
-                    <p className="text-sm font-black uppercase tracking-wider text-zinc-300">No owned IP yet</p>
+                    <p className="text-sm font-black uppercase tracking-wider text-zinc-300">{tr('developmentLab.vault.noOwnedIp')}</p>
                     <p className="mt-2 max-w-sm text-xs leading-relaxed text-zinc-600">
-                        Completed IP acquisitions will appear here without mixing ownership records into your working scripts.
+                        {tr('developmentLab.vault.noOwnedIpBody')}
                     </p>
                 </div>
             ) : (
                 <div className="space-y-3">
                     <div className="border-l-2 border-amber-400 pl-4">
-                        <p className="text-[9px] font-black uppercase tracking-[0.22em] text-amber-400">Owned IP</p>
-                        <h3 className="mt-1 text-xl font-black uppercase text-white">IP Library</h3>
+                        <p className="text-[9px] font-black uppercase tracking-[0.22em] text-amber-400">{tr('developmentLab.vault.ownedIp')}</p>
+                        <h3 className="mt-1 text-xl font-black uppercase text-white">{tr('developmentLab.vault.ipLibrary')}</h3>
                         <p className="mt-2 text-xs leading-relaxed text-zinc-500">
-                            Manage acquired and studio-created IP, then expand it through the existing production systems.
+                            {tr('developmentLab.vault.ipLibraryBody')}
                         </p>
                     </div>
                     <div className="grid grid-cols-3 rounded-xl border border-white/10 bg-zinc-950 p-1">
                         {[
-                            { id: 'ALL', label: 'All IP', count: ownedRights.length },
-                            { id: 'ACQUIRED', label: 'Acquired', count: ownedRights.filter(right => right.ownershipSource !== 'STUDIO_ORIGINAL').length },
-                            { id: 'STUDIO_ORIGINAL', label: 'Originals', count: ownedRights.filter(right => right.ownershipSource === 'STUDIO_ORIGINAL').length },
+                            { id: 'ALL', labelKey: 'developmentLab.vault.filter.allIp', count: ownedRights.length },
+                            { id: 'ACQUIRED', labelKey: 'developmentLab.vault.filter.acquired', count: ownedRights.filter(right => right.ownershipSource !== 'STUDIO_ORIGINAL').length },
+                            { id: 'STUDIO_ORIGINAL', labelKey: 'developmentLab.vault.filter.originals', count: ownedRights.filter(right => right.ownershipSource === 'STUDIO_ORIGINAL').length },
                         ].map(filter => (
                             <button
                                 key={filter.id}
@@ -1197,7 +1204,7 @@ const ScriptVault: React.FC<{
                                 onClick={() => setIpSourceFilter(filter.id as typeof ipSourceFilter)}
                                 className={`min-h-9 rounded-lg text-[7px] font-black uppercase tracking-[0.13em] transition-colors ${ipSourceFilter === filter.id ? 'bg-zinc-800 text-white' : 'text-zinc-600 hover:text-zinc-300'}`}
                             >
-                                {filter.label} <span className="ml-1 font-mono text-[7px] text-amber-300">{filter.count}</span>
+                                {tr(filter.labelKey)} <span className="ml-1 font-mono text-[7px] text-amber-300">{filter.count}</span>
                             </button>
                         ))}
                     </div>
@@ -1207,7 +1214,7 @@ const ScriptVault: React.FC<{
                         const permanent = right.expiresAtWeek === undefined;
                         const isStudioOriginal = right.ownershipSource === 'STUDIO_ORIGINAL';
                         const lifetimeGross = ownedIpPerformanceById.get(right.id)?.lifetimeGross || 0;
-                        const ipType = getOwnedIpTypePresentation(right.propertyType);
+                        const ipType = getOwnedIpTypePresentation(right.propertyType, language);
                         const IpTypeIcon = ipType.Icon;
                         return (
                             <article
@@ -1477,7 +1484,8 @@ const ScriptDoctorPanel: React.FC<{
 
 type ScriptBuilderStep = 'IDEA' | 'IDENTITY' | 'STORY' | 'DRAFT';
 
-const ScriptWizard: React.FC<{ onComplete: (script: Script) => void, initialScript?: Script, initialProjectType?: ProjectType }> = ({ onComplete, initialScript, initialProjectType }) => {
+const ScriptWizard: React.FC<{ onComplete: (script: Script) => void, language: ReturnType<typeof getPlayerLanguage>, initialScript?: Script, initialProjectType?: ProjectType }> = ({ onComplete, language, initialScript, initialProjectType }) => {
+    const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
     const [step, setStep] = useState<ScriptBuilderStep>(initialScript ? 'STORY' : 'IDEA');
     const [storyIndex, setStoryIndex] = useState(0);
     const [title, setTitle] = useState(initialScript?.title || '');
@@ -1523,10 +1531,10 @@ const ScriptWizard: React.FC<{ onComplete: (script: Script) => void, initialScri
     const displayedPremise = premiseEdited ? draftPremise : suggestedPremise;
     const finalPremise = (displayedPremise.trim() || suggestedPremise).slice(0, CUSTOM_PREMISE_MAX_LENGTH);
     const builderSteps: { id: ScriptBuilderStep; label: string; short: string }[] = [
-        { id: 'IDEA', label: 'Concept Basics', short: 'Basics' },
-        { id: 'IDENTITY', label: 'Genre & Subject', short: 'Genre' },
-        { id: 'STORY', label: 'Story Choices', short: 'Story' },
-        { id: 'DRAFT', label: 'Final Review', short: 'Review' }
+        { id: 'IDEA', label: tr('developmentLab.builder.step.idea.label'), short: tr('developmentLab.builder.step.idea.short') },
+        { id: 'IDENTITY', label: tr('developmentLab.builder.step.identity.label'), short: tr('developmentLab.builder.step.identity.short') },
+        { id: 'STORY', label: tr('developmentLab.builder.step.story.label'), short: tr('developmentLab.builder.step.story.short') },
+        { id: 'DRAFT', label: tr('developmentLab.builder.step.draft.label'), short: tr('developmentLab.builder.step.draft.short') }
     ];
     const stepIndex = builderSteps.findIndex(s => s.id === step);
     const safeStoryIndex = Math.min(storyIndex, Math.max(questions.length - 1, 0));
@@ -1535,7 +1543,7 @@ const ScriptWizard: React.FC<{ onComplete: (script: Script) => void, initialScri
     const canLeaveIdea = Boolean(title.trim());
     const canLeaveIdentity = Boolean(primaryGenre && (!needsSubject || subjectName.trim()));
     const canLeaveStory = !currentQuestion || Boolean(selectedQuestionChoice);
-    const currentStepLabel = builderSteps[stepIndex]?.label || 'Script Builder';
+    const currentStepLabel = builderSteps[stepIndex]?.label || tr('developmentLab.builder.scriptBuilder');
     const audienceTone: Record<TargetAudience, string> = {
         G: 'bg-emerald-400 text-black border-emerald-300 shadow-[0_10px_24px_rgba(52,211,153,0.15)]',
         PG: 'bg-lime-300 text-black border-lime-200 shadow-[0_10px_24px_rgba(190,242,100,0.13)]',
@@ -2067,10 +2075,12 @@ const IPMarket: React.FC<{
     weeksUntilRefresh: number,
     currentWeek: number,
     marketTrends: ReturnType<typeof createMarketTrends>,
+    language: ReturnType<typeof getPlayerLanguage>,
     initialRightsMarketOpportunityId?: string,
     onRightsMarketTargetConsumed?: () => void,
-}> = ({ market, player, studio, onUpdatePlayer, playerMoney, onBuy, onRefresh, weeksUntilRefresh, currentWeek, marketTrends, initialRightsMarketOpportunityId, onRightsMarketTargetConsumed }) => {
+}> = ({ market, player, studio, onUpdatePlayer, playerMoney, onBuy, onRefresh, weeksUntilRefresh, currentWeek, marketTrends, language, initialRightsMarketOpportunityId, onRightsMarketTargetConsumed }) => {
     const [marketLane, setMarketLane] = useState<StudioMarketLane>('SCRIPTS');
+    const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
 
     useEffect(() => {
         if (initialRightsMarketOpportunityId) setMarketLane('PROPERTIES');
@@ -2094,8 +2104,8 @@ const IPMarket: React.FC<{
 
             <div className="grid grid-cols-2 rounded-xl border border-zinc-800 bg-zinc-950 p-1">
                 {[
-                    { id: 'SCRIPTS', label: 'Scripts', icon: <PenTool size={13} /> },
-                    { id: 'PROPERTIES', label: 'IP Rights', icon: <Globe size={13} /> },
+                    { id: 'SCRIPTS', labelKey: 'developmentLab.vault.scripts', icon: <PenTool size={13} /> },
+                    { id: 'PROPERTIES', labelKey: 'developmentLab.market.ipRights', icon: <Globe size={13} /> },
                 ].map(lane => (
                     <button
                         key={lane.id}
@@ -2107,7 +2117,7 @@ const IPMarket: React.FC<{
                         }`}
                     >
                         {lane.icon}
-                        {lane.label}
+                        {tr(lane.labelKey)}
                     </button>
                 ))}
             </div>
@@ -2123,6 +2133,7 @@ const IPMarket: React.FC<{
                     weeksUntilRefresh={weeksUntilRefresh}
                     currentWeek={currentWeek}
                     marketTrends={marketTrends}
+                    language={language}
                 />
             )}
         </div>
@@ -2136,9 +2147,11 @@ const SourceMaterialMarket: React.FC<{
     onRefresh: () => void,
     weeksUntilRefresh: number,
     currentWeek: number,
-    marketTrends: ReturnType<typeof createMarketTrends>
-}> = ({ market, playerMoney, onBuy, onRefresh, weeksUntilRefresh, currentWeek, marketTrends }) => {
+    marketTrends: ReturnType<typeof createMarketTrends>,
+    language: ReturnType<typeof getPlayerLanguage>
+}> = ({ market, playerMoney, onBuy, onRefresh, weeksUntilRefresh, currentWeek, marketTrends, language }) => {
     const [filter, setFilter] = useState<'ALL' | 'TRENDING' | 'MOVIE' | 'SERIES'>('ALL');
+    const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
 
     const filteredMarket = (market || []).filter(s => {
         if (filter === 'ALL') return true;
@@ -2151,16 +2164,16 @@ const SourceMaterialMarket: React.FC<{
             <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-8">
                 <div className="flex-1">
                     <h3 className="text-xl font-black tracking-tight uppercase leading-none">
-                        Scripts & Story Rights
+                        {tr('developmentLab.market.sourceTitle')}
                     </h3>
                     <div className="mt-4 space-y-2 max-w-2xl">
 	                        <p className="text-sm text-zinc-400 leading-relaxed">
-                                Buy finished screenplays or secure books, true stories, documentary subjects, and other source material for adaptation.
+                                {tr('developmentLab.market.sourceSubtitle')}
 	                        </p>
                         <div className="flex items-center gap-4">
                             <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-amber-500/80 bg-amber-500/5 px-3 py-1.5 rounded-lg border border-amber-500/10 w-fit">
                                 <Clock size={12} />
-                                Market refreshes in {weeksUntilRefresh} {weeksUntilRefresh === 1 ? 'week' : 'weeks'}
+                                {tr(weeksUntilRefresh === 1 ? 'developmentLab.market.refreshesInWeek' : 'developmentLab.market.refreshesInWeeks', { weeks: weeksUntilRefresh })}
                             </div>
                             <button 
                                 onClick={onRefresh}
@@ -2172,7 +2185,7 @@ const SourceMaterialMarket: React.FC<{
                                 }`}
                             >
                                 <RefreshCw size={12} className={playerMoney >= 250000 ? 'animate-spin' : ''} />
-                                Refresh Now ($250,000)
+                                {tr('developmentLab.market.refreshNow', { amount: formatCurrency(250000) })}
                             </button>
                         </div>
                     </div>
@@ -2182,10 +2195,10 @@ const SourceMaterialMarket: React.FC<{
             {/* E-commerce Filters */}
             <div className="flex gap-4 overflow-x-auto pb-2 hide-scrollbar border-b border-zinc-800/20">
 	                {[
-	                    { id: 'ALL', label: 'All' },
-	                    { id: 'TRENDING', label: 'Trending' },
-	                    { id: 'MOVIE', label: 'Movie' },
-	                    { id: 'SERIES', label: 'Series' }
+	                    { id: 'ALL', labelKey: 'developmentLab.market.filter.all' },
+	                    { id: 'TRENDING', labelKey: 'developmentLab.market.filter.trending' },
+	                    { id: 'MOVIE', labelKey: 'developmentLab.market.filter.movie' },
+	                    { id: 'SERIES', labelKey: 'developmentLab.market.filter.series' }
 	                ].map((f) => (
                     <button
                         key={f.id}
@@ -2196,7 +2209,7 @@ const SourceMaterialMarket: React.FC<{
                                 : 'text-zinc-500 hover:text-zinc-400'
                         }`}
                     >
-                        {f.label}
+                        {tr(f.labelKey)}
                         {filter === f.id && (
                             <div className="absolute bottom-[-1px] left-0 right-0 h-[1px] bg-white" />
                         )}
@@ -2207,7 +2220,7 @@ const SourceMaterialMarket: React.FC<{
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-6">
 	                {filteredMarket.map((script, idx) => {
 	                    const demand = getScriptMarketDemand(script, currentWeek, marketTrends);
-	                    const trend = getGenreMarketTrend(script.genres[0] || 'DRAMA', currentWeek, marketTrends);
+	                    const trend = getGenreMarketTrend(script.genres[0] || 'DRAMA', currentWeek, marketTrends, language);
 	                    const cost = script.purchaseCost || Math.floor((script.baseQuality || 50) * 15000 * demand);
 	                    const canAfford = playerMoney >= cost;
                     
@@ -2237,7 +2250,7 @@ const SourceMaterialMarket: React.FC<{
                                         {isBook && (
                                             <div className="flex items-center gap-1 bg-amber-500/90 text-black text-[8px] font-black px-2 py-1 rounded uppercase tracking-widest">
                                                 <BookOpen size={8} />
-                                                Novel
+                                                {tr('developmentLab.market.novel')}
                                             </div>
                                         )}
                                     </div>
@@ -2254,7 +2267,7 @@ const SourceMaterialMarket: React.FC<{
                                     </h3>
                                     {script.author && (
                                         <p className="text-[10px] font-bold text-white/70 mt-2 uppercase tracking-widest italic">
-                                            By {script.author}
+                                            {tr('developmentLab.market.byAuthor', { author: script.author })}
                                         </p>
                                     )}
                                     <div className="flex gap-1 mt-4 flex-wrap">
@@ -2278,7 +2291,7 @@ const SourceMaterialMarket: React.FC<{
                             <div className="p-5 flex flex-col flex-1 justify-between bg-zinc-900/50">
                                 <div className="space-y-3">
 	                                    <div className="flex justify-between items-center">
-	                                        <span className="text-[9px] text-zinc-500 uppercase tracking-widest font-black">{trend.label} Demand</span>
+	                                        <span className="text-[9px] text-zinc-500 uppercase tracking-widest font-black">{tr('developmentLab.market.demandLabel', { label: trend.label })}</span>
 	                                        <div className="flex items-center gap-1">
 	                                            <Star size={10} className="text-amber-500 fill-amber-500" />
 	                                            <span className="text-xs font-mono font-black text-white">{Math.round(demand * 100)}%</span>
@@ -2290,9 +2303,9 @@ const SourceMaterialMarket: React.FC<{
                                             {script.logline}
                                         </p>
                                     )}
-                                    {script.subjectName && (
+                                            {script.subjectName && (
                                         <p className="text-[10px] text-amber-300 font-black uppercase tracking-widest">
-                                            Subject: {script.subjectName}
+                                            {tr('developmentLab.market.subject', { subject: script.subjectName })}
                                         </p>
                                     )}
                                 </div>
@@ -2300,13 +2313,13 @@ const SourceMaterialMarket: React.FC<{
                                 <div className="pt-4 mt-4 border-t border-zinc-800">
                                     <div className="flex items-center justify-between mb-4">
                                         <div className="flex flex-col">
-                                            <span className="text-[8px] text-zinc-500 uppercase tracking-widest font-black">Rights Cost</span>
+                                            <span className="text-[8px] text-zinc-500 uppercase tracking-widest font-black">{tr('developmentLab.market.rightsCost')}</span>
                                             <span className={`text-xl font-mono font-black tracking-tighter ${canAfford ? 'text-white' : 'text-rose-500'}`}>
                                                 {formatCurrency(cost)}
                                             </span>
                                         </div>
                                         <div className="text-right">
-                                            <span className="text-[8px] text-zinc-500 uppercase tracking-widest font-black">Potential</span>
+                                            <span className="text-[8px] text-zinc-500 uppercase tracking-widest font-black">{tr('developmentLab.market.potential')}</span>
                                             <div className="flex gap-1 mt-1 justify-end">
                                                 {[1, 2, 3, 4, 5].map(s => (
                                                     <div key={s} className={`w-1.5 h-1.5 rounded-full ${s <= Math.ceil((script.baseQuality || 0) / 20) ? 'bg-amber-500 shadow-[0_0_5px_rgba(245,158,11,0.5)]' : 'bg-zinc-800'}`} />
@@ -2324,7 +2337,7 @@ const SourceMaterialMarket: React.FC<{
                                         }`}
                                     >
                                         <ShoppingCart size={12} />
-                                        {canAfford ? 'Acquire Rights' : 'Insufficient Funds'}
+                                        {canAfford ? tr('developmentLab.market.acquireRights') : tr('developmentLab.market.insufficientFunds')}
                                     </button>
                                 </div>
                             </div>
@@ -2336,14 +2349,14 @@ const SourceMaterialMarket: React.FC<{
             {filteredMarket.length === 0 && (
                 <div className="flex flex-col items-center justify-center py-20 text-zinc-600 bg-zinc-900/20 rounded-3xl border border-dashed border-zinc-800">
                     <BookOpen size={48} className="mb-4 opacity-20" />
-                    <p className="font-bold uppercase tracking-widest text-xs">No items found in this category</p>
+                    <p className="font-bold uppercase tracking-widest text-xs">{tr('developmentLab.market.noItems')}</p>
                     <button 
                         onClick={onRefresh}
                         disabled={playerMoney < 250000}
                         className="mt-6 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-amber-500 hover:text-amber-400 bg-amber-500/5 hover:bg-amber-500/10 px-6 py-3 rounded-xl border border-amber-500/20 transition-all active:scale-95"
                     >
                         <RefreshCw size={14} />
-                        Force Refresh Market ($250,000)
+                        {tr('developmentLab.market.forceRefresh', { amount: formatCurrency(250000) })}
                     </button>
                 </div>
             )}
@@ -2361,6 +2374,11 @@ const FranchiseManager: React.FC<{
         mode: FranchiseCommissionMode;
         suggestedTitle: string;
     } | null>(null);
+    const language = getPlayerLanguage(player);
+    const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
+    const franchiseMove = (key: string) => tr(`developmentLab.franchise.move.${key}`);
+    const franchiseModeLabel = (mode: FranchiseCommissionMode) => tr(`developmentLab.franchise.mode.${mode}`);
+    const projectTypeLabel = (type: string) => tr(`developmentLab.franchise.projectType.${type.toLowerCase()}`);
 
     const getFranchiseLifecycle = (franchiseId: string, projects: any[]) => {
         const pendingScripts = (studio.studioState?.scripts || []).filter(script => script.franchiseId === franchiseId && script.status !== 'PRODUCED');
@@ -2374,61 +2392,66 @@ const FranchiseManager: React.FC<{
         if (hasPendingReboot) {
             return {
                 state: 'REBOOT_PENDING' as const,
-                label: 'Reboot In Development',
-                description: 'A new era is already being written. Finish or cancel that direction before stacking more moves.',
+                label: tr('developmentLab.franchise.lifecycle.rebootPending.label'),
+                description: tr('developmentLab.franchise.lifecycle.rebootPending.description'),
                 lockMainline: true,
                 lockFinale: true,
                 lockSpinoff: false,
-                recommendedMove: 'Finish Reboot'
+                recommendedMove: franchiseMove('finishReboot'),
+                recommendedMoveKey: 'finishReboot'
             };
         }
 
         if (rebootProjects.length > 0) {
             return {
                 state: 'REBOOTED' as const,
-                label: 'Rebooted Era',
-                description: 'This franchise has restarted with a fresh angle. Sequels are open again, but audience trust depends on consistency.',
+                label: tr('developmentLab.franchise.lifecycle.rebooted.label'),
+                description: tr('developmentLab.franchise.lifecycle.rebooted.description'),
                 lockMainline: false,
                 lockFinale: projects.length < 2,
                 lockSpinoff: false,
-                recommendedMove: 'Build New Era'
+                recommendedMove: franchiseMove('buildNewEra'),
+                recommendedMoveKey: 'buildNewEra'
             };
         }
 
         if (hasPendingFinale) {
             return {
                 state: 'FINALE_PENDING' as const,
-                label: 'Finale In Development',
-                description: 'The closing chapter is already in the script vault. Do not stack another finale.',
+                label: tr('developmentLab.franchise.lifecycle.finalePending.label'),
+                description: tr('developmentLab.franchise.lifecycle.finalePending.description'),
                 lockMainline: true,
                 lockFinale: true,
                 lockSpinoff: false,
-                recommendedMove: 'Finish Finale'
+                recommendedMove: franchiseMove('finishFinale'),
+                recommendedMoveKey: 'finishFinale'
             };
         }
 
         if (hasProducedFinale) {
             return {
                 state: 'CONCLUDED' as const,
-                label: 'Saga Concluded',
-                description: 'The main story is closed. Only spinoffs or a soft reboot should revive it.',
+                label: tr('developmentLab.franchise.lifecycle.concluded.label'),
+                description: tr('developmentLab.franchise.lifecycle.concluded.description'),
                 lockMainline: true,
                 lockFinale: true,
                 lockSpinoff: false,
-                recommendedMove: yearsSinceLatest >= 2 ? 'Soft Reboot' : 'Let It Rest'
+                recommendedMove: yearsSinceLatest >= 2 ? franchiseMove('softReboot') : franchiseMove('letItRest'),
+                recommendedMoveKey: yearsSinceLatest >= 2 ? 'softReboot' : 'letItRest'
             };
         }
 
         return {
             state: yearsSinceLatest >= 4 ? 'RESTING' as const : 'ACTIVE' as const,
-            label: yearsSinceLatest >= 4 ? 'Resting IP' : 'Active Franchise',
+            label: yearsSinceLatest >= 4 ? tr('developmentLab.franchise.lifecycle.resting.label') : tr('developmentLab.franchise.lifecycle.active.label'),
             description: yearsSinceLatest >= 4
-                ? 'The brand has been quiet long enough that a comeback can feel fresh.'
-                : 'The franchise is open for sequels, spinoffs, finales, or reboot planning.',
+                ? tr('developmentLab.franchise.lifecycle.resting.description')
+                : tr('developmentLab.franchise.lifecycle.active.description'),
             lockMainline: false,
             lockFinale: false,
             lockSpinoff: false,
-            recommendedMove: ''
+            recommendedMove: '',
+            recommendedMoveKey: ''
         };
     };
 
@@ -2443,69 +2466,69 @@ const FranchiseManager: React.FC<{
         const fatigue = Math.round(clamp((installmentCount - 1) * 14 + (yearsSinceLatest <= 1 ? 18 : 0) - Math.max(0, (avgRating - 7) * 8)));
         const demand = Math.round(clamp((totalGross / 250_000_000) * 16 + avgRating * 6 + Math.max(0, 18 - yearsSinceLatest * 4) - fatigue * 0.25));
 
-        let verdict = 'Protect the IP';
-        let bestMove = 'Pause Franchise';
-        let demandLabel = 'Cult';
-        let riskLabel = 'Medium Risk';
+        let verdict = tr('developmentLab.franchise.pulse.default.verdict');
+        let bestMove = franchiseMove('pauseFranchise');
+        let demandLabel = tr('developmentLab.franchise.pulse.demand.cult');
+        let riskLabel = tr('developmentLab.franchise.pulse.risk.medium');
         let tone = 'text-amber-300';
 
         if (demand >= 75 && fatigue < 55) {
-            verdict = 'Audience is hungry';
-            bestMove = 'Commission Sequel';
-            demandLabel = 'Hot';
-            riskLabel = 'Low Risk';
+            verdict = tr('developmentLab.franchise.pulse.hot.verdict');
+            bestMove = franchiseMove('commissionSequel');
+            demandLabel = tr('developmentLab.franchise.pulse.demand.hot');
+            riskLabel = tr('developmentLab.franchise.pulse.risk.low');
             tone = 'text-emerald-300';
         } else if (fatigue >= 70) {
-            verdict = 'Fans need breathing room';
-            bestMove = 'Pause or Spinoff';
-            demandLabel = 'Tired';
-            riskLabel = 'High Risk';
+            verdict = tr('developmentLab.franchise.pulse.tired.verdict');
+            bestMove = franchiseMove('pauseOrSpinoff');
+            demandLabel = tr('developmentLab.franchise.pulse.demand.tired');
+            riskLabel = tr('developmentLab.franchise.pulse.risk.high');
             tone = 'text-rose-300';
         } else if (health >= 78 && installmentCount >= 3) {
-            verdict = 'Ready for a big closer';
-            bestMove = 'Event Finale';
-            demandLabel = 'Premium';
-            riskLabel = 'Medium Risk';
+            verdict = tr('developmentLab.franchise.pulse.premium.verdict');
+            bestMove = franchiseMove('eventFinale');
+            demandLabel = tr('developmentLab.franchise.pulse.demand.premium');
+            riskLabel = tr('developmentLab.franchise.pulse.risk.medium');
             tone = 'text-sky-300';
         } else if (demand >= 55) {
-            verdict = 'Expansion window open';
-            bestMove = 'Develop Spinoff';
-            demandLabel = 'Rising';
-            riskLabel = 'Medium Risk';
+            verdict = tr('developmentLab.franchise.pulse.expansion.verdict');
+            bestMove = franchiseMove('developSpinoff');
+            demandLabel = tr('developmentLab.franchise.pulse.demand.rising');
+            riskLabel = tr('developmentLab.franchise.pulse.risk.medium');
             tone = 'text-violet-300';
         } else if (health < 48 && installmentCount >= 2) {
-            verdict = 'Brand needs a reset';
-            bestMove = 'Soft Reboot';
-            demandLabel = 'Cold';
-            riskLabel = 'High Risk';
+            verdict = tr('developmentLab.franchise.pulse.reset.verdict');
+            bestMove = franchiseMove('softReboot');
+            demandLabel = tr('developmentLab.franchise.pulse.demand.cold');
+            riskLabel = tr('developmentLab.franchise.pulse.risk.high');
             tone = 'text-orange-300';
         }
 
         if (franchiseId) {
             const lifecycle = getFranchiseLifecycle(franchiseId, projects);
             if (lifecycle.state === 'CONCLUDED') {
-                verdict = 'Saga concluded';
+                verdict = tr('developmentLab.franchise.pulse.concluded.verdict');
                 bestMove = lifecycle.recommendedMove;
-                demandLabel = 'Closed';
-                riskLabel = lifecycle.recommendedMove === 'Soft Reboot' ? 'Reboot Window' : 'Let It Rest';
+                demandLabel = tr('developmentLab.franchise.pulse.demand.closed');
+                riskLabel = lifecycle.recommendedMoveKey === 'softReboot' ? tr('developmentLab.franchise.pulse.risk.rebootWindow') : franchiseMove('letItRest');
                 tone = 'text-blue-300';
             } else if (lifecycle.state === 'FINALE_PENDING') {
-                verdict = 'Finale already moving';
-                bestMove = 'Finish Finale';
-                demandLabel = 'Pending';
-                riskLabel = 'Do Not Stack';
+                verdict = tr('developmentLab.franchise.pulse.finalePending.verdict');
+                bestMove = franchiseMove('finishFinale');
+                demandLabel = tr('developmentLab.franchise.pulse.demand.pending');
+                riskLabel = tr('developmentLab.franchise.pulse.risk.doNotStack');
                 tone = 'text-blue-300';
             } else if (lifecycle.state === 'REBOOT_PENDING') {
-                verdict = 'Reboot in development';
-                bestMove = 'Finish Reboot';
-                demandLabel = 'Resetting';
-                riskLabel = 'Transition Risk';
+                verdict = tr('developmentLab.franchise.pulse.rebootPending.verdict');
+                bestMove = franchiseMove('finishReboot');
+                demandLabel = tr('developmentLab.franchise.pulse.demand.resetting');
+                riskLabel = tr('developmentLab.franchise.pulse.risk.transition');
                 tone = 'text-rose-300';
             } else if (lifecycle.state === 'REBOOTED') {
-                verdict = 'New era active';
-                bestMove = demand >= 60 ? 'Commission Sequel' : 'Build New Era';
-                demandLabel = 'Rebooted';
-                riskLabel = 'Trust Rebuild';
+                verdict = tr('developmentLab.franchise.pulse.rebooted.verdict');
+                bestMove = demand >= 60 ? franchiseMove('commissionSequel') : franchiseMove('buildNewEra');
+                demandLabel = tr('developmentLab.franchise.pulse.demand.rebooted');
+                riskLabel = tr('developmentLab.franchise.pulse.risk.trustRebuild');
                 tone = 'text-violet-300';
             }
         }
@@ -2712,19 +2735,19 @@ const FranchiseManager: React.FC<{
                 project: continuationProject,
                 mode,
                 title,
-                overrides: {
-                    genres: [displayFranchise.genre],
-                    projectType: mode === 'SPINOFF' ? (displayFranchise.type === 'MOVIE' ? 'SERIES' : 'MOVIE') : displayFranchise.type,
-                    franchiseId: displayFranchise.id,
-                    logline: mode === 'FINALE'
-                    ? `The closing chapter of the ${displayFranchise.name} saga.`
-                    : mode === 'REBOOT'
-                        ? `A fresh entry designed to revive ${displayFranchise.name} for a new audience.`
-                        : mode === 'SPINOFF'
-                            ? `A new story set in the world of ${displayFranchise.name}.`
-                            : `The next chapter in the ${displayFranchise.name} saga.`
-                }
-            });
+	                overrides: {
+	                    genres: [displayFranchise.genre],
+	                    projectType: mode === 'SPINOFF' ? (displayFranchise.type === 'MOVIE' ? 'SERIES' : 'MOVIE') : displayFranchise.type,
+	                    franchiseId: displayFranchise.id,
+	                    logline: mode === 'FINALE'
+	                    ? tr('developmentLab.franchise.logline.finale', { name: displayFranchise.name })
+	                    : mode === 'REBOOT'
+	                        ? tr('developmentLab.franchise.logline.reboot', { name: displayFranchise.name })
+	                        : mode === 'SPINOFF'
+	                            ? tr('developmentLab.franchise.logline.spinoff', { name: displayFranchise.name })
+	                            : tr('developmentLab.franchise.logline.sequel', { name: displayFranchise.name })
+	                }
+	            });
             if (!result.ok || !result.script) return;
             onCommission(result.script);
         };
@@ -2744,18 +2767,18 @@ const FranchiseManager: React.FC<{
                         <ArrowLeft size={16} />
                     </button>
                     <div className="min-w-0">
-                        <p className={`text-[10px] font-black uppercase tracking-[0.28em] ${pulse.tone}`}>{isCandidate ? 'Franchise Candidate' : pulse.verdict}</p>
-                        <h2 className="text-3xl font-black uppercase tracking-tight text-white truncate">{displayFranchise.name}</h2>
-                        <p className="text-[10px] text-zinc-400 uppercase tracking-widest">{displayFranchise.projects.length} installments • {displayFranchise.genre} • {lifecycle.label}</p>
-                    </div>
-                    </div>
+	                        <p className={`text-[10px] font-black uppercase tracking-[0.28em] ${pulse.tone}`}>{isCandidate ? tr('developmentLab.franchise.candidate') : pulse.verdict}</p>
+	                        <h2 className="text-3xl font-black uppercase tracking-tight text-white truncate">{displayFranchise.name}</h2>
+	                        <p className="text-[10px] text-zinc-400 uppercase tracking-widest">{tr('developmentLab.franchise.meta', { count: displayFranchise.projects.length, genre: formatGenreLabel(displayFranchise.genre), lifecycle: lifecycle.label })}</p>
+	                    </div>
+	                    </div>
 
-                    <div className="grid grid-cols-3 gap-3 relative">
-                        {[
-                            { label: 'Health', value: pulse.health, icon: <Gauge size={15} />, color: 'bg-emerald-400' },
-                            { label: 'Demand', value: pulse.demand, icon: <Flame size={15} />, color: 'bg-amber-400' },
-                            { label: 'Fatigue', value: pulse.fatigue, icon: <AlertTriangle size={15} />, color: pulse.fatigue > 68 ? 'bg-rose-500' : 'bg-sky-400' }
-                        ].map(metric => (
+	                    <div className="grid grid-cols-3 gap-3 relative">
+	                        {[
+	                            { label: tr('developmentLab.franchise.metric.health'), value: pulse.health, icon: <Gauge size={15} />, color: 'bg-emerald-400' },
+	                            { label: tr('developmentLab.franchise.metric.demand'), value: pulse.demand, icon: <Flame size={15} />, color: 'bg-amber-400' },
+	                            { label: tr('developmentLab.franchise.metric.fatigue'), value: pulse.fatigue, icon: <AlertTriangle size={15} />, color: pulse.fatigue > 68 ? 'bg-rose-500' : 'bg-sky-400' }
+	                        ].map(metric => (
                             <div key={metric.label} className="bg-black/35 border border-white/10 p-3 rounded-2xl">
                                 <div className="flex items-center justify-between text-zinc-400 mb-2">
                                     {metric.icon}
@@ -2769,23 +2792,23 @@ const FranchiseManager: React.FC<{
                         ))}
                     </div>
 
-                    <div className="mt-4 grid grid-cols-3 gap-3 relative">
-                        <div className="bg-black/25 border border-white/10 p-3 rounded-2xl">
-                            <p className="text-[8px] text-zinc-500 uppercase font-black mb-1">Gross</p>
-                            <p className="text-sm font-mono font-bold text-emerald-300">{formatCurrency(displayFranchise.totalGross)}</p>
-                        </div>
-                        <div className="bg-black/25 border border-white/10 p-3 rounded-2xl">
-                            <p className="text-[8px] text-zinc-500 uppercase font-black mb-1">Avg Rating</p>
-                            <p className="text-sm font-mono font-bold text-amber-300">{displayFranchise.avgRating.toFixed(1)}/10</p>
-                        </div>
-                        <div className="bg-black/25 border border-white/10 p-3 rounded-2xl">
-                            <p className="text-[8px] text-zinc-500 uppercase font-black mb-1">Best Move</p>
-                            <p className="text-[11px] font-black text-white uppercase leading-tight">{pulse.bestMove}</p>
-                        </div>
-                    </div>
-                    <div className="mt-4 bg-black/35 border border-white/10 rounded-2xl p-3 relative">
-                        <div className="flex items-center justify-between gap-3 mb-2">
-                            <p className="text-[9px] font-black uppercase tracking-[0.22em] text-zinc-400">Lifecycle</p>
+	                    <div className="mt-4 grid grid-cols-3 gap-3 relative">
+	                        <div className="bg-black/25 border border-white/10 p-3 rounded-2xl">
+	                            <p className="text-[8px] text-zinc-500 uppercase font-black mb-1">{tr('developmentLab.franchise.metric.gross')}</p>
+	                            <p className="text-sm font-mono font-bold text-emerald-300">{formatCurrency(displayFranchise.totalGross)}</p>
+	                        </div>
+	                        <div className="bg-black/25 border border-white/10 p-3 rounded-2xl">
+	                            <p className="text-[8px] text-zinc-500 uppercase font-black mb-1">{tr('developmentLab.franchise.metric.avgRating')}</p>
+	                            <p className="text-sm font-mono font-bold text-amber-300">{displayFranchise.avgRating.toFixed(1)}/10</p>
+	                        </div>
+	                        <div className="bg-black/25 border border-white/10 p-3 rounded-2xl">
+	                            <p className="text-[8px] text-zinc-500 uppercase font-black mb-1">{tr('developmentLab.franchise.metric.bestMove')}</p>
+	                            <p className="text-[11px] font-black text-white uppercase leading-tight">{pulse.bestMove}</p>
+	                        </div>
+	                    </div>
+	                    <div className="mt-4 bg-black/35 border border-white/10 rounded-2xl p-3 relative">
+	                        <div className="flex items-center justify-between gap-3 mb-2">
+	                            <p className="text-[9px] font-black uppercase tracking-[0.22em] text-zinc-400">{tr('developmentLab.franchise.lifecycle.title')}</p>
                             <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-full ${
                                 lifecycle.state === 'CONCLUDED' ? 'bg-blue-500/10 text-blue-300' :
                                 lifecycle.state === 'REBOOTED' || lifecycle.state === 'REBOOT_PENDING' ? 'bg-violet-500/10 text-violet-300' :
@@ -2799,30 +2822,30 @@ const FranchiseManager: React.FC<{
                 </div>
 
                 <div className="bg-zinc-950/80 border border-zinc-800 p-4 rounded-3xl">
-                    <div className="flex items-center gap-2 mb-2">
-                        <Sparkles size={16} className="text-amber-400" />
-                        <h3 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Audience Pulse</h3>
-                    </div>
-                    <p className="text-sm text-zinc-200 font-bold leading-relaxed">
-                        {lifecycle.state === 'CONCLUDED'
-                            ? `${displayFranchise.name} has a finished main saga. Fans may still accept spinoffs, but a direct sequel should wait for a reboot plan.`
-                            : lifecycle.state === 'FINALE_PENDING'
-                                ? `A finale is already in development. The smart move is to finish that chapter before making another mainline promise.`
-                                : lifecycle.state === 'REBOOT_PENDING'
-                                    ? `A reboot is already in development. The franchise is in transition, so another mainline move would confuse the brand.`
-                                    : pulse.fatigue > 70
-                            ? `Fans still know ${displayFranchise.name}, but the brand is getting noisy. A spinoff or pause protects long-term value.`
-                            : pulse.demand > 75
-                                ? `${displayFranchise.name} is hot right now. A direct sequel has strong upside if the core cast stays intact.`
-                                : pulse.health > 78
-                                    ? `The brand has prestige. A finale or premium chapter can turn momentum into legacy.`
-                                    : `${displayFranchise.name} has room to grow, but the next move needs a clear hook.`}
-                    </p>
-                </div>
+	                    <div className="flex items-center gap-2 mb-2">
+	                        <Sparkles size={16} className="text-amber-400" />
+	                        <h3 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">{tr('developmentLab.franchise.audiencePulse')}</h3>
+	                    </div>
+	                    <p className="text-sm text-zinc-200 font-bold leading-relaxed">
+	                        {lifecycle.state === 'CONCLUDED'
+	                            ? tr('developmentLab.franchise.audience.concluded', { name: displayFranchise.name })
+	                            : lifecycle.state === 'FINALE_PENDING'
+	                                ? tr('developmentLab.franchise.audience.finalePending')
+	                                : lifecycle.state === 'REBOOT_PENDING'
+	                                    ? tr('developmentLab.franchise.audience.rebootPending')
+	                                    : pulse.fatigue > 70
+	                            ? tr('developmentLab.franchise.audience.fatigue', { name: displayFranchise.name })
+	                            : pulse.demand > 75
+	                                ? tr('developmentLab.franchise.audience.hot', { name: displayFranchise.name })
+	                                : pulse.health > 78
+	                                    ? tr('developmentLab.franchise.audience.prestige')
+	                                    : tr('developmentLab.franchise.audience.growth', { name: displayFranchise.name })}
+	                    </p>
+	                </div>
 
                 {/* History */}
                 <div className="space-y-3">
-                    <h3 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest px-1">Release History</h3>
+	                    <h3 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest px-1">{tr('developmentLab.franchise.releaseHistory')}</h3>
                     <div className="space-y-2">
                         {displayFranchise.projects.map((p: any) => (
                             <div key={p.id} className="bg-zinc-900 border border-zinc-800 p-3 rounded-xl flex justify-between items-center">
@@ -2832,7 +2855,7 @@ const FranchiseManager: React.FC<{
                                     </div>
                                     <div>
                                         <p className="text-sm font-bold text-white">{p.name}</p>
-                                        <p className="text-[10px] text-zinc-500 uppercase tracking-widest">{p.year} • {p.type}</p>
+	                                        <p className="text-[10px] text-zinc-500 uppercase tracking-widest">{p.year} • {projectTypeLabel(p.type)}</p>
                                     </div>
                                 </div>
                                 <div className="text-right">
@@ -2848,22 +2871,22 @@ const FranchiseManager: React.FC<{
                     <div className="space-y-3">
                         <div className="flex items-end justify-between gap-3 px-1">
                             <div>
-                                <h3 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Returning Cast Preview</h3>
-                                <p className="text-[10px] text-zinc-600 mt-1">
-                                    {characterFocus.summary.total} characters • {characterFocus.summary.recurring} recurring • {characterFocus.summary.recast} recast
-                                </p>
-                            </div>
-                            <span className="text-[9px] font-black uppercase tracking-widest text-amber-300 bg-amber-500/10 px-2 py-1 rounded-full">
-                                {characterFocus.summary.leads} Lead
-                            </span>
-                        </div>
-                        <div className="grid grid-cols-4 gap-2">
-                            {[
-                                ['Supporting', characterFocus.summary.supporting],
-                                ['Cameos', characterFocus.summary.cameos],
-                                ['Minor', characterFocus.summary.minor],
-                                ['Recurring', characterFocus.summary.recurring]
-                            ].map(([label, value]) => (
+	                                <h3 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">{tr('developmentLab.franchise.castPreview')}</h3>
+	                                <p className="text-[10px] text-zinc-600 mt-1">
+	                                    {tr('developmentLab.franchise.castSummary', { total: characterFocus.summary.total, recurring: characterFocus.summary.recurring, recast: characterFocus.summary.recast })}
+	                                </p>
+	                            </div>
+	                            <span className="text-[9px] font-black uppercase tracking-widest text-amber-300 bg-amber-500/10 px-2 py-1 rounded-full">
+	                                {tr('developmentLab.franchise.leadCount', { count: characterFocus.summary.leads })}
+	                            </span>
+	                        </div>
+	                        <div className="grid grid-cols-4 gap-2">
+	                            {[
+	                                [tr('developmentLab.franchise.role.supporting'), characterFocus.summary.supporting],
+	                                [tr('developmentLab.franchise.role.cameos'), characterFocus.summary.cameos],
+	                                [tr('developmentLab.franchise.role.minor'), characterFocus.summary.minor],
+	                                [tr('developmentLab.franchise.role.recurring'), characterFocus.summary.recurring]
+	                            ].map(([label, value]) => (
                                 <div key={label} className="bg-zinc-950 border border-zinc-800 rounded-2xl p-2 text-center">
                                     <p className="text-sm font-black text-white">{value}</p>
                                     <p className="text-[7px] font-black uppercase tracking-widest text-zinc-600">{label}</p>
@@ -2876,15 +2899,15 @@ const FranchiseManager: React.FC<{
                                     <div className="flex items-start justify-between gap-3">
                                         <div>
                                             <p className="text-base font-black text-white leading-tight">{char.name}</p>
-                                            <p className="text-[10px] text-zinc-500 mt-1">Played by <span className="text-zinc-300">{char.actorName}</span></p>
-                                        </div>
-                                        <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-full ${char.isRecast ? 'bg-rose-500/10 text-rose-300' : 'bg-emerald-500/10 text-emerald-300'}`}>
-                                            {char.isRecast ? 'Recast' : `${char.appearances}x`}
-                                        </span>
-                                    </div>
-                                    <p className="text-[9px] text-zinc-600 uppercase tracking-widest mt-3">
-                                        {char.roleType} • Latest: {char.latestProject}
-                                    </p>
+	                                            <p className="text-[10px] text-zinc-500 mt-1">{tr('developmentLab.franchise.playedBy', { actor: char.actorName })}</p>
+	                                        </div>
+	                                        <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-full ${char.isRecast ? 'bg-rose-500/10 text-rose-300' : 'bg-emerald-500/10 text-emerald-300'}`}>
+	                                            {char.isRecast ? tr('developmentLab.franchise.recast') : tr('developmentLab.franchise.appearancesShort', { count: char.appearances })}
+	                                        </span>
+	                                    </div>
+	                                    <p className="text-[9px] text-zinc-600 uppercase tracking-widest mt-3">
+	                                        {tr('developmentLab.franchise.characterMeta', { role: tr(`developmentLab.franchise.roleType.${String(char.roleType).toLowerCase()}`), project: char.latestProject })}
+	                                    </p>
                                 </div>
                             ))}
                         </div>
@@ -2893,7 +2916,7 @@ const FranchiseManager: React.FC<{
 
                 {/* Actions */}
                 <div className="space-y-3">
-                    <h3 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest px-1">Next Move</h3>
+	                    <h3 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest px-1">{tr('developmentLab.franchise.action.nextMove')}</h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <button
                             onClick={() => requestFranchiseCommission('SEQUEL')}
@@ -2903,8 +2926,8 @@ const FranchiseManager: React.FC<{
                             <div className="flex items-center gap-3">
                                 <Plus size={20} />
                                 <div className="text-left">
-                                    <p className="font-black uppercase tracking-tight text-sm">{isCandidate ? 'Start Franchise (Sequel)' : sequelLocked ? 'Mainline Locked' : 'Commission Sequel'}</p>
-                                    <p className="text-[10px] opacity-70 font-bold">{sequelLocked ? (lifecycle.lockMainline ? lifecycle.label : continuationEligibility.SEQUEL.message) : `Develop ${displayFranchise.name} ${displayFranchise.lastInstallment + 1}`}</p>
+	                                    <p className="font-black uppercase tracking-tight text-sm">{isCandidate ? tr('developmentLab.franchise.action.startSequel') : sequelLocked ? tr('developmentLab.franchise.action.mainlineLocked') : franchiseMove('commissionSequel')}</p>
+	                                    <p className="text-[10px] opacity-70 font-bold">{sequelLocked ? (lifecycle.lockMainline ? lifecycle.label : continuationEligibility.SEQUEL.message) : tr('developmentLab.franchise.action.developNumbered', { name: displayFranchise.name, number: displayFranchise.lastInstallment + 1 })}</p>
                                 </div>
                             </div>
                             <ChevronRight size={20} />
@@ -2918,8 +2941,8 @@ const FranchiseManager: React.FC<{
                             <div className="flex items-center gap-3">
                                 <Sparkles size={20} className="text-amber-500" />
                                 <div className="text-left">
-                                    <p className="font-black uppercase tracking-tight text-sm">Develop Spinoff</p>
-                                    <p className="text-[10px] text-zinc-400 font-bold">{spinoffLocked ? (lifecycle.lockSpinoff ? lifecycle.label : continuationEligibility.SPINOFF.message) : 'Expand the universe with a new perspective'}</p>
+	                                    <p className="font-black uppercase tracking-tight text-sm">{franchiseMove('developSpinoff')}</p>
+	                                    <p className="text-[10px] text-zinc-400 font-bold">{spinoffLocked ? (lifecycle.lockSpinoff ? lifecycle.label : continuationEligibility.SPINOFF.message) : tr('developmentLab.franchise.action.spinoffDescription')}</p>
                                 </div>
                             </div>
                             <ChevronRight size={20} />
@@ -2932,8 +2955,8 @@ const FranchiseManager: React.FC<{
                             <div className="flex items-center gap-3">
                                 <Trophy size={20} className="text-blue-400" />
                                 <div className="text-left">
-                                    <p className="font-black uppercase tracking-tight text-sm">{finaleLocked ? 'Finale Locked' : 'Event Finale'}</p>
-                                    <p className="text-[10px] text-zinc-400 font-bold">{finaleLocked ? (lifecycle.lockFinale ? lifecycle.label : continuationEligibility.FINALE.message) : 'Cash in legacy with a closer'}</p>
+	                                    <p className="font-black uppercase tracking-tight text-sm">{finaleLocked ? tr('developmentLab.franchise.action.finaleLocked') : franchiseMove('eventFinale')}</p>
+	                                    <p className="text-[10px] text-zinc-400 font-bold">{finaleLocked ? (lifecycle.lockFinale ? lifecycle.label : continuationEligibility.FINALE.message) : tr('developmentLab.franchise.action.finaleDescription')}</p>
                                 </div>
                             </div>
                             <ChevronRight size={20} />
@@ -2946,8 +2969,8 @@ const FranchiseManager: React.FC<{
                             <div className="flex items-center gap-3">
                                 <RotateCcw size={20} className="text-rose-400" />
                                 <div className="text-left">
-                                    <p className="font-black uppercase tracking-tight text-sm">Soft Reboot</p>
-                                    <p className="text-[10px] text-zinc-400 font-bold">{rebootLocked ? continuationEligibility.REBOOT.message : 'Refresh cast and tone'}</p>
+	                                    <p className="font-black uppercase tracking-tight text-sm">{franchiseMove('softReboot')}</p>
+	                                    <p className="text-[10px] text-zinc-400 font-bold">{rebootLocked ? continuationEligibility.REBOOT.message : tr('developmentLab.franchise.action.rebootDescription')}</p>
                                 </div>
                             </div>
                             <ChevronRight size={20} />
@@ -2957,13 +2980,8 @@ const FranchiseManager: React.FC<{
                 {franchiseCommissionDraft && (
                     <WorkingTitleDialog
                         mode="COMMISSION"
-                        title={`Commission ${
-                            franchiseCommissionDraft.mode === 'SPINOFF' ? 'Spinoff' :
-                            franchiseCommissionDraft.mode === 'FINALE' ? 'Event Finale' :
-                            franchiseCommissionDraft.mode === 'REBOOT' ? 'Soft Reboot' :
-                            'Sequel'
-                        }`}
-                        description={`Choose the working title for the next ${displayFranchise.name} project.`}
+	                        title={tr('developmentLab.franchise.dialog.title', { mode: franchiseModeLabel(franchiseCommissionDraft.mode) })}
+	                        description={tr('developmentLab.franchise.dialog.description', { name: displayFranchise.name })}
                         initialTitle={franchiseCommissionDraft.suggestedTitle}
                         onClose={() => setFranchiseCommissionDraft(null)}
                         onConfirm={(title) => {
@@ -2976,12 +2994,12 @@ const FranchiseManager: React.FC<{
         );
     }
 
-    return (
-        <div className="space-y-6 pb-20">
-            <div className="bg-zinc-900/50 border border-zinc-800 p-6 rounded-2xl">
-                <h2 className="text-2xl font-black uppercase tracking-tight text-white mb-1">Studio Franchises</h2>
-                <p className="text-xs text-zinc-400">Track and expand your most successful IP.</p>
-            </div>
+	    return (
+	        <div className="space-y-6 pb-20">
+	            <div className="bg-zinc-900/50 border border-zinc-800 p-6 rounded-2xl">
+	                <h2 className="text-2xl font-black uppercase tracking-tight text-white mb-1">{tr('developmentLab.franchise.title')}</h2>
+	                <p className="text-xs text-zinc-400">{tr('developmentLab.franchise.subtitle')}</p>
+	            </div>
 
             {franchises.length > 0 && (
                 <div className="grid grid-cols-1 gap-4">
@@ -3003,8 +3021,8 @@ const FranchiseManager: React.FC<{
                                             <span className="text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400">{f.pulse.riskLabel}</span>
                                         </div>
                                         <h3 className="text-xl font-black uppercase tracking-tight text-white group-hover:text-amber-500 transition-colors">{f.name}</h3>
-                                        <p className="text-[10px] text-zinc-500 uppercase tracking-widest">{f.projects.length} Installments • {f.type}</p>
-                                    </div>
+	                                        <p className="text-[10px] text-zinc-500 uppercase tracking-widest">{tr('developmentLab.franchise.listMeta', { count: f.projects.length, type: projectTypeLabel(f.type) })}</p>
+	                                    </div>
                                 </div>
                                 <div className="bg-zinc-800 p-2 rounded-lg text-zinc-400 group-hover:text-amber-500 transition-colors">
                                     <ChevronRight size={16} />
@@ -3013,15 +3031,15 @@ const FranchiseManager: React.FC<{
 
                             <div className="grid grid-cols-3 gap-3 pt-4 border-t border-zinc-800/50 relative">
                                 <div>
-                                    <p className="text-[8px] text-zinc-500 uppercase font-black mb-1">Gross</p>
+	                                    <p className="text-[8px] text-zinc-500 uppercase font-black mb-1">{tr('developmentLab.franchise.metric.gross')}</p>
                                     <p className="text-sm font-mono font-bold text-white">{formatCurrency(f.totalGross)}</p>
                                 </div>
                                 <div>
-                                    <p className="text-[8px] text-zinc-500 uppercase font-black mb-1">Health</p>
+	                                    <p className="text-[8px] text-zinc-500 uppercase font-black mb-1">{tr('developmentLab.franchise.metric.health')}</p>
                                     <p className="text-sm font-mono font-bold text-emerald-300">{f.pulse.health}</p>
                                 </div>
                                 <div>
-                                    <p className="text-[8px] text-zinc-500 uppercase font-black mb-1">Best Move</p>
+	                                    <p className="text-[8px] text-zinc-500 uppercase font-black mb-1">{tr('developmentLab.franchise.metric.bestMove')}</p>
                                     <p className="text-[10px] font-black text-amber-300 uppercase leading-tight">{f.pulse.bestMove}</p>
                                 </div>
                             </div>
@@ -3030,12 +3048,12 @@ const FranchiseManager: React.FC<{
                 </div>
             )}
 
-            {candidates.length > 0 && (
-                <div className="space-y-4">
-                    <div className="px-1">
-                        <h3 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Franchise Candidates</h3>
-                        <p className="text-[9px] text-zinc-600 mt-1">Successful standalone projects ready for expansion.</p>
-                    </div>
+	            {candidates.length > 0 && (
+	                <div className="space-y-4">
+	                    <div className="px-1">
+	                        <h3 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">{tr('developmentLab.franchise.candidatesTitle')}</h3>
+	                        <p className="text-[9px] text-zinc-600 mt-1">{tr('developmentLab.franchise.candidatesSubtitle')}</p>
+	                    </div>
                     <div className="grid grid-cols-1 gap-3">
                         {candidates.map(c => {
                             const pulse = getFranchisePulse([c], c.gross, c.rating, c.id);
@@ -3051,7 +3069,7 @@ const FranchiseManager: React.FC<{
                                     </div>
                                     <div>
                                         <p className="text-sm font-bold text-zinc-300 group-hover:text-white transition-colors">{c.name}</p>
-                                        <p className="text-[9px] text-zinc-600 uppercase tracking-widest">{formatCurrency(c.gross)} • {c.rating.toFixed(1)} Rating • Demand {pulse.demand}</p>
+	                                        <p className="text-[9px] text-zinc-600 uppercase tracking-widest">{tr('developmentLab.franchise.candidateMeta', { gross: formatCurrency(c.gross), rating: c.rating.toFixed(1), demand: pulse.demand })}</p>
                                     </div>
                                 </div>
                                 <Plus size={14} className="text-zinc-700 group-hover:text-amber-500 transition-colors" />
@@ -3062,23 +3080,23 @@ const FranchiseManager: React.FC<{
                 </div>
             )}
 
-            {franchises.length === 0 && candidates.length === 0 && (
-                <div className="bg-zinc-900/20 border border-dashed border-zinc-800 rounded-3xl p-20 flex flex-col items-center justify-center text-center">
-                    <Layers size={48} className="text-zinc-800 mb-4" />
-                    <p className="text-[10px] font-black text-zinc-600 uppercase tracking-widest">No Franchises Established</p>
-                    <p className="text-[9px] text-zinc-700 mt-2 max-w-[200px]">Produce sequels or spinoffs to start building a franchise.</p>
-                </div>
-            )}
-        </div>
-    );
+	            {franchises.length === 0 && candidates.length === 0 && (
+	                <div className="bg-zinc-900/20 border border-dashed border-zinc-800 rounded-3xl p-20 flex flex-col items-center justify-center text-center">
+	                    <Layers size={48} className="text-zinc-800 mb-4" />
+	                    <p className="text-[10px] font-black text-zinc-600 uppercase tracking-widest">{tr('developmentLab.franchise.empty.title')}</p>
+	                    <p className="text-[9px] text-zinc-700 mt-2 max-w-[200px]">{tr('developmentLab.franchise.empty.subtitle')}</p>
+	                </div>
+	            )}
+	        </div>
+	    );
 };
 
 const UNIVERSE_PRODUCT_BLUEPRINTS = [
-    { id: 'merch_apparel', name: 'Apparel & Fashion', type: 'MERCH', cost: 500000, baseAppeal: 20, baseRevenue: 50000, description: 'T-shirts, hoodies, and accessories.' },
-    { id: 'merch_toys', name: 'Action Figures & Toys', type: 'MERCH', cost: 1000000, baseAppeal: 35, baseRevenue: 120000, description: 'High-quality figures and playsets.' },
-    { id: 'merch_collectibles', name: 'Premium Collectibles', type: 'MERCH', cost: 2500000, baseAppeal: 50, baseRevenue: 350000, description: 'Limited edition statues and replicas.' },
-    { id: 'park_land', name: 'Themed Land (Park)', type: 'PARK', cost: 50000000, baseAppeal: 85, baseRevenue: 6000000, description: 'A dedicated area in a major theme park.' },
-    { id: 'park_ride', name: 'Signature Attraction', type: 'PARK', cost: 15000000, baseAppeal: 65, baseRevenue: 1800000, description: 'A state-of-the-art immersive ride.' },
+    { id: 'merch_apparel', type: 'MERCH', cost: 500000, baseAppeal: 20, baseRevenue: 50000 },
+    { id: 'merch_toys', type: 'MERCH', cost: 1000000, baseAppeal: 35, baseRevenue: 120000 },
+    { id: 'merch_collectibles', type: 'MERCH', cost: 2500000, baseAppeal: 50, baseRevenue: 350000 },
+    { id: 'park_land', type: 'PARK', cost: 50000000, baseAppeal: 85, baseRevenue: 6000000 },
+    { id: 'park_ride', type: 'PARK', cost: 15000000, baseAppeal: 65, baseRevenue: 1800000 },
 ];
 
 const UniverseMerchView: React.FC<{
@@ -3091,13 +3109,17 @@ const UniverseMerchView: React.FC<{
     const releaseActivity = getUniverseReleaseActivity(player, universe, player.activeReleases || []);
     const lifecycleRevenueMultiplier = getUniverseLifecycleRevenueMultiplier(universe);
     const effectivePayoutRate = releaseActivity.multiplier * lifecycleRevenueMultiplier;
+    const language = getPlayerLanguage(player);
+    const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
+    const getUniverseProductName = (id: string) => tr(`services.business.universeMerch.product.${id}.name`);
+    const getUniverseProductDescription = (id: string) => tr(`services.business.universeMerch.product.${id}.description`);
     const activityNote = isUniverseRetired(universe)
-        ? 'Legacy archive demand remains at 35% of normal catalog potential until a reboot relaunches the universe.'
+        ? tr('services.business.universeMerch.activity.legacy')
         : releaseActivity.weeksSinceLatestRelease === null
-            ? 'Release a canon project to activate licensing.'
+            ? tr('services.business.universeMerch.activity.needsRelease')
             : releaseActivity.multiplier <= 0
-                ? 'No recent canon release. Passive licensing is paused until this universe returns.'
-                : `${Math.max(0, Math.floor(releaseActivity.weeksSinceLatestRelease / 52))} years since the latest canon release.`;
+                ? tr('services.business.universeMerch.activity.paused')
+                : tr('services.business.universeMerch.activity.yearsSinceRelease', { years: Math.max(0, Math.floor(releaseActivity.weeksSinceLatestRelease / 52)) });
     const projectedWeeklyRevenue = activeProducts.reduce(
         (sum, product) => sum + Math.floor(calculateUniverseProductWeeklyRevenue(universe, product) * effectivePayoutRate),
         0
@@ -3110,7 +3132,7 @@ const UniverseMerchView: React.FC<{
         const newProduct = {
             id: `up_${Date.now()}_${Math.random()}`,
             catalogId: blueprint.id,
-            name: blueprint.name,
+            name: getUniverseProductName(blueprint.id),
             quality: 70 + Math.random() * 30,
             productionCost: blueprint.cost,
             sellingPrice: blueprint.baseRevenue, // Using this as base weekly revenue for now
@@ -3148,7 +3170,7 @@ const UniverseMerchView: React.FC<{
                 {
                     week: player.currentWeek,
                     year: player.age,
-                    message: `🌐 Launched ${blueprint.name} for ${universe.name}. Licensing starts next week and pays into studio capital.`,
+                    message: tr('services.business.universeMerch.log.launched', { productName: getUniverseProductName(blueprint.id), universeName: universe.name }),
                     type: 'positive' as const
                 },
                 ...(player.logs || [])
@@ -3161,20 +3183,20 @@ const UniverseMerchView: React.FC<{
     return (
         <div className="space-y-6">
             <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4">
-                <p className="text-[10px] font-black text-emerald-300 uppercase tracking-widest mb-1">Studio Capital Payout</p>
+                <p className="text-[10px] font-black text-emerald-300 uppercase tracking-widest mb-1">{tr('services.business.universeMerch.studioCapitalPayout')}</p>
                 <p className="text-sm text-zinc-300 leading-relaxed">
-                    Merch and licensing pays into your production house while the universe stays culturally active. If the catalog goes quiet too long, passive income pauses.
+                    {tr('services.business.universeMerch.studioCapitalBody')}
                 </p>
             </div>
 
             <div className={`border rounded-2xl p-4 ${effectivePayoutRate > 0 ? 'bg-amber-500/10 border-amber-500/20' : 'bg-rose-500/10 border-rose-500/20'}`}>
                 <div className="flex items-center justify-between gap-3">
                     <div>
-                        <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-1">Catalog Heat</p>
+                        <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-1">{tr('services.business.universeMerch.catalogHeat')}</p>
                         <p className="text-xl font-black text-white">{releaseActivity.label}</p>
                     </div>
                     <div className="text-right">
-                        <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-1">Payout Rate</p>
+                        <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-1">{tr('services.business.universeMerch.payoutRate')}</p>
                         <p className={`text-xl font-black ${effectivePayoutRate > 0 ? 'text-amber-300' : 'text-rose-300'}`}>{Math.round(effectivePayoutRate * 100)}%</p>
                     </div>
                 </div>
@@ -3183,28 +3205,28 @@ const UniverseMerchView: React.FC<{
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-2xl">
-                    <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-1">Last Paid</p>
+                    <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-1">{tr('services.business.universeMerch.lastPaid')}</p>
                     <p className="text-xl font-black text-emerald-400">{formatCurrency(universe.stats?.weeklyRevenue || 0)}</p>
                 </div>
                 <div className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-2xl">
-                    <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-1">Next Week</p>
+                    <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-1">{tr('services.business.universeMerch.nextWeek')}</p>
                     <p className="text-xl font-black text-amber-300">{formatCurrency(projectedWeeklyRevenue)}</p>
                 </div>
                 <div className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-2xl">
-                    <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-1">Lifetime Revenue</p>
+                    <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-1">{tr('services.business.universeMerch.lifetimeRevenue')}</p>
                     <p className="text-xl font-black text-white">{formatCurrency(universe.stats?.lifetimeRevenue || 0)}</p>
                 </div>
                 <div className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-2xl">
-                    <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-1">Active Licenses</p>
+                    <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-1">{tr('services.business.universeMerch.activeLicenses')}</p>
                     <p className="text-xl font-black text-white">{activeProducts.length}</p>
                 </div>
             </div>
 
             <div className="space-y-4">
-                <h3 className="text-xs font-black text-zinc-500 uppercase tracking-widest px-2">Active Products & Lands</h3>
+                <h3 className="text-xs font-black text-zinc-500 uppercase tracking-widest px-2">{tr('services.business.universeMerch.activeProducts')}</h3>
                 {(universe.products || []).length === 0 ? (
                     <div className="bg-zinc-900/30 border border-zinc-800 rounded-2xl p-8 text-center">
-                        <p className="text-zinc-500 text-sm">No active merchandising or theme park licenses.</p>
+                        <p className="text-zinc-500 text-sm">{tr('services.business.universeMerch.noActiveProducts')}</p>
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -3217,13 +3239,13 @@ const UniverseMerchView: React.FC<{
                                         {prod.catalogId.startsWith('park') ? <Palmtree size={20} /> : <ShoppingBag size={20} />}
                                     </div>
                                     <div>
-                                        <p className="font-bold text-white">{prod.name}</p>
-                                        <p className="text-[10px] text-zinc-500 uppercase tracking-widest">Base: {formatCurrency(prod.sellingPrice)} / wk</p>
-                                        <p className="text-[10px] text-emerald-400 uppercase tracking-widest">Projected: {formatCurrency(projectedRevenue)} / wk</p>
+                                        <p className="font-bold text-white">{getUniverseProductName(prod.catalogId)}</p>
+                                        <p className="text-[10px] text-zinc-500 uppercase tracking-widest">{tr('services.business.universeMerch.basePerWeek', { amount: formatCurrency(prod.sellingPrice) })}</p>
+                                        <p className="text-[10px] text-emerald-400 uppercase tracking-widest">{tr('services.business.universeMerch.projectedPerWeek', { amount: formatCurrency(projectedRevenue) })}</p>
                                     </div>
                                 </div>
                                 <div className="text-right">
-                                    <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Appeal</p>
+                                    <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">{tr('services.business.universeMerch.appeal')}</p>
                                     <p className="text-sm font-black text-white">{Math.floor(prod.appeal)}%</p>
                                 </div>
                             </div>
@@ -3234,7 +3256,7 @@ const UniverseMerchView: React.FC<{
             </div>
 
             <div className="space-y-4">
-                <h3 className="text-xs font-black text-zinc-500 uppercase tracking-widest px-2">Launch New Venture</h3>
+                <h3 className="text-xs font-black text-zinc-500 uppercase tracking-widest px-2">{tr('services.business.universeMerch.launchNewVenture')}</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                     {UNIVERSE_PRODUCT_BLUEPRINTS.map(bp => {
                         const isOwned = (universe.products || []).some(p => p.catalogId === bp.id);
@@ -3248,20 +3270,20 @@ const UniverseMerchView: React.FC<{
                                         {bp.type === 'PARK' ? <Palmtree size={20} /> : <ShoppingBag size={20} />}
                                     </div>
                                     <div className="text-right">
-                                        <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Cost</p>
+                                        <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">{tr('services.business.universeMerch.cost')}</p>
                                         <p className="text-sm font-black text-white">{formatCurrency(bp.cost)}</p>
                                     </div>
                                 </div>
                                 <div className="flex-1">
-                                    <p className="font-bold text-white">{bp.name}</p>
-                                    <p className="text-[10px] text-zinc-500 leading-relaxed mt-1">{bp.description}</p>
+                                    <p className="font-bold text-white">{getUniverseProductName(bp.id)}</p>
+                                    <p className="text-[10px] text-zinc-500 leading-relaxed mt-1">{getUniverseProductDescription(bp.id)}</p>
                                 </div>
                                 <button 
                                     disabled={archiveLocked || isOwned || !canAfford}
                                     onClick={() => handleLaunchProduct(bp)}
                                     className={`w-full py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${archiveLocked || isOwned ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed' : canAfford ? 'bg-amber-500 text-black hover:scale-[1.02]' : 'bg-zinc-800 text-zinc-500 cursor-not-allowed'}`}
                                 >
-                                    {archiveLocked ? 'Archive Locked' : isOwned ? 'Already Launched' : canAfford ? 'Launch Venture' : 'Insufficient Funds'}
+                                    {archiveLocked ? tr('services.business.universeMerch.status.archiveLocked') : isOwned ? tr('services.business.universeMerch.status.alreadyLaunched') : canAfford ? tr('services.business.universeMerch.status.launchVenture') : tr('services.business.universeMerch.status.insufficientFunds')}
                                 </button>
                             </div>
                         );
@@ -3280,15 +3302,25 @@ const UniverseDashboard: React.FC<{
     onCommission: (script: Script) => void;
     onBack: () => void;
 }> = ({ universe, player, studio, onUpdatePlayer, onCommission, onBack }) => {
+    const language = getPlayerLanguage(player);
+    const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
+    const getSagaLabel = (saga: number) => tr('services.business.universeLifecycle.sagaLabel', { saga });
+    const getPhaseLabel = (phase: number) => tr('services.business.universeLifecycle.phaseLabel', { phase });
+    const getCharacterStatusLabel = (char: ReturnType<typeof buildUniverseRoster>[number]) => {
+        if (char.status === 'RECAST') return tr('services.business.universeRoster.status.recast');
+        if (char.status === 'RETIRED') return tr('services.business.universeRoster.status.retired');
+        return char.roleType || tr('services.business.universeRoster.status.active');
+    };
     const [activeTab, setActiveTab] = useState<'TIMELINE' | 'ROSTER' | 'MERCH'>('TIMELINE');
     const [editingSaga, setEditingSaga] = useState(false);
     const [editingPhase, setEditingPhase] = useState(false);
-    const [sagaName, setSagaName] = useState(universe.currentSagaName || `Saga ${universe.saga}`);
-    const [phaseName, setPhaseName] = useState(universe.currentPhaseName || `Phase ${universe.currentPhase}`);
+    const [sagaName, setSagaName] = useState(universe.currentSagaName || getSagaLabel(typeof universe.saga === 'number' ? universe.saga : parseInt(String(universe.saga).replace(/\D/g, '')) || 1));
+    const [phaseName, setPhaseName] = useState(universe.currentPhaseName || getPhaseLabel(typeof universe.currentPhase === 'number' ? universe.currentPhase : parseInt(String(universe.currentPhase).replace(/\D/g, '')) || 1));
     const [eventFilmTitle, setEventFilmTitle] = useState<string | null>(null);
     const [showRetirementDialog, setShowRetirementDialog] = useState(false);
     const [rebootTitle, setRebootTitle] = useState<string | null>(null);
     const retired = isUniverseRetired(universe);
+    const currentSagaNumber = typeof universe.saga === 'number' ? universe.saga : parseInt(String(universe.saga).replace(/\D/g, '')) || 1;
 
     const syncStudioUniverse = (updatedUniverse: Universe, extraStudioState: Record<string, any> = {}) => {
         const existingUniverses = studio.studioState?.universes || [];
@@ -3345,11 +3377,12 @@ const UniverseDashboard: React.FC<{
         if (retired) return;
         const currentPhaseNum = typeof universe.currentPhase === 'number' ? universe.currentPhase : parseInt(String(universe.currentPhase).replace(/\D/g, '')) || 1;
         const nextPhaseNum = currentPhaseNum + 1;
+        const nextPhaseLabel = getPhaseLabel(nextPhaseNum);
         
         const newsItem = {
             id: `news_phase_${Date.now()}`,
-            headline: `${universe.name} announces Phase ${nextPhaseNum}!`,
-            subtext: `The studio reveals the next chapter of their cinematic universe.`,
+            headline: tr('services.business.universeLifecycle.news.phaseHeadline', { universeName: universe.name, phase: nextPhaseNum }),
+            subtext: tr('services.business.universeLifecycle.news.phaseSubtext'),
             category: 'UNIVERSE' as const,
             week: player.currentWeek,
             year: player.age,
@@ -3365,8 +3398,8 @@ const UniverseDashboard: React.FC<{
                     ...normalizeUniverseMap(player.world?.universes || {}),
                     [universe.id]: {
                         ...universe,
-                        currentPhase: `Phase ${nextPhaseNum}`,
-                        currentPhaseName: `Phase ${nextPhaseNum}`
+                        currentPhase: nextPhaseLabel,
+                        currentPhaseName: nextPhaseLabel
                     }
                 }
             }
@@ -3379,8 +3412,8 @@ const UniverseDashboard: React.FC<{
                     ...studio.studioState,
                     universes: (studio.studioState?.universes || []).map(u => u.id === universe.id ? {
                         ...u,
-                        currentPhase: `Phase ${nextPhaseNum}`,
-                        currentPhaseName: `Phase ${nextPhaseNum}`
+                        currentPhase: nextPhaseLabel,
+                        currentPhaseName: nextPhaseLabel
                     } : u)
                 }
             };
@@ -3388,18 +3421,20 @@ const UniverseDashboard: React.FC<{
         }
 
         onUpdatePlayer(updatedPlayer);
-        setPhaseName(`Phase ${nextPhaseNum}`);
+        setPhaseName(nextPhaseLabel);
     };
 
     const handleConcludeSaga = () => {
         if (retired) return;
         const currentSagaNum = typeof universe.saga === 'number' ? universe.saga : parseInt(String(universe.saga).replace(/\D/g, '')) || 1;
         const nextSagaNum = currentSagaNum + 1;
+        const nextSagaLabel = getSagaLabel(nextSagaNum);
+        const firstPhaseLabel = getPhaseLabel(1);
         
         const newsItem = {
             id: `news_saga_${Date.now()}`,
-            headline: `${universe.name} concludes, announces Saga ${nextSagaNum}!`,
-            subtext: `An era ends, and a new one begins for the massive franchise.`,
+            headline: tr('services.business.universeLifecycle.news.sagaHeadline', { universeName: universe.name, saga: nextSagaNum }),
+            subtext: tr('services.business.universeLifecycle.news.sagaSubtext'),
             category: 'UNIVERSE' as const,
             week: player.currentWeek,
             year: player.age,
@@ -3416,9 +3451,9 @@ const UniverseDashboard: React.FC<{
                     [universe.id]: {
                         ...universe,
                         saga: nextSagaNum,
-                        currentSagaName: `Saga ${nextSagaNum}`,
-                        currentPhase: 'Phase 1',
-                        currentPhaseName: `Phase 1`
+                        currentSagaName: nextSagaLabel,
+                        currentPhase: firstPhaseLabel,
+                        currentPhaseName: firstPhaseLabel
                     }
                 }
             }
@@ -3432,9 +3467,9 @@ const UniverseDashboard: React.FC<{
                     universes: (studio.studioState?.universes || []).map(u => u.id === universe.id ? {
                         ...u,
                         saga: nextSagaNum,
-                        currentSagaName: `Saga ${nextSagaNum}`,
-                        currentPhase: 'Phase 1',
-                        currentPhaseName: `Phase 1`
+                        currentSagaName: nextSagaLabel,
+                        currentPhase: firstPhaseLabel,
+                        currentPhaseName: firstPhaseLabel
                     } : u)
                 }
             };
@@ -3442,8 +3477,8 @@ const UniverseDashboard: React.FC<{
         }
 
         onUpdatePlayer(updatedPlayer);
-        setSagaName(`Saga ${nextSagaNum}`);
-        setPhaseName(`Phase 1`);
+        setSagaName(nextSagaLabel);
+        setPhaseName(firstPhaseLabel);
     };
 
     const universeProjects = getUniverseDashboardProjects(player, universe.id, player.activeReleases || []);
@@ -3457,11 +3492,11 @@ const UniverseDashboard: React.FC<{
         return details?.universeId === universe.id || (commitment as any).universeId === universe.id;
     });
     const retirementBlockers = [
-        releasedProjects.length === 0 ? 'Release at least one canon project first.' : '',
-        upcomingProjects.length > 0 ? `${upcomingProjects.length} active canon project${upcomingProjects.length === 1 ? '' : 's'} still in flight.` : '',
-        linkedUnfinishedScripts.length > 0 ? `${linkedUnfinishedScripts.length} attached script${linkedUnfinishedScripts.length === 1 ? '' : 's'} still unfinished.` : '',
-        linkedConcepts.length > 0 ? `${linkedConcepts.length} attached concept${linkedConcepts.length === 1 ? '' : 's'} still in development.` : '',
-        linkedCommitments.length > 0 ? `${linkedCommitments.length} attached production commitment${linkedCommitments.length === 1 ? '' : 's'} still active.` : ''
+        releasedProjects.length === 0 ? tr('services.business.universeDashboard.blocker.releaseCanon') : '',
+        upcomingProjects.length > 0 ? tr(upcomingProjects.length === 1 ? 'services.business.universeDashboard.blocker.activeCanonOne' : 'services.business.universeDashboard.blocker.activeCanonMany', { count: upcomingProjects.length }) : '',
+        linkedUnfinishedScripts.length > 0 ? tr(linkedUnfinishedScripts.length === 1 ? 'services.business.universeDashboard.blocker.attachedScriptOne' : 'services.business.universeDashboard.blocker.attachedScriptMany', { count: linkedUnfinishedScripts.length }) : '',
+        linkedConcepts.length > 0 ? tr(linkedConcepts.length === 1 ? 'services.business.universeDashboard.blocker.attachedConceptOne' : 'services.business.universeDashboard.blocker.attachedConceptMany', { count: linkedConcepts.length }) : '',
+        linkedCommitments.length > 0 ? tr(linkedCommitments.length === 1 ? 'services.business.universeDashboard.blocker.productionCommitmentOne' : 'services.business.universeDashboard.blocker.productionCommitmentMany', { count: linkedCommitments.length }) : ''
     ].filter(Boolean);
     const canRetireUniverse = !retired && retirementBlockers.length === 0;
     const lastReleasedGenre = (releasedProjects[0]?.genre || releasedProjects[releasedProjects.length - 1]?.genre || 'ACTION') as Genre;
@@ -3503,24 +3538,24 @@ const UniverseDashboard: React.FC<{
         + fatigue * 0.35
         - recurringCount * 3
     );
-    const continuityRiskLabel = continuityRisk >= 70 ? 'High Risk' : continuityRisk >= 38 ? 'Watch Closely' : 'Stable';
+    const continuityRiskLabel = continuityRisk >= 70 ? tr('services.business.universeDashboard.risk.high') : continuityRisk >= 38 ? tr('services.business.universeDashboard.risk.watch') : tr('services.business.universeDashboard.risk.stable');
     const continuityRiskTone = continuityRisk >= 70 ? 'text-rose-300 bg-rose-500/10 border-rose-500/20' : continuityRisk >= 38 ? 'text-amber-300 bg-amber-500/10 border-amber-500/20' : 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20';
     const healthLabel = retired
-        ? 'Legacy Archive'
+        ? tr('services.business.universeDashboard.health.legacyArchive')
         : fatigue >= 75
-        ? 'Overheated'
+        ? tr('services.business.universeDashboard.health.overheated')
         : eventReadiness >= 75
-            ? 'Event Ready'
+            ? tr('services.business.universeDashboard.health.eventReady')
             : fanTrust >= 70
-                ? 'Stable Canon'
-                : 'Needs Build-Up';
+                ? tr('services.business.universeDashboard.health.stableCanon')
+                : tr('services.business.universeDashboard.health.needsBuildUp');
     const audiencePulse = retired
-        ? `${universe.name} is archived as legacy IP. Canon history stays visible, passive licensing continues at reduced catalog demand, and a reboot can relaunch the same universe when the studio is ready.`
+        ? tr('services.business.universeDashboard.audiencePulse.retired', { universeName: universe.name })
         : eventReadiness >= 70
-        ? `${universe.name} is primed for a major crossover. An event film has strong upside if the core roster stays intact.`
+        ? tr('services.business.universeDashboard.audiencePulse.eventReady', { universeName: universe.name })
         : fatigue >= 70
-            ? `${universe.name} is running hot. Let the audience miss the world before another giant swing.`
-            : `${universe.name} needs stronger character attachment before the next mega-event. Build trust with solos, cameos, or a focused crossover.`;
+            ? tr('services.business.universeDashboard.audiencePulse.overheated', { universeName: universe.name })
+            : tr('services.business.universeDashboard.audiencePulse.needsBuildUp', { universeName: universe.name });
 
     const getUniverseEventTitle = () => {
         const eventNumber = universeProjects.filter(project => project.subtype === 'UNIVERSE_EVENT' || /event|crossover|finale|war|crisis/i.test(project.title)).length + 1;
@@ -3567,8 +3602,8 @@ const UniverseDashboard: React.FC<{
         const updatedUniverse = retireUniverseForArchive(universe, player.age, player.currentWeek);
         const newsItem = {
             id: `news_universe_retired_${updatedUniverse.id}_${Date.now()}`,
-            headline: `${updatedUniverse.name} enters the legacy archive.`,
-            subtext: `The studio is preserving the full canon while closing new phases and event films for now.`,
+            headline: tr('services.business.universeLifecycle.news.archiveHeadline', { universeName: updatedUniverse.name }),
+            subtext: tr('services.business.universeLifecycle.news.archiveSubtext'),
             category: 'UNIVERSE' as const,
             week: player.currentWeek,
             year: player.age,
@@ -3580,7 +3615,7 @@ const UniverseDashboard: React.FC<{
                 {
                     week: player.currentWeek,
                     year: player.age,
-                    message: `📦 ${updatedUniverse.name} entered the legacy archive. History stays visible and reboot rights remain open.`,
+                    message: tr('services.business.universeLifecycle.log.archive', { universeName: updatedUniverse.name }),
                     type: 'neutral' as const
                 },
                 ...(player.logs || [])
@@ -3595,8 +3630,8 @@ const UniverseDashboard: React.FC<{
         const updatedScripts = [...(studio.studioState?.scripts || []), script];
         const newsItem = {
             id: `news_universe_reboot_${rebootedUniverse.id}_${Date.now()}`,
-            headline: `${rebootedUniverse.name} gets a reboot era.`,
-            subtext: `${title} reopens the canon while keeping the original timeline in the archive.`,
+            headline: tr('services.business.universeLifecycle.news.rebootHeadline', { universeName: rebootedUniverse.name }),
+            subtext: tr('services.business.universeLifecycle.news.rebootSubtext', { title }),
             category: 'UNIVERSE' as const,
             week: player.currentWeek,
             year: player.age,
@@ -3608,20 +3643,20 @@ const UniverseDashboard: React.FC<{
                 {
                     week: player.currentWeek,
                     year: player.age,
-                    message: `🎬 ${title} launched as a reboot script for ${rebootedUniverse.name}.`,
+                    message: tr('services.business.universeLifecycle.log.reboot', { title, universeName: rebootedUniverse.name }),
                     type: 'positive' as const
                 },
                 ...(player.logs || [])
             ].slice(0, 50)
         }, { scripts: updatedScripts }));
-        setSagaName(rebootedUniverse.currentSagaName || 'Reboot Era');
-        setPhaseName(rebootedUniverse.currentPhaseName || 'Phase 1: Reintroduction');
+        setSagaName(rebootedUniverse.currentSagaName || tr('services.business.universeLifecycle.rebootEra'));
+        setPhaseName(rebootedUniverse.currentPhaseName || tr('services.business.universeLifecycle.rebootPhase'));
         setRebootTitle(null);
     };
 
     const timeline = universeProjects.reduce((acc, p) => {
-        const sName = p?.universeSagaName || 'Saga 1';
-        const pName = p?.universePhaseName || 'Phase 1';
+        const sName = p?.universeSagaName || getSagaLabel(1);
+        const pName = p?.universePhaseName || getPhaseLabel(1);
         if (!acc[sName]) acc[sName] = {};
         if (!acc[sName][pName]) acc[sName][pName] = [];
         acc[sName][pName].push(p);
@@ -3636,7 +3671,7 @@ const UniverseDashboard: React.FC<{
                 </button>
                 <div>
                     <h2 className="text-2xl font-black uppercase tracking-tight text-white">{universe.name}</h2>
-                    <p className="text-[10px] text-zinc-500 uppercase tracking-widest">Universe Dashboard</p>
+                    <p className="text-[10px] text-zinc-500 uppercase tracking-widest">{tr('services.business.universeDashboard.subtitle')}</p>
                 </div>
             </div>
 
@@ -3645,19 +3680,19 @@ const UniverseDashboard: React.FC<{
                     onClick={() => setActiveTab('TIMELINE')}
                     className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${activeTab === 'TIMELINE' ? 'bg-amber-500 text-black shadow-lg' : 'text-zinc-500 hover:text-white hover:bg-zinc-800'}`}
                 >
-                    Timeline
+                    {tr('services.business.universeDashboard.tab.timeline')}
                 </button>
                 <button 
                     onClick={() => setActiveTab('ROSTER')}
                     className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${activeTab === 'ROSTER' ? 'bg-amber-500 text-black shadow-lg' : 'text-zinc-500 hover:text-white hover:bg-zinc-800'}`}
                 >
-                    Roster
+                    {tr('services.business.universeDashboard.tab.roster')}
                 </button>
                 <button 
                     onClick={() => setActiveTab('MERCH')}
                     className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${activeTab === 'MERCH' ? 'bg-amber-500 text-black shadow-lg' : 'text-zinc-500 hover:text-white hover:bg-zinc-800'}`}
                 >
-                    Merch & Licensing
+                    {tr('services.business.universeDashboard.tab.merch')}
                 </button>
             </div>
 
@@ -3667,7 +3702,7 @@ const UniverseDashboard: React.FC<{
                         <p className="text-[10px] font-black uppercase tracking-[0.28em] text-amber-300">{healthLabel}</p>
                         <h3 className="text-4xl sm:text-5xl font-black text-white uppercase tracking-tight leading-none">{universe.name}</h3>
                         <p className="text-xs text-zinc-400 mt-2 uppercase tracking-widest">
-                            {universeProjects.length} canon projects • {normalizedRoster.length} characters • {universe.currentSagaName || `Saga ${universe.saga}`}
+                            {tr('services.business.universeDashboard.heroSummary', { projectCount: universeProjects.length, characterCount: normalizedRoster.length, sagaName: universe.currentSagaName || getSagaLabel(currentSagaNumber) })}
                         </p>
                     </div>
                     <button
@@ -3675,20 +3710,20 @@ const UniverseDashboard: React.FC<{
                         disabled={retired || normalizedRoster.length < 2}
                         className="bg-white text-black px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-amber-300 disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-[0.98]"
                     >
-                        {retired ? 'Archive Locked' : 'Commission Event Film'}
+                        {retired ? tr('services.business.universeDashboard.action.archiveLocked') : tr('services.business.universeDashboard.action.commissionEventFilm')}
                     </button>
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     {[
-                        { label: 'Fan Trust', value: fanTrust, color: 'bg-emerald-400' },
-                        { label: 'Continuity', value: continuityScore, color: 'bg-blue-400' },
-                        { label: 'Fatigue', value: fatigue, color: fatigue >= 70 ? 'bg-rose-500' : 'bg-zinc-500' },
-                        { label: 'Event Ready', value: eventReadiness, color: 'bg-amber-400' }
+                        { labelKey: 'services.business.universeDashboard.metric.fanTrust', value: fanTrust, color: 'bg-emerald-400' },
+                        { labelKey: 'services.business.universeDashboard.metric.continuity', value: continuityScore, color: 'bg-blue-400' },
+                        { labelKey: 'services.business.universeDashboard.metric.fatigue', value: fatigue, color: fatigue >= 70 ? 'bg-rose-500' : 'bg-zinc-500' },
+                        { labelKey: 'services.business.universeDashboard.metric.eventReady', value: eventReadiness, color: 'bg-amber-400' }
                     ].map(metric => (
-                        <div key={metric.label} className="bg-black/35 border border-white/10 rounded-2xl p-3">
+                        <div key={metric.labelKey} className="bg-black/35 border border-white/10 rounded-2xl p-3">
                             <div className="flex items-center justify-between mb-2">
-                                <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500">{metric.label}</p>
+                                <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500">{tr(metric.labelKey)}</p>
                                 <p className="text-sm font-black text-white">{Math.round(metric.value)}</p>
                             </div>
                             <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
@@ -3700,19 +3735,19 @@ const UniverseDashboard: React.FC<{
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
                     <div className="bg-black/25 border border-white/10 rounded-2xl p-3">
-                        <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Canon Projects</p>
+                        <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500">{tr('services.business.universeDashboard.metric.canonProjects')}</p>
                         <p className="text-xl font-black text-white">{universeProjects.length}</p>
                     </div>
                     <div className="bg-black/25 border border-white/10 rounded-2xl p-3">
-                        <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Avg IMDb</p>
+                        <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500">{tr('services.business.universeDashboard.metric.avgImdb')}</p>
                         <p className="text-xl font-black text-white">{averageRating > 0 ? averageRating.toFixed(1) : '-'}</p>
                     </div>
                     <div className="bg-black/25 border border-white/10 rounded-2xl p-3">
-                        <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Total Gross</p>
+                        <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500">{tr('services.business.universeDashboard.metric.totalGross')}</p>
                         <p className="text-xl font-black text-emerald-300">{formatCurrency(totalGross)}</p>
                     </div>
                     <div className="bg-black/25 border border-white/10 rounded-2xl p-3">
-                        <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Licensing</p>
+                        <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500">{tr('services.business.universeDashboard.metric.licensing')}</p>
                         <p className="text-xl font-black text-amber-300">{formatCurrency(projectedLicensing)}</p>
                         <p className="text-[9px] font-black uppercase tracking-widest text-zinc-600 mt-1">{releaseActivity.label}</p>
                     </div>
@@ -3722,7 +3757,7 @@ const UniverseDashboard: React.FC<{
                     <div className="flex items-center justify-between gap-3 mb-2">
                         <div className="flex items-center gap-2">
                             <AlertTriangle size={14} className={continuityRisk >= 70 ? 'text-rose-300' : continuityRisk >= 38 ? 'text-amber-300' : 'text-emerald-300'} />
-                            <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Continuity Risk</p>
+                            <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500">{tr('services.business.universeDashboard.continuityRisk')}</p>
                         </div>
                         <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-full border ${continuityRiskTone}`}>
                             {continuityRiskLabel}
@@ -3731,15 +3766,15 @@ const UniverseDashboard: React.FC<{
                     <div className="grid grid-cols-3 gap-2">
                         <div>
                             <p className="text-lg font-black text-white">{recastCount}</p>
-                            <p className="text-[8px] font-black uppercase tracking-widest text-zinc-600">Recasts</p>
+                            <p className="text-[8px] font-black uppercase tracking-widest text-zinc-600">{tr('services.business.universeDashboard.metric.recasts')}</p>
                         </div>
                         <div>
                             <p className="text-lg font-black text-white">{recurringCount}</p>
-                            <p className="text-[8px] font-black uppercase tracking-widest text-zinc-600">Returning</p>
+                            <p className="text-[8px] font-black uppercase tracking-widest text-zinc-600">{tr('services.business.universeDashboard.metric.returning')}</p>
                         </div>
                         <div>
                             <p className="text-lg font-black text-white">{upcomingProjects.length}</p>
-                            <p className="text-[8px] font-black uppercase tracking-widest text-zinc-600">In Flight</p>
+                            <p className="text-[8px] font-black uppercase tracking-widest text-zinc-600">{tr('services.business.universeDashboard.metric.inFlight')}</p>
                         </div>
                     </div>
                     <div className="mt-3 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
@@ -3751,7 +3786,7 @@ const UniverseDashboard: React.FC<{
             <div className="bg-zinc-950/70 border border-zinc-800 rounded-3xl p-5">
                 <div className="flex items-center gap-2 mb-3 text-amber-300">
                     <Sparkles size={18} />
-                    <p className="text-[10px] font-black uppercase tracking-[0.28em] text-zinc-400">Audience Pulse</p>
+                    <p className="text-[10px] font-black uppercase tracking-[0.28em] text-zinc-400">{tr('services.business.universeDashboard.audiencePulse.title')}</p>
                 </div>
                 <p className="text-xl font-black text-white leading-snug">{audiencePulse}</p>
             </div>
@@ -3763,12 +3798,12 @@ const UniverseDashboard: React.FC<{
                             {retired ? <Archive size={20} /> : <History size={20} />}
                         </div>
                         <div>
-                            <p className="text-[10px] font-black uppercase tracking-[0.28em] text-zinc-500">Universe Lifecycle</p>
-                            <h3 className="text-lg font-black text-white">{retired ? 'Legacy Archive' : 'Active Canon'}</h3>
+                            <p className="text-[10px] font-black uppercase tracking-[0.28em] text-zinc-500">{tr('services.business.universeDashboard.lifecycle.title')}</p>
+                            <h3 className="text-lg font-black text-white">{retired ? tr('services.business.universeDashboard.lifecycle.legacyArchive') : tr('services.business.universeDashboard.lifecycle.activeCanon')}</h3>
                             <p className="text-xs text-zinc-400 leading-relaxed mt-1">
                                 {retired
-                                    ? `Retired in Age ${universe.retiredAt?.year || player.age}, Week ${universe.retiredAt?.week || player.currentWeek}. History remains visible and licensing runs at 35% legacy demand.`
-                                    : 'Retire only when the current canon has released history and no unfinished attached projects.'}
+                                    ? tr('services.business.universeDashboard.lifecycle.retiredBody', { age: universe.retiredAt?.year || player.age, week: universe.retiredAt?.week || player.currentWeek })
+                                    : tr('services.business.universeDashboard.lifecycle.activeBody')}
                             </p>
                             {!retired && retirementBlockers.length > 0 && (
                                 <p className="mt-2 text-[10px] font-bold uppercase tracking-wider text-amber-300">{retirementBlockers[0]}</p>
@@ -3780,7 +3815,7 @@ const UniverseDashboard: React.FC<{
                             onClick={() => setRebootTitle(`${universe.name}: Reborn`)}
                             className="bg-white text-black px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-amber-300 transition-all active:scale-[0.98]"
                         >
-                            <span className="flex items-center justify-center gap-2"><Clapperboard size={15} /> Launch Reboot</span>
+                            <span className="flex items-center justify-center gap-2"><Clapperboard size={15} /> {tr('services.business.universeDashboard.action.launchReboot')}</span>
                         </button>
                     ) : (
                         <button
@@ -3788,7 +3823,7 @@ const UniverseDashboard: React.FC<{
                             disabled={!canRetireUniverse}
                             className="bg-zinc-900 text-zinc-300 border border-zinc-700 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-amber-500 hover:text-black disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-zinc-900 disabled:hover:text-zinc-300 transition-all"
                         >
-                            <span className="flex items-center justify-center gap-2"><Archive size={15} /> Retire Universe</span>
+                            <span className="flex items-center justify-center gap-2"><Archive size={15} /> {tr('services.business.universeDashboard.action.retireUniverse')}</span>
                         </button>
                     )}
                 </div>
@@ -3799,9 +3834,9 @@ const UniverseDashboard: React.FC<{
                 {/* Saga Control */}
                 <div className="bg-zinc-900/50 border border-zinc-800 p-5 rounded-2xl space-y-4">
                     <div className="flex justify-between items-center">
-                        <h3 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Current Saga</h3>
+                        <h3 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">{tr('services.business.universeTimeline.currentSaga')}</h3>
                         <button disabled={retired} onClick={handleConcludeSaga} className="text-[9px] font-black uppercase tracking-widest bg-rose-500/10 text-rose-500 px-2 py-1 rounded hover:bg-rose-500/20 disabled:opacity-40 disabled:cursor-not-allowed">
-                            {retired ? 'Archived' : 'Conclude Saga'}
+                            {retired ? tr('services.business.universeTimeline.archived') : tr('services.business.universeTimeline.concludeSaga')}
                         </button>
                     </div>
                     {editingSaga ? (
@@ -3811,11 +3846,11 @@ const UniverseDashboard: React.FC<{
                                 onChange={e => setSagaName(e.target.value)}
                                 className="flex-1 bg-zinc-950 border border-zinc-800 rounded p-2 text-sm text-white focus:outline-none focus:border-amber-500"
                             />
-                            <button onClick={handleSaveSaga} className="bg-amber-500 text-black px-3 rounded text-xs font-bold">Save</button>
+                            <button onClick={handleSaveSaga} className="bg-amber-500 text-black px-3 rounded text-xs font-bold">{tr('services.business.universeTimeline.save')}</button>
                         </div>
                     ) : (
                         <div className="flex justify-between items-center group">
-                            <p className="text-xl font-black text-white">{universe.currentSagaName || `Saga ${universe.saga}`}</p>
+                            <p className="text-xl font-black text-white">{universe.currentSagaName || getSagaLabel(currentSagaNumber)}</p>
                             <button disabled={retired} onClick={() => setEditingSaga(true)} className="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-white transition-opacity disabled:opacity-20 disabled:cursor-not-allowed">
                                 <Edit2 size={14} />
                             </button>
@@ -3826,9 +3861,9 @@ const UniverseDashboard: React.FC<{
                 {/* Phase Control */}
                 <div className="bg-zinc-900/50 border border-zinc-800 p-5 rounded-2xl space-y-4">
                     <div className="flex justify-between items-center">
-                        <h3 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Current Phase</h3>
+                        <h3 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">{tr('services.business.universeTimeline.currentPhase')}</h3>
                         <button disabled={retired} onClick={handleConcludePhase} className="text-[9px] font-black uppercase tracking-widest bg-blue-500/10 text-blue-500 px-2 py-1 rounded hover:bg-blue-500/20 disabled:opacity-40 disabled:cursor-not-allowed">
-                            {retired ? 'Archived' : 'Conclude Phase'}
+                            {retired ? tr('services.business.universeTimeline.archived') : tr('services.business.universeTimeline.concludePhase')}
                         </button>
                     </div>
                     {editingPhase ? (
@@ -3838,11 +3873,11 @@ const UniverseDashboard: React.FC<{
                                 onChange={e => setPhaseName(e.target.value)}
                                 className="flex-1 bg-zinc-950 border border-zinc-800 rounded p-2 text-sm text-white focus:outline-none focus:border-amber-500"
                             />
-                            <button onClick={handleSavePhase} className="bg-amber-500 text-black px-3 rounded text-xs font-bold">Save</button>
+                            <button onClick={handleSavePhase} className="bg-amber-500 text-black px-3 rounded text-xs font-bold">{tr('services.business.universeTimeline.save')}</button>
                         </div>
                     ) : (
                         <div className="flex justify-between items-center group">
-                            <p className="text-xl font-black text-white">{universe.currentPhaseName || `Phase ${universe.currentPhase}`}</p>
+                            <p className="text-xl font-black text-white">{universe.currentPhaseName || getPhaseLabel(typeof universe.currentPhase === 'number' ? universe.currentPhase : parseInt(String(universe.currentPhase).replace(/\D/g, '')) || 1)}</p>
                             <button disabled={retired} onClick={() => setEditingPhase(true)} className="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-white transition-opacity disabled:opacity-20 disabled:cursor-not-allowed">
                                 <Edit2 size={14} />
                             </button>
@@ -3854,11 +3889,11 @@ const UniverseDashboard: React.FC<{
 
             {activeTab === 'TIMELINE' && (
                 <div className="space-y-6">
-                    <h3 className="text-xs font-black text-zinc-500 uppercase tracking-widest px-2">Universe Timeline</h3>
+                    <h3 className="text-xs font-black text-zinc-500 uppercase tracking-widest px-2">{tr('services.business.universeTimeline.title')}</h3>
                     {Object.keys(timeline).length === 0 ? (
                         <div className="bg-zinc-900/30 border border-zinc-800 rounded-2xl p-8 text-center">
-                            <p className="text-zinc-500 text-sm">No projects released in this universe yet.</p>
-                            <p className="text-[10px] text-zinc-600 uppercase tracking-widest mt-2">Greenlight a project and attach it to this universe to begin.</p>
+                            <p className="text-zinc-500 text-sm">{tr('services.business.universeTimeline.emptyTitle')}</p>
+                            <p className="text-[10px] text-zinc-600 uppercase tracking-widest mt-2">{tr('services.business.universeTimeline.emptySubtext')}</p>
                         </div>
                     ) : (
                         Object.entries(timeline).map(([sName, phases]) => (
@@ -3892,10 +3927,10 @@ const UniverseDashboard: React.FC<{
 
             {activeTab === 'ROSTER' && (
                 <div className="space-y-6">
-                    <h3 className="text-xs font-black text-zinc-500 uppercase tracking-widest px-2">Character Roster</h3>
+                    <h3 className="text-xs font-black text-zinc-500 uppercase tracking-widest px-2">{tr('services.business.universeRoster.title')}</h3>
                     {normalizedRoster.length === 0 ? (
                         <div className="bg-zinc-900/30 border border-zinc-800 rounded-2xl p-8 text-center">
-                            <p className="text-zinc-500 text-sm">No characters in this universe yet.</p>
+                            <p className="text-zinc-500 text-sm">{tr('services.business.universeRoster.empty')}</p>
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
@@ -3907,7 +3942,7 @@ const UniverseDashboard: React.FC<{
                                         <div className="min-w-0">
                                             <p className="text-lg font-black text-white truncate">{char.name}</p>
                                             <p className="text-xs text-zinc-500 truncate">
-                                                Played by <span className="text-zinc-300">{char.actorId === 'PLAYER_SELF' ? 'You' : char.actorName}</span>
+                                                {tr('services.business.universeRoster.playedBy', { actorName: char.actorId === 'PLAYER_SELF' ? tr('services.business.universeRoster.you') : char.actorName })}
                                             </p>
                                         </div>
                                         <div className={`shrink-0 text-[9px] font-black px-2 py-1 rounded uppercase tracking-widest ${
@@ -3917,23 +3952,23 @@ const UniverseDashboard: React.FC<{
                                                     ? 'bg-zinc-500/10 text-zinc-400'
                                                     : 'bg-amber-500/10 text-amber-500'
                                         }`}>
-                                            {char.status === 'RECAST' ? 'RECAST' : char.status === 'RETIRED' ? 'RETIRED' : (char.roleType || 'ACTIVE')}
+                                            {getCharacterStatusLabel(char)}
                                         </div>
                                     </div>
                                     <div className="bg-black/25 rounded-xl p-2 space-y-1">
                                         <div className="flex gap-2 min-w-0 text-[9px] uppercase tracking-widest">
-                                            <span className="text-zinc-600 shrink-0">First</span>
-                                            <span className="text-zinc-400 truncate">{timeline.first || 'Not introduced yet'}</span>
+                                            <span className="text-zinc-600 shrink-0">{tr('services.business.universeRoster.first')}</span>
+                                            <span className="text-zinc-400 truncate">{timeline.first || tr('services.business.universeRoster.notIntroduced')}</span>
                                         </div>
                                         <div className="flex gap-2 min-w-0 text-[9px] uppercase tracking-widest">
-                                            <span className="text-zinc-600 shrink-0">Latest</span>
-                                            <span className="text-zinc-400 truncate">{timeline.latest || timeline.first || 'No release yet'}</span>
+                                            <span className="text-zinc-600 shrink-0">{tr('services.business.universeRoster.latest')}</span>
+                                            <span className="text-zinc-400 truncate">{timeline.latest || timeline.first || tr('services.business.universeRoster.noRelease')}</span>
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-4 pt-1">
                                         <div className="flex-1">
                                             <div className="flex justify-between text-[8px] font-black text-zinc-500 uppercase tracking-widest mb-1">
-                                                <span>Approval</span>
+                                                <span>{tr('services.business.universeRoster.approval')}</span>
                                                 <span>{Math.round(char.fanApproval || 0)}%</span>
                                             </div>
                                             <div className="h-1 bg-zinc-800 rounded-full overflow-hidden">
@@ -3942,7 +3977,7 @@ const UniverseDashboard: React.FC<{
                                         </div>
                                         <div className="flex-1">
                                             <div className="flex justify-between text-[8px] font-black text-zinc-500 uppercase tracking-widest mb-1">
-                                                <span>Appearances</span>
+                                                <span>{tr('services.business.universeRoster.appearances')}</span>
                                                 <span>{Math.max(0, char.appearances || 0)}</span>
                                             </div>
                                             <div className="h-1 bg-zinc-800 rounded-full overflow-hidden">
@@ -3969,10 +4004,10 @@ const UniverseDashboard: React.FC<{
             {eventFilmTitle && (
                 <WorkingTitleDialog
                     mode="COMMISSION"
-                    title="Commission Event Film"
-                    description={`Name the next crossover chapter in ${universe.name}.`}
+                    title={tr('services.business.universeDashboard.dialog.eventTitle')}
+                    description={tr('services.business.universeDashboard.dialog.eventDescription', { universeName: universe.name })}
                     initialTitle={eventFilmTitle}
-                    confirmLabel="Commission Event"
+                    confirmLabel={tr('services.business.universeDashboard.dialog.eventConfirm')}
                     onClose={() => setEventFilmTitle(null)}
                     onConfirm={(title) => {
                         createUniverseEventScript(title);
@@ -3983,10 +4018,10 @@ const UniverseDashboard: React.FC<{
             {rebootTitle && (
                 <WorkingTitleDialog
                     mode="COMMISSION"
-                    title="Launch Universe Reboot"
-                    description={`Choose the working title that reopens ${universe.name} without deleting its original canon.`}
+                    title={tr('services.business.universeDashboard.dialog.rebootTitle')}
+                    description={tr('services.business.universeDashboard.dialog.rebootDescription', { universeName: universe.name })}
                     initialTitle={rebootTitle}
-                    confirmLabel="Launch Reboot"
+                    confirmLabel={tr('services.business.universeDashboard.dialog.rebootConfirm')}
                     onClose={() => setRebootTitle(null)}
                     onConfirm={handleLaunchReboot}
                 />
@@ -4008,6 +4043,10 @@ const UniverseManager: React.FC<{
     onUpdatePlayer: (p: Player) => void;
     onCommission: (script: Script) => void;
 }> = ({ player, studio, onUpdatePlayer, onCommission }) => {
+    const language = getPlayerLanguage(player);
+    const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
+    const getSagaLabel = (saga: number) => tr('services.business.universeLifecycle.sagaLabel', { saga });
+    const getPhaseLabel = (phase: number) => tr('services.business.universeLifecycle.phaseLabel', { phase });
     const [isCreating, setIsCreating] = useState(false);
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
@@ -4044,9 +4083,9 @@ const UniverseManager: React.FC<{
             description,
             studioId: studio.id,
             currentPhase: 1,
-            currentPhaseName: 'Phase 1',
+            currentPhaseName: getPhaseLabel(1),
             saga: 1,
-            currentSagaName: 'Saga 1',
+            currentSagaName: getSagaLabel(1),
             momentum: 0,
             brandPower: 0,
             marketShare: 0,
@@ -4088,15 +4127,15 @@ const UniverseManager: React.FC<{
             <div className="bg-zinc-900/50 border border-zinc-800 p-6 rounded-2xl">
                 <div className="flex justify-between items-start mb-4">
                     <div>
-                        <h2 className="text-2xl font-black uppercase tracking-tight text-white">Cinematic Universes</h2>
-                        <p className="text-xs text-zinc-400 mt-1">Build interconnected worlds. Universes compete for market share and audience attention.</p>
+                        <h2 className="text-2xl font-black uppercase tracking-tight text-white">{tr('services.business.universeManager.title')}</h2>
+                        <p className="text-xs text-zinc-400 mt-1">{tr('services.business.universeManager.subtitle')}</p>
                     </div>
                     {!isCreating && (
                         <button 
                             onClick={() => setIsCreating(true)}
                             className="bg-amber-500 hover:bg-amber-400 text-black px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all"
                         >
-                            Start New Universe
+                            {tr('services.business.universeManager.startNewUniverse')}
                         </button>
                     )}
                 </div>
@@ -4105,21 +4144,21 @@ const UniverseManager: React.FC<{
                     <div className="bg-zinc-950 border border-zinc-800 p-6 rounded-xl space-y-4 animate-in slide-in-from-top-4 duration-300">
                         <div className="space-y-4">
                             <div>
-                                <label className="block text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2">Universe Name</label>
+                                <label className="block text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2">{tr('services.business.universeManager.createName')}</label>
                                 <input 
                                     type="text" 
                                     value={name}
                                     onChange={e => setName(e.target.value)}
-                                    placeholder="e.g. The MonsterVerse"
+                                    placeholder={tr('services.business.universeManager.namePlaceholder')}
                                     className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-3 text-sm text-white focus:outline-none focus:border-amber-500"
                                 />
                             </div>
                             <div>
-                                <label className="block text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2">Description</label>
+                                <label className="block text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2">{tr('services.business.universeManager.createDescription')}</label>
                                 <textarea 
                                     value={description}
                                     onChange={e => setDescription(e.target.value)}
-                                    placeholder="What is this world about?"
+                                    placeholder={tr('services.business.universeManager.descriptionPlaceholder')}
                                     className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-3 text-sm text-white h-24 focus:outline-none focus:border-amber-500"
                                 />
                             </div>
@@ -4130,13 +4169,13 @@ const UniverseManager: React.FC<{
                                 disabled={!name || studio.balance < 5000000}
                                 className="flex-1 bg-white text-black py-3 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-amber-500 disabled:opacity-50"
                             >
-                                Register Universe ($5M)
+                                {tr('services.business.universeManager.registerUniverse', { amount: formatCurrency(5000000) })}
                             </button>
                             <button 
                                 onClick={() => setIsCreating(false)}
                                 className="px-6 py-3 bg-zinc-800 text-zinc-400 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-zinc-700"
                             >
-                                Cancel
+                                {tr('services.business.universeManager.cancel')}
                             </button>
                         </div>
                     </div>
@@ -4146,7 +4185,7 @@ const UniverseManager: React.FC<{
             {/* Market Share Overview */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="md:col-span-2 space-y-4">
-                    <h3 className="text-xs font-black text-zinc-500 uppercase tracking-widest px-2">Market Share Battle</h3>
+                    <h3 className="text-xs font-black text-zinc-500 uppercase tracking-widest px-2">{tr('services.business.universeManager.marketShareBattle')}</h3>
                     <div className="bg-zinc-900/30 border border-zinc-800 rounded-2xl p-6">
                         <div className="flex h-8 w-full rounded-full overflow-hidden mb-6 border border-zinc-800">
                             {universesWithShare.map((u: any) => (
@@ -4177,7 +4216,7 @@ const UniverseManager: React.FC<{
                                     </div>
                                     <div className="text-right">
                                         <div className="text-sm font-mono font-black text-white">{u.marketShare.toFixed(1)}%</div>
-                                        <div className="text-[9px] text-zinc-500 uppercase tracking-widest">Brand Power: {u.brandPower}</div>
+                                        <div className="text-[9px] text-zinc-500 uppercase tracking-widest">{tr('services.business.universeManager.brandPower', { amount: u.brandPower })}</div>
                                     </div>
                                 </div>
                             ))}
@@ -4186,11 +4225,11 @@ const UniverseManager: React.FC<{
                 </div>
 
                 <div className="space-y-4">
-                    <h3 className="text-xs font-black text-zinc-500 uppercase tracking-widest px-2">Your Universes</h3>
+                    <h3 className="text-xs font-black text-zinc-500 uppercase tracking-widest px-2">{tr('services.business.universeManager.yourUniverses')}</h3>
                     {activeStudioUniverses.length === 0 ? (
                         <div className="bg-zinc-900/30 border border-zinc-800 rounded-2xl p-8 flex flex-col items-center justify-center text-center">
                             <Sparkles size={32} className="text-zinc-700 mb-3" />
-                            <p className="text-[10px] font-black text-zinc-600 uppercase tracking-widest">No Active Studio Universes</p>
+                            <p className="text-[10px] font-black text-zinc-600 uppercase tracking-widest">{tr('services.business.universeManager.noActiveUniverses')}</p>
                         </div>
                     ) : (
                         activeStudioUniverses.map((u: any) => {
@@ -4208,12 +4247,12 @@ const UniverseManager: React.FC<{
                                 <div className="flex justify-between items-start">
                                     <h4 className="text-sm font-black text-white uppercase group-hover:text-amber-400 transition-colors">{u.name}</h4>
                                     <span className="text-[8px] font-black px-2 py-0.5 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20">
-                                        {u.currentPhaseName || `Phase ${u.currentPhase}`}
+                                        {u.currentPhaseName || getPhaseLabel(typeof u.currentPhase === 'number' ? u.currentPhase : parseInt(String(u.currentPhase).replace(/\D/g, '')) || 1)}
                                     </span>
                                 </div>
                                 <div className="space-y-2">
                                     <div className="flex justify-between text-[10px]">
-                                        <span className="text-zinc-500 uppercase font-bold">Momentum</span>
+                                        <span className="text-zinc-500 uppercase font-bold">{tr('services.business.universeManager.momentum')}</span>
                                         <span className="text-white font-mono">{u.momentum}/100</span>
                                     </div>
                                     <div className="h-1 bg-zinc-800 rounded-full overflow-hidden">
@@ -4222,12 +4261,12 @@ const UniverseManager: React.FC<{
                                 </div>
                                 <div className="pt-2 border-t border-zinc-800/50 grid grid-cols-2 gap-4">
                                     <div>
-                                        <p className="text-[8px] text-zinc-500 uppercase font-black">Saga</p>
-                                        <p className="text-xs font-mono text-white">{u.currentSagaName || `Saga ${u.saga}`}</p>
+                                        <p className="text-[8px] text-zinc-500 uppercase font-black">{tr('services.business.universeManager.saga')}</p>
+                                        <p className="text-xs font-mono text-white">{u.currentSagaName || getSagaLabel(typeof u.saga === 'number' ? u.saga : parseInt(String(u.saga).replace(/\D/g, '')) || 1)}</p>
                                     </div>
                                     <div>
-                                        <p className="text-[8px] text-zinc-500 uppercase font-black">Roster</p>
-                                        <p className="text-xs font-mono text-white">{rosterCount} Heroes</p>
+                                        <p className="text-[8px] text-zinc-500 uppercase font-black">{tr('services.business.universeManager.roster')}</p>
+                                        <p className="text-xs font-mono text-white">{tr('services.business.universeManager.rosterCount', { count: rosterCount })}</p>
                                     </div>
                                 </div>
                             </div>
@@ -4237,10 +4276,10 @@ const UniverseManager: React.FC<{
 
                     {retiredStudioUniverses.length > 0 && (
                         <div className="pt-4 space-y-3">
-                            <h3 className="text-xs font-black text-amber-300 uppercase tracking-widest px-2">Legacy Archive</h3>
+                            <h3 className="text-xs font-black text-amber-300 uppercase tracking-widest px-2">{tr('services.business.universeManager.legacyArchive')}</h3>
                             {retiredStudioUniverses.map((u: any) => {
                                 const canonCount = getUniverseDashboardProjects(player, u.id, player.activeReleases || []).length;
-                                const retiredLabel = u.retiredAt ? `Age ${u.retiredAt.year}, Week ${u.retiredAt.week}` : 'Archived';
+                                const retiredLabel = u.retiredAt ? tr('services.business.universeManager.retiredAt', { age: u.retiredAt.year, week: u.retiredAt.week }) : tr('services.business.universeManager.archived');
                                 return (
                                     <div
                                         key={u.id}
@@ -4254,24 +4293,24 @@ const UniverseManager: React.FC<{
                                                 </div>
                                                 <div className="min-w-0">
                                                     <h4 className="text-sm font-black text-white uppercase group-hover:text-amber-300 transition-colors truncate">{u.name}</h4>
-                                                    <p className="text-[9px] text-zinc-500 uppercase tracking-widest mt-1">Retired {retiredLabel}</p>
+                                                    <p className="text-[9px] text-zinc-500 uppercase tracking-widest mt-1">{tr('services.business.universeManager.retiredLabel', { retiredLabel })}</p>
                                                 </div>
                                             </div>
                                             <span className="text-[8px] font-black px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20">
-                                                Legacy
+                                                {tr('services.business.universeManager.legacy')}
                                             </span>
                                         </div>
                                         <p className="text-xs text-zinc-400 leading-relaxed">
-                                            History preserved. New phases are closed until a reboot relaunches this canon.
+                                            {tr('services.business.universeManager.legacyBody')}
                                         </p>
                                         <div className="pt-2 border-t border-amber-500/10 grid grid-cols-2 gap-4">
                                             <div>
-                                                <p className="text-[8px] text-zinc-500 uppercase font-black">Canon</p>
-                                                <p className="text-xs font-mono text-white">{canonCount} Projects</p>
+                                                <p className="text-[8px] text-zinc-500 uppercase font-black">{tr('services.business.universeManager.canon')}</p>
+                                                <p className="text-xs font-mono text-white">{tr('services.business.universeManager.projectCount', { count: canonCount })}</p>
                                             </div>
                                             <div>
-                                                <p className="text-[8px] text-zinc-500 uppercase font-black">Licensing</p>
-                                                <p className="text-xs font-mono text-amber-300">35% Legacy</p>
+                                                <p className="text-[8px] text-zinc-500 uppercase font-black">{tr('services.business.universeManager.licensing')}</p>
+                                                <p className="text-xs font-mono text-amber-300">{tr('services.business.universeManager.legacyRate')}</p>
                                             </div>
                                         </div>
                                     </div>

@@ -1,4 +1,5 @@
 import { Player, Commitment, NPCActor, ProductionCrisis, Genre } from '../types';
+import { getPlayerLanguage, t } from './i18n';
 
 const tuneProject = (project: Commitment, performanceDelta = 0, hypeDelta = 0): Commitment => {
     const updatedProject = {
@@ -63,7 +64,7 @@ export const GENERAL_CRISIS_TEMPLATES: ((project: Commitment) => ProductionCrisi
                         authorName: 'MovieNerd99',
                         authorHandle: '@movienerd99',
                         authorAvatar: 'https://api.dicebear.com/7.x/pixel-art/svg?seed=Nerd',
-                        content: `LMAO did anyone else see the camera guy in the new ${project.name} trailer? 💀 #MovieMistakes`,
+                        content: t(getPlayerLanguage(p), 'production.event.camera.leave.socialPost', { project: project.name }),
                         likes: 45000,
                         retweets: 12000,
                         replies: 300,

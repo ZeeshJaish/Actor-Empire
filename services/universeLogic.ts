@@ -1,9 +1,10 @@
 
-import { Universe, UniverseId, UniverseContract, Player, ProjectDetails, NewsItem, StudioId, Genre, IndustryProject, NPCActor, UniversePhase, RoleType, ProjectSubtype, ContractFilm, AuditionOpportunity, Gender, ActiveRelease, CastMember, UniverseCharacter, Script } from '../types';
+import { Universe, UniverseId, UniverseContract, Player, ProjectDetails, NewsItem, StudioId, Genre, IndustryProject, NPCActor, UniversePhase, RoleType, ProjectSubtype, ContractFilm, AuditionOpportunity, Gender, ActiveRelease, CastMember, UniverseCharacter, Script, GameLanguage } from '../types';
 import { STUDIO_CATALOG } from './studioLogic';
 import { NPC_DATABASE } from './npcLogic';
 import { generateProjectTitle, getEstimatedBudget, generateProjectDetails } from './roleLogic';
 import { getProjectReleaseSortValue, getProjectReleaseTiming } from './releaseTiming';
+import { getPlayerLanguage, t } from './i18n';
 
 // --- CONFIGURATION ---
 
@@ -210,50 +211,325 @@ const SW_ARCS: CharacterArc[] = [
         name: "Jedi Prodigy", 
         gender: 'ALL', // Can be any gender
         roadmap: [
-            { title: "Star Wars: The Awakening", role: "LEAD", type: "UNIVERSE_ENTRY", offset: 0 },
-            { title: "Star Wars: Shadow of the Sith", role: "LEAD", type: "SEQUEL", offset: 100 },
-            { title: "Star Wars: The Final Order", role: "LEAD", type: "SEQUEL", offset: 200 }
+            { title: "Star Wars: The Force Awakens", role: "LEAD", type: "UNIVERSE_ENTRY", offset: 0 },
+            { title: "Star Wars: The Last Jedi", role: "LEAD", type: "SEQUEL", offset: 80 },
+            { title: "Star Wars: The Rise of Skywalker", role: "LEAD", type: "SEQUEL", offset: 160 },
+            { title: "Star Wars: New Jedi Order", role: "LEAD", type: "SEQUEL", offset: 260 }
         ] 
     },
     {
         name: "Rogue Smuggler",
         gender: 'ALL',
         roadmap: [
-            { title: "Smuggler's Run", role: "LEAD", type: "SPINOFF", offset: 0 },
-            { title: "Star Wars: The Underworld", role: "ENSEMBLE", type: "UNIVERSE_CROSSOVER", offset: 80 },
-            { title: "Kessel Run", role: "LEAD", type: "SEQUEL", offset: 160 }
+            { title: "Solo: A Star Wars Story", role: "SUPPORTING", type: "SPINOFF", offset: 0 },
+            { title: "Rogue Squadron", role: "ENSEMBLE", type: "UNIVERSE_CROSSOVER", offset: 90 },
+            { title: "Star Wars: Starfighter", role: "LEAD", type: "SPINOFF", offset: 190 }
         ]
     },
     {
         name: "Mandalorian Warrior",
-        gender: 'MALE', // Typically male archetype in canon, but flexible
+        gender: 'ALL',
         roadmap: [
-            { title: "The Bounty Hunter", role: "LEAD", type: "UNIVERSE_ENTRY", offset: 0 },
-            { title: "Book of Boba Fett", role: "CAMEO", type: "UNIVERSE_CROSSOVER", offset: 40 },
-            { title: "War for Mandalore", role: "LEAD", type: "SEQUEL", offset: 100 },
-            { title: "Star Wars: Galaxy's Edge", role: "ENSEMBLE", type: "UNIVERSE_EVENT", offset: 160 }
+            { title: "The Mandalorian (Series)", role: "LEAD", type: "UNIVERSE_ENTRY", offset: 0 },
+            { title: "The Book of Boba Fett", role: "CAMEO", type: "UNIVERSE_CROSSOVER", offset: 50 },
+            { title: "Ahsoka (Series)", role: "SUPPORTING", type: "UNIVERSE_CROSSOVER", offset: 110 },
+            { title: "The Mandalorian and Grogu", role: "LEAD", type: "UNIVERSE_EVENT", offset: 190 }
+        ]
+    },
+    {
+        name: "Prime Jedi",
+        gender: 'ALL',
+        roadmap: [
+            { title: "Star Wars: Dawn of the Jedi", role: "LEAD", type: "UNIVERSE_ENTRY", offset: 0 },
+            { title: "Star Wars: First Temple", role: "LEAD", type: "SEQUEL", offset: 120 },
+            { title: "Star Wars: Force Origins", role: "ENSEMBLE", type: "UNIVERSE_EVENT", offset: 240 }
         ]
     }
 ];
 
-const UNIVERSE_TEMPLATES: Record<UniverseId, { name: string, studioId: StudioId, genre: Genre, arcs: CharacterArc[] }> = {
+const AVATAR_ARCS: CharacterArc[] = [
+    {
+        name: "Na'vi Warrior",
+        gender: 'ALL',
+        roadmap: [
+            { title: "Avatar", role: "SUPPORTING", type: "UNIVERSE_ENTRY", offset: 0 },
+            { title: "Avatar: The Way of Water", role: "ENSEMBLE", type: "SEQUEL", offset: 120 },
+            { title: "Avatar: Fire and Ash", role: "LEAD", type: "SEQUEL", offset: 220 },
+            { title: "Avatar 4", role: "LEAD", type: "SEQUEL", offset: 360 },
+            { title: "Avatar 5", role: "LEAD", type: "UNIVERSE_EVENT", offset: 480 }
+        ]
+    },
+    {
+        name: "Marine Defector",
+        gender: 'ALL',
+        roadmap: [
+            { title: "Avatar", role: "SUPPORTING", type: "UNIVERSE_ENTRY", offset: 0 },
+            { title: "Avatar: The Way of Water", role: "SUPPORTING", type: "SEQUEL", offset: 120 },
+            { title: "Avatar: Fire and Ash", role: "ENSEMBLE", type: "SEQUEL", offset: 220 },
+            { title: "Avatar 4", role: "LEAD", type: "SEQUEL", offset: 360 }
+        ]
+    },
+    {
+        name: "Ash Clan Heir",
+        gender: 'ALL',
+        roadmap: [
+            { title: "Avatar: Fire and Ash", role: "LEAD", type: "UNIVERSE_ENTRY", offset: 0 },
+            { title: "Avatar 4", role: "LEAD", type: "SEQUEL", offset: 140 },
+            { title: "Avatar 5", role: "ENSEMBLE", type: "UNIVERSE_EVENT", offset: 260 }
+        ]
+    }
+];
+
+const MONSTERVERSE_ARCS: CharacterArc[] = [
+    {
+        name: "Titan Tracker",
+        gender: 'ALL',
+        roadmap: [
+            { title: "Godzilla", role: "SUPPORTING", type: "UNIVERSE_ENTRY", offset: 0 },
+            { title: "Kong: Skull Island", role: "SUPPORTING", type: "UNIVERSE_CROSSOVER", offset: 70 },
+            { title: "Godzilla: King of the Monsters", role: "ENSEMBLE", type: "UNIVERSE_EVENT", offset: 140 },
+            { title: "Godzilla vs. Kong", role: "ENSEMBLE", type: "UNIVERSE_EVENT", offset: 210 },
+            { title: "Godzilla x Kong: The New Empire", role: "SUPPORTING", type: "UNIVERSE_EVENT", offset: 300 },
+            { title: "Godzilla x Kong: Supernova", role: "LEAD", type: "UNIVERSE_EVENT", offset: 420 }
+        ]
+    },
+    {
+        name: "Monarch Operative",
+        gender: 'ALL',
+        roadmap: [
+            { title: "Monarch: Legacy of Monsters (Series)", role: "LEAD", type: "UNIVERSE_ENTRY", offset: 0 },
+            { title: "Godzilla x Kong: The New Empire", role: "SUPPORTING", type: "UNIVERSE_CROSSOVER", offset: 80 },
+            { title: "Godzilla x Kong: Supernova", role: "LEAD", type: "SEQUEL", offset: 200 }
+        ]
+    },
+    {
+        name: "Apex Engineer",
+        gender: 'ALL',
+        roadmap: [
+            { title: "Godzilla vs. Kong", role: "SUPPORTING", type: "UNIVERSE_ENTRY", offset: 0 },
+            { title: "Godzilla x Kong: The New Empire", role: "SUPPORTING", type: "SEQUEL", offset: 90 },
+            { title: "Godzilla x Kong: Supernova", role: "ENSEMBLE", type: "UNIVERSE_EVENT", offset: 210 }
+        ]
+    }
+];
+
+const JURASSIC_ARCS: CharacterArc[] = [
+    {
+        name: "Dinosaur Geneticist",
+        gender: 'ALL',
+        roadmap: [
+            { title: "Jurassic Park", role: "SUPPORTING", type: "UNIVERSE_ENTRY", offset: 0 },
+            { title: "The Lost World: Jurassic Park", role: "SUPPORTING", type: "SEQUEL", offset: 70 },
+            { title: "Jurassic World", role: "ENSEMBLE", type: "REBOOT", offset: 180 },
+            { title: "Jurassic World: Fallen Kingdom", role: "SUPPORTING", type: "SEQUEL", offset: 260 },
+            { title: "Jurassic World Dominion", role: "ENSEMBLE", type: "UNIVERSE_EVENT", offset: 340 },
+            { title: "Jurassic World Rebirth", role: "LEAD", type: "SEQUEL", offset: 460 }
+        ]
+    },
+    {
+        name: "Island Survivor",
+        gender: 'ALL',
+        roadmap: [
+            { title: "Jurassic Park III", role: "SUPPORTING", type: "UNIVERSE_ENTRY", offset: 0 },
+            { title: "Jurassic World", role: "SUPPORTING", type: "REBOOT", offset: 120 },
+            { title: "Jurassic World Dominion", role: "ENSEMBLE", type: "UNIVERSE_EVENT", offset: 260 },
+            { title: "Jurassic World Rebirth", role: "LEAD", type: "SEQUEL", offset: 380 }
+        ]
+    },
+    {
+        name: "Black Market Handler",
+        gender: 'ALL',
+        roadmap: [
+            { title: "Jurassic World: Fallen Kingdom", role: "SUPPORTING", type: "UNIVERSE_ENTRY", offset: 0 },
+            { title: "Jurassic World Dominion", role: "SUPPORTING", type: "UNIVERSE_CROSSOVER", offset: 90 },
+            { title: "Jurassic World Rebirth", role: "LEAD", type: "SEQUEL", offset: 210 }
+        ]
+    }
+];
+
+const SPIDER_VERSE_ARCS: CharacterArc[] = [
+    {
+        name: "Miles Morales",
+        gender: 'MALE',
+        roadmap: [
+            { title: "Spider-Man: Into the Spider-Verse", role: "LEAD", type: "UNIVERSE_ENTRY", offset: 0 },
+            { title: "Spider-Man: Across the Spider-Verse", role: "LEAD", type: "SEQUEL", offset: 90 },
+            { title: "Spider-Man: Beyond the Spider-Verse", role: "LEAD", type: "UNIVERSE_EVENT", offset: 210 }
+        ]
+    },
+    {
+        name: "Spider-Woman",
+        gender: 'FEMALE',
+        roadmap: [
+            { title: "Spider-Man: Into the Spider-Verse", role: "SUPPORTING", type: "UNIVERSE_ENTRY", offset: 0 },
+            { title: "Spider-Man: Across the Spider-Verse", role: "ENSEMBLE", type: "SEQUEL", offset: 90 },
+            { title: "Spider-Man: Beyond the Spider-Verse", role: "LEAD", type: "UNIVERSE_EVENT", offset: 210 }
+        ]
+    },
+    {
+        name: "Spider Society Recruit",
+        gender: 'ALL',
+        roadmap: [
+            { title: "Spider-Man: Across the Spider-Verse", role: "SUPPORTING", type: "UNIVERSE_ENTRY", offset: 0 },
+            { title: "Spider-Man: Beyond the Spider-Verse", role: "ENSEMBLE", type: "UNIVERSE_EVENT", offset: 120 },
+            { title: "Spider-Verse: Web of Worlds", role: "LEAD", type: "SPINOFF", offset: 260 }
+        ]
+    }
+];
+
+const FAST_SAGA_ARCS: CharacterArc[] = [
+    {
+        name: "Street Racer",
+        gender: 'ALL',
+        roadmap: [
+            { title: "The Fast and the Furious", role: "SUPPORTING", type: "UNIVERSE_ENTRY", offset: 0 },
+            { title: "Fast Five", role: "ENSEMBLE", type: "UNIVERSE_EVENT", offset: 120 },
+            { title: "Furious 7", role: "ENSEMBLE", type: "UNIVERSE_EVENT", offset: 220 },
+            { title: "F9", role: "SUPPORTING", type: "SEQUEL", offset: 330 },
+            { title: "Fast X", role: "ENSEMBLE", type: "UNIVERSE_EVENT", offset: 420 },
+            { title: "Fast X: Part 2", role: "LEAD", type: "UNIVERSE_EVENT", offset: 520 }
+        ]
+    },
+    {
+        name: "Agency Driver",
+        gender: 'ALL',
+        roadmap: [
+            { title: "Fast & Furious 6", role: "SUPPORTING", type: "UNIVERSE_ENTRY", offset: 0 },
+            { title: "Fast & Furious Presents: Hobbs & Shaw", role: "SUPPORTING", type: "SPINOFF", offset: 120 },
+            { title: "Fast X", role: "ENSEMBLE", type: "UNIVERSE_CROSSOVER", offset: 240 },
+            { title: "Fast X: Part 2", role: "LEAD", type: "UNIVERSE_EVENT", offset: 340 }
+        ]
+    },
+    {
+        name: "Tech Wheelman",
+        gender: 'ALL',
+        roadmap: [
+            { title: "Furious 7", role: "SUPPORTING", type: "UNIVERSE_ENTRY", offset: 0 },
+            { title: "The Fate of the Furious", role: "SUPPORTING", type: "SEQUEL", offset: 80 },
+            { title: "F9", role: "SUPPORTING", type: "SEQUEL", offset: 170 },
+            { title: "Fast X: Part 2", role: "ENSEMBLE", type: "UNIVERSE_EVENT", offset: 310 }
+        ]
+    }
+];
+
+interface UniverseTemplate {
+    name: string;
+    studioId: StudioId;
+    genre: Genre;
+    arcs: CharacterArc[];
+    saga?: number;
+    phase?: UniversePhase;
+    momentum?: number;
+    brandPower?: number;
+    marketShare?: number;
+    merchScale?: number;
+    weeksUntilNextPhase?: number;
+}
+
+const UNIVERSE_TEMPLATES: Record<UniverseId, UniverseTemplate> = {
     MCU: {
         name: "Marvel Cinematic Universe",
         studioId: 'MARVEL_STUDIOS',
         genre: 'SUPERHERO',
-        arcs: MCU_ARCS
+        arcs: MCU_ARCS,
+        saga: 2,
+        phase: 'PHASE_4_MULTIVERSE',
+        momentum: 85,
+        brandPower: 95,
+        marketShare: 45,
+        merchScale: 1,
+        weeksUntilNextPhase: 52
     },
     DCU: {
         name: "DC Universe",
         studioId: 'DC_STUDIOS',
         genre: 'SUPERHERO',
-        arcs: DCU_ARCS
+        arcs: DCU_ARCS,
+        saga: 1,
+        phase: 'PHASE_1_ORIGINS',
+        momentum: 60,
+        brandPower: 75,
+        marketShare: 25,
+        merchScale: 0.58,
+        weeksUntilNextPhase: 104
     },
     SW: {
         name: "Star Wars Galaxy",
         studioId: 'LUCASFILM',
         genre: 'SCI_FI',
-        arcs: SW_ARCS
+        arcs: SW_ARCS,
+        saga: 3,
+        phase: 'PHASE_3_WAR',
+        momentum: 70,
+        brandPower: 88,
+        marketShare: 30,
+        merchScale: 0.78,
+        weeksUntilNextPhase: 156
+    },
+    AVATAR: {
+        name: "Avatar",
+        studioId: 'DISNEY_PLUS',
+        genre: 'SCI_FI',
+        arcs: AVATAR_ARCS,
+        saga: 3,
+        phase: 'PHASE_3_WAR',
+        momentum: 78,
+        brandPower: 90,
+        marketShare: 28,
+        merchScale: 0.82,
+        weeksUntilNextPhase: 156
+    },
+    MONSTERVERSE: {
+        name: "Monsterverse",
+        studioId: 'WARNER_BROS',
+        genre: 'ACTION',
+        arcs: MONSTERVERSE_ARCS,
+        saga: 2,
+        phase: 'PHASE_2_EXPANSION',
+        momentum: 76,
+        brandPower: 83,
+        marketShare: 22,
+        merchScale: 0.66,
+        weeksUntilNextPhase: 104
+    },
+    JURASSIC: {
+        name: "Jurassic World",
+        studioId: 'UNIVERSAL',
+        genre: 'ADVENTURE',
+        arcs: JURASSIC_ARCS,
+        saga: 3,
+        phase: 'PHASE_3_WAR',
+        momentum: 72,
+        brandPower: 86,
+        marketShare: 24,
+        merchScale: 0.72,
+        weeksUntilNextPhase: 130
+    },
+    SPIDER_VERSE: {
+        name: "Spider-Verse",
+        studioId: 'MARVEL_STUDIOS',
+        genre: 'ANIMATION',
+        arcs: SPIDER_VERSE_ARCS,
+        saga: 2,
+        phase: 'PHASE_4_MULTIVERSE',
+        momentum: 82,
+        brandPower: 84,
+        marketShare: 19,
+        merchScale: 0.7,
+        weeksUntilNextPhase: 104
+    },
+    FAST_SAGA: {
+        name: "Fast Saga",
+        studioId: 'UNIVERSAL',
+        genre: 'ACTION',
+        arcs: FAST_SAGA_ARCS,
+        saga: 4,
+        phase: 'PHASE_3_WAR',
+        momentum: 68,
+        brandPower: 80,
+        marketShare: 20,
+        merchScale: 0.62,
+        weeksUntilNextPhase: 104
     }
 };
 
@@ -262,8 +538,39 @@ const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
 const KNOWN_UNIVERSE_COLORS: Record<string, string> = {
     MCU: '#e23636',
     DCU: '#0476f2',
-    SW: '#ffe81f'
+    SW: '#ffe81f',
+    AVATAR: '#22d3ee',
+    MONSTERVERSE: '#34d399',
+    JURASSIC: '#84cc16',
+    SPIDER_VERSE: '#f97316',
+    FAST_SAGA: '#ef4444'
 };
+
+export const getUniverseTemplateGenre = (universeId: UniverseId): Genre =>
+    UNIVERSE_TEMPLATES[universeId]?.genre || 'ACTION';
+
+export const getUniverseTemplateStudioName = (universeId: UniverseId): string => {
+    const studioId = UNIVERSE_TEMPLATES[universeId]?.studioId;
+    return studioId ? (STUDIO_CATALOG[studioId]?.name || String(studioId).replace(/_/g, ' ')) : 'Franchise Casting';
+};
+
+const universeText = (language: GameLanguage, key: string, vars: Record<string, string | number> = {}) =>
+    t(language, `services.universeLogic.${key}`, vars);
+
+const getUniverseSagaName = (language: GameLanguage, saga: number | string) =>
+    universeText(language, 'saga.name', { saga });
+
+const getUniversePhaseName = (language: GameLanguage, phase: UniversePhase | string) => {
+    const normalized = String(phase || 'PHASE_1_ORIGINS').toUpperCase();
+    if (normalized === 'PHASE_1_ORIGINS') return universeText(language, 'phase.PHASE_1_ORIGINS');
+    if (normalized === 'PHASE_2_EXPANSION') return universeText(language, 'phase.PHASE_2_EXPANSION');
+    if (normalized === 'PHASE_3_WAR') return universeText(language, 'phase.PHASE_3_WAR');
+    if (normalized === 'PHASE_4_MULTIVERSE') return universeText(language, 'phase.PHASE_4_MULTIVERSE');
+    return String(phase || '').replace(/_/g, ' ').replace(/\b\w/g, char => char.toUpperCase());
+};
+
+const getDefaultProductName = (language: GameLanguage, catalogId: string) =>
+    t(language, `services.business.universeMerch.product.${catalogId}.name`);
 
 const toFiniteNumber = (value: unknown, fallback = 0): number => {
     const parsed = typeof value === 'number' ? value : Number(value);
@@ -337,7 +644,7 @@ const findUniverseRosterMatch = (
     return null;
 };
 
-export const getDefaultUniverseRoster = (universeId: UniverseId): UniverseCharacter[] => {
+export const getDefaultUniverseRoster = (universeId: UniverseId, language: GameLanguage = 'en'): UniverseCharacter[] => {
     const template = UNIVERSE_TEMPLATES[universeId];
     if (!template) return [];
 
@@ -352,30 +659,32 @@ export const getDefaultUniverseRoster = (universeId: UniverseId): UniverseCharac
             characterId,
             name: arc.name,
             actorId: actor?.id || 'UNKNOWN',
-            actorName: actor?.name || 'Unknown Actor',
+            actorName: actor?.name || universeText(language, 'actor.unknown'),
             status: 'ACTIVE' as const,
             fanApproval: 65 + ((index * 7) % 25),
             appearances: arc.roadmap.length,
             firstAppearanceTitle: firstRoadmapEntry?.title,
             latestAppearanceTitle: latestRoadmapEntry?.title,
-            description: `${arc.name} is part of the ${template.name} canon.`
+            description: universeText(language, 'character.canonDescription', { character: arc.name, universe: template.name })
         };
     });
 };
 
-const createDefaultUniverseFromTemplate = (id: UniverseId): Universe | null => {
+const createDefaultUniverseFromTemplate = (id: UniverseId, language: GameLanguage = 'en'): Universe | null => {
     const template = UNIVERSE_TEMPLATES[id];
     if (!template) return null;
-    const merchScale = id === 'MCU' ? 1 : id === 'SW' ? 0.78 : 0.58;
+    const saga = template.saga ?? 1;
+    const phase = template.phase ?? 'PHASE_1_ORIGINS';
+    const merchScale = template.merchScale ?? 0.58;
     const defaultProducts = [
         {
             id: `${id.toLowerCase()}_legacy_apparel`,
             catalogId: 'merch_apparel',
-            name: 'Apparel & Fashion',
-            quality: id === 'MCU' ? 92 : id === 'SW' ? 88 : 82,
+            name: getDefaultProductName(language, 'merch_apparel'),
+            quality: Math.min(96, Math.max(78, Math.round((template.brandPower ?? 75) * 0.98))),
             productionCost: 0,
             sellingPrice: Math.floor(50_000 * merchScale),
-            appeal: id === 'MCU' ? 96 : id === 'SW' ? 91 : 82,
+            appeal: Math.min(98, Math.max(78, Math.round((template.brandPower ?? 75) * 1.01))),
             unitsSold: 0,
             inventory: 0,
             active: true
@@ -383,11 +692,11 @@ const createDefaultUniverseFromTemplate = (id: UniverseId): Universe | null => {
         {
             id: `${id.toLowerCase()}_legacy_collectibles`,
             catalogId: 'merch_collectibles',
-            name: 'Premium Collectibles',
-            quality: id === 'MCU' ? 94 : id === 'SW' ? 90 : 84,
+            name: getDefaultProductName(language, 'merch_collectibles'),
+            quality: Math.min(96, Math.max(80, Math.round((template.brandPower ?? 75) * 1.0))),
             productionCost: 0,
             sellingPrice: Math.floor(350_000 * merchScale),
-            appeal: id === 'MCU' ? 97 : id === 'SW' ? 94 : 86,
+            appeal: Math.min(98, Math.max(80, Math.round((template.brandPower ?? 75) * 1.03))),
             unitsSold: 0,
             inventory: 0,
             active: true
@@ -395,11 +704,11 @@ const createDefaultUniverseFromTemplate = (id: UniverseId): Universe | null => {
         {
             id: `${id.toLowerCase()}_legacy_attraction`,
             catalogId: 'park_ride',
-            name: 'Signature Attraction',
-            quality: id === 'MCU' ? 93 : id === 'SW' ? 92 : 80,
+            name: getDefaultProductName(language, 'park_ride'),
+            quality: Math.min(96, Math.max(76, Math.round((template.brandPower ?? 75) * 0.99))),
             productionCost: 0,
             sellingPrice: Math.floor(1_800_000 * merchScale),
-            appeal: id === 'MCU' ? 96 : id === 'SW' ? 95 : 82,
+            appeal: Math.min(98, Math.max(78, Math.round((template.brandPower ?? 75) * 1.02))),
             unitsSold: 0,
             inventory: 0,
             active: true
@@ -409,39 +718,39 @@ const createDefaultUniverseFromTemplate = (id: UniverseId): Universe | null => {
     return {
         id,
         name: template.name,
-        description: `${template.name} canon is active in the global industry.`,
+        description: universeText(language, 'universe.templateDescription', { universe: template.name }),
         studioId: template.studioId,
-        currentPhase: id === 'MCU' ? 'PHASE_4_MULTIVERSE' : id === 'SW' ? 'PHASE_3_WAR' : 'PHASE_1_ORIGINS',
-        saga: id === 'MCU' ? 2 : id === 'SW' ? 3 : 1,
-        currentSagaName: id === 'MCU' ? 'Saga 2' : id === 'SW' ? 'Saga 3' : 'Saga 1',
-        currentPhaseName: id === 'MCU' ? 'Phase 4 Multiverse' : id === 'SW' ? 'Phase 3 War' : 'Phase 1 Origins',
-        momentum: id === 'MCU' ? 85 : id === 'SW' ? 70 : 60,
-        brandPower: id === 'MCU' ? 95 : id === 'SW' ? 88 : 75,
-        marketShare: id === 'MCU' ? 45 : id === 'SW' ? 30 : 25,
+        currentPhase: phase,
+        saga,
+        currentSagaName: getUniverseSagaName(language, saga),
+        currentPhaseName: getUniversePhaseName(language, phase),
+        momentum: template.momentum ?? 60,
+        brandPower: template.brandPower ?? 75,
+        marketShare: template.marketShare ?? 25,
         color: KNOWN_UNIVERSE_COLORS[id] || '#f59e0b',
-        roster: getDefaultUniverseRoster(id),
+        roster: getDefaultUniverseRoster(id, language),
         slate: [],
         products: defaultProducts,
         stats: {
             weeklyRevenue: 0,
             lifetimeRevenue: 0
         },
-        weeksUntilNextPhase: id === 'MCU' ? 52 : id === 'SW' ? 156 : 104
+        weeksUntilNextPhase: template.weeksUntilNextPhase ?? 104
     };
 };
 
-export const getDefaultUniverseMap = (): Record<UniverseId, Universe> => {
+export const getDefaultUniverseMap = (language: GameLanguage = 'en'): Record<UniverseId, Universe> => {
     const universes: Record<UniverseId, Universe> = {} as Record<UniverseId, Universe>;
     (Object.keys(UNIVERSE_TEMPLATES) as UniverseId[]).forEach(id => {
-        const universe = createDefaultUniverseFromTemplate(id);
+        const universe = createDefaultUniverseFromTemplate(id, language);
         if (universe) universes[id] = universe;
     });
     return universes;
 };
 
-const normalizeUniverseCharacter = (entry: any, universeId: UniverseId, index = 0): UniverseCharacter | null => {
+const normalizeUniverseCharacter = (entry: any, universeId: UniverseId, index = 0, language: GameLanguage = 'en'): UniverseCharacter | null => {
     if (!entry || typeof entry !== 'object') return null;
-    const fallbackName = `Character ${index + 1}`;
+    const fallbackName = universeText(language, 'fallback.character', { index: index + 1 });
     const name = typeof entry.name === 'string' && entry.name.trim() ? entry.name.trim() : fallbackName;
     const characterId = typeof entry.characterId === 'string' && entry.characterId.trim()
         ? entry.characterId.trim()
@@ -452,13 +761,13 @@ const normalizeUniverseCharacter = (entry: any, universeId: UniverseId, index = 
     const actorName = typeof entry.actorName === 'string' && entry.actorName.trim()
         ? entry.actorName.trim()
         : actorId === 'PLAYER_SELF'
-            ? 'Player'
-            : 'Unknown Actor';
+            ? universeText(language, 'actor.player')
+            : universeText(language, 'actor.unknown');
     const safeStatus = ['ACTIVE', 'RECAST', 'RETIRED'].includes(entry.status) ? entry.status : 'ACTIVE';
     const templateArc = UNIVERSE_TEMPLATES[universeId]?.arcs.find(arc => normalizeUniverseCharacterKey(arc.name) === normalizeUniverseCharacterKey(name));
     const firstRoadmapEntry = templateArc?.roadmap[0];
     const latestRoadmapEntry = templateArc?.roadmap[(templateArc?.roadmap.length || 1) - 1];
-    const templateCharacter = getDefaultUniverseRoster(universeId).find(character => normalizeUniverseCharacterKey(character.name) === normalizeUniverseCharacterKey(name));
+    const templateCharacter = getDefaultUniverseRoster(universeId, language).find(character => normalizeUniverseCharacterKey(character.name) === normalizeUniverseCharacterKey(name));
     const rawAppearances = toFiniteNumber(entry.appearances, NaN);
     const fallbackAppearances = templateArc?.roadmap.length ?? templateCharacter?.appearances ?? (UNIVERSE_TEMPLATES[universeId] ? 1 : 0);
     const appearances = Math.max(
@@ -485,9 +794,9 @@ const normalizeUniverseCharacter = (entry: any, universeId: UniverseId, index = 
     };
 };
 
-const normalizeUniverseProduct = (product: any, index = 0): any | null => {
+const normalizeUniverseProduct = (product: any, index = 0, language: GameLanguage = 'en'): any | null => {
     if (!product || typeof product !== 'object') return null;
-    const name = typeof product.name === 'string' && product.name.trim() ? product.name.trim() : `License Product ${index + 1}`;
+    const name = typeof product.name === 'string' && product.name.trim() ? product.name.trim() : universeText(language, 'product.fallback', { index: index + 1 });
     return {
         ...product,
         id: typeof product.id === 'string' && product.id.trim() ? product.id : `legacy_product_${normalizeUniverseCharacterKey(name)}_${index}`,
@@ -502,19 +811,19 @@ const normalizeUniverseProduct = (product: any, index = 0): any | null => {
     };
 };
 
-export const normalizeUniverseForSave = (raw: any, fallbackId?: UniverseId): Universe => {
+export const normalizeUniverseForSave = (raw: any, fallbackId?: UniverseId, language: GameLanguage = 'en'): Universe => {
     const id = getSafeUniverseId(raw, fallbackId);
-    const defaults = createDefaultUniverseFromTemplate(id);
+    const defaults = createDefaultUniverseFromTemplate(id, language);
     const template = UNIVERSE_TEMPLATES[id];
     const base = defaults || {
         id,
-        name: 'Untitled Universe',
-        description: 'A player-created cinematic universe.',
+        name: universeText(language, 'universe.untitled'),
+        description: universeText(language, 'universe.customDescription'),
         studioId: 'PLAYER_STUDIO' as StudioId,
         currentPhase: 'PHASE_1_ORIGINS',
         saga: 1,
-        currentSagaName: 'Saga 1',
-        currentPhaseName: 'Phase 1',
+        currentSagaName: getUniverseSagaName(language, 1),
+        currentPhaseName: getUniversePhaseName(language, 'PHASE_1_ORIGINS'),
         momentum: 0,
         brandPower: 0,
         marketShare: 0,
@@ -533,7 +842,7 @@ export const normalizeUniverseForSave = (raw: any, fallbackId?: UniverseId): Uni
     const rosterSource = rawRoster.length > 0 ? rawRoster : base.roster;
     const rosterMap = new Map<string, UniverseCharacter>();
     rosterSource
-        .map((entry: any, index: number) => normalizeUniverseCharacter(entry, id, index))
+        .map((entry: any, index: number) => normalizeUniverseCharacter(entry, id, index, language))
         .filter(Boolean)
         .forEach((entry: any) => {
             const character = entry as UniverseCharacter;
@@ -565,7 +874,7 @@ export const normalizeUniverseForSave = (raw: any, fallbackId?: UniverseId): Uni
     const rawProducts = Array.isArray(raw?.products) ? raw.products : [];
     const productsSource = rawProducts.length > 0 ? rawProducts : (base.products || []);
     const products = productsSource
-        .map((product: any, index: number) => normalizeUniverseProduct(product, index))
+        .map((product: any, index: number) => normalizeUniverseProduct(product, index, language))
         .filter(Boolean) as any[];
 
     const currentPhase = normalizeUniversePhase(raw?.currentPhase ?? raw?.currentPhaseName ?? base.currentPhase);
@@ -581,10 +890,10 @@ export const normalizeUniverseForSave = (raw: any, fallbackId?: UniverseId): Uni
         studioId: (raw?.studioId || base.studioId || template?.studioId || 'PLAYER_STUDIO') as StudioId,
         currentPhase,
         saga: safeSaga,
-        currentSagaName: typeof raw?.currentSagaName === 'string' && raw.currentSagaName.trim() ? raw.currentSagaName : `Saga ${safeSaga}`,
+        currentSagaName: typeof raw?.currentSagaName === 'string' && raw.currentSagaName.trim() ? raw.currentSagaName : getUniverseSagaName(language, safeSaga),
         currentPhaseName: typeof raw?.currentPhaseName === 'string' && raw.currentPhaseName.trim()
             ? raw.currentPhaseName
-            : String(currentPhase).replace(/_/g, ' ').replace(/\b\w/g, char => char.toUpperCase()),
+            : getUniversePhaseName(language, currentPhase),
         momentum: clampNumber(raw?.momentum, base.momentum, 0, 100),
         brandPower: clampNumber(raw?.brandPower, base.brandPower, 0, 100),
         marketShare: Math.max(0, toFiniteNumber(raw?.marketShare, base.marketShare)),
@@ -613,7 +922,7 @@ export const normalizeUniverseForSave = (raw: any, fallbackId?: UniverseId): Uni
                     type: event.type,
                     year: Number.isFinite(Number(event.year)) ? Number(event.year) : 1,
                     week: Number.isFinite(Number(event.week)) ? Number(event.week) : 1,
-                    label: typeof event.label === 'string' && event.label.trim() ? event.label.trim() : event.type === 'RETIRED' ? 'Universe retired' : 'Universe rebooted'
+                    label: typeof event.label === 'string' && event.label.trim() ? event.label.trim() : event.type === 'RETIRED' ? universeText(language, 'lifecycle.retired') : universeText(language, 'lifecycle.rebooted')
                 }))
             : []
     };
@@ -628,9 +937,10 @@ export const getUniverseLifecycleRevenueMultiplier = (universe: Pick<Universe, '
 export const retireUniverseForArchive = (
     rawUniverse: Universe,
     year: number,
-    week: number
+    week: number,
+    language: GameLanguage = 'en'
 ): Universe => {
-    const universe = normalizeUniverseForSave(rawUniverse, rawUniverse.id);
+    const universe = normalizeUniverseForSave(rawUniverse, rawUniverse.id, language);
     if (isUniverseRetired(universe)) return universe;
 
     return normalizeUniverseForSave({
@@ -644,10 +954,10 @@ export const retireUniverseForArchive = (
                 type: 'RETIRED',
                 year,
                 week,
-                label: `${universe.name} entered the legacy archive`
+                label: universeText(language, 'lifecycle.archiveLabel', { universe: universe.name })
             }
         ]
-    }, universe.id);
+    }, universe.id, language);
 };
 
 export const rebootRetiredUniverse = (
@@ -655,9 +965,10 @@ export const rebootRetiredUniverse = (
     title: string,
     genre: Genre,
     year: number,
-    week: number
+    week: number,
+    language: GameLanguage = 'en'
 ): { universe: Universe; script: Script } => {
-    const universe = normalizeUniverseForSave(rawUniverse, rawUniverse.id);
+    const universe = normalizeUniverseForSave(rawUniverse, rawUniverse.id, language);
     const rebootCount = (universe.rebootCount || 0) + 1;
     const nextSaga = Math.max(1, Number(universe.saga) || 1) + 1;
     const rebootedUniverse = normalizeUniverseForSave({
@@ -666,9 +977,9 @@ export const rebootRetiredUniverse = (
         lastRebootAt: { year, week },
         rebootCount,
         saga: nextSaga,
-        currentSagaName: `Reboot Era ${rebootCount}`,
+        currentSagaName: universeText(language, 'saga.rebootEra', { rebootCount }),
         currentPhase: 'PHASE_1_ORIGINS',
-        currentPhaseName: 'Phase 1: Reintroduction',
+        currentPhaseName: universeText(language, 'phase.reintroduction'),
         weeksUntilNextPhase: 104,
         momentum: clampNumber(Math.max(20, universe.momentum * 0.45), 20, 0, 55),
         brandPower: clampNumber(Math.max(20, universe.brandPower * 0.82), 20, 0, 100),
@@ -680,10 +991,10 @@ export const rebootRetiredUniverse = (
                 type: 'REBOOTED',
                 year,
                 week,
-                label: `${universe.name} relaunched with ${title}`
+                label: universeText(language, 'lifecycle.relaunchLabel', { universe: universe.name, title })
             }
         ]
-    }, universe.id);
+    }, universe.id, language);
 
     const script: Script = {
         id: `script_universe_reboot_${Date.now()}`,
@@ -702,8 +1013,8 @@ export const rebootRetiredUniverse = (
         universeId: universe.id,
         universeSagaName: rebootedUniverse.currentSagaName,
         universePhaseName: rebootedUniverse.currentPhaseName,
-        logline: `A new creative era reintroduces ${universe.name} while preserving the history of its original canon.`,
-        tags: ['UNIVERSE_REBOOT', rebootedUniverse.currentSagaName || `Reboot Era ${rebootCount}`],
+        logline: universeText(language, 'script.rebootLogline', { universe: universe.name }),
+        tags: ['UNIVERSE_REBOOT', rebootedUniverse.currentSagaName || universeText(language, 'saga.rebootEra', { rebootCount })],
         hype: Math.round(clampNumber(25 + universe.brandPower * 0.45, 45, 0, 85)),
         createdAtWeek: week
     };
@@ -711,12 +1022,12 @@ export const rebootRetiredUniverse = (
     return { universe: rebootedUniverse, script };
 };
 
-export const normalizeUniverseMap = (rawUniverses: any): Record<UniverseId, Universe> => {
-    const normalized = getDefaultUniverseMap();
+export const normalizeUniverseMap = (rawUniverses: any, language: GameLanguage = 'en'): Record<UniverseId, Universe> => {
+    const normalized = getDefaultUniverseMap(language);
     const incoming = rawUniverses && typeof rawUniverses === 'object' && !Array.isArray(rawUniverses) ? rawUniverses : {};
 
     Object.entries(incoming).forEach(([id, universe]) => {
-        const normalizedUniverse = normalizeUniverseForSave(universe, id as UniverseId);
+        const normalizedUniverse = normalizeUniverseForSave(universe, id as UniverseId, language);
         normalized[normalizedUniverse.id] = normalizedUniverse;
     });
 
@@ -739,7 +1050,8 @@ const GENERIC_CAST_ROLE_NAMES = new Set([
 export const getFallbackCharacterName = (
     member: Partial<CastMember> | any,
     projectTitle: string,
-    index = 0
+    index = 0,
+    language: GameLanguage = 'en'
 ) => {
     const explicitName = typeof member?.characterName === 'string' ? member.characterName.trim() : '';
     if (explicitName) return explicitName;
@@ -749,15 +1061,17 @@ export const getFallbackCharacterName = (
     if (roleName && !GENERIC_CAST_ROLE_NAMES.has(normalizedRoleName)) return roleName;
 
     const roleType = String(member?.roleType || '').toUpperCase();
-    if (roleType === 'LEAD') return projectTitle || 'Lead Character';
-    if (roleType === 'CAMEO') return `${projectTitle || 'Project'} Cameo`;
-    if (roleType === 'EXTRA') return `${projectTitle || 'Project'} Extra ${index + 1}`;
-    if (roleType === 'SUPPORTING') return `${projectTitle || 'Project'} Supporting ${index + 1}`;
+    if (roleType === 'LEAD') return projectTitle || universeText(language, 'fallback.leadCharacter');
+    if (roleType === 'CAMEO') return universeText(language, 'fallback.projectCameo', { project: projectTitle || universeText(language, 'fallback.project') });
+    if (roleType === 'EXTRA') return universeText(language, 'fallback.projectExtra', { project: projectTitle || universeText(language, 'fallback.project'), index: index + 1 });
+    if (roleType === 'SUPPORTING') return universeText(language, 'fallback.projectSupporting', { project: projectTitle || universeText(language, 'fallback.project'), index: index + 1 });
 
-    return projectTitle ? `${projectTitle} Character ${index + 1}` : `Character ${index + 1}`;
+    return projectTitle
+        ? universeText(language, 'fallback.projectCharacter', { project: projectTitle, index: index + 1 })
+        : universeText(language, 'fallback.character', { index: index + 1 });
 };
 
-const normalizeUniverseCastEntries = (castList: CastMember[] | undefined, projectTitle: string, playerName: string): UniverseCharacter[] => {
+const normalizeUniverseCastEntries = (castList: CastMember[] | undefined, projectTitle: string, playerName: string, language: GameLanguage = 'en'): UniverseCharacter[] => {
     if (!Array.isArray(castList)) return [];
 
     return castList
@@ -768,8 +1082,8 @@ const normalizeUniverseCastEntries = (castList: CastMember[] | undefined, projec
             const actorId = member.actorId || member.npcId || 'UNKNOWN';
             const actorName = actorId === 'PLAYER_SELF'
                 ? playerName
-                : (member.name || member.actorName || 'Unknown Actor');
-            const name = getFallbackCharacterName(member, projectTitle, index);
+                : (member.name || member.actorName || universeText(language, 'actor.unknown'));
+            const name = getFallbackCharacterName(member, projectTitle, index, language);
             const characterId = member.characterId || `${normalizeUniverseCharacterKey(name)}`;
 
             return {
@@ -784,7 +1098,11 @@ const normalizeUniverseCastEntries = (castList: CastMember[] | undefined, projec
                 appearances: 1,
                 firstAppearanceTitle: projectTitle,
                 latestAppearanceTitle: projectTitle,
-                description: `Played by ${actorId === 'PLAYER_SELF' ? 'you' : actorName}.`
+                description: universeText(
+                    language,
+                    actorId === 'PLAYER_SELF' ? 'character.playedByYou' : 'character.playedBy',
+                    { actorName }
+                )
             };
         });
 };
@@ -857,20 +1175,21 @@ export const getUniverseDashboardProjects = (
 export const buildUniverseRoster = (
     universe: Universe,
     projects: UniverseDashboardProject[],
-    playerName: string
+    playerName: string,
+    language: GameLanguage = 'en'
 ): UniverseCharacter[] => {
     const rosterMap = new Map<string, UniverseCharacter>();
 
     const existingRoster = Array.isArray(universe.roster) && universe.roster.length > 0
         ? universe.roster
-        : getDefaultUniverseRoster(universe.id);
+        : getDefaultUniverseRoster(universe.id, language);
     existingRoster.forEach(entry => {
         if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return;
         if (typeof entry.name !== 'string' || typeof entry.actorId !== 'string') return;
 
         const characterId = entry.characterId || entry.id || normalizeUniverseCharacterKey(entry.name);
         const templateArc = UNIVERSE_TEMPLATES[universe.id]?.arcs.find(arc => normalizeUniverseCharacterKey(arc.name) === normalizeUniverseCharacterKey(entry.name));
-        const templateCharacter = getDefaultUniverseRoster(universe.id).find(character => normalizeUniverseCharacterKey(character.name) === normalizeUniverseCharacterKey(entry.name));
+        const templateCharacter = getDefaultUniverseRoster(universe.id, language).find(character => normalizeUniverseCharacterKey(character.name) === normalizeUniverseCharacterKey(entry.name));
         const fallbackAppearances = templateArc?.roadmap.length ?? templateCharacter?.appearances ?? 0;
         const safeAppearances = typeof entry.appearances === 'number' && entry.appearances > 0
             ? entry.appearances
@@ -884,7 +1203,7 @@ export const buildUniverseRoster = (
                 ? entry.actorName
                 : entry.actorId === 'PLAYER_SELF'
                     ? playerName
-                    : templateCharacter?.actorName || 'Unknown Actor',
+                    : templateCharacter?.actorName || universeText(language, 'actor.unknown'),
             status: entry.status || 'ACTIVE',
             fanApproval: typeof entry.fanApproval === 'number' ? entry.fanApproval : typeof entry.appeal === 'number' ? entry.appeal : 50,
             roleType: entry.roleType,
@@ -900,7 +1219,7 @@ export const buildUniverseRoster = (
     });
 
     projects.forEach(project => {
-        normalizeUniverseCastEntries(project.castList, project.title, playerName).forEach(character => {
+        normalizeUniverseCastEntries(project.castList, project.title, playerName, language).forEach(character => {
             const characterKey = character.characterId || character.name;
             const existingMatch = findUniverseRosterMatch(rosterMap, universe.id, characterKey, character.name);
             const existing = existingMatch?.character;
@@ -920,8 +1239,16 @@ export const buildUniverseRoster = (
                 firstAppearanceTitle: existing?.firstAppearanceTitle || project.title,
                 latestAppearanceTitle: project.title,
                 description: wasRecast
-                    ? `${character.name} was ${isReboot ? 'reintroduced' : 'recast'} with ${character.actorId === 'PLAYER_SELF' ? 'you' : character.actorName}.`
-                    : `Played by ${character.actorId === 'PLAYER_SELF' ? 'you' : character.actorName}.`
+                    ? universeText(
+                        language,
+                        isReboot ? 'character.reintroduced' : 'character.recast',
+                        { character: character.name, actorName: character.actorId === 'PLAYER_SELF' ? universeText(language, 'actor.you') : character.actorName }
+                    )
+                    : universeText(
+                        language,
+                        character.actorId === 'PLAYER_SELF' ? 'character.playedByYou' : 'character.playedBy',
+                        { actorName: character.actorName }
+                    )
             };
             if (existingMatch?.key && existingMatch.key !== characterKey) rosterMap.delete(existingMatch.key);
             getUniverseCharacterKeyAliases(universe.id, characterKey, character.name).forEach(alias => rosterMap.delete(alias));
@@ -945,7 +1272,8 @@ export const mergeUniverseRosterWithProject = (
     universe: Universe,
     projectTitle: string,
     castList: CastMember[] | undefined,
-    playerName: string
+    playerName: string,
+    language: GameLanguage = 'en'
 ): Universe => {
     const mergedRoster = buildUniverseRoster(
         universe,
@@ -957,7 +1285,8 @@ export const mergeUniverseRosterWithProject = (
             castList: Array.isArray(castList) ? castList : [],
             source: 'ACTIVE'
         }],
-        playerName
+        playerName,
+        language
     );
 
     return {
@@ -968,8 +1297,8 @@ export const mergeUniverseRosterWithProject = (
 
 // --- FACTORY ---
 
-export const initUniverses = (): Record<UniverseId, Universe> => {
-    return getDefaultUniverseMap();
+export const initUniverses = (language: GameLanguage = 'en'): Record<UniverseId, Universe> => {
+    return getDefaultUniverseMap(language);
 };
 
 // --- HELPER: CHECK IF TITLE IS RELEASED ---
@@ -1019,6 +1348,7 @@ export const generateDirectEntryOffer = (player: Player, universeId: UniverseId)
 };
 
 export const generateRandomUniverseOpportunity = (player: Player, source: 'AGENT'|'DIRECT'): AuditionOpportunity | null => {
+    const language = getPlayerLanguage(player);
     // Only fetch if player isn't already tied to a contract (simulated exclusivity)
     if (player.activeUniverseContract) return null;
 
@@ -1087,7 +1417,7 @@ export const generateRandomUniverseOpportunity = (player: Player, source: 'AGENT
     project.isFamous = true; // Treats as famous for prestige
     
     // Adjust visual label if it's a cameo
-    const label = filmDef.role === 'CAMEO' ? 'Universe Cameo' : 'Franchise Lead';
+    const label = filmDef.role === 'CAMEO' ? universeText(language, 'opportunity.universeCameo') : universeText(language, 'opportunity.franchiseLead');
     const energyCost = filmDef.role === 'CAMEO' ? 15 : 40;
 
     return {
@@ -1129,8 +1459,9 @@ export const getUniverseReleaseActivity = (
     universe: Pick<Universe, 'id'>,
     activeReleases: ActiveRelease[] = player.activeReleases || []
 ): { weeksSinceLatestRelease: number | null; multiplier: number; label: string } => {
+    const language = getPlayerLanguage(player);
     const universeId = universe?.id;
-    if (!universeId) return { weeksSinceLatestRelease: null, multiplier: 0, label: 'No release history' };
+    if (!universeId) return { weeksSinceLatestRelease: null, multiplier: 0, label: universeText(language, 'releaseActivity.none') };
 
     const currentAbsoluteWeek = getGameAbsoluteWeek(player.age, player.currentWeek);
     const releaseWeeks: number[] = [];
@@ -1155,22 +1486,22 @@ export const getUniverseReleaseActivity = (
     });
 
     if (releaseWeeks.length === 0) {
-        return { weeksSinceLatestRelease: null, multiplier: 0, label: 'No release history' };
+        return { weeksSinceLatestRelease: null, multiplier: 0, label: universeText(language, 'releaseActivity.none') };
     }
 
     const latestReleaseWeek = Math.max(...releaseWeeks);
     const weeksSinceLatestRelease = Math.max(0, currentAbsoluteWeek - latestReleaseWeek);
 
     if (weeksSinceLatestRelease <= 104) {
-        return { weeksSinceLatestRelease, multiplier: 1, label: 'Fresh releases' };
+        return { weeksSinceLatestRelease, multiplier: 1, label: universeText(language, 'releaseActivity.fresh') };
     }
     if (weeksSinceLatestRelease <= 156) {
-        return { weeksSinceLatestRelease, multiplier: 0.55, label: 'Cooling down' };
+        return { weeksSinceLatestRelease, multiplier: 0.55, label: universeText(language, 'releaseActivity.cooling') };
     }
     if (weeksSinceLatestRelease <= 208) {
-        return { weeksSinceLatestRelease, multiplier: 0.2, label: 'Dormant catalog' };
+        return { weeksSinceLatestRelease, multiplier: 0.2, label: universeText(language, 'releaseActivity.dormant') };
     }
-    return { weeksSinceLatestRelease, multiplier: 0, label: 'No recent releases' };
+    return { weeksSinceLatestRelease, multiplier: 0, label: universeText(language, 'releaseActivity.noRecent') };
 };
 
 const getUniverseReleaseImpact = (player: Player, universe: Pick<Universe, 'id'>) => {
@@ -1200,7 +1531,8 @@ const getUniverseReleaseImpact = (player: Player, universe: Pick<Universe, 'id'>
 
 // Main processing loop
 export const processUniverseTurn = (player: Player, universe: Universe): { universe: Universe, news: NewsItem[], project?: IndustryProject } => {
-    const updated = normalizeUniverseForSave(universe, universe?.id);
+    const language = getPlayerLanguage(player);
+    const updated = normalizeUniverseForSave(universe, universe?.id, language);
     const news: NewsItem[] = [];
     let generatedProject: IndustryProject | undefined;
 
@@ -1270,12 +1602,15 @@ export const processUniverseTurn = (player: Player, universe: Universe): { unive
         updated.weeksUntilNextPhase = 150 + Math.floor(Math.random() * 50); // Reset timer
 
         // Generate Slate Announcement
-        const phaseTitle = updated.currentPhase.replace(/_/g, ' ').replace('PHASE', `SAGA ${updated.saga} - PHASE`);
+        const phaseTitle = universeText(language, 'phaseTitle', {
+            saga: Number(updated.saga) || 1,
+            phase: getUniversePhaseName(language, updated.currentPhase)
+        });
         
         news.push({
             id: `uni_news_phase_${Date.now()}`,
-            headline: `${updated.name} Unveils ${phaseTitle}!`,
-            subtext: `The studio announces the next chapter of the universe at Comic-Con.`,
+            headline: universeText(language, 'news.phaseHeadline', { universe: updated.name, phaseTitle }),
+            subtext: universeText(language, 'news.phaseSubtext'),
             category: 'UNIVERSE',
             week: player.currentWeek,
             year: player.age,
@@ -1287,8 +1622,8 @@ export const processUniverseTurn = (player: Player, universe: Universe): { unive
             const char = pick(UNIVERSE_TEMPLATES[updated.id].arcs).name;
             news.push({
                 id: `uni_news_fan_${Date.now()}`,
-                headline: `Fans Demand ${player.name} as ${char}!`,
-                subtext: `#Cast${player.name.replace(/\s+/g,'')} is trending worldwide.`,
+                headline: universeText(language, 'news.fanHeadline', { player: player.name, character: char }),
+                subtext: universeText(language, 'news.fanSubtext', { tag: `#Cast${player.name.replace(/\s+/g,'')}` }),
                 category: 'UNIVERSE',
                 week: player.currentWeek,
                 year: player.age,

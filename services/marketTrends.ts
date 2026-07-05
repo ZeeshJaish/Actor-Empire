@@ -1,13 +1,15 @@
-import { Genre, GenreMarketTrend, ProjectDetails, Script } from '../types';
+import { GameLanguage, Genre, GenreMarketTrend, ProjectDetails, Script } from '../types';
 import { ALL_GENRES, formatGenreLabel } from './genreCatalog';
+import { t } from './i18n';
 
-const TREND_REASONS: Record<string, string[]> = {
-    Hot: ['audiences are actively seeking this lane', 'streamers are bidding up similar packages', 'recent hits have lifted buyer confidence'],
-    Breakout: ['a breakout hit has created a gold rush', 'the market is chasing fresh supply right now', 'fans are making this category noisy online'],
-    Soft: ['buyers are being selective this cycle', 'recent misses have made distributors cautious', 'audience interest is cooling for now'],
-    Cold: ['the market is oversupplied this cycle', 'buyers want a very strong package before committing', 'audience demand is low this season'],
-    Stable: ['demand is steady and predictable', 'buyers are open to strong execution', 'the market is balanced this cycle'],
+const TREND_REASON_COUNTS: Record<GenreMarketTrend['label'], number> = {
+    Hot: 3,
+    Breakout: 3,
+    Soft: 3,
+    Cold: 3,
+    Stable: 3,
 };
+const STABLE_MARKET_LABEL: GenreMarketTrend['label'] = 'Stable';
 
 const seededScore = (genre: Genre, week: number) => {
     const season = Math.floor(Math.max(1, week) / 4);
@@ -20,7 +22,21 @@ const seededScore = (genre: Genre, week: number) => {
     return Math.abs(hash % 100);
 };
 
-export const createMarketTrends = (week: number): GenreMarketTrend[] => ALL_GENRES.map(genre => {
+const getMarketTrendGenreLabel = (genre: Genre, language: GameLanguage) => {
+    const key = `services.marketTrends.genre.${genre}`;
+    const translated = t(language, key);
+    return translated === key ? formatGenreLabel(genre) : translated;
+};
+
+const buildMarketTrendReason = (genre: Genre, label: GenreMarketTrend['label'], week: number, language: GameLanguage) => {
+    const score = seededScore(genre, week);
+    const reasonIndex = score % TREND_REASON_COUNTS[label];
+    return t(language, `services.marketTrends.reason.${label}.${reasonIndex}`, {
+        genre: getMarketTrendGenreLabel(genre, language),
+    });
+};
+
+export const createMarketTrends = (week: number, language: GameLanguage = 'en'): GenreMarketTrend[] => ALL_GENRES.map(genre => {
     const score = seededScore(genre, week);
     const demand = score >= 92 ? 1.28
         : score >= 76 ? 1.14
@@ -32,21 +48,27 @@ export const createMarketTrends = (week: number): GenreMarketTrend[] => ALL_GENR
         : demand <= 0.82 ? 'Cold'
         : demand < 0.96 ? 'Soft'
         : 'Stable';
-    const reasons = TREND_REASONS[label];
     return {
         genre,
         demand,
         label,
-        reason: `${formatGenreLabel(genre)} ${reasons[score % reasons.length]}.`,
+        reason: buildMarketTrendReason(genre, label, week, language),
     };
 });
 
-export const getGenreMarketTrend = (genre: Genre, week: number, trends?: GenreMarketTrend[]): GenreMarketTrend => {
-    return (trends || createMarketTrends(week)).find(trend => trend.genre === genre) || {
+export const getGenreMarketTrend = (genre: Genre, week: number, trends?: GenreMarketTrend[], language: GameLanguage = 'en'): GenreMarketTrend => {
+    const trend = (trends || createMarketTrends(week, language)).find(item => item.genre === genre);
+    if (trend) {
+        return {
+            ...trend,
+            reason: buildMarketTrendReason(trend.genre, trend.label, week, language),
+        };
+    }
+    return {
         genre,
         demand: 1,
-        label: 'Stable',
-        reason: `${formatGenreLabel(genre)} demand is steady and predictable.`,
+        label: STABLE_MARKET_LABEL,
+        reason: buildMarketTrendReason(genre, STABLE_MARKET_LABEL, week, language),
     };
 };
 

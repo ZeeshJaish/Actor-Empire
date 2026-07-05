@@ -24,7 +24,6 @@ import {
 import type { Player, SubsidiaryOperatingModel } from '../../../types';
 import type { ForbesStudioProfile } from '../../../services/forbesStudioProfile';
 import {
-    ACQUISITION_COMMITMENTS,
     calculateDueDiligenceFee,
     analyzeCustomOffer,
     getFundingOptions,
@@ -39,10 +38,14 @@ import {
     type AcquisitionCommitmentId,
     type AcquisitionOfferType,
     type SellerResponsePosture,
+    getAcquisitionCommitments,
 } from '../../../services/studioAcquisition';
 import { getCompanyPosition, getStrategicStakeThreshold } from '../../../services/companyPosition';
 import { formatMoney } from '../../../services/formatUtils';
-import { OPERATING_MODELS } from '../../../services/studioGroup';
+import { getOperatingModels } from '../../../services/studioGroup';
+import { getPlayerLanguage, t } from '../../../services/i18n';
+
+type I18nKey = Parameters<typeof t>[1];
 
 type DeskStage = 'ENTRY' | 'OFFER' | 'FUNDING' | 'REVIEW';
 type FundingPurpose = 'DILIGENCE' | 'OFFER';
@@ -71,27 +74,27 @@ interface StudioAcquisitionDeskProps {
     onCompleteStockControl: () => ReturnType<typeof completeStockControlAcquisition>;
 }
 
-const STRUCTURE_LABELS: Record<'FULL' | 'MINORITY', string> = {
-    FULL: 'Full Acquisition',
-    MINORITY: 'Minority Stake',
-};
-
-const POSTURE_COPY: Record<SellerResponsePosture, { label: string; note: string; color: string; bar: string }> = {
-    DISMISSIVE: { label: 'Dismissive', note: 'The seller is unlikely to treat these terms as credible.', color: 'text-rose-300', bar: 'bg-rose-400' },
-    TESTING: { label: 'Testing', note: 'A discounted approach that may open a conversation.', color: 'text-sky-300', bar: 'bg-sky-400' },
-    SERIOUS: { label: 'Serious', note: 'Terms sit near credible company value.', color: 'text-emerald-300', bar: 'bg-emerald-400' },
-    COMPELLING: { label: 'Compelling', note: 'A meaningful premium should command attention.', color: 'text-amber-300', bar: 'bg-amber-400' },
-    OVERPAYING: { label: 'Overpaying', note: 'The premium may waste capital without adding leverage.', color: 'text-orange-300', bar: 'bg-orange-400' },
+const POSTURE_COPY: Record<SellerResponsePosture, { labelKey: I18nKey; noteKey: I18nKey; color: string; bar: string }> = {
+    DISMISSIVE: { labelKey: 'studioAcquisitionDesk.posture.dismissive.label', noteKey: 'studioAcquisitionDesk.posture.dismissive.note', color: 'text-rose-300', bar: 'bg-rose-400' },
+    TESTING: { labelKey: 'studioAcquisitionDesk.posture.testing.label', noteKey: 'studioAcquisitionDesk.posture.testing.note', color: 'text-sky-300', bar: 'bg-sky-400' },
+    SERIOUS: { labelKey: 'studioAcquisitionDesk.posture.serious.label', noteKey: 'studioAcquisitionDesk.posture.serious.note', color: 'text-emerald-300', bar: 'bg-emerald-400' },
+    COMPELLING: { labelKey: 'studioAcquisitionDesk.posture.compelling.label', noteKey: 'studioAcquisitionDesk.posture.compelling.note', color: 'text-amber-300', bar: 'bg-amber-400' },
+    OVERPAYING: { labelKey: 'studioAcquisitionDesk.posture.overpaying.label', noteKey: 'studioAcquisitionDesk.posture.overpaying.note', color: 'text-orange-300', bar: 'bg-orange-400' },
 };
 
 const COMPLIANCE_COPY = {
-    ROUTINE: { label: 'Routine', color: 'text-emerald-300', bar: 'bg-emerald-400' },
-    REVIEWABLE: { label: 'Reviewable', color: 'text-amber-300', bar: 'bg-amber-400' },
-    HIGH_SCRUTINY: { label: 'High Scrutiny', color: 'text-orange-300', bar: 'bg-orange-400' },
-    INVESTIGATION_LIKELY: { label: 'Investigation Likely', color: 'text-rose-300', bar: 'bg-rose-400' },
+    ROUTINE: { labelKey: 'studioAcquisitionDesk.compliance.routine', color: 'text-emerald-300', bar: 'bg-emerald-400' },
+    REVIEWABLE: { labelKey: 'studioAcquisitionDesk.compliance.reviewable', color: 'text-amber-300', bar: 'bg-amber-400' },
+    HIGH_SCRUTINY: { labelKey: 'studioAcquisitionDesk.compliance.highScrutiny', color: 'text-orange-300', bar: 'bg-orange-400' },
+    INVESTIGATION_LIKELY: { labelKey: 'studioAcquisitionDesk.compliance.investigationLikely', color: 'text-rose-300', bar: 'bg-rose-400' },
 } as const;
 
-const STAGES = ['Public View', 'Offer Setup', 'Funding', 'Review'];
+const STAGE_KEYS: I18nKey[] = [
+    'studioAcquisitionDesk.stage.publicView',
+    'studioAcquisitionDesk.stage.offerSetup',
+    'studioAcquisitionDesk.stage.funding',
+    'studioAcquisitionDesk.stage.review',
+];
 
 const CLOSING_STEP_IDS: ClosingStepId[] = ['PURCHASE_AGREEMENT', 'ASSETS_LIABILITIES', 'OWNERSHIP_TRANSFER'];
 
@@ -105,8 +108,10 @@ const getStageIndex = (stage: DeskStage) => {
 const FundingOptionCard: React.FC<{
     option: AcquisitionFundingOption;
     selected: boolean;
+    language: ReturnType<typeof getPlayerLanguage>;
     onSelect: () => void;
-}> = ({ option, selected, onSelect }) => {
+}> = ({ option, selected, language, onSelect }) => {
+    const tr = (key: I18nKey, vars?: Parameters<typeof t>[2]) => t(language, key, vars);
     const compliance = COMPLIANCE_COPY[option.complianceBand];
     const isPersonal = option.source === 'PERSONAL';
     return (
@@ -134,7 +139,7 @@ const FundingOptionCard: React.FC<{
                     <div className="flex items-center justify-between gap-2">
                         <div>
                             <div className={`text-[7px] font-black uppercase tracking-[0.18em] ${isPersonal ? 'text-sky-400' : 'text-violet-400'}`}>
-                                {isPersonal ? 'Personal Wealth' : 'Studio Capital'}
+                                {isPersonal ? tr('studioAcquisitionDesk.funding.personalWealth') : tr('studioAcquisitionDesk.funding.studioCapital')}
                             </div>
                             <div className="mt-0.5 truncate text-xs font-black text-white">{option.label}</div>
                         </div>
@@ -146,11 +151,11 @@ const FundingOptionCard: React.FC<{
                     </div>
                     <div className="mt-3 grid grid-cols-2 gap-2">
                         <div>
-                            <div className="text-[6px] font-black uppercase tracking-widest text-zinc-600">Available</div>
+                            <div className="text-[6px] font-black uppercase tracking-widest text-zinc-600">{tr('studioAcquisitionDesk.funding.available')}</div>
                             <div className="mt-0.5 font-mono text-[11px] font-black text-zinc-200">{formatMoney(option.balance)}</div>
                         </div>
                         <div>
-                            <div className="text-[6px] font-black uppercase tracking-widest text-zinc-600">After Transaction</div>
+                            <div className="text-[6px] font-black uppercase tracking-widest text-zinc-600">{tr('studioAcquisitionDesk.funding.afterTransaction')}</div>
                             <div className={`mt-0.5 font-mono text-[11px] font-black ${option.affordable ? 'text-zinc-200' : 'text-rose-300'}`}>
                                 {formatMoney(option.remainingBalance)}
                             </div>
@@ -160,9 +165,9 @@ const FundingOptionCard: React.FC<{
                     {!isPersonal ? (
                         <div className="mt-2.5">
                             <div className="mb-1 flex items-center justify-between">
-                                <span className="text-[6px] font-black uppercase tracking-widest text-zinc-600">Compliance Risk</span>
+                                <span className="text-[6px] font-black uppercase tracking-widest text-zinc-600">{tr('studioAcquisitionDesk.funding.complianceRisk')}</span>
                                 <span className={`text-[7px] font-black uppercase tracking-wider ${compliance.color}`}>
-                                    {option.complianceRisk}/100 · {compliance.label}
+                                    {option.complianceRisk}/100 · {tr(COMPLIANCE_COPY[option.complianceBand].labelKey)}
                                 </span>
                             </div>
                             <div className="h-1 overflow-hidden rounded-full bg-white/[0.06]">
@@ -197,6 +202,15 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
     onCompleteAcquisition,
     onCompleteStockControl,
 }) => {
+    const language = getPlayerLanguage(player);
+    const tr = (key: I18nKey, vars?: Parameters<typeof t>[2]) => t(language, key, vars);
+    const structureLabels = {
+        FULL: tr('studioAcquisitionDesk.structure.full'),
+        MINORITY: tr('studioAcquisitionDesk.structure.minority'),
+    };
+    const stageLabels = STAGE_KEYS.map(key => tr(key));
+    const acquisitionCommitments = getAcquisitionCommitments(language);
+    const operatingModels = getOperatingModels(language);
     const publicCompany = profile.acquisitionState === 'PUBLICLY_TRADED';
     const companyPosition = getCompanyPosition(player, profile);
     const stockControlMode = publicCompany && !profile.isPlayerOwned && companyPosition.influenceStatus === 'CONTROLLING_OWNER';
@@ -261,6 +275,7 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
         profile,
         amount: fundingAmount,
         expenseType: fundingPurpose === 'DILIGENCE' ? 'DILIGENCE' : 'OFFER',
+        language,
     });
     const resolvedFunding = selectedFunding
         ? fundingOptions.find(option => (
@@ -279,9 +294,9 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
         (offerType === 'MINORITY' ? offerPresets.MINORITY.amount : customOfferAnalysis.referenceValue) * 0.01 / 100_000,
     ) * 100_000);
     const anyFundingAffordable = fundingOptions.some(option => option.affordable);
-    const activeCommitments = ACQUISITION_COMMITMENTS.filter(commitment => selectedCommitments.includes(commitment.id));
-    const submittedCommitments = ACQUISITION_COMMITMENTS.filter(commitment => submittedOffer?.commitments?.includes(commitment.id));
-    const responseCommitments = ACQUISITION_COMMITMENTS.filter(commitment => responseOffer?.commitments?.includes(commitment.id));
+    const activeCommitments = acquisitionCommitments.filter(commitment => selectedCommitments.includes(commitment.id));
+    const submittedCommitments = acquisitionCommitments.filter(commitment => submittedOffer?.commitments?.includes(commitment.id));
+    const responseCommitments = acquisitionCommitments.filter(commitment => responseOffer?.commitments?.includes(commitment.id));
     const closing = acquisitionCase?.closing;
     const finalPrice = closing?.finalPrice
         || sellerResponse?.agreedAmount
@@ -292,9 +307,9 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
     const finalHiddenLiabilities = closing?.hiddenLiabilities ?? report?.hiddenLiabilities ?? Math.round(profile.valuation * 0.035);
     const finalExpectedIncome = closing?.expectedAnnualIncome ?? report?.expectedAnnualIncome ?? Math.max(profile.profitability, Math.round(profile.valuation * 0.02));
     const finalFundingLabel = responseOffer?.funding.source === 'STUDIO'
-        ? player.businesses.find(business => business.id === responseOffer.funding.businessId)?.name || 'Studio Capital'
-        : 'Personal Wealth';
-    const signatoryName = player.name?.trim() || 'Studio Owner';
+        ? player.businesses.find(business => business.id === responseOffer.funding.businessId)?.name || tr('studioAcquisitionDesk.funding.studioCapital')
+        : tr('studioAcquisitionDesk.funding.personalWealth');
+    const signatoryName = player.name?.trim() || tr('studioAcquisitionDesk.contract.studioOwner');
     const contractSerial = `${profile.id.replace(/[^A-Z0-9]/g, '').slice(0, 4)}-${player.currentWeek}-${Math.max(0, Math.round(finalPrice / 1_000_000))}`;
     const acceptedContractMode = acquisitionCase?.status === 'ACCEPTED' && Boolean(responseOffer && sellerResponse);
     const signingRoomVisible = signingRoomOpen || acceptedContractMode;
@@ -308,23 +323,23 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
     const closingDocuments = [
         {
             id: 'PURCHASE_AGREEMENT' as const,
-            label: 'Purchase Agreement',
+            label: tr('studioAcquisitionDesk.closing.purchaseAgreement.label'),
             value: formatMoney(finalPrice),
-            note: 'Seller terms and purchase price locked.',
+            note: tr('studioAcquisitionDesk.closing.purchaseAgreement.note'),
             Icon: CircleDollarSign,
         },
         {
             id: 'ASSETS_LIABILITIES' as const,
-            label: 'Assets + Liabilities',
-            value: `${profile.catalog.length} titles · ${formatMoney(finalVerifiedDebt + finalHiddenLiabilities)}`,
-            note: 'Catalog, facilities, debt, and hidden obligations reviewed.',
+            label: tr('studioAcquisitionDesk.closing.assetsLiabilities.label'),
+            value: tr('studioAcquisitionDesk.closing.assetsLiabilities.value', { count: profile.catalog.length, amount: formatMoney(finalVerifiedDebt + finalHiddenLiabilities) }),
+            note: tr('studioAcquisitionDesk.closing.assetsLiabilities.note'),
             Icon: FileSearch,
         },
         {
             id: 'OWNERSHIP_TRANSFER' as const,
-            label: 'Ownership Transfer',
-            value: 'Control moves to you',
-            note: 'Studio becomes an owned production-house asset.',
+            label: tr('studioAcquisitionDesk.closing.ownershipTransfer.label'),
+            value: tr('studioAcquisitionDesk.closing.ownershipTransfer.value'),
+            note: tr('studioAcquisitionDesk.closing.ownershipTransfer.note'),
             Icon: Landmark,
         },
     ];
@@ -338,44 +353,48 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
         clauses?: string[];
     }> = [
         {
-            eyebrow: 'Page 1 / 4',
-            title: 'Deal Summary',
-            kicker: 'Legal Folio · Review Packet',
-            body: 'Seller terms are accepted. Confirm the price, funding source, and transfer authority.',
+            eyebrow: tr('studioAcquisitionDesk.contract.page1.eyebrow'),
+            title: tr('studioAcquisitionDesk.contract.page1.title'),
+            kicker: tr('studioAcquisitionDesk.contract.page1.kicker'),
+            body: tr('studioAcquisitionDesk.contract.page1.body'),
             stats: [
-                ['Purchase Price', formatMoney(finalPrice)],
-                ['Funding Source', finalFundingLabel],
-                ['Studio', profile.name],
+                [tr('studioAcquisitionDesk.contract.purchasePrice'), formatMoney(finalPrice)],
+                [tr('studioAcquisitionDesk.contract.fundingSource'), finalFundingLabel],
+                [tr('studioAcquisitionDesk.contract.studio'), profile.name],
             ],
         },
         {
-            eyebrow: 'Page 2 / 4',
-            title: 'Assets + Risk',
-            kicker: 'Bond Paper',
-            body: 'Review what moves into your company group when the signature lands.',
+            eyebrow: tr('studioAcquisitionDesk.contract.page2.eyebrow'),
+            title: tr('studioAcquisitionDesk.contract.page2.title'),
+            kicker: tr('studioAcquisitionDesk.contract.page2.kicker'),
+            body: tr('studioAcquisitionDesk.contract.page2.body'),
             stats: [
-                ['Catalog', `${profile.catalog.length} titles`],
-                ['Debt + Liabilities', formatMoney(finalVerifiedDebt + finalHiddenLiabilities)],
-                ['Expected Income', formatMoney(finalExpectedIncome)],
+                [tr('studioAcquisitionDesk.contract.catalog'), tr('studioAcquisitionDesk.contract.titlesCount', { count: profile.catalog.length })],
+                [tr('studioAcquisitionDesk.contract.debtLiabilities'), formatMoney(finalVerifiedDebt + finalHiddenLiabilities)],
+                [tr('studioAcquisitionDesk.contract.expectedIncome'), formatMoney(finalExpectedIncome)],
             ],
         },
         {
-            eyebrow: 'Page 3 / 4',
-            title: 'Binding Clauses',
-            kicker: 'Board Conditions',
-            body: 'These promises become active obligations after the seal.',
+            eyebrow: tr('studioAcquisitionDesk.contract.page3.eyebrow'),
+            title: tr('studioAcquisitionDesk.contract.page3.title'),
+            kicker: tr('studioAcquisitionDesk.contract.page3.kicker'),
+            body: tr('studioAcquisitionDesk.contract.page3.body'),
             clauses: responseCommitments.length > 0
                 ? responseCommitments.map(commitment => commitment.shortLabel)
-                : ['Seller terms accepted', 'Assets transfer on signature', 'Liabilities accepted at close'],
+                : [
+                    tr('studioAcquisitionDesk.contract.defaultClause.sellerTerms'),
+                    tr('studioAcquisitionDesk.contract.defaultClause.assetsTransfer'),
+                    tr('studioAcquisitionDesk.contract.defaultClause.liabilitiesAccepted'),
+                ],
         },
         {
-            eyebrow: 'Page 4 / 4',
-            title: 'Signature',
-            kicker: 'Ink Signature',
-            body: 'Hold to sign. Release early cancels the pressure.',
+            eyebrow: tr('studioAcquisitionDesk.contract.page4.eyebrow'),
+            title: tr('studioAcquisitionDesk.contract.page4.title'),
+            kicker: tr('studioAcquisitionDesk.contract.page4.kicker'),
+            body: tr('studioAcquisitionDesk.contract.page4.body'),
             stats: [
-                ['Transfer Status', signingProgress > 0 ? 'Control transferring' : 'Ready to sign'],
-                ['Notary Stamp', stampDropped ? 'Transfer approved' : 'Pending'],
+                [tr('studioAcquisitionDesk.contract.transferStatus'), signingProgress > 0 ? tr('studioAcquisitionDesk.contract.controlTransferring') : tr('studioAcquisitionDesk.contract.readyToSign')],
+                [tr('studioAcquisitionDesk.contract.notaryStamp'), stampDropped ? tr('studioAcquisitionDesk.contract.transferApproved') : tr('studioAcquisitionDesk.contract.pending')],
             ],
         },
     ];
@@ -387,13 +406,13 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
     const configuredOperatingModel = acquiredStudio?.studioState?.operatingModel;
     const takeoverPercent = Math.max(0, Math.min(100, Math.round(((boundedContractPage + (boundedContractPage === contractPages.length - 1 ? signingProgress / 100 : 0)) / contractPages.length) * 100)));
     const activeStageLabel = boundedContractPage === contractPages.length - 1
-        ? (signingProgress > 0 ? 'Signature pressure' : 'Seal ready')
-        : `Clause ${boundedContractPage + 1} armed`;
+        ? (signingProgress > 0 ? tr('studioAcquisitionDesk.contract.signaturePressure') : tr('studioAcquisitionDesk.contract.sealReady'))
+        : tr('studioAcquisitionDesk.contract.clauseArmed', { number: boundedContractPage + 1 });
     const takeoverStages = [
-        { label: 'Price Locked', value: formatMoney(finalPrice), state: boundedContractPage > 0 ? 'COMPLETE' : 'LIVE' },
-        { label: 'Assets Verified', value: `${profile.catalog.length} titles`, state: boundedContractPage > 1 ? 'COMPLETE' : boundedContractPage === 1 ? 'LIVE' : 'QUEUED' },
-        { label: 'Clauses Bound', value: `${responseCommitments.length || 3} terms`, state: boundedContractPage > 2 ? 'COMPLETE' : boundedContractPage === 2 ? 'LIVE' : 'QUEUED' },
-        { label: 'Control Transfer', value: contractSigned ? 'Studio Acquired' : `${Math.round(signingProgress)}%`, state: contractSigned ? 'COMPLETE' : boundedContractPage === 3 ? 'LIVE' : 'QUEUED' },
+        { label: tr('studioAcquisitionDesk.takeover.priceLocked'), value: formatMoney(finalPrice), state: boundedContractPage > 0 ? 'COMPLETE' : 'LIVE' },
+        { label: tr('studioAcquisitionDesk.takeover.assetsVerified'), value: tr('studioAcquisitionDesk.contract.titlesCount', { count: profile.catalog.length }), state: boundedContractPage > 1 ? 'COMPLETE' : boundedContractPage === 1 ? 'LIVE' : 'QUEUED' },
+        { label: tr('studioAcquisitionDesk.takeover.clausesBound'), value: tr('studioAcquisitionDesk.takeover.termsCount', { count: responseCommitments.length || 3 }), state: boundedContractPage > 2 ? 'COMPLETE' : boundedContractPage === 2 ? 'LIVE' : 'QUEUED' },
+        { label: tr('studioAcquisitionDesk.takeover.controlTransfer'), value: contractSigned ? tr('studioAcquisitionDesk.contract.studioAcquired') : `${Math.round(signingProgress)}%`, state: contractSigned ? 'COMPLETE' : boundedContractPage === 3 ? 'LIVE' : 'QUEUED' },
     ];
 
     React.useEffect(() => () => {
@@ -459,13 +478,13 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
         if (fundingPurpose === 'DILIGENCE') {
             const result = onRunDiligence(selectedFunding);
             if (result.success) {
-                setFeedback('Due diligence complete. The verified report is now locked to this company.');
+                setFeedback(tr('studioAcquisitionDesk.feedback.diligenceComplete'));
                 setSelectedFunding(null);
                 setStage('OFFER');
             } else {
                 setFeedback(result.reason === 'ALREADY_PURCHASED'
-                    ? 'This report is already complete.'
-                    : 'The selected funding source cannot complete this review.');
+                    ? tr('studioAcquisitionDesk.feedback.reportAlreadyComplete')
+                    : tr('studioAcquisitionDesk.feedback.reviewFundingFailed'));
             }
             return;
         }
@@ -482,11 +501,11 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
             commitments: selectedCommitments,
         });
         if (result.success) {
-            setFeedback('Opening offer submitted. No purchase funds have been deducted while the seller considers it.');
+            setFeedback(tr('studioAcquisitionDesk.feedback.offerSubmitted'));
         } else {
             setFeedback(result.reason === 'INSUFFICIENT_FUNDS'
-                ? 'The selected source no longer has enough capital.'
-                : 'This opening offer cannot be submitted in the current company state.');
+                ? tr('studioAcquisitionDesk.feedback.sourceInsufficient')
+                : tr('studioAcquisitionDesk.feedback.offerSubmitFailed'));
         }
     };
 
@@ -494,9 +513,9 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
         const result = onReviseOffer(Number(revisionInput.replace(/[^\d.]/g, '')) || 0);
         if (result.success) {
             setRevisionMode(false);
-            setFeedback('Revised offer filed. The board will respond next week.');
+            setFeedback(tr('studioAcquisitionDesk.feedback.revisionFiled'));
         } else {
-            setFeedback('Enter a credible revised amount before sending it.');
+            setFeedback(tr('studioAcquisitionDesk.feedback.revisionInvalid'));
         }
     };
 
@@ -504,9 +523,9 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
         const result = onBeatRival(amount);
         if (result.success) {
             setRivalBidMode(false);
-            setFeedback('Rival bid beaten. The board will answer in the next negotiation round.');
+            setFeedback(tr('studioAcquisitionDesk.feedback.rivalBidBeaten'));
         } else {
-            setFeedback('This bid does not beat the rival table. Raise the number or walk away.');
+            setFeedback(tr('studioAcquisitionDesk.feedback.rivalBidTooLow'));
         }
     };
 
@@ -517,7 +536,7 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
 
     const openSigningRoom = () => {
         if (!allClosingStepsReviewed) {
-            setFeedback('Review and stamp every closing document before entering the signing room.');
+            setFeedback(tr('studioAcquisitionDesk.feedback.reviewBeforeSigningRoom'));
             return;
         }
         setStampDropped(false);
@@ -538,7 +557,7 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
             setSigningProgress(100);
             setContractPage(contractPages.length - 1);
             setSigningRoomOpen(true);
-            setFeedback('Documents signed. The studio has moved into your owned company group.');
+            setFeedback(tr('studioAcquisitionDesk.feedback.documentsSigned'));
             return;
         }
         signingCompleteRef.current = false;
@@ -547,22 +566,22 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
         setSignedAcquisitionLocked(false);
         setSigningProgress(0);
         setFeedback(result.reason === 'INSUFFICIENT_FUNDS'
-            ? 'The selected funding source no longer has enough capital to close.'
+            ? tr('studioAcquisitionDesk.feedback.closeInsufficientFunds')
             : result.reason === 'MINORITY_NOT_OWNERSHIP'
-                ? 'Minority investments create a stake, not a full owned studio.'
-                : 'This deal is not ready to sign.');
+                ? tr('studioAcquisitionDesk.feedback.minorityNotOwnership')
+                : tr('studioAcquisitionDesk.feedback.notReadyToSign'));
     };
 
     const completeStockControlTransfer = () => {
         const result = onCompleteStockControl();
         if (result.success) {
             setStockControlComplete(true);
-            setFeedback('Control transfer completed. No second acquisition price was charged.');
+            setFeedback(tr('studioAcquisitionDesk.feedback.controlTransferComplete'));
             return;
         }
         setFeedback(result.reason === 'ALREADY_OWNED'
-            ? 'This studio is already inside your owned group.'
-            : 'Majority public-market control is required before this transfer can close.');
+            ? tr('studioAcquisitionDesk.feedback.alreadyOwned')
+            : tr('studioAcquisitionDesk.feedback.majorityRequired'));
     };
 
     const stopSigningHold = (reset = true) => {
@@ -575,7 +594,7 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
 
     const startSigningHold = () => {
         if (!canSignContract) {
-            setFeedback('Review and stamp every closing document before signing.');
+            setFeedback(tr('studioAcquisitionDesk.feedback.reviewBeforeSigning'));
             return;
         }
         if (signingTimerRef.current || signingCompleteRef.current) return;
@@ -608,7 +627,7 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
         <div
             role="dialog"
             aria-modal="true"
-            aria-label={`${profile.name} Acquisition Desk`}
+            aria-label={tr('studioAcquisitionDesk.aria', { name: profile.name })}
             className="Fixed Acquisition Viewport fixed inset-0 z-[9999] flex flex-col overflow-hidden bg-[#050506] text-white"
         >
             <div className="Cinematic Acquisition Screen pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(245,158,11,0.18),transparent_30%),radial-gradient(circle_at_78%_22%,rgba(16,185,129,0.12),transparent_28%),radial-gradient(circle_at_50%_100%,rgba(120,53,15,0.28),transparent_42%),linear-gradient(180deg,#0f0b07_0%,#050506_58%,#020202_100%)]" />
@@ -620,7 +639,7 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
                 <div className="flex items-center gap-3">
                     <button
                         type="button"
-                        aria-label={stage === 'ENTRY' || hasDealStatus ? 'Back to studio profile' : 'Previous acquisition step'}
+                        aria-label={stage === 'ENTRY' || hasDealStatus ? tr('studioAcquisitionDesk.backToProfile') : tr('studioAcquisitionDesk.previousStep')}
                         onClick={goBack}
                         className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-zinc-300"
                     >
@@ -628,7 +647,7 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
                     </button>
                     <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 text-[7px] font-black uppercase tracking-[0.22em] text-amber-400">
-                            <Target size={12} /> Acquisition Desk
+                            <Target size={12} /> {tr('studioAcquisitionDesk.title')}
                         </div>
                         <h2 className="mt-1 line-clamp-2 break-words font-serif text-[clamp(0.95rem,5vw,1.25rem)] font-black uppercase italic leading-[0.95] tracking-tight text-[#f4f0e7]">
                             {profile.name}
@@ -637,7 +656,7 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
                 </div>
 
                 <div className="mt-3 grid grid-cols-4 gap-1">
-                    {STAGES.map((label, index) => (
+                    {stageLabels.map((label, index) => (
                         <div key={label}>
                             <div className={`h-1 rounded-full ${index <= activeStage ? 'bg-amber-400' : 'bg-white/[0.07]'}`} />
                             <div className={`mt-1 text-center text-[5px] font-black uppercase tracking-[0.1em] ${index === activeStage ? 'text-amber-300' : 'text-zinc-700'}`}>
@@ -652,19 +671,19 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
             <main className="relative z-10 mx-auto w-full max-w-6xl flex-1 overflow-y-auto px-4 pb-28 pt-4 custom-scrollbar lg:px-8 lg:pb-32">
                 <div className="mb-4 hidden grid-cols-3 gap-3 lg:grid">
                     <div className="rounded-3xl border border-amber-300/15 bg-black/24 p-4">
-                        <div className="text-[7px] font-black uppercase tracking-[0.22em] text-amber-300">Deal Room Viewport</div>
-                        <div className="mt-1 text-lg font-black uppercase text-white">Private Closing Floor</div>
-                        <p className="mt-1 text-[10px] font-semibold leading-relaxed text-zinc-500">Forbes discovered the target. The acquisition now leaves the phone and becomes a company-level decision.</p>
+                        <div className="text-[7px] font-black uppercase tracking-[0.22em] text-amber-300">{tr('studioAcquisitionDesk.desktop.viewport')}</div>
+                        <div className="mt-1 text-lg font-black uppercase text-white">{tr('studioAcquisitionDesk.desktop.privateFloor')}</div>
+                        <p className="mt-1 text-[10px] font-semibold leading-relaxed text-zinc-500">{tr('studioAcquisitionDesk.desktop.phoneToCompany')}</p>
                     </div>
                     <div className="rounded-3xl border border-emerald-300/15 bg-emerald-300/[0.04] p-4">
-                        <div className="text-[7px] font-black uppercase tracking-[0.22em] text-emerald-300">Target</div>
+                        <div className="text-[7px] font-black uppercase tracking-[0.22em] text-emerald-300">{tr('studioAcquisitionDesk.desktop.target')}</div>
                         <div className="mt-1 truncate font-serif text-xl font-black uppercase italic text-[#f4f0e7]">{profile.name}</div>
-                        <p className="mt-1 text-[10px] font-semibold leading-relaxed text-zinc-500">Offer, funding, board response, and signing stay in one cinematic desk flow.</p>
+                        <p className="mt-1 text-[10px] font-semibold leading-relaxed text-zinc-500">{tr('studioAcquisitionDesk.desktop.flow')}</p>
                     </div>
                     <div className="rounded-3xl border border-sky-300/15 bg-sky-300/[0.04] p-4">
-                        <div className="text-[7px] font-black uppercase tracking-[0.22em] text-sky-300">Current File</div>
-                        <div className="mt-1 text-lg font-black uppercase text-white">{acquisitionCase?.status?.replace(/_/g, ' ') || 'Public View'}</div>
-                        <p className="mt-1 text-[10px] font-semibold leading-relaxed text-zinc-500">Wide layout gives negotiation and legal-paper moments room to breathe.</p>
+                        <div className="text-[7px] font-black uppercase tracking-[0.22em] text-sky-300">{tr('studioAcquisitionDesk.desktop.currentFile')}</div>
+                        <div className="mt-1 text-lg font-black uppercase text-white">{acquisitionCase?.status?.replace(/_/g, ' ') || tr('studioAcquisitionDesk.stage.publicView')}</div>
+                        <p className="mt-1 text-[10px] font-semibold leading-relaxed text-zinc-500">{tr('studioAcquisitionDesk.desktop.wideLayout')}</p>
                     </div>
                 </div>
                 <AnimatePresence mode="wait">
@@ -681,7 +700,7 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
                                 </div>
                                 <div className="mt-4 text-[8px] font-black uppercase tracking-[0.22em] text-sky-300">Majority Stock Control</div>
                                 <h3 className="mt-1 text-2xl font-black uppercase tracking-tight">
-                                    {stockControlComplete || stockControlClosing ? 'Control Transfer Complete' : 'Control Transfer Ready'}
+                                    {stockControlComplete || stockControlClosing ? tr('studioAcquisitionDesk.stockControl.completeTitle') : tr('studioAcquisitionDesk.stockControl.readyTitle')}
                                 </h3>
                                 <p className="mt-2 text-[10px] font-semibold leading-relaxed text-zinc-400">
                                     No seller counter is needed here. You already bought majority control through public shares, so this closes the company transfer without charging the acquisition price again.
@@ -738,7 +757,7 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
                                         onClick={completeStockControlTransfer}
                                         className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-emerald-400 px-4 text-[9px] font-black uppercase tracking-[0.14em] text-black"
                                     >
-                                        <Check size={15} /> Complete Control Transfer
+                                        <Check size={15} /> {tr('studioAcquisitionDesk.stockControl.completeAction')}
                                     </button>
                                 )}
                             </div>
@@ -1114,7 +1133,7 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
                                 <div className="border-r border-white/[0.07] p-4">
                                     <div className="text-[6px] font-black uppercase tracking-widest text-zinc-600">Structure</div>
                                     <div className="mt-1 text-xs font-black text-white">
-                                        {submittedOffer.type === 'MINORITY' ? STRUCTURE_LABELS.MINORITY : STRUCTURE_LABELS.FULL}
+                                        {submittedOffer.type === 'MINORITY' ? structureLabels.MINORITY : structureLabels.FULL}
                                     </div>
                                 </div>
                                 <div className="p-4">
@@ -1279,7 +1298,7 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
                                     }`}
                                 >
                                     <TrendingUp size={15} className="mx-auto mb-1" />
-                                    <div className="text-[8px] font-black uppercase tracking-[0.12em]">Full Acquisition</div>
+                                    <div className="text-[8px] font-black uppercase tracking-[0.12em]">{structureLabels.FULL}</div>
                                 </button>
                                 <button
                                     type="button"
@@ -1289,7 +1308,7 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
                                     }`}
                                 >
                                     <Landmark size={15} className="mx-auto mb-1" />
-                                    <div className="text-[8px] font-black uppercase tracking-[0.12em]">Minority Stake</div>
+                                    <div className="text-[8px] font-black uppercase tracking-[0.12em]">{structureLabels.MINORITY}</div>
                                 </button>
                             </div>
                             {publicCompany ? (
@@ -1300,13 +1319,13 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
                                 <section className="mt-3 rounded-2xl border border-violet-400/20 bg-violet-400/[0.05] p-3">
                                     <div className="flex items-center justify-between gap-3">
                                         <div>
-                                            <div className="text-[7px] font-black uppercase tracking-[0.18em] text-violet-300">Minority Stake</div>
+                                            <div className="text-[7px] font-black uppercase tracking-[0.18em] text-violet-300">{structureLabels.MINORITY}</div>
                                             <div className="mt-1 text-[7px] font-semibold text-zinc-500">5–49% · strategic threshold {strategicThreshold}%</div>
                                         </div>
                                         <div className="flex items-center gap-1.5">
                                             <Percent size={13} className="text-violet-300" />
                                             <input
-                                                aria-label="Minority Stake Percentage"
+                                                aria-label={tr('studioAcquisitionDesk.offer.minorityPercentAria')}
                                                 type="number"
                                                 min={5}
                                                 max={49}
@@ -1405,7 +1424,7 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
                                     <div>
                                         <div className="text-[6px] font-black uppercase tracking-[0.18em] text-zinc-600">Seller Posture</div>
                                         <div className={`mt-1 text-sm font-black uppercase ${POSTURE_COPY[customOfferAnalysis.posture].color}`}>
-                                            {POSTURE_COPY[customOfferAnalysis.posture].label}
+                                            {tr(POSTURE_COPY[customOfferAnalysis.posture].labelKey)}
                                         </div>
                                     </div>
                                     <div className="text-right">
@@ -1425,7 +1444,7 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
                                     <div className={`h-full rounded-full ${POSTURE_COPY[customOfferAnalysis.posture].bar}`} style={{ width: `${Math.min(100, Math.max(4, customOfferAnalysis.comparisonValue / Math.max(customOfferAnalysis.referenceValue, 1) * 50))}%` }} />
                                 </div>
                                 <p className="mt-2 text-[8px] font-semibold leading-relaxed text-zinc-500">
-                                    {customOfferAnalysis.validationReason || POSTURE_COPY[customOfferAnalysis.posture].note}
+                                    {customOfferAnalysis.validationReason || tr(POSTURE_COPY[customOfferAnalysis.posture].noteKey)}
                                 </p>
                                 {offerType === 'MINORITY' ? (
                                     <div className="mt-3 grid grid-cols-2 gap-2 border-t border-white/[0.07] pt-3">
@@ -1456,7 +1475,7 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
                                     </div>
                                 </div>
                                 <div className="mt-3 space-y-2">
-                                    {ACQUISITION_COMMITMENTS.map(commitment => {
+                                    {acquisitionCommitments.map(commitment => {
                                         const selected = selectedCommitments.includes(commitment.id);
                                         return (
                                             <button
@@ -1504,6 +1523,7 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
                                     <FundingOptionCard
                                         key={`${option.source}-${option.businessId || 'personal'}`}
                                         option={option}
+                                        language={language}
                                         selected={Boolean(selectedFunding
                                             && selectedFunding.source === option.source
                                             && (option.source === 'PERSONAL' || selectedFunding.businessId === option.businessId))}
@@ -1531,7 +1551,7 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
                                         <div>
                                             <div className="text-[7px] font-black uppercase tracking-[0.18em] text-zinc-600">Structure</div>
                                             <div className="mt-1 text-sm font-black uppercase text-white">
-                                                {offerType === 'MINORITY' ? STRUCTURE_LABELS.MINORITY : STRUCTURE_LABELS.FULL}
+                                                {offerType === 'MINORITY' ? structureLabels.MINORITY : structureLabels.FULL}
                                             </div>
                                             {offerType === 'MINORITY' ? <div className="mt-1 text-[9px] font-black text-violet-300">{minorityPercent}% company stake</div> : null}
                                         </div>
@@ -1554,7 +1574,7 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
                                             <Scale size={12} /> Compliance Risk
                                         </div>
                                         <div className={`mt-1 text-[10px] font-black uppercase ${resolvedFunding ? COMPLIANCE_COPY[resolvedFunding.complianceBand].color : 'text-zinc-500'}`}>
-                                            {resolvedFunding ? COMPLIANCE_COPY[resolvedFunding.complianceBand].label : 'Unknown'}
+                                            {resolvedFunding ? tr(COMPLIANCE_COPY[resolvedFunding.complianceBand].labelKey) : tr('studioAcquisitionDesk.value.unknown')}
                                         </div>
                                         <div className="mt-1 font-mono text-[9px] font-black text-zinc-400">{resolvedFunding?.complianceRisk || 0}/100 projected</div>
                                     </div>
@@ -1620,7 +1640,7 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
                         <div className="Mahogany Closing Table pointer-events-none absolute inset-x-0 bottom-0 h-[34vh] min-h-[240px] bg-[linear-gradient(180deg,rgba(58,25,7,0)_0%,#3b1706_26%,#1b0802_100%)]" />
                         <div className="pointer-events-none absolute inset-0 opacity-[0.045] [background-image:linear-gradient(90deg,#fff_1px,transparent_1px),linear-gradient(#fff_1px,transparent_1px)] [background-size:44px_44px]" />
                         <span className="sr-only">
-                            Executive Desk Terms & Conditions Signature Line APPROVED FOR TRANSFER Deal Room Closing Contract Stack Review Packet Responsive Packet Scroll overflow-y-auto safe-area-inset-bottom max-w-[1120px] Bond Paper Legal Folio Paper Fiber Embossed Seal Live Stamp Ink Signature Notary Stamp Deal Room Viewport max-w-6xl Closing Table Purchase Agreement Ownership Transfer Binding Clauses Document Signing DEAL SIGNED Open Studio Profile Develop From Catalog Board Witnesses Transfer Vault Ownership Reveal Mahogany Closing Table Brass Lamp Executive Pen Stamp Pad Seal Press Action Plate Signature Pressure Stamp Strike Studio Takeover Ceremony Acquisition Command Board Solid Game Panel Takeover Meter Control Transfer Confirm Clause Studio Acquired Game Signing Flow
+                            {tr('studioAcquisitionDesk.signing.srOnly')}
                         </span>
 
                         <div className="Deal Room Viewport relative z-10 mx-auto flex min-h-screen w-full max-w-6xl flex-col px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))] sm:px-6 lg:px-8">
@@ -1637,7 +1657,7 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
                                     <div className="mt-2 flex flex-wrap items-center gap-2 text-[8px] font-black uppercase tracking-[0.2em] text-zinc-500">
                                         <span>Executive Desk</span>
                                         <span>·</span>
-                                        <span>Control Transfer</span>
+                                        <span>{tr('studioAcquisitionDesk.takeover.controlTransfer')}</span>
                                         <span>·</span>
                                         <span>{activeStageLabel}</span>
                                     </div>
@@ -1847,7 +1867,7 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
                                                             <div className="text-[8px] font-black uppercase tracking-[0.22em] text-amber-300">Final Board Directive</div>
                                                             <div className="mt-1 text-lg font-black uppercase text-white">Choose how the studio operates</div>
                                                             <div className="mt-3 grid gap-2 sm:grid-cols-3">
-                                                                {OPERATING_MODELS.map(model => {
+                                                                {operatingModels.map(model => {
                                                                     const active = selectedOperatingModel === model.id;
                                                                     return (
                                                                         <button
@@ -1898,7 +1918,7 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
                                                         style={{ width: `${signingProgress}%` }}
                                                     />
                                                     <div className="relative z-10">
-                                                        <div className="text-2xl font-black uppercase tracking-[-0.05em]">{signingProgress > 0 ? 'CONTROL TRANSFERRING' : 'Hold To Sign'}</div>
+                                                        <div className="text-2xl font-black uppercase tracking-[-0.05em]">{signingProgress > 0 ? tr('studioAcquisitionDesk.contract.controlTransferring').toUpperCase() : tr('studioAcquisitionDesk.contract.holdToSign')}</div>
                                                         <div className="mt-1 text-[8px] font-black uppercase tracking-[0.2em] text-emerald-100/70">Sign & Acquire Studio · Seal Contract</div>
                                                     </div>
                                                     <div className="relative z-10 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#d8ab3c] text-black shadow-[0_7px_0_#7a4a0a]">

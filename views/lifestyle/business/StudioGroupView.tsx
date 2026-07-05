@@ -18,12 +18,13 @@ import type { Business, Player, SubsidiaryOperatingModel } from '../../../types'
 import type { DevelopmentLabInitialTab } from './DevelopmentLab';
 import {
     executeFullStudioMerger,
+    getOperatingModels,
     getOperatingModelDefinition,
     getStudioGroup,
-    OPERATING_MODELS,
     setSubsidiaryOperatingModel,
 } from '../../../services/studioGroup';
 import { OwnedStudioCommandCenter } from './OwnedStudioCommandCenter';
+import { getPlayerLanguage } from '../../../services/i18n';
 
 interface StudioGroupViewProps {
     player: Player;
@@ -56,7 +57,8 @@ const SubsidiaryPanel: React.FC<{
     onConfigure: () => void;
     onOpen: () => void;
 }> = ({ player, studio, onConfigure, onOpen }) => {
-    const model = getOperatingModelDefinition(studio.studioState?.operatingModel);
+    const language = getPlayerLanguage(player);
+    const model = getOperatingModelDefinition(studio.studioState?.operatingModel, language);
     const slateCount = (studio.studioState?.concepts?.length || 0)
         + player.commitments.filter(commitment => commitment.projectDetails?.studioId === studio.id).length
         + player.activeReleases.filter(release => release.projectDetails?.studioId === studio.id).length;
@@ -156,6 +158,8 @@ const SubsidiaryPanel: React.FC<{
 };
 
 export const StudioGroupView: React.FC<StudioGroupViewProps> = ({ player, onBack, onUpdatePlayer, initialCommandStudioId, onGreenlightStudioProject, onOpenStudioWorkbench }) => {
+    const language = getPlayerLanguage(player);
+    const operatingModels = getOperatingModels(language);
     const group = getStudioGroup(player);
     const [selectedStudioId, setSelectedStudioId] = React.useState<string | null>(null);
     const [commandStudioId, setCommandStudioId] = React.useState<string | null>(initialCommandStudioId || null);
@@ -349,6 +353,7 @@ export const StudioGroupView: React.FC<StudioGroupViewProps> = ({ player, onBack
             <AnimatePresence>
                 {selectedStudio ? (
                     <OperatingModelDialog
+                        player={player}
                         studio={selectedStudio}
                         selectedModel={selectedModel}
                         onSelect={setSelectedModel}
@@ -362,14 +367,17 @@ export const StudioGroupView: React.FC<StudioGroupViewProps> = ({ player, onBack
 };
 
 const OperatingModelDialog: React.FC<{
+    player: Player;
     studio: Business;
     selectedModel: SubsidiaryOperatingModel | null;
     onSelect: (model: SubsidiaryOperatingModel) => void;
     onClose: () => void;
     onConfirm: () => void;
-}> = ({ studio, selectedModel, onSelect, onClose, onConfirm }) => {
+}> = ({ player, studio, selectedModel, onSelect, onClose, onConfirm }) => {
+    const language = getPlayerLanguage(player);
+    const operatingModels = getOperatingModels(language);
     const [confirmingMerger, setConfirmingMerger] = React.useState(false);
-    const selectedDefinition = selectedModel ? getOperatingModelDefinition(selectedModel) : null;
+    const selectedDefinition = selectedModel ? getOperatingModelDefinition(selectedModel, language) : null;
     const isMerger = selectedModel === 'FULL_MERGER';
 
     React.useEffect(() => {
@@ -411,7 +419,7 @@ const OperatingModelDialog: React.FC<{
 
                 {!confirmingMerger ? (
                     <div className="mt-5 space-y-3">
-                        {OPERATING_MODELS.map(model => {
+                        {operatingModels.map(model => {
                             const active = selectedModel === model.id;
                             return (
                                 <button

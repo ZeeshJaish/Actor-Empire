@@ -1,4 +1,5 @@
 import type {
+    GameLanguage,
     Message,
     NewsItem,
     Player,
@@ -9,6 +10,7 @@ import type {
     Stock,
 } from '../types';
 import { getStockOwnershipPercent } from './stockLogic';
+import { getPlayerLanguage, t } from './i18n';
 
 export interface ShareholderInfluence {
     level: ShareholderInfluenceLevel;
@@ -36,77 +38,108 @@ const getHoldingPercent = (player: Pick<Player, 'portfolio'>, stock: Stock) => {
     return getStockOwnershipPercent(shares, stock);
 };
 
-export const getShareholderInfluence = (ownershipPercent: number): ShareholderInfluence => {
+export const getShareholderInfluence = (ownershipPercent: number, language: GameLanguage = 'en'): ShareholderInfluence => {
     if (ownershipPercent >= 51) {
         return {
             level: 'CONTROLLING_OWNER',
-            label: 'Controlling Owner',
+            label: t(language, 'services.shareholder.influence.CONTROLLING_OWNER.label'),
             threshold: 51,
-            rights: ['Control votes', 'takeover command', 'board control'],
+            rights: [
+                t(language, 'services.shareholder.influence.CONTROLLING_OWNER.rights.controlVotes'),
+                t(language, 'services.shareholder.influence.CONTROLLING_OWNER.rights.takeoverCommand'),
+                t(language, 'services.shareholder.influence.CONTROLLING_OWNER.rights.boardControl'),
+            ],
         };
     }
     if (ownershipPercent >= 30) {
         return {
             level: 'BOARD_SEAT',
-            label: 'Board Seat',
+            label: t(language, 'services.shareholder.influence.BOARD_SEAT.label'),
             threshold: 30,
             nextThreshold: 51,
-            rights: ['Board seat', 'major strategy pressure', 'takeover leverage'],
+            rights: [
+                t(language, 'services.shareholder.influence.BOARD_SEAT.rights.boardSeat'),
+                t(language, 'services.shareholder.influence.BOARD_SEAT.rights.strategyPressure'),
+                t(language, 'services.shareholder.influence.BOARD_SEAT.rights.takeoverLeverage'),
+            ],
         };
     }
     if (ownershipPercent >= 20) {
         return {
             level: 'STRATEGIC_INFLUENCE',
-            label: 'Strategic Influence',
+            label: t(language, 'services.shareholder.influence.STRATEGIC_INFLUENCE.label'),
             threshold: 20,
             nextThreshold: 30,
-            rights: ['Strategic proposals', 'management pressure', 'alliance leverage'],
+            rights: [
+                t(language, 'services.shareholder.influence.STRATEGIC_INFLUENCE.rights.strategicProposals'),
+                t(language, 'services.shareholder.influence.STRATEGIC_INFLUENCE.rights.managementPressure'),
+                t(language, 'services.shareholder.influence.STRATEGIC_INFLUENCE.rights.allianceLeverage'),
+            ],
         };
     }
     if (ownershipPercent >= 10) {
         return {
             level: 'SHAREHOLDER_VOTER',
-            label: 'Shareholder Voter',
+            label: t(language, 'services.shareholder.influence.SHAREHOLDER_VOTER.label'),
             threshold: 10,
             nextThreshold: 20,
-            rights: ['Vote on board decisions', 'receive shareholder ballots'],
+            rights: [
+                t(language, 'services.shareholder.influence.SHAREHOLDER_VOTER.rights.boardVotes'),
+                t(language, 'services.shareholder.influence.SHAREHOLDER_VOTER.rights.ballots'),
+            ],
         };
     }
     return {
         level: 'PASSIVE_INVESTOR',
-        label: 'Passive Investor',
+        label: t(language, 'services.shareholder.influence.PASSIVE_INVESTOR.label'),
         threshold: 0,
         nextThreshold: 10,
-        rights: ['Financial exposure', 'dividends'],
+        rights: [
+            t(language, 'services.shareholder.influence.PASSIVE_INVESTOR.rights.financialExposure'),
+            t(language, 'services.shareholder.influence.PASSIVE_INVESTOR.rights.dividends'),
+        ],
     };
 };
 
-const getVoteTemplate = (type: ShareholderVoteType, stock: Stock) => {
+const getVoteTemplate = (language: GameLanguage, type: ShareholderVoteType, stock: Stock) => {
+    const vars = { company: stock.name };
     switch (type) {
         case 'DIVIDEND_POLICY':
             return {
-                title: `${stock.name} dividend policy`,
-                summary: 'Shareholders are voting on whether management should prioritize a richer dividend or keep cash for studio expansion.',
-                stakes: ['FOR can lift income and investor confidence.', 'AGAINST keeps more capital inside the company.'],
+                title: t(language, 'services.shareholder.vote.dividend.title', vars),
+                summary: t(language, 'services.shareholder.vote.dividend.summary'),
+                stakes: [
+                    t(language, 'services.shareholder.vote.dividend.stakeFor'),
+                    t(language, 'services.shareholder.vote.dividend.stakeAgainst'),
+                ],
             };
         case 'SLATE_APPROVAL':
             return {
-                title: `${stock.name} slate approval`,
-                summary: 'The board wants backing for its next entertainment slate and capital plan.',
-                stakes: ['FOR supports management momentum.', 'AGAINST pressures the company to rethink spending.'],
+                title: t(language, 'services.shareholder.vote.slate.title', vars),
+                summary: t(language, 'services.shareholder.vote.slate.summary'),
+                stakes: [
+                    t(language, 'services.shareholder.vote.slate.stakeFor'),
+                    t(language, 'services.shareholder.vote.slate.stakeAgainst'),
+                ],
             };
         case 'CEO_CONFIDENCE':
             return {
-                title: `${stock.name} leadership confidence`,
-                summary: 'Large holders are testing support for current leadership after recent studio performance.',
-                stakes: ['FOR stabilizes leadership.', 'AGAINST increases pressure for a shake-up.'],
+                title: t(language, 'services.shareholder.vote.ceo.title', vars),
+                summary: t(language, 'services.shareholder.vote.ceo.summary'),
+                stakes: [
+                    t(language, 'services.shareholder.vote.ceo.stakeFor'),
+                    t(language, 'services.shareholder.vote.ceo.stakeAgainst'),
+                ],
             };
         case 'CAPITAL_RAISE':
         default:
             return {
-                title: `${stock.name} capital raise`,
-                summary: 'The company wants permission to raise capital for production and acquisition opportunities.',
-                stakes: ['FOR funds aggressive expansion.', 'AGAINST protects current shareholders from dilution.'],
+                title: t(language, 'services.shareholder.vote.capital.title', vars),
+                summary: t(language, 'services.shareholder.vote.capital.summary'),
+                stakes: [
+                    t(language, 'services.shareholder.vote.capital.stakeFor'),
+                    t(language, 'services.shareholder.vote.capital.stakeAgainst'),
+                ],
             };
     }
 };
@@ -121,11 +154,12 @@ export const createShareholderVote = (
     player: Pick<Player, 'age' | 'currentWeek' | 'portfolio'>,
     stock: Stock,
     type: ShareholderVoteType = chooseVoteType(player, stock),
+    language: GameLanguage = 'en',
 ): ShareholderVote | null => {
     const ownershipPercent = getHoldingPercent(player, stock);
     if (getShareholderInfluence(ownershipPercent).level === 'PASSIVE_INVESTOR') return null;
 
-    const template = getVoteTemplate(type, stock);
+    const template = getVoteTemplate(language, type, stock);
     const expectedSupport = clamp(48 + (ownershipPercent * 0.65) + (stock.dividendYield * 120) - (stock.volatility * 90), 28, 82);
 
     return {
@@ -146,11 +180,14 @@ export const createShareholderVote = (
     };
 };
 
-const createVoteMessage = (vote: ShareholderVote): Message => ({
+const createVoteMessage = (vote: ShareholderVote, language: GameLanguage = 'en'): Message => ({
     id: `msg_${vote.id}`,
     sender: 'Shareholder Services',
-    subject: `Shareholder Ballot: ${vote.stockSymbol}`,
-    text: `${vote.companyName} has opened a shareholder decision. Your ${vote.playerVotingPower.toFixed(2)}% position gives you a meaningful vote.`,
+    subject: t(language, 'services.shareholder.message.subject', { symbol: vote.stockSymbol }),
+    text: t(language, 'services.shareholder.message.text', {
+        company: vote.companyName,
+        stake: vote.playerVotingPower.toFixed(2),
+    }),
     type: 'SHAREHOLDER_VOTE' as Message['type'],
     data: { voteId: vote.id, stockId: vote.stockId },
     isRead: false,
@@ -159,6 +196,7 @@ const createVoteMessage = (vote: ShareholderVote): Message => ({
 });
 
 export const processShareholderVoting = (player: Player): Player => {
+    const language = getPlayerLanguage(player);
     const existingVotes = Array.isArray(player.shareholderVotes) ? player.shareholderVotes : [];
     let nextVotes = existingVotes;
     let nextInbox = Array.isArray(player.inbox) ? player.inbox : [];
@@ -176,12 +214,12 @@ export const processShareholderVoting = (player: Player): Player => {
                 .sort((a, b) => b.createdWeek - a.createdWeek)[0];
             if (lastVote && player.currentWeek - lastVote.createdWeek < VOTE_CYCLE_WEEKS) return;
 
-            const vote = createShareholderVote(player, stock);
+            const vote = createShareholderVote(player, stock, undefined, language);
             if (!vote) return;
             nextVotes = [vote, ...nextVotes].slice(0, 24);
-            nextInbox = [createVoteMessage(vote), ...nextInbox].slice(0, 120);
+            nextInbox = [createVoteMessage(vote, language), ...nextInbox].slice(0, 120);
             if (!nextPendingEvents.some(event => event.data?.voteId === vote.id)) {
-                nextPendingEvents = [...nextPendingEvents, createShareholderVoteEvent(vote)].slice(0, 12);
+                nextPendingEvents = [...nextPendingEvents, createShareholderVoteEvent(vote, language)].slice(0, 12);
             }
         });
 
@@ -198,11 +236,11 @@ export const processShareholderVoting = (player: Player): Player => {
     };
 };
 
-const createShareholderVoteEvent = (vote: ShareholderVote): ScheduledEvent => ({
+const createShareholderVoteEvent = (vote: ShareholderVote, language: GameLanguage = 'en'): ScheduledEvent => ({
     id: `event_${vote.id}`,
     week: vote.createdWeek,
     type: 'LIFE_EVENT',
-    title: `Shareholder Decision: ${vote.stockSymbol}`,
+    title: t(language, 'services.shareholder.event.titleFallback', { symbol: vote.stockSymbol }),
     description: vote.summary,
     data: {
         stockDecisionType: 'SHAREHOLDER_VOTE',
@@ -211,79 +249,79 @@ const createShareholderVoteEvent = (vote: ShareholderVote): ScheduledEvent => ({
         lifeEvent: {
             id: `life_${vote.id}`,
             type: 'NETWORKING',
-            title: `Shareholder Decision: ${vote.companyName}`,
+            title: t(language, 'life.event.shareholder.title', { company: vote.companyName }),
             titleKey: 'life.event.shareholder.title',
-            description: `${vote.summary} Your ${vote.playerVotingPower.toFixed(2)}% stake gives you a direct voice instead of making you hunt inside Stocks.`,
+            description: t(language, 'life.event.shareholder.description', { summary: vote.summary, stake: vote.playerVotingPower.toFixed(2) }),
             descriptionKey: 'life.event.shareholder.description',
             textVars: { company: vote.companyName, summary: vote.summary, stake: vote.playerVotingPower.toFixed(2) },
-            category: 'Stock Decision',
+            category: t(language, 'services.shareholder.event.category'),
             options: [
                 {
                     id: 'VOTE_FOR',
-                    label: 'Vote For',
+                    label: t(language, 'life.event.shareholder.for.label'),
                     labelKey: 'life.event.shareholder.for.label',
-                    description: 'Back the board proposal and accept the market reaction.',
+                    description: t(language, 'life.event.shareholder.for.description'),
                     descriptionKey: 'life.event.shareholder.for.description',
                     previewEffects: [
-                        { label: 'Vote', labelKey: 'life.effect.vote', value: 'For', tone: 'positive' },
-                        { label: 'Market', labelKey: 'life.effect.market', value: 'Visible reaction', tone: 'neutral' },
+                        { label: t(language, 'life.effect.vote'), labelKey: 'life.effect.vote', value: t(language, 'services.shareholder.value.for'), tone: 'positive' },
+                        { label: t(language, 'life.effect.market'), labelKey: 'life.effect.market', value: t(language, 'services.shareholder.value.visibleReaction'), tone: 'neutral' },
                     ],
                     impact: (player: Player) => {
                         const result = resolveShareholderVote(player, vote.id, 'FOR');
                         return {
                             updatedPlayer: result.player,
-                            log: result.vote?.outcomeSummary || `${vote.companyName} shareholder vote resolved.`,
+                            log: result.vote?.outcomeSummary || t(language, 'life.event.shareholder.for.log', { company: vote.companyName }),
                             logKey: result.vote?.outcomeSummary ? undefined : 'life.event.shareholder.for.log',
                             logVars: { company: vote.companyName },
                             effects: [
-                                { label: 'Decision', labelKey: 'life.effect.decision', value: 'For', tone: result.success ? 'positive' : 'neutral' },
+                                { label: t(language, 'life.effect.decision'), labelKey: 'life.effect.decision', value: t(language, 'services.shareholder.value.for'), tone: result.success ? 'positive' : 'neutral' },
                             ],
                         };
                     },
                 },
                 {
                     id: 'VOTE_AGAINST',
-                    label: 'Vote Against',
+                    label: t(language, 'life.event.shareholder.against.label'),
                     labelKey: 'life.event.shareholder.against.label',
-                    description: 'Push back against the board proposal.',
+                    description: t(language, 'life.event.shareholder.against.description'),
                     descriptionKey: 'life.event.shareholder.against.description',
                     previewEffects: [
-                        { label: 'Vote', labelKey: 'life.effect.vote', value: 'Against', tone: 'neutral' },
-                        { label: 'Pressure', labelKey: 'life.effect.pressure', value: 'Board challenge', tone: 'negative' },
+                        { label: t(language, 'life.effect.vote'), labelKey: 'life.effect.vote', value: t(language, 'services.shareholder.value.against'), tone: 'neutral' },
+                        { label: t(language, 'life.effect.pressure'), labelKey: 'life.effect.pressure', value: t(language, 'services.shareholder.value.boardChallenge'), tone: 'negative' },
                     ],
                     impact: (player: Player) => {
                         const result = resolveShareholderVote(player, vote.id, 'AGAINST');
                         return {
                             updatedPlayer: result.player,
-                            log: result.vote?.outcomeSummary || `${vote.companyName} shareholder vote resolved.`,
+                            log: result.vote?.outcomeSummary || t(language, 'life.event.shareholder.against.log', { company: vote.companyName }),
                             logKey: result.vote?.outcomeSummary ? undefined : 'life.event.shareholder.against.log',
                             logVars: { company: vote.companyName },
                             effects: [
-                                { label: 'Decision', labelKey: 'life.effect.decision', value: 'Against', tone: result.success ? 'neutral' : 'negative' },
+                                { label: t(language, 'life.effect.decision'), labelKey: 'life.effect.decision', value: t(language, 'services.shareholder.value.against'), tone: result.success ? 'neutral' : 'negative' },
                             ],
                         };
                     },
                 },
                 {
                     id: 'ADVISOR_SAFE_VOTE',
-                    label: 'Let Advisors Handle It',
+                    label: t(language, 'life.event.shareholder.advisor.label'),
                     labelKey: 'life.event.shareholder.advisor.label',
-                    description: 'Watch a rewarded ad to take the safest guided vote and reduce messy fallout.',
+                    description: t(language, 'life.event.shareholder.advisor.description'),
                     descriptionKey: 'life.event.shareholder.advisor.description',
                     isGolden: true,
                     previewEffects: [
-                        { label: 'Reward Ad', labelKey: 'life.effect.rewardAd', value: 'Required', tone: 'neutral' },
-                        { label: 'Risk', labelKey: 'life.effect.risk', value: 'Safer route', tone: 'positive' },
+                        { label: t(language, 'life.effect.rewardAd'), labelKey: 'life.effect.rewardAd', value: t(language, 'services.shareholder.value.required'), tone: 'neutral' },
+                        { label: t(language, 'life.effect.risk'), labelKey: 'life.effect.risk', value: t(language, 'services.shareholder.value.saferRoute'), tone: 'positive' },
                     ],
                     impact: (player: Player) => {
                         const result = resolveShareholderVote(player, vote.id, 'FOR', { golden: true });
                         return {
                             updatedPlayer: result.player,
-                            log: result.vote?.outcomeSummary || `${vote.companyName} advisors guided the shareholder vote safely.`,
+                            log: result.vote?.outcomeSummary || t(language, 'life.event.shareholder.advisor.log', { company: vote.companyName }),
                             logKey: result.vote?.outcomeSummary ? undefined : 'life.event.shareholder.advisor.log',
                             logVars: { company: vote.companyName },
                             effects: [
-                                { label: 'Golden Option', labelKey: 'life.effect.goldenOption', value: 'Advisor-led', tone: 'positive' },
+                                { label: t(language, 'life.effect.goldenOption'), labelKey: 'life.effect.goldenOption', value: t(language, 'services.shareholder.value.advisorLed'), tone: 'positive' },
                             ],
                         };
                     },
@@ -299,6 +337,7 @@ export const resolveShareholderVote = (
     selectedVote: 'FOR' | 'AGAINST',
     options: { golden?: boolean } = {},
 ): ShareholderVoteResult => {
+    const language = getPlayerLanguage(player);
     const votes = Array.isArray(player.shareholderVotes) ? player.shareholderVotes : [];
     const vote = votes.find(candidate => candidate.id === voteId);
     if (!vote) return { success: false, player, reason: 'VOTE_NOT_FOUND' };
@@ -312,8 +351,15 @@ export const resolveShareholderVote = (
         ? (passed ? 0.025 : -0.012)
         : (passed ? -0.018 : 0.01);
     const outcomeSummary = passed
-        ? `${vote.companyName} shareholders backed the proposal with ${Math.round(clamp(support))}% support${options.golden ? ' after advisor-led outreach' : ''}.`
-        : `${vote.companyName} shareholders rejected the proposal with ${Math.round(clamp(100 - support))}% opposition.`;
+        ? t(language, 'services.shareholder.result.passed', {
+            company: vote.companyName,
+            support: Math.round(clamp(support)),
+            advisorSuffix: options.golden ? t(language, 'services.shareholder.result.advisorSuffix') : '',
+        })
+        : t(language, 'services.shareholder.result.rejected', {
+            company: vote.companyName,
+            opposition: Math.round(clamp(100 - support)),
+        });
     const resolvedVote: ShareholderVote = {
         ...vote,
         status: 'RESOLVED',
@@ -324,7 +370,10 @@ export const resolveShareholderVote = (
     };
     const newsItem: NewsItem = {
         id: `news_${vote.id}_${selectedVote.toLowerCase()}`,
-        headline: `${vote.companyName} shareholders ${passed ? 'back' : 'reject'} board proposal`,
+        headline: t(language, 'services.shareholder.news.headline', {
+            company: vote.companyName,
+            decision: t(language, passed ? 'services.shareholder.news.back' : 'services.shareholder.news.reject'),
+        }),
         subtext: outcomeSummary,
         category: 'INDUSTRY',
         week: player.currentWeek,
@@ -352,7 +401,10 @@ export const resolveShareholderVote = (
                 {
                     week: player.currentWeek,
                     year: player.age,
-                    message: `Shareholder Vote: ${vote.stockSymbol} ${selectedVote === 'FOR' ? 'for' : 'against'} resolved.`,
+                    message: t(language, 'services.shareholder.log.resolved', {
+                        symbol: vote.stockSymbol,
+                        vote: t(language, selectedVote === 'FOR' ? 'services.shareholder.value.for' : 'services.shareholder.value.against'),
+                    }),
                     type: passed ? 'positive' as const : 'neutral' as const,
                 },
                 ...(player.logs || []),

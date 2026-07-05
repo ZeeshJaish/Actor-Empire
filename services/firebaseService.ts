@@ -507,7 +507,7 @@ export const bootstrapPushMessaging = async () => {
   return getFirebasePushStatus();
 };
 
-export const enableManualPushNotifications = async () => {
+export const enableManualPushNotifications = async (source = 'settings_support') => {
   if (!Capacitor.isNativePlatform()) {
     setFirebasePushStatus({ state: 'web_skipped', tokenTail: null, error: undefined });
     return getFirebasePushStatus();
@@ -516,7 +516,7 @@ export const enableManualPushNotifications = async () => {
   installPushMessagingListeners();
   markTraceAction('push_permission_requested', { flow: 'manual_push' });
   addBreadcrumb('push_permission_requested', { platform: getTelemetryPlatform() });
-  trackGameEvent('push_permission_requested', { source: 'settings_support' });
+  trackGameEvent('push_permission_requested', { source });
   setFirebasePushStatus({ state: 'prompting', error: undefined });
 
   try {
@@ -533,7 +533,7 @@ export const enableManualPushNotifications = async () => {
     if (receive !== 'granted') {
       setFirebasePushStatus({ state: 'denied', receive, tokenTail: null, error: undefined });
       addBreadcrumb('push_permission_denied', { receive: receive || 'unknown' });
-      trackGameEvent('push_permission_denied', { receive: receive || 'unknown', source: 'settings_support' });
+      trackGameEvent('push_permission_denied', { receive: receive || 'unknown', source });
       return getFirebasePushStatus();
     }
 
@@ -546,19 +546,19 @@ export const enableManualPushNotifications = async () => {
     trackGameEvent('push_manual_enabled', {
       has_token: Boolean(tokenTail),
       token_tail: tokenTail || 'none',
-      source: 'settings_support',
+      source,
     });
   } catch (error) {
     const message = getErrorMessage(error);
     if (Capacitor.getPlatform() === 'ios' && message.includes('No APNS token specified')) {
       setFirebasePushStatus({ state: 'checking', error: 'Waiting for APNS token.' });
       addBreadcrumb('push_waiting_for_apns_token', { platform: getTelemetryPlatform() });
-      trackGameEvent('push_waiting_for_apns_token', { source: 'settings_support' });
+      trackGameEvent('push_waiting_for_apns_token', { source });
       return getFirebasePushStatus();
     }
     setFirebasePushStatus({ state: 'failed', error: message });
     recordNonFatal(error, 'push_manual_enable_failed', { platform: getTelemetryPlatform() });
-    trackGameEvent('push_manual_enable_failed', { error: message, source: 'settings_support' });
+    trackGameEvent('push_manual_enable_failed', { error: message, source });
   }
 
   return getFirebasePushStatus();

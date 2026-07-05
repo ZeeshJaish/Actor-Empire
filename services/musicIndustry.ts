@@ -1,6 +1,7 @@
 import artistCsv from './data/music_artists_database.csv?raw';
 import {
     BudgetTier,
+    GameLanguage,
     Genre,
     MusicArtist,
     MusicArtistAvailability,
@@ -26,6 +27,7 @@ import {
     ProjectSoundtrackRevenueBreakdown,
     WorldState
 } from '../types';
+import { getPlayerLanguage, t } from './i18n';
 
 const FAME_SCORE: Record<MusicArtistFameTier, number> = {
     EMERGING: 10,
@@ -581,9 +583,13 @@ export const getProjectMusicPlan = (project?: ProjectDetails): ProjectMusicPlan 
     return project.musicPlan?.credits?.length ? project.musicPlan : buildAutomaticProjectMusicPlan(project);
 };
 
-export const getMusicCreditRoleLabel = (role: MusicCreditRole): string => ROLE_LABELS[role] || role.replace(/_/g, ' ').toLowerCase();
+export const getMusicCreditRoleLabel = (role: MusicCreditRole, language: GameLanguage = 'en'): string => (
+    t(language, `services.musicIndustry.role.${role}`) || ROLE_LABELS[role] || role.replace(/_/g, ' ').toLowerCase()
+);
 
-export const getMusicStrategyLabel = (strategy?: ProjectMusicStrategy): string => strategy ? STRATEGY_LABELS[strategy] : 'Soundtrack';
+export const getMusicStrategyLabel = (strategy?: ProjectMusicStrategy, language: GameLanguage = 'en'): string => (
+    strategy ? t(language, `services.musicIndustry.strategy.${strategy}`) : t(language, 'services.musicIndustry.strategy.soundtrack')
+);
 
 export const getMusicArtistGenderLabel = (gender?: MusicArtistGender): string => GENDER_LABELS[gender || 'UNKNOWN'];
 
@@ -595,12 +601,12 @@ export const formatProjectMusicByline = (project?: ProjectDetails, maxArtists = 
     return `${names.slice(0, maxArtists).join(', ')} +${names.length - maxArtists}`;
 };
 
-export const formatProjectMusicSummary = (project?: ProjectDetails): string => {
+export const formatProjectMusicSummary = (project?: ProjectDetails, language: GameLanguage = 'en'): string => {
     const plan = getProjectMusicPlan(project);
     if (!plan?.credits?.length) return '';
     const lead = plan.credits[0];
-    const extra = plan.credits.length > 1 ? ` +${plan.credits.length - 1} more` : '';
-    return `${getMusicStrategyLabel(plan.strategy)}: ${lead.artistName}${extra}`;
+    const extra = plan.credits.length > 1 ? t(language, 'services.musicIndustry.summary.more', { count: plan.credits.length - 1 }) : '';
+    return `${getMusicStrategyLabel(plan.strategy, language)}: ${lead.artistName}${extra}`;
 };
 
 const ROLE_IMPACT_WEIGHTS: Record<MusicCreditRole, { opening: number; social: number; trailer: number; awards: number; reach: number }> = {
@@ -612,7 +618,7 @@ const ROLE_IMPACT_WEIGHTS: Record<MusicCreditRole, { opening: number; social: nu
     MUSIC_VIDEO_TIE_IN: { opening: 0.86, social: 1.2, trailer: 0.8, awards: 0.45, reach: 0.95 }
 };
 
-const getMusicImpactEmpty = (): ProjectMusicImpact => ({
+const getMusicImpactEmpty = (language: GameLanguage = 'en'): ProjectMusicImpact => ({
     openingWeekendLiftPct: 0,
     audienceReachLiftPct: 0,
     socialHypeLift: 0,
@@ -622,8 +628,8 @@ const getMusicImpactEmpty = (): ProjectMusicImpact => ({
     awardChanceLift: 0,
     streamingInterestLiftPct: 0,
     score: 0,
-    label: 'Composer score only',
-    headline: 'Composer score supports the movie without named-artist campaign lift.',
+    label: t(language, 'services.musicIndustry.impact.empty.label'),
+    headline: t(language, 'services.musicIndustry.impact.empty.headline'),
     strengths: [],
     warnings: []
 });
@@ -631,9 +637,10 @@ const getMusicImpactEmpty = (): ProjectMusicImpact => ({
 export const calculateProjectMusicImpact = (
     project?: ProjectDetails,
     plan: ProjectMusicPlan | undefined = project ? getProjectMusicPlan(project) : undefined,
-    catalog: MusicArtist[] = MUSIC_ARTISTS
+    catalog: MusicArtist[] = MUSIC_ARTISTS,
+    language: GameLanguage = 'en'
 ): ProjectMusicImpact => {
-    if (!project || !plan?.credits?.length) return getMusicImpactEmpty();
+    if (!project || !plan?.credits?.length) return getMusicImpactEmpty(language);
 
     const projectTags = getProjectTags(project);
     const creditCount = plan.credits.length;
@@ -695,22 +702,32 @@ export const calculateProjectMusicImpact = (
     ));
 
     const strengths = [
-        openingWeekendLiftPct >= 8 ? 'Opening weekend lift' : '',
-        audienceReachLiftPct >= 8 ? 'Broader audience reach' : '',
-        trailerStrengthLift >= 8 ? 'Stronger trailer hook' : '',
-        socialHypeLift >= 12 ? 'Social campaign heat' : '',
-        awardChanceLift >= 6 ? 'Original song awards push' : ''
+        openingWeekendLiftPct >= 8 ? t(language, 'services.musicIndustry.impact.strength.openingWeekendLift') : '',
+        audienceReachLiftPct >= 8 ? t(language, 'services.musicIndustry.impact.strength.audienceReach') : '',
+        trailerStrengthLift >= 8 ? t(language, 'services.musicIndustry.impact.strength.trailerHook') : '',
+        socialHypeLift >= 12 ? t(language, 'services.musicIndustry.impact.strength.socialHeat') : '',
+        awardChanceLift >= 6 ? t(language, 'services.musicIndustry.impact.strength.awardsPush') : ''
     ].filter(Boolean);
     const warnings = [
-        mismatchBacklashRisk >= 38 ? 'Genre mismatch backlash risk' : '',
-        controversyRisk >= 36 ? 'Artist controversy can spill into campaign' : '',
-        openingWeekendLiftPct < 0 ? 'Music package may weaken positioning' : ''
+        mismatchBacklashRisk >= 38 ? t(language, 'services.musicIndustry.impact.warning.genreMismatch') : '',
+        controversyRisk >= 36 ? t(language, 'services.musicIndustry.impact.warning.artistControversy') : '',
+        openingWeekendLiftPct < 0 ? t(language, 'services.musicIndustry.impact.warning.weakPositioning') : ''
     ].filter(Boolean);
     const lead = plan.credits[0];
-    const label = score >= 76 ? 'Culture moment' : score >= 58 ? 'Strong music push' : score >= 38 ? 'Useful soundtrack' : 'Risky fit';
+    const label = score >= 76
+        ? t(language, 'services.musicIndustry.impact.label.cultureMoment')
+        : score >= 58
+            ? t(language, 'services.musicIndustry.impact.label.strongPush')
+            : score >= 38
+                ? t(language, 'services.musicIndustry.impact.label.usefulSoundtrack')
+                : t(language, 'services.musicIndustry.impact.label.riskyFit');
     const headline = lead
-        ? `${getMusicCreditRoleLabel(lead.role)} by ${lead.artistName} adds ${openingWeekendLiftPct >= 0 ? '+' : ''}${openingWeekendLiftPct}% opening signal.`
-        : getMusicImpactEmpty().headline;
+        ? t(language, 'services.musicIndustry.impact.headline', {
+            role: getMusicCreditRoleLabel(lead.role, language),
+            artist: lead.artistName,
+            signal: `${openingWeekendLiftPct >= 0 ? '+' : ''}${openingWeekendLiftPct}`
+        })
+        : getMusicImpactEmpty(language).headline;
 
     return {
         openingWeekendLiftPct,
@@ -964,12 +981,8 @@ const getReleaseKind = (artist: MusicArtist, rng: () => number): MusicReleaseKin
     return 'SINGLE';
 };
 
-const releaseKindLabel = (kind: MusicReleaseKind): string => {
-    if (kind === 'ALBUM') return 'promo album';
-    if (kind === 'EP') return 'soundtrack-style EP';
-    if (kind === 'VIDEO') return 'music video';
-    if (kind === 'REMIX') return 'remix';
-    return 'single';
+const releaseKindLabel = (kind: MusicReleaseKind, language: GameLanguage = 'en'): string => {
+    return t(language, `services.musicIndustry.releaseKind.${kind}`);
 };
 
 const estimateYoutubeViews = (artist: MusicArtist, score: number, rng: () => number): number => {
@@ -1129,14 +1142,15 @@ const buildMusicScandal = (
     week: number,
     year: number,
     absoluteWeek: number,
-    rng: () => number
+    rng: () => number,
+    language: GameLanguage
 ): MusicScandalRecord => {
     const severity = getScandalSeverity(artist, rng);
     const templates = [
-        `${artist.stageName} faces backlash after a messy livestream.`,
-        `${artist.stageName} sparks fan drama during a chart week.`,
-        `${artist.stageName} is criticized for skipping a major promo event.`,
-        `${artist.stageName} gets dragged into a label dispute.`
+        t(language, 'services.musicIndustry.scandal.template.livestream', { artist: artist.stageName }),
+        t(language, 'services.musicIndustry.scandal.template.fanDrama', { artist: artist.stageName }),
+        t(language, 'services.musicIndustry.scandal.template.skippedPromo', { artist: artist.stageName }),
+        t(language, 'services.musicIndustry.scandal.template.labelDispute', { artist: artist.stageName })
     ];
     const momentumHit = severity === 'HIGH' ? 26 : severity === 'MEDIUM' ? 15 : 8;
     const followerLoss = severity === 'HIGH' ? 180_000 : severity === 'MEDIUM' ? 62_000 : 14_000;
@@ -1215,6 +1229,7 @@ const generateEmergingMusicArtist = (seed: string, index: number): MusicArtist =
 export const processMusicIndustryWeek = (player: Player): { world: WorldState; news: NewsItem[]; logs: string[]; newArtists?: MusicArtist[]; artistEarnings?: { artistId: string; amount: number; followerGain: number }[] } => {
     const world: WorldState = { ...player.world };
     const industry = ensureMusicIndustryState(world);
+    const language = getPlayerLanguage(player);
     const absoluteWeek = getAbsoluteWeek(player);
     const news: NewsItem[] = [];
     const logs: string[] = [];
@@ -1262,14 +1277,14 @@ export const processMusicIndustryWeek = (player: Player): { world: WorldState; n
             };
             news.push({
                 id: `music_debut_${absoluteWeek}_${artist.id}`,
-                headline: `${artist.stageName} breaks out of the ${artist.genre} scene.`,
-                subtext: 'Industry trackers add a new music artist to the celebrity world.',
+                headline: t(language, 'services.musicIndustry.weekly.debut.headline', { artist: artist.stageName, genre: artist.genre }),
+                subtext: t(language, 'services.musicIndustry.weekly.debut.subtext'),
                 category: 'INDUSTRY',
                 week: player.currentWeek,
                 year: player.age,
                 impactLevel: artist.fameTier === 'STAR' ? 'MEDIUM' : 'LOW'
             });
-            logs.push(`${artist.stageName} emerged as a new ${artist.genre} artist.`);
+            logs.push(t(language, 'services.musicIndustry.weekly.debut.log', { artist: artist.stageName, genre: artist.genre }));
         }
     }
     industry.generatedArtists = generatedArtists;
@@ -1377,8 +1392,8 @@ export const processMusicIndustryWeek = (player: Player): { world: WorldState; n
             if (index === 0) {
                 news.push({
                     id: `music_release_${absoluteWeek}_${artist.id}`,
-                    headline: `${artist.stageName} drops a ${releaseKindLabel(releaseKind)}: "${songTitle}".`,
-                    subtext: `${artist.genre} fans push the track into the industry conversation.`,
+                    headline: t(language, 'services.musicIndustry.weekly.release.headline', { artist: artist.stageName, kind: releaseKindLabel(releaseKind, language), song: songTitle }),
+                    subtext: t(language, 'services.musicIndustry.weekly.release.subtext', { genre: artist.genre }),
                     category: 'INDUSTRY',
                     week: player.currentWeek,
                     year: player.age,
@@ -1389,8 +1404,8 @@ export const processMusicIndustryWeek = (player: Player): { world: WorldState; n
             if (score >= 168 || youtubeViews >= 18_000_000) {
                 const moment = createMusicCultureMoment('ARTIST_BREAKOUT', {
                     id: `music_culture_breakout_${absoluteWeek}_${artist.id}`,
-                    headline: `${artist.stageName} turns "${songTitle}" into a culture moment.`,
-                    description: `${artist.genre} clips, edits, and fan posts push the release beyond a normal drop.`,
+                    headline: t(language, 'services.musicIndustry.culture.breakout.headline', { artist: artist.stageName, song: songTitle }),
+                    description: t(language, 'services.musicIndustry.culture.breakout.description', { genre: artist.genre }),
                     artistIds: [artist.id],
                     artistNames: [artist.stageName],
                     songTitle,
@@ -1451,20 +1466,20 @@ export const processMusicIndustryWeek = (player: Player): { world: WorldState; n
     if (newLeader && newLeader.artistId !== previousLeader && releaseWeek) {
         news.push({
             id: `music_chart_${absoluteWeek}_${newLeader.artistId}`,
-            headline: `${newLeader.artistName} takes #1 with "${newLeader.songTitle}".`,
-            subtext: 'The in-game music scene shifts again as artists battle for the top spot.',
+            headline: t(language, 'services.musicIndustry.weekly.chart.headline', { artist: newLeader.artistName, song: newLeader.songTitle }),
+            subtext: t(language, 'services.musicIndustry.weekly.chart.subtext'),
             category: 'INDUSTRY',
             week: player.currentWeek,
             year: player.age,
             impactLevel: 'MEDIUM'
         });
-        logs.push(`${newLeader.artistName} now leads the music charts with "${newLeader.songTitle}".`);
+        logs.push(t(language, 'services.musicIndustry.weekly.chart.log', { artist: newLeader.artistName, song: newLeader.songTitle }));
 
         if (previousLeaderEntry) {
-            const moment = createMusicCultureMoment('SONG_BEATS_SONG', {
-                id: `music_culture_song_beats_${absoluteWeek}_${newLeader.artistId}_${previousLeaderEntry.artistId}`,
-                headline: `"${newLeader.songTitle}" beats "${previousLeaderEntry.songTitle}" for #1.`,
-                description: `${newLeader.artistName} knocks ${previousLeaderEntry.artistName} off the top spot, giving both fanbases something to argue about.`,
+                const moment = createMusicCultureMoment('SONG_BEATS_SONG', {
+                    id: `music_culture_song_beats_${absoluteWeek}_${newLeader.artistId}_${previousLeaderEntry.artistId}`,
+                    headline: t(language, 'services.musicIndustry.culture.songBeats.headline', { song: newLeader.songTitle, previousSong: previousLeaderEntry.songTitle }),
+                    description: t(language, 'services.musicIndustry.culture.songBeats.description', { artist: newLeader.artistName, previousArtist: previousLeaderEntry.artistName }),
                 artistIds: [newLeader.artistId, previousLeaderEntry.artistId],
                 artistNames: [newLeader.artistName, previousLeaderEntry.artistName],
                 songTitle: newLeader.songTitle,
@@ -1510,8 +1525,8 @@ export const processMusicIndustryWeek = (player: Player): { world: WorldState; n
         if (rivalryResult.isNew || rivalryResult.rivalry.heat >= 64) {
             const moment = createMusicCultureMoment('FANBASE_WAR', {
                 id: `music_culture_fanbase_war_${absoluteWeek}_${rivalryResult.rivalry.id}`,
-                headline: `${newLeader.artistName} and ${runnerUp.artistName} fanbases go to war.`,
-                description: 'Chart posts turn into a full fanbase fight over streams, videos, and who owns the week.',
+                headline: t(language, 'services.musicIndustry.culture.fanbaseWar.headline', { leader: newLeader.artistName, runnerUp: runnerUp.artistName }),
+                description: t(language, 'services.musicIndustry.culture.fanbaseWar.description'),
                 artistIds: rivalryResult.rivalry.artistIds,
                 artistNames: rivalryResult.rivalry.artistNames,
                 songTitle: newLeader.songTitle,
@@ -1523,8 +1538,8 @@ export const processMusicIndustryWeek = (player: Player): { world: WorldState; n
             recordCultureMoment(moment);
             news.push({
                 id: `music_rivalry_${absoluteWeek}_${rivalryResult.rivalry.id}`,
-                headline: `${newLeader.artistName} and ${runnerUp.artistName} spark a chart rivalry.`,
-                subtext: 'Fanbases are comparing numbers, clips, and chart positions all week.',
+                headline: t(language, 'services.musicIndustry.weekly.rivalry.headline', { leader: newLeader.artistName, runnerUp: runnerUp.artistName }),
+                subtext: t(language, 'services.musicIndustry.weekly.rivalry.subtext'),
                 category: 'INDUSTRY',
                 week: player.currentWeek,
                 year: player.age,
@@ -1539,7 +1554,7 @@ export const processMusicIndustryWeek = (player: Player): { world: WorldState; n
                 year: player.age,
                 impactLevel: moment.impactLevel
             });
-            logs.push(`${newLeader.artistName} and ${runnerUp.artistName} became a music-scene rivalry.`);
+            logs.push(t(language, 'services.musicIndustry.weekly.rivalry.log', { leader: newLeader.artistName, runnerUp: runnerUp.artistName }));
         }
     }
 
@@ -1570,7 +1585,7 @@ export const processMusicIndustryWeek = (player: Player): { world: WorldState; n
         const chartPressure = (candidate.entry.currentRank || 20) <= 3 ? 0.012 : 0;
         const rivalryPressure = Math.min(0.035, (artistState?.rivalryHeat || 0) / 2000);
         if (rng() >= riskBase + chartPressure + rivalryPressure) continue;
-        const scandal = buildMusicScandal(candidate.artist, player.currentWeek, player.age, absoluteWeek, rng);
+        const scandal = buildMusicScandal(candidate.artist, player.currentWeek, player.age, absoluteWeek, rng, language);
         scandals.unshift(scandal);
         if (artistState) {
             industry.artists[candidate.artist.id] = {
@@ -1585,13 +1600,13 @@ export const processMusicIndustryWeek = (player: Player): { world: WorldState; n
         news.push({
             id: scandal.id,
             headline: scandal.headline,
-            subtext: `${candidate.artist.stageName} loses momentum while the ${candidate.artist.genre} scene reacts.`,
+            subtext: t(language, 'services.musicIndustry.scandal.subtext', { artist: candidate.artist.stageName, genre: candidate.artist.genre }),
             category: 'INDUSTRY',
             week: player.currentWeek,
             year: player.age,
             impactLevel: scandal.severity === 'HIGH' ? 'HIGH' : scandal.severity === 'MEDIUM' ? 'MEDIUM' : 'LOW'
         });
-        logs.push(`${candidate.artist.stageName} hit a ${scandal.severity.toLowerCase()} music scandal.`);
+        logs.push(t(language, 'services.musicIndustry.scandal.log', { artist: candidate.artist.stageName, severity: scandal.severity.toLowerCase() }));
         break;
     }
 
@@ -1602,10 +1617,10 @@ export const processMusicIndustryWeek = (player: Player): { world: WorldState; n
     industry.cultureMoments = cultureMoments.slice(0, 30);
     industry.lastProcessedWeek = absoluteWeek;
     industry.history = [
-        ...(cultureMoments[0]?.week === player.currentWeek && cultureMoments[0]?.year === player.age ? [`Week ${player.currentWeek}, ${player.age}: ${cultureMoments[0].headline}`] : []),
-        ...(scandals[0]?.week === player.currentWeek && scandals[0]?.year === player.age ? [`Week ${player.currentWeek}, ${player.age}: ${scandals[0].artistName} scandal affected music momentum.`] : []),
-        ...(rivalries[0]?.lastEventWeek === player.currentWeek && rivalries[0]?.lastEventYear === player.age ? [`Week ${player.currentWeek}, ${player.age}: ${rivalries[0].artistNames.join(' vs ')} became a chart rivalry.`] : []),
-        ...(newLeader ? [`Week ${player.currentWeek}, ${player.age}: ${newLeader.artistName} led with "${newLeader.songTitle}".`] : []),
+        ...(cultureMoments[0]?.week === player.currentWeek && cultureMoments[0]?.year === player.age ? [t(language, 'services.musicIndustry.history.culture', { week: player.currentWeek, year: player.age, headline: cultureMoments[0].headline })] : []),
+        ...(scandals[0]?.week === player.currentWeek && scandals[0]?.year === player.age ? [t(language, 'services.musicIndustry.history.scandal', { week: player.currentWeek, year: player.age, artist: scandals[0].artistName })] : []),
+        ...(rivalries[0]?.lastEventWeek === player.currentWeek && rivalries[0]?.lastEventYear === player.age ? [t(language, 'services.musicIndustry.history.rivalry', { week: player.currentWeek, year: player.age, artists: rivalries[0].artistNames.join(' vs ') })] : []),
+        ...(newLeader ? [t(language, 'services.musicIndustry.history.leader', { week: player.currentWeek, year: player.age, artist: newLeader.artistName, song: newLeader.songTitle })] : []),
         ...industry.history
     ].slice(0, 40);
 

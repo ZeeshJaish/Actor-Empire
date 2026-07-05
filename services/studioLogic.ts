@@ -92,6 +92,55 @@ export const STUDIO_CATALOG: Record<StudioId, Studio> = {
         castingBias: { reputation: 1.3, followers: 1.0, experience: 1.0 },
         qualityBias: { script: 1.1, hype: 1.5, distribution: 1.3 },
         payMultiplier: 1.3, budgetComfort: ['HIGH']
+    },
+    SONY_PICTURES: {
+        id: 'SONY_PICTURES', name: 'Sony Pictures', archetype: 'LEGACY',
+        valuation: 45,
+        castingBias: { reputation: 1.1, followers: 1.1, experience: 1.0 },
+        qualityBias: { script: 1.0, hype: 1.2, distribution: 1.2 },
+        payMultiplier: 1.15, budgetComfort: ['MID', 'HIGH']
+    },
+    LIONSGATE: {
+        id: 'LIONSGATE', name: 'Lionsgate', archetype: 'LEGACY',
+        valuation: 7,
+        castingBias: { reputation: 0.9, followers: 1.2, experience: 0.9 },
+        qualityBias: { script: 1.0, hype: 1.25, distribution: 0.95 },
+        payMultiplier: 0.95, budgetComfort: ['LOW', 'MID', 'HIGH']
+    },
+    MGM: {
+        id: 'MGM', name: 'MGM', archetype: 'LEGACY',
+        valuation: 8,
+        castingBias: { reputation: 1.2, followers: 0.9, experience: 1.2 },
+        qualityBias: { script: 1.15, hype: 1.0, distribution: 1.05 },
+        payMultiplier: 1.05, budgetComfort: ['MID', 'HIGH']
+    },
+    DREAMWORKS: {
+        id: 'DREAMWORKS', name: 'DreamWorks Pictures', archetype: 'LEGACY',
+        valuation: 15,
+        castingBias: { reputation: 1.0, followers: 1.1, experience: 1.0 },
+        qualityBias: { script: 1.05, hype: 1.2, distribution: 1.1 },
+        payMultiplier: 1.05, budgetComfort: ['MID', 'HIGH']
+    },
+    PIXAR: {
+        id: 'PIXAR', name: 'Pixar', archetype: 'PRESTIGE',
+        valuation: 20,
+        castingBias: { reputation: 1.2, followers: 0.9, experience: 1.1 },
+        qualityBias: { script: 1.4, hype: 1.0, distribution: 1.2 },
+        payMultiplier: 1.15, budgetComfort: ['MID', 'HIGH']
+    },
+    SEARCHLIGHT: {
+        id: 'SEARCHLIGHT', name: 'Searchlight Pictures', archetype: 'PRESTIGE',
+        valuation: 5,
+        castingBias: { reputation: 1.2, followers: 0.6, experience: 1.3 },
+        qualityBias: { script: 1.45, hype: 0.75, distribution: 0.85 },
+        payMultiplier: 0.9, budgetComfort: ['LOW', 'MID']
+    },
+    AMAZON_STUDIOS: {
+        id: 'AMAZON_STUDIOS', name: 'Amazon Studios', archetype: 'PLATFORM',
+        valuation: 150,
+        castingBias: { reputation: 1.0, followers: 1.25, experience: 0.95 },
+        qualityBias: { script: 1.05, hype: 1.2, distribution: 1.1 },
+        payMultiplier: 1.2, budgetComfort: ['MID', 'HIGH']
     }
 };
 

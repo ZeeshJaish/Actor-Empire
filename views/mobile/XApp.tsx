@@ -21,47 +21,72 @@ type XPostType = NonNullable<XPost['postType']>;
 type XReplyTone = 'SUPPORT' | 'JOKE' | 'CLAP_BACK' | 'CLARIFY' | 'APOLOGIZE';
 
 const X_POST_TYPES: Record<XPostType, {
-    label: string;
-    prompt: string;
+    labelKey: string;
+    promptKey: string;
     icon: React.ElementType;
     reach: number;
     conversion: number;
     controversy: number;
     reputation: number;
-    placeholder: string;
+    placeholderKey: string;
 }> = {
-    CAREER: { label: 'Career', prompt: 'Career Update', icon: Megaphone, reach: 1.25, conversion: 0.026, controversy: 0, reputation: 1, placeholder: 'Share a career update...' },
-    HOT_TAKE: { label: 'Hot Take', prompt: 'Hot Take', icon: Flame, reach: 1.65, conversion: 0.018, controversy: 7, reputation: -1, placeholder: 'Say the thing Film Twitter will argue about...' },
-    JOKE: { label: 'Joke', prompt: 'Joke', icon: Laugh, reach: 1.35, conversion: 0.024, controversy: 2, reputation: 0, placeholder: 'Post something funny...' },
-    FILM_OPINION: { label: 'Film', prompt: 'Film Opinion', icon: Film, reach: 1.2, conversion: 0.02, controversy: 2, reputation: 1, placeholder: 'Share a film opinion...' },
-    PR_STATEMENT: { label: 'PR', prompt: 'PR Statement', icon: ShieldCheck, reach: 0.85, conversion: 0.012, controversy: -6, reputation: 2, placeholder: 'Make a clean public statement...' },
-    DRAMA_REPLY: { label: 'Drama', prompt: 'Drama Reply', icon: MessageSquareQuote, reach: 1.85, conversion: 0.016, controversy: 10, reputation: -2, placeholder: 'Reply to the discourse...' },
-    FAN_THANKS: { label: 'Fans', prompt: 'Fan Thank You', icon: Users, reach: 1.05, conversion: 0.032, controversy: -1, reputation: 1, placeholder: 'Thank the fans...' },
-    GENERAL: { label: 'General', prompt: 'General Post', icon: PenTool, reach: 1, conversion: 0.02, controversy: 0, reputation: 0, placeholder: 'What is happening?!' }
+    CAREER: { labelKey: 'x.postType.CAREER.label', promptKey: 'x.postType.CAREER.prompt', icon: Megaphone, reach: 1.25, conversion: 0.026, controversy: 0, reputation: 1, placeholderKey: 'x.postType.CAREER.placeholder' },
+    HOT_TAKE: { labelKey: 'x.postType.HOT_TAKE.label', promptKey: 'x.postType.HOT_TAKE.prompt', icon: Flame, reach: 1.65, conversion: 0.018, controversy: 7, reputation: -1, placeholderKey: 'x.postType.HOT_TAKE.placeholder' },
+    JOKE: { labelKey: 'x.postType.JOKE.label', promptKey: 'x.postType.JOKE.prompt', icon: Laugh, reach: 1.35, conversion: 0.024, controversy: 2, reputation: 0, placeholderKey: 'x.postType.JOKE.placeholder' },
+    FILM_OPINION: { labelKey: 'x.postType.FILM_OPINION.label', promptKey: 'x.postType.FILM_OPINION.prompt', icon: Film, reach: 1.2, conversion: 0.02, controversy: 2, reputation: 1, placeholderKey: 'x.postType.FILM_OPINION.placeholder' },
+    PR_STATEMENT: { labelKey: 'x.postType.PR_STATEMENT.label', promptKey: 'x.postType.PR_STATEMENT.prompt', icon: ShieldCheck, reach: 0.85, conversion: 0.012, controversy: -6, reputation: 2, placeholderKey: 'x.postType.PR_STATEMENT.placeholder' },
+    DRAMA_REPLY: { labelKey: 'x.postType.DRAMA_REPLY.label', promptKey: 'x.postType.DRAMA_REPLY.prompt', icon: MessageSquareQuote, reach: 1.85, conversion: 0.016, controversy: 10, reputation: -2, placeholderKey: 'x.postType.DRAMA_REPLY.placeholder' },
+    FAN_THANKS: { labelKey: 'x.postType.FAN_THANKS.label', promptKey: 'x.postType.FAN_THANKS.prompt', icon: Users, reach: 1.05, conversion: 0.032, controversy: -1, reputation: 1, placeholderKey: 'x.postType.FAN_THANKS.placeholder' },
+    GENERAL: { labelKey: 'x.postType.GENERAL.label', promptKey: 'x.postType.GENERAL.prompt', icon: PenTool, reach: 1, conversion: 0.02, controversy: 0, reputation: 0, placeholderKey: 'x.postType.GENERAL.placeholder' }
 };
 
-const X_REPLY_TONES: Record<XReplyTone, { label: string; text: string; controversy: number; reputation: number; reach: number }> = {
-    SUPPORT: { label: 'Support', text: 'This is fair. People should actually read the full context.', controversy: -1, reputation: 1, reach: 0.8 },
-    JOKE: { label: 'Joke', text: 'The timeline chose chaos today and somehow I respect it.', controversy: 2, reputation: 0, reach: 1.1 },
-    CLAP_BACK: { label: 'Clap Back', text: 'Wild take. Loud does not always mean right.', controversy: 8, reputation: -1, reach: 1.65 },
-    CLARIFY: { label: 'Clarify', text: 'Quick context before this turns into something it is not.', controversy: -4, reputation: 2, reach: 0.9 },
-    APOLOGIZE: { label: 'Apologize', text: 'I hear the criticism. That could have been said better.', controversy: -8, reputation: 2, reach: 0.65 }
+const X_REPLY_TONES: Record<XReplyTone, { labelKey: string; textKey: string; controversy: number; reputation: number; reach: number }> = {
+    SUPPORT: { labelKey: 'x.replyTone.SUPPORT.label', textKey: 'x.replyTone.SUPPORT.text', controversy: -1, reputation: 1, reach: 0.8 },
+    JOKE: { labelKey: 'x.replyTone.JOKE.label', textKey: 'x.replyTone.JOKE.text', controversy: 2, reputation: 0, reach: 1.1 },
+    CLAP_BACK: { labelKey: 'x.replyTone.CLAP_BACK.label', textKey: 'x.replyTone.CLAP_BACK.text', controversy: 8, reputation: -1, reach: 1.65 },
+    CLARIFY: { labelKey: 'x.replyTone.CLARIFY.label', textKey: 'x.replyTone.CLARIFY.text', controversy: -4, reputation: 2, reach: 0.9 },
+    APOLOGIZE: { labelKey: 'x.replyTone.APOLOGIZE.label', textKey: 'x.replyTone.APOLOGIZE.text', controversy: -8, reputation: 2, reach: 0.65 }
 };
 
-const X_REPLY_BANK: Record<XPostType, string[]> = {
-    CAREER: ['Booked and busy era?', 'This sounds bigger than people realize.', 'Casting directors are watching.', 'The resume is moving.'],
-    HOT_TAKE: ['The quotes are about to be a war zone.', 'Honestly? Not completely wrong.', 'Delete this before brunch.', 'Film Twitter found its lunch today.'],
-    JOKE: ['Okay this one got me.', 'Rare good celebrity joke.', 'The timing is too clean.', 'I hate that I laughed.'],
-    FILM_OPINION: ['Cinema discourse is alive.', 'This is a brave ranking.', 'Respectfully disagree but I see it.', 'You can tell they actually watch movies.'],
-    PR_STATEMENT: ['This is the mature version.', 'PR team finally slept tonight.', 'Good clarification.', 'Clean statement, no notes.'],
-    DRAMA_REPLY: ['The timeline is awake.', 'This is getting screenshotted.', 'PR is sweating.', 'This reply changed the whole conversation.'],
-    FAN_THANKS: ['Day one fans are emotional.', 'This is why people root for you.', 'Simple and sweet.', 'The fanbase needed this.'],
-    GENERAL: ['Real.', 'The timeline gets it.', 'Mood.', 'This app is unserious.']
+const X_REPLY_BANK_KEYS: Record<XPostType, string[]> = {
+    CAREER: ['x.replyBank.CAREER.0', 'x.replyBank.CAREER.1', 'x.replyBank.CAREER.2', 'x.replyBank.CAREER.3'],
+    HOT_TAKE: ['x.replyBank.HOT_TAKE.0', 'x.replyBank.HOT_TAKE.1', 'x.replyBank.HOT_TAKE.2', 'x.replyBank.HOT_TAKE.3'],
+    JOKE: ['x.replyBank.JOKE.0', 'x.replyBank.JOKE.1', 'x.replyBank.JOKE.2', 'x.replyBank.JOKE.3'],
+    FILM_OPINION: ['x.replyBank.FILM_OPINION.0', 'x.replyBank.FILM_OPINION.1', 'x.replyBank.FILM_OPINION.2', 'x.replyBank.FILM_OPINION.3'],
+    PR_STATEMENT: ['x.replyBank.PR_STATEMENT.0', 'x.replyBank.PR_STATEMENT.1', 'x.replyBank.PR_STATEMENT.2', 'x.replyBank.PR_STATEMENT.3'],
+    DRAMA_REPLY: ['x.replyBank.DRAMA_REPLY.0', 'x.replyBank.DRAMA_REPLY.1', 'x.replyBank.DRAMA_REPLY.2', 'x.replyBank.DRAMA_REPLY.3'],
+    FAN_THANKS: ['x.replyBank.FAN_THANKS.0', 'x.replyBank.FAN_THANKS.1', 'x.replyBank.FAN_THANKS.2', 'x.replyBank.FAN_THANKS.3'],
+    GENERAL: ['x.replyBank.GENERAL.0', 'x.replyBank.GENERAL.1', 'x.replyBank.GENERAL.2', 'x.replyBank.GENERAL.3']
 };
+
+const X_QUOTE_BANK_KEYS = {
+    profile: ['x.quote.profile.0', 'x.quote.profile.1', 'x.quote.profile.2'],
+    player: ['x.quote.player.0', 'x.quote.player.1', 'x.quote.player.2', 'x.quote.player.3'],
+    reply: ['x.quote.reply.0', 'x.quote.reply.1', 'x.quote.reply.2', 'x.quote.reply.3'],
+} as const;
 
 export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) => {
     const language = getPlayerLanguage(player);
     const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
+    const getXPostTypeConfig = (type: XPostType) => {
+        const config = X_POST_TYPES[type];
+        return {
+            ...config,
+            label: tr(config.labelKey),
+            prompt: tr(config.promptKey),
+            placeholder: tr(config.placeholderKey),
+        };
+    };
+    const getXReplyToneConfig = (tone: XReplyTone) => {
+        const config = X_REPLY_TONES[tone];
+        return {
+            ...config,
+            label: tr(config.labelKey),
+            text: tr(config.textKey),
+        };
+    };
+    const getXReplyBank = (type: XPostType) => X_REPLY_BANK_KEYS[type].map(key => tr(key));
+    const getXQuoteBank = (kind: 'profile' | 'player' | 'reply') => X_QUOTE_BANK_KEYS[kind].map(key => tr(key));
     const [tab, setTab] = useState<XTab>('HOME');
     const [view, setView] = useState<XView>('MAIN');
     const [feedTab, setFeedTab] = useState<FeedTab>('FOR_YOU');
@@ -122,8 +147,8 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
                 isRetweeted: false,
                 isVerified: selectedProfile.tier === 'A_LIST' || selectedProfile.tier === 'ESTABLISHED',
                 postType,
-                replyList: X_REPLY_BANK[postType].slice(0, 3),
-                quoteList: ['Interesting timing.', 'This has layers.', 'The replies are better than the trades.'],
+                replyList: getXReplyBank(postType).slice(0, 3),
+                quoteList: getXQuoteBank('profile'),
                 sentiment: postType === 'JOKE' ? 'FUNNY' : postType === 'HOT_TAKE' ? 'MESSY' : 'NEUTRAL'
             };
         });
@@ -141,7 +166,7 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
         // CALCULATE ENGAGEMENT (Improved Randomized Logic for X)
         const currentXFollowers = Math.max(0, player.x.followers);
         const fameFactor = Math.max(1, player.stats.fame);
-        const typeConfig = X_POST_TYPES[composeType];
+        const typeConfig = getXPostTypeConfig(composeType);
         
         // Base reach is followers + random fame boost (Twitter algorithm can be volatile)
         // Even with 0 followers, hashtags give reach
@@ -198,13 +223,8 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
             isRetweeted: false,
             isVerified: player.stats.fame > 50,
             postType: composeType,
-            replyList: X_REPLY_BANK[composeType].sort(() => 0.5 - Math.random()).slice(0, 4),
-            quoteList: [
-                'This is spreading outside the fandom.',
-                'Someone in the industry definitely saw this.',
-                'The replies are doing the most.',
-                'This is the kind of post that changes the week.'
-            ].sort(() => 0.5 - Math.random()).slice(0, 2),
+	            replyList: getXReplyBank(composeType).sort(() => 0.5 - Math.random()).slice(0, 4),
+	            quoteList: getXQuoteBank('player').sort(() => 0.5 - Math.random()).slice(0, 2),
             controversyScore: Math.max(0, typeConfig.controversy + Math.floor(Math.random() * 4)),
             sentiment: typeConfig.controversy >= 7 ? 'MESSY' : composeType === 'JOKE' ? 'FUNNY' : composeType === 'CAREER' ? 'INDUSTRY' : 'NEUTRAL'
         };
@@ -233,7 +253,14 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
                 ...player.instagram,
                 controversy: Math.max(0, Math.min(100, (player.instagram.controversy || 0) + Math.max(0, controversyDelta)))
             },
-            logs: [{ week: player.currentWeek, year: player.age, message: controversyDelta >= 7 ? `X heated up after your ${typeConfig.label.toLowerCase()} post.` : `Posted a ${typeConfig.label.toLowerCase()} update on X.`, type: logType }, ...player.logs].slice(0, 50)
+	            logs: [{
+	                week: player.currentWeek,
+	                year: player.age,
+	                message: controversyDelta >= 7
+	                    ? tr('x.log.heatedPost', { type: typeConfig.label.toLowerCase() })
+	                    : tr('x.log.postedUpdate', { type: typeConfig.label.toLowerCase() }),
+	                type: logType
+	            }, ...player.logs].slice(0, 50)
         };
         spendPlayerEnergy(nextPlayer, 5);
         onUpdatePlayer(nextPlayer);
@@ -279,7 +306,7 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
     };
 
     const handleQuoteOrReply = (post: XPost, tone: XReplyTone, mode: 'QUOTE' | 'REPLY') => {
-        const toneConfig = X_REPLY_TONES[tone];
+        const toneConfig = getXReplyToneConfig(tone);
         const sourceReach = Math.max(40, post.likes + post.retweets * 2 + post.replies * 4);
         const reach = Math.floor(sourceReach * toneConfig.reach * (0.2 + Math.random() * 0.25));
         const likes = Math.max(1, Math.floor(reach * (0.08 + Math.random() * 0.08)));
@@ -303,8 +330,8 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
             isVerified: player.stats.fame > 50,
             postType: tone === 'CLAP_BACK' ? 'DRAMA_REPLY' : tone === 'JOKE' ? 'JOKE' : tone === 'CLARIFY' || tone === 'APOLOGIZE' ? 'PR_STATEMENT' : 'GENERAL',
             quoteOfId: mode === 'QUOTE' ? post.id : undefined,
-            replyList: X_REPLY_BANK[tone === 'CLAP_BACK' ? 'DRAMA_REPLY' : tone === 'JOKE' ? 'JOKE' : 'PR_STATEMENT'].slice(0, 4),
-            quoteList: ['This reply changed the tone.', 'The timeline is watching.', 'Smart move.', 'Risky but effective.'],
+            replyList: getXReplyBank(tone === 'CLAP_BACK' ? 'DRAMA_REPLY' : tone === 'JOKE' ? 'JOKE' : 'PR_STATEMENT').slice(0, 4),
+            quoteList: getXQuoteBank('reply'),
             controversyScore: Math.max(0, toneConfig.controversy),
             sentiment: toneConfig.controversy >= 6 ? 'MESSY' : tone === 'JOKE' ? 'FUNNY' : 'NEUTRAL'
         };
@@ -331,8 +358,8 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
                 week: player.currentWeek,
                 year: player.age,
                 message: mode === 'QUOTE'
-                    ? `Quoted ${post.authorName} on X.`
-                    : `Replied to ${post.authorName} on X.`,
+                    ? tr('x.log.quotedPost', { name: post.authorName })
+                    : tr('x.log.repliedPost', { name: post.authorName }),
                 type: toneConfig.controversy >= 6 ? 'negative' as const : 'positive' as const
             }, ...player.logs].slice(0, 50)
         };
@@ -393,12 +420,12 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
             if (p.isPlayer) return true;
             return npcStates[p.authorId]?.isFollowing;
         });
-    const activeComposeConfig = X_POST_TYPES[composeType];
+    const activeComposeConfig = getXPostTypeConfig(composeType);
     const composeImpact = [
-        { label: 'Reach', value: `x${activeComposeConfig.reach.toFixed(1)}`, color: 'text-blue-300' },
-        { label: 'Followers', value: activeComposeConfig.conversion >= 0.028 ? 'High' : activeComposeConfig.conversion >= 0.02 ? 'Medium' : 'Low', color: 'text-emerald-300' },
-        { label: 'Heat', value: activeComposeConfig.controversy > 6 ? 'Risky' : activeComposeConfig.controversy > 0 ? `+${activeComposeConfig.controversy}` : activeComposeConfig.controversy < 0 ? 'Cools' : 'Low', color: activeComposeConfig.controversy > 0 ? 'text-red-300' : activeComposeConfig.controversy < 0 ? 'text-emerald-300' : 'text-zinc-300' },
-        { label: 'Rep', value: activeComposeConfig.reputation > 0 ? `+${activeComposeConfig.reputation}` : activeComposeConfig.reputation < 0 ? `${activeComposeConfig.reputation}` : '0', color: activeComposeConfig.reputation >= 0 ? 'text-emerald-300' : 'text-rose-300' }
+        { label: tr('x.forecast.reach'), value: `x${activeComposeConfig.reach.toFixed(1)}`, color: 'text-blue-300' },
+        { label: tr('x.forecast.followers'), value: activeComposeConfig.conversion >= 0.028 ? tr('x.value.high') : activeComposeConfig.conversion >= 0.02 ? tr('x.value.medium') : tr('x.value.low'), color: 'text-emerald-300' },
+        { label: tr('x.forecast.heat'), value: activeComposeConfig.controversy > 6 ? tr('x.value.risky') : activeComposeConfig.controversy > 0 ? `+${activeComposeConfig.controversy}` : activeComposeConfig.controversy < 0 ? tr('x.value.cools') : tr('x.value.low'), color: activeComposeConfig.controversy > 0 ? 'text-red-300' : activeComposeConfig.controversy < 0 ? 'text-emerald-300' : 'text-zinc-300' },
+        { label: tr('x.forecast.rep'), value: activeComposeConfig.reputation > 0 ? `+${activeComposeConfig.reputation}` : activeComposeConfig.reputation < 0 ? `${activeComposeConfig.reputation}` : '0', color: activeComposeConfig.reputation >= 0 ? 'text-emerald-300' : 'text-rose-300' }
     ];
 
     // --- SUB-COMPONENTS ---
@@ -423,7 +450,7 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
                     </div>
                     {post.quoteOfId && (
                         <div className="mb-3 rounded-2xl border border-zinc-800 bg-zinc-950 p-3 text-xs text-zinc-400">
-                            Quoted post
+                            {tr('x.quotedPost')}
                         </div>
                     )}
                     
@@ -460,7 +487,7 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
                         </button>
                         <div>
                             <div className="font-black text-lg leading-none">Post</div>
-                            <div className="text-[11px] text-zinc-500 uppercase tracking-widest">{X_POST_TYPES[selectedPost.postType || 'GENERAL'].label}</div>
+                            <div className="text-[11px] text-zinc-500 uppercase tracking-widest">{getXPostTypeConfig(selectedPost.postType || 'GENERAL').label}</div>
                         </div>
                     </div>
 
@@ -478,20 +505,20 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
                             </div>
                             <div className="mt-4 whitespace-pre-wrap text-[17px] leading-relaxed text-white">{selectedPost.content}</div>
                             <div className="mt-4 flex flex-wrap gap-2 text-[11px] font-black uppercase tracking-widest">
-                                <span className="rounded-full bg-zinc-900 px-3 py-1 text-zinc-400">{selectedPost.timestamp === player.currentWeek ? 'This week' : `Week ${selectedPost.timestamp}`}</span>
-                                {(selectedPost.controversyScore || 0) > 0 && <span className="rounded-full bg-red-500/10 px-3 py-1 text-red-300">Heat {selectedPost.controversyScore}</span>}
+                                <span className="rounded-full bg-zinc-900 px-3 py-1 text-zinc-400">{selectedPost.timestamp === player.currentWeek ? tr('x.thisWeek') : tr('x.weekLabel', { week: selectedPost.timestamp })}</span>
+                                {(selectedPost.controversyScore || 0) > 0 && <span className="rounded-full bg-red-500/10 px-3 py-1 text-red-300">{tr('x.heatValue', { value: selectedPost.controversyScore || 0 })}</span>}
                             </div>
                         </div>
 
                         <div className="grid grid-cols-3 border-b border-zinc-800 text-center">
-                            <div className="p-3"><div className="font-black">{formatNumber(selectedPost.replies)}</div><div className="text-[10px] text-zinc-500 uppercase">Replies</div></div>
-                            <div className="p-3 border-x border-zinc-800"><div className="font-black">{formatNumber(selectedPost.retweets)}</div><div className="text-[10px] text-zinc-500 uppercase">Reposts</div></div>
-                            <div className="p-3"><div className="font-black">{formatNumber(selectedPost.likes)}</div><div className="text-[10px] text-zinc-500 uppercase">Likes</div></div>
+                            <div className="p-3"><div className="font-black">{formatNumber(selectedPost.replies)}</div><div className="text-[10px] text-zinc-500 uppercase">{tr('x.replies')}</div></div>
+                            <div className="p-3 border-x border-zinc-800"><div className="font-black">{formatNumber(selectedPost.retweets)}</div><div className="text-[10px] text-zinc-500 uppercase">{tr('x.reposts')}</div></div>
+                            <div className="p-3"><div className="font-black">{formatNumber(selectedPost.likes)}</div><div className="text-[10px] text-zinc-500 uppercase">{tr('x.likes')}</div></div>
                         </div>
 
                         {!selectedPost.isPlayer && (
                             <div className="p-4 border-b border-zinc-800">
-                                <div className="text-xs font-black uppercase tracking-widest text-zinc-500 mb-3">Respond</div>
+                                <div className="text-xs font-black uppercase tracking-widest text-zinc-500 mb-3">{tr('x.respond')}</div>
                                 <div className="grid grid-cols-2 gap-2">
                                     {(Object.keys(X_REPLY_TONES) as XReplyTone[]).map(tone => (
                                         <button
@@ -500,8 +527,8 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
                                             disabled={player.energy.current < 5}
                                             className="rounded-2xl border border-zinc-800 bg-zinc-950 px-3 py-3 text-left disabled:opacity-40"
                                         >
-                                            <div className="text-sm font-black text-white">{X_REPLY_TONES[tone].label}</div>
-                                            <div className="mt-1 text-[11px] leading-snug text-zinc-500">{tone === 'CLAP_BACK' ? 'High reach, risky.' : tone === 'APOLOGIZE' ? 'Cools backlash.' : 'Public reply.'}</div>
+	                                            <div className="text-sm font-black text-white">{getXReplyToneConfig(tone).label}</div>
+	                                            <div className="mt-1 text-[11px] leading-snug text-zinc-500">{tone === 'CLAP_BACK' ? tr('x.replyToneHint.risky') : tone === 'APOLOGIZE' ? tr('x.replyToneHint.cools') : tr('x.replyToneHint.public')}</div>
                                         </button>
                                     ))}
                                 </div>
@@ -510,8 +537,8 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
 
                         <div className="p-4 space-y-4">
                             <div>
-                                <div className="mb-3 text-xs font-black uppercase tracking-widest text-zinc-500">Replies</div>
-                                {(selectedPost.replyList && selectedPost.replyList.length > 0 ? selectedPost.replyList : X_REPLY_BANK[selectedPost.postType || 'GENERAL']).map((reply, index) => (
+                                <div className="mb-3 text-xs font-black uppercase tracking-widest text-zinc-500">{tr('x.replies')}</div>
+	                                {(selectedPost.replyList && selectedPost.replyList.length > 0 ? selectedPost.replyList : getXReplyBank(selectedPost.postType || 'GENERAL')).map((reply, index) => (
                                     <div key={`${selectedPost.id}_reply_${index}`} className="flex gap-3 border-b border-zinc-900 py-3">
                                         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-xs font-black text-zinc-400">@</div>
                                         <div className="min-w-0">
@@ -522,8 +549,8 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
                                 ))}
                             </div>
                             <div>
-                                <div className="mb-3 text-xs font-black uppercase tracking-widest text-zinc-500">Quotes</div>
-                                {(selectedPost.quoteList && selectedPost.quoteList.length > 0 ? selectedPost.quoteList : ['People are watching this one.']).map((quote, index) => (
+                                <div className="mb-3 text-xs font-black uppercase tracking-widest text-zinc-500">{tr('x.quotes')}</div>
+	                                {(selectedPost.quoteList && selectedPost.quoteList.length > 0 ? selectedPost.quoteList : [tr('x.quote.fallback')]).map((quote, index) => (
                                     <div key={`${selectedPost.id}_quote_${index}`} className="rounded-2xl border border-zinc-800 bg-zinc-950 p-3 text-sm text-zinc-300 mb-2">
                                         <span className="font-bold text-white">@quote_room_{index + 1}</span> {quote}
                                     </div>
@@ -802,7 +829,7 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
                                             </span>
                                             {activeComposeConfig.controversy > 0 && (
                                                 <span className="rounded-full bg-red-500/10 border border-red-500/20 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-red-300">
-                                                    Heat +{activeComposeConfig.controversy}
+                                                    {tr('x.heatPlus', { value: activeComposeConfig.controversy })}
                                                 </span>
                                             )}
                                         </div>
@@ -833,7 +860,7 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
                                 </div>
                                 <div className="grid grid-cols-2 gap-2">
                                     {(Object.keys(X_POST_TYPES) as XPostType[]).filter(type => type !== 'DRAMA_REPLY').map(type => {
-                                        const config = X_POST_TYPES[type];
+	                                        const config = getXPostTypeConfig(type);
                                         const Icon = config.icon;
                                         const isSelected = composeType === type;
                                         return (
@@ -849,7 +876,7 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
                                                     <div className="min-w-0">
                                                         <div className="font-black text-xs uppercase tracking-wide truncate">{config.label}</div>
                                                         <div className={`text-[9px] font-mono mt-0.5 ${isSelected ? 'text-zinc-500' : 'text-zinc-600'}`}>
-                                                            x{config.reach.toFixed(1)} reach
+	                                                            {tr('x.reachMultiplier', { value: config.reach.toFixed(1) })}
                                                         </div>
                                                     </div>
                                                 </div>
@@ -862,7 +889,7 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
                             <div className="rounded-[1.5rem] border border-zinc-800 bg-gradient-to-br from-zinc-950 to-black p-4">
                                 <div className="text-sm font-black text-white">{tr('x.timelineForecast')}</div>
                                 <div className="text-[11px] text-zinc-500 mt-1 leading-relaxed">
-                                    X is volatile. Small accounts can still get discovered, but heat can spill into reputation and future events.
+                                    {tr('x.timelineForecastSub')}
                                 </div>
                                 <div className="grid grid-cols-4 gap-2 mt-4">
                                     {composeImpact.map(item => (

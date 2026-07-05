@@ -64,8 +64,8 @@ export const AWARD_SHOW_DB: Record<AwardType, AwardShowLore> = {
     BAFTA: {
         id: 'BAFTA',
         name: 'BAFTA Film Awards',
-        shortName: 'The BAFTAs',
-        description: "The British Academy Film Awards. Often seen as a key predictor for the Oscars, focused on artistic merit and British excellence.",
+        shortName: 'BAFTA',
+        description: '',
         categories: ["Best Film", "Best Director", "Best Actor", "Best Actress", "Best Supporting Actor", "Best Supporting Actress", "Best Original Song", "Best Score", "Best Soundtrack", "Best Trailer", "Best Music Video Tie-In"],
         focus: 'Artistic',
         color: 'text-blue-400'
@@ -73,8 +73,8 @@ export const AWARD_SHOW_DB: Record<AwardType, AwardShowLore> = {
     GOLDEN_GLOBE: {
         id: 'GOLDEN_GLOBE',
         name: 'Golden Globe Awards',
-        shortName: 'Golden Globes',
-        description: "Accolades bestowed by the Hollywood Foreign Press Association. A glamorous dinner party that honors both Film and Television.",
+        shortName: 'Golden Globe',
+        description: '',
         categories: [
             "Best Motion Picture - Drama", "Best TV Series - Drama", 
             "Best Actor - Motion Picture", "Best Actress - Motion Picture",
@@ -87,8 +87,8 @@ export const AWARD_SHOW_DB: Record<AwardType, AwardShowLore> = {
     EMMY: {
         id: 'EMMY',
         name: 'Primetime Emmy Awards',
-        shortName: 'The Emmys',
-        description: "The premier award for the television industry. Dominating the Emmys signals you have conquered the small screen.",
+        shortName: 'Emmy',
+        description: '',
         categories: [
             "Outstanding Drama Series", "Outstanding Comedy Series", 
             "Outstanding Lead Actor", "Outstanding Lead Actress",
@@ -101,8 +101,8 @@ export const AWARD_SHOW_DB: Record<AwardType, AwardShowLore> = {
     OSCAR: {
         id: 'OSCAR',
         name: 'The Oscars',
-        shortName: 'Academy Awards',
-        description: "The Academy Awards. The most prestigious honor in cinema. A win here immortalizes you in film history.",
+        shortName: 'Oscar',
+        description: '',
         categories: [
             "Best Picture", "Best Director", 
             "Best Actor", "Best Actress",
@@ -113,6 +113,16 @@ export const AWARD_SHOW_DB: Record<AwardType, AwardShowLore> = {
         focus: 'Prestige',
         color: 'text-amber-400'
     }
+};
+
+export const getAwardShowLore = (language: GameLanguage, awardType: AwardType): AwardShowLore => {
+    const lore = AWARD_SHOW_DB[awardType];
+    return {
+        ...lore,
+        name: t(language, `imdb.awards.show.${awardType}.name`),
+        shortName: t(language, `imdb.awards.show.${awardType}.shortName`),
+        description: t(language, `imdb.awards.show.${awardType}.description`),
+    };
 };
 
 // --- GOSSIP STRINGS ---
@@ -145,6 +155,14 @@ export interface Nomination {
     category: string;
     isPlayer: boolean;
     nomineeName?: string; // For NPCs
+    playerCreditRole?: 'ACTOR' | 'WRITER' | 'DIRECTOR' | 'PRODUCER' | 'MUSIC';
+}
+
+export interface AwardResolvedWinner {
+    category: string;
+    winnerName: string;
+    projectName: string;
+    isPlayer: boolean;
 }
 
 const MUSIC_AWARD_CATEGORY_KEYWORDS = ['Song', 'Score', 'Soundtrack', 'Trailer', 'Music Video'];
@@ -181,6 +199,64 @@ const getPlayerMusicAwardCategory = (awardType: AwardType, baseCategory: 'SONG' 
     if (baseCategory === 'SOUNDTRACK') return `${prefix} Soundtrack`;
     if (baseCategory === 'TRAILER') return `${prefix} Trailer`;
     return `${prefix} Music Video Tie-In`;
+};
+
+const getPlayerAwardNomineeName = (player: Player, playerCreditRole: NonNullable<Nomination['playerCreditRole']>) => {
+    if (playerCreditRole === 'PRODUCER') return player.name;
+    if (playerCreditRole === 'WRITER') return player.name;
+    if (playerCreditRole === 'DIRECTOR') return player.name;
+    return player.name;
+};
+
+const getAverageStat = (stats?: Record<string, number>) => {
+    const values = Object.values(stats || {}).filter(value => Number.isFinite(value));
+    if (!values.length) return 50;
+    return values.reduce((sum, value) => sum + value, 0) / values.length;
+};
+
+const getPlayerCreativeCreditFlags = (player: Player, project: any) => {
+    const sourceScriptId = project.sourceScriptId;
+    const sourceScript = sourceScriptId
+        ? (player.businesses || [])
+            .flatMap((business: any) => business.studioState?.scripts || [])
+            .find((script: any) => script.id === sourceScriptId)
+        : null;
+    const writerId = String(sourceScript?.writerId || '').toLowerCase();
+    const author = String(sourceScript?.author || '').trim().toLowerCase();
+    const playerName = String(player.name || '').trim().toLowerCase();
+    const playerIsWriter = Boolean(sourceScript) && (
+        writerId === 'player' ||
+        writerId === 'player_self' ||
+        author === playerName ||
+        (sourceScript.isOriginal && !sourceScript.writerId && !sourceScript.author)
+    );
+    const playerIsDirector = (
+        String(project.directorId || '').toLowerCase() === 'player' ||
+        String(project.directorId || '').toLowerCase() === 'player_self' ||
+        String(project.director?.id || '').toLowerCase() === 'player_self' ||
+        String(project.director?.id || '').toLowerCase() === 'player' ||
+        String(project.directorName || '').trim().toLowerCase() === playerName
+    );
+    const playerIsProducer = (player.businesses || []).some((business: any) => (
+        business.id === project.studioId &&
+        business.type === 'PRODUCTION_HOUSE'
+    ));
+    return {
+        WRITER: playerIsWriter,
+        DIRECTOR: playerIsDirector,
+        PRODUCER: playerIsProducer,
+        sourceScript
+    };
+};
+
+const getProducerAwardCategory = (awardType: AwardType, project: any): string | null => {
+    if (awardType === 'OSCAR') return project.mediaType === 'MOVIE' ? 'Best Picture' : null;
+    if (awardType === 'BAFTA') return project.mediaType === 'MOVIE' ? 'Best Film' : null;
+    if (awardType === 'GOLDEN_GLOBE') {
+        return project.mediaType === 'SERIES' ? 'Best TV Series - Drama' : 'Best Motion Picture - Drama';
+    }
+    if (awardType === 'EMMY') return project.mediaType === 'SERIES' ? 'Outstanding Drama Series' : null;
+    return null;
 };
 
 type AwardLike = {
@@ -255,6 +331,12 @@ export const checkAwardEligibility = (player: Player, week: number, awardYear = 
             musicPlan: fromActive ? p.projectDetails.musicPlan : p.musicPlan,
             hiddenStats: fromActive ? p.projectDetails.hiddenStats : (p.hiddenStats || {}),
             crewList: fromActive ? p.projectDetails.crewList : (p.crewList || []),
+            sourceScriptId: fromActive ? p.projectDetails.sourceScriptId : p.sourceScriptId,
+            studioId: fromActive ? p.projectDetails.studioId : p.studioId,
+            directorId: fromActive ? p.projectDetails.directorId : p.directorId,
+            director: fromActive ? p.projectDetails.director : p.director,
+            directorName: fromActive ? p.projectDetails.directorName : p.directorName,
+            isOriginal: fromActive ? p.projectDetails.isOriginal : p.isOriginal,
             soundtrackRevenue: fromActive ? p.soundtrackRevenue : p.soundtrackRevenue,
             gross: fromActive ? p.totalGross : p.gross,
             streamingRevenue: fromActive ? p.streamingRevenue : p.streamingRevenue,
@@ -365,6 +447,62 @@ export const checkAwardEligibility = (player: Player, week: number, awardYear = 
                     awardType === 'OSCAR' ? 84 : 76
                 );
             }
+
+            const addPlayerCreativeNomination = (
+                category: string | null,
+                score: number,
+                threshold: number,
+                playerCreditRole: NonNullable<Nomination['playerCreditRole']>
+            ) => {
+                if (!category || !AWARD_SHOW_DB[awardType].categories.includes(category) || score < threshold) return;
+                const exists = player.awards.some(a =>
+                    a.projectId === project.id &&
+                    a.category === category &&
+                    a.type === awardType &&
+                    a.year === awardYear
+                );
+                const alreadyQueued = nominations.some(n => n.project.id === project.id && n.category === category);
+                if (exists || alreadyQueued) return;
+                nominations.push({
+                    project: { id: project.id, name: project.name },
+                    score,
+                    category,
+                    isPlayer: true,
+                    nomineeName: getPlayerAwardNomineeName(player, playerCreditRole),
+                    playerCreditRole
+                });
+            };
+
+            const playerCreativeCredits = getPlayerCreativeCreditFlags(player, project);
+            const writerScore = getAverageStat(player.writerStats as any);
+            const directorScore = getAverageStat(player.directorStats as any);
+            const producerHeat = Math.min(18, Math.log10(Math.max(1, (project.gross || 0) + (project.streamingRevenue || 0))) * 2.1);
+            const creativeLuck = Math.random() * 8;
+
+            if (playerCreativeCredits.WRITER) {
+                addPlayerCreativeNomination(
+                    awardType === 'OSCAR' ? 'Best Original Screenplay' : null,
+                    prestigeBase + (project.hiddenStats?.scriptQuality || qualityScore) * 0.2 + writerScore * 0.28 + creativeLuck,
+                    86,
+                    'WRITER'
+                );
+            }
+            if (playerCreativeCredits.DIRECTOR) {
+                addPlayerCreativeNomination(
+                    ['OSCAR', 'BAFTA'].includes(awardType) ? 'Best Director' : null,
+                    prestigeBase + (project.hiddenStats?.directorQuality || qualityScore) * 0.2 + directorScore * 0.28 + creativeLuck,
+                    awardType === 'OSCAR' ? 87 : 82,
+                    'DIRECTOR'
+                );
+            }
+            if (playerCreativeCredits.PRODUCER) {
+                addPlayerCreativeNomination(
+                    getProducerAwardCategory(awardType, project),
+                    prestigeBase + producerHeat + Number(project.campaignForecastSnapshot?.awardsVisibility || 0) * 0.18 + creativeLuck,
+                    awardType === 'OSCAR' ? 88 : awardType === 'EMMY' ? 81 : 79,
+                    'PRODUCER'
+                );
+            }
         }
 
         const normalizedRole = project.roleType || 'MINOR';
@@ -432,7 +570,9 @@ export const checkAwardEligibility = (player: Player, week: number, awardYear = 
                         project: { id: project.id, name: project.name },
                         score: nomScore,
                         category: cat,
-                        isPlayer: true
+                        isPlayer: true,
+                        nomineeName: getPlayerAwardNomineeName(player, 'ACTOR'),
+                        playerCreditRole: 'ACTOR'
                     });
                 }
             }
@@ -582,7 +722,30 @@ export const determineWinners = (
     });
 };
 
-export const generateSeasonWinners = (player: Player, awardType: AwardType, awardYear = player.age): AwardHistoryEntry => {
+export const createAwardHistoryFromBallot = (
+    awardType: AwardType,
+    awardYear: number,
+    resolvedWinners: AwardResolvedWinner[]
+): AwardHistoryEntry => ({
+    year: awardYear,
+    type: awardType,
+    winners: resolvedWinners.map(winner => ({
+        category: winner.category,
+        winnerName: winner.winnerName,
+        projectName: winner.projectName,
+        isPlayer: winner.isPlayer
+    }))
+});
+
+export const generateSeasonWinners = (
+    player: Player,
+    awardType: AwardType,
+    awardYear = player.age,
+    resolvedWinners?: AwardResolvedWinner[]
+): AwardHistoryEntry => {
+    if (resolvedWinners?.length) {
+        return createAwardHistoryFromBallot(awardType, awardYear, resolvedWinners);
+    }
     // This function creates the historical record AFTER the ceremony
     const lore = AWARD_SHOW_DB[awardType];
     const year = awardYear;

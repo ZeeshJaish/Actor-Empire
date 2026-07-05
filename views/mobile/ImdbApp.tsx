@@ -1,14 +1,17 @@
 
 // ... existing imports
 import React, { useState } from 'react';
-import { Player, PastProject, ActiveRelease, CastMember, Review, Award, Universe, UniverseId, IndustryProject, CustomPoster, CampaignRealitySnapshot, ProjectDetails, ProjectMusicPlan, BudgetTier } from '../../types';
+import { Player, PastProject, ActiveRelease, CastMember, Review, Award, AwardType, Universe, UniverseId, IndustryProject, CustomPoster, CampaignRealitySnapshot, ProjectDetails, ProjectMusicPlan, BudgetTier, SeasonEpisodeRatings, AudienceReception } from '../../types';
 import { formatMoney } from '../../services/formatUtils';
 import { getProjectIdentityLabel } from '../../services/genreCatalog';
 import { getProjectReleaseLabel, getProjectReleaseTiming } from '../../services/releaseTiming';
-import { AWARD_CALENDAR, AWARD_SHOW_DB, AwardShowLore, AwardDefinition, Nomination, sanitizeAwardRecords, getAwardCeremonyYear } from '../../services/awardLogic';
-import { ArrowLeft, Star, Film, ChevronRight, User, TrendingUp, DollarSign, Eye, Award as AwardIcon, Calendar, BookOpen, Clock, List, MessageSquare, Users, Globe, Zap, LayoutGrid, Shield, ArrowRight, Tv, Music2, Handshake } from 'lucide-react';
+import { AWARD_CALENDAR, AwardShowLore, AwardDefinition, Nomination, sanitizeAwardRecords, getAwardCeremonyYear, getAwardShowLore } from '../../services/awardLogic';
+import { ArrowLeft, Star, Film, ChevronRight, User, TrendingUp, DollarSign, Eye, Award as AwardIcon, Calendar, BookOpen, Clock, List, MessageSquare, Users, Globe, Zap, LayoutGrid, Shield, ArrowRight, Tv, Music2, Handshake, Mountain, Car, Sparkles } from 'lucide-react';
 import { buildUniverseRoster, calculateUniverseProductWeeklyRevenue, getFallbackCharacterName, getUniverseDashboardProjects, getUniverseReleaseActivity, normalizeUniverseForSave, normalizeUniverseMap } from '../../services/universeLogic';
 import { calculateProjectMusicImpact, getMusicCreditRoleLabel, getMusicStrategyLabel, getProjectMusicPlan } from '../../services/musicIndustry';
+import { getPlayerLanguage, t } from '../../services/i18n';
+import { inferSeasonNumber } from '../../services/episodeRatings';
+import { CustomPosterImage } from '../../components/CustomPosterImage';
 
 interface ImdbAppProps {
   player: Player;
@@ -28,6 +31,7 @@ interface DisplayProject {
     description?: string;
     cast?: CastMember[];
     reviews?: Review[];
+    audienceReception?: AudienceReception;
     streamingViews?: number; // New
     awards?: any[]; // New
     originalObject: PastProject | ActiveRelease;
@@ -38,6 +42,10 @@ interface DisplayProject {
     releaseLabel: string;
     releaseDetailLabel: string;
     musicPlan?: ProjectMusicPlan;
+    franchiseId?: string;
+    sourceScriptId?: string;
+    seasonNumber?: number;
+    episodeRatings?: SeasonEpisodeRatings[];
 }
 
 type Tab = 'PROFILE' | 'FILMOGRAPHY' | 'AWARDS' | 'FRANCHISES' | 'SEASON'; // Added SEASON
@@ -49,10 +57,15 @@ interface SelectedShow extends AwardDefinition {
     hasPassed: boolean; // NEW: Explicit flag passed from list
 }
 
-const UNIVERSE_THEMES: Record<UniverseId, { color: string, bg: string, icon: any }> = {
-    MCU: { color: 'text-red-500', bg: 'bg-red-600', icon: Zap },
-    DCU: { color: 'text-blue-500', bg: 'bg-blue-600', icon: Shield }, // Assuming Shield icon imported or generic
-    SW: { color: 'text-yellow-400', bg: 'bg-yellow-500', icon: Globe },
+const UNIVERSE_THEMES: Record<string, { color: string, bg: string, border: string, icon: any }> = {
+    MCU: { color: 'text-red-500', bg: 'bg-red-600', border: 'border-red-500/35', icon: Zap },
+    DCU: { color: 'text-blue-500', bg: 'bg-blue-600', border: 'border-blue-500/35', icon: Shield },
+    SW: { color: 'text-yellow-400', bg: 'bg-yellow-500', border: 'border-yellow-400/35', icon: Globe },
+    AVATAR: { color: 'text-cyan-300', bg: 'bg-cyan-500', border: 'border-cyan-300/35', icon: Globe },
+    MONSTERVERSE: { color: 'text-emerald-300', bg: 'bg-emerald-600', border: 'border-emerald-300/35', icon: Mountain },
+    JURASSIC: { color: 'text-lime-300', bg: 'bg-lime-600', border: 'border-lime-300/35', icon: Mountain },
+    SPIDER_VERSE: { color: 'text-fuchsia-300', bg: 'bg-fuchsia-600', border: 'border-fuchsia-300/35', icon: Sparkles },
+    FAST_SAGA: { color: 'text-orange-300', bg: 'bg-orange-600', border: 'border-orange-300/35', icon: Car },
 };
 
 const getPosterBg = (title: string = '') => {
@@ -69,6 +82,13 @@ const getPosterBg = (title: string = '') => {
     const charCode = title.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
     return colors[charCode % colors.length];
 };
+
+const hasCustomPosterMedia = (customPoster?: CustomPoster): boolean => (
+    Boolean(
+        (customPoster?.type === 'IMAGE' || customPoster?.type === 'CANVA') &&
+        (customPoster.imageData || customPoster.posterMediaId)
+    )
+);
 
 const getSafeUniversePhaseLabel = (phase: Universe['currentPhase']) => {
     if (typeof phase === 'number') return `Phase ${phase}`;
@@ -108,19 +128,19 @@ const getReturnStatusMeta = (status?: 'RETURNING' | 'WRITTEN_OFF' | 'KILLED_OFF'
     switch (status) {
         case 'RETURNING':
             return {
-                label: 'Returning',
+                labelKey: 'imdb.project.returnStatus.returning',
                 tone: 'border-emerald-500/30 bg-emerald-950/30 text-emerald-300',
                 chip: 'bg-emerald-500/15 text-emerald-300'
             };
         case 'WRITTEN_OFF':
             return {
-                label: 'Written Off',
+                labelKey: 'imdb.project.returnStatus.writtenOff',
                 tone: 'border-amber-500/30 bg-amber-950/30 text-amber-200',
                 chip: 'bg-amber-500/15 text-amber-200'
             };
         case 'KILLED_OFF':
             return {
-                label: 'Killed Off',
+                labelKey: 'imdb.project.returnStatus.killedOff',
                 tone: 'border-rose-500/30 bg-rose-950/30 text-rose-200',
                 chip: 'bg-rose-500/15 text-rose-200'
             };
@@ -134,6 +154,118 @@ const inferBudgetTierFromBudget = (budget = 0): BudgetTier => {
     if (budget > 10_000_000) return 'HIGH';
     if (budget > 2_000_000) return 'MID';
     return 'LOW';
+};
+
+const normalizeSeriesTitleKey = (title = '') => title
+    .replace(/\bseason\s+\d+\b/gi, '')
+    .replace(/\bs\d+\b/gi, '')
+    .replace(/[:\-–]+$/g, '')
+    .replace(/[^a-z0-9]+/gi, ' ')
+    .trim()
+    .toLowerCase();
+
+const getDisplayProjectSeriesKey = (project: DisplayProject) => {
+    const original = project.originalObject as any;
+    const details = original.projectDetails || original;
+    return details.franchiseId || details.sourceScriptId || normalizeSeriesTitleKey(project.name);
+};
+
+const getEpisodeRatingCellTone = (rating: number) => {
+    if (rating >= 9.2) return 'bg-emerald-400 text-emerald-950 shadow-[0_0_14px_rgba(52,211,153,0.22)]';
+    if (rating >= 8.2) return 'bg-green-500 text-green-950';
+    if (rating >= 7.0) return 'bg-lime-400 text-lime-950';
+    if (rating >= 5.8) return 'bg-amber-400 text-amber-950';
+    if (rating >= 4.5) return 'bg-rose-500 text-white';
+    return 'bg-fuchsia-700 text-white';
+};
+
+const EpisodeRatingsHeatmap: React.FC<{
+    ratings: SeasonEpisodeRatings[];
+    tr: (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => string;
+}> = ({ ratings, tr }) => {
+    const sortedRatings = [...ratings].sort((a, b) => a.season - b.season);
+    const maxEpisodes = Math.max(...sortedRatings.map(season => season.episodes.length), 0);
+    if (!sortedRatings.length || maxEpisodes === 0) return null;
+    const episodeRatingSeasonColumnWidth = '48px';
+    const episodeRatingGridMinWidth = `calc(30px + (${sortedRatings.length} * ${episodeRatingSeasonColumnWidth}) + (${sortedRatings.length} * 0.25rem))`;
+
+    const legend = [
+        { label: tr('imdb.project.rating.awesome'), className: 'bg-emerald-400' },
+        { label: tr('imdb.project.rating.great'), className: 'bg-green-500' },
+        { label: tr('imdb.project.rating.good'), className: 'bg-lime-400' },
+        { label: tr('imdb.project.rating.regular'), className: 'bg-amber-400' },
+        { label: tr('imdb.project.rating.bad'), className: 'bg-rose-500' },
+        { label: tr('imdb.project.rating.garbage'), className: 'bg-fuchsia-700' },
+    ];
+
+    return (
+        <div className="px-3 py-2.5 border-b border-zinc-800 bg-zinc-950">
+            <div className="flex items-start justify-between gap-2 mb-1.5">
+                <div>
+                    <h3 className="text-white font-bold text-[11px] flex items-center gap-1.5">
+                        <LayoutGrid size={12} className="text-emerald-400"/> {tr('imdb.project.episodeRatings')}
+                    </h3>
+                    <div className="mt-0.5 text-[7px] uppercase tracking-[0.18em] text-zinc-500">
+                        {tr('imdb.project.seasonAverage')}
+                    </div>
+                </div>
+                <div className="flex flex-wrap justify-end gap-x-1.5 gap-y-0.5 max-w-[180px]">
+                    {legend.map(item => (
+                        <div key={item.label} className="flex items-center gap-1 text-[6px] font-bold uppercase tracking-wider text-zinc-500">
+                            <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${item.className}`} />
+                            <span>{item.label}</span>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            <div className="episode-rating-season-scroll overflow-x-auto no-scrollbar pb-1">
+                <div
+                    className="grid gap-1 min-w-max"
+                    style={{
+                        gridTemplateColumns: `30px repeat(${sortedRatings.length}, minmax(42px, ${episodeRatingSeasonColumnWidth}))`,
+                        minWidth: episodeRatingGridMinWidth,
+                    }}
+                >
+                    <div />
+                    {sortedRatings.map(season => (
+                        <div key={`season_head_${season.season}`} className="text-center">
+                            <div className="text-[8px] font-black text-zinc-300 uppercase tracking-widest">
+                                {tr('imdb.project.seasonShort', { season: season.season })}
+                            </div>
+                            <div className="mt-0.5 text-[8px] font-mono font-black text-emerald-300">
+                                {season.averageRating.toFixed(1)}
+                            </div>
+                        </div>
+                    ))}
+
+                    {Array.from({ length: maxEpisodes }, (_, index) => {
+                        const episodeNumber = index + 1;
+                        return (
+                            <React.Fragment key={`episode_row_${episodeNumber}`}>
+                                <div className="h-7 flex items-center justify-end pr-1 text-[9px] font-bold text-zinc-400">
+                                    {tr('imdb.project.episodeShort', { episode: episodeNumber })}
+                                </div>
+                                {sortedRatings.map(season => {
+                                    const episode = season.episodes.find(item => item.episode === episodeNumber);
+                                    return episode ? (
+                                        <div
+                                            key={`s${season.season}_e${episodeNumber}`}
+                                            className={`h-7 rounded flex items-center justify-center text-xs font-black ${getEpisodeRatingCellTone(episode.rating)}`}
+                                        >
+                                            {episode.rating.toFixed(1)}
+                                        </div>
+                                    ) : (
+                                        <div key={`s${season.season}_e${episodeNumber}_empty`} className="h-7 rounded border border-zinc-800 bg-zinc-900/40" />
+                                    );
+                                })}
+                            </React.Fragment>
+                        );
+                    })}
+                </div>
+            </div>
+        </div>
+    );
 };
 
 const getArchivedProjectMusicPlan = (project: PastProject): ProjectMusicPlan | undefined => {
@@ -173,6 +305,55 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
   const [selectedProject, setSelectedProject] = useState<DisplayProject | null>(null);
   const [selectedShow, setSelectedShow] = useState<SelectedShow | null>(null);
   const [selectedUniverse, setSelectedUniverse] = useState<Universe | null>(null);
+  const language = getPlayerLanguage(player);
+  const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
+  const awardCategoryKey = (category: string) => category.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+  const getAwardShowName = (type: AwardDefinition['type']) => tr(`imdb.awards.show.${type}.name`);
+  const getAwardShowFocus = (type: AwardDefinition['type']) => tr(`imdb.awards.show.${type}.focus`);
+  const getAwardCategoryLabel = (category: string) => tr(`imdb.awards.category.${awardCategoryKey(category)}`);
+  const getUniverseSagaLabel = (saga: Universe['saga']) => tr('imdb.franchise.sagaNumber', { saga: Number.isFinite(Number(saga)) ? Number(saga) : 1 });
+  const getUniversePhaseLabel = (phase: Universe['currentPhase'] | number) => {
+      if (typeof phase === 'number') return tr('imdb.franchise.phaseNumber', { phase });
+      if (typeof phase === 'string') {
+          const normalized = phase.replace(/_/g, ' ');
+          const fallback = normalized.replace('PHASE', 'Phase').replace(/\bORIGINS\b/g, 'Origins').replace(/\bEXPANSION\b/g, 'Expansion').replace(/\bWAR\b/g, 'War').replace(/\bMULTIVERSE\b/g, 'Multiverse');
+          const phaseKey = `imdb.franchise.phase.${phase.toLowerCase()}`;
+          const localized = tr(phaseKey, { fallback });
+          return localized === phaseKey ? fallback : localized;
+      }
+      return tr('imdb.franchise.phaseNumber', { phase: 1 });
+  };
+  const getTimelineProjectTypeLabel = (type: string) => {
+      if (type === 'MOVIE') return tr('imdb.franchise.projectType.movie');
+      if (type === 'SERIES') return tr('imdb.franchise.projectType.series');
+      return type;
+  };
+  const getCharacterStatusLabel = (status: string) => {
+      if (status === 'ACTIVE') return tr('imdb.franchise.characterStatus.active');
+      if (status === 'RECAST') return tr('imdb.franchise.characterStatus.recast');
+      if (status === 'RETIRED') return tr('imdb.franchise.characterStatus.retired');
+      return status;
+  };
+  const getProjectMediaTypeLabel = (mediaType: DisplayProject['mediaType'], mode: 'short' | 'long' = 'long') => {
+      if (mediaType === 'SERIES') return tr(mode === 'short' ? 'imdb.project.mediaType.tv' : 'imdb.project.mediaType.series');
+      return tr('imdb.project.mediaType.movie');
+  };
+  const getDisplayProjectDescription = (project: DisplayProject) => {
+      const description = (project.description || '').trim();
+      if (
+          description.includes('Episode Ratings IMDb QA season') ||
+          description.includes('Cheat QA prestige series for IMDb episode rating heatmap testing.')
+      ) {
+          return 'Audience response shifted across the season. Open this credit to see the S1-S3 heatmap.';
+      }
+      return description || tr('imdb.project.defaultDescription');
+  };
+  const getCreditFilterLabel = (type: typeof creditFilter) => {
+      if (type === 'ALL') return tr('imdb.profile.filter.all');
+      if (type === 'MOVIE') return tr('imdb.profile.filter.movies');
+      return tr('imdb.profile.filter.tv');
+  };
+  const getReturnStatusLabel = (labelKey?: string) => labelKey ? tr(labelKey) : '';
 
   // Check for Active Season (Pending Ceremony)
   const pendingCeremony = player.scheduledEvents.find(e => e.type === 'AWARD_CEREMONY');
@@ -188,28 +369,38 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
   const activeList: DisplayProject[] = player.activeReleases.map(r => {
       const timing = getProjectReleaseTiming(r, releaseFallback);
       return {
-          id: r.id, name: r.name, year: timing.releaseYear || player.age, role: r.roleType, rating: r.imdbRating || 0, status: 'ACTIVE' as const,
-          gross: r.totalGross, budget: r.budget, description: r.projectDetails.description, cast: r.projectDetails.castList,
-          reviews: r.projectDetails.reviews, streamingViews: r.streaming?.totalViews, originalObject: r,
-          mediaType: r.type, customPoster: r.projectDetails.customPoster, identityLabel: getProjectIdentityLabel(r.projectDetails),
-          musicPlan: getProjectMusicPlan(r.projectDetails),
-          campaignRealitySnapshot: r.projectDetails.campaignRealitySnapshot,
-          releaseLabel: getProjectReleaseLabel(r, releaseFallback),
-          releaseDetailLabel: getProjectReleaseLabel(r, releaseFallback, { includeWeek: true })
-      };
+	          id: r.id, name: r.name, year: timing.releaseYear || player.age, role: r.roleType, rating: r.imdbRating || 0, status: 'ACTIVE' as const,
+	          gross: r.totalGross, budget: r.budget, description: r.projectDetails.description, cast: r.projectDetails.castList,
+	          reviews: r.projectDetails.reviews, audienceReception: r.audienceReception || r.projectDetails.audienceReception,
+              streamingViews: r.streaming?.totalViews, originalObject: r,
+	          mediaType: r.type, customPoster: r.projectDetails.customPoster, identityLabel: getProjectIdentityLabel(r.projectDetails),
+	          musicPlan: getProjectMusicPlan(r.projectDetails),
+	          franchiseId: r.projectDetails.franchiseId,
+	          sourceScriptId: r.projectDetails.sourceScriptId,
+	          seasonNumber: inferSeasonNumber(r.projectDetails),
+	          episodeRatings: r.projectDetails.episodeRatings,
+	          campaignRealitySnapshot: r.projectDetails.campaignRealitySnapshot,
+	          releaseLabel: getProjectReleaseLabel(r, releaseFallback),
+	          releaseDetailLabel: getProjectReleaseLabel(r, releaseFallback, { includeWeek: true })
+	      };
   });
 
   const pastList: DisplayProject[] = player.pastProjects.map(p => {
       const timing = getProjectReleaseTiming(p, releaseFallback);
       return {
           id: p.id, name: p.name, year: timing.releaseYear || p.year, role: p.roleType || 'Role', rating: p.imdbRating || 0, status: 'ARCHIVED' as const,
-          gross: p.gross, budget: p.budget, description: p.description, cast: p.castList, reviews: p.reviews, streamingViews: p.totalViews, awards: p.awards, originalObject: p,
-          mediaType: p.projectType || 'MOVIE', customPoster: p.customPoster, identityLabel: getProjectIdentityLabel(p),
-          musicPlan: getArchivedProjectMusicPlan(p),
-          campaignRealitySnapshot: p.campaignRealitySnapshot,
-          releaseLabel: getProjectReleaseLabel(p, releaseFallback),
-          releaseDetailLabel: getProjectReleaseLabel(p, releaseFallback, { includeWeek: true })
-      };
+	          gross: p.gross, budget: p.budget, description: p.description, cast: p.castList, reviews: p.reviews, audienceReception: p.audienceReception,
+              streamingViews: p.totalViews, awards: p.awards, originalObject: p,
+	          mediaType: p.projectType || 'MOVIE', customPoster: p.customPoster, identityLabel: getProjectIdentityLabel(p),
+	          musicPlan: getArchivedProjectMusicPlan(p),
+	          franchiseId: p.franchiseId,
+	          sourceScriptId: p.sourceScriptId,
+	          seasonNumber: inferSeasonNumber(p),
+	          episodeRatings: p.episodeRatings,
+	          campaignRealitySnapshot: p.campaignRealitySnapshot,
+	          releaseLabel: getProjectReleaseLabel(p, releaseFallback),
+	          releaseDetailLabel: getProjectReleaseLabel(p, releaseFallback, { includeWeek: true })
+	      };
   }).reverse();
 
   const fullList = [...activeList, ...pastList];
@@ -245,12 +436,115 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
       return `${(val / 1000).toFixed(0)}k`;
   }
 
+  const buildDisplayAudienceReception = (project: DisplayProject): AudienceReception | undefined => {
+      if (!project.rating) return undefined;
+      const budget = Math.max(1, Number(project.budget || 1));
+      const gross = Math.max(0, Number(project.gross || 0));
+      const grossPressure = Math.max(-10, Math.min(18, (gross / budget) * 12));
+      const score = Math.round(Math.max(18, Math.min(96, (project.rating * 8.2) + grossPressure + (project.status === 'ACTIVE' ? 3 : 0))));
+      const trend: AudienceReception['trend'] = project.status === 'ACTIVE' && gross > budget ? 'RISING' : 'STEADY';
+      const label = score >= 82 ? 'Crowd Favorite' : score >= 68 ? 'Strong Word of Mouth' : score >= 50 ? 'Divided Audience' : 'Soft Reaction';
+      return {
+          openingScore: score,
+          currentScore: score,
+          trend,
+          label,
+          summary: project.status === 'ACTIVE'
+              ? 'Early viewer reaction is still moving as the release finds its wider audience.'
+              : 'Final audience read is locked after the run.',
+          sampleSize: Math.max(650, Math.round(Math.max(gross, budget * 0.08) / 3200)),
+          updatedWeek: player.currentWeek,
+          updatedYear: player.age,
+          isFinal: project.status !== 'ACTIVE',
+          quotes: [
+              {
+                  id: `${project.id}_display_quote_1`,
+                  author: 'Weekend Crowd',
+                  text: score >= 68 ? 'People are recommending this one after the first wave.' : 'The audience is split, but the conversation is active.',
+                  sentiment: score >= 68 ? 'POSITIVE' : 'MIXED',
+                  rating: Math.max(1, Math.min(5, score / 20)),
+                  week: player.currentWeek,
+                  year: player.age
+              },
+              {
+                  id: `${project.id}_display_quote_2`,
+                  author: 'Film Fan',
+                  text: trend === 'RISING' ? 'The later crowd is helping the score climb.' : 'The score is holding close to the opening reaction.',
+                  sentiment: trend === 'RISING' ? 'POSITIVE' : 'MIXED',
+                  rating: Math.max(1, Math.min(5, score / 21)),
+                  week: player.currentWeek,
+                  year: player.age
+              }
+          ]
+      };
+  };
+
+  const getDisplayCriticReviews = (project: DisplayProject, reviews: Review[]): Review[] => {
+      const existing = reviews.filter(Boolean).slice(0, 6);
+      if (existing.length >= 5) return existing;
+
+      const rating = Number(project.rating || 0);
+      const strong = rating >= 7.8;
+      const soft = rating < 6.1;
+      const publications = ['Screen Ledger', 'Cinema Wire', 'Frame Journal', 'Box Office Weekly', 'Daily Review', 'The Backlot'];
+      const authors = ['Leena Cross', 'Mira Vale', 'Omar Reed', 'Anika Stone', 'Theo Mercer', 'Dev Rao'];
+      const positiveLines = [
+          `${project.name} understands its audience and lands the big emotional beats.`,
+          `A confident ${project.identityLabel.toLowerCase()} release with real crowd energy.`,
+          `The package is polished enough to keep viewers talking after the credits.`,
+          `It has the kind of momentum that can survive past opening weekend.`
+      ];
+      const mixedLines = [
+          `${project.name} has strong moments, even when the pacing gets uneven.`,
+          `A sturdy release with a few rough edges around the middle act.`,
+          `The audience hook is clear, though the execution is not always clean.`,
+          `It plays well enough, but it leaves some bigger ideas on the table.`
+      ];
+      const negativeLines = [
+          `${project.name} struggles to turn its promise into a full theatrical experience.`,
+          `The concept is readable, but the final result feels thin in too many places.`,
+          `A few bright pieces cannot fully cover a soft overall package.`,
+          `It may find loyal defenders, but the wider response looks limited.`
+      ];
+      const sentimentPattern: Array<Review['sentiment']> = strong
+          ? ['POSITIVE', 'POSITIVE', 'POSITIVE', 'MIXED', 'POSITIVE', 'POSITIVE']
+          : soft
+              ? ['NEGATIVE', 'MIXED', 'NEGATIVE', 'MIXED', 'NEGATIVE', 'MIXED']
+              : ['MIXED', 'POSITIVE', 'MIXED', 'MIXED', 'POSITIVE', 'NEGATIVE'];
+      const ratingFor = (sentiment: Review['sentiment'], index: number) => {
+          if (sentiment === 'POSITIVE') return Number((4.1 + ((index % 3) * 0.25)).toFixed(1));
+          if (sentiment === 'NEGATIVE') return Number((1.7 + ((index % 2) * 0.35)).toFixed(1));
+          return Number((2.8 + ((index % 3) * 0.2)).toFixed(1));
+      };
+      const lineFor = (sentiment: Review['sentiment'], index: number) => {
+          if (sentiment === 'POSITIVE') return positiveLines[index % positiveLines.length];
+          if (sentiment === 'NEGATIVE') return negativeLines[index % negativeLines.length];
+          return mixedLines[index % mixedLines.length];
+      };
+
+      const generated = Array.from({ length: 6 - existing.length }, (_, offset) => {
+          const index = existing.length + offset;
+          const sentiment = sentimentPattern[index % sentimentPattern.length];
+          return {
+              id: `${project.id}_critic_fallback_${index}`,
+              author: authors[index % authors.length],
+              publication: publications[index % publications.length],
+              text: lineFor(sentiment, index),
+              sentiment,
+              type: 'CRITIC' as const,
+              rating: ratingFor(sentiment, index)
+          };
+      });
+
+      return [...existing, ...generated].slice(0, 6);
+  };
+
   const getCriticLabel = (score: number) => {
-      if (score >= 9.0) return { label: "Cinema Legend", color: "text-amber-400" };
-      if (score >= 8.0) return { label: "Critical Darling", color: "text-emerald-400" };
-      if (score >= 6.0) return { label: "Reliable Star", color: "text-blue-400" };
-      if (score >= 4.0) return { label: "Hit or Miss", color: "text-zinc-400" };
-      return { label: "Box Office Poison", color: "text-rose-500" };
+      if (score >= 9.0) return { label: tr('imdb.profile.criticLabel.legend'), color: "text-amber-400" };
+      if (score >= 8.0) return { label: tr('imdb.profile.criticLabel.darling'), color: "text-emerald-400" };
+      if (score >= 6.0) return { label: tr('imdb.profile.criticLabel.reliable'), color: "text-blue-400" };
+      if (score >= 4.0) return { label: tr('imdb.profile.criticLabel.hitOrMiss'), color: "text-zinc-400" };
+      return { label: tr('imdb.profile.criticLabel.poison'), color: "text-rose-500" };
   };
 
   const criticStatus = getCriticLabel(avgRating);
@@ -262,9 +556,9 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
           return (
               <div className="text-center py-12 text-zinc-500">
                   <div className="text-4xl mb-2">🏆</div>
-                  <div className="font-bold">No Active Season</div>
-                  <div className="text-xs mt-1">Wait for nominations to be announced.</div>
-                  <button onClick={() => setActiveTab('AWARDS')} className="mt-4 text-amber-400 text-xs font-bold">View History</button>
+                  <div className="font-bold">{tr('imdb.awards.noActiveSeason')}</div>
+                  <div className="text-xs mt-1">{tr('imdb.awards.waitForNominations')}</div>
+                  <button onClick={() => setActiveTab('AWARDS')} className="mt-4 text-amber-400 text-xs font-bold">{tr('imdb.awards.viewHistory')}</button>
               </div>
           );
       }
@@ -276,13 +570,13 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
           <div className="space-y-4">
               <div className="flex items-center gap-2 mb-2">
                   <button onClick={() => setActiveTab('AWARDS')}><ArrowLeft size={16} className="text-zinc-500"/></button>
-                  <h2 className="text-xl font-bold text-white">Current Nominations</h2>
+                  <h2 className="text-xl font-bold text-white">{tr('imdb.awards.currentNominations')}</h2>
               </div>
               
               <div className="bg-gradient-to-br from-zinc-900 to-black p-4 rounded-xl border border-zinc-800 mb-6 text-center">
                   <h3 className="font-serif font-black text-2xl text-amber-400 mb-1">{pendingCeremony.title}</h3>
                   <div className="text-[10px] text-zinc-400 uppercase tracking-widest">
-                      {weeksAway === 0 ? "Live Today!" : `Live in ${weeksAway} Weeks`}
+                      {weeksAway === 0 ? tr('imdb.awards.liveToday') : tr('imdb.awards.liveInWeeks', { weeks: weeksAway })}
                   </div>
               </div>
 
@@ -295,7 +589,7 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
                   return (
                     <div key={category} className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
                         <div className="bg-zinc-800/50 p-3 border-b border-zinc-800">
-                            <div className="font-bold text-sm text-zinc-200">{category}</div>
+                            <div className="font-bold text-sm text-zinc-200">{getAwardCategoryLabel(category)}</div>
                         </div>
                         <div className="divide-y divide-zinc-800">
                             {nominees.map((nom) => (
@@ -307,30 +601,30 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
                                         </div>
                                         {/* BOTTOM LINE: Context (Producers OR Project Title) */}
                                         <div className="text-[10px] text-zinc-500">
-                                            {reallyProjectAward ? 'Producers' : nom.project.name}
+                                            {reallyProjectAward ? tr('imdb.awards.producers') : nom.project.name}
                                         </div>
                                     </div>
-                                    {nom.isPlayer && <div className="text-[9px] bg-amber-500 text-black px-2 py-0.5 rounded font-bold uppercase">You</div>}
+                                    {nom.isPlayer && <div className="text-[9px] bg-amber-500 text-black px-2 py-0.5 rounded font-bold uppercase">{tr('imdb.awards.you')}</div>}
                                 </div>
                             ))}
                         </div>
                         {(musicHeavyProjects.length > 0 || totalSoundtrackRevenue > 0 || musicAwardWins.length > 0) && (
                             <div className="mt-3 rounded-2xl border border-cyan-300/20 bg-cyan-950/20 p-3">
                                 <div className="mb-2 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.18em] text-cyan-200">
-                                    <Music2 size={13}/> Music Legacy
+                                    <Music2 size={13}/> {tr('imdb.awards.music.legacy')}
                                 </div>
                                 <div className="grid grid-cols-3 gap-2">
                                     <div className="rounded-xl bg-black/35 p-2 text-center">
                                         <div className="text-lg font-black text-white">{musicHeavyProjects.length}</div>
-                                        <div className="text-[8px] uppercase tracking-widest text-zinc-500">Credits</div>
+                                        <div className="text-[8px] uppercase tracking-widest text-zinc-500">{tr('imdb.awards.music.credits')}</div>
                                     </div>
                                     <div className="rounded-xl bg-black/35 p-2 text-center">
                                         <div className="text-sm font-black text-emerald-300 truncate">{formatMoney(totalSoundtrackRevenue)}</div>
-                                        <div className="text-[8px] uppercase tracking-widest text-zinc-500">Soundtrack</div>
+                                        <div className="text-[8px] uppercase tracking-widest text-zinc-500">{tr('imdb.awards.music.soundtrack')}</div>
                                     </div>
                                     <div className="rounded-xl bg-black/35 p-2 text-center">
                                         <div className="text-lg font-black text-amber-300">{musicAwardWins.length}</div>
-                                        <div className="text-[8px] uppercase tracking-widest text-zinc-500">Music Wins</div>
+                                        <div className="text-[8px] uppercase tracking-widest text-zinc-500">{tr('imdb.awards.music.wins')}</div>
                                     </div>
                                 </div>
                             </div>
@@ -345,12 +639,13 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
   const renderShowDetail = () => {
       if (!selectedShow) return null;
       
-      const lore = AWARD_SHOW_DB[selectedShow.type as keyof typeof AWARD_SHOW_DB];
+      const lore = getAwardShowLore(language, selectedShow.type as AwardType);
       const playerResults = player.awards.filter(a => a.type === selectedShow.type && a.year === selectedShow.year);
       // Use the passed flag or fallback to history presence
       const historyEntry = player.world.awardHistory?.find(h => h.year === selectedShow.year && h.type === selectedShow.type);
       
       const isCompleted = selectedShow.hasPassed || !!historyEntry;
+      const selectedShowName = getAwardShowName(selectedShow.type);
       
       const pendingEvent = player.scheduledEvents.find(e => e.type === 'AWARD_CEREMONY' && e.title === selectedShow.name && e.data?.awardYear === selectedShow.year);
       const ballot = (pendingEvent && pendingEvent.data && pendingEvent.data.fullBallot) ? (pendingEvent.data.fullBallot as Record<string, Nomination[]>) : null;
@@ -358,16 +653,16 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
       return (
           <div className="space-y-6">
               <button onClick={() => setAwardView('HOME')} className="flex items-center gap-1 text-xs text-zinc-500 font-bold uppercase tracking-wider mb-2 hover:text-white">
-                  <ArrowLeft size={12}/> Back to Awards
+                  <ArrowLeft size={12}/> {tr('imdb.awards.backToAwards')}
               </button>
 
               <div className="text-center pb-6 border-b border-zinc-800">
                   <div className={`inline-block px-3 py-1 rounded-full text-[10px] font-bold uppercase mb-3 ${lore.color} bg-white/5`}>
-                      {lore.focus} Event
+                      {tr('imdb.awards.focusEvent', { focus: getAwardShowFocus(lore.id) })}
                   </div>
-                  <h2 className="text-3xl font-serif font-bold text-white mb-1">{selectedShow.name}</h2>
-                  <div className="text-sm text-zinc-500 font-mono">{selectedShow.year} Edition</div>
-                  {!isCompleted && ballot && <div className="text-[10px] text-amber-500 mt-2 animate-pulse font-bold uppercase tracking-widest">Nominations Revealed</div>}
+                  <h2 className="text-3xl font-serif font-bold text-white mb-1">{selectedShowName}</h2>
+                  <div className="text-sm text-zinc-500 font-mono">{tr('imdb.awards.edition', { year: selectedShow.year })}</div>
+                  {!isCompleted && ballot && <div className="text-[10px] text-amber-500 mt-2 animate-pulse font-bold uppercase tracking-widest">{tr('imdb.awards.nominationsRevealed')}</div>}
               </div>
 
               <div className="space-y-4">
@@ -382,7 +677,7 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
                       return (
                           <div key={cat} className={`rounded-xl border overflow-hidden ${playerResult ? (playerResult.outcome === 'WON' ? 'bg-amber-900/10 border-amber-500/50' : 'bg-zinc-800 border-zinc-700') : 'bg-zinc-900 border-zinc-800'}`}>
                               <div className="p-4 border-b border-zinc-800/50">
-                                <div className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">{cat}</div>
+                                <div className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">{getAwardCategoryLabel(cat)}</div>
                               </div>
                               
                               {isCompleted ? (
@@ -395,11 +690,11 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
                                                       {reallyProjectAward ? actualWinner.projectName : actualWinner.winnerName}
                                                       {!reallyProjectAward && <span className="text-zinc-500 font-normal"> - {actualWinner.projectName}</span>}
                                                   </div>
-                                                  <div className="text-[10px] text-zinc-500">Winner</div>
+                                                  <div className="text-[10px] text-zinc-500">{tr('imdb.awards.result.winner')}</div>
                                               </div>
                                           </>
                                       ) : (
-                                          <div className="text-xs text-zinc-600 italic">Winners archived.</div>
+                                          <div className="text-xs text-zinc-600 italic">{tr('imdb.awards.winnersArchived')}</div>
                                       )}
                                   </div>
                               ) : (
@@ -412,20 +707,20 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
                                                           <span className={reallyProjectAward ? 'font-bold italic text-zinc-200' : (nom.isPlayer ? 'text-amber-200 font-bold' : 'text-zinc-300')}>
                                                               {reallyProjectAward ? nom.project.name : (nom.isPlayer ? player.name : nom.nomineeName)}
                                                           </span>
-                                                          <span className="text-zinc-500 ml-2 italic">{reallyProjectAward ? 'Producers' : nom.project.name}</span>
+                                                          <span className="text-zinc-500 ml-2 italic">{reallyProjectAward ? tr('imdb.awards.producers') : nom.project.name}</span>
                                                       </div>
                                                   </div>
                                               ))}
                                           </div>
                                       ) : (
-                                          <div className="p-4 text-xs text-zinc-600 italic">Nominations pending...</div>
+                                          <div className="p-4 text-xs text-zinc-600 italic">{tr('imdb.awards.nominationsPending')}</div>
                                       )}
                                   </div>
                               )}
 
                               {playerResult && playerResult.outcome === 'NOMINATED' && !playerResult.outcome.includes('WON') && isCompleted && (
                                   <div className="p-3 bg-white/5 text-xs text-zinc-400 flex items-center gap-2">
-                                      <div className="w-1.5 h-1.5 rounded-full bg-zinc-500"></div> You were nominated
+                                      <div className="w-1.5 h-1.5 rounded-full bg-zinc-500"></div> {tr('imdb.awards.youWereNominated')}
                                   </div>
                               )}
                           </div>
@@ -439,14 +734,14 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
   const renderAwardsHome = () => (
       <div className="space-y-6">
           <div className="space-y-2">
-              <h3 className="text-yellow-400 font-bold uppercase tracking-widest text-xs border-l-2 border-yellow-400 pl-2">Current Season</h3>
+              <h3 className="text-yellow-400 font-bold uppercase tracking-widest text-xs border-l-2 border-yellow-400 pl-2">{tr('imdb.awards.currentSeason')}</h3>
               
               {pendingCeremony && (
                   <div onClick={() => setActiveTab('SEASON')} className="bg-gradient-to-r from-amber-900/40 to-black p-4 rounded-xl border border-amber-500/30 flex items-center justify-between cursor-pointer mb-4">
                       <div>
-                          <div className="font-bold text-amber-400 text-sm flex items-center gap-2"><AwardIcon size={14} fill="currentColor"/> {pendingCeremony.title}</div>
+                          <div className="font-bold text-amber-400 text-sm flex items-center gap-2"><AwardIcon size={14} fill="currentColor"/> {pendingCeremony.data?.awardDef?.type ? getAwardShowName(pendingCeremony.data.awardDef.type) : pendingCeremony.title}</div>
                           <div className="text-[10px] text-zinc-400">
-                              Nominations Announced • Ceremony in {getWeeksUntil(pendingCeremony.week, player.currentWeek)} wks
+                              {tr('imdb.awards.nominationsAnnounced', { weeks: getWeeksUntil(pendingCeremony.week, player.currentWeek) })}
                           </div>
                       </div>
                       <ChevronRight size={16} className="text-amber-400"/>
@@ -482,9 +777,9 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
                       return (
                           <div key={def.type} onClick={() => { setSelectedShow({ ...def, year: displayYear, isCurrent: true, hasPassed }); setAwardView('SHOW_DETAIL'); }} className="bg-zinc-900 p-4 rounded-xl border border-zinc-800 flex items-center justify-between active:bg-zinc-800 transition-colors">
                               <div>
-                                  <div className="font-bold text-white text-sm">{def.name}</div>
+                                  <div className="font-bold text-white text-sm">{getAwardShowName(def.type)}</div>
                                   <div className={`text-[10px] uppercase font-bold tracking-wider mt-1 ${isPending ? 'text-amber-400' : hasPassed ? 'text-zinc-500' : 'text-zinc-400'}`}>
-                                      {isPending ? 'Ceremony Pending' : hasPassed ? 'Completed' : `Upcoming (Wk ${ceremonyWeek})`}
+                                      {isPending ? tr('imdb.awards.status.pending') : hasPassed ? tr('imdb.awards.status.completed') : tr('imdb.awards.status.upcoming', { week: ceremonyWeek })}
                                   </div>
                               </div>
                               <ChevronRight size={16} className="text-zinc-600"/>
@@ -496,17 +791,17 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
 
           <div className="bg-zinc-900 p-5 rounded-2xl border border-zinc-800">
               <div className="flex justify-between items-center mb-4">
-                  <h3 className="font-bold text-white text-lg">My Awards</h3>
-                  <button onClick={() => setAwardView('MY_AWARDS')} className="text-xs text-blue-400 font-bold">View All</button>
+                  <h3 className="font-bold text-white text-lg">{tr('imdb.awards.myAwards')}</h3>
+                  <button onClick={() => setAwardView('MY_AWARDS')} className="text-xs text-blue-400 font-bold">{tr('imdb.awards.viewAll')}</button>
               </div>
               <div className="grid grid-cols-2 gap-4">
                   <div className="bg-black/40 p-3 rounded-xl border border-zinc-800 text-center">
                       <div className="text-2xl font-mono font-bold text-amber-400">{awardsWon.length}</div>
-                      <div className="text-[10px] text-zinc-500 uppercase tracking-widest">Wins</div>
+                      <div className="text-[10px] text-zinc-500 uppercase tracking-widest">{tr('imdb.awards.wins')}</div>
                   </div>
                   <div className="bg-black/40 p-3 rounded-xl border border-zinc-800 text-center">
                       <div className="text-2xl font-mono font-bold text-zinc-400">{awardsWon.length + awardsNom.length}</div>
-                      <div className="text-[10px] text-zinc-500 uppercase tracking-widest">Nominations</div>
+                      <div className="text-[10px] text-zinc-500 uppercase tracking-widest">{tr('imdb.awards.nominations')}</div>
                   </div>
               </div>
           </div>
@@ -514,25 +809,25 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
   );
 
   const renderMyAwards = () => {
-      const grouped: Record<string, Award[]> = {};
+      const grouped: Partial<Record<AwardType, Award[]>> = {};
       cleanedAwards.forEach(a => {
-          if (!grouped[a.name]) grouped[a.name] = [];
-          grouped[a.name].push(a);
+          if (!grouped[a.type]) grouped[a.type] = [];
+          grouped[a.type]!.push(a);
       });
 
       return (
           <div className="space-y-6">
               <button onClick={() => setAwardView('HOME')} className="flex items-center gap-1 text-xs text-zinc-500 font-bold uppercase tracking-wider mb-2 hover:text-white">
-                  <ArrowLeft size={12}/> Back
+                  <ArrowLeft size={12}/> {tr('imdb.awards.back')}
               </button>
-              <h2 className="text-2xl font-bold text-white mb-4">Career Achievements</h2>
+              <h2 className="text-2xl font-bold text-white mb-4">{tr('imdb.awards.careerAchievements')}</h2>
               
               {Object.keys(grouped).length === 0 ? (
-                  <div className="text-center py-12 text-zinc-600">No awards yet. Keep working!</div>
+                  <div className="text-center py-12 text-zinc-600">{tr('imdb.awards.empty')}</div>
               ) : (
-                  Object.entries(grouped).map(([showName, awards]) => (
-                      <div key={showName} className="bg-zinc-900 rounded-2xl p-5 border border-zinc-800">
-                          <h3 className="font-bold text-white border-b border-zinc-800 pb-2 mb-3">{showName}</h3>
+                  Object.entries(grouped).map(([showType, awards]) => (
+                      <div key={showType} className="bg-zinc-900 rounded-2xl p-5 border border-zinc-800">
+                          <h3 className="font-bold text-white border-b border-zinc-800 pb-2 mb-3">{getAwardShowName(showType as AwardType)}</h3>
                           <div className="space-y-3">
                               {awards.map(award => (
                                   <div key={award.id} className="flex items-start gap-3">
@@ -541,13 +836,13 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
                                       </div>
                                       <div>
                                           <div className={`text-sm font-bold ${award.outcome === 'WON' ? 'text-white' : 'text-zinc-400'}`}>
-                                              {award.category}
+                                              {getAwardCategoryLabel(award.category)}
                                           </div>
                                           <div className="text-xs text-zinc-500">
-                                              {award.projectName} • Year {award.year}
+                                              {award.projectName} • {tr('imdb.awards.year', { year: award.year })}
                                           </div>
                                       </div>
-                                      {award.outcome === 'WON' && <div className="ml-auto text-[10px] font-bold bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded uppercase">Won</div>}
+                                      {award.outcome === 'WON' && <div className="ml-auto text-[10px] font-bold bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded uppercase">{tr('imdb.awards.result.won')}</div>}
                                   </div>
                               ))}
                           </div>
@@ -565,9 +860,9 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
 
       return (
           <div className="space-y-4">
-              <h2 className="text-xl font-bold text-white mb-4 px-1">Cinematic Universes</h2>
+              <h2 className="text-xl font-bold text-white mb-4 px-1">{tr('imdb.franchise.title')}</h2>
               {allUniverses.map(uni => {
-                  const theme = UNIVERSE_THEMES[uni.id] || { color: 'text-zinc-400', bg: 'bg-zinc-700', icon: Film };
+                  const theme = UNIVERSE_THEMES[uni.id] || { color: 'text-zinc-400', bg: 'bg-zinc-700', border: 'border-zinc-700', icon: Film };
                   const Icon = theme.icon;
                   const rosterCount = buildUniverseRoster(
                       uni,
@@ -575,7 +870,7 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
                       player.name
                   ).filter(character => character.status !== 'RETIRED').length;
                   return (
-                      <div key={uni.id} onClick={() => setSelectedUniverse(normalizeUniverseForSave(uni, uni.id))} className="bg-zinc-900 rounded-2xl overflow-hidden border border-zinc-800 relative group cursor-pointer">
+                      <div key={uni.id} onClick={() => setSelectedUniverse(normalizeUniverseForSave(uni, uni.id))} className={`bg-zinc-900 rounded-2xl overflow-hidden border ${theme.border} relative group cursor-pointer`}>
                           <div className={`h-24 ${theme.bg} opacity-20 relative`}><div className="absolute inset-0 bg-gradient-to-t from-zinc-900 to-transparent"></div></div>
                           <div className="p-5 relative -mt-10">
                               <div className={`w-14 h-14 rounded-xl ${theme.bg} flex items-center justify-center shadow-lg mb-3 text-white`}><Icon size={28} /></div>
@@ -583,14 +878,14 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
                                   <div>
                                       <h3 className="text-2xl font-black uppercase tracking-tight leading-none mb-1">{uni.name}</h3>
                                       <div className={`text-[10px] font-bold uppercase tracking-widest ${theme.color}`}>
-                                          {uni.currentPhaseName || 'N/A'}
+                                          {uni.currentPhaseName || tr('imdb.franchise.na')}
                                       </div>
                                   </div>
                                   <div className="bg-zinc-800 px-2 py-1 rounded text-[10px] text-zinc-400 border border-zinc-700">
-                                      {uni.currentSagaName || 'N/A'}
+                                      {uni.currentSagaName || tr('imdb.franchise.na')}
                                   </div>
                               </div>
-                              <div className="mt-4 pt-4 border-t border-zinc-800 flex justify-between items-center"><div className="text-xs text-zinc-500"><span className="text-white font-bold">{rosterCount}</span> Active Heroes</div><div className="flex items-center gap-1 text-xs font-bold text-zinc-300 group-hover:text-white transition-colors">View Dossier <ArrowRight size={14}/></div></div>
+                              <div className="mt-4 pt-4 border-t border-zinc-800 flex justify-between items-center"><div className="text-xs text-zinc-500"><span className="text-white font-bold">{rosterCount}</span> {tr('imdb.franchise.activeHeroes', { count: rosterCount })}</div><div className="flex items-center gap-1 text-xs font-bold text-zinc-300 group-hover:text-white transition-colors">{tr('imdb.franchise.viewDossier')} <ArrowRight size={14}/></div></div>
                           </div>
                       </div>
                   );
@@ -602,7 +897,7 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
   const renderUniverseDetail = () => {
       if (!selectedUniverse) return null;
       const currentUniverse = normalizeUniverseForSave(player.world?.universes?.[selectedUniverse.id] || selectedUniverse, selectedUniverse.id);
-      const theme = UNIVERSE_THEMES[currentUniverse.id] || { color: 'text-white', bg: 'bg-zinc-700', icon: Globe };
+      const theme = UNIVERSE_THEMES[currentUniverse.id] || { color: 'text-white', bg: 'bg-zinc-700', border: 'border-zinc-700', icon: Globe };
       const worldMovies = (Array.isArray(player.world?.projects) ? player.world.projects : []).filter(p => p?.universeId === currentUniverse.id);
       const playerPastMovies = (Array.isArray(player.pastProjects) ? player.pastProjects : []).filter(p => p?.universeId === currentUniverse.id);
       const playerActiveMovies = (Array.isArray(player.activeReleases) ? player.activeReleases : []).filter(p => p?.projectDetails?.universeId === currentUniverse.id);
@@ -612,7 +907,7 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
       const canonProjects = [
           ...worldMovies.map(m => ({
               id: m.id,
-              title: m.title || 'Untitled Release',
+              title: m.title || tr('imdb.franchise.untitledRelease'),
               year: Number.isFinite(Number(m.year)) ? Number(m.year) : player.age,
               genre: m.genre || 'UNKNOWN',
               boxOffice: Number.isFinite(Number(m.boxOffice)) ? Number(m.boxOffice) : 0,
@@ -622,7 +917,7 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
           })),
           ...playerPastMovies.map(m => ({
               id: m.id,
-              title: m.name || 'Untitled Release',
+              title: m.name || tr('imdb.franchise.untitledRelease'),
               year: Number.isFinite(Number(m.year)) ? Number(m.year) : player.age,
               genre: m.genre || 'UNKNOWN',
               boxOffice: Number.isFinite(Number(m.gross)) ? Number(m.gross) : 0,
@@ -632,7 +927,7 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
           })),
           ...playerActiveMovies.map(m => ({
               id: m.id,
-              title: m.name || 'Untitled Release',
+              title: m.name || tr('imdb.franchise.untitledRelease'),
               year: player.age,
               genre: m.projectDetails?.genre || 'UNKNOWN',
               boxOffice: Number.isFinite(Number(m.totalGross)) ? Number(m.totalGross) : 0,
@@ -656,10 +951,10 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
       const licensingValue = lifetimeLicensing > 0
           ? formatMoney(lifetimeLicensing)
           : projectedLicensing > 0
-              ? `${formatMoney(projectedLicensing)}/wk`
+              ? tr('imdb.franchise.perWeek', { amount: formatMoney(projectedLicensing) })
               : hasLicenses
-                  ? 'Dormant'
-                  : 'No License';
+                  ? tr('imdb.franchise.dormant')
+                  : tr('imdb.franchise.noLicense');
       const fanApproval = normalizedRoster.length > 0
           ? normalizedRoster.reduce((sum, character) => sum + (character.fanApproval || 0), 0) / normalizedRoster.length
           : 0;
@@ -668,18 +963,18 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
       const timelineProjects = [
           ...worldMovies.map(movie => ({
               id: movie.id,
-              title: movie.title || 'Untitled Release',
+              title: movie.title || tr('imdb.franchise.untitledRelease'),
               year: Number.isFinite(Number(movie.year)) ? Number(movie.year) : player.age,
               type: 'MOVIE' as const,
               source: 'WORLD' as const,
-              universeSagaName: currentUniverse.currentSagaName || `Saga ${currentUniverse.saga || 1}`,
-              universePhaseName: currentUniverse.currentPhaseName || getSafeUniversePhaseLabel(currentUniverse.currentPhase)
+              universeSagaName: currentUniverse.currentSagaName || getUniverseSagaLabel(currentUniverse.saga),
+              universePhaseName: currentUniverse.currentPhaseName || getUniversePhaseLabel(currentUniverse.currentPhase)
           })),
           ...playerUniverseProjects
       ].sort((a, b) => Number(a.year || 0) - Number(b.year || 0));
       const timeline = timelineProjects.reduce((acc, project) => {
-          const sagaName = project.universeSagaName || currentUniverse.currentSagaName || 'Saga 1';
-          const phaseName = project.universePhaseName || currentUniverse.currentPhaseName || 'Phase 1';
+          const sagaName = project.universeSagaName || currentUniverse.currentSagaName || getUniverseSagaLabel(1);
+          const phaseName = project.universePhaseName || currentUniverse.currentPhaseName || getUniversePhaseLabel(1);
           if (!acc[sagaName]) acc[sagaName] = {};
           if (!acc[sagaName][phaseName]) acc[sagaName][phaseName] = [];
           acc[sagaName][phaseName].push(project);
@@ -688,20 +983,20 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
 
       return (
           <div className="space-y-6 pb-20">
-              <div className="flex items-center justify-between mb-2"><button onClick={() => setSelectedUniverse(null)} className="flex items-center gap-1 text-xs text-zinc-500 font-bold uppercase tracking-wider hover:text-white"><ArrowLeft size={12}/> All Franchises</button></div>
+              <div className="flex items-center justify-between mb-2"><button onClick={() => setSelectedUniverse(null)} className="flex items-center gap-1 text-xs text-zinc-500 font-bold uppercase tracking-wider hover:text-white"><ArrowLeft size={12}/> {tr('imdb.franchise.allFranchises')}</button></div>
               <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 relative overflow-hidden">
                   <div className={`absolute top-0 left-0 right-0 h-1 ${theme.bg}`}></div>
                   <div className="text-center">
                       <h2 className="text-3xl font-black uppercase tracking-tighter text-white mb-1">{currentUniverse.name}</h2>
-                      <div className={`text-xs font-bold uppercase tracking-widest ${theme.color} mb-2`}>{currentUniverse.currentSagaName || `Saga ${currentUniverse.saga}`}</div>
-                      <div className="text-[10px] text-zinc-500 uppercase tracking-widest mb-6">{getSafeUniversePhaseLabel(currentUniverse.currentPhase)}</div>
+                      <div className={`text-xs font-bold uppercase tracking-widest ${theme.color} mb-2`}>{currentUniverse.currentSagaName || getUniverseSagaLabel(currentUniverse.saga)}</div>
+                      <div className="text-[10px] text-zinc-500 uppercase tracking-widest mb-6">{currentUniverse.currentPhaseName || getUniversePhaseLabel(currentUniverse.currentPhase)}</div>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                       {[
-                          ['Total Gross', formatMoney(totalGross)],
-                          ['Avg IMDb', averageRating > 0 ? averageRating.toFixed(1) : '-'],
-                          ['Characters', `${normalizedRoster.length}`],
-                          ['Licensing', licensingValue]
+                          [tr('imdb.franchise.metric.totalGross'), formatMoney(totalGross)],
+                          [tr('imdb.franchise.metric.avgImdb'), averageRating > 0 ? averageRating.toFixed(1) : '-'],
+                          [tr('imdb.franchise.metric.characters'), `${normalizedRoster.length}`],
+                          [tr('imdb.franchise.metric.licensing'), licensingValue]
                       ].map(([label, value]) => (
                           <div key={label} className="bg-black/40 p-3 rounded-xl border border-zinc-800">
                               <div className="text-[10px] text-zinc-500 uppercase tracking-widest mb-1">{label}</div>
@@ -712,23 +1007,23 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
               </div>
               <div className="grid grid-cols-3 gap-2">
                   <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-3">
-                      <p className="text-[9px] text-zinc-500 uppercase tracking-widest font-bold">Fan Score</p>
+                      <p className="text-[9px] text-zinc-500 uppercase tracking-widest font-bold">{tr('imdb.franchise.fanScore')}</p>
                       <p className="text-lg font-black text-white">{fanApproval > 0 ? `${Math.round(fanApproval)}%` : '-'}</p>
                   </div>
                   <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-3">
-                      <p className="text-[9px] text-zinc-500 uppercase tracking-widest font-bold">Fan Favorite</p>
+                      <p className="text-[9px] text-zinc-500 uppercase tracking-widest font-bold">{tr('imdb.franchise.fanFavorite')}</p>
                       <p className="text-sm font-black text-white truncate">{topCharacter?.name || '-'}</p>
                   </div>
                   <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-3">
-                      <p className="text-[9px] text-zinc-500 uppercase tracking-widest font-bold">Recasts</p>
+                      <p className="text-[9px] text-zinc-500 uppercase tracking-widest font-bold">{tr('imdb.franchise.recasts')}</p>
                       <p className={`text-lg font-black ${recastCount > 0 ? 'text-amber-400' : 'text-white'}`}>{recastCount}</p>
                   </div>
               </div>
 
               <div>
-                  <h3 className="text-zinc-500 text-xs font-bold uppercase tracking-widest mb-3 pl-2">Canon Timeline</h3>
+                  <h3 className="text-zinc-500 text-xs font-bold uppercase tracking-widest mb-3 pl-2">{tr('imdb.franchise.canonTimeline')}</h3>
                   {Object.keys(timeline).length === 0 ? (
-                      <div className="text-center py-8 text-zinc-600 text-xs italic">No canon timeline recorded.</div>
+                      <div className="text-center py-8 text-zinc-600 text-xs italic">{tr('imdb.franchise.noCanonTimeline')}</div>
                   ) : (
                       <div className="space-y-4">
                           {Object.entries(timeline).map(([sagaName, phases]) => (
@@ -743,9 +1038,9 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
                                                       <div key={project.id} className="flex justify-between items-center bg-black/30 rounded-xl p-3">
                                                           <div className="min-w-0">
                                                               <p className="text-sm font-bold text-white truncate">{project.title}</p>
-                                                              <p className="text-[10px] text-zinc-500 uppercase tracking-widest">{project.year} • {project.type}</p>
+                                                              <p className="text-[10px] text-zinc-500 uppercase tracking-widest">{project.year} • {getTimelineProjectTypeLabel(project.type)}</p>
                                                           </div>
-                                                          {project.source === 'ACTIVE' && <span className="text-[8px] font-black bg-blue-500/15 text-blue-300 px-2 py-1 rounded uppercase">Filming</span>}
+                                                          {project.source === 'ACTIVE' && <span className="text-[8px] font-black bg-blue-500/15 text-blue-300 px-2 py-1 rounded uppercase">{tr('imdb.franchise.filming')}</span>}
                                                       </div>
                                                   ))}
                                               </div>
@@ -759,7 +1054,7 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
               </div>
 
               <div>
-                  <h3 className="text-zinc-500 text-xs font-bold uppercase tracking-widest mb-3 pl-2">Character Dossiers</h3>
+                  <h3 className="text-zinc-500 text-xs font-bold uppercase tracking-widest mb-3 pl-2">{tr('imdb.franchise.characterDossiers')}</h3>
                   <div className="grid grid-cols-1 gap-3">
                       {normalizedRoster.map((char) => {
                           const timeline = getCharacterTimelineParts(char);
@@ -769,28 +1064,28 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
                                       <div className="min-w-0 flex-1">
                                           <div className="font-bold text-white text-sm truncate">{char.name}</div>
                                           <div className="text-xs text-zinc-500 truncate">
-                                              Played by <span className={char.actorId === player.id || char.actorId === 'PLAYER_SELF' ? 'text-amber-400 font-bold' : 'text-zinc-300'}>{char.actorId === player.id || char.actorId === 'PLAYER_SELF' ? 'YOU' : char.actorName}</span>
+                                              {tr('imdb.franchise.playedBy', { actor: '' })}<span className={char.actorId === player.id || char.actorId === 'PLAYER_SELF' ? 'text-amber-400 font-bold' : 'text-zinc-300'}>{char.actorId === player.id || char.actorId === 'PLAYER_SELF' ? tr('imdb.franchise.you') : char.actorName}</span>
                                           </div>
                                       </div>
-                                      <div className={`shrink-0 text-[10px] font-bold px-2 py-1 rounded uppercase ${char.status === 'ACTIVE' ? 'bg-emerald-900/30 text-emerald-500' : char.status === 'RECAST' ? 'bg-amber-500/15 text-amber-300' : 'bg-zinc-800 text-zinc-500'}`}>{char.status}</div>
+                                      <div className={`shrink-0 text-[10px] font-bold px-2 py-1 rounded uppercase ${char.status === 'ACTIVE' ? 'bg-emerald-900/30 text-emerald-500' : char.status === 'RECAST' ? 'bg-amber-500/15 text-amber-300' : 'bg-zinc-800 text-zinc-500'}`}>{getCharacterStatusLabel(char.status)}</div>
                                   </div>
                                   <div className="mt-3 grid grid-cols-1 gap-1.5 text-[10px] uppercase tracking-widest">
                                       <div className="flex gap-2 min-w-0">
-                                          <span className="text-zinc-600 shrink-0">First</span>
-                                          <span className="text-zinc-400 truncate">{timeline.first || 'Not introduced yet'}</span>
+                                          <span className="text-zinc-600 shrink-0">{tr('imdb.franchise.first')}</span>
+                                          <span className="text-zinc-400 truncate">{timeline.first || tr('imdb.franchise.notIntroduced')}</span>
                                       </div>
                                       <div className="flex gap-2 min-w-0">
-                                          <span className="text-zinc-600 shrink-0">Latest</span>
-                                          <span className="text-zinc-400 truncate">{timeline.latest || timeline.first || 'No release yet'}</span>
+                                          <span className="text-zinc-600 shrink-0">{tr('imdb.franchise.latest')}</span>
+                                          <span className="text-zinc-400 truncate">{timeline.latest || timeline.first || tr('imdb.franchise.noRelease')}</span>
                                       </div>
                                   </div>
                                   <div className="grid grid-cols-2 gap-3 mt-3">
                                       <div className="bg-black/30 rounded-xl p-2">
-                                          <p className="text-[9px] text-zinc-500 uppercase tracking-widest">Approval</p>
+                                          <p className="text-[9px] text-zinc-500 uppercase tracking-widest">{tr('imdb.franchise.approval')}</p>
                                           <p className="text-sm font-black text-white">{Math.round(char.fanApproval || 0)}%</p>
                                       </div>
                                       <div className="bg-black/30 rounded-xl p-2">
-                                          <p className="text-[9px] text-zinc-500 uppercase tracking-widest">Appearances</p>
+                                          <p className="text-[9px] text-zinc-500 uppercase tracking-widest">{tr('imdb.franchise.appearances')}</p>
                                           <p className="text-sm font-black text-white">{Math.max(0, char.appearances || 0)}</p>
                                       </div>
                                   </div>
@@ -799,7 +1094,7 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
                       })}
                   </div>
               </div>
-              <div><h3 className="text-zinc-500 text-xs font-bold uppercase tracking-widest mb-3 pl-2">Recent Releases</h3><div className="space-y-3">{recentMovies.length === 0 ? (<div className="text-center py-8 text-zinc-600 text-xs italic">No recent releases recorded.</div>) : (recentMovies.map(movie => (<div key={movie.id} className="bg-zinc-900 p-4 rounded-xl border border-zinc-800 flex justify-between items-center"><div><div className="font-bold text-white text-sm flex items-center gap-2">{movie.title} {movie.isPlayer && <span className="bg-amber-500/20 text-amber-500 text-[8px] px-1 rounded">YOU</span>}</div><div className="text-xs text-zinc-500">{movie.year} • {movie.genre}</div></div><div className={`font-mono text-xs font-bold ${movie.boxOffice > 500000000 ? 'text-emerald-400' : 'text-zinc-400'}`}>${(Math.max(0, movie.boxOffice) / 1000000).toFixed(0)}M</div></div>)))}</div></div>
+              <div><h3 className="text-zinc-500 text-xs font-bold uppercase tracking-widest mb-3 pl-2">{tr('imdb.franchise.recentReleases')}</h3><div className="space-y-3">{recentMovies.length === 0 ? (<div className="text-center py-8 text-zinc-600 text-xs italic">{tr('imdb.franchise.noRecentReleases')}</div>) : (recentMovies.map(movie => (<div key={movie.id} className="bg-zinc-900 p-4 rounded-xl border border-zinc-800 flex justify-between items-center"><div><div className="font-bold text-white text-sm flex items-center gap-2">{movie.title} {movie.isPlayer && <span className="bg-amber-500/20 text-amber-500 text-[8px] px-1 rounded">{tr('imdb.franchise.you')}</span>}</div><div className="text-xs text-zinc-500">{movie.year} • {movie.genre}</div></div><div className={`font-mono text-xs font-bold ${movie.boxOffice > 500000000 ? 'text-emerald-400' : 'text-zinc-400'}`}>${(Math.max(0, movie.boxOffice) / 1000000).toFixed(0)}M</div></div>)))}</div></div>
           </div>
       );
   };
@@ -822,16 +1117,29 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
         .slice(0, 2)
         .join(', ') || '';
     const selectedInvestorOwnerExtra = Math.max(0, (selectedInvestorPlan?.commitments?.filter((item: any) => item.ownerName).length || 0) - 2);
-    const selectedInvestorScopeLabel = selectedProject.mediaType === 'SERIES' ? 'Season-only cap table' : 'Project-only cap table';
+    const selectedInvestorScopeLabel = selectedProject.mediaType === 'SERIES' ? tr('imdb.project.investor.scopeSeason') : tr('imdb.project.investor.scopeProject');
     const selectedInvestorPayoutTotal = Math.max(0, Number(selectedInvestorPayouts?.lifetimeInvestorPayout || 0));
     const selectedProjectMusicMoments = (player.world.musicIndustry?.cultureMoments || [])
         .filter(moment => moment.projectTitle === selectedProject.name)
         .slice(0, 2);
-    const selectedProjectMusicRisk = selectedProjectMusicImpact
-        ? Math.max(selectedProjectMusicImpact.controversyRisk, selectedProjectMusicImpact.mismatchBacklashRisk)
-        : 0;
-    const returnStatusMeta = getReturnStatusMeta(futurePotential?.playerReturnStatus);
-     return (
+	    const selectedProjectMusicRisk = selectedProjectMusicImpact
+	        ? Math.max(selectedProjectMusicImpact.controversyRisk, selectedProjectMusicImpact.mismatchBacklashRisk)
+	        : 0;
+	    const returnStatusMeta = getReturnStatusMeta(futurePotential?.playerReturnStatus);
+	    const selectedProjectSeriesKey = selectedProject.mediaType === 'SERIES' ? getDisplayProjectSeriesKey(selectedProject) : '';
+	    const selectedProjectEpisodeRatings = selectedProject.mediaType === 'SERIES'
+	        ? fullList
+	            .filter(project => project.mediaType === 'SERIES' && getDisplayProjectSeriesKey(project) === selectedProjectSeriesKey)
+	            .flatMap(project => project.episodeRatings || [])
+	            .filter((season, index, seasons) => seasons.findIndex(item => item.season === season.season) === index)
+	            .sort((a, b) => a.season - b.season)
+	        : [];
+        const selectedAudienceReception = selectedProject.audienceReception || buildDisplayAudienceReception(selectedProject);
+        const selectedCriticReviews = getDisplayCriticReviews(
+            selectedProject,
+            (selectedProject.reviews || []).filter(review => review.type !== 'AUDIENCE' && review.publication !== 'IMDb Audience Pulse')
+        );
+	     return (
         <div className="absolute inset-0 bg-zinc-950 flex flex-col z-50 text-white animate-in slide-in-from-right duration-300">
             <div className="bg-zinc-900 p-4 pt-12 pb-3 shadow-lg flex items-center gap-3 border-b border-zinc-800">
                 <button onClick={() => setSelectedProject(null)} className="p-1 rounded-full hover:bg-white/10"><ArrowLeft size={20}/></button>
@@ -843,27 +1151,27 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
                 {/* Hero Section */}
                 {(() => {
                     const customPoster = selectedProject.customPoster;
-                    if (customPoster?.type === 'IMAGE' && customPoster.imageData) {
+                    if (hasCustomPosterMedia(customPoster)) {
                         return (
-                            <div className="relative h-48 bg-zinc-900 overflow-hidden">
-                                <img src={customPoster.imageData} alt={selectedProject.name} className="absolute inset-0 w-full h-full object-cover" />
-                                <div className="absolute bottom-0 left-0 p-4 w-full bg-gradient-to-t from-zinc-950 via-zinc-950/80 to-transparent z-10">
-                                    <h1 className="text-2xl font-bold leading-tight mb-1">{selectedProject.name}</h1>
-                                    <div className="flex items-center gap-3 text-xs text-zinc-400 mb-2">
+                            <div className="relative min-h-[230px] bg-zinc-900 overflow-hidden">
+                                <CustomPosterImage poster={customPoster} alt={selectedProject.name} className="absolute inset-0 w-full h-full object-cover" />
+                                <div className="absolute bottom-0 left-0 p-4 w-full bg-gradient-to-t from-zinc-950 via-zinc-950/85 to-transparent z-10">
+                                    <h1 className="text-[26px] font-black leading-[1.02] mb-2">{selectedProject.name}</h1>
+                                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-400 mb-2">
                                         <span>{selectedProject.releaseDetailLabel}</span>
                                         <span>•</span>
                                         <span className="bg-zinc-800 border border-zinc-700 px-1.5 rounded text-[10px]">PG-13</span>
                                         <span>•</span>
                                         <span className="flex items-center gap-1">
                                             {selectedProject.mediaType === 'SERIES' ? <Tv size={10}/> : <Film size={10}/>}
-                                            {selectedProject.mediaType === 'SERIES' ? 'TV Series' : 'Movie'}
+                                            {getProjectMediaTypeLabel(selectedProject.mediaType)}
                                         </span>
-                                        <span className="truncate">{selectedProject.identityLabel}</span>
+                                        <span>{selectedProject.identityLabel}</span>
                                     </div>
                                     <div className="flex items-center gap-4">
                                         <div className="flex items-center gap-1.5">
                                             <Star size={20} className="text-yellow-400 fill-yellow-400" />
-                                            <span className="text-xl font-bold text-white">{selectedProject.rating > 0 ? selectedProject.rating.toFixed(1) : 'TBD'}</span>
+                                            <span className="text-xl font-bold text-white">{selectedProject.rating > 0 ? selectedProject.rating.toFixed(1) : tr('imdb.project.ratingTbd')}</span>
                                             <span className="text-xs text-zinc-500">/10</span>
                                         </div>
                                     </div>
@@ -876,29 +1184,29 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
                     const textColor = customPoster?.type === 'CONFIG' && customPoster.textColor ? customPoster.textColor : 'text-white';
                     
                     return (
-                        <div className={`relative h-48 bg-gradient-to-br ${bgClass} overflow-hidden`}>
+                        <div className={`relative min-h-[230px] bg-gradient-to-br ${bgClass} overflow-hidden`}>
                             <div className="absolute inset-0 flex items-center justify-center p-4">
                                 <div className={`text-center font-serif font-black ${textColor} opacity-20 text-5xl leading-none uppercase tracking-tighter transform -rotate-6 scale-125 mix-blend-overlay`}>
                                     {selectedProject.name}
                                 </div>
                             </div>
-                            <div className="absolute bottom-0 left-0 p-4 w-full bg-gradient-to-t from-zinc-950 via-zinc-950/80 to-transparent z-10">
-                                <h1 className="text-2xl font-bold leading-tight mb-1">{selectedProject.name}</h1>
-                                <div className="flex items-center gap-3 text-xs text-zinc-400 mb-2">
+                            <div className="absolute bottom-0 left-0 p-4 w-full bg-gradient-to-t from-zinc-950 via-zinc-950/85 to-transparent z-10">
+                                <h1 className="text-[26px] font-black leading-[1.02] mb-2">{selectedProject.name}</h1>
+                                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-400 mb-2">
                                     <span>{selectedProject.releaseDetailLabel}</span>
                                     <span>•</span>
                                     <span className="bg-zinc-800 border border-zinc-700 px-1.5 rounded text-[10px]">PG-13</span>
                                     <span>•</span>
                                     <span className="flex items-center gap-1">
                                         {selectedProject.mediaType === 'SERIES' ? <Tv size={10}/> : <Film size={10}/>}
-                                        {selectedProject.mediaType === 'SERIES' ? 'TV Series' : 'Movie'}
+                                        {getProjectMediaTypeLabel(selectedProject.mediaType)}
                                     </span>
-                                    <span className="truncate">{selectedProject.identityLabel}</span>
+                                    <span>{selectedProject.identityLabel}</span>
                                 </div>
                                 <div className="flex items-center gap-4">
                                     <div className="flex items-center gap-1.5">
                                         <Star size={20} className="text-yellow-400 fill-yellow-400" />
-                                        <span className="text-xl font-bold text-white">{selectedProject.rating > 0 ? selectedProject.rating.toFixed(1) : 'TBD'}</span>
+                                        <span className="text-xl font-bold text-white">{selectedProject.rating > 0 ? selectedProject.rating.toFixed(1) : tr('imdb.project.ratingTbd')}</span>
                                         <span className="text-xs text-zinc-500">/10</span>
                                     </div>
                                 </div>
@@ -914,7 +1222,7 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
                             <div key={award.id} className="flex items-center gap-1.5 shrink-0 bg-black/40 px-2 py-1 rounded-lg border border-amber-500/30">
                                 <AwardIcon size={12} className="text-amber-400"/>
                                 <div className="text-xs">
-                                    <span className="text-amber-200 font-bold">{award.outcome === 'WON' ? 'Winner' : 'Nominee'}</span>
+                                    <span className="text-amber-200 font-bold">{award.outcome === 'WON' ? tr('imdb.awards.result.winner') : tr('imdb.awards.result.nominee')}</span>
                                     <span className="text-amber-500/50 mx-1">•</span>
                                     <span className="text-zinc-300">{award.name}</span>
                                 </div>
@@ -924,25 +1232,84 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
                 )}
 
                 {/* Plot */}
-                <div className="p-4 border-b border-zinc-800">
-                    <p className="text-sm text-zinc-300 leading-relaxed">
-                        {selectedProject.description || "A captivating story about ambition, betrayal, and the cost of dreams in a world that never sleeps."}
-                    </p>
-                </div>
+	                <div className="p-4 border-b border-zinc-800">
+	                    <p className="text-sm text-zinc-300 leading-relaxed">
+	                        {getDisplayProjectDescription(selectedProject)}
+	                    </p>
+	                </div>
 
-                {selectedProject.musicPlan?.credits?.length ? (
+                {selectedAudienceReception && (
+                    <div className="px-3 py-2 border-b border-zinc-800 bg-gradient-to-br from-yellow-950/10 via-zinc-950 to-zinc-950">
+                        <div className="rounded-2xl border border-yellow-400/20 bg-black/35 p-3">
+                            <div className="flex items-center justify-between gap-3">
+                                <div className="min-w-0">
+                                    <div className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.2em] text-yellow-300">
+                                        <MessageSquare size={12} className="shrink-0"/> Audience Score
+                                    </div>
+                                    <div className="mt-0.5 truncate text-lg font-black text-white">{selectedAudienceReception.label}</div>
+                                </div>
+                                <div className="shrink-0 rounded-xl border border-white/10 bg-white text-black px-3 py-1.5 text-center">
+                                    <div className="text-[8px] font-black uppercase tracking-widest text-zinc-500">{selectedAudienceReception.isFinal ? 'Final' : 'Live'}</div>
+                                    <div className="text-lg font-black leading-none">{selectedAudienceReception.currentScore}</div>
+                                </div>
+                            </div>
+                            <div className="mt-2 grid grid-cols-3 gap-1.5">
+                                <div className="rounded-lg bg-zinc-950/80 p-2">
+                                    <div className="text-[8px] font-black uppercase tracking-widest text-zinc-500">Opening</div>
+                                    <div className="text-sm font-black text-zinc-100">{selectedAudienceReception.openingScore}/100</div>
+                                </div>
+                                <div className="rounded-lg bg-zinc-950/80 p-2">
+                                    <div className="text-[8px] font-black uppercase tracking-widest text-zinc-500">Trend</div>
+                                    <div className={`text-sm font-black ${
+                                        selectedAudienceReception.trend === 'RISING'
+                                            ? 'text-emerald-300'
+                                            : selectedAudienceReception.trend === 'FALLING'
+                                                ? 'text-rose-300'
+                                                : 'text-cyan-200'
+                                    }`}>
+                                        {selectedAudienceReception.trend}
+                                    </div>
+                                </div>
+                                <div className="rounded-lg bg-zinc-950/80 p-2">
+                                    <div className="text-[8px] font-black uppercase tracking-widest text-zinc-500">Votes</div>
+                                    <div className="text-sm font-black text-zinc-100">{formatViews(selectedAudienceReception.sampleSize)}</div>
+                                </div>
+                            </div>
+                            <p className="mt-2 text-[11px] font-semibold leading-relaxed text-zinc-400">
+                                {selectedAudienceReception.summary}
+                            </p>
+                        </div>
+                    </div>
+                )}
+
+	                {selectedProject.mediaType === 'SERIES' && (
+	                    selectedProjectEpisodeRatings.length > 0 ? (
+	                        <EpisodeRatingsHeatmap ratings={selectedProjectEpisodeRatings} tr={tr} />
+	                    ) : (
+	                        <div className="p-4 border-b border-zinc-800 bg-zinc-950">
+	                            <h3 className="text-white font-bold text-sm flex items-center gap-2">
+	                                <LayoutGrid size={16} className="text-emerald-400"/> {tr('imdb.project.episodeRatings')}
+	                            </h3>
+	                            <div className="mt-3 rounded-xl border border-zinc-800 bg-zinc-900/50 p-3 text-xs font-semibold text-zinc-500">
+	                                {tr('imdb.project.noEpisodeRatings')}
+	                            </div>
+	                        </div>
+	                    )
+	                )}
+
+	                {selectedProject.musicPlan?.credits?.length ? (
                     <div className="px-4 py-3 border-b border-zinc-800 bg-gradient-to-br from-cyan-950/20 via-zinc-950 to-zinc-950">
                         <div className="flex items-center justify-between gap-3">
                             <div className="min-w-0">
                                 <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.22em] text-cyan-200">
-                                    <Music2 size={13} className="shrink-0"/> Soundtrack Desk
+                                    <Music2 size={13} className="shrink-0"/> {tr('imdb.project.soundtrackDesk')}
                                 </div>
                                 <div className="mt-1 truncate text-sm font-black text-white">
                                     {getMusicStrategyLabel(selectedProject.musicPlan.strategy)}
                                 </div>
                             </div>
                             <div className="shrink-0 rounded-2xl border border-cyan-300/20 bg-black/35 px-3 py-2 text-right">
-                                <div className="text-[8px] font-black uppercase tracking-widest text-zinc-500">Revenue</div>
+                                <div className="text-[8px] font-black uppercase tracking-widest text-zinc-500">{tr('imdb.project.revenue')}</div>
                                 <div className="text-xs font-black text-emerald-300">{formatMoney(selectedProjectSoundtrackRevenue)}</div>
                             </div>
                         </div>
@@ -962,19 +1329,19 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
                         {selectedProjectMusicImpact && selectedProjectMusicImpact.score > 0 && (
                             <div className="mt-3 grid grid-cols-4 gap-2">
                                 <div className="rounded-xl bg-black/35 p-2 text-center">
-                                    <div className="text-[8px] uppercase tracking-widest text-zinc-500">Open</div>
+                                    <div className="text-[8px] uppercase tracking-widest text-zinc-500">{tr('imdb.project.music.open')}</div>
                                     <div className="text-xs font-black text-emerald-300">+{selectedProjectMusicImpact.openingWeekendLiftPct}%</div>
                                 </div>
                                 <div className="rounded-xl bg-black/35 p-2 text-center">
-                                    <div className="text-[8px] uppercase tracking-widest text-zinc-500">Reach</div>
+                                    <div className="text-[8px] uppercase tracking-widest text-zinc-500">{tr('imdb.project.music.reach')}</div>
                                     <div className="text-xs font-black text-cyan-200">+{selectedProjectMusicImpact.audienceReachLiftPct}%</div>
                                 </div>
                                 <div className="rounded-xl bg-black/35 p-2 text-center">
-                                    <div className="text-[8px] uppercase tracking-widest text-zinc-500">Awards</div>
+                                    <div className="text-[8px] uppercase tracking-widest text-zinc-500">{tr('imdb.project.music.awards')}</div>
                                     <div className="text-xs font-black text-violet-200">+{selectedProjectMusicImpact.awardChanceLift}</div>
                                 </div>
                                 <div className="rounded-xl bg-black/35 p-2 text-center">
-                                    <div className="text-[8px] uppercase tracking-widest text-zinc-500">Risk</div>
+                                    <div className="text-[8px] uppercase tracking-widest text-zinc-500">{tr('imdb.project.music.risk')}</div>
                                     <div className={`text-xs font-black ${selectedProjectMusicRisk >= 38 ? 'text-amber-300' : 'text-zinc-300'}`}>{selectedProjectMusicRisk}</div>
                                 </div>
                             </div>
@@ -998,38 +1365,38 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
                         <div className="flex items-center justify-between gap-3">
                             <div className="min-w-0">
                                 <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.22em] text-emerald-200">
-                                    <Handshake size={13} className="shrink-0"/> Investor Funding
+                                    <Handshake size={13} className="shrink-0"/> {tr('imdb.project.investorFunding')}
                                 </div>
                                 <div className="mt-1 truncate text-sm font-black text-white">
                                     {selectedInvestorNames}{selectedInvestorExtra > 0 ? ` +${selectedInvestorExtra}` : ''}
                                 </div>
                                 {selectedInvestorOwnerNames && (
                                     <div className="mt-1 truncate text-[10px] font-bold uppercase tracking-widest text-emerald-100/55">
-                                        Owners: {selectedInvestorOwnerNames}{selectedInvestorOwnerExtra > 0 ? ` +${selectedInvestorOwnerExtra}` : ''}
+                                        {tr('imdb.project.investor.owners', { owners: selectedInvestorOwnerNames })}{selectedInvestorOwnerExtra > 0 ? ` +${selectedInvestorOwnerExtra}` : ''}
                                     </div>
                                 )}
                             </div>
                             <div className="shrink-0 rounded-2xl border border-emerald-300/20 bg-black/35 px-3 py-2 text-right">
-                                <div className="text-[8px] font-black uppercase tracking-widest text-zinc-500">Studio Keeps</div>
+                                <div className="text-[8px] font-black uppercase tracking-widest text-zinc-500">{tr('imdb.project.investor.studioKeeps')}</div>
                                 <div className="text-xs font-black text-emerald-300">{selectedInvestorPlan.studioEquityPercent}%</div>
                             </div>
                         </div>
                         <div className="mt-3 grid grid-cols-3 gap-2">
                             <div className="rounded-xl bg-black/35 p-2 text-center">
-                                <div className="text-[8px] uppercase tracking-widest text-zinc-500">Raised</div>
+                                <div className="text-[8px] uppercase tracking-widest text-zinc-500">{tr('imdb.project.investor.raised')}</div>
                                 <div className="text-xs font-black text-emerald-300">{formatMoney(selectedInvestorPlan.totalRaised)}</div>
                             </div>
                             <div className="rounded-xl bg-black/35 p-2 text-center">
-                                <div className="text-[8px] uppercase tracking-widest text-zinc-500">Investor Cut</div>
+                                <div className="text-[8px] uppercase tracking-widest text-zinc-500">{tr('imdb.project.investor.cut')}</div>
                                 <div className="text-xs font-black text-cyan-200">{selectedInvestorPlan.investorEquityPercent}%</div>
                             </div>
                             <div className="rounded-xl bg-black/35 p-2 text-center">
-                                <div className="text-[8px] uppercase tracking-widest text-zinc-500">Paid Out</div>
+                                <div className="text-[8px] uppercase tracking-widest text-zinc-500">{tr('imdb.project.investor.paidOut')}</div>
                                 <div className="text-xs font-black text-zinc-200">{formatMoney(selectedInvestorPayoutTotal)}</div>
                             </div>
                         </div>
                         <div className="mt-3 text-xs font-bold text-zinc-400">
-                            {selectedInvestorScopeLabel}; sequels or later seasons need fresh financing.
+                            {tr('imdb.project.investor.freshFinancing', { scope: selectedInvestorScopeLabel })}
                         </div>
                     </div>
                 )}
@@ -1037,24 +1404,24 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
                 {returnStatusMeta && (
                     <div className="p-4 border-b border-zinc-800 bg-zinc-900/40">
                         <h3 className="text-white font-bold text-sm mb-3 flex items-center gap-2">
-                            <Clock size={16} className="text-zinc-400"/> Franchise Status
+                            <Clock size={16} className="text-zinc-400"/> {tr('imdb.project.franchiseStatus')}
                         </h3>
                         <div className={`rounded-2xl border p-4 ${returnStatusMeta.tone}`}>
                             <div className="flex items-center justify-between gap-3 mb-2">
                                 <div className="text-[10px] uppercase tracking-[0.28em] text-zinc-400">
-                                    {selectedProject.mediaType === 'SERIES' ? 'Season Outcome' : 'Sequel Outcome'}
+                                    {selectedProject.mediaType === 'SERIES' ? tr('imdb.project.seasonOutcome') : tr('imdb.project.sequelOutcome')}
                                 </div>
                                 <div className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] ${returnStatusMeta.chip}`}>
-                                    {returnStatusMeta.label}
+                                    {getReturnStatusLabel(returnStatusMeta.labelKey)}
                                 </div>
                             </div>
                             <div className="text-sm leading-relaxed">
                                 {futurePotential?.returnStatusNote || (
                                     futurePotential?.playerReturnStatus === 'RETURNING'
-                                        ? 'You are attached to the continuation.'
+                                        ? tr('imdb.project.returnNote.returning')
                                         : futurePotential?.playerReturnStatus === 'KILLED_OFF'
-                                            ? 'The story continues after your character is killed off.'
-                                            : 'The story continues without your character.'
+                                            ? tr('imdb.project.returnNote.killedOff')
+                                            : tr('imdb.project.returnNote.writtenOff')
                                 )}
                             </div>
                         </div>
@@ -1065,12 +1432,12 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
                 {selectedProject.cast && selectedProject.cast.length > 0 && (
                     <div className="p-4 border-b border-zinc-800">
                         <h3 className="text-white font-bold text-sm mb-3 flex items-center gap-2">
-                            <Users size={16} className="text-zinc-400"/> Top Cast
+                            <Users size={16} className="text-zinc-400"/> {tr('imdb.project.topCast')}
                         </h3>
                         <div className="space-y-3">
                             {selectedProject.cast.slice(0, 5).map((member, index) => {
-                                const actorName = member.name || member.actorName || 'Unknown Actor';
-                                const characterLabel = `as ${member.characterName || getFallbackCharacterName(member, selectedProject.name, index)}`;
+                                const actorName = member.name || member.actorName || tr('imdb.project.unknownActor');
+                                const characterLabel = tr('imdb.project.asCharacter', { character: member.characterName || getFallbackCharacterName(member, selectedProject.name, index) });
                                 const actorImage = member.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(actorName)}&background=27272a&color=ffffff`;
                                 const isPlayerCast = member.isPlayer || member.actorId === 'PLAYER_SELF';
 
@@ -1083,7 +1450,7 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
                                             <div className="text-xs text-zinc-500">{characterLabel}</div>
                                         </div>
                                     </div>
-                                    {isPlayerCast && <div className="text-[9px] font-bold bg-zinc-800 px-2 py-0.5 rounded text-zinc-400">YOU</div>}
+                                    {isPlayerCast && <div className="text-[9px] font-bold bg-zinc-800 px-2 py-0.5 rounded text-zinc-400">{tr('imdb.franchise.you')}</div>}
                                 </div>
                                 );
                             })}
@@ -1093,11 +1460,11 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
 
                 {/* Box Office / Stats */}
                 <div className="p-4 border-b border-zinc-800 bg-zinc-900/50">
-                    <h3 className="text-white font-bold text-sm mb-3 flex items-center gap-2"><TrendingUp size={16} className="text-emerald-500"/> Box Office & Tech Specs</h3>
+                    <h3 className="text-white font-bold text-sm mb-3 flex items-center gap-2"><TrendingUp size={16} className="text-emerald-500"/> {tr('imdb.project.techSpecs')}</h3>
                     <div className="grid grid-cols-2 gap-y-4 gap-x-2 text-sm">
-                        <div><div className="text-zinc-500 text-xs">Budget</div><div className="text-zinc-300 font-mono">{formatMoney(selectedProject.budget)}</div></div>
-                        <div><div className="text-zinc-500 text-xs">Gross Worldwide</div><div className={`font-mono font-bold ${(selectedProject.gross || 0) > (selectedProject.budget || 0) ? 'text-emerald-400' : 'text-zinc-300'}`}>{formatMoney(selectedProject.gross)}</div></div>
-                        {selectedProject.streamingViews && (<div><div className="text-zinc-500 text-xs">Streaming Views</div><div className="text-indigo-400 font-mono font-bold">{formatViews(selectedProject.streamingViews)}</div></div>)}
+                        <div><div className="text-zinc-500 text-xs">{tr('imdb.project.budget')}</div><div className="text-zinc-300 font-mono">{formatMoney(selectedProject.budget)}</div></div>
+                        <div><div className="text-zinc-500 text-xs">{tr('imdb.project.grossWorldwide')}</div><div className={`font-mono font-bold ${(selectedProject.gross || 0) > (selectedProject.budget || 0) ? 'text-emerald-400' : 'text-zinc-300'}`}>{formatMoney(selectedProject.gross)}</div></div>
+                        {(selectedProject.streamingViews || 0) > 0 && (<div><div className="text-zinc-500 text-xs">{tr('imdb.project.streamingViews')}</div><div className="text-indigo-400 font-mono font-bold">{formatViews(selectedProject.streamingViews)}</div></div>)}
                     </div>
                 </div>
 
@@ -1113,7 +1480,7 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
                             <div className={`reality-tone rounded-2xl border p-4 ${realityTone}`}>
                                 <div className="flex items-start justify-between gap-3 mb-3">
                                     <div>
-                                        <div className="text-[10px] uppercase tracking-[0.24em] text-zinc-500 font-black mb-1">Campaign Reality</div>
+                                        <div className="text-[10px] uppercase tracking-[0.24em] text-zinc-500 font-black mb-1">{tr('imdb.project.campaignReality')}</div>
                                         <div className="text-xl font-black text-white">{reality.label}</div>
                                     </div>
                                     <div className="rounded-full border border-white/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em]">
@@ -1123,15 +1490,15 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
                                 <p className="text-sm leading-relaxed text-zinc-300 mb-4">{reality.summary}</p>
                                 <div className="grid grid-cols-2 gap-2 text-xs">
                                     <div className="rounded-xl bg-black/30 border border-white/10 p-3">
-                                        <div className="text-[9px] uppercase tracking-[0.18em] text-zinc-500 font-black mb-1">Promise</div>
+                                        <div className="text-[9px] uppercase tracking-[0.18em] text-zinc-500 font-black mb-1">{tr('imdb.project.promise')}</div>
                                         <div className="font-bold text-white">{reality.promised}</div>
                                     </div>
                                     <div className="rounded-xl bg-black/30 border border-white/10 p-3">
-                                        <div className="text-[9px] uppercase tracking-[0.18em] text-zinc-500 font-black mb-1">Audience Read</div>
+                                        <div className="text-[9px] uppercase tracking-[0.18em] text-zinc-500 font-black mb-1">{tr('imdb.project.audienceRead')}</div>
                                         <div className="font-bold text-white">{reality.audienceScore}/100</div>
                                     </div>
                                     <div className="col-span-2 rounded-xl bg-black/30 border border-white/10 p-3">
-                                        <div className="text-[9px] uppercase tracking-[0.18em] text-zinc-500 font-black mb-1">Forecast Shift</div>
+                                        <div className="text-[9px] uppercase tracking-[0.18em] text-zinc-500 font-black mb-1">{tr('imdb.project.forecastShift')}</div>
                                         <div className="text-zinc-300 leading-relaxed">{reality.forecastShift}</div>
                                     </div>
                                 </div>
@@ -1141,28 +1508,33 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
                 })()}
 
                 {/* Reviews */}
-                {selectedProject.reviews && selectedProject.reviews.length > 0 && (
-                    <div className="p-4 space-y-4 pb-20">
-                        <h3 className="text-white font-bold text-sm flex items-center gap-2">
-                            <MessageSquare size={16} className="text-blue-400"/> Critic Reviews
-                        </h3>
-                        <div className="space-y-3">
-                            {selectedProject.reviews.map((review) => (
-                                <div key={review.id} className="bg-zinc-900 p-3 rounded-xl border border-zinc-800">
-                                    <div className="flex justify-between items-start mb-2">
-                                        <div className="flex items-center gap-2">
-                                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                {selectedCriticReviews.length > 0 && (
+                    <div className="px-3 py-4 space-y-3 pb-20 border-t border-zinc-800 bg-zinc-950">
+                        <div className="flex items-center justify-between gap-3">
+                            <h3 className="text-white font-black text-sm flex items-center gap-2">
+                                <MessageSquare size={15} className="text-blue-400"/> {tr('imdb.project.criticReviews')}
+                            </h3>
+                            <div className="rounded-full border border-zinc-700 px-2 py-1 text-[9px] font-black uppercase tracking-widest text-zinc-400">
+                                {selectedCriticReviews.length} Critics
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-1 gap-2">
+                            {selectedCriticReviews.map((review) => (
+                                <div key={review.id} className="bg-zinc-900/80 px-3 py-2.5 rounded-xl border border-zinc-800">
+                                    <div className="flex justify-between items-center gap-2 mb-1.5">
+                                        <div className="flex items-center gap-1.5 min-w-0">
+                                            <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider ${
                                                 review.sentiment === 'POSITIVE' ? 'bg-emerald-900/30 text-emerald-400' : 
                                                 review.sentiment === 'NEGATIVE' ? 'bg-rose-900/30 text-rose-400' : 'bg-yellow-900/30 text-yellow-400'
                                             }`}>
                                                 {review.sentiment}
                                             </span>
-                                            <span className="text-[10px] text-zinc-500 uppercase font-bold">{review.publication}</span>
+                                            <span className="truncate text-[9px] text-zinc-500 uppercase font-black tracking-wider">{review.publication}</span>
                                         </div>
-                                        {review.rating && <div className="text-xs font-bold text-zinc-400 flex items-center gap-1"><Star size={10} className="fill-zinc-400"/> {review.rating}/5</div>}
+                                        {review.rating && <div className="shrink-0 text-[10px] font-bold text-zinc-400 flex items-center gap-1"><Star size={9} className="fill-zinc-400"/> {review.rating}/5</div>}
                                     </div>
-                                    <p className="text-sm text-zinc-300 italic leading-relaxed">"{review.text}"</p>
-                                    <div className="text-[10px] text-zinc-600 mt-2 text-right font-serif">- {review.author}</div>
+                                    <p className="line-clamp-2 text-[12px] text-zinc-300 italic leading-snug">"{review.text}"</p>
+                                    <div className="mt-1 text-[9px] text-zinc-600 text-right font-bold">- {review.author}</div>
                                 </div>
                             ))}
                         </div>
@@ -1186,46 +1558,72 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
              
              {/* PROFILE TAB */}
              {activeTab === 'PROFILE' && (
-                 <>
-                    <div className="p-6 bg-zinc-800 border-b border-zinc-700">
-                        <div className="flex gap-4">
-                            <div className="relative">
-                                <img src={player.avatar} className="w-20 h-20 rounded-full object-cover border-2 border-yellow-400" />
-                                <div className="absolute -bottom-2 -right-2 bg-black text-white text-[10px] font-bold px-2 py-0.5 rounded-full border border-zinc-700">#{imdbRank}</div>
+                 <div className="p-4 space-y-4 pb-6">
+                    <div className="relative overflow-hidden rounded-3xl border border-yellow-400/25 bg-gradient-to-br from-zinc-900 via-zinc-950 to-black p-4 shadow-[0_24px_70px_rgba(0,0,0,0.35)]">
+                        <div className="pointer-events-none absolute -right-8 -top-10 text-[82px] font-black tracking-tighter text-yellow-400/5">IMDb</div>
+                        <div className="flex items-center gap-3.5">
+                            <div className="relative shrink-0">
+                                <img src={player.avatar} className="h-[74px] w-[74px] rounded-2xl object-cover border-2 border-yellow-400 bg-zinc-900 shadow-[0_0_24px_rgba(250,204,21,0.18)]" />
+                                <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 rounded-full border border-zinc-800 bg-black px-2.5 py-1 text-[10px] font-black text-white">#{imdbRank}</div>
                             </div>
-                            <div>
-                                <h2 className="text-2xl font-bold">{player.name}</h2>
-                                <div className="text-sm text-zinc-400">Actor | Producer</div>
-                                {knownFor && <div className="text-xs text-zinc-500 mt-2">Known for <span className="text-zinc-300 font-medium">{knownFor.name}</span></div>}
-                            </div>
-                        </div>
-                        {/* Awards & Score Dashboard */}
-                        <div className="grid grid-cols-3 gap-2 mt-6">
-                            <div className="bg-zinc-900/50 p-2.5 rounded-xl border border-zinc-700/50 text-center">
-                                <div className="text-[9px] text-zinc-500 uppercase font-bold tracking-wider mb-1">Total Gross</div>
-                                <div className="font-mono text-emerald-400 font-bold text-sm truncate">{formatMoney(totalBoxOffice)}</div>
-                            </div>
-                            <div className="bg-zinc-900/50 p-2.5 rounded-xl border border-zinc-700/50 text-center">
-                                <div className="text-[9px] text-zinc-500 uppercase font-bold tracking-wider mb-1">Critic Score</div>
-                                <div className={`font-mono font-bold text-lg ${avgRating > 0 ? criticStatus.color : 'text-zinc-500'}`}>
-                                    {avgRating > 0 ? avgRating.toFixed(1) : '-'}
-                                </div>
-                                {avgRating > 0 && <div className={`text-[8px] font-bold ${criticStatus.color} mt-0.5 truncate`}>{criticStatus.label}</div>}
-                            </div>
-                            <div className="bg-zinc-900/50 p-2.5 rounded-xl border border-zinc-700/50 text-center" onClick={() => setActiveTab('AWARDS')}>
-                                <div className="text-[9px] text-zinc-500 uppercase font-bold tracking-wider mb-1">Awards</div>
-                                <div className="flex items-center justify-center gap-1 font-bold text-lg text-amber-400">
-                                    <AwardIcon size={14} fill="currentColor"/> {awardsWon.length}
-                                </div>
+                            <div className="min-w-0 flex-1">
+                                <div className="text-[9px] font-black uppercase tracking-[0.22em] text-yellow-300">IMDb {tr('imdb.tabs.profile')}</div>
+                                <h2 className="mt-1 break-words text-[30px] font-black leading-none text-white">{player.name}</h2>
+                                <div className="mt-2 text-sm font-semibold text-zinc-400">{tr('imdb.profile.actorProducer')}</div>
                             </div>
                         </div>
+                        {knownFor && (
+                            <button
+                                onClick={() => setSelectedProject(knownFor)}
+                                className="mt-4 w-full rounded-2xl border border-yellow-400/15 bg-black/55 p-3.5 text-left transition-colors hover:bg-black/70"
+                            >
+                                <div className="flex items-start justify-between gap-3">
+                                    <div className="min-w-0 flex-1">
+                                        <div className="text-[9px] font-black uppercase tracking-[0.18em] text-zinc-500">{tr('imdb.profile.knownFor')}</div>
+                                        <div className="mt-1 text-[18px] font-black leading-tight text-white">{knownFor.name}</div>
+                                        <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] font-black uppercase tracking-wider text-zinc-500">
+                                            <span>{knownFor.releaseLabel}</span>
+                                            <span className="text-zinc-700">•</span>
+                                            <span>{knownFor.identityLabel}</span>
+                                        </div>
+                                    </div>
+                                    <div className="shrink-0 flex items-center gap-1 rounded-full bg-yellow-400 px-2.5 py-1.5 text-sm font-black text-black">
+                                        <Star size={11} className="fill-black" />
+                                        {knownFor.rating > 0 ? knownFor.rating.toFixed(1) : '-'}
+                                    </div>
+                                </div>
+                            </button>
+                        )}
                     </div>
-                    {/* Bio / Mini-Filmography */}
-                    <div className="p-4">
-                        <h3 className="text-yellow-400 font-bold uppercase tracking-widest text-xs mb-3">Bio</h3>
-                        <p className="text-sm text-zinc-400 leading-relaxed mb-6">A rising star in Hollywood known for their versatility and recent breakout performances.</p>
+
+                    <div className="grid grid-cols-2 gap-2">
+                        <div className="col-span-2 rounded-2xl border border-emerald-400/15 bg-gradient-to-br from-zinc-900 to-black p-3.5">
+                            <div className="text-[9px] text-zinc-500 uppercase font-black tracking-wider">{tr('imdb.franchise.metric.totalGross')}</div>
+                            <div className="mt-1 font-mono text-[26px] font-black leading-none text-emerald-400">{formatMoney(totalBoxOffice)}</div>
+                        </div>
+                        <div className="min-h-[86px] rounded-2xl border border-zinc-800 bg-zinc-900/80 p-3">
+                            <div className="text-[9px] text-zinc-500 uppercase font-black tracking-wider">{tr('imdb.profile.criticScore')}</div>
+                            <div className={`mt-2 font-mono text-lg font-black ${avgRating > 0 ? criticStatus.color : 'text-zinc-500'}`}>
+                                {avgRating > 0 ? avgRating.toFixed(1) : '-'}
+                            </div>
+                            {avgRating > 0 && <div className={`mt-0.5 text-[8px] font-black uppercase leading-tight tracking-wide ${criticStatus.color}`}>{criticStatus.label}</div>}
+                        </div>
+                        <button
+                            onClick={() => setActiveTab('AWARDS')}
+                            className="min-h-[86px] rounded-2xl border border-zinc-800 bg-zinc-900/80 p-3 text-left transition-colors hover:border-yellow-400/30"
+                        >
+                            <div className="text-[9px] text-zinc-500 uppercase font-black tracking-wider">{tr('imdb.awards.myAwards')}</div>
+                            <div className="mt-2 flex items-center gap-1 font-black text-lg text-amber-400">
+                                <AwardIcon size={15} fill="currentColor"/> {awardsWon.length}
+                            </div>
+                        </button>
                     </div>
-                 </>
+
+                    <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4">
+                        <h3 className="text-yellow-400 font-black uppercase tracking-widest text-xs mb-3">{tr('imdb.profile.bio')}</h3>
+                        <p className="text-sm text-zinc-400 leading-relaxed">{tr('imdb.profile.bioText')}</p>
+                    </div>
+                 </div>
              )}
 
              {/* FILMOGRAPHY TAB */}
@@ -1233,7 +1631,7 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
                  <div className="p-4">
                      <div className="flex items-center justify-between mb-4">
                          <h3 className="text-yellow-400 font-bold uppercase tracking-widest text-xs flex items-center gap-2">
-                            Filmography <span className="bg-zinc-700 text-white px-1.5 py-0.5 rounded-full text-[10px]">{filteredCredits.length}</span>
+                            {tr('imdb.profile.filmography')} <span className="bg-zinc-700 text-white px-1.5 py-0.5 rounded-full text-[10px]">{filteredCredits.length}</span>
                          </h3>
                          {/* FILTER PILLS */}
                          <div className="flex bg-zinc-900 rounded-lg p-0.5 border border-zinc-700">
@@ -1243,18 +1641,18 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
                                     onClick={() => setCreditFilter(type)}
                                     className={`px-3 py-1 rounded-md text-[10px] font-bold transition-all ${creditFilter === type ? 'bg-zinc-700 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
                                  >
-                                     {type === 'ALL' ? 'All' : type === 'MOVIE' ? 'Movies' : 'TV'}
+                                     {getCreditFilterLabel(type)}
                                  </button>
                              ))}
                          </div>
                      </div>
 
                      <div className="divide-y divide-zinc-800 bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800">
-                         {filteredCredits.length === 0 ? <div className="text-zinc-600 text-center py-8 text-sm">No credits found.</div> : filteredCredits.map((project) => (
+                         {filteredCredits.length === 0 ? <div className="text-zinc-600 text-center py-8 text-sm">{tr('imdb.profile.noCredits')}</div> : filteredCredits.map((project) => (
                              <div key={project.id} onClick={() => setSelectedProject(project)} className="flex gap-4 p-4 hover:bg-zinc-800 transition-colors cursor-pointer group">
-                                 {project.customPoster?.type === 'IMAGE' && project.customPoster.imageData ? (
+                                 {hasCustomPosterMedia(project.customPoster) ? (
                                      <div className={`w-12 h-16 rounded shrink-0 flex items-center justify-center border-2 relative overflow-hidden ${project.mediaType === 'MOVIE' ? 'border-blue-500/60' : project.mediaType === 'SERIES' ? 'border-red-500/60' : 'border-zinc-700'}`}>
-                                         <img src={project.customPoster.imageData} alt={project.name} className="absolute inset-0 w-full h-full object-cover" />
+                                         <CustomPosterImage poster={project.customPoster} alt={project.name} className="absolute inset-0 w-full h-full object-cover" />
                                      </div>
                                  ) : (
                                      <div className={`w-12 h-16 rounded shrink-0 flex items-center justify-center border-2 relative overflow-hidden bg-gradient-to-br ${project.customPoster?.type === 'CONFIG' && project.customPoster.bgGradient ? project.customPoster.bgGradient : getPosterBg(project.name)} ${project.mediaType === 'MOVIE' ? 'border-blue-500/60' : project.mediaType === 'SERIES' ? 'border-red-500/60' : 'border-zinc-700'}`}>
@@ -1273,7 +1671,7 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
                                      <div className="text-xs text-zinc-500 mb-1 truncate">{project.releaseLabel} • {project.role} • {project.identityLabel}</div>
                                      <div className="flex items-center gap-3 mt-1.5">
                                          {project.rating > 0 && <span className="flex items-center gap-1 text-zinc-200 text-xs font-bold"><Star size={10} className="text-yellow-400 fill-yellow-400"/> {project.rating.toFixed(1)}</span>}
-                                         <span className="text-[10px] text-zinc-600 font-bold uppercase border border-zinc-700 px-1.5 rounded">{project.mediaType === 'SERIES' ? 'TV' : 'Movie'}</span>
+                                         <span className="text-[10px] text-zinc-600 font-bold uppercase border border-zinc-700 px-1.5 rounded">{getProjectMediaTypeLabel(project.mediaType, 'short')}</span>
                                      </div>
                                  </div>
                                  <ChevronRight size={16} className="text-zinc-600"/>
@@ -1312,19 +1710,19 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
         <div className="flex border-t border-zinc-800 bg-zinc-950 pb-safe">
             <button onClick={() => setActiveTab('PROFILE')} className={`flex-1 py-4 flex flex-col items-center gap-1 ${activeTab === 'PROFILE' ? 'text-yellow-400' : 'text-zinc-500 hover:text-zinc-300'}`}>
                 <User size={20} />
-                <span className="text-[10px] font-bold uppercase tracking-wide">Profile</span>
+                <span className="text-[10px] font-bold uppercase tracking-wide">{tr('imdb.tabs.profile')}</span>
             </button>
             <button onClick={() => setActiveTab('FILMOGRAPHY')} className={`flex-1 py-4 flex flex-col items-center gap-1 ${activeTab === 'FILMOGRAPHY' ? 'text-yellow-400' : 'text-zinc-500 hover:text-zinc-300'}`}>
                 <Film size={20} />
-                <span className="text-[10px] font-bold uppercase tracking-wide">Credits</span>
+                <span className="text-[10px] font-bold uppercase tracking-wide">{tr('imdb.tabs.credits')}</span>
             </button>
             <button onClick={() => setActiveTab('AWARDS')} className={`flex-1 py-4 flex flex-col items-center gap-1 ${activeTab === 'AWARDS' || activeTab === 'SEASON' ? 'text-yellow-400' : 'text-zinc-500 hover:text-zinc-300'}`}>
                 <AwardIcon size={20} />
-                <span className="text-[10px] font-bold uppercase tracking-wide">Awards</span>
+                <span className="text-[10px] font-bold uppercase tracking-wide">{tr('imdb.tabs.awards')}</span>
             </button>
             <button onClick={() => setActiveTab('FRANCHISES')} className={`flex-1 py-4 flex flex-col items-center gap-1 ${activeTab === 'FRANCHISES' ? 'text-yellow-400' : 'text-zinc-500 hover:text-zinc-300'}`}>
                 <Globe size={20} />
-                <span className="text-[10px] font-bold uppercase tracking-wide">Universe</span>
+                <span className="text-[10px] font-bold uppercase tracking-wide">{tr('imdb.tabs.universe')}</span>
             </button>
         </div>
     </div>

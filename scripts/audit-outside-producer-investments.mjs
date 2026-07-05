@@ -24,8 +24,8 @@ assertIncludes('services/outsideProductions.ts', 'hasOutsideProductionExposure')
 assertIncludes('services/outsideProductions.ts', 'producerReceipts');
 assertIncludes('services/outsideProductions.ts', 'playerPayout');
 assertIncludes('services/outsideProductions.ts', 'counterUsed');
-assertIncludes('services/outsideProductions.ts', 'Producer investment:');
-assertIncludes('services/outsideProductions.ts', 'Producer payout:');
+assertIncludes('services/outsideProductions.ts', 'services.outsideProducer.finance.investment', 'localized producer investment ledger');
+assertIncludes('services/outsideProductions.ts', 'services.outsideProducer.finance.payout', 'localized producer payout ledger');
 assertIncludes('services/outsideProductions.ts', "category: 'BUSINESS'");
 assertIncludes('services/outsideProductions.ts', 'buildOutsideProductionResultMessage');
 assertIncludes('services/outsideProductions.ts', 'OUTSIDE_PRODUCER_RESULT');
@@ -40,14 +40,14 @@ assertIncludes('services/outsideProductions.ts', 'clamp(base + exposureDelay + j
 assertIncludes('services/outsideProductions.ts', 'reputationImpact');
 assertIncludes('services/outsideProductions.ts', 'producerType');
 assertIncludes('services/outsideProductions.ts', 'ownerName');
-assertIncludes('services/outsideProductions.ts', 'Producer Result:');
+assertIncludes('services/outsideProductions.ts', 'services.outsideProducer.result.subject', 'localized producer result subject');
 assertIncludes('services/outsideProductions.ts', 'Fraud-Risk Producer Investment Offers');
 assertIncludes('services/outsideProductions.ts', 'fraudRisk');
 assertIncludes('services/outsideProductions.ts', 'GENEROUS_TERMS');
 assertIncludes('services/outsideProductions.ts', 'UNVERIFIED_FINANCING');
 assertIncludes('services/outsideProductions.ts', 'createOutsideProductionLegalCase');
-assertIncludes('services/outsideProductions.ts', 'Shell company producer disappeared');
-assertIncludes('services/outsideProductions.ts', 'Producer legal fees:');
+assertIncludes('services/outsideProductions.ts', 'services.outsideProducer.fraud.text.', 'localized fraud fallout message');
+assertIncludes('services/outsideProductions.ts', 'services.outsideProducer.finance.legalFees', 'localized producer legal fees ledger');
 assertIncludes('services/outsideProductions.ts', 'FRAUD_CASE');
 
 assertIncludes('services/gameLoop.ts', 'generateOutsideProducerInvestmentOffers');
@@ -89,7 +89,6 @@ assertIncludes('App.tsx', 'acceptOutsideProducerInvestmentOffer');
 assertIncludes('App.tsx', 'counterOutsideProducerInvestmentOffer');
 assertIncludes('App.tsx', 'OFFER_OUTSIDE_PRODUCER_INVESTMENT');
 
-assertIncludes('views/lifestyle/business/ProductionHouseGame.tsx', 'Outside Productions');
 assertIncludes('views/mobile/BankApp.tsx', 'Producer Investments');
 assertIncludes('views/mobile/BankApp.tsx', "detailView === 'PRODUCER_INVESTMENTS'");
 assertIncludes('views/mobile/BankApp.tsx', 'Latest 5 positions');
@@ -113,8 +112,6 @@ assertIncludes('views/HomePage.tsx', 'liveFeedLogs');
 assertIncludes('views/HomePage.tsx', 'now leads the music charts');
 assertIncludes('services/gameLoop.ts', 'news_investor_leadership');
 assertIncludes('services/gameLoop.ts', 'Music-world releases and chart movement already feed News and social');
-assertIncludes('views/lifestyle/business/ProductionHouseGame.tsx', 'Reputation');
-assertIncludes('views/lifestyle/business/ProductionHouseGame.tsx', 'Owner');
 assertIncludes('views/HomePage.tsx', 'triggerOutsideProducerInvestmentQa');
 assertIncludes('views/HomePage.tsx', 'Producer Investment QA');
 assertIncludes('views/HomePage.tsx', 'cheat_outside_offer');

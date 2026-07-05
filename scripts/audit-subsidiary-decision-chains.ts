@@ -180,13 +180,13 @@ if (!approved.success) {
 
 const approvedStudio = approved.player.businesses.find(studio => studio.id === 'franchise_studio')!;
 const resolved = approvedStudio.studioState?.subsidiaryDecisions?.find(decision => decision.id === franchiseDecision.id);
-if (!resolved?.outcomeSummary?.includes('Franchise')) {
+if (!resolved?.outcomeSummary?.includes(franchiseDecision.relatedTitle || '')) {
     throw new Error('Dormant franchise approval should produce a franchise-specific outcome summary.');
 }
 if ((approvedStudio.stats.studioMomentum || 0) <= (processed.businesses.find(studio => studio.id === 'franchise_studio')?.stats.studioMomentum || 0)) {
     throw new Error('Dormant franchise approval should improve studio momentum.');
 }
-if (!approved.player.news.some(item => item.subtext.includes('Follow-up'))) {
+if (!approved.player.news.some(item => item.subtext.includes(franchiseDecision.followUp?.effect || ''))) {
     throw new Error('Resolved chained decisions should publish a follow-up consequence in news.');
 }
 

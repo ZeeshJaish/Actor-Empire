@@ -4,7 +4,7 @@ const DB_VERSION = 1;
 
 export interface StoredMediaMeta {
     id: string;
-    kind: 'youtube_thumbnail' | 'instagram_post' | 'x_post' | 'profile_image' | 'other';
+    kind: 'youtube_thumbnail' | 'instagram_post' | 'x_post' | 'profile_image' | 'production_poster' | 'other';
     mimeType: string;
     size: number;
     createdAt: number;

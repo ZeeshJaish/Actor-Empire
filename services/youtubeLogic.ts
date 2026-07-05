@@ -1,9 +1,11 @@
 
-import { Gender, NPCActor, NPCPrestige, NPCTier, Player, YoutubeBrandDeal, YoutubeChannel, YoutubeCollabOffer, YoutubeCreatorIdentity, YoutubeMusicVideoFeatureOffer, YoutubeVideo, YoutubeVideoType } from '../types';
+import { GameLanguage, Gender, NPCActor, NPCPrestige, NPCTier, Player, YoutubeBrandDeal, YoutubeChannel, YoutubeCollabOffer, YoutubeCreatorIdentity, YoutubeMusicVideoFeatureOffer, YoutubeVideo, YoutubeVideoType } from '../types';
 import { getGenderedAvatar, NPC_DATABASE } from './npcLogic';
 import { MOD_TALENT_ROWS, ModTalentRow } from './modTalentData';
+import { MOD_TALENT_SUPPLEMENT_ROWS } from './modTalentSupplement';
 import { hydrateGenreXP } from './genreCatalog';
 import { getMusicArtistCatalog } from './musicIndustry';
+import { getPlayerLanguage, t } from './i18n';
 
 export const YOUTUBE_MONETIZATION_SUBS = 1000;
 export const YOUTUBE_MONETIZATION_VIEWS = 4000;
@@ -166,6 +168,7 @@ const modTalentCreatorToProfile = (row: ModTalentRow): GlobalCreatorProfile =>
 const GLOBAL_YOUTUBE_CREATORS = [
     ...BASE_GLOBAL_YOUTUBE_CREATORS,
     ...MOD_TALENT_ROWS
+        .concat(MOD_TALENT_SUPPLEMENT_ROWS)
         .filter(row => row.category === 'creator')
         .filter(row => !baseCreatorNames.has(normalizeCreatorName(row.name)))
         .map(modTalentCreatorToProfile)
@@ -278,18 +281,30 @@ export const calculateYoutubeCreatorScore = (player: Player): number => {
     ));
 };
 
-export const getYoutubePublicImageLabel = (player: Player): string => {
+const getYoutubePublicImageKey = (player: Player): 'volatile' | 'industryDarling' | 'brandSafe' | 'growingCreator' | 'riskyBet' | 'damagedImage' => {
     const score = calculateYoutubeCreatorScore(player);
     const heat = player.youtube?.controversy ?? 0;
     const identity = player.youtube?.creatorIdentity;
 
-    if (heat >= 75 || identity === 'CONTROVERSY_MAGNET') return 'Volatile';
-    if (score >= 82) return 'Industry Darling';
-    if (score >= 68) return 'Brand Safe';
-    if (score >= 52) return 'Growing Creator';
-    if (score >= 35) return 'Risky Bet';
-    return 'Damaged Image';
+    if (heat >= 75 || identity === 'CONTROVERSY_MAGNET') return 'volatile';
+    if (score >= 82) return 'industryDarling';
+    if (score >= 68) return 'brandSafe';
+    if (score >= 52) return 'growingCreator';
+    if (score >= 35) return 'riskyBet';
+    return 'damagedImage';
 };
+
+export const getYoutubePublicImageLabel = (player: Player): string => (
+    t('en', `services.youtube.publicImage.${getYoutubePublicImageKey(player)}`)
+);
+
+const getLocalizedYoutubePublicImageLabel = (player: Player, language: GameLanguage): string => (
+    t(language, `services.youtube.publicImage.${getYoutubePublicImageKey(player)}`)
+);
+
+const getYoutubeVideoTypeLabel = (language: GameLanguage, type: YoutubeVideoType): string => (
+    t(language, `services.youtube.videoType.${type}`)
+);
 
 const VIDEO_TEMPLATES = [
     "My Morning Routine ☀️", 
@@ -390,13 +405,14 @@ export const getWeeksSinceYoutubeUpload = (
     return Math.max(0, currentAbs - uploadAbs);
 };
 
-export const generateYoutubeCollabOffer = (player: Player): YoutubeCollabOffer | null => {
+export const generateYoutubeCollabOffer = (player: Player, language = getPlayerLanguage(player)): YoutubeCollabOffer | null => {
     const channel = player.youtube;
     if (channel.subscribers < 1500 || channel.videos.length < 2) return null;
     if ((channel.activeCollabs?.length || 0) >= 2) return null;
 
     const creatorScore = calculateYoutubeCreatorScore(player);
-    const publicImage = getYoutubePublicImageLabel(player);
+    const publicImageKey = getYoutubePublicImageKey(player);
+    const publicImage = getLocalizedYoutubePublicImageLabel(player, language);
     const pullMultiplier = creatorScore >= 75 ? 0.38 : creatorScore >= 55 ? 0.5 : 0.65;
     const eligibleCreators = [...NPC_DATABASE, ...getEnabledGlobalCreatorProfiles(player)]
         .filter(npc => npc.followers >= Math.max(3000, channel.subscribers * pullMultiplier));
@@ -409,7 +425,7 @@ export const generateYoutubeCollabOffer = (player: Player): YoutubeCollabOffer |
     const imageBoost = creatorScore >= 70 ? 1.18 : creatorScore < 40 ? 0.82 : 1;
     const bonusViews = Math.max(4000, Math.floor(creator.followers * (0.03 + Math.random() * 0.05) * imageBoost));
     const bonusSubscribers = Math.max(40, Math.floor(bonusViews / 140));
-    const qualityBonus = 10 + Math.floor(Math.random() * 10) + (publicImage === 'Industry Darling' ? 4 : publicImage === 'Volatile' ? -2 : 0);
+    const qualityBonus = 10 + Math.floor(Math.random() * 10) + (publicImageKey === 'industryDarling' ? 4 : publicImageKey === 'volatile' ? -2 : 0);
 
     return {
         id: `yt_collab_${Date.now()}`,
@@ -423,18 +439,22 @@ export const generateYoutubeCollabOffer = (player: Player): YoutubeCollabOffer |
         qualityBonus,
         bonusViews,
         bonusSubscribers,
-        description: `${creator.name} wants a ${requiredType.replace(/_/g, ' ')} collab. Your public image is ${publicImage.toLowerCase()}, so chemistry can either compound the hype or expose the risk.`,
+        description: t(language, 'services.youtube.offer.collab.description', {
+            creator: creator.name,
+            type: getYoutubeVideoTypeLabel(language, requiredType).toLowerCase(),
+            image: publicImage.toLowerCase(),
+        }),
         expiresInWeeks: 3
     };
 };
 
-export const generateYoutubeBrandDeal = (player: Player): YoutubeBrandDeal | null => {
+export const generateYoutubeBrandDeal = (player: Player, language = getPlayerLanguage(player)): YoutubeBrandDeal | null => {
     const channel = player.youtube;
     if (!channel.isMonetized || channel.subscribers < 5000) return null;
     if ((channel.activeBrandDeals?.length || 0) >= 2) return null;
 
     const creatorScore = calculateYoutubeCreatorScore(player);
-    const publicImage = getYoutubePublicImageLabel(player);
+    const publicImage = getLocalizedYoutubePublicImageLabel(player, language);
     const categoryKeys = Object.keys(YOUTUBE_BRANDS) as (keyof typeof YOUTUBE_BRANDS)[];
     const weightedCategories = [...categoryKeys];
     if (channel.creatorIdentity === 'LIFESTYLE_ICON' || creatorScore >= 72) weightedCategories.push('LUXURY', 'FASHION', 'AUTOMOTIVE');
@@ -454,7 +474,11 @@ export const generateYoutubeBrandDeal = (player: Player): YoutubeBrandDeal | nul
         id: `yt_brand_${Date.now()}`,
         brandName,
         category,
-        description: `${brandName} wants a ${requiredType.replace(/_/g, ' ')} integration because your creator image reads as ${publicImage.toLowerCase()}.`,
+        description: t(language, 'services.youtube.offer.brand.description', {
+            brand: brandName,
+            type: getYoutubeVideoTypeLabel(language, requiredType).toLowerCase(),
+            image: publicImage.toLowerCase(),
+        }),
         payout,
         requiredType,
         energyCost,
@@ -464,7 +488,7 @@ export const generateYoutubeBrandDeal = (player: Player): YoutubeBrandDeal | nul
     };
 };
 
-export const generateMusicVideoFeatureOffer = (player: Player): YoutubeMusicVideoFeatureOffer | null => {
+export const generateMusicVideoFeatureOffer = (player: Player, language = getPlayerLanguage(player)): YoutubeMusicVideoFeatureOffer | null => {
     const channel = player.youtube;
     const creatorScore = calculateYoutubeCreatorScore(player);
     const actingPull = (player.stats.fame || 0) + (player.stats.reputation || 0) * 0.55 + creatorScore * 0.35;
@@ -501,7 +525,10 @@ export const generateMusicVideoFeatureOffer = (player: Player): YoutubeMusicVide
         artistHandle: `@${artist.stageName.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 24) || artist.id}`,
         songTitle,
         genre: artist.genre,
-        description: `${artist.stageName} wants you featured in the "${songTitle}" music video. It is more career visibility than a normal ad: fans judge chemistry, style, and whether the cameo feels natural.`,
+        description: t(language, 'services.youtube.offer.musicFeature.description', {
+            artist: artist.stageName,
+            song: songTitle,
+        }),
         appearanceFee,
         energyCost: artist.fameTier === 'LEGEND' || artist.fameTier === 'SUPERSTAR' ? 24 : 18,
         bonusViews,

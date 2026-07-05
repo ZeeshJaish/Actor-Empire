@@ -3,6 +3,7 @@ import { Player, NPCActor, StudioContract, ContractType, PaymentMode } from '../
 import { Users, Briefcase, Star, TrendingUp, DollarSign, X, Check, AlertCircle, Info, Clock, Calendar, Film, ShieldAlert, PenTool } from 'lucide-react';
 import { getAvailableTalent, NPC_DATABASE } from '../services/npcLogic';
 import { calculateNPCAsk, evaluateOffer, createContract, getTalentNegotiationProfile } from '../services/talentService';
+import { getPlayerLanguage, t } from '../services/i18n';
 
 interface StudioPageProps {
     player: Player;
@@ -19,6 +20,8 @@ export const StudioPage: React.FC<StudioPageProps> = ({ player, onUpdatePlayer, 
     const [negotiationResult, setNegotiationResult] = useState<{ success: boolean, message: string, maintenanceFee?: number, profileLabel?: string } | null>(null);
 
     const studio = player.businesses.find(b => b.type === 'PRODUCTION_HOUSE');
+    const language = getPlayerLanguage(player);
+    const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
     const signedContracts = studio?.studioState?.talentRoster || player.studio?.talentRoster || [];
     
     // Initialize memory if needed
@@ -57,7 +60,8 @@ export const StudioPage: React.FC<StudioPageProps> = ({ player, onUpdatePlayer, 
             offerAmount,
             paymentMode,
             player.stats.fame, 
-            studio.stats.valuation || 0
+            studio.stats.valuation || 0,
+            language
         );
 
         setNegotiationResult(result);
@@ -106,7 +110,7 @@ export const StudioPage: React.FC<StudioPageProps> = ({ player, onUpdatePlayer, 
                     year: player.age,
                     amount: -result.totalContractValue,
                     category: 'EXPENSE',
-                    description: `Contract Upfront: ${selectedNPC.name}`
+                    description: tr('studio.talent.contractUpfront', { name: selectedNPC.name })
                 });
             }
 
@@ -135,7 +139,7 @@ export const StudioPage: React.FC<StudioPageProps> = ({ player, onUpdatePlayer, 
     };
 
     const ask = selectedNPC ? calculateNPCAsk(selectedNPC, negotiationDuration) : null;
-    const negotiationProfile = selectedNPC ? getTalentNegotiationProfile(selectedNPC) : null;
+    const negotiationProfile = selectedNPC ? getTalentNegotiationProfile(selectedNPC, language) : null;
     const currentAttempts = selectedNPC ? (attempts[selectedNPC.id] || 0) : 0;
     const attemptsLeft = 3 - currentAttempts;
 

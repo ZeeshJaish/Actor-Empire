@@ -1,6 +1,7 @@
-import type { LifeEvent, LifeEventImpactResult, Message, NewsItem, Player, ScheduledEvent, XPost } from '../types';
+import type { GameLanguage, LifeEvent, LifeEventImpactResult, Message, NewsItem, Player, ScheduledEvent, XPost } from '../types';
 import type { AcquisitionCase } from './studioAcquisition';
 import { queueAcquisitionPressureEvent } from './acquisitionEventCadence';
+import { getPlayerLanguage, t } from './i18n';
 import { getWorldReactionState } from './worldReactions';
 
 export type RivalRetaliationEventType = 'RIVAL_COUNTER_BID' | 'NEGATIVE_PRESS_LEAK' | 'DEAL_CHALLENGE' | 'DEFENSIVE_ALLIANCE';
@@ -41,6 +42,8 @@ const RIVAL_NAMES = [
 const clamp = (value: number, min = 0, max = 100) => Math.max(min, Math.min(max, value));
 const round = (value: number) => Math.round(value);
 const roundMoney = (value: number) => Math.max(0, Math.round(value / 10_000) * 10_000);
+const formatMoney = (value: number, language: GameLanguage) =>
+    `$${new Intl.NumberFormat(language === 'pt-BR' ? 'pt-BR' : 'en-US', { maximumFractionDigits: 0 }).format(value)}`;
 const stableHash = (value: string) => Array.from(value).reduce(
     (hash, character) => ((hash * 33) ^ character.charCodeAt(0)) >>> 0,
     5381,
@@ -124,10 +127,11 @@ const makeAcquisitionMessage = (
     acquisitionCase: AcquisitionCase,
     action: RivalActionRecord,
     requiredBidAmount: number,
+    language: GameLanguage,
 ): Message => ({
     id: `rival_retaliation_acq_${acquisitionCase.studioId}_${player.age}_${player.currentWeek}`,
-    sender: 'Business Affairs',
-    subject: `Rival Bid: ${acquisitionCase.studioName}`,
+    sender: t(language, 'services.rivalRetaliation.inbox.sender'),
+    subject: t(language, 'services.rivalRetaliation.inbox.subject', { studio: acquisitionCase.studioName }),
     text: action.summary,
     type: 'STUDIO_ACQUISITION',
     data: {
@@ -142,7 +146,11 @@ const makeAcquisitionMessage = (
     weekSent: player.currentWeek,
 });
 
-const applyRivalCounterBid = (player: Player, state: RivalRetaliationState): { player: Player; action?: RivalActionRecord } => {
+const applyRivalCounterBid = (
+    player: Player,
+    state: RivalRetaliationState,
+    language: GameLanguage,
+): { player: Player; action?: RivalActionRecord } => {
     if (state.retaliationScore < 58) return { player };
     const cases = getAcquisitionCases(player);
     const target = cases.find(acquisitionCase => (
@@ -164,7 +172,11 @@ const applyRivalCounterBid = (player: Player, state: RivalRetaliationState): { p
         rivalStudioName,
         week: player.currentWeek,
         year: player.age,
-        summary: `${rivalStudioName} entered the room and challenged your ${target.studioName} terms. You now need $${requiredBidAmount.toLocaleString()} to retake the lead.`,
+        summary: t(language, 'services.rivalRetaliation.counterBid.summary', {
+            rivalStudioName,
+            studioName: target.studioName,
+            amount: formatMoney(requiredBidAmount, language),
+        }),
     };
     const updatedCase: AcquisitionCase = {
         ...target,
@@ -184,7 +196,7 @@ const applyRivalCounterBid = (player: Player, state: RivalRetaliationState): { p
     const updatedCases = cases.map(acquisitionCase => (
         acquisitionCase.studioId === target.studioId ? updatedCase : acquisitionCase
     ));
-    const message = makeAcquisitionMessage(player, updatedCase, action, requiredBidAmount);
+    const message = makeAcquisitionMessage(player, updatedCase, action, requiredBidAmount, language);
     const nextPlayer: Player = {
         ...player,
         flags: {
@@ -202,10 +214,11 @@ const applyRivalCounterBid = (player: Player, state: RivalRetaliationState): { p
 const makeChoiceImpact = (
     mode: 'QUIET' | 'PUBLIC' | 'GOLDEN',
 ): ((player: Player) => LifeEventImpactResult) => (player: Player) => {
+    const language = getPlayerLanguage(player);
     const state = getRivalRetaliationState(player);
     const effects = [];
     let updatedPlayer = player;
-    let log = 'Rival Retaliation handled.';
+    let log = t(language, 'life.event.rival.log.default');
     let logKey = 'life.event.rival.log.default';
 
     if (mode === 'QUIET') {
@@ -219,10 +232,10 @@ const makeChoiceImpact = (
             dealChallengeWeeksRemaining: Math.max(0, state.dealChallengeWeeksRemaining - 1),
             pressureShieldWeeksRemaining: Math.max(state.pressureShieldWeeksRemaining, 6),
         });
-        log = `Rival Retaliation: Quiet backchannels cooled the room.`;
+        log = t(language, 'life.event.rival.log.quiet');
         logKey = 'life.event.rival.log.quiet';
-        effects.push({ label: 'Rival Pressure', labelKey: 'life.effect.rivalPressure', value: '-14', tone: 'positive' as const });
-        effects.push({ label: 'Cost', labelKey: 'life.effect.cost', value: `$${cost.toLocaleString()}`, tone: 'negative' as const });
+        effects.push({ label: t(language, 'life.effect.rivalPressure'), labelKey: 'life.effect.rivalPressure', value: '-14', tone: 'positive' as const });
+        effects.push({ label: t(language, 'life.effect.cost'), labelKey: 'life.effect.cost', value: formatMoney(cost, language), tone: 'negative' as const });
     } else if (mode === 'PUBLIC') {
         updatedPlayer = persistRivalRetaliationState({
             ...player,
@@ -237,10 +250,10 @@ const makeChoiceImpact = (
             negativePressHeat: state.negativePressHeat + 12,
             dealChallengeWeeksRemaining: state.dealChallengeWeeksRemaining + 1,
         });
-        log = `Rival Retaliation: Your public countermove raised the stakes.`;
+        log = t(language, 'life.event.rival.log.public');
         logKey = 'life.event.rival.log.public';
-        effects.push({ label: 'Fame', labelKey: 'life.effect.fame', value: '+2', tone: 'positive' as const });
-        effects.push({ label: 'Heat', labelKey: 'life.effect.heat', value: '+5', tone: 'negative' as const });
+        effects.push({ label: t(language, 'life.effect.fame'), labelKey: 'life.effect.fame', value: '+2', tone: 'positive' as const });
+        effects.push({ label: t(language, 'life.effect.heat'), labelKey: 'life.effect.heat', value: '+5', tone: 'negative' as const });
     } else {
         const cost = Math.min(player.money, Math.max(28_000_000, state.defensiveAllianceCount * 14_000_000));
         updatedPlayer = persistRivalRetaliationState({
@@ -256,10 +269,10 @@ const makeChoiceImpact = (
             dealChallengeWeeksRemaining: 0,
             pressureShieldWeeksRemaining: Math.max(state.pressureShieldWeeksRemaining, 10),
         });
-        log = `Rival Retaliation: Advisors built a clean deal-defense room and neutralized the alliance pressure.`;
+        log = t(language, 'life.event.rival.log.golden');
         logKey = 'life.event.rival.log.golden';
-        effects.push({ label: 'Rival Pressure', labelKey: 'life.effect.rivalPressure', value: '-26', tone: 'positive' as const });
-        effects.push({ label: 'Reward Ad', labelKey: 'life.effect.rewardAd', value: 'Safest path', tone: 'positive' as const });
+        effects.push({ label: t(language, 'life.effect.rivalPressure'), labelKey: 'life.effect.rivalPressure', value: '-26', tone: 'positive' as const });
+        effects.push({ label: t(language, 'life.effect.rewardAd'), labelKey: 'life.effect.rewardAd', value: t(language, 'life.effect.value.safestPath'), valueKey: 'life.effect.value.safestPath', tone: 'positive' as const });
     }
 
     return { updatedPlayer, log, logKey, effects };
@@ -277,75 +290,76 @@ const createRivalLifeEvent = (
     player: Player,
     state: RivalRetaliationState,
     type: RivalRetaliationEventType,
-): LifeEvent => ({
-    id: `life_rival_retaliation_${type.toLowerCase()}_${player.age}_${player.currentWeek}`,
-    type: 'CONFLICT',
-    title: type === 'RIVAL_COUNTER_BID'
-        ? 'Rivals Challenge Your Deal'
-        : type === 'DEFENSIVE_ALLIANCE'
-            ? 'Studios Form Defensive Alliance'
-            : type === 'NEGATIVE_PRESS_LEAK'
-                ? 'Negative Deal Story Leaks'
-                : 'Rivals Challenge Your Expansion',
-    titleKey: type === 'RIVAL_COUNTER_BID'
+    language: GameLanguage,
+): LifeEvent => {
+    const titleKey = type === 'RIVAL_COUNTER_BID'
         ? 'life.event.rival.counterBid.title'
         : type === 'DEFENSIVE_ALLIANCE'
             ? 'life.event.rival.defensiveAlliance.title'
             : type === 'NEGATIVE_PRESS_LEAK'
                 ? 'life.event.rival.negativeLeak.title'
-                : 'life.event.rival.expansion.title',
-    category: 'Rival Retaliation',
-    description: `Competing studios are reacting to your expansion. Rival pressure is ${state.retaliationScore}%, with ${state.defensiveAllianceCount} defensive alliance signal${state.defensiveAllianceCount === 1 ? '' : 's'} in the market.`,
-    descriptionKey: state.defensiveAllianceCount === 1 ? 'life.event.rival.description.singular' : 'life.event.rival.description.plural',
-    textVars: { pressure: state.retaliationScore, alliances: state.defensiveAllianceCount },
-    options: [
-        {
-            id: 'QUIET_BACKCHANNEL',
-            label: 'Quiet Backchannel',
-            labelKey: 'life.event.rival.quiet.label',
-            description: 'Spend discreetly on bankers, lawyers, and relationship repair to cool the retaliation.',
-            descriptionKey: 'life.event.rival.quiet.description',
-            previewEffects: [
-                { label: 'Rival Pressure', labelKey: 'life.effect.rivalPressure', value: '-14', tone: 'positive' },
-                { label: 'Cost', labelKey: 'life.effect.cost', value: 'Deal defense', tone: 'negative' },
-            ],
-            impact: makeChoiceImpact('QUIET'),
-        },
-        {
-            id: 'PUBLIC_COUNTERMOVE',
-            label: 'Public Countermove',
-            labelKey: 'life.event.rival.public.label',
-            description: 'Push back in public and show rivals you will not slow down.',
-            descriptionKey: 'life.event.rival.public.description',
-            previewEffects: [
-                { label: 'Fame', labelKey: 'life.effect.fame', value: '+2', tone: 'positive' },
-                { label: 'Heat', labelKey: 'life.effect.heat', value: '+5', tone: 'negative' },
-            ],
-            impact: makeChoiceImpact('PUBLIC'),
-        },
-        {
-            id: 'GOLDEN_DEAL_DEFENSE',
-            label: 'Clean Deal Defense Room',
-            labelKey: 'life.event.rival.golden.label',
-            description: 'Reward ad: advisors handle the safest response to rival alliances and leaks.',
-            descriptionKey: 'life.event.rival.golden.description',
-            isGolden: true,
-            previewEffects: [
-                { label: 'Rival Pressure', labelKey: 'life.effect.rivalPressure', value: '-26', tone: 'positive' },
-                { label: 'Risk', labelKey: 'life.effect.risk', value: 'Safest path', tone: 'positive' },
-            ],
-            impact: makeChoiceImpact('GOLDEN'),
-        },
-    ],
-});
+                : 'life.event.rival.expansion.title';
+    const descriptionKey = state.defensiveAllianceCount === 1 ? 'life.event.rival.description.singular' : 'life.event.rival.description.plural';
+    const textVars = { pressure: state.retaliationScore, alliances: state.defensiveAllianceCount };
+    return {
+        id: `life_rival_retaliation_${type.toLowerCase()}_${player.age}_${player.currentWeek}`,
+        type: 'CONFLICT',
+        title: t(language, titleKey),
+        titleKey,
+        category: t(language, 'life.event.rival.category'),
+        description: t(language, descriptionKey, textVars),
+        descriptionKey,
+        textVars,
+        options: [
+            {
+                id: 'QUIET_BACKCHANNEL',
+                label: t(language, 'life.event.rival.quiet.label'),
+                labelKey: 'life.event.rival.quiet.label',
+                description: t(language, 'life.event.rival.quiet.description'),
+                descriptionKey: 'life.event.rival.quiet.description',
+                previewEffects: [
+                    { label: t(language, 'life.effect.rivalPressure'), labelKey: 'life.effect.rivalPressure', value: '-14', tone: 'positive' },
+                    { label: t(language, 'life.effect.cost'), labelKey: 'life.effect.cost', value: t(language, 'life.effect.value.dealDefense'), valueKey: 'life.effect.value.dealDefense', tone: 'negative' },
+                ],
+                impact: makeChoiceImpact('QUIET'),
+            },
+            {
+                id: 'PUBLIC_COUNTERMOVE',
+                label: t(language, 'life.event.rival.public.label'),
+                labelKey: 'life.event.rival.public.label',
+                description: t(language, 'life.event.rival.public.description'),
+                descriptionKey: 'life.event.rival.public.description',
+                previewEffects: [
+                    { label: t(language, 'life.effect.fame'), labelKey: 'life.effect.fame', value: '+2', tone: 'positive' },
+                    { label: t(language, 'life.effect.heat'), labelKey: 'life.effect.heat', value: '+5', tone: 'negative' },
+                ],
+                impact: makeChoiceImpact('PUBLIC'),
+            },
+            {
+                id: 'GOLDEN_DEAL_DEFENSE',
+                label: t(language, 'life.event.rival.golden.label'),
+                labelKey: 'life.event.rival.golden.label',
+                description: t(language, 'life.event.rival.golden.description'),
+                descriptionKey: 'life.event.rival.golden.description',
+                isGolden: true,
+                previewEffects: [
+                    { label: t(language, 'life.effect.rivalPressure'), labelKey: 'life.effect.rivalPressure', value: '-26', tone: 'positive' },
+                    { label: t(language, 'life.effect.risk'), labelKey: 'life.effect.risk', value: t(language, 'life.effect.value.safestPath'), valueKey: 'life.effect.value.safestPath', tone: 'positive' },
+                ],
+                impact: makeChoiceImpact('GOLDEN'),
+            },
+        ],
+    };
+};
 
 const createRivalEvent = (
     player: Player,
     state: RivalRetaliationState,
+    language: GameLanguage,
 ): ScheduledEvent | null => {
     const type = getRivalRetaliationEventType(state);
     if (!type) return null;
-    const lifeEvent = createRivalLifeEvent(player, state, type);
+    const lifeEvent = createRivalLifeEvent(player, state, type, language);
     return {
         id: `event_rival_retaliation_${type.toLowerCase()}_${player.age}_${player.currentWeek}`,
         week: player.currentWeek,
@@ -359,29 +373,37 @@ const createRivalEvent = (
     };
 };
 
-const makeRivalNews = (player: Player, state: RivalRetaliationState, action?: RivalActionRecord): NewsItem => ({
+const makeRivalNews = (player: Player, state: RivalRetaliationState, language: GameLanguage, action?: RivalActionRecord): NewsItem => ({
     id: `news_rival_retaliation_${player.age}_${player.currentWeek}`,
     headline: action?.type === 'RIVAL_COUNTER_BID'
-        ? `${action.rivalStudioName} challenges ${player.name}'s ${action.studioName} deal`
+        ? t(language, 'services.rivalRetaliation.news.counterBid.headline', {
+            rivalStudioName: action.rivalStudioName,
+            playerName: player.name,
+            studioName: action.studioName || '',
+        })
         : state.defensiveAllianceCount > 0
-            ? `Rival studios quietly align against ${player.name}'s expansion`
-            : `Negative deal chatter follows ${player.name}'s acquisition run`,
-    subtext: action?.summary || `${state.retaliationScore}% rival pressure is creating leaks, deal challenges, and defensive positioning across the market.`,
+            ? t(language, 'services.rivalRetaliation.news.alliance.headline', { playerName: player.name })
+            : t(language, 'services.rivalRetaliation.news.default.headline', { playerName: player.name }),
+    subtext: action?.summary || t(language, 'services.rivalRetaliation.news.default.subtext', { pressure: state.retaliationScore }),
     category: 'INDUSTRY',
     week: player.currentWeek,
     year: player.age,
     impactLevel: state.retaliationScore >= 65 ? 'HIGH' : 'MEDIUM',
 });
 
-const makeRivalPost = (player: Player, state: RivalRetaliationState, action?: RivalActionRecord): XPost => ({
+const makeRivalPost = (player: Player, state: RivalRetaliationState, language: GameLanguage, action?: RivalActionRecord): XPost => ({
     id: `x_rival_retaliation_${player.age}_${player.currentWeek}`,
     authorId: 'deal_room_wire',
     authorName: 'Deal Room Wire',
     authorHandle: '@dealroomwire',
     authorAvatar: 'DRW',
     content: action?.type === 'RIVAL_COUNTER_BID'
-        ? `${action.rivalStudioName} just made ${player.name}'s ${action.studioName} deal more expensive. This market is getting sharp.`
-        : `Rivals are not letting ${player.name}'s studio expansion move quietly. Expect leaks, alliances, and deal pressure.`,
+        ? t(language, 'services.rivalRetaliation.social.counterBid.content', {
+            rivalStudioName: action.rivalStudioName,
+            playerName: player.name,
+            studioName: action.studioName || '',
+        })
+        : t(language, 'services.rivalRetaliation.social.default.content', { playerName: player.name }),
     timestamp: Date.now(),
     likes: 2_200 + state.retaliationScore * 80,
     retweets: 320 + state.negativePressHeat * 16,
@@ -395,6 +417,7 @@ const makeRivalPost = (player: Player, state: RivalRetaliationState, action?: Ri
 });
 
 export const processRivalRetaliation = (player: Player): Player => {
+    const language = getPlayerLanguage(player);
     const previousState = player.flags?.rivalRetaliationState as RivalRetaliationState | undefined;
     if (previousState?.lastProcessedWeek === player.currentWeek) {
         return {
@@ -407,11 +430,11 @@ export const processRivalRetaliation = (player: Player): Player => {
     }
 
     const state = getRivalRetaliationState(player);
-    const withCounterBid = applyRivalCounterBid(player, state);
+    const withCounterBid = applyRivalCounterBid(player, state, language);
     const action = withCounterBid.action;
-    const event = state.retaliationScore >= 44 ? createRivalEvent(withCounterBid.player, state) : null;
-    const news = state.retaliationScore >= 40 ? makeRivalNews(withCounterBid.player, state, action) : undefined;
-    const xPost = state.retaliationScore >= 40 ? makeRivalPost(withCounterBid.player, state, action) : undefined;
+    const event = state.retaliationScore >= 44 ? createRivalEvent(withCounterBid.player, state, language) : null;
+    const news = state.retaliationScore >= 40 ? makeRivalNews(withCounterBid.player, state, language, action) : undefined;
+    const xPost = state.retaliationScore >= 40 ? makeRivalPost(withCounterBid.player, state, language, action) : undefined;
     const existingPendingEvents = Array.isArray(withCounterBid.player.pendingEvents) ? withCounterBid.player.pendingEvents : [];
     const cadence = queueAcquisitionPressureEvent(
         withCounterBid.player,
@@ -451,7 +474,12 @@ export const processRivalRetaliation = (player: Player): Player => {
         logs: [{
             week: player.currentWeek,
             year: player.age,
-            message: `Rival Retaliation: ${state.retaliationScore}% pressure, ${state.defensiveAllianceCount} defensive alliance signal${state.defensiveAllianceCount === 1 ? '' : 's'}.`,
+            message: t(language, state.defensiveAllianceCount === 1
+                ? 'services.rivalRetaliation.log.weeklySingular'
+                : 'services.rivalRetaliation.log.weekly', {
+                pressure: state.retaliationScore,
+                alliances: state.defensiveAllianceCount,
+            }),
             type: state.retaliationScore >= 65 ? 'negative' as const : 'neutral' as const,
         }, ...(withCounterBid.player.logs || [])].slice(0, 50),
     };

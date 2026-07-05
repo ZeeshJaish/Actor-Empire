@@ -6,6 +6,7 @@ import {
     Player,
     XPost
 } from '../types';
+import { getPlayerLanguage, t } from './i18n';
 
 export type YoutubeEventResolution =
     | {
@@ -87,6 +88,8 @@ const toneForDelta = (value: number, positiveIsGood = true): EventImpactSignal['
     return (value > 0) === positiveIsGood ? 'positive' : 'negative';
 };
 
+const CREATOR_WATCH_AUTHOR_ID = 'CREATOR_WATCH';
+
 const YOUTUBE_EFFECT_LABEL_KEYS: Record<string, string> = {
     Cash: 'life.effect.cash',
     'Channel Views': 'life.effect.channelViews',
@@ -102,7 +105,8 @@ const YOUTUBE_EFFECT_LABEL_KEYS: Record<string, string> = {
 
 const buildImpactSignals = (
     before: YoutubeImpactSnapshot,
-    after: YoutubeImpactSnapshot
+    after: YoutubeImpactSnapshot,
+    language = 'en' as ReturnType<typeof getPlayerLanguage>
 ): EventImpactSignal[] => {
     const effects: EventImpactSignal[] = [];
     const add = (
@@ -113,7 +117,7 @@ const buildImpactSignals = (
     ) => {
         if (!delta) return;
         effects.push({
-            label,
+            label: YOUTUBE_EFFECT_LABEL_KEYS[label] ? t(language, YOUTUBE_EFFECT_LABEL_KEYS[label]) : label,
             labelKey: YOUTUBE_EFFECT_LABEL_KEYS[label],
             value: signed(delta, format),
             tone: toneForDelta(delta, positiveIsGood)
@@ -132,9 +136,10 @@ const buildImpactSignals = (
 
     if (after.legalCases > before.legalCases) {
         effects.push({
-            label: 'Legal Case',
+            label: t(language, 'life.effect.legalCase'),
             labelKey: 'life.effect.legalCase',
-            value: 'Opened',
+            value: t(language, 'life.effect.value.opened'),
+            valueKey: 'life.effect.value.opened',
             tone: 'negative'
         });
     }
@@ -219,11 +224,12 @@ const createCreatorRivalPost = (
     content: string,
     reach: number,
     rivalName: string,
-    random: RandomSource
+    random: RandomSource,
+    language: ReturnType<typeof getPlayerLanguage> = 'en'
 ): XPost => ({
     id: `x_yt_rival_${Date.now()}_${random()}`,
     authorId: `rival_${rivalName.toLowerCase().replace(/\s+/g, '_')}`,
-    authorName: rivalName,
+    authorName: rivalName === CREATOR_WATCH_AUTHOR_ID ? t(language, 'services.youtubeEvent.social.creatorWatch.name') : rivalName,
     authorHandle: `@${rivalName.toLowerCase().replace(/\s+/g, '')}`,
     authorAvatar: `https://api.dicebear.com/8.x/pixel-art/svg?seed=${encodeURIComponent(rivalName)}`,
     content,
@@ -259,7 +265,8 @@ const resolveCopyrightChoice = (
     player: Player,
     resolution: Extract<YoutubeEventResolution, { kind: 'COPYRIGHT' }>,
     choiceId: string,
-    random: RandomSource
+    random: RandomSource,
+    language: ReturnType<typeof getPlayerLanguage>
 ): string => {
     const { videoTitle, claimAmount, evidenceStrength } = resolution.payload;
 
@@ -292,8 +299,8 @@ const resolveCopyrightChoice = (
 
             player.flags.activeCases!.push(createYoutubeLegalCase(
                 player,
-                'YouTube Copyright Dispute',
-                `A copyright holder escalated the claim around "${videoTitle}".`,
+                t(language, 'services.youtubeEvent.legalCase.copyright.title'),
+                t(language, 'services.youtubeEvent.legalCase.copyright.description', { videoTitle }),
                 evidenceStrength,
                 Math.floor(defenseScore),
                 random
@@ -301,8 +308,8 @@ const resolveCopyrightChoice = (
             player.youtube.controversy = clamp((player.youtube.controversy ?? 0) + 8);
             player.news.unshift({
                 id: `news_yt_copyright_case_${Date.now()}`,
-                headline: `${player.name} faces a copyright dispute over a YouTube upload.`,
-                subtext: 'The creator side of fame just got legally messy.',
+                headline: t(language, 'services.youtubeEvent.news.copyrightCase.headline', { player: player.name }),
+                subtext: t(language, 'services.youtubeEvent.news.copyrightCase.subtext'),
                 category: 'YOU',
                 week: player.currentWeek,
                 year: player.age,
@@ -317,7 +324,7 @@ const resolveCopyrightChoice = (
                 const recoveredViews = Math.floor(Math.max(750, video.views * 0.08));
                 video.views += recoveredViews;
                 video.likes += Math.floor(recoveredViews * 0.05);
-                video.comments = ['The claim was handled professionally.', ...(video.comments || [])].slice(0, 5);
+                video.comments = [t(language, 'services.youtubeEvent.videoComment.claimHandled'), ...(video.comments || [])].slice(0, 5);
                 player.youtube.totalChannelViews += recoveredViews;
             }
             player.youtube.audienceTrust = clamp((player.youtube.audienceTrust ?? 55) + 5);
@@ -335,7 +342,8 @@ const resolveBacklashChoice = (
     player: Player,
     resolution: Extract<YoutubeEventResolution, { kind: 'BACKLASH' }>,
     choiceId: string,
-    random: RandomSource
+    random: RandomSource,
+    language: ReturnType<typeof getPlayerLanguage>
 ): string => {
     const { videoTitle, severity } = resolution.payload;
 
@@ -352,7 +360,7 @@ const resolveBacklashChoice = (
             if (video) {
                 video.views += recoveryViews;
                 video.likes += Math.floor(recoveryViews * 0.06);
-                video.comments = ['This response actually felt mature.', ...(video.comments || [])].slice(0, 5);
+                video.comments = [t(language, 'services.youtubeEvent.videoComment.matureResponse'), ...(video.comments || [])].slice(0, 5);
             }
             player.youtube.totalChannelViews += recoveryViews;
             player.youtube.audienceTrust = clamp((player.youtube.audienceTrust ?? 55) + 9);
@@ -367,7 +375,7 @@ const resolveBacklashChoice = (
             if (video) {
                 video.views += spikeViews;
                 video.likes += Math.floor(spikeViews * 0.035);
-                video.comments = ['This response made everything louder.', ...(video.comments || [])].slice(0, 5);
+                video.comments = [t(language, 'services.youtubeEvent.videoComment.louderResponse'), ...(video.comments || [])].slice(0, 5);
             }
             player.youtube.totalChannelViews += spikeViews;
             player.youtube.fanMood = clamp((player.youtube.fanMood ?? 55) - 2);
@@ -378,8 +386,8 @@ const resolveBacklashChoice = (
             if (severity >= 72 || random() < 0.25) {
                 player.flags.activeCases!.push(createYoutubeLegalCase(
                     player,
-                    'Creator Backlash Defamation Case',
-                    `A public response to backlash around "${videoTitle}" triggered a legal complaint.`,
+                    t(language, 'services.youtubeEvent.legalCase.backlash.title'),
+                    t(language, 'services.youtubeEvent.legalCase.backlash.description', { videoTitle }),
                     55 + Math.floor(random() * 25),
                     Math.floor((player.stats.reputation * 0.35) + random() * 30),
                     random
@@ -439,7 +447,8 @@ const resolveRivalryChoice = (
     player: Player,
     resolution: Extract<YoutubeEventResolution, { kind: 'RIVALRY' }>,
     choiceId: string,
-    random: RandomSource
+    random: RandomSource,
+    language: ReturnType<typeof getPlayerLanguage>
 ): string => {
     const { rivalName, baseReach } = resolution.payload;
 
@@ -449,10 +458,11 @@ const resolveRivalryChoice = (
             player.youtube.fanMood = clamp((player.youtube.fanMood ?? 55) - 1);
             player.youtube.controversy = clamp((player.youtube.controversy ?? 0) - 5);
             player.x.feed.unshift(createCreatorRivalPost(
-                `${player.name} refusing to feed the ${rivalName} drama is... annoyingly mature.`,
+                t(language, 'services.youtubeEvent.social.rival.ignore', { player: player.name, rivalName }),
                 baseReach,
-                'Creator Watch',
-                random
+                CREATOR_WATCH_AUTHOR_ID,
+                random,
+                language
             ));
             player.x.feed = player.x.feed.slice(0, 50);
             return `You ignored ${rivalName}'s bait. The channel stayed cleaner, but the moment lost some energy.`;
@@ -468,10 +478,11 @@ const resolveRivalryChoice = (
             player.stats.reputation = clamp(player.stats.reputation - 2);
             player.x.followers += Math.floor(bonusViews * 0.015);
             player.x.feed.unshift(createCreatorRivalPost(
-                `${player.name} just answered ${rivalName} and the timeline is on fire.`,
+                t(language, 'services.youtubeEvent.social.rival.clapBack', { player: player.name, rivalName }),
                 bonusViews,
-                'Creator Watch',
-                random
+                CREATOR_WATCH_AUTHOR_ID,
+                random,
+                language
             ));
             player.x.feed = player.x.feed.slice(0, 50);
             return `You clapped back at ${rivalName}. The response gained ${bonusViews.toLocaleString()} views and ${bonusSubs.toLocaleString()} subscribers, but raised the heat.`;
@@ -485,10 +496,11 @@ const resolveRivalryChoice = (
             player.youtube.controversy = clamp((player.youtube.controversy ?? 0) - 12);
             player.stats.reputation = clamp(player.stats.reputation + 5);
             player.x.feed.unshift(createCreatorRivalPost(
-                `${player.name} and ${rivalName} turned beef into a polished collab. That is career control.`,
+                t(language, 'services.youtubeEvent.social.rival.collab', { player: player.name, rivalName }),
                 bonusViews,
-                'Creator Watch',
-                random
+                CREATOR_WATCH_AUTHOR_ID,
+                random,
+                language
             ));
             player.x.feed = player.x.feed.slice(0, 50);
             return `You turned ${rivalName}'s feud into a controlled hit collaboration with ${bonusViews.toLocaleString()} new views.`;
@@ -509,30 +521,32 @@ export const resolveYoutubeEventChoice = (
     }
 
     ensureYoutubeState(player);
+    const language = getPlayerLanguage(player);
     const before = snapshotYoutubeImpact(player);
     let log = '';
 
     switch (resolution.kind) {
         case 'COPYRIGHT':
-            log = resolveCopyrightChoice(player, resolution, choiceId, random);
+            log = resolveCopyrightChoice(player, resolution, choiceId, random, language);
             break;
         case 'BACKLASH':
-            log = resolveBacklashChoice(player, resolution, choiceId, random);
+            log = resolveBacklashChoice(player, resolution, choiceId, random, language);
             break;
         case 'CREATOR_INVITE':
             log = resolveCreatorInviteChoice(player, resolution, choiceId, random);
             break;
         case 'RIVALRY':
-            log = resolveRivalryChoice(player, resolution, choiceId, random);
+            log = resolveRivalryChoice(player, resolution, choiceId, random, language);
             break;
     }
 
     const logRef = getYoutubeLogRef(resolution, choiceId, log);
+    const localizedLog = logRef.logKey ? t(language, logRef.logKey, logRef.logVars) : log;
 
     return {
         updatedPlayer: player,
-        log,
+        log: localizedLog,
         ...logRef,
-        effects: buildImpactSignals(before, snapshotYoutubeImpact(player))
+        effects: buildImpactSignals(before, snapshotYoutubeImpact(player), language)
     };
 };

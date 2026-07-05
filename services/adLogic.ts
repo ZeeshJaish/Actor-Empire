@@ -1,3 +1,4 @@
+import { AdMob } from '@capacitor-community/admob';
 import { AdType } from '../types';
 
 const ADMOB_IDS = {
@@ -21,11 +22,9 @@ declare global {
             isNativePlatform?: () => boolean;
             getPlatform?: () => string;
             Plugins?: {
-                AdMob?: any;
                 Purchases?: any;
             };
         };
-        AdMob?: any;
         adBreak?: any;
         adConfig?: any;
     }
@@ -33,11 +32,9 @@ declare global {
 
 let initialized = false;
 
-const getAdMob = () => window.AdMob || window.Capacitor?.Plugins?.AdMob;
 const isRewardedType = (type: AdType) => type !== 'INTERSTITIAL';
 
 const requestConsent = async () => {
-    const AdMob = getAdMob();
     if (!AdMob?.requestConsentInfo) return;
 
     try {
@@ -68,7 +65,6 @@ export const initAds = async () => {
 
     if (initialized) return;
 
-    const AdMob = getAdMob();
     if (!AdMob?.initialize) {
         console.warn('AdMob plugin not found. Native ads are unavailable.');
         return;
@@ -92,7 +88,6 @@ export const showAd = async (type: AdType): Promise<AdResult> => {
     if (isNative) {
         await initAds();
 
-        const AdMob = getAdMob();
         if (!AdMob) return { success: false };
 
         const platform = (window.Capacitor?.getPlatform?.() === 'ios' ? 'ios' : 'android') as 'ios' | 'android';

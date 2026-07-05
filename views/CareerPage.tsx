@@ -231,7 +231,7 @@ export const CareerPage: React.FC<CareerPageProps> = ({ player, onQuitJob, onReh
             </h3>
             {postPhase.map(gig => {
                 const buzz = gig.promotionalBuzz || 0;
-                const buzzLabel = getBuzzLabel(buzz);
+                const buzzLabel = getBuzzLabel(buzz, language);
                 const weeksSincePress = typeof gig.lastPressAbsolute === 'number'
                   ? Math.max(0, getAbsoluteWeek(player.age, player.currentWeek) - gig.lastPressAbsolute)
                   : getElapsedWeeks(

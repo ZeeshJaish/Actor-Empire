@@ -101,7 +101,7 @@ if (!controlledDecision) {
 if (!controlledDecision.logic.length || controlledDecision.options.length < 2) {
     throw new Error('Subsidiary decisions should explain the logic and offer at least two choices.');
 }
-if (!processed.inbox.some(message => message.subject.includes('Board Decision'))) {
+if (!processed.inbox.some(message => message.data?.decisionId === controlledDecision.id && message.subject.includes(controlledDecision.title))) {
     throw new Error('New subsidiary decisions should notify the player inbox.');
 }
 if (processedMerged.studioState?.subsidiaryDecisions?.length) {
@@ -130,7 +130,7 @@ if (resolvedDecision?.status !== 'RESOLVED' || resolvedDecision.selectedOptionId
 if (controlledDecision.type === 'RISKY_PRODUCTION' && !approvedStudio.studioState?.subsidiaryProjectProposals?.length) {
     throw new Error('Approving risky production should create a real project proposal.');
 }
-if (!approvedRisk.player.news.some(item => item.headline.includes('approves'))) {
+if (!approvedRisk.player.news.some(item => item.headline.includes(controlledDecision.title) || item.subtext.includes(resolvedDecision?.outcomeSummary || ''))) {
     throw new Error('Resolving subsidiary decisions should generate industry news.');
 }
 

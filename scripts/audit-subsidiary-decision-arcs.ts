@@ -119,10 +119,10 @@ const advancedArc = advancedStudio.studioState?.activeDecisionArcs?.find(arc => 
 if (!advancedArc || advancedArc.beatsResolved < 1) {
     throw new Error('Weekly decision engine should advance active decision storylines.');
 }
-if (!advanced.news.some(item => item.headline.includes('Storyline') || item.subtext.includes(activeArc.title))) {
+if (!advanced.news.some(item => item.headline.includes(activeArc.title) || item.subtext.includes(activeArc.beats[0]?.label || ''))) {
     throw new Error('Advancing a decision storyline should publish world/news feedback.');
 }
-if (!advanced.logs.some(log => log.message.includes('storyline advanced'))) {
+if (!advanced.logs.some(log => log.message.includes(activeArc.title))) {
     throw new Error('Advancing a decision storyline should add a studio log entry.');
 }
 

@@ -1,5 +1,5 @@
-import { Player, Commitment, ActorTrait, ProductionCrisis, ProductionCrisisOption } from '../types';
-import { NPC_DATABASE } from './npcLogic';
+import { Player, Commitment, GameLanguage, ProductionCrisis, ProductionCrisisOption } from '../types';
+import { getPlayerLanguage, t } from './i18n';
 
 type CrisisCategory = 'TECHNICAL' | 'INTERPERSONAL' | 'ENVIRONMENTAL' | 'FINANCIAL' | 'CREATIVE' | 'LEGAL';
 
@@ -14,49 +14,49 @@ interface CrisisTemplate {
 
 const TECHNICAL_TEMPLATES: CrisisTemplate[] = [
     {
-        title: "Corrupted Footage",
+        title: '',
         titleKey: 'production.crisis.corruptedFootage.title',
-        description: "A digital error has corrupted several key scenes from yesterday's shoot.",
+        description: '',
         descriptionKey: 'production.crisis.corruptedFootage.description',
         options: [
             {
-                label: "Reshoot ($50k)",
+                label: '',
                 labelKey: 'production.crisis.corruptedFootage.reshoot.label',
                 impact: (p, c) => {
                     const updatedPlayer = { ...p, money: p.money - 50000 };
-                    return { updatedPlayer, updatedProject: c, log: "You paid for a quick reshoot. The schedule holds, but the budget takes a hit.", logKey: 'production.crisis.corruptedFootage.reshoot.log' };
+                    return { updatedPlayer, updatedProject: c, log: '', logKey: 'production.crisis.corruptedFootage.reshoot.log' };
                 }
             },
             {
-                label: "Fix in Post (Quality -5)",
+                label: '',
                 labelKey: 'production.crisis.corruptedFootage.fix.label',
                 impact: (p, c) => {
                     const updatedProject = { ...c, productionPerformance: Math.max(0, (c.productionPerformance || 50) - 5) };
-                    return { updatedPlayer: p, updatedProject, log: "The VFX team will try to patch it. It won't be perfect, but it's cheaper than a reshoot.", logKey: 'production.crisis.corruptedFootage.fix.log' };
+                    return { updatedPlayer: p, updatedProject, log: '', logKey: 'production.crisis.corruptedFootage.fix.log' };
                 }
             }
         ]
     },
     {
-        title: "Equipment Failure",
+        title: '',
         titleKey: 'production.crisis.equipmentFailure.title',
-        description: "The high-end anamorphic lenses have been damaged during an action sequence.",
+        description: '',
         descriptionKey: 'production.crisis.equipmentFailure.description',
         options: [
             {
-                label: "Rent Replacements ($30k)",
+                label: '',
                 labelKey: 'production.crisis.equipmentFailure.rent.label',
                 impact: (p, c) => {
                     const updatedPlayer = { ...p, money: p.money - 30000 };
-                    return { updatedPlayer, updatedProject: c, log: "You rented replacements immediately. Production continues.", logKey: 'production.crisis.equipmentFailure.rent.log' };
+                    return { updatedPlayer, updatedProject: c, log: '', logKey: 'production.crisis.equipmentFailure.rent.log' };
                 }
             },
             {
-                label: "Use Backup Lenses (Quality -3)",
+                label: '',
                 labelKey: 'production.crisis.equipmentFailure.backup.label',
                 impact: (p, c) => {
                     const updatedProject = { ...c, productionPerformance: Math.max(0, (c.productionPerformance || 50) - 3) };
-                    return { updatedPlayer: p, updatedProject, log: "The backup glass isn't as sharp, but the show must go on.", logKey: 'production.crisis.equipmentFailure.backup.log' };
+                    return { updatedPlayer: p, updatedProject, log: '', logKey: 'production.crisis.equipmentFailure.backup.log' };
                 }
             }
         ]
@@ -65,28 +65,28 @@ const TECHNICAL_TEMPLATES: CrisisTemplate[] = [
 
 const INTERPERSONAL_TEMPLATES: CrisisTemplate[] = [
     {
-        title: "Director vs Star",
+        title: '',
         titleKey: 'production.crisis.directorVsStar.title',
-        description: "The Director and the Lead Actor are having a heated argument over a creative choice.",
+        description: '',
         descriptionKey: 'production.crisis.directorVsStar.description',
         options: [
             {
-                label: "Side with Director",
+                label: '',
                 labelKey: 'production.crisis.directorVsStar.director.label',
                 impact: (p, c) => {
                     const updatedProject = { ...c, productionPerformance: Math.min(100, (c.productionPerformance || 50) + 5) };
-                    return { updatedPlayer: p, updatedProject, log: "The director's vision is preserved, boosting quality, but the actor is fuming.", logKey: 'production.crisis.directorVsStar.director.log' };
+                    return { updatedPlayer: p, updatedProject, log: '', logKey: 'production.crisis.directorVsStar.director.log' };
                 }
             },
             {
-                label: "Side with Actor",
+                label: '',
                 labelKey: 'production.crisis.directorVsStar.actor.label',
                 impact: (p, c) => {
                     const updatedProject = { ...c };
                     if (updatedProject.projectDetails) {
                         updatedProject.projectDetails.hiddenStats.rawHype = Math.min(100, (updatedProject.projectDetails.hiddenStats.rawHype || 50) + 5);
                     }
-                    return { updatedPlayer: p, updatedProject, log: "The actor is happy and promotes the film more, but the director feels undermined.", logKey: 'production.crisis.directorVsStar.actor.log' };
+                    return { updatedPlayer: p, updatedProject, log: '', logKey: 'production.crisis.directorVsStar.actor.log' };
                 }
             }
         ]
@@ -95,25 +95,25 @@ const INTERPERSONAL_TEMPLATES: CrisisTemplate[] = [
 
 const ENVIRONMENTAL_TEMPLATES: CrisisTemplate[] = [
     {
-        title: "Sudden Storm",
+        title: '',
         titleKey: 'production.crisis.suddenStorm.title',
-        description: "An unpredicted storm has washed out the exterior location.",
+        description: '',
         descriptionKey: 'production.crisis.suddenStorm.description',
         options: [
             {
-                label: "Wait it Out (Delay 1w)",
+                label: '',
                 labelKey: 'production.crisis.suddenStorm.wait.label',
                 impact: (p, c) => {
                     const updatedProject = { ...c, phaseWeeksLeft: (c.phaseWeeksLeft || 1) + 1 };
-                    return { updatedPlayer: p, updatedProject, log: "You waited for the sun. One week added to production.", logKey: 'production.crisis.suddenStorm.wait.log' };
+                    return { updatedPlayer: p, updatedProject, log: '', logKey: 'production.crisis.suddenStorm.wait.log' };
                 }
             },
             {
-                label: "Move to Studio ($40k)",
+                label: '',
                 labelKey: 'production.crisis.suddenStorm.studio.label',
                 impact: (p, c) => {
                     const updatedPlayer = { ...p, money: p.money - 40000 };
-                    return { updatedPlayer, updatedProject: c, log: "You moved the shoot to a soundstage. Expensive, but on schedule.", logKey: 'production.crisis.suddenStorm.studio.log' };
+                    return { updatedPlayer, updatedProject: c, log: '', logKey: 'production.crisis.suddenStorm.studio.log' };
                 }
             }
         ]
@@ -122,25 +122,25 @@ const ENVIRONMENTAL_TEMPLATES: CrisisTemplate[] = [
 
 const FINANCIAL_TEMPLATES: CrisisTemplate[] = [
     {
-        title: "Budget Overrun",
+        title: '',
         titleKey: 'production.crisis.budgetOverrun.title',
-        description: "The production is running over budget due to unexpected logistics costs.",
+        description: '',
         descriptionKey: 'production.crisis.budgetOverrun.description',
         options: [
             {
-                label: "Inject Cash ($100k)",
+                label: '',
                 labelKey: 'production.crisis.budgetOverrun.cash.label',
                 impact: (p, c) => {
                     const updatedPlayer = { ...p, money: p.money - 100000 };
-                    return { updatedPlayer, updatedProject: c, log: "You covered the costs out of pocket to keep things moving.", logKey: 'production.crisis.budgetOverrun.cash.log' };
+                    return { updatedPlayer, updatedProject: c, log: '', logKey: 'production.crisis.budgetOverrun.cash.log' };
                 }
             },
             {
-                label: "Cut Corners (Quality -10)",
+                label: '',
                 labelKey: 'production.crisis.budgetOverrun.cut.label',
                 impact: (p, c) => {
                     const updatedProject = { ...c, productionPerformance: Math.max(0, (c.productionPerformance || 50) - 10) };
-                    return { updatedPlayer: p, updatedProject, log: "You slashed the catering and background actor budget. Morale and quality dropped.", logKey: 'production.crisis.budgetOverrun.cut.log' };
+                    return { updatedPlayer: p, updatedProject, log: '', logKey: 'production.crisis.budgetOverrun.cut.log' };
                 }
             }
         ]
@@ -149,28 +149,28 @@ const FINANCIAL_TEMPLATES: CrisisTemplate[] = [
 
 const CREATIVE_TEMPLATES: CrisisTemplate[] = [
     {
-        title: "Script Leak",
+        title: '',
         titleKey: 'production.crisis.scriptLeak.title',
-        description: "A major plot twist has been leaked online by a disgruntled extra.",
+        description: '',
         descriptionKey: 'production.crisis.scriptLeak.description',
         options: [
             {
-                label: "Rewrite Twist (Delay 1w)",
+                label: '',
                 labelKey: 'production.crisis.scriptLeak.rewrite.label',
                 impact: (p, c) => {
                     const updatedProject = { ...c, phaseWeeksLeft: (c.phaseWeeksLeft || 1) + 1 };
-                    return { updatedPlayer: p, updatedProject, log: "The writers scrambled to change the ending. One week delay.", logKey: 'production.crisis.scriptLeak.rewrite.log' };
+                    return { updatedPlayer: p, updatedProject, log: '', logKey: 'production.crisis.scriptLeak.rewrite.log' };
                 }
             },
             {
-                label: "Lean Into It (Hype +10)",
+                label: '',
                 labelKey: 'production.crisis.scriptLeak.lean.label',
                 impact: (p, c) => {
                     const updatedProject = { ...c };
                     if (updatedProject.projectDetails) {
                         updatedProject.projectDetails.hiddenStats.rawHype = Math.min(100, (updatedProject.projectDetails.hiddenStats.rawHype || 50) + 10);
                     }
-                    return { updatedPlayer: p, updatedProject, log: "You confirmed the leak and used it for marketing. Hype is through the roof!", logKey: 'production.crisis.scriptLeak.lean.log' };
+                    return { updatedPlayer: p, updatedProject, log: '', logKey: 'production.crisis.scriptLeak.lean.log' };
                 }
             }
         ]
@@ -179,37 +179,50 @@ const CREATIVE_TEMPLATES: CrisisTemplate[] = [
 
 const LEGAL_TEMPLATES: CrisisTemplate[] = [
     {
-        title: "Copyright Claim",
+        title: '',
         titleKey: 'production.crisis.copyrightClaim.title',
-        description: "A local artist claims a mural in the background of a key scene is copyrighted.",
+        description: '',
         descriptionKey: 'production.crisis.copyrightClaim.description',
         options: [
             {
-                label: "Pay Settlement ($20k)",
+                label: '',
                 labelKey: 'production.crisis.copyrightClaim.pay.label',
                 impact: (p, c) => {
                     const updatedPlayer = { ...p, money: p.money - 20000 };
-                    return { updatedPlayer, updatedProject: c, log: "You paid the artist to avoid a lawsuit.", logKey: 'production.crisis.copyrightClaim.pay.log' };
+                    return { updatedPlayer, updatedProject: c, log: '', logKey: 'production.crisis.copyrightClaim.pay.log' };
                 }
             },
             {
-                label: "Blur it Out (Quality -2)",
+                label: '',
                 labelKey: 'production.crisis.copyrightClaim.blur.label',
                 impact: (p, c) => {
                     const updatedProject = { ...c, productionPerformance: Math.max(0, (c.productionPerformance || 50) - 2) };
-                    return { updatedPlayer: p, updatedProject, log: "The VFX team blurred the mural. It looks a bit distracting.", logKey: 'production.crisis.copyrightClaim.blur.log' };
+                    return { updatedPlayer: p, updatedProject, log: '', logKey: 'production.crisis.copyrightClaim.blur.log' };
                 }
             }
         ]
     }
 ];
 
-// GENERATIVE COMPONENTS
-const ADJECTIVES = ["Unexpected", "Catastrophic", "Bizarre", "Sudden", "Total", "Minor", "Critical", "Shocking"];
-const NOUNS = ["Failure", "Crisis", "Disaster", "Incident", "Drama", "Breakdown", "Mishap", "Scandal"];
-const SUBJECTS = ["Catering", "Transportation", "Lighting", "Sound", "Security", "Publicity", "Logistics", "Scheduling"];
+type GeneratedAdjectiveId = 'UNEXPECTED' | 'CATASTROPHIC' | 'BIZARRE' | 'SUDDEN' | 'TOTAL' | 'MINOR' | 'CRITICAL' | 'SHOCKING';
+type GeneratedNounId = 'FAILURE' | 'CRISIS' | 'DISASTER' | 'INCIDENT' | 'DRAMA' | 'BREAKDOWN' | 'MISHAP' | 'SCANDAL';
+type GeneratedSubjectId = 'CATERING' | 'TRANSPORTATION' | 'LIGHTING' | 'SOUND' | 'SECURITY' | 'PUBLICITY' | 'LOGISTICS' | 'SCHEDULING';
+
+const ADJECTIVE_IDS: GeneratedAdjectiveId[] = ['UNEXPECTED', 'CATASTROPHIC', 'BIZARRE', 'SUDDEN', 'TOTAL', 'MINOR', 'CRITICAL', 'SHOCKING'];
+const NOUN_IDS: GeneratedNounId[] = ['FAILURE', 'CRISIS', 'DISASTER', 'INCIDENT', 'DRAMA', 'BREAKDOWN', 'MISHAP', 'SCANDAL'];
+const SUBJECT_IDS: GeneratedSubjectId[] = ['CATERING', 'TRANSPORTATION', 'LIGHTING', 'SOUND', 'SECURITY', 'PUBLICITY', 'LOGISTICS', 'SCHEDULING'];
+
+const pickRandom = <T,>(items: T[]): T => items[Math.floor(Math.random() * items.length)];
+
+const getGeneratedCrisisText = (
+    language: GameLanguage,
+    group: 'adjective' | 'noun' | 'subject',
+    id: string,
+    form: 'label' | 'lower' = 'label'
+) => t(language, `production.crisis.generated.${group}.${id}.${form}`);
 
 export const generateRandomCrisis = (project: Commitment, player: Player): ProductionCrisis => {
+    const language = getPlayerLanguage(player);
     const categories: CrisisCategory[] = ['TECHNICAL', 'INTERPERSONAL', 'ENVIRONMENTAL', 'FINANCIAL', 'CREATIVE', 'LEGAL'];
     const category = categories[Math.floor(Math.random() * categories.length)];
     
@@ -236,38 +249,50 @@ export const generateRandomCrisis = (project: Commitment, player: Player): Produ
             options: template.options
         };
     } else {
-        // GENERATIVE LOGIC
-        const adj = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)];
-        const noun = NOUNS[Math.floor(Math.random() * NOUNS.length)];
-        const subject = SUBJECTS[Math.floor(Math.random() * SUBJECTS.length)];
+        const adjectiveId = pickRandom(ADJECTIVE_IDS);
+        const nounId = pickRandom(NOUN_IDS);
+        const subjectId = pickRandom(SUBJECT_IDS);
+        const adj = getGeneratedCrisisText(language, 'adjective', adjectiveId);
+        const adjLower = getGeneratedCrisisText(language, 'adjective', adjectiveId, 'lower');
+        const noun = getGeneratedCrisisText(language, 'noun', nounId);
+        const nounLower = getGeneratedCrisisText(language, 'noun', nounId, 'lower');
+        const subject = getGeneratedCrisisText(language, 'subject', subjectId);
+        const subjectLower = getGeneratedCrisisText(language, 'subject', subjectId, 'lower');
         
-        const title = `${adj} ${subject} ${noun}`;
-        const description = `A ${adj.toLowerCase()} issue with the ${subject.toLowerCase()} team has caused a ${noun.toLowerCase()} on the set of ${project.name}.`;
+        const textVars = {
+            adjective: adj,
+            adjectiveLower: adjLower,
+            noun,
+            nounLower,
+            subject,
+            subjectLower,
+            project: project.name
+        };
         
         return {
             id: `crisis_gen_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
-            title,
+            title: '',
             titleKey: 'production.crisis.generated.title',
-            description,
+            description: '',
             descriptionKey: 'production.crisis.generated.description',
-            textVars: { adjective: adj, adjectiveLower: adj.toLowerCase(), noun, nounLower: noun.toLowerCase(), subject, subjectLower: subject.toLowerCase(), project: project.name },
+            textVars,
             options: [
                 {
-                    label: "Fix with Money ($25k)",
+                    label: '',
                     labelKey: 'production.crisis.generated.money.label',
-                    textVars: { subject, subjectLower: subject.toLowerCase() },
+                    textVars: { subject, subjectLower },
                     impact: (p, c) => {
                         const updatedPlayer = { ...p, money: p.money - 25000 };
-                        return { updatedPlayer, updatedProject: c, log: `You threw money at the ${subject.toLowerCase()} problem. It's fixed.`, logKey: 'production.crisis.generated.money.log', logVars: { subject, subjectLower: subject.toLowerCase() } };
+                        return { updatedPlayer, updatedProject: c, log: '', logKey: 'production.crisis.generated.money.log', logVars: { subject, subjectLower } };
                     }
                 },
                 {
-                    label: "Push Through (Quality -4)",
+                    label: '',
                     labelKey: 'production.crisis.generated.push.label',
-                    textVars: { subject, subjectLower: subject.toLowerCase() },
+                    textVars: { subject, subjectLower },
                     impact: (p, c) => {
                         const updatedProject = { ...c, productionPerformance: Math.max(0, (c.productionPerformance || 50) - 4) };
-                        return { updatedPlayer: p, updatedProject, log: `You ignored the ${subject.toLowerCase()} issue. Production continued, but quality took a hit.`, logKey: 'production.crisis.generated.push.log', logVars: { subject, subjectLower: subject.toLowerCase() } };
+                        return { updatedPlayer: p, updatedProject, log: '', logKey: 'production.crisis.generated.push.log', logVars: { subject, subjectLower } };
                     }
                 }
             ]

@@ -2,10 +2,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Player, PendingEvent, ClothingItem, PressInteraction, ClothingCategory, Stats, Vehicle, Award } from '../types';
 import { CLOTHING_CATALOG, CAR_CATALOG, MOTORCYCLE_CATALOG, BOAT_CATALOG, AIRCRAFT_CATALOG } from '../services/lifestyleLogic';
-import { generatePressInteractions, determineWinners, Nomination, sanitizeAwardRecords, generateSeasonWinners } from '../services/awardLogic';
+import { generatePressInteractions, determineWinners, Nomination, sanitizeAwardRecords, generateSeasonWinners, AwardResolvedWinner } from '../services/awardLogic';
 import { RED_CARPET_INTERVIEWS } from '../services/premiereLogic';
 import { NPC_DATABASE } from '../services/npcLogic';
-import { getPlayerLanguage } from '../services/i18n';
+import { getPlayerLanguage, t } from '../services/i18n';
 import { Camera, Star, Mic2, Shirt, ArrowRight, Trophy, Zap, X, MapPin, Watch, Footprints, Layers, Check, Car, Barcode, Users, Tv, Sparkles, Music, Video, Clapperboard, Globe, FastForward, Glasses, ShoppingBag, Gem } from 'lucide-react';
 
 interface RedCarpetEventProps {
@@ -122,6 +122,10 @@ const buildFallbackOpponentNames = (category: string, playerName: string): strin
     return shuffled.slice(0, 3).length > 0 ? shuffled.slice(0, 3) : ['Alex Mercer', 'Jordan Vale', 'Taylor Quinn'];
 };
 
+const getNomineeDisplayName = (nomination: Nomination, playerName: string) => (
+    nomination.nomineeName || (nomination.isPlayer ? playerName : nomination.project.name)
+);
+
 // --- VISUAL ASSETS ---
 
 const STYLE = `
@@ -202,6 +206,8 @@ const SlotButton = ({ label, subLabel, icon, isActive, hasItem, onClick, disable
 
 export const RedCarpetEvent: React.FC<RedCarpetEventProps> = ({ player, event, onComplete }) => {
     const [phase, setPhase] = useState<Phase>('OUTFIT');
+    const language = getPlayerLanguage(player);
+    const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
     
     // Outfit State
     const [equippedItems, setEquippedItems] = useState<{
@@ -267,6 +273,43 @@ export const RedCarpetEvent: React.FC<RedCarpetEventProps> = ({ player, event, o
 
     const nominations = event.data?.nominations || [];
     const fullBallot = event.data?.fullBallot as Record<string, Nomination[]>;
+    const getResolvedWinnerEntry = (category: string): Nomination | null => {
+        const nominees = fullBallot?.[category];
+        if (nominees?.length) {
+            return [...nominees].sort((a, b) => b.score - a.score)[0];
+        }
+        const result = currentResults.find((item: any) => item.nomination.category === category);
+        return result?.won ? result.nomination : null;
+    };
+    const getCeremonyWinnerName = (result: any) => {
+        const winnerEntry = getResolvedWinnerEntry(result.nomination.category);
+        if (winnerEntry) return getNomineeDisplayName(winnerEntry, player.name);
+        if (result.won) return player.name;
+        return buildFallbackOpponentNames(result.nomination.category, player.name)[0];
+    };
+    const ceremonyResolvedWinners = useMemo<AwardResolvedWinner[]>(() => {
+        if (fullBallot) {
+            return Object.entries(fullBallot).flatMap(([category, nominees]) => {
+                const winnerEntry = [...nominees].sort((a, b) => b.score - a.score)[0];
+                if (!winnerEntry) return [];
+                return [{
+                    category,
+                    winnerName: getNomineeDisplayName(winnerEntry, player.name),
+                    projectName: winnerEntry.project.name,
+                    isPlayer: winnerEntry.isPlayer
+                }];
+            });
+        }
+        return currentResults.map((result: any) => {
+            const winnerEntry = result.won ? result.nomination : null;
+            return {
+                category: result.nomination.category,
+                winnerName: winnerEntry ? getNomineeDisplayName(winnerEntry, player.name) : getCeremonyWinnerName(result),
+                projectName: winnerEntry?.project.name || result.nomination.project.name,
+                isPlayer: Boolean(winnerEntry?.isPlayer)
+            };
+        });
+    }, [fullBallot, currentResults, player.name]);
 
     // Calculate Style
     const totalStylePoints = (Object.values(equippedItems) as (ClothingItem | null)[])
@@ -303,13 +346,13 @@ export const RedCarpetEvent: React.FC<RedCarpetEventProps> = ({ player, event, o
                     const nominees = fullBallot[cat];
                     // Pick a random winner from the list based on score (simulated)
                     // The ballot is already sorted by score in awardLogic, so [0] is the winner
-                    const winnerNom = nominees[0];
-                    const winnerName = winnerNom.nomineeName || winnerNom.project.name;
+                    const winnerEntry = getResolvedWinnerEntry(cat) || nominees[0];
+                    const winnerName = getNomineeDisplayName(winnerEntry, player.name);
                     
                     queue.push({
                         type: 'FILLER_CATEGORY',
                         categoryName: cat,
-                        nominees: nominees.map(n => n.nomineeName || n.project.name),
+                        nominees: nominees.map(n => getNomineeDisplayName(n, player.name)),
                         winner: winnerName
                     });
                 });
@@ -324,15 +367,13 @@ export const RedCarpetEvent: React.FC<RedCarpetEventProps> = ({ player, event, o
             }
 
             // 2. Add Player Category (The Tension Moment)
-            if (currentResults.length > 0) {
-                const result = currentResults[0]; // Focusing on primary nomination
-                
+            currentResults.map((result: any) => {
                 // Find rivals from ballot if possible
                 let opponentNames: string[] = [];
                 if (fullBallot && fullBallot[result.nomination.category]) {
                     opponentNames = fullBallot[result.nomination.category]
                         .filter((n: any) => !n.isPlayer)
-                        .map((n: any) => n.nomineeName || n.project.name)
+                        .map((n: any) => getNomineeDisplayName(n, player.name))
                         .filter((name: string) => !!name && name.trim().length > 0);
                 } else {
                     opponentNames = buildFallbackOpponentNames(result.nomination.category, player.name);
@@ -349,11 +390,12 @@ export const RedCarpetEvent: React.FC<RedCarpetEventProps> = ({ player, event, o
                     type: 'PLAYER_CATEGORY',
                     categoryName: result.nomination.category,
                     nominees: displayNominees,
-                    winner: result.won ? player.name : opponentNames[0], // If player lost, top rival wins
-                    isPlayerWinner: result.won,
+                    winner: getCeremonyWinnerName(result),
+                    isPlayerWinner: Boolean(getResolvedWinnerEntry(result.nomination.category)?.isPlayer),
                     data: result
                 });
-            }
+                return result;
+            });
 
             setCeremonyQueue(queue);
         }
@@ -558,8 +600,8 @@ export const RedCarpetEvent: React.FC<RedCarpetEventProps> = ({ player, event, o
             // Add news about the premiere
             const newsItem = {
                 id: `news_premiere_${Date.now()}`,
-                headline: `${player.name} shines at ${event.title}!`,
-                subtext: `The premiere was a massive success, boosting hype for the upcoming release.`,
+                headline: tr('redCarpet.generated.premiereSuccess.headline', { name: player.name, title: event.title }),
+                subtext: tr('redCarpet.generated.premiereSuccess.subtext'),
                 category: 'YOU' as any,
                 week: player.currentWeek,
                 year: player.age,
@@ -616,7 +658,7 @@ export const RedCarpetEvent: React.FC<RedCarpetEventProps> = ({ player, event, o
             updatedPlayer.pastProjects = pastProjectsUpdate;
             const awardType = event.data?.awardDef?.type;
             if (['GOLDEN_GLOBE', 'BAFTA', 'OSCAR', 'EMMY'].includes(awardType)) {
-                const historyEntry = generateSeasonWinners(updatedPlayer, awardType, awardYear);
+                const historyEntry = generateSeasonWinners(updatedPlayer, awardType, awardYear, ceremonyResolvedWinners);
                 updatedPlayer.world = {
                     ...updatedPlayer.world,
                     awardHistory: [

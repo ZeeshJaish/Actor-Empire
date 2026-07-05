@@ -1,0 +1,1217 @@
+id,type,name,output,prompt
+"prop_apt_1","Property","Silver Lake Studio","assets/lifestyle/properties/prop_apt_1.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Silver Lake Studio in Los Angeles, starter home. Show an exterior hero view with architecture that matches the name: apartment/condo as stylish urban building, villa/estate as wide luxury home, tower/penthouse as tall skyline residence, island as private island villa, chalet/cabin as scenic retreat. Retro pixel-art, warm window glow, tasteful environment hints, premium game inventory icon, no text."
+"prop_starter_condo","Property","West Hollywood Condo","assets/lifestyle/properties/prop_starter_condo.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+West Hollywood Condo in Los Angeles, starter home. Show an exterior hero view with architecture that matches the name: apartment/condo as stylish urban building, villa/estate as wide luxury home, tower/penthouse as tall skyline residence, island as private island villa, chalet/cabin as scenic retreat. Retro pixel-art, warm window glow, tasteful environment hints, premium game inventory icon, no text."
+"prop_la_loft","Property","Downtown Artist Loft","assets/lifestyle/properties/prop_la_loft.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Downtown Artist Loft in Los Angeles, premium home. Show an exterior hero view with architecture that matches the name: apartment/condo as stylish urban building, villa/estate as wide luxury home, tower/penthouse as tall skyline residence, island as private island villa, chalet/cabin as scenic retreat. Retro pixel-art, warm window glow, tasteful environment hints, premium game inventory icon, no text."
+"prop_suburban_house","Property","Sherman Oaks House","assets/lifestyle/properties/prop_suburban_house.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Sherman Oaks House in Los Angeles, premium home. Show an exterior hero view with architecture that matches the name: apartment/condo as stylish urban building, villa/estate as wide luxury home, tower/penthouse as tall skyline residence, island as private island villa, chalet/cabin as scenic retreat. Retro pixel-art, warm window glow, tasteful environment hints, premium game inventory icon, no text."
+"prop_hollywood_hills_home","Property","Hollywood Hills Villa","assets/lifestyle/properties/prop_hollywood_hills_home.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Hollywood Hills Villa in Los Angeles, premium home. Show an exterior hero view with architecture that matches the name: apartment/condo as stylish urban building, villa/estate as wide luxury home, tower/penthouse as tall skyline residence, island as private island villa, chalet/cabin as scenic retreat. Retro pixel-art, warm window glow, tasteful environment hints, premium game inventory icon, no text."
+"prop_beverly_hills_mansion","Property","Beverly Hills Estate","assets/lifestyle/properties/prop_beverly_hills_mansion.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Beverly Hills Estate in Los Angeles, luxury property. Show an exterior hero view with architecture that matches the name: apartment/condo as stylish urban building, villa/estate as wide luxury home, tower/penthouse as tall skyline residence, island as private island villa, chalet/cabin as scenic retreat. Retro pixel-art, warm window glow, tasteful environment hints, premium game inventory icon, no text."
+"prop_malibu_beach_house","Property","Malibu Glass House","assets/lifestyle/properties/prop_malibu_beach_house.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Malibu Glass House in Los Angeles, luxury property. Show an exterior hero view with architecture that matches the name: apartment/condo as stylish urban building, villa/estate as wide luxury home, tower/penthouse as tall skyline residence, island as private island villa, chalet/cabin as scenic retreat. Retro pixel-art, warm window glow, tasteful environment hints, premium game inventory icon, no text."
+"prop_the_one","Property","'The One' Bel Air","assets/lifestyle/properties/prop_the_one.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+'The One' Bel Air in Los Angeles, ultra luxury trophy property. Show an exterior hero view with architecture that matches the name: apartment/condo as stylish urban building, villa/estate as wide luxury home, tower/penthouse as tall skyline residence, island as private island villa, chalet/cabin as scenic retreat. Retro pixel-art, warm window glow, tasteful environment hints, premium game inventory icon, no text."
+"prop_brooklyn_brownstone","Property","Park Slope Brownstone","assets/lifestyle/properties/prop_brooklyn_brownstone.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Park Slope Brownstone in New York, premium home. Show an exterior hero view with architecture that matches the name: apartment/condo as stylish urban building, villa/estate as wide luxury home, tower/penthouse as tall skyline residence, island as private island villa, chalet/cabin as scenic retreat. Retro pixel-art, warm window glow, tasteful environment hints, premium game inventory icon, no text."
+"prop_manhattan_penthouse","Property","TriBeCa Penthouse","assets/lifestyle/properties/prop_manhattan_penthouse.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+TriBeCa Penthouse in New York, luxury property. Show an exterior hero view with architecture that matches the name: apartment/condo as stylish urban building, villa/estate as wide luxury home, tower/penthouse as tall skyline residence, island as private island villa, chalet/cabin as scenic retreat. Retro pixel-art, warm window glow, tasteful environment hints, premium game inventory icon, no text."
+"prop_nyc_billionaire","Property","Central Park Tower","assets/lifestyle/properties/prop_nyc_billionaire.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Central Park Tower in New York, ultra luxury trophy property. Show an exterior hero view with architecture that matches the name: apartment/condo as stylish urban building, villa/estate as wide luxury home, tower/penthouse as tall skyline residence, island as private island villa, chalet/cabin as scenic retreat. Retro pixel-art, warm window glow, tasteful environment hints, premium game inventory icon, no text."
+"prop_paris_marais","Property","Le Marais Apartment","assets/lifestyle/properties/prop_paris_marais.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Le Marais Apartment in Paris, premium home. Show an exterior hero view with architecture that matches the name: apartment/condo as stylish urban building, villa/estate as wide luxury home, tower/penthouse as tall skyline residence, island as private island villa, chalet/cabin as scenic retreat. Retro pixel-art, warm window glow, tasteful environment hints, premium game inventory icon, no text."
+"prop_paris_eiffel","Property","Eiffel View Penthouse","assets/lifestyle/properties/prop_paris_eiffel.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Eiffel View Penthouse in Paris, luxury property. Show an exterior hero view with architecture that matches the name: apartment/condo as stylish urban building, villa/estate as wide luxury home, tower/penthouse as tall skyline residence, island as private island villa, chalet/cabin as scenic retreat. Retro pixel-art, warm window glow, tasteful environment hints, premium game inventory icon, no text."
+"prop_chateau_france","Property","Château de Villette","assets/lifestyle/properties/prop_chateau_france.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Château de Villette in France, ultra luxury trophy property. Show an exterior hero view with architecture that matches the name: apartment/condo as stylish urban building, villa/estate as wide luxury home, tower/penthouse as tall skyline residence, island as private island villa, chalet/cabin as scenic retreat. Retro pixel-art, warm window glow, tasteful environment hints, premium game inventory icon, no text."
+"prop_london_notting","Property","Notting Hill Flat","assets/lifestyle/properties/prop_london_notting.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Notting Hill Flat in London, premium home. Show an exterior hero view with architecture that matches the name: apartment/condo as stylish urban building, villa/estate as wide luxury home, tower/penthouse as tall skyline residence, island as private island villa, chalet/cabin as scenic retreat. Retro pixel-art, warm window glow, tasteful environment hints, premium game inventory icon, no text."
+"prop_london_townhouse","Property","Mayfair Townhouse","assets/lifestyle/properties/prop_london_townhouse.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Mayfair Townhouse in London, ultra luxury trophy property. Show an exterior hero view with architecture that matches the name: apartment/condo as stylish urban building, villa/estate as wide luxury home, tower/penthouse as tall skyline residence, island as private island villa, chalet/cabin as scenic retreat. Retro pixel-art, warm window glow, tasteful environment hints, premium game inventory icon, no text."
+"prop_tokyo_shibuya","Property","Shibuya High-Rise","assets/lifestyle/properties/prop_tokyo_shibuya.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Shibuya High-Rise in Tokyo, premium home. Show an exterior hero view with architecture that matches the name: apartment/condo as stylish urban building, villa/estate as wide luxury home, tower/penthouse as tall skyline residence, island as private island villa, chalet/cabin as scenic retreat. Retro pixel-art, warm window glow, tasteful environment hints, premium game inventory icon, no text."
+"prop_la_sunset_skyloft","Property","Sunset Strip Skyloft","assets/lifestyle/properties/prop_la_sunset_skyloft.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Sunset Strip Skyloft in Los Angeles, premium home. Show an exterior hero view with architecture that matches the name: apartment/condo as stylish urban building, villa/estate as wide luxury home, tower/penthouse as tall skyline residence, island as private island villa, chalet/cabin as scenic retreat. Retro pixel-art, warm window glow, tasteful environment hints, premium game inventory icon, no text."
+"prop_venice_canal_house","Property","Venice Canal House","assets/lifestyle/properties/prop_venice_canal_house.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Venice Canal House in Los Angeles, premium home. Show an exterior hero view with architecture that matches the name: apartment/condo as stylish urban building, villa/estate as wide luxury home, tower/penthouse as tall skyline residence, island as private island villa, chalet/cabin as scenic retreat. Retro pixel-art, warm window glow, tasteful environment hints, premium game inventory icon, no text."
+"prop_atlanta_film_estate","Property","Atlanta Film Estate","assets/lifestyle/properties/prop_atlanta_film_estate.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Atlanta Film Estate in Atlanta, premium home. Show an exterior hero view with architecture that matches the name: apartment/condo as stylish urban building, villa/estate as wide luxury home, tower/penthouse as tall skyline residence, island as private island villa, chalet/cabin as scenic retreat. Retro pixel-art, warm window glow, tasteful environment hints, premium game inventory icon, no text."
+"prop_nashville_music_row_loft","Property","Music Row Loft","assets/lifestyle/properties/prop_nashville_music_row_loft.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Music Row Loft in Nashville, premium home. Show an exterior hero view with architecture that matches the name: apartment/condo as stylish urban building, villa/estate as wide luxury home, tower/penthouse as tall skyline residence, island as private island villa, chalet/cabin as scenic retreat. Retro pixel-art, warm window glow, tasteful environment hints, premium game inventory icon, no text."
+"prop_austin_lake_house","Property","Lake Travis Hideaway","assets/lifestyle/properties/prop_austin_lake_house.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Lake Travis Hideaway in Austin, premium home. Show an exterior hero view with architecture that matches the name: apartment/condo as stylish urban building, villa/estate as wide luxury home, tower/penthouse as tall skyline residence, island as private island villa, chalet/cabin as scenic retreat. Retro pixel-art, warm window glow, tasteful environment hints, premium game inventory icon, no text."
+"prop_seoul_han_river_apartment","Property","Han River Apartment","assets/lifestyle/properties/prop_seoul_han_river_apartment.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Han River Apartment in Seoul, premium home. Show an exterior hero view with architecture that matches the name: apartment/condo as stylish urban building, villa/estate as wide luxury home, tower/penthouse as tall skyline residence, island as private island villa, chalet/cabin as scenic retreat. Retro pixel-art, warm window glow, tasteful environment hints, premium game inventory icon, no text."
+"prop_sydney_harbour_flat","Property","Sydney Harbour Flat","assets/lifestyle/properties/prop_sydney_harbour_flat.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Sydney Harbour Flat in Sydney, premium home. Show an exterior hero view with architecture that matches the name: apartment/condo as stylish urban building, villa/estate as wide luxury home, tower/penthouse as tall skyline residence, island as private island villa, chalet/cabin as scenic retreat. Retro pixel-art, warm window glow, tasteful environment hints, premium game inventory icon, no text."
+"prop_lisbon_cliff_villa","Property","Lisbon Cliff Villa","assets/lifestyle/properties/prop_lisbon_cliff_villa.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Lisbon Cliff Villa in Lisbon, premium home. Show an exterior hero view with architecture that matches the name: apartment/condo as stylish urban building, villa/estate as wide luxury home, tower/penthouse as tall skyline residence, island as private island villa, chalet/cabin as scenic retreat. Retro pixel-art, warm window glow, tasteful environment hints, premium game inventory icon, no text."
+"prop_marrakech_riad","Property","Marrakech Private Riad","assets/lifestyle/properties/prop_marrakech_riad.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Marrakech Private Riad in Marrakech, premium home. Show an exterior hero view with architecture that matches the name: apartment/condo as stylish urban building, villa/estate as wide luxury home, tower/penthouse as tall skyline residence, island as private island villa, chalet/cabin as scenic retreat. Retro pixel-art, warm window glow, tasteful environment hints, premium game inventory icon, no text."
+"prop_reykjavik_glass_cabin","Property","Aurora Glass Cabin","assets/lifestyle/properties/prop_reykjavik_glass_cabin.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Aurora Glass Cabin in Iceland, premium home. Show an exterior hero view with architecture that matches the name: apartment/condo as stylish urban building, villa/estate as wide luxury home, tower/penthouse as tall skyline residence, island as private island villa, chalet/cabin as scenic retreat. Retro pixel-art, warm window glow, tasteful environment hints, premium game inventory icon, no text."
+"prop_dubai_palm","Property","Palm Jumeirah Villa","assets/lifestyle/properties/prop_dubai_palm.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Palm Jumeirah Villa in Dubai, luxury property. Show an exterior hero view with architecture that matches the name: apartment/condo as stylish urban building, villa/estate as wide luxury home, tower/penthouse as tall skyline residence, island as private island villa, chalet/cabin as scenic retreat. Retro pixel-art, warm window glow, tasteful environment hints, premium game inventory icon, no text."
+"prop_dubai_royal","Property","Royal Atlantis Penthouse","assets/lifestyle/properties/prop_dubai_royal.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Royal Atlantis Penthouse in Dubai, ultra luxury trophy property. Show an exterior hero view with architecture that matches the name: apartment/condo as stylish urban building, villa/estate as wide luxury home, tower/penthouse as tall skyline residence, island as private island villa, chalet/cabin as scenic retreat. Retro pixel-art, warm window glow, tasteful environment hints, premium game inventory icon, no text."
+"prop_miami_beachfront","Property","Miami Condo","assets/lifestyle/properties/prop_miami_beachfront.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Miami Condo in Miami, luxury property. Show an exterior hero view with architecture that matches the name: apartment/condo as stylish urban building, villa/estate as wide luxury home, tower/penthouse as tall skyline residence, island as private island villa, chalet/cabin as scenic retreat. Retro pixel-art, warm window glow, tasteful environment hints, premium game inventory icon, no text."
+"prop_aspen_chalet","Property","Aspen Ski Chalet","assets/lifestyle/properties/prop_aspen_chalet.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Aspen Ski Chalet in Aspen, luxury property. Show an exterior hero view with architecture that matches the name: apartment/condo as stylish urban building, villa/estate as wide luxury home, tower/penthouse as tall skyline residence, island as private island villa, chalet/cabin as scenic retreat. Retro pixel-art, warm window glow, tasteful environment hints, premium game inventory icon, no text."
+"prop_private_island","Property","Necker Island","assets/lifestyle/properties/prop_private_island.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Necker Island in Caribbean, ultra luxury trophy property. Show an exterior hero view with architecture that matches the name: apartment/condo as stylish urban building, villa/estate as wide luxury home, tower/penthouse as tall skyline residence, island as private island villa, chalet/cabin as scenic retreat. Retro pixel-art, warm window glow, tasteful environment hints, premium game inventory icon, no text."
+"prop_monaco_penthouse","Property","Tour Odéon Sky Penthouse","assets/lifestyle/properties/prop_monaco_penthouse.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Tour Odéon Sky Penthouse in Monaco, ultra luxury trophy property. Show an exterior hero view with architecture that matches the name: apartment/condo as stylish urban building, villa/estate as wide luxury home, tower/penthouse as tall skyline residence, island as private island villa, chalet/cabin as scenic retreat. Retro pixel-art, warm window glow, tasteful environment hints, premium game inventory icon, no text."
+"veh_car_civic","Vehicle","Honda Civic","assets/lifestyle/vehicles/veh_car_civic.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Honda Civic, Car. Show a clean three-quarter hero view like a premium collectible in a game garage. Retro pixel-art, glossy highlights, strong silhouette, elegant dark showroom floor, no brand logo text, no readable license plate, no text."
+"veh_car_tesla3","Vehicle","Tesla Model 3","assets/lifestyle/vehicles/veh_car_tesla3.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Tesla Model 3, Car. Show a clean three-quarter hero view like a premium collectible in a game garage. Retro pixel-art, glossy highlights, strong silhouette, elegant dark showroom floor, no brand logo text, no readable license plate, no text."
+"veh_car_mustang","Vehicle","Ford Mustang GT","assets/lifestyle/vehicles/veh_car_mustang.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Ford Mustang GT, Car. Show a clean three-quarter hero view like a premium collectible in a game garage. Retro pixel-art, glossy highlights, strong silhouette, elegant dark showroom floor, no brand logo text, no readable license plate, no text."
+"veh_car_porsche911","Vehicle","Porsche 911 Turbo S","assets/lifestyle/vehicles/veh_car_porsche911.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Porsche 911 Turbo S, Car. Show a clean three-quarter hero view like a premium collectible in a game garage. Retro pixel-art, glossy highlights, strong silhouette, elegant dark showroom floor, no brand logo text, no readable license plate, no text."
+"veh_car_teslas","Vehicle","Tesla Model S Plaid","assets/lifestyle/vehicles/veh_car_teslas.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Tesla Model S Plaid, Car. Show a clean three-quarter hero view like a premium collectible in a game garage. Retro pixel-art, glossy highlights, strong silhouette, elegant dark showroom floor, no brand logo text, no readable license plate, no text."
+"veh_car_gwagon","Vehicle","Mercedes G-Wagon","assets/lifestyle/vehicles/veh_car_gwagon.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Mercedes G-Wagon, Car. Show a clean three-quarter hero view like a premium collectible in a game garage. Retro pixel-art, glossy highlights, strong silhouette, elegant dark showroom floor, no brand logo text, no readable license plate, no text."
+"veh_car_ferrari488","Vehicle","Ferrari F8 Tributo","assets/lifestyle/vehicles/veh_car_ferrari488.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Ferrari F8 Tributo, Car. Show a clean three-quarter hero view like a premium collectible in a game garage. Retro pixel-art, glossy highlights, strong silhouette, elegant dark showroom floor, no brand logo text, no readable license plate, no text."
+"veh_car_rr_cullinan","Vehicle","Rolls-Royce Cullinan","assets/lifestyle/vehicles/veh_car_rr_cullinan.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Rolls-Royce Cullinan, Car. Show a clean three-quarter hero view like a premium collectible in a game garage. Retro pixel-art, glossy highlights, strong silhouette, elegant dark showroom floor, no brand logo text, no readable license plate, no text."
+"veh_car_range_rover_sv","Vehicle","Range Rover Sport SV","assets/lifestyle/vehicles/veh_car_range_rover_sv.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Range Rover Sport SV, Car. Show a clean three-quarter hero view like a premium collectible in a game garage. Retro pixel-art, glossy highlights, strong silhouette, elegant dark showroom floor, no brand logo text, no readable license plate, no text."
+"veh_car_lucid_sapphire","Vehicle","Lucid Air Sapphire","assets/lifestyle/vehicles/veh_car_lucid_sapphire.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Lucid Air Sapphire, Car. Show a clean three-quarter hero view like a premium collectible in a game garage. Retro pixel-art, glossy highlights, strong silhouette, elegant dark showroom floor, no brand logo text, no readable license plate, no text."
+"veh_car_amg_gt","Vehicle","Mercedes-AMG GT Coupe","assets/lifestyle/vehicles/veh_car_amg_gt.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Mercedes-AMG GT Coupe, Car. Show a clean three-quarter hero view like a premium collectible in a game garage. Retro pixel-art, glossy highlights, strong silhouette, elegant dark showroom floor, no brand logo text, no readable license plate, no text."
+"veh_car_bmw_i8","Vehicle","BMW i8 Roadster","assets/lifestyle/vehicles/veh_car_bmw_i8.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+BMW i8 Roadster, Car. Show a clean three-quarter hero view like a premium collectible in a game garage. Retro pixel-art, glossy highlights, strong silhouette, elegant dark showroom floor, no brand logo text, no readable license plate, no text."
+"veh_car_bugatti","Vehicle","Bugatti Chiron","assets/lifestyle/vehicles/veh_car_bugatti.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Bugatti Chiron, Car. Show a clean three-quarter hero view like a premium collectible in a game garage. Retro pixel-art, glossy highlights, strong silhouette, elegant dark showroom floor, no brand logo text, no readable license plate, no text."
+"veh_car_koenigsegg","Vehicle","Koenigsegg Jesko","assets/lifestyle/vehicles/veh_car_koenigsegg.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Koenigsegg Jesko, Car. Show a clean three-quarter hero view like a premium collectible in a game garage. Retro pixel-art, glossy highlights, strong silhouette, elegant dark showroom floor, no brand logo text, no readable license plate, no text."
+"veh_car_vintage_ferrari","Vehicle","1963 Ferrari 250 GTO","assets/lifestyle/vehicles/veh_car_vintage_ferrari.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+1963 Ferrari 250 GTO, Car. Show a clean three-quarter hero view like a premium collectible in a game garage. Retro pixel-art, glossy highlights, strong silhouette, elegant dark showroom floor, no brand logo text, no readable license plate, no text."
+"veh_car_pagani","Vehicle","Pagani Zonda HP","assets/lifestyle/vehicles/veh_car_pagani.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Pagani Zonda HP, Car. Show a clean three-quarter hero view like a premium collectible in a game garage. Retro pixel-art, glossy highlights, strong silhouette, elegant dark showroom floor, no brand logo text, no readable license plate, no text."
+"veh_bike_vespa","Vehicle","Vespa Primavera","assets/lifestyle/vehicles/veh_bike_vespa.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Vespa Primavera, Motorcycle. Show a clean three-quarter hero view like a premium collectible in a game garage. Retro pixel-art, glossy highlights, strong silhouette, elegant dark showroom floor, no brand logo text, no readable license plate, no text."
+"veh_bike_honda_rebel","Vehicle","Honda Rebel 500","assets/lifestyle/vehicles/veh_bike_honda_rebel.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Honda Rebel 500, Motorcycle. Show a clean three-quarter hero view like a premium collectible in a game garage. Retro pixel-art, glossy highlights, strong silhouette, elegant dark showroom floor, no brand logo text, no readable license plate, no text."
+"veh_bike_yamaha_r1","Vehicle","Yamaha R1","assets/lifestyle/vehicles/veh_bike_yamaha_r1.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Yamaha R1, Motorcycle. Show a clean three-quarter hero view like a premium collectible in a game garage. Retro pixel-art, glossy highlights, strong silhouette, elegant dark showroom floor, no brand logo text, no readable license plate, no text."
+"veh_bike_harley","Vehicle","Harley-Davidson Fat Boy","assets/lifestyle/vehicles/veh_bike_harley.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Harley-Davidson Fat Boy, Motorcycle. Show a clean three-quarter hero view like a premium collectible in a game garage. Retro pixel-art, glossy highlights, strong silhouette, elegant dark showroom floor, no brand logo text, no readable license plate, no text."
+"veh_bike_indian_ftr","Vehicle","Indian FTR R Carbon","assets/lifestyle/vehicles/veh_bike_indian_ftr.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Indian FTR R Carbon, Motorcycle. Show a clean three-quarter hero view like a premium collectible in a game garage. Retro pixel-art, glossy highlights, strong silhouette, elegant dark showroom floor, no brand logo text, no readable license plate, no text."
+"veh_bike_bmw_m1000rr","Vehicle","BMW M 1000 RR","assets/lifestyle/vehicles/veh_bike_bmw_m1000rr.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+BMW M 1000 RR, Motorcycle. Show a clean three-quarter hero view like a premium collectible in a game garage. Retro pixel-art, glossy highlights, strong silhouette, elegant dark showroom floor, no brand logo text, no readable license plate, no text."
+"veh_bike_ducati","Vehicle","Ducati Panigale V4 R","assets/lifestyle/vehicles/veh_bike_ducati.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Ducati Panigale V4 R, Motorcycle. Show a clean three-quarter hero view like a premium collectible in a game garage. Retro pixel-art, glossy highlights, strong silhouette, elegant dark showroom floor, no brand logo text, no readable license plate, no text."
+"veh_bike_arch","Vehicle","Arch KRGT-1","assets/lifestyle/vehicles/veh_bike_arch.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Arch KRGT-1, Motorcycle. Show a clean three-quarter hero view like a premium collectible in a game garage. Retro pixel-art, glossy highlights, strong silhouette, elegant dark showroom floor, no brand logo text, no readable license plate, no text."
+"veh_boat_jetski","Vehicle","Sea-Doo GTX","assets/lifestyle/vehicles/veh_boat_jetski.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Sea-Doo GTX, Boat. Show a clean three-quarter hero view like a premium collectible in a game garage. Retro pixel-art, glossy highlights, strong silhouette, elegant dark showroom floor, no brand logo text, no readable license plate, no text."
+"veh_boat_axopar37","Vehicle","Axopar 37 Sun-Top","assets/lifestyle/vehicles/veh_boat_axopar37.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Axopar 37 Sun-Top, Boat. Show a clean three-quarter hero view like a premium collectible in a game garage. Retro pixel-art, glossy highlights, strong silhouette, elegant dark showroom floor, no brand logo text, no readable license plate, no text."
+"veh_boat_riva_aquariva","Vehicle","Riva Aquariva Super","assets/lifestyle/vehicles/veh_boat_riva_aquariva.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Riva Aquariva Super, Boat. Show a clean three-quarter hero view like a premium collectible in a game garage. Retro pixel-art, glossy highlights, strong silhouette, elegant dark showroom floor, no brand logo text, no readable license plate, no text."
+"veh_boat_mastercraft","Vehicle","MasterCraft XStar","assets/lifestyle/vehicles/veh_boat_mastercraft.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+MasterCraft XStar, Boat. Show a clean three-quarter hero view like a premium collectible in a game garage. Retro pixel-art, glossy highlights, strong silhouette, elegant dark showroom floor, no brand logo text, no readable license plate, no text."
+"veh_boat_yacht","Vehicle","Sunseeker 90","assets/lifestyle/vehicles/veh_boat_yacht.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Sunseeker 90, Boat. Show a clean three-quarter hero view like a premium collectible in a game garage. Retro pixel-art, glossy highlights, strong silhouette, elegant dark showroom floor, no brand logo text, no readable license plate, no text."
+"veh_boat_superyacht","Vehicle","Project Azzam","assets/lifestyle/vehicles/veh_boat_superyacht.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Project Azzam, Boat. Show a clean three-quarter hero view like a premium collectible in a game garage. Retro pixel-art, glossy highlights, strong silhouette, elegant dark showroom floor, no brand logo text, no readable license plate, no text."
+"veh_plane_cessna","Vehicle","Cessna 172","assets/lifestyle/vehicles/veh_plane_cessna.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Cessna 172, Aircraft. Show a clean three-quarter hero view like a premium collectible in a game garage. Retro pixel-art, glossy highlights, strong silhouette, elegant dark showroom floor, no brand logo text, no readable license plate, no text."
+"veh_plane_hondajet","Vehicle","HondaJet Elite II","assets/lifestyle/vehicles/veh_plane_hondajet.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+HondaJet Elite II, Aircraft. Show a clean three-quarter hero view like a premium collectible in a game garage. Retro pixel-art, glossy highlights, strong silhouette, elegant dark showroom floor, no brand logo text, no readable license plate, no text."
+"veh_plane_phenom300","Vehicle","Embraer Phenom 300E","assets/lifestyle/vehicles/veh_plane_phenom300.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Embraer Phenom 300E, Aircraft. Show a clean three-quarter hero view like a premium collectible in a game garage. Retro pixel-art, glossy highlights, strong silhouette, elegant dark showroom floor, no brand logo text, no readable license plate, no text."
+"veh_plane_cirrus","Vehicle","Cirrus Vision Jet","assets/lifestyle/vehicles/veh_plane_cirrus.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Cirrus Vision Jet, Aircraft. Show a clean three-quarter hero view like a premium collectible in a game garage. Retro pixel-art, glossy highlights, strong silhouette, elegant dark showroom floor, no brand logo text, no readable license plate, no text."
+"veh_plane_gulfstream","Vehicle","Gulfstream G700","assets/lifestyle/vehicles/veh_plane_gulfstream.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Gulfstream G700, Aircraft. Show a clean three-quarter hero view like a premium collectible in a game garage. Retro pixel-art, glossy highlights, strong silhouette, elegant dark showroom floor, no brand logo text, no readable license plate, no text."
+"veh_plane_bbj","Vehicle","Boeing Business Jet","assets/lifestyle/vehicles/veh_plane_bbj.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Boeing Business Jet, Aircraft. Show a clean three-quarter hero view like a premium collectible in a game garage. Retro pixel-art, glossy highlights, strong silhouette, elegant dark showroom floor, no brand logo text, no readable license plate, no text."
+"cloth_outfit_tracksuit","Clothing","Velour Tracksuit","assets/lifestyle/clothing/cloth_outfit_tracksuit.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Velour Tracksuit, outfit fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_outfit_linen","Clothing","Linen Summer Suit","assets/lifestyle/clothing/cloth_outfit_linen.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Linen Summer Suit, outfit fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_outfit_tux_cheap","Clothing","Rental Tuxedo","assets/lifestyle/clothing/cloth_outfit_tux_cheap.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Rental Tuxedo, outfit fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_outfit_tux_armani","Clothing","Armani Tuxedo","assets/lifestyle/clothing/cloth_outfit_tux_armani.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Armani Tuxedo, outfit fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_outfit_tom_ford","Clothing","Tom Ford Shelton Suit","assets/lifestyle/clothing/cloth_outfit_tom_ford.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Tom Ford Shelton Suit, outfit fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_outfit_brioni","Clothing","Brioni Bespoke Suit","assets/lifestyle/clothing/cloth_outfit_brioni.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Brioni Bespoke Suit, outfit fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_outfit_valentino_redcarpet","Clothing","Valentino Red Carpet Suit","assets/lifestyle/clothing/cloth_outfit_valentino_redcarpet.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Valentino Red Carpet Suit, outfit fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_outfit_oscar_gown","Clothing","Oscar de la Renta Gown","assets/lifestyle/clothing/cloth_outfit_oscar_gown.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Oscar de la Renta Gown, outfit fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_outfit_dress_chanel","Clothing","Chanel Evening Gown","assets/lifestyle/clothing/cloth_outfit_dress_chanel.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Chanel Evening Gown, outfit fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_outfit_dress_dior","Clothing","Dior Haute Couture","assets/lifestyle/clothing/cloth_outfit_dress_dior.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Dior Haute Couture, outfit fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_outfit_met_gala","Clothing","Avant-Garde Piece","assets/lifestyle/clothing/cloth_outfit_met_gala.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Avant-Garde Piece, outfit fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_outfit_balmain","Clothing","Balmain Embellished","assets/lifestyle/clothing/cloth_outfit_balmain.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Balmain Embellished, outfit fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_outfit_marilyn","Clothing","Marilyn\","assets/lifestyle/clothing/cloth_outfit_marilyn.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Marilyn\, outfit fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_outfit_mj_jacket","Clothing","Thriller Jacket","assets/lifestyle/clothing/cloth_outfit_mj_jacket.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Thriller Jacket, outfit fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_top_tee_white","Clothing","Plain White Tee","assets/lifestyle/clothing/cloth_top_tee_white.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Plain White Tee, top fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_top_off_white","Clothing","Off-White Arrow Tee","assets/lifestyle/clothing/cloth_top_off_white.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Off-White Arrow Tee, top fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_top_hoodie_supreme","Clothing","Supreme Box Logo","assets/lifestyle/clothing/cloth_top_hoodie_supreme.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Supreme Box Logo, top fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_top_palm_angels","Clothing","Palm Angels Track Jacket","assets/lifestyle/clothing/cloth_top_palm_angels.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Palm Angels Track Jacket, top fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_top_denim_jacket","Clothing","Vintage Denim Jacket","assets/lifestyle/clothing/cloth_top_denim_jacket.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Vintage Denim Jacket, top fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_top_givenchy","Clothing","Givenchy Hoodie","assets/lifestyle/clothing/cloth_top_givenchy.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Givenchy Hoodie, top fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_top_leather_jacket","Clothing","Saint Laurent Jacket","assets/lifestyle/clothing/cloth_top_leather_jacket.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Saint Laurent Jacket, top fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_top_silk_shirt","Clothing","Versace Silk Shirt","assets/lifestyle/clothing/cloth_top_silk_shirt.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Versace Silk Shirt, top fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_top_celine_blazer","Clothing","Celine Velvet Blazer","assets/lifestyle/clothing/cloth_top_celine_blazer.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Celine Velvet Blazer, top fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_top_burberry_coat","Clothing","Burberry Trench","assets/lifestyle/clothing/cloth_top_burberry_coat.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Burberry Trench, top fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_top_prada_shirt","Clothing","Prada Re-Nylon Shirt","assets/lifestyle/clothing/cloth_top_prada_shirt.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Prada Re-Nylon Shirt, top fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_bot_jeans_levis","Clothing","Levi\","assets/lifestyle/clothing/cloth_bot_jeans_levis.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Levi\, bottom fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_bot_sweats_nike","Clothing","Nike Tech Fleece","assets/lifestyle/clothing/cloth_bot_sweats_nike.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Nike Tech Fleece, bottom fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_bot_essentials","Clothing","Fear of God Sweats","assets/lifestyle/clothing/cloth_bot_essentials.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Fear of God Sweats, bottom fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_bot_amiri","Clothing","Amiri MX1 Jeans","assets/lifestyle/clothing/cloth_bot_amiri.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Amiri MX1 Jeans, bottom fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_bot_loro_piana","Clothing","Loro Piana Cashmere Trousers","assets/lifestyle/clothing/cloth_bot_loro_piana.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Loro Piana Cashmere Trousers, bottom fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_bot_chino_rl","Clothing","Ralph Lauren Chinos","assets/lifestyle/clothing/cloth_bot_chino_rl.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Ralph Lauren Chinos, bottom fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_bot_thom_browne","Clothing","Thom Browne Shorts","assets/lifestyle/clothing/cloth_bot_thom_browne.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Thom Browne Shorts, bottom fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_bot_leather_pants","Clothing","Rick Owens Pants","assets/lifestyle/clothing/cloth_bot_leather_pants.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Rick Owens Pants, bottom fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_bot_skirt_gucci","Clothing","Gucci Midi Skirt","assets/lifestyle/clothing/cloth_bot_skirt_gucci.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Gucci Midi Skirt, bottom fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_shoe_vans","Clothing","Vans Old Skool","assets/lifestyle/clothing/cloth_shoe_vans.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Vans Old Skool, shoes fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_shoe_crocs","Clothing","Crocs Classic","assets/lifestyle/clothing/cloth_shoe_crocs.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Crocs Classic, shoes fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_shoe_dunk","Clothing","Nike Dunk Low Panda","assets/lifestyle/clothing/cloth_shoe_dunk.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Nike Dunk Low Panda, shoes fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_shoe_jordan1","Clothing","Jordan 1 Chicago","assets/lifestyle/clothing/cloth_shoe_jordan1.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Jordan 1 Chicago, shoes fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_shoe_yeezy","Clothing","Yeezy Boost 350","assets/lifestyle/clothing/cloth_shoe_yeezy.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Yeezy Boost 350, shoes fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_shoe_boots_doc","Clothing","Dr. Martens","assets/lifestyle/clothing/cloth_shoe_boots_doc.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Dr. Martens, shoes fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_shoe_balenciaga","Clothing","Balenciaga Triple S","assets/lifestyle/clothing/cloth_shoe_balenciaga.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Balenciaga Triple S, shoes fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_shoe_loafers_gucci","Clothing","Gucci Loafers","assets/lifestyle/clothing/cloth_shoe_loafers_gucci.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Gucci Loafers, shoes fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_shoe_heels_loub","Clothing","Louboutin Heels","assets/lifestyle/clothing/cloth_shoe_heels_loub.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Louboutin Heels, shoes fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_shoe_oxford_tf","Clothing","Tom Ford Oxfords","assets/lifestyle/clothing/cloth_shoe_oxford_tf.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Tom Ford Oxfords, shoes fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_shoe_loro_loafers","Clothing","Loro Piana Summer Walks","assets/lifestyle/clothing/cloth_shoe_loro_loafers.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Loro Piana Summer Walks, shoes fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_shoe_jimmy_choo","Clothing","Jimmy Choo Diamond Heels","assets/lifestyle/clothing/cloth_shoe_jimmy_choo.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Jimmy Choo Diamond Heels, shoes fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_shoe_mags","Clothing","Nike Air Mag","assets/lifestyle/clothing/cloth_shoe_mags.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Nike Air Mag, shoes fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_acc_rayban","Clothing","Ray-Ban Aviators","assets/lifestyle/clothing/cloth_acc_rayban.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Ray-Ban Aviators, eyewear fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_acc_oakley","Clothing","Oakley Sunglasses","assets/lifestyle/clothing/cloth_acc_oakley.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Oakley Sunglasses, eyewear fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_acc_persol","Clothing","Persol 714","assets/lifestyle/clothing/cloth_acc_persol.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Persol 714, eyewear fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_acc_gucci_shades","Clothing","Gucci Oversized","assets/lifestyle/clothing/cloth_acc_gucci_shades.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Gucci Oversized, eyewear fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_acc_gentle_monster","Clothing","Gentle Monster Studios","assets/lifestyle/clothing/cloth_acc_gentle_monster.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Gentle Monster Studios, eyewear fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_acc_jacques","Clothing","Jacques Marie Mage","assets/lifestyle/clothing/cloth_acc_jacques.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Jacques Marie Mage, eyewear fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_acc_cartier_glasses","Clothing","Cartier Rimless","assets/lifestyle/clothing/cloth_acc_cartier_glasses.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Cartier Rimless, eyewear fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_acc_chrome","Clothing","Chrome Hearts","assets/lifestyle/clothing/cloth_acc_chrome.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Chrome Hearts, eyewear fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_acc_applewatch","Clothing","Apple Watch Ultra","assets/lifestyle/clothing/cloth_acc_applewatch.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Apple Watch Ultra, watch fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_acc_rolex","Clothing","Rolex Daytona","assets/lifestyle/clothing/cloth_acc_rolex.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Rolex Daytona, watch fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_acc_ap","Clothing","AP Royal Oak","assets/lifestyle/clothing/cloth_acc_ap.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+AP Royal Oak, watch fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_acc_richard_mille","Clothing","Richard Mille RM","assets/lifestyle/clothing/cloth_acc_richard_mille.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Richard Mille RM, watch fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_acc_patek","Clothing","Patek Philippe Nautilus","assets/lifestyle/clothing/cloth_acc_patek.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Patek Philippe Nautilus, watch fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_acc_jacob","Clothing","Jacob & Co Astronomia","assets/lifestyle/clothing/cloth_acc_jacob.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Jacob & Co Astronomia, watch fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_acc_vintage_rolex","Clothing","Paul Newman Daytona","assets/lifestyle/clothing/cloth_acc_vintage_rolex.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Paul Newman Daytona, watch fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_acc_omega","Clothing","Omega Speedmaster","assets/lifestyle/clothing/cloth_acc_omega.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Omega Speedmaster, watch fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_acc_cartier_tank","Clothing","Cartier Tank","assets/lifestyle/clothing/cloth_acc_cartier_tank.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Cartier Tank, watch fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_acc_tag_monaco","Clothing","TAG Heuer Monaco","assets/lifestyle/clothing/cloth_acc_tag_monaco.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+TAG Heuer Monaco, watch fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_acc_lv_bag","Clothing","LV Keepall Bag","assets/lifestyle/clothing/cloth_acc_lv_bag.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+LV Keepall Bag, bag fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_acc_rimowa","Clothing","Rimowa Aluminum Carry-On","assets/lifestyle/clothing/cloth_acc_rimowa.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Rimowa Aluminum Carry-On, bag fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_acc_birkin","Clothing","Hermès Birkin","assets/lifestyle/clothing/cloth_acc_birkin.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Hermès Birkin, bag fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_acc_dior_saddle","Clothing","Dior Saddle Bag","assets/lifestyle/clothing/cloth_acc_dior_saddle.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Dior Saddle Bag, bag fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_acc_chanel_flap","Clothing","Chanel Classic Flap","assets/lifestyle/clothing/cloth_acc_chanel_flap.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Chanel Classic Flap, bag fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_acc_prada_tote","Clothing","Prada Tote","assets/lifestyle/clothing/cloth_acc_prada_tote.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Prada Tote, bag fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_acc_bottega","Clothing","Bottega Veneta Pouch","assets/lifestyle/clothing/cloth_acc_bottega.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Bottega Veneta Pouch, bag fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_acc_goyard","Clothing","Goyard Trunk","assets/lifestyle/clothing/cloth_acc_goyard.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Goyard Trunk, bag fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_acc_sl_clutch","Clothing","YSL Clutch","assets/lifestyle/clothing/cloth_acc_sl_clutch.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+YSL Clutch, bag fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_acc_cartier","Clothing","Cartier Love Bracelet","assets/lifestyle/clothing/cloth_acc_cartier.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Cartier Love Bracelet, jewelry fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_acc_diamond_ring","Clothing","Pink Star Diamond Ring","assets/lifestyle/clothing/cloth_acc_diamond_ring.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Pink Star Diamond Ring, jewelry fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_acc_crown","Clothing","Crown of the Empire","assets/lifestyle/clothing/cloth_acc_crown.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Crown of the Empire, jewelry fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_acc_vca","Clothing","Van Cleef Necklace","assets/lifestyle/clothing/cloth_acc_vca.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Van Cleef Necklace, jewelry fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_acc_cartier_juste","Clothing","Cartier Juste un Clou","assets/lifestyle/clothing/cloth_acc_cartier_juste.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Cartier Juste un Clou, jewelry fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_acc_tiffany","Clothing","Tiffany Diamond Studs","assets/lifestyle/clothing/cloth_acc_tiffany.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Tiffany Diamond Studs, jewelry fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_acc_bulgari","Clothing","Bulgari Serpenti","assets/lifestyle/clothing/cloth_acc_bulgari.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Bulgari Serpenti, jewelry fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_acc_harry_winston","Clothing","Harry Winston Necklace","assets/lifestyle/clothing/cloth_acc_harry_winston.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Harry Winston Necklace, jewelry fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."
+"cloth_acc_chopard","Clothing","Chopard Cufflinks","assets/lifestyle/clothing/cloth_acc_chopard.png","MASTER STYLE FOR EVERY IMAGE
+Retro pixel game asset, polished mobile life-sim inventory art, 2.5D pixel-art look, clean silhouette, charming high-detail pixel clusters, cinematic luxury lighting, dark transparent-feeling studio backdrop but no actual transparency required, centered hero object, readable at small card size, no text, no labels, no logos, no watermark, no people unless the asset is clothing on a faceless mannequin, no UI frame. Use a square 1:1 composition.
+
+IMPORTANT OUTPUT
+Save each generated image using the exact output filename shown below. PNG is preferred.
+
+IMAGE PROMPT
+Chopard Cufflinks, jewelry fashion asset. Show the item centered as a luxury game inventory collectible: clothing on a faceless mannequin or hanger, shoes as paired product, jewelry/watch/bag as close product hero. Retro pixel-art, premium materials, clean dark backdrop, no brand logo text, no text."

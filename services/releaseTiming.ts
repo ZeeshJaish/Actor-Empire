@@ -1,3 +1,6 @@
+import type { GameLanguage } from '../types';
+import { t } from './i18n';
+
 interface ReleaseTimingFallback {
     currentAge?: number;
     currentWeek?: number;
@@ -6,6 +9,8 @@ interface ReleaseTimingFallback {
 interface ReleaseTimingOptions {
     includeWeek?: boolean;
     emptyLabel?: string;
+    language?: GameLanguage;
+    compact?: boolean;
 }
 
 export interface ProjectReleaseTiming {
@@ -84,11 +89,14 @@ export const getProjectReleaseLabel = (
     options: ReleaseTimingOptions = {}
 ) => {
     const timing = getProjectReleaseTiming(project, fallback);
-    if (!timing.releaseYear) return options.emptyLabel || 'Release TBA';
+    const language = options.language || 'en';
+    if (!timing.releaseYear) return options.emptyLabel || t(language, 'release.timing.tba');
 
-    const base = `Age ${timing.releaseYear}`;
+    const base = t(language, 'release.timing.age', { age: timing.releaseYear });
     if (options.includeWeek && timing.releaseWeek) {
-        return `${base}, Week ${timing.releaseWeek}`;
+        return options.compact
+            ? t(language, 'release.timing.ageWeekCompact', { age: timing.releaseYear, week: timing.releaseWeek })
+            : t(language, 'release.timing.ageWeek', { age: timing.releaseYear, week: timing.releaseWeek });
     }
     return base;
 };

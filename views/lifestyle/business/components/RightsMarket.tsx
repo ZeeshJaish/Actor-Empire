@@ -48,6 +48,7 @@ import {
     withdrawRightsNegotiation,
 } from '../../../../services/rightsNegotiation';
 import { generateRightsAcquisitionNews } from '../../../../services/newsLogic';
+import { getPlayerLanguage, t } from '../../../../services/i18n';
 import { RightsDealRoom } from './RightsDealRoom';
 
 interface RightsMarketProps {
@@ -61,12 +62,12 @@ interface RightsMarketProps {
 
 type RightsFilter = 'ALL' | 'AFFORDABLE' | 'HIGH_INTEREST' | 'EXPIRING' | 'TRACKED';
 
-const FILTERS: { id: RightsFilter; label: string }[] = [
-    { id: 'ALL', label: 'All Leads' },
-    { id: 'AFFORDABLE', label: 'Affordable' },
-    { id: 'HIGH_INTEREST', label: 'Contested' },
-    { id: 'EXPIRING', label: 'Expiring' },
-    { id: 'TRACKED', label: 'Tracked' },
+const FILTERS: { id: RightsFilter; labelKey: string }[] = [
+    { id: 'ALL', labelKey: 'rightsMarket.filter.all' },
+    { id: 'AFFORDABLE', labelKey: 'rightsMarket.filter.affordable' },
+    { id: 'HIGH_INTEREST', labelKey: 'rightsMarket.filter.contested' },
+    { id: 'EXPIRING', labelKey: 'rightsMarket.filter.expiring' },
+    { id: 'TRACKED', labelKey: 'rightsMarket.filter.tracked' },
 ];
 
 const EMBLEM_ICONS = {
@@ -178,6 +179,8 @@ export const RightsMarket: React.FC<RightsMarketProps> = ({ player, studio, onUp
     const reduceMotion = useReducedMotion();
     const studioState = normalizeStudioState(studio.studioState, player.currentWeek);
     const prestige = getStudioPrestige(studio);
+    const language = getPlayerLanguage(player);
+    const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
 
     const savedMarketSignature = JSON.stringify(studioState.rightsMarket || []);
     const savedNoticeSignature = JSON.stringify(studioState.rightsMarketNotices || []);
@@ -442,7 +445,7 @@ export const RightsMarket: React.FC<RightsMarketProps> = ({ player, studio, onUp
     };
 
     const handleWithdrawDeal = (negotiationId: string) => {
-        const transition = withdrawRightsNegotiation(negotiations, negotiationId);
+        const transition = withdrawRightsNegotiation(negotiations, negotiationId, language);
         if (!transition.changed) {
             setFeedback('This agreement can no longer be withdrawn.');
             return;
@@ -460,6 +463,7 @@ export const RightsMarket: React.FC<RightsMarketProps> = ({ player, studio, onUp
             currentWeek: player.currentWeek,
             studioBalance: studio.balance,
             studioName: studio.name,
+            language,
         });
         if (!transition.changed || !transition.ownedRight) {
             setFeedback(transition.reason === 'INSUFFICIENT_FUNDS' ? 'The studio cannot fund the final contract.' : 'The agreement is not ready to sign.');
@@ -479,7 +483,7 @@ export const RightsMarket: React.FC<RightsMarketProps> = ({ player, studio, onUp
             ...player,
             businesses: player.businesses.map(business => business.id === studio.id ? updatedStudio : business),
             news: [
-                generateRightsAcquisitionNews(studio.name, opportunity.title, transition.ownedRight.dealType, player.currentWeek, player.age),
+                generateRightsAcquisitionNews(studio.name, opportunity.title, transition.ownedRight.dealType, player.currentWeek, player.age, language),
                 ...(player.news || []),
             ],
             logs: [...player.logs, {
@@ -512,7 +516,7 @@ export const RightsMarket: React.FC<RightsMarketProps> = ({ player, studio, onUp
     const tracked = opportunities.filter(item => item.isTracked);
     const latestNotice = normalized.notices[normalized.notices.length - 1];
     const selectedLead = opportunities.find(item => item.id === selectedLeadId);
-    const selectedAction = selectedLead ? getRightsOpportunityAction(negotiations, selectedLead.id) : null;
+    const selectedAction = selectedLead ? getRightsOpportunityAction(negotiations, selectedLead.id, language) : null;
     const dealLead = opportunities.find(item => item.id === dealLeadId);
     const dealNegotiation = dealLead ? getLatestRightsNegotiation(negotiations, dealLead.id) : undefined;
     const cycleWeeksRemaining = RIGHTS_MARKET_CYCLE_WEEKS - (player.currentWeek % RIGHTS_MARKET_CYCLE_WEEKS || 0);
@@ -736,7 +740,7 @@ export const RightsMarket: React.FC<RightsMarketProps> = ({ player, studio, onUp
                             onClick={() => setFilter(option.id)}
                             className={`shrink-0 px-3 py-2 text-[9px] font-black uppercase tracking-[0.18em] transition-colors ${filter === option.id ? 'bg-amber-400 text-black' : 'bg-zinc-900 text-zinc-500 hover:text-white'}`}
                         >
-                            {option.label}
+                            {tr(option.labelKey)}
                         </button>
                     ))}
                 </div>
@@ -754,7 +758,7 @@ export const RightsMarket: React.FC<RightsMarketProps> = ({ player, studio, onUp
                         {visibleOpportunities.map(opportunity => {
                             const Emblem = EMBLEM_ICONS[opportunity.emblemKey];
                             const remaining = weeksRemaining(opportunity, player.currentWeek);
-                            const action = getRightsOpportunityAction(negotiations, opportunity.id);
+                            const action = getRightsOpportunityAction(negotiations, opportunity.id, language);
                             return (
                                 <article key={opportunity.id} className={`group grid grid-cols-[auto_1fr_auto] gap-3 border p-4 transition-colors md:gap-4 md:p-5 ${
                                     action.state === 'RESPONSE' || action.state === 'SIGNING'
@@ -1109,6 +1113,7 @@ export const RightsMarket: React.FC<RightsMarketProps> = ({ player, studio, onUp
                         onAcceptTerms={() => dealNegotiation && handleAcceptDealTerms(dealNegotiation.id)}
                         onWithdraw={() => dealNegotiation && handleWithdrawDeal(dealNegotiation.id)}
                         onSign={() => dealNegotiation && handleSignDeal(dealLead, dealNegotiation.id)}
+                        language={language}
                     />
                 )}
             </AnimatePresence>

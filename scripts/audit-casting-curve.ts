@@ -149,7 +149,7 @@ assert(underdogProfile.weeklyChance > 0 && underdogProfile.weeklyChance <= 0.08,
 assert(!getBreakthroughInviteProfile(weakPlayer).eligible, 'An untrained beginner should not receive breakthrough invites.');
 assert(!getBreakthroughInviteProfile(strongPlayer).eligible, 'Established stars should use the normal direct-offer path.');
 
-const blockbusterInvite = generateBreakthroughAuditionInvite(underdogPlayer, [], () => 0);
+const blockbusterInvite = generateBreakthroughAuditionInvite(underdogPlayer, [], 'en', () => 0);
 assert(blockbusterInvite?.kind === 'BLOCKBUSTER_EXTRA', 'A rare blockbuster extra-role invite should be possible.');
 assert(blockbusterInvite?.opportunity.project.isFamous === true, 'Blockbuster extra-role invites must use famous projects.');
 assert(blockbusterInvite?.opportunity.roleType !== 'LEAD', 'Underdog blockbuster invites must never hand out lead roles.');
@@ -167,7 +167,7 @@ const pendingInvitePlayer = makePlayer({
     }]
 });
 assert(
-    generateBreakthroughAuditionInvite(pendingInvitePlayer, [], () => 0) === null,
+    generateBreakthroughAuditionInvite(pendingInvitePlayer, [], 'en', () => 0) === null,
     'A pending breakthrough invite must block duplicate invite farming.'
 );
 
@@ -179,7 +179,7 @@ const cooldownPlayer = makePlayer({
     }
 });
 assert(
-    generateBreakthroughAuditionInvite(cooldownPlayer, [], () => 0) === null,
+    generateBreakthroughAuditionInvite(cooldownPlayer, [], 'en', () => 0) === null,
     'Breakthrough invite cooldown must block repeated weekly invites.'
 );
 

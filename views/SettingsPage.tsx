@@ -4,7 +4,7 @@ import { Capacitor } from '@capacitor/core';
 import { ArrowLeft, Twitter, Send, Star, Globe, LogOut, Coffee, Bug, Puzzle, Lock, CheckCircle2, Users, ChevronRight, Sparkles, SlidersHorizontal, ShieldCheck, Gauge, Database, Copy, Smartphone, MessageCircle, LifeBuoy, Bell } from 'lucide-react';
 import { GameLanguage, Player } from '../types';
 import { APP_DISPLAY_VERSION } from '../services/appVersion';
-import { createGlobalActorPackNPCs, GLOBAL_ACTOR_PACKS } from '../services/npcLogic';
+import { createGlobalActorPackNPCs, getGlobalActorPackDescription, getGlobalActorPackLabel, GLOBAL_ACTOR_PACKS } from '../services/npcLogic';
 import { getGlobalCreatorCountForPack } from '../services/youtubeLogic';
 import { getPlayerLanguage, SUPPORTED_LANGUAGES, t } from '../services/i18n';
 import { addBreadcrumb, enableManualPushNotifications, getFirebaseAuthStatus, getFirebasePushStatus, markTraceAction, onFirebaseAuthStatusChanged, onFirebasePushStatusChanged, submitPlayerIssueReport, trackGameEvent } from '../services/firebaseService';
@@ -16,7 +16,7 @@ interface SettingsPageProps {
   onMainMenu: () => void;
 }
 
-type SettingsMode = 'SETTINGS' | 'PERFORMANCE' | 'GAMEPLAY' | 'SUPPORT' | 'COMMUNITY' | 'MODS' | 'EXTERNAL_ACTORS';
+type SettingsMode = 'SETTINGS' | 'PERFORMANCE' | 'GAMEPLAY' | 'LANGUAGE' | 'SUPPORT' | 'COMMUNITY' | 'MODS' | 'EXTERNAL_ACTORS';
 type SettingsIcon = React.ComponentType<{ size?: number; className?: string }>;
 
 const ISSUE_CATEGORIES = [
@@ -63,6 +63,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
   const [pushStatus, setPushStatus] = useState(getFirebasePushStatus);
   const [isEnablingPush, setIsEnablingPush] = useState(false);
   const language = getPlayerLanguage(player);
+  const selectedLanguageOption = SUPPORTED_LANGUAGES.find(option => option.id === language);
   const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
   const smoothModeEnabled = player.settings?.smoothMode === true;
   const firebaseAuthUserId = authStatus.userId;
@@ -201,6 +202,15 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
       },
     }));
   };
+
+  const getLanguageCoverageLabel = (optionId: GameLanguage, isSelected: boolean) => {
+    if (isSelected) return tr('settings.defaultLanguage');
+    return optionId === 'en' ? tr('settings.languageSource') : tr('settings.languageInterface');
+  };
+
+  const getLanguageCoverageSubtext = (optionId: GameLanguage) => (
+    optionId === 'en' ? tr('settings.languageSourceSub') : tr('settings.languageInterfaceSub')
+  );
 
   const handleSubmitIssueReport = () => {
     markTraceAction('issue_report_send_tapped', {
@@ -386,6 +396,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
       if (currentPackIds.includes(packId)) return prev;
 
       const packNPCs = createGlobalActorPackNPCs(packId);
+      const pack = GLOBAL_ACTOR_PACKS.find(entry => entry.id === packId);
+      const packLabel = pack ? getGlobalActorPackLabel(pack, language) : t(language, 'services.npc.globalActorPack.label', { country: 'Global' });
       const existingExtraNPCs = Array.isArray(prev.flags?.extraNPCs) ? prev.flags.extraNPCs : [];
       const existingIds = new Set([
         ...existingExtraNPCs.map((npc: any) => npc.id),
@@ -414,7 +426,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
           {
             week: prev.currentWeek,
             year: prev.age,
-            message: `🧩 MOD ENABLED: ${GLOBAL_ACTOR_PACKS.find(pack => pack.id === packId)?.label || 'Global Talent Pack'} added to this save.`,
+            message: t(language, 'settings.globalActorPack.enabledLog', { packLabel }),
             type: 'positive'
           },
           ...prev.logs
@@ -473,6 +485,19 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
 
         <div className="space-y-3">
           <button
+            onClick={() => setMode('LANGUAGE')}
+            className="w-full flex items-center justify-between p-4 bg-zinc-900/55 rounded-2xl hover:bg-zinc-800/80 transition-colors border border-white/5"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-zinc-800 rounded-lg text-zinc-300"><Globe size={20}/></div>
+              <div className="text-left">
+                <div className="font-bold text-white">{tr('settings.language')}</div>
+                <div className="text-xs text-zinc-400">{selectedLanguageOption ? `${selectedLanguageOption.flagEmoji} ${selectedLanguageOption.nativeLabel}` : language}</div>
+              </div>
+            </div>
+            <ChevronRight size={18} className="text-zinc-500"/>
+          </button>
+          <button
             onClick={() => setMode('MODS')}
             className="w-full flex items-center justify-between p-4 bg-amber-500/10 rounded-2xl hover:bg-amber-500/15 transition-colors border border-amber-500/20"
           >
@@ -485,44 +510,65 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
             </div>
             <ChevronRight size={18} className="text-zinc-500"/>
           </button>
+        </div>
+      </div>
+    );
+  }
 
-          <div className="p-4 bg-zinc-900/50 rounded-2xl border border-white/5 space-y-4">
-            <div className="flex items-start gap-3">
-              <div className="p-2 bg-zinc-800 rounded-lg text-zinc-400"><Globe size={20}/></div>
-              <div className="text-left flex-1">
-                <div className="font-bold text-white">{tr('settings.language')}</div>
-                <div className="text-xs text-zinc-500 leading-relaxed mt-1">{tr('settings.languagePhaseNote')}</div>
-              </div>
+  if (mode === 'LANGUAGE') {
+    return (
+      <div className="space-y-5 pb-24 pt-4">
+        {renderSubpageHeader(tr('settings.languageMenu'), tr('settings.language'), 'GAMEPLAY')}
+
+        <div className="glass-card rounded-3xl p-5">
+          <div className="flex items-start gap-3">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-zinc-800 text-zinc-300">
+              <Globe size={22} />
             </div>
-            <div className="space-y-2">
-              {SUPPORTED_LANGUAGES.map(option => {
-                const isSelected = option.id === language;
-                return (
-                  <button
-                    key={option.id}
-                    type="button"
-                    aria-pressed={isSelected}
-                    onClick={() => handleChangeLanguage(option.id)}
-                    className={`w-full rounded-2xl border p-4 text-left transition-colors ${isSelected ? 'border-emerald-400/30 bg-emerald-500/10' : 'border-white/5 bg-zinc-900/60 hover:bg-zinc-800'}`}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="font-black text-white">{option.nativeLabel}</div>
-                        <div className="text-[10px] uppercase tracking-widest text-zinc-500">{option.label}</div>
-                        <div className="mt-2 text-xs leading-relaxed text-zinc-400">{option.coverageSubtext}</div>
-                      </div>
-                      <div className="flex shrink-0 flex-col items-end gap-2">
-                        <span className={`rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-widest ${isSelected ? 'border-emerald-300/30 bg-emerald-400/10 text-emerald-200' : 'border-white/10 bg-black/20 text-zinc-400'}`}>
-                          {isSelected ? tr('settings.defaultLanguage') : option.coverageLabel}
-                        </span>
-                        {isSelected && <CheckCircle2 size={18} className="text-emerald-300" />}
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
+            <div className="min-w-0">
+              <div className="font-black text-white">{tr('settings.languageChooseTitle')}</div>
+              <p className="mt-1 text-sm leading-relaxed text-zinc-500">{tr('settings.languagePhaseNote')}</p>
             </div>
           </div>
+        </div>
+
+        <div className="space-y-2.5">
+          {SUPPORTED_LANGUAGES.map(option => {
+            const isSelected = option.id === language;
+            return (
+              <button
+                key={option.id}
+                type="button"
+                aria-pressed={isSelected}
+                onClick={() => handleChangeLanguage(option.id)}
+                className={`w-full rounded-2xl border p-3 text-left transition-colors ${isSelected ? 'border-emerald-400/35 bg-emerald-500/10' : 'border-white/5 bg-zinc-900/55 hover:bg-zinc-800/80'}`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <div
+                      className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border text-3xl shadow-inner ${isSelected ? 'border-emerald-300/30 bg-emerald-400/10' : 'border-white/10 bg-black/20'}`}
+                      aria-hidden="true"
+                    >
+                      {option.flagEmoji}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-lg font-black leading-tight text-white">{option.nativeLabel}</div>
+                      <div className="mt-0.5 text-[9px] uppercase tracking-[0.2em] text-zinc-500">{option.label}</div>
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <span className={`inline-flex w-fit rounded-full border px-2.5 py-0.5 text-[9px] font-black uppercase tracking-[0.14em] ${isSelected ? 'border-emerald-300/30 bg-emerald-400/10 text-emerald-200' : 'border-white/10 bg-black/20 text-zinc-400'}`}>
+                          {getLanguageCoverageLabel(option.id, isSelected)}
+                        </span>
+                        <span className="text-xs leading-snug text-zinc-400">{getLanguageCoverageSubtext(option.id)}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border ${isSelected ? 'border-emerald-300/40 bg-emerald-400/15 text-emerald-200' : 'border-white/10 bg-black/20 text-zinc-600'}`}>
+                    {isSelected && <CheckCircle2 size={17} />}
+                  </div>
+                </div>
+              </button>
+            );
+          })}
         </div>
       </div>
     );
@@ -923,13 +969,13 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-3">
-                      <div className="font-black text-white truncate">{pack.country}</div>
+                      <div className="font-black text-white truncate">{getGlobalActorPackLabel(pack, language)}</div>
                       <div className="text-[10px] text-zinc-400 font-black uppercase whitespace-nowrap">
                         {pack.actorCount} talent · {creatorCount} creators
                       </div>
                     </div>
                     <p className="text-xs text-zinc-500 mt-1 leading-relaxed">
-                      {tr('settings.countryPackSub')}
+                      {getGlobalActorPackDescription(pack, language)}
                     </p>
                     <button
                       onClick={() => enableActorPack(pack.id)}

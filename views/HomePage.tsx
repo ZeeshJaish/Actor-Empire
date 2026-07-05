@@ -1,10 +1,10 @@
 
 import React, { useRef, useEffect, useState, useMemo } from 'react';
-import { Player, ActorSkills, Commitment, ActiveRelease, ScheduledEvent, Message, AuditionOpportunity, NegotiationData, UniverseContract, UniverseId, Page, Genre, Relationship, LifeEvent, SponsorshipOffer, XPost, Script, RareHollywoodChaosKind, BoxOfficeRegionId, CinemaChainId, PlatformId, MusicCreditRole, OutsideProducerInvestmentOffer, OutsideProductionInvestment } from '../types';
+import { Player, ActorSkills, Commitment, ActiveRelease, ScheduledEvent, Message, AuditionOpportunity, NegotiationData, UniverseContract, UniverseId, Page, Genre, Relationship, LifeEvent, SponsorshipOffer, XPost, Script, RareHollywoodChaosKind, BoxOfficeRegionId, CinemaChainId, PlatformId, MusicCreditRole, OutsideProducerInvestmentOffer, OutsideProductionInvestment, Review } from '../types';
 import { formatMoney } from '../services/formatUtils';
 import { StatsBar } from '../components/StatsBar';
 import { formatRoleRejectionReview, generateProjectDetails, getRoleRejectionFeedback, ROLE_DEFINITIONS } from '../services/roleLogic';
-import { generateDirectEntryOffer, normalizeUniverseForSave, rebootRetiredUniverse, retireUniverseForArchive } from '../services/universeLogic';
+import { generateDirectEntryOffer, getUniverseTemplateGenre, getUniverseTemplateStudioName, normalizeUniverseForSave, rebootRetiredUniverse, retireUniverseForArchive } from '../services/universeLogic';
 import { generateLifeEvent } from '../services/lifeEventLogic';
 import { getAbsoluteWeek } from '../services/legacyLogic';
 import { getGenderedAvatar, MALE_AVATAR_SEEDS, FEMALE_AVATAR_SEEDS, NPC_DATABASE } from '../services/npcLogic';
@@ -26,6 +26,10 @@ import { processAcquisitionMarketPulse } from '../services/acquisitionMarketPuls
 import { calculateStreamingDistributionBreakdown, calculateTheatricalDistributionBreakdown } from '../services/distributionRevenue';
 import { applyMusicImpactToHiddenStats, buildProjectMusicPlanFromArtists, calculateProjectMusicImpact, calculateWeeklySoundtrackRevenue, getMusicArtistCatalog, mergeSoundtrackRevenueBreakdowns } from '../services/musicIndustry';
 import { buildOutsideProducerInvestmentMessage } from '../services/outsideProductions';
+import { generateEpisodeRatings } from '../services/episodeRatings';
+import { buildAudienceReception } from '../services/audienceReception';
+import { ProfilePictureBuilder } from './avatar/ProfilePictureBuilder';
+import { getActorCareerArc } from '../services/actorCareerArc';
 
 interface HomePageProps {
   player: Player;
@@ -61,6 +65,8 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
   const [passwordInput, setPasswordInput] = useState('');
   const [passwordError, setPasswordError] = useState(false);
   const [showAvatarEditor, setShowAvatarEditor] = useState(false);
+  const [showPortraitBuilder, setShowPortraitBuilder] = useState(false);
+  const [showActorArcSheet, setShowActorArcSheet] = useState(false);
   const [selectedAvatar, setSelectedAvatar] = useState(player.avatar);
   const [isCustomUpload, setIsCustomUpload] = useState(player.avatar.startsWith('data:image'));
   const [isCompressing, setIsCompressing] = useState(false);
@@ -76,6 +82,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
     if (/now leads the music charts|turns ".+" into a culture moment|beats ".+" for #1|became a music-scene rivalry|hit a .+ music scandal/i.test(message)) return false;
     return true;
   }), [player.logs]);
+  const actorCareerArc = useMemo(() => getActorCareerArc(player), [player]);
 
   useEffect(() => {
     if (logContainerRef.current) {
@@ -132,6 +139,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
     avatarClickTimeoutRef.current = window.setTimeout(() => {
         if (clickCountRef.current < 3) {
             setShowAvatarEditor(true);
+            setShowPortraitBuilder(false);
             setAvatarError('');
             setSelectedAvatar(player.avatar);
             setIsCustomUpload(player.avatar.startsWith('data:image'));
@@ -225,6 +233,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
       if (!onUpdatePlayer || !selectedAvatar) return;
       onUpdatePlayer({ ...player, avatar: selectedAvatar });
       setShowAvatarEditor(false);
+      setShowPortraitBuilder(false);
       setAvatarError('');
   };
 
@@ -284,12 +293,12 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
       const rivalWinner = stage === 'AUDITION'
           ? NPC_DATABASE.find(npc => npc.occupation === 'ACTOR') || NPC_DATABASE[0]
           : undefined;
-      const feedback = getRoleRejectionFeedback(player, opportunity, stage, rivalWinner);
+      const feedback = getRoleRejectionFeedback(player, opportunity, stage, rivalWinner, language);
       const newMessage: Message = {
           id: `msg_cheat_casting_feedback_${Date.now()}`,
-          sender: 'Casting Office',
-          subject: `Casting Review: ${project.title}`,
-          text: formatRoleRejectionReview(project.title, stage, feedback),
+          sender: tr('services.role.rejection.inbox.sender'),
+          subject: tr('services.role.rejection.inbox.subject', { projectName: project.title }),
+          text: formatRoleRejectionReview(project.title, stage, feedback, language),
           type: 'CASTING_FEEDBACK',
           isRead: false,
           weekSent: player.currentWeek,
@@ -485,6 +494,100 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
       setActiveCheatMenu('NONE');
   };
 
+  const triggerAwardsPolishQa = () => {
+      if (!onUpdatePlayer) return;
+
+      const project = { id: `cheat_awards_polish_${Date.now()}`, name: 'Crown of Debug' };
+      const makePlayerNomination = (category: string, playerCreditRole: 'ACTOR' | 'WRITER' | 'DIRECTOR' | 'PRODUCER') => ({
+          project,
+          score: 118,
+          category,
+          isPlayer: true,
+          nomineeName: player.name,
+          playerCreditRole
+      });
+      const makeNpcNomination = (category: string, index: number, score: number) => ({
+          project: { id: `npc_awards_polish_${category.replace(/\W+/g, '_')}_${index}`, name: ['Silver Meridian', 'Glass Orchard', 'Velvet Hour', 'Neon Witness'][index] || `Rival Project ${index + 1}` },
+          score,
+          category,
+          isPlayer: false,
+          nomineeName: ['Mara Voss', 'Julian Cross', 'Nadia Frost', 'Cole Mercer'][index] || `Rival ${index + 1}`
+      });
+      const playerNominations = [
+          makePlayerNomination('Best Actor', 'ACTOR'),
+          makePlayerNomination('Best Original Screenplay', 'WRITER'),
+          makePlayerNomination('Best Director', 'DIRECTOR'),
+          makePlayerNomination('Best Picture', 'PRODUCER')
+      ];
+      const fullBallot = playerNominations.reduce<Record<string, any[]>>((ballot, nomination) => {
+          ballot[nomination.category] = [
+              nomination,
+              makeNpcNomination(nomination.category, 0, 91),
+              makeNpcNomination(nomination.category, 1, 88),
+              makeNpcNomination(nomination.category, 2, 84),
+              makeNpcNomination(nomination.category, 3, 80)
+          ];
+          return ballot;
+      }, {});
+
+      const eventData: ScheduledEvent = {
+          id: `evt_awards_polish_qa_${Date.now()}`,
+          week: player.currentWeek,
+          type: 'AWARD_CEREMONY',
+          title: 'Awards Polish QA',
+          description: 'Debug ceremony for actor, writer, director, and producer award records.',
+          data: {
+              awardDef: { type: 'OSCAR', name: 'Awards Polish QA', prestige: 3.0 },
+              awardYear: player.age,
+              nominations: playerNominations,
+              fullBallot
+          }
+      };
+
+      const qaPastProject = {
+          id: project.id,
+          name: project.name,
+          type: 'ACTING_GIG',
+          roleType: 'LEAD',
+          year: player.age,
+          earnings: 0,
+          rating: 9.4,
+          reception: 'AWARDS_QA',
+          projectQuality: 96,
+          imdbRating: 9.4,
+          boxOfficeResult: '$180.0M',
+          outcomeTier: 'BLOCKBUSTER',
+          subtype: 'STANDALONE',
+          futurePotential: {
+              sequelChance: 0,
+              franchiseChance: 0,
+              rebootChance: 0,
+              renewalChance: 0,
+              isFranchiseStarter: false,
+              isSequelGreenlit: false,
+              isRenewed: false,
+              seriesStatus: 'N/A'
+          },
+          studioId: 'ARTISAN_PICTURES',
+          budget: 40_000_000,
+          gross: 180_000_000,
+          genre: 'DRAMA',
+          projectType: 'MOVIE',
+          sourceScriptId: 'cheat_awards_polish_script',
+          isOriginal: true,
+          directorId: 'player',
+          awards: []
+      } as any;
+
+      onUpdatePlayer({
+          ...player,
+          pastProjects: [qaPastProject, ...player.pastProjects.filter(item => item.id !== project.id)],
+          pendingEvent: eventData
+      });
+      setActiveCheatMenu('NONE');
+      alert('Awards Polish QA ready: actor, writer, director, and producer Oscar categories are queued in one ceremony.');
+  };
+
   const triggerAwardInvite = () => {
       if (!onUpdatePlayer) return;
 
@@ -617,7 +720,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
       const project = generateProjectDetails('HIGH', 'MOVIE', [], player);
       project.title = contract.films[0].title;
       project.universeId = universeId;
-      project.genre = universeId === 'SW' ? 'SCI_FI' : 'SUPERHERO';
+      project.genre = getUniverseTemplateGenre(universeId);
       project.visibleHype = 'HIGH';
       
       const offer: AuditionOpportunity = {
@@ -647,7 +750,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
 
       const msg: Message = {
           id: `msg_cheat_uni_${Date.now()}`,
-          sender: universeId === 'MCU' ? 'Marvel Studios' : universeId === 'DCU' ? 'DC Studios' : 'Lucasfilm',
+          sender: getUniverseTemplateStudioName(universeId),
           subject: `OFFER: ${contract.films.length}-Picture Universe Deal`,
           text: `We want you for ${contract.characterName}. This is a multi-year commitment.`,
           type: 'OFFER_NEGOTIATION',
@@ -662,7 +765,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
           inbox: [msg, ...player.inbox]
       });
       setActiveCheatMenu('NONE');
-      alert(`${universeId} Universe Contract Offer sent to Inbox.`);
+      alert(`${getUniverseTemplateStudioName(universeId)} Universe Contract Offer sent to Inbox.`);
   };
 
   const triggerCheatPostProd = (type: 'MOVIE' | 'SERIES') => {
@@ -2095,6 +2198,300 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
       alert('Box Office QA loaded. Tap Atlas Rising or Northline in Box Office to test the detailed view.');
   };
 
+  const triggerAudiencePulseQa = () => {
+      if (!onUpdatePlayer) return;
+
+      const { updatedPlayer: basePlayer, studio } = ensureCheatStudio();
+      const now = Date.now();
+      const qaPrefix = 'cheat_audience_pulse_';
+      const currentYear = Math.max(18, basePlayer.age || 18);
+      const currentWeek = Math.max(1, basePlayer.currentWeek || 1);
+      const currentAbsoluteWeek = getAbsoluteWeek(currentYear, currentWeek);
+      const releaseRegions: BoxOfficeRegionId[] = ['NORTH_AMERICA', 'EUROPE', 'ASIA'];
+      const releaseChainSelections = {
+          NORTH_AMERICA: ['EMPIRE_CINEMAS', 'NOVA_CIRCUIT'],
+          EUROPE: ['PRISM_HALLS'],
+          ASIA: ['CROWNSCREEN']
+      } as Partial<Record<BoxOfficeRegionId, CinemaChainId[]>>;
+      const baseFuturePotential = {
+          sequelChance: 42,
+          franchiseChance: 20,
+          rebootChance: 8,
+          renewalChance: 0,
+          isFranchiseStarter: false,
+          isSequelGreenlit: false,
+          isRenewed: false,
+          seriesStatus: 'N/A' as const
+      };
+      const makeCriticReviews = (projectId: string, title: string, rating: number): Review[] => {
+          const positive = rating >= 7.6;
+          const mixed = rating < 7.6 && rating >= 6.1;
+          const criticData = [
+              ['Leena Cross', 'Screen Ledger'],
+              ['Mira Vale', 'Cinema Wire'],
+              ['Omar Reed', 'Frame Journal'],
+              ['Anika Stone', 'Box Office Weekly'],
+              ['Theo Mercer', 'The Backlot'],
+              ['Dev Rao', 'Daily Review']
+          ];
+          const lines = positive
+              ? [
+                  `${title} has the kind of finish that makes the audience score feel earned.`,
+                  `A polished release with real commercial shape and a clean emotional hook.`,
+                  `The craft is confident enough to keep the conversation alive after opening weekend.`,
+                  `It knows when to go big and when to let the cast carry the moment.`,
+                  `A strong package that should age better than most crowd plays.`,
+                  `The run feels built on genuine word of mouth, not just campaign noise.`
+              ]
+              : mixed
+                  ? [
+                      `${title} has bright sections, but the total package is a little uneven.`,
+                      `The crowd hook is visible even when the middle stretch drags.`,
+                      `A readable commercial swing with a few rough creative edges.`,
+                      `It works in bursts, especially when the ensemble gets room.`,
+                      `The movie finds its lane, but it takes time getting there.`,
+                      `Good enough to stay in the conversation, not clean enough to dominate it.`
+                  ]
+                  : [
+                      `${title} has promise, but the response may cool quickly.`,
+                      `The idea is bigger than the final execution.`,
+                      `A few moments connect, but the movie struggles to sustain them.`,
+                      `It may find defenders, though wider turnout looks limited.`,
+                      `The campaign sells a stronger movie than the one on screen.`,
+                      `Too many pieces feel underpowered for a broad audience breakout.`
+                  ];
+          return criticData.map(([author, publication], index) => {
+              const sentiment: Review['sentiment'] = positive
+                  ? (index === 2 ? 'MIXED' : 'POSITIVE')
+                  : mixed
+                      ? (index === 5 ? 'NEGATIVE' : index % 2 === 0 ? 'MIXED' : 'POSITIVE')
+                      : (index % 2 === 0 ? 'NEGATIVE' : 'MIXED');
+              return {
+                  id: `${projectId}_critic_${index}`,
+                  author,
+                  publication,
+                  text: lines[index],
+                  sentiment,
+                  type: 'CRITIC',
+                  rating: sentiment === 'POSITIVE' ? 4.4 : sentiment === 'MIXED' ? 3.1 : 1.9
+              };
+          });
+      };
+
+      const makeProjectDetails = (title: string, genre: Genre, budget: number, quality: number, gradient: string) => {
+          const details = generateProjectDetails('HIGH', 'MOVIE', [], basePlayer);
+          details.title = title;
+          details.studioId = studio.id;
+          details.genre = genre;
+          details.subtype = 'STANDALONE';
+          details.estimatedBudget = budget;
+          details.releaseStrategy = 'THEATRICAL';
+          details.releaseScale = 'GLOBAL';
+          details.screeningStrategy = 'INTERNATIONAL';
+          details.releaseRegionIds = releaseRegions;
+          details.releaseChainSelections = releaseChainSelections;
+          details.visibleHype = 'HIGH';
+          details.description = title.includes('Live')
+              ? 'A crowd-pleasing action film where the audience score is still moving during the run.'
+              : 'A completed prestige thriller with a settled audience verdict after its run.';
+          details.hiddenStats = {
+              ...details.hiddenStats,
+              scriptQuality: Math.max(45, quality - 2),
+              directorQuality: quality,
+              castingStrength: Math.max(45, quality - 4),
+              distributionPower: Math.max(45, quality + 3),
+              rawHype: Math.max(45, quality + 4),
+              qualityScore: quality,
+              releaseWeek: currentWeek,
+              campaignFitScore: Math.max(45, quality - 1),
+              campaignPromise: 'MASS_EVENT',
+              campaignTimeline: 'BALANCED_ROLLOUT',
+              falseMarketingRisk: 'LOW',
+              campaignOverspendRisk: 'LOW'
+          };
+          details.directorName = quality >= 82 ? 'Mara Voss' : 'Kiran Vale';
+          details.visibleDirectorTier = quality >= 82 ? 'Prestige' : 'Reliable';
+          details.visibleScriptBuzz = quality >= 82 ? 'Hot' : 'Solid';
+          details.visibleCastStrength = quality >= 82 ? 'Strong' : 'Balanced';
+          details.customPoster = {
+              type: 'CONFIG' as const,
+              bgGradient: gradient,
+              icon: 'Film' as const,
+              textColor: 'text-white'
+          };
+          return details;
+      };
+
+      const liveProject = makeProjectDetails(
+          'Live Audience Drift',
+          'ACTION',
+          118_000_000,
+          79,
+          'from-cyan-950 via-blue-900 to-black'
+      );
+      liveProject.reviews = makeCriticReviews(`${qaPrefix}live_${now}`, liveProject.title, 7.4);
+      const liveWeeklyBreakdowns = [74_000_000, 46_000_000].map((gross, index) => (
+          calculateTheatricalDistributionBreakdown(liveProject, gross, index + 1)
+      ));
+      const liveWeeklyGross = liveWeeklyBreakdowns.map(breakdown => breakdown.gross);
+      const liveOpeningRelease = {
+          id: `${qaPrefix}live_${now}`,
+          name: liveProject.title,
+          type: 'MOVIE',
+          roleType: 'LEAD',
+          projectDetails: liveProject,
+          distributionPhase: 'THEATRICAL',
+          weekNum: 1,
+          weeklyGross: [liveWeeklyGross[0]],
+          totalGross: liveWeeklyGross[0],
+          weeklyStudioReceipts: [liveWeeklyBreakdowns[0].studioReceipts],
+          totalStudioReceipts: liveWeeklyBreakdowns[0].studioReceipts,
+          weeklyExhibitorReceipts: [liveWeeklyBreakdowns[0].exhibitorReceipts],
+          totalExhibitorReceipts: liveWeeklyBreakdowns[0].exhibitorReceipts,
+          weeklyDistributionBreakdowns: [liveWeeklyBreakdowns[0]],
+          budget: liveProject.estimatedBudget,
+          status: 'RUNNING',
+          imdbRating: 7.4,
+          productionPerformance: 79,
+          maxTheatricalWeeks: 10,
+          weeksInTheaters: 1,
+          promotionalBuzz: 84,
+          releaseWeek: Math.max(1, currentWeek - 1),
+          releaseYear: currentYear,
+          releasedAtAbsoluteWeek: Math.max(1, currentAbsoluteWeek - 1)
+      } as ActiveRelease;
+      const liveOpeningAudience = buildAudienceReception(liveOpeningRelease, undefined, Math.max(1, currentWeek - 1), currentYear);
+      const liveRelease = {
+          ...liveOpeningRelease,
+          weekNum: 2,
+          weeklyGross: liveWeeklyGross,
+          totalGross: liveWeeklyGross.reduce((sum, gross) => sum + gross, 0),
+          weeklyStudioReceipts: liveWeeklyBreakdowns.map(breakdown => breakdown.studioReceipts),
+          totalStudioReceipts: liveWeeklyBreakdowns.reduce((sum, breakdown) => sum + breakdown.studioReceipts, 0),
+          weeklyExhibitorReceipts: liveWeeklyBreakdowns.map(breakdown => breakdown.exhibitorReceipts),
+          totalExhibitorReceipts: liveWeeklyBreakdowns.reduce((sum, breakdown) => sum + breakdown.exhibitorReceipts, 0),
+          weeklyDistributionBreakdowns: liveWeeklyBreakdowns,
+          weeksInTheaters: 2
+      } as ActiveRelease;
+      const liveAudience = buildAudienceReception(liveRelease, liveOpeningAudience, currentWeek, currentYear);
+      liveRelease.audienceReception = liveAudience;
+      liveRelease.projectDetails = {
+          ...liveProject,
+          audienceReception: liveAudience
+      };
+
+      const finalProject = makeProjectDetails(
+          'Final Audience Verdict',
+          'THRILLER',
+          42_000_000,
+          86,
+          'from-emerald-950 via-zinc-900 to-black'
+      );
+      finalProject.reviews = makeCriticReviews(`${qaPrefix}final_${now}`, finalProject.title, 8.3);
+      finalProject.releaseDate = Math.max(1, currentWeek - 11);
+      const finalWeeklyBreakdowns = [28_000_000, 23_000_000, 19_000_000, 14_000_000, 9_000_000, 5_000_000, 2_400_000].map((gross, index) => (
+          calculateTheatricalDistributionBreakdown(finalProject, gross, index + 1)
+      ));
+      const finalWeeklyGross = finalWeeklyBreakdowns.map(breakdown => breakdown.gross);
+      const finalOpeningRelease = {
+          id: `${qaPrefix}final_${now}`,
+          name: finalProject.title,
+          type: 'MOVIE',
+          roleType: 'LEAD',
+          projectDetails: finalProject,
+          distributionPhase: 'THEATRICAL',
+          weekNum: 1,
+          weeklyGross: [finalWeeklyGross[0]],
+          totalGross: finalWeeklyGross[0],
+          budget: finalProject.estimatedBudget,
+          status: 'RUNNING',
+          imdbRating: 8.3,
+          productionPerformance: 87,
+          maxTheatricalWeeks: 7,
+          weeksInTheaters: 1,
+          promotionalBuzz: 73,
+          releaseWeek: Math.max(1, currentWeek - 8),
+          releaseYear: currentYear,
+          releasedAtAbsoluteWeek: Math.max(1, currentAbsoluteWeek - 8)
+      } as ActiveRelease;
+      const finalOpeningAudience = buildAudienceReception(finalOpeningRelease, undefined, Math.max(1, currentWeek - 8), currentYear);
+      const finalRelease = {
+          ...finalOpeningRelease,
+          weekNum: finalWeeklyGross.length,
+          weeklyGross: finalWeeklyGross,
+          totalGross: finalWeeklyGross.reduce((sum, gross) => sum + gross, 0),
+          weeklyStudioReceipts: finalWeeklyBreakdowns.map(breakdown => breakdown.studioReceipts),
+          totalStudioReceipts: finalWeeklyBreakdowns.reduce((sum, breakdown) => sum + breakdown.studioReceipts, 0),
+          weeklyExhibitorReceipts: finalWeeklyBreakdowns.map(breakdown => breakdown.exhibitorReceipts),
+          totalExhibitorReceipts: finalWeeklyBreakdowns.reduce((sum, breakdown) => sum + breakdown.exhibitorReceipts, 0),
+          weeklyDistributionBreakdowns: finalWeeklyBreakdowns,
+          status: 'FINISHED',
+          weeksInTheaters: finalWeeklyGross.length
+      } as ActiveRelease;
+      const finalAudience = buildAudienceReception(finalRelease, finalOpeningAudience, currentWeek, currentYear, { isFinal: true });
+      const finalPastProject = {
+          id: `${qaPrefix}final_${now}`,
+          name: finalProject.title,
+          type: 'ACTING_GIG',
+          roleType: 'LEAD',
+          year: currentYear,
+          releaseYear: currentYear,
+          releaseWeek: Math.max(1, currentWeek - 1),
+          releasedAtAbsoluteWeek: Math.max(1, currentAbsoluteWeek - 1),
+          earnings: 3_800_000,
+          rating: 8.3,
+          reception: 'Audience favorite',
+          projectQuality: 86,
+          imdbRating: 8.3,
+          boxOfficeResult: 'HIT',
+          outcomeTier: 'HIT',
+          subtype: 'STANDALONE',
+          futurePotential: { ...baseFuturePotential, sequelChance: 58, franchiseChance: 28 },
+          studioId: studio.id,
+          castList: [],
+          reviews: finalProject.reviews,
+          audienceReception: finalAudience,
+          budget: finalProject.estimatedBudget,
+          gross: finalRelease.totalGross,
+          weeklyGross: finalRelease.weeklyGross,
+          weeklyStudioReceipts: finalRelease.weeklyStudioReceipts,
+          totalStudioReceipts: finalRelease.totalStudioReceipts,
+          weeklyExhibitorReceipts: finalRelease.weeklyExhibitorReceipts,
+          totalExhibitorReceipts: finalRelease.totalExhibitorReceipts,
+          weeklyDistributionBreakdowns: finalRelease.weeklyDistributionBreakdowns,
+          genre: finalProject.genre,
+          description: finalProject.description,
+          projectType: 'MOVIE',
+          customPoster: finalProject.customPoster,
+          projectDetails: {
+              ...finalProject,
+              audienceReception: finalAudience
+          }
+      } as any;
+
+      onUpdatePlayer({
+          ...basePlayer,
+          businesses: basePlayer.businesses.map(b => b.id === studio.id ? studio : b),
+          activeReleases: [
+              liveRelease,
+              ...basePlayer.activeReleases.filter(release => !String(release.id).startsWith(qaPrefix))
+          ],
+          pastProjects: [
+              finalPastProject,
+              ...basePlayer.pastProjects.filter(project => !String(project.id).startsWith(qaPrefix))
+          ],
+          logs: [{
+              week: currentWeek,
+              year: currentYear,
+              message: 'CHEAT: Audience Pulse QA added a live release and a completed audience verdict for IMDb testing.',
+              type: 'positive'
+          }, ...basePlayer.logs].slice(0, 50)
+      } as Player);
+      setActiveCheatMenu('NONE');
+      setPage?.(Page.MOBILE);
+      alert('Audience Pulse QA loaded. Open Phone > IMDb: Live Audience Drift is still running, Final Audience Verdict is completed. Age Up once to see the live score move.');
+  };
+
   const triggerSoundtrackRevenueQa = () => {
       if (!onUpdatePlayer) return;
 
@@ -3401,8 +3798,8 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
       alert(`Studio QA scenario ready: ${scenario.replace(/_/g, ' ')}. Age Up once for the result.`);
   };
 
-  const triggerFilmographySortQa = () => {
-      if (!onUpdatePlayer) return;
+	  const triggerFilmographySortQa = () => {
+	      if (!onUpdatePlayer) return;
 
       const { updatedPlayer: basePlayer, studio } = ensureCheatStudio();
       const now = Date.now();
@@ -3614,11 +4011,359 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
       onUpdatePlayer(nextPlayer as Player);
       setActiveCheatMenu('NONE');
       onOpenProductionHouseCheat?.();
-      alert('Filmography QA loaded: 9 library titles plus theatrical and streaming active releases. Open Past Projects > See More to test sorting.');
-  };
+	      alert('Filmography QA loaded: 9 library titles plus theatrical and streaming active releases. Open Past Projects > See More to test sorting.');
+	  };
 
-  const triggerRareHollywoodChaosQa = (kind: RareHollywoodChaosKind) => {
-      if (!onUpdatePlayer) return;
+	  const triggerEpisodeRatingsQa = (target: 'IMDB' | 'PRODUCTION_HOUSE' = 'IMDB') => {
+	      if (!onUpdatePlayer) return;
+
+	      const { updatedPlayer: basePlayer, studio } = ensureCheatStudio();
+	      const now = Date.now();
+	      const qaPrefix = 'cheat_episode_ratings_';
+	      const franchiseId = `${qaPrefix}franchise_${now}`;
+	      const sourceScriptId = `${qaPrefix}script_${now}`;
+	      const currentAge = Math.max(18, basePlayer.age || 18);
+	      const poster = {
+	          type: 'CONFIG' as const,
+	          bgGradient: 'from-emerald-950 via-zinc-900 to-black',
+	          icon: 'Tv' as const,
+	          textColor: 'text-white'
+	      };
+
+	      const makeSeason = (season: number, rating: number, quality: number, views: number, weeklyViews: number[]) => {
+	          const title = `Signal Room: Season ${season}`;
+	          const projectDetails = {
+	              title,
+	              type: 'SERIES' as const,
+	              description: 'A tense prestige crime series tracked through season-by-season audience response.',
+	              studioId: studio.id,
+	              subtype: 'STANDALONE' as const,
+	              genre: 'CRIME' as Genre,
+	              budgetTier: 'HIGH' as const,
+	              estimatedBudget: 72_000_000 + (season * 6_000_000),
+	              visibleHype: 'HIGH' as const,
+	              hiddenStats: {
+	                  scriptQuality: quality + 2,
+	                  directorQuality: quality,
+	                  castingStrength: Math.max(35, quality - 4),
+	                  distributionPower: Math.max(35, quality - 2),
+	                  rawHype: Math.max(35, quality - 5),
+	                  qualityScore: quality,
+	                  prestigeBonus: rating >= 8 ? 12 : 2,
+	                  castDepthScore: Math.max(35, quality - 3)
+	              },
+	              directorName: 'Mara Voss',
+	              visibleDirectorTier: 'Prestige',
+	              visibleScriptBuzz: 'Hot',
+	              visibleCastStrength: 'Strong',
+	              episodes: season === 3 ? 6 : 8,
+	              franchiseId,
+	              sourceScriptId,
+	              installmentNumber: season,
+	              customPoster: poster,
+	          };
+	          const episodeRatings = generateEpisodeRatings({
+	              id: `${qaPrefix}s${season}_${now}`,
+	              name: title,
+	              type: 'SERIES',
+	              projectType: 'SERIES',
+	              imdbRating: rating,
+	              productionPerformance: quality,
+	              totalViews: views,
+	              weeklyViews,
+	              projectDetails,
+	          });
+
+	          return {
+	              id: `${qaPrefix}s${season}_${now}`,
+	              name: title,
+	              type: 'ACTING_GIG',
+	              roleType: season === 3 ? 'SUPPORTING' : 'LEAD',
+	              year: Math.max(16, currentAge - (4 - season)),
+	              releaseYear: Math.max(16, currentAge - (4 - season)),
+	              releaseWeek: Math.max(1, 8 + (season * 7)),
+	              releasedAtAbsoluteWeek: Math.max(1, getAbsoluteWeek(Math.max(16, currentAge - (4 - season)), Math.max(1, 8 + (season * 7)))),
+	              earnings: Math.round((views / 1_000_000) * 220_000),
+	              rating,
+	              reception: rating >= 8.2 ? 'Prestige breakout' : rating >= 7 ? 'Solid but debated' : 'Uneven season',
+	              projectQuality: quality,
+	              imdbRating: rating,
+	              boxOfficeResult: 'STREAMING',
+	              outcomeTier: rating >= 8.2 ? 'HIT' : rating >= 7 ? 'AVERAGE' : 'FLOP',
+	              subtype: 'STANDALONE',
+	              futurePotential: {
+	                  sequelChance: 0,
+	                  franchiseChance: 30,
+	                  rebootChance: 10,
+	                  renewalChance: season < 3 ? 86 : 48,
+	                  isFranchiseStarter: false,
+	                  isSequelGreenlit: false,
+	                  isRenewed: season < 3,
+	                  seriesStatus: season < 3 ? 'ONGOING' : 'CANCELLED'
+	              },
+	              studioId: studio.id,
+	              streamingPlatform: 'NETFLIX',
+	              totalViews: views,
+	              weeklyViews,
+	              streamingRevenue: views * 3,
+	              castList: [],
+	              reviews: [],
+	              episodeRatings,
+	              budget: projectDetails.estimatedBudget,
+	              gross: 0,
+	              genre: 'CRIME',
+	              description: `Audience response shifted across season ${season}. Open this credit to see the S1-S3 heatmap.`,
+	              projectType: 'SERIES',
+	              franchiseId,
+	              sourceScriptId,
+	              installmentNumber: season,
+	              customPoster: poster
+	          } as any;
+	      };
+
+	      const seededSeasons = [
+	          makeSeason(1, 8.4, 83, 58_000_000, [14_000_000, 12_500_000, 10_000_000, 8_000_000, 7_000_000, 6_500_000]),
+	          makeSeason(2, 9.0, 90, 86_000_000, [20_000_000, 18_500_000, 16_000_000, 13_000_000, 10_500_000, 8_000_000]),
+	          makeSeason(3, 6.8, 64, 24_000_000, [8_000_000, 5_800_000, 3_900_000, 2_500_000, 2_000_000, 1_800_000]),
+	      ];
+
+	      onUpdatePlayer({
+	          ...basePlayer,
+	          businesses: basePlayer.businesses.map(b => b.id === studio.id ? studio : b),
+	          pastProjects: [
+	              ...seededSeasons,
+	              ...basePlayer.pastProjects.filter(project => !String(project.id).startsWith(qaPrefix))
+	          ],
+	          logs: [{
+	              week: basePlayer.currentWeek,
+	              year: basePlayer.age,
+	              message: target === 'PRODUCTION_HOUSE'
+	                  ? '🧪 CHEAT: Episode Ratings Production House QA series added. Open Production House > Past Projects > Signal Room.'
+	                  : '🧪 CHEAT: Episode Ratings IMDb QA series added. Open Phone > IMDb > Credits > Signal Room.',
+	              type: 'positive'
+	          }, ...basePlayer.logs].slice(0, 50)
+	      } as Player);
+	      setActiveCheatMenu('NONE');
+	      if (target === 'PRODUCTION_HOUSE') {
+	          onOpenProductionHouseCheat?.();
+	          alert('Episode Ratings Production House QA loaded. Open Production House > Past Projects, then tap Signal Room to test the scorecard.');
+	      } else {
+	          setPage?.(Page.MOBILE);
+	          alert('Episode Ratings IMDb QA loaded. Open Phone > IMDb > Credits, then tap Signal Room to test the S1-S3 heatmap.');
+	      }
+	  };
+
+	  const triggerEpisodeRatingsProductionHouseQa = () => triggerEpisodeRatingsQa('PRODUCTION_HOUSE');
+
+	  const triggerProductionRiskQa = () => {
+	      if (!onUpdatePlayer) return;
+
+	      const { updatedPlayer: basePlayer, studio } = ensureCheatStudio();
+	      const now = Date.now();
+	      const qaPrefix = 'cheat_production_risk_';
+	      const currentAge = Math.max(18, basePlayer.age || 18);
+	      const makeProjectDetails = (
+	          title: string,
+	          genre: Genre,
+	          type: 'MOVIE' | 'SERIES',
+	          budget: number,
+	          quality: number,
+	          budgetTier: 'MID' | 'HIGH' | 'BLOCKBUSTER',
+	          episodeRatings?: any[]
+	      ) => ({
+	          title,
+	          type,
+	          description: 'Cheat QA project for Production House risk and studio net testing.',
+	          studioId: studio.id,
+	          subtype: 'STANDALONE' as const,
+	          genre,
+	          budgetTier,
+	          estimatedBudget: budget,
+	          visibleHype: quality >= 80 ? 'HIGH' as const : quality >= 65 ? 'MEDIUM' as const : 'LOW' as const,
+	          hiddenStats: {
+	              scriptQuality: quality,
+	              directorQuality: Math.max(25, quality - 3),
+	              castingStrength: Math.max(25, quality - 6),
+	              distributionPower: Math.max(25, quality - 4),
+	              rawHype: quality >= 80 ? 78 : quality >= 65 ? 62 : 86,
+	              qualityScore: quality,
+	              prestigeBonus: genre === 'DRAMA' ? 12 : 0,
+	              castDepthScore: Math.max(25, quality - 8)
+	          },
+	          directorName: quality >= 80 ? 'Mara Voss' : 'Studio Hire',
+	          visibleDirectorTier: quality >= 80 ? 'Prestige' : 'Working',
+	          visibleScriptBuzz: quality >= 80 ? 'Hot' : quality >= 65 ? 'Solid' : 'Weak',
+	          visibleCastStrength: quality >= 80 ? 'Strong' : 'Uneven',
+	          episodes: type === 'SERIES' ? 8 : undefined,
+	          customPoster: {
+	              type: 'CONFIG' as const,
+	              bgGradient: quality >= 80 ? 'from-emerald-950 via-zinc-900 to-black' : 'from-rose-950 via-zinc-900 to-black',
+	              icon: type === 'SERIES' ? 'Tv' as const : 'Film' as const,
+	              textColor: 'text-white'
+	          },
+	          episodeRatings,
+	      });
+	      const makeSeasonRatings = (season: number, values: number[]) => {
+	          const averageRating = Math.round((values.reduce((sum, rating) => sum + rating, 0) / values.length) * 10) / 10;
+	          return {
+	              season,
+	              averageRating,
+	              verdict: averageRating >= 8.2 ? 'GREAT' : averageRating >= 7 ? 'GOOD' : averageRating >= 5.8 ? 'REGULAR' : 'BAD',
+	              episodes: values.map((rating, index) => ({ episode: index + 1, rating }))
+	          };
+	      };
+	      const buildPastProject = ({
+	          key,
+	          title,
+	          genre,
+	          type = 'MOVIE',
+	          budget,
+	          gross,
+	          totalStudioReceipts,
+	          streamingRevenue,
+	          rating,
+	          quality,
+	          outcomeTier,
+	          budgetTier,
+	          episodeRatings,
+	          releaseOffset,
+	      }: any) => {
+	          const projectDetails = makeProjectDetails(title, genre, type, budget, quality, budgetTier, episodeRatings);
+	          return {
+	              id: `${qaPrefix}${key}_${now}`,
+	              name: title,
+	              type: 'ACTING_GIG',
+	              roleType: 'LEAD',
+	              year: currentAge,
+	              releaseYear: currentAge,
+	              releaseWeek: Math.max(1, basePlayer.currentWeek - releaseOffset),
+	              releasedAtAbsoluteWeek: Math.max(1, getAbsoluteWeek(currentAge, Math.max(1, basePlayer.currentWeek - releaseOffset))),
+	              earnings: Math.floor(budget * 0.02),
+	              rating,
+	              reception: outcomeTier === 'FLOP' ? 'Expensive miss' : outcomeTier === 'HIT' ? 'Strong studio return' : 'Mixed studio economics',
+	              projectQuality: quality,
+	              imdbRating: rating,
+	              boxOfficeResult: streamingRevenue > gross ? 'STREAMING' : 'THEATRICAL',
+	              outcomeTier,
+	              subtype: 'STANDALONE',
+	              futurePotential: {
+	                  sequelChance: outcomeTier === 'HIT' ? 64 : outcomeTier === 'FLOP' ? 8 : 28,
+	                  franchiseChance: outcomeTier === 'HIT' ? 44 : 10,
+	                  rebootChance: 8,
+	                  renewalChance: type === 'SERIES' ? 86 : 0,
+	                  isFranchiseStarter: false,
+	                  isSequelGreenlit: false,
+	                  isRenewed: type === 'SERIES',
+	                  seriesStatus: type === 'SERIES' ? 'ONGOING' : undefined
+	              },
+	              studioId: studio.id,
+	              streamingPlatform: streamingRevenue > 0 ? 'NETFLIX' : undefined,
+	              totalViews: streamingRevenue > 0 ? Math.floor(streamingRevenue / 3) : undefined,
+	              weeklyViews: streamingRevenue > 0 ? [Math.floor(streamingRevenue / 9), Math.floor(streamingRevenue / 12), Math.floor(streamingRevenue / 18)] : undefined,
+	              streamingRevenue,
+	              castList: [],
+	              reviews: [],
+	              episodeRatings,
+	              budget,
+	              gross,
+	              totalStudioReceipts,
+	              genre,
+	              description: 'Production Risk QA project. Check Project Revenue and outcome variety.',
+	              projectType: type,
+	              directorName: projectDetails.directorName,
+	              visibleDirectorTier: projectDetails.visibleDirectorTier,
+	              visibleScriptBuzz: projectDetails.visibleScriptBuzz,
+	              visibleCastStrength: projectDetails.visibleCastStrength,
+	              customPoster: projectDetails.customPoster,
+	              projectDetails
+	          };
+	      };
+	      const prestigeRatings = [
+	          makeSeasonRatings(1, [8.5, 8.8, 8.7, 9.0, 8.6, 8.9, 9.1, 8.8]),
+	          makeSeasonRatings(2, [8.9, 9.1, 9.0, 9.2, 8.8, 9.0, 9.1, 9.3])
+	      ];
+	      const riskProjects = [
+	          buildPastProject({
+	              key: 'risk_bomb',
+	              title: 'Risk Bomb',
+	              genre: 'ACTION',
+	              budgetTier: 'BLOCKBUSTER',
+	              budget: 220_000_000,
+	              gross: 142_000_000,
+	              totalStudioReceipts: 68_000_000,
+	              streamingRevenue: 8_000_000,
+	              rating: 5.4,
+	              quality: 42,
+	              outcomeTier: 'FLOP',
+	              releaseOffset: 3
+	          }),
+	          buildPastProject({
+	              key: 'break_even',
+	              title: 'Break Even',
+	              genre: 'THRILLER',
+	              budgetTier: 'HIGH',
+	              budget: 80_000_000,
+	              gross: 130_000_000,
+	              totalStudioReceipts: 66_000_000,
+	              streamingRevenue: 15_000_000,
+	              rating: 6.8,
+	              quality: 67,
+	              outcomeTier: 'AVERAGE',
+	              releaseOffset: 2
+	          }),
+	          buildPastProject({
+	              key: 'surprise_hit',
+	              title: 'Surprise Hit',
+	              genre: 'MYSTERY',
+	              budgetTier: 'MID',
+	              budget: 32_000_000,
+	              gross: 170_000_000,
+	              totalStudioReceipts: 88_000_000,
+	              streamingRevenue: 28_000_000,
+	              rating: 8.1,
+	              quality: 84,
+	              outcomeTier: 'HIT',
+	              releaseOffset: 1
+	          }),
+	          buildPastProject({
+	              key: 'prestige_series',
+	              title: 'Prestige Series',
+	              genre: 'DRAMA',
+	              type: 'SERIES',
+	              budgetTier: 'HIGH',
+	              budget: 70_000_000,
+	              gross: 0,
+	              totalStudioReceipts: 0,
+	              streamingRevenue: 155_000_000,
+	              rating: 8.9,
+	              quality: 88,
+	              outcomeTier: 'HIT',
+	              episodeRatings: prestigeRatings,
+	              releaseOffset: 0
+	          })
+	      ];
+
+	      onUpdatePlayer({
+	          ...basePlayer,
+	          businesses: basePlayer.businesses.map(b => b.id === studio.id ? studio : b),
+	          pastProjects: [
+	              ...riskProjects,
+	              ...basePlayer.pastProjects.filter(project => !String(project.id).startsWith(qaPrefix))
+	          ],
+	          logs: [{
+	              week: basePlayer.currentWeek,
+	              year: basePlayer.age,
+	              message: '🧪 CHEAT: Production Risk QA slate added. Open Production House > Past Projects to compare Risk Bomb, Break Even, Surprise Hit, and Prestige Series.',
+	              type: 'positive'
+	          }, ...basePlayer.logs].slice(0, 50)
+	      } as Player);
+	      setActiveCheatMenu('NONE');
+	      onOpenProductionHouseCheat?.();
+	      alert('Production Risk QA loaded. Open Production House > Past Projects to inspect Risk Bomb, Break Even, Surprise Hit, and Prestige Series.');
+	  };
+
+	  const triggerRareHollywoodChaosQa = (kind: RareHollywoodChaosKind) => {
+	      if (!onUpdatePlayer) return;
 
       const { updatedPlayer: basePlayer, studio } = ensureCheatStudio();
       const now = Date.now();
@@ -5449,11 +6194,23 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                                   <button onClick={triggerStudioAcquisitionSigningCheat} className="col-span-2 bg-orange-950/40 hover:bg-orange-900/60 border border-orange-400/40 text-xs font-bold py-3 rounded-lg text-orange-200">
                                       Studio Acquisition Signing QA
                                   </button>
-                                  <button onClick={triggerFilmographySortQa} className="col-span-2 bg-pink-900/30 hover:bg-pink-900/50 border border-pink-500/30 text-xs font-bold py-3 rounded-lg text-pink-300">
-                                      Add Filmography Sort QA Library
-                                  </button>
-                                  <button onClick={triggerBoxOfficeDepthQa} className="col-span-2 bg-sky-900/30 hover:bg-sky-900/50 border border-sky-400/40 text-xs font-bold py-3 rounded-lg text-sky-300 flex items-center justify-center gap-2">
-                                      <BarChart3 size={14}/> Box Office Detail QA
+	                                  <button onClick={triggerFilmographySortQa} className="col-span-2 bg-pink-900/30 hover:bg-pink-900/50 border border-pink-500/30 text-xs font-bold py-3 rounded-lg text-pink-300">
+	                                      Add Filmography Sort QA Library
+	                                  </button>
+	                                  <button onClick={triggerEpisodeRatingsQa} className="col-span-2 bg-emerald-950/40 hover:bg-emerald-900/60 border border-emerald-400/40 text-xs font-bold py-3 rounded-lg text-emerald-200 flex items-center justify-center gap-2">
+	                                      <Tv size={14}/> Episode Ratings IMDb QA
+	                                  </button>
+	                                  <button onClick={triggerEpisodeRatingsProductionHouseQa} className="col-span-2 bg-teal-950/40 hover:bg-teal-900/60 border border-teal-400/40 text-xs font-bold py-3 rounded-lg text-teal-200 flex items-center justify-center gap-2">
+	                                      <Clapperboard size={14}/> Episode Ratings Production House QA
+	                                  </button>
+	                                  <button onClick={triggerProductionRiskQa} className="col-span-2 bg-rose-950/40 hover:bg-rose-900/60 border border-rose-400/40 text-xs font-bold py-3 rounded-lg text-rose-200 flex items-center justify-center gap-2">
+	                                      <BarChart3 size={14}/> Production Risk QA
+	                                  </button>
+	                                  <button onClick={triggerBoxOfficeDepthQa} className="col-span-2 bg-sky-900/30 hover:bg-sky-900/50 border border-sky-400/40 text-xs font-bold py-3 rounded-lg text-sky-300 flex items-center justify-center gap-2">
+	                                      <BarChart3 size={14}/> Box Office Detail QA
+	                                  </button>
+                                  <button onClick={triggerAudiencePulseQa} className="col-span-2 bg-yellow-950/40 hover:bg-yellow-900/60 border border-yellow-400/40 text-xs font-bold py-3 rounded-lg text-yellow-200 flex items-center justify-center gap-2">
+                                      <MessageSquareQuote size={14}/> Audience Pulse IMDb QA
                                   </button>
                                   <button onClick={triggerSoundtrackRevenueQa} className="col-span-2 bg-cyan-900/30 hover:bg-cyan-900/50 border border-cyan-400/40 text-xs font-bold py-3 rounded-lg text-cyan-200 flex items-center justify-center gap-2">
                                       <Mic2 size={14}/> Soundtrack Revenue QA
@@ -5554,6 +6311,9 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                                   </button>
                                   <button onClick={triggerAwardCeremony} className="bg-zinc-800 hover:bg-zinc-700 border border-zinc-600 text-xs font-bold py-3 rounded-lg text-zinc-300 flex items-center justify-center gap-2">
                                       <Trophy size={14}/> Force Award Ceremony (Instant)
+                                  </button>
+                                  <button onClick={triggerAwardsPolishQa} className="bg-violet-900/30 hover:bg-violet-900/50 border border-violet-500/30 text-xs font-bold py-3 rounded-lg text-violet-300 flex items-center justify-center gap-2">
+                                      <Trophy size={14}/> Awards Polish QA
                                   </button>
                                   <div className="grid grid-cols-2 gap-2">
                                       <button onClick={() => triggerCheatPostProd('MOVIE')} className="bg-emerald-900/30 hover:bg-emerald-900/50 border border-emerald-500/30 text-[10px] font-bold py-3 rounded-lg text-emerald-400 flex items-center justify-center gap-2">
@@ -5740,6 +6500,21 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                                   </button>
                                   <button onClick={() => triggerCheatFranchiseContract('SW')} className="bg-yellow-900/30 hover:bg-yellow-900/50 border border-yellow-500/30 text-xs font-bold py-3 rounded-lg text-yellow-400">
                                       Trigger SW Contract
+                                  </button>
+                                  <button onClick={() => triggerCheatFranchiseContract('AVATAR')} className="bg-cyan-900/30 hover:bg-cyan-900/50 border border-cyan-500/30 text-xs font-bold py-3 rounded-lg text-cyan-300">
+                                      Avatar Deal
+                                  </button>
+                                  <button onClick={() => triggerCheatFranchiseContract('MONSTERVERSE')} className="bg-emerald-900/30 hover:bg-emerald-900/50 border border-emerald-500/30 text-xs font-bold py-3 rounded-lg text-emerald-300">
+                                      Monsterverse
+                                  </button>
+                                  <button onClick={() => triggerCheatFranchiseContract('JURASSIC')} className="bg-lime-900/30 hover:bg-lime-900/50 border border-lime-500/30 text-xs font-bold py-3 rounded-lg text-lime-300">
+                                      Jurassic
+                                  </button>
+                                  <button onClick={() => triggerCheatFranchiseContract('SPIDER_VERSE')} className="bg-orange-900/30 hover:bg-orange-900/50 border border-orange-500/30 text-xs font-bold py-3 rounded-lg text-orange-300">
+                                      Spider-Verse
+                                  </button>
+                                  <button onClick={() => triggerCheatFranchiseContract('FAST_SAGA')} className="bg-rose-900/30 hover:bg-rose-900/50 border border-rose-500/30 text-xs font-bold py-3 rounded-lg text-rose-300">
+                                      Fast Saga
                                   </button>
                               </div>
                           </div>
@@ -5985,7 +6760,13 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                           >
                               Save
                           </button>
-                          <button onClick={() => setShowAvatarEditor(false)} className="p-2 rounded-full bg-zinc-900 text-zinc-400 hover:text-white transition-colors">
+                          <button
+                              onClick={() => {
+                                  setShowAvatarEditor(false);
+                                  setShowPortraitBuilder(false);
+                              }}
+                              className="p-2 rounded-full bg-zinc-900 text-zinc-400 hover:text-white transition-colors"
+                          >
                               <X size={18} />
                           </button>
                       </div>
@@ -6022,6 +6803,13 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                           <button onClick={() => fileInputRef.current?.click()} className="mt-3 inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 hover:text-white transition-colors">
                               <UploadCloud size={12} /> Upload Custom Photo
                           </button>
+                          <button
+                              type="button"
+                              onClick={() => setShowPortraitBuilder(true)}
+                              className="mt-2 inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-amber-400 hover:text-amber-200 transition-colors"
+                          >
+                              <Sparkles size={12} /> Build Pixel Portrait
+                          </button>
                           {avatarError && <div className="mt-2 text-xs text-rose-300">{avatarError}</div>}
                       </div>
 
@@ -6055,6 +6843,70 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                           </div>
                       )}
                   </div>
+
+                  {showPortraitBuilder && (
+                      <div className="fixed inset-0 z-[650] bg-black/90 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200">
+                          <div className="relative w-full max-w-md max-h-[100dvh] overflow-y-auto rounded-t-[2rem] sm:rounded-[2rem] border border-zinc-800 bg-black p-5 custom-scrollbar">
+                              <button
+                                  type="button"
+                                  onClick={() => setShowPortraitBuilder(false)}
+                                  className="absolute right-4 top-4 rounded-full bg-zinc-900 p-2 text-zinc-400 hover:text-white transition-colors"
+                              >
+                                  <X size={18} />
+                              </button>
+                              <ProfilePictureBuilder
+                                  gender={player.gender}
+                                  language={language}
+                                  onApply={(avatarDataUrl) => {
+                                      setSelectedAvatar(avatarDataUrl);
+                                      setIsCustomUpload(true);
+                                      setShowPortraitBuilder(false);
+                                      setAvatarError('');
+                                  }}
+                              />
+                          </div>
+                      </div>
+                  )}
+              </div>
+          </div>
+      )}
+
+      {showActorArcSheet && (
+          <div className="fixed inset-0 z-[480] bg-black/80 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200">
+              <div
+                  className="relative w-full max-w-md rounded-t-[2rem] sm:rounded-[2rem] border border-zinc-800 bg-zinc-950 p-5 shadow-2xl"
+                  style={{ paddingBottom: 'max(calc(env(safe-area-inset-bottom) + 1.25rem), 1.75rem)' }}
+              >
+                  <button
+                      type="button"
+                      onClick={() => setShowActorArcSheet(false)}
+                      className="absolute right-4 top-4 rounded-full bg-zinc-900 p-2 text-zinc-400 hover:text-white transition-colors"
+                  >
+                      <X size={18} />
+                  </button>
+
+                  <div className="pr-12">
+                      <div className="text-[10px] font-black uppercase tracking-[0.24em] text-amber-400">{tr('home.actorArc.sheet.eyebrow')}</div>
+                      <h3 className="mt-2 text-2xl font-black text-white">{tr(actorCareerArc.labelKey)}</h3>
+                      <p className="mt-2 text-sm leading-relaxed text-zinc-300">{tr(actorCareerArc.summaryKey)}</p>
+                  </div>
+
+                  <div className={`mt-5 rounded-2xl border p-4 ${actorCareerArc.toneClass}`}>
+                      <div className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80">{tr('home.actorArc.sheet.current')}</div>
+                      <div className="mt-2 text-sm font-semibold leading-relaxed">{tr(actorCareerArc.detailKey)}</div>
+                  </div>
+
+                  <div className="mt-5">
+                      <div className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">{tr('home.actorArc.sheet.signals')}</div>
+                      <div className="mt-3 space-y-2">
+                          {actorCareerArc.signals.map((signal, index) => (
+                              <div key={`${signal.key}_${index}`} className="flex items-start gap-3 rounded-2xl border border-zinc-800 bg-black/40 px-3 py-2.5">
+                                  <TrendingUp size={14} className="mt-0.5 shrink-0 text-emerald-300" />
+                                  <span className="text-xs font-semibold leading-relaxed text-zinc-300">{tr(signal.key, signal.vars)}</span>
+                              </div>
+                          ))}
+                      </div>
+                  </div>
               </div>
           </div>
       )}
@@ -6084,8 +6936,16 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
             
             <div className="flex-1 min-w-0">
                 <h1 className="text-3xl font-bold text-white tracking-tight truncate">{player.name}</h1>
-                <div className="flex items-center gap-3 mt-1">
-                    <span className="text-xs font-medium text-amber-400 uppercase tracking-widest border border-amber-900/50 bg-amber-950/30 px-2 py-1 rounded">Actor</span>
+                <div className="flex flex-wrap items-center gap-2 mt-1">
+                    <span className="text-xs font-medium text-amber-400 uppercase tracking-widest border border-amber-900/50 bg-amber-950/30 px-2 py-1 rounded">{tr('home.actor.role')}</span>
+                    <button
+                        type="button"
+                        onClick={() => setShowActorArcSheet(true)}
+                        className={`max-w-full truncate rounded border px-2 py-1 text-[10px] font-black uppercase tracking-[0.16em] ${actorCareerArc.toneClass}`}
+                        title={tr(actorCareerArc.summaryKey)}
+                    >
+                        {tr(actorCareerArc.labelKey)}
+                    </button>
                 </div>
                 <div className="flex items-center gap-1 mt-3 text-emerald-400 font-mono text-lg font-bold truncate">
                     {formatMoney(player.money)}

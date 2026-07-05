@@ -1,6 +1,7 @@
 import {
     OwnedRight,
     OwnedRightDevelopmentChoice,
+    GameLanguage,
     RightsCreativeGuarantee,
     RightsDealType,
     RightsNegotiation,
@@ -8,6 +9,7 @@ import {
     RightsSignal,
     Script,
 } from '../types';
+import { t } from './i18n';
 
 export const RIGHTS_NEGOTIATION_MAX_ROUNDS = 3;
 export const RIGHTS_OPTION_TERM_WEEKS = 104;
@@ -57,6 +59,9 @@ const DEAL_MULTIPLIER: Record<RightsDealType, number> = {
 
 const INVESTIGATION_STATUS = new Set(['REPORT_READY', 'PURSUIT_READY']);
 
+const formatRightsNumber = (value: number, language: GameLanguage) =>
+    new Intl.NumberFormat(language === 'pt-BR' ? 'pt-BR' : 'en-US', { maximumFractionDigits: 0 }).format(value);
+
 export interface RightsDealQuote {
     available: boolean;
     suggestedOffer: number;
@@ -85,26 +90,29 @@ export interface RightsOpportunityAction {
 export const getRightsOpportunityAction = (
     negotiations: RightsNegotiation[] = [],
     opportunityId: string,
+    language: GameLanguage = 'en',
 ): RightsOpportunityAction => {
     const negotiation = getLatestRightsNegotiation(negotiations, opportunityId);
     if (!negotiation || negotiation.status === 'WITHDRAWN') {
-        return { state: 'AVAILABLE', label: 'Acquire' };
+        return { state: 'AVAILABLE', label: t(language, 'services.rightsNegotiation.action.acquire') };
     }
     if (negotiation.status === 'AWAITING_RESPONSE') {
-        return { state: 'PENDING', label: 'Offer Submitted', negotiation };
+        return { state: 'PENDING', label: t(language, 'services.rightsNegotiation.action.offerSubmitted'), negotiation };
     }
     if (negotiation.status === 'READY_TO_SIGN') {
-        return { state: 'SIGNING', label: 'Sign Contract', negotiation };
+        return { state: 'SIGNING', label: t(language, 'services.rightsNegotiation.action.signContract'), negotiation };
     }
     if (negotiation.status === 'SIGNED') {
-        return { state: 'COMPLETED', label: 'Acquired', negotiation };
+        return { state: 'COMPLETED', label: t(language, 'services.rightsNegotiation.action.acquired'), negotiation };
     }
     if (negotiation.status === 'REJECTED') {
-        return { state: 'CLOSED', label: 'Offer Rejected', negotiation };
+        return { state: 'CLOSED', label: t(language, 'services.rightsNegotiation.action.offerRejected'), negotiation };
     }
     return {
         state: 'RESPONSE',
-        label: negotiation.status === 'ACCEPTED' ? 'Offer Accepted' : 'Review Response',
+        label: negotiation.status === 'ACCEPTED'
+            ? t(language, 'services.rightsNegotiation.action.offerAccepted')
+            : t(language, 'services.rightsNegotiation.action.reviewResponse'),
         negotiation,
     };
 };
@@ -113,6 +121,7 @@ export const getRightsDealQuote = (
     opportunity: RightsOpportunity,
     dealType: RightsDealType,
     currentWeek = opportunity.listedAtWeek,
+    language: GameLanguage = 'en',
 ): RightsDealQuote => {
     const catalogOnly = dealType === 'CATALOG_PURCHASE' && opportunity.propertyType !== 'CATALOG';
     const multiplier = DEAL_MULTIPLIER[dealType];
@@ -128,8 +137,8 @@ export const getRightsDealQuote = (
             ...common,
             expiresAtWeek: currentWeek + RIGHTS_OPTION_TERM_WEEKS,
             projectsAllowed: 1,
-            label: 'Screen Option',
-            description: 'Temporary exclusive control to develop one screen project. The seller keeps permanent ownership.',
+            label: t(language, 'services.rightsNegotiation.quote.OPTION.label'),
+            description: t(language, 'services.rightsNegotiation.quote.OPTION.description'),
         };
     }
     if (dealType === 'LICENSE') {
@@ -137,21 +146,21 @@ export const getRightsDealQuote = (
             ...common,
             expiresAtWeek: currentWeek + RIGHTS_LICENSE_TERM_WEEKS,
             projectsAllowed: opportunity.propertyType === 'CATALOG' ? 4 : 2,
-            label: 'Limited License',
-            description: 'Temporary permission to make a limited number of screen projects. The seller still owns the IP.',
+            label: t(language, 'services.rightsNegotiation.quote.LICENSE.label'),
+            description: t(language, 'services.rightsNegotiation.quote.LICENSE.description'),
         };
     }
     if (dealType === 'CATALOG_PURCHASE') {
         return {
             ...common,
-            label: 'Catalog Purchase',
-            description: 'Permanent ownership of the complete listed package.',
+            label: t(language, 'services.rightsNegotiation.quote.CATALOG_PURCHASE.label'),
+            description: t(language, 'services.rightsNegotiation.quote.CATALOG_PURCHASE.description'),
         };
     }
     return {
         ...common,
-        label: 'Permanent Buyout',
-        description: 'Your studio owns the IP permanently, with no expiry date or project limit.',
+        label: t(language, 'services.rightsNegotiation.quote.BUYOUT.label'),
+        description: t(language, 'services.rightsNegotiation.quote.BUYOUT.description'),
     };
 };
 
@@ -233,25 +242,25 @@ const rivalWeight: Record<RightsSignal, number> = {
     EXTREME: 0.3,
 };
 
-const creativeGuaranteeFor = (opportunity: RightsOpportunity): RightsCreativeGuarantee => {
+const creativeGuaranteeFor = (opportunity: RightsOpportunity, language: GameLanguage): RightsCreativeGuarantee => {
     if (opportunity.archetype === 'PRESTIGE_PROPERTY') {
         return {
             id: 'estate_approval',
-            title: 'Estate Approval',
-            description: 'The rights holder keeps approval over the lead and final screenplay.',
+            title: t(language, 'services.rightsNegotiation.creativeGuarantee.estate_approval.title'),
+            description: t(language, 'services.rightsNegotiation.creativeGuarantee.estate_approval.description'),
         };
     }
     if (opportunity.archetype === 'DORMANT_HERO') {
         return {
             id: 'legacy_custodian',
-            title: 'Legacy Custodian',
-            description: 'A franchise custodian must approve major canon changes.',
+            title: t(language, 'services.rightsNegotiation.creativeGuarantee.legacy_custodian.title'),
+            description: t(language, 'services.rightsNegotiation.creativeGuarantee.legacy_custodian.description'),
         };
     }
     return {
         id: 'creator_consultation',
-        title: 'Creator Consultation',
-        description: 'The original creator receives consultation rights through production.',
+        title: t(language, 'services.rightsNegotiation.creativeGuarantee.creator_consultation.title'),
+        description: t(language, 'services.rightsNegotiation.creativeGuarantee.creator_consultation.description'),
     };
 };
 
@@ -259,6 +268,7 @@ const evaluateResponse = (
     negotiation: RightsNegotiation,
     opportunity: RightsOpportunity,
     studioPrestige: number,
+    language: GameLanguage,
 ): RightsNegotiation => {
     const random = seededRandom(negotiation.intelligenceSeed ^ (negotiation.round * 0x9E3779B9));
     const investigationLeverage = negotiation.isInvestigated ? 0.06 : 0;
@@ -275,7 +285,7 @@ const evaluateResponse = (
             ...negotiation,
             status: 'ACCEPTED',
             agreedAmount: negotiation.currentOffer,
-            responseSummary: `${opportunity.sellerName} accepted the premium offer without reopening terms.`,
+            responseSummary: t(language, 'services.rightsNegotiation.response.acceptedPremium', { seller: opportunity.sellerName }),
         };
     }
 
@@ -288,8 +298,8 @@ const evaluateResponse = (
             ...negotiation,
             status: 'CREATIVE_GUARANTEE',
             counterAmount: negotiation.currentOffer,
-            creativeGuarantee: creativeGuaranteeFor(opportunity),
-            responseSummary: `${opportunity.sellerName} will proceed if the studio accepts a creative protection clause.`,
+            creativeGuarantee: creativeGuaranteeFor(opportunity, language),
+            responseSummary: t(language, 'services.rightsNegotiation.response.creativeGuarantee', { seller: opportunity.sellerName }),
         };
     }
 
@@ -304,7 +314,9 @@ const evaluateResponse = (
             status: negotiation.round >= 2 ? 'BIDDING_WAR' : 'RIVAL_OFFER',
             rivalAmount,
             counterAmount: rivalAmount,
-            responseSummary: `A rival studio entered at ${rivalAmount.toLocaleString()}. The owner opened a limited bidding round.`,
+            responseSummary: t(language, 'services.rightsNegotiation.response.rivalOffer', {
+                amount: formatRightsNumber(rivalAmount, language),
+            }),
         };
     }
 
@@ -313,7 +325,7 @@ const evaluateResponse = (
             ...negotiation,
             status: 'ACCEPTED',
             agreedAmount: negotiation.currentOffer,
-            responseSummary: `${opportunity.sellerName} accepted the proposed terms.`,
+            responseSummary: t(language, 'services.rightsNegotiation.response.acceptedTerms', { seller: opportunity.sellerName }),
         };
     }
 
@@ -323,7 +335,7 @@ const evaluateResponse = (
             ...negotiation,
             status: 'COUNTEROFFER',
             counterAmount,
-            responseSummary: `${opportunity.sellerName} remains interested but wants stronger financial terms.`,
+            responseSummary: t(language, 'services.rightsNegotiation.response.counter', { seller: opportunity.sellerName }),
         };
     }
 
@@ -331,8 +343,8 @@ const evaluateResponse = (
         ...negotiation,
         status: 'REJECTED',
         responseSummary: offerRatio < 0.55
-            ? 'The owner considered the offer too far below the IP’s market position.'
-            : 'The owner chose another direction after reviewing the studio and offer.',
+            ? t(language, 'services.rightsNegotiation.response.rejectedLow')
+            : t(language, 'services.rightsNegotiation.response.rejectedDirection'),
     };
 };
 
@@ -341,8 +353,10 @@ export const advanceRightsNegotiations = (input: {
     opportunities: RightsOpportunity[];
     currentWeek: number;
     studioPrestige: number;
+    language?: GameLanguage;
 }): { negotiations: RightsNegotiation[]; newResponses: RightsNegotiation[] } => {
     const newResponses: RightsNegotiation[] = [];
+    const language = input.language || 'en';
     const negotiations = input.negotiations.map(negotiation => {
         if (negotiation.status !== 'AWAITING_RESPONSE' || input.currentWeek < negotiation.responseDueWeek) {
             return negotiation;
@@ -352,12 +366,12 @@ export const advanceRightsNegotiations = (input: {
             const rejected = {
                 ...negotiation,
                 status: 'REJECTED' as const,
-                responseSummary: 'The IP left the market before terms could be completed.',
+                responseSummary: t(language, 'services.rightsNegotiation.response.marketLeft'),
             };
             newResponses.push(rejected);
             return rejected;
         }
-        const response = evaluateResponse(negotiation, opportunity, input.studioPrestige);
+        const response = evaluateResponse(negotiation, opportunity, input.studioPrestige, language);
         newResponses.push(response);
         return response;
     });
@@ -435,6 +449,7 @@ export const acceptRightsTerms = (
 export const withdrawRightsNegotiation = (
     negotiations: RightsNegotiation[],
     negotiationId: string,
+    language: GameLanguage = 'en',
 ): { negotiations: RightsNegotiation[]; changed: boolean; reason?: 'NOT_FOUND' | 'ALREADY_SIGNED' } => {
     const target = negotiations.find(item => item.id === negotiationId);
     if (!target) return { negotiations, changed: false, reason: 'NOT_FOUND' };
@@ -443,7 +458,7 @@ export const withdrawRightsNegotiation = (
         negotiations: negotiations.map(item => item.id === target.id ? {
             ...item,
             status: 'WITHDRAWN',
-            responseSummary: 'Your studio withdrew from the negotiation.',
+            responseSummary: t(language, 'services.rightsNegotiation.response.withdrawn'),
         } : item),
         changed: true,
     };
@@ -456,6 +471,7 @@ export const signRightsAgreement = (input: {
     currentWeek: number;
     studioBalance: number;
     studioName: string;
+    language?: GameLanguage;
 }): {
     negotiations: RightsNegotiation[];
     ownedRight?: OwnedRight;
@@ -463,6 +479,7 @@ export const signRightsAgreement = (input: {
     changed: boolean;
     reason?: 'NOT_FOUND' | 'NOT_READY' | 'ALREADY_SIGNED' | 'INSUFFICIENT_FUNDS';
 } => {
+    const language = input.language || 'en';
     const target = input.negotiations.find(item => item.id === input.negotiationId);
     if (!target) return { negotiations: input.negotiations, balance: input.studioBalance, changed: false, reason: 'NOT_FOUND' };
     if (target.status === 'SIGNED') {
@@ -475,7 +492,7 @@ export const signRightsAgreement = (input: {
     if (input.studioBalance < amount) {
         return { negotiations: input.negotiations, balance: input.studioBalance, changed: false, reason: 'INSUFFICIENT_FUNDS' };
     }
-    const quote = getRightsDealQuote(input.opportunity, target.dealType, input.currentWeek);
+    const quote = getRightsDealQuote(input.opportunity, target.dealType, input.currentWeek, language);
     const ownedRight: OwnedRight = {
         id: `owned_${input.opportunity.id}_${input.currentWeek}`,
         sourceOpportunityId: input.opportunity.id,
@@ -502,7 +519,7 @@ export const signRightsAgreement = (input: {
             ...item,
             status: 'SIGNED',
             agreedAmount: amount,
-            responseSummary: `${input.studioName} completed the acquisition.`,
+            responseSummary: t(language, 'services.rightsNegotiation.response.signed', { studio: input.studioName }),
         } : item),
         ownedRight,
         balance: input.studioBalance - amount,
@@ -584,12 +601,14 @@ export const developOwnedRight = (input: {
     ownedRight: OwnedRight;
     currentWeek: number;
     choice?: OwnedRightDevelopmentChoice;
+    language?: GameLanguage;
 }): {
     ownedRight?: OwnedRight;
     script?: Script;
     changed: boolean;
     reason?: 'EXPIRED' | 'PROJECT_LIMIT';
 } => {
+    const language = input.language || 'en';
     const expired = input.ownedRight.expiresAtWeek !== undefined
         && input.currentWeek > input.ownedRight.expiresAtWeek;
     if (expired) {
@@ -614,8 +633,11 @@ export const developOwnedRight = (input: {
     const script: Script = {
         id: `rights_script_${input.ownedRight.id}_${projectNumber}`,
         title: projectNumber === 1
-            ? `Untitled ${input.ownedRight.title} Project`
-            : `Untitled ${input.ownedRight.title} Project ${projectNumber}`,
+            ? t(language, 'services.rightsNegotiation.script.untitledFirst', { title: input.ownedRight.title })
+            : t(language, 'services.rightsNegotiation.script.untitledNumber', {
+                title: input.ownedRight.title,
+                number: projectNumber.toLocaleString(),
+            }),
         genres: [input.ownedRight.primaryGenre],
         status: 'CONCEPT',
         quality: 38,
@@ -628,7 +650,7 @@ export const developOwnedRight = (input: {
         sourceMaterial: 'ADAPTATION',
         sourceMaterialType: 'SCREENPLAY',
         subjectName: input.ownedRight.title,
-        logline: `A new screen project built from the acquired ${input.ownedRight.title} rights.`,
+        logline: t(language, 'services.rightsNegotiation.script.logline', { title: input.ownedRight.title }),
         connectedProjectIntent: isReboot ? 'REBOOT' : 'SOLO',
         tags: [
             'ACQUIRED_RIGHTS',

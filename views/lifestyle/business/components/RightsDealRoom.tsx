@@ -15,8 +15,9 @@ import {
     Timer,
     X,
 } from 'lucide-react';
-import { RightsDealType, RightsNegotiation, RightsOpportunity } from '../../../../types';
+import { GameLanguage, RightsDealType, RightsNegotiation, RightsOpportunity } from '../../../../types';
 import { getRightsDealQuote, RIGHTS_NEGOTIATION_MAX_ROUNDS } from '../../../../services/rightsNegotiation';
+import { t } from '../../../../services/i18n';
 
 interface RightsDealRoomProps {
     opportunity: RightsOpportunity;
@@ -29,6 +30,7 @@ interface RightsDealRoomProps {
     onAcceptTerms: () => void;
     onWithdraw: () => void;
     onSign: () => void;
+    language: GameLanguage;
 }
 
 const formatCurrency = (value: number) => {
@@ -49,17 +51,17 @@ const DEAL_ICONS = {
     CATALOG_PURCHASE: FileSignature,
 } as const;
 
-const RESPONSE_TONE: Record<string, { eyebrow: string; title: string; accent: string }> = {
-    AWAITING_RESPONSE: { eyebrow: 'Offer Delivered', title: 'The owner is reviewing your terms', accent: 'text-sky-300' },
-    ACCEPTED: { eyebrow: 'Terms Accepted', title: 'The IP is ready for contract', accent: 'text-emerald-300' },
-    COUNTEROFFER: { eyebrow: 'Counteroffer', title: 'The owner wants stronger terms', accent: 'text-amber-300' },
-    CREATIVE_GUARANTEE: { eyebrow: 'Creative Condition', title: 'Money is not the only demand', accent: 'text-violet-300' },
-    RIVAL_OFFER: { eyebrow: 'Rival Entered', title: 'Another studio is at the table', accent: 'text-rose-300' },
-    BIDDING_WAR: { eyebrow: 'Final Bidding Room', title: 'The IP is being contested', accent: 'text-rose-300' },
-    REJECTED: { eyebrow: 'Offer Rejected', title: 'The owner passed on your terms', accent: 'text-rose-300' },
-    READY_TO_SIGN: { eyebrow: 'Agreement Prepared', title: 'Review the contract and sign', accent: 'text-emerald-300' },
-    SIGNED: { eyebrow: 'Deal Complete', title: 'The IP belongs to your studio', accent: 'text-emerald-300' },
-    WITHDRAWN: { eyebrow: 'Table Closed', title: 'Your studio walked away', accent: 'text-zinc-400' },
+const RESPONSE_TONE: Record<string, { eyebrowKey: string; titleKey: string; accent: string }> = {
+    AWAITING_RESPONSE: { eyebrowKey: 'rightsDeal.response.AWAITING_RESPONSE.eyebrow', titleKey: 'rightsDeal.response.AWAITING_RESPONSE.title', accent: 'text-sky-300' },
+    ACCEPTED: { eyebrowKey: 'rightsDeal.response.ACCEPTED.eyebrow', titleKey: 'rightsDeal.response.ACCEPTED.title', accent: 'text-emerald-300' },
+    COUNTEROFFER: { eyebrowKey: 'rightsDeal.response.COUNTEROFFER.eyebrow', titleKey: 'rightsDeal.response.COUNTEROFFER.title', accent: 'text-amber-300' },
+    CREATIVE_GUARANTEE: { eyebrowKey: 'rightsDeal.response.CREATIVE_GUARANTEE.eyebrow', titleKey: 'rightsDeal.response.CREATIVE_GUARANTEE.title', accent: 'text-violet-300' },
+    RIVAL_OFFER: { eyebrowKey: 'rightsDeal.response.RIVAL_OFFER.eyebrow', titleKey: 'rightsDeal.response.RIVAL_OFFER.title', accent: 'text-rose-300' },
+    BIDDING_WAR: { eyebrowKey: 'rightsDeal.response.BIDDING_WAR.eyebrow', titleKey: 'rightsDeal.response.BIDDING_WAR.title', accent: 'text-rose-300' },
+    REJECTED: { eyebrowKey: 'rightsDeal.response.REJECTED.eyebrow', titleKey: 'rightsDeal.response.REJECTED.title', accent: 'text-rose-300' },
+    READY_TO_SIGN: { eyebrowKey: 'rightsDeal.response.READY_TO_SIGN.eyebrow', titleKey: 'rightsDeal.response.READY_TO_SIGN.title', accent: 'text-emerald-300' },
+    SIGNED: { eyebrowKey: 'rightsDeal.response.SIGNED.eyebrow', titleKey: 'rightsDeal.response.SIGNED.title', accent: 'text-emerald-300' },
+    WITHDRAWN: { eyebrowKey: 'rightsDeal.response.WITHDRAWN.eyebrow', titleKey: 'rightsDeal.response.WITHDRAWN.title', accent: 'text-zinc-400' },
 };
 
 export const RightsDealRoom: React.FC<RightsDealRoomProps> = ({
@@ -73,7 +75,9 @@ export const RightsDealRoom: React.FC<RightsDealRoomProps> = ({
     onAcceptTerms,
     onWithdraw,
     onSign,
+    language,
 }) => {
+    const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
     const reduceMotion = useReducedMotion();
     const dealTypes = useMemo<RightsDealType[]>(() => (
         opportunity.propertyType === 'CATALOG'
@@ -81,7 +85,7 @@ export const RightsDealRoom: React.FC<RightsDealRoomProps> = ({
             : ['OPTION', 'LICENSE', 'BUYOUT']
     ), [opportunity.propertyType]);
     const [dealType, setDealType] = useState<RightsDealType>(dealTypes[0]);
-    const quote = getRightsDealQuote(opportunity, dealType);
+    const quote = getRightsDealQuote(opportunity, dealType, undefined, language);
     const [offerAmount, setOfferAmount] = useState(quote.suggestedOffer);
     const [signing, setSigning] = useState(false);
     const response = negotiation ? RESPONSE_TONE[negotiation.status] : null;
@@ -104,7 +108,7 @@ export const RightsDealRoom: React.FC<RightsDealRoomProps> = ({
 
     const chooseDeal = (next: RightsDealType) => {
         setDealType(next);
-        setOfferAmount(getRightsDealQuote(opportunity, next).suggestedOffer);
+        setOfferAmount(getRightsDealQuote(opportunity, next, undefined, language).suggestedOffer);
     };
 
     const handleSign = () => {
@@ -171,7 +175,7 @@ export const RightsDealRoom: React.FC<RightsDealRoomProps> = ({
                             <div className="mt-6 grid gap-2 sm:grid-cols-3">
                                 {dealTypes.map(type => {
                                     const DealIcon = DEAL_ICONS[type];
-                                    const dealQuote = getRightsDealQuote(opportunity, type);
+                                    const dealQuote = getRightsDealQuote(opportunity, type, undefined, language);
                                     return (
                                         <button
                                             key={type}
@@ -310,8 +314,8 @@ export const RightsDealRoom: React.FC<RightsDealRoomProps> = ({
                                                 : <Gavel size={23} />}
                                 </div>
                                 <div>
-                                    <p className={`text-[9px] font-black uppercase tracking-[0.22em] ${response?.accent}`}>{response?.eyebrow}</p>
-                                    <h3 className="mt-2 text-2xl font-black uppercase leading-tight">{response?.title}</h3>
+                                    <p className={`text-[9px] font-black uppercase tracking-[0.22em] ${response?.accent}`}>{response ? tr(response.eyebrowKey) : ''}</p>
+                                    <h3 className="mt-2 text-2xl font-black uppercase leading-tight">{response ? tr(response.titleKey) : ''}</h3>
                                     <p className="mt-3 text-sm leading-relaxed text-zinc-400">{negotiation.responseSummary}</p>
                                 </div>
                             </div>

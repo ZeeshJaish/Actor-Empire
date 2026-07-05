@@ -129,7 +129,7 @@ check('production house: sequel concept pre-fills cast', has('productionHouse', 
 check('production house: sequel prefill preserves character id', has('productionHouse', 'characterId: c.characterId'));
 check('production house: sequel prefill preserves source universe id', has('productionHouse', 'sourceUniverseId: c.sourceUniverseId'));
 
-check('release: release normalizes universe map before roster merge', has('releaseWizard', 'normalizeUniverseMap(updatedPlayer.world?.universes || {})'));
+check('release: release normalizes universe map before roster merge', has('releaseWizard', 'normalizeUniverseMap(updatedPlayer.world?.universes || {}, language)'));
 check('release: release merges final cast into universe roster', has('releaseWizard', 'mergeUniverseRosterWithProject('));
 check('game loop: weekly simulation normalizes universes', has('gameLoop', 'normalizeUniverseMap(nextPlayer.world.universes)'));
 check('game loop: weekly simulation updates universe release activity', has('gameLoop', 'getUniverseReleaseActivity'));

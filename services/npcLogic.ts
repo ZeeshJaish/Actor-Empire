@@ -1,11 +1,15 @@
 
 // ... existing imports
-import { NPCActor, NPCTier, NPCPrestige, Player, InstaPost, InstaPostType, InteractionType, Genre, Gender, ActorTrait, MusicArtist } from '../types';
+import { NPCActor, NPCTier, NPCPrestige, Player, InstaPost, InstaPostType, InteractionType, Genre, Gender, ActorTrait, MusicArtist, GameLanguage } from '../types';
 import { MOD_TALENT_ROWS, ModTalentRow } from './modTalentData';
+import { MOD_TALENT_SUPPLEMENT_ROWS } from './modTalentSupplement';
 import { getInstagramPostComments, getInstagramPresetCaption } from './instagramLogic';
+import { getPlayerLanguage, t } from './i18n';
 import { ALL_GENRES, hydrateGenreXP } from './genreCatalog';
 import { MUSIC_ARTISTS } from './musicIndustry';
 import { INVESTOR_LEADERSHIP_POOL, PROJECT_INVESTORS, investorOwnerNpcId, investorOwnerNpcIdFromName } from './projectInvestors';
+import { ProfileBuilderCategoryId, ProfileBuilderGender, createSeededProfileSelection, getProfilePart } from './profileBuilder';
+import { exportProfilePortrait } from '../views/avatar/profilePortraitRenderer';
 
 const ACTOR_TRAITS: ActorTrait[] = ['DIVA', 'METHOD', 'WORKAHOLIC', 'UNRELIABLE', 'EASY_GOING', 'BOX_OFFICE_POISON', 'PROFESSIONAL', 'AMBITIOUS'];
 
@@ -29,11 +33,89 @@ export const FEMALE_AVATAR_SEEDS = [
 ];
 
 const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
+const generatedProfileAvatarCache = new Map<string, string>();
+
+const toProfileBuilderGender = (gender: Gender): ProfileBuilderGender => {
+    if (gender === 'FEMALE') return 'FEMALE';
+    if (gender === 'NON_BINARY') return 'NON_BINARY';
+    return 'MALE';
+};
+
+const getFallbackProfileColors = (category: ProfileBuilderCategoryId, id: string, fallback: string[]): string[] => {
+    const colors = getProfilePart(category, id)?.colors || [];
+    return colors.length > 0 ? colors : fallback;
+};
+
+const createFallbackProfileAvatar = (gender: ProfileBuilderGender, seed: string): string => {
+    const selection = createSeededProfileSelection(gender, seed);
+    const skin = getFallbackProfileColors('skinTone', selection.skinTone, ['#d8a878', '#b88254', '#8e5c34']);
+    const hair = getFallbackProfileColors('hairColor', selection.hairColor, ['#4a4644', '#26221e', '#100d0a']);
+    const outfit = getFallbackProfileColors('outfit', selection.outfit, ['#3e4454', '#262a36', '#14161e', '#e8e6e0']);
+    const frame = getFallbackProfileColors('frame', selection.frame, ['#20242c', '#12151b', '#5b6470']);
+    const eye = getFallbackProfileColors('eyeColor', selection.eyeColor, ['#201005', '#4a2c14', '#66421e']);
+    const faceShape = getProfilePart('faceShape', selection.faceShape)?.shape || 'oval';
+    const hairShape = getProfilePart('hair', selection.hair)?.shape || 'side';
+    const mouthShape = getProfilePart('mouth', selection.mouth)?.shape || 'smile';
+    const facialHairShape = getProfilePart('facialHair', selection.facialHair)?.shape || 'none';
+    const faceWidth = faceShape === 'wide' || faceShape === 'square' ? 54 : faceShape === 'slim' || faceShape === 'sharp' ? 44 : 50;
+    const chinRadius = faceShape === 'square' ? 10 : faceShape === 'sharp' ? 4 : 16;
+    const hairTop = hairShape === 'bald' ? '' : `<path d="M${64 - faceWidth / 2 - 2} 45 Q64 25 ${64 + faceWidth / 2 + 2} 45 L${64 + faceWidth / 2 - 2} 58 Q64 48 ${64 - faceWidth / 2 + 2} 58 Z" fill="${hair[1] || hair[0]}"/>`;
+    const hairExtra = hairShape === 'long' || hairShape === 'bob' || hairShape === 'dreads'
+        ? `<rect x="${64 - faceWidth / 2 - 5}" y="50" width="${faceWidth + 10}" height="42" rx="12" fill="${hair[2] || hair[1] || hair[0]}"/>`
+        : hairShape === 'bun'
+            ? `<circle cx="64" cy="33" r="12" fill="${hair[1] || hair[0]}"/>`
+            : hairShape === 'afro' || hairShape === 'curly'
+                ? `<circle cx="64" cy="43" r="33" fill="${hair[1] || hair[0]}"/>`
+                : '';
+    const mouth = mouthShape === 'full-lips' || mouthShape === 'pout'
+        ? '<path d="M55 88 Q64 94 73 88 Q64 98 55 88Z" fill="#a65254"/>'
+        : '<path d="M55 88 Q64 95 73 88" fill="none" stroke="#5e2d28" stroke-width="4" stroke-linecap="round"/>';
+    const beard = facialHairShape === 'none'
+        ? ''
+        : `<path d="M${64 - faceWidth / 2 + 8} 84 Q64 110 ${64 + faceWidth / 2 - 8} 84 L${64 + faceWidth / 2 - 8} 98 Q64 116 ${64 - faceWidth / 2 + 8} 98 Z" fill="${hair[2] || hair[1] || hair[0]}" opacity="0.72"/>`;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" shape-rendering="crispEdges">
+<rect width="128" height="128" rx="20" fill="${frame[1] || frame[0]}"/>
+<circle cx="64" cy="60" r="48" fill="${frame[0]}" opacity="0.65"/>
+<rect x="35" y="95" width="58" height="30" rx="8" fill="${outfit[1] || outfit[0]}"/>
+<path d="M45 95 L64 110 L83 95 L86 128 H42 Z" fill="${outfit[2] || outfit[1] || outfit[0]}"/>
+${hairExtra}
+<rect x="${64 - faceWidth / 2}" y="42" width="${faceWidth}" height="58" rx="${chinRadius}" fill="${skin[1] || skin[0]}"/>
+<rect x="${64 - faceWidth / 2 + 7}" y="52" width="${faceWidth - 14}" height="39" rx="${Math.max(4, chinRadius - 4)}" fill="${skin[0]}"/>
+${hairTop}
+<rect x="${64 - faceWidth / 2 + 10}" y="66" width="10" height="8" fill="#f3f6f8"/>
+<rect x="${64 + faceWidth / 2 - 20}" y="66" width="10" height="8" fill="#f3f6f8"/>
+<rect x="${64 - faceWidth / 2 + 14}" y="68" width="5" height="5" fill="${eye[1] || eye[0]}"/>
+<rect x="${64 + faceWidth / 2 - 16}" y="68" width="5" height="5" fill="${eye[1] || eye[0]}"/>
+<rect x="61" y="76" width="6" height="8" fill="${skin[2] || skin[1] || skin[0]}" opacity="0.72"/>
+${beard}
+${mouth}
+</svg>`;
+    return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+};
 
 // Helper to get gendered pixel art
 export const getGenderedAvatar = (gender: Gender, nameSeed: string): string => {
     let seed = nameSeed.replace(/\s/g, '');
-    return `https://api.dicebear.com/7.x/pixel-art/svg?seed=${seed}`;
+    const profileGender = toProfileBuilderGender(gender);
+    const cacheKey = `${profileGender}:${seed}`;
+
+    if (typeof document !== 'undefined') {
+        const cachedAvatar = generatedProfileAvatarCache.get(cacheKey);
+        if (cachedAvatar) return cachedAvatar;
+
+        try {
+            const selection = createSeededProfileSelection(profileGender, seed);
+            const profileAvatar = exportProfilePortrait(selection, 1);
+            generatedProfileAvatarCache.set(cacheKey, profileAvatar);
+            return profileAvatar;
+        } catch (error) {
+            console.warn('Profile avatar generation failed, falling back to local profile avatar.', error);
+        }
+    }
+
+    const fallbackAvatar = createFallbackProfileAvatar(profileGender, seed);
+    generatedProfileAvatarCache.set(cacheKey, fallbackAvatar);
+    return fallbackAvatar;
 };
 
 // --- REAL CELEBRITY DATABASE ---
@@ -655,6 +737,7 @@ const existingModTalentNames = new Set([
 ].map(celeb => normalizeTalentName(celeb.name)));
 
 const CSV_TALENT_EXPANSION: RealCeleb[] = MOD_TALENT_ROWS
+    .concat(MOD_TALENT_SUPPLEMENT_ROWS)
     .filter(row => row.category === 'actor' || row.category === 'director')
     .filter(row => !existingModTalentNames.has(normalizeTalentName(row.name)))
     .map(modTalentToCeleb);
@@ -722,11 +805,17 @@ export const GLOBAL_ACTOR_PACKS = Array.from(
     return {
         id,
         country: country!,
-        label: `${country} Talent`,
-        description: `Adds ${talent.length} ${country} actors/directors to casting, Forbes, and social discovery.`,
         actorCount: talent.length
     };
 });
+
+export const getGlobalActorPackLabel = (pack: (typeof GLOBAL_ACTOR_PACKS)[number], language: GameLanguage = 'en'): string => (
+    t(language, 'services.npc.globalActorPack.label', { country: pack.country })
+);
+
+export const getGlobalActorPackDescription = (pack: (typeof GLOBAL_ACTOR_PACKS)[number], language: GameLanguage = 'en'): string => (
+    t(language, 'services.npc.globalActorPack.description', { count: pack.actorCount, country: pack.country })
+);
 
 export const createGlobalActorPackNPCs = (packId: string): NPCActor[] => {
     const pack = GLOBAL_ACTOR_PACKS.find(entry => entry.id === packId);
@@ -1053,6 +1142,7 @@ const CAPTIONS = {
 export const generateWeeklyFeed = (player: Player): InstaPost[] => {
     const feed: InstaPost[] = [];
     const npcPool = [...NPC_DATABASE, ...(Array.isArray(player.flags?.extraNPCs) ? player.flags.extraNPCs : [])];
+    const language = getPlayerLanguage(player);
     
     // 1. Add Player's posts from this week (Persist them in the new feed batch)
     const playerPosts = player.instagram.posts.filter(p => p.week === player.currentWeek);
@@ -1091,7 +1181,7 @@ export const generateWeeklyFeed = (player: Player): InstaPost[] => {
         else if (typeRoll > 0.45) type = 'BTS';
         else if (typeRoll > 0.25) type = 'SELFIE';
 
-        const caption = getInstagramPresetCaption(type);
+        const caption = getInstagramPresetCaption(type, language);
         // Variance in likes based on followers
         const likes = Math.floor(npc.followers * (0.02 + Math.random() * 0.08)); 
         const comments = Math.floor(likes * 0.01);
@@ -1110,7 +1200,7 @@ export const generateWeeklyFeed = (player: Player): InstaPost[] => {
             comments,
             shares,
             saves,
-            commentList: getInstagramPostComments(type),
+            commentList: getInstagramPostComments(type, 5, language),
             engagementScore: Math.min(100, Math.round((likes + comments * 2 + shares * 3 + saves * 2) / Math.max(1, npc.followers) * 100)),
             week: player.currentWeek,
             year: player.age,
@@ -1132,7 +1222,7 @@ export const generateWeeklyFeed = (player: Player): InstaPost[] => {
             comments: 450,
             shares: 700 + Math.floor(Math.random() * 400),
             saves: 300 + Math.floor(Math.random() * 250),
-            commentList: getInstagramPostComments('INDUSTRY_NEWS', 6),
+            commentList: getInstagramPostComments('INDUSTRY_NEWS', 6, language),
             engagementScore: 72,
             week: player.currentWeek,
             year: player.age,

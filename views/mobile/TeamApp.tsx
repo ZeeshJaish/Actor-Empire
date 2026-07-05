@@ -67,6 +67,14 @@ export const TeamApp: React.FC<TeamAppProps> = ({ player, onBack, onHireAgent, o
       return tr('home.mood');
   };
 
+  const getTeamDescription = (member: Agent | Manager | TeamMember) => (
+      member.descriptionKey ? tr(member.descriptionKey) : member.description
+  );
+
+  const getTeamPerks = (member: TeamMember) => (
+      member.perksKey ? tr(member.perksKey) : member.perks
+  );
+
   const lifestyleRoles = [
       { label: tr('team.personalTrainer'), icon: Dumbbell, member: player.team.personalTrainer, tab: 'TRAINER' as const },
       { label: tr('team.stylist'), icon: Sparkles, member: player.team.stylist, tab: 'STYLIST' as const },
@@ -200,7 +208,7 @@ export const TeamApp: React.FC<TeamAppProps> = ({ player, onBack, onHireAgent, o
                       </div>
                       <button onClick={() => handleFireMember(roleType)} className="text-rose-500 text-xs font-bold px-3 py-1 bg-rose-50 rounded-lg border border-rose-100">{tr('team.fire')}</button>
                   </div>
-                  <div className="text-sm text-slate-600 mb-4 relative z-10">{current.description}</div>
+	                  <div className="text-sm text-slate-600 mb-4 relative z-10">{getTeamDescription(current)}</div>
                   <div className="grid grid-cols-2 gap-2 text-xs text-slate-500 bg-slate-50 p-3 rounded-xl relative z-10">
                       <div>{tr('team.cost')}: <strong>${current.weeklyCost.toLocaleString()}/wk</strong></div>
                       <div>{tr('team.focus')}: <strong>{roleFocus(roleType)}</strong></div>
@@ -228,10 +236,10 @@ export const TeamApp: React.FC<TeamAppProps> = ({ player, onBack, onHireAgent, o
                           <div className="font-bold text-slate-900">{member.name}</div>
                           <div className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${member.tier === 'ELITE' || member.tier === 'LEGEND' ? 'bg-amber-100 text-amber-700' : 'bg-blue-50 text-blue-600'}`}>{member.tier}</div>
                       </div>
-                      <div className="text-xs text-slate-500 line-clamp-1 mb-2">{member.description}</div>
+	                      <div className="text-xs text-slate-500 line-clamp-1 mb-2">{getTeamDescription(member)}</div>
                       <div className="flex justify-between items-center text-[10px] text-slate-400 font-mono border-t border-slate-100 pt-2">
                           <span className={`font-bold ${player.money < member.weeklyCost ? 'text-rose-500' : 'text-emerald-600'}`}>${member.weeklyCost.toLocaleString()}/wk</span>
-                          <span className="text-right">{member.perks}</span>
+	                          <span className="text-right">{getTeamPerks(member)}</span>
                       </div>
                   </div>
               ))}
@@ -399,17 +407,17 @@ export const TeamApp: React.FC<TeamAppProps> = ({ player, onBack, onHireAgent, o
             {/* ROLE TABS */}
             {tab === 'AGENT' && !selectedAgent && (
                 <div>
-                    {player.team.agent && <div className="bg-white p-5 rounded-2xl shadow-sm border border-blue-100 mb-6"><div className="flex justify-between items-start mb-2"><div><div className="text-xs text-blue-500 font-bold uppercase mb-1">Current Agent</div><div className="font-bold text-xl">{player.team.agent.name}</div></div><button onClick={handleFireAgentFromCard} className="text-rose-500 text-xs font-bold px-3 py-1 bg-rose-50 rounded-lg">Fire</button></div><div className="text-sm text-slate-600 mb-4">{player.team.agent.description}</div><div className="grid grid-cols-2 gap-2 text-xs text-slate-500 bg-slate-50 p-3 rounded-xl"><div>Commission: <strong>{player.team.agent.commission * 100}%</strong></div><div>Annual Fee: <strong>${player.team.agent.annualFee.toLocaleString()}</strong></div><div>Specialty: <strong>{player.team.agent.specialty}</strong></div><div>Access: <strong>{player.team.agent.studioAccess}</strong></div></div></div>}
+                    {player.team.agent && <div className="bg-white p-5 rounded-2xl shadow-sm border border-blue-100 mb-6"><div className="flex justify-between items-start mb-2"><div><div className="text-xs text-blue-500 font-bold uppercase mb-1">Current Agent</div><div className="font-bold text-xl">{player.team.agent.name}</div></div><button onClick={handleFireAgentFromCard} className="text-rose-500 text-xs font-bold px-3 py-1 bg-rose-50 rounded-lg">Fire</button></div><div className="text-sm text-slate-600 mb-4">{getTeamDescription(player.team.agent)}</div><div className="grid grid-cols-2 gap-2 text-xs text-slate-500 bg-slate-50 p-3 rounded-xl"><div>Commission: <strong>{player.team.agent.commission * 100}%</strong></div><div>Annual Fee: <strong>${player.team.agent.annualFee.toLocaleString()}</strong></div><div>Specialty: <strong>{player.team.agent.specialty}</strong></div><div>Access: <strong>{player.team.agent.studioAccess}</strong></div></div></div>}
                     <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 pl-2">Available Agents</h3>
-                    <div className="space-y-3">{availableAgents.length === 0 && <div className="bg-white border border-dashed border-slate-300 rounded-2xl p-6 text-center text-sm text-slate-400">No available agents right now. Check back after the hiring pool refreshes.</div>}{availableAgents.map(agent => <div key={agent.id} onClick={() => setSelectedAgent(agent)} className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 active:scale-[0.99] transition-transform"><div className="flex justify-between items-center mb-1"><div className="font-bold text-slate-900">{agent.name}</div><div className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">{agent.tier}</div></div><div className="text-xs text-slate-500 line-clamp-1 mb-2">{agent.description}</div><div className="flex gap-4 text-[10px] text-slate-400 font-mono"><span>${agent.annualFee.toLocaleString()}/yr</span><span>{(agent.commission * 100).toFixed(0)}% Comm</span></div></div>)}</div>
+                    <div className="space-y-3">{availableAgents.length === 0 && <div className="bg-white border border-dashed border-slate-300 rounded-2xl p-6 text-center text-sm text-slate-400">No available agents right now. Check back after the hiring pool refreshes.</div>}{availableAgents.map(agent => <div key={agent.id} onClick={() => setSelectedAgent(agent)} className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 active:scale-[0.99] transition-transform"><div className="flex justify-between items-center mb-1"><div className="font-bold text-slate-900">{agent.name}</div><div className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">{agent.tier}</div></div><div className="text-xs text-slate-500 line-clamp-1 mb-2">{getTeamDescription(agent)}</div><div className="flex gap-4 text-[10px] text-slate-400 font-mono"><span>${agent.annualFee.toLocaleString()}/yr</span><span>{(agent.commission * 100).toFixed(0)}% Comm</span></div></div>)}</div>
                 </div>
             )}
 
             {tab === 'MANAGER' && !selectedManager && (
                 <div>
-                    {player.team.manager && <div className="bg-white p-5 rounded-2xl shadow-sm border border-blue-100 mb-6"><div className="flex justify-between items-start mb-2"><div><div className="text-xs text-blue-500 font-bold uppercase mb-1">Current Manager</div><div className="font-bold text-xl">{player.team.manager.name}</div></div><button onClick={handleFireManagerFromCard} className="text-rose-500 text-xs font-bold px-3 py-1 bg-rose-50 rounded-lg">Fire</button></div><div className="text-sm text-slate-600 mb-4">{player.team.manager.description}</div><div className="grid grid-cols-2 gap-2 text-xs text-slate-500 bg-slate-50 p-3 rounded-xl"><div>Power: <strong>{player.team.manager.sponsorshipPower}/10</strong></div><div>Annual Fee: <strong>${player.team.manager.annualFee.toLocaleString()}</strong></div></div></div>}
+                    {player.team.manager && <div className="bg-white p-5 rounded-2xl shadow-sm border border-blue-100 mb-6"><div className="flex justify-between items-start mb-2"><div><div className="text-xs text-blue-500 font-bold uppercase mb-1">Current Manager</div><div className="font-bold text-xl">{player.team.manager.name}</div></div><button onClick={handleFireManagerFromCard} className="text-rose-500 text-xs font-bold px-3 py-1 bg-rose-50 rounded-lg">Fire</button></div><div className="text-sm text-slate-600 mb-4">{getTeamDescription(player.team.manager)}</div><div className="grid grid-cols-2 gap-2 text-xs text-slate-500 bg-slate-50 p-3 rounded-xl"><div>Power: <strong>{player.team.manager.sponsorshipPower}/10</strong></div><div>Annual Fee: <strong>${player.team.manager.annualFee.toLocaleString()}</strong></div></div></div>}
                     <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 pl-2">Available Managers</h3>
-                    <div className="space-y-3">{availableManagers.length === 0 && <div className="bg-white border border-dashed border-slate-300 rounded-2xl p-6 text-center text-sm text-slate-400">No available managers right now. Check back after the hiring pool refreshes.</div>}{availableManagers.map(mgr => <div key={mgr.id} onClick={() => setSelectedManager(mgr)} className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 active:scale-[0.99] transition-transform"><div className="flex justify-between items-center mb-1"><div className="font-bold text-slate-900">{mgr.name}</div><div className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">{mgr.tier}</div></div><div className="text-xs text-slate-500 line-clamp-1 mb-2">{mgr.description}</div><div className="flex gap-4 text-[10px] text-slate-400 font-mono"><span>${mgr.annualFee.toLocaleString()}/yr</span><span>Power: {mgr.sponsorshipPower}</span></div></div>)}</div>
+                    <div className="space-y-3">{availableManagers.length === 0 && <div className="bg-white border border-dashed border-slate-300 rounded-2xl p-6 text-center text-sm text-slate-400">No available managers right now. Check back after the hiring pool refreshes.</div>}{availableManagers.map(mgr => <div key={mgr.id} onClick={() => setSelectedManager(mgr)} className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 active:scale-[0.99] transition-transform"><div className="flex justify-between items-center mb-1"><div className="font-bold text-slate-900">{mgr.name}</div><div className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">{mgr.tier}</div></div><div className="text-xs text-slate-500 line-clamp-1 mb-2">{getTeamDescription(mgr)}</div><div className="flex gap-4 text-[10px] text-slate-400 font-mono"><span>${mgr.annualFee.toLocaleString()}/yr</span><span>Power: {mgr.sponsorshipPower}</span></div></div>)}</div>
                 </div>
             )}
 
@@ -420,8 +428,8 @@ export const TeamApp: React.FC<TeamAppProps> = ({ player, onBack, onHireAgent, o
             {tab === 'WELLNESS' && !selectedMember && renderLifestyleTab('WELLNESS', player.team.wellness, availableWellness)}
 
             {/* HIRE MODALS */}
-            {selectedAgent && <div className="space-y-4 animate-in slide-in-from-bottom"><div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 text-center"><h2 className="text-xl font-bold text-slate-900">{selectedAgent.name}</h2><p className="text-sm text-slate-500 mt-2">{selectedAgent.description}</p><button onClick={handleHireAgentFromModal} className="w-full py-4 rounded-xl font-bold text-white shadow-lg bg-blue-600 hover:bg-blue-700 mt-4">Hire Agent</button></div></div>}
-            {selectedManager && <div className="space-y-4 animate-in slide-in-from-bottom"><div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 text-center"><h2 className="text-xl font-bold text-slate-900">{selectedManager.name}</h2><p className="text-sm text-slate-500 mt-2">{selectedManager.description}</p><button onClick={handleHireManagerFromModal} className="w-full py-4 rounded-xl font-bold text-white shadow-lg bg-purple-600 hover:bg-purple-700 mt-4">Hire Manager</button></div></div>}
+            {selectedAgent && <div className="space-y-4 animate-in slide-in-from-bottom"><div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 text-center"><h2 className="text-xl font-bold text-slate-900">{selectedAgent.name}</h2><p className="text-sm text-slate-500 mt-2">{getTeamDescription(selectedAgent)}</p><button onClick={handleHireAgentFromModal} className="w-full py-4 rounded-xl font-bold text-white shadow-lg bg-blue-600 hover:bg-blue-700 mt-4">Hire Agent</button></div></div>}
+            {selectedManager && <div className="space-y-4 animate-in slide-in-from-bottom"><div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 text-center"><h2 className="text-xl font-bold text-slate-900">{selectedManager.name}</h2><p className="text-sm text-slate-500 mt-2">{getTeamDescription(selectedManager)}</p><button onClick={handleHireManagerFromModal} className="w-full py-4 rounded-xl font-bold text-white shadow-lg bg-purple-600 hover:bg-purple-700 mt-4">Hire Manager</button></div></div>}
             
             {/* Generic Lifestyle Hire Modal */}
             {selectedMember && (
@@ -429,7 +437,7 @@ export const TeamApp: React.FC<TeamAppProps> = ({ player, onBack, onHireAgent, o
                     <div className="bg-white p-6 rounded-3xl shadow-xl border border-slate-200 text-center">
                         <div className="text-[10px] uppercase font-bold text-slate-400 mb-2">{selectedMember.type}</div>
                         <h2 className="text-2xl font-bold text-slate-900 mb-2">{selectedMember.name}</h2>
-                        <p className="text-sm text-slate-600 mb-6">{selectedMember.description}</p>
+                        <p className="text-sm text-slate-600 mb-6">{getTeamDescription(selectedMember)}</p>
                         
                         <div className="bg-slate-50 p-4 rounded-xl mb-6 text-left space-y-2 text-xs">
                             <div className="flex justify-between">
@@ -438,7 +446,7 @@ export const TeamApp: React.FC<TeamAppProps> = ({ player, onBack, onHireAgent, o
                             </div>
                             <div className="flex justify-between">
                                 <span className="text-slate-500">Perks</span>
-                                <span className="font-bold text-emerald-600">{selectedMember.perks}</span>
+                                <span className="font-bold text-emerald-600">{getTeamPerks(selectedMember)}</span>
                             </div>
                         </div>
 

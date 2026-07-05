@@ -1,5 +1,6 @@
 import type { Business, LifeEvent, LifeEventImpactResult, NewsItem, Player, ScheduledEvent, XPost } from '../types';
 import { queueAcquisitionPressureEvent } from './acquisitionEventCadence';
+import { getPlayerLanguage, t } from './i18n';
 
 export type RegulatorPressureStatus = 'CLEAR' | 'MONITORING' | 'REVIEW' | 'MORATORIUM' | 'CONDUCT_AGREEMENT';
 export type RegulatorPressureEventType = 'REGULATOR_REVIEW' | 'RIVAL_COMPLAINT' | 'CONSENT_DECREE';
@@ -154,10 +155,11 @@ const updateRegulatorState = (
 const makeImpact = (
     mode: 'COOPERATE' | 'FIGHT' | 'DIVEST' | 'GOLDEN',
 ): ((player: Player) => LifeEventImpactResult) => (player: Player) => {
+    const language = getPlayerLanguage(player);
     const state = getRegulatorPressureState(player);
     let updatedPlayer = player;
     const effects = [];
-    let log = 'Regulator review handled.';
+    let log = t(language, 'life.event.regulator.log.default');
     let logKey = 'life.event.regulator.log.default';
 
     if (mode === 'COOPERATE') {
@@ -174,10 +176,10 @@ const makeImpact = (
             acquisitionMoratoriumWeeksRemaining: Math.max(1, state.acquisitionMoratoriumWeeksRemaining - 1),
             conductAgreementWeeksRemaining: Math.max(state.conductAgreementWeeksRemaining, 8),
         });
-        log = `Regulator Review: You cooperated with the review and lowered anti-monopoly pressure.`;
+        log = t(language, 'life.event.regulator.log.cooperate');
         logKey = 'life.event.regulator.log.cooperate';
-        effects.push({ label: 'Regulator Pressure', labelKey: 'life.effect.regulatorPressure', value: '-12', tone: 'positive' as const });
-        effects.push({ label: 'Legal Spend', labelKey: 'life.effect.legalSpend', value: `$${cost.toLocaleString()}`, tone: 'negative' as const });
+        effects.push({ label: t(language, 'life.effect.regulatorPressure'), labelKey: 'life.effect.regulatorPressure', value: '-12', tone: 'positive' as const });
+        effects.push({ label: t(language, 'life.effect.legalSpend'), labelKey: 'life.effect.legalSpend', value: `$${cost.toLocaleString()}`, tone: 'negative' as const });
     } else if (mode === 'FIGHT') {
         const fine = Math.min(player.money, 45_000_000);
         updatedPlayer = updateRegulatorState({
@@ -194,10 +196,10 @@ const makeImpact = (
             acquisitionMoratoriumWeeksRemaining: state.acquisitionMoratoriumWeeksRemaining + 2,
             finesPaidToDate: state.finesPaidToDate + fine,
         });
-        log = `Regulator Review: You fought the review and raised the stakes.`;
+        log = t(language, 'life.event.regulator.log.fight');
         logKey = 'life.event.regulator.log.fight';
-        effects.push({ label: 'Fame', labelKey: 'life.effect.fame', value: '+2', tone: 'positive' as const });
-        effects.push({ label: 'Moratorium', labelKey: 'life.effect.moratorium', value: '+2 weeks', tone: 'negative' as const });
+        effects.push({ label: t(language, 'life.effect.fame'), labelKey: 'life.effect.fame', value: '+2', tone: 'positive' as const });
+        effects.push({ label: t(language, 'life.effect.moratorium'), labelKey: 'life.effect.moratorium', value: t(language, 'services.regulatorPressure.value.weeks', { weeks: 2 }), valueKey: 'services.regulatorPressure.value.weeks', textVars: { weeks: 2 }, tone: 'negative' as const });
     } else if (mode === 'DIVEST') {
         updatedPlayer = updateRegulatorState({
             ...player,
@@ -215,10 +217,10 @@ const makeImpact = (
             acquisitionMoratoriumWeeksRemaining: 0,
             conductAgreementWeeksRemaining: Math.max(state.conductAgreementWeeksRemaining, 16),
         });
-        log = `Regulator Review: You accepted conduct limits and cooled acquisition pressure.`;
+        log = t(language, 'life.event.regulator.log.limits');
         logKey = 'life.event.regulator.log.limits';
-        effects.push({ label: 'Regulator Pressure', labelKey: 'life.effect.regulatorPressure', value: '-18', tone: 'positive' as const });
-        effects.push({ label: 'Acquisitions', labelKey: 'life.effect.acquisitions', value: 'Conduct limits', tone: 'negative' as const });
+        effects.push({ label: t(language, 'life.effect.regulatorPressure'), labelKey: 'life.effect.regulatorPressure', value: '-18', tone: 'positive' as const });
+        effects.push({ label: t(language, 'life.effect.acquisitions'), labelKey: 'life.effect.acquisitions', value: t(language, 'services.regulatorPressure.value.conductLimits'), valueKey: 'services.regulatorPressure.value.conductLimits', tone: 'negative' as const });
     } else {
         const cost = Math.min(player.money, 35_000_000);
         updatedPlayer = updateRegulatorState({
@@ -234,10 +236,10 @@ const makeImpact = (
             conductAgreementWeeksRemaining: Math.max(state.conductAgreementWeeksRemaining, 10),
             acquisitionCostMultiplier: 1.05,
         });
-        log = `Regulator Review: Advisors set up the safest compliance path and reopened deal flexibility.`;
+        log = t(language, 'life.event.regulator.log.golden');
         logKey = 'life.event.regulator.log.golden';
-        effects.push({ label: 'Regulator Pressure', labelKey: 'life.effect.regulatorPressure', value: '-24', tone: 'positive' as const });
-        effects.push({ label: 'Reward Ad', labelKey: 'life.effect.rewardAd', value: 'Safest path', tone: 'positive' as const });
+        effects.push({ label: t(language, 'life.effect.regulatorPressure'), labelKey: 'life.effect.regulatorPressure', value: '-24', tone: 'positive' as const });
+        effects.push({ label: t(language, 'life.effect.rewardAd'), labelKey: 'life.effect.rewardAd', value: t(language, 'services.regulatorPressure.value.safestPath'), valueKey: 'services.regulatorPressure.value.safestPath', tone: 'positive' as const });
     }
 
     return { updatedPlayer, log, logKey, effects };
@@ -254,67 +256,72 @@ const createRegulatorLifeEvent = (
     player: Player,
     state: RegulatorPressureState,
     type: RegulatorPressureEventType,
-): LifeEvent => ({
-    id: `life_regulator_pressure_${type.toLowerCase()}_${player.age}_${player.currentWeek}`,
-    type: 'LEGAL',
-    title: type === 'RIVAL_COMPLAINT' ? 'Rivals File Antitrust Complaint' : 'Regulators Open Studio Review',
-    titleKey: type === 'RIVAL_COMPLAINT' ? 'life.event.regulator.rivalComplaint.title' : 'life.event.regulator.review.title',
-    category: 'Regulator Pressure',
-    description: `Your studio group controls ${state.controlledStudioCount} production studios, including ${state.controlledMajorStudioCount} major studios. Regulators are reviewing whether your expansion hurts competition.`,
-    descriptionKey: 'life.event.regulator.description',
-    textVars: { controlled: state.controlledStudioCount, majors: state.controlledMajorStudioCount },
-    options: [
+): LifeEvent => {
+    const language = getPlayerLanguage(player);
+    const titleKey = type === 'RIVAL_COMPLAINT' ? 'life.event.regulator.rivalComplaint.title' : 'life.event.regulator.review.title';
+    const textVars = { controlled: state.controlledStudioCount, majors: state.controlledMajorStudioCount };
+    return {
+        id: `life_regulator_pressure_${type.toLowerCase()}_${player.age}_${player.currentWeek}`,
+        type: 'LEGAL',
+        title: t(language, titleKey),
+        titleKey,
+        category: t(language, 'life.event.regulator.category'),
+        description: t(language, 'life.event.regulator.description', textVars),
+        descriptionKey: 'life.event.regulator.description',
+        textVars,
+        options: [
         {
             id: 'COOPERATE_WITH_REVIEW',
-            label: 'Cooperate With Review',
+            label: t(language, 'life.event.regulator.cooperate.label'),
             labelKey: 'life.event.regulator.cooperate.label',
-            description: 'Spend on lawyers, provide documents, and lower pressure without picking a public fight.',
+            description: t(language, 'life.event.regulator.cooperate.description'),
             descriptionKey: 'life.event.regulator.cooperate.description',
             previewEffects: [
-                { label: 'Pressure', labelKey: 'life.effect.pressure', value: '-12', tone: 'positive' },
-                { label: 'Cost', labelKey: 'life.effect.cost', value: 'Legal spend', tone: 'negative' },
+                { label: t(language, 'life.effect.pressure'), labelKey: 'life.effect.pressure', value: '-12', tone: 'positive' },
+                { label: t(language, 'life.effect.cost'), labelKey: 'life.effect.cost', value: t(language, 'services.regulatorPressure.value.legalSpend'), valueKey: 'services.regulatorPressure.value.legalSpend', tone: 'negative' },
             ],
             impact: makeImpact('COOPERATE'),
         },
         {
             id: 'FIGHT_REVIEW',
-            label: 'Fight The Review',
+            label: t(language, 'life.event.regulator.fight.label'),
             labelKey: 'life.event.regulator.fight.label',
-            description: 'Challenge the review publicly. It can help fame, but makes the regulator timeline harsher.',
+            description: t(language, 'life.event.regulator.fight.description'),
             descriptionKey: 'life.event.regulator.fight.description',
             previewEffects: [
-                { label: 'Fame', labelKey: 'life.effect.fame', value: '+2', tone: 'positive' },
-                { label: 'Moratorium', labelKey: 'life.effect.moratorium', value: '+2 weeks', tone: 'negative' },
+                { label: t(language, 'life.effect.fame'), labelKey: 'life.effect.fame', value: '+2', tone: 'positive' },
+                { label: t(language, 'life.effect.moratorium'), labelKey: 'life.effect.moratorium', value: t(language, 'services.regulatorPressure.value.weeks', { weeks: 2 }), valueKey: 'services.regulatorPressure.value.weeks', textVars: { weeks: 2 }, tone: 'negative' },
             ],
             impact: makeImpact('FIGHT'),
         },
         {
             id: 'VOLUNTARY_LIMITS',
-            label: 'Offer Conduct Limits',
+            label: t(language, 'life.event.regulator.limits.label'),
             labelKey: 'life.event.regulator.limits.label',
-            description: 'Accept limits on future deals and exclusive practices to cool pressure quickly.',
+            description: t(language, 'life.event.regulator.limits.description'),
             descriptionKey: 'life.event.regulator.limits.description',
             previewEffects: [
-                { label: 'Pressure', labelKey: 'life.effect.pressure', value: '-18', tone: 'positive' },
-                { label: 'Deals', labelKey: 'life.effect.deals', value: 'Limits', tone: 'negative' },
+                { label: t(language, 'life.effect.pressure'), labelKey: 'life.effect.pressure', value: '-18', tone: 'positive' },
+                { label: t(language, 'life.effect.deals'), labelKey: 'life.effect.deals', value: t(language, 'services.regulatorPressure.value.limits'), valueKey: 'services.regulatorPressure.value.limits', tone: 'negative' },
             ],
             impact: makeImpact('DIVEST'),
         },
         {
             id: 'GOLDEN_COMPLIANCE_FIREWALL',
-            label: 'Clean Compliance Firewall',
+            label: t(language, 'life.event.regulator.golden.label'),
             labelKey: 'life.event.regulator.golden.label',
-            description: 'Reward ad: advisors handle the safest compliance route and keep deal options open.',
+            description: t(language, 'life.event.regulator.golden.description'),
             descriptionKey: 'life.event.regulator.golden.description',
             isGolden: true,
             previewEffects: [
-                { label: 'Pressure', labelKey: 'life.effect.pressure', value: '-24', tone: 'positive' },
-                { label: 'Risk', labelKey: 'life.effect.risk', value: 'Safest path', tone: 'positive' },
+                { label: t(language, 'life.effect.pressure'), labelKey: 'life.effect.pressure', value: '-24', tone: 'positive' },
+                { label: t(language, 'life.effect.risk'), labelKey: 'life.effect.risk', value: t(language, 'services.regulatorPressure.value.safestPath'), valueKey: 'services.regulatorPressure.value.safestPath', tone: 'positive' },
             ],
             impact: makeImpact('GOLDEN'),
         },
-    ],
-});
+        ],
+    };
+};
 
 const createRegulatorEvent = (
     player: Player,
@@ -336,25 +343,25 @@ const createRegulatorEvent = (
     };
 };
 
-const makeRegulatorNews = (player: Player, state: RegulatorPressureState): NewsItem => ({
+const makeRegulatorNews = (player: Player, state: RegulatorPressureState, language: ReturnType<typeof getPlayerLanguage>): NewsItem => ({
     id: `news_regulator_pressure_${player.age}_${player.currentWeek}`,
     headline: state.pressureScore >= 75
-        ? `Regulators open antitrust review into ${player.name}'s studio empire`
-        : `${player.name}'s acquisition pace attracts regulator monitoring`,
-    subtext: `${state.controlledStudioCount} controlled studios and ${state.controlledMajorStudioCount} major labels have pushed regulator pressure to ${state.pressureScore}%.`,
+        ? t(language, 'services.regulatorPressure.news.review.headline', { name: player.name })
+        : t(language, 'services.regulatorPressure.news.monitoring.headline', { name: player.name }),
+    subtext: t(language, 'services.regulatorPressure.news.subtext', { studios: state.controlledStudioCount, majors: state.controlledMajorStudioCount, pressure: state.pressureScore }),
     category: 'INDUSTRY',
     week: player.currentWeek,
     year: player.age,
     impactLevel: state.pressureScore >= 75 ? 'HIGH' : 'MEDIUM',
 });
 
-const makeRegulatorPost = (player: Player, state: RegulatorPressureState): XPost => ({
+const makeRegulatorPost = (player: Player, state: RegulatorPressureState, language: ReturnType<typeof getPlayerLanguage>): XPost => ({
     id: `x_regulator_pressure_${player.age}_${player.currentWeek}`,
     authorId: 'trade_regulator_watch',
     authorName: 'Regulator Watch',
     authorHandle: '@regwatch',
     authorAvatar: '⚖️',
-    content: `${player.name}'s studio buying spree is now a competition story. Dealmakers are watching whether the next acquisition gets delayed.`,
+    content: t(language, 'services.regulatorPressure.social.content', { name: player.name }),
     timestamp: Date.now(),
     likes: 1_200 + (state.pressureScore * 54),
     retweets: 240 + (state.pressureScore * 12),
@@ -397,6 +404,7 @@ const agePreviousState = (player: Player): Player => {
 };
 
 export const processRegulatorPressure = (player: Player): Player => {
+    const language = getPlayerLanguage(player);
     const previous = getPreviousState(player) as RegulatorPressureState | undefined;
     if (previous?.lastProcessedWeek === player.currentWeek) {
         return {
@@ -421,8 +429,8 @@ export const processRegulatorPressure = (player: Player): Player => {
     }
 
     const shouldPublish = state.pressureScore >= 40 && state.controlledStudioCount >= 3;
-    const news = shouldPublish ? makeRegulatorNews(agedPlayer, state) : undefined;
-    const xPost = shouldPublish ? makeRegulatorPost(agedPlayer, state) : undefined;
+    const news = shouldPublish ? makeRegulatorNews(agedPlayer, state, language) : undefined;
+    const xPost = shouldPublish ? makeRegulatorPost(agedPlayer, state, language) : undefined;
     const regulatorEvent = shouldPublish ? createRegulatorEvent(agedPlayer, state) : null;
     const existingPendingEvents = Array.isArray(agedPlayer.pendingEvents) ? agedPlayer.pendingEvents : [];
     const cadence = queueAcquisitionPressureEvent(
@@ -457,7 +465,11 @@ export const processRegulatorPressure = (player: Player): Player => {
             ? [{
                 week: agedPlayer.currentWeek,
                 year: agedPlayer.age,
-                message: `Regulator Pressure: ${state.status.replaceAll('_', ' ')} at ${state.pressureScore}%. New acquisition offers face ${state.acquisitionMoratoriumWeeksRemaining} week(s) of delay.`,
+                message: t(language, 'services.regulatorPressure.log.weekly', {
+                    status: t(language, `services.regulatorPressure.status.${state.status}`),
+                    pressure: state.pressureScore,
+                    weeks: state.acquisitionMoratoriumWeeksRemaining,
+                }),
                 type: state.pressureScore >= 65 ? 'negative' as const : 'neutral' as const,
             }, ...(agedPlayer.logs || [])].slice(0, 80)
             : agedPlayer.logs,

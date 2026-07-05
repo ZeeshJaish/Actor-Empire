@@ -9,6 +9,7 @@ import { getEquipmentStageName } from './FacilitiesView';
 import { showAd } from '../../../services/adLogic';
 import { hasNoAds } from '../../../services/premiumLogic';
 import { formatProjectFormatLabel } from '../../../services/genreCatalog';
+import { getPlayerLanguage, t } from '../../../services/i18n';
 import { addBreadcrumb, markGameCheckpoint, markTraceAction, setCrashContext, startPerformanceTrace, stopPerformanceTrace, trackGameEvent } from '../../../services/firebaseService';
 import { applyLockedSeasonFunding, markHiddenSeasonFundingUsed } from '../../../services/streamingFundingLogic';
 import { InteractiveRegionMap, RegionMapLocationPin } from './components/InteractiveRegionMap';
@@ -49,11 +50,11 @@ const clampStat = (value: number, min = 0, max = 100) => Math.max(min, Math.min(
 
 type MarketingBudgetPreset = 'LEAN' | 'STANDARD' | 'HEAVY' | 'EVENT' | 'CUSTOM';
 
-const MARKETING_BUDGET_PRESETS: { id: MarketingBudgetPreset; label: string; note: string; percent: number }[] = [
-    { id: 'LEAN', label: 'Lean', note: 'Trailer and digital essentials.', percent: 0.08 },
-    { id: 'STANDARD', label: 'Standard', note: 'Balanced awareness push.', percent: 0.15 },
-    { id: 'HEAVY', label: 'Heavy', note: 'Wide-release pressure.', percent: 0.25 },
-    { id: 'EVENT', label: 'Event', note: 'Tentpole-level launch reserve.', percent: 0.40 },
+const MARKETING_BUDGET_PRESETS: { id: MarketingBudgetPreset; percent: number }[] = [
+    { id: 'LEAN', percent: 0.08 },
+    { id: 'STANDARD', percent: 0.15 },
+    { id: 'HEAVY', percent: 0.25 },
+    { id: 'EVENT', percent: 0.40 },
 ];
 
 const getMarketingBudgetForPreset = (preset: MarketingBudgetPreset, productionBudget: number) => {
@@ -81,14 +82,14 @@ const MUSIC_DELIVERABLE_ROLES: MusicCreditRole[] = [
 
 type MusicArtistSortOption = 'RECOMMENDED' | 'RATING' | 'COST_LOW' | 'COST_HIGH' | 'FAME' | 'FOLLOWERS' | 'AVAILABILITY';
 
-const MUSIC_ARTIST_SORT_OPTIONS: { id: MusicArtistSortOption; label: string }[] = [
-    { id: 'RECOMMENDED', label: 'Best Fit' },
-    { id: 'RATING', label: 'Rating' },
-    { id: 'COST_LOW', label: 'Cost Low' },
-    { id: 'COST_HIGH', label: 'Cost High' },
-    { id: 'FAME', label: 'Fame' },
-    { id: 'FOLLOWERS', label: 'Followers' },
-    { id: 'AVAILABILITY', label: 'Available' },
+const MUSIC_ARTIST_SORT_OPTIONS: { id: MusicArtistSortOption }[] = [
+    { id: 'RECOMMENDED' },
+    { id: 'RATING' },
+    { id: 'COST_LOW' },
+    { id: 'COST_HIGH' },
+    { id: 'FAME' },
+    { id: 'FOLLOWERS' },
+    { id: 'AVAILABILITY' },
 ];
 
 const MUSIC_FAME_SORT_SCORE: Record<MusicArtist['fameTier'], number> = {
@@ -610,6 +611,8 @@ const LocationSelector: React.FC<{
 };
 
 export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, studio, initialConcept, onBack, onUpdatePlayer, onComplete }) => {
+    const language = getPlayerLanguage(player);
+    const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
     const [selectedScriptId, setSelectedScriptId] = useState<string | null>(initialConcept?.scriptId || null);
     type GreenlightStep = 'SELECT_SCRIPT' | 'DIRECTOR' | 'CAST' | 'CREW' | 'EQUIPMENT' | 'LOCATION' | 'SETUP' | 'CONFIRM' | 'BUZZ';
     const initialStep = initialConcept?.lastStep === 'TONE' ? 'SETUP' : (initialConcept?.lastStep || (initialConcept ? 'DIRECTOR' : 'SELECT_SCRIPT'));
@@ -3495,23 +3498,23 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                                     <span className="text-white font-mono">{formatMoney(budgetBreakdown.baseCost)}</span>
                                                 </div>
                                                 <div className="flex justify-between text-[9px]">
-                                                    <span className="text-zinc-500 uppercase">Script & IP</span>
+                                                    <span className="text-zinc-500 uppercase">{tr('greenlight.budget.scriptIp')}</span>
                                                     <span className="text-white font-mono">{formatMoney(budgetBreakdown.scriptCost)}</span>
                                                 </div>
                                                 <div className="flex justify-between text-[9px]">
-                                                    <span className="text-zinc-500 uppercase">Equipment</span>
+                                                    <span className="text-zinc-500 uppercase">{tr('greenlight.budget.equipment')}</span>
                                                     <span className="text-white font-mono">{formatMoney(budgetBreakdown.equipmentCost)}</span>
                                                 </div>
                                                 <div className="flex justify-between text-[9px]">
-                                                    <span className="text-zinc-500 uppercase">Soundtrack Artists</span>
+                                                    <span className="text-zinc-500 uppercase">{tr('greenlight.budget.soundtrackArtists')}</span>
                                                     <span className="text-cyan-300 font-mono">{formatMoney(musicBudget)}</span>
                                                 </div>
                                                 <div className="flex justify-between text-[9px]">
-                                                    <span className="text-zinc-500 uppercase">Reserved Campaign Budget</span>
+                                                    <span className="text-zinc-500 uppercase">{tr('greenlight.marketing.reservedCampaignBudget')}</span>
                                                     <span className="text-amber-300 font-mono">{formatMoney(reservedMarketingBudget)}</span>
                                                 </div>
                                                 <div className="pt-1.5 border-t border-zinc-800 flex justify-between text-[10px] font-bold">
-                                                    <span className="text-zinc-400 uppercase">Total Package</span>
+                                                    <span className="text-zinc-400 uppercase">{tr('greenlight.budget.totalPackage')}</span>
                                                     <span className="text-emerald-400 font-mono">{formatMoney(packageBudget)}</span>
                                                 </div>
                                             </div>
@@ -4587,10 +4590,10 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                                                         setActiveMusicSlotIndex(roleIndex);
                                                                     }}
                                                                     className="rounded-xl border border-zinc-800 bg-black/35 px-3 py-2.5 text-[10px] font-black uppercase tracking-[0.12em] text-cyan-100 outline-none transition-colors focus:border-cyan-300"
-                                                                    aria-label={`Sort artists for ${getMusicCreditRoleLabel(role)}`}
+                                                                    aria-label={tr('greenlight.music.sortArtistsFor', { role: getMusicCreditRoleLabel(role) })}
                                                                 >
                                                                     {MUSIC_ARTIST_SORT_OPTIONS.map(option => (
-                                                                        <option key={option.id} value={option.id}>{option.label}</option>
+                                                                        <option key={option.id} value={option.id}>{tr(`greenlight.music.sort.${option.id}`)}</option>
                                                                     ))}
                                                                 </select>
                                                             </div>
@@ -4598,7 +4601,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                                                 <div className="rounded-xl border border-zinc-800 bg-zinc-950/85 p-2">
                                                                     {searchMatches.length === 0 ? (
                                                                         <div className="p-3 text-xs font-bold text-zinc-500">
-                                                                            No artists match this search.
+                                                                            {tr('greenlight.music.noArtistsMatch')}
                                                                         </div>
                                                                     ) : (
                                                                         <div className="flex gap-2 overflow-x-auto pb-1 custom-scrollbar">
@@ -4654,14 +4657,14 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                                     <div>
                                         <h3 className="text-sm font-bold text-amber-300 uppercase tracking-wider flex items-center gap-2">
-                                            <DollarSign size={16} /> Reserved Campaign Budget
+                                            <DollarSign size={16} /> {tr('greenlight.marketing.reservedCampaignBudget')}
                                         </h3>
                                         <p className="mt-1 text-xs text-zinc-500 leading-relaxed">
-                                            Set aside marketing money now. Release Strategy will spend this pool later, and unused campaign money returns to the studio wallet.
+                                            {tr('greenlight.marketing.reservedCampaignBody')}
                                         </p>
                                     </div>
                                     <div className="text-left sm:text-right">
-                                        <div className="text-[10px] font-black uppercase tracking-[0.18em] text-zinc-600">Reserved</div>
+                                        <div className="text-[10px] font-black uppercase tracking-[0.18em] text-zinc-600">{tr('greenlight.marketing.reserved')}</div>
                                         <div className="font-mono text-3xl font-black text-amber-300">{formatMoney(reservedMarketingBudget)}</div>
                                     </div>
                                 </div>
@@ -4684,10 +4687,10 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                                 }`}
                                             >
                                                 <div className="flex items-center justify-between gap-2">
-                                                    <div className="text-[11px] font-black uppercase tracking-widest">{option.label}</div>
+                                                    <div className="text-[11px] font-black uppercase tracking-widest">{tr(`greenlight.marketing.preset.${option.id}.label`)}</div>
                                                     <div className="font-mono text-xs font-black text-amber-300">{formatMoney(amount)}</div>
                                                 </div>
-                                                <div className="mt-2 text-[10px] text-zinc-500 leading-tight">{option.note}</div>
+                                                <div className="mt-2 text-[10px] text-zinc-500 leading-tight">{tr(`greenlight.marketing.preset.${option.id}.note`)}</div>
                                             </button>
                                         );
                                     })}
@@ -4707,7 +4710,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                                     : 'border-zinc-700 bg-zinc-900 text-zinc-400 hover:text-white'
                                             }`}
                                         >
-                                            Custom
+                                            {tr('greenlight.marketing.custom')}
                                         </button>
                                         <div className="flex-1">
                                             <input
@@ -4762,28 +4765,22 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                                 This tells the game what kind of IP movie you are making, so it can set validation, subtype, continuity risk, and fan expectations.
                                             </p>
                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                                {[
-                                                    ['Auto', 'Game picks the best plan from your cast and script.'],
-                                                    ['Solo', 'A normal franchise or universe chapter with its own main story.'],
-                                                    ['Crossover', 'Needs 1 known character pulled into the cast.'],
-                                                    ['Event', 'Needs 3 known characters, like a major universe team-up.'],
-                                                    ['Reboot', 'Starts a new era for an existing universe or franchise.']
-                                                ].map(([label, body]) => (
-                                                    <div key={label} className="bg-zinc-950/80 border border-zinc-800 rounded-lg p-2">
-                                                        <p className="text-[9px] font-black uppercase tracking-widest text-emerald-300">{label}</p>
-                                                        <p className="text-[10px] text-zinc-500 leading-relaxed mt-1">{body}</p>
+                                                {(['AUTO', 'SOLO', 'CROSSOVER', 'EVENT', 'REBOOT'] as ConnectedProjectIntent[]).map((id) => (
+                                                    <div key={id} className="bg-zinc-950/80 border border-zinc-800 rounded-lg p-2">
+                                                        <p className="text-[9px] font-black uppercase tracking-widest text-emerald-300">{tr(`greenlight.connectedIntent.${id}.label`)}</p>
+                                                        <p className="text-[10px] text-zinc-500 leading-relaxed mt-1">{tr(`greenlight.connectedIntent.${id}.body`)}</p>
                                                     </div>
                                                 ))}
                                             </div>
                                         </div>
                                     )}
                                     <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-                                        {[
-                                            { id: 'AUTO', label: 'Auto', hint: 'Best fit' },
-                                            { id: 'SOLO', label: 'Solo', hint: 'Own story' },
-                                            { id: 'CROSSOVER', label: 'Crossover', hint: '1+ known role' },
-                                            { id: 'EVENT', label: 'Event', hint: '3+ known roles' },
-                                            { id: 'REBOOT', label: 'Reboot', hint: 'New era' }
+                                        {([
+                                            { id: 'AUTO' },
+                                            { id: 'SOLO' },
+                                            { id: 'CROSSOVER' },
+                                            { id: 'EVENT' },
+                                            { id: 'REBOOT' }
                                         ].map(option => {
                                             const isSelected = connectedProjectIntent === option.id;
                                             const isEffective = effectiveConnectedIntent === option.id || (connectedProjectIntent === 'AUTO' && option.id === effectiveConnectedIntent);
@@ -4799,11 +4796,11 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                                                 : 'bg-black/25 border-zinc-800 text-zinc-500 hover:text-white hover:border-zinc-700'
                                                     }`}
                                                 >
-                                                    <div className="text-[10px] font-black uppercase tracking-widest">{option.label}</div>
-                                                    <div className="mt-1 text-[9px] opacity-60 leading-tight">{option.hint}</div>
+                                                    <div className="text-[10px] font-black uppercase tracking-widest">{tr(`greenlight.connectedIntent.${option.id}.label`)}</div>
+                                                    <div className="mt-1 text-[9px] opacity-60 leading-tight">{tr(`greenlight.connectedIntent.${option.id}.hint`)}</div>
                                                 </button>
                                             );
-                                        })}
+                                        }))}
                                     </div>
                                     <p className="text-[10px] text-zinc-500 uppercase tracking-widest">
                                         Current plan: <span className="text-emerald-300">{effectiveConnectedIntent}</span>
@@ -5372,7 +5369,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                                                 : 'bg-black/25 text-zinc-400 border-zinc-800 hover:border-zinc-600'
                                                         }`}
                                                     >
-                                                        {percent === 0 ? 'None' : percent === 100 ? 'Max' : `${percent}%`}
+                                                        {percent === 0 ? tr('greenlight.investors.raise.none') : percent === 100 ? tr('greenlight.investors.raise.max') : `${percent}%`}
                                                     </button>
                                                 );
                                             })}
@@ -5384,15 +5381,15 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                             {([
                                                 {
                                                     id: 'LEAD' as ProjectInvestorFundingMode,
-                                                    label: 'Lead Deal',
-                                                    stat: 'Single',
-                                                    note: 'Cleaner cap table. If capacity is low, the rest stays studio-funded.'
+                                                    label: tr('greenlight.investors.mode.lead.label'),
+                                                    stat: tr('greenlight.investors.mode.lead.stat'),
+                                                    note: tr('greenlight.investors.mode.lead.note')
                                                 },
                                                 {
                                                     id: 'SYNDICATE' as ProjectInvestorFundingMode,
-                                                    label: 'Syndicate',
-                                                    stat: 'Multi',
-                                                    note: 'Each investor fills the leftover ask, then extras show as over-target.'
+                                                    label: tr('greenlight.investors.mode.syndicate.label'),
+                                                    stat: tr('greenlight.investors.mode.syndicate.stat'),
+                                                    note: tr('greenlight.investors.mode.syndicate.note')
                                                 }
                                             ]).map(option => {
                                                 const active = investorFundingMode === option.id;
@@ -5434,10 +5431,10 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                         <div className="space-y-2">
                                             <div className="flex items-center justify-between gap-3">
                                                 <div className="text-[9px] font-black uppercase tracking-[0.2em] text-zinc-500">
-                                                    {investorFundingMode === 'LEAD' ? 'Lead Investor Offers' : 'Syndicate Offers'}
+                                                    {investorFundingMode === 'LEAD' ? tr('greenlight.investors.offers.lead') : tr('greenlight.investors.offers.syndicate')}
                                                 </div>
                                                 <div className="text-[9px] font-black uppercase tracking-[0.2em] text-zinc-600">
-                                                    {selectedInvestorPlan?.commitments.length || 0} selected
+                                                    {tr('greenlight.investors.offers.selected', { count: selectedInvestorPlan?.commitments.length || 0 })}
                                                 </div>
                                             </div>
                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -5500,7 +5497,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                                                 <div className="min-w-0">
                                                                     <div className="text-sm font-black text-white truncate">{offer.investorName}</div>
                                                                     <div className="text-[8px] font-black uppercase tracking-widest text-zinc-500">
-                                                                        {describeInvestorKind(offer.kind)} • Rep {offer.reputation} • {offer.relationshipLabel}
+                                                                        {describeInvestorKind(offer.kind, language)} • Rep {offer.reputation} • {offer.relationshipLabel}
                                                                     </div>
                                                                     {offer.ownerName && (
                                                                         <div className="mt-1 text-[9px] font-bold text-zinc-500 truncate">

@@ -1,9 +1,10 @@
-import type { Business, BusinessStaff, NewsItem, Player, XPost } from '../types';
+import type { Business, BusinessStaff, GameLanguage, NewsItem, Player, XPost } from '../types';
 import type { ForbesStudioProfile, StudioAcquisitionState } from './forbesStudioProfile';
 import { createDefaultStudioState } from './businessLogic';
 import { getCompanyPosition } from './companyPosition';
 import { isStreamingPlatformStudio } from './studioClassification';
 import { getRegulatorAcquisitionControls, getRegulatorAdjustedDiligenceFee } from './regulatorPressure';
+import { getPlayerLanguage, t } from './i18n';
 
 export type AcquisitionCaseStatus = 'DRAFT' | 'OFFER_SUBMITTED' | 'COUNTERED' | 'RIVAL_BID' | 'ACCEPTED' | 'REJECTED' | 'CLOSED' | 'ACQUIRED';
 export type AcquisitionOfferType = 'CONSERVATIVE' | 'FAIR' | 'AGGRESSIVE' | 'MINORITY';
@@ -13,35 +14,38 @@ export type SellerResponsePosture = 'DISMISSIVE' | 'TESTING' | 'SERIOUS' | 'COMP
 export type AcquisitionSellerDecision = 'ACCEPTED' | 'COUNTERED' | 'RIVAL_BID' | 'REJECTED';
 export type AcquisitionCommitmentId = 'PRESERVE_STUDIO_NAME' | 'PROTECT_EMPLOYEES' | 'GUARANTEE_PRODUCTIONS';
 
-export const ACQUISITION_COMMITMENTS: Array<{
+const ACQUISITION_COMMITMENT_TEMPLATES: Array<{
+    id: AcquisitionCommitmentId;
+    leverageBonus: number;
+}> = [
+    {
+        id: 'PRESERVE_STUDIO_NAME',
+        leverageBonus: 0.02,
+    },
+    {
+        id: 'PROTECT_EMPLOYEES',
+        leverageBonus: 0.025,
+    },
+    {
+        id: 'GUARANTEE_PRODUCTIONS',
+        leverageBonus: 0.035,
+    },
+];
+
+export const getAcquisitionCommitments = (language: GameLanguage = 'en'): Array<{
     id: AcquisitionCommitmentId;
     label: string;
     shortLabel: string;
     description: string;
     leverageBonus: number;
-}> = [
-    {
-        id: 'PRESERVE_STUDIO_NAME',
-        label: 'Preserve Studio Name',
-        shortLabel: 'Name Protected',
-        description: 'Keep the label identity intact after close.',
-        leverageBonus: 0.02,
-    },
-    {
-        id: 'PROTECT_EMPLOYEES',
-        label: 'Protect Employees',
-        shortLabel: 'Staff Protected',
-        description: 'Promise transition protection for existing employees.',
-        leverageBonus: 0.025,
-    },
-    {
-        id: 'GUARANTEE_PRODUCTIONS',
-        label: 'Guarantee Productions',
-        shortLabel: 'Slate Guaranteed',
-        description: 'Commit to future productions using the acquired studio.',
-        leverageBonus: 0.035,
-    },
-];
+}> => ACQUISITION_COMMITMENT_TEMPLATES.map(template => ({
+    ...template,
+    label: t(language, `services.studioAcquisition.commitment.${template.id}.label`),
+    shortLabel: t(language, `services.studioAcquisition.commitment.${template.id}.shortLabel`),
+    description: t(language, `services.studioAcquisition.commitment.${template.id}.description`),
+}));
+
+export const ACQUISITION_COMMITMENTS = getAcquisitionCommitments('en');
 
 export interface AcquisitionFundingSelection {
     source: AcquisitionFundingSource;
@@ -192,6 +196,7 @@ const formatCompactMoney = (value: number): string => {
     if (absolute >= 1_000) return `$${(absolute / 1_000).toFixed(absolute >= 100_000 ? 0 : 1).replace(/\.0$/, '')}K`;
     return `$${absolute.toLocaleString()}`;
 };
+const formatAcquisitionMoney = (value: number): string => `$${Math.max(0, Math.round(value || 0)).toLocaleString()}`;
 
 type AcquisitionMediaMoment =
     | 'DILIGENCE'
@@ -206,6 +211,38 @@ type AcquisitionMediaMoment =
     | 'WALKED_AWAY'
     | 'ACQUIRED';
 
+const ACQUISITION_MEDIA_META: Record<AcquisitionMediaMoment, { impact: NewsItem['impactLevel']; sentiment: XPost['sentiment'] }> = {
+    DILIGENCE: { impact: 'LOW', sentiment: 'INDUSTRY' },
+    OFFER_SUBMITTED: { impact: 'MEDIUM', sentiment: 'INDUSTRY' },
+    ACCEPTED: { impact: 'HIGH', sentiment: 'SUPPORTIVE' },
+    COUNTERED: { impact: 'MEDIUM', sentiment: 'NEUTRAL' },
+    RIVAL_BID: { impact: 'HIGH', sentiment: 'MESSY' },
+    REJECTED: { impact: 'MEDIUM', sentiment: 'MESSY' },
+    COUNTER_ACCEPTED: { impact: 'HIGH', sentiment: 'INDUSTRY' },
+    REVISED_OFFER: { impact: 'MEDIUM', sentiment: 'INDUSTRY' },
+    RIVAL_BEAT: { impact: 'HIGH', sentiment: 'INDUSTRY' },
+    WALKED_AWAY: { impact: 'MEDIUM', sentiment: 'NEUTRAL' },
+    ACQUIRED: { impact: 'HIGH', sentiment: 'SUPPORTIVE' },
+};
+
+const getAcquisitionMediaPrice = (language: ReturnType<typeof getPlayerLanguage>, moment: AcquisitionMediaMoment, amount = 0): string => {
+    if (amount > 0) return formatCompactMoney(amount);
+    switch (moment) {
+        case 'OFFER_SUBMITTED':
+            return t(language, 'services.studioAcquisition.media.price.formalOffer');
+        case 'ACCEPTED':
+            return t(language, 'services.studioAcquisition.media.price.agreed');
+        case 'REVISED_OFFER':
+            return t(language, 'services.studioAcquisition.media.price.strongerOffer');
+        case 'RIVAL_BEAT':
+            return t(language, 'services.studioAcquisition.media.price.higherBid');
+        case 'ACQUIRED':
+            return t(language, 'services.studioAcquisition.media.price.signedDeal');
+        default:
+            return '';
+    }
+};
+
 const getAcquisitionMediaCopy = ({
     moment,
     player,
@@ -214,105 +251,41 @@ const getAcquisitionMediaCopy = ({
     rivalStudioName,
 }: {
     moment: AcquisitionMediaMoment;
-    player: Pick<Player, 'name'>;
+    player: Pick<Player, 'name' | 'settings'>;
     studioName: string;
     amount?: number;
     rivalStudioName?: string;
 }): { headline: string; subtext: string; social: string; impact: NewsItem['impactLevel']; sentiment: XPost['sentiment'] } => {
-    const playerName = player.name?.trim() || 'Your studio group';
-    const price = amount > 0 ? formatCompactMoney(amount) : undefined;
-    switch (moment) {
-        case 'DILIGENCE':
-            return {
-                headline: `${playerName}'s advisors begin diligence on ${studioName}.`,
-                subtext: 'Bankers and entertainment lawyers are reviewing the target before any final offer.',
-                social: `Deal desks are hearing ${playerName} is doing serious homework on ${studioName}. Not an acquisition yet, but the room is awake.`,
-                impact: 'LOW',
-                sentiment: 'INDUSTRY',
-            };
-        case 'OFFER_SUBMITTED':
-            return {
-                headline: `${playerName} makes an opening approach for ${studioName}.`,
-                subtext: `${price || 'A formal offer'} is now on the table. The seller can accept, counter, reject, or draw rival interest.`,
-                social: `${playerName} just put ${studioName} in play with ${price || 'a formal acquisition proposal'}. Forbes watchers are refreshing like it is awards morning.`,
-                impact: 'MEDIUM',
-                sentiment: 'INDUSTRY',
-            };
-        case 'ACCEPTED':
-            return {
-                headline: `${studioName}'s board accepts ${playerName}'s acquisition terms.`,
-                subtext: `The ${price || 'agreed'} deal now moves to closing documents and final signature.`,
-                social: `${studioName} said yes to ${playerName}. Now it is paperwork, nerves, and one very expensive signature.`,
-                impact: 'HIGH',
-                sentiment: 'SUPPORTIVE',
-            };
-        case 'COUNTERED':
-            return {
-                headline: `${studioName} counters ${playerName}'s acquisition approach.`,
-                subtext: `The board wants stronger terms before it releases control of the company.`,
-                social: `${studioName} did not slam the door on ${playerName}; they slid a counter across the table. Very boardroom-drama coded.`,
-                impact: 'MEDIUM',
-                sentiment: 'NEUTRAL',
-            };
-        case 'RIVAL_BID':
-            return {
-                headline: `${rivalStudioName || 'A rival studio'} enters the fight for ${studioName}.`,
-                subtext: `${playerName}'s acquisition attempt has turned into a limited bidding war.`,
-                social: `${studioName} has a rival bidder now. ${playerName} either raises the room temperature or walks away with dignity.`,
-                impact: 'HIGH',
-                sentiment: 'MESSY',
-            };
-        case 'REJECTED':
-            return {
-                headline: `${studioName} rejects ${playerName}'s acquisition proposal.`,
-                subtext: 'The seller says the offer did not meet board expectations.',
-                social: `${studioName} rejected ${playerName}'s approach. Not every deal becomes a trophy; sometimes the board just enjoys saying no.`,
-                impact: 'MEDIUM',
-                sentiment: 'MESSY',
-            };
-        case 'COUNTER_ACCEPTED':
-            return {
-                headline: `${playerName} accepts ${studioName}'s counteroffer.`,
-                subtext: `The parties have agreed on terms and are moving toward final closing.`,
-                social: `${playerName} accepted ${studioName}'s counter. The deal room just got very quiet in that expensive way.`,
-                impact: 'HIGH',
-                sentiment: 'INDUSTRY',
-            };
-        case 'REVISED_OFFER':
-            return {
-                headline: `${playerName} revises the bid for ${studioName}.`,
-                subtext: `${price || 'A stronger offer'} has been filed after seller pushback.`,
-                social: `${playerName} came back with a revised number for ${studioName}. This is no longer casual shopping.`,
-                impact: 'MEDIUM',
-                sentiment: 'INDUSTRY',
-            };
-        case 'RIVAL_BEAT':
-            return {
-                headline: `${playerName} raises the bid to stay in the ${studioName} race.`,
-                subtext: `${price || 'A higher bid'} beats the rival table for now.`,
-                social: `${playerName} just beat the rival table for ${studioName}. Somewhere a banker is pretending not to smile.`,
-                impact: 'HIGH',
-                sentiment: 'INDUSTRY',
-            };
-        case 'WALKED_AWAY':
-            return {
-                headline: `${playerName} walks away from the ${studioName} acquisition table.`,
-                subtext: 'The approach is closed for now after the parties failed to align.',
-                social: `${playerName} walked away from ${studioName}. Honestly, not overpaying is also a flex.`,
-                impact: 'MEDIUM',
-                sentiment: 'NEUTRAL',
-            };
-        case 'ACQUIRED':
-        default:
-            return {
-                headline: `${playerName} completes the acquisition of ${studioName}.`,
-                subtext: `${price || 'The signed deal'} transfers catalog, facilities, staff, liabilities, and company control.`,
-                social: `${playerName} officially acquired ${studioName}. That is not a headline, that is a new chapter of the map.`,
-                impact: 'HIGH',
-                sentiment: 'SUPPORTIVE',
-            };
-    }
+    const language = getPlayerLanguage(player);
+    const meta = ACQUISITION_MEDIA_META[moment];
+    const vars = {
+        player: player.name?.trim() || t(language, 'services.studioAcquisition.media.playerFallback'),
+        studio: studioName,
+        price: getAcquisitionMediaPrice(language, moment, amount),
+        rival: rivalStudioName || t(language, 'services.studioAcquisition.media.rivalFallback'),
+    };
+    return {
+        headline: t(language, `services.studioAcquisition.media.${moment}.headline`, vars),
+        subtext: t(language, `services.studioAcquisition.media.${moment}.subtext`, vars),
+        social: t(language, `services.studioAcquisition.media.${moment}.social`, vars),
+        impact: meta.impact,
+        sentiment: meta.sentiment,
+    };
 };
+
+const getAcquisitionRoundLabel = (language: GameLanguage, round: number): string => (
+    t(language, round === 1
+        ? 'services.studioAcquisition.seller.round.opening'
+        : 'services.studioAcquisition.seller.round.revised')
+);
+
+const getAcquisitionDecisionLabel = (language: GameLanguage, decision: AcquisitionSellerDecision): string => (
+    t(language, `services.studioAcquisition.seller.decision.${decision}`)
+);
+
+const getAcquisitionInboxSubject = (language: GameLanguage, decision: AcquisitionSellerDecision | 'COUNTER_ACCEPTED' | 'ACQUIRED' | 'STOCK_CONTROL_ACQUIRED', studioName: string): string => (
+    t(language, `services.studioAcquisition.inbox.subject.${decision}`, { studio: studioName })
+);
 
 const addAcquisitionMediaPulse = (
     player: Player,
@@ -490,11 +463,13 @@ export const getFundingOptions = ({
     profile,
     amount,
     expenseType,
+    language = 'en',
 }: {
     player: Pick<Player, 'money' | 'businesses' | 'flags'>;
     profile: AcquisitionProfile;
     amount: number;
     expenseType: 'DILIGENCE' | 'OFFER';
+    language?: GameLanguage;
 }): AcquisitionFundingOption[] => {
     const safeAmount = Math.max(0, amount);
     const cases = getAcquisitionCases(player);
@@ -505,14 +480,14 @@ export const getFundingOptions = ({
     const personalBalance = Math.max(0, player.money || 0);
     const options: AcquisitionFundingOption[] = [{
         source: 'PERSONAL',
-        label: 'Personal Wealth',
+        label: t(language, 'services.studioAcquisition.funding.personal.label'),
         balance: personalBalance,
         remainingBalance: personalBalance - safeAmount,
         affordable: personalBalance >= safeAmount,
         complianceRisk: 0,
         complianceBand: 'ROUTINE',
-        taxTreatment: 'Personally funded · no business compliance exposure',
-        unavailableReason: personalBalance >= safeAmount ? undefined : 'Insufficient personal wealth',
+        taxTreatment: t(language, 'services.studioAcquisition.funding.personal.taxTreatment'),
+        unavailableReason: personalBalance >= safeAmount ? undefined : t(language, 'services.studioAcquisition.funding.personal.unavailable'),
     }];
 
     const studios = (player.businesses || []).filter(business => business.type === 'PRODUCTION_HOUSE');
@@ -528,14 +503,14 @@ export const getFundingOptions = ({
         options.push({
             source: 'STUDIO',
             businessId: business.id,
-            label: `${business.name} Capital`,
+            label: t(language, 'services.studioAcquisition.funding.studio.label', { studio: business.name }),
             balance,
             remainingBalance: balance - safeAmount,
             affordable: balance >= safeAmount,
             complianceRisk,
             complianceBand: getComplianceBand(complianceRisk),
-            taxTreatment: 'Business investment · may receive favorable tax treatment',
-            unavailableReason: balance >= safeAmount ? undefined : 'Insufficient production studio capital',
+            taxTreatment: t(language, 'services.studioAcquisition.funding.studio.taxTreatment'),
+            unavailableReason: balance >= safeAmount ? undefined : t(language, 'services.studioAcquisition.funding.studio.unavailable'),
         });
     }
     return options;
@@ -739,6 +714,7 @@ export const runDueDiligence = ({
     report?: AcquisitionDiligenceReport;
     reason?: 'INELIGIBLE' | 'ALREADY_PURCHASED' | 'FUNDING_SOURCE_UNAVAILABLE' | 'INSUFFICIENT_FUNDS';
 } => {
+    const language = getPlayerLanguage(player);
     const existingCase = getAcquisitionCase(player, profile.id);
     if (!getAcquisitionEligibility(profile, existingCase).canApproach && existingCase?.status !== 'DRAFT') {
         return { success: false, player, reason: 'INELIGIBLE' };
@@ -753,6 +729,7 @@ export const runDueDiligence = ({
         profile,
         amount: fee,
         expenseType: 'DILIGENCE',
+        language,
     }), funding);
     if (!option) return { success: false, player, reason: 'FUNDING_SOURCE_UNAVAILABLE' };
     if (!option.affordable) return { success: false, player, reason: 'INSUFFICIENT_FUNDS' };
@@ -928,6 +905,7 @@ export const submitOpeningOffer = ({
     acquisitionCase?: AcquisitionCase;
     reason?: 'PLAYER_OWNED' | 'NOT_FOR_SALE' | 'OFFER_ALREADY_SUBMITTED' | 'STREAMING_PLATFORM_RESERVED' | 'REGULATOR_REVIEW_ACTIVE' | 'OFFER_TYPE_UNAVAILABLE' | 'INVALID_OFFER_TERMS' | 'FUNDING_SOURCE_UNAVAILABLE' | 'INSUFFICIENT_FUNDS';
 } => {
+    const language = getPlayerLanguage(player);
     const existingCase = getAcquisitionCase(player, profile.id);
     const eligibility = getAcquisitionEligibility(profile, existingCase);
     if (!eligibility.canApproach) {
@@ -964,6 +942,7 @@ export const submitOpeningOffer = ({
         profile,
         amount: resolvedOfferAmount,
         expenseType: 'OFFER',
+        language,
     }), funding);
     if (!option) return { success: false, player, reason: 'FUNDING_SOURCE_UNAVAILABLE' };
     if (!option.affordable) return { success: false, player, reason: 'INSUFFICIENT_FUNDS' };
@@ -1068,7 +1047,8 @@ const getRivalBid = (
     };
 };
 
-const getSellerResponse = (acquisitionCase: AcquisitionCase, player: Pick<Player, 'currentWeek' | 'age'>): AcquisitionSellerResponse => {
+const getSellerResponse = (acquisitionCase: AcquisitionCase, player: Pick<Player, 'currentWeek' | 'age' | 'settings'>): AcquisitionSellerResponse => {
+    const language = getPlayerLanguage(player);
     const offer = acquisitionCase.offer!;
     const comparisonValue = getOfferComparisonValue(acquisitionCase);
     const offerRatio = offer.amount / comparisonValue;
@@ -1083,7 +1063,10 @@ const getSellerResponse = (acquisitionCase: AcquisitionCase, player: Pick<Player
             round,
             respondedWeek: player.currentWeek,
             respondedYear: player.age,
-            summary: `${acquisitionCase.studioName} accepted your ${round === 1 ? 'opening' : 'revised'} terms. The deal is ready for final review.`,
+            summary: t(language, 'services.studioAcquisition.seller.summary.accepted', {
+                studio: acquisitionCase.studioName,
+                round: getAcquisitionRoundLabel(language, round),
+            }),
         };
     }
     const rivalBid = getRivalBid(acquisitionCase, comparisonValue, effectiveOfferRatio);
@@ -1094,7 +1077,10 @@ const getSellerResponse = (acquisitionCase: AcquisitionCase, player: Pick<Player
             round,
             respondedWeek: player.currentWeek,
             respondedYear: player.age,
-            summary: `${rivalBid.rivalStudioName} entered the room at $${rivalBid.rivalAmount.toLocaleString()}. The seller opened a limited bidding round.`,
+            summary: t(language, 'services.studioAcquisition.seller.summary.rivalBid', {
+                rival: rivalBid.rivalStudioName,
+                amount: formatAcquisitionMoney(rivalBid.rivalAmount),
+            }),
         };
     }
     if (round >= RIVAL_BID_MAX_ROUNDS && effectiveOfferRatio >= 0.72) {
@@ -1103,7 +1089,9 @@ const getSellerResponse = (acquisitionCase: AcquisitionCase, player: Pick<Player
             round,
             respondedWeek: player.currentWeek,
             respondedYear: player.age,
-            summary: `${acquisitionCase.studioName} ended the bidding round after rival pressure outpaced your final position.`,
+            summary: t(language, 'services.studioAcquisition.seller.summary.rejectedRival', {
+                studio: acquisitionCase.studioName,
+            }),
         };
     }
     if (effectiveOfferRatio >= 0.82) {
@@ -1114,7 +1102,9 @@ const getSellerResponse = (acquisitionCase: AcquisitionCase, player: Pick<Player
             round,
             respondedWeek: player.currentWeek,
             respondedYear: player.age,
-            summary: `${acquisitionCase.studioName} is willing to continue, but the board wants stronger terms.`,
+            summary: t(language, 'services.studioAcquisition.seller.summary.countered', {
+                studio: acquisitionCase.studioName,
+            }),
         };
     }
     return {
@@ -1122,7 +1112,9 @@ const getSellerResponse = (acquisitionCase: AcquisitionCase, player: Pick<Player
         round,
         respondedWeek: player.currentWeek,
         respondedYear: player.age,
-        summary: `${acquisitionCase.studioName} rejected the proposal as too far below its expectations.`,
+        summary: t(language, 'services.studioAcquisition.seller.summary.rejectedLow', {
+            studio: acquisitionCase.studioName,
+        }),
     };
 };
 
@@ -1133,6 +1125,7 @@ export const resolveStudioAcquisitionResponses = (player: Player): Player => {
 
     let updatedPlayer = player;
     responses.forEach(acquisitionCase => {
+        const language = getPlayerLanguage(updatedPlayer);
         const sellerResponse = getSellerResponse(acquisitionCase, updatedPlayer);
         const nextStatus: AcquisitionCaseStatus = sellerResponse.decision;
         const updatedCase: AcquisitionCase = {
@@ -1148,13 +1141,7 @@ export const resolveStudioAcquisitionResponses = (player: Player): Player => {
             rivalStudioName: sellerResponse.rivalStudioName,
             round: sellerResponse.round,
         });
-        const subject = sellerResponse.decision === 'ACCEPTED'
-            ? `Offer Accepted: ${acquisitionCase.studioName}`
-            : sellerResponse.decision === 'COUNTERED'
-                ? `Counteroffer: ${acquisitionCase.studioName}`
-                : sellerResponse.decision === 'RIVAL_BID'
-                    ? `Bidding War: ${acquisitionCase.studioName}`
-                    : `Offer Rejected: ${acquisitionCase.studioName}`;
+        const subject = t(language, `services.studioAcquisition.inbox.subject.${sellerResponse.decision}`, { studio: acquisitionCase.studioName });
         const messageId = `studio_acquisition_${acquisitionCase.studioId}_r${sellerResponse.round}_${sellerResponse.decision}`;
         updatedPlayer = {
             ...updatedPlayer,
@@ -1162,7 +1149,7 @@ export const resolveStudioAcquisitionResponses = (player: Player): Player => {
                 ? (updatedPlayer.inbox || [])
                 : [{
                     id: messageId,
-                    sender: 'Business Affairs',
+                    sender: t(language, 'services.studioAcquisition.inbox.sender'),
                     subject,
                     text: sellerResponse.summary,
                     type: 'STUDIO_ACQUISITION' as const,
@@ -1182,7 +1169,10 @@ export const resolveStudioAcquisitionResponses = (player: Player): Player => {
             logs: [{
                 week: updatedPlayer.currentWeek,
                 year: updatedPlayer.age,
-                message: `Studio acquisition response: ${acquisitionCase.studioName} ${sellerResponse.decision.toLowerCase()}.`,
+                message: t(language, 'services.studioAcquisition.log.response', {
+                    studio: acquisitionCase.studioName,
+                    decision: getAcquisitionDecisionLabel(language, sellerResponse.decision),
+                }),
                 type: sellerResponse.decision === 'ACCEPTED' ? 'positive' as const : sellerResponse.decision === 'REJECTED' ? 'negative' as const : 'neutral' as const,
             }, ...(updatedPlayer.logs || [])].slice(0, 50),
         };
@@ -1197,6 +1187,7 @@ export const acceptAcquisitionCounter = ({
     player: Player;
     studioId: string;
 }): { success: boolean; player: Player; reason?: 'COUNTER_NOT_AVAILABLE' } => {
+    const language = getPlayerLanguage(player);
     const acquisitionCase = getAcquisitionCase(player, studioId);
     if (acquisitionCase?.status !== 'COUNTERED' || !acquisitionCase.sellerResponse?.counterAmount) {
         return { success: false, player, reason: 'COUNTER_NOT_AVAILABLE' };
@@ -1208,7 +1199,9 @@ export const acceptAcquisitionCounter = ({
                 ...acquisitionCase.sellerResponse,
                 decision: 'ACCEPTED',
                 agreedAmount: acquisitionCase.sellerResponse.counterAmount,
-                summary: `You accepted ${acquisitionCase.studioName}'s counteroffer. The deal is ready for final review.`,
+                summary: t(language, 'services.studioAcquisition.seller.summary.counterAccepted', {
+                    studio: acquisitionCase.studioName,
+                }),
             },
         };
     const casePlayer = addAcquisitionMediaPulse(persistCase(player, acceptedCase), {
@@ -1226,7 +1219,8 @@ export const acceptAcquisitionCounter = ({
                 message.type === 'STUDIO_ACQUISITION' && message.data?.studioId === studioId
                     ? {
                         ...message,
-                        subject: `Terms Agreed: ${acquisitionCase.studioName}`,
+                        sender: t(language, 'services.studioAcquisition.inbox.sender'),
+                        subject: t(language, 'services.studioAcquisition.inbox.subject.COUNTER_ACCEPTED', { studio: acquisitionCase.studioName }),
                         text: acceptedCase.sellerResponse!.summary,
                         data: {
                             ...message.data,
@@ -1342,6 +1336,7 @@ export const completeStudioAcquisition = ({
     acquiredBusiness?: Business;
     reason?: 'CASE_NOT_ACCEPTED' | 'MINORITY_NOT_OWNERSHIP' | 'FUNDING_SOURCE_UNAVAILABLE' | 'INSUFFICIENT_FUNDS' | 'ALREADY_OWNED';
 } => {
+    const language = getPlayerLanguage(player);
     const acquisitionCase = getAcquisitionCase(player, profile.id);
     if (!acquisitionCase || acquisitionCase.status !== 'ACCEPTED' || !acquisitionCase.offer) {
         return { success: false, player, reason: 'CASE_NOT_ACCEPTED' };
@@ -1360,6 +1355,7 @@ export const completeStudioAcquisition = ({
         profile,
         amount: finalPrice,
         expenseType: 'OFFER',
+        language,
     }), funding);
     if (!fundingOption) return { success: false, player, acquisitionCase, reason: 'FUNDING_SOURCE_UNAVAILABLE' };
     if (!fundingOption.affordable) return { success: false, player, acquisitionCase, reason: 'INSUFFICIENT_FUNDS' };
@@ -1372,7 +1368,11 @@ export const completeStudioAcquisition = ({
         signedYear: player.age,
         funding,
         ...liabilities,
-        assetSummary: `${profile.facilities.length} facilities · ${profile.rightsCount} rights · ${profile.keyTalent.length} talent anchors`,
+        assetSummary: t(language, 'services.studioAcquisition.closing.assetSummary.full', {
+            facilities: profile.facilities.length,
+            rights: profile.rightsCount,
+            talent: profile.keyTalent.length,
+        }),
     };
     const chargedPlayer = deductImmediateExpense(player, finalPrice, funding);
     const acquiredBusiness = buildAcquiredStudioBusiness({ player: chargedPlayer, profile, closing });
@@ -1394,9 +1394,9 @@ export const completeStudioAcquisition = ({
         message.type === 'STUDIO_ACQUISITION' && message.data?.studioId === profile.id
             ? {
                 ...message,
-                sender: 'Business Affairs',
-                subject: `Deal Signed: ${profile.name}`,
-                text: `${profile.name} is now part of your owned studio group. Assets, liabilities, staff, and operating capital have transferred.`,
+                sender: t(language, 'services.studioAcquisition.inbox.sender'),
+                subject: t(language, 'services.studioAcquisition.inbox.subject.ACQUIRED', { studio: profile.name }),
+                text: t(language, 'services.studioAcquisition.inbox.text.acquired', { studio: profile.name }),
                 data: {
                     ...message.data,
                     decision: 'ACQUIRED',
@@ -1418,9 +1418,9 @@ export const completeStudioAcquisition = ({
             ? existingInbox
             : [{
                 id: messageId,
-                sender: 'Business Affairs',
-                subject: `Deal Signed: ${profile.name}`,
-                text: `${profile.name} is now part of your owned studio group. Assets, liabilities, staff, and operating capital have transferred.`,
+                sender: t(language, 'services.studioAcquisition.inbox.sender'),
+                subject: getAcquisitionInboxSubject(language, 'ACQUIRED', profile.name),
+                text: t(language, 'services.studioAcquisition.inbox.text.acquired', { studio: profile.name }),
                 type: 'STUDIO_ACQUISITION' as const,
                 data: {
                     studioId: profile.id,
@@ -1438,7 +1438,10 @@ export const completeStudioAcquisition = ({
         logs: [{
             week: player.currentWeek,
             year: player.age,
-            message: `Deal signed: ${profile.name} acquired for $${finalPrice.toLocaleString()} and added to your owned studios.`,
+            message: t(language, 'services.studioAcquisition.log.acquired', {
+                studio: profile.name,
+                amount: formatAcquisitionMoney(finalPrice),
+            }),
             type: 'positive' as const,
         }, ...(player.logs || [])].slice(0, 50),
     };
@@ -1470,6 +1473,7 @@ export const completeStockControlAcquisition = ({
     acquiredBusiness?: Business;
     reason?: 'CONTROL_NOT_READY' | 'ALREADY_OWNED' | 'STREAMING_PLATFORM_RESERVED';
 } => {
+    const language = getPlayerLanguage(player);
     const existingCase = getAcquisitionCase(player, profile.id);
     if ((player.businesses || []).some(business => business.id === profile.id) || profile.isPlayerOwned) {
         return { success: false, player, acquisitionCase: existingCase, reason: 'ALREADY_OWNED' };
@@ -1495,7 +1499,10 @@ export const completeStockControlAcquisition = ({
         verifiedDebt,
         hiddenLiabilities,
         expectedAnnualIncome,
-        assetSummary: `${profile.facilities.length} facilities · ${profile.rightsCount} rights · public-market control transfer`,
+        assetSummary: t(language, 'services.studioAcquisition.closing.assetSummary.stockControl', {
+            facilities: profile.facilities.length,
+            rights: profile.rightsCount,
+        }),
     };
     const acquiredBusiness = buildAcquiredStudioBusiness({ player, profile, closing });
     const acquiredCase: AcquisitionCase = {
@@ -1533,9 +1540,12 @@ export const completeStockControlAcquisition = ({
         ...withCase,
         inbox: [{
             id: messageId,
-            sender: 'Business Affairs',
-            subject: `Control Transfer Complete: ${profile.name}`,
-            text: `${profile.name} moved into your owned studio group through ${companyPosition.ownershipPercent.toFixed(1)}% public-market control. No additional acquisition price was charged.`,
+            sender: t(language, 'services.studioAcquisition.inbox.sender'),
+            subject: t(language, 'services.studioAcquisition.inbox.subject.STOCK_CONTROL_ACQUIRED', { studio: profile.name }),
+            text: t(language, 'services.studioAcquisition.inbox.text.stockControlAcquired', {
+                studio: profile.name,
+                ownership: companyPosition.ownershipPercent.toFixed(1),
+            }),
             type: 'STUDIO_ACQUISITION' as const,
             data: {
                 studioId: profile.id,
@@ -1554,7 +1564,10 @@ export const completeStockControlAcquisition = ({
         logs: [{
             week: player.currentWeek,
             year: player.age,
-            message: `Control transfer completed: ${profile.name} added through ${companyPosition.ownershipPercent.toFixed(1)}% public-market ownership. No additional acquisition price charged.`,
+            message: t(language, 'services.studioAcquisition.log.stockControlAcquired', {
+                studio: profile.name,
+                ownership: companyPosition.ownershipPercent.toFixed(1),
+            }),
             type: 'positive' as const,
         }, ...(player.logs || [])].slice(0, 50),
     };

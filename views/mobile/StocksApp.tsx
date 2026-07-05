@@ -194,11 +194,11 @@ export const StocksApp: React.FC<StocksAppProps> = ({
         const positionInvested = holding?.totalInvested ?? ((holding?.shares || 0) * (holding?.averageCost || selectedStock.price));
         const averageCost = holding?.averageCost || (holding?.shares ? selectedStock.price : 0);
         const gainLoss = snapshot.positionValue - positionInvested;
-        const influence = getShareholderInfluence(snapshot.ownershipPercent);
+        const influence = getShareholderInfluence(snapshot.ownershipPercent, language);
         const influenceProgress = influence.nextThreshold
             ? Math.min(100, (snapshot.ownershipPercent / influence.nextThreshold) * 100)
             : 100;
-        const takeoverSnapshot = getStockTakeoverSnapshot(player, selectedStock);
+        const takeoverSnapshot = getStockTakeoverSnapshot(player, selectedStock, language);
         const takeoverCase = takeoverSnapshot.activeCase;
         const openAcquisitionDesk = () => {
             if (!selectedStock.relatedStudioId || !onOpenStudioAcquisition) {
@@ -405,8 +405,14 @@ export const StocksApp: React.FC<StocksAppProps> = ({
                                 />
                             </div>
                             <div className="mt-1.5 flex items-center justify-between text-[8px] font-bold uppercase tracking-wide text-zinc-600">
-                                <span>Influence progress</span>
-                                <span>{influence.nextThreshold === 10 ? '10% Influence' : influence.nextThreshold ? `${influence.nextThreshold}% Next` : 'Control'}</span>
+                                <span>{tr('stocks.influence.progress')}</span>
+                                <span>
+                                    {influence.nextThreshold === 10
+                                        ? tr('stocks.influence.firstUnlock')
+                                        : influence.nextThreshold
+                                            ? tr('stocks.influence.next', { threshold: influence.nextThreshold })
+                                            : tr('stocks.influence.control')}
+                                </span>
                             </div>
                         </div>
                         <div className="mt-4 grid grid-cols-3 divide-x divide-zinc-800 border-t border-zinc-800 bg-zinc-950/45">
@@ -415,11 +421,11 @@ export const StocksApp: React.FC<StocksAppProps> = ({
                                 <div className="mt-1 truncate font-mono text-xs font-bold text-white">{snapshot.holdingShares.toLocaleString()}</div>
                             </div>
                             <div className="px-3 py-3">
-                                <div className="text-[8px] font-bold uppercase tracking-wide text-zinc-600">Average Cost</div>
+                                <div className="text-[8px] font-bold uppercase tracking-wide text-zinc-600">{tr('stocks.averageCost')}</div>
                                 <div className="mt-1 font-mono text-xs font-bold text-zinc-300">{formatMoney(averageCost)}</div>
                             </div>
                             <div className="px-3 py-3">
-                                <div className="text-[8px] font-bold uppercase tracking-wide text-zinc-600">Gain / Loss</div>
+                                <div className="text-[8px] font-bold uppercase tracking-wide text-zinc-600">{tr('stocks.gainLoss')}</div>
                                 <div className={`mt-1 font-mono text-xs font-bold ${gainLoss >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                                     {gainLoss >= 0 ? '+' : ''}{formatCompactMoney(gainLoss)}
                                 </div>
@@ -430,7 +436,7 @@ export const StocksApp: React.FC<StocksAppProps> = ({
                     <div className="mb-4 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900">
                         <div className="flex items-center justify-between gap-3 border-b border-zinc-800 p-4">
                             <div>
-                                <div className="text-xs font-bold uppercase text-zinc-500">Influence Ladder</div>
+                                <div className="text-xs font-bold uppercase text-zinc-500">{tr('stocks.influence.ladder')}</div>
                                 <div className="mt-1 text-sm font-bold text-white">{influence.label}</div>
                             </div>
                             <div className="rounded-full border border-sky-400/30 bg-sky-400/10 px-3 py-1 font-mono text-xs font-bold text-sky-300">
@@ -439,10 +445,10 @@ export const StocksApp: React.FC<StocksAppProps> = ({
                         </div>
                         <div className="grid grid-cols-4 divide-x divide-zinc-800 text-center">
                             {[
-                                ['10%', 'Vote'],
-                                ['20%', 'Influence'],
-                                ['30%', 'Board'],
-                                ['51%', 'Control'],
+                                ['10%', tr('stocks.influence.vote')],
+                                ['20%', tr('stocks.influence.influence')],
+                                ['30%', tr('stocks.influence.board')],
+                                ['51%', tr('stocks.influence.control')],
                             ].map(([threshold, label]) => {
                                 const unlocked = snapshot.ownershipPercent >= Number(threshold.replace('%', ''));
                                 return (

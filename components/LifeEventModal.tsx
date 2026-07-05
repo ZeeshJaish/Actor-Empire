@@ -49,6 +49,8 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
         localizeText(option.description, option.descriptionKey, option.textVars);
     const getSignalLabel = (effect: EventImpactSignal) =>
         localizeText(effect.label, effect.labelKey, effect.textVars);
+    const getSignalValue = (effect: EventImpactSignal) =>
+        localizeText(effect.value, effect.valueKey, effect.textVars);
     const getImpactLog = (impactResult: LifeEventImpactResult) =>
         localizeText(impactResult.log, impactResult.logKey, impactResult.logVars);
 
@@ -419,7 +421,7 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
                                             key={`${getSignalLabel(effect)}-${effect.value}`}
                                             className={`rounded-full border px-3 py-1.5 text-xs font-black ${getSignalClasses(effect.tone)}`}
                                         >
-                                            {getSignalLabel(effect)} {effect.value}
+                                            {getSignalLabel(effect)} {getSignalValue(effect)}
                                         </span>
                                     ))}
                                     {fallbackSignals.map(signal => (
@@ -543,7 +545,7 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
                                                 key={`${getSignalLabel(effect)}-${effect.value}`}
                                                 className={`rounded-full border px-2.5 py-1 text-[10px] font-black ${getSignalClasses(effect.tone)}`}
                                             >
-                                                {getSignalLabel(effect)} {effect.value}
+                                                {getSignalLabel(effect)} {getSignalValue(effect)}
                                             </span>
                                         ))}
                                     </div>

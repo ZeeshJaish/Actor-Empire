@@ -15,8 +15,10 @@ import type {
     StudioOperatingMandate,
     SubsidiaryOperatingModel,
     Transaction,
+    GameLanguage,
 } from '../types';
 import { normalizeStudioState } from './businessLogic';
+import { t } from './i18n';
 
 export interface OperatingModelDefinition {
     id: SubsidiaryOperatingModel;
@@ -111,103 +113,117 @@ const createPersonalTransaction = ({
     description: label,
 });
 
-export const OPERATING_MODELS: OperatingModelDefinition[] = [
-    {
-        id: 'INDEPENDENT_LABEL',
-        label: 'Independent Label',
-        shortLabel: 'Independent',
-        control: 'Board oversight',
-        description: 'The studio keeps its identity and management while operating on its own.',
-        benefits: ['Automatic operations', 'Brand and leadership retained', 'Profits flow to the group'],
-        tradeoffs: ['Limited direct control', 'Group absorbs losses'],
-        accent: 'EMERALD',
-    },
-    {
-        id: 'CONTROLLED_SUBSIDIARY',
-        label: 'Controlled Subsidiary',
-        shortLabel: 'Controlled',
-        control: 'Strategic command',
-        description: 'The studio keeps its banner, while you control budgets, leadership and major productions.',
-        benefits: ['Direct production control', 'Separate brand and finances', 'Routine work can stay automatic'],
-        tradeoffs: ['Higher management load', 'Leadership changes may create friction'],
-        accent: 'SKY',
-    },
-    {
-        id: 'FULL_MERGER',
-        label: 'Full Merger',
-        shortLabel: 'Merger',
-        control: 'Total integration',
-        description: 'Assets and liabilities move into the parent studio as the acquired identity is retired.',
-        benefits: ['Unified catalog and facilities', 'Total operating control', 'Consolidated production power'],
-        tradeoffs: ['Integration costs and backlash', 'Difficult to reverse'],
-        accent: 'AMBER',
-    },
+const OPERATING_MODEL_TEMPLATES: Array<Pick<OperatingModelDefinition, 'id' | 'accent'>> = [
+    { id: 'INDEPENDENT_LABEL', accent: 'EMERALD' },
+    { id: 'CONTROLLED_SUBSIDIARY', accent: 'SKY' },
+    { id: 'FULL_MERGER', accent: 'AMBER' },
 ];
 
-export const MANDATE_FOCUS_OPTIONS: StudioMandateOption<StudioMandateFocus>[] = [
-    { id: 'MOVIES_FIRST', label: 'Movie First', shortLabel: 'Movies', description: 'Prioritize feature films and theatrical-style projects.' },
-    { id: 'SERIES_FIRST', label: 'Series First', shortLabel: 'Series', description: 'Prioritize episodic projects and longer audience arcs.' },
-    { id: 'BALANCED_SLATE', label: 'Balanced Slate', shortLabel: 'Balanced', description: 'Keep movies and series moving without overcommitting.' },
-    { id: 'FRANCHISE_EXPANSION', label: 'Franchise Expansion', shortLabel: 'Franchise', description: 'Push sequels, universes and recognizable IP plays.' },
-    { id: 'PRESTIGE_AWARDS', label: 'Prestige Awards', shortLabel: 'Prestige', description: 'Favor critic-friendly projects and award momentum.' },
-    { id: 'COMMERCIAL_HITS', label: 'Commercial Hits', shortLabel: 'Hits', description: 'Chase broad audience winners and strong box-office upside.' },
+const createMandateOption = <T extends string>(language: GameLanguage, group: string, id: T): StudioMandateOption<T> => ({
+    id,
+    label: t(language, `services.studioGroup.mandate.${group}.${id}.label`),
+    shortLabel: t(language, `services.studioGroup.mandate.${group}.${id}.shortLabel`),
+    description: t(language, `services.studioGroup.mandate.${group}.${id}.description`),
+});
+
+export const getOperatingModels = (language: GameLanguage = 'en'): OperatingModelDefinition[] => (
+    OPERATING_MODEL_TEMPLATES.map(template => ({
+        ...template,
+        label: t(language, `services.studioGroup.operatingModel.${template.id}.label`),
+        shortLabel: t(language, `services.studioGroup.operatingModel.${template.id}.shortLabel`),
+        control: t(language, `services.studioGroup.operatingModel.${template.id}.control`),
+        description: t(language, `services.studioGroup.operatingModel.${template.id}.description`),
+        benefits: [1, 2, 3].map(index => t(language, `services.studioGroup.operatingModel.${template.id}.benefit.${index}`)),
+        tradeoffs: [1, 2].map(index => t(language, `services.studioGroup.operatingModel.${template.id}.tradeoff.${index}`)),
+    }))
+);
+
+export const getMandateFocusOptions = (language: GameLanguage = 'en'): StudioMandateOption<StudioMandateFocus>[] => [
+    createMandateOption(language, 'focus', 'MOVIES_FIRST'),
+    createMandateOption(language, 'focus', 'SERIES_FIRST'),
+    createMandateOption(language, 'focus', 'BALANCED_SLATE'),
+    createMandateOption(language, 'focus', 'FRANCHISE_EXPANSION'),
+    createMandateOption(language, 'focus', 'PRESTIGE_AWARDS'),
+    createMandateOption(language, 'focus', 'COMMERCIAL_HITS'),
 ];
 
-export const MANDATE_BUDGET_OPTIONS: StudioMandateOption<StudioMandateBudgetAppetite>[] = [
-    { id: 'LEAN', label: 'Lean', shortLabel: 'Lean', description: 'Keep spending tight and avoid heavy exposure.' },
-    { id: 'STANDARD', label: 'Standard', shortLabel: 'Standard', description: 'Fund reliable productions at a normal studio pace.' },
-    { id: 'PREMIUM', label: 'Premium', shortLabel: 'Premium', description: 'Authorize bigger swings when the slate deserves it.' },
+export const getMandateBudgetOptions = (language: GameLanguage = 'en'): StudioMandateOption<StudioMandateBudgetAppetite>[] => [
+    createMandateOption(language, 'budget', 'LEAN'),
+    createMandateOption(language, 'budget', 'STANDARD'),
+    createMandateOption(language, 'budget', 'PREMIUM'),
 ];
 
-export const MANDATE_RELEASE_PACE_OPTIONS: StudioMandateOption<StudioMandateReleasePace>[] = [
-    { id: 'CAREFUL', label: 'Careful Pace', shortLabel: 'Careful', description: 'Fewer releases with more time to shape each project.' },
-    { id: 'STEADY', label: 'Steady Pipeline', shortLabel: 'Steady', description: 'Maintain a dependable production rhythm.' },
-    { id: 'AGGRESSIVE', label: 'Aggressive Push', shortLabel: 'Aggressive', description: 'Move fast and accept higher operational pressure.' },
+export const getMandateReleasePaceOptions = (language: GameLanguage = 'en'): StudioMandateOption<StudioMandateReleasePace>[] => [
+    createMandateOption(language, 'releasePace', 'CAREFUL'),
+    createMandateOption(language, 'releasePace', 'STEADY'),
+    createMandateOption(language, 'releasePace', 'AGGRESSIVE'),
 ];
 
-export const MANDATE_IP_OPTIONS: StudioMandateOption<StudioMandateIpStrategy>[] = [
-    { id: 'ORIGINALS', label: 'Original IP', shortLabel: 'Originals', description: 'Build new stories and characters for the catalog.' },
-    { id: 'OWNED_IP', label: 'Owned IP', shortLabel: 'Owned IP', description: 'Use existing rights, catalog and universe assets.' },
-    { id: 'SEQUELS_REBOOTS', label: 'Sequels / Reboots', shortLabel: 'Sequels', description: 'Extend proven titles and revive dormant properties.' },
-    { id: 'MIXED', label: 'Mixed Rights', shortLabel: 'Mixed', description: 'Let the studio balance originals and existing IP.' },
+export const getMandateIpOptions = (language: GameLanguage = 'en'): StudioMandateOption<StudioMandateIpStrategy>[] => [
+    createMandateOption(language, 'ipStrategy', 'ORIGINALS'),
+    createMandateOption(language, 'ipStrategy', 'OWNED_IP'),
+    createMandateOption(language, 'ipStrategy', 'SEQUELS_REBOOTS'),
+    createMandateOption(language, 'ipStrategy', 'MIXED'),
 ];
 
-export const MANDATE_TALENT_OPTIONS: StudioMandateOption<StudioMandateTalentPolicy>[] = [
-    { id: 'IN_HOUSE', label: 'In-House Talent', shortLabel: 'In-House', description: 'Favor contracted and retained talent.' },
-    { id: 'RISING_STARS', label: 'Rising Stars', shortLabel: 'Risers', description: 'Give emerging names more chances to break out.' },
-    { id: 'STAR_POWER', label: 'Star Power', shortLabel: 'Stars', description: 'Spend on names that can carry attention.' },
-    { id: 'MIXED', label: 'Flexible Casting', shortLabel: 'Flexible', description: 'Choose talent by fit instead of fixed policy.' },
+export const getMandateTalentOptions = (language: GameLanguage = 'en'): StudioMandateOption<StudioMandateTalentPolicy>[] => [
+    createMandateOption(language, 'talentPolicy', 'IN_HOUSE'),
+    createMandateOption(language, 'talentPolicy', 'RISING_STARS'),
+    createMandateOption(language, 'talentPolicy', 'STAR_POWER'),
+    createMandateOption(language, 'talentPolicy', 'MIXED'),
 ];
 
-export const MANDATE_OBJECTIVE_OPTIONS: StudioMandateOption<StudioMandateObjective>[] = [
-    { id: 'PROFIT_FIRST', label: 'Profit First', shortLabel: 'Profit', description: 'Optimize the slate for cash discipline and returns.' },
-    { id: 'PRESTIGE_FIRST', label: 'Prestige First', shortLabel: 'Prestige', description: 'Accept slower money for reputation and awards.' },
-    { id: 'COMMERCIAL_FIRST', label: 'Commercial First', shortLabel: 'Commercial', description: 'Prioritize audience scale and cultural reach.' },
-    { id: 'BALANCED', label: 'Balanced Target', shortLabel: 'Balanced', description: 'Balance profit, prestige and long-term brand health.' },
+export const getMandateObjectiveOptions = (language: GameLanguage = 'en'): StudioMandateOption<StudioMandateObjective>[] => [
+    createMandateOption(language, 'objective', 'PROFIT_FIRST'),
+    createMandateOption(language, 'objective', 'PRESTIGE_FIRST'),
+    createMandateOption(language, 'objective', 'COMMERCIAL_FIRST'),
+    createMandateOption(language, 'objective', 'BALANCED'),
 ];
 
-export const MANDATE_CREATIVE_APPETITE_OPTIONS: StudioMandateOption<StudioMandateCreativeAppetite>[] = [
-    { id: 'SAFE', label: 'Safe Bets', shortLabel: 'Safe', description: 'Avoid volatile experiments and protect the balance sheet.' },
-    { id: 'CALCULATED', label: 'Calculated Swings', shortLabel: 'Calculated', description: 'Take selective chances when upside is clear.' },
-    { id: 'BOLD', label: 'Bold Plays', shortLabel: 'Bold', description: 'Let leadership chase memorable, high-conviction bets.' },
+export const getMandateCreativeAppetiteOptions = (language: GameLanguage = 'en'): StudioMandateOption<StudioMandateCreativeAppetite>[] => [
+    createMandateOption(language, 'creativeAppetite', 'SAFE'),
+    createMandateOption(language, 'creativeAppetite', 'CALCULATED'),
+    createMandateOption(language, 'creativeAppetite', 'BOLD'),
 ];
 
-export const MANDATE_AUTO_PRODUCTION_OPTIONS: StudioMandateOption<StudioMandateAutoProduction>[] = [
-    { id: 'PAUSED', label: 'Manual Only', shortLabel: 'Paused', description: 'No automatic projects until the player starts them.' },
-    { id: 'BOARD_REVIEW', label: 'Board Review', shortLabel: 'Review', description: 'The studio may propose projects before spending.' },
-    { id: 'APPROVED', label: 'Auto Approved', shortLabel: 'Auto', description: 'Let the studio create projects within this mandate.' },
+export const getMandateAutoProductionOptions = (language: GameLanguage = 'en'): StudioMandateOption<StudioMandateAutoProduction>[] => [
+    createMandateOption(language, 'autoProduction', 'PAUSED'),
+    createMandateOption(language, 'autoProduction', 'BOARD_REVIEW'),
+    createMandateOption(language, 'autoProduction', 'APPROVED'),
 ];
 
-export const STUDIO_MANDATE_GROUPS = [
-    { key: 'focus', label: 'Slate Focus', commandLabel: 'What should this studio chase?', options: MANDATE_FOCUS_OPTIONS },
-    { key: 'budgetAppetite', label: 'Budget Appetite', commandLabel: 'How much money can it swing?', options: MANDATE_BUDGET_OPTIONS },
-    { key: 'releasePace', label: 'Release Pace', commandLabel: 'How fast should the pipeline move?', options: MANDATE_RELEASE_PACE_OPTIONS },
-    { key: 'ipStrategy', label: 'IP Strategy', commandLabel: 'What source material should it use?', options: MANDATE_IP_OPTIONS },
-    { key: 'talentPolicy', label: 'Talent Policy', commandLabel: 'Who should carry the slate?', options: MANDATE_TALENT_OPTIONS },
-    { key: 'objective', label: 'Studio Target', commandLabel: 'What is the board measuring?', options: MANDATE_OBJECTIVE_OPTIONS },
-    { key: 'creativeAppetite', label: 'Creative Appetite', commandLabel: 'How daring should leadership be?', options: MANDATE_CREATIVE_APPETITE_OPTIONS },
-    { key: 'autoProduction', label: 'Auto Production', commandLabel: 'Can the studio start work alone?', options: MANDATE_AUTO_PRODUCTION_OPTIONS },
-] as const;
+const createMandateGroup = <T extends string>(
+    language: GameLanguage,
+    key: keyof StudioOperatingMandate,
+    options: StudioMandateOption<T>[],
+): StudioMandateOptionGroup<T> => ({
+    key,
+    label: t(language, `services.studioGroup.mandateGroup.${key}.label`),
+    commandLabel: t(language, `services.studioGroup.mandateGroup.${key}.commandLabel`),
+    options,
+});
+
+export const getStudioMandateGroups = (language: GameLanguage = 'en'): StudioMandateOptionGroup<string>[] => [
+    createMandateGroup(language, 'focus', getMandateFocusOptions(language)),
+    createMandateGroup(language, 'budgetAppetite', getMandateBudgetOptions(language)),
+    createMandateGroup(language, 'releasePace', getMandateReleasePaceOptions(language)),
+    createMandateGroup(language, 'ipStrategy', getMandateIpOptions(language)),
+    createMandateGroup(language, 'talentPolicy', getMandateTalentOptions(language)),
+    createMandateGroup(language, 'objective', getMandateObjectiveOptions(language)),
+    createMandateGroup(language, 'creativeAppetite', getMandateCreativeAppetiteOptions(language)),
+    createMandateGroup(language, 'autoProduction', getMandateAutoProductionOptions(language)),
+];
+
+export const OPERATING_MODELS = getOperatingModels('en');
+export const MANDATE_FOCUS_OPTIONS = getMandateFocusOptions('en');
+export const MANDATE_BUDGET_OPTIONS = getMandateBudgetOptions('en');
+export const MANDATE_RELEASE_PACE_OPTIONS = getMandateReleasePaceOptions('en');
+export const MANDATE_IP_OPTIONS = getMandateIpOptions('en');
+export const MANDATE_TALENT_OPTIONS = getMandateTalentOptions('en');
+export const MANDATE_OBJECTIVE_OPTIONS = getMandateObjectiveOptions('en');
+export const MANDATE_CREATIVE_APPETITE_OPTIONS = getMandateCreativeAppetiteOptions('en');
+export const MANDATE_AUTO_PRODUCTION_OPTIONS = getMandateAutoProductionOptions('en');
+export const STUDIO_MANDATE_GROUPS = getStudioMandateGroups('en');
 
 export const DEFAULT_STUDIO_OPERATING_MANDATE: StudioOperatingMandate = {
     focus: 'BALANCED_SLATE',
@@ -246,7 +262,8 @@ export const getStudioGroup = (player: Pick<Player, 'businesses'>): {
 
 export const getOperatingModelDefinition = (
     model?: SubsidiaryOperatingModel,
-): OperatingModelDefinition | undefined => OPERATING_MODELS.find(definition => definition.id === model);
+    language: GameLanguage = 'en',
+): OperatingModelDefinition | undefined => getOperatingModels(language).find(definition => definition.id === model);
 
 export const getStudioOperatingMandate = (studio: Business): StudioOperatingMandate => ({
     ...DEFAULT_STUDIO_OPERATING_MANDATE,
@@ -256,20 +273,28 @@ export const getStudioOperatingMandate = (studio: Business): StudioOperatingMand
 export const getMandateOptionLabel = (
     key: keyof StudioOperatingMandate,
     value: string | undefined,
+    language: GameLanguage = 'en',
 ): string => {
-    const group = STUDIO_MANDATE_GROUPS.find(optionGroup => optionGroup.key === key);
-    return group?.options.find(option => option.id === value)?.shortLabel || value || 'Unset';
+    const group = getStudioMandateGroups(language).find(optionGroup => optionGroup.key === key);
+    return group?.options.find(option => option.id === value)?.shortLabel || value || t(language, 'services.studioGroup.mandate.unset');
 };
 
-export const getSubsidiaryControlProfile = (studio: Business): SubsidiaryControlProfile => {
+const getControlProfileCopy = (language: GameLanguage, copyKey: SubsidiaryOperatingModel | 'UNSET') => ({
+    controlCopy: t(language, `services.studioGroup.controlProfile.${copyKey}.controlCopy`),
+    productionCopy: t(language, `services.studioGroup.controlProfile.${copyKey}.productionCopy`),
+});
+
+export const getSubsidiaryControlProfile = (
+    studio: Business,
+    language: GameLanguage = 'en',
+): SubsidiaryControlProfile => {
     const model = studio.studioState?.operatingModel;
     if (model === 'INDEPENDENT_LABEL') {
         return {
             canSetMandate: true,
             canDirectProduce: false,
             canAutoProduce: true,
-            controlCopy: 'Board mandate only',
-            productionCopy: 'The label runs itself. You set direction and receive results.',
+            ...getControlProfileCopy(language, model),
         };
     }
     if (model === 'CONTROLLED_SUBSIDIARY') {
@@ -277,8 +302,7 @@ export const getSubsidiaryControlProfile = (studio: Business): SubsidiaryControl
             canSetMandate: true,
             canDirectProduce: true,
             canAutoProduce: true,
-            controlCopy: 'Strategic command',
-            productionCopy: 'You can directly develop projects here while routine work stays guided by mandate.',
+            ...getControlProfileCopy(language, model),
         };
     }
     if (model === 'FULL_MERGER') {
@@ -286,16 +310,14 @@ export const getSubsidiaryControlProfile = (studio: Business): SubsidiaryControl
             canSetMandate: false,
             canDirectProduce: false,
             canAutoProduce: false,
-            controlCopy: 'Merged into parent',
-            productionCopy: 'This banner no longer operates as a separate studio.',
+            ...getControlProfileCopy(language, model),
         };
     }
     return {
         canSetMandate: false,
         canDirectProduce: false,
         canAutoProduce: false,
-        controlCopy: 'Choose model first',
-        productionCopy: 'Select an operating model before issuing studio strategy.',
+        ...getControlProfileCopy(language, 'UNSET'),
     };
 };
 

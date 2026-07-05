@@ -12,11 +12,11 @@ type NewsViewTab = 'TOP' | 'YOU' | 'INDUSTRY' | 'PROJECTS';
 
 const USE_LEGACY_NEWS_UI = true;
 
-const tabConfig: { id: NewsViewTab; label: string; icon: React.ReactNode }[] = [
-  { id: 'TOP', label: 'Top', icon: <Flame size={15} /> },
-  { id: 'YOU', label: 'You', icon: <UserRound size={15} /> },
-  { id: 'INDUSTRY', label: 'Industry', icon: <BriefcaseBusiness size={15} /> },
-  { id: 'PROJECTS', label: 'Projects', icon: <Clapperboard size={15} /> },
+const tabConfig: { id: NewsViewTab; icon: React.ReactNode }[] = [
+  { id: 'TOP', icon: <Flame size={15} /> },
+  { id: 'YOU', icon: <UserRound size={15} /> },
+  { id: 'INDUSTRY', icon: <BriefcaseBusiness size={15} /> },
+  { id: 'PROJECTS', icon: <Clapperboard size={15} /> },
 ];
 
 const getImpactTone = (language: GameLanguage): Record<NewsItem['impactLevel'], { label: string; className: string; glow: string }> => ({
@@ -54,7 +54,7 @@ const getSource = (item: NewsItem, language: GameLanguage) => {
   if (/scandal|backlash|controversy|brands distance|caught/.test(text)) return t(language, 'news.source.pop');
   if (/legal|court|audit|case|verdict/.test(text)) return t(language, 'news.source.court');
   if (/award|oscar|emmy|bafta|globes|nomination|snub/.test(text)) return t(language, 'news.source.awards');
-  if (/music|song|single|album|chart|soundtrack|artist|fanbase/.test(text)) return 'Music Desk';
+  if (/music|song|single|album|chart|soundtrack|artist|fanbase/.test(text)) return t(language, 'news.source.music');
   if (/streaming|netflix|hulu|youtube|apple|disney/.test(text)) return t(language, 'news.source.streaming');
   if (/sequel|franchise|universe|phase|saga/.test(text)) return t(language, 'news.source.franchise');
   if (/casting|attached|role|cast/.test(text)) return t(language, 'news.source.casting');
@@ -71,7 +71,7 @@ const getTags = (item: NewsItem, player: Player, language: GameLanguage) => {
   if (/scandal|legal|court|backlash|controversy|audit/.test(text)) tags.push(t(language, 'news.tag.risk'));
   if (/box office|gross|opening|weekend|audience|critics/.test(text)) tags.push(t(language, 'news.tag.audience'));
   if (/streaming|netflix|hulu|youtube|apple|disney/.test(text)) tags.push(t(language, 'news.tag.streaming'));
-  if (/music|song|single|album|chart|soundtrack|artist|fanbase/.test(text)) tags.push('Music');
+  if (/music|song|single|album|chart|soundtrack|artist|fanbase/.test(text)) tags.push(t(language, 'news.tag.music'));
   if (/award|oscar|emmy|bafta|globes|nomination|snub/.test(text)) tags.push(t(language, 'news.tag.awards'));
   if (/studio|greenlight|production|venture|banner/.test(text)) tags.push(t(language, 'news.tag.studio'));
   if (/sequel|franchise|universe|phase|saga/.test(text)) tags.push(t(language, 'news.tag.franchise'));
@@ -98,7 +98,7 @@ const getImpactChips = (item: NewsItem, language: GameLanguage) => {
   if (item.impactLevel === 'HIGH') chips.push({ label: t(language, 'news.chip.heat'), value: t(language, 'news.value.high'), className: 'text-rose-300' });
   if (/box office|gross|opening|weekend/.test(text)) chips.push({ label: t(language, 'news.chip.market'), value: t(language, 'news.value.moving'), className: 'text-emerald-300' });
   if (/streaming|netflix|hulu|youtube|apple|disney/.test(text)) chips.push({ label: t(language, 'news.chip.bids'), value: t(language, 'news.value.watch'), className: 'text-sky-300' });
-  if (/music|song|single|album|chart|soundtrack|artist|fanbase/.test(text)) chips.push({ label: 'Music', value: 'Live', className: 'text-cyan-300' });
+  if (/music|song|single|album|chart|soundtrack|artist|fanbase/.test(text)) chips.push({ label: t(language, 'news.chip.music'), value: t(language, 'news.value.live'), className: 'text-cyan-300' });
   if (/award|oscar|emmy|bafta|globes|nomination/.test(text)) chips.push({ label: t(language, 'news.chip.prestige'), value: '+', className: 'text-amber-300' });
   if (/scandal|legal|court|backlash|controversy/.test(text)) chips.push({ label: t(language, 'news.chip.risk'), value: t(language, 'news.value.active'), className: 'text-red-300' });
   if (/sequel|franchise|universe|phase|saga/.test(text)) chips.push({ label: t(language, 'news.chip.future'), value: t(language, 'news.value.open'), className: 'text-violet-300' });

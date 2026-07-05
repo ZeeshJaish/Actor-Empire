@@ -5,6 +5,8 @@ import { calculateLegacyScore, getGenerationNumber, getInteractionAgeInWeeks, ge
 import { getDivorceLawyerCost, isChildAbandoned } from '../services/familyLogic';
 import { hasOwnedPremiumAssetInCollection } from '../services/premiumLogic';
 import { getPlayerLanguage, t } from '../services/i18n';
+import { ProfileBuilderGender, createSeededProfileSelection } from '../services/profileBuilder';
+import { exportProfilePortrait } from './avatar/profilePortraitRenderer';
 
 interface SocialPageProps {
   player: Player;
@@ -13,7 +15,10 @@ interface SocialPageProps {
 }
 
 type SocialTab = 'connections' | 'legacy';
-type SocialInteractionType = 'CALL' | 'HANGOUT' | 'GIFT' | 'NETWORK' | 'DATE' | 'PROPOSE' | 'INTIMACY' | 'CLUBBING' | 'TRIP' | 'ESTATE_DATE' | 'YACHT_DATE' | 'JET_ESCAPE' | 'LUXURY_GIFT' | 'ABANDON_CHILD' | 'RECONNECT_CHILD' | 'BREAK_UP' | 'DIVORCE_SETTLE' | 'DIVORCE_FIGHT_BUDGET' | 'DIVORCE_FIGHT_ESTABLISHED' | 'DIVORCE_FIGHT_ELITE' | 'PET_FEED' | 'PET_PLAY' | 'PET_GROOM' | 'PET_VET';
+type GiftInteractionType = 'GIFT_THOUGHTFUL' | 'GIFT_LUXURY' | 'GIFT_APOLOGY' | 'GIFT_FAMILY_SUPPORT' | 'GIFT_INDUSTRY_FAVOR';
+type SocialInteractionType = 'CALL' | 'CHECK_IN' | 'DEEP_TALK' | 'FAMILY_DINNER' | 'INDUSTRY_LUNCH' | 'HANGOUT' | 'GIFT' | GiftInteractionType | 'NETWORK' | 'DATE' | 'PROPOSE' | 'INTIMACY' | 'CLUBBING' | 'TRIP' | 'ESTATE_DATE' | 'YACHT_DATE' | 'JET_ESCAPE' | 'LUXURY_GIFT' | 'ABANDON_CHILD' | 'RECONNECT_CHILD' | 'BREAK_UP' | 'DIVORCE_SETTLE' | 'DIVORCE_FIGHT_BUDGET' | 'DIVORCE_FIGHT_ESTABLISHED' | 'DIVORCE_FIGHT_ELITE' | 'PET_FEED' | 'PET_PLAY' | 'PET_GROOM' | 'PET_VET';
+
+const familyProfileAvatarCache = new Map<string, string>();
 
 const formatWealth = (amount: number) => {
   if (amount >= 1000000000) return `$${(amount / 1000000000).toFixed(1)}B`;
@@ -22,14 +27,50 @@ const formatWealth = (amount: number) => {
   return `$${amount.toLocaleString()}`;
 };
 
+const getParentProfileGender = (rel: Relationship): ProfileBuilderGender | null => {
+  const familyName = `${rel.id}:${rel.name}`.toLowerCase();
+  if (rel.id === 'rel_mom' || /(^|:)mom\b|mother/.test(familyName)) return 'FEMALE';
+  if (rel.id === 'rel_dad' || /(^|:)dad\b|father/.test(familyName)) return 'MALE';
+  if (rel.relation !== 'Parent' && rel.relation !== 'Deceased Parent') return null;
+  if (rel.gender === 'FEMALE') return 'FEMALE';
+  if (rel.gender === 'NON_BINARY') return 'NON_BINARY';
+  if (rel.gender === 'MALE') return 'MALE';
+  return null;
+};
+
+const getFamilyProfileAvatar = (rel: Relationship, fallbackImage: string): string => {
+  const profileGender = getParentProfileGender(rel);
+  if (!profileGender || typeof document === 'undefined') return fallbackImage;
+
+  const cacheKey = `${profileGender}:${rel.id}:${rel.name}`;
+  const cached = familyProfileAvatarCache.get(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const selection = createSeededProfileSelection(profileGender, `family-profile:${rel.id}:${rel.name}`);
+    const avatar = exportProfilePortrait(selection, 1);
+    familyProfileAvatarCache.set(cacheKey, avatar);
+    return avatar;
+  } catch (error) {
+    console.warn('Family profile avatar generation failed, falling back to saved relationship image.', error);
+    return fallbackImage;
+  }
+};
+
 export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onContinueAsChild }) => {
   const [selectedContact, setSelectedContact] = useState<Relationship | null>(null);
   const [activeTab, setActiveTab] = useState<SocialTab>('connections');
   const [legacyCandidate, setLegacyCandidate] = useState<Relationship | null>(null);
   const [showDivorceOptions, setShowDivorceOptions] = useState(false);
+  const [showGiftPicker, setShowGiftPicker] = useState(false);
   const language = getPlayerLanguage(player);
   const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
   const relationLabel = (relation: Relationship['relation']) => relation === 'Pet' ? 'Pet' : tr(`connections.relation.${relation}`);
+  const contactDisplayName = (rel: Relationship) => {
+      if (rel.id === 'rel_mom' && rel.name === 'Mom') return tr('connections.family.mom');
+      if (rel.id === 'rel_dad' && rel.name === 'Dad') return tr('connections.family.dad');
+      return rel.name;
+  };
 
   const getHangoutCost = () => {
       if (player.stats.fame > 75) return 500;
@@ -46,6 +87,7 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
       if (selectedContact) {
           onInteract(selectedContact.id, type);
           setShowDivorceOptions(false);
+          setShowGiftPicker(false);
           setSelectedContact(null);
       }
   };
@@ -181,6 +223,7 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
 
   React.useEffect(() => {
       setShowDivorceOptions(false);
+      setShowGiftPicker(false);
   }, [selectedContact?.id]);
 
   const getRelationPill = (relation: Relationship['relation']) => {
@@ -235,6 +278,114 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
       return Math.round(1200 * multiplier);
   };
 
+  const isNetworkContact = (rel?: Relationship | null) => !!rel && ['Agent', 'Director', 'Connection', 'Manager', 'Colleague', 'Networking'].includes(rel.relation);
+  const isFamilyContact = (rel?: Relationship | null) => !!rel && ['Parent', 'Sibling', 'Child'].includes(rel.relation);
+
+  const getBondLabel = (rel: Relationship) => {
+      if (rel.relation === 'Deceased Parent') return tr('connections.inMemory');
+      if (rel.closeness >= 85) return tr('connections.bondTrusted');
+      if (rel.closeness >= 60) return tr('connections.bondWarm');
+      if (rel.closeness >= 35) return tr('connections.bondFragile');
+      return tr('connections.bondCold');
+  };
+
+  const getRelationshipPulse = (rel: Relationship) => {
+      if (rel.relation === 'Pet') return rel.petRarity === 'endangered'
+          ? tr('connections.pulseSanctuary')
+          : tr('connections.pulsePetCare');
+      if (rel.relation === 'Deceased Parent') return tr('connections.pulseLegacy');
+      if (rel.relation === 'Child') return isChildAbandoned(player, rel.id)
+          ? tr('connections.pulseAbsentChild')
+          : tr('connections.pulseChild');
+      if (rel.relation === 'Parent' || rel.relation === 'Sibling') return tr('connections.pulseFamily');
+      if (rel.relation === 'Partner' || rel.relation === 'Spouse') return tr('connections.pulseRomance');
+      if (isNetworkContact(rel)) return tr('connections.pulseIndustry');
+      return tr('connections.pulseSocial');
+  };
+
+  const getContactWeekLabel = (rel: Relationship) => {
+      if (rel.relation === 'Deceased Parent') return tr('connections.inMemory');
+      const weeks = getInteractionAgeInWeeks(rel, player.age, player.currentWeek);
+      if (weeks === 0) return tr('connections.thisWeek');
+      return tr('connections.weeksAgo', { count: weeks });
+  };
+
+  const getGiftOptions = (rel: Relationship): Array<{
+      action: GiftInteractionType;
+      label: string;
+      subtext: string;
+      cost: number;
+      effect: string;
+      icon: typeof Gift;
+      accent: string;
+  }> => {
+      const base = player.stats.fame > 75 ? 2000 : 250;
+      const options: Array<{
+          action: GiftInteractionType;
+          label: string;
+          subtext: string;
+          cost: number;
+          effect: string;
+          icon: typeof Gift;
+          accent: string;
+      }> = [
+          {
+              action: 'GIFT_THOUGHTFUL',
+              label: tr('connections.giftThoughtful'),
+              subtext: tr('connections.giftThoughtfulSub'),
+              cost: Math.max(120, Math.round(base * 0.7)),
+              effect: '+4 bond',
+              icon: Heart,
+              accent: 'border-emerald-400/40 bg-emerald-400/10 text-emerald-200',
+          },
+          {
+              action: 'GIFT_APOLOGY',
+              label: tr('connections.giftApology'),
+              subtext: tr('connections.giftApologySub'),
+              cost: Math.max(600, Math.round(base * 1.8)),
+              effect: '+7 repair',
+              icon: Gift,
+              accent: 'border-amber-400/40 bg-amber-400/10 text-amber-200',
+          },
+      ];
+
+      if (rel.relation === 'Child' || rel.relation === 'Parent' || rel.relation === 'Sibling') {
+          options.push({
+              action: 'GIFT_FAMILY_SUPPORT',
+              label: tr('connections.giftFamilySupport'),
+              subtext: tr('connections.giftFamilySupportSub'),
+              cost: Math.max(2500, Math.round(base * 4)),
+              effect: '+9 family',
+              icon: Home,
+              accent: 'border-sky-400/40 bg-sky-400/10 text-sky-200',
+          });
+      }
+
+      if (isNetworkContact(rel)) {
+          options.push({
+              action: 'GIFT_INDUSTRY_FAVOR',
+              label: tr('connections.giftIndustryFavor'),
+              subtext: tr('connections.giftIndustryFavorSub'),
+              cost: Math.max(5000, Math.round(base * 5)),
+              effect: '+8 access',
+              icon: Briefcase,
+              accent: 'border-purple-400/40 bg-purple-400/10 text-purple-200',
+          });
+      }
+
+      options.push({
+          action: 'GIFT_LUXURY',
+          label: tr('connections.giftLuxury'),
+          subtext: tr('connections.giftLuxurySub'),
+          cost: Math.max(8000, Math.round(base * 8)),
+          effect: '+10 bond',
+          icon: Gem,
+          accent: 'border-fuchsia-400/40 bg-fuchsia-400/10 text-fuchsia-200',
+      });
+
+      return options;
+  };
+
   const renderPetAvatar = (rel: Relationship, sizeClass = 'w-14 h-14', textClass = 'text-3xl') => (
       <div
           className={`${sizeClass} grid place-items-center rounded-full border-2 border-lime-500/35 bg-lime-500/10 shadow-[0_0_22px_rgba(163,230,53,0.10)] ${textClass}`}
@@ -250,16 +401,20 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
       const closeness = rel.closeness || 0;
       const isLegacyBond = rel.relation === 'Deceased Parent';
       const isCritical = !isLegacyBond && weeksSince >= 8 && closeness < 45;
+      const parentProfileGender = getParentProfileGender(rel);
+      const contactAvatar = getFamilyProfileAvatar(rel, rel.image);
       
       return (
           <div key={rel.id} onClick={() => setSelectedContact(rel)} className={`glass-card p-4 rounded-3xl flex items-center gap-4 group cursor-pointer transition-transform active:scale-[0.98] ${rel.relation === 'Partner' || rel.relation === 'Spouse' ? 'border-pink-500/30 bg-pink-900/5' : ''} ${rel.relation === 'Ex-Partner' || rel.relation === 'Ex-Spouse' ? 'border-rose-500/20 bg-rose-900/5' : ''} ${isLegacyBond ? 'border-zinc-700/60 bg-zinc-950/60' : ''}`}>
               <div className="relative">
                   {rel.relation === 'Pet' ? renderPetAvatar(rel) : (
-                      <img
-                          src={rel.image}
-                          alt={rel.name}
-                          className={`w-14 h-14 rounded-full object-cover border-2 transition-colors ${isLegacyBond ? 'grayscale border-zinc-700 opacity-80' : isCritical ? 'border-rose-500' : 'border-zinc-800 group-hover:border-zinc-600'}`}
-                      />
+                      <div className={`grid h-14 w-14 place-items-center overflow-hidden border-2 bg-zinc-950 transition-colors ${parentProfileGender ? 'rounded-2xl border-amber-400/35 p-0.5 shadow-[0_0_22px_rgba(245,158,11,0.10)]' : 'rounded-full'} ${isLegacyBond ? 'grayscale border-zinc-700 opacity-80' : isCritical ? 'border-rose-500' : parentProfileGender ? 'group-hover:border-amber-300/70' : 'border-zinc-800 group-hover:border-zinc-600'}`}>
+                          <img
+                              src={contactAvatar}
+                              alt={rel.name}
+                              className={`${parentProfileGender ? 'rounded-[0.85rem] [image-rendering:pixelated]' : 'rounded-full'} h-full w-full object-cover`}
+                          />
+                      </div>
                   )}
                   <div className="absolute -bottom-1 -right-1 bg-zinc-900 rounded-full p-1 border border-zinc-800 shadow-md">
                       {rel.relation === 'Partner' || rel.relation === 'Spouse' ? <Heart size={10} className="text-rose-500 fill-rose-500"/> :
@@ -280,7 +435,7 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
               
               <div className="flex-1 min-w-0">
                   <div className="flex justify-between items-start mb-1">
-                      <div className="font-bold text-white text-lg truncate">{rel.name}</div>
+                      <div className="font-bold text-white text-lg truncate">{contactDisplayName(rel)}</div>
                       {isCritical && <div className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-rose-500 text-white animate-pulse">{tr('connections.estranged')}</div>}
                   </div>
                   
@@ -336,6 +491,82 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
           {subtext && <div className="absolute top-4 right-4 text-[9px] font-bold uppercase tracking-wider text-zinc-600">{subtext}</div>}
       </button>
   );
+
+  const ContactActionRow = ({ label, subtext, icon: Icon, costMoney, costEnergy, onClick, disabled, accent = 'cyan' }: any) => {
+      const accentClass = accent === 'emerald'
+          ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300'
+          : accent === 'amber'
+              ? 'border-amber-400/30 bg-amber-400/10 text-amber-300'
+              : accent === 'purple'
+                  ? 'border-purple-400/30 bg-purple-400/10 text-purple-300'
+                  : accent === 'rose'
+                      ? 'border-rose-400/30 bg-rose-400/10 text-rose-300'
+                  : 'border-cyan-400/30 bg-cyan-400/10 text-cyan-300';
+      return (
+          <button
+              onClick={onClick}
+              disabled={disabled}
+              className={`min-h-[112px] rounded-2xl border p-3 text-left transition-colors cursor-pointer ${
+                  disabled
+                      ? 'border-zinc-800 bg-zinc-900/35 opacity-50 cursor-not-allowed'
+                      : 'border-zinc-800 bg-zinc-950/70 hover:border-zinc-600 hover:bg-zinc-900'
+              }`}
+          >
+              <div className="flex h-full flex-col justify-between gap-3">
+                  <div className="flex items-start justify-between gap-2">
+                      <div className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl border ${disabled ? 'border-zinc-800 bg-zinc-900 text-zinc-600' : accentClass}`}>
+                          <Icon size={16} />
+                      </div>
+                      <div className="shrink-0 text-right text-[9px] font-black uppercase tracking-[0.1em] text-zinc-500">
+                          <div className="inline-flex items-center gap-1"><Zap size={9} />-{costEnergy}</div>
+                          <div className={costMoney > 0 ? 'text-rose-300' : 'text-emerald-300'}>
+                              {costMoney > 0 ? `-${formatWealth(costMoney)}` : tr('connections.free')}
+                          </div>
+                      </div>
+                  </div>
+                  <div className="min-w-0">
+                      <div className={`text-sm font-black leading-tight ${disabled ? 'text-zinc-600' : 'text-white'}`}>{label}</div>
+                      <div className="mt-1 line-clamp-2 text-[11px] font-bold leading-snug text-zinc-500">{subtext}</div>
+                  </div>
+              </div>
+          </button>
+      );
+  };
+
+  const GiftOptionButton = ({ option }: { option: ReturnType<typeof getGiftOptions>[number] }) => {
+      const Icon = option.icon;
+      const disabled = player.money < option.cost;
+      return (
+          <button
+              onClick={() => handleInteraction(option.action)}
+              disabled={disabled}
+              className={`min-h-[116px] rounded-2xl border p-3 text-left transition-colors cursor-pointer ${
+                  disabled
+                      ? 'border-zinc-800 bg-zinc-950/50 opacity-50 cursor-not-allowed'
+                      : 'border-zinc-800 bg-black/45 hover:border-zinc-600 hover:bg-zinc-900/80'
+              }`}
+          >
+              <div className="flex h-full flex-col justify-between gap-3">
+                  <div className="flex items-start justify-between gap-2">
+                      <div className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl border ${option.accent}`}>
+                          <Icon size={16} />
+                      </div>
+                      <div className="shrink-0 rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[8px] font-black uppercase tracking-[0.1em] text-emerald-200">
+                          {option.effect}
+                      </div>
+                  </div>
+                  <div className="min-w-0">
+                      <div className="text-sm font-black leading-tight text-white">{option.label}</div>
+                      <div className="mt-1 line-clamp-2 text-[11px] font-bold leading-snug text-zinc-500">{option.subtext}</div>
+                  </div>
+                  <div className="flex items-center justify-between text-[10px] font-bold">
+                      <span className="text-zinc-600">{tr('connections.giftPrivateDelivery')}</span>
+                      <span className={disabled ? 'text-rose-300' : 'text-white'}>{formatWealth(option.cost)}</span>
+                  </div>
+              </div>
+          </button>
+      );
+  };
 
   const closeLegacyConfirmation = () => setLegacyCandidate(null);
 
@@ -492,37 +723,65 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
       )}
 
       {selectedContact && (
-          <div className="fixed inset-0 z-[200] bg-black/90 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200">
-              <div className="bg-black w-full max-w-sm h-[85vh] sm:h-auto sm:rounded-3xl border-t sm:border border-zinc-800 overflow-hidden flex flex-col shadow-2xl animate-in slide-in-from-bottom duration-300 relative">
-                  <button onClick={() => { setShowDivorceOptions(false); setSelectedContact(null); }} className="absolute top-4 right-4 z-20 p-2 bg-zinc-900/80 rounded-full text-zinc-400 hover:text-white transition-colors backdrop-blur-md"><X size={18} /></button>
-
-                  <div className="relative pt-12 pb-6 px-6 bg-zinc-900 border-b border-zinc-800 flex flex-col items-center shrink-0">
-                      <div className="w-24 h-24 rounded-full p-1 bg-gradient-to-tr from-zinc-700 to-zinc-900 shadow-xl mb-3">
-                          {selectedContact.relation === 'Pet' ? renderPetAvatar(selectedContact, 'w-full h-full', 'text-5xl') : (
-                              <img src={selectedContact.image} className={`w-full h-full rounded-full object-cover border-4 border-black ${selectedContact.relation === 'Deceased Parent' ? 'grayscale opacity-80' : ''}`} />
-                          )}
+          <div className="fixed inset-0 z-[200] bg-black/90 backdrop-blur-md flex items-stretch sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200">
+              <div className="bg-black w-full max-w-md h-[100dvh] sm:h-[92vh] sm:rounded-[2rem] border-zinc-800 sm:border overflow-hidden flex flex-col shadow-2xl animate-in slide-in-from-bottom duration-300 relative">
+                  <div className="relative shrink-0 overflow-hidden border-b border-white/10 bg-[radial-gradient(circle_at_20%_0%,rgba(34,211,238,0.22),transparent_35%),radial-gradient(circle_at_90%_10%,rgba(168,85,247,0.16),transparent_38%),linear-gradient(180deg,rgba(24,24,27,1),rgba(9,9,11,1))] p-4">
+                      <div className="mb-3 flex items-center justify-between">
+                          <div className="text-[9px] font-black uppercase tracking-[0.24em] text-cyan-200/70">{tr('connections.relationshipFile')}</div>
+                          <button onClick={() => { setShowDivorceOptions(false); setShowGiftPicker(false); setSelectedContact(null); }} className="grid h-9 w-9 place-items-center rounded-xl border border-white/10 bg-black/35 text-zinc-400 hover:text-white transition-colors backdrop-blur-md"><X size={17} /></button>
                       </div>
-                      <h3 className="text-2xl font-bold text-white mb-1">{selectedContact.name}</h3>
-                      <div className={`mb-2 inline-flex items-center rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] ${getRelationPill(selectedContact.relation)}`}>{relationLabel(selectedContact.relation)}</div>
-                      {selectedContact.relation === 'Pet' && (
-                        <div className="mb-4 text-center text-xs font-bold text-lime-100/70">
-                            {selectedContact.petBreed} {selectedContact.petSpecies} • {selectedContact.petAcquisition === 'endangered' ? 'Sanctuary sponsorship' : selectedContact.petAcquisition}
-                        </div>
-                      )}
-                      {(selectedContact.relation === 'Child' || selectedContact.relation === 'Sibling' || selectedContact.relation === 'Parent' || selectedContact.relation === 'Deceased Parent') && (
-                        <div className="text-xs text-zinc-400 mb-4">{tr('connections.age')} {getRelationshipAge(selectedContact, player.age, player.currentWeek)}</div>
-                      )}
-                      
-                      <div className="w-full max-w-[200px] flex items-center gap-3 bg-black/40 p-2 rounded-xl border border-white/5">
-                          <span className="text-[10px] font-bold text-zinc-500 uppercase">{tr('connections.bond')}</span>
-                          <div className="flex-1 h-2 bg-zinc-800 rounded-full overflow-hidden">
-                               <div className={`h-full rounded-full ${selectedContact.relation === 'Deceased Parent' ? 'bg-zinc-500' : selectedContact.closeness > 80 ? 'bg-emerald-500' : 'bg-amber-400'}`} style={{ width: `${selectedContact.closeness}%` }}/>
+
+                      <div className="flex items-start gap-3">
+                          <div className="relative shrink-0">
+                              <div className={`h-16 w-16 rounded-2xl border bg-black/45 p-1 shadow-xl ${getParentProfileGender(selectedContact) ? 'border-amber-300/35 shadow-amber-500/10' : 'border-white/10'}`}>
+                                  {selectedContact.relation === 'Pet' ? renderPetAvatar(selectedContact, 'w-full h-full rounded-[0.9rem]', 'text-3xl') : (
+                                      <img src={getFamilyProfileAvatar(selectedContact, selectedContact.image)} alt={selectedContact.name} className={`h-full w-full rounded-[0.9rem] object-cover ${getParentProfileGender(selectedContact) ? '[image-rendering:pixelated]' : ''} ${selectedContact.relation === 'Deceased Parent' ? 'grayscale opacity-80' : ''}`} />
+                                  )}
+                              </div>
+                              <div className={`absolute -bottom-2 left-1 right-1 rounded-full border px-1.5 py-0.5 text-center text-[8px] font-black uppercase tracking-[0.12em] ${getRelationPill(selectedContact.relation)}`}>
+                                  {relationLabel(selectedContact.relation)}
+                              </div>
                           </div>
-                          <span className="text-xs font-mono text-zinc-300">{selectedContact.closeness}</span>
+                          <div className="min-w-0 flex-1 pt-1">
+                              <h3 className="truncate text-2xl font-black leading-none text-white">{contactDisplayName(selectedContact)}</h3>
+                              <div className="mt-2 line-clamp-2 text-xs font-bold leading-snug text-zinc-400">{getRelationshipPulse(selectedContact)}</div>
+                              {(selectedContact.relation === 'Child' || selectedContact.relation === 'Sibling' || selectedContact.relation === 'Parent' || selectedContact.relation === 'Deceased Parent') && (
+                                  <div className="mt-2 text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500">{tr('connections.age')} {getRelationshipAge(selectedContact, player.age, player.currentWeek)}</div>
+                              )}
+                              {selectedContact.relation === 'Pet' && (
+                                  <div className="mt-2 text-[10px] font-bold uppercase tracking-[0.14em] text-lime-100/70">
+                                      {selectedContact.petBreed} {selectedContact.petSpecies}
+                                  </div>
+                              )}
+                          </div>
+                      </div>
+
+                      <div className="mt-4 grid grid-cols-3 gap-2">
+                          <div className="rounded-xl border border-white/10 bg-black/35 p-2">
+                              <div className="text-[8px] font-black uppercase tracking-[0.16em] text-zinc-500">{tr('connections.bond')}</div>
+                              <div className="mt-0.5 text-lg font-black text-white">{Math.round(selectedContact.closeness || 0)}</div>
+                              <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-white/10">
+                                  <div className={`h-full rounded-full ${selectedContact.relation === 'Deceased Parent' ? 'bg-zinc-500' : selectedContact.closeness > 80 ? 'bg-emerald-400' : selectedContact.closeness < 35 ? 'bg-rose-400' : 'bg-amber-300'}`} style={{ width: `${selectedContact.closeness}%` }}/>
+                              </div>
+                          </div>
+                          <div className="rounded-xl border border-white/10 bg-black/35 p-2">
+                              <div className="text-[8px] font-black uppercase tracking-[0.16em] text-zinc-500">{tr('connections.status')}</div>
+                              <div className="mt-0.5 text-xs font-black leading-tight text-white">{getBondLabel(selectedContact)}</div>
+                          </div>
+                          <div className="rounded-xl border border-white/10 bg-black/35 p-2">
+                              <div className="text-[8px] font-black uppercase tracking-[0.16em] text-zinc-500">{tr('connections.lastTouch')}</div>
+                              <div className="mt-0.5 text-xs font-black leading-tight text-white">{getContactWeekLabel(selectedContact)}</div>
+                          </div>
                       </div>
                   </div>
 
-                  <div className="flex-1 overflow-y-auto p-4 pb-12 custom-scrollbar bg-black">
+                  <div className="flex-1 overflow-y-auto p-3 pb-5 custom-scrollbar bg-black">
+                      {selectedContact.relation === 'Pet' && (selectedContact.petHomeSetup || selectedContact.petAccessory || selectedContact.petCustomization) && (
+                          <div className="mb-3 rounded-2xl border border-lime-300/15 bg-lime-300/5 p-3 text-[11px] font-bold text-lime-100/70">
+                              {[selectedContact.petHomeSetup, selectedContact.petAccessory, selectedContact.petCustomization].filter(Boolean).join(' • ')}
+                          </div>
+                      )}
+
                       {selectedContact.relation === 'Deceased Parent' && (
                           <div className="mb-6 rounded-3xl border border-zinc-700/60 bg-zinc-950 p-5 text-center">
                               <Skull className="mx-auto mb-3 text-zinc-500" size={28} />
@@ -659,35 +918,127 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
 	                          )}
                       </div>
                       ) : selectedContact.relation !== 'Deceased Parent' ? (
-                      <div className="mb-6">
-                          <h4 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3 pl-1">{tr('connections.social')}</h4>
-                          <div className="grid grid-cols-2 gap-3">
-                              <ActionCard label={tr('connections.callText')} icon={Phone} color="bg-blue-500" costMoney={0} costEnergy={5} disabled={player.energy.current < 5} onClick={() => handleInteraction('CALL')} />
-                              <ActionCard label={tr('connections.hangOut')} icon={Coffee} color="bg-orange-500" costMoney={getHangoutCost()} costEnergy={15} disabled={player.energy.current < 15 || player.money < getHangoutCost()} onClick={() => handleInteraction('HANGOUT')} />
-                              <ActionCard label={tr('connections.sendGift')} icon={Gift} color="bg-purple-500" costMoney={getGiftCost()} costEnergy={0} disabled={player.money < getGiftCost()} onClick={() => handleInteraction('GIFT')} />
-                              
-                              {['Agent', 'Director', 'Connection', 'Manager', 'Colleague', 'Networking'].includes(selectedContact.relation) ? (
-                                  <ActionCard label={tr('connections.network')} icon={Users} color="bg-emerald-500" costMoney={0} costEnergy={25} disabled={player.energy.current < 25} onClick={() => handleInteraction('NETWORK')} />
-                              ) : (
-                                  <div className="p-4 rounded-2xl border border-zinc-800 bg-zinc-900/30 flex items-center justify-center text-zinc-700 text-xs font-bold uppercase tracking-wider">
-                                      {tr('connections.noNetworkAction')}
-                                  </div>
-                              )}
+                      <div className="mb-4">
+                          <div className="mb-2 flex items-center justify-between">
+                              <h4 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">{tr('connections.social')}</h4>
+                              <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-600">{tr('connections.chooseMove')}</div>
                           </div>
+                          <div className="grid grid-cols-2 gap-2">
+                              <ContactActionRow
+                                  label={tr('connections.callText')}
+                                  subtext={tr('connections.callTextSub')}
+                                  icon={Phone}
+                                  accent="cyan"
+                                  costMoney={0}
+                                  costEnergy={5}
+                                  disabled={player.energy.current < 5}
+                                  onClick={() => handleInteraction('CALL')}
+                              />
+                              <ContactActionRow
+                                  label={tr('connections.checkIn')}
+                                  subtext={tr('connections.checkInSub')}
+                                  icon={MessageCircle}
+                                  accent="cyan"
+                                  costMoney={0}
+                                  costEnergy={3}
+                                  disabled={player.energy.current < 3}
+                                  onClick={() => handleInteraction('CHECK_IN')}
+                              />
+                              <ContactActionRow
+                                  label={tr('connections.hangOut')}
+                                  subtext={tr('connections.hangOutSub')}
+                                  icon={Coffee}
+                                  accent="amber"
+                                  costMoney={getHangoutCost()}
+                                  costEnergy={15}
+                                  disabled={player.energy.current < 15 || player.money < getHangoutCost()}
+                                  onClick={() => handleInteraction('HANGOUT')}
+                              />
+                              {isFamilyContact(selectedContact) && (
+                                  <ContactActionRow
+                                      label={tr('connections.deepTalk')}
+                                      subtext={tr('connections.deepTalkSub')}
+                                      icon={Heart}
+                                      accent="rose"
+                                      costMoney={0}
+                                      costEnergy={12}
+                                      disabled={player.energy.current < 12}
+                                      onClick={() => handleInteraction('DEEP_TALK')}
+                                  />
+                              )}
+                              {isFamilyContact(selectedContact) && (
+                                  <ContactActionRow
+                                      label={tr('connections.familyDinner')}
+                                      subtext={tr('connections.familyDinnerSub')}
+                                      icon={Home}
+                                      accent="amber"
+                                      costMoney={player.stats.fame > 75 ? 1500 : 800}
+                                      costEnergy={18}
+                                      disabled={player.energy.current < 18 || player.money < (player.stats.fame > 75 ? 1500 : 800)}
+                                      onClick={() => handleInteraction('FAMILY_DINNER')}
+                                  />
+                              )}
+                              {isNetworkContact(selectedContact) && (
+                                  <ContactActionRow
+                                      label={tr('connections.network')}
+                                      subtext={tr('connections.networkSub')}
+                                      icon={Users}
+                                      accent="emerald"
+                                      costMoney={0}
+                                      costEnergy={25}
+                                      disabled={player.energy.current < 25}
+                                      onClick={() => handleInteraction('NETWORK')}
+                                  />
+                              )}
+                              {isNetworkContact(selectedContact) && (
+                                  <ContactActionRow
+                                      label={tr('connections.industryLunch')}
+                                      subtext={tr('connections.industryLunchSub')}
+                                      icon={Briefcase}
+                                      accent="emerald"
+                                      costMoney={player.stats.fame > 75 ? 2500 : 1200}
+                                      costEnergy={18}
+                                      disabled={player.energy.current < 18 || player.money < (player.stats.fame > 75 ? 2500 : 1200)}
+                                      onClick={() => handleInteraction('INDUSTRY_LUNCH')}
+                                  />
+                              )}
+                              <button
+                                  onClick={() => setShowGiftPicker(prev => !prev)}
+                                  disabled={getGiftOptions(selectedContact).every(option => player.money < option.cost)}
+                                  className="min-h-[112px] rounded-2xl border border-zinc-800 bg-zinc-950/70 p-3 text-left transition-colors hover:border-purple-400/40 hover:bg-purple-400/5 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                  <div className="flex h-full flex-col justify-between gap-3">
+                                      <div className="flex items-start justify-between gap-2">
+                                          <div className="grid h-9 w-9 place-items-center rounded-xl border border-purple-400/30 bg-purple-400/10 text-purple-300">
+                                              <Gift size={16} />
+                                          </div>
+                                          <div className="text-[9px] font-black uppercase tracking-[0.12em] text-purple-200">
+                                              {showGiftPicker ? tr('connections.hideOptions') : tr('connections.pickGift')}
+                                          </div>
+                                      </div>
+                                      <div className="min-w-0">
+                                          <div className="text-sm font-black leading-tight text-white">{tr('connections.sendGift')}</div>
+                                          <div className="mt-1 line-clamp-2 text-[11px] font-bold leading-snug text-zinc-500">{tr('connections.sendGiftSub')}</div>
+                                      </div>
+                                  </div>
+                              </button>
+                          </div>
+
+                          {showGiftPicker && (
+                              <div className="mt-2 grid grid-cols-2 gap-2 rounded-[1.5rem] border border-purple-400/20 bg-purple-400/5 p-2">
+                                  {getGiftOptions(selectedContact).map(option => (
+                                      <React.Fragment key={option.action}>
+                                          <GiftOptionButton option={option} />
+                                      </React.Fragment>
+                                  ))}
+                              </div>
+                          )}
                       </div>
                       ) : (
                           <div className="mb-6 rounded-2xl border border-zinc-800 bg-zinc-900/30 p-4 text-center text-xs font-bold uppercase tracking-wider text-zinc-600">
                               {tr('connections.noActiveActions')}
                           </div>
                       )}
-
-                      <div className="text-center pb-6">
-                           <p className="text-[10px] text-zinc-600 font-mono">
-                              {selectedContact.relation === 'Deceased Parent'
-                                  ? tr('connections.inMemory')
-                                  : `${tr('connections.lastInteraction')}: ${getInteractionAgeInWeeks(selectedContact, player.age, player.currentWeek) === 0 ? tr('connections.thisWeek') : tr('connections.weeksAgo', { count: getInteractionAgeInWeeks(selectedContact, player.age, player.currentWeek) })}`}
-                           </p>
-                      </div>
 
                       {selectedContact.relation === 'Child' && (
                           <div className="px-4 pb-6">

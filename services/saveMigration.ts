@@ -1,8 +1,9 @@
-import { INITIAL_PLAYER, type NewsItem, type Player, type PortfolioItem, type ScheduledEvent, type Stock, type StockTakeoverCase } from '../types';
+import { INITIAL_PLAYER, type Message, type NewsItem, type Player, type PortfolioItem, type ScheduledEvent, type Stock, type StockTakeoverCase } from '../types';
 import { ensureLifestyleActivityState } from './lifestyleActivities';
+import { createGlobalActorPackNPCs } from './npcLogic';
 import { getStockOutstandingShares, initializeStocks } from './stockLogic';
 
-const SAVE_MIGRATION_VERSION = 12;
+const SAVE_MIGRATION_VERSION = 13;
 
 const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
 const clamp = (value: number, min = 0, max = 100) => Math.max(min, Math.min(max, Number.isFinite(value) ? value : min));
@@ -13,6 +14,30 @@ const toMoneySeries = (value: unknown): number[] => toArray<unknown>(value)
     .filter(amount => amount >= 0);
 const toObjectSeries = <T,>(value: unknown): T[] => toArray<T>(value)
     .filter(item => item && typeof item === 'object');
+
+const normalizeEpisodeRatings = (value: unknown) => toObjectSeries<any>(value)
+    .map((season, index) => {
+        const episodes = toObjectSeries<any>(season.episodes)
+            .map((episode, episodeIndex) => ({
+                episode: Math.max(1, Math.round(Number(episode.episode || episodeIndex + 1))),
+                rating: Math.round(clamp(Number(episode.rating || 0), 1, 10) * 10) / 10,
+            }))
+            .slice(0, 24);
+        const averageRating = episodes.length
+            ? Math.round((episodes.reduce((sum, item) => sum + item.rating, 0) / episodes.length) * 10) / 10
+            : 0;
+        const verdict = ['AWESOME', 'GREAT', 'GOOD', 'REGULAR', 'BAD', 'GARBAGE'].includes(String(season.verdict))
+            ? season.verdict
+            : averageRating >= 9.2 ? 'AWESOME' : averageRating >= 8.2 ? 'GREAT' : averageRating >= 7 ? 'GOOD' : averageRating >= 5.8 ? 'REGULAR' : averageRating >= 4.5 ? 'BAD' : 'GARBAGE';
+        return {
+            season: Math.max(1, Math.round(Number(season.season || index + 1))),
+            episodes,
+            averageRating,
+            verdict,
+        };
+    })
+    .filter(season => season.episodes.length > 0)
+    .slice(0, 20);
 
 const normalizeSoundtrackBreakdown = (value: any) => {
     const base = value && typeof value === 'object' ? value : {};
@@ -148,6 +173,7 @@ const migrateProjectDetails = (details: any) => {
     next.hiddenStats = next.hiddenStats && typeof next.hiddenStats === 'object' ? { ...next.hiddenStats } : {};
     next.castList = toObjectSeries(next.castList);
     next.reviews = toObjectSeries(next.reviews);
+    next.episodeRatings = normalizeEpisodeRatings(next.episodeRatings);
     next.selectedLocations = toArray<any>(next.selectedLocations);
     next.releaseRegionIds = toArray<string>(next.releaseRegionIds).map(String);
     next.releaseChainSelections = next.releaseChainSelections && typeof next.releaseChainSelections === 'object' ? next.releaseChainSelections : {};
@@ -160,6 +186,7 @@ const migrateProjectDetails = (details: any) => {
     next.campaignFitSnapshot = next.campaignFitSnapshot && typeof next.campaignFitSnapshot === 'object' ? next.campaignFitSnapshot : undefined;
     next.campaignForecastSnapshot = next.campaignForecastSnapshot && typeof next.campaignForecastSnapshot === 'object' ? next.campaignForecastSnapshot : undefined;
     next.campaignRealitySnapshot = next.campaignRealitySnapshot && typeof next.campaignRealitySnapshot === 'object' ? next.campaignRealitySnapshot : undefined;
+    next.audienceReception = next.audienceReception && typeof next.audienceReception === 'object' ? next.audienceReception : undefined;
     return next;
 };
 
@@ -184,6 +211,9 @@ const migrateActiveRelease = (release: any): any => {
     next.weeklySoundtrackBreakdowns = toObjectSeries(next.weeklySoundtrackBreakdowns).map(normalizeSoundtrackBreakdown);
     next.generatedNewsKeys = toArray<string>(next.generatedNewsKeys).map(String);
     next.projectDetails = migrateProjectDetails(next.projectDetails);
+    next.audienceReception = next.audienceReception && typeof next.audienceReception === 'object'
+        ? next.audienceReception
+        : next.projectDetails?.audienceReception;
     next.streaming = next.streaming && typeof next.streaming === 'object'
         ? {
             ...next.streaming,
@@ -236,9 +266,11 @@ const migratePastProject = (project: any, index: number): any => {
     next.weeklySoundtrackBreakdowns = toObjectSeries(next.weeklySoundtrackBreakdowns).map(normalizeSoundtrackBreakdown);
     next.castList = toObjectSeries(next.castList);
     next.reviews = toObjectSeries(next.reviews);
+    next.episodeRatings = normalizeEpisodeRatings(next.episodeRatings);
     next.campaignRealitySnapshot = next.campaignRealitySnapshot && typeof next.campaignRealitySnapshot === 'object' ? next.campaignRealitySnapshot : undefined;
     next.campaignFitSnapshot = next.campaignFitSnapshot && typeof next.campaignFitSnapshot === 'object' ? next.campaignFitSnapshot : undefined;
     next.campaignForecastSnapshot = next.campaignForecastSnapshot && typeof next.campaignForecastSnapshot === 'object' ? next.campaignForecastSnapshot : undefined;
+    next.audienceReception = next.audienceReception && typeof next.audienceReception === 'object' ? next.audienceReception : undefined;
     next.marketingChannelAllocations = next.marketingChannelAllocations && typeof next.marketingChannelAllocations === 'object' ? next.marketingChannelAllocations : undefined;
     next.reservedMarketingBudget = clampMoney(Number(next.reservedMarketingBudget || 0));
     next.marketingBudgetSpent = clampMoney(Number(next.marketingBudgetSpent || 0));
@@ -328,6 +360,25 @@ const migrateFlags = (flags: any, player: Player) => {
         annualInterestRate: Math.max(0, Math.min(0.5, Number(entry?.annualInterestRate || 0))),
         status: entry?.status === 'PAID_OFF' || entry?.status === 'DEFAULTED' ? entry.status : 'ACTIVE',
     }));
+    const enabledGlobalActorPacks = toArray<string>(nextFlags.enabledGlobalActorPacks).map(String);
+    if (enabledGlobalActorPacks.length > 0) {
+        const existingExtraNPCs = toObjectSeries<any>(nextFlags.extraNPCs);
+        const existingKeys = new Set([
+            ...existingExtraNPCs.map(npc => String(npc.id || '')),
+            ...existingExtraNPCs.map(npc => String(npc.name || '')),
+        ]);
+        const packNPCs = enabledGlobalActorPacks.flatMap(packId => createGlobalActorPackNPCs(packId));
+        const missingPackNPCs = packNPCs.filter(npc => {
+            const id = String(npc.id || '');
+            const name = String(npc.name || '');
+            if (existingKeys.has(id) || existingKeys.has(name)) return false;
+            existingKeys.add(id);
+            existingKeys.add(name);
+            return true;
+        });
+        nextFlags.enabledGlobalActorPacks = enabledGlobalActorPacks;
+        nextFlags.extraNPCs = [...existingExtraNPCs, ...missingPackNPCs];
+    }
     if (!Array.isArray(nextFlags.studioAcquisitionCases)) nextFlags.studioAcquisitionCases = [];
     if (!nextFlags.stockTakeoverEventDismissals || typeof nextFlags.stockTakeoverEventDismissals !== 'object') nextFlags.stockTakeoverEventDismissals = {};
     nextFlags.saveMigrationVersion = SAVE_MIGRATION_VERSION;
@@ -344,6 +395,17 @@ const dedupePendingEvents = (events: ScheduledEvent[] | undefined): ScheduledEve
 
 const dedupeNews = (news: NewsItem[] | undefined): NewsItem[] => (
     dedupeByKey(toArray<NewsItem>(news), (item, index) => String(item?.id || `${item?.headline || 'news'}:${item?.week || 0}:${index}`)).slice(0, 80)
+);
+
+const shouldRemoveEpisodeRatingsReportMessage = (message: Message): boolean => (
+    message.data?.kind === 'EPISODE_RATINGS_REPORT'
+    || (message.sender === 'Studio Analytics' && String(message.subject || '').startsWith('Episode Scorecard:'))
+);
+
+const migrateInbox = (inbox: Message[] | undefined): Message[] => (
+    toObjectSeries<Message>(inbox)
+        .filter(message => !shouldRemoveEpisodeRatingsReportMessage(message))
+        .slice(0, 120)
 );
 
 export const migratePlayerSave = (input: Partial<Player> | Player): Player => {
@@ -365,7 +427,27 @@ export const migratePlayerSave = (input: Partial<Player> | Player): Player => {
         ),
         pendingEvents: dedupePendingEvents(base.pendingEvents),
         news: dedupeNews(base.news),
+        inbox: migrateInbox(base.inbox),
         logs: toArray<any>(base.logs).slice(0, 50),
+        assetStates: toArray<any>(base.assetStates)
+            .filter((state) => typeof state?.assetId === 'string')
+            .map((state) => ({
+                assetId: state.assetId,
+                condition: Math.max(0, Math.min(100, Math.round(Number(state.condition ?? 100)))),
+                currentValue: Math.max(0, Math.round(Number(state.currentValue || 0))),
+                valueTrend: Number.isFinite(Number(state.valueTrend)) ? Number(state.valueTrend) : 0,
+                marketCycle: typeof state.marketCycle === 'string' ? state.marketCycle : undefined,
+                neighborhoodTier: typeof state.neighborhoodTier === 'string' ? state.neighborhoodTier : undefined,
+                rentDemand: Math.max(0, Math.min(100, Math.round(Number(state.rentDemand || 0)))),
+                vacancyChance: Math.max(0, Math.min(1, Number(state.vacancyChance || 0))),
+                vacancyWeeks: Math.max(0, Math.round(Number(state.vacancyWeeks || 0))),
+                rentalListed: Boolean(state.rentalListed),
+                weeklyRent: Math.max(0, Math.round(Number(state.weeklyRent || 0))),
+                lifetimeRevenue: Math.max(0, Math.round(Number(state.lifetimeRevenue || 0))),
+                listedWeek: Math.max(0, Math.round(Number(state.listedWeek || 0))),
+                lastMaintainedWeek: Math.max(0, Math.round(Number(state.lastMaintainedWeek || 0))),
+            })),
+        activeVehicleId: typeof base.activeVehicleId === 'string' ? base.activeVehicleId : null,
         lifestyleActivities: ensureLifestyleActivityState(base.lifestyleActivities),
         activeHealthConditions: toArray<any>(base.activeHealthConditions).slice(0, 6),
     };

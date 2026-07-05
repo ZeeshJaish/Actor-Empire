@@ -7,9 +7,9 @@ const gameLoop = readFileSync('services/gameLoop.ts', 'utf8');
 const shareholderVoting = readFileSync('services/shareholderVoting.ts', 'utf8');
 
 const required = [
-    [stocksApp, 'Influence Ladder', 'compact influence ladder'],
-    [shareholderVoting, 'Shareholder Decision', 'shareholder decision popup title'],
-    [shareholderVoting, 'Let Advisors Handle It', 'golden rewarded-ad safety option'],
+    [stocksApp, "tr('stocks.influence.ladder')", 'localized compact influence ladder'],
+    [shareholderVoting, "t(language, 'life.event.shareholder.title'", 'localized shareholder decision popup title'],
+    [shareholderVoting, "t(language, 'life.event.shareholder.advisor.label')", 'localized golden rewarded-ad safety option'],
     [shareholderVoting, 'isGolden: true', 'golden option flag'],
     [shareholderVoting, 'resolveShareholderVote', 'popup ballot resolution'],
     [mobilePage, 'initialStockId', 'message-to-stock targeting'],

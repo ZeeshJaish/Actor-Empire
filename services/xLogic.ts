@@ -4,109 +4,27 @@ import { NPC_DATABASE } from './npcLogic';
 import { getAwardGossipTemplate } from './awardLogic';
 import { getEnabledGlobalCreatorProfiles } from './youtubeLogic';
 import { normalizeUniverseMap } from './universeLogic';
-import { getPlayerLanguage } from './i18n';
+import { getPlayerLanguage, t } from './i18n';
 
 // --- TWEET TEMPLATES ---
-
-const GENERAL_TWEETS = [
-    "Just had the best coffee of my life. ☕",
-    "Does anyone else feel like today is going to be great?",
-    "Reading scripts all day. 📖",
-    "LA traffic is a personality trait at this point.",
-    "Why is it so hard to find good sushi at 2am?",
-    "Thinking about starting a podcast. Thoughts?",
-    "Set life is the best life. 🎬",
-    "Manifesting good energy for everyone reading this.",
-    "Can we skip to the weekend?",
-    "Cinema is back.",
-    "Just watched a masterpiece. No spoilers.",
-    "Gym done. Now time to eat everything.",
-    "Who's watching the game tonight?"
-];
-
-const GENERAL_TWEETS_PT = [
-    "Acabei de tomar o melhor café da minha vida. ☕",
-    "Mais alguém sente que hoje vai ser um ótimo dia?",
-    "Lendo roteiros o dia inteiro. 📖",
-    "Trânsito de LA já virou traço de personalidade.",
-    "Por que é tão difícil achar sushi bom às 2h da manhã?",
-    "Pensando em começar um podcast. Opiniões?",
-    "Vida de set é a melhor vida. 🎬",
-    "Manifestando energia boa para todo mundo lendo isso.",
-    "Podemos pular direto para o fim de semana?",
-    "O cinema voltou.",
-    "Acabei de ver uma obra-prima. Sem spoilers.",
-    "Treino feito. Agora vou comer tudo.",
-    "Quem vai assistir ao jogo hoje?"
-];
-
-const NEWS_TWEETS = [
-    "BREAKING: Studio execs hinting at a massive merger.",
-    "Box Office Update: Numbers are looking strong for the summer slate.",
-    "Rumor has it a certain A-Lister is walking away from their franchise.",
-    "Streaming services announced price hikes again. 📉",
-    "Award season predictions are already heating up.",
-    "Just In: Production halted on major blockbuster due to weather."
-];
-
-const NEWS_TWEETS_PT = [
-    "URGENTE: executivos de estúdio indicam uma fusão enorme.",
-    "Bilheteria: os números parecem fortes para a temporada de verão.",
-    "Rumores dizem que um grande nome está saindo de sua franquia.",
-    "Serviços de streaming anunciaram aumento de preço de novo. 📉",
-    "Previsões da temporada de prêmios já estão esquentando.",
-    "Agora: produção de grande blockbuster pausada por causa do clima."
-];
-
-const UNIVERSE_TWEETS = [
-    "I'm calling it right now, the next {Universe} movie is going to break records.",
-    "Who else is staying up till 3AM to watch the new {Universe} trailer drop?",
-    "If they don't bring back the original cast for {Universe}, we riot.",
-    "Just saw the leaked {Universe} concept art. I am SCREAMING.",
-    "Can we talk about the post-credits scene in the latest {Universe} film?",
-    "I've mapped out the entire {Universe} timeline on my wall. I need help.",
-    "Unpopular opinion: Phase 1 of {Universe} was the peak.",
-    "The casting for the new {Universe} villain is absolutely perfect."
-];
-
-const UNIVERSE_TWEETS_PT = [
-    "Estou cravando agora: o próximo filme de {Universe} vai quebrar recordes.",
-    "Quem mais vai ficar acordado até 3h para ver o trailer novo de {Universe}?",
-    "Se não trouxerem o elenco original de {Universe}, vai dar ruim.",
-    "Vi a arte conceitual vazada de {Universe}. Estou GRITANDO.",
-    "Podemos falar da cena pós-créditos do último filme de {Universe}?",
-    "Mapeei toda a linha do tempo de {Universe} na parede. Preciso de ajuda.",
-    "Opinião impopular: a Fase 1 de {Universe} foi o auge.",
-    "O elenco do novo vilão de {Universe} ficou perfeito."
-];
 
 const HASHTAGS = [
     "#ActorEmpire", "#Hollywood", "#FilmTwitter", "#SetLife", "#Cinema", 
     "#Trending", "#MondayMotivation", "#ThrowbackThursday", "#NewRelease", "#IndieFilm"
 ];
 
-const REPLIES_PT = [
-    'A timeline precisava desse contexto.',
-    'Film Twitter já está debatendo isso.',
-    'Alguém no PR acabou de abrir o grupo.',
-    'Isso vai envelhecer de um jeito interessante.'
-];
-
-const QUOTES_PT = [
-    'Isso explica muita coisa.',
-    'As pessoas não estão prontas para essa conversa.',
-    'Salvando isso para depois.',
-    'A indústria está se mexendo estranho hoje.'
-];
-
 // --- GENERATORS ---
 
 const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
+const X_VARIANT_SEPARATOR = ' || ';
+const getXVariants = (language: ReturnType<typeof getPlayerLanguage>, key: string, vars: Record<string, string | number> = {}) =>
+    t(language, key, vars).split(X_VARIANT_SEPARATOR);
+const pickXVariant = (language: ReturnType<typeof getPlayerLanguage>, key: string, vars: Record<string, string | number> = {}) =>
+    pick(getXVariants(language, key, vars));
 
 export const generateXFeed = (player: Player): XPost[] => {
     const feed: XPost[] = [];
     const language = getPlayerLanguage(player);
-    const isPt = language === 'pt-BR';
     const creatorProfiles = getEnabledGlobalCreatorProfiles(player).map(creator => ({
         ...creator,
         tier: 'A_LIST' as const
@@ -143,12 +61,12 @@ export const generateXFeed = (player: Player): XPost[] => {
              content += " #AwardsSeason";
         } else if (isUniverseGossip) {
              const randomUniverse = pick(universes);
-             content = pick(isPt ? UNIVERSE_TWEETS_PT : UNIVERSE_TWEETS).replace(/{Universe}/g, randomUniverse.name);
+             content = pickXVariant(language, 'services.x.universePost', { universeName: randomUniverse.name });
              content += ` #${randomUniverse.name.replace(/\s+/g, '')}`;
         } else if (isNews && npc.tier === 'A_LIST') {
-            content = pick(isPt ? NEWS_TWEETS_PT : NEWS_TWEETS);
+            content = pickXVariant(language, 'services.x.newsPost');
         } else {
-            content = pick(isPt ? GENERAL_TWEETS_PT : GENERAL_TWEETS);
+            content = pickXVariant(language, 'services.x.generalPost');
         }
 
         // Add hashtags randomly
@@ -177,18 +95,8 @@ export const generateXFeed = (player: Player): XPost[] => {
             isVerified: npc.tier === 'A_LIST' || npc.tier === 'ESTABLISHED',
             postType: isNews ? 'CAREER' : isUniverseGossip ? 'FILM_OPINION' : 'GENERAL',
             sentiment: isNews ? 'INDUSTRY' : 'NEUTRAL',
-            replyList: (isPt ? REPLIES_PT : [
-                'The timeline needed this context.',
-                'Film Twitter is already debating this.',
-                'Someone in PR just opened the group chat.',
-                'This is going to age interestingly.'
-            ]).sort(() => 0.5 - Math.random()).slice(0, 3),
-            quoteList: (isPt ? QUOTES_PT : [
-                'This explains a lot.',
-                'People are not ready for this conversation.',
-                'Bookmarking this for later.',
-                'The industry is moving weird today.'
-            ]).sort(() => 0.5 - Math.random()).slice(0, 2)
+            replyList: getXVariants(language, 'services.x.reply').sort(() => 0.5 - Math.random()).slice(0, 3),
+            quoteList: getXVariants(language, 'services.x.quote').sort(() => 0.5 - Math.random()).slice(0, 2)
         });
     }
 
@@ -196,19 +104,20 @@ export const generateXFeed = (player: Player): XPost[] => {
 };
 
 export const generateTrendingTopics = (player: Player): { tag: string, posts: string, category: string }[] => {
+    const language = getPlayerLanguage(player);
     // Dynamic trends based on player events?
     const trends = [
-        { tag: "#ActorEmpire", posts: "54.2K posts", category: "Entertainment" },
-        { tag: "Hollywood", posts: "120K posts", category: "Movies" },
-        { tag: "Politics", posts: "2.5M posts", category: "Politics" },
-        { tag: "The Academy", posts: "12K posts", category: "Entertainment" },
-        { tag: "#MetGala", posts: "2.1M posts", category: "Fashion" }
+        { tag: "#ActorEmpire", posts: t(language, 'services.x.trends.posts', { count: '54.2K' }), category: t(language, 'services.x.trends.entertainment') },
+        { tag: "Hollywood", posts: t(language, 'services.x.trends.posts', { count: '120K' }), category: t(language, 'services.x.trends.movies') },
+        { tag: "Politics", posts: t(language, 'services.x.trends.posts', { count: '2.5M' }), category: t(language, 'services.x.trends.politics') },
+        { tag: "The Academy", posts: t(language, 'services.x.trends.posts', { count: '12K' }), category: t(language, 'services.x.trends.entertainment') },
+        { tag: "#MetGala", posts: t(language, 'services.x.trends.posts', { count: '2.1M' }), category: t(language, 'services.x.trends.fashion') }
     ];
 
     // Add movie release trend if active
     const release = player.activeReleases.find(r => r.status === 'RUNNING' || r.status === 'BLOCKBUSTER_TRACK');
     if (release) {
-        trends.unshift({ tag: `#${release.name.replace(/\s+/g, '')}`, posts: "Trending in Movies", category: "Entertainment" });
+        trends.unshift({ tag: `#${release.name.replace(/\s+/g, '')}`, posts: t(language, 'services.x.trends.trendingInMovies'), category: t(language, 'services.x.trends.entertainment') });
     }
 
     return trends;

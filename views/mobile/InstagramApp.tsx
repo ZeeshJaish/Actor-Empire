@@ -3,7 +3,8 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Player, InstaPost, InstaPostType, NPCActor, NPCState, InteractionType } from '../../types';
 import { NPC_DATABASE } from '../../services/npcLogic';
 import { getEnabledGlobalCreatorSocialProfiles } from '../../services/youtubeLogic';
-import { getInstagramPostComments, getInstagramPresetCaption, INSTAGRAM_POST_CONFIGS } from '../../services/instagramLogic';
+import { getInstagramPostComments, getInstagramPresetCaption, getLocalizedInstagramPostConfig, INSTAGRAM_POST_CONFIGS } from '../../services/instagramLogic';
+import { getPlayerLanguage, t } from '../../services/i18n';
 import { loadMediaBlob, pruneMediaStore, saveMediaBlob } from '../../services/mediaStorage';
 import { Camera, Heart, MessageCircle, Send, Search, User, Grid, ArrowLeft, Video, Sparkles, Popcorn, Zap, XCircle, Check, Briefcase, Handshake, Smile, Lock, Coffee, Images, Clapperboard, Flame, Shirt, Bookmark, BarChart3, ImagePlus, Music2 } from 'lucide-react';
 
@@ -165,7 +166,9 @@ export const InstagramApp: React.FC<InstagramAppProps> = ({ player, onBack, onPo
       (r.relation === 'Partner' || r.relation === 'Spouse') && (r.closeness ?? 0) >= 50
   );
   const publicFollowers = Math.max(player.stats.followers || 0, player.instagram?.followers || 0);
-  const selectedConfig = INSTAGRAM_POST_CONFIGS[selectedPresetType];
+  const language = getPlayerLanguage(player);
+  const tr = (key: string, vars?: Record<string, string | number>) => t(language, key, vars);
+  const selectedConfig = getLocalizedInstagramPostConfig(selectedPresetType, language);
   const dmContacts = npcPool
       .map(npc => ({ npc, state: npcStates[npc.id] }))
       .filter(entry => (entry.state?.chatHistory || []).length > 0)
@@ -231,7 +234,7 @@ export const InstagramApp: React.FC<InstagramAppProps> = ({ player, onBack, onPo
               comments: Math.max(4, Math.floor(likes * 0.045)),
               shares: Math.max(1, Math.floor(likes * 0.018)),
               saves: Math.max(1, Math.floor(likes * 0.03)),
-              commentList: getInstagramPostComments(type, 5),
+              commentList: getInstagramPostComments(type, 5, language),
               isPlayer: false
           };
       });
@@ -341,11 +344,11 @@ export const InstagramApp: React.FC<InstagramAppProps> = ({ player, onBack, onPo
   };
 
   const getRelationshipLabel = (score: number) => {
-      if (score >= 80) return { label: 'Inner Circle', color: 'text-emerald-400', bar: 'bg-emerald-500' };
-      if (score >= 60) return { label: 'Close Friend', color: 'text-teal-400', bar: 'bg-teal-500' };
-      if (score >= 40) return { label: 'Friendly', color: 'text-blue-400', bar: 'bg-blue-500' };
-      if (score >= 20) return { label: 'Acquaintance', color: 'text-yellow-400', bar: 'bg-yellow-500' };
-      return { label: 'Stranger', color: 'text-zinc-500', bar: 'bg-zinc-600' };
+      if (score >= 80) return { label: tr('instagram.relationship.innerCircle'), color: 'text-emerald-400', bar: 'bg-emerald-500' };
+      if (score >= 60) return { label: tr('instagram.relationship.closeFriend'), color: 'text-teal-400', bar: 'bg-teal-500' };
+      if (score >= 40) return { label: tr('instagram.relationship.friendly'), color: 'text-blue-400', bar: 'bg-blue-500' };
+      if (score >= 20) return { label: tr('instagram.relationship.acquaintance'), color: 'text-yellow-400', bar: 'bg-yellow-500' };
+      return { label: tr('instagram.relationship.stranger'), color: 'text-zinc-500', bar: 'bg-zinc-600' };
   };
 
   // Helper for Post Visuals
@@ -405,7 +408,7 @@ export const InstagramApp: React.FC<InstagramAppProps> = ({ player, onBack, onPo
       
       // If user didn't write anything, pick a random preset
       if (!finalCaption) {
-          finalCaption = getInstagramPresetCaption(selectedPresetType);
+          finalCaption = getInstagramPresetCaption(selectedPresetType, language);
       }
 
       setIsImageProcessing(true);
@@ -441,18 +444,28 @@ export const InstagramApp: React.FC<InstagramAppProps> = ({ player, onBack, onPo
       tint: string;
       lockReason?: string;
   }> = [
-      { type: 'LIFESTYLE', title: 'Lifestyle', subtitle: 'Daily life, soft growth.', icon: <Camera size={17} />, tint: 'emerald' },
-      { type: 'SELFIE', title: 'Selfie', subtitle: 'Personal and fan-friendly.', icon: <Smile size={17} />, tint: 'pink' },
-      { type: 'REEL', title: 'Reel', subtitle: 'More reach, short-form vibe.', icon: <Clapperboard size={17} />, tint: 'fuchsia' },
-      { type: 'CAROUSEL', title: 'Photo Dump', subtitle: 'Authentic multi-photo post.', icon: <Images size={17} />, tint: 'cyan' },
-      { type: 'BTS', title: 'On Set BTS', subtitle: 'Behind the scenes from filming.', icon: <Video size={17} />, tint: 'blue', lockReason: hasFilmingRole ? undefined : 'Start filming a role' },
-      { type: 'ANNOUNCEMENT', title: 'Announcement', subtitle: 'Project or casting news.', icon: <Sparkles size={17} />, tint: 'purple', lockReason: hasActiveRole ? undefined : 'Need an active role' },
-      { type: 'RED_CARPET', title: 'Red Carpet', subtitle: 'Prestige and fashion moment.', icon: <Sparkles size={17} />, tint: 'rose', lockReason: hasReleasedMovie || player.stats.fame >= 20 ? undefined : 'Need release or 20 fame' },
-      { type: 'COUPLE_POST', title: 'Couple Post', subtitle: 'Relationship content.', icon: <Heart size={17} />, tint: 'red', lockReason: hasRomance ? undefined : 'Need a public romance' },
-      { type: 'BRAND_FIT', title: 'Brand Fit', subtitle: 'Influence and style signal.', icon: <Shirt size={17} />, tint: 'lime', lockReason: publicFollowers >= 1000 || player.stats.fame >= 15 ? undefined : 'Need 1k followers or 15 fame' },
-      { type: 'CELEBRATION', title: 'Celebrate Release', subtitle: 'Turn a release into momentum.', icon: <Popcorn size={17} />, tint: 'amber', lockReason: hasReleasedMovie ? undefined : 'Need an active release' },
-      { type: 'CONTROVERSIAL', title: 'Hot Take', subtitle: 'High reach, backlash risk.', icon: <Flame size={17} />, tint: 'red' }
-  ];
+      ['LIFESTYLE', <Camera size={17} />, 'emerald'],
+      ['SELFIE', <Smile size={17} />, 'pink'],
+      ['REEL', <Clapperboard size={17} />, 'fuchsia'],
+      ['CAROUSEL', <Images size={17} />, 'cyan'],
+      ['BTS', <Video size={17} />, 'blue', hasFilmingRole ? undefined : 'Start filming a role'],
+      ['ANNOUNCEMENT', <Sparkles size={17} />, 'purple', hasActiveRole ? undefined : 'Need an active role'],
+      ['RED_CARPET', <Sparkles size={17} />, 'rose', hasReleasedMovie || player.stats.fame >= 20 ? undefined : 'Need release or 20 fame'],
+      ['COUPLE_POST', <Heart size={17} />, 'red', hasRomance ? undefined : 'Need a public romance'],
+      ['BRAND_FIT', <Shirt size={17} />, 'lime', publicFollowers >= 1000 || player.stats.fame >= 15 ? undefined : 'Need 1k followers or 15 fame'],
+      ['CELEBRATION', <Popcorn size={17} />, 'amber', hasReleasedMovie ? undefined : 'Need an active release'],
+      ['CONTROVERSIAL', <Flame size={17} />, 'red']
+  ].map(([type, icon, tint, lockReason]) => {
+      const config = getLocalizedInstagramPostConfig(type, language);
+      return {
+          type,
+          title: config.label,
+          subtitle: config.description,
+          icon,
+          tint,
+          lockReason
+      };
+  });
 
   const getTypeTintClasses = (tint: string, selected: boolean, locked?: boolean) => {
       if (locked) return 'bg-zinc-950/80 border-zinc-900 text-zinc-600';
@@ -780,7 +793,7 @@ export const InstagramApp: React.FC<InstagramAppProps> = ({ player, onBack, onPo
                     <div className="flex-1 min-w-0">
                         <div className="font-bold text-sm truncate">{selectedPost.authorName || selectedPost.authorHandle}</div>
                         <div className="text-[10px] text-zinc-500 uppercase tracking-widest">
-                            {selectedPost.authorHandle} • {INSTAGRAM_POST_CONFIGS[selectedPost.type]?.label || selectedPost.type}
+                            {selectedPost.authorHandle} • {getLocalizedInstagramPostConfig(selectedPost.type, language).label || selectedPost.type}
                         </div>
                     </div>
                     <div className="px-3 py-1 rounded-full bg-zinc-900 text-[10px] font-black text-zinc-300">
@@ -791,7 +804,7 @@ export const InstagramApp: React.FC<InstagramAppProps> = ({ player, onBack, onPo
                 <InstagramPostVisual post={selectedPost} getPostStyle={getPostStyle}>
                     {!selectedPost.contentMediaId && !selectedPost.contentImage && (
                         <span className="absolute bottom-5 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-black/25 text-[10px] font-black uppercase tracking-widest">
-                            {INSTAGRAM_POST_CONFIGS[selectedPost.type]?.iconLabel || 'Post'}
+                            {getLocalizedInstagramPostConfig(selectedPost.type, language).iconLabel || tr('services.instagram.postType.fallback.iconLabel')}
                         </span>
                     )}
                 </InstagramPostVisual>
@@ -931,7 +944,7 @@ export const InstagramApp: React.FC<InstagramAppProps> = ({ player, onBack, onPo
                                 <div className="absolute inset-0 bg-black/0 hover:bg-black/35 transition-colors"></div>
                                 {!post.contentMediaId && !post.contentImage && (
                                     <span className="absolute bottom-2 left-2 right-2 truncate text-[8px] font-black uppercase tracking-widest text-white/70">
-                                        {INSTAGRAM_POST_CONFIGS[post.type]?.shortLabel || post.type}
+                                        {getLocalizedInstagramPostConfig(post.type, language).shortLabel || post.type}
                                     </span>
                                 )}
                             </InstagramPostVisual>
@@ -1112,11 +1125,11 @@ export const InstagramApp: React.FC<InstagramAppProps> = ({ player, onBack, onPo
                             <div className="rounded-[1.5rem] border border-zinc-800 bg-zinc-950 p-3 space-y-4">
                                 <div className="flex items-center justify-between gap-3">
                                     <div>
-                                        <div className="text-white font-black text-sm">Image Fit</div>
-                                        <div className="text-[11px] text-zinc-500">Crop, fit, and position before posting.</div>
+                                        <div className="text-white font-black text-sm">{tr('instagram.imageFit.title')}</div>
+                                        <div className="text-[11px] text-zinc-500">{tr('instagram.imageFit.subtitle')}</div>
                                     </div>
                                     <button onClick={resetImageDraft} className="rounded-full border border-zinc-800 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-zinc-300">
-                                        Remove
+                                        {tr('instagram.imageFit.remove')}
                                     </button>
                                 </div>
                                 <div className="grid grid-cols-2 gap-2">
@@ -1124,22 +1137,22 @@ export const InstagramApp: React.FC<InstagramAppProps> = ({ player, onBack, onPo
                                         onClick={() => setImageFitMode('cover')}
                                         className={`rounded-2xl p-3 text-left border ${imageFitMode === 'cover' ? 'bg-white text-black border-white' : 'bg-zinc-900 border-zinc-800 text-white'}`}
                                     >
-                                        <div className="font-black text-xs uppercase tracking-widest">Cover</div>
-                                        <div className="text-[10px] opacity-70 mt-1">Fill square.</div>
+                                        <div className="font-black text-xs uppercase tracking-widest">{tr('instagram.imageFit.cover')}</div>
+                                        <div className="text-[10px] opacity-70 mt-1">{tr('instagram.imageFit.coverSub')}</div>
                                     </button>
                                     <button
                                         onClick={() => setImageFitMode('contain')}
                                         className={`rounded-2xl p-3 text-left border ${imageFitMode === 'contain' ? 'bg-white text-black border-white' : 'bg-zinc-900 border-zinc-800 text-white'}`}
                                     >
-                                        <div className="font-black text-xs uppercase tracking-widest">Fit Full</div>
-                                        <div className="text-[10px] opacity-70 mt-1">Show all.</div>
+                                        <div className="font-black text-xs uppercase tracking-widest">{tr('instagram.imageFit.contain')}</div>
+                                        <div className="text-[10px] opacity-70 mt-1">{tr('instagram.imageFit.containSub')}</div>
                                     </button>
                                 </div>
 
                                 {[
-                                    { label: 'Zoom', value: imageZoom, min: 1, max: 2.4, step: 0.05, onChange: setImageZoom },
-                                    { label: 'Move Left / Right', value: imageOffsetX, min: -320, max: 320, step: 5, onChange: setImageOffsetX },
-                                    { label: 'Move Up / Down', value: imageOffsetY, min: -320, max: 320, step: 5, onChange: setImageOffsetY }
+                                    { label: tr('instagram.imageFit.zoom'), value: imageZoom, min: 1, max: 2.4, step: 0.05, onChange: setImageZoom },
+                                    { label: tr('instagram.imageFit.moveHorizontal'), value: imageOffsetX, min: -320, max: 320, step: 5, onChange: setImageOffsetX },
+                                    { label: tr('instagram.imageFit.moveVertical'), value: imageOffsetY, min: -320, max: 320, step: 5, onChange: setImageOffsetY }
                                 ].map(control => (
                                     <label key={control.label} className="block">
                                         <div className="text-[10px] text-zinc-500 font-black uppercase tracking-widest mb-2">{control.label}</div>

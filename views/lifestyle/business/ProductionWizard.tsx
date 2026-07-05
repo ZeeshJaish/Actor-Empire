@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Player } from '../../../types';
 import { createBusiness, HEAD_OF_PRODUCTION_CANDIDATES } from '../../../services/businessLogic';
 import { ArrowLeft, ArrowRight, Camera, Check, Clapperboard, Star, Users, Zap, Lock, DollarSign, TrendingUp, ShieldCheck, Crown, Sparkles, X, AlertTriangle, ChevronRight, PenTool } from 'lucide-react';
+import { getPlayerLanguage, t } from '../../../services/i18n';
 
 interface ProductionWizardProps {
     player: Player;
@@ -10,6 +11,15 @@ interface ProductionWizardProps {
     onUpdatePlayer: (p: Player) => void;
     onComplete: () => void;
 }
+
+const PRODUCTION_DREAM_KEYS = [
+    'services.business.productionWizard.dream.cinematicUniverse',
+    'services.business.productionWizard.dream.avatar',
+    'services.business.productionWizard.dream.titanic',
+    'services.business.productionWizard.dream.avengers',
+    'services.business.productionWizard.dream.godfather',
+    'services.business.productionWizard.dream.legacy'
+];
 
 export const ProductionWizard: React.FC<ProductionWizardProps> = ({ player, onCancel, onUpdatePlayer, onComplete }) => {
     // Start at Step 0 (The Gate) instead of 1
@@ -28,32 +38,26 @@ export const ProductionWizard: React.FC<ProductionWizardProps> = ({ player, onCa
     // --- DOCUMENT INTERACTION STATE ---
     const [isSigning, setIsSigning] = useState(false);
     const [isStamping, setIsStamping] = useState(false);
-
-    // Dynamic Text State (Typewriter for Gate)
-    const DREAMS = [
-        "The Next Cinematic Universe",
-        "The Next Avatar",
-        "The Next Titanic",
-        "The Next Avengers",
-        "The Next Godfather",
-        "Your Own Legacy"
-    ];
+    const language = getPlayerLanguage(player);
+    const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
 
     const [displayText, setDisplayText] = useState('');
     const [index, setIndex] = useState(0);
     const [subIndex, setSubIndex] = useState(0);
     const [reverse, setReverse] = useState(false);
+    const getProductionDream = (dreamIndex: number) => tr(PRODUCTION_DREAM_KEYS[dreamIndex % PRODUCTION_DREAM_KEYS.length]);
+    const currentDream = getProductionDream(index);
 
     // Typing Logic
     useEffect(() => {
         if (step !== 0) return; // Only run on Gate
 
-        if (index >= DREAMS.length) {
+        if (index >= PRODUCTION_DREAM_KEYS.length) {
              setIndex(0); 
              return;
         }
 
-        if (subIndex === DREAMS[index].length + 1 && !reverse) {
+        if (subIndex === currentDream.length + 1 && !reverse) {
             const timeout = setTimeout(() => {
                 setReverse(true);
             }, 2000); // Wait 2s before deleting
@@ -62,7 +66,7 @@ export const ProductionWizard: React.FC<ProductionWizardProps> = ({ player, onCa
 
         if (subIndex === 0 && reverse) {
             setReverse(false);
-            setIndex((prev) => (prev + 1) % DREAMS.length);
+            setIndex((prev) => (prev + 1) % PRODUCTION_DREAM_KEYS.length);
             return;
         }
 
@@ -71,40 +75,40 @@ export const ProductionWizard: React.FC<ProductionWizardProps> = ({ player, onCa
         }, reverse ? 30 : 80); // Typing speed vs Deleting speed
 
         return () => clearTimeout(timeout);
-    }, [subIndex, index, reverse, step]);
+    }, [subIndex, index, reverse, step, currentDream]);
 
     useEffect(() => {
-        setDisplayText(DREAMS[index].substring(0, subIndex));
-    }, [subIndex, index]);
+        setDisplayText(currentDream.substring(0, subIndex));
+    }, [subIndex, index, currentDream]);
 
     // --- ORIGIN STORY GENERATOR ---
     const getOriginStory = () => {
         if (player.age < 25) {
             return [
-                "They said you were too young to understand the business.",
-                "They said you were just a fleeting trend.",
-                "Today, you buy the ones who doubted you."
+                tr('services.business.productionWizard.origin.young.1'),
+                tr('services.business.productionWizard.origin.young.2'),
+                tr('services.business.productionWizard.origin.young.3')
             ];
         }
         if (player.stats.reputation < 30) {
             return [
-                "The tabloids call you a liability.",
-                "The studios are afraid to hire you.",
-                "So you'll build a studio that answers to no one."
+                tr('services.business.productionWizard.origin.lowRep.1'),
+                tr('services.business.productionWizard.origin.lowRep.2'),
+                tr('services.business.productionWizard.origin.lowRep.3')
             ];
         }
         if (player.age >= 40 && player.stats.fame > 80) {
             return [
-                "Decades of reading other people's lines.",
-                "Thousands of hours waiting in trailers.",
-                "It's time to write your own history."
+                tr('services.business.productionWizard.origin.veteran.1'),
+                tr('services.business.productionWizard.origin.veteran.2'),
+                tr('services.business.productionWizard.origin.veteran.3')
             ];
         }
         // Default / Rich Outsider
         return [
-            "The critics don't know your vision yet.",
-            "But money speaks a language everyone understands.",
-            "Time to buy your seat at the table."
+            tr('services.business.productionWizard.origin.default.1'),
+            tr('services.business.productionWizard.origin.default.2'),
+            tr('services.business.productionWizard.origin.default.3')
         ];
     };
 
@@ -143,6 +147,15 @@ export const ProductionWizard: React.FC<ProductionWizardProps> = ({ player, onCa
     };
 
     const COST = 50000000;
+    const getHeadOfProductionName = (id: string) => tr(`services.business.productionWizard.headOfProduction.${id}.name`);
+    const getHeadOfProductionBonus = (id: string) => tr(`services.business.productionWizard.headOfProduction.${id}.bonus`);
+    const getHeadOfProductionDescription = (id: string) => tr(`services.business.productionWizard.headOfProduction.${id}.description`);
+    const getDocumentStatusText = () => {
+        if (step === 1) return tr('services.business.productionWizard.status.waitingEntityName');
+        if (isSigning) return tr('services.business.productionWizard.status.signingDocument');
+        if (isStamping) return tr('services.business.productionWizard.status.finalizing');
+        return tr('services.business.productionWizard.status.waitingExecutive');
+    };
 
     const handleFinalRatify = () => {
         if (!name || !headOfProd) return;
@@ -173,7 +186,7 @@ export const ProductionWizard: React.FC<ProductionWizardProps> = ({ player, onCa
                 headOfProductionId: headOfProd 
             }, '🎬', player.currentWeek);
 
-            const hopName = HEAD_OF_PRODUCTION_CANDIDATES.find(h => h.id === headOfProd)?.name;
+            const hopName = getHeadOfProductionName(headOfProd);
 
             onUpdatePlayer({
                 ...player,
@@ -182,13 +195,13 @@ export const ProductionWizard: React.FC<ProductionWizardProps> = ({ player, onCa
                 logs: [...player.logs, { 
                     week: player.currentWeek, 
                     year: player.age, 
-                    message: `GRAND OPENING: ${name} Production House established! ${hopName} hired as Head of Production.`, 
+                    message: tr('services.business.productionWizard.launchLog', { name, hopName }), 
                     type: 'positive' 
                 }],
                 news: [{
                     id: `news_studio_launch_${Date.now()}`,
-                    headline: `${player.name} launches ${name} Studios with $50M investment.`,
-                    subtext: "Industry experts call it a bold move.",
+                    headline: tr('services.business.productionWizard.launchHeadline', { playerName: player.name, name }),
+                    subtext: tr('services.business.productionWizard.launchSubtext'),
                     category: 'TOP_STORY',
                     week: player.currentWeek,
                     year: player.age,
@@ -207,7 +220,7 @@ export const ProductionWizard: React.FC<ProductionWizardProps> = ({ player, onCa
                 <div className="relative z-10 space-y-6">
                     <div className="text-6xl animate-bounce">🎬</div>
                     <h1 className="text-4xl font-serif font-black text-white uppercase tracking-widest">{name}</h1>
-                    <div className="text-amber-500 font-bold uppercase tracking-[0.5em] text-xs animate-pulse">Grand Opening</div>
+                    <div className="text-amber-500 font-bold uppercase tracking-[0.5em] text-xs animate-pulse">{tr('services.business.productionWizard.launchAnimation.grandOpening')}</div>
                     <div className="flex justify-center gap-2 mt-8">
                         <Camera className="text-white animate-ping" size={24}/>
                         <Camera className="text-white animate-ping delay-100" size={24}/>
@@ -266,12 +279,12 @@ export const ProductionWizard: React.FC<ProductionWizardProps> = ({ player, onCa
                                 </div>
                                 
                                 <div>
-                                    <h3 className="text-2xl font-black text-white uppercase tracking-tight mb-2">Major Investment</h3>
+                                    <h3 className="text-2xl font-black text-white uppercase tracking-tight mb-2">{tr('services.business.productionWizard.modal.majorInvestment')}</h3>
                                     <p className="text-zinc-400 text-sm leading-relaxed">
-                                        This action requires a capital injection of <span className="text-white font-bold font-mono">$50,000,000</span>.
+                                        {tr('services.business.productionWizard.modal.requiresCapital', { amount: '$50,000,000' })}
                                     </p>
                                     <p className="text-zinc-500 text-xs mt-4 italic">
-                                        "This transfer is irreversible. Are you ready to become a Mogul?"
+                                        {tr('services.business.productionWizard.modal.irreversible')}
                                     </p>
                                 </div>
 
@@ -280,13 +293,13 @@ export const ProductionWizard: React.FC<ProductionWizardProps> = ({ player, onCa
                                         onClick={handleConfirmSetup}
                                         className="w-full py-4 bg-amber-600 hover:bg-amber-500 text-black font-black text-sm uppercase tracking-wider rounded-xl shadow-lg shadow-amber-900/20 transition-all active:scale-[0.98]"
                                     >
-                                        Sign The Check
+                                        {tr('services.business.productionWizard.modal.signCheck')}
                                     </button>
                                     <button 
                                         onClick={() => setShowConfirm(false)}
                                         className="w-full py-3 text-zinc-500 hover:text-white text-xs font-bold uppercase tracking-wider"
                                     >
-                                        Not Yet
+                                        {tr('services.business.productionWizard.modal.notYet')}
                                     </button>
                                 </div>
                             </div>
@@ -298,7 +311,7 @@ export const ProductionWizard: React.FC<ProductionWizardProps> = ({ player, onCa
                 <div className="relative z-10 p-6 pt-safe-top flex justify-between items-center shrink-0">
                     <button onClick={onCancel} className="text-zinc-500 hover:text-white transition-colors p-2 bg-black/50 rounded-full backdrop-blur-md"><ArrowLeft size={20}/></button>
                     <div className="flex items-center gap-2 text-[10px] text-amber-400 font-black uppercase tracking-[0.2em] border border-amber-500/30 px-3 py-1 rounded-full bg-amber-950/40 backdrop-blur-md">
-                        <Crown size={12} fill="currentColor" /> Elite Tier
+                        <Crown size={12} fill="currentColor" /> {tr('services.business.productionWizard.gate.eliteTier')}
                     </div>
                 </div>
 
@@ -313,18 +326,18 @@ export const ProductionWizard: React.FC<ProductionWizardProps> = ({ player, onCa
                                 <div className={`w-full h-full rounded-[2rem] flex items-center justify-center relative z-10 shadow-2xl border-t border-l border-white/10 ${canAfford ? 'bg-gradient-to-br from-amber-400 to-amber-600 text-black' : 'bg-gradient-to-br from-zinc-800 to-zinc-900 text-zinc-600 border-zinc-700'}`}>
                                     {canAfford ? <Clapperboard size={56} strokeWidth={1.5} /> : <Lock size={56} strokeWidth={1.5} />}
                                 </div>
-                                {canAfford && <div className="absolute -top-2 -right-2 bg-white text-black text-[10px] font-bold px-2 py-1 rounded-full shadow-lg animate-bounce">READY</div>}
+                                {canAfford && <div className="absolute -top-2 -right-2 bg-white text-black text-[10px] font-bold px-2 py-1 rounded-full shadow-lg animate-bounce">{tr('services.business.productionWizard.gate.ready')}</div>}
                             </div>
 
                             <div>
                                 <h1 className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white via-zinc-200 to-zinc-600 uppercase tracking-tighter leading-[0.9] mb-4 drop-shadow-xl">
-                                    Production<br/>House
+                                    {tr('lifestyle.productionHouse')}
                                 </h1>
                                 
                                 {/* DYNAMIC TEXT TYPEWRITER */}
                                 <div className="h-8 flex items-center justify-center overflow-hidden relative">
                                     <div className="text-amber-400 text-xs md:text-sm font-bold uppercase tracking-[0.3em] flex items-center gap-2">
-                                        Create <span className="text-white drop-shadow-md">{displayText}</span>
+                                        {tr('services.business.productionWizard.gate.create')} <span className="text-white drop-shadow-md">{displayText}</span>
                                         <span className="w-0.5 h-4 bg-amber-400 animate-pulse"></span>
                                     </div>
                                 </div>
@@ -337,12 +350,12 @@ export const ProductionWizard: React.FC<ProductionWizardProps> = ({ player, onCa
                                 
                                 <div className="flex justify-between items-end">
                                     <div className="text-left">
-                                        <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-1">Target Capital</div>
+                                        <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-1">{tr('services.business.productionWizard.gate.targetCapital')}</div>
                                         <div className="text-2xl font-black text-white tracking-tight">$50M</div>
                                     </div>
                                     <div className="text-right">
                                         <div className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${remaining === 0 ? 'text-emerald-500' : 'text-zinc-500'}`}>
-                                            {remaining === 0 ? 'Fully Funded' : 'Remaining'}
+                                            {remaining === 0 ? tr('services.business.productionWizard.gate.fullyFunded') : tr('services.business.productionWizard.gate.remaining')}
                                         </div>
                                         <div className={`text-lg font-mono font-bold ${remaining === 0 ? 'text-emerald-400' : 'text-rose-500'}`}>
                                             {remaining === 0 ? <Check size={20}/> : `$${remaining.toLocaleString()}`}
@@ -365,7 +378,7 @@ export const ProductionWizard: React.FC<ProductionWizardProps> = ({ player, onCa
                                 </div>
 
                                 <div className="flex justify-between text-[10px] text-zinc-600 font-mono pt-1">
-                                    <span>LIQUID: ${player.money.toLocaleString()}</span>
+                                    <span>{tr('services.business.productionWizard.gate.liquid')}: ${player.money.toLocaleString()}</span>
                                     <span>{progress.toFixed(0)}%</span>
                                 </div>
                             </div>
@@ -375,15 +388,15 @@ export const ProductionWizard: React.FC<ProductionWizardProps> = ({ player, onCa
                         <div className="flex justify-center gap-2 flex-wrap max-w-xs">
                             <div className="bg-zinc-900/50 border border-zinc-800 px-3 py-2 rounded-lg flex items-center gap-2">
                                 <TrendingUp size={14} className="text-amber-500"/>
-                                <span className="text-[10px] font-bold text-zinc-300 uppercase">100% Profits</span>
+                                <span className="text-[10px] font-bold text-zinc-300 uppercase">{tr('services.business.productionWizard.feature.profits')}</span>
                             </div>
                             <div className="bg-zinc-900/50 border border-zinc-800 px-3 py-2 rounded-lg flex items-center gap-2">
                                 <Star size={14} className="text-amber-500"/>
-                                <span className="text-[10px] font-bold text-zinc-300 uppercase">Own IP</span>
+                                <span className="text-[10px] font-bold text-zinc-300 uppercase">{tr('services.business.productionWizard.feature.ownIp')}</span>
                             </div>
                             <div className="bg-zinc-900/50 border border-zinc-800 px-3 py-2 rounded-lg flex items-center gap-2">
                                 <Users size={14} className="text-amber-500"/>
-                                <span className="text-[10px] font-bold text-zinc-300 uppercase">Cast Stars</span>
+                                <span className="text-[10px] font-bold text-zinc-300 uppercase">{tr('services.business.productionWizard.feature.castStars')}</span>
                             </div>
                         </div>
 
@@ -403,9 +416,9 @@ export const ProductionWizard: React.FC<ProductionWizardProps> = ({ player, onCa
                         }`}
                     >
                         {canAfford ? (
-                            <>Initialize Setup <ArrowRight size={18} strokeWidth={3} className="group-hover:translate-x-1 transition-transform"/></>
+                            <>{tr('services.business.productionWizard.gate.initializeSetup')} <ArrowRight size={18} strokeWidth={3} className="group-hover:translate-x-1 transition-transform"/></>
                         ) : (
-                            <><Lock size={16}/> Insufficient Funds</>
+                            <><Lock size={16}/> {tr('services.business.productionWizard.gate.insufficientFunds')}</>
                         )}
                     </button>
                     </div>
@@ -421,8 +434,8 @@ export const ProductionWizard: React.FC<ProductionWizardProps> = ({ player, onCa
             <div className="p-6 border-b border-zinc-800 flex justify-between items-center bg-black/50 backdrop-blur-md shrink-0">
                 <button onClick={onCancel} className="text-zinc-500 hover:text-white"><ArrowLeft size={24}/></button>
                 <div className="flex flex-col items-center">
-                    <div className="text-[10px] text-amber-500 font-bold uppercase tracking-widest">Premium Setup</div>
-                    <h2 className="text-white font-serif font-bold text-lg">Production House</h2>
+                    <div className="text-[10px] text-amber-500 font-bold uppercase tracking-widest">{tr('services.business.productionWizard.document.premiumSetup')}</div>
+                    <h2 className="text-white font-serif font-bold text-lg">{tr('lifestyle.productionHouse')}</h2>
                 </div>
                 <div className="w-6"></div>
             </div>
@@ -437,7 +450,7 @@ export const ProductionWizard: React.FC<ProductionWizardProps> = ({ player, onCa
                        {/* Document Header */}
                        <div className="border-b-2 border-black pb-4 mb-6 flex justify-between items-end">
                            <div>
-                               <h2 className="font-serif font-black text-2xl uppercase tracking-tighter leading-none">Articles of<br/>Incorporation</h2>
+                               <h2 className="font-serif font-black text-2xl uppercase tracking-tighter leading-none">{tr('services.business.productionWizard.document.articlesTitle')}</h2>
                            </div>
                            <div className="text-[10px] font-mono opacity-60 text-right">
                                FORM 882-AZ<br/>
@@ -448,18 +461,18 @@ export const ProductionWizard: React.FC<ProductionWizardProps> = ({ player, onCa
                        {/* STEP 1: ENTITY NAME */}
                        {step === 1 && (
                            <div className="space-y-6 font-serif flex-1 flex flex-col animate-in fade-in duration-300">
-                               <div className="text-[10px] font-sans font-bold uppercase tracking-widest border-b border-black/10 pb-1 mb-2">Article I: Identity</div>
+                               <div className="text-[10px] font-sans font-bold uppercase tracking-widest border-b border-black/10 pb-1 mb-2">{tr('services.business.productionWizard.document.articleIdentity')}</div>
                                <p className="text-sm leading-relaxed">
-                                   I, the undersigned, hereby establish a new media entity for the purpose of global entertainment domination.
+                                   {tr('services.business.productionWizard.document.identityBody')}
                                </p>
 
                                <div className="mt-8">
-                                   <label className="block text-[10px] font-bold uppercase tracking-widest mb-1 opacity-50 font-sans">Corporate Entity Name</label>
+                                   <label className="block text-[10px] font-bold uppercase tracking-widest mb-1 opacity-50 font-sans">{tr('services.business.productionWizard.document.entityName')}</label>
                                    <input 
                                        type="text" 
                                        value={name}
                                        onChange={(e) => setName(e.target.value)}
-                                       placeholder="ENTER NAME HERE"
+                                       placeholder={tr('services.business.productionWizard.document.entityPlaceholder')}
                                        className="w-full bg-transparent border-b-2 border-black/20 py-2 text-xl font-bold uppercase tracking-wide focus:outline-none focus:border-black transition-colors placeholder:text-black/20 font-serif"
                                        autoFocus
                                    />
@@ -473,7 +486,7 @@ export const ProductionWizard: React.FC<ProductionWizardProps> = ({ player, onCa
                                        disabled={!name}
                                        className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest hover:text-amber-700 transition-colors disabled:opacity-30 font-sans"
                                    >
-                                       Proceed to Schedule A <ArrowRight size={14}/>
+                                       {tr('services.business.productionWizard.document.proceedScheduleA')} <ArrowRight size={14}/>
                                    </button>
                                </div>
                            </div>
@@ -482,9 +495,9 @@ export const ProductionWizard: React.FC<ProductionWizardProps> = ({ player, onCa
                        {/* STEP 2: HEAD OF PRODUCTION */}
                        {step === 2 && (
                            <div className="space-y-4 font-serif flex-1 flex flex-col animate-in fade-in slide-in-from-right duration-300">
-                               <div className="text-[10px] font-sans font-bold uppercase tracking-widest border-b border-black/10 pb-1 mb-2">Schedule A: Executive Appointment</div>
+                               <div className="text-[10px] font-sans font-bold uppercase tracking-widest border-b border-black/10 pb-1 mb-2">{tr('services.business.productionWizard.document.scheduleA')}</div>
                                <p className="text-xs leading-relaxed opacity-70 mb-2">
-                                   Select an initial Head of Production to oversee studio operations.
+                                   {tr('services.business.productionWizard.selectHeadOfProduction')}
                                </p>
 
                                <div className="space-y-3 flex-1 overflow-y-auto custom-scrollbar pr-1">
@@ -497,11 +510,11 @@ export const ProductionWizard: React.FC<ProductionWizardProps> = ({ player, onCa
                                                className={`w-full text-left p-3 border rounded-sm transition-all relative group ${isSelected ? 'border-black bg-black/5' : 'border-black/10 hover:border-black/30'}`}
                                            >
                                                <div className="flex justify-between items-start">
-                                                   <div className="font-bold text-sm uppercase tracking-wide">{cand.name}</div>
+                                                   <div className="font-bold text-sm uppercase tracking-wide">{getHeadOfProductionName(cand.id)}</div>
                                                    {isSelected && <div className="text-black"><PenTool size={14} fill="currentColor"/></div>}
                                                </div>
-                                               <div className="text-[10px] font-sans uppercase font-bold text-black/50 mt-1">{cand.bonus}</div>
-                                               <div className="text-[10px] italic opacity-70 mt-1 leading-tight">{cand.description}</div>
+                                               <div className="text-[10px] font-sans uppercase font-bold text-black/50 mt-1">{getHeadOfProductionBonus(cand.id)}</div>
+                                               <div className="text-[10px] italic opacity-70 mt-1 leading-tight">{getHeadOfProductionDescription(cand.id)}</div>
                                            </button>
                                        );
                                    })}
@@ -510,7 +523,7 @@ export const ProductionWizard: React.FC<ProductionWizardProps> = ({ player, onCa
                                <div className="border-t-2 border-black pt-4 mt-2">
                                    <div className="flex justify-between items-end mb-4">
                                        <div className="text-xs relative min-w-[120px]">
-                                           <span className="block text-[8px] uppercase font-bold opacity-50 font-sans mb-1">Founder Signature</span>
+                                           <span className="block text-[8px] uppercase font-bold opacity-50 font-sans mb-1">{tr('services.business.productionWizard.document.founderSignature')}</span>
                                            <div className="relative h-8 border-b border-black/10">
                                                {/* Signature Animation: Reveals width from 0 to 100% */}
                                                <div className={`absolute bottom-0 left-0 whitespace-nowrap overflow-hidden transition-all duration-[1500ms] ease-out ${isSigning || isStamping ? 'w-full opacity-100' : 'w-0 opacity-0'}`}>
@@ -521,7 +534,7 @@ export const ProductionWizard: React.FC<ProductionWizardProps> = ({ player, onCa
                                        </div>
                                        
                                        <div className="text-right">
-                                           <div className="text-[8px] uppercase font-bold opacity-50 font-sans">Capital Commitment</div>
+                                           <div className="text-[8px] uppercase font-bold opacity-50 font-sans">{tr('services.business.productionWizard.document.capitalCommitment')}</div>
                                            <div className="font-mono font-bold text-sm">${COST.toLocaleString()}</div>
                                        </div>
                                    </div>
@@ -535,7 +548,7 @@ export const ProductionWizard: React.FC<ProductionWizardProps> = ({ player, onCa
                                        >
                                            <div className="w-24 h-24 rounded-full border-4 border-dashed border-red-900/30 flex items-center justify-center group-hover:border-red-600 group-hover:bg-red-50 transition-all bg-white">
                                                <div className="text-[10px] font-bold text-red-900/50 uppercase text-center leading-tight group-hover:text-red-600 font-sans">
-                                                   Click to<br/>Sign & Ratify
+                                                   {tr('services.business.productionWizard.document.signAndRatify')}
                                                </div>
                                            </div>
                                        </button>
@@ -548,7 +561,7 @@ export const ProductionWizard: React.FC<ProductionWizardProps> = ({ player, onCa
                        {isStamping && (
                            <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
                                <div className="border-8 border-red-600 text-red-600 font-black text-5xl p-4 rounded-lg transform -rotate-12 opacity-0 animate-stamp-in shadow-xl bg-red-600/10 backdrop-blur-[1px]">
-                                   APPROVED
+                                   {tr('services.business.productionWizard.document.approved')}
                                </div>
                            </div>
                        )}
@@ -558,7 +571,7 @@ export const ProductionWizard: React.FC<ProductionWizardProps> = ({ player, onCa
                    </div>
                    
                    <p className="text-zinc-500 text-xs mt-8 font-mono animate-pulse">
-                       {step === 1 ? 'Waiting for entity name...' : isSigning ? 'Signing document...' : isStamping ? 'Finalizing...' : 'Waiting for executive appointment...'}
+                       {getDocumentStatusText()}
                    </p>
                    
                    <style>{`

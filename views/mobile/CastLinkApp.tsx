@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Player, AuditionOpportunity, Commitment } from '../../types';
 import { ArrowLeft, Star, Briefcase, ChevronRight, Zap, DollarSign, XCircle, Crown, CheckCircle, Film, Tv } from 'lucide-react';
 import { ProjectDetailView } from '../../components/ProjectDetailView';
+import { getPlayerLanguage, t } from '../../services/i18n';
 
 interface CastLinkAppProps {
   player: Player;
@@ -16,6 +17,8 @@ export const CastLinkApp: React.FC<CastLinkAppProps> = ({ player, onBack, onAudi
   const [view, setView] = useState<'MENU' | 'AUDITIONS' | 'JOBS'>('MENU');
   const [auditionFilter, setAuditionFilter] = useState<'ALL' | 'MOVIE' | 'TV'>('ALL'); // NEW FILTER
   const [selectedAudition, setSelectedAudition] = useState<AuditionOpportunity | null>(null);
+  const language = getPlayerLanguage(player);
+  const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
 
   const currentAuditions = player.weeklyOpportunities?.auditions || [];
   const currentJobs = player.weeklyOpportunities?.jobs || [];
@@ -45,16 +48,16 @@ export const CastLinkApp: React.FC<CastLinkAppProps> = ({ player, onBack, onAudi
                 }}
                 actionLabel={
                     isApplied(selectedAudition.projectName) 
-                        ? 'Applied' 
+                        ? tr('castLink.applied')
                         : player.energy.current < 25 
-                            ? 'Too Tired (Need 25E)' 
+                            ? tr('castLink.tooTiredNeedEnergy', { energy: 25 })
                             : (
-                                <span className="flex items-center gap-2">Apply for Role <Zap size={16} className="text-orange-300 fill-orange-300"/> -25 Energy</span>
+                                <span className="flex items-center gap-2">{tr('castLink.applyForRole')} <Zap size={16} className="text-orange-300 fill-orange-300"/> {tr('castLink.energyCost', { energy: 25 })}</span>
                             )
                 }
                 actionDisabled={isApplied(selectedAudition.projectName) || player.energy.current < 25}
                 actionColorClass={isApplied(selectedAudition.projectName) || player.energy.current < 25 ? 'bg-slate-300 text-slate-500' : 'bg-indigo-600 hover:bg-indigo-700'}
-                headerTitle="Role Details"
+                headerTitle={tr('castLink.roleDetails')}
                 actionIcon={isApplied(selectedAudition.projectName) ? <CheckCircle size={20}/> : undefined}
             />
         )}
@@ -66,7 +69,7 @@ export const CastLinkApp: React.FC<CastLinkAppProps> = ({ player, onBack, onAudi
             </button>
             <div className="flex-1">
                 <h2 className="font-bold text-lg leading-none">CastLink</h2>
-                <p className="text-indigo-200 text-[10px]">Professional Network</p>
+                <p className="text-indigo-200 text-[10px]">{tr('castLink.subtitle')}</p>
             </div>
         </div>
 
@@ -76,24 +79,24 @@ export const CastLinkApp: React.FC<CastLinkAppProps> = ({ player, onBack, onAudi
             {view === 'MENU' && (
                 <div className="space-y-4 pt-4">
                     <div className="p-6 bg-indigo-600 rounded-3xl text-white shadow-xl shadow-indigo-200">
-                        <h2 className="text-2xl font-bold mb-1">Find Work</h2>
-                        <p className="text-indigo-100 text-sm mb-4">Browse roles tailored to your profile.</p>
+                        <h2 className="text-2xl font-bold mb-1">{tr('castLink.findWork')}</h2>
+                        <p className="text-indigo-100 text-sm mb-4">{tr('castLink.browseRoles')}</p>
                         <div className="flex gap-3">
-                            <div className="bg-white/20 px-3 py-1 rounded-lg text-xs font-bold">{currentAuditions.length} Auditions</div>
-                            <div className="bg-white/20 px-3 py-1 rounded-lg text-xs font-bold">{currentJobs.length} Jobs</div>
+                            <div className="bg-white/20 px-3 py-1 rounded-lg text-xs font-bold">{tr('castLink.auditionsCount', { count: currentAuditions.length })}</div>
+                            <div className="bg-white/20 px-3 py-1 rounded-lg text-xs font-bold">{tr('castLink.jobsCount', { count: currentJobs.length })}</div>
                         </div>
                     </div>
                     <button onClick={() => setView('AUDITIONS')} className="w-full bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex items-center justify-between group active:scale-[0.98] transition-all">
                         <div className="flex items-center gap-4">
                             <div className="w-12 h-12 rounded-full bg-pink-100 text-pink-500 flex items-center justify-center"><Star size={24} /></div>
-                            <div className="text-left"><div className="font-bold text-slate-900">Auditions</div><div className="text-xs text-slate-500">Film & TV Roles</div></div>
+                            <div className="text-left"><div className="font-bold text-slate-900">{tr('castLink.auditions')}</div><div className="text-xs text-slate-500">{tr('castLink.filmTvRoles')}</div></div>
                         </div>
                         <ChevronRight className="text-slate-400" />
                     </button>
                     <button onClick={() => setView('JOBS')} className="w-full bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex items-center justify-between group active:scale-[0.98] transition-all">
                         <div className="flex items-center gap-4">
                             <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-500 flex items-center justify-center"><Briefcase size={24} /></div>
-                            <div className="text-left"><div className="font-bold text-slate-900">Part-Time Jobs</div><div className="text-xs text-slate-500">Steady Income</div></div>
+                            <div className="text-left"><div className="font-bold text-slate-900">{tr('castLink.partTimeJobs')}</div><div className="text-xs text-slate-500">{tr('castLink.steadyIncome')}</div></div>
                         </div>
                         <ChevronRight className="text-slate-400" />
                     </button>
@@ -104,7 +107,7 @@ export const CastLinkApp: React.FC<CastLinkAppProps> = ({ player, onBack, onAudi
             {view === 'AUDITIONS' && (
                 <div className="space-y-3 pb-24">
                     <div className="flex justify-between items-center mb-2">
-                        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest pl-1">Available Roles</h3>
+                        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest pl-1">{tr('castLink.availableRoles')}</h3>
                         
                         {/* FILTER PILLS */}
                         <div className="flex bg-white rounded-lg p-0.5 border border-slate-200 shadow-sm">
@@ -114,7 +117,7 @@ export const CastLinkApp: React.FC<CastLinkAppProps> = ({ player, onBack, onAudi
                                     onClick={() => setAuditionFilter(type)}
                                     className={`px-3 py-1 rounded-md text-[10px] font-bold transition-all ${auditionFilter === type ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-slate-800'}`}
                                  >
-                                     {type === 'ALL' ? 'All' : type === 'MOVIE' ? 'Films' : 'Series'}
+                                     {type === 'ALL' ? tr('castLink.all') : type === 'MOVIE' ? tr('castLink.films') : tr('castLink.series')}
                                  </button>
                              ))}
                         </div>
@@ -122,7 +125,7 @@ export const CastLinkApp: React.FC<CastLinkAppProps> = ({ player, onBack, onAudi
 
                     {filteredAuditions.length === 0 ? (
                         <div className="p-10 text-center text-slate-400">
-                            {currentAuditions.length === 0 ? "No auditions currently." : "No results for this filter."}
+                            {currentAuditions.length === 0 ? tr('castLink.noAuditions') : tr('castLink.noFilterResults')}
                         </div>
                     ) : (
                         filteredAuditions.map(audition => {
@@ -139,8 +142,8 @@ export const CastLinkApp: React.FC<CastLinkAppProps> = ({ player, onBack, onAudi
                                         ${isFamous ? 'border-amber-400 ring-2 ring-amber-100' : 'border-slate-200'}
                                     `}
                                 >
-                                    {applied && <div className="absolute top-0 right-0 bg-green-500 text-white text-[10px] font-bold px-2 py-1 rounded-bl-xl">APPLIED</div>}
-                                    {isFamous && !applied && <div className="absolute top-0 right-0 bg-amber-500 text-white text-[10px] font-bold px-2 py-1 rounded-bl-xl flex items-center gap-1"><Crown size={10} fill="currentColor"/> LEGENDARY</div>}
+                                    {applied && <div className="absolute top-0 right-0 bg-green-500 text-white text-[10px] font-bold px-2 py-1 rounded-bl-xl">{tr('castLink.appliedBadge')}</div>}
+                                    {isFamous && !applied && <div className="absolute top-0 right-0 bg-amber-500 text-white text-[10px] font-bold px-2 py-1 rounded-bl-xl flex items-center gap-1"><Crown size={10} fill="currentColor"/> {tr('castLink.legendary')}</div>}
                                     
                                     <div className="flex justify-between items-start mb-2 pr-12">
                                         <div className="font-bold text-slate-900 text-lg leading-tight">{audition.projectName}</div>
@@ -149,11 +152,11 @@ export const CastLinkApp: React.FC<CastLinkAppProps> = ({ player, onBack, onAudi
                                     <div className="flex items-center gap-2 mb-2">
                                         <div className="text-[10px] font-bold bg-slate-100 text-slate-500 px-2 py-0.5 rounded uppercase">{audition.genre}</div>
                                         <div className="text-[10px] font-bold bg-slate-100 text-slate-500 px-2 py-0.5 rounded uppercase flex items-center gap-1">
-                                            {isTV ? <Tv size={10}/> : <Film size={10}/>} {isTV ? `Series (${audition.project.episodes || 8} eps)` : 'Movie'}
+                                            {isTV ? <Tv size={10}/> : <Film size={10}/>} {isTV ? tr('castLink.seriesEpisodes', { episodes: audition.project.episodes || 8 }) : tr('castLink.movie')}
                                         </div>
                                     </div>
 
-                                    <div className="text-xs font-bold text-indigo-600 mb-2">{audition.roleType} Role</div>
+                                    <div className="text-xs font-bold text-indigo-600 mb-2">{tr('castLink.roleLabel', { roleType: audition.roleType })}</div>
                                     <div className="flex justify-between items-center text-xs text-slate-500 border-t border-slate-100 pt-2">
                                         <span className="font-mono text-emerald-600 font-bold">${audition.estimatedIncome.toLocaleString()}</span>
                                         <span className="flex items-center gap-1 text-rose-400 font-bold"><Zap size={10}/> 25E</span>
@@ -171,21 +174,21 @@ export const CastLinkApp: React.FC<CastLinkAppProps> = ({ player, onBack, onAudi
                     {activeJob && (
                         <div className="bg-indigo-900 text-white p-5 rounded-2xl shadow-lg relative overflow-hidden">
                             <div className="relative z-10">
-                                <div className="text-[10px] font-bold uppercase tracking-widest text-indigo-300 mb-1">Current Job</div>
+                                <div className="text-[10px] font-bold uppercase tracking-widest text-indigo-300 mb-1">{tr('castLink.currentJob')}</div>
                                 <div className="text-xl font-bold mb-1">{activeJob.name}</div>
                                 <div className="flex items-center gap-3 text-xs text-indigo-200 mb-4"><span className="flex items-center gap-1"><DollarSign size={12} /> ${activeJob.income}/wk</span></div>
-                                <button onClick={() => onQuitJob(activeJob.id)} className="w-full py-2 bg-white/10 hover:bg-white/20 rounded-lg text-xs font-bold flex items-center justify-center gap-2"><XCircle size={14} /> Quit Job</button>
+                                <button onClick={() => onQuitJob(activeJob.id)} className="w-full py-2 bg-white/10 hover:bg-white/20 rounded-lg text-xs font-bold flex items-center justify-center gap-2"><XCircle size={14} /> {tr('castLink.quitJob')}</button>
                             </div>
                         </div>
                     )}
-                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-2 mb-2">Available Shifts</h3>
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-2 mb-2">{tr('castLink.availableShifts')}</h3>
                     {currentJobs.map(job => (
                         <div key={job.id} className={`bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex justify-between items-center ${activeJob ? 'opacity-60' : ''}`}>
                             <div>
                                 <div className="font-bold text-slate-800">{job.name}</div>
                                 <div className="text-xs text-slate-500 mt-1 flex items-center gap-2"><span className="text-emerald-600 font-bold">${job.income}/wk</span><span className="text-rose-400 font-bold">-{job.energyCost}E</span></div>
                             </div>
-                            <button onClick={() => !activeJob && onTakeJob(job)} disabled={!!activeJob} className={`px-4 py-2 rounded-lg text-xs font-bold ${activeJob ? 'bg-slate-100 text-slate-400' : 'bg-slate-900 text-white'}`}>{activeJob ? 'Locked' : 'Start'}</button>
+                            <button onClick={() => !activeJob && onTakeJob(job)} disabled={!!activeJob} className={`px-4 py-2 rounded-lg text-xs font-bold ${activeJob ? 'bg-slate-100 text-slate-400' : 'bg-slate-900 text-white'}`}>{activeJob ? tr('castLink.locked') : tr('castLink.start')}</button>
                         </div>
                     ))}
                 </div>

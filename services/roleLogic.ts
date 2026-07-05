@@ -1,7 +1,7 @@
 
 // ... existing imports
 import { 
-    Player, RoleType, Stats, Commitment, ActorSkills, BudgetTier, ProjectType, 
+    Player, RoleType, Stats, Commitment, ActorSkills, BudgetTier, ProjectType, GameLanguage,
     ProjectDetails, ReleaseScale, OutcomeTier, ProjectMemoryTag, FuturePotential, 
     ProjectSubtype, SeriesStatus, ReleaseStrategy, AuditionOpportunity, 
     ProjectHiddenStats, ActiveRelease, NegotiationData, CastMember, Review, 
@@ -13,19 +13,26 @@ import { createFamousOpportunity, generateFamousMovieOpportunity, generateFamous
 import { ALL_GENRES } from './genreCatalog';
 import { getAbsoluteWeek } from './legacyLogic';
 import { buildAutomaticProjectMusicPlan } from './musicIndustry';
+import { getPlayerLanguage, t } from './i18n';
 
 // --- CONSTANTS ---
 
+export const getRoleDefinitionLabel = (roleType: RoleType, language: GameLanguage = 'en'): string =>
+    t(language, `services.role.definition.${roleType}`);
+
 export const ROLE_DEFINITIONS: Record<RoleType, { label: string; difficulty: number; energyCost: number; baseIncome: number; expGain: number }> = {
-    MINOR: { label: 'Minor Role', difficulty: 10, energyCost: 10, baseIncome: 500, expGain: 1 },
-    CAMEO: { label: 'Cameo', difficulty: 20, energyCost: 5, baseIncome: 1000, expGain: 2 },
-    SUPPORTING: { label: 'Supporting Lead', difficulty: 40, energyCost: 20, baseIncome: 3000, expGain: 5 },
-    ENSEMBLE: { label: 'Ensemble Cast', difficulty: 50, energyCost: 25, baseIncome: 4000, expGain: 6 },
-    LEAD: { label: 'Lead Role', difficulty: 70, energyCost: 40, baseIncome: 10000, expGain: 10 }
+    MINOR: { label: getRoleDefinitionLabel('MINOR'), difficulty: 10, energyCost: 10, baseIncome: 500, expGain: 1 },
+    CAMEO: { label: getRoleDefinitionLabel('CAMEO'), difficulty: 20, energyCost: 5, baseIncome: 1000, expGain: 2 },
+    SUPPORTING: { label: getRoleDefinitionLabel('SUPPORTING'), difficulty: 40, energyCost: 20, baseIncome: 3000, expGain: 5 },
+    ENSEMBLE: { label: getRoleDefinitionLabel('ENSEMBLE'), difficulty: 50, energyCost: 25, baseIncome: 4000, expGain: 6 },
+    LEAD: { label: getRoleDefinitionLabel('LEAD'), difficulty: 70, energyCost: 40, baseIncome: 10000, expGain: 10 }
 };
 
 // ... (Keep existing GENRES, SYNERGIES, HELPERS, CALCULATIONS) ...
 const GENRES: Genre[] = ALL_GENRES;
+
+const getWeeklyOfferRoleLabel = (language: GameLanguage, roleType: RoleType): string =>
+    t(language, `services.weeklyOffer.role.${roleType}`);
 
 export const GENRE_SYNERGIES: Record<Genre, Genre[]> = {
     ACTION: ['ADVENTURE', 'THRILLER', 'SUPERHERO'],
@@ -48,6 +55,11 @@ export const GENRE_SYNERGIES: Record<Genre, Genre[]> = {
 };
 
 const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
+const splitLocalizedList = (language: GameLanguage, key: string, vars: Record<string, string | number> = {}): string[] => {
+    const localized = t(language, key, vars);
+    if (!localized || localized === key) return [];
+    return localized.split('||').map(item => item.trim()).filter(Boolean);
+};
 const SPECTACLE_GENRES = new Set<Genre>(['ACTION', 'SCI_FI', 'SUPERHERO', 'ADVENTURE', 'FANTASY', 'ANIMATION']);
 const INTIMATE_GENRES = new Set<Genre>(['DRAMA', 'ROMANCE', 'THRILLER', 'MYSTERY', 'COMEDY', 'HORROR', 'BIOPIC', 'CRIME', 'DOCUMENTARY', 'MUSICAL', 'SPORTS']);
 
@@ -281,6 +293,7 @@ export const getBreakthroughInviteProfile = (player: Player): BreakthroughInvite
 export const generateBreakthroughAuditionInvite = (
     player: Player,
     usedTitles: string[],
+    language: GameLanguage = 'en',
     random: () => number = Math.random
 ): BreakthroughAuditionInvite | null => {
     const profile = getBreakthroughInviteProfile(player);
@@ -308,20 +321,23 @@ export const generateBreakthroughAuditionInvite = (
         const famousProject = getNextFamousMovie(player);
         if (famousProject && !usedTitles.includes(famousProject.title)) {
             const roleType: RoleType = random() < 0.65 ? 'SUPPORTING' : 'ENSEMBLE';
-            const opportunity = createFamousOpportunity(famousProject, roleType, 'DIRECT');
+            const roleLabel = getWeeklyOfferRoleLabel(language, roleType);
+            const opportunity = createFamousOpportunity(famousProject, roleType, 'DIRECT', language);
             opportunity.source = 'DIRECTOR';
             opportunity.config = {
                 ...opportunity.config,
-                label: roleType === 'SUPPORTING' ? 'Breakout Supporting Audition' : 'Breakout Ensemble Audition'
+                label: t(language, roleType === 'SUPPORTING'
+                    ? 'services.weeklyOffer.breakthrough.blockbuster.label.supporting'
+                    : 'services.weeklyOffer.breakthrough.blockbuster.label.ensemble')
             };
             opportunity.estimatedIncome = Math.floor(opportunity.estimatedIncome * 0.65);
 
             return {
                 kind: 'BLOCKBUSTER_EXTRA',
                 opportunity,
-                sender: `${famousProject.title} Casting`,
-                subject: `Fresh Face Audition: ${famousProject.title}`,
-                text: `The casting team is opening an additional ${roleType.toLowerCase()} role for a fresh face. Your recent work put you on their list, but you still need to win the room.`
+                sender: t(language, 'services.weeklyOffer.breakthrough.blockbuster.sender', { projectTitle: famousProject.title }),
+                subject: t(language, 'services.weeklyOffer.breakthrough.blockbuster.subject', { projectTitle: famousProject.title }),
+                text: t(language, 'services.weeklyOffer.breakthrough.blockbuster.text', { role: roleLabel })
             };
         }
     }
@@ -331,15 +347,17 @@ export const generateBreakthroughAuditionInvite = (
     const opportunity = generateAudition(roleType, tier, usedTitles, player, 'DIRECTOR');
     opportunity.config = {
         ...opportunity.config,
-        label: 'Fresh Face Audition'
+        label: t(language, 'services.weeklyOffer.breakthrough.freshFace.label')
     };
 
     return {
         kind: 'FRESH_FACE',
         opportunity,
-        sender: 'Studio Casting',
-        subject: `Fresh Face Audition: ${opportunity.projectName}`,
-        text: `A casting director noticed your craft before your fame caught up. They want to see you for a ${roleType.toLowerCase()} role, but the part is still yours to earn.`
+        sender: t(language, 'services.weeklyOffer.breakthrough.freshFace.sender'),
+        subject: t(language, 'services.weeklyOffer.breakthrough.freshFace.subject', { projectName: opportunity.projectName }),
+        text: t(language, 'services.weeklyOffer.breakthrough.freshFace.text', {
+            role: getWeeklyOfferRoleLabel(language, roleType)
+        })
     };
 };
 
@@ -549,7 +567,8 @@ export const getRoleRejectionFeedback = (
     player: Player,
     opportunity: Partial<AuditionOpportunity> | ProjectDetails | undefined,
     stage: 'APPLICATION' | 'AUDITION',
-    rivalWinner?: NPCActor
+    rivalWinner?: NPCActor,
+    language: GameLanguage = getPlayerLanguage(player)
 ): { summary: string; reasons: string[]; hint: string } => {
     const project = 'project' in (opportunity || {}) ? (opportunity as AuditionOpportunity).project : opportunity as ProjectDetails | undefined;
     const roleType = 'roleType' in (opportunity || {}) ? (opportunity as AuditionOpportunity).roleType : undefined;
@@ -559,47 +578,48 @@ export const getRoleRejectionFeedback = (
     const fame = player.stats.fame || 0;
     const talent = getActorTalent(player.stats.skills);
     const reasons: string[] = [];
+    const genreLabel = genre ? genre.replace(/_/g, ' ') : '';
 
     if (rivalWinner) {
-        reasons.push(`Competition: Casting leaned toward ${rivalWinner.name}, who had stronger market pull for this one.`);
+        reasons.push(t(language, 'services.role.rejection.reason.rival', { rivalName: rivalWinner.name }));
     }
 
     if (project?.isFamous && fame < 45) {
-        reasons.push('Reputation gap: Your profile is growing, but this was a legacy-level project looking for a bigger name.');
+        reasons.push(t(language, 'services.role.rejection.reason.legacyFame'));
     } else if (role && role.difficulty >= 60 && fame < 35) {
-        reasons.push('Reputation gap: Lead roles are starting to notice you, but your fame is still below their comfort zone.');
+        reasons.push(t(language, 'services.role.rejection.reason.leadFame'));
     } else if (fame < 18 && stage === 'APPLICATION') {
-        reasons.push('Visibility gap: Casting wanted someone with more public heat before calling them in.');
+        reasons.push(t(language, 'services.role.rejection.reason.visibility'));
     }
 
     if (genre && genreScore < 35) {
-        reasons.push(`Genre fit: ${genre.replace(/_/g, ' ')} is not a trusted lane for you yet.`);
+        reasons.push(t(language, 'services.role.rejection.reason.genreWeak', { genre: genreLabel }));
     } else if (genre && genreScore >= 70 && stage === 'AUDITION') {
-        reasons.push(`Genre fit helped: Your ${genre.replace(/_/g, ' ')} reputation kept you in the conversation.`);
+        reasons.push(t(language, 'services.role.rejection.reason.genreHelped', { genre: genreLabel }));
     }
 
     if (stage === 'AUDITION') {
         reasons.push(talent < 45
-            ? 'Room read: The audition needed sharper craft and presence.'
-            : 'Room read: The audition was competitive, but another package felt safer to the studio.');
+            ? t(language, 'services.role.rejection.reason.roomCraft')
+            : t(language, 'services.role.rejection.reason.roomPackage'));
     }
 
     if (reasons.length === 0) {
         reasons.push(stage === 'APPLICATION'
-            ? 'Shortlist pressure: The studio only called in a small group this week.'
-            : 'Casting pressure: The room liked parts of your profile, but not enough to close the deal.');
+            ? t(language, 'services.role.rejection.reason.shortlist')
+            : t(language, 'services.role.rejection.reason.castingPressure'));
     }
 
     const hint = genre && genreScore < 55
-        ? `Build ${genre.replace(/_/g, ' ')} reputation with smaller work, then chase bigger roles in that lane.`
+        ? t(language, 'services.role.rejection.hint.genre', { genre: genreLabel })
         : fame < 35
-            ? 'Stack smaller roles, social reach, and press momentum to make bigger studios feel safer.'
-            : 'Keep audition prep high and stay active; close calls can turn into offers as your recent work improves.';
+            ? t(language, 'services.role.rejection.hint.fame')
+            : t(language, 'services.role.rejection.hint.prep');
 
     return {
         summary: stage === 'APPLICATION'
-            ? 'The team decided not to move forward before callbacks.'
-            : 'The room liked parts of your read, but the role went another way.',
+            ? t(language, 'services.role.rejection.summary.application')
+            : t(language, 'services.role.rejection.summary.audition'),
         reasons: reasons.slice(0, 2),
         hint
     };
@@ -610,20 +630,21 @@ const cleanCastingFeedbackReason = (reason: string): string => reason.replace(/^
 export const formatRoleRejectionReview = (
     projectName: string,
     stage: 'APPLICATION' | 'AUDITION',
-    feedback: { summary: string; reasons: string[]; hint: string }
+    feedback: { summary: string; reasons: string[]; hint: string },
+    language: GameLanguage = 'en'
 ): string => {
-    const primaryReason = cleanCastingFeedbackReason(feedback.reasons[0] || 'Casting wanted a safer fit for this project.');
+    const primaryReason = cleanCastingFeedbackReason(feedback.reasons[0] || t(language, 'services.role.rejection.reason.saferFit'));
     const secondaryReason = feedback.reasons[1] ? cleanCastingFeedbackReason(feedback.reasons[1]) : '';
     const intro = stage === 'APPLICATION'
-        ? `Thanks for applying for ${projectName}.`
-        : `Thanks for coming in for ${projectName}.`;
+        ? t(language, 'services.role.rejection.review.intro.application', { projectName })
+        : t(language, 'services.role.rejection.review.intro.audition', { projectName });
 
     return [
         intro,
         feedback.summary,
-        `Director note:\n${primaryReason}`,
-        secondaryReason ? `Casting note:\n${secondaryReason}` : '',
-        `What to work on:\n${feedback.hint}`
+        t(language, 'services.role.rejection.review.directorNote', { reason: primaryReason }),
+        secondaryReason ? t(language, 'services.role.rejection.review.castingNote', { reason: secondaryReason }) : '',
+        t(language, 'services.role.rejection.review.workOn', { hint: feedback.hint })
     ].filter(Boolean).join('\n\n');
 };
 
@@ -949,95 +970,30 @@ export const generateReviews = (
     castDepthScore: number = 70,
     budgetTier: BudgetTier = 'MID',
     format: ProjectFormat = 'LIVE_ACTION',
-    subjectName?: string
+    subjectName?: string,
+    language: GameLanguage = 'en'
 ): Review[] => {
     const reviews: Review[] = [];
-    const count = 3;
+    const count = 6;
     const isThinSpectacle = castDepthScore < 50 && SPECTACLE_GENRES.has(genre as Genre) && ['HIGH', 'BLOCKBUSTER'].includes(budgetTier);
-    const positiveLines = [
-        `A stunning entry in the ${genre} genre. ${playerName} shines.`,
-        `Confident, polished, and powered by a strong central performance from ${playerName}.`,
-        `The craft holds up, and the best moments feel genuinely cinematic.`,
-        `A crowd-pleaser with enough heart to survive beyond opening weekend.`,
-    ];
-    const mixedLines = [
-        'Has its moments, but fails to stick the landing.',
-        'Strong pieces are here, but the movie never fully becomes the event it wants to be.',
-        'The ambition is visible, even when the execution wobbles.',
-        'There is a good movie inside this, but it needed sharper structure.',
-    ];
-    const negativeLines = [
-        'A disappointing mess. Avoid.',
-        'Too loud, too thin, and not nearly as memorable as the budget suggests.',
-        'The spectacle is expensive, but the drama feels undercooked.',
-        'A glossy package with very little staying power.',
-    ];
-    const thinCastLines = [
-        'For a movie this big, the world feels strangely empty around the leads.',
-        'The lead pair works, but the missing ensemble makes the scale feel smaller than the budget.',
-        'A stronger supporting cast could have made this feel like a real event.',
-    ];
-    const genrePositiveLines: Record<string, string[]> = {
-        MUSICAL: [
-            `The songs actually carry story, and ${playerName} gives the musical its pulse.`,
-            'The choreography, vocals, and emotional arc finally move as one.',
-        ],
-        BIOPIC: [
-            `${playerName} finds the person beneath the public myth${subjectName ? ` of ${subjectName}` : ''}.`,
-            'A thoughtful biopic anchored by transformation rather than imitation.',
-        ],
-        SPORTS: [
-            'The sports scenes have impact because the emotional stakes are clear.',
-            `A sincere underdog story that lets ${playerName} play grit without losing vulnerability.`,
-        ],
-        DOCUMENTARY: [
-            `${subjectName ? `${subjectName}'s story` : 'The subject'} is handled with access, tension, and real curiosity.`,
-            'The documentary earns its urgency by asking hard questions instead of selling easy answers.',
-        ],
-        MYSTERY: [
-            'The mystery pays off because the clues feel planted, not cheated.',
-            `A tightly wound mystery that lets ${playerName} play suspicion, restraint, and discovery.`,
-        ],
-        ANIMATION: [
-            'The animation has personality, not just polish.',
-            `A visually warm animated film with a performance from ${playerName} that still registers through the craft.`,
-        ],
-        CRIME: [
-            'The crime plotting is tight, morally uneasy, and built with real momentum.',
-            'A sharp crime story that understands consequence as much as suspense.',
-        ],
-        FANTASY: [
-            'The fantasy world feels lived in, and the lore supports the emotion instead of burying it.',
-            'A richly built fantasy that gives the spectacle a human center.',
-        ],
-    };
-    const genreMixedLines: Record<string, string[]> = {
-        MUSICAL: ['The numbers are catchy, but the book scenes between them are uneven.'],
-        BIOPIC: ['The performance is committed, though the biopic keeps smoothing out the messier truths.'],
-        SPORTS: ['The sports drama is sincere, but too many beats feel familiar.'],
-        DOCUMENTARY: ['The access is valuable, but the argument could be sharper.'],
-        MYSTERY: ['The clues are intriguing, but the final reveal lands softer than the setup.'],
-        ANIMATION: ['The visual identity is strong, even when the story feels thin.'],
-        CRIME: ['The crime mechanics work, but the characters needed more interior life.'],
-        FANTASY: ['The world is imaginative, but the lore sometimes crowds out the drama.'],
-    };
-    const genreNegativeLines: Record<string, string[]> = {
-        MUSICAL: ['The songs stop the movie cold instead of lifting it.'],
-        BIOPIC: ['A surface-level biopic that mistakes makeup for insight.'],
-        SPORTS: ['The sports scenes lack authenticity, and the drama never finds a second gear.'],
-        DOCUMENTARY: ['The documentary has a subject, but not a point of view.'],
-        MYSTERY: ['A mystery with suspects, but no real sense of discovery.'],
-        ANIMATION: ['The animation is busy, but the emotional design is missing.'],
-        CRIME: ['A crime story with twists but no tension.'],
-        FANTASY: ['The fantasy world is expensive, confusing, and strangely weightless.'],
-    };
+    const genreLabel = genre.replace(/_/g, ' ');
+    const subjectPhrase = subjectName ? t(language, 'services.role.review.subjectPhrase.biopic', { subjectName }) : '';
+    const subjectStory = subjectName
+        ? t(language, 'services.role.review.subjectStory.named', { subjectName })
+        : t(language, 'services.role.review.subjectStory.default');
+    const reviewVars = { playerName, genre: genreLabel, subjectPhrase, subjectStory };
+    const genreKey = String(genre);
+    const positiveLines = splitLocalizedList(language, 'services.role.review.positive.general', reviewVars);
+    const mixedLines = splitLocalizedList(language, 'services.role.review.mixed.general', reviewVars);
+    const negativeLines = splitLocalizedList(language, 'services.role.review.negative.general', reviewVars);
+    const thinCastLines = splitLocalizedList(language, 'services.role.review.thinCast', reviewVars);
+    let genrePositiveLines = splitLocalizedList(language, `services.role.review.positive.${genreKey}`, reviewVars);
+    let genreMixedLines = splitLocalizedList(language, `services.role.review.mixed.${genreKey}`, reviewVars);
+    let genreNegativeLines = splitLocalizedList(language, `services.role.review.negative.${genreKey}`, reviewVars);
     if (format === 'ANIME') {
-        genrePositiveLines.ANIMATION = [
-            'The anime style brings kinetic emotion and a distinct visual rhythm.',
-            'A strong anime feature that understands fandom without pandering to it.',
-        ];
-        genreMixedLines.ANIMATION = ['The anime craft is exciting, though the pacing occasionally overwhelms the character work.'];
-        genreNegativeLines.ANIMATION = ['The anime influence is visible, but the film never earns its intensity.'];
+        genrePositiveLines = splitLocalizedList(language, 'services.role.review.positive.ANIME', reviewVars);
+        genreMixedLines = splitLocalizedList(language, 'services.role.review.mixed.ANIME', reviewVars);
+        genreNegativeLines = splitLocalizedList(language, 'services.role.review.negative.ANIME', reviewVars);
     }
 
     for(let i=0; i<count; i++) {
@@ -1052,22 +1008,22 @@ export const generateReviews = (
             text = pick(thinCastLines);
         }
         if (sentiment === 'POSITIVE') {
-            text = text || pick(genrePositiveLines[genre] || positiveLines);
-            if (isRecast && Math.random() > 0.5) text = `The new cast breathes fresh life into the franchise! A stunning entry in the ${genre} genre.`;
+            text = text || pick(genrePositiveLines.length > 0 ? genrePositiveLines : positiveLines);
+            if (isRecast && Math.random() > 0.5) text = t(language, 'services.role.review.recast.positive', reviewVars);
         }
         else if (sentiment === 'MIXED') {
-            text = text || pick(genreMixedLines[genre] || mixedLines);
-            if (isRecast && Math.random() > 0.5) text = `The recasting is jarring, but it has its moments.`;
+            text = text || pick(genreMixedLines.length > 0 ? genreMixedLines : mixedLines);
+            if (isRecast && Math.random() > 0.5) text = t(language, 'services.role.review.recast.mixed', reviewVars);
         }
         else {
-            text = text || pick(genreNegativeLines[genre] || negativeLines);
-            if (isRecast && Math.random() > 0.5) text = `A disastrous recast ruins whatever magic the original had. Avoid.`;
+            text = text || pick(genreNegativeLines.length > 0 ? genreNegativeLines : negativeLines);
+            if (isRecast && Math.random() > 0.5) text = t(language, 'services.role.review.recast.negative', reviewVars);
         }
 
         reviews.push({
             id: `rev_${i}`,
-            author: `Critic ${i+1}`,
-            publication: "The Daily Review",
+            author: t(language, 'services.role.review.author', { index: i + 1 }),
+            publication: t(language, 'services.role.review.publication'),
             text,
             sentiment,
             type: 'CRITIC',
@@ -1126,6 +1082,32 @@ export const calculateIMDbRating = (commitment: Commitment): number => {
     if (stats.isRecast) {
         if (quality < 60) baseRating -= 1.0; // Backlash for bad recast
         else if (quality > 85) baseRating += 0.5; // Praise for good recast
+    }
+
+    const scriptQuality = stats.scriptQuality || quality;
+    const directorQuality = stats.directorQuality || quality;
+    const castingStrength = stats.castingStrength || 50;
+    const castDepthScore = stats.castDepthScore ?? 70;
+    const budgetAnchor = details.budgetTier === 'LOW'
+        ? 8_000_000
+        : details.budgetTier === 'MID'
+            ? 35_000_000
+            : details.budgetTier === 'HIGH'
+                ? 90_000_000
+                : 180_000_000;
+    const budgetPressure = Math.max(0, ((details.estimatedBudget || budgetAnchor) / budgetAnchor) - 1);
+    const elitePackageScore = (quality * 0.34)
+        + (scriptQuality * 0.22)
+        + (directorQuality * 0.18)
+        + (castingStrength * 0.14)
+        + (perf * 0.12);
+    const packageFragility = Math.max(0, budgetPressure * 0.22)
+        + (hype > 82 && quality < 72 ? 0.16 : 0)
+        + (['ACTION', 'ADVENTURE', 'SCI_FI', 'SUPERHERO', 'FANTASY'].includes(genre) && castDepthScore < 64 ? (64 - castDepthScore) / 95 : 0)
+        + (perf < 74 ? (74 - perf) / 120 : 0);
+    const highRatingGate = 8.12 + Math.max(0, Math.min(1.05, (elitePackageScore - 82) / 15)) - packageFragility;
+    if (baseRating > 8.15 && elitePackageScore < 96) {
+        baseRating = Math.min(baseRating, highRatingGate);
     }
 
     const variance = (Math.random() * 0.6) - 0.3; 
@@ -1579,13 +1561,17 @@ export const generateRenewalOffer = (original: ActiveRelease, player: Player): N
     };
 };
 
-export const getBuzzLabel = (score: number) => {
-    if (score >= 40) return { label: 'Deafening', color: 'text-emerald-400' };
-    if (score >= 20) return { label: 'Growing', color: 'text-blue-400' };
-    if (score >= 5) return { label: 'Positive', color: 'text-teal-400' };
-    if (score > -5) return { label: 'Quiet', color: 'text-zinc-400' };
-    if (score > -20) return { label: 'Mixed', color: 'text-yellow-400' };
-    return { label: 'Controversial', color: 'text-rose-500' };
+export const getBuzzLabel = (score: number, language: GameLanguage = 'en') => {
+    const build = (level: string, color: string) => ({
+        label: t(language, `services.role.buzz.${level}`),
+        color,
+    });
+    if (score >= 40) return build('deafening', 'text-emerald-400');
+    if (score >= 20) return build('growing', 'text-blue-400');
+    if (score >= 5) return build('positive', 'text-teal-400');
+    if (score > -5) return build('quiet', 'text-zinc-400');
+    if (score > -20) return build('mixed', 'text-yellow-400');
+    return build('controversial', 'text-rose-500');
 };
 
 export const generateReleasePressQuestions = (count: number = 3): PressInteraction[] => {
