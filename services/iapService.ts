@@ -18,6 +18,23 @@ export const IOS_PRODUCT_IDS: Record<PremiumProductId, string> = {
     bundle_ultimate_lifestyle: 'com.zeeshapps.actorempire.ultimatelifestyle',
 };
 
+export const ANDROID_PRODUCT_IDS: Record<PremiumProductId, string> = {
+    no_ads: 'no_ads',
+    energy_100: 'energy_100',
+    energy_250: 'energy_250',
+    energy_500: 'energy_500',
+    energy_1000: 'energy_1000',
+    cash_25000: 'cash_25000',
+    cash_75000: 'cash_75000',
+    cash_200000: 'cash_200000',
+    cash_500000: 'cash_500000',
+    cash_1250000: 'cash_1250000',
+    bundle_luxury_homes: 'bundle_luxury_homes',
+    bundle_elite_vehicles: 'bundle_elite_vehicles',
+    bundle_sky_sea: 'bundle_sky_sea',
+    bundle_ultimate_lifestyle: 'bundle_ultimate_lifestyle',
+};
+
 interface PurchaseResult {
     success: boolean;
     cancelled?: boolean;
@@ -39,10 +56,24 @@ interface NativeStoreProduct {
     type: string;
 }
 
+interface AndroidPurchaseToken {
+    productIds?: string[];
+    purchaseToken?: string;
+    orderId?: string;
+    purchaseState?: number;
+    acknowledged?: boolean;
+}
+
 interface PurchasesPlugin {
     getProducts(options: { productIds: string[] }): Promise<{ products?: NativeStoreProduct[] }>;
     purchaseProduct(options: { productId: string }): Promise<{ cancelled?: boolean; pending?: boolean; productId?: string; transactionId?: string }>;
     restorePurchases(): Promise<{ productIds?: string[] }>;
+}
+
+interface AndroidPurchasesPlugin {
+    getProducts(options: { productIds: string[] }): Promise<{ products?: NativeStoreProduct[] }>;
+    purchaseProduct(options: { productId: string }): Promise<{ cancelled?: boolean; purchases?: AndroidPurchaseToken[] }>;
+    restorePurchases(): Promise<{ purchases?: AndroidPurchaseToken[] }>;
 }
 
 export interface PremiumCatalogProduct {
@@ -57,7 +88,13 @@ const isCapacitorIOS = () => {
     return Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios';
 };
 
+const isCapacitorAndroid = () => {
+    return Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
+};
+
 const Purchases = registerPlugin<PurchasesPlugin>('Purchases');
+const AndroidPurchases = registerPlugin<AndroidPurchasesPlugin>('AndroidPurchases');
+
 const isPurchasesPluginAvailable = () => {
     return Capacitor.isPluginAvailable('Purchases');
 };
@@ -66,9 +103,42 @@ const getPurchasesPlugin = () => {
     return isPurchasesPluginAvailable() ? Purchases : null;
 };
 
+const getAndroidPurchasesPlugin = () => {
+    return Capacitor.isPluginAvailable('AndroidPurchases') ? AndroidPurchases : null;
+};
+
 export const getPremiumCatalogProducts = async (): Promise<PremiumCatalogProduct[]> => {
-    if (import.meta.env.DEV || !isCapacitorIOS()) {
+    if (import.meta.env.DEV) {
         return [];
+    }
+
+    const platformProductIds = isCapacitorAndroid() ? ANDROID_PRODUCT_IDS : IOS_PRODUCT_IDS;
+    if (!isCapacitorIOS() && !isCapacitorAndroid()) {
+        return [];
+    }
+
+    if (isCapacitorAndroid()) {
+        try {
+            const purchases = getAndroidPurchasesPlugin();
+            if (!purchases?.getProducts) {
+                return [];
+            }
+            const result = await purchases.getProducts({ productIds: Object.values(platformProductIds) });
+            const products = result?.products || [];
+
+            return Object.entries(platformProductIds).map(([premiumProductId, storeProductId]) => {
+                const match = products.find(product => product.productId === storeProductId);
+                return {
+                    premiumProductId: premiumProductId as PremiumProductId,
+                    storeProductId,
+                    title: match?.title || '',
+                    description: match?.description || '',
+                    priceLabel: match?.priceLabel || ''
+                };
+            }).filter(product => !!product.priceLabel);
+        } catch {
+            return [];
+        }
     }
 
     try {
@@ -76,10 +146,10 @@ export const getPremiumCatalogProducts = async (): Promise<PremiumCatalogProduct
         if (!purchases?.getProducts) {
             return [];
         }
-        const result = await purchases.getProducts({ productIds: Object.values(IOS_PRODUCT_IDS) });
+        const result = await purchases.getProducts({ productIds: Object.values(platformProductIds) });
         const products = result?.products || [];
 
-        return Object.entries(IOS_PRODUCT_IDS).map(([premiumProductId, storeProductId]) => {
+        return Object.entries(platformProductIds).map(([premiumProductId, storeProductId]) => {
             const match = products.find(product => product.productId === storeProductId);
             return {
                 premiumProductId: premiumProductId as PremiumProductId,
@@ -97,6 +167,35 @@ export const getPremiumCatalogProducts = async (): Promise<PremiumCatalogProduct
 export const purchasePremiumProduct = async (productId: PremiumProductId): Promise<PurchaseResult> => {
     if (import.meta.env.DEV) {
         return { success: true, message: 'Simulated premium purchase confirmed in development.' };
+    }
+
+    if (isCapacitorAndroid()) {
+        const purchases = getAndroidPurchasesPlugin();
+        if (!purchases?.purchaseProduct) {
+            return { success: false, message: 'Purchases are not available in this Android build yet. Please update the app and try again.' };
+        }
+
+        try {
+            const storeProductId = ANDROID_PRODUCT_IDS[productId];
+            const result = await purchases.purchaseProduct({ productId: storeProductId });
+            if (result?.cancelled) {
+                return { success: false, cancelled: true, message: 'Purchase cancelled.' };
+            }
+
+            const purchaseToken = result?.purchases?.find(purchase => purchase.productIds?.includes(storeProductId))?.purchaseToken;
+            if (!purchaseToken) {
+                return { success: false, message: 'Purchase did not return a verification token.' };
+            }
+
+            return {
+                success: false,
+                message: 'Android purchase captured. Server verification is required before granting rewards.'
+            };
+        } catch (error: any) {
+            const message = String(error?.message || error || 'Purchase failed.');
+            const cancelled = /cancel/i.test(message);
+            return { success: false, cancelled, message: cancelled ? 'Purchase cancelled.' : message };
+        }
     }
 
     if (!isCapacitorIOS()) {
@@ -128,6 +227,28 @@ export const purchasePremiumProduct = async (productId: PremiumProductId): Promi
 export const restorePremiumPurchases = async (): Promise<RestoreResult> => {
     if (import.meta.env.DEV) {
         return { success: true, restoredProductIds: [], message: 'No dev purchases to restore.' };
+    }
+
+    if (isCapacitorAndroid()) {
+        const purchases = getAndroidPurchasesPlugin();
+        if (!purchases?.restorePurchases) {
+            return { success: false, restoredProductIds: [], message: 'Purchases are not available in this Android build yet. Please update the app and try again.' };
+        }
+
+        try {
+            await purchases.restorePurchases();
+            return {
+                success: false,
+                restoredProductIds: [],
+                message: 'Android restore found purchase data, but server verification is required before restoring rewards.'
+            };
+        } catch (error: any) {
+            return {
+                success: false,
+                restoredProductIds: [],
+                message: String(error?.message || error || 'Restore failed.')
+            };
+        }
     }
 
     if (!isCapacitorIOS()) {
