@@ -1,5 +1,6 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
+import { Capacitor } from '@capacitor/core';
 import { Player, ActorSkills, Genre, Stats } from '../types';
 import { formatMoney } from '../services/formatUtils';
 import { ArrowLeft, Zap, DollarSign, Heart, Brain, Clapperboard, PlayCircle, ShieldAlert, Crown, Gem, Home, CarFront, Plane, CheckCircle2 } from 'lucide-react';
@@ -26,9 +27,11 @@ export const StorePage: React.FC<StorePageProps> = ({ player, onBack, onWatchAd,
     const [catalogPrices, setCatalogPrices] = useState<Record<PremiumProductId, string>>({} as Record<PremiumProductId, string>);
     const isIOSDevice = typeof navigator !== 'undefined' && (
         /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) ||
+        (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios')
     );
-    const showPremiumStore = PREMIUM_STORE_ENABLED && (isIOSDevice || import.meta.env.DEV);
+    const isAndroidDevice = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
+    const showPremiumStore = PREMIUM_STORE_ENABLED && (isIOSDevice || isAndroidDevice || import.meta.env.DEV);
     const language = getPlayerLanguage(player);
     const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
 
