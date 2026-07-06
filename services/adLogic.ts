@@ -7,8 +7,8 @@ const ADMOB_IDS = {
         interstitial: 'ca-app-pub-1351550313263506/1369584962',
     },
     android: {
-        rewarded: 'ca-app-pub-1351550313263506/5856820425',
-        interstitial: 'ca-app-pub-1351550313263506/1162896946',
+        rewarded: 'ca-app-pub-1351550313263506/5572922698',
+        interstitial: 'ca-app-pub-1351550313263506/9957935970',
     },
 };
 
