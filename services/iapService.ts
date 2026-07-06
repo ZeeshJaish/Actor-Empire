@@ -1,5 +1,6 @@
 import { Capacitor, registerPlugin } from '@capacitor/core';
-import { PremiumProductId } from './premiumLogic';
+import { getPremiumProduct, PremiumProductId } from './premiumLogic';
+import { verifyAndroidPurchase } from './androidPurchaseVerifier';
 
 export const IOS_PRODUCT_IDS: Record<PremiumProductId, string> = {
     no_ads: 'com.zeeshapps.actorempire.noads',
@@ -74,6 +75,8 @@ interface AndroidPurchasesPlugin {
     getProducts(options: { productIds: string[] }): Promise<{ products?: NativeStoreProduct[] }>;
     purchaseProduct(options: { productId: string }): Promise<{ cancelled?: boolean; purchases?: AndroidPurchaseToken[] }>;
     restorePurchases(): Promise<{ purchases?: AndroidPurchaseToken[] }>;
+    acknowledgePurchase(options: { purchaseToken: string }): Promise<{ success?: boolean }>;
+    consumePurchase(options: { purchaseToken: string }): Promise<{ success?: boolean }>;
 }
 
 export interface PremiumCatalogProduct {
@@ -105,6 +108,27 @@ const getPurchasesPlugin = () => {
 
 const getAndroidPurchasesPlugin = () => {
     return Capacitor.isPluginAvailable('AndroidPurchases') ? AndroidPurchases : null;
+};
+
+const getAndroidPurchaseForStoreProduct = (purchases: AndroidPurchaseToken[] | undefined, storeProductId: string) =>
+    (purchases || []).find(purchase => purchase.productIds?.includes(storeProductId) && !!purchase.purchaseToken);
+
+const finishVerifiedAndroidPurchase = async (
+    purchases: AndroidPurchasesPlugin,
+    productId: PremiumProductId,
+    purchase: AndroidPurchaseToken
+) => {
+    if (!purchase.purchaseToken) return;
+    const product = getPremiumProduct(productId);
+    try {
+        if (product?.kind === 'consumable') {
+            await purchases.consumePurchase({ purchaseToken: purchase.purchaseToken });
+        } else if (!purchase.acknowledged) {
+            await purchases.acknowledgePurchase({ purchaseToken: purchase.purchaseToken });
+        }
+    } catch (error) {
+        console.warn('[IAP] Android purchase verified but Play finalization failed', error);
+    }
 };
 
 export const getPremiumCatalogProducts = async (): Promise<PremiumCatalogProduct[]> => {
@@ -182,14 +206,26 @@ export const purchasePremiumProduct = async (productId: PremiumProductId): Promi
                 return { success: false, cancelled: true, message: 'Purchase cancelled.' };
             }
 
-            const purchaseToken = result?.purchases?.find(purchase => purchase.productIds?.includes(storeProductId))?.purchaseToken;
+            const purchase = getAndroidPurchaseForStoreProduct(result?.purchases, storeProductId);
+            const purchaseToken = purchase?.purchaseToken;
             if (!purchaseToken) {
                 return { success: false, message: 'Purchase did not return a verification token.' };
             }
 
+            const verification = await verifyAndroidPurchase({
+                premiumProductId: productId,
+                storeProductId,
+                purchaseToken,
+                orderId: purchase?.orderId,
+            });
+            if (verification.verified !== true) {
+                return { success: false, message: verification.message };
+            }
+
+            await finishVerifiedAndroidPurchase(purchases, productId, purchase);
             return {
-                success: false,
-                message: 'Android purchase captured. Server verification is required before granting rewards.'
+                success: true,
+                message: verification.message || 'Android purchase verified.'
             };
         } catch (error: any) {
             const message = String(error?.message || error || 'Purchase failed.');
@@ -236,11 +272,27 @@ export const restorePremiumPurchases = async (): Promise<RestoreResult> => {
         }
 
         try {
-            await purchases.restorePurchases();
+            const result = await purchases.restorePurchases();
+            const restoredProductIds: PremiumProductId[] = [];
+            for (const [premiumProductId, storeProductId] of Object.entries(ANDROID_PRODUCT_IDS)) {
+                const purchase = getAndroidPurchaseForStoreProduct(result?.purchases, storeProductId);
+                if (!purchase?.purchaseToken) continue;
+                const verification = await verifyAndroidPurchase({
+                    premiumProductId: premiumProductId as PremiumProductId,
+                    storeProductId,
+                    purchaseToken: purchase.purchaseToken,
+                    orderId: purchase.orderId,
+                });
+                if (verification.verified === true && verification.premiumProductId === premiumProductId) {
+                    restoredProductIds.push(premiumProductId as PremiumProductId);
+                    await finishVerifiedAndroidPurchase(purchases, premiumProductId as PremiumProductId, purchase);
+                }
+            }
+
             return {
-                success: false,
-                restoredProductIds: [],
-                message: 'Android restore found purchase data, but server verification is required before restoring rewards.'
+                success: restoredProductIds.length > 0,
+                restoredProductIds,
+                message: restoredProductIds.length > 0 ? 'Android purchases restored.' : 'No verified Android purchases found to restore.'
             };
         } catch (error: any) {
             return {

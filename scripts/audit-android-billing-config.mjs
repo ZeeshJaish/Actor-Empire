@@ -16,7 +16,8 @@ assertIncludes('Billing permission', 'android/app/src/main/AndroidManifest.xml',
 assertIncludes('Plugin source', 'android/app/src/main/java/com/zeeshapps/actorempire/AndroidPurchasesPlugin.java', '@CapacitorPlugin(name = "AndroidPurchases")');
 assertIncludes('Plugin registration', 'android/app/src/main/java/com/zeeshapps/actorempire/MainActivity.java', 'registerPlugin(AndroidPurchasesPlugin.class);');
 assertIncludes('Android product ids', 'services/iapService.ts', 'ANDROID_PRODUCT_IDS');
-assertIncludes('Verification block', 'services/iapService.ts', 'Android purchase captured. Server verification is required before granting rewards.');
+assertIncludes('Verification service', 'services/iapService.ts', "from './androidPurchaseVerifier'");
+assertIncludes('Verification call', 'services/iapService.ts', 'verifyAndroidPurchase({');
 
 if (checks.length > 0) {
   console.error(checks.join('\n'));

@@ -351,6 +351,12 @@ const getFreshAnonymousAuth = async (): Promise<StoredAnonymousAuth | null> => {
   return refreshAnonymousAuthViaRest(storedAuth);
 };
 
+export const getFirebaseAuthForServerCall = async (): Promise<{ uid: string; idToken: string } | null> => {
+  const auth = await getFreshAnonymousAuth();
+  if (!auth?.localId || !auth?.idToken) return null;
+  return { uid: auth.localId, idToken: auth.idToken };
+};
+
 const getPlayerSnapshot = (player?: Player | null) => ({
   age: player?.age,
   week: player?.currentWeek,
