@@ -120,6 +120,7 @@
   "audit:outside-producer-investments": "node scripts/audit-outside-producer-investments.mjs",
   "audit:health-conditions": "node scripts/audit-health-conditions.mjs",
   "audit:android-billing": "node scripts/audit-android-billing-config.mjs",
+  "audit:android-purchase-verification": "node scripts/audit-android-purchase-verification.mjs",
   "assets:lifestyle-prompts": "node scripts/export-lifestyle-asset-image-prompts.mjs",
   "assets:properties": "php scripts/generate-property-pixel-art.php && node scripts/export-lifestyle-asset-image-prompts.mjs",
     "audit:acquisition-event-cadence": "esbuild scripts/audit-acquisition-event-cadence.ts --bundle --platform=node --format=esm --outfile=/tmp/audit-acquisition-event-cadence.mjs && node /tmp/audit-acquisition-event-cadence.mjs",
