@@ -49,6 +49,8 @@ import {
 } from '../../../../services/rightsNegotiation';
 import { generateRightsAcquisitionNews } from '../../../../services/newsLogic';
 import { getPlayerLanguage, t } from '../../../../services/i18n';
+import { spendPlayerEnergy } from '../../../../services/premiumLogic';
+import { PHASE_ONE_ENERGY_COSTS } from '../../../../services/energyCosts';
 import { RightsDealRoom } from './RightsDealRoom';
 
 interface RightsMarketProps {
@@ -254,13 +256,18 @@ export const RightsMarket: React.FC<RightsMarketProps> = ({ player, studio, onUp
         };
     }, [dealLeadId, selectedLeadId]);
 
-    const updateRightsState = (updates: Partial<StudioState>, balance = studio.balance, logMessage?: string) => {
+    const rightsStrategyEnergyCost = PHASE_ONE_ENERGY_COSTS.RIGHTS_STRATEGY_ACTION;
+    const rightsSigningEnergyCost = PHASE_ONE_ENERGY_COSTS.RIGHTS_FINAL_SIGNING;
+    const hasRightsStrategyEnergy = player.energy.current >= rightsStrategyEnergyCost;
+    const hasRightsSigningEnergy = player.energy.current >= rightsSigningEnergyCost;
+
+    const updateRightsState = (updates: Partial<StudioState>, balance = studio.balance, logMessage?: string, energyCost = 0) => {
         const updatedStudio: Business = {
             ...studio,
             balance,
             studioState: { ...studioState, ...updates },
         };
-        onUpdatePlayer({
+        const updatedPlayer: Player = {
             ...player,
             businesses: player.businesses.map(business => business.id === studio.id ? updatedStudio : business),
             logs: logMessage
@@ -271,7 +278,9 @@ export const RightsMarket: React.FC<RightsMarketProps> = ({ player, studio, onUp
                     type: 'neutral' as const,
                 }].slice(-80)
                 : player.logs,
-        });
+        };
+        if (energyCost > 0) spendPlayerEnergy(updatedPlayer, energyCost, 'Rights negotiation');
+        onUpdatePlayer(updatedPlayer);
     };
 
     const handleToggleTrack = (opportunityId: string) => {
@@ -377,6 +386,10 @@ export const RightsMarket: React.FC<RightsMarketProps> = ({ player, studio, onUp
     const reservedCapital = getReservedRightsCapital(negotiations);
 
     const handleStartDeal = (opportunity: RightsOpportunity, dealType: RightsDealType, amount: number) => {
+        if (!hasRightsStrategyEnergy) {
+            setFeedback(`Need ${rightsStrategyEnergyCost} energy to submit a rights offer.`);
+            return;
+        }
         const transition = startRightsNegotiation({
             opportunity,
             negotiations,
@@ -408,11 +421,16 @@ export const RightsMarket: React.FC<RightsMarketProps> = ({ player, studio, onUp
             },
             studio.balance,
             `Submitted a ${formatLabel(dealType)} offer for ${opportunity.title} at ${formatCurrency(amount)}.`,
+            rightsStrategyEnergyCost,
         );
         setFeedback(`Offer delivered to ${opportunity.sellerName}. Response expected next week.`);
     };
 
     const handleCounterDeal = (negotiationId: string, amount: number) => {
+        if (!hasRightsStrategyEnergy) {
+            setFeedback(`Need ${rightsStrategyEnergyCost} energy to raise the rights offer.`);
+            return;
+        }
         const transition = submitRightsCounter({
             negotiations,
             negotiationId,
@@ -430,17 +448,21 @@ export const RightsMarket: React.FC<RightsMarketProps> = ({ player, studio, onUp
             );
             return;
         }
-        updateRightsState({ rightsNegotiations: transition.negotiations }, studio.balance, `Raised the rights offer to ${formatCurrency(amount)}.`);
+        updateRightsState({ rightsNegotiations: transition.negotiations }, studio.balance, `Raised the rights offer to ${formatCurrency(amount)}.`, rightsStrategyEnergyCost);
         setFeedback('Improved offer submitted. The owner responds next week.');
     };
 
     const handleAcceptDealTerms = (negotiationId: string) => {
+        if (!hasRightsStrategyEnergy) {
+            setFeedback(`Need ${rightsStrategyEnergyCost} energy to accept the rights terms.`);
+            return;
+        }
         const transition = acceptRightsTerms(negotiations, negotiationId);
         if (!transition.changed) {
             setFeedback('These terms are no longer available.');
             return;
         }
-        updateRightsState({ rightsNegotiations: transition.negotiations }, studio.balance, 'Rights terms accepted. Contract prepared for signature.');
+        updateRightsState({ rightsNegotiations: transition.negotiations }, studio.balance, 'Rights terms accepted. Contract prepared for signature.', rightsStrategyEnergyCost);
         setFeedback('Business Affairs prepared the final agreement.');
     };
 
@@ -456,6 +478,10 @@ export const RightsMarket: React.FC<RightsMarketProps> = ({ player, studio, onUp
     };
 
     const handleSignDeal = (opportunity: RightsOpportunity, negotiationId: string) => {
+        if (!hasRightsSigningEnergy) {
+            setFeedback(`Need ${rightsSigningEnergyCost} energy to sign the final rights agreement.`);
+            return;
+        }
         const transition = signRightsAgreement({
             negotiations,
             negotiationId,
@@ -479,7 +505,7 @@ export const RightsMarket: React.FC<RightsMarketProps> = ({ player, studio, onUp
                 rightsMarket: normalized.opportunities.filter(item => item.id !== opportunity.id),
             },
         };
-        onUpdatePlayer({
+        const updatedPlayer: Player = {
             ...player,
             businesses: player.businesses.map(business => business.id === studio.id ? updatedStudio : business),
             news: [
@@ -492,7 +518,9 @@ export const RightsMarket: React.FC<RightsMarketProps> = ({ player, studio, onUp
                 message: `Signed ${formatLabel(transition.ownedRight.dealType)} agreement for ${opportunity.title} (${formatCurrency(transition.ownedRight.purchasePrice)}).`,
                 type: 'positive' as const,
             }].slice(-80),
-        });
+        };
+        spendPlayerEnergy(updatedPlayer, rightsSigningEnergyCost, `Rights signing: ${opportunity.title}`);
+        onUpdatePlayer(updatedPlayer);
         setFeedback(`${opportunity.title} added to Vault > Rights.`);
         setSelectedLeadId(null);
         setDealLeadId(null);
@@ -1112,9 +1140,12 @@ export const RightsMarket: React.FC<RightsMarketProps> = ({ player, studio, onUp
                         onCounter={(amount) => dealNegotiation && handleCounterDeal(dealNegotiation.id, amount)}
                         onAcceptTerms={() => dealNegotiation && handleAcceptDealTerms(dealNegotiation.id)}
                         onWithdraw={() => dealNegotiation && handleWithdrawDeal(dealNegotiation.id)}
-                        onSign={() => dealNegotiation && handleSignDeal(dealLead, dealNegotiation.id)}
-                        language={language}
-                    />
+	                        onSign={() => dealNegotiation && handleSignDeal(dealLead, dealNegotiation.id)}
+                            energyAvailable={player.energy.current}
+                            strategyEnergyCost={rightsStrategyEnergyCost}
+                            signingEnergyCost={rightsSigningEnergyCost}
+	                        language={language}
+	                    />
                 )}
             </AnimatePresence>
         </div>

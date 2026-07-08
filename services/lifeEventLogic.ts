@@ -99,7 +99,7 @@ export const generateLuxeLifeEvent = (player: Player): LifeEvent | null => {
                     description: 'Costs energy. Good for chemistry, risky for gossip if this connection is already hot.',
                     descriptionKey: 'life.event.luxe.privateInvite.accept.description',
                     impact: (p) => {
-                        spendPlayerEnergy(p, 8);
+                        spendPlayerEnergy(p, 8, 'Life event: Private invite');
                         p.dating.matches = p.dating.matches.map(match =>
                             match.id === focusMatch.id
                                 ? {
@@ -449,7 +449,7 @@ export const generateLifeEvent = (player: Player): LifeEvent | null => {
                     description: 'Costs energy and money, but gives you one real shot to stabilize it.',
                     descriptionKey: 'life.event.relationship.breakingPoint.fight.description',
                     impact: (p) => {
-                        spendPlayerEnergy(p, 18);
+                        spendPlayerEnergy(p, 18, 'Life event: Fight for relationship');
                         p.money = Math.max(0, p.money - 15000);
                         const rel = p.relationships.find(r => r.id === partner.id);
                         if (rel) rel.closeness = Math.min(100, rel.closeness + 10);
@@ -545,7 +545,7 @@ export const generateLifeEvent = (player: Player): LifeEvent | null => {
                     description: 'Could bring closure. Could blow up.',
                     descriptionKey: 'life.event.relationship.exReturn.meet.description',
                     impact: (p) => {
-                        spendPlayerEnergy(p, 8);
+                        spendPlayerEnergy(p, 8, 'Life event: Meet the ex');
                         const currentRel = p.relationships.find(r => r.id === partner.id);
                         const exRel = p.relationships.find(r => r.id === exPartner.id);
                         if (currentRel) currentRel.closeness = Math.max(0, currentRel.closeness - 7);
@@ -1193,7 +1193,7 @@ export const generateLifeEvent = (player: Player): LifeEvent | null => {
                         labelKey: 'life.event.early.sideHustle.job.label',
                         impact: (p) => {
                             p.money += 2000;
-                            spendPlayerEnergy(p, 10);
+                            spendPlayerEnergy(p, 10, 'Life event: Side hustle');
                             return {
                                 updatedPlayer: p,
                                 log: "You're working as an usher. It's tiring, but the bills are paid.",

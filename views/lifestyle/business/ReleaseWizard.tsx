@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Player, PendingEvent, ScreeningStrategy, ProjectHiddenStats, NextSeasonFundingTier, CampaignPositioning, CampaignTimeline, MarketingChannelAllocations, MarketingChannelId, BoxOfficeRegionId, CinemaChainId, CinemaChain, CinemaChainRegionalTerms } from '../../../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowLeft, Film, Tv, Calendar, TrendingUp, CheckCircle2, Camera, Star, Globe, Youtube, Share2, Megaphone, Music2 } from 'lucide-react';
+import { ArrowLeft, Film, Tv, Calendar, TrendingUp, CheckCircle2, Camera, Star, Globe, Youtube, Share2, Megaphone, Music2, Zap } from 'lucide-react';
 import { FESTIVALS, CALENDAR_EVENTS } from '../../../services/worldLogic';
 import { mergeUniverseRosterWithProject, normalizeUniverseMap } from '../../../services/universeLogic';
 import { getAbsoluteWeek } from '../../../services/legacyLogic';
@@ -15,6 +15,8 @@ import { CinemaChainLogo } from './components/CinemaChainLogo';
 import { InteractiveRegionMap } from './components/InteractiveRegionMap';
 import { applyInvestorPayoutMemory, calculateInvestorPayout } from '../../../services/projectInvestors';
 import { getPlayerLanguage, t } from '../../../services/i18n';
+import { spendPlayerEnergy } from '../../../services/premiumLogic';
+import { PHASE_ONE_ENERGY_COSTS } from '../../../services/energyCosts';
 
 interface ReleaseWizardProps {
     player: Player;
@@ -370,6 +372,10 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
     const [releaseWeek, setReleaseWeek] = useState<number>(player.currentWeek + 4); 
     const language = getPlayerLanguage(player);
     const tr = (key: string, vars?: Record<string, string | number>) => t(language, key, vars);
+    const streamingDealEnergyCost = PHASE_ONE_ENERGY_COSTS.STREAMING_DEAL_ACCEPT;
+    const releaseStrategyEnergyCost = PHASE_ONE_ENERGY_COSTS.RELEASE_STRATEGY_LOCK;
+    const hasStreamingDealEnergy = player.energy.current >= streamingDealEnergyCost;
+    const hasReleaseStrategyEnergy = player.energy.current >= releaseStrategyEnergyCost;
     const trFallback = (key: string, fallback: string) => {
         const translated = tr(key);
         return translated === key ? fallback : translated;
@@ -657,6 +663,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
 
     const handleAcceptBid = (bid: Bid | null) => {
         if (!bid) return;
+        if (!hasStreamingDealEnergy) return;
 
         const updatedPlayer = { ...player };
         const platformName = PLATFORMS.find(p => p.id === bid.platformId)?.name || 'Platform';
@@ -842,6 +849,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
             }
         }
 
+        spendPlayerEnergy(updatedPlayer, streamingDealEnergyCost, `Streaming deal: ${project.name}`);
         onUpdatePlayer(updatedPlayer);
         
         if (isPostTheatricalBidding) {
@@ -1144,6 +1152,8 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
     };
 
     const handleComplete = () => {
+        if (!hasReleaseStrategyEnergy) return;
+
         const updatedPlayer = { ...player };
         let festivalCost = 0;
 
@@ -1276,6 +1286,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
             }
         }
 
+        spendPlayerEnergy(updatedPlayer, releaseStrategyEnergyCost, `Release strategy: ${project.name}`);
         onUpdatePlayer(updatedPlayer);
         onComplete();
     };
@@ -1648,8 +1659,16 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                                                             No bidding room because the platform already committed. If production goes over cap, the studio pays the extra; if it comes under cap, unused funding returns to the platform.
                                                         </p>
                                                     </div>
-                                                    <button onClick={() => handleAcceptBid(lockedPremiereBid)} className="px-12 py-4 bg-sky-400 text-black rounded-full font-bold tracking-widest uppercase text-xs hover:scale-105 transition-all shadow-[0_0_30px_rgba(56,189,248,0.3)]">
-                                                        Premiere on {lockedPremierePlatform?.name}
+                                                    <button
+                                                        onClick={() => handleAcceptBid(lockedPremiereBid)}
+                                                        disabled={!hasStreamingDealEnergy}
+                                                        className={`px-12 py-4 rounded-full font-bold tracking-widest uppercase text-xs transition-all ${
+                                                            hasStreamingDealEnergy
+                                                                ? 'bg-sky-400 text-black hover:scale-105 shadow-[0_0_30px_rgba(56,189,248,0.3)]'
+                                                                : 'bg-white/10 text-white/35 cursor-not-allowed'
+                                                        }`}
+                                                    >
+                                                        {hasStreamingDealEnergy ? `Premiere on ${lockedPremierePlatform?.name} · ${streamingDealEnergyCost}E` : `Need ${streamingDealEnergyCost}E`}
                                                     </button>
                                                 </>
                                             ) : (
@@ -1726,12 +1745,16 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                                             <div className="flex justify-between items-center">
                                                 <button onClick={prevStep} className="px-8 py-4 text-white/50 hover:text-white transition-colors text-xs font-bold tracking-widest uppercase">Back</button>
                                                 
-                                                <button 
-                                                    disabled={!highestBid} 
+                                                <button
+                                                    disabled={!highestBid || !hasStreamingDealEnergy}
                                                     onClick={() => handleAcceptBid(highestBid)} 
-                                                    className={`px-12 py-4 rounded-full font-bold tracking-widest uppercase text-xs transition-all ${highestBid ? 'bg-amber-500 text-black hover:scale-105 shadow-[0_0_30px_rgba(245,158,11,0.3)]' : 'bg-white/10 text-white/30 cursor-not-allowed'}`}
+                                                    className={`px-12 py-4 rounded-full font-bold tracking-widest uppercase text-xs transition-all ${
+                                                        highestBid && hasStreamingDealEnergy
+                                                            ? 'bg-amber-500 text-black hover:scale-105 shadow-[0_0_30px_rgba(245,158,11,0.3)]'
+                                                            : 'bg-white/10 text-white/30 cursor-not-allowed'
+                                                    }`}
                                                 >
-                                                    {auctionState === 'FINISHED' ? 'Accept Winning Bid' : 'Slam the Gavel'}
+                                                    {!hasStreamingDealEnergy ? `Need ${streamingDealEnergyCost}E` : `${auctionState === 'FINISHED' ? 'Accept Winning Bid' : 'Slam the Gavel'} · ${streamingDealEnergyCost}E`}
                                                 </button>
                                             </div>
                                         </div>
@@ -2307,8 +2330,17 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
 
                                 <div className="flex justify-between items-center pt-8">
                                     <button onClick={prevStep} className="px-8 py-4 text-white/50 hover:text-white transition-colors text-xs font-bold tracking-widest uppercase">Back</button>
-                                    <button onClick={handleComplete} className="px-12 py-4 bg-amber-500 text-black rounded-full font-bold tracking-widest uppercase text-xs hover:scale-105 transition-all shadow-[0_0_20px_rgba(245,158,11,0.3)]">
-                                        Lock Strategy
+                                    <button
+                                        onClick={handleComplete}
+                                        disabled={!hasReleaseStrategyEnergy}
+                                        className={`px-12 py-4 rounded-full font-bold tracking-widest uppercase text-xs transition-all inline-flex items-center gap-2 ${
+                                            hasReleaseStrategyEnergy
+                                                ? 'bg-amber-500 text-black hover:scale-105 shadow-[0_0_20px_rgba(245,158,11,0.3)]'
+                                                : 'bg-white/10 text-white/35 cursor-not-allowed'
+                                        }`}
+                                    >
+                                        <Zap className="w-4 h-4" />
+                                        {hasReleaseStrategyEnergy ? `Lock Strategy · ${releaseStrategyEnergyCost}E` : `Need ${releaseStrategyEnergyCost}E`}
                                     </button>
                                 </div>
                             </motion.div>

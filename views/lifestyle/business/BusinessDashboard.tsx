@@ -200,7 +200,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ business, 
         if (res.success) {
             const businesses = player.businesses.map(b => b.id === business.id ? res.updated : b);
             const nextPlayer = { ...player, businesses };
-            spendPlayerEnergy(nextPlayer, res.energyCost || 0);
+            spendPlayerEnergy(nextPlayer, res.energyCost || 0, `Business product: ${newProdName || def.name}`);
             onUpdatePlayer(nextPlayer);
             setShowProductCreator(false); setProdCreatorStep(1); setNewProdName(''); setNewProdQty(100); setNewProdType(''); setCustomSellingPrice('');
             setDevOptions({ material: 'mat_standard', process: 'proc_mass', packaging: 'pack_basic' });

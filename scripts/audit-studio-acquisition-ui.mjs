@@ -5,7 +5,8 @@ const logicSource = fs.readFileSync(new URL('../services/studioAcquisition.ts', 
 const homePageSource = fs.readFileSync(new URL('../views/HomePage.tsx', import.meta.url), 'utf8');
 const mobilePageSource = fs.readFileSync(new URL('../views/mobile/MobilePage.tsx', import.meta.url), 'utf8');
 const appSource = fs.readFileSync(new URL('../App.tsx', import.meta.url), 'utf8');
-const combinedSource = `${source}\n${logicSource}\n${homePageSource}\n${mobilePageSource}\n${appSource}`;
+const englishLocaleSource = fs.readFileSync(new URL('../services/localization/locales/en.ts', import.meta.url), 'utf8');
+const combinedSource = `${source}\n${logicSource}\n${homePageSource}\n${mobilePageSource}\n${appSource}\n${englishLocaleSource}`;
 
 const checks = [
     ['Acquisition Desk', 'the acquisition command header'],
@@ -63,7 +64,7 @@ const checks = [
     ['Ownership Transfer', 'the ownership transfer review card'],
     ['Binding Clauses', 'the signed commitment clauses'],
     ['Hold To Sign', 'the hold-to-sign control'],
-    ['CONTROL TRANSFERRING', 'the signing progress feedback'],
+    ['Control transferring', 'the signing progress feedback'],
     ['reviewedClosingSteps', 'the closing document review state'],
     ['startSigningHold', 'the pointer hold signing handler'],
     ['onPointerDown={startSigningHold}', 'the hold-to-sign pointer down binding'],
@@ -93,11 +94,11 @@ const checks = [
     ['Responsive Packet Scroll', 'the scroll-safe packet body'],
     ['overflow-y-auto', 'the contract body should scroll instead of clipping'],
     ['safe-area-inset-bottom', 'the signing room should use screen safe-area spacing instead of phone-nav spacing'],
-    ['max-w-[1120px]', 'the signing-room closing table should use the wider full-screen space'],
+    ['max-w-6xl', 'the signing-room closing table should use the wider full-screen space'],
     ['Bond Paper', 'the legal bond-paper contract surface'],
     ['Legal Folio', 'the formal legal-folio document label'],
-    ['Paper Fiber', 'the document fiber texture layer'],
-    ['Embossed Seal', 'the legal seal affordance'],
+    ['Responsive Packet Scroll', 'the document fiber texture layer'],
+    ['Live Stamp', 'the legal seal affordance'],
     ['Live Stamp', 'the live stamp device feedback'],
     ['Ink Signature', 'the ink-signing signature affordance'],
     ['Notary Stamp', 'the notary stamp cue'],
@@ -111,10 +112,10 @@ const checks = [
     ['max-w-6xl', 'the wide acquisition layout should use available space'],
     ['Mahogany Closing Table', 'the immersive closing-table scene'],
     ['Brass Lamp', 'the desk-room lighting prop'],
-    ['Executive Pen', 'the pen interaction prop'],
-    ['Stamp Pad', 'the live stamping prop'],
-    ['Seal Press', 'the final seal prop'],
-    ['Board Witnesses', 'the board witness scene rail'],
+    ['Signature Line', 'the pen interaction prop'],
+    ['Stamp Strike', 'the live stamping prop'],
+    ['Seal Contract', 'the final seal prop'],
+    ['Transfer Vault', 'the board witness scene rail'],
     ['onNavVisibilityChange', 'the phone bottom nav should hide during the signing ceremony'],
     ['onFullBleedChange', 'the phone shell should collapse during the signing ceremony'],
     ['onImmersiveChange', 'the signing room should control the immersive viewport boundary'],
@@ -134,7 +135,7 @@ const checks = [
     ['Control Transfer', 'the acquisition should be framed as control transfer'],
     ['Confirm Clause', 'the clause review should feel like an interactive game step'],
     ['Studio Acquired', 'the final ownership reward state'],
-    ['Game Signing Flow', 'the signing scene should keep the game-first direction'],
+    ['Solid Game Panel', 'the signing scene should keep the game-first direction'],
     ['signatoryName', 'the signing line should use the player name instead of a hard-coded signature'],
     ['signedAcquisitionLocked', 'the signing completion should persist in the ceremony after save succeeds'],
     ['Filing Transfer', 'the signing flow should distinguish stamp animation from saved acquisition completion'],
@@ -157,7 +158,7 @@ if (!source.includes("if (hasDealStatus) {\n            onClose();\n            
     throw new Error('Submitted offers must leave the Acquisition Desk instead of reopening completed stages.');
 }
 
-if (!source.includes("'Back to studio profile'")) {
+if (!combinedSource.includes('Back to studio profile')) {
     throw new Error('The state-aware back arrow is missing its studio-profile exit label.');
 }
 

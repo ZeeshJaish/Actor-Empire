@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Player, Commitment, LogEntry, InstaPost, XPost, NewsItem, Stats, ImprovementOption, SocialEventOption, SocialEvent, Relationship, SponsorshipActionType, Message, AuditionOpportunity, NegotiationData, ScheduledEvent, PressInteraction, WriterStats, NPCActor, InteractionType, NPCState, PregnancyCarrier } from '../types';
+import { Player, Commitment, LogEntry, InstaPost, XPost, NewsItem, Stats, ImprovementOption, SocialEventOption, SocialEvent, Relationship, SponsorshipActionType, Message, AuditionOpportunity, NegotiationData, ScheduledEvent, PressInteraction, WriterStats, NPCActor, InteractionType, NPCState, PregnancyCarrier, OwnedProductionActionId } from '../types';
 import { calculateAuditionGain, calculateProductionGain, generateReleasePressQuestions, rewardGenreExperience } from '../services/roleLogic';
 import { calculateInteraction, getGenderedAvatar } from '../services/npcLogic';
 import { getFlavorTexts, getSocialEvents } from '../services/socialEvents';
@@ -9,6 +9,7 @@ import { getAbsoluteWeek } from '../services/legacyLogic';
 import { hasOwnedPremiumAssetInCollection, spendPlayerEnergy } from '../services/premiumLogic';
 import { applyParenthoodAbandonment, applyPartnerBreakup, applyDivorceOutcome, getPregnancyCarrier, getPregnancyFeedbackCopy, reconnectWithChild } from '../services/familyLogic';
 import { getPlayerLanguage, t } from '../services/i18n';
+import { OWNED_PRODUCTION_ACTIONS, applyOwnedProductionFocusAction, getOwnedProductionActionProgress } from '../services/ownedProductionCareer';
 
 interface GameActionsProps {
     player: Player;
@@ -102,7 +103,7 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
                     },
                 ].slice(-50),
             };
-            spendPlayerEnergy(nextState, Math.min(8, prev.energy.current));
+            spendPlayerEnergy(nextState, Math.min(8, prev.energy.current), 'Relationship: Declined intimacy');
             return nextState;
         });
         setToastMessage({ title: tr('actions.intimacy.notTonightTitle'), subtext: reason });
@@ -217,7 +218,7 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
                     commitments: newCommitments, 
                     logs: [...prev.logs, newLog].slice(-50)
                 };
-                spendPlayerEnergy(newState, 10);
+                spendPlayerEnergy(newState, 10, `Career prep: ${c.name}`);
                 return newState;
             }
 
@@ -232,7 +233,7 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
                const newCommitments = [...prev.commitments]; newCommitments[cIndex] = updatedC;
                const newLog: LogEntry = { week: prev.currentWeek, year: prev.age, message: msg, type: 'neutral' };
                const newState = { ...prev, commitments: newCommitments, logs: [...prev.logs, newLog].slice(-50)};
-               spendPlayerEnergy(newState, 20);
+               spendPlayerEnergy(newState, 20, `Audition rehearsal: ${c.name}`);
                return newState;
 
             } else if (c.projectPhase === 'PRODUCTION') {
@@ -247,7 +248,7 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
                const newCommitments = [...prev.commitments]; newCommitments[cIndex] = updatedC;
                const newLog: LogEntry = { week: prev.currentWeek, year: prev.age, message: msg, type: 'neutral' };
                const newState = { ...prev, commitments: newCommitments, logs: [...prev.logs, newLog].slice(-50)};
-               spendPlayerEnergy(newState, 20);
+               spendPlayerEnergy(newState, 20, `Scene rehearsal: ${c.name}`);
                return newState;
             }
             
@@ -271,7 +272,7 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
                 ...prev,
                 ...(() => {
                     const next = JSON.parse(JSON.stringify(prev)) as Player;
-                    spendPlayerEnergy(next, energyCost);
+                    spendPlayerEnergy(next, energyCost, `Press: ${commitment.name}`);
                     return { energy: next.energy, flags: next.flags };
                 })()
             }));
@@ -352,8 +353,54 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
                 instagram: { ...prev.instagram, posts: newInstaPosts, feed: newInstaFeed },
                 x: { ...prev.x, posts: newXPosts, feed: newXFeed }
             };
-            spendPlayerEnergy(newState, energyCost);
+            spendPlayerEnergy(newState, energyCost, `Promotion: ${commitment.name}`);
             return newState;
+        });
+    };
+
+    const handleOwnedProductionFocus = (commitmentId: string, actionId: OwnedProductionActionId) => {
+        const action = OWNED_PRODUCTION_ACTIONS[actionId];
+        if (!action) return;
+
+        setPlayer(prev => {
+            const cIndex = prev.commitments.findIndex(c => c.id === commitmentId);
+            if (cIndex === -1) return prev;
+            const commitment = prev.commitments[cIndex];
+            if (commitment.projectPhase !== action.phase) return prev;
+
+            if (prev.energy.current < action.energyCost) {
+                setToastMessage({ title: `Need ${action.energyCost}E`, subtext: 'Rest before taking another production push.' });
+                return prev;
+            }
+
+            const currentProgress = getOwnedProductionActionProgress(commitment, actionId);
+            if (currentProgress >= 100) return prev;
+
+            const result = applyOwnedProductionFocusAction(prev, commitment, actionId);
+            const newCommitments = [...prev.commitments];
+            newCommitments[cIndex] = result.commitment;
+            const nextState: Player = {
+                ...prev,
+                commitments: newCommitments,
+                logs: [
+                    ...prev.logs,
+                    {
+                        week: prev.currentWeek,
+                        year: prev.age,
+                        message: result.logMessage,
+                        type: result.qualityLiftDelta > 0 ? 'positive' : 'neutral',
+                    },
+                ].slice(-50),
+            };
+
+            spendPlayerEnergy(nextState, action.energyCost, `Owned production: ${action.shortLabel}`);
+            setToastMessage({
+                title: action.label,
+                subtext: result.qualityLiftDelta > 0
+                    ? `Project polish improved by ${result.qualityLiftDelta}.`
+                    : `${result.commitment.name} progress improved.`,
+            });
+            return nextState;
         });
     };
 
@@ -367,7 +414,7 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
                 const energy = option.energyCost;
                 const newPlayer = JSON.parse(JSON.stringify(prev)) as Player;
                 newPlayer.money -= cost;
-                spendPlayerEnergy(newPlayer, energy);
+                spendPlayerEnergy(newPlayer, energy, `Training: ${genre}`);
                 rewardGenreExperience(newPlayer, genre, 1);
                 newPlayer.logs.push({
                     week: prev.currentWeek, year: prev.age, 
@@ -441,7 +488,7 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
                 writerStats: newWriterStats,
                 logs: [...prev.logs, { week: prev.currentWeek, year: prev.age, message: msg, type: 'neutral' as const }].slice(-50)
             };
-            spendPlayerEnergy(newState, option.energyCost);
+            spendPlayerEnergy(newState, option.energyCost, `Improve: ${option.label}`);
             
             setToastMessage({ title: toastType, subtext: msg });
             return newState;
@@ -657,7 +704,7 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
                   tr('actions.generated.luxuryGift.subtext')
               );
           }
-          spendPlayerEnergy(nextState, energyCost);
+          spendPlayerEnergy(nextState, energyCost, logMsg || `Social: ${action}`);
           return nextState;
           
       });
@@ -718,7 +765,7 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
                         },
                     ].slice(-50),
                 };
-                spendPlayerEnergy(nextState, config.energy);
+                spendPlayerEnergy(nextState, config.energy, `Pet care: ${config.label}`);
                 setToastMessage({ title: config.label, subtext: tr('actions.pet.bondImprovedSubtext', { petName: pet.name }) });
                 return nextState;
             });
@@ -837,7 +884,7 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
               news: newsUpdate,
               logs: [...prev.logs, { week: prev.currentWeek, year: prev.age, message: logMsg, type: 'positive' as const }].slice(-50)
           };
-          spendPlayerEnergy(nextState, energyCost);
+          spendPlayerEnergy(nextState, energyCost, `Relationship: Intimacy with ${partner.name}`);
           return nextState;
       });
     };
@@ -920,7 +967,7 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
                 },
                 relationships: updatedRelationships
             };
-            spendPlayerEnergy(nextState, res.energyCost);
+            spendPlayerEnergy(nextState, res.energyCost, `Networking: ${npc.name}`);
             return nextState; 
         });
     };
@@ -928,6 +975,7 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
     return {
         handleGenericUpdate,
         handleRehearse,
+        handleOwnedProductionFocus,
         handlePromotionAction,
         handleImproveAction,
         handlePartnerAction,

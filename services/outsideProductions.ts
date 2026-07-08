@@ -14,6 +14,7 @@ import { getPlayerLanguage, t } from './i18n';
 // but carry tempting terms, weak verification, and delayed legal fallout risk.
 const clamp = (value: number, min = 0, max = 100) => Math.max(min, Math.min(max, value));
 const MAX_OUTSIDE_STAKE = 49;
+export const OUTSIDE_PRODUCER_COUNTER_LIMIT = 3;
 
 const PRODUCERS = [
     { producerName: 'Marlowe Pictures', studioName: 'Marlowe Pictures', producerType: 'Producer', ownerName: 'Elian Marlowe', lane: 'prestige', flexible: true, trackRecord: 82 },
@@ -35,9 +36,9 @@ const PRODUCERS = [
 ];
 
 const FRAUD_RISK_PRODUCERS = [
-    { producerName: 'Spam Forge Capital', studioName: 'Spam Forge', producerType: 'Shell Company', ownerName: 'Unknown beneficial owners', lane: 'risk', flexible: true, trackRecord: 18 },
-    { producerName: 'Mirage Receipts Group', studioName: 'Mirage Receipts', producerType: 'Private Finance', ownerName: 'Dario Vale', lane: 'risk', flexible: true, trackRecord: 31 },
-    { producerName: 'Offshore Slate Partners', studioName: 'Offshore Slate', producerType: 'Gap Finance', ownerName: 'Cayman Desk Holdings', lane: 'gap', flexible: true, trackRecord: 26 }
+    { producerName: 'Sable Meridian Capital', studioName: 'Sable Meridian', producerType: 'Private Finance', ownerName: 'Undisclosed sponsor group', lane: 'risk', flexible: true, trackRecord: 18 },
+    { producerName: 'Crescent Vale Partners', studioName: 'Crescent Vale', producerType: 'Private Finance', ownerName: 'Dario Vale', lane: 'risk', flexible: true, trackRecord: 31 },
+    { producerName: 'Harborlight Slate Finance', studioName: 'Harborlight Slate', producerType: 'Gap Finance', ownerName: 'Cayman Desk Holdings', lane: 'gap', flexible: true, trackRecord: 26 }
 ];
 
 const GENRES: Genre[] = ['DRAMA', 'THRILLER', 'ACTION', 'COMEDY', 'HORROR', 'ROMANCE', 'SCI_FI', 'CRIME', 'MYSTERY'];
@@ -207,7 +208,9 @@ export const calculateOutsideInvestmentAcceptanceChance = ({
     stakePercent: number;
     player: Player;
 }): number => {
-    if (offer.finalTerms || offer.counterUsed) return 0;
+    const maxCounterAttempts = Number(offer.maxCounterAttempts || OUTSIDE_PRODUCER_COUNTER_LIMIT);
+    const currentCounterAttempts = Math.max(0, Number(offer.counterAttempts || (offer.counterUsed ? 1 : 0)));
+    if (offer.finalTerms || offer.counterClosed || currentCounterAttempts >= maxCounterAttempts) return 0;
     if (cashAmount < offer.minCashAsk || cashAmount > offer.maxCashAsk || stakePercent <= 0 || stakePercent > MAX_OUTSIDE_STAKE) return 0;
     if (cashAmount > player.money) return 0;
     const cashRatio = cashAmount / Math.max(1, offer.cashAsk);
@@ -273,6 +276,8 @@ export const generateOutsideProducerInvestmentOffers = (player: Player, count = 
             maxCashAsk: Math.round(Math.min(player.money, cashAsk * 1.8, budget * 0.38) / 100_000) * 100_000,
             flexible: !finalTerms,
             finalTerms,
+            counterAttempts: 0,
+            maxCounterAttempts: OUTSIDE_PRODUCER_COUNTER_LIMIT,
             acceptanceChance,
             scoutReport,
             directorName: randomFrom(DIRECTORS, seed >> 10),
@@ -301,6 +306,7 @@ export const acceptOutsideProducerInvestmentOffer = (
     const language = getPlayerLanguage(player);
     const investedAmount = Math.max(0, Math.round(override?.cashAmount ?? offer.cashAsk));
     const stakePercent = Math.round(clamp(override?.stakePercent ?? offer.offeredStakePercent, 0, MAX_OUTSIDE_STAKE) * 10) / 10;
+    if (offer.counterClosed) return { player, accepted: false, reason: offer.counterClosedReason || 'Producer walked away after three declined counters.' };
     if (hasOutsideProductionExposure(player, offer.projectId, offer.id)) return { player, accepted: false, reason: t(language, 'services.outsideProducer.reason.alreadyExposed') };
     if (investedAmount <= 0 || stakePercent <= 0 || stakePercent > MAX_OUTSIDE_STAKE) return { player, accepted: false, reason: t(language, 'services.outsideProducer.reason.invalidStake') };
     if (investedAmount > player.money) return { player, accepted: false, reason: t(language, 'services.outsideProducer.reason.notEnoughCash') };
@@ -385,12 +391,51 @@ export const counterOutsideProducerInvestmentOffer = (
 ): { player: Player; accepted: boolean; declined: boolean; chance: number; reason?: string; investment?: OutsideProductionInvestment } => {
     const language = getPlayerLanguage(player);
     const chance = calculateOutsideInvestmentAcceptanceChance({ offer, cashAmount, stakePercent, player });
-    if (offer.finalTerms || offer.counterUsed || chance <= 0) {
+    const maxCounterAttempts = Number(offer.maxCounterAttempts || OUTSIDE_PRODUCER_COUNTER_LIMIT);
+    const currentCounterAttempts = Math.max(0, Number(offer.counterAttempts || (offer.counterUsed ? 1 : 0)));
+    const nextCounterAttempts = Math.min(maxCounterAttempts, currentCounterAttempts + 1);
+    const counterClosedReason = 'Producer walked away after three declined counters.';
+    const counterFeedback = {
+        accepted: false,
+        declined: true,
+        chance,
+        cashAmount,
+        stakePercent,
+        week: player.currentWeek,
+        year: player.age,
+        attempt: nextCounterAttempts,
+        reason: t(language, 'services.outsideProducer.reason.counterDeclined')
+    };
+    const updateOutsideProducerOfferInInbox = (
+        sourcePlayer: Player,
+        nextOffer: OutsideProducerInvestmentOffer
+    ): Player => ({
+        ...sourcePlayer,
+        inbox: (sourcePlayer.inbox || []).map(message => {
+            const isTargetOffer = message.id === offer.id
+                || message.data?.id === offer.id
+                || message.data?.projectId === offer.projectId;
+            if (!isTargetOffer) return message;
+            return {
+                ...message,
+                data: nextOffer,
+                isRead: false,
+            };
+        })
+    });
+
+    if (offer.finalTerms || offer.counterClosed || currentCounterAttempts >= maxCounterAttempts || chance <= 0) {
+        const counterClosed = offer.counterClosed || currentCounterAttempts >= maxCounterAttempts;
         return {
-            player: {
-                ...player,
-                inbox: (player.inbox || []).filter(message => message.id !== offer.id)
-            },
+            player: updateOutsideProducerOfferInInbox(player, {
+                ...offer,
+                counterAttempts: currentCounterAttempts,
+                maxCounterAttempts,
+                counterUsed: currentCounterAttempts >= maxCounterAttempts,
+                counterClosed,
+                counterClosedReason: counterClosed ? (offer.counterClosedReason || counterClosedReason) : undefined,
+                lastCounterFeedback: counterFeedback,
+            }),
             accepted: false,
             declined: true,
             chance,
@@ -399,31 +444,45 @@ export const counterOutsideProducerInvestmentOffer = (
     }
     const roll = hashString(`${offer.id}:${cashAmount}:${stakePercent}:${player.age}:${player.currentWeek}`) % 100;
     if (roll >= chance) {
+        const counterClosed = nextCounterAttempts >= maxCounterAttempts;
+        const counterDeclinedLog = {
+            week: player.currentWeek,
+            year: player.age,
+            message: t(language, 'services.outsideProducer.counter.declinedLog', {
+                producer: offer.producerName,
+                stake: stakePercent,
+                title: offer.projectTitle,
+            }),
+            type: 'neutral' as const
+        };
         return {
-            player: {
+            player: updateOutsideProducerOfferInInbox({
                 ...player,
-                inbox: (player.inbox || []).filter(message => message.id !== offer.id),
                 logs: [
                     ...(player.logs || []),
-                    {
-                        week: player.currentWeek,
-                        year: player.age,
-                        message: t(language, 'services.outsideProducer.counter.declinedLog', {
-                            producer: offer.producerName,
-                            stake: stakePercent,
-                            title: offer.projectTitle,
-                        }),
-                        type: 'neutral' as const
-                    }
+                    counterDeclinedLog
                 ].slice(-80)
-            },
+            }, {
+                ...offer,
+                counterAttempts: nextCounterAttempts,
+                maxCounterAttempts,
+                counterUsed: nextCounterAttempts >= maxCounterAttempts,
+                counterClosed: nextCounterAttempts >= maxCounterAttempts,
+                counterClosedReason: counterClosed ? counterClosedReason : undefined,
+                lastCounterFeedback: counterFeedback,
+            }),
             accepted: false,
             declined: true,
             chance,
             reason: t(language, 'services.outsideProducer.reason.counterDeclined')
         };
     }
-    const result = acceptOutsideProducerInvestmentOffer(player, { ...offer, counterUsed: true }, { cashAmount, stakePercent });
+    const result = acceptOutsideProducerInvestmentOffer(player, {
+        ...offer,
+        counterUsed: true,
+        counterAttempts: nextCounterAttempts,
+        maxCounterAttempts,
+    }, { cashAmount, stakePercent });
     return { ...result, declined: false, chance };
 };
 

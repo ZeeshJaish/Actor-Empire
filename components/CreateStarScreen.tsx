@@ -1,18 +1,21 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { ActState, NewCareerData } from './types';
+import {
+  createSeededProfileSelection,
+} from '../services/profileBuilder';
+import type { ProfileBuilderGender, ProfileBuilderSelection } from '../services/profileBuilder';
+import { ProfilePictureBuilder } from '../views/avatar/ProfilePictureBuilder';
+import { exportProfilePortrait } from '../views/avatar/profilePortraitRenderer';
 import '../styles/intro.css';
 
-/* placeholder busts — swap in real pixel portraits from the character creator */
-const SKINS = ['#8a5a3b', '#c78d5e', '#5c3a24', '#e0a67a', '#a06a42', '#6e4526', '#d69a6b', '#78482a'];
-const HAIRS = ['#e6c34c', '#2a2118', '#8a8f96', '#5a2f16', '#c2452a', '#e8e3da', '#1c1c20', '#7a3a1c'];
-const SHIRTS = ['#3a6ea5', '#7a2e2e', '#2e6e4f', '#5b4a8a', '#8a6a2e', '#2e5f6e', '#6e2e5b', '#444a52'];
-
-function bustSVG(i: number): string {
-  const s = SKINS[i % 8], h = HAIRS[i % 8], t = SHIRTS[(i + 3) % 8];
-  return `<svg viewBox="0 0 64 64"><path d="M10 64c0-13 9-19 22-19s22 6 22 19z" fill="${t}"/><rect x="26" y="34" width="12" height="12" rx="3" fill="${s}"/><circle cx="32" cy="24" r="13" fill="${s}"/><path d="M19 22c0-8 6-14 13-14s13 6 13 14c0-3-5-7-13-7s-13 4-13 7z" fill="${h}"/></svg>`;
-}
-
 const GENDERS = ['Male', 'Female', 'Non-Binary'] as const;
+const PROFILE_PRESET_COUNT = 8;
+
+const toProfileGender = (gender: NewCareerData['gender']): ProfileBuilderGender => {
+  if (gender === 'Female') return 'FEMALE';
+  if (gender === 'Non-Binary') return 'NON_BINARY';
+  return 'MALE';
+};
 
 interface Props {
   state?: ActState;
@@ -24,9 +27,43 @@ interface Props {
 export default function CreateStarScreen({ state = 'on', onBegin, onBack }: Props) {
   const [presetIndex, setPresetIndex] = useState(0);
   const [gender, setGender] = useState<NewCareerData['gender']>('Male');
+  const [isBuilderOpen, setIsBuilderOpen] = useState(false);
+  const [customAvatarDataUrl, setCustomAvatarDataUrl] = useState('');
+  const [customSelection, setCustomSelection] = useState<ProfileBuilderSelection | null>(null);
   const [stageName, setStageName] = useState('');
   const [handle, setHandle] = useState('');
   const [age, setAge] = useState(18);
+  const profileGender = toProfileGender(gender);
+  const presetSelections = useMemo(
+    () =>
+      Array.from({ length: PROFILE_PRESET_COUNT }, (_, index) =>
+        createSeededProfileSelection(profileGender, `create-star-${profileGender}-${index}`)
+      ),
+    [profileGender]
+  );
+  const selectedPreset = presetSelections[presetIndex] || presetSelections[0];
+  const selectedPresetAvatar = useMemo(
+    () => (selectedPreset ? exportProfilePortrait(selectedPreset, 2) : ''),
+    [selectedPreset]
+  );
+  const presetAvatars = useMemo(
+    () => presetSelections.map((selection) => exportProfilePortrait(selection, 1)),
+    [presetSelections]
+  );
+  const selectedAvatarDataUrl = customAvatarDataUrl || selectedPresetAvatar;
+  const selectedSelection = customSelection || selectedPreset;
+  const openBuilder = () => setIsBuilderOpen(true);
+  const choosePreset = (index: number) => {
+    setPresetIndex(index);
+    setCustomAvatarDataUrl('');
+    setCustomSelection(null);
+  };
+  const applyProfilePortrait = (avatarDataUrl: string, selection?: ProfileBuilderSelection) => {
+    setCustomAvatarDataUrl(avatarDataUrl);
+    setCustomSelection(selection || null);
+    setIsBuilderOpen(false);
+  };
+  const rerollPreset = () => choosePreset((presetIndex + 1) % PROFILE_PRESET_COUNT);
 
   return (
     <section className={`phase ${state}`.trim()} id="act5">
@@ -46,19 +83,35 @@ export default function CreateStarScreen({ state = 'on', onBegin, onBack }: Prop
             <div className="pill">PXL-01</div>
           </div>
           <div className="portrait-frame">
-            <div className="bust" dangerouslySetInnerHTML={{ __html: bustSVG(presetIndex) }} />
+            {selectedAvatarDataUrl && (
+              <img className="profile-avatar-preview" src={selectedAvatarDataUrl} alt="" />
+            )}
           </div>
           <div className="portrait-actions">
-            <button className="chip-btn solid">Build</button>
+            <button className="chip-btn solid" onClick={openBuilder}>
+              Build
+            </button>
             <button
               className="chip-btn ghost"
-              onClick={() => setPresetIndex(Math.floor(Math.random() * 8))}
+              onClick={() => choosePreset(Math.floor(Math.random() * PROFILE_PRESET_COUNT))}
             >
               ⚂ Random
             </button>
           </div>
-          <button className="upload-line">⬆ Upload custom photo</button>
+          <button className="upload-line upload-line-hero" onClick={openBuilder}>
+            ⬆ Upload custom photo
+          </button>
         </div>
+
+        {isBuilderOpen && (
+          <div className="panel profile-builder-panel">
+            <ProfilePictureBuilder
+              gender={profileGender}
+              initialSelection={selectedSelection}
+              onApply={applyProfilePortrait}
+            />
+          </div>
+        )}
 
         <div className="panel">
           <div className="panel-bar">
@@ -66,19 +119,19 @@ export default function CreateStarScreen({ state = 'on', onBegin, onBack }: Prop
             <button
               className="upload-line"
               style={{ color: 'var(--gold)', padding: 0 }}
-              onClick={() => setPresetIndex((presetIndex + 1) % 8)}
+              onClick={rerollPreset}
             >
               Reroll Face
             </button>
           </div>
           <div className="preset-grid">
-            {Array.from({ length: 8 }, (_, i) => (
+            {presetAvatars.map((avatar, i) => (
               <button
                 key={i}
-                className={'preset' + (i === presetIndex ? ' sel' : '')}
-                onClick={() => setPresetIndex(i)}
+                className={'preset' + (i === presetIndex && !customAvatarDataUrl ? ' sel' : '')}
+                onClick={() => choosePreset(i)}
               >
-                <div className="bust" dangerouslySetInnerHTML={{ __html: bustSVG(i) }} />
+                <img className="profile-avatar-thumb" src={avatar} alt="" />
               </button>
             ))}
           </div>
@@ -91,7 +144,12 @@ export default function CreateStarScreen({ state = 'on', onBegin, onBack }: Prop
               <button
                 key={g}
                 className={g === gender ? 'sel' : ''}
-                onClick={() => setGender(g)}
+                onClick={() => {
+                  setGender(g);
+                  setPresetIndex(0);
+                  setCustomAvatarDataUrl('');
+                  setCustomSelection(null);
+                }}
               >
                 {g}
               </button>
@@ -139,7 +197,17 @@ export default function CreateStarScreen({ state = 'on', onBegin, onBack }: Prop
 
         <button
           className="btn-begin"
-          onClick={() => onBegin?.({ presetIndex, gender, stageName, handle, age })}
+          onClick={() =>
+            onBegin?.({
+              presetIndex,
+              gender,
+              stageName,
+              handle,
+              age,
+              avatarDataUrl: selectedAvatarDataUrl,
+              profileSelection: selectedSelection,
+            })
+          }
         >
           Begin Career
         </button>

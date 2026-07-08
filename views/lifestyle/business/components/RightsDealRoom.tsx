@@ -30,6 +30,9 @@ interface RightsDealRoomProps {
     onAcceptTerms: () => void;
     onWithdraw: () => void;
     onSign: () => void;
+    energyAvailable: number;
+    strategyEnergyCost: number;
+    signingEnergyCost: number;
     language: GameLanguage;
 }
 
@@ -75,6 +78,9 @@ export const RightsDealRoom: React.FC<RightsDealRoomProps> = ({
     onAcceptTerms,
     onWithdraw,
     onSign,
+    energyAvailable,
+    strategyEnergyCost,
+    signingEnergyCost,
     language,
 }) => {
     const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
@@ -105,6 +111,8 @@ export const RightsDealRoom: React.FC<RightsDealRoomProps> = ({
         )
         : quote.suggestedOffer;
     const [counterAmount, setCounterAmount] = useState(counterMinimum);
+    const hasStrategyEnergy = energyAvailable >= strategyEnergyCost;
+    const hasSigningEnergy = energyAvailable >= signingEnergyCost;
 
     const chooseDeal = (next: RightsDealType) => {
         setDealType(next);
@@ -365,26 +373,28 @@ export const RightsDealRoom: React.FC<RightsDealRoomProps> = ({
                 </div>
 
                 <footer className="shrink-0 border-t border-white/10 bg-black px-5 py-4 md:px-7">
-                    {!negotiation ? (
-                        <button
-                            onClick={() => onStart(dealType, offerAmount)}
-                            disabled={offerAmount > availableCapital || offerAmount < quote.minimumOffer || offerAmount > quote.maximumOffer}
-                            className="flex min-h-[52px] w-full items-center justify-center gap-2 bg-amber-400 px-5 text-[10px] font-black uppercase tracking-[0.18em] text-black transition-colors hover:bg-amber-300 disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-600"
-                        >
-                            <Banknote size={17} /> {offerAmount > availableCapital
-                                ? 'Not Enough Available Capital'
-                                : offerAmount < quote.minimumOffer || offerAmount > quote.maximumOffer
-                                    ? 'Enter An Offer Inside The Owner Range'
-                                    : `Submit ${formatCurrency(offerAmount)} Offer`}
-                        </button>
+	                    {!negotiation ? (
+	                        <button
+	                            onClick={() => onStart(dealType, offerAmount)}
+	                            disabled={!hasStrategyEnergy || offerAmount > availableCapital || offerAmount < quote.minimumOffer || offerAmount > quote.maximumOffer}
+	                            className="flex min-h-[52px] w-full items-center justify-center gap-2 bg-amber-400 px-5 text-[10px] font-black uppercase tracking-[0.18em] text-black transition-colors hover:bg-amber-300 disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-600"
+	                        >
+	                            <Banknote size={17} /> {!hasStrategyEnergy
+                                    ? `Need ${strategyEnergyCost}E`
+                                    : offerAmount > availableCapital
+	                                ? 'Not Enough Available Capital'
+	                                : offerAmount < quote.minimumOffer || offerAmount > quote.maximumOffer
+	                                    ? 'Enter An Offer Inside The Owner Range'
+	                                    : `Submit ${formatCurrency(offerAmount)} Offer · ${strategyEnergyCost}E`}
+	                        </button>
                     ) : negotiation.status === 'AWAITING_RESPONSE' ? (
                         <div className="flex min-h-[52px] items-center justify-center gap-3 border border-sky-400/20 bg-sky-400/[0.06] text-[10px] font-black uppercase tracking-[0.18em] text-sky-200">
                             <Timer size={17} /> Response arrives next week
                         </div>
                     ) : negotiation.status === 'READY_TO_SIGN' ? (
-                        <button onClick={handleSign} disabled={signing || responseAmount > studioBalance} className="flex min-h-[52px] w-full items-center justify-center gap-2 bg-emerald-400 px-5 text-[10px] font-black uppercase tracking-[0.18em] text-black disabled:bg-zinc-800 disabled:text-zinc-600">
-                            <FileSignature size={17} /> {responseAmount > studioBalance ? 'Studio Cannot Fund Contract' : signing ? 'Signing Agreement...' : 'Sign Agreement'}
-                        </button>
+	                        <button onClick={handleSign} disabled={signing || !hasSigningEnergy || responseAmount > studioBalance} className="flex min-h-[52px] w-full items-center justify-center gap-2 bg-emerald-400 px-5 text-[10px] font-black uppercase tracking-[0.18em] text-black disabled:bg-zinc-800 disabled:text-zinc-600">
+	                            <FileSignature size={17} /> {!hasSigningEnergy ? `Need ${signingEnergyCost}E` : responseAmount > studioBalance ? 'Studio Cannot Fund Contract' : signing ? 'Signing Agreement...' : `Sign Agreement · ${signingEnergyCost}E`}
+	                        </button>
                     ) : negotiation.status === 'SIGNED' ? (
                         <button onClick={onClose} className="flex min-h-[52px] w-full items-center justify-center gap-2 bg-emerald-400 px-5 text-[10px] font-black uppercase tracking-[0.18em] text-black">
                             <ShieldCheck size={17} /> View In Rights Vault
@@ -392,15 +402,15 @@ export const RightsDealRoom: React.FC<RightsDealRoomProps> = ({
                     ) : (
                         <div className="grid grid-cols-2 gap-2">
                             {['ACCEPTED', 'COUNTEROFFER', 'CREATIVE_GUARANTEE', 'RIVAL_OFFER', 'BIDDING_WAR'].includes(negotiation.status) && (
-                                <button onClick={onAcceptTerms} className="flex min-h-12 items-center justify-center gap-2 bg-amber-400 px-3 text-[9px] font-black uppercase tracking-[0.13em] text-black">
-                                    <Handshake size={15} /> Accept Terms
-                                </button>
-                            )}
-                            {['COUNTEROFFER', 'RIVAL_OFFER', 'BIDDING_WAR', 'REJECTED'].includes(negotiation.status) && negotiation.round < negotiation.maxRounds && (
-                                <button onClick={() => onCounter(counterAmount)} className="flex min-h-12 items-center justify-center gap-2 border border-white/20 px-3 text-[9px] font-black uppercase tracking-[0.13em]">
-                                    <Gavel size={15} /> Raise Offer
-                                </button>
-                            )}
+	                                <button onClick={onAcceptTerms} disabled={!hasStrategyEnergy} className="flex min-h-12 items-center justify-center gap-2 bg-amber-400 px-3 text-[9px] font-black uppercase tracking-[0.13em] text-black disabled:bg-zinc-800 disabled:text-zinc-600">
+	                                    <Handshake size={15} /> {hasStrategyEnergy ? `Accept Terms · ${strategyEnergyCost}E` : `Need ${strategyEnergyCost}E`}
+	                                </button>
+	                            )}
+	                            {['COUNTEROFFER', 'RIVAL_OFFER', 'BIDDING_WAR', 'REJECTED'].includes(negotiation.status) && negotiation.round < negotiation.maxRounds && (
+	                                <button onClick={() => onCounter(counterAmount)} disabled={!hasStrategyEnergy} className="flex min-h-12 items-center justify-center gap-2 border border-white/20 px-3 text-[9px] font-black uppercase tracking-[0.13em] disabled:border-zinc-800 disabled:text-zinc-600">
+	                                    <Gavel size={15} /> {hasStrategyEnergy ? `Raise Offer · ${strategyEnergyCost}E` : `Need ${strategyEnergyCost}E`}
+	                                </button>
+	                            )}
                             <button onClick={onWithdraw} className="col-span-2 flex min-h-11 items-center justify-center gap-2 border border-rose-500/25 text-[9px] font-black uppercase tracking-[0.14em] text-rose-300">
                                 <AlertTriangle size={14} /> Walk Away
                             </button>

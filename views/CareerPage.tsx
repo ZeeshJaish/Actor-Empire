@@ -1,20 +1,42 @@
 
 import React from 'react';
-import { Player, Commitment } from '../types';
+import { Player, Commitment, OwnedProductionActionId, OwnedProductionTrackType } from '../types';
 import { getBuzzLabel } from '../services/roleLogic';
 import { getAbsoluteWeek, getElapsedWeeks } from '../services/legacyLogic';
 import { getPlayerLanguage, t } from '../services/i18n';
+import { deriveOwnedProductionCareerItems } from '../services/ownedProductionCareer';
 import { Film, Clapperboard, Trophy, Mic2, Video, Zap, PenTool, Coffee, TrendingUp, Twitter, Camera, Hourglass, CheckCircle2, Calendar } from 'lucide-react';
 
 interface CareerPageProps {
   player: Player;
   onQuitJob: (id: string) => void;
   onRehearse: (id: string) => void;
+  onOwnedProductionFocus: (id: string, action: OwnedProductionActionId) => void;
 }
 
-export const CareerPage: React.FC<CareerPageProps> = ({ player, onQuitJob, onRehearse }) => {
+const OWNED_TRACK_STYLES: Record<OwnedProductionTrackType, { dot: string; bar: string; text: string; border: string; panel: string; icon: string }> = {
+  ACTING: { dot: 'bg-pink-400', bar: 'bg-pink-500', text: 'text-pink-200', border: 'border-pink-400/20', panel: 'bg-pink-950/10', icon: 'text-pink-200' },
+  DIRECTING: { dot: 'bg-sky-400', bar: 'bg-sky-500', text: 'text-sky-200', border: 'border-sky-400/20', panel: 'bg-sky-950/10', icon: 'text-sky-200' },
+  PRODUCING: { dot: 'bg-amber-400', bar: 'bg-amber-500', text: 'text-amber-200', border: 'border-amber-400/20', panel: 'bg-amber-950/10', icon: 'text-amber-200' },
+};
+
+const getOwnedPhaseLabel = (phase: Commitment['projectPhase']) => {
+  if (phase === 'PRE_PRODUCTION') return 'Prep';
+  if (phase === 'PRODUCTION') return 'On Set';
+  if (phase === 'POST_PRODUCTION') return 'Post';
+  return 'Production';
+};
+
+const getOwnedTrackIcon = (type: OwnedProductionTrackType, className: string) => {
+  if (type === 'ACTING') return <Camera size={14} className={className} />;
+  if (type === 'DIRECTING') return <Video size={14} className={className} />;
+  return <Clapperboard size={14} className={className} />;
+};
+
+export const CareerPage: React.FC<CareerPageProps> = ({ player, onQuitJob, onRehearse, onOwnedProductionFocus }) => {
   const pendingApps = player.applications || [];
   const actingCommitments = player.commitments.filter(c => c.type === 'ACTING_GIG');
+  const ownedProductionItems = deriveOwnedProductionCareerItems(player);
   const pastProjects = player.pastProjects || [];
   const language = getPlayerLanguage(player);
   const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
@@ -320,7 +342,111 @@ export const CareerPage: React.FC<CareerPageProps> = ({ player, onQuitJob, onReh
           </div>
       )}
 
-      {/* 7. PENDING APPLICATIONS */}
+      {/* 7. MY PRODUCTIONS */}
+      {ownedProductionItems.length > 0 && (
+          <div className="space-y-4 animate-in slide-in-from-left duration-700">
+            <div className="flex flex-col gap-2 pl-1 sm:flex-row sm:items-center sm:justify-between">
+                <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-2">
+                    <Clapperboard size={12} className="text-amber-400"/> My Productions
+                </h3>
+                <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+                        {ownedProductionItems.length} active
+                    </span>
+                    <span className="flex items-center gap-1 rounded-full border border-amber-300/20 bg-amber-300/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-amber-100">
+                        <Zap size={11} fill="currentColor" /> Available Energy {player.energy.current}E
+                    </span>
+                </div>
+            </div>
+            <div className="space-y-2.5">
+                {ownedProductionItems.map(item => (
+                    <div key={item.commitment.id} data-owned-production-card="compact" className="glass-card rounded-2xl border-l-4 border-l-amber-500 bg-amber-950/5 p-3">
+                        <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                                <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
+                                    <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[8px] font-black uppercase tracking-widest text-zinc-300">
+                                        Owned Work
+                                    </span>
+                                    <span className="rounded-full border border-amber-300/20 bg-amber-300/10 px-2 py-0.5 text-[8px] font-black uppercase tracking-widest text-amber-100">
+                                        {getOwnedPhaseLabel(item.phase)}
+                                    </span>
+                                    <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[8px] font-black uppercase tracking-widest text-zinc-500">
+                                        {item.studioName}
+                                    </span>
+                                </div>
+                                <div className="break-words text-base font-black leading-tight text-white">{item.commitment.name}</div>
+                                <div className="mt-1 flex flex-wrap gap-x-2.5 gap-y-1 text-[8px] font-bold uppercase tracking-[0.12em] text-zinc-500">
+                                    <span>Phase {item.weeksLeft}/{item.phaseDurationWeeks}w</span>
+                                    <span className="text-amber-300">Polish +{item.qualityLift}/15</span>
+                                    <span>Quality {item.qualityScore}/100</span>
+                                </div>
+                            </div>
+                            <Clapperboard size={20} className="shrink-0 text-amber-500/35" />
+                        </div>
+
+                        <div className="mt-3 space-y-2">
+                            {item.tracks.map(track => {
+                                const style = OWNED_TRACK_STYLES[track.type];
+                                return (
+                                    <div key={`${item.commitment.id}_${track.type}`} className="space-y-2">
+                                        <div className="flex items-center gap-2">
+                                            <div className="flex min-w-0 flex-1 items-center gap-2">
+                                                <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-black/20 ${style.icon}`}>
+                                                    {getOwnedTrackIcon(track.type, style.icon)}
+                                                </span>
+                                                <span className={`shrink-0 text-[9px] font-black uppercase tracking-[0.16em] ${style.text}`}>{track.label}</span>
+                                                <div className="h-1.5 min-w-14 flex-1 overflow-hidden rounded-full bg-zinc-900">
+                                                    <div className={`h-full ${style.bar} transition-all duration-500`} style={{ width: `${Math.min(100, track.progress)}%` }} />
+                                                </div>
+                                            </div>
+                                            <span className="shrink-0 font-mono text-[10px] font-bold text-zinc-400">{Math.round(track.progress)}/100</span>
+                                        </div>
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {track.actions.map(action => {
+                                                const enoughEnergy = player.energy.current >= action.energyCost;
+                                                const disabled = action.isMaxed || !enoughEnergy;
+                                                return (
+                                                    <button
+                                                        key={action.id}
+                                                        onClick={() => !disabled && onOwnedProductionFocus(item.commitment.id, action.id)}
+                                                        disabled={disabled}
+                                                        aria-label={`Owned production ${track.label} ${action.label}`}
+                                                        className={`flex min-h-8 min-w-[8.25rem] flex-1 items-center justify-between gap-2 rounded-xl border px-2.5 py-1.5 text-left text-[8px] font-black uppercase tracking-[0.08em] transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300/50 ${
+                                                            action.isMaxed
+                                                                ? 'cursor-default border-emerald-400/20 bg-emerald-400/10 text-emerald-200'
+                                                                : enoughEnergy
+                                                                    ? 'cursor-pointer border-white/10 bg-zinc-800 text-white hover:bg-zinc-700'
+                                                                    : 'cursor-not-allowed border-rose-400/20 bg-rose-400/10 text-rose-200'
+                                                        }`}
+                                                    >
+                                                        <span className="flex min-w-0 items-center gap-2">
+                                                            {action.isMaxed ? <CheckCircle2 size={13} className="shrink-0" /> : <Zap size={13} className={`shrink-0 ${enoughEnergy ? 'text-amber-300 fill-amber-300' : 'text-rose-200'}`} />}
+                                                            <span className="whitespace-normal leading-tight">{action.shortLabel}</span>
+                                                        </span>
+                                                        <span className={`shrink-0 rounded-lg border px-2 py-0.5 font-mono text-[8px] ${
+                                                            action.isMaxed
+                                                                ? 'border-emerald-300/20 bg-emerald-300/10 text-emerald-100'
+                                                                : enoughEnergy
+                                                                    ? 'border-amber-300/20 bg-amber-300/10 text-amber-100'
+                                                                    : 'border-rose-300/20 bg-rose-300/10 text-rose-100'
+                                                        }`}>
+                                                            {action.isMaxed ? 'Complete' : enoughEnergy ? `${action.energyCost}E` : `Need ${action.energyCost}E`}
+                                                        </span>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                ))}
+            </div>
+          </div>
+      )}
+
+      {/* 8. PENDING APPLICATIONS */}
       {pendingApps.length > 0 && (
           <div className="space-y-3">
             <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest pl-1">{tr('career.applicationsSent')}</h3>
@@ -346,7 +472,7 @@ export const CareerPage: React.FC<CareerPageProps> = ({ player, onQuitJob, onReh
       )}
 
       {/* EMPTY STATE */}
-      {auditionPhase.length === 0 && planningPhase.length === 0 && preProductionPhase.length === 0 && productionPhase.length === 0 && postPhase.length === 0 && pendingApps.length === 0 && scheduledPhase.length === 0 && (
+      {auditionPhase.length === 0 && planningPhase.length === 0 && preProductionPhase.length === 0 && productionPhase.length === 0 && postPhase.length === 0 && pendingApps.length === 0 && scheduledPhase.length === 0 && ownedProductionItems.length === 0 && (
           <div className="border border-dashed border-zinc-800 rounded-3xl p-8 text-center bg-zinc-900/30 mt-8">
                <p className="text-zinc-500 text-sm">{tr('career.noActiveProjects')}</p>
           </div>

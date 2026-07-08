@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { INITIAL_PLAYER, Player, Page, Commitment, PressInteraction, SocialEvent, ActorSkills, AdType, Relationship, ProjectDetails, ActiveRelease, PastProject, StreamingState, PregnancyCarrier, ScheduledEvent } from './types';
 import { BottomNav } from './components/BottomNav';
+import { NewPlayerTutorialOverlay } from './components/NewPlayerTutorialOverlay';
 import { ProductionCrisisModal } from './components/ProductionCrisisModal';
 import { LifeEventModal } from './components/LifeEventModal';
 import { StockControlEventModal } from './components/StockControlEventModal';
@@ -46,7 +47,9 @@ import { createInstagramReferralOutcome } from './services/instagramOfferLogic';
 import { executeStockTrade } from './services/stockLogic';
 import { migratePlayerSave } from './services/saveMigration';
 import { externalizeCustomPostersInPlayer, stripEmbeddedPosterImageDataForPersistence } from './services/customPosterMedia';
+import { buildAvailableNewPlayerTutorialState, writeNewPlayerTutorialState, type NewPlayerTutorialState } from './services/newPlayerTutorial';
 import { acceptOutsideProducerInvestmentOffer, counterOutsideProducerInvestmentOffer } from './services/outsideProductions';
+import { PHASE_ONE_ENERGY_COSTS } from './services/energyCosts';
 import { getPlayerLanguage, isSupportedGameLanguage, t } from './services/i18n';
 import {
   addBreadcrumb,
@@ -367,7 +370,7 @@ export const App: React.FC = () => {
   const [rightsMarketOpportunityId, setRightsMarketOpportunityId] = useState<string | null>(null);
   const [initialForbesStudioId, setInitialForbesStudioId] = useState<string | null>(null);
   const [initialMobileStockId, setInitialMobileStockId] = useState<string | null>(null);
-  const [initialMobileAppMode, setInitialMobileAppMode] = useState<'BOXOFFICE' | null>(null);
+  const [initialMobileAppMode, setInitialMobileAppMode] = useState<'BOXOFFICE' | 'MESSAGES' | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [gameStatus, setGameStatus] = useState<GameStatus>('START_MENU');
   const [skipStartMenuIntro, setSkipStartMenuIntro] = useState(true);
@@ -686,7 +689,7 @@ export const App: React.FC = () => {
 
   // --- LOGIC HOOK ---
   const { 
-      handleGenericUpdate, handleRehearse, handleImproveAction, 
+      handleGenericUpdate, handleRehearse, handleOwnedProductionFocus, handleImproveAction,
       handlePartnerAction, handleSocialInteract, handleIntimacyChoice, 
       handlePromotionAction, handleNPCInteract
   } = useGameActions({ 
@@ -1813,6 +1816,10 @@ export const App: React.FC = () => {
           age, 
           gender, 
           avatar,
+          flags: {
+              ...(INITIAL_PLAYER.flags || {}),
+              newPlayerTutorial: buildAvailableNewPlayerTutorialState(),
+          },
           relationships: parentRelationships,
           // Set specific handle for all platforms
           instagram: { ...INITIAL_PLAYER.instagram, handle: handle },
@@ -1825,6 +1832,7 @@ export const App: React.FC = () => {
           setSaveSlots(prev => ({ ...prev, [targetSlot]: migratedNewPlayer }));
       }
       setPlayer(migratedNewPlayer); 
+      setActivePage(Page.HOME);
       setGameStatus('PLAYING'); 
   };
 
@@ -1833,12 +1841,17 @@ export const App: React.FC = () => {
       const introGender = data.gender === 'Female' ? 'FEMALE' : data.gender === 'Non-Binary' ? 'NON_BINARY' : 'MALE';
       const rawHandle = data.handle.trim() || name.toLowerCase().replace(/\s+/g, '');
       const handle = rawHandle.startsWith('@') ? rawHandle : `@${rawHandle}`;
+      const avatar = data.avatarDataUrl || getGenderedAvatar(introGender as any, `${name}-${data.presetIndex}`);
       setCurrentSlot(slot);
-      handleStartGame(name, data.age, introGender, getGenderedAvatar(introGender as any, `${name}-${data.presetIndex}`), handle, slot);
+      handleStartGame(name, data.age, introGender, avatar, handle, slot);
   };
 
   const handleOpenDeathSummaryPreview = () => {
       setDeathScreenPreviewPlayer(clone(player));
+  };
+
+  const handleUpdateTutorialState = (state: NewPlayerTutorialState) => {
+      handleGenericUpdate(prev => writeNewPlayerTutorialState(prev, state));
   };
 
   const handleContinueAsChild = (child: any) => {
@@ -2508,7 +2521,7 @@ export const App: React.FC = () => {
             <>
                 <div className={`${isFullBleedMobileSurface ? 'flex-1 overflow-hidden p-0' : `flex-1 px-5 pt-5 pb-nav-safe overflow-y-auto custom-scrollbar ${player.money < 0 ? 'pt-8' : ''}`}`}>
                     {activePage === Page.HOME && (<HomePage player={player} onNextWeek={handleNextWeek} isProcessing={isProcessing} onUpdatePlayer={handleUpdatePlayer} setPage={setActivePage} onOpenProductionHouseCheat={() => { setLifestyleInitialView('PRODUCTION_GAME'); setActivePage(Page.LIFESTYLE); }} onOpenStudioAcquisitionCheat={(studioId) => { setInitialForbesStudioId(studioId); setActivePage(Page.MOBILE); }} onOpenBoxOfficeCheat={() => { setInitialMobileAppMode('BOXOFFICE'); setActivePage(Page.MOBILE); }} onQueueBabyNamingCheat={handleQueueBabyNamingCheat} onOpenDeathSummaryPreview={handleOpenDeathSummaryPreview} onShowWhatsNewCheat={handleShowWhatsNewCheat} />)}
-                    {activePage === Page.CAREER && (<CareerPage player={player} onQuitJob={handleQuitJob} onRehearse={handleRehearse} />)}
+                    {activePage === Page.CAREER && (<CareerPage player={player} onQuitJob={handleQuitJob} onRehearse={handleRehearse} onOwnedProductionFocus={handleOwnedProductionFocus} />)}
                     {activePage === Page.IMPROVE && (<ImprovePage player={player} onTrain={()=>{}} onEnroll={(c)=>handleGenericUpdate(p=>{ const previousCommitments = p.commitments; const next: Player = { ...p, money: p.money- (c.upfrontCost||0), commitments: [...p.commitments, {...c, id: `c_${Date.now()}`, weeksCompleted:0}] }; syncWeeklyEnergyForCommitments(next, previousCommitments); return next; })} onCancel={(id)=>handleGenericUpdate(p=>{ const previousCommitments = p.commitments; const next: Player = { ...p, commitments: p.commitments.filter(c=>c.id!==id)}; syncWeeklyEnergyForCommitments(next, previousCommitments); return next; })} onPerformAction={handleImproveAction} />)}
                     {activePage === Page.SOCIAL && (<SocialPage player={player} onInteract={handleSocialInteract} onContinueAsChild={handleContinueAsChild} />)}
                     {activePage === Page.LIFESTYLE && (<LifestylePage player={player} onBuyItem={handleBuyLifestyleItem} onSellItem={handleSellLifestyleItem} onSetResidence={(id)=>handleGenericUpdate(p=>({ ...p, residenceId: id }))} onStartBusiness={()=>{}} onShutdownBusiness={()=>{}} onUpdatePlayer={handleUpdatePlayer} onPremiumPurchase={handlePremiumPurchase} onNavVisibilityChange={setIsBottomNavVisible} initialView={lifestyleInitialView ?? undefined} onInitialViewConsumed={() => setLifestyleInitialView(null)} initialRightsMarketOpportunityId={rightsMarketOpportunityId ?? undefined} onRightsMarketTargetConsumed={() => setRightsMarketOpportunityId(null)} />)}
@@ -2530,7 +2543,7 @@ export const App: React.FC = () => {
                                 setLifestyleInitialView('PRODUCTION_GAME');
                                 setActivePage(Page.LIFESTYLE);
                             }}
-                            onAudition={(opp)=>handleGenericUpdate(p=>{ const next: Player = { ...p, applications: [...p.applications, { id: `app_${Date.now()}`, type: 'AUDITION' as const, name: opp.projectName, weeksRemaining: 1, data: opp }] }; spendPlayerEnergy(next, 25); return next; })}
+                            onAudition={(opp)=>handleGenericUpdate(p=>{ const next: Player = { ...p, applications: [...p.applications, { id: `app_${Date.now()}`, type: 'AUDITION' as const, name: opp.projectName, weeksRemaining: 1, data: opp }] }; spendPlayerEnergy(next, 25, `Audition: ${opp.projectName}`); return next; })}
                             onTakeJob={(job)=>handleGenericUpdate(p=>{ const previousCommitments = p.commitments; const next: Player = { ...p, commitments: [...p.commitments, job] }; syncWeeklyEnergyForCommitments(next, previousCommitments); return next; })}
                             onQuitJob={handleQuitJob} 
                             onPost={(t,c,img)=>handleGenericUpdate(p=>{
@@ -2600,7 +2613,7 @@ export const App: React.FC = () => {
                                         fanLoyalty: clampInstagramStat((p.instagram.fanLoyalty ?? 45) + outcome.statDeltas.fanLoyalty)
                                     } 
                                 };
-                                spendPlayerEnergy(nextState, config.energy);
+                                spendPlayerEnergy(nextState, config.energy, `Instagram: ${config.label}`);
                                 return nextState;
                             })}
                             onReactInstagramPost={(postId, action)=>handleGenericUpdate(p=>{
@@ -2853,22 +2866,43 @@ export const App: React.FC = () => {
                                     });
                                     return { ...p, inbox: p.inbox.filter(m=>m.id!==msg.id) };
                                 }
+                                const investmentEnergyCost = PHASE_ONE_ENERGY_COSTS.OUTSIDE_PRODUCER_INVESTMENT_ACCEPT;
+                                if (p.energy.current < investmentEnergyCost) {
+                                    setToastMessage({
+                                        title: tr('app.producerInvestment.dealBlockedTitle'),
+                                        subtext: `Need ${investmentEnergyCost}E to commit investor money.`
+                                    });
+                                    return p;
+                                }
                                 if (action === 'COUNTER') {
+                                    const counterOffer = msg.data;
                                     const counterResult = counterOutsideProducerInvestmentOffer(
                                         p,
-                                        msg.data?.offer || msg.data,
+                                        counterOffer,
                                         Number(msg.data?.counterCash || 0),
                                         Number(msg.data?.counterStake || 0)
                                     );
+                                    if (counterResult.accepted) {
+                                        spendPlayerEnergy(counterResult.player, investmentEnergyCost, `Producer investment: ${msg.data?.projectTitle || 'Counter accepted'}`);
+                                    }
+                                    const updatedCounterOffer = (counterResult.player.inbox || []).find(message => (
+                                        message.id === msg.id
+                                        || message.data?.id === counterOffer?.id
+                                        || message.data?.projectId === counterOffer?.projectId
+                                    ))?.data;
+                                    const counterClosed = Boolean(updatedCounterOffer?.counterClosed);
                                     setToastMessage({
                                         title: counterResult.accepted ? tr('app.producerInvestment.counterAcceptedTitle') : tr('app.producerInvestment.counterDeclinedTitle'),
                                         subtext: counterResult.accepted
                                             ? tr('app.producerInvestment.counterAcceptedSubtext')
-                                            : tr('app.producerInvestment.counterDeclinedSubtext')
+                                            : tr(counterClosed ? 'app.producerInvestment.counterClosedSubtext' : 'app.producerInvestment.counterDeclinedSubtext')
                                     });
                                     return counterResult.player;
                                 }
                                 const result = acceptOutsideProducerInvestmentOffer(p, msg.data);
+                                if (result.accepted) {
+                                    spendPlayerEnergy(result.player, investmentEnergyCost, `Producer investment: ${msg.data?.projectTitle || 'Accept terms'}`);
+                                }
                                 setToastMessage({
                                     title: result.accepted ? tr('app.producerInvestment.shareBoughtTitle') : tr('app.producerInvestment.dealBlockedTitle'),
                                     subtext: result.accepted
@@ -2880,7 +2914,7 @@ export const App: React.FC = () => {
                                 });
                                 return result.player;
                             })} 
-                            onPerformSponsorship={(id, type)=>handleGenericUpdate(p=>{ const s = p.activeSponsorships.find(x=>x.id===id); if (!s) return p; const next = { ...p }; spendPlayerEnergy(next, s.requirements.energyCost); return next; })}
+                            onPerformSponsorship={(id, type)=>handleGenericUpdate(p=>{ const s = p.activeSponsorships.find(x=>x.id===id); if (!s) return p; const next = { ...p }; spendPlayerEnergy(next, s.requirements.energyCost, `Sponsorship: ${s.brandName || type}`); return next; })}
                             onDeleteMessage={(id)=>handleGenericUpdate(p=>({ ...p, inbox: p.inbox.filter(m=>m.id!==id) }))} 
                             onTradeStock={handleTradeStock} 
                         />
@@ -2915,6 +2949,18 @@ export const App: React.FC = () => {
                         unreadMessages={player.inbox?.filter(message => !message.isRead).length || 0}
                     />
                 )}
+                <NewPlayerTutorialOverlay
+                    player={player}
+                    activePage={activePage}
+                    setPage={setActivePage}
+                    onOpenMobileAppMode={(mode) => {
+                        if (mode === 'MESSAGES') {
+                            setInitialMobileAppMode('MESSAGES');
+                            setActivePage(Page.MOBILE);
+                        }
+                    }}
+                    onUpdateTutorialState={handleUpdateTutorialState}
+                />
             </>
         )}
       </div>

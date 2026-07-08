@@ -35,6 +35,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ player, activePage, setPag
                   onClick={() => setPage(item.page)}
                   aria-label={item.label}
                   title={item.label}
+                  data-tutorial-id={`nav-${String(item.page).toLowerCase()}`}
                   className={`relative flex flex-col items-center justify-center w-full h-full transition-all duration-300 ${
                     isActive ? 'text-amber-400' : 'text-zinc-500 hover:text-zinc-300'
                   }`}

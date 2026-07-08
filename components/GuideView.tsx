@@ -1,14 +1,16 @@
-import React, { useState } from 'react';
-import { Zap, DollarSign, Star, Film, TrendingUp, Users, ArrowLeft, BookOpen, Briefcase, PlayCircle, X, GraduationCap, Activity, Globe, Smartphone, BarChart3, ChevronRight, HelpCircle, Heart, Clapperboard, Landmark, Sparkles, Building2, Clock3 } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { Zap, DollarSign, Star, Film, TrendingUp, Users, ArrowLeft, BookOpen, Briefcase, PlayCircle, X, GraduationCap, Activity, Globe, Smartphone, BarChart3, ChevronRight, HelpCircle, Heart, Clapperboard, Landmark, Sparkles, Building2, Clock3, Search } from 'lucide-react';
 import { Player } from '../types';
 import { getPlayerLanguage, t } from '../services/i18n';
 
 interface GuideViewProps {
     player: Player;
     onBack: () => void;
+    onOpenApp?: (mode: GuideAppDestination) => void;
 }
 
-type GuideMode = 'MENU' | 'HANDBOOK' | 'PLAYBOOKS' | 'FAQ' | 'WIZARD';
+export type GuideAppDestination = 'CASTLINK' | 'IMDB' | 'BOXOFFICE' | 'INSTAGRAM' | 'X' | 'YOUTUBE' | 'NEWS' | 'TEAM' | 'MESSAGES' | 'FORBES' | 'STOCKS' | 'DATING_FOLDER' | 'SOCIAL_FOLDER' | 'TINDER' | 'LUXE' | 'BANK';
+type GuideMode = 'MENU' | 'HANDBOOK' | 'PLAYBOOKS' | 'FAQ' | 'WIZARD' | 'PROBLEM';
 type Translate = (key: string, vars?: Record<string, string | number>) => string;
 
 type GuideSectionConfig = {
@@ -29,6 +31,35 @@ type WizardStepConfig = {
     bodyKey: string;
     icon: React.ReactNode;
     color: string;
+};
+
+type GuideAction = {
+    labelKey: string;
+    appMode: GuideAppDestination;
+    helperKey: string;
+};
+
+type ProblemSolverConfig = {
+    id: string;
+    titleKey: string;
+    subtitleKey: string;
+    icon: React.ReactNode;
+    keywords: string[];
+    searchKey: string;
+    whatKey: string;
+    whyKey: string;
+    nowKeys: string[];
+    actions: GuideAction[];
+    related: { mode: Extract<GuideMode, 'HANDBOOK' | 'PLAYBOOKS' | 'FAQ'>; sectionId: string; labelKey: string }[];
+};
+
+type StatusTipDefinition = {
+    id: string;
+    titleKey: string;
+    bodyKey: string;
+    icon: React.ReactNode;
+    action?: GuideAction;
+    shouldShow: (player: Player) => boolean;
 };
 
 const GuideNote: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
@@ -59,6 +90,42 @@ const GuideTagRow: React.FC<{ tags: string[] }> = ({ tags }) => (
     </div>
 );
 
+const GuideActionButton: React.FC<{ action: GuideAction; guideText: Translate; onOpenApp?: (mode: GuideAppDestination) => void }> = ({ action, guideText, onOpenApp }) => (
+    <button
+        type="button"
+        onClick={() => onOpenApp?.(action.appMode)}
+        className="flex w-full items-center justify-between gap-3 rounded-2xl border border-emerald-400/20 bg-emerald-950/30 px-3 py-2.5 text-left transition hover:border-emerald-300/50 hover:bg-emerald-900/40"
+    >
+        <div className="min-w-0">
+            <div className="truncate text-sm font-black text-white">{guideText(action.labelKey)}</div>
+            <div className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-200/70">{guideText(action.helperKey)}</div>
+        </div>
+        <ChevronRight size={17} className="shrink-0 text-emerald-300" />
+    </button>
+);
+
+const GuideShortcutButton: React.FC<{
+    icon: React.ReactNode;
+    title: string;
+    subtitle: string;
+    tone: string;
+    onClick: () => void;
+}> = ({ icon, title, subtitle, tone, onClick }) => (
+    <button
+        type="button"
+        onClick={onClick}
+        className={`flex min-h-[92px] flex-col items-start gap-2 rounded-2xl border p-3 text-left transition hover:scale-[1.01] ${tone}`}
+    >
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-black/35">
+            {icon}
+        </div>
+        <div className="min-w-0">
+            <div className="line-clamp-2 text-sm font-black leading-tight text-white">{title}</div>
+            <div className="mt-1 line-clamp-2 text-[10px] font-semibold leading-snug text-zinc-400">{subtitle}</div>
+        </div>
+    </button>
+);
+
 const renderGuideContent = (section: GuideSectionConfig, guideText: Translate) => (
     <div className="space-y-3 text-xs text-zinc-400">
         {section.bodyKeys.map(key => (
@@ -82,6 +149,188 @@ const WIZARD_STEPS: WizardStepConfig[] = [
     { titleKey: 'wizard.business.title', bodyKey: 'wizard.business.body', icon: <BarChart3 size={48} className="text-emerald-400" />, color: 'bg-emerald-900/20' },
     { titleKey: 'wizard.studio.title', bodyKey: 'wizard.studio.body', icon: <Clapperboard size={48} className="text-rose-400" />, color: 'bg-rose-900/20' },
     { titleKey: 'wizard.stories.title', bodyKey: 'wizard.stories.body', icon: <Globe size={48} className="text-blue-400" />, color: 'bg-blue-900/20' },
+];
+
+const PROBLEM_SOLVERS: ProblemSolverConfig[] = [
+    {
+        id: 'roles',
+        titleKey: 'problem.roles.title',
+        subtitleKey: 'problem.roles.subtitle',
+        icon: <Film size={18} className="text-indigo-300" />,
+        keywords: ['role', 'castlink', 'audition', 'agent', 'career', 'acting', 'job'],
+        searchKey: 'problem.roles.search',
+        whatKey: 'problem.roles.what',
+        whyKey: 'problem.roles.why',
+        nowKeys: ['problem.roles.now1', 'problem.roles.now2', 'problem.roles.now3'],
+        actions: [
+            { labelKey: 'problem.action.castlink', appMode: 'CASTLINK', helperKey: 'problem.action.castlink.helper' },
+            { labelKey: 'problem.action.team', appMode: 'TEAM', helperKey: 'problem.action.team.helper' }
+        ],
+        related: [
+            { mode: 'FAQ', sectionId: 'FAQ_ROLES', labelKey: 'problem.related.faq.roles' },
+            { mode: 'PLAYBOOKS', sectionId: 'ACTOR_CAREER', labelKey: 'problem.related.playbook.actorCareer' },
+            { mode: 'HANDBOOK', sectionId: 'CAREER', labelKey: 'problem.related.handbook.career' }
+        ]
+    },
+    {
+        id: 'energy',
+        titleKey: 'problem.energy.title',
+        subtitleKey: 'problem.energy.subtitle',
+        icon: <Zap size={18} className="text-yellow-300" />,
+        keywords: ['energy', 'tired', 'week', 'rest', 'stamina', 'blocked'],
+        searchKey: 'problem.energy.search',
+        whatKey: 'problem.energy.what',
+        whyKey: 'problem.energy.why',
+        nowKeys: ['problem.energy.now1', 'problem.energy.now2', 'problem.energy.now3'],
+        actions: [
+            { labelKey: 'problem.action.castlink', appMode: 'CASTLINK', helperKey: 'problem.action.castlink.energyHelper' },
+            { labelKey: 'problem.action.social', appMode: 'SOCIAL_FOLDER', helperKey: 'problem.action.social.helper' }
+        ],
+        related: [
+            { mode: 'FAQ', sectionId: 'FAQ_ENERGY', labelKey: 'problem.related.faq.energy' },
+            { mode: 'HANDBOOK', sectionId: 'WEEKLY_LOOP', labelKey: 'problem.related.handbook.weekly' },
+            { mode: 'PLAYBOOKS', sectionId: 'EARLY_GAME', labelKey: 'problem.related.playbook.early' }
+        ]
+    },
+    {
+        id: 'money',
+        titleKey: 'problem.money.title',
+        subtitleKey: 'problem.money.subtitle',
+        icon: <DollarSign size={18} className="text-emerald-300" />,
+        keywords: ['money', 'cash', 'loan', 'bank', 'business', 'stock', 'income', 'asset'],
+        searchKey: 'problem.money.search',
+        whatKey: 'problem.money.what',
+        whyKey: 'problem.money.why',
+        nowKeys: ['problem.money.now1', 'problem.money.now2', 'problem.money.now3'],
+        actions: [
+            { labelKey: 'problem.action.bank', appMode: 'BANK', helperKey: 'problem.action.bank.helper' },
+            { labelKey: 'problem.action.stocks', appMode: 'STOCKS', helperKey: 'problem.action.stocks.helper' },
+            { labelKey: 'problem.action.forbes', appMode: 'FORBES', helperKey: 'problem.action.forbes.helper' }
+        ],
+        related: [
+            { mode: 'FAQ', sectionId: 'FAQ_BUSINESS_MONEY', labelKey: 'problem.related.faq.businessMoney' },
+            { mode: 'FAQ', sectionId: 'FAQ_LOANS', labelKey: 'problem.related.faq.loans' },
+            { mode: 'PLAYBOOKS', sectionId: 'MONEY_RISK', labelKey: 'problem.related.playbook.money' }
+        ]
+    },
+    {
+        id: 'awards',
+        titleKey: 'problem.awards.title',
+        subtitleKey: 'problem.awards.subtitle',
+        icon: <TrendingUp size={18} className="text-amber-300" />,
+        keywords: ['award', 'imdb', 'nomination', 'winner', 'release', 'streaming', 'box office', 'rating'],
+        searchKey: 'problem.awards.search',
+        whatKey: 'problem.awards.what',
+        whyKey: 'problem.awards.why',
+        nowKeys: ['problem.awards.now1', 'problem.awards.now2', 'problem.awards.now3'],
+        actions: [
+            { labelKey: 'problem.action.imdb', appMode: 'IMDB', helperKey: 'problem.action.imdb.helper' },
+            { labelKey: 'problem.action.boxOffice', appMode: 'BOXOFFICE', helperKey: 'problem.action.boxOffice.helper' },
+            { labelKey: 'problem.action.news', appMode: 'NEWS', helperKey: 'problem.action.news.helper' }
+        ],
+        related: [
+            { mode: 'HANDBOOK', sectionId: 'RELEASES_AWARDS', labelKey: 'problem.related.handbook.releases' },
+            { mode: 'FAQ', sectionId: 'FAQ_STREAMING', labelKey: 'problem.related.faq.streaming' },
+            { mode: 'PLAYBOOKS', sectionId: 'ACTOR_CAREER', labelKey: 'problem.related.playbook.actorCareer' }
+        ]
+    },
+    {
+        id: 'relationships',
+        titleKey: 'problem.relationships.title',
+        subtitleKey: 'problem.relationships.subtitle',
+        icon: <Heart size={18} className="text-rose-300" />,
+        keywords: ['relationship', 'dating', 'luxe', 'tinder', 'love', 'intimacy', 'family', 'friend'],
+        searchKey: 'problem.relationships.search',
+        whatKey: 'problem.relationships.what',
+        whyKey: 'problem.relationships.why',
+        nowKeys: ['problem.relationships.now1', 'problem.relationships.now2', 'problem.relationships.now3'],
+        actions: [
+            { labelKey: 'problem.action.luxe', appMode: 'LUXE', helperKey: 'problem.action.luxe.helper' },
+            { labelKey: 'problem.action.tinder', appMode: 'TINDER', helperKey: 'problem.action.tinder.helper' },
+            { labelKey: 'problem.action.social', appMode: 'SOCIAL_FOLDER', helperKey: 'problem.action.social.relationshipHelper' }
+        ],
+        related: [
+            { mode: 'FAQ', sectionId: 'FAQ_RELATIONSHIP', labelKey: 'problem.related.faq.relationships' },
+            { mode: 'PLAYBOOKS', sectionId: 'SOCIAL_PERSONAL', labelKey: 'problem.related.playbook.social' },
+            { mode: 'HANDBOOK', sectionId: 'RELATIONSHIPS', labelKey: 'problem.related.handbook.relationships' }
+        ]
+    },
+    {
+        id: 'studio',
+        titleKey: 'problem.studio.title',
+        subtitleKey: 'problem.studio.subtitle',
+        icon: <Clapperboard size={18} className="text-violet-300" />,
+        keywords: ['studio', 'production', 'sequel', 'prequel', 'reboot', 'spin-off', 'universe', 'greenlight', 'script'],
+        searchKey: 'problem.studio.search',
+        whatKey: 'problem.studio.what',
+        whyKey: 'problem.studio.why',
+        nowKeys: ['problem.studio.now1', 'problem.studio.now2', 'problem.studio.now3'],
+        actions: [
+            { labelKey: 'problem.action.imdb', appMode: 'IMDB', helperKey: 'problem.action.imdb.studioHelper' },
+            { labelKey: 'problem.action.boxOffice', appMode: 'BOXOFFICE', helperKey: 'problem.action.boxOffice.studioHelper' },
+            { labelKey: 'problem.action.team', appMode: 'TEAM', helperKey: 'problem.action.team.studioHelper' }
+        ],
+        related: [
+            { mode: 'HANDBOOK', sectionId: 'PRODUCTION_HOUSE', labelKey: 'problem.related.handbook.productionHouse' },
+            { mode: 'HANDBOOK', sectionId: 'GREENLIGHT', labelKey: 'problem.related.handbook.greenlight' },
+            { mode: 'PLAYBOOKS', sectionId: 'UNIVERSE_WORKFLOW', labelKey: 'problem.related.playbook.universe' }
+        ]
+    }
+];
+
+const hasProductionHouseScripts = (player: Player) => (
+    (player.businesses || []).some(business => business.type === 'PRODUCTION_HOUSE' && (business.studioState?.scripts || []).length > 0)
+);
+
+const hasActiveStudioProduction = (player: Player) => {
+    const studioIds = new Set((player.businesses || []).filter(business => business.type === 'PRODUCTION_HOUSE').map(business => business.id));
+    if (studioIds.size === 0) return false;
+    return (player.commitments || []).some(commitment => (
+        commitment.projectDetails?.studioId && studioIds.has(commitment.projectDetails.studioId)
+    ));
+};
+
+const STATUS_TIP_DEFINITIONS: StatusTipDefinition[] = [
+    {
+        id: 'lowEnergy',
+        titleKey: 'status.lowEnergy.title',
+        bodyKey: 'status.lowEnergy.body',
+        icon: <Zap size={16} className="text-yellow-300" />,
+        action: { labelKey: 'problem.action.castlink', appMode: 'CASTLINK', helperKey: 'status.lowEnergy.action' },
+        shouldShow: player => (player.energy?.current || 0) <= Math.max(15, (player.energy?.max || 100) * 0.25)
+    },
+    {
+        id: 'nominations',
+        titleKey: 'status.nominations.title',
+        bodyKey: 'status.nominations.body',
+        icon: <TrendingUp size={16} className="text-amber-300" />,
+        action: { labelKey: 'problem.action.imdb', appMode: 'IMDB', helperKey: 'status.nominations.action' },
+        shouldShow: player => (player.scheduledEvents || []).some(event => event.type === 'AWARD_CEREMONY' && (event.data?.nominations || []).length > 0)
+    },
+    {
+        id: 'noRole',
+        titleKey: 'status.noRole.title',
+        bodyKey: 'status.noRole.body',
+        icon: <Film size={16} className="text-indigo-300" />,
+        action: { labelKey: 'problem.action.castlink', appMode: 'CASTLINK', helperKey: 'status.noRole.action' },
+        shouldShow: player => !(player.commitments || []).some(commitment => commitment.type === 'ACTING_GIG')
+    },
+    {
+        id: 'scriptsNoProduction',
+        titleKey: 'status.scriptsNoProduction.title',
+        bodyKey: 'status.scriptsNoProduction.body',
+        icon: <Clapperboard size={16} className="text-violet-300" />,
+        action: { labelKey: 'problem.action.boxOffice', appMode: 'BOXOFFICE', helperKey: 'status.scriptsNoProduction.action' },
+        shouldShow: player => hasProductionHouseScripts(player) && !hasActiveStudioProduction(player)
+    },
+    {
+        id: 'loanPressure',
+        titleKey: 'status.loanPressure.title',
+        bodyKey: 'status.loanPressure.body',
+        icon: <Landmark size={16} className="text-emerald-300" />,
+        action: { labelKey: 'problem.action.bank', appMode: 'BANK', helperKey: 'status.loanPressure.action' },
+        shouldShow: player => (player.finance?.loans || []).some(loan => loan.status === 'ACTIVE' && (loan.weeklyPayment || 0) > 0)
+    }
 ];
 
 const HANDBOOK_SECTIONS: GuideSectionConfig[] = [
@@ -293,16 +542,128 @@ const SectionList: React.FC<{
     </div>
 );
 
-export const GuideView: React.FC<GuideViewProps> = ({ player, onBack }) => {
+const ProblemSolverView: React.FC<{
+    problem: ProblemSolverConfig;
+    guideText: Translate;
+    onBack: () => void;
+    onOpenApp?: (mode: GuideAppDestination) => void;
+    onOpenRelated: (mode: Extract<GuideMode, 'HANDBOOK' | 'PLAYBOOKS' | 'FAQ'>, sectionId: string) => void;
+}> = ({ problem, guideText, onBack, onOpenApp, onOpenRelated }) => (
+    <div className="absolute inset-0 z-50 flex h-full flex-col bg-zinc-950 text-white animate-in slide-in-from-right duration-300">
+        <div className="flex shrink-0 items-center gap-3 border-b border-zinc-800 bg-zinc-900 p-4 pt-12">
+            <button onClick={onBack} className="-ml-2 rounded-full p-2 text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-white">
+                <ArrowLeft size={20} />
+            </button>
+            <div className="flex min-w-0 items-center gap-2 text-lg font-bold">
+                {problem.icon}
+                <span className="truncate">{guideText(problem.titleKey)}</span>
+            </div>
+        </div>
+
+        <div className="custom-scrollbar flex-1 space-y-4 overflow-y-auto p-4 pb-24">
+            <div className="rounded-3xl border border-white/10 bg-gradient-to-br from-zinc-900 to-black p-5">
+                <div className="mb-3 inline-flex rounded-full bg-white/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-zinc-300">
+                    {guideText('problem.ui.solver')}
+                </div>
+                <h2 className="text-2xl font-black leading-tight text-white">{guideText(problem.titleKey)}</h2>
+                <p className="mt-2 text-sm leading-relaxed text-zinc-400">{guideText(problem.subtitleKey)}</p>
+            </div>
+
+            <div className="space-y-3">
+                <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4">
+                    <div className="mb-2 text-[10px] font-black uppercase tracking-[0.2em] text-sky-300">{guideText('problem.ui.what')}</div>
+                    <p className="text-sm leading-relaxed text-zinc-300">{guideText(problem.whatKey)}</p>
+                </div>
+                <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4">
+                    <div className="mb-2 text-[10px] font-black uppercase tracking-[0.2em] text-amber-300">{guideText('problem.ui.why')}</div>
+                    <p className="text-sm leading-relaxed text-zinc-300">{guideText(problem.whyKey)}</p>
+                </div>
+                <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4">
+                    <div className="mb-3 text-[10px] font-black uppercase tracking-[0.2em] text-emerald-300">{guideText('problem.ui.whatNow')}</div>
+                    <GuideBullets items={problem.nowKeys.map(key => guideText(key))} />
+                </div>
+            </div>
+
+            <div className="space-y-2">
+                <div className="px-1 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">{guideText('problem.ui.openApp')}</div>
+                {problem.actions.map(action => (
+                    <GuideActionButton key={`${problem.id}-${action.appMode}-${action.labelKey}`} action={action} guideText={guideText} onOpenApp={onOpenApp} />
+                ))}
+            </div>
+
+            <div className="space-y-2 rounded-2xl border border-zinc-800 bg-black/30 p-3">
+                <div className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">{guideText('problem.ui.related')}</div>
+                {problem.related.map(item => (
+                    <button
+                        key={`${problem.id}-${item.mode}-${item.sectionId}`}
+                        type="button"
+                        onClick={() => onOpenRelated(item.mode, item.sectionId)}
+                        className="flex w-full items-center justify-between rounded-xl bg-zinc-900 px-3 py-3 text-left text-xs font-bold text-zinc-200 transition hover:bg-zinc-800"
+                    >
+                        {guideText(item.labelKey)}
+                        <ChevronRight size={15} className="text-zinc-500" />
+                    </button>
+                ))}
+            </div>
+        </div>
+    </div>
+);
+
+export const GuideView: React.FC<GuideViewProps> = ({ player, onBack, onOpenApp }) => {
     const [mode, setMode] = useState<GuideMode>('MENU');
     const [wizardStep, setWizardStep] = useState(0);
     const [expandedSection, setExpandedSection] = useState<string | null>(null);
+    const [selectedProblemId, setSelectedProblemId] = useState<string | null>(null);
+    const [searchQuery, setSearchQuery] = useState('');
     const language = getPlayerLanguage(player);
     const menuTitle = t(language, 'guide.menu.title');
     const guideText: Translate = (key, vars) => t(language, `guide.${key}`, vars);
+    const allGuideSections = useMemo(() => [
+        ...HANDBOOK_SECTIONS.map(section => ({ ...section, mode: 'HANDBOOK' as const, typeLabelKey: 'problem.search.type.handbook' })),
+        ...PLAYBOOK_SECTIONS.map(section => ({ ...section, mode: 'PLAYBOOKS' as const, typeLabelKey: 'problem.search.type.playbook' })),
+        ...FAQ_SECTIONS.map(section => ({ ...section, mode: 'FAQ' as const, typeLabelKey: 'problem.search.type.faq' })),
+    ], []);
+    const recommendedTips = useMemo(() => (
+        STATUS_TIP_DEFINITIONS.filter(tip => tip.shouldShow(player)).slice(0, 3)
+    ), [player]);
+    const filteredGuideResults = useMemo(() => {
+        const query = searchQuery.trim().toLowerCase();
+        if (!query) return [];
+        const problemMatches = PROBLEM_SOLVERS
+            .filter(problem => [
+                guideText(problem.titleKey),
+                guideText(problem.subtitleKey),
+                guideText(problem.searchKey),
+                guideText(problem.whatKey),
+                guideText(problem.whyKey),
+                ...problem.nowKeys.map(key => guideText(key)),
+                ...problem.keywords
+            ].join(' ').toLowerCase().includes(query))
+            .map(problem => ({ type: 'problem' as const, problem }));
+        const sectionMatches = allGuideSections
+            .filter(section => [
+                guideText(section.titleKey),
+                ...section.bodyKeys.map(key => guideText(key)),
+                ...(section.bulletKeys || []).map(key => guideText(key)),
+                guideText(section.typeLabelKey)
+            ].join(' ').toLowerCase().includes(query))
+            .slice(0, 6)
+            .map(section => ({ type: 'section' as const, section }));
+        return [...problemMatches, ...sectionMatches].slice(0, 8);
+    }, [allGuideSections, guideText, searchQuery]);
 
     const openMode = (nextMode: GuideMode) => {
         setExpandedSection(null);
+        setMode(nextMode);
+    };
+
+    const openProblem = (id: string) => {
+        setSelectedProblemId(id);
+        setMode('PROBLEM');
+    };
+
+    const openRelatedSection = (nextMode: Extract<GuideMode, 'HANDBOOK' | 'PLAYBOOKS' | 'FAQ'>, sectionId: string) => {
+        setExpandedSection(sectionId);
         setMode(nextMode);
     };
 
@@ -353,6 +714,19 @@ export const GuideView: React.FC<GuideViewProps> = ({ player, onBack }) => {
         return renderWizard();
     }
 
+    if (mode === 'PROBLEM') {
+        const problem = PROBLEM_SOLVERS.find(item => item.id === selectedProblemId) || PROBLEM_SOLVERS[0];
+        return (
+            <ProblemSolverView
+                problem={problem}
+                guideText={guideText}
+                onBack={() => setMode('MENU')}
+                onOpenApp={onOpenApp}
+                onOpenRelated={openRelatedSection}
+            />
+        );
+    }
+
     if (mode === 'HANDBOOK') {
         return (
             <SectionList
@@ -400,72 +774,165 @@ export const GuideView: React.FC<GuideViewProps> = ({ player, onBack }) => {
 
     return (
         <div className="absolute inset-0 z-40 flex h-full flex-col bg-zinc-950 font-sans text-white animate-in slide-in-from-right duration-300">
-            <div className="flex shrink-0 items-center gap-3 border-b border-zinc-800 bg-zinc-900 p-4 pt-12">
+            <div className="flex shrink-0 items-center gap-3 border-b border-zinc-800 bg-zinc-900/95 px-4 pb-3 pt-10">
                 <button onClick={onBack} className="-ml-2 rounded-full p-2 text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-white">
                     <ArrowLeft size={20} />
                 </button>
-                <div className="flex items-center gap-2 text-lg font-bold">
-                    {menuTitle}
+                <div className="min-w-0">
+                    <div className="truncate text-lg font-black">{menuTitle}</div>
+                    <div className="truncate text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500">{guideText('problem.search.label')}</div>
                 </div>
             </div>
 
-            <div className="custom-scrollbar flex flex-1 flex-col gap-5 overflow-y-auto p-6 pb-24">
-                <div className="mb-1 text-center">
-                    <h2 className="mb-2 text-2xl font-bold text-white">{guideText('menu.heading')}</h2>
-                    <p className="text-sm leading-relaxed text-zinc-400">{guideText('menu.subtitle')}</p>
+            <div className="custom-scrollbar flex flex-1 flex-col gap-4 overflow-y-auto px-4 pb-8 pt-4">
+                <div className="rounded-3xl border border-zinc-800 bg-gradient-to-br from-zinc-900 to-black p-4">
+                    <h2 className="text-xl font-black leading-tight text-white">{guideText('menu.heading')}</h2>
+                    <p className="mt-1 text-xs leading-relaxed text-zinc-400">{guideText('menu.subtitle')}</p>
                 </div>
 
-                <button onClick={() => openMode('WIZARD')} className="group relative min-h-[136px] overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-600 to-purple-700 p-5 text-left shadow-xl transition-transform hover:scale-[1.02]">
-                    <div className="absolute right-0 top-0 p-6 opacity-20 transition-opacity group-hover:opacity-30"><PlayCircle size={80} /></div>
-                    <div className="relative z-10 flex items-start gap-4">
-                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-sm">
-                            <GraduationCap size={24} className="text-white" />
-                        </div>
-                        <div>
-                            <h3 className="mb-1 text-xl font-bold leading-tight text-white">{guideText('menu.quickStart.title')}</h3>
-                            <p className="text-xs font-medium leading-relaxed text-indigo-100">{guideText('menu.quickStart.subtitle')}</p>
-                        </div>
-                    </div>
-                </button>
+                <div className="grid grid-cols-2 gap-2">
+                    <GuideShortcutButton
+                        icon={<GraduationCap size={21} className="text-indigo-200" />}
+                        title={guideText('menu.quickStart.title')}
+                        subtitle={guideText('menu.quickStart.subtitle')}
+                        tone="border-indigo-500/25 bg-indigo-950/30 hover:border-indigo-400/50"
+                        onClick={() => openMode('WIZARD')}
+                    />
+                    <GuideShortcutButton
+                        icon={<BookOpen size={21} className="text-amber-200" />}
+                        title={guideText('menu.handbook.title')}
+                        subtitle={guideText('menu.handbook.subtitle')}
+                        tone="border-amber-500/20 bg-amber-950/20 hover:border-amber-400/45"
+                        onClick={() => openMode('HANDBOOK')}
+                    />
+                    <GuideShortcutButton
+                        icon={<Activity size={21} className="text-emerald-200" />}
+                        title={guideText('menu.playbooks.title')}
+                        subtitle={guideText('menu.playbooks.subtitle')}
+                        tone="border-emerald-500/20 bg-emerald-950/20 hover:border-emerald-400/45"
+                        onClick={() => openMode('PLAYBOOKS')}
+                    />
+                    <GuideShortcutButton
+                        icon={<HelpCircle size={21} className="text-cyan-200" />}
+                        title={guideText('menu.faq.title')}
+                        subtitle={guideText('menu.faq.subtitle')}
+                        tone="border-cyan-500/20 bg-cyan-950/20 hover:border-cyan-400/45"
+                        onClick={() => openMode('FAQ')}
+                    />
+                </div>
 
-                <button onClick={() => openMode('HANDBOOK')} className="group relative min-h-[124px] overflow-hidden rounded-3xl border border-zinc-800 bg-zinc-900 p-5 text-left transition-colors hover:border-zinc-600">
-                    <div className="absolute right-0 top-0 p-6 opacity-5 transition-opacity group-hover:opacity-10"><BookOpen size={80} /></div>
-                    <div className="relative z-10 flex items-start gap-4">
-                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-zinc-800">
-                            <BookOpen size={24} className="text-zinc-300" />
+                {recommendedTips.length > 0 && (
+                    <div className="rounded-3xl border border-amber-400/20 bg-amber-950/10 p-3">
+                        <div className="mb-3 flex items-start justify-between gap-3 px-1">
+                            <div>
+                                <div className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-300">
+                                    {guideText('status.heading')}
+                                </div>
+                                <p className="mt-1 text-[11px] font-semibold leading-relaxed text-zinc-400">{guideText('status.subtitle')}</p>
+                            </div>
+                            <Sparkles size={17} className="mt-0.5 shrink-0 text-amber-300/70" />
                         </div>
-                        <div>
-                            <h3 className="mb-1 text-xl font-bold leading-tight text-white">{guideText('menu.handbook.title')}</h3>
-                            <p className="text-xs font-medium leading-relaxed text-zinc-400">{guideText('menu.handbook.subtitle')}</p>
+                        <div className="space-y-2">
+                            {recommendedTips.map(tip => (
+                                <div key={tip.id} className="rounded-2xl border border-zinc-800 bg-black/35 p-3">
+                                    <div className="flex items-start gap-3">
+                                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-zinc-900">{tip.icon}</div>
+                                        <div className="min-w-0 flex-1">
+                                            <div className="text-sm font-black leading-tight text-white">{guideText(tip.titleKey)}</div>
+                                            <p className="mt-1 text-xs font-medium leading-relaxed text-zinc-400">{guideText(tip.bodyKey)}</p>
+                                        </div>
+                                    </div>
+                                    {tip.action && (
+                                        <div className="mt-3">
+                                            <GuideActionButton action={tip.action} guideText={guideText} onOpenApp={onOpenApp} />
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
                         </div>
                     </div>
-                </button>
+                )}
 
-                <button onClick={() => openMode('PLAYBOOKS')} className="group relative min-h-[124px] overflow-hidden rounded-3xl border border-emerald-900/60 bg-zinc-900 p-5 text-left transition-colors hover:border-emerald-500/50">
-                    <div className="absolute right-0 top-0 p-6 opacity-5 transition-opacity group-hover:opacity-10"><Activity size={80} /></div>
-                    <div className="relative z-10 flex items-start gap-4">
-                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-emerald-700/50 bg-emerald-950/80">
-                            <Activity size={24} className="text-emerald-300" />
-                        </div>
-                        <div>
-                            <h3 className="mb-1 text-xl font-bold leading-tight text-white">{guideText('menu.playbooks.title')}</h3>
-                            <p className="text-xs font-medium leading-relaxed text-zinc-400">{guideText('menu.playbooks.subtitle')}</p>
-                        </div>
+                <div className="rounded-3xl border border-zinc-800 bg-zinc-900 p-3">
+                    <div className="flex items-center gap-2 rounded-2xl border border-zinc-700 bg-black px-3 py-3">
+                        <Search size={17} className="shrink-0 text-zinc-500" />
+                        <input
+                            value={searchQuery}
+                            onChange={event => setSearchQuery(event.target.value)}
+                            placeholder={guideText('problem.search.placeholder')}
+                            className="w-full bg-transparent text-sm font-semibold text-white outline-none placeholder:text-zinc-600"
+                        />
+                        {searchQuery && (
+                            <button type="button" onClick={() => setSearchQuery('')} className="rounded-full p-1 text-zinc-500 hover:bg-zinc-800 hover:text-white">
+                                <X size={14} />
+                            </button>
+                        )}
                     </div>
-                </button>
+                    {searchQuery.trim() && (
+                        <div className="mt-3 space-y-2">
+                            {filteredGuideResults.length > 0 ? filteredGuideResults.map(result => (
+                                result.type === 'problem' ? (
+                                    <button
+                                        key={`problem-${result.problem.id}`}
+                                        type="button"
+                                        onClick={() => openProblem(result.problem.id)}
+                                        className="flex w-full items-center justify-between rounded-2xl border border-zinc-800 bg-black/40 p-3 text-left transition hover:border-zinc-600"
+                                    >
+                                        <div className="flex min-w-0 items-center gap-3">
+                                            <div className="rounded-xl bg-zinc-800 p-2">{result.problem.icon}</div>
+                                            <div className="min-w-0">
+                                                <div className="truncate text-sm font-black text-white">{guideText(result.problem.titleKey)}</div>
+                                                <div className="truncate text-[10px] font-bold uppercase tracking-[0.12em] text-emerald-300">{guideText('problem.search.type.problem')}</div>
+                                            </div>
+                                        </div>
+                                        <ChevronRight size={16} className="shrink-0 text-zinc-500" />
+                                    </button>
+                                ) : (
+                                    <button
+                                        key={`${result.section.mode}-${result.section.id}`}
+                                        type="button"
+                                        onClick={() => openRelatedSection(result.section.mode, result.section.id)}
+                                        className="flex w-full items-center justify-between rounded-2xl border border-zinc-800 bg-black/40 p-3 text-left transition hover:border-zinc-600"
+                                    >
+                                        <div className="flex min-w-0 items-center gap-3">
+                                            <div className="rounded-xl bg-zinc-800 p-2">{result.section.icon}</div>
+                                            <div className="min-w-0">
+                                                <div className="truncate text-sm font-black text-white">{guideText(result.section.titleKey)}</div>
+                                                <div className="truncate text-[10px] font-bold uppercase tracking-[0.12em] text-zinc-500">{guideText(result.section.typeLabelKey)}</div>
+                                            </div>
+                                        </div>
+                                        <ChevronRight size={16} className="shrink-0 text-zinc-500" />
+                                    </button>
+                                )
+                            )) : (
+                                <div className="rounded-2xl border border-dashed border-zinc-800 p-4 text-center text-xs font-semibold text-zinc-500">
+                                    {guideText('problem.search.noResults')}
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
 
-                <button onClick={() => openMode('FAQ')} className="group relative min-h-[124px] overflow-hidden rounded-3xl border border-zinc-800 bg-zinc-900 p-5 text-left transition-colors hover:border-zinc-600">
-                    <div className="absolute right-0 top-0 p-6 opacity-5 transition-opacity group-hover:opacity-10"><HelpCircle size={80} /></div>
-                    <div className="relative z-10 flex items-start gap-4">
-                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-zinc-800">
-                            <HelpCircle size={24} className="text-cyan-300" />
-                        </div>
-                        <div>
-                            <h3 className="mb-1 text-xl font-bold leading-tight text-white">{guideText('menu.faq.title')}</h3>
-                            <p className="text-xs font-medium leading-relaxed text-zinc-400">{guideText('menu.faq.subtitle')}</p>
-                        </div>
+                <div className="space-y-3">
+                    <div className="flex items-center justify-between px-1">
+                        <h3 className="text-xs font-black uppercase tracking-[0.16em] text-zinc-400">{guideText('problem.home.heading')}</h3>
+                        <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-zinc-600">{guideText('problem.home.tapOne')}</span>
                     </div>
-                </button>
+                    <div className="grid grid-cols-2 gap-2">
+                        {PROBLEM_SOLVERS.map(problem => (
+                            <button
+                                key={problem.id}
+                                type="button"
+                                onClick={() => openProblem(problem.id)}
+                                className="min-h-[92px] rounded-2xl border border-zinc-800 bg-zinc-900 p-3 text-left transition hover:border-zinc-600 hover:bg-zinc-800"
+                            >
+                                <div className="mb-2 inline-flex rounded-xl bg-black p-2">{problem.icon}</div>
+                                <div className="text-sm font-black leading-tight text-white">{guideText(problem.titleKey)}</div>
+                                <div className="mt-1 line-clamp-1 text-[10px] font-semibold leading-relaxed text-zinc-500">{guideText(problem.subtitleKey)}</div>
+                            </button>
+                        ))}
+                    </div>
+                </div>
             </div>
         </div>
     );

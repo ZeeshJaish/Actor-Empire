@@ -20,6 +20,7 @@ import {
     Target,
     TrendingUp,
     UserRound,
+    Zap,
 } from 'lucide-react';
 import type { Player, SubsidiaryOperatingModel } from '../../../types';
 import type { ForbesStudioProfile } from '../../../services/forbesStudioProfile';
@@ -44,6 +45,9 @@ import { getCompanyPosition, getStrategicStakeThreshold } from '../../../service
 import { formatMoney } from '../../../services/formatUtils';
 import { getOperatingModels } from '../../../services/studioGroup';
 import { getPlayerLanguage, t } from '../../../services/i18n';
+import { PHASE_ONE_ENERGY_COSTS } from '../../../services/energyCosts';
+import { showAd } from '../../../services/adLogic';
+import { hasNoAds } from '../../../services/premiumLogic';
 
 type I18nKey = Parameters<typeof t>[1];
 
@@ -204,9 +208,24 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
 }) => {
     const language = getPlayerLanguage(player);
     const tr = (key: I18nKey, vars?: Parameters<typeof t>[2]) => t(language, key, vars);
+    const strategyEnergyCost = PHASE_ONE_ENERGY_COSTS.ACQUISITION_STRATEGY_ACTION;
+    const signingEnergyCost = PHASE_ONE_ENERGY_COSTS.STUDIO_ACQUISITION_SIGNING;
+    const stockControlEnergyCost = PHASE_ONE_ENERGY_COSTS.STOCK_CONTROL_TAKEOVER_COMPLETION;
+    const hasStrategyEnergy = player.energy.current >= strategyEnergyCost;
+    const hasSigningEnergy = player.energy.current >= signingEnergyCost;
+    const hasStockControlEnergy = player.energy.current >= stockControlEnergyCost;
+    const EnergyChip: React.FC<{ cost: number; enough: boolean; label?: string }> = ({ cost, enough, label = 'Focus' }) => (
+        <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[7px] font-black uppercase tracking-[0.14em] ${
+            enough
+                ? 'border-amber-300/25 bg-amber-300/10 text-amber-200'
+                : 'border-rose-300/25 bg-rose-300/10 text-rose-200'
+        }`}>
+            <Zap size={10} fill="currentColor" /> {label} {cost}E
+        </span>
+    );
     const structureLabels = {
-        FULL: tr('studioAcquisitionDesk.structure.full'),
-        MINORITY: tr('studioAcquisitionDesk.structure.minority'),
+        FULL: tr('studioAcquisitionDesk.structure.full') || 'Full Acquisition',
+        MINORITY: tr('studioAcquisitionDesk.structure.minority') || 'Minority Stake',
     };
     const stageLabels = STAGE_KEYS.map(key => tr(key));
     const acquisitionCommitments = getAcquisitionCommitments(language);
@@ -316,9 +335,9 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
     const showStockControlReview = stockControlMode || stockControlComplete || stockControlClosing;
 
     React.useEffect(() => {
-        onImmersiveChange?.(signingRoomVisible);
+        onImmersiveChange?.(true);
         return () => onImmersiveChange?.(false);
-    }, [onImmersiveChange, signingRoomVisible]);
+    }, [onImmersiveChange]);
 
     const closingDocuments = [
         {
@@ -493,6 +512,10 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
 
     const submitOffer = () => {
         if (!selectedFunding) return;
+        if (!hasStrategyEnergy) {
+            setFeedback(`Need ${strategyEnergyCost} energy to submit acquisition terms.`);
+            return;
+        }
         const result = onSubmitOffer({
             offerType,
             offerAmount: customOfferAnalysis.normalizedAmount,
@@ -510,6 +533,10 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
     };
 
     const submitRevision = () => {
+        if (!hasStrategyEnergy) {
+            setFeedback(`Need ${strategyEnergyCost} energy to revise the acquisition offer.`);
+            return;
+        }
         const result = onReviseOffer(Number(revisionInput.replace(/[^\d.]/g, '')) || 0);
         if (result.success) {
             setRevisionMode(false);
@@ -520,6 +547,10 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
     };
 
     const submitRivalBid = (amount: number) => {
+        if (!hasStrategyEnergy) {
+            setFeedback(`Need ${strategyEnergyCost} energy to counter the rival bid.`);
+            return;
+        }
         const result = onBeatRival(amount);
         if (result.success) {
             setRivalBidMode(false);
@@ -537,6 +568,10 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
     const openSigningRoom = () => {
         if (!allClosingStepsReviewed) {
             setFeedback(tr('studioAcquisitionDesk.feedback.reviewBeforeSigningRoom'));
+            return;
+        }
+        if (!hasSigningEnergy) {
+            setFeedback(`Need ${signingEnergyCost} energy to enter the final signing room.`);
             return;
         }
         setStampDropped(false);
@@ -573,6 +608,10 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
     };
 
     const completeStockControlTransfer = () => {
+        if (!hasStockControlEnergy) {
+            setFeedback(`Need ${stockControlEnergyCost} energy to file the control transfer.`);
+            return;
+        }
         const result = onCompleteStockControl();
         if (result.success) {
             setStockControlComplete(true);
@@ -751,16 +790,22 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
                                             Return To Forbes
                                         </button>
                                     </div>
-                                ) : (
-                                    <button
-                                        type="button"
-                                        onClick={completeStockControlTransfer}
-                                        className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-emerald-400 px-4 text-[9px] font-black uppercase tracking-[0.14em] text-black"
-                                    >
-                                        <Check size={15} /> {tr('studioAcquisitionDesk.stockControl.completeAction')}
-                                    </button>
-                                )}
-                            </div>
+	                                ) : (
+	                                    <button
+	                                        type="button"
+	                                        onClick={completeStockControlTransfer}
+                                            disabled={!hasStockControlEnergy}
+	                                        className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-emerald-400 px-4 text-[9px] font-black uppercase tracking-[0.14em] text-black disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500"
+	                                    >
+	                                        <Check size={15} /> {hasStockControlEnergy ? tr('studioAcquisitionDesk.stockControl.completeAction') : `Need ${stockControlEnergyCost}E`}
+	                                    </button>
+	                                )}
+                                    {!stockControlComplete && !stockControlClosing ? (
+                                        <div className="mt-2 flex justify-end">
+                                            <EnergyChip cost={stockControlEnergyCost} enough={hasStockControlEnergy} label="Transfer" />
+                                        </div>
+                                    ) : null}
+	                            </div>
                         </motion.section>
                     ) : responseOffer && sellerResponse ? (
                         <motion.section
@@ -917,17 +962,21 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
                                                     onChange={(event) => setRivalBidInput(event.target.value)}
                                                     className="min-w-0 flex-1 rounded-xl border border-white/10 bg-black/50 px-3 font-mono text-sm font-black text-white outline-none focus:border-amber-400/50"
                                                 />
-                                                <button type="button" onClick={() => submitRivalBid(Number(rivalBidInput.replace(/[^\d.]/g, '')) || 0)} className="rounded-xl bg-amber-400 px-3 text-[8px] font-black uppercase tracking-wider text-black">Send Bid</button>
-                                            </div>
+	                                                <button type="button" onClick={() => submitRivalBid(Number(rivalBidInput.replace(/[^\d.]/g, '')) || 0)} disabled={!hasStrategyEnergy} className="rounded-xl bg-amber-400 px-3 text-[8px] font-black uppercase tracking-wider text-black disabled:bg-zinc-800 disabled:text-zinc-500">Send Bid</button>
+	                                            </div>
+	                                        </div>
+	                                    ) : null}
+                                        <div className="flex justify-end">
+                                            <EnergyChip cost={strategyEnergyCost} enough={hasStrategyEnergy} />
                                         </div>
-                                    ) : null}
-                                    <button
-                                        type="button"
-                                        onClick={() => submitRivalBid(sellerResponse.requiredBidAmount || 0)}
-                                        className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-amber-400 px-4 text-[9px] font-black uppercase tracking-[0.14em] text-black"
-                                    >
-                                        <Target size={15} /> Beat Rival
-                                    </button>
+	                                    <button
+	                                        type="button"
+	                                        onClick={() => submitRivalBid(sellerResponse.requiredBidAmount || 0)}
+                                            disabled={!hasStrategyEnergy}
+	                                        className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-amber-400 px-4 text-[9px] font-black uppercase tracking-[0.14em] text-black disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500"
+	                                    >
+	                                        <Target size={15} /> {hasStrategyEnergy ? 'Beat Rival' : `Need ${strategyEnergyCost}E`}
+	                                    </button>
                                     <div className="grid grid-cols-2 gap-2">
                                         <button type="button" onClick={() => setRivalBidMode(value => !value)} className="min-h-11 rounded-xl border border-amber-400/25 bg-amber-400/[0.07] px-3 text-[8px] font-black uppercase tracking-wider text-amber-300">Custom Bid</button>
                                         <button type="button" onClick={() => onWalkAway()} className="min-h-11 rounded-xl border border-white/10 bg-white/[0.03] px-3 text-[8px] font-black uppercase tracking-wider text-zinc-500">Walk Away</button>
@@ -946,17 +995,21 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
                                                     onChange={(event) => setRevisionInput(event.target.value)}
                                                     className="min-w-0 flex-1 rounded-xl border border-white/10 bg-black/50 px-3 font-mono text-sm font-black text-white outline-none focus:border-amber-400/50"
                                                 />
-                                                <button type="button" onClick={submitRevision} className="rounded-xl bg-amber-400 px-3 text-[8px] font-black uppercase tracking-wider text-black">Send Revision</button>
-                                            </div>
+	                                                <button type="button" onClick={submitRevision} disabled={!hasStrategyEnergy} className="rounded-xl bg-amber-400 px-3 text-[8px] font-black uppercase tracking-wider text-black disabled:bg-zinc-800 disabled:text-zinc-500">Send Revision</button>
+	                                            </div>
+	                                        </div>
+	                                    ) : null}
+                                        <div className="flex justify-end">
+                                            <EnergyChip cost={strategyEnergyCost} enough={hasStrategyEnergy} />
                                         </div>
-                                    ) : null}
-                                    <button
-                                        type="button"
-                                        onClick={() => onAcceptCounter()}
-                                        className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-emerald-400 px-4 text-[9px] font-black uppercase tracking-[0.14em] text-black"
-                                    >
-                                        <Check size={15} /> Accept Counter
-                                    </button>
+	                                    <button
+	                                        type="button"
+	                                        onClick={() => onAcceptCounter()}
+                                            disabled={!hasStrategyEnergy}
+	                                        className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-emerald-400 px-4 text-[9px] font-black uppercase tracking-[0.14em] text-black disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500"
+	                                    >
+	                                        <Check size={15} /> {hasStrategyEnergy ? 'Accept Counter' : `Need ${strategyEnergyCost}E`}
+	                                    </button>
                                     <div className="grid grid-cols-2 gap-2">
                                         <button type="button" onClick={() => setRevisionMode(value => !value)} className="min-h-11 rounded-xl border border-amber-400/25 bg-amber-400/[0.07] px-3 text-[8px] font-black uppercase tracking-wider text-amber-300">Revise Offer</button>
                                         <button type="button" onClick={() => onWalkAway()} className="min-h-11 rounded-xl border border-white/10 bg-white/[0.03] px-3 text-[8px] font-black uppercase tracking-wider text-zinc-500">Walk Away</button>
@@ -1076,29 +1129,32 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
                                             </div>
                                         ) : null}
                                     </section>
-                                    <section className="rounded-3xl border border-amber-400/25 bg-[radial-gradient(circle_at_bottom_right,rgba(245,158,11,0.16),transparent_45%),rgba(245,158,11,0.06)] p-4">
-                                        <div className="flex items-center gap-2 text-[7px] font-black uppercase tracking-[0.2em] text-amber-300">
-                                            <Scale size={14} /> Document Signing
-                                        </div>
-                                        <p className="mt-2 text-[9px] font-semibold leading-relaxed text-zinc-400">
-                                            Signing transfers control into your owned company group. Purchase funds move now, not at offer submission.
-                                        </p>
-                                        <button
-                                            type="button"
-                                            aria-label="Sign & Acquire Studio"
-                                            disabled={!allClosingStepsReviewed}
-                                            onClick={openSigningRoom}
-                                            className={`relative mt-4 flex min-h-14 w-full select-none items-center justify-center overflow-hidden rounded-2xl border px-4 text-[9px] font-black uppercase tracking-[0.14em] transition-all ${
-                                                allClosingStepsReviewed
-                                                    ? 'border-emerald-300/40 bg-black text-emerald-100 shadow-[0_16px_40px_rgba(16,185,129,0.12)] active:scale-[0.99]'
-                                                    : 'cursor-not-allowed border-white/[0.07] bg-white/[0.03] text-zinc-600'
-                                            }`}
-                                        >
-                                            <div className="relative z-10 flex items-center gap-2">
-                                                <Check size={15} strokeWidth={3} />
-                                                {allClosingStepsReviewed ? 'Enter Signing Room' : 'Stamp Documents First'}
+	                                    <section className="rounded-3xl border border-amber-400/25 bg-[radial-gradient(circle_at_bottom_right,rgba(245,158,11,0.16),transparent_45%),rgba(245,158,11,0.06)] p-4">
+	                                        <div className="flex items-center gap-2 text-[7px] font-black uppercase tracking-[0.2em] text-amber-300">
+	                                            <Scale size={14} /> Document Signing
+	                                        </div>
+                                            <div className="mt-3 flex justify-end">
+                                                <EnergyChip cost={signingEnergyCost} enough={hasSigningEnergy} label="Signing" />
                                             </div>
-                                        </button>
+	                                        <p className="mt-2 text-[9px] font-semibold leading-relaxed text-zinc-400">
+	                                            Signing transfers control into your owned company group. Purchase funds move now, not at offer submission.
+	                                        </p>
+	                                        <button
+	                                            type="button"
+	                                            aria-label="Sign & Acquire Studio"
+	                                            disabled={!allClosingStepsReviewed || !hasSigningEnergy}
+	                                            onClick={openSigningRoom}
+                                            className={`relative mt-4 flex min-h-14 w-full select-none items-center justify-center overflow-hidden rounded-2xl border px-4 text-[9px] font-black uppercase tracking-[0.14em] transition-all ${
+	                                                allClosingStepsReviewed && hasSigningEnergy
+	                                                    ? 'border-emerald-300/40 bg-black text-emerald-100 shadow-[0_16px_40px_rgba(16,185,129,0.12)] active:scale-[0.99]'
+	                                                    : 'cursor-not-allowed border-white/[0.07] bg-white/[0.03] text-zinc-600'
+	                                            }`}
+	                                        >
+	                                            <div className="relative z-10 flex items-center gap-2">
+	                                                <Check size={15} strokeWidth={3} />
+	                                                {!hasSigningEnergy ? `Need ${signingEnergyCost}E` : allClosingStepsReviewed ? 'Enter Signing Room' : 'Stamp Documents First'}
+	                                            </div>
+	                                        </button>
                                         <div className="mt-2 flex items-center justify-between text-[6px] font-black uppercase tracking-[0.14em] text-zinc-600">
                                             <span>Sign & Acquire Studio</span>
                                             <span>Private closing scene</span>
@@ -1541,10 +1597,13 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
                         </motion.div>
                     ) : (
                         <motion.div key="review" initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }}>
-                            <div className="mb-3">
-                                <div className="text-[7px] font-black uppercase tracking-[0.22em] text-amber-400">Final Review</div>
-                                <h3 className="mt-1 text-xl font-black uppercase tracking-tight">Authorize Opening Offer</h3>
-                            </div>
+	                            <div className="mb-3">
+	                                <div className="text-[7px] font-black uppercase tracking-[0.22em] text-amber-400">Final Review</div>
+	                                <h3 className="mt-1 text-xl font-black uppercase tracking-tight">Authorize Opening Offer</h3>
+                                    <div className="mt-2 flex justify-end">
+                                        <EnergyChip cost={strategyEnergyCost} enough={hasStrategyEnergy} />
+                                    </div>
+	                            </div>
                             <section className="overflow-hidden rounded-3xl border border-white/10 bg-[linear-gradient(145deg,#111114,#09090b)]">
                                 <div className="border-b border-white/[0.07] p-4">
                                     <div className="flex items-start justify-between gap-3">
@@ -1854,14 +1913,23 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
                                                     <p className="mt-3 text-[10px] font-bold leading-relaxed text-emerald-100/70">
                                                         The transfer is locked. {profile.name} is now part of your owned studio group.
                                                     </p>
+                                                    <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-amber-300/25 bg-amber-300/10 px-3 py-1.5 text-[8px] font-black uppercase tracking-[0.16em] text-amber-100">
+                                                        <Zap size={12} fill="currentColor" /> Final signing used 25E
+                                                    </div>
                                                     {configuredOperatingModel ? (
-                                                        <button
-                                                            type="button"
-                                                            onClick={onClose}
-                                                            className="mt-4 flex min-h-14 w-full cursor-pointer items-center justify-center gap-2 rounded-[22px] bg-[#d8ab3c] px-4 text-[9px] font-black uppercase tracking-[0.18em] text-black shadow-[0_9px_0_#7a4a0a] transition-transform active:translate-y-1 active:shadow-[0_4px_0_#7a4a0a]"
-                                                        >
-                                                            Open Studio Profile <ChevronRight size={16} />
-                                                        </button>
+                                                        <div className="mt-4 space-y-3">
+                                                            <div className="rounded-2xl border border-emerald-300/20 bg-emerald-300/10 p-3">
+                                                                <div className="text-[8px] font-black uppercase tracking-[0.18em] text-emerald-200">Operating model saved</div>
+                                                                <div className="mt-1 text-[10px] font-bold leading-relaxed text-emerald-100/70">Choose next studio action below.</div>
+                                                            </div>
+                                                            <button
+                                                                type="button"
+                                                                onClick={onClose}
+                                                                className="flex min-h-14 w-full cursor-pointer items-center justify-center gap-2 rounded-[22px] bg-[#d8ab3c] px-4 text-[9px] font-black uppercase tracking-[0.18em] text-black shadow-[0_9px_0_#7a4a0a] transition-transform active:translate-y-1 active:shadow-[0_4px_0_#7a4a0a]"
+                                                            >
+                                                                Open Studio Profile <ChevronRight size={16} />
+                                                            </button>
+                                                        </div>
                                                     ) : (
                                                         <div className="mt-4 border-t border-emerald-200/15 pt-4">
                                                             <div className="text-[8px] font-black uppercase tracking-[0.22em] text-amber-300">Final Board Directive</div>
@@ -1890,10 +1958,18 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
                                                             <button
                                                                 type="button"
                                                                 disabled={!selectedOperatingModel}
-                                                                onClick={() => {
+                                                                onClick={async () => {
                                                                     if (!selectedOperatingModel) return;
                                                                     const result = onSetOperatingModel(selectedOperatingModel);
-                                                                    if (!result.success) setFeedback('The operating model could not be saved.');
+                                                                    if (!result.success) {
+                                                                        setFeedback('The operating model could not be saved.');
+                                                                        return;
+                                                                    }
+                                                                    setFeedback('Operating model saved. Showing interstitial...');
+                                                                    if (!hasNoAds(player)) {
+                                                                        await showAd('INTERSTITIAL');
+                                                                    }
+                                                                    setFeedback('Operating model saved. Choose next studio action.');
                                                                 }}
                                                                 className="mt-3 flex min-h-14 w-full items-center justify-center gap-2 rounded-[22px] bg-[#d8ab3c] px-4 text-[9px] font-black uppercase tracking-[0.18em] text-black shadow-[0_9px_0_#7a4a0a] transition-transform active:translate-y-1 active:shadow-[0_4px_0_#7a4a0a] disabled:cursor-not-allowed disabled:opacity-40"
                                                             >
@@ -1996,13 +2072,14 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
                             {fundingPurpose === 'DILIGENCE' ? `Authorize ${formatMoney(diligenceFee)} Review` : 'Review Opening Offer'}
                         </button>
                     ) : (
-                        <button
-                            type="button"
-                            onClick={submitOffer}
-                            className="flex min-h-[52px] w-full items-center justify-center gap-2 rounded-xl bg-amber-400 px-4 text-[9px] font-black uppercase tracking-[0.16em] text-black active:scale-[0.99]"
-                        >
-                            <Sparkles size={15} /> Submit Opening Offer
-                        </button>
+	                        <button
+	                            type="button"
+	                            onClick={submitOffer}
+                                disabled={!hasStrategyEnergy}
+	                            className="flex min-h-[52px] w-full items-center justify-center gap-2 rounded-xl bg-amber-400 px-4 text-[9px] font-black uppercase tracking-[0.16em] text-black active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500"
+	                        >
+	                            <Sparkles size={15} /> {hasStrategyEnergy ? 'Submit Opening Offer' : `Need ${strategyEnergyCost}E`}
+	                        </button>
                     )}
                     </div>
                 </footer>

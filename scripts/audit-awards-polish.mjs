@@ -7,6 +7,7 @@ const assert = (condition, message) => {
 
 const awardLogic = read('services/awardLogic.ts');
 const redCarpet = read('views/RedCarpetEvent.tsx');
+const awardFlow = read('views/AwardNightFlow.tsx');
 const home = read('views/HomePage.tsx');
 const pkg = JSON.parse(read('package.json'));
 
@@ -26,15 +27,33 @@ const pkg = JSON.parse(read('package.json'));
 });
 
 [
+  'buildAwardPressQuestions',
+  'buildPremierePressQuestions',
+  'newspaperLead:',
+  'winNewsItems',
+  'news_multi_win_',
   'ceremonyResolvedWinners',
   'currentResults.map',
-  'PLAYER_CATEGORY',
-  'winner: getCeremonyWinnerName(result)',
-  'winnerEntry.isPlayer',
+  'isPlayerResolvedWinner',
+  'won: isPlayerResolvedWinner(result, fullBallot, currentResults)',
+  'const playerWon = isPlayerResolvedWinner(res, fullBallot, currentResults)',
+  "outcome: playerWon ? 'WON' : 'NOMINATED'",
+  'if (playerWon)',
   'upsertAwardRecord(updatedAwards, awardEntry)',
   'generateSeasonWinners(updatedPlayer, awardType, awardYear, ceremonyResolvedWinners)',
 ].forEach(token => {
   assert(redCarpet.includes(token), `Red carpet ceremony should save the same winners it shows: ${token}`);
+});
+
+[
+  'AwardNomineeDisplay',
+  'playerCategories?: PlayerAwardCategory[]',
+  "winner: category.won ? playerNominee : category.rivals[0] || 'Another Nominee'",
+  'nomineeProject(n)',
+  'playerCategories.filter(category => category.won).length',
+  'cfg.playerCategories?.some(category => category.won) ?? cfg.playerWins',
+].forEach(token => {
+  assert(awardFlow.includes(token), `Award night flow should display multi-category award outcomes from shared resolved winners: ${token}`);
 });
 
 assert(

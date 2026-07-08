@@ -100,7 +100,7 @@ import {
     WELLNESS_PROVIDER_OPTIONS,
     WELLNESS_SUPPORT_OPTIONS,
 } from '../../services/lifestyleActivities';
-import { getHealthConditionLabel, getHealthConditionTreatmentTags } from '../../services/healthConditions';
+import { getHealthConditionLabel, getHealthConditionSummary, getHealthConditionTreatmentTags } from '../../services/healthConditions';
 import { getPlayerLanguage, t } from '../../services/i18n';
 import { getGenderedAvatar } from '../../services/npcLogic';
 
@@ -767,6 +767,7 @@ const WellnessPreviewCard: React.FC<{
                         <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
                                 <div className="text-sm font-black text-white">{getHealthConditionLabel(activeCondition, language)}</div>
+                                <div className="mt-1 text-xs leading-relaxed text-rose-50/80">{getHealthConditionSummary(activeCondition, language)}</div>
                                 <div className="mt-1 text-[10px] font-black uppercase tracking-widest text-rose-100/70">{activeCondition.severity} • {activeCondition.source}</div>
                             </div>
                             <div className="text-right">

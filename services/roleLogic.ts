@@ -8,7 +8,7 @@ import {
     NPCActor, StudioId, PressInteraction, Genre, IndustryProject, WriterStats, DirectorStats, TargetAudience, ProjectFormat, PlatformId
 } from '../types';
 import { selectStudioForProject } from './studioLogic';
-import { NPC_DATABASE } from './npcLogic';
+import { NPC_DATABASE, isCastableActor } from './npcLogic';
 import { createFamousOpportunity, generateFamousMovieOpportunity, generateFamousSeriesOpportunity, getNextFamousMovie } from './famousMovieLogic';
 import { ALL_GENRES } from './genreCatalog';
 import { getAbsoluteWeek } from './legacyLogic';
@@ -933,7 +933,7 @@ export const generateCastList = (player: Player, project: ProjectDetails, player
     if (project.budgetTier === 'MID') count = 4;
     if (project.budgetTier === 'HIGH') count = 6;
 
-    const pool = [...NPC_DATABASE].sort(() => 0.5 - Math.random()).slice(0, count);
+    const pool = [...NPC_DATABASE].filter(npc => isCastableActor(npc)).sort(() => 0.5 - Math.random()).slice(0, count);
     
     pool.forEach(npc => {
         cast.push({

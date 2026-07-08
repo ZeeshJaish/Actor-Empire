@@ -102,7 +102,7 @@ const DECISION_TEMPLATES: DirectorDecision[] = [
                 labelKey: 'production.director.longTake.go.label',
                 impact: (p, c) => {
                     const updatedPlayer = { ...p };
-                    spendPlayerEnergy(updatedPlayer, 30);
+                    spendPlayerEnergy(updatedPlayer, 30, 'Directing: Long take');
                     const updatedProject = { ...c, productionPerformance: Math.min(100, (c.productionPerformance || 50) + 15) };
                     return { updatedPlayer, updatedProject, log: '', logKey: 'production.director.longTake.go.log' };
                 }

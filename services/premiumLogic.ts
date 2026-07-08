@@ -174,6 +174,55 @@ const ensureEnergyState = (player: Player) => {
     syncEnergyDisplay(player);
 };
 
+export interface WeeklyEnergySpendEntry {
+    id: string;
+    label: string;
+    amount: number;
+    week: number;
+    year: number;
+    createdAt: number;
+}
+
+const getEnergySpendLog = (player: Player): WeeklyEnergySpendEntry[] => (
+    Array.isArray(player.flags?.weeklyEnergySpendLog)
+        ? player.flags.weeklyEnergySpendLog.filter((entry: Partial<WeeklyEnergySpendEntry>) => (
+            entry
+            && typeof entry.label === 'string'
+            && typeof entry.amount === 'number'
+            && typeof entry.week === 'number'
+            && typeof entry.year === 'number'
+        )) as WeeklyEnergySpendEntry[]
+        : []
+);
+
+export const getWeeklyEnergySpendLog = (player: Player): WeeklyEnergySpendEntry[] => {
+    const week = player.currentWeek;
+    const year = player.age;
+    return getEnergySpendLog(player)
+        .filter(entry => entry.week === week && entry.year === year)
+        .sort((a, b) => b.createdAt - a.createdAt);
+};
+
+const recordWeeklyEnergySpend = (player: Player, amount: number, label = 'Energy use') => {
+    const spent = Math.max(0, Math.round(amount));
+    if (spent <= 0) return;
+    const safeLabel = label.trim() || 'Energy use';
+    const currentLog = getEnergySpendLog(player).filter(entry => (
+        entry.week === player.currentWeek && entry.year === player.age
+    ));
+    player.flags.weeklyEnergySpendLog = [
+        {
+            id: `energy_spend_${player.age}_${player.currentWeek}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+            label: safeLabel,
+            amount: spent,
+            week: player.currentWeek,
+            year: player.age,
+            createdAt: Date.now(),
+        },
+        ...currentLog,
+    ].slice(0, 30);
+};
+
 export const syncEnergyDisplay = (player: Player) => {
     const weeklyBase = Math.max(0, player.flags?.weeklyBaseEnergyRemaining || 0);
     const bonusBank = Math.max(0, player.flags?.bonusEnergyBank || 0);
@@ -184,6 +233,7 @@ export const syncEnergyDisplay = (player: Player) => {
 export const resetWeeklyEnergy = (player: Player) => {
     player.flags.weeklyBaseEnergyRemaining = ENERGY_BASELINE;
     player.flags.bonusEnergyBank = Math.max(0, player.flags?.bonusEnergyBank || 0);
+    player.flags.weeklyEnergySpendLog = [];
     syncEnergyDisplay(player);
 };
 
@@ -208,7 +258,7 @@ export const syncWeeklyEnergyForCommitments = (player: Player, previousCommitmen
     syncEnergyDisplay(player);
 };
 
-export const spendPlayerEnergy = (player: Player, amount: number) => {
+export const spendPlayerEnergy = (player: Player, amount: number, label = 'Energy use') => {
     ensureEnergyState(player);
 
     let remainingCost = Math.max(0, amount);
@@ -222,6 +272,7 @@ export const spendPlayerEnergy = (player: Player, amount: number) => {
 
     player.flags.weeklyBaseEnergyRemaining = weeklyBase - baseSpent;
     player.flags.bonusEnergyBank = bonusBank - bonusSpent;
+    recordWeeklyEnergySpend(player, baseSpent + bonusSpent, label);
     syncEnergyDisplay(player);
 };
 

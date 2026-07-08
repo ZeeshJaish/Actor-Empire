@@ -1,12 +1,13 @@
 
 import React, { useEffect, useState } from 'react';
 import { Player, Message, AuditionOpportunity, SponsorshipOffer, NegotiationData, ScheduledEvent, YoutubeBrandDeal, YoutubeCollabOffer, YoutubeMusicVideoFeatureOffer, OutsideProducerInvestmentOffer } from '../../types';
-import { ArrowLeft, Star, DollarSign, Calendar, CheckCircle, Lock, Trash2, Mail, Heart, Play, Users, Clapperboard, FileSearch, ShieldCheck, TrendingUp, AlertTriangle, FileSignature, Swords, ChevronRight, Landmark, Vote, Music2 } from 'lucide-react';
+import { ArrowLeft, Star, DollarSign, Calendar, CheckCircle, Lock, Trash2, Mail, Heart, Play, Users, Clapperboard, FileSearch, ShieldCheck, TrendingUp, AlertTriangle, FileSignature, Swords, ChevronRight, Landmark, Vote, Music2, Zap } from 'lucide-react';
 import { ProjectDetailView } from '../../components/ProjectDetailView';
 import { APP_DISPLAY_VERSION } from '../../services/appVersion';
 import { getPlayerLanguage, t } from '../../services/i18n';
 import { formatProjectMusicByline } from '../../services/musicIndustry';
 import { calculateOutsideInvestmentAcceptanceChance } from '../../services/outsideProductions';
+import { PHASE_ONE_ENERGY_COSTS } from '../../services/energyCosts';
 
 interface MessagesAppProps {
   player: Player;
@@ -25,9 +26,14 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
   const [isProcessing, setIsProcessing] = useState(false);
   const [outsideCounterCash, setOutsideCounterCash] = useState<number>(0);
   const [outsideCounterStake, setOutsideCounterStake] = useState<number>(0);
+  const [outsideCounterFeedback, setOutsideCounterFeedback] = useState<OutsideProducerInvestmentOffer['lastCounterFeedback'] | null>(null);
   const [outsideInvestmentReview, setOutsideInvestmentReview] = useState(false);
   const language = getPlayerLanguage(player);
   const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
+  const collaborationSigningEnergyCost = PHASE_ONE_ENERGY_COSTS.COLLABORATION_SIGNING;
+  const outsideInvestmentEnergyCost = PHASE_ONE_ENERGY_COSTS.OUTSIDE_PRODUCER_INVESTMENT_ACCEPT;
+  const hasCollabSigningEnergy = player.energy.current >= collaborationSigningEnergyCost;
+  const hasOutsideInvestmentEnergy = player.energy.current >= outsideInvestmentEnergyCost;
   
   // State for the full-screen contract view
   const [contractViewData, setContractViewData] = useState<{
@@ -51,10 +57,28 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
       ? (player.outsideProductions || []).find(item => item.id === selectedOutsideProducerUpdate.outsideProductionId || item.projectId === selectedOutsideProducerUpdate.projectId)
       : null;
   const isOutsideInvestmentMessage = selectedMessage?.type === 'OFFER_OUTSIDE_PRODUCER_INVESTMENT' && Boolean(selectedMessage.data);
+  const isDeveloperMessage = (message?: Message | null) => Boolean(
+      message?.id === 'msg_dev_welcome' ||
+      (message?.sender === 'Zeesh (Developer)' && message?.subject === 'A Note from the Creator')
+  );
   useEffect(() => {
       onImmersiveReviewChange?.(outsideInvestmentReview);
       return () => onImmersiveReviewChange?.(false);
   }, [onImmersiveReviewChange, outsideInvestmentReview]);
+
+  useEffect(() => {
+      if (!selectedMessage || selectedMessage.type !== 'OFFER_OUTSIDE_PRODUCER_INVESTMENT') return;
+      const updated = (player.inbox || []).find(message => message.id === selectedMessage.id);
+      if (updated) {
+          setSelectedMessage(updated);
+          const updatedOffer = updated.data as OutsideProducerInvestmentOffer;
+          setOutsideCounterFeedback(updatedOffer?.lastCounterFeedback || null);
+          return;
+      }
+      setOutsideCounterFeedback(null);
+      setOutsideInvestmentReview(false);
+      setSelectedMessage(null);
+  }, [player.inbox, selectedMessage?.id]);
 
   const formatMoney = (value: unknown) => {
       const amount = typeof value === 'number' && Number.isFinite(value) ? value : 0;
@@ -93,6 +117,9 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
           const offer = msg.data as OutsideProducerInvestmentOffer;
           setOutsideCounterCash(offer.cashAsk);
           setOutsideCounterStake(offer.offeredStakePercent);
+          setOutsideCounterFeedback(offer.lastCounterFeedback || null);
+      } else {
+          setOutsideCounterFeedback(null);
       }
       setOutsideInvestmentReview(false);
       setSelectedMessage(openedMessage);
@@ -141,6 +168,11 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
 
   const handleSignDeal = () => {
       if (isProcessing || !selectedMessage) return;
+      const needsCollabSigningEnergy = selectedMessage.type === 'OFFER_SPONSORSHIP'
+          || selectedMessage.type === 'OFFER_YOUTUBE_COLLAB'
+          || selectedMessage.type === 'OFFER_YOUTUBE_BRAND'
+          || selectedMessage.type === 'OFFER_MUSIC_VIDEO_FEATURE';
+      if (needsCollabSigningEnergy && !hasCollabSigningEnergy) return;
       setIsProcessing(true);
       
       setTimeout(() => {
@@ -174,18 +206,43 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
   const handleOutsideInvestmentAction = (action: 'ACCEPT' | 'COUNTER' | 'PASS') => {
       if (!selectedMessage) return;
       const offer = selectedMessage.data as OutsideProducerInvestmentOffer;
+      const maxCounterAttempts = Number(offer.maxCounterAttempts || 3);
+      const counterAttempts = Math.max(0, Number(offer.counterAttempts || (offer.counterUsed ? 1 : 0)));
+      const dealClosedByCounter = Boolean(offer.counterClosed || (offer.counterUsed && counterAttempts >= maxCounterAttempts && offer.lastCounterFeedback?.declined));
+      if (dealClosedByCounter) return;
+      if (action !== 'PASS' && !hasOutsideInvestmentEnergy) return;
+      if (action === 'COUNTER') {
+          const nextCounterAttempt = Math.min(maxCounterAttempts, counterAttempts + 1);
+          setOutsideCounterFeedback({
+              accepted: false,
+              declined: false,
+              chance: calculateOutsideInvestmentAcceptanceChance({
+                  offer,
+                  cashAmount: outsideCounterCash,
+                  stakePercent: outsideCounterStake,
+                  player
+              }),
+              cashAmount: outsideCounterCash,
+              stakePercent: outsideCounterStake,
+              week: player.currentWeek,
+              year: player.age,
+              attempt: nextCounterAttempt,
+              reason: 'Counter sent. Waiting for producer response.'
+          });
+      }
       onAccept({
           ...selectedMessage,
           data: {
               ...offer,
-              offer,
               action,
               counterCash: outsideCounterCash,
               counterStake: outsideCounterStake
           }
       });
-      setOutsideInvestmentReview(false);
-      setSelectedMessage(null);
+      if (action !== 'COUNTER') {
+          setOutsideInvestmentReview(false);
+          setSelectedMessage(null);
+      }
   };
 
   // --- RENDER: CONTRACT VIEW ---
@@ -215,7 +272,7 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
 
   // --- RENDER: MESSAGE LIST / DETAIL ---
   return (
-    <div className="absolute inset-0 bg-slate-50 flex flex-col z-40 text-slate-900 animate-in slide-in-from-right duration-300 font-sans">
+    <div className="absolute inset-0 bg-slate-50 flex flex-col z-40 text-slate-900 animate-in slide-in-from-right duration-300 font-sans" data-tutorial-id="mobile-inbox">
         
         {/* HEADER */}
         <div className="bg-white p-4 pt-12 pb-3 shadow-sm border-b border-slate-200 flex items-center gap-3 z-10 sticky top-0">
@@ -262,7 +319,8 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                                         msg.type === 'SHAREHOLDER_VOTE' ? 'bg-gradient-to-br from-sky-700 to-emerald-700' :
                                         msg.type === 'RIGHTS_REPORT' ? 'bg-gradient-to-br from-amber-500 to-orange-700' :
                                         msg.type === 'RIGHTS_NEGOTIATION' ? 'bg-gradient-to-br from-zinc-800 to-amber-800' :
-                                        msg.type === 'SYSTEM' ? 'bg-gradient-to-br from-zinc-700 to-black' : 
+                                        isDeveloperMessage(msg) ? 'bg-gradient-to-br from-zinc-700 to-black' :
+                                        msg.type === 'SYSTEM' ? 'bg-slate-500' :
                                         'bg-slate-400'
                                     }`}>
                                         {msg.type === 'CASTING_FEEDBACK'
@@ -624,7 +682,7 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                                 </div>
                             </div>
                         </div>
-                    ) : selectedMessage.type === 'SYSTEM' ? (
+                    ) : selectedMessage.type === 'SYSTEM' && isDeveloperMessage(selectedMessage) ? (
                         <div className="bg-gradient-to-br from-zinc-900 to-black p-8 rounded-3xl border border-zinc-800 shadow-2xl relative overflow-hidden text-white">
                             {/* Watermark */}
                             <div className="absolute top-0 right-0 p-8 opacity-5">
@@ -722,7 +780,12 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                                     stakePercent: outsideCounterStake,
                                     player
                                 });
-                                const canCounter = offer.flexible && !offer.finalTerms && !offer.counterUsed;
+                                const maxCounterAttempts = Number(offer.maxCounterAttempts || 3);
+                                const counterAttempts = Math.max(0, Number(offer.counterAttempts || (offer.counterUsed ? 1 : 0)));
+                                const counterAttemptsLeft = Math.max(0, maxCounterAttempts - counterAttempts);
+                                const counterAttemptNumber = Math.min(maxCounterAttempts, counterAttempts + 1);
+                                const dealClosedByCounter = Boolean(offer.counterClosed || (offer.counterUsed && counterAttempts >= maxCounterAttempts && offer.lastCounterFeedback?.declined));
+                                const canCounter = offer.flexible && !offer.finalTerms && counterAttemptsLeft > 0 && !dealClosedByCounter;
                                 const notEnoughCash = offer.cashAsk > player.money;
                                 const counterInvalid = outsideCounterCash > player.money || outsideCounterCash < offer.minCashAsk || outsideCounterCash > offer.maxCashAsk || outsideCounterStake <= 0 || outsideCounterStake > offer.maxStakePercent;
                                 const report = offer.scoutReport;
@@ -770,6 +833,9 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                                                         <div className="text-[9px] font-black uppercase tracking-widest text-emerald-100/45">Risk</div>
                                                         <div className="mt-1 font-mono text-lg font-black text-amber-200">{report.risk}</div>
                                                     </div>
+                                                </div>
+                                                <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-emerald-200/25 bg-white/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-emerald-50">
+                                                    <Zap size={13} /> Commitment Focus {outsideInvestmentEnergyCost}E
                                                 </div>
                                             </div>
 
@@ -929,9 +995,15 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                                                                 <div className="text-[10px] font-black uppercase tracking-[0.24em] text-emerald-100/55">Counter Desk</div>
                                                                 <div className="mt-1 text-lg font-black leading-tight text-white">Make your terms</div>
                                                             </div>
-                                                            <div className="shrink-0 rounded-2xl bg-white px-3 py-2 text-right shadow-lg">
-                                                                <div className="text-[8px] font-black uppercase tracking-widest text-emerald-700/70">Accept</div>
-                                                                <div className="font-mono text-xl font-black leading-none text-emerald-700">{counterChance}%</div>
+                                                            <div className="flex shrink-0 items-center gap-2">
+                                                                <div className="rounded-2xl border border-emerald-200/20 bg-black/20 px-3 py-2 text-right">
+                                                                    <div className="text-[8px] font-black uppercase tracking-widest text-emerald-100/45">Counter</div>
+                                                                    <div className="font-mono text-sm font-black leading-none text-emerald-100">{`Counter ${counterAttemptNumber}/3`}</div>
+                                                                </div>
+                                                                <div className="rounded-2xl bg-white px-3 py-2 text-right shadow-lg">
+                                                                    <div className="text-[8px] font-black uppercase tracking-widest text-emerald-700/70">Accept</div>
+                                                                    <div className="font-mono text-xl font-black leading-none text-emerald-700">{counterChance}%</div>
+                                                                </div>
                                                             </div>
                                                         </div>
                                                         <div className="mt-4 h-2 overflow-hidden rounded-full bg-black/30">
@@ -944,6 +1016,26 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                                                             <span>Risky</span>
                                                             <span>Likely</span>
                                                         </div>
+                                                        {outsideCounterFeedback && (
+                                                            <div className={`mt-3 rounded-2xl border p-3 text-xs font-bold leading-relaxed ${
+                                                                outsideCounterFeedback.declined
+                                                                    ? 'border-amber-300/30 bg-amber-300/10 text-amber-100'
+                                                                    : 'border-cyan-300/30 bg-cyan-300/10 text-cyan-100'
+                                                            }`}>
+                                                                <div className="text-[9px] font-black uppercase tracking-[0.2em]">
+                                                                    {outsideCounterFeedback.declined ? 'Counter declined' : 'Counter sent'}
+                                                                </div>
+                                                                <div className="mt-1">
+                                                                    {outsideCounterFeedback.declined
+                                                                        ? dealClosedByCounter
+                                                                            ? `They passed on ${formatMoney(outsideCounterFeedback.cashAmount)} for ${outsideCounterFeedback.stakePercent}%. After 3 counters, the producer walked away and the deal is closed.`
+                                                                        : counterAttemptsLeft > 0
+                                                                            ? `They passed on ${formatMoney(outsideCounterFeedback.cashAmount)} for ${outsideCounterFeedback.stakePercent}%. ${counterAttemptsLeft} counter ${counterAttemptsLeft === 1 ? 'try' : 'tries'} left. Adjust terms here or pass.`
+                                                                            : `They passed on ${formatMoney(outsideCounterFeedback.cashAmount)} for ${outsideCounterFeedback.stakePercent}%. No counters left.`
+                                                                        : `Sent ${formatMoney(outsideCounterFeedback.cashAmount)} for ${outsideCounterFeedback.stakePercent}%. Acceptance read: ${outsideCounterFeedback.chance}%.`}
+                                                                </div>
+                                                            </div>
+                                                        )}
                                                     </div>
 
                                                     <div className="grid grid-cols-2 gap-2 p-4 pb-0">
@@ -1036,7 +1128,7 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                                                         </div>
 
                                                         <div className="rounded-2xl border border-white/10 bg-black/20 p-3 text-[11px] font-bold leading-relaxed text-emerald-100/55">
-                                                            One counter only. If they decline, the deal is gone.
+                                                            Counter feedback is instant. You get 3 tries; declined counters stay here so you can adjust the money or stake, then counter again or pass.
                                                         </div>
                                                     </div>
                                                 </div>
@@ -1050,28 +1142,34 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
 
                                             <div className="sticky bottom-0 -mx-4 mt-2 border-t border-white/10 bg-slate-950/95 p-4 shadow-[0_-18px_30px_rgba(0,0,0,0.35)] backdrop-blur">
                                                 <div className="mb-3 flex items-center justify-between gap-3">
-                                                    <div>
-                                                        <div className="text-[9px] font-black uppercase tracking-[0.22em] text-emerald-100/45">Decision</div>
-                                                        <div className="text-sm font-black text-white">Producer receipts • {offer.offeredStakePercent}%</div>
+                                                        <div>
+                                                            <div className="text-[9px] font-black uppercase tracking-[0.22em] text-emerald-100/45">Decision</div>
+                                                        <div className="text-sm font-black text-white">{dealClosedByCounter ? 'Deal closed' : `Producer receipts • ${offer.offeredStakePercent}%`}</div>
+                                                        </div>
+                                                    <div className="flex shrink-0 items-center gap-2">
+                                                        <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200/20 bg-emerald-300/10 px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-emerald-100">
+                                                            <Zap size={11} /> {outsideInvestmentEnergyCost}E
+                                                        </span>
+                                                        <button
+                                                            onClick={() => setOutsideInvestmentReview(false)}
+                                                            className="rounded-full border border-white/10 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-slate-300"
+                                                        >
+                                                            Summary
+                                                        </button>
                                                     </div>
-                                                    <button
-                                                        onClick={() => setOutsideInvestmentReview(false)}
-                                                        className="rounded-full border border-white/10 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-slate-300"
-                                                    >
-                                                        Summary
-                                                    </button>
                                                 </div>
                                                 <div className="grid grid-cols-2 gap-3">
                                                     <button
                                                         onClick={() => handleOutsideInvestmentAction('ACCEPT')}
-                                                        disabled={notEnoughCash}
+                                                        disabled={dealClosedByCounter || notEnoughCash || !hasOutsideInvestmentEnergy}
                                                         className="rounded-2xl bg-emerald-500 px-4 py-4 text-sm font-black uppercase tracking-[0.12em] text-black disabled:opacity-40"
                                                     >
-                                                        Accept Terms
+                                                        {dealClosedByCounter ? 'Closed' : hasOutsideInvestmentEnergy ? 'Accept Terms' : `Need ${outsideInvestmentEnergyCost}E`}
                                                     </button>
                                                     <button
                                                         onClick={() => handleOutsideInvestmentAction('PASS')}
-                                                        className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4 text-sm font-black uppercase tracking-[0.12em] text-slate-300"
+                                                        disabled={dealClosedByCounter}
+                                                        className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4 text-sm font-black uppercase tracking-[0.12em] text-slate-300 disabled:opacity-40"
                                                     >
                                                         Pass
                                                     </button>
@@ -1079,11 +1177,16 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                                                 {canCounter && (
                                                     <button
                                                         onClick={() => handleOutsideInvestmentAction('COUNTER')}
-                                                        disabled={counterInvalid}
+                                                        disabled={counterInvalid || !hasOutsideInvestmentEnergy}
                                                         className="mt-3 w-full rounded-2xl border border-emerald-300/25 bg-white px-4 py-4 text-sm font-black uppercase tracking-[0.12em] text-emerald-700 disabled:opacity-40"
                                                     >
-                                                        Send Counter
+                                                        {hasOutsideInvestmentEnergy ? 'Send Counter' : `Need ${outsideInvestmentEnergyCost}E`}
                                                     </button>
+                                                )}
+                                                {!canCounter && offer.flexible && !offer.finalTerms && (
+                                                    <div className="mt-3 rounded-2xl border border-amber-300/20 bg-amber-300/10 p-3 text-center text-[10px] font-black uppercase tracking-[0.14em] text-amber-100">
+                                                        {dealClosedByCounter ? 'Producer walked away after 3 counters. Deal closed.' : 'No counters left.'}
+                                                    </div>
                                                 )}
                                             </div>
                                         </div>
@@ -1164,7 +1267,16 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                                     <div className="relative z-10">
                                         <h3 className="text-2xl font-bold mb-2">{(selectedMessage.data as any).brandName}</h3>
                                         <p className="text-sm text-emerald-200/80 mb-6">{(selectedMessage.data as any).description}</p>
-                                        <button onClick={handleSignDeal} className="w-full py-4 bg-emerald-500 text-white rounded-xl font-bold text-sm">{tr('messages.acceptDeal')}</button>
+                                        <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-emerald-200/25 bg-white/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-emerald-50">
+                                            <Zap size={13} /> Signing Focus {collaborationSigningEnergyCost}E
+                                        </div>
+                                        <button
+                                            onClick={handleSignDeal}
+                                            disabled={!hasCollabSigningEnergy || isProcessing}
+                                            className="w-full py-4 bg-emerald-500 text-white rounded-xl font-bold text-sm disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/40"
+                                        >
+                                            {hasCollabSigningEnergy ? tr('messages.acceptDeal') : `Need ${collaborationSigningEnergyCost}E`}
+                                        </button>
                                     </div>
                                 </div>
                             )}
@@ -1186,11 +1298,17 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                                                     <p className="text-sm text-red-100/80 mb-5">{collab.description}</p>
                                                     <div className="grid grid-cols-2 gap-3 text-xs mb-5">
                                                         <div className="bg-white/5 rounded-xl p-3">{tr('messages.format')}: <strong>{collab.requiredType.replace(/_/g, ' ')}</strong></div>
-                                                        <div className="bg-white/5 rounded-xl p-3">{tr('messages.energy')}: <strong>{collab.energyCost}E</strong></div>
+                                                        <div className="bg-white/5 rounded-xl p-3">Sign: <strong>{collaborationSigningEnergyCost}E</strong></div>
+                                                        <div className="bg-white/5 rounded-xl p-3">Production: <strong>{collab.energyCost}E</strong></div>
                                                         <div className="bg-white/5 rounded-xl p-3">{tr('messages.potentialViews')}: <strong>~{collab.bonusViews.toLocaleString()}</strong></div>
-                                                        <div className="bg-white/5 rounded-xl p-3">{tr('messages.potentialSubs')}: <strong>~+{collab.bonusSubscribers.toLocaleString()}</strong></div>
                                                     </div>
-                                                    <button onClick={handleSignDeal} className="w-full py-4 bg-red-500 text-white rounded-xl font-bold text-sm">{tr('messages.acceptCollab')}</button>
+                                                    <button
+                                                        onClick={handleSignDeal}
+                                                        disabled={!hasCollabSigningEnergy || isProcessing}
+                                                        className="w-full py-4 bg-red-500 text-white rounded-xl font-bold text-sm disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/40"
+                                                    >
+                                                        {hasCollabSigningEnergy ? tr('messages.acceptCollab') : `Need ${collaborationSigningEnergyCost}E`}
+                                                    </button>
                                                 </>
                                             );
                                         })()}
@@ -1214,11 +1332,18 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                                                     <p className="text-sm text-amber-100/80 mb-5">{deal.description}</p>
                                                     <div className="grid grid-cols-2 gap-3 text-xs mb-5">
                                                         <div className="bg-white/5 rounded-xl p-3">{tr('messages.format')}: <strong>{deal.requiredType.replace(/_/g, ' ')}</strong></div>
-                                                        <div className="bg-white/5 rounded-xl p-3">{tr('messages.energy')}: <strong>{deal.energyCost}E</strong></div>
+                                                        <div className="bg-white/5 rounded-xl p-3">Sign: <strong>{collaborationSigningEnergyCost}E</strong></div>
+                                                        <div className="bg-white/5 rounded-xl p-3">Integration: <strong>{deal.energyCost}E</strong></div>
                                                         <div className="bg-white/5 rounded-xl p-3">{tr('messages.payout')}: <strong>${deal.payout.toLocaleString()}</strong></div>
                                                         <div className="bg-white/5 rounded-xl p-3">{tr('messages.penalty')}: <strong>${deal.penalty.toLocaleString()}</strong></div>
                                                     </div>
-                                                    <button onClick={handleSignDeal} className="w-full py-4 bg-amber-500 text-black rounded-xl font-bold text-sm">{tr('messages.acceptDeal')}</button>
+                                                    <button
+                                                        onClick={handleSignDeal}
+                                                        disabled={!hasCollabSigningEnergy || isProcessing}
+                                                        className="w-full py-4 bg-amber-500 text-black rounded-xl font-bold text-sm disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/40"
+                                                    >
+                                                        {hasCollabSigningEnergy ? tr('messages.acceptDeal') : `Need ${collaborationSigningEnergyCost}E`}
+                                                    </button>
                                                 </>
                                             );
                                         })()}
@@ -1242,11 +1367,21 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                                                     <p className="text-sm text-cyan-100/80 mb-5">{feature.description}</p>
                                                     <div className="grid grid-cols-2 gap-3 text-xs mb-5">
                                                         <div className="bg-white/5 rounded-xl p-3">Fee: <strong>${feature.appearanceFee.toLocaleString()}</strong></div>
+                                                        <div className="bg-white/5 rounded-xl p-3">Sign: <strong>{collaborationSigningEnergyCost}E</strong></div>
                                                         <div className="bg-white/5 rounded-xl p-3">Video Reach: <strong>~{feature.bonusViews.toLocaleString()}</strong></div>
                                                         <div className="bg-white/5 rounded-xl p-3">Follower Lift: <strong>~+{feature.followerGain.toLocaleString()}</strong></div>
                                                         <div className="bg-white/5 rounded-xl p-3">Image Risk: <strong>{feature.reputationRisk}</strong></div>
                                                     </div>
-                                                    <button onClick={handleSignDeal} className="w-full py-4 bg-cyan-400 text-black rounded-xl font-bold text-sm">Accept Cameo</button>
+                                                    <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-cyan-200/25 bg-white/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-cyan-50">
+                                                        <Zap size={13} /> Music Feature Signing Focus {collaborationSigningEnergyCost}E
+                                                    </div>
+                                                    <button
+                                                        onClick={handleSignDeal}
+                                                        disabled={!hasCollabSigningEnergy || isProcessing}
+                                                        className="w-full py-4 bg-cyan-400 text-black rounded-xl font-bold text-sm disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/40"
+                                                    >
+                                                        {hasCollabSigningEnergy ? 'Accept Cameo' : `Need ${collaborationSigningEnergyCost}E`}
+                                                    </button>
                                                 </>
                                             );
                                         })()}

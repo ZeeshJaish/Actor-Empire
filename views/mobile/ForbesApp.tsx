@@ -31,6 +31,8 @@ import {
     walkAwayFromAcquisition,
 } from '../../services/studioAcquisition';
 import { setSubsidiaryOperatingModel } from '../../services/studioGroup';
+import { spendPlayerEnergy } from '../../services/premiumLogic';
+import { PHASE_ONE_ENERGY_COSTS } from '../../services/energyCosts';
 
 interface ForbesAppProps {
   player: Player;
@@ -64,6 +66,22 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePl
   const [acquisitionDeskOpen, setAcquisitionDeskOpen] = useState(false);
   const language = getPlayerLanguage(player);
   const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
+  const acquisitionStrategyEnergyCost = PHASE_ONE_ENERGY_COSTS.ACQUISITION_STRATEGY_ACTION;
+  const acquisitionSigningEnergyCost = PHASE_ONE_ENERGY_COSTS.STUDIO_ACQUISITION_SIGNING;
+  const stockControlEnergyCost = PHASE_ONE_ENERGY_COSTS.STOCK_CONTROL_TAKEOVER_COMPLETION;
+  const hasEnergyFor = (amount: number) => player.energy.current >= amount;
+  const energyBlockedResult = <T extends { success: boolean; player: Player }>(cost: number): T => ({
+      success: false,
+      player,
+      reason: `Needs ${cost}E`,
+  } as unknown as T);
+  const spendEnergyFromResult = <T extends { success: boolean; player: Player }>(result: T, cost: number): T => {
+      if (!result.success) return result;
+      const nextPlayer = { ...result.player };
+      spendPlayerEnergy(nextPlayer, cost, `Acquisition desk: ${cost}E action`);
+      onUpdatePlayer(nextPlayer);
+      return { ...result, player: nextPlayer };
+  };
   const actorPool = [
       ...NPC_DATABASE,
       ...(Array.isArray(player.flags?.extraNPCs) ? player.flags.extraNPCs : []),
@@ -351,9 +369,10 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePl
                     if (result.success) onUpdatePlayer(result.player);
                     return result;
                 }}
-                onSubmitOffer={({ offerType, offerAmount, minorityPercent, funding, commitments }) => {
-                    const result = submitOpeningOffer({
-                        player,
+	                onSubmitOffer={({ offerType, offerAmount, minorityPercent, funding, commitments }) => {
+	                    if (!hasEnergyFor(acquisitionStrategyEnergyCost)) return energyBlockedResult(acquisitionStrategyEnergyCost);
+	                    const result = submitOpeningOffer({
+	                        player,
                         profile: selectedStudioProfile,
                         offerType,
                         offerAmount,
@@ -361,24 +380,23 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePl
                         funding,
                         commitments,
                     });
-                    if (result.success) onUpdatePlayer(result.player);
-                    return result;
-                }}
-                onAcceptCounter={() => {
-                    const result = acceptAcquisitionCounter({ player, studioId: selectedStudioProfile.id });
-                    if (result.success) onUpdatePlayer(result.player);
-                    return result;
-                }}
-                onReviseOffer={(offerAmount) => {
-                    const result = reviseAcquisitionOffer({ player, studioId: selectedStudioProfile.id, offerAmount });
-                    if (result.success) onUpdatePlayer(result.player);
-                    return result;
-                }}
-                onBeatRival={(offerAmount) => {
-                    const result = beatAcquisitionRivalBid({ player, studioId: selectedStudioProfile.id, offerAmount });
-                    if (result.success) onUpdatePlayer(result.player);
-                    return result;
-                }}
+	                    return spendEnergyFromResult(result, acquisitionStrategyEnergyCost);
+	                }}
+	                onAcceptCounter={() => {
+	                    if (!hasEnergyFor(acquisitionStrategyEnergyCost)) return energyBlockedResult(acquisitionStrategyEnergyCost);
+	                    const result = acceptAcquisitionCounter({ player, studioId: selectedStudioProfile.id });
+	                    return spendEnergyFromResult(result, acquisitionStrategyEnergyCost);
+	                }}
+	                onReviseOffer={(offerAmount) => {
+	                    if (!hasEnergyFor(acquisitionStrategyEnergyCost)) return energyBlockedResult(acquisitionStrategyEnergyCost);
+	                    const result = reviseAcquisitionOffer({ player, studioId: selectedStudioProfile.id, offerAmount });
+	                    return spendEnergyFromResult(result, acquisitionStrategyEnergyCost);
+	                }}
+	                onBeatRival={(offerAmount) => {
+	                    if (!hasEnergyFor(acquisitionStrategyEnergyCost)) return energyBlockedResult(acquisitionStrategyEnergyCost);
+	                    const result = beatAcquisitionRivalBid({ player, studioId: selectedStudioProfile.id, offerAmount });
+	                    return spendEnergyFromResult(result, acquisitionStrategyEnergyCost);
+	                }}
                 onWalkAway={() => {
                     const result = walkAwayFromAcquisition({ player, studioId: selectedStudioProfile.id });
                     if (result.success) {
@@ -387,42 +405,46 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePl
                     }
                     return result;
                 }}
-                onCompleteAcquisition={() => {
-                    const result = completeStudioAcquisition({
-                        player,
-                        profile: selectedStudioProfile,
-                    });
-                    if (result.success) {
-                        onUpdatePlayer(result.player);
-                        setSelectedStudioProfile(current => current ? {
-                            ...current,
-                            isPlayerOwned: true,
-                            acquisitionState: 'NOT_FOR_SALE',
-                            capital: result.acquiredBusiness?.balance ?? current.capital,
-                            ownershipStructure: 'Privately held · Player controlled',
-                            assetDataSource: 'SAVE_DATA',
-                        } : current);
-                    }
-                    return result;
-                }}
-                onCompleteStockControl={() => {
-                    const result = completeStockControlAcquisition({
-                        player,
-                        profile: selectedStudioProfile,
-                    });
-                    if (result.success) {
-                        onUpdatePlayer(result.player);
-                        setSelectedStudioProfile(current => current ? {
-                            ...current,
-                            isPlayerOwned: true,
-                            acquisitionState: 'NOT_FOR_SALE',
-                            capital: result.acquiredBusiness?.balance ?? current.capital,
-                            ownershipStructure: 'Public-market control · Player controlled',
-                            assetDataSource: 'SAVE_DATA',
-                        } : current);
-                    }
-                    return result;
-                }}
+	                onCompleteAcquisition={() => {
+	                    if (!hasEnergyFor(acquisitionSigningEnergyCost)) return energyBlockedResult(acquisitionSigningEnergyCost);
+	                    const result = completeStudioAcquisition({
+	                        player,
+	                        profile: selectedStudioProfile,
+	                    });
+	                    if (result.success) {
+	                        const resultAfterEnergy = spendEnergyFromResult(result, acquisitionSigningEnergyCost);
+	                        setSelectedStudioProfile(current => current ? {
+	                            ...current,
+	                            isPlayerOwned: true,
+	                            acquisitionState: 'NOT_FOR_SALE',
+	                            capital: resultAfterEnergy.acquiredBusiness?.balance ?? current.capital,
+	                            ownershipStructure: 'Privately held · Player controlled',
+	                            assetDataSource: 'SAVE_DATA',
+	                        } : current);
+	                        return resultAfterEnergy;
+	                    }
+	                    return result;
+	                }}
+	                onCompleteStockControl={() => {
+	                    if (!hasEnergyFor(stockControlEnergyCost)) return energyBlockedResult(stockControlEnergyCost);
+	                    const result = completeStockControlAcquisition({
+	                        player,
+	                        profile: selectedStudioProfile,
+	                    });
+	                    if (result.success) {
+	                        const resultAfterEnergy = spendEnergyFromResult(result, stockControlEnergyCost);
+	                        setSelectedStudioProfile(current => current ? {
+	                            ...current,
+	                            isPlayerOwned: true,
+	                            acquisitionState: 'NOT_FOR_SALE',
+	                            capital: resultAfterEnergy.acquiredBusiness?.balance ?? current.capital,
+	                            ownershipStructure: 'Public-market control · Player controlled',
+	                            assetDataSource: 'SAVE_DATA',
+	                        } : current);
+	                        return resultAfterEnergy;
+	                    }
+	                    return result;
+	                }}
             />
         )}
         {/* Header */}

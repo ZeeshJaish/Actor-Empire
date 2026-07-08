@@ -1,3 +1,5 @@
+import type { ProfileBuilderSelection } from '../services/profileBuilder';
+
 export interface SaveSlot {
   name: string;
   age: number;
@@ -13,6 +15,8 @@ export interface NewCareerData {
   stageName: string;
   handle: string;
   age: number;
+  avatarDataUrl?: string;
+  profileSelection?: ProfileBuilderSelection;
 }
 
 /** Phase class strings used by the intro acts (mirrors the original HTML class machine). */

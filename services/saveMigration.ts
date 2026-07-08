@@ -1,5 +1,6 @@
 import { INITIAL_PLAYER, type Message, type NewsItem, type Player, type PortfolioItem, type ScheduledEvent, type Stock, type StockTakeoverCase } from '../types';
 import { ensureLifestyleActivityState } from './lifestyleActivities';
+import { normalizeNewPlayerTutorialState } from './newPlayerTutorial';
 import { createGlobalActorPackNPCs } from './npcLogic';
 import { getStockOutstandingShares, initializeStocks } from './stockLogic';
 
@@ -381,6 +382,8 @@ const migrateFlags = (flags: any, player: Player) => {
     }
     if (!Array.isArray(nextFlags.studioAcquisitionCases)) nextFlags.studioAcquisitionCases = [];
     if (!nextFlags.stockTakeoverEventDismissals || typeof nextFlags.stockTakeoverEventDismissals !== 'object') nextFlags.stockTakeoverEventDismissals = {};
+    const tutorialState = normalizeNewPlayerTutorialState(nextFlags.newPlayerTutorial);
+    if (tutorialState) nextFlags.newPlayerTutorial = tutorialState;
     nextFlags.saveMigrationVersion = SAVE_MIGRATION_VERSION;
     nextFlags.saveMigratedAtWeek = Math.max(1, Math.round(Number(player.currentWeek || 1)));
     return nextFlags;

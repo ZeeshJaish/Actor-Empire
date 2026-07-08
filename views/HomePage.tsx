@@ -1,13 +1,13 @@
 
 import React, { useRef, useEffect, useState, useMemo } from 'react';
-import { Player, ActorSkills, Commitment, ActiveRelease, ScheduledEvent, Message, AuditionOpportunity, NegotiationData, UniverseContract, UniverseId, Page, Genre, Relationship, LifeEvent, SponsorshipOffer, XPost, Script, RareHollywoodChaosKind, BoxOfficeRegionId, CinemaChainId, PlatformId, MusicCreditRole, OutsideProducerInvestmentOffer, OutsideProductionInvestment, Review } from '../types';
+import { Player, ActorSkills, Commitment, ActiveRelease, ScheduledEvent, Message, AuditionOpportunity, NegotiationData, UniverseContract, UniverseId, Page, Genre, Relationship, LifeEvent, SponsorshipOffer, XPost, Script, RareHollywoodChaosKind, BoxOfficeRegionId, CinemaChainId, PlatformId, MusicCreditRole, OutsideProducerInvestmentOffer, OutsideProductionInvestment, Review, PlayerProductionFocus } from '../types';
 import { formatMoney } from '../services/formatUtils';
 import { StatsBar } from '../components/StatsBar';
 import { formatRoleRejectionReview, generateProjectDetails, getRoleRejectionFeedback, ROLE_DEFINITIONS } from '../services/roleLogic';
 import { generateDirectEntryOffer, getUniverseTemplateGenre, getUniverseTemplateStudioName, normalizeUniverseForSave, rebootRetiredUniverse, retireUniverseForArchive } from '../services/universeLogic';
 import { generateLifeEvent } from '../services/lifeEventLogic';
 import { getAbsoluteWeek } from '../services/legacyLogic';
-import { getGenderedAvatar, MALE_AVATAR_SEEDS, FEMALE_AVATAR_SEEDS, NPC_DATABASE } from '../services/npcLogic';
+import { getGenderedAvatar, NPC_DATABASE } from '../services/npcLogic';
 import { createBusiness } from '../services/businessLogic';
 import { calculateYoutubeCreatorScore, generateYoutubeBrandDeal, generateYoutubeCollabOffer, getYoutubePublicImageLabel } from '../services/youtubeLogic';
 import { ALL_GENRES, formatGenreLabel } from '../services/genreCatalog';
@@ -26,10 +26,17 @@ import { processAcquisitionMarketPulse } from '../services/acquisitionMarketPuls
 import { calculateStreamingDistributionBreakdown, calculateTheatricalDistributionBreakdown } from '../services/distributionRevenue';
 import { applyMusicImpactToHiddenStats, buildProjectMusicPlanFromArtists, calculateProjectMusicImpact, calculateWeeklySoundtrackRevenue, getMusicArtistCatalog, mergeSoundtrackRevenueBreakdowns } from '../services/musicIndustry';
 import { buildOutsideProducerInvestmentMessage } from '../services/outsideProductions';
+import { getWeeklyEnergySpendLog } from '../services/premiumLogic';
 import { generateEpisodeRatings } from '../services/episodeRatings';
 import { buildAudienceReception } from '../services/audienceReception';
 import { ProfilePictureBuilder } from './avatar/ProfilePictureBuilder';
 import { getActorCareerArc } from '../services/actorCareerArc';
+import {
+  ProfileBuilderGender,
+  ProfileBuilderSelection,
+  createSeededProfileSelection,
+} from '../services/profileBuilder';
+import { exportProfilePortrait } from './avatar/profilePortraitRenderer';
 
 interface HomePageProps {
   player: Player;
@@ -45,9 +52,61 @@ interface HomePageProps {
   onShowWhatsNewCheat?: () => void;
 }
 
+type HomeProductionPhase = NonNullable<Commitment['projectPhase']>;
+
 const CHEAT_GENRES: Genre[] = ALL_GENRES;
 const DEV_TOOLS_PASSCODE = import.meta.env.VITE_DEV_TOOLS_PASSCODE || 'Kzign@420';
 const LEGACY_DEV_TOOLS_PASSCODES = ['actor-dev'];
+const HOME_AVATAR_PRESET_SEEDS = [
+  'Opening Night',
+  'Casting Call',
+  'Studio Breakout',
+  'Award Season',
+  'Indie Darling',
+  'Action Lead',
+  'Press Tour',
+  'Festival Face',
+  'Streaming Star',
+  'Teen Idol',
+  'Prestige Role',
+  'Red Carpet Debut',
+  'Comedy Lead',
+  'Mystery Star',
+  'Sci-Fi Icon',
+  'Method Actor',
+  'Box Office Heat',
+  'Talk Show Guest',
+  'Magazine Cover',
+  'Fan Favorite',
+  'Director Pick',
+  'Global Breakout',
+  'Cult Classic',
+  'Luxury Launch',
+  'Award Winner',
+  'Studio Darling',
+  'Comeback Era',
+  'Fresh Face',
+  'Press Wall',
+  'Premiere Night',
+];
+
+interface HomeAvatarPreset {
+  id: string;
+  label: string;
+  selection: ProfileBuilderSelection;
+  thumbnail: string;
+}
+
+const toHomeProfileGender = (gender: Player['gender']): ProfileBuilderGender => {
+  if (gender === 'FEMALE') return 'FEMALE';
+  if (gender === 'NON_BINARY') return 'NON_BINARY';
+  return 'MALE';
+};
+
+const safeExportHomePortrait = (selection: ProfileBuilderSelection, exportScale = 2): string => {
+  if (typeof document === 'undefined') return '';
+  return exportProfilePortrait(selection, exportScale);
+};
 
 const cheatWeekFromAbsolute = (absoluteWeek: number): { year: number; week: number } => ({
   year: Math.max(18, Math.floor(Math.max(1, absoluteWeek) / 52)),
@@ -68,9 +127,11 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
   const [showPortraitBuilder, setShowPortraitBuilder] = useState(false);
   const [showActorArcSheet, setShowActorArcSheet] = useState(false);
   const [selectedAvatar, setSelectedAvatar] = useState(player.avatar);
+  const [selectedProfileSelection, setSelectedProfileSelection] = useState<ProfileBuilderSelection | null>(null);
   const [isCustomUpload, setIsCustomUpload] = useState(player.avatar.startsWith('data:image'));
   const [isCompressing, setIsCompressing] = useState(false);
   const [avatarError, setAvatarError] = useState('');
+  const [showEnergySpendSheet, setShowEnergySpendSheet] = useState(false);
   
   const clickCountRef = useRef(0);
   const lastClickRef = useRef(0);
@@ -92,6 +153,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
 
   useEffect(() => {
     setSelectedAvatar(player.avatar);
+    setSelectedProfileSelection(null);
     setIsCustomUpload(player.avatar.startsWith('data:image'));
   }, [player.avatar]);
 
@@ -101,15 +163,27 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
       }
   }, []);
 
-  const currentAvatarList = useMemo(() => {
-      const seeds =
-          player.gender === 'MALE'
-              ? MALE_AVATAR_SEEDS
-              : player.gender === 'FEMALE'
-                  ? FEMALE_AVATAR_SEEDS
-                  : [...MALE_AVATAR_SEEDS, ...FEMALE_AVATAR_SEEDS];
-      return seeds.slice(0, 30).map(seed => `https://api.dicebear.com/8.x/pixel-art/svg?seed=${seed}`);
+  const currentAvatarList = useMemo<HomeAvatarPreset[]>(() => {
+      const profileGender = toHomeProfileGender(player.gender);
+      return HOME_AVATAR_PRESET_SEEDS.map((seed, index) => {
+          const selection = createSeededProfileSelection(profileGender, `${profileGender}:home-avatar:${seed}:${index}`);
+          return {
+              id: `${profileGender}-${seed}-${index}`,
+              label: seed,
+              selection,
+              thumbnail: safeExportHomePortrait(selection, 2),
+          };
+      });
   }, [player.gender]);
+
+  const applyAvatarPreset = (preset: HomeAvatarPreset) => {
+      const exportedAvatar = safeExportHomePortrait(preset.selection, 3);
+      if (!exportedAvatar) return;
+      setSelectedAvatar(exportedAvatar);
+      setSelectedProfileSelection(preset.selection);
+      setIsCustomUpload(false);
+      setAvatarError('');
+  };
 
   // Handle Avatar Triple Click
   const handleAvatarClick = () => {
@@ -142,6 +216,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
             setShowPortraitBuilder(false);
             setAvatarError('');
             setSelectedAvatar(player.avatar);
+            setSelectedProfileSelection(null);
             setIsCustomUpload(player.avatar.startsWith('data:image'));
         }
         clickCountRef.current = 0;
@@ -219,6 +294,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
       try {
           const compressed = await compressImage(file);
           setSelectedAvatar(compressed);
+          setSelectedProfileSelection(null);
           setIsCustomUpload(true);
       } catch (err) {
           console.error('Avatar processing failed', err);
@@ -1766,6 +1842,201 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
       onOpenProductionHouseCheat?.();
   };
 
+  const triggerEnergyFeatureCareerQa = (mode: 'FULL' | 'LOW') => {
+      if (!onUpdatePlayer) return;
+
+      const { updatedPlayer: basePlayer, studio } = ensureCheatStudio();
+      const now = Date.now();
+      const qaPrefix = 'cheat_energy_';
+      const energyQaProjectIdPrefixes = {
+          prep: 'cheat_energy_prep_',
+          production: 'cheat_energy_production_',
+          post: 'cheat_energy_post_',
+      } as const;
+      const targetEnergy = mode === 'LOW' ? 6 : 100;
+      const playerDisplayName = player.name || 'Player Star';
+
+      const buildFocus = (overrides: Partial<PlayerProductionFocus> = {}): PlayerProductionFocus => ({
+          isPlayerActor: true,
+          isPlayerDirector: true,
+          isPlayerProducer: true,
+          actorPrep: 0,
+          actorSceneRehearsal: 0,
+          actorBigPerformance: 0,
+          actorPerformance: 0,
+          actorPromotion: 0,
+          directorPrep: 0,
+          directorShotDecision: 0,
+          directorMajorCreativePush: 0,
+          directorRiskyDecision: 0,
+          directorPerformance: 0,
+          directorPost: 0,
+          producerScriptPolish: 0,
+          producerCastCrewPrep: 0,
+          producerSetQuality: 0,
+          producerEditNotes: 0,
+          producerReleasePositioning: 0,
+          producerPrep: 0,
+          producerPerformance: 0,
+          producerPost: 0,
+          qualityLift: 0,
+          ...overrides,
+      });
+
+      const makeEnergyCommitment = (
+          idSuffix: keyof typeof energyQaProjectIdPrefixes,
+          phase: HomeProductionPhase,
+          title: string,
+          focusOverrides: Partial<PlayerProductionFocus>,
+          weeksLeft: number,
+          includePlayerActor = true
+      ): Commitment => {
+          const project = generateProjectDetails('HIGH', 'MOVIE', [], basePlayer);
+          const focus = buildFocus({
+              isPlayerActor: includePlayerActor,
+              ...focusOverrides,
+          });
+
+          project.title = title;
+          project.studioId = studio.id as any;
+          project.genre = 'DRAMA';
+          project.subtype = 'STANDALONE';
+          project.estimatedBudget = 42_000_000;
+          project.visibleHype = 'HIGH';
+          project.visibleScriptBuzz = 'Hot';
+          project.visibleDirectorTier = 'Self';
+          project.visibleCastStrength = includePlayerActor ? 'Player Lead' : 'Hired Lead';
+          project.directorName = playerDisplayName;
+          project.directorId = 'PLAYER_SELF';
+          project.director = { id: 'PLAYER_SELF', name: playerDisplayName };
+          project.hiddenStats = {
+              ...project.hiddenStats,
+              scriptQuality: 72,
+              directorQuality: 70,
+              castingStrength: 68,
+              rawHype: 66,
+              qualityScore: 62,
+          };
+          project.playerProductionFocus = focus;
+          project.castList = includePlayerActor
+              ? [{
+                  id: `${qaPrefix}cast_player_${idSuffix}_${now}`,
+                  role: 'Lead',
+                  roleId: 'lead',
+                  roleName: 'Lead',
+                  roleType: 'LEAD',
+                  actorId: 'PLAYER_SELF',
+                  name: playerDisplayName,
+                  isPlayer: true,
+                  image: player.avatar || '',
+                  type: 'ACTOR',
+                  status: 'CONFIRMED',
+              }]
+              : [{
+                  id: `${qaPrefix}cast_hired_${idSuffix}_${now}`,
+                  role: 'Lead',
+                  roleId: 'lead',
+                  roleName: 'Lead',
+                  roleType: 'LEAD',
+                  actorId: `${qaPrefix}hired_actor_${idSuffix}_${now}`,
+                  name: 'Hired Lead',
+                  isPlayer: false,
+                  image: '',
+                  type: 'ACTOR',
+                  status: 'CONFIRMED',
+              }];
+          project.crewList = [{
+              id: 'PLAYER_SELF',
+              name: playerDisplayName,
+              role: 'DIRECTOR',
+              stats: { technical: 78, vision: 76 },
+              salary: 0,
+              status: 'SIGNED',
+              tier: 'PROFESSIONAL',
+              isPlayer: true,
+          } as any];
+
+          return {
+              id: `${energyQaProjectIdPrefixes[idSuffix]}${now}`,
+              name: title,
+              type: 'JOB',
+              roleType: includePlayerActor ? 'LEAD' : undefined,
+              energyCost: 0,
+              income: 0,
+              lumpSum: 0,
+              payoutType: 'LUMPSUM',
+              projectPhase: phase,
+              phaseWeeksLeft: weeksLeft,
+              totalPhaseDuration: Math.max(1, weeksLeft),
+              auditionPerformance: Number(focus.actorPrep || 0),
+              productionPerformance: Number(focus.actorSceneRehearsal || focus.actorBigPerformance || 0),
+              promotionalBuzz: 18,
+              projectDetails: project,
+          };
+      };
+
+      const energyCommitments = [
+          makeEnergyCommitment(
+              'prep',
+              'PRE_PRODUCTION',
+              'Energy QA: Prep Table',
+              { actorPrep: 100, directorPrep: 42, producerScriptPolish: 60, producerCastCrewPrep: 20, qualityLift: 5 },
+              3,
+              true
+          ),
+          makeEnergyCommitment(
+              'production',
+              'PRODUCTION',
+              'Energy QA: On-Set Pressure',
+              { actorSceneRehearsal: 35, actorBigPerformance: 0, directorShotDecision: 100, directorMajorCreativePush: 25, directorRiskyDecision: 0, producerSetQuality: 45, qualityLift: 7 },
+              2,
+              true
+          ),
+          makeEnergyCommitment(
+              'post',
+              'POST_PRODUCTION',
+              'Energy QA: Final Cut',
+              { isPlayerActor: false, directorPost: 35, producerEditNotes: 100, producerReleasePositioning: 0, qualityLift: 9 },
+              1,
+              false
+          ),
+      ];
+
+      const nextPlayer: Player = {
+          ...basePlayer,
+          energy: {
+              ...basePlayer.energy,
+              current: targetEnergy,
+              max: Math.max(basePlayer.energy?.max || 100, targetEnergy),
+          },
+          flags: {
+              ...(basePlayer.flags || {}),
+              weeklyBaseEnergyRemaining: targetEnergy,
+              bonusEnergyBank: 0,
+          },
+          commitments: [
+              ...(basePlayer.commitments || []).filter(commitment => !String(commitment.id).startsWith(qaPrefix)),
+              ...energyCommitments,
+          ],
+          logs: [{
+              week: basePlayer.currentWeek,
+              year: basePlayer.age,
+              message: mode === 'LOW'
+                  ? 'CHEAT: Energy Feature QA loaded. Available Energy should show 6E in Career.'
+                  : 'CHEAT: Energy Feature QA loaded. Available Energy should show 100E in Career.',
+              type: 'positive'
+          }, ...(basePlayer.logs || [])].slice(0, 50),
+      };
+
+      onUpdatePlayer(nextPlayer);
+      setActiveCheatMenu('NONE');
+      setPage?.(Page.CAREER);
+      alert(mode === 'LOW'
+          ? 'Energy Feature QA loaded: Available Energy should show 6E in Career with Need XE disabled buttons.'
+          : 'Energy Feature QA loaded: Available Energy should show 100E in Career with My Productions prep, on-set, and post actions.'
+      );
+  };
+
   const triggerOutsideProducerInvestmentQa = () => {
       if (!onUpdatePlayer) return;
 
@@ -1812,6 +2083,8 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
           expectedReleaseWeeks: 9,
           expectedRunWeeks: 6,
           releasePath: 'THEATRICAL',
+          counterAttempts: 0,
+          maxCounterAttempts: 3,
           createdWeek: basePlayer.currentWeek,
           createdYear: basePlayer.age,
           expiresInWeeks: 6
@@ -1821,10 +2094,10 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
           id: `cheat_outside_fraud_offer_${now}`,
           projectId: `cheat_outside_fraud_offer_project_${now}`,
           projectTitle: 'Paper Moon Protocol',
-          producerName: 'Spam Forge Capital',
-          studioName: 'Spam Forge',
-          producerType: 'Shell Company',
-          ownerName: 'Unknown beneficial owners',
+          producerName: 'Sable Meridian Capital',
+          studioName: 'Sable Meridian',
+          producerType: 'Private Finance',
+          ownerName: 'Undisclosed sponsor group',
           trackRecord: 18,
           genre: 'CRIME',
           logline: 'A crime package with unusually generous economics, rushed closing, and a weak financing paper trail.',
@@ -1843,6 +2116,8 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
           expectedReleaseWeeks: 10,
           expectedRunWeeks: 5,
           releasePath: 'STREAMING',
+          counterAttempts: 0,
+          maxCounterAttempts: 3,
           fraudRisk: 'HIGH',
           riskSignals: ['GENEROUS_TERMS', 'UNVERIFIED_FINANCING', 'SHELL_COMPANY', 'RUSHED_CLOSE'],
           financingStatus: 'UNVERIFIED_FINANCING',
@@ -1911,10 +2186,10 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
           offerId: `cheat_outside_fraud_active_offer_${now}`,
           projectId: `cheat_outside_fraud_active_project_${now}`,
           projectTitle: 'Shell Game Weekend',
-          producerName: 'Spam Forge Capital',
-          studioName: 'Spam Forge',
-          producerType: 'Shell Company',
-          ownerName: 'Unknown beneficial owners',
+          producerName: 'Sable Meridian Capital',
+          studioName: 'Sable Meridian',
+          producerType: 'Private Finance',
+          ownerName: 'Undisclosed sponsor group',
           trackRecord: 18,
           genre: 'CRIME',
           logline: 'A suspicious producer-finance package close to its verification fallout check.',
@@ -6120,6 +6395,9 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
   }, 0);
   // Removed business drain from visual calculation
   const weeklyDrain = commitmentDrain;
+  const weeklyEnergySpendLog = useMemo(() => getWeeklyEnergySpendLog(player), [player]);
+  const weeklyEnergySpent = weeklyEnergySpendLog.reduce((sum, entry) => sum + entry.amount, 0);
+  const energyLimit = Math.max(0, 100 - weeklyDrain);
 
 
   return (
@@ -6247,6 +6525,37 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                                   </button>
                                   <button onClick={() => triggerStudioScenario('STREAMING_EXIT')} className="col-span-2 bg-cyan-900/30 hover:bg-cyan-900/50 border border-cyan-500/30 text-xs font-bold py-3 rounded-lg text-cyan-400">
                                       Streaming to Library
+                                  </button>
+                              </div>
+                          </div>
+                      )}
+
+                      {activeCheatMenu === 'DEV' && (
+                          <div className="space-y-2">
+                              <h4 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest border-b border-zinc-800 pb-1 flex items-center gap-2">
+                                 <Zap size={10} /> Energy Feature QA
+                              </h4>
+                              <div className="rounded-xl bg-zinc-950 border border-zinc-800 p-3 text-[10px] text-zinc-400">
+                                  Full energy, low energy, and adjacent signing gates for quick energy QA.
+                              </div>
+                              <div className="grid grid-cols-2 gap-2">
+                                  <button onClick={() => triggerEnergyFeatureCareerQa('FULL')} className="col-span-2 bg-yellow-500/10 hover:bg-yellow-500/20 border border-yellow-400/40 text-xs font-bold py-3 rounded-lg text-yellow-300 flex items-center justify-center gap-2">
+                                      <Zap size={14}/> Career Production Energy QA
+                                  </button>
+                                  <button onClick={() => triggerEnergyFeatureCareerQa('LOW')} className="col-span-2 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-xs font-bold py-3 rounded-lg text-zinc-200 flex items-center justify-center gap-2">
+                                      <ZapOff size={14}/> Low Energy Button QA
+                                  </button>
+                                  <button onClick={triggerStudioBootstrapAndOpen} className="bg-amber-900/30 hover:bg-amber-900/50 border border-amber-500/30 text-[10px] font-bold py-3 rounded-lg text-amber-300 flex items-center justify-center gap-2">
+                                      <Clapperboard size={12}/> Greenlight / Studio Gate
+                                  </button>
+                                  <button onClick={triggerOutsideProducerInvestmentQa} className="bg-emerald-950/40 hover:bg-emerald-900/60 border border-emerald-400/40 text-[10px] font-bold py-3 rounded-lg text-emerald-200 flex items-center justify-center gap-2">
+                                      <DollarSign size={12}/> Producer Investment Gate
+                                  </button>
+                                  <button onClick={triggerYoutubeOffers} className="bg-red-900/30 hover:bg-red-900/50 border border-red-500/30 text-[10px] font-bold py-3 rounded-lg text-red-200 flex items-center justify-center gap-2">
+                                      <PlayCircle size={12}/> Creator Collab Gate
+                                  </button>
+                                  <button onClick={triggerStudioAcquisitionSigningCheat} className="bg-orange-950/40 hover:bg-orange-900/60 border border-orange-400/40 text-[10px] font-bold py-3 rounded-lg text-orange-200 flex items-center justify-center gap-2">
+                                      <ShoppingCart size={12}/> Studio Acquisition Gate
                                   </button>
                               </div>
                           </div>
@@ -6747,10 +7056,10 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                       className="flex items-start justify-between gap-4 p-5 border-b border-zinc-800 bg-zinc-950/95"
                       style={{ paddingTop: 'max(calc(env(safe-area-inset-top) + 2.5rem), 3.75rem)' }}
                   >
-                      <div className="min-w-0">
-                          <div className="text-[10px] uppercase tracking-[0.25em] text-amber-500 mb-1">Change Avatar</div>
-                          <h3 className="text-xl font-black text-white">{player.name}</h3>
-                          <div className="text-xs text-zinc-500 mt-1">Choose a preset or upload a custom photo.</div>
+                          <div className="min-w-0">
+                              <div className="text-[10px] uppercase tracking-[0.25em] text-amber-500 mb-1">Change Avatar</div>
+                              <h3 className="text-xl font-black text-white">{player.name}</h3>
+                          <div className="text-xs text-zinc-500 mt-1">Pick a studio portrait, build one, or upload your own.</div>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                           <button
@@ -6776,18 +7085,18 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                       className="min-h-0 flex-1 overflow-y-auto p-5 space-y-5"
                       style={{ paddingBottom: 'max(calc(env(safe-area-inset-bottom) + 1rem), 1.5rem)' }}
                   >
-                      <div className="flex flex-col items-center">
+                      <div className="rounded-[1.65rem] border border-zinc-800 bg-[radial-gradient(circle_at_50%_0%,rgba(245,158,11,0.14),transparent_48%),rgba(9,9,11,0.82)] p-5 flex flex-col items-center shadow-[0_18px_60px_rgba(0,0,0,0.28)]">
                           <button type="button" onClick={() => fileInputRef.current?.click()} className="relative group">
-                              <div className="w-28 h-28 rounded-full p-1 bg-gradient-to-tr from-amber-400 via-amber-500 to-amber-700 shadow-[0_0_30px_rgba(245,158,11,0.18)]">
+                              <div className="w-32 h-32 rounded-[2rem] p-1 bg-gradient-to-tr from-amber-400 via-amber-500 to-amber-700 shadow-[0_0_34px_rgba(245,158,11,0.22)]">
                                   {isCompressing ? (
-                                      <div className="w-full h-full rounded-full bg-zinc-950 flex items-center justify-center border-4 border-black">
+                                      <div className="w-full h-full rounded-[1.7rem] bg-zinc-950 flex items-center justify-center border-4 border-black">
                                           <div className="w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
                                       </div>
                                   ) : (
-                                      <img src={selectedAvatar} alt={player.name} className="w-full h-full rounded-full object-cover border-4 border-black bg-zinc-900" />
+                                      <img src={selectedAvatar} alt={player.name} className="w-full h-full rounded-[1.7rem] object-cover border-4 border-black bg-zinc-900 [image-rendering:pixelated]" />
                                   )}
                               </div>
-                              <div className="absolute bottom-0 right-0 rounded-full bg-white text-black border-4 border-black p-2 group-hover:bg-amber-100 transition-colors">
+                              <div className="absolute bottom-1 right-1 rounded-full bg-white text-black border-4 border-black p-2 group-hover:bg-amber-100 transition-colors">
                                   <Camera size={16} />
                               </div>
                           </button>
@@ -6814,18 +7123,22 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                       </div>
 
                       <div className="rounded-[1.75rem] border border-zinc-800 bg-zinc-950/80 p-4">
-                          <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] mb-3">Preset Looks</div>
+                          <div className="mb-3 flex items-center justify-between gap-3">
+                              <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em]">Preset Bench</div>
+                              <div className="text-[10px] font-black uppercase tracking-[0.14em] text-amber-400">{currentAvatarList.length} looks</div>
+                          </div>
                           <div className="grid grid-cols-5 gap-3 max-h-[48dvh] overflow-y-auto custom-scrollbar pr-1">
-                              {currentAvatarList.map((avatarUrl, idx) => {
-                                  const isSelected = selectedAvatar === avatarUrl;
+                              {currentAvatarList.map((preset) => {
+                                  const isSelected = selectedProfileSelection === preset.selection;
                                   return (
                                       <button
-                                          key={idx}
+                                          key={preset.id}
                                           type="button"
-                                          onClick={() => { setSelectedAvatar(avatarUrl); setIsCustomUpload(false); }}
-                                          className={`relative aspect-square rounded-2xl overflow-hidden transition-all ${isSelected ? 'ring-2 ring-amber-500 scale-105 z-10' : 'opacity-70 hover:opacity-100 hover:scale-[1.03]'}`}
+                                          onClick={() => applyAvatarPreset(preset)}
+                                          className={`relative aspect-square rounded-2xl overflow-hidden border bg-zinc-900 transition-all ${isSelected ? 'border-amber-400 shadow-[0_0_0_2px_rgba(245,158,11,0.24)] scale-105 z-10' : 'border-white/5 opacity-75 hover:opacity-100 hover:border-zinc-600 hover:scale-[1.03]'}`}
+                                          title={preset.label}
                                       >
-                                          <img src={avatarUrl} alt="preset avatar" className="w-full h-full object-cover bg-zinc-900" />
+                                          <img src={preset.thumbnail} alt={preset.label} className="w-full h-full object-cover bg-zinc-900 [image-rendering:pixelated]" />
                                           {isSelected && (
                                               <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
                                                   <Check size={16} className="text-white" strokeWidth={3} />
@@ -6859,6 +7172,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                                   language={language}
                                   onApply={(avatarDataUrl) => {
                                       setSelectedAvatar(avatarDataUrl);
+                                      setSelectedProfileSelection(null);
                                       setIsCustomUpload(true);
                                       setShowPortraitBuilder(false);
                                       setAvatarError('');
@@ -6912,7 +7226,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
       )}
 
       {/* Premium Profile Header */}
-      <div className="relative glass-card p-6 rounded-3xl overflow-hidden group">
+      <div className="relative glass-card p-6 rounded-3xl overflow-hidden group" data-tutorial-id="home-profile">
         <div className="absolute top-0 right-0 p-4 opacity-20 group-hover:opacity-40 transition-opacity">
             <Star size={120} className="text-amber-500 rotate-12" />
         </div>
@@ -6935,13 +7249,13 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
             </div>
             
             <div className="flex-1 min-w-0">
-                <h1 className="text-3xl font-bold text-white tracking-tight truncate">{player.name}</h1>
-                <div className="flex flex-wrap items-center gap-2 mt-1">
+                <h1 className="text-2xl font-bold leading-tight text-white tracking-tight break-words sm:text-3xl">{player.name}</h1>
+                <div className="mt-2 flex min-w-0 flex-col items-start gap-2">
                     <span className="text-xs font-medium text-amber-400 uppercase tracking-widest border border-amber-900/50 bg-amber-950/30 px-2 py-1 rounded">{tr('home.actor.role')}</span>
                     <button
                         type="button"
                         onClick={() => setShowActorArcSheet(true)}
-                        className={`max-w-full truncate rounded border px-2 py-1 text-[10px] font-black uppercase tracking-[0.16em] ${actorCareerArc.toneClass}`}
+                        className={`max-w-full rounded border px-2.5 py-1.5 text-left text-[9px] font-black uppercase leading-none tracking-[0.1em] whitespace-nowrap ${actorCareerArc.toneClass}`}
                         title={tr(actorCareerArc.summaryKey)}
                     >
                         {tr(actorCareerArc.labelKey)}
@@ -6986,13 +7300,18 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
       </div>
 
       {/* Energy Bar */}
-      <div className="glass-card p-5 rounded-3xl relative overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setShowEnergySpendSheet(true)}
+        aria-label="Open this week's energy expenses"
+        className="glass-card w-full cursor-pointer p-5 rounded-3xl relative overflow-hidden text-left transition-colors hover:border-amber-300/25 active:scale-[0.995]"
+      >
          <div className="flex justify-between items-center mb-3">
             <h2 className="text-xs font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-2">
                 <Zap className="text-amber-400 fill-amber-400" size={14} /> {tr('home.energy')}
             </h2>
             <span className="text-xs text-zinc-500 font-mono">
-                <span className="text-white">{player.energy.current}</span> / {100 - weeklyDrain} {tr('home.max').toUpperCase()}
+                <span className="text-white">{player.energy.current}</span> / {energyLimit} {tr('home.max').toUpperCase()}
             </span>
          </div>
          <div className="h-4 bg-zinc-900/50 rounded-full overflow-hidden border border-white/5 relative">
@@ -7007,7 +7326,92 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                 style={{ width: `${Math.max(0, player.energy.current)}%` }}
             />
          </div>
-      </div>
+      </button>
+
+      {showEnergySpendSheet && (
+        <div className="fixed inset-0 z-[120] flex items-end justify-center bg-black/70 px-4 pb-4 pt-16 backdrop-blur-sm sm:items-center sm:pb-16">
+          <button
+            type="button"
+            aria-label="Close energy expenses"
+            className="absolute inset-0 cursor-default"
+            onClick={() => setShowEnergySpendSheet(false)}
+          />
+          <section className="relative w-full max-w-lg overflow-hidden rounded-[28px] border border-amber-300/20 bg-[#101013] shadow-[0_24px_80px_rgba(0,0,0,0.55)]">
+            <div className="border-b border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(245,158,11,0.18),transparent_38%),rgba(255,255,255,0.03)] p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.22em] text-amber-300">
+                    <Zap size={14} fill="currentColor" /> This Week Energy
+                  </div>
+                  <h3 className="mt-2 text-2xl font-black uppercase tracking-tight text-white">
+                    Expense Log
+                  </h3>
+                  <p className="mt-1 text-xs font-semibold leading-relaxed text-zinc-500">
+                    Week {player.currentWeek} energy usage from actions and commitments.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowEnergySpendSheet(false)}
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-zinc-400 transition-colors hover:text-white"
+                  aria-label="Close energy expenses"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="mt-5 grid grid-cols-3 gap-2">
+                <div className="rounded-2xl border border-amber-300/20 bg-amber-300/10 p-3">
+                  <div className="text-[8px] font-black uppercase tracking-widest text-amber-100/60">Spent</div>
+                  <div className="mt-1 font-mono text-lg font-black text-amber-200">{weeklyEnergySpent}E</div>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3">
+                  <div className="text-[8px] font-black uppercase tracking-widest text-zinc-500">Reserved</div>
+                  <div className="mt-1 font-mono text-lg font-black text-zinc-200">{weeklyDrain}E</div>
+                </div>
+                <div className="rounded-2xl border border-emerald-300/20 bg-emerald-300/10 p-3">
+                  <div className="text-[8px] font-black uppercase tracking-widest text-emerald-100/60">Available</div>
+                  <div className="mt-1 font-mono text-lg font-black text-emerald-200">{player.energy.current}E</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="max-h-[52vh] overflow-y-auto p-4">
+              {weeklyEnergySpendLog.length > 0 ? (
+                <div className="space-y-2">
+                  {weeklyEnergySpendLog.map(entry => (
+                    <div key={entry.id} className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.035] px-3 py-3">
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-black uppercase tracking-[0.08em] text-white">{entry.label}</div>
+                        <div className="mt-0.5 text-[10px] font-bold uppercase tracking-widest text-zinc-600">Week {entry.week}</div>
+                      </div>
+                      <div className="shrink-0 rounded-full border border-amber-300/25 bg-amber-300/10 px-3 py-1 font-mono text-sm font-black text-amber-100">
+                        -{entry.amount}E
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-3xl border border-white/10 bg-white/[0.035] p-5 text-center">
+                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-amber-300/20 bg-amber-300/10 text-amber-300">
+                    <Zap size={20} fill="currentColor" />
+                  </div>
+                  <div className="mt-3 text-sm font-black uppercase tracking-[0.14em] text-white">No energy spent yet</div>
+                  <p className="mt-2 text-xs font-semibold leading-relaxed text-zinc-500">
+                    Actions you take this week will appear here after they spend energy.
+                  </p>
+                </div>
+              )}
+
+              {weeklyDrain > 0 && (
+                <div className="mt-3 rounded-2xl border border-zinc-700/70 bg-zinc-900/50 p-3 text-xs font-bold leading-relaxed text-zinc-400">
+                  {weeklyDrain}E is reserved by active weekly commitments before action spending.
+                </div>
+              )}
+            </div>
+          </section>
+        </div>
+      )}
 
       {/* Stats Section Redesign */}
       <div className="space-y-4">
@@ -7067,6 +7471,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
       <button
         onClick={onNextWeek}
         disabled={isProcessing}
+        data-tutorial-id="home-next-week"
         className={`w-full py-5 rounded-2xl font-bold text-lg shadow-xl shadow-amber-900/20 transform active:scale-[0.98] transition-all flex items-center justify-center gap-3 border border-white/10 ${
             isProcessing 
             ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed' 

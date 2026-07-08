@@ -1,7 +1,9 @@
 import React from 'react';
 import { Player, Relationship } from '../types';
-import { Skull, ArrowRight, RefreshCw, Trophy, DollarSign, Film, Crown, Users, Quote, Sparkles, ChevronLeft } from 'lucide-react';
+import { Skull, ArrowRight, RefreshCw, Trophy, DollarSign, Film, Crown, Users, Quote, Sparkles, ChevronLeft, HeartPulse } from 'lucide-react';
 import { calculateDynastyScore, calculateLegacyScore, getLegacyArchetype, getLegacyObituary, getLegacyTributes, getRelationshipAge } from '../services/legacyLogic';
+import { getHealthConditionLabel, getHealthConditionSummary } from '../services/healthConditions';
+import { getPlayerLanguage } from '../services/i18n';
 
 interface DeathScreenProps {
     player: Player;
@@ -26,6 +28,7 @@ export const DeathScreen: React.FC<DeathScreenProps> = ({
     isPreview = false,
     onClosePreview
 }) => {
+    const language = getPlayerLanguage(player);
     const children = player.relationships.filter(r => r.relation === 'Child');
     const totalAwards = player.awards?.length || 0;
     const totalProjects = player.pastProjects.length;
@@ -49,13 +52,25 @@ export const DeathScreen: React.FC<DeathScreenProps> = ({
         player.stats.reputation >= 75 ? 'Beloved by the public' :
         player.stats.reputation >= 45 ? 'Deeply debated by the public' :
         'A controversial public figure';
+    const inferredFatalCondition = player.activeHealthConditions
+        ?.slice()
+        .sort((a, b) => (b.deathRisk || 0) - (a.deathRisk || 0))[0];
+    const deathCause = {
+        title: player.flags?.deathCauseTitle || player.flags?.deathCause || (inferredFatalCondition ? getHealthConditionLabel(inferredFatalCondition, language) : 'Cause not recorded'),
+        detail: player.flags?.deathCauseDetail || player.flags?.deathCauseSummary || (inferredFatalCondition
+            ? getHealthConditionSummary(inferredFatalCondition, language)
+            : 'This save was created before detailed death reasons were tracked. New deaths now record the exact trigger here.'),
+        timing: player.flags?.deathCauseWeek && player.flags?.deathCauseYear
+            ? `Week ${player.flags.deathCauseWeek}, Age ${player.flags.deathCauseYear}`
+            : `Age ${player.age}`,
+    };
 
     return (
-        <div className="min-h-screen bg-black text-white relative overflow-hidden">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(120,53,15,0.28)_0%,rgba(12,10,9,0.95)_40%,rgba(0,0,0,1)_100%)] pointer-events-none" />
-            <div className="absolute inset-0 opacity-[0.08] bg-[linear-gradient(to_right,rgba(255,255,255,0.08)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.08)_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none" />
+        <div className="relative min-h-dvh max-h-dvh overflow-y-auto overscroll-contain bg-black text-white custom-scrollbar">
+            <div className="fixed inset-0 bg-[radial-gradient(circle_at_top,rgba(120,53,15,0.28)_0%,rgba(12,10,9,0.95)_40%,rgba(0,0,0,1)_100%)] pointer-events-none" />
+            <div className="fixed inset-0 opacity-[0.08] bg-[linear-gradient(to_right,rgba(255,255,255,0.08)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.08)_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none" />
 
-            <div className="relative z-10 max-w-4xl mx-auto px-6 py-10 md:py-14">
+            <div className="relative z-10 max-w-4xl mx-auto px-6 py-10 pb-[calc(3rem+env(safe-area-inset-bottom))] md:py-14 md:pb-16">
                 <div className="flex items-center justify-between mb-6">
                     <div className="text-[10px] md:text-xs font-black uppercase tracking-[0.35em] text-amber-400/80">
                         {isPreview ? 'Legacy Preview' : 'Final Curtain'}
@@ -99,6 +114,24 @@ export const DeathScreen: React.FC<DeathScreenProps> = ({
                                 </div>
                             </div>
                         </div>
+
+                        {!isPreview && (
+                            <div className="rounded-[2rem] border border-rose-400/20 bg-rose-500/10 backdrop-blur-xl p-5 md:p-6">
+                                <div className="flex items-start gap-4">
+                                    <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-rose-300/30 bg-rose-400/10 text-rose-100">
+                                        <HeartPulse size={24} />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <div className="text-[10px] font-black uppercase tracking-[0.25em] text-rose-100/70">Cause Of Death</div>
+                                        <div className="mt-1 text-xl font-black leading-tight text-white">{deathCause.title}</div>
+                                        <p className="mt-2 text-sm leading-relaxed text-zinc-300">{deathCause.detail}</p>
+                                        <div className="mt-3 inline-flex rounded-full border border-white/10 bg-black/30 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-zinc-400">
+                                            {deathCause.timing}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                             <div className="rounded-3xl border border-emerald-500/20 bg-emerald-500/5 p-5">

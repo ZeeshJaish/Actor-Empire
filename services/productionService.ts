@@ -106,7 +106,7 @@ const CRISIS_TEMPLATES: Record<ActorTrait, (npc: NPCActor) => ProductionCrisis> 
                 labelKey: 'production.crisis.workaholic.keepFilming.label',
                 impact: (p, c) => {
                     const updatedPlayer = { ...p };
-                    spendPlayerEnergy(updatedPlayer, 20);
+                    spendPlayerEnergy(updatedPlayer, 20, 'Production crisis: Keep filming');
                     const updatedProject = { ...c, productionPerformance: Math.min(100, (c.productionPerformance || 50) + 15) };
                     return { updatedPlayer, updatedProject, log: `You stayed until 4 AM. You're dead tired, but that scene was a masterpiece.`, logKey: 'production.crisis.workaholic.keepFilming.log' };
                 }
@@ -209,7 +209,7 @@ export const applyCrisisImpact = (player: Player, event: ScheduledEvent, choiceI
                         return { updatedPlayer: p, updatedProject, log: "The movie looks clean and accessible.", logKey: 'production.director.lighting.bright.shortLog' };
                     } else if (optionRef.includes("Go for it") || optionRef === 'production.director.longTake.go.label') {
                         const updatedPlayer = { ...p };
-                        spendPlayerEnergy(updatedPlayer, 30);
+                        spendPlayerEnergy(updatedPlayer, 30, 'Directing: Long take');
                         const updatedProject = { ...c, productionPerformance: Math.min(100, (c.productionPerformance || 50) + 15) };
                         return { updatedPlayer, updatedProject, log: "You got the long take!", logKey: 'production.director.longTake.go.shortLog' };
                     } else {

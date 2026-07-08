@@ -4,6 +4,7 @@ import { PLATFORMS } from '../../services/streamingLogic';
 import { getBoxOfficeRegionLabel, getBoxOfficeRegionShortLabel, getCinemaChainById } from '../../services/cinemaChains';
 import { getProjectIdentityLabel } from '../../services/genreCatalog';
 import { getProjectReleaseLabel } from '../../services/releaseTiming';
+import { getAbsoluteWeek } from '../../services/legacyLogic';
 import { getPlayerLanguage, t } from '../../services/i18n';
 import { ArrowLeft, BarChart3, TrendingUp, ChevronRight, Radio, Trophy, Building2, Medal } from 'lucide-react';
 import { CinemaChainLogo } from '../lifestyle/business/components/CinemaChainLogo';
@@ -141,6 +142,44 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
       const previous = Math.max(1, values[values.length - 2]);
       const latest = values[values.length - 1];
       return Math.round(((previous - latest) / previous) * 100);
+  };
+
+  const getStreamingRolloutStatus = (rel: ActiveRelease) => {
+      const streamingState = rel.streaming;
+      const weeklyViews = streamingState?.weeklyViews || [];
+      const hasReport = weeklyViews.length > 0 || (streamingState?.totalViews || 0) > 0;
+      if (!streamingState || hasReport) {
+          return { isPending: false, weeksUntilStart: 0, label: '', detail: '', meta: '' };
+      }
+
+      const platformName = PLATFORMS[streamingState.platformId]?.name || tr('box.streamingPlatform');
+      const currentAbsoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
+      const startAbsoluteWeek = typeof streamingState.startWeekAbsolute === 'number'
+          ? streamingState.startWeekAbsolute
+          : typeof streamingState.startWeek === 'number'
+              ? getAbsoluteWeek(player.age, streamingState.startWeek)
+              : undefined;
+      const weeksUntilStart = typeof startAbsoluteWeek === 'number'
+          ? Math.max(0, startAbsoluteWeek - currentAbsoluteWeek)
+          : 0;
+
+      if (weeksUntilStart > 0) {
+          return {
+              isPending: true,
+              weeksUntilStart,
+              label: `${platformName} rollout scheduled`,
+              detail: `${platformName} has the title queued. Streaming numbers will appear when the platform release window opens.`,
+              meta: `First report in ${weeksUntilStart} week${weeksUntilStart === 1 ? '' : 's'}`,
+          };
+      }
+
+      return {
+          isPending: true,
+          weeksUntilStart: 0,
+          label: 'First streaming report pending',
+          detail: `${platformName} has the title live or queued for rollout. The first audience report posts after the next weekly advance.`,
+          meta: 'Advance one week to receive the first read',
+      };
   };
 
   const getOpeningWeekend = (rel: ActiveRelease) => rel.weeklyGross?.[0] || 0;
@@ -660,6 +699,7 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
       const studioNetAfterInvestors = Math.max(0, totalStudioReceipts + (rel.streamingRevenue || 0) + soundtrackRevenue - investorPayoutTotal);
       const platform = isStreamingRelease ? PLATFORMS[rel.streaming!.platformId] : null;
       const tone = isStreamingRelease ? 'streaming' : 'theatrical';
+      const streamingRolloutStatus = isStreamingRelease ? getStreamingRolloutStatus(rel) : null;
 
       const renderDetailTabs = () => (
           <div className="shrink-0 border-b border-white/10 bg-black/35 px-3 py-2 backdrop-blur-md">
@@ -702,9 +742,29 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
           </div>
       );
 
+      const renderStreamingPendingCard = () => {
+          if (!isStreamingRelease || !streamingRolloutStatus?.isPending) return null;
+          return (
+              <div className="rounded-2xl border border-indigo-300/25 bg-indigo-400/10 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                          <div className="text-[10px] font-black uppercase tracking-[0.18em] text-indigo-200">Platform Queue</div>
+                          <div className="mt-1 text-lg font-black leading-tight text-white">{streamingRolloutStatus.label}</div>
+                          <p className="mt-2 text-sm leading-relaxed text-indigo-50/75">{streamingRolloutStatus.detail}</p>
+                      </div>
+                      <div className="shrink-0 rounded-2xl border border-white/10 bg-black/30 px-3 py-2 text-right">
+                          <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Status</div>
+                          <div className="text-xs font-black uppercase tracking-wider text-indigo-100">{streamingRolloutStatus.meta}</div>
+                      </div>
+                  </div>
+              </div>
+          );
+      };
+
       const renderOverviewTab = () => (
           <>
               {renderHeroCard()}
+              {renderStreamingPendingCard()}
               <div className="rounded-2xl border border-zinc-700 bg-zinc-800 p-4">
                   <div className="mb-3 flex items-center justify-between gap-3">
 	                      <div className={`text-[10px] font-black uppercase tracking-[0.18em] ${isStreamingRelease ? 'text-indigo-300' : 'text-emerald-300'}`}>
@@ -718,8 +778,8 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
 	                              {renderMetric(tr('box.totalViews'), formatViews(rel.streaming!.totalViews))}
 	                              {renderMetric(tr('box.streamingRevenue'), formatMoney(rel.streamingRevenue || 0), 'text-emerald-300')}
 	                              {soundtrackRevenue > 0 && renderMetric(tr('box.soundtrackRevenue'), formatMoney(soundtrackRevenue), 'text-cyan-300')}
-	                              {renderMetric(tr('box.latestWeek'), formatViews(weeklyValues.slice(-1)[0] || 0))}
-	                              {renderMetric(tr('box.weeklyDrop'), latestDrop === null ? '-' : `${latestDrop}%`, latestDrop !== null && latestDrop < 0 ? 'text-emerald-300' : 'text-amber-300')}
+	                              {renderMetric(tr('box.latestWeek'), streamingRolloutStatus?.isPending ? 'Pending' : formatViews(weeklyValues.slice(-1)[0] || 0), streamingRolloutStatus?.isPending ? 'text-indigo-200' : 'text-white')}
+	                              {renderMetric(tr('box.weeklyDrop'), streamingRolloutStatus?.isPending ? 'Waiting' : latestDrop === null ? '-' : `${latestDrop}%`, streamingRolloutStatus?.isPending ? 'text-indigo-200' : latestDrop !== null && latestDrop < 0 ? 'text-emerald-300' : 'text-amber-300')}
                           </>
                       ) : (
                           <>
@@ -799,6 +859,14 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
       const renderWeeklyTab = () => (
           <div className="rounded-2xl border border-zinc-700 bg-zinc-800 p-4">
 	              <div className="mb-3 text-[10px] font-black uppercase tracking-[0.18em] text-zinc-400">{tr('box.weeklyTrend')}</div>
+              {weeklyValues.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-indigo-300/25 bg-indigo-400/10 p-4 text-sm leading-relaxed text-indigo-50/75">
+                      {streamingRolloutStatus?.isPending
+                          ? `${streamingRolloutStatus.label}. ${streamingRolloutStatus.meta}.`
+                          : 'Weekly data will appear after the first report is generated.'}
+                  </div>
+              ) : (
+              <>
               <div className="flex h-28 w-full items-end gap-2 overflow-x-auto pb-1 no-scrollbar">
                   {weeklyValues.map((value, idx) => {
                       const maxValue = Math.max(...weeklyValues, 1);
@@ -849,6 +917,8 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
                       );
                   })}
               </div>
+              </>
+              )}
           </div>
       );
 
@@ -1047,6 +1117,7 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
                               setSelectedReleaseId(entry.rel.id);
                           }}
                           disabled={!entry.rel}
+                          aria-label={`${entry.source === 'OUTSIDE' ? 'Producer Stake' : entry.source === 'PLAYER' ? tr('box.yourRelease') : tr('box.marketFilm')} ${entry.title}`}
                           className={`w-full rounded-2xl border p-3 text-left shadow-lg transition-colors ${
                               entry.source === 'PLAYER'
                                   ? 'border-emerald-400/30 bg-emerald-950/30 hover:border-emerald-300/60'
@@ -1384,6 +1455,7 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
                     {streaming.map(rel => {
                         const platform = PLATFORMS[rel.streaming!.platformId];
                         const weeklyViews = rel.streaming!.weeklyViews || [];
+                        const rolloutStatus = getStreamingRolloutStatus(rel);
                         const maxViews = Math.max(...weeklyViews, 1);
 
                         return (
@@ -1416,10 +1488,16 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
                                     <div className="bg-black/20 p-3 rounded-xl flex flex-col justify-center min-w-0">
                                         <div className="text-[10px] text-zinc-500 uppercase font-bold">{tr('box.latestWeek')}</div>
                                         <div className="text-zinc-300 text-sm font-mono font-bold break-all">
-                                            {weeklyViews.length > 0 ? formatViews(weeklyViews[weeklyViews.length-1]) : '0'}
+                                            {rolloutStatus.isPending ? 'Pending' : weeklyViews.length > 0 ? formatViews(weeklyViews[weeklyViews.length-1]) : '0'}
                                         </div>
                                     </div>
                                 </div>
+
+                                {rolloutStatus.isPending && (
+                                    <div className="mb-4 rounded-xl border border-indigo-300/20 bg-indigo-400/10 px-3 py-2 text-xs font-bold leading-relaxed text-indigo-100/80">
+                                        {rolloutStatus.label}. {rolloutStatus.meta}.
+                                    </div>
+                                )}
 
                                 {/* Bar Graph for Streaming */}
                                 <div>

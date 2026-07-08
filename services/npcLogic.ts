@@ -987,6 +987,10 @@ export const NPC_DATABASE = generateNPCs();
 
 // --- TALENT REFRESH LOGIC ---
 
+export const isCastableActor = (npc?: Pick<NPCActor, 'occupation'> | null): boolean => (
+    Boolean(npc) && npc?.occupation === 'ACTOR'
+);
+
 export const generateNewUnknowns = (count: number): NPCActor[] => {
     const newUnknowns: NPCActor[] = [];
     for(let i=0; i<count; i++) {
@@ -1034,7 +1038,9 @@ export const getAvailableTalent = (currentWeek: number, occupation: 'ACTOR' | 'D
     const rotationSeed = Math.floor(currentWeek / 3);
     
     // 2. Filter DB by occupation
-    const allTalent = [...NPC_DATABASE, ...extraNPCs].filter(npc => npc.occupation === occupation);
+    const allTalent = [...NPC_DATABASE, ...extraNPCs].filter(npc => (
+        occupation === 'ACTOR' ? isCastableActor(npc) : npc.occupation === occupation
+    ));
     
     // 3. Shuffle using a more robust seeded shuffle
     // We use a pseudo-random number generator based on the rotationSeed

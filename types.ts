@@ -913,6 +913,48 @@ export type RareHollywoodChaosKind =
     | 'PLATFORM_MOONSHOT'
     | 'STUDIO_REBOOT_GAMBLE';
 
+export type OwnedProductionTrackType = 'ACTING' | 'DIRECTING' | 'PRODUCING';
+export type OwnedProductionActionId =
+    | 'ACTOR_PREP'
+    | 'ACTOR_SCENE'
+    | 'ACTOR_BIG_PUSH'
+    | 'DIRECTOR_PLAN'
+    | 'DIRECTOR_SHOT_DECISION'
+    | 'DIRECTOR_MAJOR_PUSH'
+    | 'DIRECTOR_RISKY_DECISION'
+    | 'DIRECTOR_CUT'
+    | 'PRODUCER_SCRIPT_REVIEW'
+    | 'PRODUCER_CAST_CREW_PREP'
+    | 'PRODUCER_SET_QUALITY'
+    | 'PRODUCER_EDIT_NOTES'
+    | 'PRODUCER_RELEASE_POSITIONING';
+
+export interface PlayerProductionFocus {
+    isPlayerActor?: boolean;
+    isPlayerDirector?: boolean;
+    isPlayerProducer?: boolean;
+    actorPrep?: number;
+    actorSceneRehearsal?: number;
+    actorBigPerformance?: number;
+    actorPerformance?: number;
+    actorPromotion?: number;
+    directorPrep?: number;
+    directorShotDecision?: number;
+    directorMajorCreativePush?: number;
+    directorRiskyDecision?: number;
+    directorPerformance?: number;
+    directorPost?: number;
+    producerScriptPolish?: number;
+    producerCastCrewPrep?: number;
+    producerSetQuality?: number;
+    producerEditNotes?: number;
+    producerReleasePositioning?: number;
+    producerPrep?: number;
+    producerPerformance?: number;
+    producerPost?: number;
+    qualityLift?: number;
+}
+
 export interface CastMember {
     id: string;
     name: string;
@@ -1240,6 +1282,21 @@ export interface OutsideProducerInvestmentOffer {
     expectedRunWeeks: number;
     releasePath: 'THEATRICAL' | 'STREAMING' | 'FESTIVAL';
     counterUsed?: boolean;
+    counterAttempts?: number;
+    maxCounterAttempts?: number;
+    counterClosed?: boolean;
+    counterClosedReason?: string;
+    lastCounterFeedback?: {
+        accepted: boolean;
+        declined: boolean;
+        chance: number;
+        cashAmount: number;
+        stakePercent: number;
+        week: number;
+        year: number;
+        attempt?: number;
+        reason?: string;
+    };
     fraudRisk?: 'NONE' | 'LOW' | 'MEDIUM' | 'HIGH';
     riskSignals?: Array<'GENEROUS_TERMS' | 'UNVERIFIED_FINANCING' | 'SHELL_COMPANY' | 'RUSHED_CLOSE'>;
     financingStatus?: 'VERIFIED' | 'UNVERIFIED_FINANCING' | 'SHELL_COMPANY';
@@ -1312,6 +1369,7 @@ export interface ProjectDetails {
     releaseStrategy?: ReleaseStrategy;
     visibleHype: 'LOW' | 'MID' | 'HIGH';
     hiddenStats: ProjectHiddenStats;
+    playerProductionFocus?: PlayerProductionFocus;
     directorName: string;
     directorId?: string;
     director?: any;

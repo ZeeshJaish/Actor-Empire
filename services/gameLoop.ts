@@ -3128,7 +3128,7 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
     const totalDrain = commitmentDrain;
     
     resetWeeklyEnergy(nextPlayer);
-    spendPlayerEnergy(nextPlayer, totalDrain);
+    spendPlayerEnergy(nextPlayer, totalDrain, 'Weekly commitments');
 
     // --- UPDATED STAT DECAY & LIFESTYLE BONUSES ---
     // DIFFICULTY SCALING: Reduce decay for new players to make early game easier.
@@ -3252,7 +3252,15 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
         const repeatRisk = newRecentHealthCrises >= 4 ? 0.06 : newRecentHealthCrises >= 2 ? 0.02 : 0;
         const moodRisk = currentMood <= 5 ? 0.01 : 0;
         if (Math.random() < ageRisk + repeatRisk + moodRisk) {
-            nextPlayer.flags.isDead = true;
+            nextPlayer.flags = {
+                ...(nextPlayer.flags || {}),
+                isDead: true,
+                deathCauseTitle: 'Health collapse',
+                deathCauseDetail: 'Repeated medical emergencies overwhelmed your body. Better health care, rest, trainer support, or wellness treatment could have reduced the risk.',
+                deathCauseType: 'HEALTH_COLLAPSE',
+                deathCauseWeek: nextPlayer.currentWeek,
+                deathCauseYear: nextPlayer.age,
+            };
             logsToAdd.push({ msg: t(language, 'services.gameLoop.wellbeing.log.healthCollapsed'), type: 'negative' });
         }
     } else if (currentHealth < 10) {
@@ -5313,7 +5321,15 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
             }
 
             if (nextPlayer.stats.health <= 0) {
-                nextPlayer.flags.isDead = true;
+                nextPlayer.flags = {
+                    ...(nextPlayer.flags || {}),
+                    isDead: true,
+                    deathCauseTitle: 'Age and failing health',
+                    deathCauseDetail: 'Health reached zero in later life after age-related decline. Wellness, rest, and support staff can slow this down before it becomes fatal.',
+                    deathCauseType: 'AGE_HEALTH_DECLINE',
+                    deathCauseWeek: nextPlayer.currentWeek,
+                    deathCauseYear: nextPlayer.age,
+                };
             } else if (nextPlayer.stats.health < 20) {
                 logsToAdd.push({ msg: `⚠️ Your health is failing. You need to focus on your wellbeing.`, type: 'negative' });
             }

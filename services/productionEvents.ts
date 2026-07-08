@@ -369,7 +369,7 @@ export const GENERAL_CRISIS_TEMPLATES: ((project: Commitment) => ProductionCrisi
                 labelKey: 'production.event.scriptCafe.rewrite.label',
                 impact: (p, c) => {
                     const updatedPlayer = { ...p };
-                    spendPlayerEnergy(updatedPlayer, 30);
+                    spendPlayerEnergy(updatedPlayer, 30, 'Production event: Rewrite ending');
                     return {
                         updatedPlayer,
                         updatedProject: { ...c, productionPerformance: (c.productionPerformance || 50) + 5 },

@@ -1,7 +1,7 @@
 
 import { WorldState, IndustryProject, StudioId, BudgetTier, Genre, Player, NPCActor, NewsItem, UniverseId, Universe, Festival, TargetAudience } from '../types';
 import { STUDIO_CATALOG } from './studioLogic';
-import { NPC_DATABASE, calculateProjectFameMultiplier } from './npcLogic';
+import { NPC_DATABASE, calculateProjectFameMultiplier, isCastableActor } from './npcLogic';
 import { generateProjectTitle, getEstimatedBudget, generateProjectDetails } from './roleLogic';
 import { initUniverses, normalizeUniverseMap, processUniverseTurn } from './universeLogic';
 import { processNpcVentures, syncNpcVenturesToStudios } from './npcVentureLogic';
@@ -79,15 +79,15 @@ export const generateIndustryProject = (
     
     // Pick Lead Actor
     let lead: NPCActor;
-    if (forcedLead) {
+    if (forcedLead && isCastableActor(forcedLead)) {
         lead = forcedLead;
     } else {
-        let pool = NPC_DATABASE.filter(n => n.occupation === 'ACTOR');
+        let pool = NPC_DATABASE.filter(n => isCastableActor(n));
         if (tier === 'HIGH') pool = pool.filter(n => n.tier === 'A_LIST' || n.tier === 'ESTABLISHED');
         else if (tier === 'MID') pool = pool.filter(n => n.tier === 'ESTABLISHED' || n.tier === 'RISING');
         else pool = pool.filter(n => n.tier === 'RISING' || n.tier === 'INDIE');
         
-        lead = pick(pool.length > 0 ? pool : NPC_DATABASE.filter(n => n.occupation === 'ACTOR'));
+        lead = pick(pool.length > 0 ? pool : NPC_DATABASE.filter(n => isCastableActor(n)));
     }
 
     // Pick Director

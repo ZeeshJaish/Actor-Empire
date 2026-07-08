@@ -26,12 +26,13 @@ import { getAbsoluteWeek } from '../../services/legacyLogic';
 import { spendPlayerEnergy } from '../../services/premiumLogic';
 import { normalizeUniverseMap } from '../../services/universeLogic';
 import { getPlayerLanguage, t } from '../../services/i18n';
+import { PHASE_ONE_ENERGY_COSTS } from '../../services/energyCosts';
 
 type MobileAppMode = 'HOME' | 'CASTLINK' | 'IMDB' | 'BOXOFFICE' | 'INSTAGRAM' | 'X' | 'YOUTUBE' | 'NEWS' | 'TEAM' | 'MESSAGES' | 'FORBES' | 'STOCKS' | 'DATING_FOLDER' | 'SOCIAL_FOLDER' | 'TINDER' | 'LUXE' | 'BANK' | 'GUIDE';
 
 // Helper Component for App Icon
-const AppIcon = ({ icon, color, label, onClick, badge, customContent, customBg }: any) => (
-    <div className="relative flex w-16 flex-col items-center gap-1 group cursor-pointer" onClick={onClick}>
+const AppIcon = ({ icon, color, label, onClick, badge, customContent, customBg, tutorialId }: any) => (
+    <div className="relative flex w-16 flex-col items-center gap-1 group cursor-pointer" onClick={onClick} data-tutorial-id={tutorialId}>
         <div className={`w-14 h-14 ${customBg || color} rounded-2xl flex items-center justify-center text-white shadow-lg group-active:scale-95 transition-transform relative overflow-hidden`}>
             {customContent ? customContent : icon}
         </div>
@@ -120,7 +121,8 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
 
   useEffect(() => {
       const fullBleed = (appMode === 'FORBES' && isImmersiveForbesScene) || (appMode === 'MESSAGES' && isImmersiveMessageReview);
-      props.onNavVisibilityChange?.(!fullBleed);
+      const focusedPhoneApp = fullBleed || appMode === 'GUIDE';
+      props.onNavVisibilityChange?.(!focusedPhoneApp);
       props.onFullBleedChange?.(fullBleed);
       return () => {
           props.onNavVisibilityChange?.(true);
@@ -151,6 +153,13 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
       setTimeout(() => setToast(null), 3000);
   };
 
+  const collaborationSigningEnergyCost = PHASE_ONE_ENERGY_COSTS.COLLABORATION_SIGNING;
+  const hasEnergyFor = (amount: number, action: string) => {
+      if (props.player!.energy.current >= amount) return true;
+      showToast(`Need ${amount}E to ${action}.`, 'bg-rose-500');
+      return false;
+  };
+
   const handleMarkMessageRead = (id: string) => {
       const updatedInbox = props.player!.inbox.map(message =>
           message.id === id ? { ...message, isRead: true } : message
@@ -160,6 +169,11 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
 
   // --- HANDLER: Accept Offers (Modified for Multi-Film) ---
   const handleAcceptMessage = (msg: Message) => {
+      if (msg.type === 'OFFER_OUTSIDE_PRODUCER_INVESTMENT' && props.onAcceptMessage) {
+          props.onAcceptMessage(msg);
+          return;
+      }
+
       // 1. Remove message from inbox
       const newInbox = props.player!.inbox.filter(m => m.id !== msg.id);
       let updatedPlayer = { ...props.player!, inbox: newInbox };
@@ -409,7 +423,9 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
               handleUpdatePlayer(updatedPlayer);
               return;
           }
+          if (!hasEnergyFor(collaborationSigningEnergyCost, 'sign this brand deal')) return;
           // Add to active sponsorships
+          spendPlayerEnergy(updatedPlayer, collaborationSigningEnergyCost, `Brand signing: ${offer.brandName}`);
           updatedPlayer.activeSponsorships = [...updatedPlayer.activeSponsorships, { ...offer, weeksCompleted: 0 }];
           updatedPlayer.logs.push({ week: updatedPlayer.currentWeek, year: updatedPlayer.age, message: `Signed sponsorship deal with ${offer.brandName}.`, type: 'positive' });
       } else if (msg.type === 'OFFER_YOUTUBE_COLLAB') {
@@ -419,6 +435,8 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
               handleUpdatePlayer(updatedPlayer);
               return;
           }
+          if (!hasEnergyFor(collaborationSigningEnergyCost, 'sign this creator collab')) return;
+          spendPlayerEnergy(updatedPlayer, collaborationSigningEnergyCost, `YouTube collab signing: ${offer.creatorName}`);
           updatedPlayer.youtube = {
               ...updatedPlayer.youtube,
               activeCollabs: [...(updatedPlayer.youtube.activeCollabs || []), offer]
@@ -431,6 +449,8 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
               handleUpdatePlayer(updatedPlayer);
               return;
           }
+          if (!hasEnergyFor(collaborationSigningEnergyCost, 'sign this channel deal')) return;
+          spendPlayerEnergy(updatedPlayer, collaborationSigningEnergyCost, `YouTube brand signing: ${offer.brandName}`);
           updatedPlayer.youtube = {
               ...updatedPlayer.youtube,
               activeBrandDeals: [...(updatedPlayer.youtube.activeBrandDeals || []), offer]
@@ -443,6 +463,8 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
               handleUpdatePlayer(updatedPlayer);
               return;
           }
+          if (!hasEnergyFor(collaborationSigningEnergyCost, 'sign this music video feature')) return;
+          spendPlayerEnergy(updatedPlayer, collaborationSigningEnergyCost, `Music feature signing: ${offer.artistName}`);
           const messy = Math.random() < Math.min(0.28, offer.reputationRisk / 28);
           const followerGain = Math.max(0, Math.round(offer.followerGain * (messy ? 0.55 : 1)));
           updatedPlayer.money += offer.appearanceFee;
@@ -525,7 +547,7 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
           ...props.player!,
           activeSponsorships: updatedSponsorships
       };
-      spendPlayerEnergy(updatedPlayer, spon.requirements.energyCost);
+      spendPlayerEnergy(updatedPlayer, spon.requirements.energyCost, `Sponsorship: ${spon.brandName}`);
 
       handleUpdatePlayer(updatedPlayer);
       showToast(action === 'POST' ? tr('mobile.toast.postComplete') : tr('mobile.toast.shootComplete'), 'bg-blue-500');
@@ -629,7 +651,7 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
 
                 {/* HOME SCREEN */}
                 {appMode === 'HOME' && (
-                    <div className="h-full w-full p-4 pt-10 flex flex-col animate-in fade-in duration-300">
+                    <div className="h-full w-full p-4 pt-10 flex flex-col animate-in fade-in duration-300" data-tutorial-id="mobile-phone-home">
                         <div className="grid grid-cols-4 gap-x-4 gap-y-8 mt-4">
                             <AppIcon 
                                 icon={<MessageSquare size={26} fill="white" />} 
@@ -637,16 +659,18 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
                                 label={tr('mobile.messages')} 
                                 onClick={() => setAppMode('MESSAGES')} 
                                 badge={unreadMessages} 
+                                tutorialId="mobile-messages-app"
                             />
                             <AppIcon 
                                 icon={<Search size={26} />} 
                                 color="bg-indigo-600" 
                                 label="CastLink" 
                                 onClick={() => setAppMode('CASTLINK')} 
+                                tutorialId="mobile-castlink-app"
                             />
                             
                             {/* SOCIAL FOLDER */}
-                            <div className="flex flex-col items-center gap-1 group cursor-pointer" onClick={() => setAppMode('SOCIAL_FOLDER')}>
+                            <div className="flex flex-col items-center gap-1 group cursor-pointer" onClick={() => setAppMode('SOCIAL_FOLDER')} data-tutorial-id="mobile-social-folder">
                                 <div className="w-14 h-14 bg-white/20 backdrop-blur-md rounded-2xl p-2 grid grid-cols-2 gap-1 shadow-lg group-active:scale-95 transition-transform overflow-hidden">
                                     <div className="w-full h-full bg-black flex items-center justify-center rounded-[5px] shadow-sm border border-zinc-700">
                                         <X size={12} strokeWidth={3} className="text-white"/>
@@ -667,30 +691,35 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
                                 color="bg-red-600" 
                                 label={tr('mobile.news')} 
                                 onClick={() => setAppMode('NEWS')} 
+                                tutorialId="mobile-news-app"
                             />
                             <AppIcon 
                                 label="IMDb" 
                                 color="bg-yellow-400" 
                                 onClick={() => setAppMode('IMDB')} 
                                 customContent={<span className="font-black text-xs tracking-tighter border-2 border-black px-1 rounded text-black">IMDb</span>}
+                                tutorialId="mobile-imdb-app"
                             />
                             <AppIcon 
                                 icon={<BarChart3 size={26} />} 
                                 color="bg-emerald-600" 
                                 label={tr('mobile.boxOffice')} 
                                 onClick={() => setAppMode('BOXOFFICE')} 
+                                tutorialId="mobile-boxoffice-app"
                             />
                             <AppIcon 
                                 icon={<Users size={26} />} 
                                 color="bg-blue-500" 
                                 label={tr('mobile.team')} 
                                 onClick={() => setAppMode('TEAM')} 
+                                tutorialId="mobile-team-app"
                             />
                             <AppIcon 
                                 icon={<Landmark size={26} />} 
                                 color="bg-[#004b87]" 
                                 label={tr('mobile.bank')} 
                                 onClick={() => setAppMode('BANK')} 
+                                tutorialId="mobile-bank-app"
                             />
                             <AppIcon 
                                 icon={<TrendingUp size={26} />} 
@@ -698,16 +727,18 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
                                 label={tr('mobile.forbes')} 
                                 onClick={() => setAppMode('FORBES')}
                                 customContent={<span className="font-serif font-black text-xs tracking-tighter text-white">FORBES</span>} 
+                                tutorialId="mobile-forbes-app"
                             />
                             <AppIcon 
                                 icon={<Activity size={26} />} 
                                 color="bg-zinc-800" 
                                 label={tr('mobile.stocks')} 
                                 onClick={() => setAppMode('STOCKS')} 
+                                tutorialId="mobile-stocks-app"
                             />
                             
                             {/* DATING FOLDER */}
-                            <div className="flex flex-col items-center gap-1 group cursor-pointer" onClick={() => setAppMode('DATING_FOLDER')}>
+                            <div className="flex flex-col items-center gap-1 group cursor-pointer" onClick={() => setAppMode('DATING_FOLDER')} data-tutorial-id="mobile-dating-folder">
                                 <div className="w-14 h-14 bg-white/20 backdrop-blur-md rounded-2xl p-2 grid grid-cols-2 gap-1 shadow-lg group-active:scale-95 transition-transform overflow-hidden">
                                     <div className="w-full h-full bg-gradient-to-tr from-pink-500 to-orange-500 rounded-[5px] flex items-center justify-center shadow-sm">
                                         <Flame size={12} fill="white" className="text-white" />
@@ -728,6 +759,7 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
                                 color="bg-zinc-800" 
                                 label={tr('mobile.guide')} 
                                 onClick={() => setAppMode('GUIDE')} 
+                                tutorialId="mobile-guide-app"
                             />
 
                         </div>
@@ -873,7 +905,11 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
 
                 {/* GUIDE APP */}
                 {appMode === 'GUIDE' && (
-                    <GuideView player={props.player} onBack={() => setAppMode('HOME')} />
+                    <GuideView
+                        player={props.player}
+                        onBack={() => setAppMode('HOME')}
+                        onOpenApp={(nextMode) => setAppMode(nextMode)}
+                    />
                 )}
 
                 {/* Home Indicator */}

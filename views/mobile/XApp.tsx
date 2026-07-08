@@ -262,7 +262,7 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
 	                type: logType
 	            }, ...player.logs].slice(0, 50)
         };
-        spendPlayerEnergy(nextPlayer, 5);
+        spendPlayerEnergy(nextPlayer, 5, `X: ${typeConfig.label}`);
         onUpdatePlayer(nextPlayer);
         
         setFeed(updatedFeed);
@@ -363,7 +363,7 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
                 type: toneConfig.controversy >= 6 ? 'negative' as const : 'positive' as const
             }, ...player.logs].slice(0, 50)
         };
-        spendPlayerEnergy(nextPlayer, mode === 'QUOTE' ? 8 : 5);
+        spendPlayerEnergy(nextPlayer, mode === 'QUOTE' ? 8 : 5, mode === 'QUOTE' ? `X: Quote ${post.authorName}` : `X: Reply to ${post.authorName}`);
         setFeed(updatedFeed);
         setSelectedPost(newPost);
         onUpdatePlayer(nextPlayer);

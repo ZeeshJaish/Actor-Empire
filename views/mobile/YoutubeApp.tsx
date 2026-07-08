@@ -989,7 +989,7 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
                 type: messy ? 'negative' as const : 'positive' as const
             }]
         };
-        spendPlayerEnergy(nextPlayer, energyCost);
+        spendPlayerEnergy(nextPlayer, energyCost, 'YouTube: Livestream');
         onUpdatePlayer(nextPlayer);
     };
 
@@ -1041,7 +1041,7 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
                 type: flop ? 'negative' as const : 'positive' as const
             }]
         };
-        spendPlayerEnergy(nextPlayer, tier.energy);
+        spendPlayerEnergy(nextPlayer, tier.energy, `YouTube: Merch ${tier.label}`);
         onUpdatePlayer(nextPlayer);
     };
 
@@ -1099,7 +1099,7 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
             youtube: updatedChannel,
             logs: [...player.logs, { week: player.currentWeek, year: player.age, message: selectedAssetContext ? tr('youtube.log.uploadedWithAsset', { plan: plan.label, title, asset: selectedAssetContext.assetName }) : tr('youtube.log.uploaded', { plan: plan.label, title }), type: selectedPlan === 'VIRAL_BAIT' || selectedPlan === 'SPONSOR_HEAVY' ? 'neutral' : 'positive' }]
         };
-        spendPlayerEnergy(nextPlayer, typeConfig.energy);
+        spendPlayerEnergy(nextPlayer, typeConfig.energy, `YouTube upload: ${title.trim()}`);
         onUpdatePlayer(nextPlayer);
 
         setView('MAIN');
@@ -1168,7 +1168,7 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
             news: nextNews,
             logs: [...player.logs, { week: player.currentWeek, year: player.age, message: tr('youtube.log.collabOutcome', { label: outcome.label, log: outcome.log }), type: outcome.logType }]
         };
-        spendPlayerEnergy(nextPlayer, collab.energyCost);
+        spendPlayerEnergy(nextPlayer, collab.energyCost, `YouTube collab: ${collab.creatorName}`);
         onUpdatePlayer(nextPlayer);
     };
 
@@ -1227,7 +1227,7 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
             news: nextNews,
             logs: [...player.logs, { week: player.currentWeek, year: player.age, message: tr('youtube.log.brandOutcome', { label: outcome.label, log: outcome.log, payout: finalPayout.toLocaleString() }), type: outcome.logType }]
         };
-        spendPlayerEnergy(nextPlayer, deal.energyCost);
+        spendPlayerEnergy(nextPlayer, deal.energyCost, `YouTube brand: ${deal.brandName}`);
         onUpdatePlayer(nextPlayer);
     };
 

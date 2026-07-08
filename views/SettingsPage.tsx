@@ -7,6 +7,7 @@ import { APP_DISPLAY_VERSION } from '../services/appVersion';
 import { createGlobalActorPackNPCs, getGlobalActorPackDescription, getGlobalActorPackLabel, GLOBAL_ACTOR_PACKS } from '../services/npcLogic';
 import { getGlobalCreatorCountForPack } from '../services/youtubeLogic';
 import { getPlayerLanguage, SUPPORTED_LANGUAGES, t } from '../services/i18n';
+import { buildActiveNewPlayerTutorialState, writeNewPlayerTutorialState } from '../services/newPlayerTutorial';
 import { addBreadcrumb, enableManualPushNotifications, getFirebaseAuthStatus, getFirebasePushStatus, markTraceAction, onFirebaseAuthStatusChanged, onFirebasePushStatusChanged, submitPlayerIssueReport, trackGameEvent } from '../services/firebaseService';
 
 interface SettingsPageProps {
@@ -201,6 +202,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
         language: nextLanguage,
       },
     }));
+  };
+
+  const handleRestartTutorial = () => {
+    onUpdatePlayer(prev => writeNewPlayerTutorialState(prev, buildActiveNewPlayerTutorialState(prev.currentWeek)));
+    onBack();
   };
 
   const getLanguageCoverageLabel = (optionId: GameLanguage, isSelected: boolean) => {
@@ -506,6 +512,19 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
               <div className="text-left">
                 <div className="font-bold text-white">{tr('settings.modPacks')}</div>
                 <div className="text-xs text-zinc-400">{tr('settings.activePacks', { count: enabledPackIds.length })}</div>
+              </div>
+            </div>
+            <ChevronRight size={18} className="text-zinc-500"/>
+          </button>
+          <button
+            onClick={handleRestartTutorial}
+            className="w-full flex items-center justify-between p-4 bg-sky-500/10 rounded-2xl hover:bg-sky-500/15 transition-colors border border-sky-500/20"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-sky-500 rounded-lg text-black"><LifeBuoy size={20}/></div>
+              <div className="text-left">
+                <div className="font-bold text-white">Replay Tutorial</div>
+                <div className="text-xs text-zinc-400">Start the guided screen-by-screen tour again.</div>
               </div>
             </div>
             <ChevronRight size={18} className="text-zinc-500"/>

@@ -195,6 +195,14 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
         setView('GREENLIGHT');
     };
 
+    const openScriptMarketFromGreenlight = () => {
+        setSelectedConcept(null);
+        setSelectedProjectDashboard(null);
+        setRightsMarketTargetId(null);
+        setSubsidiaryLaunch({ tab: 'IP_MARKET' });
+        setView('DEVELOPMENT');
+    };
+
     const closeStudioTool = () => {
         setSelectedConcept(null);
         if (returnAfterStudioTool === 'STUDIO_GROUP') {
@@ -757,6 +765,7 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
                         onBack={() => {
                             closeStudioTool();
                         }} 
+                        onOpenScriptMarket={openScriptMarketFromGreenlight}
                         onUpdatePlayer={onUpdatePlayer} 
                         onComplete={() => {
                             closeStudioTool();

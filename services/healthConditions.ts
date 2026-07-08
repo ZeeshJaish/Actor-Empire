@@ -453,6 +453,7 @@ export const processHealthConditionsWeek = (player: Player): HealthConditionWeek
     let nextHealth = player.stats.health;
     let nextReputation = player.stats.reputation;
     let deathTriggered = false;
+    let fatalCondition: HealthConditionState | null = null;
     const progressed = conditions.flatMap((condition) => {
         const definition = HEALTH_CONDITION_REGISTRY[condition.conditionId];
         if (!definition) return [];
@@ -510,16 +511,18 @@ export const processHealthConditionsWeek = (player: Player): HealthConditionWeek
             });
         }
 
-        const deathRisk = (condition.deathRisk || 0) + Math.max(0, ignoredWeeks - definition.worsenAfterWeeks) * 0.004;
-        if (deathRisk > 0 && nextHealth < 18 && conditionSeed(player, absoluteWeek, condition.id.length + 31) < deathRisk) {
-            deathTriggered = true;
-        }
-
-        return [{
+        const progressedCondition = {
             ...condition,
             ignoredWeeks,
             lastProgressWeekAbsolute: absoluteWeek,
-        }];
+        };
+        const deathRisk = (condition.deathRisk || 0) + Math.max(0, ignoredWeeks - definition.worsenAfterWeeks) * 0.004;
+        if (deathRisk > 0 && nextHealth < 18 && conditionSeed(player, absoluteWeek, condition.id.length + 31) < deathRisk) {
+            deathTriggered = true;
+            fatalCondition = progressedCondition;
+        }
+
+        return [progressedCondition];
     });
 
     const strongestCap = progressed.length
@@ -542,6 +545,15 @@ export const processHealthConditionsWeek = (player: Player): HealthConditionWeek
             activeHealthConditionCount: progressed.length,
             healthConditionCap: strongestCap,
             isDead: deathTriggered ? true : player.flags?.isDead,
+            ...(deathTriggered ? {
+                deathCauseTitle: fatalCondition ? getHealthConditionLabel(fatalCondition, language) : 'Untreated health condition',
+                deathCauseDetail: fatalCondition
+                    ? `${getHealthConditionSummary(fatalCondition, language)} It became fatal after ${fatalCondition.ignoredWeeks} untreated week${fatalCondition.ignoredWeeks === 1 ? '' : 's'} while health stayed critically low.`
+                    : 'A severe untreated health condition became fatal while health stayed critically low.',
+                deathCauseType: 'HEALTH_CONDITION',
+                deathCauseWeek: player.currentWeek,
+                deathCauseYear: player.age,
+            } : {}),
         },
     };
 

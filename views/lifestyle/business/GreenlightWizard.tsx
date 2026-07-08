@@ -2,12 +2,13 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Player, BudgetTier, Genre, ProjectDetails, ActiveRelease, Commitment, Business, LocationDetails, NewsItem, XPost, StudioEquipment, CrewMember, Universe, UniverseId, BoxOfficeRegionId, ProjectMusicStrategy, MusicCreditRole, MusicArtist, ProjectInvestorFundingMode } from '../../../types';
 import { ArrowLeft, Film, DollarSign, Users, TrendingUp, Calendar, Check, Plus, Star, Award, Zap, Briefcase, LayoutGrid, MapPin, PenTool, Globe, Camera, Clapperboard, ChevronRight, Lock, Building2, BarChart3, ShieldAlert, Crown, LogOut, AlertTriangle, Sparkles, BookOpen, Video, X, Clock, Palette, Lightbulb, Mic, Box, Info, CheckCircle, XCircle, Layers, Loader2, Search } from 'lucide-react';
-import { NPC_DATABASE, getAvailableTalent, calculateProjectFameMultiplier } from '../../../services/npcLogic';
+import { NPC_DATABASE, getAvailableTalent, calculateProjectFameMultiplier, isCastableActor } from '../../../services/npcLogic';
 import { calculateCastDepthScore, getDirectorTalent } from '../../../services/roleLogic';
 import { buildUniverseRoster, getFallbackCharacterName, getUniverseCharacterKeyAliases, getUniverseDashboardProjects, normalizeUniverseCharacterKey, normalizeUniverseForSave, normalizeUniverseMap } from '../../../services/universeLogic';
 import { getEquipmentStageName } from './FacilitiesView';
 import { showAd } from '../../../services/adLogic';
-import { hasNoAds } from '../../../services/premiumLogic';
+import { hasNoAds, spendPlayerEnergy } from '../../../services/premiumLogic';
+import { PHASE_ONE_ENERGY_COSTS } from '../../../services/energyCosts';
 import { formatProjectFormatLabel } from '../../../services/genreCatalog';
 import { getPlayerLanguage, t } from '../../../services/i18n';
 import { addBreadcrumb, markGameCheckpoint, markTraceAction, setCrashContext, startPerformanceTrace, stopPerformanceTrace, trackGameEvent } from '../../../services/firebaseService';
@@ -17,7 +18,6 @@ import {
     calculateProjectMusicImpact,
     buildProjectMusicPlanFromArtists,
     estimateMusicArtistProjectCost,
-    formatProjectMusicByline,
     getDefaultMusicArtistCount,
     getMusicArtistCountBounds,
     getMusicArtistCatalog,
@@ -105,6 +105,16 @@ const MUSIC_AVAILABILITY_SORT_SCORE: Record<MusicArtist['availability'], number>
     SELECTIVE: 2,
     RARE: 1,
 };
+
+const getCastableNpcById = (id?: string | null, extraNPCs: any[] = []) => (
+    id
+        ? [...NPC_DATABASE, ...extraNPCs].find(npc => npc.id === id && isCastableActor(npc))
+        : undefined
+);
+
+const isCastableMovieRoleId = (id?: string | null, extraNPCs: any[] = []) => (
+    !id || id === 'UNKNOWN' || id === 'PLAYER_SELF' || id === 'STUDIO_STAFF' || Boolean(getCastableNpcById(id, extraNPCs))
+);
 
 const getInitialMusicArtistTargetCount = (concept?: any): number => {
     const strategy = (concept?.musicStrategy || concept?.musicPlan?.strategy || 'LEAD_SINGLE') as ProjectMusicStrategy;
@@ -205,6 +215,7 @@ export interface GreenlightWizardProps {
     studio: Business;
     initialConcept?: any;
     onBack: () => void;
+    onOpenScriptMarket?: () => void;
     onUpdatePlayer: (p: Player) => void;
     onComplete: () => void;
 }
@@ -610,7 +621,7 @@ const LocationSelector: React.FC<{
     );
 };
 
-export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, studio, initialConcept, onBack, onUpdatePlayer, onComplete }) => {
+export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, studio, initialConcept, onBack, onOpenScriptMarket, onUpdatePlayer, onComplete }) => {
     const language = getPlayerLanguage(player);
     const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
     const [selectedScriptId, setSelectedScriptId] = useState<string | null>(initialConcept?.scriptId || null);
@@ -1372,7 +1383,9 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                 const isCastDefault = castList.length === 2 && castList.every(c => !c.actorId);
                 if (details.castList && details.castList.length > 0 && isCastDefault) {
                     const returningBase = selectedScript.returningTalent || currentReturningTalent || [];
-                    const newCastList = details.castList.map((c: any) => {
+                    const newCastList = details.castList.filter((c: any) => (
+                        isCastableMovieRoleId(c.actorId, player.flags.extraNPCs || [])
+                    )).map((c: any) => {
                         let salary = c.salary || 0;
                         // Check if this actor is in the returning talent list to get their new demand
                         const returning = returningBase.find((t: any) => t.id === c.actorId);
@@ -1397,7 +1410,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                         const merged = [...(selectedScript.returningTalent || []), ...prev];
                         const existingKeys = new Set(merged.map((talent: any) => `${talent.id}:${talent.role}`));
                         const additions = details.castList
-                            .filter((c: any) => c.actorId && c.actorId !== 'UNKNOWN')
+                            .filter((c: any) => c.actorId && c.actorId !== 'UNKNOWN' && isCastableMovieRoleId(c.actorId, player.flags.extraNPCs || []))
                             .map((c: any) => {
                                 const role = c.roleType === 'LEAD' ? 'LEAD_ACTOR' : 'SUPPORTING_ACTOR';
                                 const originalSalary = Math.max(100_000, Math.floor(c.salary || lastInstallment.budget * (c.roleType === 'LEAD' ? 0.08 : 0.03) || 100_000));
@@ -1491,14 +1504,14 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
 
     const availableActors = useMemo(() => {
         const seedWeek = Math.floor(player.currentWeek / 3);
-        const talent = getAvailableTalent(player.currentWeek, 'ACTOR', player.flags.extraNPCs || []);
+        const talent = getAvailableTalent(player.currentWeek, 'ACTOR', player.flags.extraNPCs || []).filter(isCastableActor);
 
         // Ensure all selected actors are in the list
         const selectedActorIds = castList.map(c => c.actorId).filter(id => id && id !== 'PLAYER_SELF');
         selectedActorIds.forEach(id => {
             if (!talent.some(t => t.id === id)) {
                 const selectedNPC = [...NPC_DATABASE, ...(player.flags.extraNPCs || [])].find(n => n.id === id);
-                if (selectedNPC) talent.unshift(selectedNPC);
+                if (selectedNPC && isCastableActor(selectedNPC)) talent.unshift(selectedNPC);
             }
         });
 
@@ -1507,7 +1520,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         contracts.forEach(c => {
             if (!talent.some(t => t.id === c.npcId)) {
                 const selectedNPC = [...NPC_DATABASE, ...(player.flags.extraNPCs || [])].find(n => n.id === c.npcId);
-                if (selectedNPC) talent.unshift(selectedNPC);
+                if (selectedNPC && isCastableActor(selectedNPC)) talent.unshift(selectedNPC);
             }
         });
 
@@ -2176,7 +2189,10 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
     );
 
     const focusMusicCreditRole = (role: MusicCreditRole) => {
-        if (musicStrategy === 'COMPOSER_ONLY') return;
+        if (musicStrategy === 'COMPOSER_ONLY') {
+            setMusicStrategy(getMusicStrategyForSelectedRoles([role], 'LEAD_SINGLE'));
+            setMusicArtistTargetCount(1);
+        }
         setSelectedMusicCreditRoles(current => {
             const baseRoles = (current === null ? activeMusicCreditRoles : current).filter(item => allMusicDeliverableRoles.includes(item));
             const nextRoles = baseRoles.includes(role) ? baseRoles : [...baseRoles, role];
@@ -2249,7 +2265,11 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             : undefined
     ), [musicPreviewProject, selectedMusicPlan, musicCatalogArtists]);
     const selectedMusicByline = musicPreviewProject && selectedMusicPlan
-        ? formatProjectMusicByline({ ...musicPreviewProject, musicPlan: selectedMusicPlan }, 3)
+        ? (() => {
+            const names = (selectedMusicPlan.credits || []).map(credit => credit.artistName).filter(Boolean);
+            if (!names.length) return '';
+            return names.length <= 3 ? names.join(', ') : `${names.slice(0, 3).join(', ')} +${names.length - 3}`;
+        })()
         : '';
 
     const getMusicArtistSearchMatches = (role: MusicCreditRole): MusicArtist[] => {
@@ -2445,11 +2465,13 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
     // Buzz State
     const [buzzItems, setBuzzItems] = useState<any[]>([]);
 
+    const greenlightEnergyCost = PHASE_ONE_ENERGY_COSTS.GREENLIGHT_OWNED_PROJECT;
     const greenlightStatus = useMemo(() => {
         const errors: string[] = [];
         if (!selectedScript) return { can: false, errors: ["No script selected"] };
         if (selectedScript.status === 'IN_DEVELOPMENT') errors.push("Scripting is still in progress");
         if (selectedLocations.length === 0) errors.push("No filming locations selected");
+        if (player.energy.current < greenlightEnergyCost) errors.push(`Greenlight needs ${greenlightEnergyCost} energy`);
 
         const roles = ['director', 'cinematographer', 'composer', 'lineProducer', 'vfx'] as const;
         for (const role of roles) {
@@ -2489,7 +2511,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         }
 
         return { can: errors.length === 0, errors };
-    }, [selectedScript, selectedLocations, crewModes, selectedCrew, castList, effectiveStudioFundingPool, netGreenlightCashRequirement, unresolvedReturningTalent, effectiveConnectedIntent, linkedUniverseCastCount, selectedUniverseId, selectedFranchiseId]);
+    }, [selectedScript, selectedLocations, crewModes, selectedCrew, castList, effectiveStudioFundingPool, netGreenlightCashRequirement, unresolvedReturningTalent, effectiveConnectedIntent, linkedUniverseCastCount, selectedUniverseId, selectedFranchiseId, player.energy.current, greenlightEnergyCost]);
 
     const canGreenlight = greenlightStatus.can;
 
@@ -2614,9 +2636,13 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             }
         }
 
+        const safeMovieCastList = castList.filter(c => (
+            isCastableMovieRoleId(c.actorId, player.flags.extraNPCs || [])
+        ));
+
         // Calculate Fame Multiplier
         let extraFame = 0;
-        const castIds = castList.map(c => {
+        const castIds = safeMovieCastList.map(c => {
              if (c.actorId === 'PLAYER_SELF') return 'player';
              if (c.actorId === 'STUDIO_STAFF') {
                  extraFame += getInHouseFame('ACTOR');
@@ -2633,7 +2659,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
 
         const fameMultiplier = calculateProjectFameMultiplier(castIds, directorData.name as string, player.stats.fame, player.stats.talent, extraFame);
         const finalBudgetTier = getBudgetTierForAmount(productionBudgetWithMusic);
-        const castDepth = calculateCastDepthScore(castList.length, selectedScript.genres[0], finalBudgetTier, currentCastingStrength);
+        const castDepth = calculateCastDepthScore(safeMovieCastList.length, selectedScript.genres[0], finalBudgetTier, currentCastingStrength);
 
         // Calculate Actual Quality (Hidden)
         // User request: "movie perfomed more good if movie quality is good as oer iuts est quaity but also its not neccesaary that what est quality its there movie actucal quality remain that"
@@ -2646,7 +2672,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         // Random Pre-Production Duration (4-10 weeks)
         const preProdDuration = Math.floor(Math.random() * 7) + 4;
         const isCreatingNewUniverse = selectedUniverseId === 'NEW' && !!newUniverseName.trim();
-        const primaryCastUniverseId = castList.find(c => c.sourceUniverseId)?.sourceUniverseId;
+        const primaryCastUniverseId = safeMovieCastList.find(c => c.sourceUniverseId)?.sourceUniverseId;
         const finalUniverseId = isCreatingNewUniverse ? `universe_${Date.now()}` : (selectedUniverseId || selectedScript.universeId || primaryCastUniverseId || undefined);
         const normalizedWorldUniverses = normalizeUniverseMap(player.world?.universes || {});
         const universeColors = ['#e11d48', '#2563eb', '#16a34a', '#d97706', '#7c3aed', '#db2777'];
@@ -2660,7 +2686,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             // Check if any lead actor changed
             if (lastDetails.castList) {
                 const oldLeads = lastDetails.castList.filter(c => c.roleType === 'LEAD').map(c => c.actorId);
-                const newLeads = castList.filter(c => c.roleType === 'LEAD').map(c => c.actorId);
+                const newLeads = safeMovieCastList.filter(c => c.roleType === 'LEAD').map(c => c.actorId);
 
                 // Simple check: if a new lead wasn't in the old leads, it's a recast
                 for (const newLead of newLeads) {
@@ -2703,7 +2729,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             });
         });
 
-        const finalizedCastList = castList.map((c, index) => {
+        const finalizedCastList = safeMovieCastList.map((c, index) => {
             const characterName = (c.characterName || '').trim() || getDefaultCharacterName(c, index);
             const normalizedCharacterId = c.characterId
                 || (finalUniverseId ? toUniverseCharacterId(finalUniverseId as any, characterName) : undefined)
@@ -2724,6 +2750,33 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             };
         });
         const hasLinkedUniverseCast = finalizedCastList.some(c => c.sourceUniverseId);
+        const isPlayerActor = finalizedCastList.some(c => c.actorId === 'PLAYER_SELF' || c.isPlayer);
+        const isPlayerDirector = fullCrewList.some(c => c.role === 'DIRECTOR' && (c.id === 'PLAYER_SELF' || c.isPlayer));
+        const initialPlayerProductionFocus = {
+            isPlayerActor,
+            isPlayerDirector,
+            isPlayerProducer: true,
+            actorPrep: 0,
+            actorSceneRehearsal: 0,
+            actorBigPerformance: 0,
+            actorPerformance: 0,
+            actorPromotion: 0,
+            directorPrep: 0,
+            directorShotDecision: 0,
+            directorMajorCreativePush: 0,
+            directorRiskyDecision: 0,
+            directorPerformance: 0,
+            directorPost: 0,
+            producerScriptPolish: 0,
+            producerCastCrewPrep: 0,
+            producerSetQuality: 0,
+            producerEditNotes: 0,
+            producerReleasePositioning: 0,
+            producerPrep: 0,
+            producerPerformance: 0,
+            producerPost: 0,
+            qualityLift: 0,
+        };
         const projectSubtype = effectiveConnectedIntent === 'EVENT'
             ? 'UNIVERSE_EVENT'
             : effectiveConnectedIntent === 'CROSSOVER'
@@ -2745,7 +2798,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             id: newCommitmentId,
             name: selectedScript.title,
             type: 'JOB',
-            roleType: castList.find(c => c.actorId === 'PLAYER_SELF')?.roleType as any,
+            roleType: safeMovieCastList.find(c => c.actorId === 'PLAYER_SELF')?.roleType as any,
             energyCost: 0,
             income: 0,
             payoutType: 'LUMPSUM',
@@ -2783,6 +2836,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                 marketingBudgetSpent: 0,
                 marketingBudgetRemaining: marketingReserve,
                 visibleHype: 'LOW',
+                playerProductionFocus: initialPlayerProductionFocus,
                 hiddenStats: {
                     scriptQuality: selectedScript.quality,
                     directorQuality: directorData.quality,
@@ -2849,7 +2903,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         const updatedConcepts = studio.studioState!.concepts.filter(c => c.scriptId !== selectedScriptId);
 
         // Update talent roster to decrement moviesRemaining for contracted actors
-        const usedActorIds = castList.map(c => c.actorId).filter(Boolean);
+        const usedActorIds = safeMovieCastList.map(c => c.actorId).filter(Boolean);
 
         // Update both player.studio.talentRoster and studio.studioState.talentRoster for consistency
         const updateRoster = (roster: any[]) => {
@@ -3191,7 +3245,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             }
         }
 
-        onUpdatePlayer({
+        const updatedPlayerAfterGreenlight: Player = {
             ...player,
             news: [...fundingNewsItems, ...baseNewNews].slice(0, 80),
             logs: [...player.logs, ...fundingLogEntries].slice(-80),
@@ -3248,7 +3302,9 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                     year: player.age
                 });
             })
-        });
+        };
+        spendPlayerEnergy(updatedPlayerAfterGreenlight, greenlightEnergyCost, `Greenlight: ${newCommitment.name}`);
+        onUpdatePlayer(updatedPlayerAfterGreenlight);
         addBreadcrumb('greenlight:success', {
             title: newCommitment.name,
             commitmentId: newCommitment.id,
@@ -3590,8 +3646,8 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                     <BookOpen size={48} className="opacity-20" />
                                 </div>
                                 <h2 className="text-xl font-bold text-white mb-2">No Scripts Available</h2>
-                                <p className="text-sm max-w-xs text-center leading-relaxed">Your development lab is empty. Head back to the studio to develop new IP.</p>
-                                <button onClick={onBack} className="mt-8 px-8 py-3 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl text-xs font-bold uppercase tracking-widest transition-all hover:scale-105 shadow-lg">Return to Studio</button>
+                                <p className="text-sm max-w-xs text-center leading-relaxed">Your vault is empty. Visit the script market, buy a project, then return here to green-light it.</p>
+                                <button onClick={onOpenScriptMarket || onBack} className="mt-8 px-8 py-3 bg-emerald-500 hover:bg-emerald-400 text-black rounded-xl text-xs font-black uppercase tracking-widest transition-all hover:scale-105 shadow-[0_0_25px_rgba(16,185,129,0.25)]">Open Script Market</button>
                             </div>
                         ) : (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-4">
@@ -4434,7 +4490,9 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                             {effectiveMusicArtistCount > 0 ? `${effectiveMusicArtistCount} content type${effectiveMusicArtistCount === 1 ? '' : 's'} planned` : 'Composer score only'}
                                         </div>
                                         <div className="mt-1 truncate text-xs font-bold text-zinc-500">
-                                            {selectedMusicByline || (isCustomMusicPlan ? 'Choose the music work and assign artists.' : 'Let the studio choose the music work.')}
+                                            {selectedMusicByline
+                                                ? `${isStudioDecidedMusicPlan ? 'Studio preview: ' : ''}${selectedMusicByline}`
+                                                : (isCustomMusicPlan ? 'Choose the music work and assign artists.' : 'Let the studio choose the music work.')}
                                         </div>
                                     </div>
                                     <div className="grid grid-cols-3 gap-2 min-w-full lg:min-w-[310px]">
@@ -4495,6 +4553,10 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                         <button
                                             type="button"
                                             onClick={() => {
+                                                if (musicStrategy === 'COMPOSER_ONLY') {
+                                                    setMusicStrategy('LEAD_SINGLE');
+                                                    setMusicArtistTargetCount(getDefaultMusicArtistCount('LEAD_SINGLE', musicPreviewProject || undefined));
+                                                }
                                                 setSelectedMusicCreditRoles(null);
                                                 setActiveMusicSlotIndex(0);
                                                 setActiveMusicSearchRole(null);
@@ -4536,16 +4598,28 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                                                 {getMusicCreditRoleLabel(role)}
                                                             </div>
                                                             <div className="mt-1 truncate text-sm font-black text-white">
-                                                                {isIncluded ? (credit?.artistName || 'Choose artist') : 'Not producing this'}
+                                                                {isIncluded
+                                                                    ? isStudioDecidedMusicPlan
+                                                                        ? `Studio pick: ${credit?.artistName || 'Choosing artist'}`
+                                                                        : (credit?.artistName || 'Choose artist')
+                                                                    : 'Not producing this'}
                                                             </div>
                                                             <div className="mt-1 truncate text-[10px] font-bold text-zinc-500">
-                                                                {isIncluded ? (credit?.songTitle || 'Artist not assigned yet') : 'Toggle on to add artist'}
+                                                                {isIncluded
+                                                                    ? isStudioDecidedMusicPlan
+                                                                        ? 'Auto preview - tap to customize'
+                                                                        : (credit?.songTitle || 'Artist not assigned yet')
+                                                                    : 'Toggle on to add artist'}
                                                             </div>
                                                         </div>
                                                         <button
                                                             type="button"
                                                             onClick={(event) => {
                                                                 event.stopPropagation();
+                                                                if (isStudioDecidedMusicPlan) {
+                                                                    focusMusicCreditRole(role);
+                                                                    return;
+                                                                }
                                                                 if (isIncluded) removeMusicCreditRole(role);
                                                                 else focusMusicCreditRole(role);
                                                             }}
@@ -4555,7 +4629,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                                                     : 'bg-zinc-900 text-zinc-500 hover:bg-cyan-400/10 hover:text-cyan-200'
                                                             }`}
                                                         >
-                                                            {isIncluded ? 'On' : 'Off'}
+                                                            {isIncluded ? (isStudioDecidedMusicPlan ? 'Auto' : 'On') : 'Off'}
                                                         </button>
                                                     </div>
                                                     {isIncluded && (
@@ -5654,9 +5728,14 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                 </div>
                             )}
 
-                            <button
-                                onClick={handleGreenlight}
-                                disabled={!canGreenlight}
+                                <div className={`mb-3 flex items-center justify-between rounded-xl border px-4 py-3 text-[10px] font-black uppercase tracking-[0.18em] ${player.energy.current >= greenlightEnergyCost ? 'border-emerald-400/20 bg-emerald-400/10 text-emerald-200' : 'border-rose-400/25 bg-rose-400/10 text-rose-200'}`}>
+                                    <span>Producer Focus</span>
+                                    <span className="flex items-center gap-1"><Zap size={13} fill="currentColor" /> {greenlightEnergyCost}E</span>
+                                </div>
+
+	                            <button
+	                                onClick={handleGreenlight}
+	                                disabled={!canGreenlight}
                                 className={`w-full font-black text-xl py-6 rounded-xl transition-all flex items-center justify-center gap-3 ${
                                     canGreenlight
                                     ? 'bg-emerald-500 hover:bg-emerald-400 text-black shadow-[0_0_40px_rgba(16,185,129,0.4)] hover:shadow-[0_0_60px_rgba(16,185,129,0.6)] hover:scale-105'
@@ -5664,8 +5743,8 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                 }`}
                             >
                                 <Zap size={24} fill={canGreenlight ? "black" : "none"} />
-                                {selectedScript?.status === 'IN_DEVELOPMENT' ? "SCRIPTING IN PROGRESS..." : (canGreenlight ? "GREENLIGHT PROJECT" : "MISSING REQUIREMENTS")}
-                            </button>
+	                                {selectedScript?.status === 'IN_DEVELOPMENT' ? "SCRIPTING IN PROGRESS..." : (canGreenlight ? `GREENLIGHT PROJECT · ${greenlightEnergyCost}E` : "MISSING REQUIREMENTS")}
+	                            </button>
                         </div>
                     </div>
                 )}
@@ -5835,7 +5914,8 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                         .filter(rel => {
                                             const npcId = rel.npcId || rel.id;
                                             const currentActorId = castList.find(c => c.id === selectingActorFor)?.actorId;
-                                            return !hiredIds.includes(npcId) || npcId === currentActorId;
+                                            const connectedActor = availableActors.find(a => a.id === npcId);
+                                            return Boolean(connectedActor) && (!hiredIds.includes(npcId) || npcId === currentActorId);
                                         })
                                         .map(rel => {
                                             const connectedActor = availableActors.find(a => a.id === (rel.npcId || rel.id));

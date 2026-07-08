@@ -4,6 +4,8 @@ import { Player } from '../../../types';
 import { createBusiness, HEAD_OF_PRODUCTION_CANDIDATES } from '../../../services/businessLogic';
 import { ArrowLeft, ArrowRight, Camera, Check, Clapperboard, Star, Users, Zap, Lock, DollarSign, TrendingUp, ShieldCheck, Crown, Sparkles, X, AlertTriangle, ChevronRight, PenTool } from 'lucide-react';
 import { getPlayerLanguage, t } from '../../../services/i18n';
+import { spendPlayerEnergy } from '../../../services/premiumLogic';
+import { PHASE_ONE_ENERGY_COSTS } from '../../../services/energyCosts';
 
 interface ProductionWizardProps {
     player: Player;
@@ -147,6 +149,8 @@ export const ProductionWizard: React.FC<ProductionWizardProps> = ({ player, onCa
     };
 
     const COST = 50000000;
+    const signingEnergyCost = PHASE_ONE_ENERGY_COSTS.PRODUCTION_HOUSE_SIGNING;
+    const hasSigningEnergy = player.energy.current >= signingEnergyCost;
     const getHeadOfProductionName = (id: string) => tr(`services.business.productionWizard.headOfProduction.${id}.name`);
     const getHeadOfProductionBonus = (id: string) => tr(`services.business.productionWizard.headOfProduction.${id}.bonus`);
     const getHeadOfProductionDescription = (id: string) => tr(`services.business.productionWizard.headOfProduction.${id}.description`);
@@ -159,6 +163,7 @@ export const ProductionWizard: React.FC<ProductionWizardProps> = ({ player, onCa
 
     const handleFinalRatify = () => {
         if (!name || !headOfProd) return;
+        if (!hasSigningEnergy) return;
         
         // 1. Start Signing Animation
         setIsSigning(true);
@@ -188,7 +193,7 @@ export const ProductionWizard: React.FC<ProductionWizardProps> = ({ player, onCa
 
             const hopName = getHeadOfProductionName(headOfProd);
 
-            onUpdatePlayer({
+            const launchedPlayer: Player = {
                 ...player,
                 money: player.money - COST,
                 businesses: [...player.businesses, newBiz],
@@ -207,7 +212,9 @@ export const ProductionWizard: React.FC<ProductionWizardProps> = ({ player, onCa
                     year: player.age,
                     impactLevel: 'HIGH'
                 }, ...player.news]
-            });
+            };
+            spendPlayerEnergy(launchedPlayer, signingEnergyCost, `Production house signing: ${name}`);
+            onUpdatePlayer(launchedPlayer);
             onComplete();
         }, 2500); // Animation wait
     };
@@ -533,25 +540,29 @@ export const ProductionWizard: React.FC<ProductionWizardProps> = ({ player, onCa
                                            </div>
                                        </div>
                                        
-                                       <div className="text-right">
-                                           <div className="text-[8px] uppercase font-bold opacity-50 font-sans">{tr('services.business.productionWizard.document.capitalCommitment')}</div>
-                                           <div className="font-mono font-bold text-sm">${COST.toLocaleString()}</div>
+	                                       <div className="text-right">
+	                                           <div className="text-[8px] uppercase font-bold opacity-50 font-sans">{tr('services.business.productionWizard.document.capitalCommitment')}</div>
+	                                           <div className="font-mono font-bold text-sm">${COST.toLocaleString()}</div>
+	                                       </div>
+	                                   </div>
+                                       <div className={`mb-4 flex items-center justify-between rounded-sm border px-3 py-2 font-sans text-[9px] font-black uppercase tracking-[0.16em] ${hasSigningEnergy ? 'border-amber-700/20 bg-amber-100/40 text-amber-900' : 'border-red-700/20 bg-red-100/50 text-red-800'}`}>
+                                           <span>Founder Focus</span>
+                                           <span className="flex items-center gap-1"><Zap size={12} fill="currentColor" /> {signingEnergyCost}E</span>
                                        </div>
-                                   </div>
 
-                                   {/* Ratify Button (The Stamp) */}
-                                   <div className="flex justify-center">
-                                       <button 
-                                           onClick={handleFinalRatify}
-                                           disabled={!headOfProd || isSigning || isStamping}
-                                           className="relative group disabled:opacity-50"
-                                       >
-                                           <div className="w-24 h-24 rounded-full border-4 border-dashed border-red-900/30 flex items-center justify-center group-hover:border-red-600 group-hover:bg-red-50 transition-all bg-white">
-                                               <div className="text-[10px] font-bold text-red-900/50 uppercase text-center leading-tight group-hover:text-red-600 font-sans">
-                                                   {tr('services.business.productionWizard.document.signAndRatify')}
-                                               </div>
-                                           </div>
-                                       </button>
+	                                   {/* Ratify Button (The Stamp) */}
+	                                   <div className="flex justify-center">
+	                                       <button
+	                                           onClick={handleFinalRatify}
+	                                           disabled={!headOfProd || !hasSigningEnergy || isSigning || isStamping}
+	                                           className="relative group disabled:opacity-50"
+	                                       >
+	                                           <div className="w-24 h-24 rounded-full border-4 border-dashed border-red-900/30 flex items-center justify-center group-hover:border-red-600 group-hover:bg-red-50 transition-all bg-white">
+	                                               <div className="text-[10px] font-bold text-red-900/50 uppercase text-center leading-tight group-hover:text-red-600 font-sans">
+	                                                   {!hasSigningEnergy ? `Need ${signingEnergyCost}E` : tr('services.business.productionWizard.document.signAndRatify')}
+	                                               </div>
+	                                           </div>
+	                                       </button>
                                    </div>
                                </div>
                            </div>

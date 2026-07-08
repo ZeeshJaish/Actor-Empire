@@ -413,7 +413,8 @@ export const TinderApp: React.FC<TinderAppProps> = ({ player, onBack, onUpdatePl
         };
 
         if (options?.energyCost) {
-            spendPlayerEnergy(nextPlayer, options.energyCost);
+            const currentMatch = player.dating.matches.find(match => match.id === matchId);
+            spendPlayerEnergy(nextPlayer, options.energyCost, `Dating: ${currentMatch?.name || 'Match'}`);
         }
         options?.mutatePlayer?.(nextPlayer);
         onUpdatePlayer(nextPlayer);
