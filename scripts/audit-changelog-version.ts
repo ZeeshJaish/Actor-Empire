@@ -13,7 +13,11 @@ const assert = (condition: unknown, message: string) => {
 const latest = getLatestChangelogEntry();
 assert(latest.version === APP_DISPLAY_VERSION, `latest changelog ${latest.version} does not match app version ${APP_DISPLAY_VERSION}`);
 assert(APP_DISPLAY_VERSION === '1.0.22', `app version should be 1.0.22, got ${APP_DISPLAY_VERSION}`);
-assert(CHANGELOG_ENTRIES.length >= 5, 'changelog should include current and legacy versions');
+const expectedVersions = Array.from({ length: 23 }, (_, index) => `1.0.${22 - index}`);
+assert(
+  CHANGELOG_ENTRIES.map(entry => entry.version).join('|') === expectedVersions.join('|'),
+  `changelog should include every version from 1.0.22 through 1.0.0 in order`,
+);
 
 const seenVersions = new Set<string>();
 for (const entry of CHANGELOG_ENTRIES) {
@@ -33,6 +37,10 @@ const settingsPage = read('views/SettingsPage.tsx');
 assert(settingsPage.includes("'CHANGELOG'"), 'SettingsPage must include CHANGELOG mode');
 assert(settingsPage.includes('CHANGELOG_ENTRIES'), 'SettingsPage must render changelog entries');
 assert(settingsPage.includes('getChangelogTypeLabel'), 'SettingsPage must show update type labels');
+assert(settingsPage.includes('React.Fragment'), 'SettingsPage changelog details should render inline under the selected version');
+assert(settingsPage.includes('renderChangelogDetails(entry)'), 'SettingsPage must expand selected changelog details directly below the version card');
+assert(!settingsPage.includes('Sparkles'), 'SettingsPage changelog should not use the sparkle icon');
+assert(!settingsPage.includes('Selected Version'), 'SettingsPage should not push changelog details to a separate bottom panel');
 
 const app = read('App.tsx');
 assert(app.includes('getLatestChangelogEntry'), 'App must render latest changelog in startup What\'s New');

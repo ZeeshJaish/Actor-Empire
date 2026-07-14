@@ -1,10 +1,10 @@
 
 import React, { useEffect, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
-import { ArrowLeft, Twitter, Send, Star, Globe, LogOut, Coffee, Bug, Puzzle, Lock, CheckCircle2, Users, ChevronRight, Sparkles, SlidersHorizontal, ShieldCheck, Gauge, Database, Copy, Smartphone, MessageCircle, LifeBuoy, Bell, Download, Upload } from 'lucide-react';
+import { ArrowLeft, Twitter, Send, Star, Globe, LogOut, Coffee, Bug, Puzzle, Lock, CheckCircle2, Users, ChevronRight, FileText, SlidersHorizontal, ShieldCheck, Gauge, Database, Copy, Smartphone, MessageCircle, LifeBuoy, Bell, Download, Upload } from 'lucide-react';
 import { GameLanguage, Player } from '../types';
 import { APP_DISPLAY_VERSION } from '../services/appVersion';
-import { CHANGELOG_ENTRIES, getChangelogTypeLabel, getLatestChangelogEntry, type ChangelogUpdateType } from '../services/changelog';
+import { CHANGELOG_ENTRIES, getChangelogTypeLabel, getLatestChangelogEntry, type ChangelogEntry, type ChangelogUpdateType } from '../services/changelog';
 import { createGlobalActorPackNPCs, getGlobalActorPackDescription, getGlobalActorPackLabel, GLOBAL_ACTOR_PACKS } from '../services/npcLogic';
 import { getGlobalCreatorCountForPack } from '../services/youtubeLogic';
 import { getPlayerLanguage, SUPPORTED_LANGUAGES, t } from '../services/i18n';
@@ -437,6 +437,37 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
     return 'border-emerald-400/30 bg-emerald-500/10 text-emerald-200';
   };
 
+  const renderChangelogDetails = (entry: ChangelogEntry) => (
+    <div className="glass-card rounded-3xl p-5 space-y-5 border-amber-400/20 bg-amber-500/5">
+      <div>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="text-[10px] font-black uppercase tracking-[0.24em] text-zinc-500">Version Details</div>
+          <span className={`rounded-full border px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.16em] ${getChangelogTone(entry.type)}`}>
+            {getChangelogTypeLabel(entry.type)}
+          </span>
+        </div>
+        <h3 className="mt-2 text-2xl font-black text-white">v{entry.version} - {entry.title}</h3>
+        <p className="mt-2 text-sm leading-relaxed text-zinc-400">{entry.summary}</p>
+      </div>
+
+      <div className="space-y-4">
+        {entry.sections.map(section => (
+          <div key={section.heading} className="rounded-2xl border border-white/5 bg-zinc-950/60 p-4">
+            <div className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-300">{section.heading}</div>
+            <ul className="mt-3 space-y-2 text-sm leading-relaxed text-zinc-300">
+              {section.items.map(item => (
+                <li key={item} className="flex gap-2">
+                  <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-300/80" aria-hidden="true" />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
   const enableActorPack = (packId: string) => {
     if (enabledPackIds.includes(packId)) return;
 
@@ -708,15 +739,16 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
         {renderSubpageHeader('Release Notes', 'Changelog')}
 
         <div className="glass-card rounded-3xl p-5 space-y-4">
-          <div className="flex items-start gap-3">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-500/15 text-amber-300">
-              <Sparkles size={22} />
-            </div>
+          <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
               <div className="font-black text-white">Every version in one place</div>
               <p className="mt-1 text-sm leading-relaxed text-zinc-500">
-                Tap a version to see what changed. Legacy entries are best-effort notes until exact historic release copy is added.
+                Tap a version to expand its notes directly below it. Older entries are backfilled from available history.
               </p>
+            </div>
+            <div className="shrink-0 rounded-2xl border border-white/10 bg-zinc-950/70 px-3 py-2 text-right">
+              <div className="text-lg font-black text-white">{CHANGELOG_ENTRIES.length}</div>
+              <div className="text-[9px] font-black uppercase tracking-[0.16em] text-zinc-500">Versions</div>
             </div>
           </div>
         </div>
@@ -725,65 +757,38 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
           {CHANGELOG_ENTRIES.map(entry => {
             const isSelected = entry.version === selectedChangelogEntry.version;
             return (
-              <button
-                key={entry.version}
-                type="button"
-                aria-pressed={isSelected}
-                onClick={() => setSelectedChangelogVersion(entry.version)}
-                className={`w-full rounded-2xl border p-4 text-left transition-colors ${isSelected ? 'border-amber-400/40 bg-amber-500/10' : 'border-white/5 bg-zinc-900/55 hover:bg-zinc-800/80'}`}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <div className="text-lg font-black text-white">v{entry.version}</div>
-                      <span className={`rounded-full border px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.16em] ${getChangelogTone(entry.type)}`}>
-                        {getChangelogTypeLabel(entry.type)}
-                      </span>
-                    </div>
-                    <div className="mt-1 text-sm font-bold text-zinc-300">{entry.title}</div>
-                    <div className="mt-1 text-xs leading-relaxed text-zinc-500 line-clamp-2">{entry.summary}</div>
-                  </div>
-                  <div className="shrink-0 text-right">
-                    <div className="text-[10px] font-black uppercase tracking-[0.18em] text-zinc-500">{entry.releaseLabel}</div>
-                    {entry.version === APP_DISPLAY_VERSION && (
-                      <div className="mt-2 rounded-full border border-emerald-400/30 bg-emerald-500/10 px-2 py-1 text-[9px] font-black uppercase tracking-widest text-emerald-200">
-                        Current
+              <React.Fragment key={entry.version}>
+                <button
+                  type="button"
+                  aria-pressed={isSelected}
+                  onClick={() => setSelectedChangelogVersion(entry.version)}
+                  className={`w-full rounded-2xl border p-4 text-left transition-colors ${isSelected ? 'border-amber-400/40 bg-amber-500/10' : 'border-white/5 bg-zinc-900/55 hover:bg-zinc-800/80'}`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="text-lg font-black text-white">v{entry.version}</div>
+                        <span className={`rounded-full border px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.16em] ${getChangelogTone(entry.type)}`}>
+                          {getChangelogTypeLabel(entry.type)}
+                        </span>
                       </div>
-                    )}
+                      <div className="mt-1 text-sm font-bold text-zinc-300">{entry.title}</div>
+                      <div className="mt-1 text-xs leading-relaxed text-zinc-500 line-clamp-2">{entry.summary}</div>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <div className="text-[10px] font-black uppercase tracking-[0.18em] text-zinc-500">{entry.releaseLabel}</div>
+                      {entry.version === APP_DISPLAY_VERSION && (
+                        <div className="mt-2 rounded-full border border-emerald-400/30 bg-emerald-500/10 px-2 py-1 text-[9px] font-black uppercase tracking-widest text-emerald-200">
+                          Current
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </button>
+                </button>
+                {isSelected && renderChangelogDetails(entry)}
+              </React.Fragment>
             );
           })}
-        </div>
-
-        <div className="glass-card rounded-3xl p-5 space-y-5">
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="text-[10px] font-black uppercase tracking-[0.24em] text-zinc-500">Selected Version</div>
-              <span className={`rounded-full border px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.16em] ${getChangelogTone(selectedChangelogEntry.type)}`}>
-                {getChangelogTypeLabel(selectedChangelogEntry.type)}
-              </span>
-            </div>
-            <h3 className="mt-2 text-2xl font-black text-white">v{selectedChangelogEntry.version} - {selectedChangelogEntry.title}</h3>
-            <p className="mt-2 text-sm leading-relaxed text-zinc-400">{selectedChangelogEntry.summary}</p>
-          </div>
-
-          <div className="space-y-4">
-            {selectedChangelogEntry.sections.map(section => (
-              <div key={section.heading} className="rounded-2xl border border-white/5 bg-zinc-950/60 p-4">
-                <div className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-300">{section.heading}</div>
-                <ul className="mt-3 space-y-2 text-sm leading-relaxed text-zinc-300">
-                  {section.items.map(item => (
-                    <li key={item} className="flex gap-2">
-                      <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-300/80" aria-hidden="true" />
-                      <span>{item}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
         </div>
       </div>
     );
@@ -1119,7 +1124,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
           <div className="w-full rounded-3xl border border-white/5 bg-zinc-900/40 p-5 opacity-70">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-2xl bg-zinc-800 text-zinc-500 flex items-center justify-center shrink-0">
-                <Sparkles size={22}/>
+                <Star size={22}/>
               </div>
               <div className="flex-1 min-w-0">
                 <div className="font-black text-zinc-300">{tr('settings.creatorPacks')}</div>
@@ -1238,7 +1243,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
           onClick={() => setMode('GAMEPLAY')}
         />
         <SettingsRow
-          icon={Sparkles}
+          icon={FileText}
           title="Changelog"
           subtitle="See every version and what changed"
           value={`v${APP_DISPLAY_VERSION}`}
