@@ -14,34 +14,48 @@ export interface ChangelogEntry {
   sections: ChangelogSection[];
 }
 
-const legacyChangelogEntry = (
+const changelogEntry = (
   version: string,
   title: string,
   type: ChangelogUpdateType,
+  releaseLabel: string,
   summary: string,
-  items: string[],
+  sections: ChangelogSection[],
 ): ChangelogEntry => ({
   version,
   title,
   type,
-  releaseLabel: 'Legacy notes',
+  releaseLabel,
   summary,
-  sections: [
-    {
-      heading: 'Known Focus',
-      items,
-    },
-  ],
+  sections,
 });
 
+const patchEntry = (version: string, title = 'Patch & Stability'): ChangelogEntry => changelogEntry(
+  version,
+  title,
+  'PATCH',
+  'Patch update',
+  'A maintenance update focused on bug fixes, balance cleanup, UI polish, and stability improvements.',
+  [
+    {
+      heading: 'Patch Focus',
+      items: [
+        'Fixed reported bugs and edge cases from live saves.',
+        'Improved stability, week processing, and screen recovery behavior.',
+        'Balanced gameplay numbers and cleaned up small UI issues.',
+      ],
+    },
+  ],
+);
+
 export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
-  {
-    version: '1.0.22',
-    title: 'Living World & Stability',
-    type: 'MINOR',
-    releaseLabel: 'July 2026',
-    summary: 'A player-report cleanup update focused on late-game studios, sequels, saves, social systems, health, business capacity, and mobile stability.',
-    sections: [
+  changelogEntry(
+    '1.0.22',
+    'Living World & Stability',
+    'MINOR',
+    'July 2026',
+    'A player-report cleanup update focused on late-game studios, sequels, saves, social systems, health, business capacity, and mobile stability.',
+    [
       {
         heading: 'Studio Ownership',
         items: [
@@ -80,7 +94,7 @@ export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
         ],
       },
       {
-        heading: 'Quality of Life',
+        heading: 'Quality Of Life',
         items: [
           'Business service capacity scales more logically with locations, staff, and seats.',
           'Activities screen lag was reduced on mobile by cutting repeated heavy rendering work.',
@@ -89,14 +103,14 @@ export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
         ],
       },
     ],
-  },
-  {
-    version: '1.0.21',
-    title: 'Studio Empire',
-    type: 'MAJOR',
-    releaseLabel: 'July 2026',
-    summary: 'A major expansion that pushed Actor Empire into fuller entertainment management with studios, rights, franchises, universes, richer releases, and migration support.',
-    sections: [
+  ),
+  changelogEntry(
+    '1.0.21',
+    'Studio Empire',
+    'MAJOR',
+    'Major update',
+    'A major expansion that pushed Actor Empire into fuller entertainment management with studios, rights, franchises, universes, richer releases, and migration support.',
+    [
       {
         heading: 'Studio Empire',
         items: [
@@ -130,247 +144,341 @@ export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
         ],
       },
     ],
-  },
-  {
-    version: '1.0.20',
-    title: 'Release Systems Polish',
-    type: 'MINOR',
-    releaseLabel: 'Legacy notes',
-    summary: 'Best-effort legacy notes from available repo context: release flow, box-office depth, social feedback, and stability polish before the Studio Empire update.',
-    sections: [
-      {
-        heading: 'Release Flow',
-        items: [
-          'Production-house release planning, streaming paths, marketing feedback, and box-office tracking were expanded.',
-          'IMDb and box-office screens gained clearer project outcome surfaces.',
-          'Save and event stability continued improving ahead of the major studio update.',
-        ],
-      },
-    ],
-  },
-  {
-    version: '1.0.19',
-    title: 'Production House Foundation',
-    type: 'MINOR',
-    releaseLabel: 'Legacy notes',
-    summary: 'Best-effort legacy notes from player-report and migration context: production-house projects, greenlight flow, stock and Forbes systems, and mobile support were active here.',
-    sections: [
-      {
-        heading: 'Core Systems',
-        items: [
-          'Production-house greenlight, project phases, social apps, phone apps, Forbes, and stocks were part of active gameplay.',
-          'Player reports from this build informed later fixes around stocks, sequels, save migration, and crashes.',
-        ],
-      },
-    ],
-  },
-  legacyChangelogEntry(
+  ),
+  patchEntry('1.0.20'),
+  patchEntry('1.0.19'),
+  changelogEntry(
     '1.0.18',
-    'World Polish & Native Stability',
-    'MINOR',
-    'Legacy notes from the release commit: world systems, guide polish, localization groundwork, and native stability moved forward here.',
+    'Long-Save Stability',
+    'PATCH',
+    'Patch update',
+    'A stability update focused on the major issues reported after 1.0.17 and improving long-save performance.',
     [
-      'Expanded production events, market trends, genre catalog support, and world/news reactions.',
-      'Improved Development Lab, Greenlight, Guide, Home, mobile apps, and startup/native stability.',
-      'Added localization groundwork and audit coverage for universe flow and release safety.',
+      {
+        heading: 'Fixes And Improvements',
+        items: [
+          'Fixed runaway streaming numbers so views now rise and fall more realistically.',
+          'Improved streaming bid wars, sequel offers, and next-season funding flow.',
+          'Greenlight now properly shows pending returning talent negotiations.',
+          'Fixed pregnancy logic issues in relationships and dating systems.',
+          'Improved long-career save stability and reduced mobile lag/performance issues.',
+          'Fixed UI overflow and decimal bugs across festivals, Forbes, IMDb, and career screens.',
+          'Added more protection around events, weekly processing, universe saves, and recovery flows.',
+        ],
+      },
     ],
   ),
-  legacyChangelogEntry(
+  changelogEntry(
     '1.0.17',
-    'Production Events & Guide Polish',
-    'PATCH',
-    'Backfilled legacy note for the bridge update before 1.0.18, focused on making production and help surfaces clearer.',
+    'Studio Depth & Script Systems',
+    'MAJOR',
+    'Major update',
+    'One of the biggest depth updates yet, focused on studio gameplay, scripting, franchises, quality of life, and overall polish.',
     [
-      'Improved production event handling and release-flow messaging.',
-      'Expanded guide coverage for complex production-house systems.',
-      'Continued save, event, and mobile shell stability work.',
+      {
+        heading: 'What Is New',
+        items: [
+          'Added much deeper Production House and script development systems.',
+          'Improved project flow and filmography browsing.',
+          'Added new genres and project types including Biopic, Documentary, Sports, Musical, Animation, Anime, and more.',
+          'Improved franchise and cinematic universe systems with better sequel and crossover handling.',
+          'Added new free lifestyle items including houses, vehicles, and wardrobe.',
+          'Improved loan systems with clearer repayment and payoff flow.',
+          'Refreshed the in-game Guide with better explanations across career, finance, studio, and universes.',
+          'Added major bug fixes and stability improvements across production, streaming, social systems, awards, and saves.',
+          'Started language support behind the scenes, with full rollout planned for the next update.',
+        ],
+      },
     ],
   ),
-  legacyChangelogEntry(
+  changelogEntry(
     '1.0.16',
-    'Social Apps & Creator Systems',
+    'Creator Systems & iOS Purchases',
     'MINOR',
-    'Legacy notes from visible history: social apps, creator systems, imported talent data, and media handling expanded around this period.',
+    'Minor update',
+    'This update rolled out earlier than planned to fix iOS in-app purchases in the App Store version, with creator-system features included from the upcoming social update.',
     [
-      'Expanded Instagram, YouTube, X, Forbes, messages, and creator-related weekly systems.',
-      'Added larger talent data support and improved NPC/social feed behavior.',
-      'Improved release and referral hooks feeding social and creator gameplay.',
+      {
+        heading: 'Included',
+        items: [
+          'Fixed iOS in-app purchases in the App Store version.',
+          'Added the YouTube creator system.',
+          'Added video uploads and channel growth.',
+          'Added custom thumbnail uploads.',
+          'Added YouTube Studio progression.',
+          'Added monetization, creator events, and brand/collab opportunities.',
+          'Added video watch pages with likes, dislikes, and comments.',
+          'Expanded global talent and creator mod packs.',
+          'Added bug fixes and UI improvements.',
+        ],
+      },
     ],
   ),
-  legacyChangelogEntry(
+  changelogEntry(
     '1.0.15',
-    'Luxe Dating & Life Events',
+    'Dating, Romance & Social Depth',
     'MINOR',
-    'Legacy notes from the release commit: Luxe, dating, life events, premium balance, and relationship feedback got a major pass.',
+    'Minor update',
+    'A relationship and social update with sequel fixes, deeper dating systems, improved Luxe/Tinder flow, and more life drama.',
     [
-      'Expanded Luxe and dating flows with better relationship, chemistry, and social outcomes.',
-      'Improved life events, home feedback, premium balance, and week-to-week event handling.',
-      'Updated IMDb, greenlight, release, and project dashboard feedback.',
+      {
+        heading: 'What Changed',
+        items: [
+          'Fixed sequel, renewal, and returning cast/crew progression issues.',
+          'Improved streaming release timing and follow-up project flow.',
+          'Added clearer IMDb project outcomes like returning, written off, and killed off.',
+          'Upgraded Tinder with deeper chat, casual, intimacy, and energy systems.',
+          'Upgraded Luxe with cleaner UX, more relationship depth, and drama events.',
+          'Added more jealousy, scandal, breakup, and romance fallout events.',
+          'Improved Connections with better family/relationship organization.',
+          'Added avatar changing from the player profile.',
+          'Expanded premium collections with more items, lifestyle actions, buzz, and flavor.',
+          'Fixed business hiring refresh/filter issues.',
+          'Added in-game bug reporting.',
+        ],
+      },
     ],
   ),
-  legacyChangelogEntry(
+  changelogEntry(
     '1.0.14',
-    'Sequel And Premium Stabilization',
+    'Sequel Greenlight Fix',
     'PATCH',
-    'Legacy notes from the stabilization commit between 1.0.13 and 1.0.15.',
+    'Patch update',
+    'A focused patch for sequel greenlight and family negotiation issues.',
     [
-      'Improved sequel flow and production-house continuation handling.',
-      'Hardened premium purchase and native update paths.',
-      'Stabilized game-loop, award, business, and universe interactions.',
+      {
+        heading: 'Fixes',
+        items: [
+          'Fixed sequel greenlight black screen issues.',
+          'Fixed family negotiation issues.',
+          'Added supporting stability cleanup around family and sequel flows.',
+        ],
+      },
     ],
   ),
-  legacyChangelogEntry(
+  changelogEntry(
     '1.0.13',
-    'Family Legacy & Finance',
-    'MINOR',
-    'Legacy notes from the release commit: family, legacy, loan, death, and native tracking systems expanded here.',
+    'Loans, Family & Legacy',
+    'PATCH',
+    'Patch update',
+    'A patch update adding personal loans, family consequences, legacy handoff, and several production-house fixes.',
     [
-      'Added deeper family and pregnancy logic, child legacy handoff, and death-screen improvements.',
-      'Expanded bank/loan systems and business finance pressure.',
-      'Added native tracking-permission support and improved premium/ad handling.',
+      {
+        heading: 'What Changed',
+        items: [
+          'Added personal loans with credit score and repayment mechanics.',
+          'Added baby naming and deeper family/divorce consequences.',
+          'Added a new life summary and legacy handoff screen on death.',
+          'Fixed sequel negotiation issues for returning cast and crew.',
+          'Improved streaming bids, Production House finance clarity, and universe tracking.',
+          'Fixed awards, vehicle selection, and several UI/navigation issues.',
+          'Added festival week info and more stability improvements.',
+        ],
+      },
     ],
   ),
-  legacyChangelogEntry(
+  changelogEntry(
     '1.0.12',
-    'Native Release Prep',
+    'UI Fixes & Streaming Bids',
     'PATCH',
-    'Backfilled legacy note for native release preparation work before the 1.0.13 systems update.',
+    'Patch update',
+    'A focused patch for UI issues and streaming bid balance.',
     [
-      'Improved iOS and Android shell readiness, launch assets, and store-facing configuration.',
-      'Prepared premium, ad, and device-specific systems for broader testing.',
-      'Polished guide and startup behavior for mobile players.',
+      {
+        heading: 'Fixes',
+        items: [
+          'Fixed reported UI issues.',
+          'Balanced streaming bids.',
+          'Added supporting patch fixes and stability improvements.',
+        ],
+      },
     ],
   ),
-  legacyChangelogEntry(
+  changelogEntry(
     '1.0.11',
-    'Production Flow Stabilization',
+    'Production House Recovery',
     'PATCH',
-    'Legacy notes from the stabilization commit: production flow, premium/native updates, and sequel safety were the focus.',
+    'Patch update',
+    'A patch focused on Production House reliability, save recovery, sequel flow, and UI fixes.',
     [
-      'Stabilized Greenlight, project phase progression, and production-house release handling.',
-      'Improved premium purchase paths and native plugin support.',
-      'Fixed sequel and universe edge cases before the larger family update.',
+      {
+        heading: 'Fixes And Improvements',
+        items: [
+          'Fixed several Production House and studio flow issues.',
+          'Improved save recovery for players hitting black screen or recovery mode.',
+          'Fixed multiple week-processing failures that could stop progress.',
+          'Fixed sequel projects getting stuck on returning talent negotiations.',
+          'Improved sequel and returning-talent flow so contracted returning cast no longer blocks greenlight incorrectly.',
+          'Fixed studio finance issues where inject or withdraw could fail silently.',
+          'Fixed IMDb and awards inconsistencies, including incorrect role displays on studio-produced projects.',
+          'Improved universe creation and universe-related stability.',
+          'Fixed multiple UI issues on certain devices where buttons or actions could be cut off.',
+          'Rebalanced business valuation and closed fast-money exploit paths.',
+          'Expanded the in-game Guide app with a better handbook and FAQ.',
+        ],
+      },
     ],
   ),
-  legacyChangelogEntry(
+  changelogEntry(
     '1.0.10',
-    'Mobile Store Foundation',
+    'Stability & Exploit Cleanup',
     'PATCH',
-    'Backfilled legacy note for the step between first native shell work and later production-flow stabilization.',
+    'Patch update',
+    'A stability, bug-fix, and exploit-cleanup update.',
     [
-      'Improved mobile app structure, settings support, and save handling.',
-      'Prepared store, premium, and ad surfaces for production use.',
-      'Smoothed early mobile navigation and startup recovery paths.',
+      {
+        heading: 'Patch Focus',
+        items: [
+          'Fixed several production house issues, including black screen/save recovery problems.',
+          'Fixed sequel projects getting stuck on returning talent negotiations pending.',
+          'Fixed studio finance issues where inject/withdraw could appear to do nothing.',
+          'Added safer handling for rare Processing Week hangs.',
+          'Fixed awards and IMDb inconsistencies, including false supporting-role nominations.',
+          'Improved awards flow and nominee handling for cleaner results.',
+          'Closed business exploits around fashion profits, instant valuation spikes, and quick studio flip value.',
+          'Reworked valuation behavior so businesses grow in value more realistically over time.',
+          'Upgraded the in-game Guide app with a better handbook and FAQ.',
+        ],
+      },
     ],
   ),
-  legacyChangelogEntry(
-    '1.0.9',
-    'Native Mobile Shell',
-    'MINOR',
-    'Legacy notes from the native setup commit: Capacitor Android/iOS projects, app icons, splash screens, premium, and guide updates landed here.',
-    [
-      'Added native Android and iOS project structure with launch assets and app metadata.',
-      'Expanded premium logic, IAP service support, and ad integration basics.',
-      'Improved guide, production, box office, store, and startup mobile behavior.',
-    ],
-  ),
-  legacyChangelogEntry(
+  patchEntry('1.0.9'),
+  changelogEntry(
     '1.0.8',
-    'Guide And Balance Pass',
+    'Black Screen & Fame Fix',
     'PATCH',
-    'Backfilled legacy note for early balance and help-system work before native release prep.',
+    'Patch update',
+    'A focused patch for black screen issues and fame balancing.',
     [
-      'Improved guide explanations for career, studio, and production decisions.',
-      'Balanced weekly events, business outcomes, and player feedback.',
-      'Reduced confusing early-game transitions and save edge cases.',
+      {
+        heading: 'Fixes',
+        items: [
+          'Fixed the black screen issue.',
+          'Softened fame decay so fame drops more fairly over time.',
+          'Added supporting stability cleanup for affected saves.',
+        ],
+      },
     ],
   ),
-  legacyChangelogEntry(
+  changelogEntry(
     '1.0.7',
-    'World Events And News',
-    'PATCH',
-    'Backfilled legacy note for early world-reaction, news, and social-event expansion.',
+    'Depth, Balance & Long-Term Gameplay',
+    'MAJOR',
+    'Android live',
+    'One of the biggest updates so far, focused on depth, balance, and long-term gameplay.',
     [
-      'Expanded news, life events, public reaction, and social-event outcomes.',
-      'Improved home feed and mobile news surfaces.',
-      'Added more variety to weekly event and fame/reputation feedback.',
+      {
+        heading: 'What Is New',
+        items: [
+          'Added multi-save system with save slots for parallel playthroughs.',
+          'Migrated old saves into the new save-slot system.',
+          'Massively expanded world content including news, events, gossip, and social feed.',
+          'Rebalanced business systems so service businesses are stable and product businesses require active strategy.',
+          'Strengthened the impact of cast, director, and script on movie performance.',
+          'Improved production house and movie systems.',
+          'Reworked streaming versus theatrical release logic.',
+          'Upgraded the Box Office app with cleaner UI and better tracking.',
+          'Added annual taxes for better late-game balance.',
+          'Improved the energy system so unused energy carries forward.',
+          'Rebalanced ads and rewards for less exploit and more fairness.',
+          'Improved mobile optimization for iOS and Android support.',
+          'Added general UI polish and stability improvements.',
+        ],
+      },
     ],
   ),
-  legacyChangelogEntry(
-    '1.0.6',
-    'Business Dashboard Growth',
-    'MINOR',
-    'Backfilled legacy note for the early business and production-house management expansion.',
-    [
-      'Expanded business dashboards, production-house screens, facilities, and management surfaces.',
-      'Improved Greenlight, release, and project dashboard flow.',
-      'Added more studio/business stats and player-facing finance feedback.',
-    ],
-  ),
-  legacyChangelogEntry(
+  patchEntry('1.0.6'),
+  changelogEntry(
     '1.0.5',
-    'Phone Apps Expansion',
+    'Stability & Gameplay Upgrade',
     'MINOR',
-    'Backfilled legacy note for the early mobile-phone suite expansion.',
+    'Minor update',
+    'A stability and gameplay upgrade with guide support, business improvements, lifestyle items, and UI polish.',
     [
-      'Expanded phone apps like IMDb, Forbes, Stocks, Messages, X, YouTube, Instagram, and dating surfaces.',
-      'Improved app navigation and in-game information access.',
-      'Added more project, social, and money feedback through phone screens.',
+      {
+        heading: 'What Changed',
+        items: [
+          'Fixed ad reward issue so players now correctly receive wellbeing rewards.',
+          'Added in-game Guide App to help new players understand mechanics.',
+          'Improved business logic, including service-based businesses.',
+          'Enhanced Forbes app experience.',
+          'Added more lifestyle items.',
+          'Fixed award show bugs.',
+          'Fixed gender assignment bug for female characters.',
+          'Added UI improvements across multiple screens.',
+          'Added performance optimizations and stability improvements.',
+          'Added minor bug fixes and balancing tweaks.',
+        ],
+      },
     ],
   ),
-  legacyChangelogEntry(
+  changelogEntry(
     '1.0.4',
-    'Streaming And Box Office',
-    'PATCH',
-    'Backfilled legacy note for early release-results and streaming outcome work.',
+    'Award Season Overhaul',
+    'MINOR',
+    'Minor update',
+    'A film and TV awards overhaul with smarter eligibility, dynamic ceremonies, new titles, and iOS ad fixes.',
     [
-      'Improved streaming logic, box-office feedback, IMDb pages, and release outcomes.',
-      'Added stronger project detail and post-release history surfaces.',
-      'Balanced studio, fame, money, and audience-result feedback.',
+      {
+        heading: 'Award Season Overhaul',
+        items: [
+          'Replaced the Tony Awards with the BAFTA Film Awards in Week 4 to better fit the film/TV focus.',
+          'Fixed eligibility logic so movies compete for Oscars/BAFTAs and TV shows compete for Emmys.',
+          'Fixed gender category bugs where male actors could win Best Actress or female actors could win Best Actor.',
+          'Fixed repetitive hardcoded award cutscenes so ceremonies now reflect actual projects and actors from the save file.',
+        ],
+      },
+      {
+        heading: 'Quality Of Life & Content',
+        items: [
+          'Added a Skip Ceremony button to the Red Carpet event.',
+          'Expanded the script generation engine with new word banks for more varied movie and TV titles.',
+        ],
+      },
+      {
+        heading: 'Bug Fixes',
+        items: [
+          'Fixed visual glitches in the Award Show presentation.',
+          'Added general performance improvements.',
+          'Fixed ads for iOS.',
+        ],
+      },
     ],
   ),
-  legacyChangelogEntry(
+  changelogEntry(
     '1.0.3',
-    'Career Progression',
+    'Storage & Business Fix',
     'PATCH',
-    'Backfilled legacy note for early acting career, casting, training, and role generation work.',
+    'Patch update',
+    'A focused patch for storage and business-tab issues.',
     [
-      'Improved auditions, roles, applications, commitments, and career XP loops.',
-      'Expanded training, stats, genre fit, and casting feedback.',
-      'Improved weekly progression and career-page clarity.',
+      {
+        heading: 'Fixes',
+        items: [
+          'Fixed the storage issue.',
+          'Fixed the business tab.',
+          'Added supporting stability cleanup.',
+        ],
+      },
     ],
   ),
-  legacyChangelogEntry(
-    '1.0.2',
-    'Lifestyle And Assets',
-    'PATCH',
-    'Backfilled legacy note for early lifestyle, assets, and business support.',
-    [
-      'Expanded lifestyle assets, purchases, business options, and personal money flow.',
-      'Improved social, dating, and lifestyle interactions.',
-      'Added more player-choice feedback outside the acting career loop.',
-    ],
-  ),
-  legacyChangelogEntry(
-    '1.0.1',
-    'First Stability Patch',
-    'PATCH',
-    'Backfilled legacy note for the first stability and quality-of-life pass after the foundation build.',
-    [
-      'Improved save/load behavior, week processing, and early-game screen flow.',
-      'Smoothed role, project, social, and business calculations.',
-      'Fixed first-wave UI and state bugs from the foundation build.',
-    ],
-  ),
-  legacyChangelogEntry(
+  patchEntry('1.0.2'),
+  patchEntry('1.0.1', 'Launch Stability Patch'),
+  changelogEntry(
     '1.0.0',
     'First Public Foundation',
     'MAJOR',
-    'Backfilled first-version note: the base Actor Empire loop with career, auditions, fame, lifestyle, phone apps, production, and world simulation.',
+    'Major update',
+    'The first Actor Empire foundation build with the core career, lifestyle, production, and phone-app loop.',
     [
-      'Launched the core actor career loop with auditions, jobs, skills, fame, reputation, health, and weekly progression.',
-      'Included early social, dating, lifestyle, business, news, stocks, streaming, and phone-app systems.',
-      'Established production-house, Greenlight, release, IMDb, awards, universe, and world-simulation foundations.',
+      {
+        heading: 'Foundation',
+        items: [
+          'Launched the core actor career loop with auditions, jobs, skills, fame, reputation, health, and weekly progression.',
+          'Included early social, dating, lifestyle, business, news, stocks, streaming, and phone-app systems.',
+          'Established production-house, Greenlight, release, IMDb, awards, universe, and world-simulation foundations.',
+        ],
+      },
     ],
   ),
 ];

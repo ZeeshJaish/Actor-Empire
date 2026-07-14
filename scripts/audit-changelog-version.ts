@@ -20,6 +20,16 @@ assert(
 );
 
 const seenVersions = new Set<string>();
+const entryText = (version: string) => {
+  const entry = CHANGELOG_ENTRIES.find(item => item.version === version);
+  assert(entry, `missing changelog entry ${version}`);
+  return [
+    entry.title,
+    entry.summary,
+    ...entry.sections.flatMap(section => [section.heading, ...section.items]),
+  ].join('\n');
+};
+
 for (const entry of CHANGELOG_ENTRIES) {
   assert(!seenVersions.has(entry.version), `duplicate changelog version ${entry.version}`);
   seenVersions.add(entry.version);
@@ -32,6 +42,19 @@ for (const entry of CHANGELOG_ENTRIES) {
     assert(section.items.length > 0, `empty changelog section ${section.heading} for ${entry.version}`);
   });
 }
+
+assert(entryText('1.0.3').includes('Fixed the storage issue'), '1.0.3 should include the storage fix from release notes');
+assert(entryText('1.0.4').includes('BAFTA Film Awards'), '1.0.4 should include the BAFTA award overhaul');
+assert(entryText('1.0.5').includes('Guide App'), '1.0.5 should include the Guide App addition');
+assert(entryText('1.0.7').includes('multi-save system'), '1.0.7 should include multi-save system notes');
+assert(entryText('1.0.8').includes('black screen issue'), '1.0.8 should include black screen fix notes');
+assert(entryText('1.0.10').includes('Processing Week'), '1.0.10 should include processing week hang safety');
+assert(entryText('1.0.11').includes('recovery mode'), '1.0.11 should include save recovery notes');
+assert(entryText('1.0.13').includes('personal loans'), '1.0.13 should include personal loans');
+assert(entryText('1.0.15').includes('Luxe'), '1.0.15 should include Luxe upgrades');
+assert(entryText('1.0.16').includes('iOS in-app purchases'), '1.0.16 should include iOS IAP fix');
+assert(entryText('1.0.17').includes('Biopic'), '1.0.17 should include new genres and project types');
+assert(entryText('1.0.18').includes('runaway streaming numbers'), '1.0.18 should include runaway streaming fix');
 
 const settingsPage = read('views/SettingsPage.tsx');
 assert(settingsPage.includes("'CHANGELOG'"), 'SettingsPage must include CHANGELOG mode');
