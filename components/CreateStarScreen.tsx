@@ -32,7 +32,7 @@ export default function CreateStarScreen({ state = 'on', onBegin, onBack }: Prop
   const [customSelection, setCustomSelection] = useState<ProfileBuilderSelection | null>(null);
   const [stageName, setStageName] = useState('');
   const [handle, setHandle] = useState('');
-  const [age, setAge] = useState(18);
+  const [age, setAge] = useState(15);
   const profileGender = toProfileGender(gender);
   const presetSelections = useMemo(
     () =>
@@ -186,7 +186,7 @@ export default function CreateStarScreen({ state = 'on', onBegin, onBack }: Prop
         <div className="field">
           <div className="field-label">Starting Age</div>
           <div className="stepper">
-            <button onClick={() => setAge(Math.max(18, age - 1))}>−</button>
+            <button onClick={() => setAge(Math.max(15, age - 1))}>−</button>
             <div className="val">
               <span>{age}</span>
               <small>Years old</small>

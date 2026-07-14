@@ -1,4 +1,4 @@
-import { GameLanguage, HealthConditionSeverity, HealthConditionSource, HealthConditionState, LogEntry, Message, NewsItem, Player } from '../types';
+import { GameLanguage, HealthConditionSeverity, HealthConditionSource, HealthConditionState, LogEntry, Message, NewsItem, Player, TeamMember } from '../types';
 import { getPlayerLanguage, t } from './i18n';
 import { getAbsoluteWeek } from './legacyLogic';
 
@@ -68,7 +68,7 @@ export const HEALTH_CONDITION_REGISTRY: Record<string, HealthConditionDefinition
         id: 'flu_bug',
         labelKey: 'services.health.condition.flu_bug.label',
         summaryKey: 'services.health.condition.flu_bug.summary',
-        fallbackLabel: 'Flu / Minor Illness',
+        fallbackLabel: 'Cold / Flu',
         fallbackSummary: 'A minor illness is dragging down your energy.',
         severity: 'MINOR',
         source: 'ILLNESS',
@@ -80,6 +80,23 @@ export const HEALTH_CONDITION_REGISTRY: Record<string, HealthConditionDefinition
         naturalRecoveryChance: 0.35,
         worsenAfterWeeks: 4,
         worsenTo: 'respiratory_complication',
+    },
+    back_pain: {
+        id: 'back_pain',
+        labelKey: 'services.health.condition.back_pain.label',
+        summaryKey: 'services.health.condition.back_pain.summary',
+        fallbackLabel: 'Back Pain',
+        fallbackSummary: 'A small body issue is making movement and long workdays harder.',
+        severity: 'MINOR',
+        source: 'PRODUCTION',
+        healthCap: 84,
+        weeklyHealthDrain: 1,
+        workPenalty: 5,
+        baseDurationWeeks: 2,
+        treatmentTags: ['injury', 'aftercare', 'checkup'],
+        naturalRecoveryChance: 0.38,
+        worsenAfterWeeks: 5,
+        worsenTo: 'chronic_pain',
     },
     burnout_spiral: {
         id: 'burnout_spiral',
@@ -250,6 +267,88 @@ const conditionSeed = (player: Player, absoluteWeek: number, salt: number) => {
     return raw - Math.floor(raw);
 };
 
+const careTeamMinorConditionIds = new Set(['workload_headache', 'flu_bug', 'back_pain']);
+
+const finiteNumber = (value: unknown, fallback = 0) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const getTeamMemberCarePower = (member?: TeamMember | null) => {
+    if (!member) return 0;
+    if (member.tier === 'ROOKIE') return 1;
+    if (member.tier === 'STANDARD') return 2;
+    if (member.tier === 'ELITE') return 3;
+    if (member.tier === 'LEGEND') return 4;
+    return 0;
+};
+
+export const getCareTeamConditionSupportPower = (player: Player, conditionId: string) => {
+    const wellnessPower = getTeamMemberCarePower(player.team?.wellness);
+    const trainerPower = getTeamMemberCarePower(player.team?.personalTrainer);
+    const therapistPower = getTeamMemberCarePower(player.team?.therapist);
+
+    if (conditionId === 'flu_bug') return wellnessPower + trainerPower * 0.25;
+    if (conditionId === 'back_pain') return wellnessPower * 0.8 + trainerPower;
+    if (conditionId === 'workload_headache') return wellnessPower * 0.65 + therapistPower;
+    return 0;
+};
+
+const getCareTeamAutoHandleCooldownWeeks = (supportPower: number) => {
+    if (supportPower >= 3) return 2;
+    if (supportPower >= 2) return 3;
+    return 4;
+};
+
+export const canCareTeamAutoHandleCondition = (
+    player: Player,
+    conditionOrId: HealthConditionState | string,
+    absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek),
+    handledThisWeek = 0,
+    pendingFlagUpdates: Record<string, unknown> = {},
+) => {
+    const conditionId = typeof conditionOrId === 'string' ? conditionOrId : conditionOrId.conditionId;
+    const definition = HEALTH_CONDITION_REGISTRY[conditionId];
+    if (!definition || definition.severity !== 'MINOR' || !careTeamMinorConditionIds.has(conditionId)) return false;
+    if (handledThisWeek > 0) return false;
+
+    const supportPower = getCareTeamConditionSupportPower(player, conditionId);
+    if (supportPower < 1) return false;
+
+    const flags = { ...(player.flags || {}), ...pendingFlagUpdates };
+    const sameConditionFlag = `lastCareTeamAutoHandle_${conditionId}`;
+    const lastAnyHandledWeek = finiteNumber(flags.lastCareTeamAutoHandleAbsoluteWeek, -999);
+    const lastSameHandledWeek = finiteNumber(flags[sameConditionFlag], -999);
+    const cooldownWeeks = getCareTeamAutoHandleCooldownWeeks(supportPower);
+
+    return absoluteWeek - lastAnyHandledWeek >= 1 && absoluteWeek - lastSameHandledWeek >= cooldownWeeks;
+};
+
+const buildCareTeamHandledResult = (
+    player: Player,
+    condition: HealthConditionState,
+    absoluteWeek: number,
+    language: GameLanguage,
+    handledThisWeek = 0,
+    pendingFlagUpdates: Record<string, unknown> = {},
+): { flagUpdates: Record<string, unknown>; log: LogEntry } | null => {
+    if (!canCareTeamAutoHandleCondition(player, condition, absoluteWeek, handledThisWeek, pendingFlagUpdates)) return null;
+    const conditionLabel = getHealthConditionLabel(condition, language);
+    return {
+        flagUpdates: {
+            lastCareTeamAutoHandleAbsoluteWeek: absoluteWeek,
+            [`lastCareTeamAutoHandle_${condition.conditionId}`]: absoluteWeek,
+            careTeamAutoHandledMinorHealthCount: finiteNumber(player.flags?.careTeamAutoHandledMinorHealthCount, 0) + 1,
+        },
+        log: {
+            week: player.currentWeek,
+            year: player.age,
+            message: t(language, 'services.health.careTeam.handled', { condition: conditionLabel }),
+            type: 'positive',
+        },
+    };
+};
+
 export const getActiveHealthConditions = (player: Pick<Player, 'activeHealthConditions'>): HealthConditionState[] =>
     Array.isArray(player.activeHealthConditions) ? player.activeHealthConditions.filter(Boolean) : [];
 
@@ -337,6 +436,26 @@ export const applyHealthConditionIncident = (
     if (!condition) return { player, logs: [], news: [], inbox: [] };
 
     const language = getPlayerLanguage(player);
+    const careTeamHandled = buildCareTeamHandledResult(player, condition, absoluteWeek, language);
+    if (careTeamHandled) {
+        return {
+            player: {
+                ...player,
+                stats: {
+                    ...player.stats,
+                    health: clamp((player.stats.health || 0) + 1),
+                },
+                flags: {
+                    ...(player.flags || {}),
+                    ...careTeamHandled.flagUpdates,
+                },
+            },
+            logs: [careTeamHandled.log],
+            news: [],
+            inbox: [],
+        };
+    }
+
     const conditionLabel = getHealthConditionLabel(condition, language);
     const conditionSummary = getHealthConditionSummary(condition, language);
     const sourceLabel = options.sourceLabel || definition.source.toLowerCase();
@@ -405,35 +524,48 @@ export const processHealthConditionsWeek = (player: Player): HealthConditionWeek
     const body = Number(player.stats.body || 0);
     const fame = Number(player.stats.fame || 0);
     const burnoutWeeks = Number(player.flags?.burnoutWeeks || 0);
+    let careTeamFlagUpdates: Record<string, unknown> = {};
+    let careTeamHandledThisWeek = 0;
+
+    const queueCondition = (conditionId: string) => {
+        const condition = createHealthCondition(player, conditionId, absoluteWeek);
+        if (!condition) return;
+        const careTeamHandled = buildCareTeamHandledResult(player, condition, absoluteWeek, language, careTeamHandledThisWeek, careTeamFlagUpdates);
+        if (careTeamHandled) {
+            careTeamFlagUpdates = { ...careTeamFlagUpdates, ...careTeamHandled.flagUpdates };
+            careTeamHandledThisWeek += 1;
+            logs.push(careTeamHandled.log);
+            return;
+        }
+        newConditions.push(condition);
+    };
 
     if ((happiness < 28 || burnoutWeeks >= 2) && shouldTriggerIncident(player, absoluteWeek, 'workload_headache', 0.18, 1)) {
-        const condition = createHealthCondition(player, 'workload_headache', absoluteWeek);
-        if (condition) newConditions.push(condition);
+        queueCondition('workload_headache');
     }
 
     if ((happiness < 12 || burnoutWeeks >= 4) && shouldTriggerIncident(player, absoluteWeek, 'burnout_spiral', 0.16, 2)) {
-        const condition = createHealthCondition(player, 'burnout_spiral', absoluteWeek);
-        if (condition) newConditions.push(condition);
+        queueCondition('burnout_spiral');
     }
 
     if (health < 62 && shouldTriggerIncident(player, absoluteWeek, 'flu_bug', 0.1, 3)) {
-        const condition = createHealthCondition(player, 'flu_bug', absoluteWeek);
-        if (condition) newConditions.push(condition);
+        queueCondition('flu_bug');
+    }
+
+    if ((body < 38 || (body < 52 && health < 70)) && shouldTriggerIncident(player, absoluteWeek, 'back_pain', 0.09, 7)) {
+        queueCondition('back_pain');
     }
 
     if (body < 22 && shouldTriggerIncident(player, absoluteWeek, 'stunt_fracture', 0.08, 4)) {
-        const condition = createHealthCondition(player, 'stunt_fracture', absoluteWeek);
-        if (condition) newConditions.push(condition);
+        queueCondition('stunt_fracture');
     }
 
     if (player.age >= 68 && shouldTriggerIncident(player, absoluteWeek, 'old_age_complication', 0.08 + Math.min(0.18, (player.age - 68) * 0.01), 5)) {
-        const condition = createHealthCondition(player, 'old_age_complication', absoluteWeek);
-        if (condition) newConditions.push(condition);
+        queueCondition('old_age_complication');
     }
 
     if (player.age >= 45 && health < 50 && shouldTriggerIncident(player, absoluteWeek, 'cancer_scare', 0.025, 6)) {
-        const condition = createHealthCondition(player, 'cancer_scare', absoluteWeek);
-        if (condition) newConditions.push(condition);
+        queueCondition('cancer_scare');
     }
 
     conditions = [...newConditions, ...conditions];
@@ -544,6 +676,7 @@ export const processHealthConditionsWeek = (player: Player): HealthConditionWeek
             ...(player.flags || {}),
             activeHealthConditionCount: progressed.length,
             healthConditionCap: strongestCap,
+            ...careTeamFlagUpdates,
             isDead: deathTriggered ? true : player.flags?.isDead,
             ...(deathTriggered ? {
                 deathCauseTitle: fatalCondition ? getHealthConditionLabel(fatalCondition, language) : 'Untreated health condition',

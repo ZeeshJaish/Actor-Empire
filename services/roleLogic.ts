@@ -1119,13 +1119,71 @@ export const calculateIMDbRating = (commitment: Commitment): number => {
 const BOX_OFFICE_CAPS: Record<BudgetTier, { opening: number, total: number }> = {
     'LOW': { opening: 30000000, total: 150000000 },
     'MID': { opening: 120000000, total: 500000000 },
-    // Adjusted: Hard Cap reduced from 3B to 1.6B to make >2B a rare event
+    // Base targets. The active release receives a stable per-project variance/stretch.
     'HIGH': { opening: 350000000, total: 1600000000 },
     'BLOCKBUSTER': { opening: 600000000, total: 3000000000 }
 };
 
 export const getBoxOfficeCaps = (budgetTier: BudgetTier): { opening: number, total: number } => {
     return BOX_OFFICE_CAPS[budgetTier] || BOX_OFFICE_CAPS.HIGH;
+};
+
+export const calculateDynamicBoxOfficeTotalCap = ({
+    budgetTier,
+    genre,
+    format = 'LIVE_ACTION',
+    hiddenStats,
+    marketDemand = 1,
+    studioGenreReputation = 0,
+    capRoll = 0.5
+}: {
+    budgetTier: BudgetTier;
+    genre: Genre;
+    format?: ProjectFormat;
+    hiddenStats: ProjectHiddenStats;
+    marketDemand?: number;
+    studioGenreReputation?: number;
+    capRoll?: number;
+}): { totalCap: number; label: NonNullable<ProjectHiddenStats['boxOfficeCapLabel']> } => {
+    const baseCap = getBoxOfficeCaps(budgetTier).total;
+    const safeRoll = clamp(Number.isFinite(capRoll) ? capRoll : 0.5, 0, 1);
+    const packageStrength = (
+        (hiddenStats.scriptQuality || 50) * 0.18 +
+        (hiddenStats.directorQuality || 50) * 0.16 +
+        (hiddenStats.castingStrength || 50) * 0.21 +
+        (hiddenStats.distributionPower || 50) * 0.2 +
+        (hiddenStats.qualityScore || 50) * 0.16 +
+        (hiddenStats.rawHype || 50) * 0.09
+    );
+    const eventGenre = SPECTACLE_GENRES.has(genre) || format === 'ANIMATED';
+    const variance = 0.92 + (safeRoll * 0.16);
+    const weakPackageDrag = packageStrength < 58
+        ? clamp((58 - packageStrength) * 0.006, 0, 0.14)
+        : 0;
+    const marketLift = clamp((marketDemand - 1) * 0.18, -0.08, 0.08);
+    const studioLift = clamp(Math.max(0, studioGenreReputation) / 900, 0, 0.1);
+
+    let stretch = 1 + marketLift + studioLift - weakPackageDrag;
+    let label: NonNullable<ProjectHiddenStats['boxOfficeCapLabel']> = weakPackageDrag > 0.08 ? 'LIMITED' : 'STANDARD';
+
+    if (['HIGH', 'BLOCKBUSTER'].includes(budgetTier) && eventGenre) {
+        const eventScore = packageStrength
+            + clamp((hiddenStats.rawHype || 50) - 78, -10, 16) * 0.35
+            + clamp((hiddenStats.distributionPower || 50) - 76, -10, 18) * 0.25
+            + clamp(((hiddenStats.fameMultiplier || 1) - 1) * 28, -5, 12);
+
+        if (eventScore >= 92) {
+            const breakoutRoom = budgetTier === 'BLOCKBUSTER' ? 0.34 : 0.46;
+            stretch += clamp((eventScore - 88) / 58, 0.08, breakoutRoom);
+            label = eventScore >= 102 ? 'BREAKOUT' : 'EVENT';
+        } else if (eventScore >= 82) {
+            stretch += clamp((eventScore - 80) / 95, 0.02, 0.14);
+            label = 'EVENT';
+        }
+    }
+
+    const totalCap = Math.floor(baseCap * variance * clamp(stretch, 0.72, budgetTier === 'BLOCKBUSTER' ? 1.42 : 1.58));
+    return { totalCap: Math.max(1, totalCap), label };
 };
 
 // Adjusted: Superhero/Sci-Fi are the "Money Makers"

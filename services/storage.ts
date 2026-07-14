@@ -36,7 +36,11 @@ const openDB = (): Promise<IDBDatabase> => {
   });
 };
 
-export const saveGameData = async (key: string, data: any): Promise<void> => {
+export const saveGameData = async (
+  key: string,
+  data: any,
+  options: { rethrow?: boolean } = {}
+): Promise<void> => {
   const traceName = 'save_game_data';
   markTraceAction('save_write_started', {
     save_key: key,
@@ -70,6 +74,7 @@ export const saveGameData = async (key: string, data: any): Promise<void> => {
       console.error("Failed to save game data", err);
       markTraceAction('save_write_failed', { save_key: key, save_slot: data?.flags?.lastLoadedSlot || key });
       recordNonFatal(err, 'save_game_failed', { key, ...getSaveStats(data) });
+      if (options.rethrow) throw err;
   } finally {
       stopPerformanceTrace(traceName, { duration_ms: Math.round(performance.now() - startedAt) });
   }
@@ -131,5 +136,62 @@ export const deleteGameData = async (key: string): Promise<void> => {
   } catch (err) {
       console.error("Failed to delete game data", err);
       recordNonFatal(err, 'delete_game_failed', { key });
+  }
+};
+
+export const exportAllGameData = async (): Promise<Array<{ key: string; value: any }>> => {
+  try {
+      const db = await openDB();
+      return await new Promise((resolve, reject) => {
+        const transaction = db.transaction(STORE_NAME, 'readonly');
+        const store = transaction.objectStore(STORE_NAME);
+        const request = store.getAllKeys();
+
+        request.onerror = () => {
+            recordNonFatal(request.error, 'indexeddb_export_keys_failed');
+            reject(request.error);
+        };
+        request.onsuccess = async () => {
+            try {
+                const keys = request.result.map(key => String(key));
+                const entries = await Promise.all(keys.map(async key => ({
+                    key,
+                    value: await loadGameData(key),
+                })));
+                resolve(entries.filter(entry => entry.value !== undefined && entry.value !== null));
+            } catch (error) {
+                reject(error);
+            }
+        };
+      });
+  } catch (err) {
+      console.error("Failed to export game data", err);
+      recordNonFatal(err, 'export_game_data_failed');
+      return [];
+  }
+};
+
+export const replaceAllGameData = async (entries: Array<{ key: string; value: any }>): Promise<void> => {
+  try {
+      const db = await openDB();
+      await new Promise<void>((resolve, reject) => {
+        const transaction = db.transaction(STORE_NAME, 'readwrite');
+        const store = transaction.objectStore(STORE_NAME);
+        const clearRequest = store.clear();
+
+        clearRequest.onerror = () => {
+            recordNonFatal(clearRequest.error, 'indexeddb_import_clear_failed');
+            reject(clearRequest.error);
+        };
+        clearRequest.onsuccess = () => resolve();
+      });
+
+      for (const entry of entries) {
+        await saveGameData(entry.key, entry.value);
+      }
+  } catch (err) {
+      console.error("Failed to import game data", err);
+      recordNonFatal(err, 'import_game_data_failed');
+      throw err;
   }
 };

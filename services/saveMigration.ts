@@ -1,12 +1,19 @@
-import { INITIAL_PLAYER, type Message, type NewsItem, type Player, type PortfolioItem, type ScheduledEvent, type Stock, type StockTakeoverCase } from '../types';
+import { INITIAL_PLAYER, type Message, type NewsItem, type Player, type PortfolioItem, type Relationship, type ScheduledEvent, type Stock, type StockTakeoverCase } from '../types';
 import { ensureLifestyleActivityState } from './lifestyleActivities';
 import { normalizeNewPlayerTutorialState } from './newPlayerTutorial';
 import { createGlobalActorPackNPCs } from './npcLogic';
-import { getStockOutstandingShares, initializeStocks } from './stockLogic';
+import {
+    getStockOutstandingShares,
+    getStockPriceCeiling,
+    initializeStocks,
+    normalizeStockPrice,
+    normalizeStockPriceHistory,
+} from './stockLogic';
 
-const SAVE_MIGRATION_VERSION = 13;
+const SAVE_MIGRATION_VERSION = 15;
+const RUNAWAY_STOCK_CASH_CEILING = 10_000_000_000_000;
 
-const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
+const clone = <T,>(value: T): T => value === undefined ? value : JSON.parse(JSON.stringify(value));
 const clamp = (value: number, min = 0, max = 100) => Math.max(min, Math.min(max, Number.isFinite(value) ? value : min));
 const clampMoney = (value: number) => Math.max(0, Number.isFinite(value) ? value : 0);
 const toArray = <T,>(value: unknown): T[] => Array.isArray(value) ? value as T[] : [];
@@ -15,6 +22,157 @@ const toMoneySeries = (value: unknown): number[] => toArray<unknown>(value)
     .filter(amount => amount >= 0);
 const toObjectSeries = <T,>(value: unknown): T[] => toArray<T>(value)
     .filter(item => item && typeof item === 'object');
+
+type MigratedAwardLike = {
+    type?: string;
+    year?: number;
+    category?: string;
+    projectId?: string;
+    outcome?: 'WON' | 'NOMINATED';
+};
+
+type MigratedAwardHistoryEntry = {
+    type?: string;
+    year?: number;
+    winners?: Array<{
+        category?: string;
+        projectName?: string;
+        isPlayer?: boolean;
+    }>;
+};
+
+const isPlainRecord = (value: unknown): value is Record<string, unknown> => (
+    Boolean(value)
+    && typeof value === 'object'
+    && !Array.isArray(value)
+);
+
+const mergeDefaults = <T,>(defaults: T, incoming: unknown): T => {
+    if (incoming === undefined || incoming === null) return clone(defaults);
+
+    if (Array.isArray(defaults)) {
+        return (Array.isArray(incoming) ? clone(incoming) : clone(defaults)) as T;
+    }
+
+    if (isPlainRecord(defaults)) {
+        if (!isPlainRecord(incoming)) return clone(defaults);
+        const merged: Record<string, unknown> = {};
+        Object.entries(defaults).forEach(([key, defaultValue]) => {
+            merged[key] = mergeDefaults(defaultValue, incoming[key]);
+        });
+        Object.entries(incoming).forEach(([key, value]) => {
+            if (!(key in merged)) merged[key] = clone(value);
+        });
+        return merged as T;
+    }
+
+    if (typeof defaults === 'number') {
+        const numericValue = Number(incoming);
+        return (Number.isFinite(numericValue) ? numericValue : defaults) as T;
+    }
+
+    if (typeof defaults === 'string') {
+        return (typeof incoming === 'string' ? incoming : defaults) as T;
+    }
+
+    if (typeof defaults === 'boolean') {
+        return (typeof incoming === 'boolean' ? incoming : defaults) as T;
+    }
+
+    return clone(incoming) as T;
+};
+
+const readTimingNumber = (...values: unknown[]): number | undefined => {
+    for (const value of values) {
+        const parsed = Number(value);
+        if (Number.isFinite(parsed)) return parsed;
+    }
+    return undefined;
+};
+
+const timingFromAbsoluteWeek = (absoluteWeek: number) => ({
+    releaseYear: Math.floor(Math.max(0, Math.floor(absoluteWeek)) / 52) + 1,
+    releaseWeek: (Math.max(0, Math.floor(absoluteWeek)) % 52) + 1
+});
+
+const migratePastProjectReleaseTiming = (project: any) => {
+    const hiddenStats = project?.hiddenStats || {};
+    let releasedAtAbsoluteWeek = readTimingNumber(project?.releasedAtAbsoluteWeek, hiddenStats.releasedAtAbsoluteWeek);
+    let releaseYear = readTimingNumber(project?.releaseYear, project?.year, hiddenStats.releaseYear);
+    let releaseWeek = readTimingNumber(project?.releaseWeek, hiddenStats.releaseWeek);
+
+    if (releasedAtAbsoluteWeek !== undefined) {
+        const absoluteTiming = timingFromAbsoluteWeek(releasedAtAbsoluteWeek);
+        releaseYear = releaseYear ?? absoluteTiming.releaseYear;
+        releaseWeek = releaseWeek ?? absoluteTiming.releaseWeek;
+    }
+
+    return {
+        releaseYear: Math.max(1, Math.round(releaseYear || 18)),
+        releaseWeek: releaseWeek !== undefined && releaseWeek >= 1 && releaseWeek <= 52
+            ? Math.round(releaseWeek)
+            : undefined,
+        releasedAtAbsoluteWeek: releasedAtAbsoluteWeek !== undefined
+            ? Math.max(0, Math.round(releasedAtAbsoluteWeek))
+            : undefined
+    };
+};
+
+const shouldReplaceMigratedAward = (existing: MigratedAwardLike, candidate: MigratedAwardLike): boolean => {
+    const existingYear = Math.max(1, Math.round(Number(existing.year || 0)));
+    const candidateYear = Math.max(1, Math.round(Number(candidate.year || 0)));
+    if (candidateYear < existingYear) return true;
+    if (candidateYear > existingYear) return false;
+    return existing.outcome !== 'WON' && candidate.outcome === 'WON';
+};
+
+const sanitizeMigratedAwardRecords = <T extends MigratedAwardLike>(awards: T[] = []): T[] => {
+    const byProject = new Map<string, T>();
+    awards.forEach(award => {
+        const key = `${award.type || 'UNKNOWN'}::${award.category || 'UNKNOWN'}::${award.projectId || 'UNKNOWN'}`;
+        const existing = byProject.get(key);
+        if (!existing || shouldReplaceMigratedAward(existing, award)) byProject.set(key, award);
+    });
+
+    const bySeason = new Map<string, T[]>();
+    Array.from(byProject.values()).forEach(award => {
+        const key = `${award.type || 'UNKNOWN'}::${Math.max(1, Math.round(Number(award.year || 0)))}::${award.category || 'UNKNOWN'}`;
+        if (!bySeason.has(key)) bySeason.set(key, []);
+        bySeason.get(key)!.push(award);
+    });
+
+    return Array.from(bySeason.values()).flatMap(categoryAwards => {
+        const wins = categoryAwards.filter(award => award.outcome === 'WON');
+        if (wins.length <= 1) return categoryAwards;
+        const keepWon = wins.sort((a, b) => String(a.projectId || '').localeCompare(String(b.projectId || '')))[0];
+        return categoryAwards.map(award => award === keepWon ? award : { ...award, outcome: 'NOMINATED' as const });
+    });
+};
+
+const sanitizeMigratedAwardHistory = <T extends MigratedAwardHistoryEntry>(entries: T[] = []): T[] => {
+    const seenPlayerWinners = new Set<string>();
+    const droppedWinnerKeys = new Set<string>();
+    entries
+        .map((entry, index) => ({ entry, index }))
+        .sort((a, b) => (Number(a.entry.year || 0) - Number(b.entry.year || 0)) || (a.index - b.index))
+        .forEach(({ entry, index }) => {
+            toObjectSeries<NonNullable<MigratedAwardHistoryEntry['winners']>[number]>(entry.winners).forEach((winner, winnerIndex) => {
+                if (!winner.isPlayer) return;
+                const winnerKey = `${entry.type || 'UNKNOWN'}::${winner.category || 'UNKNOWN'}::${winner.projectName || 'UNKNOWN'}`;
+                if (seenPlayerWinners.has(winnerKey)) {
+                    droppedWinnerKeys.add(`${index}::${winnerIndex}`);
+                    return;
+                }
+                seenPlayerWinners.add(winnerKey);
+            });
+        });
+
+    return entries.map((entry, index) => ({
+        ...entry,
+        winners: toObjectSeries<NonNullable<MigratedAwardHistoryEntry['winners']>[number]>(entry.winners)
+            .filter((_, winnerIndex) => !droppedWinnerKeys.has(`${index}::${winnerIndex}`))
+    }));
+};
 
 const normalizeEpisodeRatings = (value: unknown) => toObjectSeries<any>(value)
     .map((season, index) => {
@@ -59,6 +217,7 @@ const normalizeSoundtrackBreakdown = (value: any) => {
 
 const VALID_TAKEOVER_STATUS = new Set(['ACTIVE', 'READY_FOR_CONTROL', 'RIVAL_DEFENCE', 'CONTROLLED', 'FAILED']);
 const VALID_TAKEOVER_ROUTE = new Set(['FRIENDLY_TAKEOVER', 'SHAREHOLDER_ALLIANCE', 'HOSTILE_TAKEOVER', 'CONTROL_TRANSFER']);
+const VALID_RELATIONS = new Set(['Parent', 'Friend', 'Partner', 'Spouse', 'Ex-Partner', 'Ex-Spouse', 'Child', 'Pet', 'Connection', 'Agent', 'Director', 'Manager', 'Colleague', 'Networking', 'Deceased Parent', 'Sibling']);
 
 const dedupeByKey = <T,>(items: T[], getKey: (item: T, index: number) => string): T[] => {
     const seen = new Set<string>();
@@ -73,12 +232,8 @@ const dedupeByKey = <T,>(items: T[], getKey: (item: T, index: number) => string)
 const normalizeStock = (stock: Partial<Stock>, fallback?: Stock): Stock => {
     const base = fallback || stock;
     const id = String(stock.id || base.id || 'stock_unknown');
-    const price = Math.max(0.01, Number(stock.price ?? base.price ?? 1));
     const volatility = Math.max(0, Math.min(0.2, Number(stock.volatility ?? base.volatility ?? 0.02)));
     const dividendYield = Math.max(0, Math.min(0.2, Number(stock.dividendYield ?? base.dividendYield ?? 0)));
-    const priceHistory = toArray<number>(stock.priceHistory)
-        .map(value => Math.max(0.01, Number(value) || price))
-        .slice(-20);
     const normalized: Stock = {
         ...(base as Stock),
         ...(stock as Stock),
@@ -86,11 +241,11 @@ const normalizeStock = (stock: Partial<Stock>, fallback?: Stock): Stock => {
         symbol: String(stock.symbol || base.symbol || id.toUpperCase()),
         name: String(stock.name || base.name || stock.symbol || id),
         sector: (stock.sector || base.sector || 'TECH') as Stock['sector'],
-        price,
+        price: 0.01,
         volatility,
         dividendYield,
         outstandingShares: Math.max(1, Math.round(Number(stock.outstandingShares || 0))),
-        priceHistory: priceHistory.length ? priceHistory : Array(12).fill(price),
+        priceHistory: [],
         lastDividendPayoutWeek: Math.max(0, Math.round(Number(stock.lastDividendPayoutWeek || 0))),
         publicFloatPercent: stock.publicFloatPercent === undefined && base.publicFloatPercent === undefined
             ? undefined
@@ -100,6 +255,13 @@ const normalizeStock = (stock: Partial<Stock>, fallback?: Stock): Stock => {
         lastShareIssueWeek: stock.lastShareIssueWeek === undefined ? base.lastShareIssueWeek : Math.max(0, Math.round(Number(stock.lastShareIssueWeek || 0))),
     };
     normalized.outstandingShares = getStockOutstandingShares(normalized);
+    normalized.price = normalizeStockPrice(normalized, Number(stock.price ?? base.price ?? 1));
+    normalized.priceHistory = normalizeStockPriceHistory({
+        ...normalized,
+        priceHistory: toArray<number>(stock.priceHistory).length
+            ? toArray<number>(stock.priceHistory)
+            : toArray<number>(base.priceHistory),
+    });
     return normalized;
 };
 
@@ -169,6 +331,22 @@ const migrateTakeovers = (takeovers: Partial<StockTakeoverCase>[] | undefined, s
         .slice(0, 20);
 };
 
+const hasRunawayStockValues = (rawStocks: Partial<Stock>[] | undefined, migratedStocks: Stock[]): boolean => {
+    const stockById = new Map(migratedStocks.map(stock => [stock.id, stock]));
+    return toArray<Partial<Stock>>(rawStocks).some(stock => {
+        if (stock.price === undefined) return false;
+        const migrated = stockById.get(String(stock.id || ''));
+        if (!migrated) return false;
+        const rawPrice = Number(stock.price);
+        return !Number.isFinite(rawPrice) || rawPrice > getStockPriceCeiling(migrated) * 1.5;
+    });
+};
+
+const normalizeMigratedCash = (money: unknown, repairRunawayStockCash: boolean): number => {
+    const safeMoney = Number.isFinite(Number(money)) ? Math.max(0, Number(money)) : INITIAL_PLAYER.money;
+    return repairRunawayStockCash ? Math.min(safeMoney, RUNAWAY_STOCK_CASH_CEILING) : safeMoney;
+};
+
 const migrateProjectDetails = (details: any) => {
     const next = details && typeof details === 'object' ? { ...details } : {};
     next.hiddenStats = next.hiddenStats && typeof next.hiddenStats === 'object' ? { ...next.hiddenStats } : {};
@@ -236,10 +414,14 @@ const migrateActiveRelease = (release: any): any => {
 
 const migratePastProject = (project: any, index: number): any => {
     const next = project && typeof project === 'object' ? { ...project } : {};
+    const releaseTiming = migratePastProjectReleaseTiming(next);
     next.id = String(next.id || `past_project_${index}`);
     next.name = String(next.name || 'Untitled Project');
     next.type = 'ACTING_GIG';
-    next.year = Math.max(1, Math.round(Number(next.year || 18)));
+    next.year = releaseTiming.releaseYear;
+    next.releaseYear = releaseTiming.releaseYear;
+    if (releaseTiming.releaseWeek !== undefined) next.releaseWeek = releaseTiming.releaseWeek;
+    if (releaseTiming.releasedAtAbsoluteWeek !== undefined) next.releasedAtAbsoluteWeek = releaseTiming.releasedAtAbsoluteWeek;
     next.earnings = clampMoney(Number(next.earnings || 0));
     next.rating = clamp(Number(next.rating || next.imdbRating || 0), 0, 10);
     next.reception = String(next.reception || 'FINISHED');
@@ -289,6 +471,7 @@ const migratePastProject = (project: any, index: number): any => {
     next.releaseRegionIds = toArray<string>(next.releaseRegionIds).map(String);
     next.releaseChainSelections = next.releaseChainSelections && typeof next.releaseChainSelections === 'object' ? next.releaseChainSelections : {};
     next.boxOfficeArchiveVersion = Math.max(1, Math.round(Number(next.boxOfficeArchiveVersion || 1)));
+    next.awards = sanitizeMigratedAwardRecords(toObjectSeries<MigratedAwardLike>(next.awards));
     return next;
 };
 
@@ -305,6 +488,7 @@ const migratePhaseState = (state: any, defaults: Record<string, any>) => {
 
 const migrateFlags = (flags: any, player: Player) => {
     const nextFlags = flags && typeof flags === 'object' ? { ...flags } : {};
+    const previousSaveMigrationVersion = Number(nextFlags.saveMigrationVersion || 0);
     nextFlags.worldReactionState = migratePhaseState(nextFlags.worldReactionState, {
         lastProcessedWeek: 0,
         controlledStudioCount: 0,
@@ -384,6 +568,9 @@ const migrateFlags = (flags: any, player: Player) => {
     if (!nextFlags.stockTakeoverEventDismissals || typeof nextFlags.stockTakeoverEventDismissals !== 'object') nextFlags.stockTakeoverEventDismissals = {};
     const tutorialState = normalizeNewPlayerTutorialState(nextFlags.newPlayerTutorial);
     if (tutorialState) nextFlags.newPlayerTutorial = tutorialState;
+    if (previousSaveMigrationVersion > 0 && previousSaveMigrationVersion !== SAVE_MIGRATION_VERSION) {
+        nextFlags.previousSaveMigrationVersion = previousSaveMigrationVersion;
+    }
     nextFlags.saveMigrationVersion = SAVE_MIGRATION_VERSION;
     nextFlags.saveMigratedAtWeek = Math.max(1, Math.round(Number(player.currentWeek || 1)));
     return nextFlags;
@@ -411,19 +598,54 @@ const migrateInbox = (inbox: Message[] | undefined): Message[] => (
         .slice(0, 120)
 );
 
+const normalizeRelationship = (relationship: any, index: number): Relationship => {
+    const fallback = INITIAL_PLAYER.relationships.find(item => item.id === relationship?.id)
+        || INITIAL_PLAYER.relationships[index]
+        || INITIAL_PLAYER.relationships[0];
+    const next = mergeDefaults(fallback, relationship) as Relationship;
+    next.id = String(next.id || fallback.id || `rel_${index}`);
+    next.name = String(next.name || fallback.name || 'Connection');
+    next.relation = VALID_RELATIONS.has(String(next.relation))
+        ? next.relation
+        : fallback.relation;
+    next.closeness = clamp(Number(next.closeness ?? fallback.closeness));
+    next.image = typeof next.image === 'string' && next.image.trim()
+        ? next.image
+        : fallback.image;
+    next.lastInteractionWeek = Math.max(0, Math.round(Number(next.lastInteractionWeek || 0)));
+    if (next.lastInteractionAbsolute !== undefined) {
+        next.lastInteractionAbsolute = Math.max(0, Math.round(Number(next.lastInteractionAbsolute || 0)));
+    }
+    if (next.age !== undefined) {
+        next.age = Math.max(0, Math.round(Number(next.age || 0)));
+    }
+    if (next.birthWeekAbsolute !== undefined) {
+        next.birthWeekAbsolute = Math.max(0, Math.round(Number(next.birthWeekAbsolute || 0)));
+    }
+    return next;
+};
+
 export const migratePlayerSave = (input: Partial<Player> | Player): Player => {
-    const base: Player = {
-        ...clone(INITIAL_PLAYER),
-        ...(input as Player),
-    };
+    const base: Player = mergeDefaults(INITIAL_PLAYER, input);
     const stocks = migrateStocksForSave(base.stocks as Partial<Stock>[] | undefined);
+    const repairRunawayStockCash = hasRunawayStockValues(base.stocks as Partial<Stock>[] | undefined, stocks);
     const playerWithStocks: Player = {
         ...base,
+        id: String(base.id || INITIAL_PLAYER.id),
+        name: typeof base.name === 'string' && base.name.trim() ? base.name : INITIAL_PLAYER.name,
+        age: Math.max(1, Math.round(Number(base.age || INITIAL_PLAYER.age))),
+        currentWeek: Math.max(1, Math.round(Number(base.currentWeek || INITIAL_PLAYER.currentWeek))),
+        money: normalizeMigratedCash(base.money, repairRunawayStockCash),
+        world: {
+            ...base.world,
+            awardHistory: sanitizeMigratedAwardHistory(toObjectSeries<MigratedAwardHistoryEntry>(base.world?.awardHistory)) as any,
+        },
         stocks,
         portfolio: migratePortfolio(base.portfolio as Partial<PortfolioItem>[] | undefined, stocks),
         shareholderVotes: toArray<any>(base.shareholderVotes).filter(vote => stocks.some(stock => stock.id === vote?.stockId)).slice(0, 24),
         stockTakeovers: migrateTakeovers(base.stockTakeovers as Partial<StockTakeoverCase>[] | undefined, stocks, base),
         activeReleases: toObjectSeries<any>(base.activeReleases).map(migrateActiveRelease),
+        awards: sanitizeMigratedAwardRecords(toObjectSeries<MigratedAwardLike>(base.awards)) as any,
         pastProjects: dedupeByKey(
             toObjectSeries<any>(base.pastProjects).map(migratePastProject),
             project => project.id
@@ -431,6 +653,9 @@ export const migratePlayerSave = (input: Partial<Player> | Player): Player => {
         pendingEvents: dedupePendingEvents(base.pendingEvents),
         news: dedupeNews(base.news),
         inbox: migrateInbox(base.inbox),
+        relationships: toObjectSeries<any>(base.relationships).length > 0
+            ? toObjectSeries<any>(base.relationships).map(normalizeRelationship)
+            : clone(INITIAL_PLAYER.relationships),
         logs: toArray<any>(base.logs).slice(0, 50),
         assetStates: toArray<any>(base.assetStates)
             .filter((state) => typeof state?.assetId === 'string')

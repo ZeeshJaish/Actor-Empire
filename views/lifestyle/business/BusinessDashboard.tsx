@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Player, Business } from '../../../types';
-import { BUSINESS_BLUEPRINTS, checkAndRefreshHiringPool, hireCandidate, expandBusiness, restockProduct, updateProductPrice, createProduct, BUSINESS_THEMES, BUSINESS_AMENITIES, BUSINESS_PRODUCTION_TYPES, PRODUCT_CATALOG, PRODUCT_DEV_OPTIONS, injectCapital, withdrawCapital, sellBusiness, liquidateBusiness } from '../../../services/businessLogic';
+import { BUSINESS_BLUEPRINTS, checkAndRefreshHiringPool, hireCandidate, expandBusiness, restockProduct, updateProductPrice, createProduct, PRODUCT_CATALOG, PRODUCT_DEV_OPTIONS, injectCapital, withdrawCapital, sellBusiness, liquidateBusiness, calculateBusinessTrafficSnapshot } from '../../../services/businessLogic';
 import { formatMoney } from '../../../services/formatUtils';
 import { spendPlayerEnergy } from '../../../services/premiumLogic';
 import { getPlayerLanguage, t } from '../../../services/i18n';
@@ -83,47 +83,14 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ business, 
     };
 
     // --- FUNNEL METRICS CALCULATION ---
-    const locations = business.stats.locations || 1;
-    
-    // 1. Demand (Hype + Location + Config)
-    let baseDemand = 800; 
-    if (['FINE_DINING', 'LUXURY_BRAND'].includes(business.subtype)) baseDemand = 150; 
-    if (['FAST_FOOD', 'ONLINE_STORE'].includes(business.subtype)) baseDemand = 3000; 
-
-    const hypeMod = 1 + (business.stats.hype / 100); 
-    const fameMod = 1 + (player.stats.fame / 200); 
-    // const brandMod = business.stats.brandHealth / 50; // Brand Health impacts Hype Decay now, not direct demand
-    
-    let appealMod = 1.0;
-    let trafficMod = 1.0;
-    if (business.config.theme) {
-        const theme = BUSINESS_THEMES.find(t => t.id === business.config.theme);
-        if (theme) appealMod = theme.appealMod;
-    }
-    if (business.config.amenities) {
-        business.config.amenities.forEach(amenId => {
-            const amen = BUSINESS_AMENITIES.find(a => a.id === amenId);
-            if (amen && amen.trafficMod) trafficMod *= amen.trafficMod;
-        });
-    }
-    const estimatedDemand = Math.floor((baseDemand || 0) * (hypeMod || 1) * (fameMod || 1) * (locations || 1) * (appealMod || 1) * (trafficMod || 1)) || 0;
-
-    // 2. Capacity (Space / Inventory)
-    let estimatedCapacity = 0;
-    if (blueprint.model === 'SERVICE') {
-        const workers = business.staff.filter(s => s.role !== 'MANAGER');
-        if (workers.length > 0) {
-            const avgSkill = workers.reduce((acc, s) => acc + (s.skill || 0), 0) / workers.length;
-            const staffCapacity = workers.length * 20 * (1 + (avgSkill/100)); // ~20-40 per worker
-            const physicalCapacity = (business.stats.capacity || 50) * (locations || 1);
-            estimatedCapacity = Math.floor(Math.min(staffCapacity || 0, physicalCapacity || 0)) || 0;
-        } else {
-            estimatedCapacity = 0;
-        }
-    } else {
-        // Product Model: Capacity is effectively inventory
-        estimatedCapacity = business.products.reduce((acc, p) => acc + (p.inventory || 0), 0);
-    }
+    const trafficSnapshot = calculateBusinessTrafficSnapshot(business, player.stats.fame || 0);
+    const estimatedDemand = trafficSnapshot.demand;
+    const estimatedCapacity = trafficSnapshot.effectiveCapacity;
+    const serviceBottleneckNote = trafficSnapshot.bottleneck === 'STAFF'
+        ? tr('services.business.dashboard.overview.staffBottleneck')
+        : trafficSnapshot.bottleneck === 'SPACE'
+            ? tr('services.business.dashboard.overview.spaceBottleneck')
+            : tr('services.business.dashboard.overview.limitedByStaffSpace');
 
     // --- INSIGHT LOGIC ---
     let managerInsight = tr('services.business.dashboard.insight.stable');
@@ -135,6 +102,16 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ business, 
              managerInsight = tr('services.business.dashboard.insight.noStaff');
              insightColor = "text-rose-500 animate-pulse";
              insightIcon = <AlertCircle size={16}/>;
+        }
+        else if (trafficSnapshot.bottleneck === 'STAFF') {
+            managerInsight = tr('services.business.dashboard.insight.staffBottleneck');
+            insightColor = "text-amber-400";
+            insightIcon = <Users size={16}/>;
+        }
+        else if (trafficSnapshot.bottleneck === 'SPACE') {
+            managerInsight = tr('services.business.dashboard.insight.spaceBottleneck');
+            insightColor = "text-amber-400";
+            insightIcon = <Store size={16}/>;
         }
         else if (estimatedDemand > estimatedCapacity * 1.2) {
             managerInsight = tr('services.business.dashboard.insight.turningAway');
@@ -398,15 +375,35 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ business, 
                                 <div>
                                     <div className="flex justify-between text-xs mb-1">
                                         <span className="font-bold text-amber-400">{blueprint.model === 'SERVICE' ? tr('services.business.dashboard.overview.serviceCapacity') : tr('services.business.dashboard.overview.inventory')}</span>
-                                        <span className="text-zinc-400">{estimatedCapacity.toLocaleString()} {blueprint.model === 'SERVICE' ? tr('services.business.dashboard.overview.seats') : tr('services.business.dashboard.overview.units')}</span>
+                                        <span className="text-zinc-400">
+                                            {blueprint.model === 'SERVICE'
+                                                ? tr('services.business.dashboard.overview.perWeek', { amount: estimatedCapacity.toLocaleString() })
+                                                : `${estimatedCapacity.toLocaleString()} ${tr('services.business.dashboard.overview.units')}`}
+                                        </span>
                                     </div>
                                     <div className="h-3 bg-zinc-800 rounded-full overflow-hidden">
                                         <div className="h-full bg-amber-500" style={{ width: `${Math.min(100, (estimatedCapacity / Math.max(estimatedDemand, 1)) * 100)}%` }}></div>
                                     </div>
                                     <div className="text-[9px] text-zinc-600 mt-1">
-                                        {blueprint.model === 'SERVICE' ? tr('services.business.dashboard.overview.limitedByStaffSpace') : tr('services.business.dashboard.overview.limitedByStock')} 
-                                        {estimatedCapacity < estimatedDemand ? ` ${tr('services.business.dashboard.overview.bottleneck')}` : ''}
+                                        {blueprint.model === 'SERVICE' ? serviceBottleneckNote : tr('services.business.dashboard.overview.limitedByStock')} 
+                                        {trafficSnapshot.bottleneck !== 'NONE' ? ` ${tr('services.business.dashboard.overview.bottleneck')}` : ''}
                                     </div>
+                                    {blueprint.model === 'SERVICE' && (
+                                        <div className="grid grid-cols-3 gap-2 mt-3">
+                                            <div className="bg-black/30 border border-white/5 rounded-xl p-2 min-w-0">
+                                                <div className="text-[8px] uppercase tracking-widest text-zinc-600 font-bold truncate">{tr('services.business.dashboard.overview.staffCoverage')}</div>
+                                                <div className="text-xs font-black text-emerald-300">{Math.round(Math.min(1, trafficSnapshot.staffCoverage) * 100)}%</div>
+                                            </div>
+                                            <div className="bg-black/30 border border-white/5 rounded-xl p-2 min-w-0">
+                                                <div className="text-[8px] uppercase tracking-widest text-zinc-600 font-bold truncate">{tr('services.business.dashboard.overview.weeklySpace')}</div>
+                                                <div className="text-xs font-black text-sky-300 truncate">{trafficSnapshot.physicalWeeklyCapacity.toLocaleString()}</div>
+                                            </div>
+                                            <div className="bg-black/30 border border-white/5 rounded-xl p-2 min-w-0">
+                                                <div className="text-[8px] uppercase tracking-widest text-zinc-600 font-bold truncate">{tr('services.business.dashboard.overview.turnAway')}</div>
+                                                <div className="text-xs font-black text-amber-300 truncate">{trafficSnapshot.turnedAway.toLocaleString()}</div>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -439,7 +436,8 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ business, 
                                 <div className="flex items-center justify-between mb-4 bg-black/40 p-3 rounded-xl border border-zinc-800">
                                     <div>
                                         <div className="text-white font-bold">{tr('services.business.dashboard.ops.locations', { count: business.stats.locations })}</div>
-                                        <div className="text-[10px] text-zinc-500">{tr('services.business.dashboard.ops.physicalCap', { capacity: (business.stats.capacity || 50) * business.stats.locations })}</div>
+                                        <div className="text-[10px] text-zinc-500">{tr('services.business.dashboard.ops.physicalCap', { capacity: trafficSnapshot.physicalSeats.toLocaleString() })}</div>
+                                        <div className="text-[10px] text-zinc-500">{tr('services.business.dashboard.ops.weeklyThroughput', { capacity: trafficSnapshot.physicalWeeklyCapacity.toLocaleString() })}</div>
                                     </div>
                                     <button onClick={handleExpand} className="bg-amber-600 hover:bg-amber-500 text-black text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1"><Plus size={12}/> {tr('services.business.dashboard.ops.expand')}</button>
                                 </div>
@@ -455,6 +453,16 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ business, 
                                         <Users size={14}/> {tr('services.business.dashboard.ops.staffing')}
                                     </div>
                                     <button onClick={handleRecruit} className="bg-zinc-800 text-white text-[10px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1 hover:bg-zinc-700"><UserPlus size={12}/> {tr('services.business.dashboard.ops.recruit')}</button>
+                                </div>
+                                <div className="mb-3 bg-black/30 border border-white/5 rounded-xl p-3">
+                                    <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-widest mb-2">
+                                        <span className="text-zinc-500">{tr('services.business.dashboard.ops.staffCoverage')}</span>
+                                        <span className="text-emerald-300">{Math.round(Math.min(1, trafficSnapshot.staffCoverage) * 100)}%</span>
+                                    </div>
+                                    <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
+                                        <div className="h-full bg-emerald-400" style={{ width: `${Math.round(Math.min(1, trafficSnapshot.staffCoverage) * 100)}%` }} />
+                                    </div>
+                                    <div className="text-[9px] text-zinc-600 mt-2">{tr('services.business.dashboard.ops.staffThroughput', { capacity: trafficSnapshot.staffWeeklyCapacity.toLocaleString() })}</div>
                                 </div>
                                 
                                 <div className="space-y-2">

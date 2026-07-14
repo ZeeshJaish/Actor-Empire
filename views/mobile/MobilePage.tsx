@@ -160,6 +160,25 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
       return false;
   };
 
+  const normalizeSponsorshipForActivation = (offer: SponsorshipOffer): SponsorshipOffer => {
+      const req = (offer.requirements || {}) as SponsorshipOffer['requirements'];
+      return {
+          ...offer,
+          id: offer.id || `spon_${Date.now()}`,
+          durationWeeks: Math.max(1, Number(offer.durationWeeks || 1)),
+          weeklyPay: Math.max(0, Number(offer.weeklyPay || 0)),
+          penalty: Math.max(0, Number(offer.penalty || 0)),
+          weeksCompleted: Math.max(0, Number((offer as any).weeksCompleted || 0)),
+          requirements: {
+              ...req,
+              type: req.type || 'POST',
+              energyCost: Math.max(0, Number(req.energyCost || 0)),
+              totalRequired: Math.max(1, Number(req.totalRequired || 1)),
+              progress: Math.max(0, Number(req.progress || 0)),
+          },
+      };
+  };
+
   const handleMarkMessageRead = (id: string) => {
       const updatedInbox = props.player!.inbox.map(message =>
           message.id === id ? { ...message, isRead: true } : message
@@ -169,6 +188,11 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
 
   // --- HANDLER: Accept Offers (Modified for Multi-Film) ---
   const handleAcceptMessage = (msg: Message) => {
+      if (msg.isExpired) {
+          showToast('This offer already expired.', 'bg-slate-600');
+          return;
+      }
+
       if (msg.type === 'OFFER_OUTSIDE_PRODUCER_INVESTMENT' && props.onAcceptMessage) {
           props.onAcceptMessage(msg);
           return;
@@ -426,7 +450,7 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
           if (!hasEnergyFor(collaborationSigningEnergyCost, 'sign this brand deal')) return;
           // Add to active sponsorships
           spendPlayerEnergy(updatedPlayer, collaborationSigningEnergyCost, `Brand signing: ${offer.brandName}`);
-          updatedPlayer.activeSponsorships = [...updatedPlayer.activeSponsorships, { ...offer, weeksCompleted: 0 }];
+          updatedPlayer.activeSponsorships = [...updatedPlayer.activeSponsorships, normalizeSponsorshipForActivation(offer)];
           updatedPlayer.logs.push({ week: updatedPlayer.currentWeek, year: updatedPlayer.age, message: `Signed sponsorship deal with ${offer.brandName}.`, type: 'positive' });
       } else if (msg.type === 'OFFER_YOUTUBE_COLLAB') {
           const offer = msg.data as YoutubeCollabOffer;
@@ -535,9 +559,13 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
 
       // Update Logic - Increment PROGRESS, not just period count
       const updatedSpon = { ...spon };
+      const nextProgress = Math.min(
+          Math.max(1, Number(spon.requirements.totalRequired || 1)),
+          (spon.requirements.progress || 0) + 1
+      );
       updatedSpon.requirements = {
           ...spon.requirements,
-          progress: (spon.requirements.progress || 0) + 1
+          progress: nextProgress
       };
 
       const updatedSponsorships = [...props.player!.activeSponsorships];
@@ -545,7 +573,15 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
 
       const updatedPlayer = {
           ...props.player!,
-          activeSponsorships: updatedSponsorships
+          activeSponsorships: updatedSponsorships,
+          logs: nextProgress >= Math.max(1, Number(spon.requirements.totalRequired || 1))
+              ? [{
+                  week: props.player!.currentWeek,
+                  year: props.player!.age,
+                  message: `✅ Completed all deliverables for ${spon.brandName}. Contract will close cleanly next week.`,
+                  type: 'positive' as const,
+              }, ...(props.player!.logs || [])].slice(0, 80)
+              : props.player!.logs
       };
       spendPlayerEnergy(updatedPlayer, spon.requirements.energyCost, `Sponsorship: ${spon.brandName}`);
 
@@ -831,10 +867,12 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
                         onFireAgent={props.onFireAgent!} 
                         onHireManager={handleHireManager} 
                         onFireManager={props.onFireManager!} 
-                        onPerformSponsorship={handlePerformSponsorship} // New Handler
-                        onUpdatePlayer={handleUpdatePlayer}
-                        onShowToast={showToast}
-                    />
+	                        onPerformSponsorship={handlePerformSponsorship} // New Handler
+	                        onUpdatePlayer={handleUpdatePlayer}
+	                        onShowToast={showToast}
+	                        onOpenMessages={() => setAppMode('MESSAGES')}
+	                        onOpenCastLink={() => setAppMode('CASTLINK')}
+	                    />
                 )}
                 {appMode === 'NEWS' && (
                     <NewsApp player={props.player} onBack={() => setAppMode('HOME')} />

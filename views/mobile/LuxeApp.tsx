@@ -194,7 +194,7 @@ export const LuxeApp: React.FC<LuxeAppProps> = ({ player, onBack, onUpdatePlayer
     const [inviteMode, setInviteMode] = useState<InviteMode>('PRIVATE');
     const [chatActionMode, setChatActionMode] = useState<ChatActionMode>('CHAT');
     const [feedback, setFeedback] = useState<{ message: string; tone: 'success' | 'error' | 'neutral' } | null>(null);
-    const [resultModal, setResultModal] = useState<{ title: string; body: string; tone: 'success' | 'error' | 'neutral'; meta?: string } | null>(null);
+    const [resultModal, setResultModal] = useState<{ title: string; body: string; tone: 'success' | 'error' | 'neutral'; meta?: string; primaryAction?: 'MAKE_OFFICIAL' } | null>(null);
     const [liveChatHistory, setLiveChatHistory] = useState<DatingMatch['chatHistory']>([]);
     const [showProfileDetails, setShowProfileDetails] = useState(false);
     const [isAwaitingReply, setIsAwaitingReply] = useState(false);
@@ -214,6 +214,7 @@ export const LuxeApp: React.FC<LuxeAppProps> = ({ player, onBack, onUpdatePlayer
     const selectedCandidate = candidates.find(candidate => candidate.id === selectedCandidateId) || candidates[0] || null;
     const activeChatMatch = myMatches.find(match => match.id === activeChatMatchId) || null;
     const canAskToDate = !!activeChatMatch && activeChatMatch.officialStatus !== 'GHOSTED' && activeChatMatch.officialStatus !== 'DATING' && ((activeChatMatch.dateCount || 0) >= 1 || activeChatMatch.hasGoneOnDate || activeChatMatch.inviteHistory?.some(entry => entry.outcome === 'SUCCESS'));
+    const isReadyToMakeOfficial = !!activeChatMatch && activeChatMatch.officialStatus !== 'DATING' && activeChatMatch.officialStatus !== 'GHOSTED' && canAskToDate;
     const canBeIntimate = !!activeChatMatch && activeChatMatch.officialStatus !== 'GHOSTED' && (((activeChatMatch.dateCount || 0) >= 1) || activeChatMatch.officialStatus === 'SEEING');
     const nextFreeRefreshInWeeks = Math.max(0, cycleStartAbsoluteWeek + LUXE_REFRESH_CYCLE_WEEKS - currentAbsoluteWeek);
     const getLuxeResponseBank = (tone: 'warm' | 'cool') => (
@@ -316,8 +317,8 @@ export const LuxeApp: React.FC<LuxeAppProps> = ({ player, onBack, onUpdatePlayer
         setTimeout(() => setFeedback(null), 2800);
     };
 
-    const showResultModal = (title: string, body: string, tone: 'success' | 'error' | 'neutral', meta?: string) => {
-        setResultModal({ title, body, tone, meta });
+    const showResultModal = (title: string, body: string, tone: 'success' | 'error' | 'neutral', meta?: string, primaryAction?: 'MAKE_OFFICIAL') => {
+        setResultModal({ title, body, tone, meta, primaryAction });
     };
 
     const handleApply = () => {
@@ -634,9 +635,10 @@ export const LuxeApp: React.FC<LuxeAppProps> = ({ player, onBack, onUpdatePlayer
         pushFeedback(outcome.headline, 'success');
         showResultModal(
             'Date Locked In',
-            `${activeChatMatch.name.split(' ')[0]} said yes to ${inviteMode === 'PRIVATE' ? 'a private' : 'a public'} ${option.label.toLowerCase()}. You are closer now, but still not official until you define the relationship.`,
+            `${activeChatMatch.name.split(' ')[0]} said yes to ${inviteMode === 'PRIVATE' ? 'a private' : 'a public'} ${option.label.toLowerCase()}. You are seeing each other now. Use Make Official when you want them in Connections as your partner.`,
             'success',
-            `${option.label} • chemistry +${Math.max(0, outcome.chemistryGain)}`
+            `${option.label} • chemistry +${Math.max(0, outcome.chemistryGain)}`,
+            'MAKE_OFFICIAL'
         );
     };
 
@@ -1082,12 +1084,32 @@ export const LuxeApp: React.FC<LuxeAppProps> = ({ player, onBack, onUpdatePlayer
                                 {resultModal.meta}
                             </div>
                         )}
-                        <button
-                            onClick={() => setResultModal(null)}
-                            className="mt-5 w-full rounded-full bg-[linear-gradient(135deg,#f8d05e,#f59e0b)] px-4 py-3 text-sm font-bold font-sans text-black"
-                        >
-                            Continue
-                        </button>
+                        {resultModal.primaryAction === 'MAKE_OFFICIAL' ? (
+                            <div className="mt-5 grid grid-cols-2 gap-3">
+                                <button
+                                    onClick={() => setResultModal(null)}
+                                    className="rounded-full border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-bold font-sans text-zinc-200"
+                                >
+                                    Later
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setResultModal(null);
+                                        setChatActionMode('ASK');
+                                    }}
+                                    className="rounded-full bg-[linear-gradient(135deg,#34d399,#f8d05e)] px-4 py-3 text-sm font-bold font-sans text-black"
+                                >
+                                    Make Official
+                                </button>
+                            </div>
+                        ) : (
+                            <button
+                                onClick={() => setResultModal(null)}
+                                className="mt-5 w-full rounded-full bg-[linear-gradient(135deg,#f8d05e,#f59e0b)] px-4 py-3 text-sm font-bold font-sans text-black"
+                            >
+                                Continue
+                            </button>
+                        )}
                     </div>
                 </div>
             )}
@@ -1357,8 +1379,8 @@ export const LuxeApp: React.FC<LuxeAppProps> = ({ player, onBack, onUpdatePlayer
             )}
 
             {view === 'CHAT' && activeChatMatch && (
-                <div className="flex-1 min-h-0 flex flex-col bg-[radial-gradient(circle_at_top,_rgba(245,158,11,0.12),_transparent_24%),linear-gradient(to_bottom,#09090b,#000000)] overflow-hidden">
-                    <div className="relative shrink-0 border-b border-white/5 bg-black/78 px-4 pb-4 pt-4 backdrop-blur-xl safe-area-pt">
+                <div className="relative flex-1 min-h-0 flex flex-col bg-[radial-gradient(circle_at_top,_rgba(245,158,11,0.12),_transparent_24%),linear-gradient(to_bottom,#09090b,#000000)] overflow-y-auto overscroll-contain custom-scrollbar">
+                    <div className="sticky top-0 z-20 shrink-0 border-b border-white/5 bg-black/78 px-4 pb-4 pt-4 backdrop-blur-xl safe-area-pt">
                         <div className="absolute inset-0 bg-gradient-to-b from-amber-500/10 to-transparent pointer-events-none" />
                         <div className="relative z-10 flex items-center gap-3">
                             <img
@@ -1409,7 +1431,7 @@ export const LuxeApp: React.FC<LuxeAppProps> = ({ player, onBack, onUpdatePlayer
                         </div>
                     )}
 
-                    <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-4 pt-4 custom-scrollbar">
+                    <div className="min-h-[260px] shrink-0 px-4 pb-4 pt-4">
                         <div className="mb-4 text-center text-[11px] font-sans uppercase tracking-[0.16em] text-zinc-500">
                             You matched with {activeChatMatch.name.split(' ')[0]}
                         </div>
@@ -1479,7 +1501,7 @@ export const LuxeApp: React.FC<LuxeAppProps> = ({ player, onBack, onUpdatePlayer
                         </div>
                     </div>
 
-                    <div className="shrink-0 border-t border-white/5 bg-black/72 px-4 pb-5 pt-3 backdrop-blur-2xl safe-area-pb">
+                    <div className="sticky bottom-0 z-20 shrink-0 border-t border-white/5 bg-black/80 px-4 pb-[max(2rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur-2xl">
                         <div className="rounded-[24px] border border-white/7 bg-[linear-gradient(180deg,rgba(18,18,24,0.95),rgba(8,8,12,0.98))] p-3 shadow-[0_-10px_50px_rgba(0,0,0,0.22)] space-y-3">
                             <div className="flex gap-2 overflow-x-auto no-scrollbar">
                                 <button
@@ -1498,7 +1520,7 @@ export const LuxeApp: React.FC<LuxeAppProps> = ({ player, onBack, onUpdatePlayer
                                     onClick={() => setChatActionMode('ASK')}
                                     className={`shrink-0 rounded-full px-4 py-2 text-sm font-sans font-bold ${chatActionMode === 'ASK' ? 'bg-amber-200 text-black' : 'border border-white/10 bg-white/[0.03] text-zinc-300'}`}
                                 >
-                                    Ask Out
+                                    {isReadyToMakeOfficial ? 'Official' : 'Ask Out'}
                                 </button>
                                 <button
                                     onClick={() => setChatActionMode('INTIMACY')}
@@ -1552,12 +1574,21 @@ export const LuxeApp: React.FC<LuxeAppProps> = ({ player, onBack, onUpdatePlayer
 
                             {chatActionMode === 'ASK' && (
                                 <>
+                                    {isReadyToMakeOfficial && (
+                                        <div className="rounded-[20px] border border-emerald-500/20 bg-emerald-500/8 p-4">
+                                            <div className="text-[10px] font-sans uppercase tracking-[0.18em] text-emerald-200/75">Seeing</div>
+                                            <div className="mt-1 text-sm font-bold text-white">Ready to make this official</div>
+                                            <p className="mt-2 text-xs leading-relaxed text-zinc-400">
+                                                If they say yes, this Luxe match becomes your partner in Connections.
+                                            </p>
+                                        </div>
+                                    )}
                                     <div className="flex items-start justify-between gap-3">
                                         <div className="min-w-0">
-                                            <div className="text-[10px] font-sans uppercase tracking-[0.18em] text-zinc-500">Date Style</div>
-                                            <div className="mt-1 text-sm font-bold text-white">{labelInviteModeTitle(inviteMode)}</div>
+                                            <div className="text-[10px] font-sans uppercase tracking-[0.18em] text-zinc-500">{isReadyToMakeOfficial ? 'Next Move' : 'Date Style'}</div>
+                                            <div className="mt-1 text-sm font-bold text-white">{isReadyToMakeOfficial ? 'Define the relationship' : labelInviteModeTitle(inviteMode)}</div>
                                             <p className="mt-1 text-xs leading-relaxed text-zinc-400">
-                                                {labelInviteModeDescription(inviteMode)}
+                                                {isReadyToMakeOfficial ? 'You can still plan more Luxe dates, or ask them to become your official partner.' : labelInviteModeDescription(inviteMode)}
                                             </p>
                                         </div>
                                     </div>
@@ -1619,7 +1650,7 @@ export const LuxeApp: React.FC<LuxeAppProps> = ({ player, onBack, onUpdatePlayer
                                     >
                                         <div className="flex items-center justify-between gap-3">
                                             <div>
-                                                <div className="text-sm font-bold text-white">Ask to Date</div>
+                                                <div className="text-sm font-bold text-white">Make Official</div>
                                                 <div className="mt-1 text-xs leading-relaxed text-zinc-400">
                                                     {canAskToDate
                                                         ? 'Make it official. If they accept, they become your partner and move into Connections.'

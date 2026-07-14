@@ -61,12 +61,16 @@ const developmentLab = read('views/lifestyle/business/DevelopmentLab.tsx');
 const greenlight = read('views/lifestyle/business/GreenlightWizard.tsx');
 const homePage = read('views/HomePage.tsx');
 
-assert.match(developmentLab, /Legacy Archive/, 'universe manager should expose a legacy archive');
-assert.match(developmentLab, /Retire Universe/, 'active universe dashboard should offer retirement');
-assert.match(developmentLab, /Launch Reboot/, 'retired universe dashboard should offer a reboot');
-assert.match(developmentLab, /Archive Locked/, 'retired universes should block new merchandise ventures');
-assert.match(greenlight, /universe\.status !== 'RETIRED'/, 'Greenlight should exclude archived universes');
+assert.match(developmentLab, /universeManager\.legacyArchive/, 'universe manager should expose a legacy archive');
+assert.match(developmentLab, /universeDashboard\.action\.retireUniverse/, 'active universe dashboard should offer retirement');
+assert.match(developmentLab, /universeDashboard\.action\.launchReboot/, 'retired universe dashboard should offer a reboot');
+assert.match(developmentLab, /universeDashboard\.action\.archiveLocked/, 'retired universes should block new merchandise ventures');
+assert.match(greenlight, /getUniverseCharacterSelectionOptions/, 'Greenlight should use the shared universe character selection guard');
+assert.match(greenlight, /showLegacyCharacterArchive/, 'Greenlight should expose retired characters only through an explicit legacy archive opt-in');
+assert.match(greenlight, /isUniverseRetired\(normalizedWorldUniverses/, 'Greenlight should avoid attaching new projects to archived universes');
 assert.match(homePage, /Lifecycle Archive Kit/, 'cheat menu should expose a universe lifecycle QA shortcut');
+assert.match(homePage, /triggerLegacyCharacterPickerQa/, 'cheat menu should expose a focused legacy character picker QA shortcut');
+assert.match(homePage, /Legacy Character Picker QA/, 'cheat menu should label the focused legacy character picker QA shortcut');
 assert.match(homePage, /triggerUniverseLifecycleQa/, 'cheat menu should seed universe lifecycle states');
 
 console.log('Universe lifecycle audit passed.');

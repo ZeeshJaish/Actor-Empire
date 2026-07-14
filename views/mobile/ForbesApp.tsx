@@ -31,8 +31,10 @@ import {
     walkAwayFromAcquisition,
 } from '../../services/studioAcquisition';
 import { setSubsidiaryOperatingModel } from '../../services/studioGroup';
+import { getMergedStudioIds } from '../../services/stockLogic';
 import { spendPlayerEnergy } from '../../services/premiumLogic';
 import { PHASE_ONE_ENERGY_COSTS } from '../../services/energyCosts';
+import { getInheritedStudioProjects } from '../../services/legacyLogic';
 
 interface ForbesAppProps {
   player: Player;
@@ -129,8 +131,10 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePl
   const playerRank = playerRankIndex + 1;
 
   // STUDIOS
+  const mergedStudioIds = getMergedStudioIds(player);
   const playerOwnedStudios = (player.businesses || [])
     .filter((business): business is Business => business.type === 'PRODUCTION_HOUSE')
+    .filter(business => business.studioState?.operatingModel !== 'FULL_MERGER')
     .map(business => {
         const dollarValuation = Math.max(business.stats?.valuation || 0, business.balance || 0);
         return {
@@ -149,7 +153,8 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePl
     });
 
   const studioRanking = [
-      ...(player.world.studios ? (Object.values(player.world.studios) as any[]) : (Object.values(STUDIO_CATALOG) as any[])),
+      ...(player.world.studios ? (Object.values(player.world.studios) as any[]) : (Object.values(STUDIO_CATALOG) as any[]))
+          .filter(studio => !mergedStudioIds.has(studio.id)),
       ...playerOwnedStudios
   ].filter((studio, idx, arr) => arr.findIndex(entry => entry.id === studio.id) === idx)
     .sort((a, b) => b.valuation - a.valuation);
@@ -158,14 +163,18 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePl
       const playerBusiness = playerOwnedStudios.some(entry => entry.id === studio.id)
           ? (player.businesses || []).find(business => business.id === studio.id && business.type === 'PRODUCTION_HOUSE')
           : undefined;
-      const playerStudioReleases = playerBusiness ? player.pastProjects.filter(project => project.studioId === studio.id) : [];
+      const inheritedStudioReleases = playerBusiness ? getInheritedStudioProjects(player, studio.id) : [];
+      const playerStudioReleases = playerBusiness ? [
+          ...player.pastProjects.filter(project => project.studioId === studio.id),
+          ...inheritedStudioReleases
+      ] : [];
       const playerActiveStudioReleases = playerBusiness ? player.activeReleases.filter(release => release.projectDetails?.studioId === studio.id) : [];
       const acquiredRights = playerBusiness?.studioState?.ownedRights || [];
       const originalRights = playerBusiness ? deriveStudioOriginalRights({
           studioId: studio.id,
           scripts: playerBusiness.studioState?.scripts || [],
           activeReleases: player.activeReleases,
-          pastProjects: player.pastProjects,
+          pastProjects: [...player.pastProjects, ...inheritedStudioReleases],
           acquiredRights,
           purchasedIPTitles: playerBusiness.studioState?.purchasedIPTitles || [],
       }) : [];
@@ -411,11 +420,12 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePl
 	                        player,
 	                        profile: selectedStudioProfile,
 	                    });
-	                    if (result.success) {
-	                        const resultAfterEnergy = spendEnergyFromResult(result, acquisitionSigningEnergyCost);
-	                        setSelectedStudioProfile(current => current ? {
-	                            ...current,
-	                            isPlayerOwned: true,
+		                    if (result.success) {
+		                        const resultAfterEnergy = spendEnergyFromResult(result, acquisitionSigningEnergyCost);
+		                        onUpdatePlayer(resultAfterEnergy.player);
+		                        setSelectedStudioProfile(current => current ? {
+		                            ...current,
+		                            isPlayerOwned: true,
 	                            acquisitionState: 'NOT_FOR_SALE',
 	                            capital: resultAfterEnergy.acquiredBusiness?.balance ?? current.capital,
 	                            ownershipStructure: 'Privately held · Player controlled',
@@ -430,12 +440,13 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePl
 	                    const result = completeStockControlAcquisition({
 	                        player,
 	                        profile: selectedStudioProfile,
-	                    });
-	                    if (result.success) {
-	                        const resultAfterEnergy = spendEnergyFromResult(result, stockControlEnergyCost);
-	                        setSelectedStudioProfile(current => current ? {
-	                            ...current,
-	                            isPlayerOwned: true,
+		                    });
+		                    if (result.success) {
+		                        const resultAfterEnergy = spendEnergyFromResult(result, stockControlEnergyCost);
+		                        onUpdatePlayer(resultAfterEnergy.player);
+		                        setSelectedStudioProfile(current => current ? {
+		                            ...current,
+		                            isPlayerOwned: true,
 	                            acquisitionState: 'NOT_FOR_SALE',
 	                            capital: resultAfterEnergy.acquiredBusiness?.balance ?? current.capital,
 	                            ownershipStructure: 'Public-market control · Player controlled',

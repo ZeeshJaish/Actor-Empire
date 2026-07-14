@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { getWriterTalent } from '../../../services/roleLogic';
 import { generateWriters, generateIPMarket, generateProceduralLogline } from '../../../src/data/generators';
 import { SCRIPT_TEMPLATES, ScriptQuestion } from '../../../src/data/scriptTemplates';
-import { normalizeStudioState } from '../../../services/businessLogic';
+import { normalizeStudioState, resolveProjectType } from '../../../services/businessLogic';
 import { buildUniverseRoster, calculateUniverseProductWeeklyRevenue, getUniverseDashboardProjects, getUniverseLifecycleRevenueMultiplier, getUniverseReleaseActivity, isUniverseRetired, normalizeUniverseForSave, normalizeUniverseMap, rebootRetiredUniverse, retireUniverseForArchive } from '../../../services/universeLogic';
 import { ALL_GENRES, PROJECT_FORMATS, formatGenreLabel, formatProjectFormatLabel, isSubjectDrivenGenre } from '../../../services/genreCatalog';
 import { createMarketTrends, getGenreMarketTrend, getScriptMarketDemand } from '../../../services/marketTrends';
@@ -22,6 +22,7 @@ import { OwnedIpDossier } from './components/OwnedIpDossier';
 import { getOwnedIpPerformance } from '../../../services/ownedIpPerformance';
 import { deriveStudioOriginalRights } from '../../../services/studioOriginalIp';
 import { getPlayerLanguage, t } from '../../../services/i18n';
+import { getInheritedStudioProjects } from '../../../services/legacyLogic';
 
 interface DevelopmentLabProps {
     player: Player;
@@ -944,8 +945,8 @@ const ScriptVault: React.FC<{
                         <div className="min-w-0 pr-3">
                             <h3 className="min-w-0 break-words font-bold text-lg leading-tight">{script.title}</h3>
                             <div className="flex flex-wrap items-center gap-2 mt-2">
-                                <span className={`text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider ${script.projectType === 'SERIES' ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30' : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'}`}>
-                                    {script.projectType} {script.projectType === 'SERIES' && `(${script.episodes} eps)`}
+	                                <span className={`text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider ${resolveProjectType(script.projectType, (script as any).type, (script as any).projectDetails?.type) === 'SERIES' ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30' : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'}`}>
+	                                    {resolveProjectType(script.projectType, (script as any).type, (script as any).projectDetails?.type)} {resolveProjectType(script.projectType, (script as any).type, (script as any).projectDetails?.type) === 'SERIES' && `(${script.episodes || 8} eps)`}
                                 </span>
                                 {script.genres.map(g => (
                                     <span key={g} className="text-[9px] bg-zinc-800 text-zinc-300 px-1.5 py-0.5 rounded uppercase tracking-wider">{formatGenreLabel(g)}</span>
@@ -1489,7 +1490,7 @@ const ScriptWizard: React.FC<{ onComplete: (script: Script) => void, language: R
     const [step, setStep] = useState<ScriptBuilderStep>(initialScript ? 'STORY' : 'IDEA');
     const [storyIndex, setStoryIndex] = useState(0);
     const [title, setTitle] = useState(initialScript?.title || '');
-    const [projectType, setProjectType] = useState<ProjectType>(initialScript?.projectType || initialProjectType || 'MOVIE');
+    const [projectType, setProjectType] = useState<ProjectType>(resolveProjectType(initialScript?.projectType, (initialScript as any)?.type, (initialScript as any)?.projectDetails?.type, initialProjectType));
     const [format, setFormat] = useState<ProjectFormat>(initialScript?.format || 'LIVE_ACTION');
     const [targetAudience, setTargetAudience] = useState<TargetAudience>(initialScript?.targetAudience || 'PG-13');
     const [episodes, setEpisodes] = useState(initialScript?.episodes || 8);
@@ -2156,7 +2157,7 @@ const SourceMaterialMarket: React.FC<{
     const filteredMarket = (market || []).filter(s => {
         if (filter === 'ALL') return true;
         if (filter === 'TRENDING') return getScriptMarketDemand(s, currentWeek, marketTrends) >= 1.08;
-        return s.projectType === filter;
+        return resolveProjectType(s.projectType, (s as any).type, (s as any).projectDetails?.type) === filter;
     });
 
     return (
@@ -2588,6 +2589,24 @@ const FranchiseManager: React.FC<{
     };
 
     // Identify studio projects
+    const inheritedStudioProjects = getInheritedStudioProjects(player, studio.id).map((p: any) => ({
+        id: p.id,
+        name: p.name || p.title,
+        franchiseId: p.franchiseId,
+        universeId: p.universeId,
+        year: p.year || p.releaseYear,
+        gross: p.gross || p.totalGross || 0,
+        rating: p.rating || p.imdbRating || 0,
+        type: resolveProjectType(p.projectType, p.type, p.projectDetails?.type),
+        subtype: p.subtype,
+        genre: p.genre,
+        installmentNumber: p.installmentNumber || 1,
+        castList: p.castList || [],
+        releaseWeek: p.releaseWeek,
+        releaseYear: p.releaseYear,
+        releasedAtAbsoluteWeek: p.releasedAtAbsoluteWeek,
+        phase: 'RELEASED'
+    }));
     const studioProjects = [
         ...player.pastProjects.filter(p => p.studioId === studio.id).map(p => ({ 
             id: p.id, 
@@ -2597,7 +2616,7 @@ const FranchiseManager: React.FC<{
             year: p.year, 
             gross: p.gross || 0, 
             rating: p.imdbRating || 0,
-            type: p.projectType || 'MOVIE',
+            type: resolveProjectType(p.projectType, (p as any).type, (p as any).projectDetails?.type),
             subtype: p.subtype,
             genre: p.genre,
             installmentNumber: p.installmentNumber || 1,
@@ -2615,7 +2634,7 @@ const FranchiseManager: React.FC<{
             year: r.releaseYear || player.age,
             gross: r.totalGross || 0, 
             rating: r.imdbRating || 0,
-            type: r.type,
+            type: resolveProjectType(r.type, r.projectDetails?.type),
             subtype: r.projectDetails.subtype,
             genre: r.projectDetails.genre,
             installmentNumber: r.projectDetails.installmentNumber || 1,
@@ -2625,7 +2644,8 @@ const FranchiseManager: React.FC<{
             releasedAtAbsoluteWeek: r.releasedAtAbsoluteWeek,
             weekNum: r.weekNum,
             phase: r.distributionPhase === 'STREAMING' ? 'STREAMING' : 'IN THEATERS'
-        }))
+        })),
+        ...inheritedStudioProjects
     ];
 
     // Identify which IDs are actually franchises (have sequels or are part of one)

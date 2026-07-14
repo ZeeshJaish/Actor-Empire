@@ -3909,7 +3909,7 @@ const phase5StudioAcquisitionDeskShellHardcodedMarkers = [
   'Deal Summary',
   'Signature pressure',
   'Control Transfer',
-  'Hold To Sign',
+  'Tap To Sign Transfer',
 ].filter((marker) => studioAcquisitionDeskSource.includes(marker));
 
 if (phase5StudioAcquisitionDeskShellHardcodedMarkers.length > 0) {

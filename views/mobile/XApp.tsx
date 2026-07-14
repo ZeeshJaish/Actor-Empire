@@ -1,7 +1,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { Player, XPost, NPCActor, NPCState } from '../../types';
-import { generateXFeed, generateTrendingTopics } from '../../services/xLogic';
+import { generateXFeed, generateTrendingTopics, isIndustryInfoPost } from '../../services/xLogic';
 import { NPC_DATABASE } from '../../services/npcLogic';
 import { getEnabledGlobalCreatorSocialProfiles } from '../../services/youtubeLogic';
 import { spendPlayerEnergy } from '../../services/premiumLogic';
@@ -15,7 +15,7 @@ interface XAppProps {
 }
 
 type XTab = 'HOME' | 'SEARCH' | 'NOTIFICATIONS' | 'PROFILE';
-type FeedTab = 'FOR_YOU' | 'FOLLOWING';
+type FeedTab = 'FOR_YOU' | 'INDUSTRY' | 'FOLLOWING';
 type XView = 'MAIN' | 'POST_DETAIL';
 type XPostType = NonNullable<XPost['postType']>;
 type XReplyTone = 'SUPPORT' | 'JOKE' | 'CLAP_BACK' | 'CLARIFY' | 'APOLOGIZE';
@@ -414,9 +414,12 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
         return num.toString();
     };
 
-    const filteredFeed = feedTab === 'FOR_YOU' 
-        ? feed 
+    const filteredFeed = feedTab === 'FOR_YOU'
+        ? feed
+        : feedTab === 'INDUSTRY'
+        ? feed.filter(isIndustryInfoPost)
         : feed.filter(p => {
+            if (isIndustryInfoPost(p)) return true;
             if (p.isPlayer) return true;
             return npcStates[p.authorId]?.isFollowing;
         });
@@ -433,18 +436,24 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
     const TweetCard: React.FC<{ post: XPost }> = ({ post }) => {
         // FIX: Use player avatar directly if it's the player's post
         const avatarSrc = post.isPlayer ? player.avatar : post.authorAvatar;
+        const isIndustryPost = isIndustryInfoPost(post);
 
         return (
             <div onClick={() => openPostDetail(post)} className="p-4 flex gap-3 border-b border-zinc-800 hover:bg-white/5 transition-colors cursor-pointer">
-                <div className="shrink-0" onClick={(e) => { e.stopPropagation(); handleProfileClick(post.authorId); }}>
+                <div className="shrink-0" onClick={(e) => { e.stopPropagation(); if (!isIndustryPost) handleProfileClick(post.authorId); }}>
                     <img src={avatarSrc} className="w-10 h-10 rounded-full object-cover bg-zinc-800 border border-zinc-800" />
                 </div>
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1 mb-0.5">
-                        <span className="font-bold text-white truncate max-w-[140px] hover:underline" onClick={(e) => { e.stopPropagation(); handleProfileClick(post.authorId); }}>{post.authorName}</span>
+                        <span className={`font-bold text-white truncate max-w-[140px] ${isIndustryPost ? '' : 'hover:underline'}`} onClick={(e) => { e.stopPropagation(); if (!isIndustryPost) handleProfileClick(post.authorId); }}>{post.authorName}</span>
                         {post.isVerified && <div className="text-blue-400"><Check size={14} className="bg-white rounded-full text-blue-500 fill-blue-500" /></div>}
                         <span className="text-zinc-500 text-sm truncate">{post.authorHandle} · {post.timestamp === player.currentWeek ? '2h' : '1d'}</span>
                     </div>
+                    {isIndustryPost && (
+                        <div className="mb-2 inline-flex rounded-full border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.18em] text-blue-300">
+                            {tr('x.industryInfo')}
+                        </div>
+                    )}
                     <div className="text-sm text-zinc-200 leading-normal mb-3 whitespace-pre-wrap">
                         {post.content}
                     </div>
@@ -575,6 +584,10 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
                         <button onClick={() => setFeedTab('FOR_YOU')} className={`flex-1 py-3 text-center hover:bg-white/5 relative ${feedTab === 'FOR_YOU' ? 'text-white' : ''}`}>
                             {tr('x.forYou')}
                             {feedTab === 'FOR_YOU' && <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-14 h-1 bg-blue-500 rounded-full"></div>}
+                        </button>
+                        <button onClick={() => setFeedTab('INDUSTRY')} className={`flex-1 py-3 text-center hover:bg-white/5 relative ${feedTab === 'INDUSTRY' ? 'text-white' : ''}`}>
+                            {tr('x.industry')}
+                            {feedTab === 'INDUSTRY' && <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-16 h-1 bg-blue-500 rounded-full"></div>}
                         </button>
                         <button onClick={() => setFeedTab('FOLLOWING')} className={`flex-1 py-3 text-center hover:bg-white/5 relative ${feedTab === 'FOLLOWING' ? 'text-white' : ''}`}>
                             {tr('x.following')}

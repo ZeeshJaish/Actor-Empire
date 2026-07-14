@@ -307,6 +307,9 @@ export const getLocalizedPremiumProducts = (language: GameLanguage = 'en'): Prem
 export const getPremiumProduct = (productId: PremiumProductId, language: GameLanguage = 'en'): PremiumProduct | undefined =>
     getLocalizedPremiumProduct(productId, language);
 
+export const isNonConsumablePremiumProduct = (productId: PremiumProductId): boolean =>
+    PREMIUM_PRODUCT_CONFIGS.some(product => product.id === productId && product.kind === 'non_consumable');
+
 export const getRequiredPremiumProductForAsset = (assetId: string): PremiumProductId | null =>
     PREMIUM_ASSET_COLLECTIONS[assetId] || null;
 

@@ -1,5 +1,6 @@
 import { Business, Player, PlayerLoan } from '../types';
 import { getAbsoluteWeek } from './legacyLogic';
+import { isStockRetiredByMerger, normalizeStockPrice } from './stockLogic';
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 const toFinite = (value: number, fallback = 0) => (Number.isFinite(value) ? value : fallback);
@@ -25,7 +26,8 @@ export const getEstimatedNetWorth = (player: Player): number => {
     const assetValue = (player.customItems || []).reduce((sum, item) => sum + Math.max(0, toFinite((item as any).price)), 0);
     const portfolioValue = (player.portfolio || []).reduce((sum, holding) => {
         const stock = (player.stocks || []).find(s => s.id === holding.stockId);
-        return sum + (stock ? Math.max(0, toFinite(stock.price) * toFinite(holding.shares)) : 0);
+        if (!stock || isStockRetiredByMerger(player, stock)) return sum;
+        return sum + Math.max(0, normalizeStockPrice(stock, stock.price) * toFinite(holding.shares));
     }, 0);
     const businessValue = (player.businesses || []).reduce((sum, business) => sum + getBusinessValuation(business), 0);
     return cash + assetValue + portfolioValue + businessValue;

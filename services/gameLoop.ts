@@ -26,7 +26,7 @@ import {
     calculateAuditionGain,
     calculateProductionGain,
     calculatePassiveGain,
-    getBoxOfficeCaps,
+    calculateDynamicBoxOfficeTotalCap,
     rewardGenreExperience,
     getRoleRejectionFeedback,
     formatRoleRejectionReview,
@@ -55,13 +55,13 @@ import { generateLifeEvent, generateLegalHearing, generateLuxeLifeEvent, hasElig
 import { generateWeeklyFeed, NPC_DATABASE, calculateProjectFameMultiplier, generateNewUnknowns, updateNPCLives, createNPCFromMusicArtist } from './npcLogic';
 import { generateAgentOffers, generateManagerOffer, generateDirectOffer, getRandomAgents, getRandomManagers, getRandomTrainers, getRandomStylists, getRandomTherapists, getRandomPublicists, getRandomWellness, sanitizeTeamPools } from './teamLogic';
 import { processStockMarket, calculatePortfolioValue, getDividendPayout, initializeStocks } from './stockLogic';
-import { AWARD_CALENDAR, checkAwardEligibility, AwardDefinition, generateSeasonWinners, generateFullBallot, getAwardCeremonyYear } from './awardLogic';
+import { AWARD_CALENDAR, checkAwardEligibility, AwardDefinition, generateSeasonWinners, generateFullBallot, getAwardCeremonyYear, sanitizeAwardHistoryEntries, sanitizeAwardRecords } from './awardLogic';
 import { processWorldTurn, generateIndustryProject } from './worldLogic'; 
 import { generateFamousMovieOpportunity, generateCameoOffer } from './famousMovieLogic'; 
 import { calculateYoutubeCreatorScore, generateMusicVideoFeatureOffer, generateYoutubeBrandDeal, generateYoutubeCollabOffer, getYoutubePublicImageLabel, processYoutubeChannel } from './youtubeLogic';
 import { getInstagramPostComments, pickInstagramMicroBrand } from './instagramLogic';
 import { checkForDirectorDecision, checkForProductionCrisis } from './productionService';
-import { applyProductionHouseReleaseOutcome, processBusinessWeek, recalculateBusinessValuation } from './businessLogic';
+import { applyProductionHouseReleaseOutcome, processBusinessWeek, recalculateBusinessValuation, resolveProjectType } from './businessLogic';
 import { getAbsoluteWeek, getRelationshipAge, inferStreamingStartWeekAbsolute } from './legacyLogic';
 import { hasNoAds, resetWeeklyEnergy, spendPlayerEnergy } from './premiumLogic';
 import { advanceLuxeConnections, advanceTinderConnections } from './datingLogic';
@@ -79,7 +79,7 @@ import { resolveInstagramReferralOutcome } from './instagramOfferLogic';
 import { resolveYoutubeEventChoice, YoutubeEventResolution } from './youtubeEventLogic';
 import { resolveStudioAcquisitionResponses } from './studioAcquisition';
 import { buildAudienceReception } from './audienceReception';
-import { processSubsidiaryAutonomousOperations } from './subsidiaryOperations';
+import { prepareSubsidiaryProjectsForGameLoop, processSubsidiaryAutonomousOperations } from './subsidiaryOperations';
 import { calculateStreamingDistributionBreakdown, calculateTheatricalDistributionBreakdown } from './distributionRevenue';
 import { processSubsidiaryDecisionEngine } from './subsidiaryDecisions';
 import { processShareholderVoting } from './shareholderVoting';
@@ -90,6 +90,13 @@ import { processRegulatorPressure } from './regulatorPressure';
 import { processTalentInstability } from './talentInstability';
 import { processRivalRetaliation } from './rivalRetaliation';
 import { processAcquisitionMarketPulse } from './acquisitionMarketPulse';
+import { processStudioSaleRoyalties } from './studioSale';
+import {
+    advanceProductionCalendarWeek,
+    ensureProductionCalendarForCommitment,
+    getProductionCalendarPhaseDuration,
+    normalizeProductionCalendar,
+} from './productionCalendar';
 import { evaluatePostReleaseReality } from './marketingReality';
 import { applyHealthConditionIncident, processHealthConditionsWeek } from './healthConditions';
 import { addMusicCultureMoment, applyMusicImpactToHiddenStats, calculateProjectMusicImpact, calculateWeeklySoundtrackRevenue, createMusicCultureMoment, getMusicArtistCatalog, mergeSoundtrackRevenueBreakdowns, processMusicIndustryWeek, withAutomaticMusicPlan } from './musicIndustry';
@@ -98,6 +105,7 @@ import { applyInvestorPayoutMemory, calculateInvestorPayout, processInvestorLead
 import { buildOutsideProducerInvestmentMessage, generateOutsideProducerInvestmentOffers, getOutsideProducerOfferCadenceWeeks, processOutsideProductionsWeek } from './outsideProductions';
 import { buildEpisodeRatingsStory, generateEpisodeRatings, getEpisodeRatingsGameplayImpact } from './episodeRatings';
 import { calculateProductionRiskProfile } from './productionRisk';
+import { getContinuationPerformanceGross, shouldResolveContinuationDecision } from './releaseContinuationLogic';
 
 // --- CONSTANTS ---
 const ANNUAL_TAX_FREE_ALLOWANCE = 25000;
@@ -128,6 +136,10 @@ const formatMoneyShort = (value: number) => {
 };
 
 const clampPercent = (value: number) => Math.max(0, Math.min(100, Math.round(Number(value) || 0)));
+const rollContinuationGreenlight = (chance: number, maxChance = 96) => {
+    const safeChance = clampPercent(chance);
+    return Math.random() * 100 < Math.min(safeChance, maxChance);
+};
 
 const appendInvestorPayout = (
     summary: ActiveRelease['investorPayouts'] | undefined,
@@ -577,6 +589,56 @@ const createReturnStatusNews = (
         week,
         year,
         impactLevel: 'MEDIUM' as const
+    };
+};
+
+const getNextSeasonNumber = (title: string) => {
+    const seasonMatch = title.match(/Season (\d+)/i);
+    return seasonMatch ? parseInt(seasonMatch[1], 10) + 1 : 2;
+};
+
+const createContinuationDecisionMessage = ({
+    id,
+    sender,
+    subject,
+    text,
+    week
+}: {
+    id: string;
+    sender: string;
+    subject: string;
+    text: string;
+    week: number;
+}): Message => ({
+    id: `${id}_${Date.now()}`,
+    sender,
+    subject,
+    text,
+    type: 'TEXT',
+    isRead: false,
+    weekSent: week,
+    expiresIn: 8
+});
+
+const createSequelPassNews = (
+    release: ActiveRelease,
+    potential: FuturePotential,
+    week: number,
+    year: number
+): NewsItem => {
+    const hitPassed = potential.sequelChance >= 70 || release.totalGross >= release.budget * 3;
+    return {
+        id: `news_sequel_pass_${release.id}_${Date.now()}`,
+        headline: hitPassed
+            ? `Studio Passes on "${release.name}" Sequel Despite Hit Run`
+            : `No Sequel Planned for "${release.name}"`,
+        subtext: hitPassed
+            ? 'Executives are choosing to protect the original run instead of forcing a follow-up.'
+            : 'The studio says the project will remain a standalone release for now.',
+        category: 'INDUSTRY',
+        week,
+        year,
+        impactLevel: hitPassed ? 'HIGH' : 'MEDIUM'
     };
 };
 
@@ -1078,10 +1140,11 @@ const defaultFuturePotential = (): FuturePotential => ({
 
 const normalizeReleaseProjectDetails = (details: any): ProjectDetails => {
     const safeDetails = details && typeof details === 'object' ? details : {};
+    const resolvedType = resolveProjectType(safeDetails.type, safeDetails.projectType, safeDetails.mediaType);
     const normalized = {
         ...safeDetails,
         title: safeDetails.title || safeDetails.name || 'Untitled Project',
-        type: safeDetails.type || 'MOVIE',
+        type: resolvedType,
         description: safeDetails.description || '',
         studioId: safeDetails.studioId || 'ARTISAN_PICTURES',
         subtype: safeDetails.subtype || 'STANDALONE',
@@ -1137,11 +1200,76 @@ const normalizeReleaseProjectDetails = (details: any): ProjectDetails => {
     return withAutomaticMusicPlan(normalized);
 };
 
+const readReleaseTimingNumber = (...values: unknown[]): number | undefined => {
+    for (const value of values) {
+        const parsed = Number(value);
+        if (Number.isFinite(parsed)) return parsed;
+    }
+    return undefined;
+};
+
+const getTimingFromAbsoluteWeek = (absoluteWeek: number) => ({
+    releaseYear: Math.floor(Math.max(0, Math.floor(absoluteWeek)) / 52) + 1,
+    releaseWeek: (Math.max(0, Math.floor(absoluteWeek)) % 52) + 1
+});
+
+const inferArchiveReleaseTiming = (
+    release: ActiveRelease,
+    projectDetails: ProjectDetails,
+    player: Player
+): { releaseYear: number; releaseWeek: number; releasedAtAbsoluteWeek: number } => {
+    const details = projectDetails as any;
+    const hiddenStats = details.hiddenStats || {};
+    let releasedAtAbsoluteWeek = readReleaseTimingNumber(
+        release.releasedAtAbsoluteWeek,
+        details.releasedAtAbsoluteWeek,
+        hiddenStats.releasedAtAbsoluteWeek
+    );
+    let releaseYear = readReleaseTimingNumber(
+        release.releaseYear,
+        details.releaseYear,
+        hiddenStats.releaseYear
+    );
+    let releaseWeek = readReleaseTimingNumber(
+        release.releaseWeek,
+        details.releaseWeek,
+        hiddenStats.releaseWeek
+    );
+
+    if (releasedAtAbsoluteWeek !== undefined) {
+        const absoluteTiming = getTimingFromAbsoluteWeek(releasedAtAbsoluteWeek);
+        releaseYear = releaseYear ?? absoluteTiming.releaseYear;
+        releaseWeek = releaseWeek ?? absoluteTiming.releaseWeek;
+    }
+
+    const runWeek = Math.max(1, Math.round(readReleaseTimingNumber(
+        release.weekNum,
+        release.streaming?.weekOnPlatform
+    ) || 1));
+    const inferredAbsoluteWeek = Math.max(0, getAbsoluteWeek(player.age, player.currentWeek) - Math.max(0, runWeek - 1));
+    const inferredTiming = getTimingFromAbsoluteWeek(inferredAbsoluteWeek);
+
+    releaseYear = releaseYear ?? inferredTiming.releaseYear;
+    releaseWeek = releaseWeek ?? inferredTiming.releaseWeek;
+    releasedAtAbsoluteWeek = releasedAtAbsoluteWeek ?? inferredAbsoluteWeek;
+
+    const safeReleaseWeek = releaseWeek >= 1 && releaseWeek <= 52
+        ? Math.floor(releaseWeek)
+        : inferredTiming.releaseWeek;
+
+    return {
+        releaseYear: Math.max(1, Math.floor(releaseYear || inferredTiming.releaseYear)),
+        releaseWeek: safeReleaseWeek,
+        releasedAtAbsoluteWeek: Math.max(0, Math.floor(releasedAtAbsoluteWeek))
+    };
+};
+
 const createPastProjectArchiveSnapshot = (
     release: ActiveRelease,
     options: { player: Player; streamingRevenue?: number; totalViews?: number; weeklyStreamingBreakdowns?: any[]; weeklyViews?: number[] }
 ): PastProject => {
     const projectDetails = normalizeReleaseProjectDetails(release.projectDetails);
+    const archiveTiming = inferArchiveReleaseTiming(release, projectDetails, options.player);
     const episodeRatings = projectDetails.episodeRatings?.length
         ? projectDetails.episodeRatings
         : generateEpisodeRatings({ ...release, projectDetails });
@@ -1163,7 +1291,7 @@ const createPastProjectArchiveSnapshot = (
         name: release.name,
         type: 'ACTING_GIG',
         roleType: getPlayerProjectRoleType(release.roleType, projectDetails.castList),
-        year: release.releaseYear || options.player.age,
+        year: archiveTiming.releaseYear,
         earnings: 0,
         rating: ensureFiniteNumber(release.imdbRating),
         reception: release.status || 'FINISHED',
@@ -1218,7 +1346,7 @@ const createPastProjectArchiveSnapshot = (
         subjectName: projectDetails.subjectName,
         subjectType: projectDetails.subjectType,
         description: projectDetails.description,
-        projectType: release.type || projectDetails.type,
+        projectType: resolveProjectType(release.type, projectDetails.type, (release as any).projectType),
         royaltyPercentage: release.royaltyPercentage,
         franchiseId: projectDetails.franchiseId,
         universeId: projectDetails.universeId,
@@ -1228,9 +1356,9 @@ const createPastProjectArchiveSnapshot = (
         directorId: projectDetails.directorId,
         sourceScriptId: projectDetails.sourceScriptId,
         isOriginal: projectDetails.isOriginal,
-        releaseWeek: release.releaseWeek,
-        releaseYear: release.releaseYear,
-        releasedAtAbsoluteWeek: release.releasedAtAbsoluteWeek,
+        releaseWeek: archiveTiming.releaseWeek,
+        releaseYear: archiveTiming.releaseYear,
+        releasedAtAbsoluteWeek: archiveTiming.releasedAtAbsoluteWeek,
         customPoster: projectDetails.customPoster,
         musicPlan: projectDetails.musicPlan,
     };
@@ -1333,7 +1461,9 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
     if (!nextPlayer.world.universes || typeof nextPlayer.world.universes !== 'object') nextPlayer.world.universes = {} as any;
     nextPlayer.world.universes = normalizeUniverseMap(nextPlayer.world.universes);
     if (!Array.isArray(nextPlayer.world.famousMoviesReleased)) nextPlayer.world.famousMoviesReleased = [];
-    if (!Array.isArray(nextPlayer.world.awardHistory)) nextPlayer.world.awardHistory = [];
+    nextPlayer.world.awardHistory = sanitizeAwardHistoryEntries(
+        Array.isArray(nextPlayer.world.awardHistory) ? nextPlayer.world.awardHistory : []
+    );
     if (!Array.isArray(nextPlayer.world.upcomingRivals)) nextPlayer.world.upcomingRivals = [];
     if (nextPlayer.world.musicIndustry && !Array.isArray(nextPlayer.world.musicIndustry.chart)) nextPlayer.world.musicIndustry.chart = [];
     if (nextPlayer.world.musicIndustry && !Array.isArray(nextPlayer.world.musicIndustry.history)) nextPlayer.world.musicIndustry.history = [];
@@ -1377,6 +1507,7 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
         royaltyPercentage: commitment.royaltyPercentage === undefined ? undefined : ensureFiniteNumber(commitment.royaltyPercentage),
         phaseWeeksLeft: commitment.phaseWeeksLeft === undefined ? undefined : ensureFiniteNumber(commitment.phaseWeeksLeft, 1),
         totalPhaseDuration: commitment.totalPhaseDuration === undefined ? undefined : ensureFiniteNumber(commitment.totalPhaseDuration),
+        productionCalendar: normalizeProductionCalendar(commitment.productionCalendar),
         weeksCompleted: commitment.weeksCompleted === undefined ? undefined : ensureFiniteNumber(commitment.weeksCompleted),
         totalDuration: commitment.totalDuration === undefined ? undefined : ensureFiniteNumber(commitment.totalDuration),
         durationLeft: commitment.durationLeft === undefined ? undefined : ensureFiniteNumber(commitment.durationLeft),
@@ -1451,7 +1582,10 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
             duration: ensureFiniteNumber(bid.duration, 52)
         }))
     }) as ActiveRelease);
-    nextPlayer.pastProjects = ensureObjectArray(nextPlayer.pastProjects);
+    nextPlayer.pastProjects = ensureObjectArray<PastProject>(nextPlayer.pastProjects).map(project => ({
+        ...project,
+        awards: sanitizeAwardRecords(ensureObjectArray<any>((project as any).awards) as any) as any
+    }));
     nextPlayer.applications = ensureObjectArray<Application>(nextPlayer.applications).map(app => ({
         ...app,
         weeksRemaining: ensureFiniteNumber(app.weeksRemaining, 1)
@@ -1478,7 +1612,7 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
         week: ensureFiniteNumber(event.week, nextPlayer.currentWeek),
         data: event.data && typeof event.data === 'object' ? event.data : {}
     }));
-    nextPlayer.awards = ensureObjectArray(nextPlayer.awards);
+    nextPlayer.awards = sanitizeAwardRecords(ensureObjectArray<any>(nextPlayer.awards) as any);
     nextPlayer.logs = ensureObjectArray(nextPlayer.logs);
     nextPlayer.pendingEvents = ensureObjectArray<ScheduledEvent>(nextPlayer.pendingEvents)
         .map(event => ({
@@ -1623,16 +1757,37 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
     };
 
     // --- 0.5 INBOX MAINTENANCE ---
-    nextPlayer.inbox = nextPlayer.inbox.filter(msg => {
-        if (msg.expiresIn !== undefined) {
-            msg.expiresIn -= 1;
-            if (msg.expiresIn <= 0) {
-                logsToAdd.push({ msg: `⚠️ Offer expired: "${msg.subject}"`, type: 'neutral' });
-                return false; 
+    nextPlayer.inbox = nextPlayer.inbox.reduce<Message[]>((messages, msg) => {
+        if (msg.isExpired) {
+            const noticeWeeks = Math.max(0, Number(msg.expiredNoticeWeeks ?? 1) - 1);
+            if (noticeWeeks > 0) {
+                messages.push({ ...msg, expiredNoticeWeeks: noticeWeeks });
             }
+            return messages;
         }
-        return true;
-    });
+
+        if (msg.expiresIn !== undefined) {
+            const expiresIn = Number(msg.expiresIn) - 1;
+            if (expiresIn <= 0) {
+                logsToAdd.push({ msg: `⚠️ Offer expired: "${msg.subject}"`, type: 'neutral' });
+                messages.push({
+                    ...msg,
+                    isExpired: true,
+                    isRead: false,
+                    expiresIn: undefined,
+                    expiredAtWeek: nextPlayer.currentWeek,
+                    expiredNoticeWeeks: 2,
+                    text: `Expired offer. ${msg.text || 'This opportunity is no longer available.'}`,
+                });
+                return messages;
+            }
+            messages.push({ ...msg, expiresIn });
+            return messages;
+        }
+
+        messages.push(msg);
+        return messages;
+    }, []);
 
     const friendFavorAbsWeek = getAbsoluteWeek(nextPlayer.age, nextPlayer.currentWeek);
     const friendFavorRequest = buildFriendFavorRequest(nextPlayer, friendFavorAbsWeek);
@@ -1898,6 +2053,7 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
     nextPlayer = processRivalRetaliation(nextPlayer);
     nextPlayer = processTalentInstability(nextPlayer);
     nextPlayer = processAcquisitionMarketPulse(nextPlayer);
+    nextPlayer = processStudioSaleRoyalties(nextPlayer);
 
     // --- 3. YOUTUBE & TALENT SIMULATION ---
     try {
@@ -3459,28 +3615,30 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
     // --- 6. SPONSORSHIPS ---
     let processedSponsorships: any[] = [];
     nextPlayer.activeSponsorships.forEach(spon => {
-        const req = spon.requirements;
+        const req: any = spon.requirements || {};
+        const totalDone = Math.max(0, Number(req.progress || 0));
+        const goal = Math.max(1, Number(req.totalRequired || 1));
+
+        if (totalDone >= goal) {
+            addTransaction(spon.weeklyPay, 'SPONSORSHIP', `${spon.brandName} Final Payment`);
+            logsToAdd.push({ msg: `✅ Contract fulfilled with ${spon.brandName}. Reputation increased.`, type: 'positive' });
+            nextPlayer.stats.reputation = Math.min(100, nextPlayer.stats.reputation + 5);
+            return;
+        }
+
         addTransaction(spon.weeklyPay, 'SPONSORSHIP', `${spon.brandName} Payment`);
         
         const nextWeekSpon = { 
             ...spon, 
-            durationWeeks: spon.durationWeeks - 1, 
+            durationWeeks: Math.max(0, Number(spon.durationWeeks || 0) - 1), 
             weeksCompleted: (spon.weeksCompleted || 0) + 1 
         };
 
         if (nextWeekSpon.durationWeeks <= 0) {
-            const totalDone = req.progress || 0;
-            const goal = req.totalRequired || 1; 
-
-            if (totalDone >= goal) {
-                logsToAdd.push({ msg: `✅ Contract fulfilled with ${spon.brandName}. Reputation increased.`, type: 'positive' });
-                nextPlayer.stats.reputation = Math.min(100, nextPlayer.stats.reputation + 5);
-            } else {
-                const penalty = spon.penalty || 0;
-                addTransaction(-penalty, 'EXPENSE', `Breach of Contract (${spon.brandName})`);
-                nextPlayer.stats.reputation = Math.max(0, nextPlayer.stats.reputation - 10);
-                logsToAdd.push({ msg: `❌ CONTRACT BREACHED: Failed to complete tasks for ${spon.brandName}. Penalty applied.`, type: 'negative' });
-            }
+            const penalty = spon.penalty || 0;
+            addTransaction(-penalty, 'EXPENSE', `Breach of Contract (${spon.brandName})`);
+            nextPlayer.stats.reputation = Math.max(0, nextPlayer.stats.reputation - 10);
+            logsToAdd.push({ msg: `❌ CONTRACT BREACHED: Failed to complete tasks for ${spon.brandName}. Penalty applied.`, type: 'negative' });
         } else {
             processedSponsorships.push(nextWeekSpon);
         }
@@ -3603,6 +3761,7 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
 
     const nextCommitments: Commitment[] = [];
     const newReleases: ActiveRelease[] = [];
+    nextPlayer = prepareSubsidiaryProjectsForGameLoop(nextPlayer);
     
     nextPlayer.commitments.forEach(c => {
         let updatedC = { ...c };
@@ -3616,6 +3775,7 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
 
         // Allow studio projects (JOB with projectPhase) to fall through to phase logic
         const isStudioProject = updatedC.type === 'JOB' && updatedC.projectPhase !== undefined;
+        const isStudioProductionProject = isStudioProject && Boolean(updatedC.projectDetails?.studioId);
 
         if (updatedC.type !== 'ACTING_GIG' && updatedC.type !== 'DIRECTOR_GIG' && updatedC.type !== 'WRITER_GIG' && !isStudioProject) {
             if (updatedC.type === 'JOB' && updatedC.durationLeft !== undefined) {
@@ -3628,11 +3788,20 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
             return;
         }
 
+        if (isStudioProductionProject) {
+            updatedC = ensureProductionCalendarForCommitment(updatedC);
+            if (updatedC.projectPhase === 'PRE_PRODUCTION' || updatedC.projectPhase === 'PRODUCTION' || updatedC.projectPhase === 'POST_PRODUCTION') {
+                updatedC = advanceProductionCalendarWeek(updatedC);
+            }
+        }
+
         const weeksLeft = (updatedC.phaseWeeksLeft || 1) - 1;
 
         if (updatedC.projectPhase === 'SCHEDULED') {
             if (weeksLeft <= 0) {
-                const duration = getPhaseDuration('PRE_PRODUCTION');
+                const duration = isStudioProductionProject
+                    ? getProductionCalendarPhaseDuration(updatedC, 'PRE_PRODUCTION', getPhaseDuration('PRE_PRODUCTION'))
+                    : getPhaseDuration('PRE_PRODUCTION');
                 logsToAdd.push({ msg: `🎬 Production gearing up for "${updatedC.name}". Entering Pre-Production.`, type: 'positive' });
                 nextCommitments.push({ ...updatedC, projectPhase: 'PRE_PRODUCTION', phaseWeeksLeft: duration, totalPhaseDuration: duration, productionPerformance: 50 });
             } else { nextCommitments.push({ ...updatedC, phaseWeeksLeft: weeksLeft }); }
@@ -3641,13 +3810,17 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
 
         if (updatedC.projectPhase === 'PLANNING') {
             if (weeksLeft <= 0) {
-                const duration = getPhaseDuration('PRE_PRODUCTION');
+                const duration = isStudioProductionProject
+                    ? getProductionCalendarPhaseDuration(updatedC, 'PRE_PRODUCTION', getPhaseDuration('PRE_PRODUCTION'))
+                    : getPhaseDuration('PRE_PRODUCTION');
                 logsToAdd.push({ msg: `📜 Planning for "${updatedC.name}" is complete. Entering Pre-Production.`, type: 'neutral' });
                 nextCommitments.push({ ...updatedC, projectPhase: 'PRE_PRODUCTION', phaseWeeksLeft: duration, totalPhaseDuration: duration, auditionPerformance: 0 });
             } else { nextCommitments.push({ ...updatedC, phaseWeeksLeft: weeksLeft }); }
         } else if (updatedC.projectPhase === 'PRE_PRODUCTION') {
             if (weeksLeft <= 0) {
-                const duration = getPhaseDuration('PRODUCTION');
+                const duration = isStudioProductionProject
+                    ? getProductionCalendarPhaseDuration(updatedC, 'PRODUCTION', getPhaseDuration('PRODUCTION'))
+                    : getPhaseDuration('PRODUCTION');
                 logsToAdd.push({ msg: `🎬 Pre-production wrapped for "${updatedC.name}". Filming begins!`, type: 'positive' });
                 nextCommitments.push({ ...updatedC, projectPhase: 'PRODUCTION', phaseWeeksLeft: duration, totalPhaseDuration: duration, productionPerformance: 0 });
                 // FIX: Grant +1 Experience here for roles that skipped the 'AUDITION' phase (like Direct Offers) to ensure progression
@@ -3657,7 +3830,9 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
             if (weeksLeft <= 0) {
                 const result = checkAuditionPass(nextPlayer, updatedC);
                 if (result.passed) {
-                    const duration = getPhaseDuration('PRODUCTION');
+                    const duration = isStudioProductionProject
+                        ? getProductionCalendarPhaseDuration(updatedC, 'PRODUCTION', getPhaseDuration('PRODUCTION'))
+                        : getPhaseDuration('PRODUCTION');
                     logsToAdd.push({ msg: `🎉 CAST! You booked the role in "${updatedC.name}"! Production starts now.`, type: 'positive' });
                     if (updatedC.projectDetails?.isFamous) {
                         nextPlayer.world.famousMoviesReleased.push(updatedC.name);
@@ -3756,7 +3931,9 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
             }
 
             if (weeksLeft <= 0) {
-                const duration = getPhaseDuration('POST_PRODUCTION');
+                const duration = isStudioProductionProject
+                    ? getProductionCalendarPhaseDuration(updatedC, 'POST_PRODUCTION', getPhaseDuration('POST_PRODUCTION'))
+                    : getPhaseDuration('POST_PRODUCTION');
                 logsToAdd.push({ msg: `🎬 That's a wrap on "${updatedC.name}"! Moving to post-production.`, type: 'positive' });
                 nextCommitments.push({ ...updatedC, projectPhase: 'POST_PRODUCTION', phaseWeeksLeft: duration, totalPhaseDuration: duration, promotionalBuzz: 0 });
             } else { nextCommitments.push({ ...updatedC, phaseWeeksLeft: weeksLeft }); }
@@ -3839,7 +4016,7 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                         const platform = nextPlayer.world.platforms[platformId];
                         // Estimate acquisition cost
                         const cost = Math.floor((updatedC.projectDetails?.estimatedBudget || 0) * 0.4 * PLATFORMS[platformId].payoutMult);
-                        platform.cashReserve -= cost;
+                        platform.cashReserve = Math.max(0, platform.cashReserve - cost);
                         platform.recentHits += 1;
                     }
                 } else {
@@ -3958,7 +4135,7 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                             : undefined,
                         royaltyPercentage: updatedC.royaltyPercentage,
                         studioRoyaltyPercentage: updatedC.projectDetails.hiddenStats.backendPct,
-                        sequelDecisionWeek: 4 + Math.floor(Math.random() * 7),
+                        sequelDecisionWeek: isTV ? 6 + Math.floor(Math.random() * 3) : 4 + Math.floor(Math.random() * 7),
                         promotionalBuzz: accumulatedBuzz,
                         maxTheatricalWeeks,
                         releaseWeek: nextPlayer.currentWeek,
@@ -4096,13 +4273,13 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
             rel.imdbRating = Math.max(1.1, Math.min(9.9, rel.imdbRating + change));
         }
 
-        const decisionWeek = rel.sequelDecisionWeek || 5; 
-        if (rel.weekNum === decisionWeek && !rel.sequelDecisionMade) {
+        if (shouldResolveContinuationDecision(rel)) {
             rel.sequelDecisionMade = true;
+            const continuationPerformanceGross = getContinuationPerformanceGross(rel);
             const potential = calculateFuturePotential(
                 rel.type,
                 rel.projectDetails.budgetTier,
-                rel.totalGross,
+                continuationPerformanceGross,
                 rel.budget,
                 rel.imdbRating || 5,
                 rel.projectDetails.genre,
@@ -4114,7 +4291,10 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                     productionPerformance: rel.productionPerformance,
                     platformId: (rel.streaming?.platformId || rel.projectDetails.hiddenStats.platformId) as any
                 } : undefined
-            );
+	            );
+            if (rel.type !== 'SERIES') {
+                potential.isSequelGreenlit = rollContinuationGreenlight(potential.sequelChance, 94);
+            }
             const isUniverseContracted = !!(player.activeUniverseContract && rel.projectDetails.universeId && player.activeUniverseContract.universeId === rel.projectDetails.universeId);
             
             // Check if this project belongs to the player's production house
@@ -4123,7 +4303,7 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                 const episodeImpact = getEpisodeRatingsGameplayImpact(rel.projectDetails.episodeRatings);
                 potential.renewalChance = clampPercent(potential.renewalChance + episodeImpact.renewalModifier);
                 potential.franchiseChance = clampPercent((potential.franchiseChance || 0) + episodeImpact.franchiseValueModifier);
-                potential.isRenewed = Math.random() * 100 < potential.renewalChance;
+                potential.isRenewed = rollContinuationGreenlight(potential.renewalChance, 94);
 
                 const platformId = (rel.streaming?.platformId || rel.projectDetails.hiddenStats.platformId) as PlatformId | undefined;
                 const platform = platformId ? nextPlayer.world.platforms?.[platformId] : undefined;
@@ -4159,7 +4339,10 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                         msg: `📺 Episode scorecard: ${rel.name} ${episodeImpact.signal} signal (${episodeImpact.renewalModifier >= 0 ? '+' : ''}${episodeImpact.renewalModifier} renewal).`,
                         type: episodeImpact.renewalModifier >= 0 ? 'positive' : 'negative',
                     });
-                }
+	                }
+	            }
+            if (rel.type === 'SERIES' && !rel.projectDetails.episodeRatings?.length) {
+                potential.isRenewed = rollContinuationGreenlight(potential.renewalChance, 94);
             }
             const hasForcedRareChaos = Boolean(rel.projectDetails.hiddenStats.forcedRareChaosKind);
             const shouldCheckRareChaos = hasForcedRareChaos
@@ -4269,25 +4452,50 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                             weekSent: nextPlayer.currentWeek,
                             expiresIn: 4
                         });
-                    } else if (isPlayerProduction || returnDecision.status === 'RETURNING') {
-                        // Just show news for player production if it's "renewed" (successful)
-                        const seasonMatch = rel.name.match(/Season (\d+)/);
-                        const nextSeasonNum = seasonMatch ? parseInt(seasonMatch[1]) + 1 : 2;
-                        newNews.unshift(rareChaos?.news || generateRenewalNews(rel.name, nextSeasonNum, nextPlayer.currentWeek, nextPlayer.age, language));
-                    } else {
-                        const seasonMatch = rel.name.match(/Season (\d+)/);
-                        const nextSeasonNum = seasonMatch ? parseInt(seasonMatch[1]) + 1 : 2;
-                        newNews.unshift(rareChaos?.news || generateRenewalNews(rel.name, nextSeasonNum, nextPlayer.currentWeek, nextPlayer.age, language));
-                        const returnStatusNews = createReturnStatusNews(rel.name, returnDecision.status, nextPlayer.currentWeek, nextPlayer.age, true);
-                        if (returnStatusNews) newNews.unshift(returnStatusNews);
-                    }
-                } else {
-                    potential.seriesStatus = 'CANCELLED';
-                    rel.futurePotential = potential;
-                    newNews.unshift(generateCancellationNews(rel.name, 1, nextPlayer.currentWeek, nextPlayer.age, language));
-                }
-            } else {
-                if (potential.isSequelGreenlit) {
+	                    } else if (isPlayerProduction || returnDecision.status === 'RETURNING') {
+	                        const nextSeasonNum = getNextSeasonNumber(rel.name);
+	                        newNews.unshift(rareChaos?.news || generateRenewalNews(rel.name, nextSeasonNum, nextPlayer.currentWeek, nextPlayer.age, language));
+	                        newInbox.unshift(createContinuationDecisionMessage({
+	                            id: `renewal_decision_${rel.id}`,
+	                            sender: rareChaos?.platformName ? `${rareChaos.platformName} Executive` : 'Network Exec',
+	                            subject: rareChaos?.kind === 'PLATFORM_MOONSHOT'
+	                                ? `Risky Season ${nextSeasonNum} Bet`
+	                                : `Season ${nextSeasonNum} Renewed`,
+	                            text: isPlayerProduction
+	                                ? `${rel.name} has been renewed. Your production house can build the next season from the Development Lab.`
+	                                : `${rel.name} is coming back for Season ${nextSeasonNum}. ${returnDecision.note}`,
+	                            week: nextPlayer.currentWeek
+	                        }));
+	                    } else {
+	                        const nextSeasonNum = getNextSeasonNumber(rel.name);
+	                        newNews.unshift(rareChaos?.news || generateRenewalNews(rel.name, nextSeasonNum, nextPlayer.currentWeek, nextPlayer.age, language));
+	                        const returnStatusNews = createReturnStatusNews(rel.name, returnDecision.status, nextPlayer.currentWeek, nextPlayer.age, true);
+	                        if (returnStatusNews) newNews.unshift(returnStatusNews);
+	                        newInbox.unshift(createContinuationDecisionMessage({
+	                            id: `renewal_without_player_${rel.id}`,
+	                            sender: 'Network Exec',
+	                            subject: `Season ${nextSeasonNum} Without You`,
+	                            text: `${rel.name} was renewed, but the new season is moving forward without your character. ${returnDecision.note}`,
+	                            week: nextPlayer.currentWeek
+	                        }));
+	                    }
+	                } else {
+	                    potential.seriesStatus = 'CANCELLED';
+	                    rel.futurePotential = potential;
+	                    const nextSeasonNum = getNextSeasonNumber(rel.name);
+	                    newNews.unshift(generateCancellationNews(rel.name, nextSeasonNum, nextPlayer.currentWeek, nextPlayer.age, language));
+	                    newInbox.unshift(createContinuationDecisionMessage({
+	                        id: `renewal_pass_${rel.id}`,
+	                        sender: 'Network Exec',
+	                        subject: `No Season ${nextSeasonNum}`,
+	                        text: potential.renewalChance >= 70
+	                            ? `${rel.name} had a strong case for renewal, but the network is stopping here. No Season ${nextSeasonNum} is planned.`
+	                            : `${rel.name} will not continue to Season ${nextSeasonNum}. The network is treating it as a completed run for now.`,
+	                        week: nextPlayer.currentWeek
+	                    }));
+	                }
+	            } else {
+	                if (potential.isSequelGreenlit) {
                     const returnDecision = getReturnStatusForContinuation(rel, nextPlayer, !!isPlayerProduction, isUniverseContracted);
                     potential.playerReturnStatus = returnDecision.status;
                     potential.returnStatusNote = returnDecision.note;
@@ -4314,11 +4522,13 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                             };
                         }
                         newInbox.unshift({
-                            id: `negot_${Date.now()}`,
-                            sender: 'Studio Legal',
-                            subject: rareChaos?.continuationSubtype === 'REBOOT'
-                                ? `Reboot Offer: ${offer.opportunity.projectName}`
-                                : `Return Offer: ${offer.opportunity.projectName}`,
+	                            id: `negot_${Date.now()}`,
+	                            sender: 'Studio Legal',
+	                            subject: rareChaos?.continuationSubtype === 'REBOOT'
+	                                ? `Reboot Offer: ${offer.opportunity.projectName}`
+	                                : rareChaos?.kind === 'FLOP_SEQUEL_GAMBLE'
+	                                    ? `Risky Sequel Bet: ${offer.opportunity.projectName}`
+	                                    : `Return Offer: ${offer.opportunity.projectName}`,
                             text: rareChaos?.reason || `We offer you the role in the sequel.`,
                             type: 'OFFER_NEGOTIATION',
                             data: offer,
@@ -4326,15 +4536,48 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                             weekSent: nextPlayer.currentWeek,
                             expiresIn: 4
                         });
-                    } else if ((isUniverseContracted || isPlayerProduction) || returnDecision.status === 'RETURNING') {
-                        newNews.unshift(rareChaos?.news || generateSequelConfirmedNews(rel.name, nextPlayer.currentWeek, nextPlayer.age, language));
-                    } else {
-                        newNews.unshift(rareChaos?.news || generateSequelConfirmedNews(rel.name, nextPlayer.currentWeek, nextPlayer.age, language));
-                        const returnStatusNews = createReturnStatusNews(rel.name, returnDecision.status, nextPlayer.currentWeek, nextPlayer.age, false);
-                        if (returnStatusNews) newNews.unshift(returnStatusNews);
-                    }
-                }
-            }
+	                    } else if ((isUniverseContracted || isPlayerProduction) || returnDecision.status === 'RETURNING') {
+	                        newNews.unshift(rareChaos?.news || generateSequelConfirmedNews(rel.name, nextPlayer.currentWeek, nextPlayer.age, language));
+	                        newInbox.unshift(createContinuationDecisionMessage({
+	                            id: `sequel_greenlit_${rel.id}`,
+	                            sender: rareChaos?.continuationSubtype === 'REBOOT' ? 'Studio Strategy' : 'Studio Legal',
+	                            subject: rareChaos?.kind === 'FLOP_SEQUEL_GAMBLE'
+	                                ? `Risky Sequel Bet: ${rel.name}`
+	                                : rareChaos?.continuationSubtype === 'REBOOT'
+	                                    ? `Reboot Moving Forward: ${rel.name}`
+	                                    : `Sequel Greenlit: ${rel.name}`,
+	                            text: rareChaos?.reason || (isPlayerProduction
+	                                ? `${rel.name} has been cleared for a follow-up from your production house.`
+	                                : `${rel.name} is getting a follow-up. ${returnDecision.note}`),
+	                            week: nextPlayer.currentWeek
+	                        }));
+	                    } else {
+	                        newNews.unshift(rareChaos?.news || generateSequelConfirmedNews(rel.name, nextPlayer.currentWeek, nextPlayer.age, language));
+	                        const returnStatusNews = createReturnStatusNews(rel.name, returnDecision.status, nextPlayer.currentWeek, nextPlayer.age, false);
+	                        if (returnStatusNews) newNews.unshift(returnStatusNews);
+	                        newInbox.unshift(createContinuationDecisionMessage({
+	                            id: `sequel_without_player_${rel.id}`,
+	                            sender: 'Studio Legal',
+	                            subject: `Sequel Without You: ${rel.name}`,
+	                            text: `${rel.name} is getting a follow-up, but the studio is moving on from your character. ${returnDecision.note}`,
+	                            week: nextPlayer.currentWeek
+	                        }));
+	                    }
+	                } else {
+	                    newNews.unshift(createSequelPassNews(rel, potential, nextPlayer.currentWeek, nextPlayer.age));
+	                    newInbox.unshift(createContinuationDecisionMessage({
+	                        id: `sequel_pass_${rel.id}`,
+	                        sender: 'Studio Strategy',
+	                        subject: potential.sequelChance >= 70
+	                            ? `No Sequel Despite Hit: ${rel.name}`
+	                            : `No Sequel Planned: ${rel.name}`,
+	                        text: potential.sequelChance >= 70
+	                            ? `${rel.name} performed like sequel material, but the studio is choosing not to continue it right now.`
+	                            : `${rel.name} will stay standalone for now. The studio is not opening a sequel room.`,
+	                        week: nextPlayer.currentWeek
+	                    }));
+	                }
+	            }
         }
 
 	        if (rel.distributionPhase === 'THEATRICAL') {
@@ -4367,14 +4610,29 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
             }
             const charityGoodwillMultiplier = Math.max(0, Math.min(0.03, Number(nextPlayer.flags?.charityMovieGoodwillMultiplier || 0)));
             const goodwillAdjustedRevenue = Math.floor(riskAdjustedRevenue * (1 + charityGoodwillMultiplier));
-            const boxOfficeCaps = getBoxOfficeCaps(rel.projectDetails.budgetTier);
+            const existingCapRoll = rel.projectDetails.hiddenStats.boxOfficeCapRoll;
+            const capRoll = typeof existingCapRoll === 'number' && Number.isFinite(existingCapRoll)
+                ? Math.max(0, Math.min(1, existingCapRoll))
+                : Math.random();
+            rel.projectDetails.hiddenStats.boxOfficeCapRoll = capRoll;
+            const dynamicBoxOfficeCap = calculateDynamicBoxOfficeTotalCap({
+                budgetTier: rel.projectDetails.budgetTier,
+                genre: rel.projectDetails.genre,
+                format: rel.projectDetails.format || 'LIVE_ACTION',
+                hiddenStats: rel.projectDetails.hiddenStats,
+                marketDemand,
+                studioGenreReputation,
+                capRoll
+            });
             const thinSpectaclePenalty =
                 ['ACTION', 'SCI_FI', 'SUPERHERO', 'ADVENTURE'].includes(rel.projectDetails.genre) &&
                 ['HIGH', 'BLOCKBUSTER'].includes(rel.projectDetails.budgetTier) &&
                 (rel.projectDetails.hiddenStats.castDepthScore ?? 70) < 55;
             const effectiveTotalCap = thinSpectaclePenalty
-                ? Math.floor(boxOfficeCaps.total * (0.54 + ((rel.projectDetails.hiddenStats.castDepthScore ?? 45) / 180)))
-                : boxOfficeCaps.total;
+                ? Math.floor(dynamicBoxOfficeCap.totalCap * (0.54 + ((rel.projectDetails.hiddenStats.castDepthScore ?? 45) / 180)))
+                : dynamicBoxOfficeCap.totalCap;
+            rel.projectDetails.hiddenStats.boxOfficeTotalCap = effectiveTotalCap;
+            rel.projectDetails.hiddenStats.boxOfficeCapLabel = thinSpectaclePenalty ? 'LIMITED' : dynamicBoxOfficeCap.label;
             const remainingHeadroom = Math.max(0, effectiveTotalCap - rel.totalGross);
             const rawRevenue = Math.min(goodwillAdjustedRevenue, remainingHeadroom);
             const distributionBreakdown = calculateTheatricalDistributionBreakdown(
@@ -4559,6 +4817,7 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                 weeklyExhibitorReceipts: newWeeklyExhibitorReceipts,
                 totalExhibitorReceipts: (rel.totalExhibitorReceipts || 0) + finalDistributionBreakdown.exhibitorReceipts,
                 weeklyDistributionBreakdowns: newWeeklyDistributionBreakdowns,
+                weeksInTheaters: newWeeklyGross.length,
                 soundtrackRevenue: newSoundtrackRevenue,
                 weeklySoundtrackRevenue: newWeeklySoundtrackRevenue,
                 soundtrackRevenueBreakdown: newSoundtrackRevenueBreakdown,
@@ -4755,7 +5014,7 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                         const platform = nextPlayer.world.platforms[platformId];
                         // Estimate acquisition cost
                         const cost = Math.floor(rel.budget * 0.4 * PLATFORMS[platformId].payoutMult);
-                        platform.cashReserve -= cost;
+                        platform.cashReserve = Math.max(0, platform.cashReserve - cost);
                         platform.recentHits += 1;
                     }
 
@@ -5063,7 +5322,6 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                 const awardEntries = noms
                     .filter(n => !nextPlayer.awards.some(a =>
                         a.type === def.type &&
-                        a.year === awardYear &&
                         a.projectId === n.project.id &&
                         a.category === n.category
                     ))
@@ -5080,6 +5338,7 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                 if (awardEntries.length > 0) {
                     addedNominationEntries = true;
                     nextPlayer.awards.push(...awardEntries);
+                    nextPlayer.awards = sanitizeAwardRecords(nextPlayer.awards);
                     nextPlayer.inbox.unshift({
                         id: `msg_award_invite_${def.type}_${Date.now()}`,
                         sender: t(language, 'services.gameLoop.awards.inbox.sender'),
@@ -5108,6 +5367,7 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
         if (!existingEntry && !ceremonyPendingForPlayer) {
             const historyEntry = generateSeasonWinners(nextPlayer, awardShow.type, nextPlayer.age);
             nextPlayer.world.awardHistory.push(historyEntry);
+            nextPlayer.world.awardHistory = sanitizeAwardHistoryEntries(nextPlayer.world.awardHistory);
             const bestPic = historyEntry.winners.find(w => w.category.includes('Picture') || w.category.includes('Series'));
             if (bestPic) { nextPlayer.news.unshift({ id: `news_award_${Date.now()}`, headline: t(language, 'services.gameLoop.awards.news.winner', { projectName: bestPic.projectName, awardName: awardShow.name }), category: 'INDUSTRY', week: nextPlayer.currentWeek, year: nextPlayer.age, impactLevel: 'MEDIUM' }); }
         }
@@ -5429,7 +5689,7 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
     if (nextPlayer.team.agent) {
         try {
             const agentOffer = generateAgentOffers(nextPlayer);
-            if (agentOffer) nextPlayer.inbox.unshift({ id: `offer_${Date.now()}`, sender: nextPlayer.team.agent.name, subject: `Audition: ${agentOffer.projectName}`, text: "New role for you.", type: 'OFFER_ROLE', data: agentOffer, isRead: false, weekSent: nextPlayer.currentWeek, expiresIn: 2 });
+            if (agentOffer) nextPlayer.inbox.unshift({ id: `offer_${Date.now()}`, sender: nextPlayer.team.agent.name, subject: `Audition: ${agentOffer.projectName}`, text: "New role for you.", type: 'OFFER_ROLE', data: agentOffer, isRead: false, weekSent: nextPlayer.currentWeek, expiresIn: 4 });
         } catch (error) {
             console.error('Agent offer generation failed during week processing:', error);
         }

@@ -4,9 +4,10 @@ const source = fs.readFileSync(new URL('../views/mobile/components/StudioAcquisi
 const logicSource = fs.readFileSync(new URL('../services/studioAcquisition.ts', import.meta.url), 'utf8');
 const homePageSource = fs.readFileSync(new URL('../views/HomePage.tsx', import.meta.url), 'utf8');
 const mobilePageSource = fs.readFileSync(new URL('../views/mobile/MobilePage.tsx', import.meta.url), 'utf8');
+const forbesAppSource = fs.readFileSync(new URL('../views/mobile/ForbesApp.tsx', import.meta.url), 'utf8');
 const appSource = fs.readFileSync(new URL('../App.tsx', import.meta.url), 'utf8');
 const englishLocaleSource = fs.readFileSync(new URL('../services/localization/locales/en.ts', import.meta.url), 'utf8');
-const combinedSource = `${source}\n${logicSource}\n${homePageSource}\n${mobilePageSource}\n${appSource}\n${englishLocaleSource}`;
+const combinedSource = `${source}\n${logicSource}\n${homePageSource}\n${mobilePageSource}\n${forbesAppSource}\n${appSource}\n${englishLocaleSource}`;
 
 const checks = [
     ['Acquisition Desk', 'the acquisition command header'],
@@ -63,11 +64,19 @@ const checks = [
     ['Purchase Agreement', 'the purchase agreement review card'],
     ['Ownership Transfer', 'the ownership transfer review card'],
     ['Binding Clauses', 'the signed commitment clauses'],
-    ['Hold To Sign', 'the hold-to-sign control'],
+    ['Tap To Sign Transfer', 'the tap-to-sign control'],
+    ['Signing Requirement', 'the blocked-signing requirement prompt'],
+    ['showAcquisitionRequirement', 'the modal blocker feedback path'],
+    ['Requirement Check', 'the visible pre-signing requirements summary'],
+    ['signingRequirementChecks', 'the money/energy/terms requirement model'],
+    ['hasSigningFunding', 'the accepted-deal funding availability check'],
+    ['Short by', 'the exact funding-shortfall amount copy'],
+    ['Funding shortfall', 'the explicit closing-funds blocker'],
+    ['Current energy:', 'the explicit energy requirement detail'],
     ['Control transferring', 'the signing progress feedback'],
     ['reviewedClosingSteps', 'the closing document review state'],
-    ['startSigningHold', 'the pointer hold signing handler'],
-    ['onPointerDown={startSigningHold}', 'the hold-to-sign pointer down binding'],
+    ['onClick={signAcquisition}', 'the direct tap signing binding'],
+    ['onPointerUp={(event)', 'the mobile pointer-up signing binding'],
     ['Open Studio Profile', 'the post-signing action'],
     ['Develop From Catalog', 'the post-signing development prompt'],
     ['Signing Room', 'the immersive desk-room signing scene'],
@@ -78,7 +87,7 @@ const checks = [
     ['Seal Contract', 'the final paper sealing instruction'],
     ['signingRoomOpen', 'the signing-room scene state'],
     ['openSigningRoom', 'the signing-room entry action'],
-    ['signingSubmitQueuedRef', 'the one-shot signing completion guard'],
+    ['isSigningAcquisition', 'the duplicate signing guard'],
     ['setSigningRoomOpen(true)', 'the signing-room open transition'],
     ['acceptedContractMode', 'accepted terms should render directly as the contract scene'],
     ['signingRoomVisible', 'accepted terms should show the signing room without an intermediate card'],
@@ -121,6 +130,7 @@ const checks = [
     ['onImmersiveChange', 'the signing room should control the immersive viewport boundary'],
     ['isFullBleedMobileSurface', 'the app shell should support full-bleed acquisition mode'],
     ['isImmersiveForbesScene', 'only the Forbes signing scene should bypass the MobilePage phone frame'],
+    ['onUpdatePlayer(resultAfterEnergy.player)', 'the final acquisition result must persist into player state'],
     ['Closing Ritual', 'the signing scene should use a fresh ritual-style structure'],
     ['Deal Theater', 'the signing room should feel like an immersive scene rather than a paper card'],
     ['Action Plate', 'the signing action should be a physical control surface'],
@@ -170,12 +180,20 @@ if (source.includes('Z. Empire')) {
     throw new Error('The acquisition signature still uses the old hard-coded Z. Empire name.');
 }
 
+if (source.includes('lowGraphicsMode')) {
+    throw new Error('The acquisition ceremony still has a reduced-graphics branch; the rich ceremony must be the default for every user.');
+}
+
 if (source.includes('bg-[linear-gradient(90deg,#10b981,#facc15)]')) {
     throw new Error('The signing hold fill still uses the rejected bright green/yellow gradient.');
 }
 
+if (/press and hold|Release early cancels/i.test(source)) {
+    throw new Error('The signing ceremony still contains old hold-to-sign wording.');
+}
+
 if (source.includes("setSigningRoomOpen(false);\n            setFeedback('Documents signed.")) {
-    throw new Error('Successful signing still closes the ceremony immediately, which can look like Hold To Sign reset.');
+    throw new Error('Successful signing still closes the ceremony immediately, which can look like tap-to-sign reset.');
 }
 
 if (/const isFullBleedApp = appMode === 'FORBES';/.test(mobilePageSource)) {

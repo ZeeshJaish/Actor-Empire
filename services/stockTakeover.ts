@@ -11,7 +11,7 @@ import type {
 } from '../types';
 import { createDefaultStudioState } from './businessLogic';
 import { getEntertainmentStockSnapshot } from './entertainmentStockMarket';
-import { getStockOutstandingShares, getStockOwnershipPercent } from './stockLogic';
+import { getStockOutstandingShares, getStockOwnershipPercent, normalizeStockPrice, normalizeStockPriceHistory } from './stockLogic';
 import { isStreamingPlatformStudio } from './studioClassification';
 import { getPlayerLanguage, t } from './i18n';
 
@@ -45,7 +45,7 @@ const clamp = (value: number, min = 0, max = 100) => Math.max(min, Math.min(max,
 
 const roundPercent = (value: number) => Math.round(value * 100) / 100;
 
-const getMarketCap = (stock: Stock) => Math.max(0, stock.price || 0) * getStockOutstandingShares(stock);
+const getMarketCap = (stock: Stock) => normalizeStockPrice(stock, stock.price) * getStockOutstandingShares(stock);
 
 const getHoldingShares = (player: Pick<Player, 'portfolio'>, stockId: string) => (
     Math.max(0, player.portfolio.find(item => item.stockId === stockId)?.shares || 0)
@@ -395,13 +395,15 @@ export const executeStockTakeoverAction = (
     const withCase = persistTakeoverCase({
         ...player,
         money: player.money - cost,
-        stocks: player.stocks.map(candidate => candidate.id === stock.id
-            ? {
+        stocks: player.stocks.map(candidate => {
+            if (candidate.id !== stock.id) return candidate;
+            const nextPrice = normalizeStockPrice(candidate, candidate.price * (1 + priceImpact));
+            return {
                 ...candidate,
-                price: Number(Math.max(0.01, candidate.price * (1 + priceImpact)).toFixed(2)),
-                priceHistory: [...candidate.priceHistory, Math.max(0.01, candidate.price * (1 + priceImpact))].slice(-20),
-            }
-            : candidate),
+                price: nextPrice,
+                priceHistory: [...normalizeStockPriceHistory(candidate), nextPrice].slice(-20),
+            };
+        }),
     }, takeoverCase);
     const newsItem = createTakeoverNews(player, takeoverCase, language);
 

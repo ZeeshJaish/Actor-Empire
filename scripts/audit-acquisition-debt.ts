@@ -115,6 +115,10 @@ assert(
 const unrelatedLedgerPlayer: Player = {
     ...serviced.player,
     money: 500_000_000,
+    businesses: [
+        ...serviced.player.businesses,
+        makeStudio('OTHER_STUDIO', 'Other Studio'),
+    ],
     flags: {
         ...serviced.player.flags,
         studioAcquisitionCases: [],
@@ -139,6 +143,77 @@ const wrongStudioPaydown = payDownAcquisitionDebt(unrelatedLedgerPlayer, 50_000_
 assert(!wrongStudioPaydown.success && wrongStudioPaydown.reason === 'NO_ACTIVE_DEBT', 'Studio-scoped paydown should fail when that studio has no active debt.');
 assert(wrongStudioPaydown.summary.totalRemainingPrincipal === 600_000_000, 'Studio-scoped paydown should not reduce another studio debt.');
 assert(wrongStudioPaydown.player.money === unrelatedLedgerPlayer.money, 'Failed scoped paydown should not spend cash.');
+
+const orphanDebtPlayer: Player = {
+    ...serviced.player,
+    money: 500_000_000,
+    businesses: serviced.player.businesses.filter(business => business.id !== 'WARNER_BROS'),
+    flags: {
+        ...serviced.player.flags,
+        studioAcquisitionCases: [],
+        acquisitionDebtLedger: [{
+            id: 'acq_debt_WARNER_BROS_40_120',
+            studioId: 'WARNER_BROS',
+            studioName: 'Warner Bros.',
+            originalPrincipal: 600_000_000,
+            remainingPrincipal: 600_000_000,
+            annualInterestRate: 0.12,
+            originatedWeek: 120,
+            originatedYear: 40,
+            source: 'NEGOTIATED_ACQUISITION',
+            status: 'ACTIVE',
+            interestPaidToDate: 0,
+            missedServiceAmount: 0,
+            missedPayments: 0,
+        }],
+    },
+};
+const orphanSynced = syncAcquisitionDebtLedger(orphanDebtPlayer);
+assert(
+    orphanSynced.flags?.acquisitionDebtLedger?.[0]?.status === 'PAID_OFF'
+        && orphanSynced.flags?.acquisitionDebtLedger?.[0]?.closureReason === 'ORPHANED_STUDIO_ASSET',
+    'Debt ledger should close active debt when the linked studio asset no longer exists.',
+);
+const orphanSummary = getAcquisitionDebtSummary(orphanSynced);
+assert(orphanSummary.totalRemainingPrincipal === 0, 'Orphaned studio debt should not remain in active debt totals.');
+const orphanService = processAcquisitionDebtService({ ...orphanDebtPlayer, currentWeek: 123 });
+assert(orphanService.servicedAmount === 0, 'Orphaned studio debt should not charge weekly interest.');
+
+const missingBusinessCase = syncAcquisitionDebtLedger({
+    ...makePlayer(),
+    businesses: makePlayer().businesses.filter(business => business.id !== 'WARNER_BROS'),
+});
+assert(
+    getAcquisitionDebtSummary(missingBusinessCase).entries.length === 0,
+    'Acquired-case flags should not recreate debt when the acquired studio business is gone.',
+);
+
+const mergedDebtPlayer = syncAcquisitionDebtLedger({
+    ...makePlayer(),
+    businesses: [
+        makeStudio('PLAYER_MAIN', 'Player Pictures'),
+        {
+            ...makeStudio('WARNER_BROS', 'Warner Bros.'),
+            isActive: false,
+            balance: 0,
+            stats: {
+                ...makeStudio('WARNER_BROS', 'Warner Bros.').stats,
+                weeklyRevenue: 0,
+                weeklyExpenses: 0,
+                weeklyProfit: 0,
+                valuation: 0,
+            },
+            studioState: {
+                acquisitionOrigin: 'STUDIO_ACQUISITION',
+                operatingModel: 'FULL_MERGER',
+                mergedIntoStudioId: 'PLAYER_MAIN',
+            },
+        } as Business,
+    ],
+});
+const mergedSummary = getAcquisitionDebtSummary(mergedDebtPlayer);
+assert(mergedSummary.entries.length === 1, 'Full-merged studio debt should stay active because HQ absorbed the liability.');
+assert(mergedSummary.totalRemainingPrincipal === 16_000_000_000, 'Full-merged studio debt should still reflect acquired liabilities.');
 
 const missed = processAcquisitionDebtService({
     ...makePlayer(1_000),

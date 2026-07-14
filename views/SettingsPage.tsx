@@ -1,23 +1,27 @@
 
 import React, { useEffect, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
-import { ArrowLeft, Twitter, Send, Star, Globe, LogOut, Coffee, Bug, Puzzle, Lock, CheckCircle2, Users, ChevronRight, Sparkles, SlidersHorizontal, ShieldCheck, Gauge, Database, Copy, Smartphone, MessageCircle, LifeBuoy, Bell } from 'lucide-react';
+import { ArrowLeft, Twitter, Send, Star, Globe, LogOut, Coffee, Bug, Puzzle, Lock, CheckCircle2, Users, ChevronRight, Sparkles, SlidersHorizontal, ShieldCheck, Gauge, Database, Copy, Smartphone, MessageCircle, LifeBuoy, Bell, Download, Upload } from 'lucide-react';
 import { GameLanguage, Player } from '../types';
 import { APP_DISPLAY_VERSION } from '../services/appVersion';
+import { CHANGELOG_ENTRIES, getChangelogTypeLabel, getLatestChangelogEntry, type ChangelogUpdateType } from '../services/changelog';
 import { createGlobalActorPackNPCs, getGlobalActorPackDescription, getGlobalActorPackLabel, GLOBAL_ACTOR_PACKS } from '../services/npcLogic';
 import { getGlobalCreatorCountForPack } from '../services/youtubeLogic';
 import { getPlayerLanguage, SUPPORTED_LANGUAGES, t } from '../services/i18n';
 import { buildActiveNewPlayerTutorialState, writeNewPlayerTutorialState } from '../services/newPlayerTutorial';
+import { isAndroidSaveTransferSurface, type SaveTransferResult } from '../services/saveTransfer';
 import { addBreadcrumb, enableManualPushNotifications, getFirebaseAuthStatus, getFirebasePushStatus, markTraceAction, onFirebaseAuthStatusChanged, onFirebasePushStatusChanged, submitPlayerIssueReport, trackGameEvent } from '../services/firebaseService';
 
 interface SettingsPageProps {
   player: Player;
   onUpdatePlayer: (updater: (player: Player) => Player) => void;
+  onExportData: () => Promise<SaveTransferResult>;
+  onImportData: () => Promise<SaveTransferResult | void>;
   onBack: () => void;
   onMainMenu: () => void;
 }
 
-type SettingsMode = 'SETTINGS' | 'PERFORMANCE' | 'GAMEPLAY' | 'LANGUAGE' | 'SUPPORT' | 'COMMUNITY' | 'MODS' | 'EXTERNAL_ACTORS';
+type SettingsMode = 'SETTINGS' | 'PERFORMANCE' | 'GAMEPLAY' | 'LANGUAGE' | 'SUPPORT' | 'COMMUNITY' | 'MODS' | 'EXTERNAL_ACTORS' | 'DATA_TRANSFER' | 'CHANGELOG';
 type SettingsIcon = React.ComponentType<{ size?: number; className?: string }>;
 
 const ISSUE_CATEGORIES = [
@@ -52,18 +56,22 @@ const getSupportDeviceId = () => {
   }
 };
 
-export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlayer, onBack, onMainMenu }) => {
+export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlayer, onExportData, onImportData, onBack, onMainMenu }) => {
   const [mode, setMode] = useState<SettingsMode>('SETTINGS');
   const [isReportOpen, setIsReportOpen] = useState(false);
   const [reportCategory, setReportCategory] = useState(ISSUE_CATEGORIES[0].id);
   const [reportDetails, setReportDetails] = useState('');
   const [sentIssueId, setSentIssueId] = useState<string | null>(null);
   const [supportNotice, setSupportNotice] = useState<string | null>(null);
+  const [transferNotice, setTransferNotice] = useState<string | null>(null);
+  const [isTransferBusy, setIsTransferBusy] = useState(false);
+  const [selectedChangelogVersion, setSelectedChangelogVersion] = useState(APP_DISPLAY_VERSION);
   const [supportDeviceId] = useState(getSupportDeviceId);
   const [authStatus, setAuthStatus] = useState(getFirebaseAuthStatus);
   const [pushStatus, setPushStatus] = useState(getFirebasePushStatus);
   const [isEnablingPush, setIsEnablingPush] = useState(false);
   const language = getPlayerLanguage(player);
+  const showSaveTransfer = isAndroidSaveTransferSurface();
   const selectedLanguageOption = SUPPORTED_LANGUAGES.find(option => option.id === language);
   const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
   const smoothModeEnabled = player.settings?.smoothMode === true;
@@ -94,6 +102,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
     ? player.flags.enabledGlobalActorPacks as string[]
     : [];
   const selectedIssueCategory = ISSUE_CATEGORIES.find(category => category.id === reportCategory) || ISSUE_CATEGORIES[0];
+  const selectedChangelogEntry = CHANGELOG_ENTRIES.find(entry => entry.version === selectedChangelogVersion) || getLatestChangelogEntry();
   const selectedIssueCategoryLabel = tr(selectedIssueCategory.labelKey);
   const pushStatusLabel = pushStatus.state === 'ready'
     ? tr('settings.push.on')
@@ -337,6 +346,36 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
     window.location.href = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   };
 
+  const handleExportTransfer = async () => {
+    if (isTransferBusy) return;
+    setIsTransferBusy(true);
+    setTransferNotice(null);
+    try {
+      const result = await onExportData();
+      setTransferNotice(`Export ready: ${result.saveSlots} save slot${result.saveSlots === 1 ? '' : 's'} signed.`);
+    } catch (error) {
+      setTransferNotice(error instanceof Error ? error.message : 'Export failed.');
+    } finally {
+      setIsTransferBusy(false);
+    }
+  };
+
+  const handleImportTransfer = async () => {
+    if (isTransferBusy) return;
+    setIsTransferBusy(true);
+    setTransferNotice(null);
+    try {
+      const result = await onImportData();
+      if (result) {
+        setTransferNotice(`Imported ${result.saveSlots} save slot${result.saveSlots === 1 ? '' : 's'}. Restarting.`);
+      }
+    } catch (error) {
+      setTransferNotice(error instanceof Error ? error.message : 'Import blocked.');
+    } finally {
+      setIsTransferBusy(false);
+    }
+  };
+
   const renderSubpageHeader = (eyebrow: string, title: string, backTarget: SettingsMode = 'SETTINGS') => (
     <div className="flex items-center gap-4">
       <button onClick={() => setMode(backTarget)} className="p-2 bg-zinc-900 rounded-full hover:bg-zinc-800 transition-colors">
@@ -390,6 +429,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
         </div>
       </button>
     );
+  };
+
+  const getChangelogTone = (type: ChangelogUpdateType) => {
+    if (type === 'MAJOR') return 'border-amber-400/35 bg-amber-500/10 text-amber-200';
+    if (type === 'MINOR') return 'border-sky-400/30 bg-sky-500/10 text-sky-200';
+    return 'border-emerald-400/30 bg-emerald-500/10 text-emerald-200';
   };
 
   const enableActorPack = (packId: string) => {
@@ -588,6 +633,157 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
               </button>
             );
           })}
+        </div>
+      </div>
+    );
+  }
+
+  if (mode === 'DATA_TRANSFER') {
+    return (
+      <div className="space-y-5 pb-24 pt-4">
+        {renderSubpageHeader('Android Migration', 'Save Transfer')}
+
+        <div className="glass-card rounded-3xl p-5 space-y-4">
+          <div className="flex items-start gap-3">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-500/15 text-emerald-300">
+              <ShieldCheck size={22} />
+            </div>
+            <div className="min-w-0">
+              <div className="font-black text-white">Signed save file</div>
+              <p className="mt-1 text-sm leading-relaxed text-zinc-500">
+                Export from the Telegram build, then import the same file on the Play Store build. Edited or corrupted files are blocked before they touch the save slots.
+              </p>
+            </div>
+          </div>
+
+          {transferNotice && (
+            <div className="rounded-2xl border border-sky-500/20 bg-sky-500/10 px-4 py-3 text-sm font-bold text-sky-200">
+              {transferNotice}
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-3">
+          <button
+            type="button"
+            onClick={handleExportTransfer}
+            disabled={isTransferBusy}
+            className="w-full rounded-3xl border border-emerald-500/20 bg-emerald-500/10 p-5 text-left transition-all hover:bg-emerald-500/15 disabled:opacity-70"
+          >
+            <div className="flex items-center gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-500 text-black">
+                <Download size={22} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="font-black text-white">{isTransferBusy ? 'Working...' : 'Export Game Data'}</div>
+                <div className="mt-1 text-xs leading-relaxed text-zinc-400">Creates one signed transfer file with every local save slot.</div>
+              </div>
+            </div>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleImportTransfer}
+            disabled={isTransferBusy}
+            className="w-full rounded-3xl border border-amber-500/20 bg-amber-500/10 p-5 text-left transition-all hover:bg-amber-500/15 disabled:opacity-70"
+          >
+            <div className="flex items-center gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-500 text-black">
+                <Upload size={22} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="font-black text-white">Import Game Data</div>
+                <div className="mt-1 text-xs leading-relaxed text-zinc-400">Verifies the signature, replaces local save slots, then restarts the game.</div>
+              </div>
+            </div>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (mode === 'CHANGELOG') {
+    return (
+      <div className="space-y-5 pb-24 pt-4">
+        {renderSubpageHeader('Release Notes', 'Changelog')}
+
+        <div className="glass-card rounded-3xl p-5 space-y-4">
+          <div className="flex items-start gap-3">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-500/15 text-amber-300">
+              <Sparkles size={22} />
+            </div>
+            <div className="min-w-0">
+              <div className="font-black text-white">Every version in one place</div>
+              <p className="mt-1 text-sm leading-relaxed text-zinc-500">
+                Tap a version to see what changed. Legacy entries are best-effort notes until exact historic release copy is added.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-2.5">
+          {CHANGELOG_ENTRIES.map(entry => {
+            const isSelected = entry.version === selectedChangelogEntry.version;
+            return (
+              <button
+                key={entry.version}
+                type="button"
+                aria-pressed={isSelected}
+                onClick={() => setSelectedChangelogVersion(entry.version)}
+                className={`w-full rounded-2xl border p-4 text-left transition-colors ${isSelected ? 'border-amber-400/40 bg-amber-500/10' : 'border-white/5 bg-zinc-900/55 hover:bg-zinc-800/80'}`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="text-lg font-black text-white">v{entry.version}</div>
+                      <span className={`rounded-full border px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.16em] ${getChangelogTone(entry.type)}`}>
+                        {getChangelogTypeLabel(entry.type)}
+                      </span>
+                    </div>
+                    <div className="mt-1 text-sm font-bold text-zinc-300">{entry.title}</div>
+                    <div className="mt-1 text-xs leading-relaxed text-zinc-500 line-clamp-2">{entry.summary}</div>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <div className="text-[10px] font-black uppercase tracking-[0.18em] text-zinc-500">{entry.releaseLabel}</div>
+                    {entry.version === APP_DISPLAY_VERSION && (
+                      <div className="mt-2 rounded-full border border-emerald-400/30 bg-emerald-500/10 px-2 py-1 text-[9px] font-black uppercase tracking-widest text-emerald-200">
+                        Current
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="glass-card rounded-3xl p-5 space-y-5">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="text-[10px] font-black uppercase tracking-[0.24em] text-zinc-500">Selected Version</div>
+              <span className={`rounded-full border px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.16em] ${getChangelogTone(selectedChangelogEntry.type)}`}>
+                {getChangelogTypeLabel(selectedChangelogEntry.type)}
+              </span>
+            </div>
+            <h3 className="mt-2 text-2xl font-black text-white">v{selectedChangelogEntry.version} - {selectedChangelogEntry.title}</h3>
+            <p className="mt-2 text-sm leading-relaxed text-zinc-400">{selectedChangelogEntry.summary}</p>
+          </div>
+
+          <div className="space-y-4">
+            {selectedChangelogEntry.sections.map(section => (
+              <div key={section.heading} className="rounded-2xl border border-white/5 bg-zinc-950/60 p-4">
+                <div className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-300">{section.heading}</div>
+                <ul className="mt-3 space-y-2 text-sm leading-relaxed text-zinc-300">
+                  {section.items.map(item => (
+                    <li key={item} className="flex gap-2">
+                      <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-300/80" aria-hidden="true" />
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     );
@@ -1041,6 +1237,24 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
           value={tr('settings.activeShort', { count: enabledPackIds.length })}
           onClick={() => setMode('GAMEPLAY')}
         />
+        <SettingsRow
+          icon={Sparkles}
+          title="Changelog"
+          subtitle="See every version and what changed"
+          value={`v${APP_DISPLAY_VERSION}`}
+          tone="community"
+          onClick={() => setMode('CHANGELOG')}
+        />
+        {showSaveTransfer && (
+          <SettingsRow
+            icon={Database}
+            title="Save Transfer"
+            subtitle="Export or import signed Android save data"
+            value="Android"
+            tone="community"
+            onClick={() => setMode('DATA_TRANSFER')}
+          />
+        )}
         <SettingsRow
           icon={LifeBuoy}
           title={tr('settings.support')}

@@ -23,6 +23,7 @@ import {
     getStudioGroup,
     setSubsidiaryOperatingModel,
 } from '../../../services/studioGroup';
+import { getAcquisitionDebtSummary } from '../../../services/acquisitionDebt';
 import { OwnedStudioCommandCenter } from './OwnedStudioCommandCenter';
 import { getPlayerLanguage } from '../../../services/i18n';
 
@@ -170,6 +171,11 @@ export const StudioGroupView: React.FC<StudioGroupViewProps> = ({ player, onBack
     const groupCapital = group.allStudios.reduce((total, studio) => total + (studio.balance || 0), 0);
     const weeklyResult = group.allStudios.reduce((total, studio) => total + (studio.stats.weeklyProfit || 0), 0);
     const integratedValue = group.mergedStudios.reduce((total, studio) => total + (studio.stats.valuation || 0), 0);
+    const debtSummary = getAcquisitionDebtSummary(player);
+    const mergedStudioIds = new Set(group.mergedStudios.map(studio => studio.id));
+    const mergedDebtTotal = debtSummary.entries
+        .filter(entry => mergedStudioIds.has(entry.studioId))
+        .reduce((total, entry) => total + entry.remainingPrincipal, 0);
 
     React.useEffect(() => {
         if (initialCommandStudioId) setCommandStudioId(initialCommandStudioId);
@@ -298,7 +304,9 @@ export const StudioGroupView: React.FC<StudioGroupViewProps> = ({ player, onBack
                             <Building2 size={30} className="mx-auto text-zinc-700" />
                             <h3 className="mt-4 text-lg font-black uppercase">No subsidiaries yet</h3>
                             <p className="mx-auto mt-2 max-w-sm text-[10px] font-semibold leading-relaxed text-zinc-500">
-                                Studios acquired through Forbes will appear here with their finances, identity and operating model intact.
+                                {group.mergedStudios.length
+                                    ? 'No active subsidiary banners remain. Fully merged studios are tracked below as HQ assets.'
+                                    : 'Studios acquired through Forbes will appear here with their finances, identity and operating model intact.'}
                             </p>
                         </div>
                     )}
@@ -314,36 +322,49 @@ export const StudioGroupView: React.FC<StudioGroupViewProps> = ({ player, onBack
                                 <div className="text-right">
                                     <div className="text-[6px] font-black uppercase tracking-wider text-zinc-600">Transferred Value</div>
                                     <div className="mt-1 font-mono text-sm font-black text-amber-200">{formatMoney(integratedValue)}</div>
+                                    {mergedDebtTotal > 0 ? (
+                                        <div className="mt-0.5 text-[6px] font-black uppercase tracking-wider text-rose-300">
+                                            HQ Debt {formatMoney(mergedDebtTotal)}
+                                        </div>
+                                    ) : null}
                                 </div>
                             </div>
                             <div className="mt-3 space-y-2">
-                                {group.mergedStudios.map(studio => (
-                                    <div key={studio.id} className="rounded-[16px] border border-amber-300/15 bg-black/35 p-3">
-                                        <div className="flex items-center justify-between gap-3">
-                                            <div className="min-w-0">
-                                                <div className="text-[6px] font-black uppercase tracking-[0.2em] text-zinc-600">Former Studio Banner</div>
-                                                <div className="mt-1 truncate font-serif text-[15px] font-black uppercase italic text-white">{studio.name}</div>
+                                {group.mergedStudios.map(studio => {
+                                    const studioDebt = debtSummary.entries.find(entry => entry.studioId === studio.id)?.remainingPrincipal || 0;
+                                    return (
+                                        <div key={studio.id} className="rounded-[16px] border border-amber-300/15 bg-black/35 p-3">
+                                            <div className="flex items-center justify-between gap-3">
+                                                <div className="min-w-0">
+                                                    <div className="text-[6px] font-black uppercase tracking-[0.2em] text-zinc-600">Former Studio Banner</div>
+                                                    <div className="mt-1 truncate font-serif text-[15px] font-black uppercase italic text-white">{studio.name}</div>
+                                                    {studioDebt > 0 ? (
+                                                        <div className="mt-1 font-mono text-[8px] font-black uppercase tracking-wider text-rose-300">
+                                                            HQ assumed debt {formatMoney(studioDebt)}
+                                                        </div>
+                                                    ) : null}
+                                                </div>
+                                                <div className="rounded-full border border-amber-300/25 bg-amber-300/[0.08] px-2.5 py-1 text-[6px] font-black uppercase tracking-wider text-amber-200">
+                                                    Absorbed
+                                                </div>
                                             </div>
-                                            <div className="rounded-full border border-amber-300/25 bg-amber-300/[0.08] px-2.5 py-1 text-[6px] font-black uppercase tracking-wider text-amber-200">
-                                                Absorbed
+                                            <div className="mt-3 grid grid-cols-3 overflow-hidden rounded-[12px] border border-white/[0.06] bg-black/35">
+                                                <div className="border-r border-white/[0.06] p-2">
+                                                    <div className="text-[5px] font-black uppercase tracking-wider text-zinc-600">Catalog</div>
+                                                    <div className="mt-1 font-mono text-[10px] font-black text-white">{(studio.studioState?.ownedRights?.length || 0) + (studio.studioState?.purchasedIPTitles?.length || 0)}</div>
+                                                </div>
+                                                <div className="border-r border-white/[0.06] p-2">
+                                                    <div className="text-[5px] font-black uppercase tracking-wider text-zinc-600">Capital</div>
+                                                    <div className="mt-1 truncate font-mono text-[10px] font-black text-emerald-300">{formatMoney(studio.balance)}</div>
+                                                </div>
+                                                <div className="p-2">
+                                                    <div className="text-[5px] font-black uppercase tracking-wider text-zinc-600">Status</div>
+                                                    <div className="mt-1 text-[8px] font-black uppercase text-amber-200">HQ Asset</div>
+                                                </div>
                                             </div>
                                         </div>
-                                        <div className="mt-3 grid grid-cols-3 overflow-hidden rounded-[12px] border border-white/[0.06] bg-black/35">
-                                            <div className="border-r border-white/[0.06] p-2">
-                                                <div className="text-[5px] font-black uppercase tracking-wider text-zinc-600">Catalog</div>
-                                                <div className="mt-1 font-mono text-[10px] font-black text-white">{(studio.studioState?.ownedRights?.length || 0) + (studio.studioState?.purchasedIPTitles?.length || 0)}</div>
-                                            </div>
-                                            <div className="border-r border-white/[0.06] p-2">
-                                                <div className="text-[5px] font-black uppercase tracking-wider text-zinc-600">Capital</div>
-                                                <div className="mt-1 truncate font-mono text-[10px] font-black text-emerald-300">{formatMoney(studio.balance)}</div>
-                                            </div>
-                                            <div className="p-2">
-                                                <div className="text-[5px] font-black uppercase tracking-wider text-zinc-600">Status</div>
-                                                <div className="mt-1 text-[8px] font-black uppercase text-amber-200">HQ Asset</div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         </section>
                     ) : null}

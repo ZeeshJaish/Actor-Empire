@@ -1,16 +1,17 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 import { Player, BudgetTier, Genre, ProjectDetails, ActiveRelease, Commitment, Business, LocationDetails, NewsItem, XPost, StudioEquipment, CrewMember, Universe, UniverseId, BoxOfficeRegionId, ProjectMusicStrategy, MusicCreditRole, MusicArtist, ProjectInvestorFundingMode } from '../../../types';
 import { ArrowLeft, Film, DollarSign, Users, TrendingUp, Calendar, Check, Plus, Star, Award, Zap, Briefcase, LayoutGrid, MapPin, PenTool, Globe, Camera, Clapperboard, ChevronRight, Lock, Building2, BarChart3, ShieldAlert, Crown, LogOut, AlertTriangle, Sparkles, BookOpen, Video, X, Clock, Palette, Lightbulb, Mic, Box, Info, CheckCircle, XCircle, Layers, Loader2, Search } from 'lucide-react';
 import { NPC_DATABASE, getAvailableTalent, calculateProjectFameMultiplier, isCastableActor } from '../../../services/npcLogic';
-import { calculateCastDepthScore, getDirectorTalent } from '../../../services/roleLogic';
-import { buildUniverseRoster, getFallbackCharacterName, getUniverseCharacterKeyAliases, getUniverseDashboardProjects, normalizeUniverseCharacterKey, normalizeUniverseForSave, normalizeUniverseMap } from '../../../services/universeLogic';
+import { calculateCastDepthScore, getDirectorTalent, getPhaseDuration } from '../../../services/roleLogic';
+import { buildUniverseRoster, getFallbackCharacterName, getUniverseCharacterKeyAliases, getUniverseCharacterSelectionOptions, getUniverseDashboardProjects, isUniverseRetired, normalizeUniverseCharacterKey, normalizeUniverseForSave, normalizeUniverseMap } from '../../../services/universeLogic';
 import { getEquipmentStageName } from './FacilitiesView';
 import { showAd } from '../../../services/adLogic';
 import { hasNoAds, spendPlayerEnergy } from '../../../services/premiumLogic';
 import { PHASE_ONE_ENERGY_COSTS } from '../../../services/energyCosts';
 import { formatProjectFormatLabel } from '../../../services/genreCatalog';
 import { getPlayerLanguage, t } from '../../../services/i18n';
+import { resolveProjectType } from '../../../services/businessLogic';
 import { addBreadcrumb, markGameCheckpoint, markTraceAction, setCrashContext, startPerformanceTrace, stopPerformanceTrace, trackGameEvent } from '../../../services/firebaseService';
 import { applyLockedSeasonFunding, markHiddenSeasonFundingUsed } from '../../../services/streamingFundingLogic';
 import { InteractiveRegionMap, RegionMapLocationPin } from './components/InteractiveRegionMap';
@@ -35,6 +36,8 @@ import {
     normalizeInvestorRaiseAmount,
     updateInvestorRelationshipsForPlan
 } from '../../../services/projectInvestors';
+import { getInheritedStudioProjects } from '../../../services/legacyLogic';
+import { createProductionCalendar } from '../../../services/productionCalendar';
 
 type ConnectedProjectIntent = 'AUTO' | 'SOLO' | 'CROSSOVER' | 'EVENT' | 'REBOOT';
 
@@ -625,6 +628,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
     const language = getPlayerLanguage(player);
     const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
     const [selectedScriptId, setSelectedScriptId] = useState<string | null>(initialConcept?.scriptId || null);
+    const loadedScriptStateRef = useRef<string | null>(initialConcept?.scriptId ? `initial:${initialConcept.scriptId}` : null);
     type GreenlightStep = 'SELECT_SCRIPT' | 'DIRECTOR' | 'CAST' | 'CREW' | 'EQUIPMENT' | 'LOCATION' | 'SETUP' | 'CONFIRM' | 'BUZZ';
     const initialStep = initialConcept?.lastStep === 'TONE' ? 'SETUP' : (initialConcept?.lastStep || (initialConcept ? 'DIRECTOR' : 'SELECT_SCRIPT'));
     const [step, setStep] = useState<GreenlightStep>(initialStep);
@@ -700,6 +704,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
     const [connectedProjectIntent, setConnectedProjectIntent] = useState<ConnectedProjectIntent>(initialConcept?.connectedProjectIntent || 'AUTO');
     const [showStoryConnectionInfo, setShowStoryConnectionInfo] = useState(false);
     const [showCharacterFlowInfo, setShowCharacterFlowInfo] = useState(false);
+    const [showLegacyCharacterArchive, setShowLegacyCharacterArchive] = useState(false);
 
     // Equipment State
     const [equipmentChoices, setEquipmentChoices] = useState<Record<string, string>>(initialConcept?.equipmentChoices || {
@@ -777,6 +782,8 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
 
     const normalizeReturningTalentEntries = (script: any) => {
         if (!script || typeof script !== 'object') return null;
+        const projectType = resolveProjectType(script.projectType, script.type, script.projectDetails?.type, script.mediaType);
+        const rawEpisodes = Number(script.episodes ?? script.projectDetails?.episodes);
         const safeGenres = Array.isArray(script.genres) && script.genres.length > 0
             ? script.genres.filter(Boolean)
             : [script.genre || 'DRAMA'];
@@ -784,7 +791,10 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             ...script,
             id: String(script.id || `safe_script_${script.title || Date.now()}`),
             title: String(script.title || script.name || 'Untitled Project'),
-            projectType: script.projectType === 'SERIES' ? 'SERIES' : 'MOVIE',
+            projectType,
+            episodes: projectType === 'SERIES'
+                ? Math.max(1, Math.round(Number.isFinite(rawEpisodes) ? rawEpisodes : 8))
+                : script.episodes,
             genres: safeGenres.length ? safeGenres : ['DRAMA'],
             status: script.status || 'READY',
             returningTalent: dedupeReturningTalent((Array.isArray(script.returningTalent) ? script.returningTalent : []).map((talent: any) => {
@@ -800,13 +810,11 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         };
     };
 
-    // Save Draft Helper
-    const saveDraft = () => {
-        if (!selectedScriptId) return;
-
+    const buildCurrentConceptDraft = () => {
+        if (!selectedScriptId) return null;
         const existingConcept = studio.studioState?.concepts?.find(c => c.scriptId === selectedScriptId);
 
-        const draft: any = { // Use ProjectConcept type if imported, else any
+        return { // Use ProjectConcept type if imported, else any
             id: initialConcept?.id || existingConcept?.id || `concept_${selectedScriptId}`, // Deterministic ID per script
             scriptId: selectedScriptId,
             lastUpdated: Date.now(),
@@ -836,35 +844,63 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             connectedProjectIntent,
             lastStep: step
         };
+    };
 
-        const updatedStudio = { ...studio };
-        if (!updatedStudio.studioState) updatedStudio.studioState = { scripts: [], concepts: [], writers: [], ipMarket: [], lastMarketRefreshWeek: 0, lastWriterRefreshWeek: 0 };
-        else updatedStudio.studioState = { ...updatedStudio.studioState }; // Shallow copy to trigger re-render
+    const buildStudioWithCurrentDraft = (returningTalentOverride: any[] = currentReturningTalent) => {
+        const draft = buildCurrentConceptDraft();
+        if (!draft) return null;
 
-        if (!updatedStudio.studioState.concepts) updatedStudio.studioState.concepts = [];
-        else updatedStudio.studioState.concepts = [...updatedStudio.studioState.concepts];
+        const baseStudioState: any = studio.studioState || {};
+        const defaultStudioState = {
+            scripts: [],
+            concepts: [],
+            writers: [],
+            ipMarket: [],
+            lastMarketRefreshWeek: 0,
+            lastWriterRefreshWeek: 0
+        };
+        const updatedStudio: Business = {
+            ...studio,
+            studioState: {
+                ...defaultStudioState,
+                ...baseStudioState,
+                scripts: Array.isArray(baseStudioState.scripts) ? [...baseStudioState.scripts] : [],
+                concepts: Array.isArray(baseStudioState.concepts) ? [...baseStudioState.concepts] : [],
+                writers: Array.isArray(baseStudioState.writers) ? [...baseStudioState.writers] : [],
+                ipMarket: Array.isArray(baseStudioState.ipMarket) ? [...baseStudioState.ipMarket] : []
+            } as any
+        };
 
-        const existingIndex = updatedStudio.studioState.concepts.findIndex(c => c.id === draft.id);
+        const concepts = updatedStudio.studioState!.concepts as any[];
+        const existingIndex = concepts.findIndex(c => c?.id === draft.id || c?.scriptId === draft.scriptId);
         if (existingIndex >= 0) {
-            updatedStudio.studioState.concepts[existingIndex] = draft;
+            concepts[existingIndex] = draft;
         } else {
-            updatedStudio.studioState.concepts.push(draft);
+            concepts.push(draft);
         }
 
-        // Also ensure the script is saved if returningTalent was modified
+        // Also ensure the script is saved if returningTalent was modified.
         if (selectedScript) {
-            if (!updatedStudio.studioState.scripts) updatedStudio.studioState.scripts = [];
-            else updatedStudio.studioState.scripts = [...updatedStudio.studioState.scripts];
-
-            const scriptIndex = updatedStudio.studioState.scripts.findIndex(s => s.id === selectedScript.id);
+            const scripts = updatedStudio.studioState!.scripts as any[];
+            const scriptIndex = scripts.findIndex(s => s.id === selectedScript.id);
+            const cleanReturningTalent = dedupeReturningTalent(returningTalentOverride);
             if (scriptIndex >= 0) {
-                updatedStudio.studioState.scripts[scriptIndex] = { ...selectedScript, returningTalent: dedupeReturningTalent(currentReturningTalent) };
+                scripts[scriptIndex] = { ...scripts[scriptIndex], returningTalent: cleanReturningTalent };
             }
         }
 
-        // Update player
-        const updatedPlayer = { ...player };
-        updatedPlayer.businesses = updatedPlayer.businesses.map(b => b.id === studio.id ? updatedStudio : b);
+        return updatedStudio;
+    };
+
+    // Save Draft Helper
+    const saveDraft = () => {
+        const updatedStudio = buildStudioWithCurrentDraft();
+        if (!updatedStudio) return;
+
+        const updatedPlayer = {
+            ...player,
+            businesses: (Array.isArray(player.businesses) ? player.businesses : []).map(b => b.id === studio.id ? updatedStudio : b)
+        };
         onUpdatePlayer(updatedPlayer);
     };
 
@@ -928,21 +964,10 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
 
     const activeUniverseId = useMemo(() => {
         const id = selectedUniverseId || selectedScript?.universeId || null;
-        return id && id !== 'NEW' ? id as UniverseId : null;
-    }, [selectedUniverseId, selectedScript?.universeId]);
-
-    const universeCharacterOptions = useMemo(() => {
-        if (!activeUniverseId) return [];
-        const universe = normalizeUniverseMap(player.world?.universes || {})[activeUniverseId];
-        if (!universe) return [];
-        const projects = getUniverseDashboardProjects(player, activeUniverseId, player.activeReleases || []);
-        return buildUniverseRoster(universe, projects, player.name)
-            .filter(character => character.status !== 'RETIRED')
-            .map(character => ({
-                ...character,
-                normalizedId: toUniverseCharacterId(activeUniverseId, character.name) || character.characterId || character.id
-            }));
-    }, [activeUniverseId, player]);
+        if (!id || id === 'NEW') return null;
+        const universe = normalizeUniverseMap(player.world?.universes || {})[id as UniverseId];
+        return universe && !isUniverseRetired(universe) ? id as UniverseId : null;
+    }, [selectedUniverseId, selectedScript?.universeId, player.world?.universes]);
 
     const isKnownConnectedRole = (role: { characterId?: string; characterName?: string; sourceUniverseId?: UniverseId }) => {
         if (role.sourceUniverseId) return true;
@@ -972,9 +997,11 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
 
     // Identify studio franchises (for selection)
     const studioFranchises = useMemo(() => {
+        const inheritedStudioProjects = getInheritedStudioProjects(player, studio.id);
         const studioProjects = [
             ...player.pastProjects.filter(p => p.studioId === studio.id),
-            ...player.activeReleases.filter(r => r.projectDetails.studioId === studio.id).map(r => ({ ...r.projectDetails, id: r.id }))
+            ...player.activeReleases.filter(r => r.projectDetails.studioId === studio.id).map(r => ({ ...r.projectDetails, id: r.id })),
+            ...inheritedStudioProjects
         ];
 
         const establishedFranchiseIds = new Set<string>();
@@ -1005,14 +1032,15 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                 projects: sorted
             };
         });
-    }, [player.pastProjects, player.activeReleases, studio.id]);
+    }, [player, studio.id]);
 
     const previousFranchiseInstallments = useMemo(() => {
         if (!selectedScript?.franchiseId) return [];
         const franchiseId = selectedScript.franchiseId;
         return [
             ...(player.pastProjects || []),
-            ...(player.activeReleases || [])
+            ...(player.activeReleases || []),
+            ...getInheritedStudioProjects(player, studio.id)
         ]
             .filter((project: any) => {
                 const details = project.projectDetails || project;
@@ -1027,7 +1055,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                 return (bDetails.installmentNumber || b.installmentNumber || 0) - (aDetails.installmentNumber || a.installmentNumber || 0)
                     || (b.year || b.releaseYear || 0) - (a.year || a.releaseYear || 0);
             });
-    }, [selectedScript?.franchiseId, player.pastProjects, player.activeReleases]);
+    }, [selectedScript?.franchiseId, player, studio.id]);
 
     const previousCharacterOptions = useMemo(() => {
         if (!selectedScript?.franchiseId || previousFranchiseInstallments.length === 0) return [];
@@ -1071,34 +1099,59 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         return intent === 'CROSSOVER' || intent === 'EVENT' || selectedScript?.tags?.includes('UNIVERSE_EVENT');
     }, [connectedProjectIntent, selectedScript?.connectedProjectIntent, selectedScript?.tags]);
 
+    const activeUniverseCharacterOptions = useMemo(() => (
+        getUniverseCharacterSelectionOptions(player, player.world?.universes || {}, {
+            targetUniverseId: activeUniverseId,
+            includeOutsideActiveUniverses: allowsOutsideConnectedCharacters,
+            studioId: studio.id,
+            language: getPlayerLanguage(player)
+        })
+    ), [activeUniverseId, allowsOutsideConnectedCharacters, player, studio.id]);
+
+    const legacyCharacterOptions = useMemo(() => (
+        getUniverseCharacterSelectionOptions(player, player.world?.universes || {}, {
+            includeLegacyArchive: true,
+            studioId: studio.id,
+            language: getPlayerLanguage(player)
+        }).filter(character => character.legacyArchive)
+    ), [player, studio.id]);
+
+    useEffect(() => {
+        if (showLegacyCharacterArchive && legacyCharacterOptions.length === 0) {
+            setShowLegacyCharacterArchive(false);
+        }
+    }, [showLegacyCharacterArchive, legacyCharacterOptions.length]);
+
     const linkedCharacterOptions = useMemo(() => {
-        const options: any[] = [...previousCharacterOptions];
+        const normalizedUniverses = normalizeUniverseMap(player.world?.universes || {});
+        const retiredUniverseIds = new Set(
+            Object.values(normalizedUniverses)
+                .filter(universe => isUniverseRetired(universe))
+                .map(universe => universe.id)
+        );
+        const visiblePreviousCharacterOptions = previousCharacterOptions.filter(character => {
+            if (!character.sourceUniverseId) return true;
+            return !retiredUniverseIds.has(character.sourceUniverseId) || showLegacyCharacterArchive;
+        });
+        const options: any[] = [...visiblePreviousCharacterOptions];
         const seen = new Set<string>();
-        previousCharacterOptions.forEach(character => {
+        visiblePreviousCharacterOptions.forEach(character => {
             seen.add(`${character.sourceUniverseId || character.sourceFranchiseId || 'LOCAL'}:${normalizeUniverseCharacterKey(character.characterId || character.name)}`);
         });
-        const normalizedUniverses = normalizeUniverseMap(player.world?.universes || {});
 
-        Object.values(normalizedUniverses)
-            .filter((universe) => universe.status !== 'RETIRED' && universe.studioId === studio.id && (universe.id === activeUniverseId || allowsOutsideConnectedCharacters))
-            .forEach((universe) => {
-                const projects = getUniverseDashboardProjects(player, universe.id, player.activeReleases || []);
-                buildUniverseRoster(universe, projects, player.name)
-                    .filter(character => character.status !== 'RETIRED')
-                    .forEach(character => {
-                        const characterId = character.characterId || character.id || normalizeUniverseCharacterKey(character.name);
-                        const key = `${universe.id}:${characterId}`;
-                        if (seen.has(key)) return;
-                        seen.add(key);
-                        options.push({
-                            ...character,
-                            characterId,
-                            sourceUniverseId: universe.id,
-                            sourceName: universe.name,
-                            sourceType: 'UNIVERSE'
-                        });
-                    });
+        const universeOptions = showLegacyCharacterArchive
+            ? [...activeUniverseCharacterOptions, ...legacyCharacterOptions]
+            : activeUniverseCharacterOptions;
+        universeOptions.forEach(character => {
+            const characterId = character.characterId || character.id || normalizeUniverseCharacterKey(character.name);
+            const key = `${character.sourceUniverseId}:${characterId}`;
+            if (seen.has(key)) return;
+            seen.add(key);
+            options.push({
+                ...character,
+                characterId
             });
+        });
 
         if (selectedFranchiseId && selectedFranchiseId !== 'NEW' && previousCharacterOptions.length === 0) {
             const franchise = studioFranchises.find(f => f.id === selectedFranchiseId);
@@ -1128,9 +1181,10 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             });
         }
 
-        const projectIsConnected = previousCharacterOptions.length > 0 || !!activeUniverseId || !!selectedFranchiseId || !!selectedScript?.universeId || !!selectedScript?.franchiseId || allowsOutsideConnectedCharacters;
+        const projectIsConnected = visiblePreviousCharacterOptions.length > 0 || !!activeUniverseId || !!selectedFranchiseId || !!selectedScript?.universeId || !!selectedScript?.franchiseId || allowsOutsideConnectedCharacters || (showLegacyCharacterArchive && legacyCharacterOptions.length > 0);
         return projectIsConnected
             ? options.sort((a, b) => {
+                if (!!a.legacyArchive !== !!b.legacyArchive) return a.legacyArchive ? 1 : -1;
                 const aPrevious = a.sourceType === 'FRANCHISE' && a.sourceFranchiseId === selectedScript?.franchiseId ? 0 : 1;
                 const bPrevious = b.sourceType === 'FRANCHISE' && b.sourceFranchiseId === selectedScript?.franchiseId ? 0 : 1;
                 if (aPrevious !== bPrevious) return aPrevious - bPrevious;
@@ -1140,7 +1194,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                 return String(a.name).localeCompare(String(b.name));
             })
             : [];
-    }, [activeUniverseId, player, selectedFranchiseId, selectedScript?.universeId, selectedScript?.franchiseId, studio.id, studioFranchises, previousCharacterOptions, allowsOutsideConnectedCharacters]);
+    }, [activeUniverseId, player.world?.universes, selectedFranchiseId, selectedScript?.universeId, selectedScript?.franchiseId, studioFranchises, previousCharacterOptions, allowsOutsideConnectedCharacters, activeUniverseCharacterOptions, legacyCharacterOptions, showLegacyCharacterArchive]);
 
     const getCharacterOptionValue = (character: any) => {
         const characterKey = normalizeUniverseCharacterKey(character.characterId || character.id || character.name || '');
@@ -1173,14 +1227,15 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                 rating: r.imdbRating,
                 gross: r.totalGross + (r.streamingRevenue || 0),
                 awards: [],
-            }))
+            })),
+            ...getInheritedStudioProjects(player, studio.id)
         ];
         if (studioProjects.length === 0) return 0;
         const avgRating = studioProjects.reduce((sum, project: any) => sum + (project.rating || project.imdbRating || 0), 0) / studioProjects.length;
         const awardsWon = studioProjects.reduce((sum, project: any) => sum + (project.awards?.filter((award: any) => award.outcome === 'WON').length || 0), 0);
         const hitBonus = studioProjects.filter((project: any) => (project.gross || project.boxOffice || 0) > 200_000_000).length * 1.2;
         return Math.min(100, Math.round((avgRating * 6) + (awardsWon * 2.5) + (studioProjects.length * 0.8) + hitBonus));
-    }, [player.pastProjects, player.activeReleases, studio.id]);
+    }, [player, studio.id]);
 
     // Track previous installment cost for comparison
     useEffect(() => {
@@ -1199,7 +1254,21 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
 
     // Reset state when script changes
     useEffect(() => {
-        if (selectedScriptId && (!initialConcept || selectedScriptId !== initialConcept.scriptId)) {
+        if (!selectedScriptId) {
+            loadedScriptStateRef.current = null;
+            return;
+        }
+
+        if (initialConcept && selectedScriptId === initialConcept.scriptId) {
+            loadedScriptStateRef.current = `initial:${selectedScriptId}`;
+            return;
+        }
+
+        const loadKey = `script:${selectedScriptId}`;
+        if (loadedScriptStateRef.current === loadKey) return;
+        loadedScriptStateRef.current = loadKey;
+
+        if (selectedScriptId) {
             const existingConcept = conceptByScriptId.get(selectedScriptId);
             if (existingConcept) {
                 setCrewModes(existingConcept.crewModes || {
@@ -1502,6 +1571,17 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         });
     }, [Math.floor(player.currentWeek / 3), player.flags.extraNPCs, selectedCrew.director, previousFranchiseInstallments, currentReturningTalent]);
 
+    const actorCandidatePool = useMemo(() => [
+        ...NPC_DATABASE,
+        ...(player.flags.extraNPCs || [])
+    ], [player.flags.extraNPCs]);
+
+    const getCastableActorById = (actorId?: string | null) => {
+        if (!actorId || actorId === 'UNKNOWN' || actorId === 'PLAYER_SELF') return null;
+        const actor = actorCandidatePool.find(candidate => candidate.id === actorId);
+        return actor && isCastableActor(actor) ? actor : null;
+    };
+
     const availableActors = useMemo(() => {
         const seedWeek = Math.floor(player.currentWeek / 3);
         const talent = getAvailableTalent(player.currentWeek, 'ACTOR', player.flags.extraNPCs || []).filter(isCastableActor);
@@ -1510,7 +1590,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         const selectedActorIds = castList.map(c => c.actorId).filter(id => id && id !== 'PLAYER_SELF');
         selectedActorIds.forEach(id => {
             if (!talent.some(t => t.id === id)) {
-                const selectedNPC = [...NPC_DATABASE, ...(player.flags.extraNPCs || [])].find(n => n.id === id);
+                const selectedNPC = actorCandidatePool.find(n => n.id === id);
                 if (selectedNPC && isCastableActor(selectedNPC)) talent.unshift(selectedNPC);
             }
         });
@@ -1519,9 +1599,23 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         const contracts = player.studio?.talentRoster?.filter(c => c.type === 'MOVIE_DEAL' && c.moviesRemaining > 0) || [];
         contracts.forEach(c => {
             if (!talent.some(t => t.id === c.npcId)) {
-                const selectedNPC = [...NPC_DATABASE, ...(player.flags.extraNPCs || [])].find(n => n.id === c.npcId);
+                const selectedNPC = actorCandidatePool.find(n => n.id === c.npcId);
                 if (selectedNPC && isCastableActor(selectedNPC)) talent.unshift(selectedNPC);
             }
+        });
+
+        (player.relationships || []).forEach(rel => {
+            const npcId = rel.npcId || rel.id;
+            if (!npcId || talent.some(t => t.id === npcId)) return;
+            const selectedNPC = actorCandidatePool.find(n => n.id === npcId);
+            if (selectedNPC && isCastableActor(selectedNPC)) talent.unshift(selectedNPC);
+        });
+
+        [...currentReturningTalent, ...linkedCharacterOptions, ...previousCharacterOptions, ...legacyCharacterOptions, ...activeUniverseCharacterOptions].forEach(entry => {
+            const npcId = entry?.actorId && entry.actorId !== 'UNKNOWN' ? entry.actorId : entry?.id;
+            if (!npcId || npcId === 'PLAYER_SELF' || npcId === 'UNKNOWN' || talent.some(t => t.id === npcId)) return;
+            const selectedNPC = actorCandidatePool.find(n => n.id === npcId);
+            if (selectedNPC && isCastableActor(selectedNPC)) talent.unshift(selectedNPC);
         });
 
         return talent.map(t => {
@@ -1544,7 +1638,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
 
             return { ...t, salary, stats: { ...t.stats, fame: currentFame, talent: currentTalent } };
         });
-    }, [Math.floor(player.currentWeek / 3), castList, player.studio?.talentRoster, player.flags.extraNPCs]);
+    }, [Math.floor(player.currentWeek / 3), castList, player.studio?.talentRoster, player.flags.extraNPCs, player.relationships, actorCandidatePool, currentReturningTalent, linkedCharacterOptions, previousCharacterOptions, legacyCharacterOptions, activeUniverseCharacterOptions]);
 
     const contractedActors = useMemo(() => {
         return Array.from(contractedTalentIds)
@@ -1778,21 +1872,15 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         );
         setCurrentReturningTalent(updatedReturningTalent);
 
-        const updatedScripts = (studio.studioState?.scripts || []).map(s =>
-            s.id === selectedScript?.id ? { ...s, returningTalent: updatedReturningTalent } : s
-        );
+        const updatedStudio = buildStudioWithCurrentDraft(updatedReturningTalent);
+        if (!updatedStudio) return false;
 
-        const updatedPlayer = { ...player };
-        const studioIndex = updatedPlayer.businesses.findIndex(b => b.id === studio.id);
+        const updatedBusinesses = Array.isArray(player.businesses) ? [...player.businesses] : [];
+        const studioIndex = updatedBusinesses.findIndex(b => b.id === studio.id);
         if (studioIndex !== -1) {
-            updatedPlayer.businesses[studioIndex] = {
-                ...studio,
-                studioState: {
-                    ...studio.studioState!,
-                    scripts: updatedScripts
-                }
-            };
+            updatedBusinesses[studioIndex] = updatedStudio;
         }
+        const updatedPlayer = { ...player, businesses: updatedBusinesses };
         onUpdatePlayer(updatedPlayer);
         return true;
     };
@@ -1872,7 +1960,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
 
     const estimateLinkedCharacterSalary = (character: any, roleType: string) => {
         const actorId = character.actorId && character.actorId !== 'UNKNOWN' ? character.actorId : null;
-        const actor = actorId ? availableActors.find(a => a.id === actorId) : null;
+        const actor = actorId ? (availableActors.find(a => a.id === actorId) || getCastableActorById(actorId)) : null;
         if (actor) return calculateActorSalary(actor, roleType);
 
         const fame = Math.max(20, Math.min(100, Number(character.fame ?? character.appeal ?? character.fanApproval ?? 55)));
@@ -1884,8 +1972,9 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
     const attachLinkedCharacterToRole = (roleId: string, character: any) => {
         const currentRole = castList.find(role => role.id === roleId);
         const roleType = currentRole?.roleType || 'SUPPORTING';
-        const actorId = character.actorId && character.actorId !== 'UNKNOWN' ? character.actorId : null;
-        const actor = actorId ? availableActors.find(a => a.id === actorId) : null;
+        const requestedActorId = character.actorId && character.actorId !== 'UNKNOWN' ? character.actorId : null;
+        const actor = requestedActorId ? (availableActors.find(a => a.id === requestedActorId) || getCastableActorById(requestedActorId)) : null;
+        const actorId = actor?.id || null;
         const salary = estimateLinkedCharacterSalary(character, roleType);
         const returningRole = roleType === 'LEAD' ? 'LEAD_ACTOR' : 'SUPPORTING_ACTOR';
 
@@ -1895,7 +1984,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             characterName: character.name,
             sourceUniverseId: character.sourceUniverseId || activeUniverseId || undefined,
             actorId: actorId || role.actorId,
-            actorName: character.actorName || actor?.name || role.actorName,
+            actorName: actor?.name || (actorId ? character.actorName : role.actorName),
             salary: actorId ? salary : role.salary
         } : role));
 
@@ -2105,14 +2194,15 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         if (!selectedScript) return null;
         const previewBudget = Math.max(1_000_000, budgetBreakdown.total || 1_000_000);
         const previewTier = getBudgetTierForAmount(previewBudget);
+        const previewProjectType = resolveProjectType(selectedScript.projectType, (selectedScript as any).type, (selectedScript as any).projectDetails?.type);
         return {
             title: selectedScript.title,
             sourceScriptId: selectedScript.id,
             isOriginal: selectedScript.isOriginal,
-            type: selectedScript.projectType,
+            type: previewProjectType,
             format: selectedScript.format || 'LIVE_ACTION',
             episodes: selectedScript.episodes,
-            description: `A ${selectedScript.genres.join('/')} ${selectedScript.projectType === 'SERIES' ? 'series' : 'film'} produced by ${studio.name}.`,
+            description: `A ${selectedScript.genres.join('/')} ${previewProjectType === 'SERIES' ? 'series' : 'film'} produced by ${studio.name}.`,
             studioId: studio.id as any,
             subtype: 'STANDALONE',
             genre: selectedScript.genres[0],
@@ -2671,10 +2761,28 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
 
         // Random Pre-Production Duration (4-10 weeks)
         const preProdDuration = Math.floor(Math.random() * 7) + 4;
+        const productionDuration = getPhaseDuration('PRODUCTION');
+        const postProductionDuration = getPhaseDuration('POST_PRODUCTION');
+        const productionCalendar = createProductionCalendar({
+            preProductionWeeks: preProdDuration,
+            productionWeeks: productionDuration,
+            postProductionWeeks: postProductionDuration,
+            age: player.age,
+            week: player.currentWeek,
+        });
         const isCreatingNewUniverse = selectedUniverseId === 'NEW' && !!newUniverseName.trim();
-        const primaryCastUniverseId = safeMovieCastList.find(c => c.sourceUniverseId)?.sourceUniverseId;
-        const finalUniverseId = isCreatingNewUniverse ? `universe_${Date.now()}` : (selectedUniverseId || selectedScript.universeId || primaryCastUniverseId || undefined);
         const normalizedWorldUniverses = normalizeUniverseMap(player.world?.universes || {});
+        const primaryCastUniverseId = safeMovieCastList.find(c => {
+            if (!c.sourceUniverseId) return false;
+            return !isUniverseRetired(normalizedWorldUniverses[c.sourceUniverseId]);
+        })?.sourceUniverseId;
+        const selectedActiveUniverseId = selectedUniverseId && selectedUniverseId !== 'NEW' && !isUniverseRetired(normalizedWorldUniverses[selectedUniverseId])
+            ? selectedUniverseId
+            : undefined;
+        const scriptActiveUniverseId = selectedScript.universeId && !isUniverseRetired(normalizedWorldUniverses[selectedScript.universeId])
+            ? selectedScript.universeId
+            : undefined;
+        const finalUniverseId = isCreatingNewUniverse ? `universe_${Date.now()}` : (selectedActiveUniverseId || scriptActiveUniverseId || primaryCastUniverseId || undefined);
         const universeColors = ['#e11d48', '#2563eb', '#16a34a', '#d97706', '#7c3aed', '#db2777'];
         const randomUniverseColor = universeColors[Math.floor(Math.random() * universeColors.length)];
 
@@ -2805,14 +2913,15 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             projectPhase: 'PRE_PRODUCTION',
             phaseWeeksLeft: preProdDuration,
             totalPhaseDuration: preProdDuration,
+            productionCalendar,
             projectDetails: {
                 title: selectedScript.title,
                 sourceScriptId: selectedScript.id,
                 isOriginal: selectedScript.isOriginal,
-                type: selectedScript.projectType,
+                type: resolveProjectType(selectedScript.projectType, (selectedScript as any).type, (selectedScript as any).projectDetails?.type),
                 format: selectedScript.format || 'LIVE_ACTION',
                 episodes: selectedScript.episodes,
-                description: `A ${selectedScript.genres.join('/')} ${formatProjectFormatLabel(selectedScript.format)} ${selectedScript.projectType === 'SERIES' ? 'series' : 'film'} produced by ${studio.name}${selectedScript.subjectName ? ` about ${selectedScript.subjectName}` : ''}.`,
+                description: `A ${selectedScript.genres.join('/')} ${formatProjectFormatLabel(selectedScript.format)} ${resolveProjectType(selectedScript.projectType, (selectedScript as any).type, (selectedScript as any).projectDetails?.type) === 'SERIES' ? 'series' : 'film'} produced by ${studio.name}${selectedScript.subjectName ? ` about ${selectedScript.subjectName}` : ''}.`,
                 studioId: studio.id as any,
                 subtype: projectSubtype,
                 universeId: finalUniverseId,
@@ -2925,6 +3034,11 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         const isBlockbuster = estimatedBudget > 100000000;
         const isHighQuality = buzzQuality > 85;
         const isLowQuality = buzzQuality < 45;
+        const legacyParent = player.flags?.legacyParent || null;
+        const legacyParentActorId = legacyParent?.actorId;
+        const legacyParentName = legacyParent?.name || 'the previous owner';
+        const parentTitle = legacyParent?.gender === 'FEMALE' ? 'mother' : legacyParent?.gender === 'NON_BINARY' ? 'parent' : 'father';
+        const childTitle = player.gender === 'FEMALE' ? 'daughter' : player.gender === 'NON_BINARY' ? 'child' : 'son';
 
         // 1. HEADLINE (Always 1)
         let headlineText = `${studio.name} Greenlights "${selectedScript.title}"`;
@@ -2997,13 +3111,29 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
 
                 if (story) {
                     const actorName = story.cast.name || 'Unknown Actor';
-                    const oldActorName = story.existing.actorId === 'PLAYER_SELF' ? player.name : (story.existing.actorName || 'Unknown Actor');
-                    const headline = story.isRecast
+                    const parentLinkedRole = legacyParentActorId && story.existing.actorId === legacyParentActorId;
+                    const oldActorName = parentLinkedRole ? legacyParentName : story.existing.actorId === 'PLAYER_SELF' ? player.name : (story.existing.actorName || 'Unknown Actor');
+                    const headline = parentLinkedRole && story.isRecast
+                        ? `${actorName} takes over ${legacyParentName}'s ${story.cast.characterName} role in "${selectedScript.title}"`
+                        : parentLinkedRole
+                            ? `${player.name} brings ${legacyParentName} back as ${story.cast.characterName} in "${selectedScript.title}"`
+                            : story.isRecast
                         ? `${actorName} takes over as ${story.cast.characterName} in "${selectedScript.title}"`
                         : `${story.cast.characterName} returns in "${selectedScript.title}"`;
-                    const subtext = story.isRecast
+                    const subtext = parentLinkedRole && story.isRecast
+                        ? `The franchise keeps ${story.cast.characterName} alive, while fans watch how ${player.name}'s studio handles a role built by their ${parentTitle}.`
+                        : parentLinkedRole
+                            ? `The ${childTitle}-${parentTitle} collaboration turns this connected chapter into a personal industry story.`
+                            : story.isRecast
                         ? `The universe is keeping ${story.cast.characterName} alive, but fans will be watching the recast closely after ${oldActorName}'s run.`
                         : `${actorName} is back as ${story.cast.characterName}, giving the universe another connected chapter.`;
+                    const socialContent = parentLinkedRole && story.isRecast
+                        ? `${actorName} stepping into ${story.cast.characterName} after ${legacyParentName}'s run is a serious pressure test.`
+                        : parentLinkedRole
+                            ? `${legacyParentName} returning as ${story.cast.characterName} under ${player.name}'s greenlight is going to have people talking.`
+                            : story.isRecast
+                                ? `Big swing. ${actorName} as ${story.cast.characterName} could either refresh the whole universe or split the fandom.`
+                                : `${story.cast.characterName} coming back in "${selectedScript.title}" is exactly the connected-universe energy fans wanted.`;
 
                     const characterNews: NewsItem = {
                         id: `news_character_${Date.now()}`,
@@ -3025,9 +3155,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                             authorName: story.isRecast ? 'FandomWire' : 'Universe Updates',
                             authorHandle: story.isRecast ? '@FandomWire' : '@UniverseUpdates',
                             authorAvatar: `https://api.dicebear.com/8.x/avataaars/svg?seed=${story.isRecast ? 'FandomWire' : 'UniverseUpdates'}`,
-                            content: story.isRecast
-                                ? `Big swing. ${actorName} as ${story.cast.characterName} could either refresh the whole universe or split the fandom.`
-                                : `${story.cast.characterName} coming back in "${selectedScript.title}" is exactly the connected-universe energy fans wanted.`,
+                            content: socialContent,
                             timestamp: Date.now(),
                             likes: story.isRecast ? 18000 : 12000,
                             retweets: story.isRecast ? 4200 : 2600,
@@ -3040,6 +3168,87 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                     });
                 }
             }
+        }
+
+        const legacyArchiveStory = finalizedCastList
+            .map(cast => {
+                const sourceUniverse = cast.sourceUniverseId ? normalizedWorldUniverses[cast.sourceUniverseId] : null;
+                if (!sourceUniverse || !isUniverseRetired(sourceUniverse)) return null;
+                if (finalUniverseId && cast.sourceUniverseId === finalUniverseId) return null;
+                return { cast, sourceUniverse };
+            })
+            .find(Boolean) as { cast: typeof finalizedCastList[number], sourceUniverse: Universe } | undefined;
+
+        if (legacyArchiveStory) {
+            const actorName = legacyArchiveStory.cast.name || 'Unknown Actor';
+            const characterNews: NewsItem = {
+                id: `news_legacy_character_${Date.now()}`,
+                headline: `${legacyArchiveStory.cast.characterName} returns from the ${legacyArchiveStory.sourceUniverse.name} archive`,
+                subtext: `${actorName}'s casting in "${selectedScript.title}" has fans asking if this is a one-off legacy play or the first signal of a bigger revival.`,
+                category: 'UNIVERSE',
+                week: player.currentWeek,
+                year: Math.floor(player.currentWeek / 52) + 2024,
+                impactLevel: 'HIGH'
+            };
+            characterNewsItems.push(characterNews);
+            generatedBuzz.push({ type: 'HEADLINE', data: characterNews });
+            generatedBuzz.push({
+                type: 'TWEET',
+                data: {
+                    id: `x_legacy_character_${Date.now()}`,
+                    authorId: 'npc_archive_watch',
+                    authorName: 'Archive Watch',
+                    authorHandle: '@ArchiveWatch',
+                    authorAvatar: 'https://api.dicebear.com/8.x/avataaars/svg?seed=ArchiveWatch',
+                    content: `${legacyArchiveStory.cast.characterName} showing up after ${legacyArchiveStory.sourceUniverse.name} was retired is not a normal casting choice. This could be tribute, reboot bait, or pure chaos.`,
+                    timestamp: Date.now(),
+                    likes: 21000,
+                    retweets: 5400,
+                    replies: 2600,
+                    isPlayer: false,
+                    isLiked: false,
+                    isRetweeted: false,
+                    isVerified: true
+                } as XPost
+            });
+        }
+
+        const parentCollaborationCast = legacyParentActorId && !legacyParent?.isDeceased
+            ? finalizedCastList.find(cast => cast.actorId === legacyParentActorId)
+            : null;
+        if (parentCollaborationCast) {
+            const collaborationNews: NewsItem = {
+                id: `news_parent_collab_${Date.now()}`,
+                headline: `${player.name} sets ${legacyParentName} for "${selectedScript.title}"`,
+                subtext: isPlayerDirector
+                    ? `The ${childTitle}-${parentTitle} production has extra attention because ${player.name} is calling action on a parent-led performance.`
+                    : `The ${childTitle}-${parentTitle} pairing gives ${studio.name}'s new slate a personal industry hook.`,
+                category: 'INDUSTRY',
+                week: player.currentWeek,
+                year: Math.floor(player.currentWeek / 52) + 2024,
+                impactLevel: 'MEDIUM'
+            };
+            characterNewsItems.push(collaborationNews);
+            generatedBuzz.push({ type: 'HEADLINE', data: collaborationNews });
+            generatedBuzz.push({
+                type: 'TWEET',
+                data: {
+                    id: `x_parent_collab_${Date.now()}`,
+                    authorId: 'npc_setwatch',
+                    authorName: 'SetWatch',
+                    authorHandle: '@SetWatch',
+                    authorAvatar: 'https://api.dicebear.com/8.x/avataaars/svg?seed=SetWatch',
+                    content: `${legacyParentName} joining "${selectedScript.title}" while ${player.name} runs the studio is the kind of casting story people will follow week by week.`,
+                    timestamp: Date.now(),
+                    likes: 9000,
+                    retweets: 1700,
+                    replies: 520,
+                    isPlayer: false,
+                    isLiked: false,
+                    isRetweeted: false,
+                    isVerified: true
+                } as XPost
+            });
         }
 
         // 2. SOCIAL POSTS (Increased Count)
@@ -3827,13 +4036,17 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                         const value = getCharacterOptionValue(character);
                                         return value === selectedCharacterValue || !usedCharacterValues.has(value);
                                     });
+                                    const activeAvailableCharacterOptions = availableCharacterOptions.filter(character => !character.legacyArchive);
+                                    const legacyAvailableCharacterOptions = availableCharacterOptions.filter(character => character.legacyArchive);
                                     const characterFlowHelp = allowsOutsideConnectedCharacters
                                         ? 'Crossover/Event: choose from this project plus other owned connected IP.'
                                         : previousCharacterOptions.length > 0
                                             ? 'Sequel: continuing characters from the previous movie or franchise.'
                                             : activeUniverseId
                                                 ? 'Universe: choose characters from the selected universe.'
-                                                : 'Standalone: name a new character for this movie.';
+                                                : showLegacyCharacterArchive
+                                                    ? 'Legacy Archive: retired-universe names are opt-in and will create comeback buzz.'
+                                                    : 'Standalone: name a new character for this movie.';
                                     const returningData = role.actorId
                                         ? currentReturningTalent.find(t => t.id === role.actorId && (t.role === 'LEAD_ACTOR' || t.role === 'SUPPORTING_ACTOR'))
                                         : null;
@@ -3943,6 +4156,20 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                                                     >
                                                                         <Info size={11} />
                                                                     </button>
+                                                                    {legacyCharacterOptions.length > 0 && (
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => setShowLegacyCharacterArchive(prev => !prev)}
+                                                                            className={`h-5 rounded-full border px-2 text-[8px] font-black uppercase tracking-widest transition-colors ${
+                                                                                showLegacyCharacterArchive
+                                                                                    ? 'border-amber-400 bg-amber-400/10 text-amber-200'
+                                                                                    : 'border-zinc-700 bg-black/30 text-zinc-500 hover:text-white'
+                                                                            }`}
+                                                                            aria-pressed={showLegacyCharacterArchive}
+                                                                        >
+                                                                            Legacy
+                                                                        </button>
+                                                                    )}
                                                                 </div>
                                                                 <select
                                                                     value={selectedCharacterValue}
@@ -3964,11 +4191,24 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                                                     className="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500"
                                                                 >
                                                                     <option value="">Create New Character</option>
-                                                                    {availableCharacterOptions.map(character => (
-                                                                        <option key={getCharacterOptionValue(character)} value={getCharacterOptionValue(character)}>
-                                                                            {character.name} {character.actorName ? `(${character.actorName})` : ''} - {character.sourceName}
-                                                                        </option>
-                                                                    ))}
+                                                                    {activeAvailableCharacterOptions.length > 0 && (
+                                                                        <optgroup label="Active Canon">
+                                                                            {activeAvailableCharacterOptions.map(character => (
+                                                                                <option key={getCharacterOptionValue(character)} value={getCharacterOptionValue(character)}>
+                                                                                    {character.name} {character.actorName ? `(${character.actorName})` : ''} - {character.sourceName}
+                                                                                </option>
+                                                                            ))}
+                                                                        </optgroup>
+                                                                    )}
+                                                                    {showLegacyCharacterArchive && legacyAvailableCharacterOptions.length > 0 && (
+                                                                        <optgroup label="Legacy Archive">
+                                                                            {legacyAvailableCharacterOptions.map(character => (
+                                                                                <option key={getCharacterOptionValue(character)} value={getCharacterOptionValue(character)}>
+                                                                                    {character.name} {character.actorName ? `(${character.actorName})` : ''} - {character.sourceName}
+                                                                                </option>
+                                                                            ))}
+                                                                        </optgroup>
+                                                                    )}
                                                                 </select>
                                                                 <p className="mt-1 text-[9px] text-zinc-600 leading-snug">{characterFlowHelp}</p>
                                                             </div>
@@ -3981,7 +4221,9 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                                                 <div className="min-h-[42px] flex items-center justify-between gap-3 bg-blue-500/5 border border-blue-500/20 rounded-xl px-3 py-2.5">
                                                                     <div className="min-w-0">
                                                                         <p className="text-sm font-black text-blue-100 truncate">{role.characterName || selectedCharacterOption.name}</p>
-                                                                        <p className="text-[9px] font-black uppercase tracking-widest text-blue-300/70 truncate">{selectedCharacterOption.sourceName}</p>
+                                                                        <p className={`text-[9px] font-black uppercase tracking-widest truncate ${selectedCharacterOption.legacyArchive ? 'text-amber-300/80' : 'text-blue-300/70'}`}>
+                                                                            {selectedCharacterOption.legacyArchive ? 'Legacy Archive' : selectedCharacterOption.sourceName}
+                                                                        </p>
                                                                     </div>
                                                                     <CheckCircle size={15} className="text-blue-300 shrink-0" />
                                                                 </div>

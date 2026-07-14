@@ -9,7 +9,7 @@ import type {
     ShareholderVoteType,
     Stock,
 } from '../types';
-import { getStockOwnershipPercent } from './stockLogic';
+import { getStockOwnershipPercent, normalizeStockPrice, normalizeStockPriceHistory } from './stockLogic';
 import { getPlayerLanguage, t } from './i18n';
 
 export interface ShareholderInfluence {
@@ -387,13 +387,15 @@ export const resolveShareholderVote = (
         player: {
             ...player,
             shareholderVotes: votes.map(candidate => candidate.id === voteId ? resolvedVote : candidate),
-            stocks: player.stocks.map(stock => stock.id === vote.stockId
-                ? {
+            stocks: player.stocks.map(stock => {
+                if (stock.id !== vote.stockId) return stock;
+                const nextPrice = normalizeStockPrice(stock, stock.price * (1 + stockImpact));
+                return {
                     ...stock,
-                    price: Number(Math.max(0.01, stock.price * (1 + stockImpact)).toFixed(2)),
-                    priceHistory: [...stock.priceHistory, Math.max(0.01, stock.price * (1 + stockImpact))].slice(-20),
-                }
-                : stock),
+                    price: nextPrice,
+                    priceHistory: [...normalizeStockPriceHistory(stock), nextPrice].slice(-20),
+                };
+            }),
             news: [newsItem, ...(player.news || [])].slice(0, 80),
             inbox: (player.inbox || []).filter(message => message.data?.voteId !== voteId),
             pendingEvents: (player.pendingEvents || []).filter(event => event.data?.voteId !== voteId),

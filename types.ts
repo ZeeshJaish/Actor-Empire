@@ -688,6 +688,7 @@ export interface SubsidiaryProjectProposal {
     decidedYear?: number;
     startedScriptId?: string;
     startedConceptId?: string;
+    startedCommitmentId?: string;
 }
 
 export interface SubsidiaryDecisionOption {
@@ -754,6 +755,77 @@ export interface SubsidiaryDecisionArc {
     completedYear?: number;
 }
 
+export type StudioSaleDeckStatus = 'DRAFT' | 'LISTED' | 'NEGOTIATING' | 'SIGNING' | 'CLOSED' | 'WITHDRAWN';
+
+export type StudioSaleBuyerType =
+    | 'RIVAL_STUDIO'
+    | 'FAMOUS_PERSON'
+    | 'PRIVATE_EQUITY'
+    | 'STREAMING_PLATFORM'
+    | 'NPC_PRODUCER';
+
+export type StudioSaleOfferStatus = 'PENDING' | 'COUNTERED' | 'ACCEPTED' | 'REJECTED';
+
+export type StudioSaleNameRights = 'BUYER_KEEPS_NAME' | 'BUYER_REBRANDS' | 'SELLER_RETAINS_NAME';
+
+export type StudioSaleCatalogRights = 'FULL_LIBRARY' | 'FUTURE_SLATE_ONLY' | 'SELLER_RETAINS_BACK_CATALOG';
+
+export interface StudioSaleTransferTerms {
+    nameRights: StudioSaleNameRights;
+    catalogRights: StudioSaleCatalogRights;
+    sellerCredit: boolean;
+    staffProtectionWeeks: number;
+    royaltyPercent: number;
+    royaltyWeeks: number;
+}
+
+export interface StudioSaleOffer {
+    id: string;
+    buyerName: string;
+    buyerType: StudioSaleBuyerType;
+    headline: string;
+    amount: number;
+    cashAtClose: number;
+    debtAssumed: number;
+    bankerFee: number;
+    royaltyPercent: number;
+    royaltyWeeks: number;
+    royaltyEstimate: number;
+    availableWeek: number;
+    availableYear: number;
+    availableAfterWeeks: number;
+    counterAmount?: number;
+    counterRoyaltyPercent?: number;
+    counterStatus?: 'PENDING' | 'ACCEPTED' | 'REJECTED';
+    reputationImpact: number;
+    buyerIntent: string;
+    conditions: string[];
+    status: StudioSaleOfferStatus;
+}
+
+export interface StudioSaleDeck {
+    id: string;
+    studioId: string;
+    studioName: string;
+    status: StudioSaleDeckStatus;
+    askPrice: number;
+    minimumPrice: number;
+    indicativeValuation: number;
+    debtAtListing?: number;
+    listedWeek: number;
+    listedYear: number;
+    offerWindowWeeks: number;
+    offersCloseWeek: number;
+    offersCloseYear: number;
+    transferTerms: StudioSaleTransferTerms;
+    offers: StudioSaleOffer[];
+    acceptedOfferId?: string;
+    signingStartedWeek?: number;
+    signingStartedYear?: number;
+    closedWeek?: number;
+    closedYear?: number;
+}
+
 export interface OwnedRightDevelopmentChoice {
     format: Extract<ProjectType, 'MOVIE' | 'SERIES'>;
     strategy: OwnedRightDevelopmentStrategy;
@@ -805,6 +877,7 @@ export interface StudioState {
     mergerIntegratedWeek?: number;
     mergerIntegratedYear?: number;
     mergerIntegrationCost?: number;
+    saleDeck?: StudioSaleDeck;
 }
 
 export interface GenreMarketTrend {
@@ -847,7 +920,7 @@ export interface StudioFinanceEntry {
     week: number;
     year: number;
     amount: number;
-    type: 'THEATRICAL' | 'STREAMING_DEAL' | 'STREAMING_ROYALTY' | 'SOUNDTRACK' | 'UNIVERSE' | 'CAPITAL_INJECTION' | 'CAPITAL_WITHDRAWAL' | 'PRODUCTION_SPEND' | 'FUNDING_SURPLUS' | 'INVESTOR_FUNDING' | 'INVESTOR_PAYOUT' | 'ACQUISITION_MERGER' | 'IP_ACQUISITION';
+    type: 'THEATRICAL' | 'STREAMING_DEAL' | 'STREAMING_ROYALTY' | 'SOUNDTRACK' | 'UNIVERSE' | 'CAPITAL_INJECTION' | 'CAPITAL_WITHDRAWAL' | 'PRODUCTION_SPEND' | 'FUNDING_SURPLUS' | 'INVESTOR_FUNDING' | 'INVESTOR_PAYOUT' | 'ACQUISITION_MERGER' | 'IP_ACQUISITION' | 'STUDIO_SALE';
     label: string;
     projectId?: string;
 }
@@ -905,6 +978,9 @@ export interface ProjectHiddenStats {
     rareChaosResolvedWeek?: number;
     rareChaosResolvedYear?: number;
     forcedRareChaosKind?: RareHollywoodChaosKind;
+    boxOfficeCapRoll?: number;
+    boxOfficeTotalCap?: number;
+    boxOfficeCapLabel?: 'STANDARD' | 'EVENT' | 'BREAKOUT' | 'LIMITED';
 }
 
 export type RareHollywoodChaosKind =
@@ -928,6 +1004,16 @@ export type OwnedProductionActionId =
     | 'PRODUCER_SET_QUALITY'
     | 'PRODUCER_EDIT_NOTES'
     | 'PRODUCER_RELEASE_POSITIONING';
+
+export interface ProductionCalendar {
+    preProductionWeeks: number;
+    productionWeeks: number;
+    postProductionWeeks: number;
+    totalWeeks: number;
+    focusWindowWeeks: number;
+    elapsedWeeks: number;
+    startedAbsoluteWeek?: number;
+}
 
 export interface PlayerProductionFocus {
     isPlayerActor?: boolean;
@@ -1625,6 +1711,7 @@ export interface Commitment {
     projectPhase?: 'AUDITION' | 'PLANNING' | 'PRE_PRODUCTION' | 'PRODUCTION' | 'POST_PRODUCTION' | 'SCHEDULED' | 'AWAITING_RELEASE';
     phaseWeeksLeft?: number;
     totalPhaseDuration?: number;
+    productionCalendar?: ProductionCalendar;
     auditionPerformance?: number;
     productionPerformance?: number;
     promotionalBuzz?: number;
@@ -1951,6 +2038,9 @@ export interface Message {
     isRead: boolean;
     weekSent: number;
     expiresIn?: number;
+    isExpired?: boolean;
+    expiredAtWeek?: number;
+    expiredNoticeWeeks?: number;
 }
 
 export interface Business {
@@ -3056,7 +3146,7 @@ export interface Player {
 export const INITIAL_PLAYER: Player = {
     id: 'player',
     name: 'New Player',
-    age: 18,
+    age: 15,
     gender: 'MALE',
     avatar: 'https://api.dicebear.com/8.x/pixel-art/svg?seed=Felix',
     settings: { language: 'en', smoothMode: false },
@@ -3230,7 +3320,7 @@ export const INITIAL_PLAYER: Player = {
         lastTalentRefreshWeek: 0
     },
     logs: [
-        { week: 1, year: 18, message: "Welcome to Hollywood. Your journey starts today.", type: 'neutral' },
-        { week: 1, year: 18, message: "🔔 Check your Message App for a note from the developer.", type: 'positive' }
+        { week: 1, year: 15, message: "Welcome to Hollywood. Your journey starts today.", type: 'neutral' },
+        { week: 1, year: 15, message: "🔔 Check your Message App for a note from the developer.", type: 'positive' }
     ]
 };

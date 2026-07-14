@@ -1,17 +1,24 @@
 import type {
     BudgetTier,
     Business,
+    Commitment,
     Genre,
     LogEntry,
     Message,
     NewsItem,
     Player,
     ProjectConcept,
+    ProjectDetails,
     ProjectType,
+    ProjectSubtype,
+    ReleaseScale,
+    ReleaseStrategy,
     Script,
+    StudioFinanceEntry,
     StudioOperatingMandate,
     SubsidiaryProjectProposal,
     SubsidiaryProjectSource,
+    TargetAudience,
     Universe,
     XPost,
 } from '../types';
@@ -21,6 +28,7 @@ import {
     getSubsidiaryControlProfile,
     isAcquiredStudio,
 } from './studioGroup';
+import { createProductionCalendar } from './productionCalendar';
 
 const COMMERCIAL_GENRES: Genre[] = ['ACTION', 'COMEDY', 'SCI_FI', 'ADVENTURE', 'SUPERHERO', 'THRILLER'];
 const PRESTIGE_GENRES: Genre[] = ['DRAMA', 'BIOPIC', 'DOCUMENTARY', 'CRIME', 'MUSICAL'];
@@ -53,6 +61,12 @@ const getCadenceWeeks = (mandate: StudioOperatingMandate) => {
     if (mandate.releasePace === 'AGGRESSIVE') return 10;
     if (mandate.releasePace === 'CAREFUL') return 24;
     return 16;
+};
+
+const getSubsidiaryPhaseDuration = (phase: 'PRE_PRODUCTION' | 'PRODUCTION' | 'POST_PRODUCTION', seed: string) => {
+    if (phase === 'PRE_PRODUCTION') return 6 + getSeedIndex(`${phase}:subsidiary:${seed}`, 7);
+    if (phase === 'PRODUCTION') return 8 + getSeedIndex(`${phase}:subsidiary:${seed}`, 6);
+    return 10 + getSeedIndex(`${phase}:subsidiary:${seed}`, 5);
 };
 
 const budgetValueByTier: Record<BudgetTier, number> = {
@@ -90,6 +104,171 @@ const getBudgetValue = (tier: BudgetTier, projectType: ProjectType, mandate: Stu
     const prestigeTrim = mandate.objective === 'PRESTIGE_FIRST' ? 0.82 : 1;
     const boldLift = mandate.creativeAppetite === 'BOLD' ? 1.12 : mandate.creativeAppetite === 'SAFE' ? 0.88 : 1;
     return Math.round(base * seriesMultiplier * prestigeTrim * boldLift);
+};
+
+const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
+
+const seededRange = (seed: string, min: number, max: number) => (
+    min + getSeedIndex(seed, Math.max(1, max - min + 1))
+);
+
+const getSubsidiaryReleaseStrategy = (
+    projectType: ProjectType,
+    mandate: StudioOperatingMandate,
+): ReleaseStrategy => {
+    if (projectType === 'SERIES' || mandate.focus === 'SERIES_FIRST') return 'STREAMING_ONLY';
+    if (mandate.objective === 'PRESTIGE_FIRST' && mandate.budgetAppetite !== 'PREMIUM') return 'THEATRICAL';
+    return 'THEATRICAL';
+};
+
+const getSubsidiaryReleaseScale = (tier: BudgetTier, mandate: StudioOperatingMandate): ReleaseScale => {
+    if (tier === 'BLOCKBUSTER' || tier === 'HIGH') return 'GLOBAL';
+    if (tier === 'MID' || mandate.objective === 'COMMERCIAL_FIRST') return 'MASS';
+    return 'LIMITED';
+};
+
+const getProposalSubtype = (proposal: SubsidiaryProjectProposal): ProjectSubtype => {
+    if (proposal.source === 'UNIVERSE') return 'UNIVERSE_ENTRY';
+    if (proposal.source === 'FRANCHISE') return 'SEQUEL';
+    if (proposal.source === 'OWNED_IP' && proposal.mandateSnapshot.ipStrategy === 'SEQUELS_REBOOTS') return 'REBOOT';
+    return 'STANDALONE';
+};
+
+const getTargetAudience = (genre: Genre): TargetAudience => (
+    genre === 'HORROR' || genre === 'CRIME' || genre === 'THRILLER' ? 'R' : 'PG-13'
+);
+
+const getDirectorName = (seed: string) => {
+    const first = ['Ava', 'Jordan', 'Mira', 'Leo', 'Sofia', 'Karan', 'Nia', 'Dante', 'Elena', 'Rafael'];
+    const last = ['Stone', 'Kapoor', 'Vale', 'Cross', 'Shah', 'Reyes', 'Monroe', 'Pierce', 'Okafor', 'Sinclair'];
+    return `${pickSeeded(first, `${seed}:director:first`)} ${pickSeeded(last, `${seed}:director:last`)}`;
+};
+
+const getVisibleTier = (score: number) => (
+    score >= 82 ? 'A-List' : score >= 64 ? 'Established' : 'Indie'
+);
+
+const getVisibleBuzz = (score: number) => (
+    score >= 82 ? 'Hot' : score >= 64 ? 'Good' : 'Unknown'
+);
+
+const buildSubsidiaryProjectDetails = (
+    studio: Business,
+    proposal: SubsidiaryProjectProposal,
+    scriptId: string,
+): ProjectDetails => {
+    const seed = `${proposal.id}:${studio.id}`;
+    const prestigeLift = proposal.mandateSnapshot.objective === 'PRESTIGE_FIRST' ? 8 : 0;
+    const commercialLift = proposal.mandateSnapshot.objective === 'COMMERCIAL_FIRST' ? 7 : 0;
+    const budgetLift = proposal.budgetTier === 'BLOCKBUSTER' ? 14 : proposal.budgetTier === 'HIGH' ? 9 : proposal.budgetTier === 'MID' ? 4 : 0;
+    const scriptQuality = clamp(60 + prestigeLift + seededRange(`${seed}:script`, -8, 12), 35, 95);
+    const directorQuality = clamp(58 + prestigeLift + Math.round((studio.stats.studioMomentum || studio.stats.hype || 50) / 10) + seededRange(`${seed}:director`, -8, 12), 35, 96);
+    const castingStrength = clamp(
+        54
+        + commercialLift
+        + budgetLift
+        + (proposal.mandateSnapshot.talentPolicy === 'STAR_POWER' ? 12 : proposal.mandateSnapshot.talentPolicy === 'RISING_STARS' ? -4 : 3)
+        + seededRange(`${seed}:cast`, -10, 10),
+        30,
+        98
+    );
+    const distributionPower = clamp(
+        48
+        + budgetLift
+        + Math.round((studio.stats.valuation || studio.balance || 0) / 100_000_000)
+        + seededRange(`${seed}:distribution`, -8, 12),
+        25,
+        100
+    );
+    const rawHype = clamp(
+        42
+        + commercialLift
+        + budgetLift
+        + (proposal.source === 'ORIGINAL' ? 0 : 12)
+        + seededRange(`${seed}:hype`, -12, 14),
+        18,
+        100
+    );
+    const qualityScore = clamp(
+        Math.round((scriptQuality * 0.38) + (directorQuality * 0.28) + (castingStrength * 0.22) + (distributionPower * 0.12) + seededRange(`${seed}:quality`, -5, 5)),
+        25,
+        98
+    );
+    const directorName = getDirectorName(seed);
+
+    return {
+        title: proposal.title,
+        sourceScriptId: scriptId,
+        isOriginal: proposal.source === 'ORIGINAL',
+        type: proposal.projectType,
+        format: 'LIVE_ACTION',
+        episodes: proposal.projectType === 'SERIES' ? 8 : undefined,
+        description: proposal.logline,
+        studioId: studio.id,
+        subtype: getProposalSubtype(proposal),
+        genre: proposal.genre,
+        subjectName: proposal.sourceLabel,
+        targetAudience: getTargetAudience(proposal.genre),
+        budgetTier: proposal.budgetTier,
+        estimatedBudget: proposal.estimatedBudget,
+        releaseScale: getSubsidiaryReleaseScale(proposal.budgetTier, proposal.mandateSnapshot),
+        releaseStrategy: getSubsidiaryReleaseStrategy(proposal.projectType, proposal.mandateSnapshot),
+        visibleHype: rawHype >= 78 ? 'HIGH' : rawHype >= 48 ? 'MID' : 'LOW',
+        hiddenStats: {
+            scriptQuality,
+            directorQuality,
+            castingStrength,
+            distributionPower,
+            rawHype,
+            qualityScore,
+            prestigeBonus: proposal.mandateSnapshot.objective === 'PRESTIGE_FIRST' ? 8 : 0,
+            studioPrestigeScore: Math.round(studio.stats.investorConfidence || studio.stats.brandHealth || 50),
+        },
+        directorName,
+        director: {
+            id: `sub_director_${getSeedIndex(seed, 10_000)}`,
+            name: directorName,
+            tier: getVisibleTier(directorQuality),
+            quality: directorQuality,
+        },
+        visibleDirectorTier: getVisibleTier(directorQuality),
+        visibleScriptBuzz: getVisibleBuzz(scriptQuality),
+        visibleCastStrength: castingStrength >= 82 ? 'Star-Studded' : castingStrength >= 62 ? 'Solid' : 'Thin',
+        franchiseId: proposal.franchiseId,
+        universeId: proposal.universeId,
+        installmentNumber: proposal.installmentNumber,
+    };
+};
+
+const createSubsidiaryProductionCommitment = (
+    studio: Business,
+    proposal: SubsidiaryProjectProposal,
+    scriptId: string,
+): Commitment => {
+    const phaseWeeks = getSubsidiaryPhaseDuration('PRE_PRODUCTION', proposal.id);
+    const productionWeeks = getSubsidiaryPhaseDuration('PRODUCTION', proposal.id);
+    const postProductionWeeks = getSubsidiaryPhaseDuration('POST_PRODUCTION', proposal.id);
+    const projectDetails = buildSubsidiaryProjectDetails(studio, proposal, scriptId);
+    return {
+        id: `sub_project_${proposal.id}`,
+        name: proposal.title,
+        type: 'JOB',
+        energyCost: 0,
+        income: 0,
+        payoutType: 'LUMPSUM',
+        upfrontCost: proposal.estimatedBudget,
+        projectPhase: 'PRE_PRODUCTION',
+        phaseWeeksLeft: phaseWeeks,
+        totalPhaseDuration: phaseWeeks,
+        productionCalendar: createProductionCalendar({
+            preProductionWeeks: phaseWeeks,
+            productionWeeks,
+            postProductionWeeks,
+        }),
+        productionPerformance: projectDetails.hiddenStats.qualityScore,
+        promotionalBuzz: projectDetails.hiddenStats.rawHype,
+        projectDetails,
+    };
 };
 
 const chooseProjectType = (mandate: StudioOperatingMandate, seed: string): ProjectType => {
@@ -410,6 +589,198 @@ const updateStudioOnPlayer = (player: Player, studio: Business): Player => ({
     businesses: player.businesses.map(candidate => candidate.id === studio.id ? studio : candidate),
 });
 
+const launchSubsidiaryProductionFromProposal = (
+    player: Player,
+    studio: Business,
+    studioState: NonNullable<Business['studioState']>,
+    proposal: SubsidiaryProjectProposal,
+    status: 'APPROVED' | 'AUTO_STARTED',
+): {
+    player: Player;
+    studio: Business;
+    proposal: SubsidiaryProjectProposal;
+    commitment: Commitment;
+} => {
+    const assets = createProjectAssetsFromProposal(proposal, status);
+    const baseProposal: SubsidiaryProjectProposal = {
+        ...assets.proposal,
+        decidedWeek: player.currentWeek,
+        decidedYear: player.age,
+    };
+    const commitment = createSubsidiaryProductionCommitment(studio, baseProposal, assets.script.id);
+    const updatedProposal: SubsidiaryProjectProposal = {
+        ...baseProposal,
+        startedCommitmentId: commitment.id,
+    };
+    const spend = Math.min(studio.balance, Math.max(0, updatedProposal.estimatedBudget));
+    const producedScript: Script = {
+        ...assets.script,
+        status: 'PRODUCED',
+        producedAtWeek: player.currentWeek,
+    };
+    const ledgerEntry: StudioFinanceEntry = {
+        id: `studio_ledger_subsidiary_greenlight_${commitment.id}_${player.age}_${player.currentWeek}`,
+        week: player.currentWeek,
+        year: player.age,
+        amount: -spend,
+        type: 'PRODUCTION_SPEND',
+        label: `${updatedProposal.title} autonomous greenlight spend`,
+        projectId: commitment.id,
+    };
+    const updatedStudio: Business = {
+        ...studio,
+        balance: Math.max(0, studio.balance - spend),
+        studioState: {
+            ...studioState,
+            scripts: [
+                producedScript,
+                ...studioState.scripts.filter(script => script.id !== producedScript.id),
+            ].slice(0, 80),
+            concepts: studioState.concepts.filter(concept => concept.id !== assets.concept.id && concept.scriptId !== assets.script.id),
+            subsidiaryProjectProposals: [
+                updatedProposal,
+                ...(studioState.subsidiaryProjectProposals || []).filter(candidate => candidate.id !== updatedProposal.id),
+            ].slice(0, 12),
+            financeLedger: [
+                ledgerEntry,
+                ...(studioState.financeLedger || []),
+            ].slice(0, 200),
+            lastSubsidiaryOperationWeek: player.currentWeek,
+            lastSubsidiaryOperationYear: player.age,
+        },
+    };
+    return {
+        player: updateStudioOnPlayer({
+            ...player,
+            commitments: [
+                ...(player.commitments || []).filter(existing => existing.id !== commitment.id),
+                commitment,
+            ],
+        }, updatedStudio),
+        studio: updatedStudio,
+        proposal: updatedProposal,
+        commitment,
+    };
+};
+
+const hasLiveOrArchivedSubsidiaryProject = (
+    player: Player,
+    studioId: string,
+    proposal: SubsidiaryProjectProposal,
+) => {
+    const scriptId = proposal.startedScriptId || `script_${proposal.id}`;
+    const commitmentId = proposal.startedCommitmentId || `sub_project_${proposal.id}`;
+    return (player.commitments || []).some(commitment => (
+        commitment.id === commitmentId
+        || commitment.projectDetails?.sourceScriptId === scriptId
+        || (commitment.projectDetails?.studioId === studioId && commitment.name === proposal.title)
+    ))
+        || (player.activeReleases || []).some(release => (
+            release.id === commitmentId
+            || release.projectDetails?.sourceScriptId === scriptId
+            || (release.projectDetails?.studioId === studioId && release.name === proposal.title)
+        ))
+        || (player.pastProjects || []).some(project => (
+            project.id === commitmentId
+            || project.sourceScriptId === scriptId
+            || (project.studioId === studioId && project.name === proposal.title)
+        ));
+};
+
+const reviveDormantSubsidiaryProduction = (
+    player: Player,
+    studio: Business,
+    studioState: NonNullable<Business['studioState']>,
+): Player => {
+    const profile = getSubsidiaryControlProfile(studio);
+    const mandate = getStudioOperatingMandate({ ...studio, studioState });
+    if (mandate.autoProduction === 'PAUSED') return player;
+    if (!profile.canAutoProduce && mandate.autoProduction !== 'APPROVED') return player;
+    const activeCount = (player.commitments || []).filter(commitment => commitment.projectDetails?.studioId === studio.id).length
+        + (player.activeReleases || []).filter(release => release.projectDetails?.studioId === studio.id).length;
+    const capacity = mandate.releasePace === 'AGGRESSIVE' ? 4 : mandate.releasePace === 'CAREFUL' ? 2 : 3;
+    if (activeCount >= capacity) return player;
+    const dormantProposal = [...(studioState.subsidiaryProjectProposals || [])]
+        .filter(proposal => (
+            (proposal.status === 'APPROVED' || proposal.status === 'AUTO_STARTED')
+            && !hasLiveOrArchivedSubsidiaryProject(player, studio.id, proposal)
+        ))
+        .sort((a, b) => ((a.decidedYear || a.createdYear) * 52 + (a.decidedWeek || a.createdWeek)) - ((b.decidedYear || b.createdYear) * 52 + (b.decidedWeek || b.createdWeek)))[0];
+    if (!dormantProposal) return player;
+    const launched = launchSubsidiaryProductionFromProposal(
+        player,
+        studio,
+        studioState,
+        dormantProposal,
+        dormantProposal.status === 'APPROVED' ? 'APPROVED' : 'AUTO_STARTED',
+    );
+    const logEntry: LogEntry = {
+        week: player.currentWeek,
+        year: player.age,
+        message: `🎞️ ${studio.name} moved stalled slate item ${dormantProposal.title} into real production.`,
+        type: 'positive',
+    };
+    launched.player.logs = [logEntry, ...(launched.player.logs || [])].slice(0, 50);
+    return launched.player;
+};
+
+export const prepareSubsidiaryProjectsForGameLoop = (player: Player): Player => {
+    const acquiredStudioIds = new Set(
+        (player.businesses || [])
+            .filter(studio => studio.type === 'PRODUCTION_HOUSE' && studio.studioState && isAcquiredStudio(studio) && studio.studioState.operatingModel !== 'FULL_MERGER')
+            .map(studio => studio.id)
+    );
+    if (!acquiredStudioIds.size) return player;
+    let repairedCount = 0;
+    const commitments = (player.commitments || []).map(commitment => {
+        const studioId = commitment.projectDetails?.studioId;
+        if (
+            commitment.type !== 'JOB'
+            || commitment.projectPhase !== 'AWAITING_RELEASE'
+            || !studioId
+            || !acquiredStudioIds.has(studioId)
+            || commitment.projectDetails?.releaseStrategy
+        ) {
+            return commitment;
+        }
+        const studio = player.businesses.find(candidate => candidate.id === studioId);
+        const mandate = studio ? getStudioOperatingMandate(studio) : commitment.projectDetails
+            ? {
+                focus: commitment.projectDetails.type === 'SERIES' ? 'SERIES_FIRST' : 'COMMERCIAL_HITS',
+                budgetAppetite: 'STANDARD',
+                releasePace: 'STEADY',
+                ipStrategy: 'MIXED',
+                talentPolicy: 'MIXED',
+                objective: 'COMMERCIAL_FIRST',
+                creativeAppetite: 'CALCULATED',
+                autoProduction: 'APPROVED',
+            } as StudioOperatingMandate
+            : undefined;
+        if (!mandate || !commitment.projectDetails) return commitment;
+        repairedCount += 1;
+        return {
+            ...commitment,
+            phaseWeeksLeft: 0,
+            projectDetails: {
+                ...commitment.projectDetails,
+                releaseStrategy: getSubsidiaryReleaseStrategy(commitment.projectDetails.type, mandate),
+                releaseScale: commitment.projectDetails.releaseScale || getSubsidiaryReleaseScale(commitment.projectDetails.budgetTier, mandate),
+            },
+        };
+    });
+    if (!repairedCount) return player;
+    return {
+        ...player,
+        commitments,
+        logs: [{
+            week: player.currentWeek,
+            year: player.age,
+            message: `📅 Subsidiary distribution teams scheduled ${repairedCount} stalled release${repairedCount === 1 ? '' : 's'}.`,
+            type: 'positive',
+        } as LogEntry, ...(player.logs || [])].slice(0, 50),
+    };
+};
+
 export const approveSubsidiaryProjectProposal = (
     player: Player,
     studioId: string,
@@ -426,35 +797,18 @@ export const approveSubsidiaryProjectProposal = (
     if (!proposal) return { success: false, player, reason: 'PROPOSAL_NOT_FOUND' };
     if (proposal.status !== 'PENDING') return { success: false, player, reason: 'PROPOSAL_CLOSED' };
 
-    const assets = createProjectAssetsFromProposal({
+    const launchProposal: SubsidiaryProjectProposal = {
         ...proposal,
         decidedWeek: player.currentWeek,
         decidedYear: player.age,
-    }, 'APPROVED');
-    const updatedProposal: SubsidiaryProjectProposal = {
-        ...assets.proposal,
-        decidedWeek: player.currentWeek,
-        decidedYear: player.age,
     };
-    const updatedStudio: Business = {
-        ...studio,
-        studioState: {
-            ...studioState,
-            scripts: [...studioState.scripts, assets.script],
-            concepts: [...studioState.concepts, assets.concept],
-            subsidiaryProjectProposals: (studioState.subsidiaryProjectProposals || []).map(candidate => (
-                candidate.id === proposalId ? updatedProposal : candidate
-            )),
-            lastSubsidiaryOperationWeek: player.currentWeek,
-            lastSubsidiaryOperationYear: player.age,
-        },
-    };
-    const updatedPlayer = updateStudioOnPlayer({ ...player }, updatedStudio);
-    addStudioOperationMedia(updatedPlayer, updatedProposal, 'APPROVED');
+    const launched = launchSubsidiaryProductionFromProposal({ ...player }, studio, studioState, launchProposal, 'APPROVED');
+    const updatedPlayer = launched.player;
+    addStudioOperationMedia(updatedPlayer, launched.proposal, 'APPROVED');
     const logEntry: LogEntry = {
         week: player.currentWeek,
         year: player.age,
-        message: `🎬 ${studio.name} board approved ${proposal.title}. It is now in the studio development slate.`,
+        message: `🎬 ${studio.name} board approved ${proposal.title}. Production is now active under the studio banner.`,
         type: 'positive',
     };
     updatedPlayer.logs = [logEntry, ...(updatedPlayer.logs || [])].slice(0, 50);
@@ -511,51 +865,36 @@ export const processSubsidiaryAutonomousOperations = (player: Player): Player =>
 
     nextPlayer.businesses.forEach(studio => {
         if (!studio.studioState || !isAcquiredStudio(studio) || studio.studioState.operatingModel === 'FULL_MERGER') return;
-        const mandate = getStudioOperatingMandate(studio);
+        const initialStudioState = normalizeStudioState(studio.studioState, player.currentWeek);
+        nextPlayer = reviveDormantSubsidiaryProduction(nextPlayer, { ...studio, studioState: initialStudioState }, initialStudioState);
+        const currentStudio = nextPlayer.businesses.find(candidate => candidate.id === studio.id) || studio;
+        if (!currentStudio.studioState || currentStudio.studioState.operatingModel === 'FULL_MERGER') return;
+        const mandate = getStudioOperatingMandate(currentStudio);
         if (mandate.autoProduction === 'PAUSED') return;
-        const studioState = normalizeStudioState(studio.studioState, player.currentWeek);
+        const studioState = normalizeStudioState(currentStudio.studioState, player.currentWeek);
         const hasPendingProposal = (studioState.subsidiaryProjectProposals || []).some(proposal => proposal.status === 'PENDING');
         if (hasPendingProposal) return;
 
         const lastAbsolute = typeof studioState.lastSubsidiaryOperationWeek === 'number' && typeof studioState.lastSubsidiaryOperationYear === 'number'
             ? absoluteWeek(studioState.lastSubsidiaryOperationYear, studioState.lastSubsidiaryOperationWeek)
-            : absoluteWeek(studio.studioState.acquiredYear || player.age, studio.studioState.acquiredWeek || Math.max(1, player.currentWeek - getCadenceWeeks(mandate)));
+            : absoluteWeek(currentStudio.studioState.acquiredYear || player.age, currentStudio.studioState.acquiredWeek || Math.max(1, player.currentWeek - getCadenceWeeks(mandate)));
         if (currentAbsolute - lastAbsolute < getCadenceWeeks(mandate)) return;
 
-        const proposal = planSubsidiaryProject(nextPlayer, { ...studio, studioState });
+        const proposal = planSubsidiaryProject(nextPlayer, { ...currentStudio, studioState });
         if (!proposal) return;
 
-        const profile = getSubsidiaryControlProfile(studio);
-        const shouldAutoStart = studio.studioState?.operatingModel === 'INDEPENDENT_LABEL'
+        const profile = getSubsidiaryControlProfile(currentStudio);
+        const shouldAutoStart = currentStudio.studioState?.operatingModel === 'INDEPENDENT_LABEL'
             || (profile.canAutoProduce && mandate.autoProduction === 'APPROVED');
 
         if (shouldAutoStart) {
-            const assets = createProjectAssetsFromProposal(proposal, 'AUTO_STARTED');
-            const updatedProposal: SubsidiaryProjectProposal = {
-                ...assets.proposal,
-                decidedWeek: player.currentWeek,
-                decidedYear: player.age,
-            };
-            const updatedStudio: Business = {
-                ...studio,
-                studioState: {
-                    ...studioState,
-                    scripts: [...studioState.scripts, assets.script],
-                    concepts: [...studioState.concepts, assets.concept],
-                    subsidiaryProjectProposals: [
-                        updatedProposal,
-                        ...(studioState.subsidiaryProjectProposals || []),
-                    ].slice(0, 12),
-                    lastSubsidiaryOperationWeek: player.currentWeek,
-                    lastSubsidiaryOperationYear: player.age,
-                },
-            };
-            nextPlayer = updateStudioOnPlayer({ ...nextPlayer }, updatedStudio);
-            addStudioOperationMedia(nextPlayer, updatedProposal, 'AUTO_STARTED');
+            const launched = launchSubsidiaryProductionFromProposal(nextPlayer, currentStudio, studioState, proposal, 'AUTO_STARTED');
+            nextPlayer = launched.player;
+            addStudioOperationMedia(nextPlayer, launched.proposal, 'AUTO_STARTED');
             const logEntry: LogEntry = {
                 week: player.currentWeek,
                 year: player.age,
-                message: `🏛️ ${studio.name} autonomously started ${proposal.title} from its current mandate.`,
+                message: `🏛️ ${currentStudio.name} autonomously greenlit ${proposal.title} and scheduled its release plan.`,
                 type: 'positive',
             };
             nextPlayer.logs = [logEntry, ...(nextPlayer.logs || [])].slice(0, 50);
@@ -563,7 +902,7 @@ export const processSubsidiaryAutonomousOperations = (player: Player): Player =>
         }
 
         const updatedStudio: Business = {
-            ...studio,
+            ...currentStudio,
             studioState: {
                 ...studioState,
                 subsidiaryProjectProposals: [
@@ -578,9 +917,9 @@ export const processSubsidiaryAutonomousOperations = (player: Player): Player =>
         addStudioOperationMedia(nextPlayer, proposal, 'PROPOSED');
         const inboxMessage: Message = {
             id: `msg_subsidiary_proposal_${proposal.id}`,
-            sender: `${studio.name} Board`,
+            sender: `${currentStudio.name} Board`,
             subject: `Project Proposal: ${proposal.title}`,
-            text: `${studio.name} wants to develop ${proposal.title} as a ${proposal.genre.replaceAll('_', ' ')} ${proposal.projectType.toLowerCase()} with a ${formatMoneyShort(proposal.estimatedBudget)} mandate budget. Review it inside Studio Group.`,
+            text: `${currentStudio.name} wants to develop ${proposal.title} as a ${proposal.genre.replaceAll('_', ' ')} ${proposal.projectType.toLowerCase()} with a ${formatMoneyShort(proposal.estimatedBudget)} mandate budget. Review it inside Studio Group.`,
             type: 'SYSTEM',
             data: {
                 studioId: studio.id,
@@ -595,7 +934,7 @@ export const processSubsidiaryAutonomousOperations = (player: Player): Player =>
         const logEntry: LogEntry = {
             week: player.currentWeek,
             year: player.age,
-            message: `📋 ${studio.name} submitted ${proposal.title} for board approval.`,
+            message: `📋 ${currentStudio.name} submitted ${proposal.title} for board approval.`,
             type: 'neutral',
         };
         nextPlayer.logs = [logEntry, ...(nextPlayer.logs || [])].slice(0, 50);

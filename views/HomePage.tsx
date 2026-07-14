@@ -5351,6 +5351,164 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
       alert('Universe lifecycle QA loaded. Open Development Lab > Universe: Phoenix Circuit is active, Obsidian League is archived, and Silver Dominion has a reboot script in Vault.');
   };
 
+  const triggerLegacyCharacterPickerQa = () => {
+      if (!onUpdatePlayer) return;
+
+      const { updatedPlayer: basePlayer, studio } = ensureCheatStudio();
+      const now = Date.now();
+      const currentWeek = Math.max(1, basePlayer.currentWeek || 1);
+      const currentAge = Math.max(18, basePlayer.age || 18);
+      const qaPrefix = 'cheat_legacy_picker_';
+      const actors = NPC_DATABASE.filter(n => n.occupation === 'ACTOR');
+      const pickActor = (index: number) => actors[index % Math.max(actors.length, 1)] || NPC_DATABASE[index % Math.max(NPC_DATABASE.length, 1)];
+      const makeCharacter = (id: string, name: string, actorIndex: number, fanApproval = 72) => {
+          const actor = pickActor(actorIndex);
+          return {
+              id,
+              characterId: id,
+              name,
+              actorId: actor?.id || 'UNKNOWN',
+              actorName: actor?.name || 'Unknown Actor',
+              status: 'ACTIVE' as const,
+              fanApproval,
+              appearances: 2,
+              firstAppearanceTitle: `${name}: Origins`,
+              latestAppearanceTitle: `${name}: Legacy`,
+              description: `Legacy picker QA character: ${name}.`
+          };
+      };
+
+      const activeUniverseId = `${qaPrefix}active_${now}`;
+      const retiredUniverseId = `${qaPrefix}retired_${now}`;
+      const activeUniverse = normalizeUniverseForSave({
+          id: activeUniverseId,
+          name: 'Aurora Guard',
+          description: 'Legacy picker QA active universe. This roster should appear before the Legacy toggle.',
+          studioId: studio.id,
+          currentPhase: 'PHASE_2_EXPANSION',
+          currentPhaseName: 'Phase 2: Expansion',
+          saga: 1,
+          currentSagaName: 'Saga 1',
+          momentum: 81,
+          brandPower: 84,
+          marketShare: 6,
+          color: '#22d3ee',
+          roster: [
+              makeCharacter('aurora_guard_nova_warden', 'Nova Warden', 1, 86),
+              makeCharacter('aurora_guard_solar_vex', 'Solar Vex', 2, 78),
+              makeCharacter('aurora_guard_lumen_saint', 'Lumen Saint', 3, 74)
+          ],
+          slate: [
+              { id: `${qaPrefix}active_origin_${now}`, title: 'Aurora Guard', status: 'RELEASED', year: currentAge - 1, week: 12 }
+          ],
+          stats: { weeklyRevenue: 1_200_000, lifetimeRevenue: 640_000_000 },
+          weeksUntilNextPhase: 18
+      } as any, activeUniverseId);
+
+      const retiredBaseUniverse = normalizeUniverseForSave({
+          id: retiredUniverseId,
+          name: 'Obsidian League',
+          description: 'Legacy picker QA retired universe. These names should stay hidden until the Legacy toggle is enabled.',
+          studioId: studio.id,
+          currentPhase: 'PHASE_3_WAR',
+          currentPhaseName: 'Phase 3: War',
+          saga: 2,
+          currentSagaName: 'Saga 2',
+          momentum: 31,
+          brandPower: 69,
+          marketShare: 4,
+          color: '#a855f7',
+          roster: [
+              makeCharacter('obsidian_league_midnight_lion', 'Midnight Lion', 4, 91),
+              makeCharacter('obsidian_league_glass_oracle', 'Glass Oracle', 5, 83),
+              makeCharacter('obsidian_league_metro_ghost', 'Metro Ghost', 6, 77)
+          ],
+          slate: [
+              { id: `${qaPrefix}retired_origin_${now}`, title: 'Obsidian League', status: 'RELEASED', year: currentAge - 4, week: 20 },
+              { id: `${qaPrefix}retired_finale_${now}`, title: 'Obsidian League: Last Signal', status: 'RELEASED', year: currentAge - 2, week: 31 }
+          ],
+          stats: { weeklyRevenue: 220_000, lifetimeRevenue: 805_000_000 },
+          weeksUntilNextPhase: 52
+      } as any, retiredUniverseId);
+      const retiredUniverse = retireUniverseForArchive(retiredBaseUniverse, Math.max(18, currentAge - 1), 32);
+
+      const readyScript: Script = {
+          id: `${qaPrefix}script_${now}`,
+          title: 'Aurora Guard: Archive Signal',
+          logline: 'The Aurora Guard investigate a signal that seems to come from a retired rival universe.',
+          projectType: 'MOVIE',
+          genres: ['SCI_FI'],
+          quality: 87,
+          status: 'READY',
+          writerId: 'cheat_legacy_picker_writer',
+          author: 'Cheat Writers Room',
+          weeksInDevelopment: 6,
+          totalDevelopmentWeeks: 6,
+          isOriginal: false,
+          options: [],
+          sourceMaterial: 'SPINOFF',
+          universeId: activeUniverseId,
+          universeSagaName: 'Saga 1',
+          universePhaseName: 'Phase 2',
+          connectedProjectIntent: 'EVENT',
+          tags: ['LEGACY_CHARACTER_PICKER_QA', 'UNIVERSE_EVENT']
+      };
+
+      const existingWorldUniverses = Object.fromEntries(
+          Object.entries(basePlayer.world?.universes || {}).filter(([id]) => !id.startsWith(qaPrefix))
+      ) as Record<UniverseId, any>;
+      const existingStudioUniverses = ((studio.studioState as any)?.universes || []).filter((universe: any) => !String(universe.id).startsWith(qaPrefix));
+      const existingScripts = (studio.studioState?.scripts || []).filter((script: Script) => !String(script.id).startsWith(`${qaPrefix}script_`));
+      const updatedStudio = {
+          ...studio,
+          studioState: {
+              ...(studio.studioState || {}),
+              scripts: [readyScript, ...existingScripts],
+              concepts: (studio.studioState?.concepts || []).filter((concept: any) => !String(concept.scriptId || '').startsWith(`${qaPrefix}script_`)),
+              writers: studio.studioState?.writers || [],
+              ipMarket: studio.studioState?.ipMarket || [],
+              lastMarketRefreshWeek: studio.studioState?.lastMarketRefreshWeek || currentWeek,
+              lastWriterRefreshWeek: studio.studioState?.lastWriterRefreshWeek || currentWeek,
+              universes: [activeUniverse, retiredUniverse, ...existingStudioUniverses]
+          } as any
+      };
+
+      onUpdatePlayer({
+          ...basePlayer,
+          businesses: (basePlayer.businesses || []).map(b => b.id === studio.id ? updatedStudio : b),
+          world: {
+              ...basePlayer.world,
+              universes: {
+                  ...existingWorldUniverses,
+                  [activeUniverse.id]: activeUniverse,
+                  [retiredUniverse.id]: retiredUniverse
+              }
+          },
+          newsItems: [
+              {
+                  id: `${qaPrefix}news_${now}`,
+                  headline: 'Legacy character picker QA is staged.',
+                  subtext: 'Aurora Guard is active, Obsidian League is archived, and the Greenlight character selector should only show Obsidian names after tapping Legacy.',
+                  category: 'UNIVERSE',
+                  week: currentWeek,
+                  year: currentAge,
+                  impactLevel: 'MEDIUM'
+              },
+              ...(basePlayer.newsItems || []).filter(item => !String(item.id).startsWith(`${qaPrefix}news_`))
+          ],
+          logs: [{
+              week: currentWeek,
+              year: currentAge,
+              message: '🌐 CHEAT: Legacy Character Picker QA loaded. Greenlight Aurora Guard: Archive Signal and test the Legacy toggle.',
+              type: 'positive'
+          }, ...basePlayer.logs].slice(0, 50)
+      } as Player);
+
+      setActiveCheatMenu('NONE');
+      onOpenProductionHouseCheat?.();
+      alert('Legacy Character Picker QA loaded. Open Development Lab > Vault, greenlight "Aurora Guard: Archive Signal", then Cast: Obsidian names should appear only after tapping Legacy.');
+  };
+
   const triggerUniverseNamingFlowCheat = () => {
       if (!onUpdatePlayer) return;
 
@@ -6896,6 +7054,9 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                                   </button>
                                   <button onClick={triggerUniverseLifecycleQa} className="col-span-2 bg-emerald-900/30 hover:bg-emerald-900/50 border border-emerald-500/30 text-xs font-bold py-3 rounded-lg text-emerald-300">
                                       Lifecycle Archive Kit
+                                  </button>
+                                  <button onClick={triggerLegacyCharacterPickerQa} className="col-span-2 bg-violet-900/30 hover:bg-violet-900/50 border border-violet-500/30 text-xs font-bold py-3 rounded-lg text-violet-300">
+                                      Legacy Character Picker QA
                                   </button>
                                   <button onClick={triggerUniverseNamingFlowCheat} className="col-span-2 bg-blue-900/30 hover:bg-blue-900/50 border border-blue-500/30 text-xs font-bold py-3 rounded-lg text-blue-300">
                                       Naming Flow Kit

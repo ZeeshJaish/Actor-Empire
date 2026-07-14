@@ -87,6 +87,14 @@ const makeCommitment = (overrides: Partial<Commitment> = {}): Commitment => ({
     projectPhase: 'PRE_PRODUCTION',
     phaseWeeksLeft: 3,
     totalPhaseDuration: 3,
+    productionCalendar: {
+        preProductionWeeks: 3,
+        productionWeeks: 8,
+        postProductionWeeks: 6,
+        totalWeeks: 17,
+        focusWindowWeeks: 13,
+        elapsedWeeks: 2,
+    },
     auditionPerformance: 0,
     productionPerformance: 0,
     projectDetails: {
@@ -140,6 +148,10 @@ const makeCommitment = (overrides: Partial<Commitment> = {}): Commitment => ({
 const attachedProject = makeCommitment();
 const attachedItems = deriveOwnedProductionCareerItems(makePlayer([attachedProject]));
 assert.equal(attachedItems.length, 1, 'self-attached owned project should appear in Career production section');
+assert.equal(attachedItems[0].projectWeek, 3, 'owned project should show the full project week from the stored calendar');
+assert.equal(attachedItems[0].totalProjectWeeks, 17, 'owned project should keep the full lifecycle instead of phase-only weeks');
+assert.equal(attachedItems[0].focusWindowWeeks, 13, 'owned project focus window should be derived from the full lifecycle');
+assert.equal(attachedItems[0].focusWeeksUsed, 2, 'owned project focus usage should advance from the stored project calendar');
 assert.deepEqual(
     attachedItems[0].tracks.map(track => track.type).sort(),
     ['ACTING', 'DIRECTING', 'PRODUCING'],

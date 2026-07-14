@@ -67,10 +67,19 @@ const createStudio = (id: string, name: string, model: Business['studioState']['
 const parentStudio = createStudio('parent_studio', 'Empire Pictures', undefined, 900_000_000);
 const controlledStudio = createStudio('controlled_studio', 'Artisan Pictures', 'CONTROLLED_SUBSIDIARY');
 const independentStudio = {
-    ...createStudio('independent_studio', 'Velvet Pictures', 'INDEPENDENT_LABEL', 120_000_000),
+    ...createStudio('independent_studio', 'Velvet Pictures', 'INDEPENDENT_LABEL', 20_000_000),
     stats: {
-        ...createStudio('independent_studio', 'Velvet Pictures', 'INDEPENDENT_LABEL', 120_000_000).stats,
+        ...createStudio('independent_studio', 'Velvet Pictures', 'INDEPENDENT_LABEL', 20_000_000).stats,
         weeklyProfit: -4_000_000,
+    },
+};
+const cashRichLossStudio = {
+    ...createStudio('cash_rich_loss_studio', 'Searchlight Vault', 'INDEPENDENT_LABEL', 5_000_000_000),
+    stats: {
+        ...createStudio('cash_rich_loss_studio', 'Searchlight Vault', 'INDEPENDENT_LABEL', 5_000_000_000).stats,
+        weeklyRevenue: 10_000_000,
+        weeklyExpenses: 16_000_000,
+        weeklyProfit: -6_000_000,
     },
 };
 const mergedStudio = createStudio('merged_studio', 'Merged Banner', 'FULL_MERGER');
@@ -79,7 +88,7 @@ const player: Player = {
     ...INITIAL_PLAYER,
     age: 31,
     currentWeek: 24,
-    businesses: [parentStudio, controlledStudio, independentStudio, mergedStudio],
+    businesses: [parentStudio, controlledStudio, independentStudio, cashRichLossStudio, mergedStudio],
     inbox: [],
     news: [],
     logs: [],
@@ -92,6 +101,7 @@ if (getSubsidiaryPersonality(controlledStudio) !== 'Aggressive') {
 const processed = processSubsidiaryDecisionEngine(player);
 const processedControlled = processed.businesses.find(business => business.id === controlledStudio.id)!;
 const processedIndependent = processed.businesses.find(business => business.id === independentStudio.id)!;
+const processedCashRichLoss = processed.businesses.find(business => business.id === cashRichLossStudio.id)!;
 const processedMerged = processed.businesses.find(business => business.id === mergedStudio.id)!;
 
 const controlledDecision = processedControlled.studioState?.subsidiaryDecisions?.find(decision => decision.status === 'PENDING');
@@ -110,7 +120,11 @@ if (processedMerged.studioState?.subsidiaryDecisions?.length) {
 
 const emergencyDecision = processedIndependent.studioState?.subsidiaryDecisions?.find(decision => decision.type === 'EMERGENCY_CAPITAL');
 if (!emergencyDecision) {
-    throw new Error('Loss-making subsidiaries should prefer emergency capital decisions.');
+    throw new Error('Underfunded loss-making subsidiaries should prefer emergency capital decisions.');
+}
+const cashRichEmergency = processedCashRichLoss.studioState?.subsidiaryDecisions?.find(decision => decision.type === 'EMERGENCY_CAPITAL');
+if (cashRichEmergency) {
+    throw new Error('Cash-rich subsidiaries with long runway should not spam headquarters for emergency capital.');
 }
 
 const approvedRisk = resolveSubsidiaryDecision({

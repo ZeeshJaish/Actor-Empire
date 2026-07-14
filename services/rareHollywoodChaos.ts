@@ -173,10 +173,10 @@ export const resolveRareHollywoodChaos = ({
         }[selectedForcedKind];
         if (isEligible) kind = selectedForcedKind;
     } else if (release.type === 'SERIES') {
-        const revivalChance = (0.018
-            + (eligibility.rating >= 8.2 ? 0.012 : 0)
-            + (eligibility.retention >= 0.8 ? 0.01 : 0)) * suppression;
-        const moonshotChance = 0.012 * suppression;
+        const revivalChance = (0.035
+            + (eligibility.rating >= 8.2 ? 0.02 : 0)
+            + (eligibility.retention >= 0.8 ? 0.018 : 0)) * suppression;
+        const moonshotChance = (0.018 + (eligibility.provenIp ? 0.012 : 0)) * suppression;
 
         if (eligibility.revival && chanceRoll < revivalChance) {
             kind = 'CANCELLED_SHOW_REVIVAL';
@@ -184,8 +184,10 @@ export const resolveRareHollywoodChaos = ({
             kind = 'PLATFORM_MOONSHOT';
         }
     } else {
-        const rebootChance = 0.012 * suppression;
-        const sequelChance = (0.02 + (eligibility.hype >= 85 ? 0.01 : 0)) * suppression;
+        const rebootChance = (0.018 + (eligibility.hype >= 75 ? 0.01 : 0)) * suppression;
+        const sequelChance = (0.045
+            + (eligibility.hype >= 85 ? 0.02 : 0)
+            + (eligibility.rating >= 7.2 ? 0.015 : 0)) * suppression;
 
         if (eligibility.reboot && chanceRoll < rebootChance) {
             kind = 'STUDIO_REBOOT_GAMBLE';

@@ -73,10 +73,14 @@ assert(streamingBreakdown.regionBreakdowns.reduce((sum, region) => sum + region.
 assert(streamingBreakdown.globalReachScore > 0, 'Streaming breakdown should expose a global reach score for reporting.');
 
 const gameLoopSource = fs.readFileSync('services/gameLoop.ts', 'utf8');
+const releaseWizardSource = fs.readFileSync('views/lifestyle/business/ReleaseWizard.tsx', 'utf8');
 assert(gameLoopSource.includes('calculateTheatricalDistributionBreakdown'), 'Game loop should use the distribution revenue engine.');
 assert(gameLoopSource.includes('calculateStreamingDistributionBreakdown'), 'Game loop should use the streaming regional breakdown engine.');
 assert(!gameLoopSource.includes('revenue * 0.5'), 'Game loop should not pay a flat 50% theatrical studio share.');
 assert(gameLoopSource.includes('weeklyDistributionBreakdowns'), 'Game loop should persist weekly distribution breakdowns.');
 assert(gameLoopSource.includes('weeklyStreamingBreakdowns'), 'Game loop should persist weekly streaming regional breakdowns.');
+assert(gameLoopSource.includes('weeksInTheaters: newWeeklyGross.length'), 'Game loop should keep live theatrical week count current for streaming presales.');
+assert(releaseWizardSource.includes('release.weeklyGross?.length || 0'), 'Streaming presales should calculate remaining theatrical weeks from recorded weekly gross.');
+assert(releaseWizardSource.includes('Math.max(0, release.weekNum - 1)'), 'Streaming presales should fall back to weekNum when weeksInTheaters is missing.');
 
 console.log('Distribution revenue audit passed.');

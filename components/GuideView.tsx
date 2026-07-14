@@ -193,6 +193,25 @@ const PROBLEM_SOLVERS: ProblemSolverConfig[] = [
         ]
     },
     {
+        id: 'health',
+        titleKey: 'problem.health.title',
+        subtitleKey: 'problem.health.subtitle',
+        icon: <Activity size={18} className="text-rose-300" />,
+        keywords: ['health', 'medical', 'clinic', 'wellness', 'care', 'flu', 'cold', 'pain', 'injury', 'sick', 'treatment'],
+        searchKey: 'problem.health.search',
+        whatKey: 'problem.health.what',
+        whyKey: 'problem.health.why',
+        nowKeys: ['problem.health.now1', 'problem.health.now2', 'problem.health.now3'],
+        actions: [
+            { labelKey: 'problem.action.team', appMode: 'TEAM', helperKey: 'problem.action.team.healthHelper' }
+        ],
+        related: [
+            { mode: 'HANDBOOK', sectionId: 'HEALTH_CARE', labelKey: 'problem.related.handbook.healthCare' },
+            { mode: 'FAQ', sectionId: 'FAQ_HEALTH', labelKey: 'problem.related.faq.health' },
+            { mode: 'HANDBOOK', sectionId: 'WEEKLY_LOOP', labelKey: 'problem.related.handbook.weekly' }
+        ]
+    },
+    {
         id: 'money',
         titleKey: 'problem.money.title',
         subtitleKey: 'problem.money.subtitle',
@@ -359,6 +378,14 @@ const HANDBOOK_SECTIONS: GuideSectionConfig[] = [
         bodyKeys: ['handbook.weeklyLoop.p1', 'handbook.weeklyLoop.p2', 'handbook.weeklyLoop.p3'],
     },
     {
+        id: 'HEALTH_CARE',
+        titleKey: 'handbook.healthCare.title',
+        icon: <Activity size={18} className="text-rose-400" />,
+        bodyKeys: ['handbook.healthCare.p1', 'handbook.healthCare.p2', 'handbook.healthCare.p3'],
+        bulletKeys: ['handbook.healthCare.b1', 'handbook.healthCare.b2', 'handbook.healthCare.b3'],
+        note: { titleKey: 'handbook.healthCare.noteTitle', bodyKey: 'handbook.healthCare.noteBody' },
+    },
+    {
         id: 'SOCIAL_MEDIA',
         titleKey: 'handbook.social.title',
         icon: <Smartphone size={18} className="text-pink-400" />,
@@ -482,6 +509,7 @@ const FAQ_SECTIONS: GuideSectionConfig[] = [
     { id: 'FAQ_BUSINESS_MONEY', titleKey: 'faq.businessMoney.title', icon: <BarChart3 size={18} className="text-emerald-400" />, bodyKeys: ['faq.businessMoney.p1'] },
     { id: 'FAQ_MARKETING', titleKey: 'faq.marketing.title', icon: <TrendingUp size={18} className="text-pink-400" />, bodyKeys: ['faq.marketing.p1'] },
     { id: 'FAQ_ENERGY', titleKey: 'faq.energy.title', icon: <Zap size={18} className="text-yellow-400" />, bodyKeys: ['faq.energy.p1'] },
+    { id: 'FAQ_HEALTH', titleKey: 'faq.health.title', icon: <Activity size={18} className="text-rose-400" />, bodyKeys: ['faq.health.p1'] },
     { id: 'FAQ_SPONSOR', titleKey: 'faq.sponsor.title', icon: <Briefcase size={18} className="text-emerald-400" />, bodyKeys: ['faq.sponsor.p1'] },
     { id: 'FAQ_RELATIONSHIP', titleKey: 'faq.relationship.title', icon: <Heart size={18} className="text-rose-400" />, bodyKeys: ['faq.relationship.p1'] },
     { id: 'FAQ_STUDIO', titleKey: 'faq.studio.title', icon: <Clapperboard size={18} className="text-violet-400" />, bodyKeys: ['faq.studio.p1'] },

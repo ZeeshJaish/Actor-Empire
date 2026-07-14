@@ -12,6 +12,7 @@ import { calculateProjectMusicImpact, getMusicCreditRoleLabel, getMusicStrategyL
 import { getPlayerLanguage, t } from '../../services/i18n';
 import { inferSeasonNumber } from '../../services/episodeRatings';
 import { CustomPosterImage } from '../../components/CustomPosterImage';
+import { resolveProjectType } from '../../services/businessLogic';
 
 interface ImdbAppProps {
   player: Player;
@@ -167,7 +168,16 @@ const normalizeSeriesTitleKey = (title = '') => title
 const getDisplayProjectSeriesKey = (project: DisplayProject) => {
     const original = project.originalObject as any;
     const details = original.projectDetails || original;
-    return details.franchiseId || details.sourceScriptId || normalizeSeriesTitleKey(project.name);
+    const franchiseId = details.franchiseId || original.franchiseId;
+    const titleKey = normalizeSeriesTitleKey(project.name || details.title || original.name || original.title);
+    const sourceScriptId = details.sourceScriptId || original.sourceScriptId;
+    return franchiseId
+        ? `franchise:${franchiseId}`
+        : titleKey
+            ? `title:${titleKey}`
+            : sourceScriptId
+                ? `script:${sourceScriptId}`
+                : `project:${project.id}`;
 };
 
 const getEpisodeRatingCellTone = (rating: number) => {
@@ -219,7 +229,7 @@ const EpisodeRatingsHeatmap: React.FC<{
                 </div>
             </div>
 
-            <div className="episode-rating-season-scroll overflow-x-auto no-scrollbar pb-1">
+            <div className="episode-rating-season-scroll max-h-[420px] overflow-auto no-scrollbar pb-1 pr-1">
                 <div
                     className="grid gap-1 min-w-max"
                     style={{
@@ -272,7 +282,7 @@ const getArchivedProjectMusicPlan = (project: PastProject): ProjectMusicPlan | u
     if (project.musicPlan?.credits?.length) return project.musicPlan;
     const inferredProject: ProjectDetails = {
         title: project.name,
-        type: project.projectType || 'MOVIE',
+        type: resolveProjectType(project.projectType, (project as any).type, (project as any).projectDetails?.type),
         description: project.description || '',
         studioId: project.studioId || 'ARTISAN_PICTURES',
         subtype: project.subtype || 'STANDALONE',
@@ -373,7 +383,7 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
 	          gross: r.totalGross, budget: r.budget, description: r.projectDetails.description, cast: r.projectDetails.castList,
 	          reviews: r.projectDetails.reviews, audienceReception: r.audienceReception || r.projectDetails.audienceReception,
               streamingViews: r.streaming?.totalViews, originalObject: r,
-	          mediaType: r.type, customPoster: r.projectDetails.customPoster, identityLabel: getProjectIdentityLabel(r.projectDetails),
+		          mediaType: resolveProjectType(r.type, r.projectDetails?.type, (r as any).projectType), customPoster: r.projectDetails.customPoster, identityLabel: getProjectIdentityLabel(r.projectDetails),
 	          musicPlan: getProjectMusicPlan(r.projectDetails),
 	          franchiseId: r.projectDetails.franchiseId,
 	          sourceScriptId: r.projectDetails.sourceScriptId,
@@ -391,7 +401,7 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
           id: p.id, name: p.name, year: timing.releaseYear || p.year, role: p.roleType || 'Role', rating: p.imdbRating || 0, status: 'ARCHIVED' as const,
 	          gross: p.gross, budget: p.budget, description: p.description, cast: p.castList, reviews: p.reviews, audienceReception: p.audienceReception,
               streamingViews: p.totalViews, awards: p.awards, originalObject: p,
-	          mediaType: p.projectType || 'MOVIE', customPoster: p.customPoster, identityLabel: getProjectIdentityLabel(p),
+		          mediaType: resolveProjectType(p.projectType, (p as any).type, (p as any).projectDetails?.type), customPoster: p.customPoster, identityLabel: getProjectIdentityLabel(p),
 	          musicPlan: getArchivedProjectMusicPlan(p),
 	          franchiseId: p.franchiseId,
 	          sourceScriptId: p.sourceScriptId,

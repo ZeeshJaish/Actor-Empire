@@ -5,9 +5,12 @@ const gameLoop = readFileSync('services/gameLoop.ts', 'utf8');
 const worldReactions = readFileSync('services/worldReactions.ts', 'utf8');
 const commandCenter = readFileSync('views/lifestyle/business/OwnedStudioCommandCenter.tsx', 'utf8');
 const homePage = readFileSync('views/HomePage.tsx', 'utf8');
+const studioGroup = readFileSync('views/lifestyle/business/StudioGroupView.tsx', 'utf8');
 
 const required = [
     [service, 'syncAcquisitionDebtLedger', 'debt ledger migration helper'],
+    [service, 'ORPHANED_STUDIO_ASSET', 'orphaned studio debt closure guard'],
+    [service, 'getStudioAssetById', 'debt service reconciles against live studio assets'],
     [service, 'processAcquisitionDebtService', 'weekly service processor'],
     [service, 'payDownAcquisitionDebt', 'player pay-down action'],
     [gameLoop, "import { processAcquisitionDebtService } from './acquisitionDebt';", 'game loop debt import'],
@@ -21,6 +24,8 @@ const required = [
     [commandCenter, 'setDebtPaydownAmount(formatDebtInputAmount', 'quick amount chips should write formatted amounts into the field'],
     [homePage, 'triggerPhase10DebtQa', 'Phase 10 debt cheat handler'],
     [homePage, 'Phase 10 Debt QA', 'visible debt QA cheat button'],
+    [studioGroup, 'HQ assumed debt', 'merged studio debt is visible as HQ assumed debt'],
+    [studioGroup, 'Fully merged studios are tracked below as HQ assets.', 'empty subsidiary UX explains merged assets'],
 ];
 
 for (const [source, needle, description] of required) {

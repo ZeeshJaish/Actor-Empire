@@ -1,4 +1,4 @@
-import { Capacitor, registerPlugin } from '@capacitor/core';
+import { Capacitor, registerPlugin, type PluginListenerHandle } from '@capacitor/core';
 import { getPremiumProduct, PremiumProductId } from './premiumLogic';
 
 export const IOS_PRODUCT_IDS: Record<PremiumProductId, string> = {
@@ -39,6 +39,8 @@ interface PurchaseResult {
     success: boolean;
     cancelled?: boolean;
     message: string;
+    storeProductId?: string;
+    transactionId?: string;
 }
 
 interface RestoreResult {
@@ -64,10 +66,22 @@ interface AndroidPurchaseToken {
     acknowledged?: boolean;
 }
 
+interface IOSStoreTransactionEvent {
+    productId?: string;
+    transactionId?: string;
+}
+
+export interface IOSPurchaseUpdate {
+    premiumProductId: PremiumProductId;
+    storeProductId: string;
+    transactionId?: string;
+}
+
 interface PurchasesPlugin {
     getProducts(options: { productIds: string[] }): Promise<{ products?: NativeStoreProduct[] }>;
     purchaseProduct(options: { productId: string }): Promise<{ cancelled?: boolean; pending?: boolean; productId?: string; transactionId?: string }>;
     restorePurchases(): Promise<{ productIds?: string[] }>;
+    addListener(eventName: 'purchaseCompleted', listenerFunc: (update: IOSStoreTransactionEvent) => void): Promise<PluginListenerHandle>;
 }
 
 interface AndroidPurchasesPlugin {
@@ -112,6 +126,12 @@ const getAndroidPurchasesPlugin = () => {
 const getAndroidPurchaseForStoreProduct = (purchases: AndroidPurchaseToken[] | undefined, storeProductId: string) =>
     (purchases || []).find(purchase => purchase.productIds?.includes(storeProductId) && !!purchase.purchaseToken);
 
+export const getPremiumProductIdForIOSStoreProduct = (storeProductId?: string): PremiumProductId | null => {
+    if (!storeProductId) return null;
+    const match = Object.entries(IOS_PRODUCT_IDS).find(([, productId]) => productId === storeProductId);
+    return match ? match[0] as PremiumProductId : null;
+};
+
 const finishAndroidPurchase = async (
     purchases: AndroidPurchasesPlugin,
     productId: PremiumProductId,
@@ -128,6 +148,34 @@ const finishAndroidPurchase = async (
     } catch (error) {
         console.warn('[IAP] Android purchase succeeded but Play finalization failed', error);
     }
+};
+
+export const startIOSPurchaseUpdatesListener = async (
+    onPurchase: (update: IOSPurchaseUpdate) => void
+): Promise<PluginListenerHandle | null> => {
+    if (import.meta.env.DEV || !isCapacitorIOS()) {
+        return null;
+    }
+
+    const purchases = getPurchasesPlugin();
+    if (!purchases?.addListener) {
+        return null;
+    }
+
+    return purchases.addListener('purchaseCompleted', event => {
+        const storeProductId = event?.productId || '';
+        const premiumProductId = getPremiumProductIdForIOSStoreProduct(storeProductId);
+        if (!premiumProductId) {
+            console.warn('[IAP] Ignoring unknown iOS StoreKit product update', storeProductId);
+            return;
+        }
+
+        onPurchase({
+            premiumProductId,
+            storeProductId,
+            transactionId: event?.transactionId
+        });
+    });
 };
 
 export const getPremiumCatalogProducts = async (): Promise<PremiumCatalogProduct[]> => {
@@ -241,7 +289,12 @@ export const purchasePremiumProduct = async (productId: PremiumProductId): Promi
         if (result?.pending) {
             return { success: false, message: 'Purchase is pending approval.' };
         }
-        return { success: true, message: 'Purchase confirmed.' };
+        return {
+            success: true,
+            message: 'Purchase confirmed.',
+            storeProductId: result?.productId || storeProductId,
+            transactionId: result?.transactionId
+        };
     } catch (error: any) {
         const message = String(error?.message || error || 'Purchase failed.');
         const cancelled = /cancel/i.test(message);

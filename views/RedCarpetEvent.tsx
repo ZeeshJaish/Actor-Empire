@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { Player, PendingEvent, ClothingItem, Vehicle, Award } from '../types';
 import { CLOTHING_CATALOG, CAR_CATALOG, MOTORCYCLE_CATALOG, BOAT_CATALOG, AIRCRAFT_CATALOG } from '../services/lifestyleLogic';
-import { determineWinners, generateSeasonWinners, AwardResolvedWinner, Nomination } from '../services/awardLogic';
+import { determineWinners, generateSeasonWinners, AwardResolvedWinner, Nomination, sanitizeAwardHistoryEntries, sanitizeAwardRecords } from '../services/awardLogic';
 import { NPC_DATABASE } from '../services/npcLogic';
 import {
   AwardNightConfig,
@@ -25,7 +25,6 @@ interface RedCarpetEventProps {
 const upsertAwardRecord = (awards: Award[], nextAward: Award): Award[] => {
   const existingIndex = awards.findIndex(award =>
     award.type === nextAward.type &&
-    award.year === nextAward.year &&
     award.category === nextAward.category &&
     award.projectId === nextAward.projectId
   );
@@ -34,7 +33,9 @@ const upsertAwardRecord = (awards: Award[], nextAward: Award): Award[] => {
 
   return awards.map((award, index) =>
     index === existingIndex
-      ? { ...award, ...nextAward, id: award.id, outcome: nextAward.outcome === 'WON' ? 'WON' : award.outcome }
+      ? award.year === nextAward.year
+        ? { ...award, ...nextAward, id: award.id, outcome: nextAward.outcome === 'WON' ? 'WON' : award.outcome }
+        : award
       : award
   );
 };
@@ -566,7 +567,7 @@ export const RedCarpetEvent: React.FC<RedCarpetEventProps> = ({ player, event, o
           const project = pastProjectsUpdate[projIndex];
           pastProjectsUpdate[projIndex] = {
             ...project,
-            awards: upsertAwardRecord((project.awards || []) as Award[], awardEntry) as any
+            awards: sanitizeAwardRecords(upsertAwardRecord((project.awards || []) as Award[], awardEntry)) as any
           };
         }
 
@@ -592,17 +593,20 @@ export const RedCarpetEvent: React.FC<RedCarpetEventProps> = ({ player, event, o
         }
       });
 
-      updatedPlayer.awards = updatedAwards;
-      updatedPlayer.pastProjects = pastProjectsUpdate;
+      updatedPlayer.awards = sanitizeAwardRecords(updatedAwards);
+      updatedPlayer.pastProjects = pastProjectsUpdate.map(project => ({
+        ...project,
+        awards: sanitizeAwardRecords((project.awards || []) as Award[]) as any
+      }));
       const awardType = event.data?.awardDef?.type;
       if (['GOLDEN_GLOBE', 'BAFTA', 'OSCAR', 'EMMY'].includes(awardType)) {
         const historyEntry = generateSeasonWinners(updatedPlayer, awardType, awardYear, ceremonyResolvedWinners);
         updatedPlayer.world = {
           ...updatedPlayer.world,
-          awardHistory: [
+          awardHistory: sanitizeAwardHistoryEntries([
             ...(updatedPlayer.world.awardHistory || []).filter(entry => !(entry.type === awardType && entry.year === awardYear)),
             historyEntry
-          ]
+          ])
         };
       }
       if (winNewsItems.length === 1) {

@@ -169,7 +169,7 @@ export const generateEpisodeRatings = (release: EpisodeRatingSource): SeasonEpis
     const mediaType = release.type || release.projectType || details.type;
     if (mediaType !== 'SERIES') return [];
 
-    const episodeCount = Math.round(clamp(Number(details.episodes || 8), 4, 12));
+    const episodeCount = Math.round(clamp(Number(details.episodes || 8), 4, 24));
     const hiddenStats = (details.hiddenStats || {}) as Partial<ProjectDetails['hiddenStats']>;
     const imdbRating = Number(release.imdbRating || release.rating || details.hiddenStats?.qualityScore / 10 || 0);
     const qualityRating = clamp(Number(hiddenStats.qualityScore || 50) / 10, 1, 10);

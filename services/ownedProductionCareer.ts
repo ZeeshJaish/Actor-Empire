@@ -5,6 +5,7 @@ import type {
     Player,
     PlayerProductionFocus,
 } from '../types';
+import { getProductionCalendarProgress } from './productionCalendar';
 
 type ProductionPhase = NonNullable<Commitment['projectPhase']>;
 type FocusProgressKey = Exclude<keyof PlayerProductionFocus, 'isPlayerActor' | 'isPlayerDirector' | 'isPlayerProducer' | 'qualityLift'>;
@@ -41,6 +42,11 @@ export interface OwnedProductionCareerItem {
     phase: ProductionPhase;
     weeksLeft: number;
     phaseDurationWeeks: number;
+    projectWeek: number;
+    totalProjectWeeks: number;
+    focusWindowWeeks: number;
+    focusWeeksUsed: number;
+    focusWeeksRemaining: number;
     focusLoadWeeks: number;
     tracks: OwnedProductionTrack[];
     focus: PlayerProductionFocus;
@@ -404,6 +410,7 @@ export const deriveOwnedProductionCareerItems = (
 
         if (tracks.length === 0) return [];
         const phaseDurationWeeks = Math.max(1, Number(commitment.totalPhaseDuration || commitment.phaseWeeksLeft || 1));
+        const calendarProgress = getProductionCalendarProgress(commitment);
 
         return [{
             commitment,
@@ -411,6 +418,11 @@ export const deriveOwnedProductionCareerItems = (
             phase,
             weeksLeft: Math.max(0, Number(commitment.phaseWeeksLeft || 0)),
             phaseDurationWeeks,
+            projectWeek: calendarProgress.projectWeek,
+            totalProjectWeeks: calendarProgress.totalProjectWeeks,
+            focusWindowWeeks: calendarProgress.focusWindowWeeks,
+            focusWeeksUsed: calendarProgress.focusWeeksUsed,
+            focusWeeksRemaining: calendarProgress.focusWeeksRemaining,
             focusLoadWeeks: getOwnedProductionFocusLoadWeeks(tracks),
             tracks,
             focus,

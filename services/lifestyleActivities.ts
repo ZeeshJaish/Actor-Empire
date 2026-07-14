@@ -3514,6 +3514,61 @@ const buildSoloFriendEncounter = (
     };
 };
 
+const getTripInviteBondTargets = (
+    relationships: Relationship[],
+    inviteId?: string,
+): Relationship[] => {
+    const eligible = relationships.filter(relationship => {
+        if (inviteId === 'partner') return relationship.relation === 'Partner' || relationship.relation === 'Spouse';
+        if (inviteId === 'family') return ['Parent', 'Sibling', 'Child', 'Spouse'].includes(relationship.relation);
+        if (inviteId === 'friends') return relationship.relation === 'Friend';
+        return false;
+    });
+    const sorted = [...eligible].sort((a, b) => {
+        if (inviteId === 'partner') {
+            if (a.relation === 'Spouse' && b.relation !== 'Spouse') return -1;
+            if (b.relation === 'Spouse' && a.relation !== 'Spouse') return 1;
+        }
+        return (b.closeness || 0) - (a.closeness || 0);
+    });
+    return sorted.slice(0, inviteId === 'partner' ? 1 : 8);
+};
+
+const buildTripInviteBondOutcome = (
+    player: Player,
+    selections: LifestyleActivitySelections,
+    absoluteWeek: number,
+): { relationships: Relationship[]; effectSummary: string; socialMoment: string } | undefined => {
+    const inviteId = selections.inviteId;
+    if (!['partner', 'family', 'friends'].includes(inviteId || '')) return undefined;
+    const targets = getTripInviteBondTargets(player.relationships || [], inviteId);
+    if (targets.length === 0) return undefined;
+    const targetIds = new Set(targets.map(target => target.id));
+    const tripDays = clampTripDays(selections.tripDurationDays);
+    const durationBonus = tripDays >= 7 ? 2 : tripDays >= 5 ? 1 : 0;
+    const scaleBonus = selections.scaleId === 'legendary' ? 2 : selections.scaleId === 'luxury' ? 1 : 0;
+    const baseDelta = inviteId === 'partner' ? 5 : inviteId === 'family' ? 4 : 3;
+    const delta = Math.max(1, baseDelta + durationBonus + scaleBonus);
+    const relationships = (player.relationships || []).map(relationship => targetIds.has(relationship.id)
+        ? {
+            ...relationship,
+            closeness: clamp(relationship.closeness + delta),
+            lastInteractionWeek: player.currentWeek,
+            lastInteractionAbsolute: absoluteWeek,
+        }
+        : relationship);
+    const label = inviteId === 'partner' ? 'Partner bond' : inviteId === 'family' ? 'Family bond' : 'Friend bond';
+    const countLabel = targets.length > 1 ? ` (${targets.length})` : '';
+    const featuredNames = targets.slice(0, 2).map(target => target.name).join(', ');
+    return {
+        relationships,
+        effectSummary: `${label} +${delta}${countLabel}`,
+        socialMoment: featuredNames
+            ? `${featuredNames}${targets.length > 2 ? ' and others' : ''} came back closer from the trip.`
+            : `${label} improved during the trip.`,
+    };
+};
+
 export const resolveLifestyleActivity = (
     player: Player,
     activity: LifestyleActivityDefinition,
@@ -3570,6 +3625,9 @@ export const resolveLifestyleActivity = (
         ? buildPetCompanionOutcome(player, selections, quote)
         : undefined;
     const friendEncounter = buildSoloFriendEncounter(player, activity, selections, absoluteWeek);
+    const tripInviteBondOutcome = activity.id === 'vacation_escape'
+        ? buildTripInviteBondOutcome(player, selections, absoluteWeek)
+        : undefined;
     const socialEffects = nightlifeOutcome?.statEffects || wellnessOutcome?.statEffects || industryOutcome?.statEffects || charityOutcome?.statEffects || adoptionOutcome?.statEffects || petOutcome?.statEffects || {};
     const nextStats: Stats = {
         ...player.stats,
@@ -3584,9 +3642,11 @@ export const resolveLifestyleActivity = (
         followers: clampMoney(player.stats.followers + (quote.statEffects.followers || 0) + (socialEffects.followers || 0)),
     };
     const outcomeEffectSummary = nightlifeOutcome?.effectSummary || wellnessOutcome?.effectSummary || industryOutcome?.effectSummary || charityOutcome?.effectSummary || adoptionOutcome?.effectSummary || petOutcome?.effectSummary;
-    const effectSummary = outcomeEffectSummary
-        ? [...quote.effectSummary, outcomeEffectSummary].slice(0, 6)
-        : quote.effectSummary;
+    const effectSummary = [
+        ...quote.effectSummary,
+        ...(outcomeEffectSummary ? [outcomeEffectSummary] : []),
+        ...(tripInviteBondOutcome?.effectSummary ? [tripInviteBondOutcome.effectSummary] : []),
+    ].slice(0, 6);
 
     const memory: LifestyleActivityMemory = {
         id: `life_memory_${activity.id}_${absoluteWeek}_${Date.now()}`,
@@ -3613,7 +3673,7 @@ export const resolveLifestyleActivity = (
             industryAddonIds: [...(selections.industryAddonIds || [])],
         },
         effectSummary,
-        socialMoment: nightlifeOutcome?.socialMoment || wellnessOutcome?.socialMoment || industryOutcome?.socialMoment || charityOutcome?.socialMoment || adoptionOutcome?.socialMoment || petOutcome?.socialMoment,
+        socialMoment: nightlifeOutcome?.socialMoment || wellnessOutcome?.socialMoment || industryOutcome?.socialMoment || charityOutcome?.socialMoment || adoptionOutcome?.socialMoment || petOutcome?.socialMoment || tripInviteBondOutcome?.socialMoment,
     };
 
     const currentYearMemories = state.memories.filter(existingMemory => existingMemory.year === player.age);
@@ -3652,7 +3712,9 @@ export const resolveLifestyleActivity = (
                 ? [adoptionOutcome.child, ...(player.relationships || [])].slice(0, 80)
                 : petOutcome?.pet
                     ? [petOutcome.pet, ...(player.relationships || [])].slice(0, 80)
-                    : player.relationships,
+                    : tripInviteBondOutcome
+                        ? tripInviteBondOutcome.relationships
+                        : player.relationships,
         finance: {
             ...player.finance,
             history: [transaction, ...(player.finance?.history || [])].slice(0, 200),

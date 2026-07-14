@@ -1,5 +1,5 @@
 
-import { Business, BusinessType, BusinessSubtype, BusinessConfig, BusinessStaff, BusinessProduct, GameLanguage, Player, EmployeeCandidate, StudioState, NewsItem, RightsNegotiation, RightsOpportunity } from '../types';
+import { Business, BusinessType, BusinessSubtype, BusinessConfig, BusinessStaff, BusinessProduct, GameLanguage, Player, EmployeeCandidate, StudioState, NewsItem, RightsNegotiation, RightsOpportunity, ProjectType } from '../types';
 import { generateWriters, generateIPMarket } from '../src/data/generators';
 import { createMarketTrends } from './marketTrends';
 import { advanceRightsInvestigations, RIGHTS_MARKET_CYCLE_WEEKS } from './rightsMarket';
@@ -197,6 +197,202 @@ const getServiceBaseRevenuePerLocation = (subtype: BusinessSubtype): number => {
         default:
             return 8000;
     }
+};
+
+export interface BusinessAmenityModifiers {
+    traffic: number;
+    price: number;
+    capacity: number;
+}
+
+export interface ServiceBusinessCapacitySnapshot {
+    locations: number;
+    physicalSeats: number;
+    weeklyTurns: number;
+    physicalWeeklyCapacity: number;
+    staffWeeklyCapacity: number;
+    effectiveCapacity: number;
+    staffCoverage: number;
+    avgStaffSkill: number;
+    workerCount: number;
+    managerCount: number;
+}
+
+export type BusinessCapacityBottleneck = 'NONE' | 'STAFF' | 'SPACE' | 'STOCK';
+
+export interface BusinessTrafficSnapshot {
+    demand: number;
+    effectiveCapacity: number;
+    physicalSeats: number;
+    physicalWeeklyCapacity: number;
+    staffWeeklyCapacity: number;
+    staffCoverage: number;
+    bottleneck: BusinessCapacityBottleneck;
+    turnedAway: number;
+}
+
+export const getBusinessAmenityModifiers = (business: Business): BusinessAmenityModifiers => {
+    return (business.config.amenities || []).reduce((acc, amenityId) => {
+        const amenity = BUSINESS_AMENITIES.find(a => a.id === amenityId);
+        if (!amenity) return acc;
+
+        return {
+            traffic: acc.traffic * (amenity.trafficMod || 1),
+            price: acc.price * (amenity.priceMod || 1),
+            capacity: acc.capacity * (amenity.capacityMod || 1),
+        };
+    }, { traffic: 1, price: 1, capacity: 1 });
+};
+
+const getServiceWeeklyTurns = (subtype: BusinessSubtype): number => {
+    switch (subtype) {
+        case 'FAST_FOOD':
+            return 24;
+        case 'CASUAL_DINING':
+            return 14;
+        case 'FINE_DINING':
+            return 9;
+        case 'COFFEE_SHOP':
+            return 22;
+        case 'ARTISAN_BAKERY':
+            return 18;
+        case 'LOCAL_GYM':
+            return 30;
+        case 'WELLNESS_STUDIO':
+            return 12;
+        default:
+            return 14;
+    }
+};
+
+export const calculateBusinessDemand = (
+    business: Business,
+    playerFame: number,
+    amenityMods: BusinessAmenityModifiers = getBusinessAmenityModifiers(business),
+): number => {
+    const blueprint = BUSINESS_BLUEPRINTS[business.type];
+    const locations = Math.max(1, Math.floor(business.stats.locations || 1));
+
+    let baseFootfall = 25;
+    if (['FAST_FOOD', 'ONLINE_STORE'].includes(business.subtype)) baseFootfall = 100;
+    if (['FINE_DINING', 'LUXURY_BRAND'].includes(business.subtype)) baseFootfall = 10;
+
+    const hypeDemandWeight =
+        business.type === 'FASHION' ? 0.07 :
+        business.type === 'MERCH' ? 0.06 :
+        business.type === 'RESTAURANT' ? 0.05 :
+        0.045;
+    const hypeMod = 1 + ((business.stats.hype || 0) * hypeDemandWeight);
+    const fameMod = 1 + (playerFame / 200);
+
+    let qualityMod = 1.0;
+    if (blueprint.model === 'PRODUCT') {
+        const avgQual = business.products.length > 0
+            ? business.products.reduce((sum, product) => sum + (product.quality || 0), 0) / business.products.length
+            : 50;
+        if (business.type === 'FASHION') {
+            qualityMod = Math.max(0.75, Math.min(1.45, 0.65 + (avgQual / 100) * 0.8));
+        } else if (business.type === 'MERCH') {
+            qualityMod = Math.max(0.8, Math.min(1.3, 0.72 + (avgQual / 100) * 0.65));
+        } else {
+            qualityMod = 0.5 + (avgQual / 100);
+        }
+    } else {
+        qualityMod = 0.5 + ((business.stats.customerSatisfaction || 0) / 100);
+    }
+
+    const theme = business.config.theme ? BUSINESS_THEMES.find(t => t.id === business.config.theme) : null;
+    const appealMod = theme?.appealMod || 1;
+
+    return Math.max(0, Math.floor(
+        baseFootfall
+        * hypeMod
+        * fameMod
+        * qualityMod
+        * locations
+        * appealMod
+        * amenityMods.traffic
+    ));
+};
+
+export const calculateServiceBusinessCapacity = (
+    business: Business,
+    amenityMods: BusinessAmenityModifiers = getBusinessAmenityModifiers(business),
+): ServiceBusinessCapacitySnapshot => {
+    const locations = Math.max(1, Math.floor(business.stats.locations || 1));
+    const workers = business.staff.filter(staff => staff.role !== 'MANAGER');
+    const managers = business.staff.filter(staff => staff.role === 'MANAGER');
+    const avgStaffSkill = workers.length > 0
+        ? workers.reduce((acc, staff) => acc + (staff.skill || 0), 0) / workers.length
+        : 0;
+
+    const physicalSeats = Math.max(0, Math.floor((business.stats.capacity || 50) * locations * amenityMods.capacity));
+    const weeklyTurns = getServiceWeeklyTurns(business.subtype);
+    const physicalWeeklyCapacity = Math.max(0, Math.floor(physicalSeats * weeklyTurns));
+
+    let staffCoverage = 0;
+    if (workers.length > 0) {
+        const teamDepth = Math.min(0.36, workers.length * 0.08);
+        const skillDepth = Math.min(0.24, avgStaffSkill / 400);
+        const scaleCrew = Math.min(0.18, Math.log10(locations + 1) * 0.08);
+        const managerDepth = managers.length > 0 ? 0.12 : 0;
+        staffCoverage = Math.min(1.05, 0.32 + teamDepth + skillDepth + scaleCrew + managerDepth);
+    }
+
+    const staffWeeklyCapacity = Math.floor(physicalWeeklyCapacity * Math.min(1, staffCoverage));
+    const effectiveCapacity = Math.max(0, Math.min(staffWeeklyCapacity, physicalWeeklyCapacity));
+
+    return {
+        locations,
+        physicalSeats,
+        weeklyTurns,
+        physicalWeeklyCapacity,
+        staffWeeklyCapacity,
+        effectiveCapacity,
+        staffCoverage,
+        avgStaffSkill,
+        workerCount: workers.length,
+        managerCount: managers.length,
+    };
+};
+
+export const calculateBusinessTrafficSnapshot = (
+    business: Business,
+    playerFame: number,
+): BusinessTrafficSnapshot => {
+    const blueprint = BUSINESS_BLUEPRINTS[business.type];
+    const amenityMods = getBusinessAmenityModifiers(business);
+    const demand = calculateBusinessDemand(business, playerFame, amenityMods);
+
+    if (blueprint.model === 'SERVICE') {
+        const serviceCapacity = calculateServiceBusinessCapacity(business, amenityMods);
+        const bottleneck: BusinessCapacityBottleneck = demand > serviceCapacity.effectiveCapacity
+            ? serviceCapacity.staffWeeklyCapacity < serviceCapacity.physicalWeeklyCapacity * 0.92 ? 'STAFF' : 'SPACE'
+            : 'NONE';
+
+        return {
+            demand,
+            effectiveCapacity: serviceCapacity.effectiveCapacity,
+            physicalSeats: serviceCapacity.physicalSeats,
+            physicalWeeklyCapacity: serviceCapacity.physicalWeeklyCapacity,
+            staffWeeklyCapacity: serviceCapacity.staffWeeklyCapacity,
+            staffCoverage: serviceCapacity.staffCoverage,
+            bottleneck,
+            turnedAway: Math.max(0, demand - serviceCapacity.effectiveCapacity),
+        };
+    }
+
+    const inventory = business.products.reduce((acc, product) => acc + (product.inventory || 0), 0);
+    return {
+        demand,
+        effectiveCapacity: inventory,
+        physicalSeats: 0,
+        physicalWeeklyCapacity: inventory,
+        staffWeeklyCapacity: inventory,
+        staffCoverage: inventory > 0 ? 1 : 0,
+        bottleneck: demand > inventory ? 'STOCK' : 'NONE',
+        turnedAway: Math.max(0, demand - inventory),
+    };
 };
 
 const getProductPriceSweetSpot = (business: Business, product: BusinessProduct): { min: number; max: number } => {
@@ -666,19 +862,58 @@ export const sanitizeReturningTalentList = (talentList: any[] = []) => {
     return Array.from(byKey.values());
 };
 
+export const resolveProjectType = (...candidates: unknown[]): ProjectType => {
+    for (const candidate of candidates) {
+        if (candidate === 'SERIES') return 'SERIES';
+        if (candidate === 'MOVIE') return 'MOVIE';
+        if (typeof candidate === 'string') {
+            const normalized = candidate.trim().toUpperCase();
+            if (normalized === 'SERIES') return 'SERIES';
+            if (normalized === 'MOVIE') return 'MOVIE';
+        }
+    }
+    return 'MOVIE';
+};
+
+const normalizeStudioScript = (script: any) => {
+    if (!script || typeof script !== 'object') return script;
+    const projectType = resolveProjectType(
+        script.projectType,
+        script.type,
+        script.projectDetails?.type,
+        script.mediaType
+    );
+    const rawEpisodes = Number(script.episodes ?? script.projectDetails?.episodes);
+
+    return {
+        ...script,
+        projectType,
+        episodes: projectType === 'SERIES'
+            ? Math.max(1, Math.round(Number.isFinite(rawEpisodes) ? rawEpisodes : 8))
+            : script.episodes,
+        returningTalent: sanitizeReturningTalentList(script?.returningTalent),
+    };
+};
+
 export const normalizeStudioState = (studioState: Partial<StudioState> | undefined, currentWeek: number): StudioState => {
     const defaults = createDefaultStudioState(currentWeek);
     const safeScripts = Array.isArray(studioState?.scripts)
-        ? studioState!.scripts.map((script: any) => ({
-            ...script,
-            returningTalent: sanitizeReturningTalentList(script?.returningTalent),
-        }))
+        ? studioState!.scripts.map(normalizeStudioScript)
         : defaults.scripts;
+    const safeConcepts = Array.isArray(studioState?.concepts)
+        ? studioState!.concepts.map((concept: any) => {
+            const script = safeScripts.find((candidate: any) => candidate?.id === concept?.scriptId);
+            return {
+                ...concept,
+                projectType: resolveProjectType(concept?.projectType, concept?.type, script?.projectType, script?.type),
+            };
+        })
+        : defaults.concepts;
     return {
         ...defaults,
         ...studioState,
         scripts: safeScripts,
-        concepts: Array.isArray(studioState?.concepts) ? studioState!.concepts : defaults.concepts,
+        concepts: safeConcepts,
         writers: Array.isArray(studioState?.writers) ? studioState!.writers : defaults.writers,
         ipMarket: Array.isArray(studioState?.ipMarket) ? studioState!.ipMarket : defaults.ipMarket,
         talentRoster: Array.isArray(studioState?.talentRoster) ? studioState!.talentRoster : defaults.talentRoster,
@@ -788,18 +1023,8 @@ export const processBusinessWeek = (
     const rightsReportsReady: RightsReportReadyNotice[] = [];
     const rightsNegotiationResponses: RightsNegotiationResponseNotice[] = [];
 
-    const locations = b.stats.locations || 1;
-    const theme = b.config.theme ? BUSINESS_THEMES.find(t => t.id === b.config.theme) : null;
-    const amenityMods = (b.config.amenities || []).reduce((acc, amenityId) => {
-        const amenity = BUSINESS_AMENITIES.find(a => a.id === amenityId);
-        if (!amenity) return acc;
-
-        return {
-            traffic: acc.traffic * (amenity.trafficMod || 1),
-            price: acc.price * (amenity.priceMod || 1),
-            capacity: acc.capacity * (amenity.capacityMod || 1),
-        };
-    }, { traffic: 1, price: 1, capacity: 1 });
+    const locations = Math.max(1, Math.floor(b.stats.locations || 1));
+    const amenityMods = getBusinessAmenityModifiers(b);
 
     // 1. MARKETING & HYPE
     const marketingBudget = b.config.marketingBudget || { social: 0, influencer: 0, billboard: 0, tv: 0 };
@@ -832,35 +1057,7 @@ export const processBusinessWeek = (
     b.stats.hype = Math.max(0, Math.min(100, b.stats.hype + hypeGain - finalDecay));
 
     // 2. DEMAND GENERATION
-    let baseFootfall = 25; 
-    if (['FAST_FOOD', 'ONLINE_STORE'].includes(b.subtype)) baseFootfall = 100;
-    if (['FINE_DINING', 'LUXURY_BRAND'].includes(b.subtype)) baseFootfall = 10;
-
-    const hypeDemandWeight =
-        b.type === 'FASHION' ? 0.07 :
-        b.type === 'MERCH' ? 0.06 :
-        b.type === 'RESTAURANT' ? 0.05 :
-        0.045;
-    const hypeMod = 1 + (b.stats.hype * hypeDemandWeight); 
-    const fameMod = 1 + (playerFame / 200); 
-    
-    // Quality directly impacts demand too
-    let qualityMod = 1.0;
-    if (blueprint.model === 'PRODUCT') {
-        const avgQual = b.products.length > 0 ? b.products.reduce((s,p)=>s+p.quality,0)/b.products.length : 50;
-        if (b.type === 'FASHION') {
-            qualityMod = Math.max(0.75, Math.min(1.45, 0.65 + (avgQual / 100) * 0.8));
-        } else if (b.type === 'MERCH') {
-            qualityMod = Math.max(0.8, Math.min(1.3, 0.72 + (avgQual / 100) * 0.65));
-        } else {
-            qualityMod = 0.5 + (avgQual / 100);
-        }
-    } else {
-        qualityMod = 0.5 + (b.stats.customerSatisfaction / 100);
-    }
-
-    const appealMod = theme?.appealMod || 1;
-    const totalDemand = Math.floor(baseFootfall * hypeMod * fameMod * qualityMod * locations * appealMod * amenityMods.traffic);
+    const totalDemand = calculateBusinessDemand(b, playerFame, amenityMods);
 
     if (totalDemand < 10 && totalMarketingSpend === 0 && b.stats.brandHealth < 50) {
          alerts.push(t(language, 'services.business.weekly.lowTrafficAlert', { businessName: b.name }));
@@ -875,14 +1072,11 @@ export const processBusinessWeek = (
         const managers = b.staff.filter(s => s.role === 'MANAGER');
         const workers = b.staff.filter(s => s.role !== 'MANAGER');
 
-        const avgSkill = workers.length > 0
-            ? workers.reduce((acc, s) => acc + s.skill, 0) / workers.length
-            : 0;
-        const staffCapacity = workers.length > 0
-            ? workers.length * 35 * (1 + (avgSkill / 120))
-            : 0;
-        const physicalCapacity = Math.floor((b.stats.capacity || 50) * locations * amenityMods.capacity);
-        const effectiveCapacity = Math.max(0, Math.min(staffCapacity, physicalCapacity));
+        const serviceCapacity = calculateServiceBusinessCapacity(b, amenityMods);
+        const avgSkill = serviceCapacity.avgStaffSkill;
+        const staffCapacity = serviceCapacity.staffWeeklyCapacity;
+        const physicalCapacity = serviceCapacity.physicalWeeklyCapacity;
+        const effectiveCapacity = serviceCapacity.effectiveCapacity;
         const demandCoverage = totalDemand > 0
             ? Math.min(1.1, effectiveCapacity / Math.max(1, totalDemand))
             : 1;
@@ -920,10 +1114,15 @@ export const processBusinessWeek = (
             * operationalStability
         );
 
-        if (workers.length > 0 && totalDemand > effectiveCapacity * 1.4) {
+        if (workers.length > 0 && totalDemand > effectiveCapacity * 1.25) {
             b.stats.customerSatisfaction = Math.max(0, b.stats.customerSatisfaction - 2);
             b.stats.brandHealth = Math.max(0, b.stats.brandHealth - 1);
-            alerts.push(t(language, 'services.business.weekly.understaffedDemandAlert', { businessName: b.name }));
+            const isStaffBottleneck = staffCapacity < physicalCapacity * 0.92;
+            alerts.push(t(
+                language,
+                isStaffBottleneck ? 'services.business.weekly.understaffedDemandAlert' : 'services.business.weekly.capacityDemandAlert',
+                { businessName: b.name }
+            ));
         } else if (avgSkill > 70 || managers.length > 0) {
             b.stats.customerSatisfaction = Math.min(100, b.stats.customerSatisfaction + 1);
             b.stats.brandHealth = Math.min(100, b.stats.brandHealth + 0.5);

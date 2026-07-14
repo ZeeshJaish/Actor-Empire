@@ -4,6 +4,7 @@ import {
     executeFullStudioMerger,
     performStudioTreasuryTransfer,
 } from '../services/studioGroup';
+import { getTradableStocks, initializeStocks } from '../services/stockLogic';
 import type { Business, Player } from '../types';
 
 const createStudio = (id: string, name: string, productionType: string, balance: number): Business => ({
@@ -113,6 +114,13 @@ const acquiredStudio: Business = {
         financeLedger: [],
     },
 };
+const acquiredStudioStock = {
+    ...initializeStocks().find(stock => stock.id === 'stk_wbd')!,
+    id: 'stk_acquired_studio',
+    symbol: 'ARTI',
+    name: 'Artisan Pictures',
+    relatedStudioId: acquiredStudio.id as any,
+};
 
 const player: Player = {
     ...INITIAL_PLAYER,
@@ -120,6 +128,8 @@ const player: Player = {
     currentWeek: 24,
     money: 500_000_000,
     businesses: [parentStudio, acquiredStudio],
+    stocks: [acquiredStudioStock as any],
+    portfolio: [{ stockId: acquiredStudioStock.id, shares: 1_000_000, averageCost: acquiredStudioStock.price, totalInvested: acquiredStudioStock.price * 1_000_000 }],
     commitments: [{
         id: 'commit_artisan',
         name: 'Artisan Active Movie',
@@ -222,6 +232,13 @@ if (!merged.success) throw new Error('Full studio merger should succeed.');
 const mergedParent = merged.player.businesses.find(business => business.id === parentStudio.id)!;
 const mergedArchive = merged.player.businesses.find(business => business.id === acquiredStudio.id)!;
 if (mergedArchive.studioState?.operatingModel !== 'FULL_MERGER') throw new Error('Merged studio should become an inactive merged archive.');
+if (mergedArchive.stats.valuation !== 0) throw new Error('Merged archive valuation should be retired to prevent double-counting.');
+if (mergedParent.stats.valuation < parentStudio.stats.valuation + Math.round(acquiredStudio.stats.valuation * 0.9)) {
+    throw new Error('Merged HQ valuation should absorb most of the acquired studio valuation.');
+}
+if (getTradableStocks(merged.player.stocks, merged.player).some(stock => stock.relatedStudioId === acquiredStudio.id)) {
+    throw new Error('Merged public studio stock should be retired from tradable stock listings.');
+}
 if (!mergedParent.studioState?.scripts.some(script => script.id === 'artisan_script')) throw new Error('Merged scripts should transfer into HQ.');
 if (!mergedParent.studioState?.ownedRights?.some(right => right.id === 'right_moon_castle')) throw new Error('Merged owned IP should transfer into HQ.');
 if (!merged.player.commitments.every(commitment => commitment.projectDetails?.studioId !== acquiredStudio.id)) throw new Error('Active commitments should be reassigned to HQ.');

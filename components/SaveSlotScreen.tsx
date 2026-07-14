@@ -1,6 +1,8 @@
 import { useState } from 'react';
+import { Upload } from 'lucide-react';
 import { logoDataUri } from '../assets/logo';
 import type { ActState, SlotEntry } from './types';
+import { isAndroidSaveTransferSurface, type SaveTransferResult } from '../services/saveTransfer';
 import '../styles/intro.css';
 
 interface Props {
@@ -9,6 +11,7 @@ interface Props {
   slots: SlotEntry[];
   onPlay?: (slotIndex: number) => void;
   onDeleteSlot?: (slotIndex: number) => void;
+  onImportData?: () => Promise<SaveTransferResult | void>;
   onCreateNew?: (slotIndex: number) => void;
   onBack?: () => void;
   version?: string;
@@ -21,12 +24,32 @@ export default function SaveSlotScreen({
   slots,
   onPlay,
   onDeleteSlot,
+  onImportData,
   onCreateNew,
   onBack,
   version = 'Version 1.0.18',
   credit = 'Designed & built by Zeesh',
 }: Props) {
   const [confirmDeleteSlot, setConfirmDeleteSlot] = useState<number | null>(null);
+  const [isImportingSave, setIsImportingSave] = useState(false);
+  const [importNotice, setImportNotice] = useState<string | null>(null);
+  const showSaveImport = isAndroidSaveTransferSurface() && !!onImportData;
+
+  const handleImportSave = async () => {
+    if (!onImportData || isImportingSave) return;
+    setIsImportingSave(true);
+    setImportNotice(null);
+    try {
+      const result = await onImportData();
+      if (result) {
+        setImportNotice(`Imported ${result.saveSlots} save slot${result.saveSlots === 1 ? '' : 's'}. Restarting.`);
+      }
+    } catch (error) {
+      setImportNotice(error instanceof Error ? error.message : 'Import blocked.');
+    } finally {
+      setIsImportingSave(false);
+    }
+  };
 
   return (
     <section className={`phase ${state}`.trim()} id="act4">
@@ -39,10 +62,28 @@ export default function SaveSlotScreen({
       </div>
       <div className="slot-bar">
         <div className="kicker">Select Save Slot</div>
-        <button className="back-link" onClick={onBack}>
-          Back
-        </button>
+        <div className="slot-actions">
+          {showSaveImport && (
+            <button
+              type="button"
+              className="slot-import"
+              onClick={handleImportSave}
+              disabled={isImportingSave}
+            >
+              <Upload size={13} />
+              {isImportingSave ? 'Importing' : 'Import Save'}
+            </button>
+          )}
+          <button className="back-link" onClick={onBack}>
+            Back
+          </button>
+        </div>
       </div>
+      {importNotice && (
+        <div className="slot-import-notice">
+          {importNotice}
+        </div>
+      )}
       <div className="slot-list">
         {slots.map((slot, i) =>
           slot ? (

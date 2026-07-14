@@ -17,6 +17,7 @@ import {
     getEstimatedAnnualDividend,
     getSharesForCashOrder,
     getStockOutstandingShares,
+    getTradableStocks,
 } from '../../services/stockLogic';
 import { getPlayerLanguage, t } from '../../services/i18n';
 import {
@@ -153,20 +154,24 @@ export const StocksApp: React.FC<StocksAppProps> = ({
         onInitialStockConsumed?.();
     }, [initialStockId, onInitialStockConsumed]);
 
-    const portfolioValue = useMemo(
-        () => calculatePortfolioValue(player.portfolio, player.stocks),
-        [player.portfolio, player.stocks],
-    );
-    const snapshots = useMemo(
-        () => new Map(player.stocks.map(stock => [stock.id, getEntertainmentStockSnapshot(player, stock)])),
+    const tradableStocks = useMemo(
+        () => getTradableStocks(player.stocks, player),
         [player],
     );
+    const portfolioValue = useMemo(
+        () => calculatePortfolioValue(player.portfolio, tradableStocks),
+        [player.portfolio, tradableStocks],
+    );
+    const snapshots = useMemo(
+        () => new Map(tradableStocks.map(stock => [stock.id, getEntertainmentStockSnapshot(player, stock)])),
+        [player, tradableStocks],
+    );
     const selectedStock = selectedStockId
-        ? player.stocks.find(stock => stock.id === selectedStockId) || null
+        ? tradableStocks.find(stock => stock.id === selectedStockId) || null
         : null;
     const getHolding = (stockId: string) => player.portfolio.find(position => position.stockId === stockId);
     const estimatedAnnualYield = player.portfolio.reduce((total, position) => {
-        const stock = player.stocks.find(candidate => candidate.id === position.stockId);
+        const stock = tradableStocks.find(candidate => candidate.id === position.stockId);
         return total + (stock ? getEstimatedAnnualDividend(player, stock, position.shares) : 0);
     }, 0);
 
@@ -527,9 +532,9 @@ export const StocksApp: React.FC<StocksAppProps> = ({
         );
     }
 
-    const marketStocks = player.stocks;
+    const marketStocks = tradableStocks;
     const portfolioStocks = player.portfolio
-        .map(position => player.stocks.find(stock => stock.id === position.stockId))
+        .map(position => tradableStocks.find(stock => stock.id === position.stockId))
         .filter((stock): stock is Stock => Boolean(stock));
     const visibleStocks = tab === 'MARKET' ? marketStocks : portfolioStocks;
 

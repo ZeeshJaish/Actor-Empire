@@ -53,6 +53,11 @@ assert(
   'No Fresh Matches',
   'Luxe has run out of eligible picks.',
   "onClick={handlePaidRefresh}",
+  "primaryAction?: 'MAKE_OFFICIAL'",
+  "setChatActionMode('ASK')",
+  'Make Official',
+  'Ready to make this official',
+  'If they say yes, this Luxe match becomes your partner in Connections.',
 ].forEach(token => {
   assert(luxeApp.includes(token), `Luxe app should expose a usable browse or empty state: ${token}`);
 });

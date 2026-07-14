@@ -52,7 +52,7 @@ export const CreationMenu: React.FC<CreationMenuProps> = ({ onStartGame }) => {
   const [name, setName] = useState('');
   const [handle, setHandle] = useState('');
   const [isHandleEdited, setIsHandleEdited] = useState(false);
-  const [age, setAge] = useState<number | string>(18);
+  const [age, setAge] = useState<number | string>(15);
   const [gender, setGender] = useState<Gender>('MALE');
   const initialProfileGender = toProfileGender('MALE');
   const initialSelection = createDefaultProfileSelection(initialProfileGender);
@@ -450,7 +450,7 @@ export const CreationMenu: React.FC<CreationMenuProps> = ({ onStartGame }) => {
                     </div>
                     <input
                       type="number"
-                      placeholder="18"
+                      placeholder="15"
                       value={age}
                       min={15}
                       max={99}

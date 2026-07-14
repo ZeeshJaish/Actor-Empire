@@ -111,6 +111,13 @@ const weakImpact = getEpisodeRatingsGameplayImpact(weak);
 assert(weakImpact.renewalModifier < 0, 'Weak episode ratings should hurt renewal odds.');
 assert(weakImpact.franchiseValueModifier < 0, 'Weak episode ratings should hurt franchise value.');
 
+const longSeason = generateEpisodeRatings(makeRelease({
+    projectDetails: {
+        episodes: 22,
+    },
+}));
+assert(longSeason[0].episodes.length === 22, 'Long seasons should generate ratings for every selected episode, not stop at 12.');
+
 const story = buildEpisodeRatingsStory({
     projectId: 'episode_rating_audit_release',
     title: 'Audit Season',

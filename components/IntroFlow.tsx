@@ -5,6 +5,7 @@ import ActorEmpireStart from './ActorEmpireStart';
 import SaveSlotScreen from './SaveSlotScreen';
 import CreateStarScreen from './CreateStarScreen';
 import type { ActState, NewCareerData, SlotEntry } from './types';
+import type { SaveTransferResult } from '../services/saveTransfer';
 import '../styles/intro.css';
 
 interface Props {
@@ -13,6 +14,8 @@ interface Props {
   onPlaySlot?: (slotIndex: number) => void;
   /** Delete this save and keep the save-slot screen in place */
   onDeleteSlot?: (slotIndex: number) => void;
+  /** Import a signed transfer file on the save-slot screen */
+  onImportData?: () => Promise<SaveTransferResult | void>;
   /** Create the career with the chosen options */
   onBeginCareer?: (data: NewCareerData, slotIndex: number) => void;
   /** Start at the title screen when the app already showed the boot bumper */
@@ -34,6 +37,7 @@ export default function IntroFlow({
   slots = DEMO_SLOTS,
   onPlaySlot,
   onDeleteSlot,
+  onImportData,
   onBeginCareer,
   skipIntro = false,
   version = 'Version 1.0.18',
@@ -112,6 +116,7 @@ export default function IntroFlow({
           onPlaySlot?.(i);
         }}
         onDeleteSlot={onDeleteSlot}
+        onImportData={onImportData}
         onCreateNew={(i) => {
           setPendingCreateSlot(i);
           setAct4('');

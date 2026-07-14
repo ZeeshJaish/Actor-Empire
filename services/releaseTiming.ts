@@ -4,6 +4,7 @@ import { t } from './i18n';
 interface ReleaseTimingFallback {
     currentAge?: number;
     currentWeek?: number;
+    allowCurrentAgeFallback?: boolean;
 }
 
 interface ReleaseTimingOptions {
@@ -38,6 +39,13 @@ const timingFromAbsoluteWeek = (absoluteWeek: number) => ({
     releaseWeek: (absoluteWeek % 52) + 1
 });
 
+const hasActiveReleaseShape = (project: any): boolean => Boolean(project && (
+    typeof project.weekNum === 'number' ||
+    typeof project.distributionPhase === 'string' ||
+    project.status === 'RUNNING' ||
+    project.status === 'STREAMING'
+));
+
 export const getProjectReleaseTiming = (
     project: any,
     fallback: ReleaseTimingFallback = {}
@@ -69,7 +77,12 @@ export const getProjectReleaseTiming = (
         releaseWeek = releaseWeek ?? absoluteTiming.releaseWeek;
     }
 
-    releaseYear = releaseYear ?? readFirstNumber(project?.year, details?.year, fallback.currentAge);
+    const canUseCurrentAgeFallback = fallback.allowCurrentAgeFallback || hasActiveReleaseShape(project);
+    releaseYear = releaseYear ?? readFirstNumber(
+        project?.year,
+        details?.year,
+        canUseCurrentAgeFallback ? fallback.currentAge : undefined
+    );
 
     const safeWeek = releaseWeek !== undefined && releaseWeek >= 1 && releaseWeek <= 52
         ? Math.floor(releaseWeek)

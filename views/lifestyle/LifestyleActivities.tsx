@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
     ArrowLeft,
     BadgeCheck,
@@ -37,6 +37,7 @@ import {
     LogEntry,
     Player,
     Relationship,
+    LifestyleActivityQuote,
 } from '../../types';
 import {
     AdoptionChildProfile,
@@ -114,6 +115,14 @@ type CategoryFilter = 'ALL' | LifestyleActivityCategory;
 type PetStage = 'brief' | 'stores' | 'categories' | 'pets' | 'checkout';
 
 const ActivityLanguageContext = React.createContext<GameLanguage>('en');
+const EMPTY_LIFESTYLE_ACTIVITY_QUOTE: LifestyleActivityQuote = {
+    totalCost: 0,
+    risk: 0,
+    statEffects: {},
+    effectSummary: [],
+    selectedLabels: [],
+    assetSignals: [],
+};
 
 const getChoiceLabel = (choice: LifestyleActivityChoice, language: GameLanguage) => (
     choice.labelKey ? t(language, choice.labelKey) : choice.label
@@ -1463,14 +1472,14 @@ const TripDurationPicker: React.FC<{
 
 const ActivityCard: React.FC<{
     activity: LifestyleActivityDefinition;
-    onClick: () => void;
-}> = ({ activity, onClick }) => {
+    onSelect: (activity: LifestyleActivityDefinition) => void;
+}> = React.memo(({ activity, onSelect }) => {
     const language = React.useContext(ActivityLanguageContext);
     const meta = getActivityVisual(activity);
     const Icon = meta.icon;
     return (
         <button
-            onClick={onClick}
+            onClick={() => onSelect(activity)}
             className="w-full rounded-3xl border border-zinc-800 bg-zinc-950/80 p-4 text-left transition-all hover:border-emerald-500/60 hover:bg-emerald-500/5"
         >
             <div className="flex items-center gap-3">
@@ -1485,7 +1494,8 @@ const ActivityCard: React.FC<{
             </div>
         </button>
     );
-};
+});
+ActivityCard.displayName = 'ActivityCard';
 
 export const LifestyleActivities: React.FC<LifestyleActivitiesProps> = ({ player, onBack, onUpdatePlayer }) => {
     const language = getPlayerLanguage(player);
@@ -1493,7 +1503,10 @@ export const LifestyleActivities: React.FC<LifestyleActivitiesProps> = ({ player
     const [category, setCategory] = useState<CategoryFilter>('ALL');
     const [selectedActivityId, setSelectedActivityId] = useState(LIFESTYLE_ACTIVITY_CATALOG[0].id);
     const [isBuilderOpen, setIsBuilderOpen] = useState(false);
-    const selectedActivity = LIFESTYLE_ACTIVITY_CATALOG.find(activity => activity.id === selectedActivityId) || LIFESTYLE_ACTIVITY_CATALOG[0];
+    const selectedActivity = useMemo(
+        () => LIFESTYLE_ACTIVITY_CATALOG.find(activity => activity.id === selectedActivityId) || LIFESTYLE_ACTIVITY_CATALOG[0],
+        [selectedActivityId],
+    );
     const [selections, setSelections] = useState<LifestyleActivitySelections>(() => createDefaultLifestyleActivitySelections(selectedActivity));
     const [status, setStatus] = useState<{ tone: 'good' | 'bad'; text: string } | null>(null);
     const [nightlifeGuestQuery, setNightlifeGuestQuery] = useState('');
@@ -1503,46 +1516,112 @@ export const LifestyleActivities: React.FC<LifestyleActivitiesProps> = ({ player
     const [pendingAdoptionName, setPendingAdoptionName] = useState<{ player: Player; child: Relationship } | null>(null);
     const [pendingPetName, setPendingPetName] = useState<{ player: Player; pet: Relationship } | null>(null);
     const [activityResult, setActivityResult] = useState<ActivityResultState | null>(null);
-    const state = ensureLifestyleActivityState(player.lifestyleActivities);
-    const quote = buildLifestyleActivityQuote(selectedActivity, selections, player);
-    const cooldownWeeks = getLifestyleActivityCooldownWeeks(player, selectedActivity.id);
+    const state = useMemo(() => ensureLifestyleActivityState(player.lifestyleActivities), [player.lifestyleActivities]);
+    const selectedVisual = useMemo(() => getActivityVisual(selectedActivity), [selectedActivity]);
+    const SelectedIcon = selectedVisual.icon;
+    const isTripPlanner = selectedActivity.id === 'vacation_escape';
+    const isNightlifePlanner = selectedActivity.id === 'nightlife_takeover';
+    const isIndustryPlanner = selectedActivity.id === 'industry_dinner';
+    const isCharityPlanner = selectedActivity.id === 'charity_gala';
+    const isWellnessPlanner = selectedActivity.category === 'WELLNESS';
+    const isAdoptionPlanner = selectedActivity.id === 'adoption_center';
+    const isPetPlanner = selectedActivity.id === 'companion_day';
+    const quote = useMemo(
+        () => isBuilderOpen ? buildLifestyleActivityQuote(selectedActivity, selections, player) : EMPTY_LIFESTYLE_ACTIVITY_QUOTE,
+        [isBuilderOpen, selectedActivity, selections, player],
+    );
+    const cooldownWeeks = useMemo(
+        () => isBuilderOpen ? getLifestyleActivityCooldownWeeks(player, selectedActivity.id) : 0,
+        [isBuilderOpen, player, selectedActivity.id],
+    );
     const canAfford = player.money >= quote.totalCost;
     const canConfirm = canAfford && cooldownWeeks === 0 && Boolean(onUpdatePlayer);
     const selectedCountryId = selections.tripDestinationId || TRIP_DESTINATION_OPTIONS[0]?.id;
-    const tripCityOptions = getTripCityOptions(selectedCountryId);
+    const tripCityOptions = useMemo(
+        () => isBuilderOpen && isTripPlanner ? getTripCityOptions(selectedCountryId) : [],
+        [isBuilderOpen, isTripPlanner, selectedCountryId],
+    );
     const selectedCityId = selections.tripCityId || tripCityOptions[0]?.id;
-    const tripActivityOptions = getTripActivityOptions(selectedCountryId, selectedCityId);
-    const tripTravelOptions = getAvailableTripTravelModes(player);
-    const selectedCountry = TRIP_DESTINATION_OPTIONS.find(option => option.id === selectedCountryId);
-    const selectedCity = tripCityOptions.find(option => option.id === selectedCityId);
-    const selectedStay = TRIP_STAY_OPTIONS.find(option => option.id === selections.tripStayId);
+    const tripActivityOptions = useMemo(
+        () => isBuilderOpen && isTripPlanner ? getTripActivityOptions(selectedCountryId, selectedCityId) : [],
+        [isBuilderOpen, isTripPlanner, selectedCountryId, selectedCityId],
+    );
+    const tripTravelOptions = useMemo(
+        () => isBuilderOpen && isTripPlanner ? getAvailableTripTravelModes(player) : [],
+        [isBuilderOpen, isTripPlanner, player],
+    );
+    const selectedCountry = useMemo(
+        () => TRIP_DESTINATION_OPTIONS.find(option => option.id === selectedCountryId),
+        [selectedCountryId],
+    );
+    const selectedCity = useMemo(
+        () => tripCityOptions.find(option => option.id === selectedCityId),
+        [tripCityOptions, selectedCityId],
+    );
+    const selectedStay = useMemo(
+        () => TRIP_STAY_OPTIONS.find(option => option.id === selections.tripStayId),
+        [selections.tripStayId],
+    );
     const selectedTripTravelId = tripTravelOptions.some(option => option.id === selections.tripTravelId) ? selections.tripTravelId : tripTravelOptions[1]?.id;
-    const selectedTravelMode = tripTravelOptions.find(option => option.id === selectedTripTravelId);
+    const selectedTravelMode = useMemo(
+        () => tripTravelOptions.find(option => option.id === selectedTripTravelId),
+        [tripTravelOptions, selectedTripTravelId],
+    );
     const selectedTripDays = clampTripDays(selections.tripDurationDays || 7);
     const selectedNightlifeType = NIGHTLIFE_TYPE_OPTIONS.find(option => option.id === selections.nightlifeTypeId) || NIGHTLIFE_TYPE_OPTIONS[0];
-    const nightlifeVenueOptions = getAvailableNightlifeVenueOptions(player, selectedNightlifeType?.id);
-    const nightlifeGuestOptions = getAvailableNightlifeGuestOptions(player, nightlifeGuestQuery, selections.nightlifeGuestId);
+    const nightlifeVenueOptions = useMemo(
+        () => isBuilderOpen && isNightlifePlanner ? getAvailableNightlifeVenueOptions(player, selectedNightlifeType?.id) : [],
+        [isBuilderOpen, isNightlifePlanner, player, selectedNightlifeType?.id],
+    );
+    const nightlifeGuestOptions = useMemo(
+        () => isBuilderOpen && isNightlifePlanner ? getAvailableNightlifeGuestOptions(player, nightlifeGuestQuery, selections.nightlifeGuestId) : [],
+        [isBuilderOpen, isNightlifePlanner, player, nightlifeGuestQuery, selections.nightlifeGuestId],
+    );
     const selectedNightlifeVenue = nightlifeVenueOptions.find(option => option.id === selections.nightlifeVenueId) || nightlifeVenueOptions[0];
-    const selectedNightlifeGuest = getAvailableNightlifeGuestOptions(player, '', selections.nightlifeGuestId).find(option => option.id === selections.nightlifeGuestId) || nightlifeGuestOptions[1];
+    const selectedNightlifeGuest = useMemo(() => {
+        if (!isBuilderOpen || !isNightlifePlanner) return undefined;
+        return getAvailableNightlifeGuestOptions(player, '', selections.nightlifeGuestId).find(option => option.id === selections.nightlifeGuestId)
+            || nightlifeGuestOptions[1];
+    }, [isBuilderOpen, isNightlifePlanner, player, selections.nightlifeGuestId, nightlifeGuestOptions]);
     const selectedNightlifeCrowd = NIGHTLIFE_CROWD_OPTIONS.find(option => option.id === selections.nightlifeCrowdId) || NIGHTLIFE_CROWD_OPTIONS[1];
     const selectedNightlifeControl = NIGHTLIFE_CONTROL_OPTIONS.find(option => option.id === selections.nightlifeControlId) || NIGHTLIFE_CONTROL_OPTIONS[1];
-    const availableInviteOptions = getAvailableInviteOptions(selectedActivity, player);
+    const availableInviteOptions = useMemo(
+        () => isBuilderOpen ? getAvailableInviteOptions(selectedActivity, player) : [],
+        [isBuilderOpen, selectedActivity, player],
+    );
     const selectedInviteId = availableInviteOptions.some(option => option.id === selections.inviteId)
         ? selections.inviteId
         : availableInviteOptions[0]?.id || 'solo';
     const selectedIndustryEvent = INDUSTRY_EVENT_OPTIONS.find(option => option.id === selections.industryEventId) || INDUSTRY_EVENT_OPTIONS[0];
-    const industryVenueOptions = getAvailableIndustryVenueOptions(player);
+    const industryVenueOptions = useMemo(
+        () => isBuilderOpen && isIndustryPlanner ? getAvailableIndustryVenueOptions(player) : [],
+        [isBuilderOpen, isIndustryPlanner, player],
+    );
     const selectedIndustryVenue = industryVenueOptions.find(option => option.id === selections.industryVenueId) || industryVenueOptions[0];
     const selectedIndustryGroupIds = selections.industryInviteGroupIds || [];
-    const selectedIndustryGroups = INDUSTRY_INVITE_GROUP_OPTIONS.filter(option => selectedIndustryGroupIds.includes(option.id));
-    const industryGuestOptions = getAvailableIndustryGuestOptions(player, industryGuestQuery, selections.industryGuestIds || []);
-    const selectedIndustryGuests = getAvailableIndustryGuestOptions(player, '', selections.industryGuestIds || [])
-        .filter(option => (selections.industryGuestIds || []).includes(option.id));
+    const selectedIndustryGroups = useMemo(
+        () => isBuilderOpen && isIndustryPlanner ? INDUSTRY_INVITE_GROUP_OPTIONS.filter(option => selectedIndustryGroupIds.includes(option.id)) : [],
+        [isBuilderOpen, isIndustryPlanner, selectedIndustryGroupIds],
+    );
+    const industryGuestOptions = useMemo(
+        () => isBuilderOpen && isIndustryPlanner ? getAvailableIndustryGuestOptions(player, industryGuestQuery, selections.industryGuestIds || []) : [],
+        [isBuilderOpen, isIndustryPlanner, player, industryGuestQuery, selections.industryGuestIds],
+    );
+    const selectedIndustryGuests = useMemo(
+        () => isBuilderOpen && isIndustryPlanner
+            ? getAvailableIndustryGuestOptions(player, '', selections.industryGuestIds || [])
+                .filter(option => (selections.industryGuestIds || []).includes(option.id))
+            : [],
+        [isBuilderOpen, isIndustryPlanner, player, selections.industryGuestIds],
+    );
     const selectedIndustryStyle = INDUSTRY_HOSTING_STYLE_OPTIONS.find(option => option.id === selections.industryHostingStyleId) || INDUSTRY_HOSTING_STYLE_OPTIONS[0];
     const selectedIndustryService = INDUSTRY_SERVICE_OPTIONS.find(option => option.id === selections.industryServiceId) || INDUSTRY_SERVICE_OPTIONS[1];
     const selectedIndustryAddonIds = selections.industryAddonIds || [];
     const selectedCharityCause = CHARITY_CAUSE_OPTIONS.find(option => option.id === selections.charityCauseId) || CHARITY_CAUSE_OPTIONS[2];
-    const charityFormatOptions = getAvailableCharityFormatOptions(player);
+    const charityFormatOptions = useMemo(
+        () => isBuilderOpen && isCharityPlanner ? getAvailableCharityFormatOptions(player) : [],
+        [isBuilderOpen, isCharityPlanner, player],
+    );
     const selectedCharityFormat = charityFormatOptions.find(option => option.id === selections.charityFormatId) || charityFormatOptions[1];
     const charityCustomDonationAmount = Math.max(0, Math.round(Number(selections.charityCustomDonationAmount || 0)));
     const selectedBaseCharityDonation = CHARITY_DONATION_OPTIONS.find(option => option.id === selections.charityDonationId) || CHARITY_DONATION_OPTIONS[1];
@@ -1565,17 +1644,34 @@ export const LifestyleActivities: React.FC<LifestyleActivitiesProps> = ({ player
         || WELLNESS_FOCUS_OPTIONS[1];
     const selectedWellnessSupport = WELLNESS_SUPPORT_OPTIONS.find(option => option.id === selections.wellnessSupportId)
         || WELLNESS_SUPPORT_OPTIONS[1];
-    const availableAdoptionProfiles = getAvailableAdoptionChildProfiles(player);
-    const availableAdoptionOptions = getAvailableAdoptionChildOptions(player);
-    const adoptionPoolCycle = getAdoptionPoolCycle(player);
+    const availableAdoptionProfiles = useMemo(
+        () => isBuilderOpen && isAdoptionPlanner ? getAvailableAdoptionChildProfiles(player) : [],
+        [isBuilderOpen, isAdoptionPlanner, player],
+    );
+    const availableAdoptionOptions = useMemo(
+        () => isBuilderOpen && isAdoptionPlanner ? getAvailableAdoptionChildOptions(player) : [],
+        [isBuilderOpen, isAdoptionPlanner, player],
+    );
+    const adoptionPoolCycle = useMemo(
+        () => isBuilderOpen && isAdoptionPlanner ? getAdoptionPoolCycle(player) : 0,
+        [isBuilderOpen, isAdoptionPlanner, player],
+    );
     const selectedAdoptionChild = availableAdoptionOptions.find(option => option.id === selections.adoptionChildId)
         || availableAdoptionOptions[0];
-    const selectedAdoptionProfile = getAdoptionChildProfile(selectedAdoptionChild?.id, player)
-        || availableAdoptionProfiles[0]
-        || ADOPTION_CHILD_PROFILES[0];
+    const selectedAdoptionProfile = useMemo(
+        () => isBuilderOpen && isAdoptionPlanner
+            ? getAdoptionChildProfile(selectedAdoptionChild?.id, player)
+                || availableAdoptionProfiles[0]
+                || ADOPTION_CHILD_PROFILES[0]
+            : undefined,
+        [isBuilderOpen, isAdoptionPlanner, selectedAdoptionChild?.id, player, availableAdoptionProfiles],
+    );
     const selectedAdoptionRoute = ADOPTION_ROUTE_OPTIONS.find(option => option.id === selections.adoptionRouteId)
         || ADOPTION_ROUTE_OPTIONS[0];
-    const adoptionHomePrepOptions = getAvailableAdoptionHomePrepOptions(player);
+    const adoptionHomePrepOptions = useMemo(
+        () => isBuilderOpen && isAdoptionPlanner ? getAvailableAdoptionHomePrepOptions(player) : [],
+        [isBuilderOpen, isAdoptionPlanner, player],
+    );
     const selectedAdoptionHomePrep = adoptionHomePrepOptions.find(option => option.id === selections.adoptionHomePrepId)
         || adoptionHomePrepOptions[1];
     const selectedAdoptionSupport = ADOPTION_SUPPORT_OPTIONS.find(option => option.id === selections.adoptionSupportId)
@@ -1583,21 +1679,38 @@ export const LifestyleActivities: React.FC<LifestyleActivitiesProps> = ({ player
     const selectedPetStoreId = selections.companionStoreId || COMPANION_STORE_OPTIONS[0]?.id;
     const selectedPetStore = getPetCompanionStore(selectedPetStoreId);
     const selectedPetStoreName = getPetStoreName(selectedPetStore, language);
-    const petCategoryOptions = getPetCompanionCategoryOptions(selectedPetStore.id);
+    const petCategoryOptions = useMemo(
+        () => isBuilderOpen && isPetPlanner ? getPetCompanionCategoryOptions(selectedPetStore.id) : [],
+        [isBuilderOpen, isPetPlanner, selectedPetStore.id],
+    );
     const selectedPetCategoryId = petCategoryOptions.some(option => option.id === selections.companionCategoryId)
         ? selections.companionCategoryId
         : petCategoryOptions[0]?.id;
     const selectedPetCategory = petCategoryOptions.find(option => option.id === selectedPetCategoryId)
         || petCategoryOptions[0];
     const selectedPetCategoryLabel = selectedPetCategory ? getChoiceLabel(selectedPetCategory, language) : tr('activities.chooseCategory');
-    const filteredPetProfiles = getFilteredPetCompanionProfiles(player, selectedPetStore.id, selectedPetCategory?.id);
-    const petPoolCycle = getPetCompanionPoolCycle(player);
-    const selectedPetProfile = getPetCompanionProfile(selections.companionPetId, player)
-        || filteredPetProfiles[0];
+    const filteredPetProfiles = useMemo(
+        () => isBuilderOpen && isPetPlanner ? getFilteredPetCompanionProfiles(player, selectedPetStore.id, selectedPetCategory?.id) : [],
+        [isBuilderOpen, isPetPlanner, player, selectedPetStore.id, selectedPetCategory?.id],
+    );
+    const petPoolCycle = useMemo(
+        () => isBuilderOpen && isPetPlanner ? getPetCompanionPoolCycle(player) : 0,
+        [isBuilderOpen, isPetPlanner, player],
+    );
+    const selectedPetProfile = useMemo(
+        () => isBuilderOpen && isPetPlanner ? getPetCompanionProfile(selections.companionPetId, player) || filteredPetProfiles[0] : undefined,
+        [isBuilderOpen, isPetPlanner, selections.companionPetId, player, filteredPetProfiles],
+    );
     const selectedPetBreed = selectedPetProfile ? getPetProfileBreed(selectedPetProfile, language) : undefined;
     const selectedPetSpecies = selectedPetProfile ? getPetProfileSpecies(selectedPetProfile, language) : undefined;
-    const petCareOptions = getCompanionCareOptionsForPet(selectedPetProfile);
-    const petPermitOptions = getCompanionPermitOptionsForPet(selectedPetProfile);
+    const petCareOptions = useMemo(
+        () => isBuilderOpen && isPetPlanner ? getCompanionCareOptionsForPet(selectedPetProfile) : [],
+        [isBuilderOpen, isPetPlanner, selectedPetProfile],
+    );
+    const petPermitOptions = useMemo(
+        () => isBuilderOpen && isPetPlanner ? getCompanionPermitOptionsForPet(selectedPetProfile) : [],
+        [isBuilderOpen, isPetPlanner, selectedPetProfile],
+    );
     const selectedPetCare = petCareOptions.find(option => option.id === selections.companionCareId)
         || petCareOptions[Math.min(1, petCareOptions.length - 1)];
     const selectedPetHome = COMPANION_HOME_OPTIONS.find(option => option.id === selections.companionHomeId)
@@ -1608,40 +1721,59 @@ export const LifestyleActivities: React.FC<LifestyleActivitiesProps> = ({ player
         || COMPANION_CUSTOMIZATION_OPTIONS[1];
     const selectedPetPermit = petPermitOptions.find(option => option.id === selections.companionPermitId)
         || petPermitOptions[0];
-    const activeHealthConditions = Array.isArray(player.activeHealthConditions) ? player.activeHealthConditions : [];
-    const activeHealthCondition = activeHealthConditions[0];
-    const selectedWellnessTags = getHealthConditionTreatmentTags(
-        selectedWellnessProgram?.id,
-        selectedWellnessProvider?.id,
-        selectedWellnessFocus?.id,
-        selectedWellnessSupport?.id,
+    const activeHealthConditions = useMemo(
+        () => Array.isArray(player.activeHealthConditions) ? player.activeHealthConditions : [],
+        [player.activeHealthConditions],
     );
-    const treatmentMatchCount = activeHealthCondition
-        ? activeHealthCondition.treatmentTags.filter(tag => selectedWellnessTags.includes(tag)).length
-        : 0;
+    const activeHealthCondition = activeHealthConditions[0];
+    const selectedWellnessTags = useMemo(
+        () => isBuilderOpen && isWellnessPlanner ? getHealthConditionTreatmentTags(
+            selectedWellnessProgram?.id,
+            selectedWellnessProvider?.id,
+            selectedWellnessFocus?.id,
+            selectedWellnessSupport?.id,
+        ) : [],
+        [isBuilderOpen, isWellnessPlanner, selectedWellnessProgram?.id, selectedWellnessProvider?.id, selectedWellnessFocus?.id, selectedWellnessSupport?.id],
+    );
+    const treatmentMatchCount = useMemo(
+        () => isBuilderOpen && isWellnessPlanner && activeHealthCondition
+            ? activeHealthCondition.treatmentTags.filter(tag => selectedWellnessTags.includes(tag)).length
+            : 0,
+        [isBuilderOpen, isWellnessPlanner, activeHealthCondition, selectedWellnessTags],
+    );
     const treatmentMatch = activeHealthCondition
         ? treatmentMatchCount >= 2 ? t(language, 'activities.treatmentMatch.strong') : treatmentMatchCount === 1 ? t(language, 'activities.treatmentMatch.partial') : t(language, 'activities.treatmentMatch.poor')
         : t(language, 'activities.treatmentMatch.preventive');
-    const adoptionEligibility = getAdoptionEligibility(player, quote);
-    const filteredActivities = category === 'ALL'
+    const adoptionEligibility = useMemo(
+        () => isBuilderOpen && isAdoptionPlanner
+            ? getAdoptionEligibility(player, quote)
+            : { qualifies: false, score: 0, statusLabel: '', blockers: [], checks: [] },
+        [isBuilderOpen, isAdoptionPlanner, player, quote],
+    );
+    const filteredActivities = useMemo(() => category === 'ALL'
         ? LIFESTYLE_ACTIVITY_CATALOG
-        : LIFESTYLE_ACTIVITY_CATALOG.filter(activity => activity.category === category);
-    const statSummary = [
+        : LIFESTYLE_ACTIVITY_CATALOG.filter(activity => activity.category === category),
+        [category],
+    );
+    const statSummary = useMemo(() => [
         { label: t(language, 'activities.stat.mood'), value: formatStat(player.stats.happiness), color: 'text-yellow-300' },
         { label: t(language, 'activities.stat.health'), value: formatStat(player.stats.health), color: 'text-emerald-300' },
         { label: t(language, 'activities.stat.rep'), value: formatStat(player.stats.reputation), color: 'text-sky-300' },
         { label: t(language, 'activities.stat.spent'), value: formatMoney(state.totalSpent), color: 'text-white' },
-    ];
-    const currentYearMemories = state.memories.filter(memory => memory.year === player.age);
+    ], [language, player.stats.happiness, player.stats.health, player.stats.reputation, state.totalSpent]);
+    const currentYearMemories = useMemo(
+        () => state.memories.filter(memory => memory.year === player.age),
+        [state.memories, player.age],
+    );
 
-    const selectActivity = (activity: LifestyleActivityDefinition) => {
+    const selectActivity = useCallback((activity: LifestyleActivityDefinition) => {
         setSelectedActivityId(activity.id);
         setSelections(createDefaultLifestyleActivitySelections(activity));
         setStatus(null);
         setAdoptionStage('eligibility');
         setPetStage('brief');
         setIsBuilderOpen(true);
-    };
+    }, []);
 
     const updateSelection = (key: 'scaleId' | 'privacyId' | 'inviteId' | 'durationId', value: string) => {
         setSelections(prev => ({ ...prev, [key]: value }));
@@ -1920,15 +2052,6 @@ export const LifestyleActivities: React.FC<LifestyleActivitiesProps> = ({ player
         }
     };
 
-    const selectedVisual = getActivityVisual(selectedActivity);
-    const SelectedIcon = selectedVisual.icon;
-    const isTripPlanner = selectedActivity.id === 'vacation_escape';
-    const isNightlifePlanner = selectedActivity.id === 'nightlife_takeover';
-    const isIndustryPlanner = selectedActivity.id === 'industry_dinner';
-    const isCharityPlanner = selectedActivity.id === 'charity_gala';
-    const isWellnessPlanner = selectedActivity.category === 'WELLNESS';
-    const isAdoptionPlanner = selectedActivity.id === 'adoption_center';
-    const isPetPlanner = selectedActivity.id === 'companion_day';
     const builderShellClass = isNightlifePlanner
         ? 'border-fuchsia-400/25 bg-gradient-to-b from-fuchsia-950/35 via-violet-950/20 to-zinc-950'
         : isIndustryPlanner
@@ -2105,7 +2228,7 @@ export const LifestyleActivities: React.FC<LifestyleActivitiesProps> = ({ player
                     <ActivityCard
                         key={activity.id}
                         activity={activity}
-                        onClick={() => selectActivity(activity)}
+                        onSelect={selectActivity}
                     />
                 ))}
             </div>

@@ -14,6 +14,8 @@ export const formatMoney = (val: number) => {
         { value: 1_000_000, label: 'M' },
         { value: 1_000, label: 'k' },
     ];
+    const largestTier = suffixes[0];
+    if (absVal >= largestTier.value * 1000) return `${sign}$999${largestTier.label}+`;
     const tier = suffixes.find(item => absVal >= item.value);
     const formatted = tier
         ? `${(absVal / tier.value).toFixed(tier.value >= 1_000_000 ? 1 : 0)}${tier.label}`

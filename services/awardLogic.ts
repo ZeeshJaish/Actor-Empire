@@ -1,9 +1,18 @@
 
-import { GameLanguage, Player, AwardType, PastProject, Award, PendingEvent, PressInteraction, IndustryProject, AwardHistoryEntry } from '../types';
+import { GameLanguage, Player, AwardType, PastProject, Award, PendingEvent, PressInteraction, IndustryProject, AwardHistoryEntry, ProjectType } from '../types';
 import { NPC_DATABASE } from './npcLogic';
 import { generateProjectTitle } from './roleLogic';
 import { calculateProjectMusicImpact } from './musicIndustry';
 import { t } from './i18n';
+import { getProjectReleaseTiming } from './releaseTiming';
+
+const resolveAwardMediaType = (...candidates: unknown[]): ProjectType => {
+    for (const candidate of candidates) {
+        if (candidate === 'SERIES') return 'SERIES';
+        if (candidate === 'MOVIE') return 'MOVIE';
+    }
+    return 'MOVIE';
+};
 
 export interface AwardDefinition {
     type: AwardType;
@@ -267,20 +276,30 @@ type AwardLike = {
     outcome: 'WON' | 'NOMINATED';
 };
 
+const getAwardRecordProjectKey = (award: AwardLike): string => `${award.type}::${award.category}::${award.projectId}`;
+const getAwardRecordSeasonKey = (award: AwardLike): string => `${award.type}::${award.year}::${award.category}`;
+
+const shouldReplaceAwardRecord = <T extends AwardLike>(existing: T, candidate: T): boolean => {
+    if (candidate.year < existing.year) return true;
+    if (candidate.year > existing.year) return false;
+    if (existing.outcome !== 'WON' && candidate.outcome === 'WON') return true;
+    return false;
+};
+
 export const sanitizeAwardRecords = <T extends AwardLike>(awards: T[] = []): T[] => {
     const byProject = new Map<string, T>();
 
     awards.forEach(award => {
-        const projectKey = `${award.type}::${award.year}::${award.category}::${award.projectId}`;
+        const projectKey = getAwardRecordProjectKey(award);
         const existing = byProject.get(projectKey);
-        if (!existing || (existing.outcome !== 'WON' && award.outcome === 'WON')) {
+        if (!existing || shouldReplaceAwardRecord(existing, award)) {
             byProject.set(projectKey, award);
         }
     });
 
     const byCategory = new Map<string, T[]>();
     Array.from(byProject.values()).forEach(award => {
-        const categoryKey = `${award.type}::${award.year}::${award.category}`;
+        const categoryKey = getAwardRecordSeasonKey(award);
         if (!byCategory.has(categoryKey)) byCategory.set(categoryKey, []);
         byCategory.get(categoryKey)!.push(award);
     });
@@ -304,15 +323,77 @@ export const sanitizeAwardRecords = <T extends AwardLike>(awards: T[] = []): T[]
     });
 };
 
+export const sanitizeAwardHistoryEntries = <T extends AwardHistoryEntry>(entries: T[] = []): T[] => {
+    const seenPlayerWinners = new Set<string>();
+    const droppedWinnerKeys = new Set<string>();
+    const orderedEntries = entries
+        .map((entry, index) => ({ entry, index }))
+        .sort((a, b) => (a.entry.year - b.entry.year) || (a.index - b.index));
+
+    orderedEntries.forEach(({ entry, index }) => {
+        (entry.winners || []).forEach((winner, winnerIndex) => {
+            if (!winner.isPlayer) return;
+            const winnerKey = `${entry.type}::${winner.category}::${winner.projectName}`;
+            if (seenPlayerWinners.has(winnerKey)) {
+                droppedWinnerKeys.add(`${index}::${winnerIndex}`);
+                return;
+            }
+            seenPlayerWinners.add(winnerKey);
+        });
+    });
+
+    return entries.map((entry, index) => ({
+        ...entry,
+        winners: (entry.winners || []).filter((_, winnerIndex) => !droppedWinnerKeys.has(`${index}::${winnerIndex}`))
+    }));
+};
+
 const getAwardTypeForInviteWeek = (week: number): AwardType | null => {
     const match = Object.values(AWARD_CALENDAR).find(def => def.inviteWeek === week);
     return match?.type || null;
 };
 
+const getAwardDefinitionByType = (awardType: AwardType): AwardDefinition | undefined => (
+    Object.values(AWARD_CALENDAR).find(def => def.type === awardType)
+);
+
+const getProjectAwardSeasonYear = (project: any, awardType: AwardType | null): number | undefined => {
+    if (!awardType) return undefined;
+    const timing = getProjectReleaseTiming(project);
+    if (!timing.releaseYear) return undefined;
+
+    if (awardType === 'EMMY') {
+        const emmyInviteWeek = getAwardDefinitionByType('EMMY')?.inviteWeek || 34;
+        return timing.releaseWeek && timing.releaseWeek > emmyInviteWeek
+            ? timing.releaseYear + 1
+            : timing.releaseYear;
+    }
+
+    return timing.releaseYear + 1;
+};
+
+export const isProjectEligibleForAwardSeason = (
+    project: any,
+    awardType: AwardType | null,
+    awardYear: number
+): boolean => getProjectAwardSeasonYear(project, awardType) === awardYear;
+
+const hasExistingPlayerAwardRecord = (
+    player: Player,
+    projectId: string,
+    category: string,
+    awardType: AwardType | null
+): boolean => player.awards.some(a =>
+    a.projectId === projectId &&
+    a.category === category &&
+    (!awardType || a.type === awardType)
+);
+
 export const checkAwardEligibility = (player: Player, week: number, awardYear = player.age): Nomination[] => {
     // 1. GATHER ALL CANDIDATES (Player + World)
     const candidates: any[] = [];
     const processedIds = new Set<string>(); // Prevent duplicates between past/active/same-project
+    const awardType = getAwardTypeForInviteWeek(week);
 
     // Helper
     const addCandidate = (p: any, fromActive: boolean) => {
@@ -327,7 +408,9 @@ export const checkAwardEligibility = (player: Player, week: number, awardYear = 
             rating: fromActive ? p.imdbRating : p.rating,
             isPlayer: true,
             genre: fromActive ? p.projectDetails.genre : p.genre,
-            mediaType: fromActive ? p.projectDetails.type : (p.projectType || 'MOVIE'),
+            mediaType: fromActive
+                ? resolveAwardMediaType(p.projectDetails?.type, p.type)
+                : resolveAwardMediaType(p.projectType, p.type, p.projectDetails?.type),
             musicPlan: fromActive ? p.projectDetails.musicPlan : p.musicPlan,
             hiddenStats: fromActive ? p.projectDetails.hiddenStats : (p.hiddenStats || {}),
             crewList: fromActive ? p.projectDetails.crewList : (p.crewList || []),
@@ -344,16 +427,16 @@ export const checkAwardEligibility = (player: Player, week: number, awardYear = 
         });
     };
 
-    // Player Past Projects (Released in last 52 weeks)
+    // Player Past Projects (only their exact award season)
     player.pastProjects.forEach(p => {
-        if (p.year >= player.age - 1) { 
+        if (isProjectEligibleForAwardSeason(p, awardType, awardYear)) {
             addCandidate(p, false);
         }
     });
     
     // Player Active Releases (Currently running or just finished)
     player.activeReleases.forEach(r => {
-        if (r.weekNum > 2) {
+        if (r.weekNum > 2 && isProjectEligibleForAwardSeason(r, awardType, awardYear)) {
             addCandidate(r, true);
         }
     });
@@ -361,7 +444,6 @@ export const checkAwardEligibility = (player: Player, week: number, awardYear = 
     const nominations: Nomination[] = [];
     const isFemale = player.gender === 'FEMALE';
     const actorTerm = isFemale ? 'Actress' : 'Actor';
-    const awardType = getAwardTypeForInviteWeek(week);
 
     // 2. EVALUATE CANDIDATES
     candidates.forEach(project => {
@@ -378,8 +460,7 @@ export const checkAwardEligibility = (player: Player, week: number, awardYear = 
                 const exists = player.awards.some(a =>
                     a.projectId === project.id &&
                     a.category === category &&
-                    a.type === awardType &&
-                    a.year === awardYear
+                    a.type === awardType
                 );
                 const alreadyQueued = nominations.some(n => n.project.id === project.id && n.category === category);
                 if (exists || alreadyQueued) return;
@@ -455,12 +536,7 @@ export const checkAwardEligibility = (player: Player, week: number, awardYear = 
                 playerCreditRole: NonNullable<Nomination['playerCreditRole']>
             ) => {
                 if (!category || !AWARD_SHOW_DB[awardType].categories.includes(category) || score < threshold) return;
-                const exists = player.awards.some(a =>
-                    a.projectId === project.id &&
-                    a.category === category &&
-                    a.type === awardType &&
-                    a.year === awardYear
-                );
+                const exists = hasExistingPlayerAwardRecord(player, project.id, category, awardType);
                 const alreadyQueued = nominations.some(n => n.project.id === project.id && n.category === category);
                 if (exists || alreadyQueued) return;
                 nominations.push({
@@ -557,12 +633,7 @@ export const checkAwardEligibility = (player: Player, week: number, awardYear = 
 
             if (project.isPlayer) {
                 // Check if already nominated for this project/category to avoid duplicates
-                const exists = player.awards.some(a =>
-                    a.projectId === project.id &&
-                    a.category === cat &&
-                    (!awardType || a.type === awardType) &&
-                    a.year === awardYear
-                );
+                const exists = hasExistingPlayerAwardRecord(player, project.id, cat, awardType);
                 const alreadyQueued = nominations.some(n => n.project.id === project.id && n.category === cat);
 
                 if (!exists && !alreadyQueued) {

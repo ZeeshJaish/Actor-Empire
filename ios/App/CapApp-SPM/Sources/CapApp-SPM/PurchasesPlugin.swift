@@ -11,6 +11,49 @@ public class PurchasesPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "purchaseProduct", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "restorePurchases", returnType: CAPPluginReturnPromise)
     ]
+    private var transactionUpdatesTask: Task<Void, Never>?
+
+    public override func load() {
+        super.load()
+        startTransactionUpdatesListener()
+    }
+
+    deinit {
+        transactionUpdatesTask?.cancel()
+    }
+
+    private func startTransactionUpdatesListener() {
+        guard transactionUpdatesTask == nil else { return }
+
+        transactionUpdatesTask = Task { [weak self] in
+            for await update in Transaction.updates {
+                await self?.handleTransactionUpdate(update)
+            }
+        }
+    }
+
+    private func notifyPurchaseCompleted(productId: String, transactionId: UInt64) async {
+        await MainActor.run {
+            self.notifyListeners("purchaseCompleted", data: [
+                "productId": productId,
+                "transactionId": String(transactionId)
+            ], retainUntilConsumed: true)
+        }
+    }
+
+    private func handleTransactionUpdate(_ verification: VerificationResult<Transaction>) async {
+        switch verification {
+        case .verified(let transaction):
+            await notifyPurchaseCompleted(productId: transaction.productID, transactionId: transaction.id)
+            await transaction.finish()
+        case .unverified(_, let error):
+            await MainActor.run {
+                self.notifyListeners("purchaseFailed", data: [
+                    "message": "Purchase could not be verified: \(error.localizedDescription)"
+                ], retainUntilConsumed: true)
+            }
+        }
+    }
 
     @objc public func getProducts(_ call: CAPPluginCall) {
         let productIds = call.getArray("productIds", String.self) ?? []

@@ -1096,8 +1096,8 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
       )}
 
       {legacyCandidate && (
-          <div className="fixed inset-0 z-[220] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
-              <div className="w-full max-w-md rounded-[2rem] border border-amber-500/20 bg-[radial-gradient(circle_at_top,rgba(245,158,11,0.18),rgba(24,24,27,0.96)_38%,rgba(9,9,11,1)_100%)] shadow-2xl overflow-hidden">
+          <div className="fixed inset-0 z-[220] bg-black/90 backdrop-blur-md flex items-start justify-center overflow-y-auto p-4 pt-10 pb-[calc(env(safe-area-inset-bottom)+6.5rem)] animate-in fade-in duration-200">
+              <div className="w-full max-w-md max-h-[calc(100vh-8rem)] overflow-y-auto rounded-[2rem] border border-amber-500/20 bg-[radial-gradient(circle_at_top,rgba(245,158,11,0.18),rgba(24,24,27,0.96)_38%,rgba(9,9,11,1)_100%)] shadow-2xl">
                   <div className="flex items-start justify-between gap-4 p-6 border-b border-white/5">
                       <div className="flex items-center gap-4">
                           <div className="w-16 h-16 rounded-2xl overflow-hidden border border-amber-500/30 bg-black/30">
@@ -1160,7 +1160,7 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
                       </div>
                   </div>
 
-                  <div className="p-6 pt-0 grid grid-cols-2 gap-3">
+	                  <div className="p-6 pt-0 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] grid grid-cols-2 gap-3">
                       <button
                           onClick={closeLegacyConfirmation}
                           className="py-3 rounded-2xl border border-zinc-800 bg-zinc-900/80 text-zinc-300 font-bold text-sm hover:bg-zinc-800 transition-colors"

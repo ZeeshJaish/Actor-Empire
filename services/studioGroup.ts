@@ -576,6 +576,9 @@ export const executeFullStudioMerger = ({
     const integrationCost = getMergerIntegrationCost(studio);
     const transferredCapital = Math.max(0, studio.balance - integrationCost);
     const netParentBalance = parentStudio.balance + studio.balance - integrationCost;
+    const parentValuation = Math.max(0, parentStudio.stats.valuation || 0);
+    const acquiredValuation = Math.max(0, studio.stats.valuation || 0);
+    const mergedValuationContribution = Math.round(acquiredValuation * 0.9);
 
     const updatedParentStudio: Business = {
         ...parentStudio,
@@ -583,7 +586,11 @@ export const executeFullStudioMerger = ({
         staff: uniqueById([...parentStudio.staff, ...studio.staff]),
         stats: {
             ...parentStudio.stats,
-            valuation: (parentStudio.stats.valuation || 0) + Math.round((studio.stats.valuation || 0) * 0.65),
+            weeklyRevenue: (parentStudio.stats.weeklyRevenue || 0) + Math.round((studio.stats.weeklyRevenue || 0) * 0.85),
+            weeklyExpenses: (parentStudio.stats.weeklyExpenses || 0) + Math.round((studio.stats.weeklyExpenses || 0) * 0.82),
+            weeklyProfit: (parentStudio.stats.weeklyProfit || 0) + Math.round((studio.stats.weeklyProfit || 0) * 0.8),
+            lifetimeRevenue: (parentStudio.stats.lifetimeRevenue || 0) + (studio.stats.lifetimeRevenue || 0),
+            valuation: Math.max(parentValuation, parentValuation + mergedValuationContribution),
             brandHealth: Math.max(0, Math.min(100, Math.round(((parentStudio.stats.brandHealth || 50) * 0.85) + ((studio.stats.brandHealth || 50) * 0.15)))),
             studioMomentum: Math.max(parentStudio.stats.studioMomentum || 0, studio.stats.studioMomentum || 0),
             investorConfidence: Math.max(0, Math.min(100, (parentStudio.stats.investorConfidence || 50) + 3)),
@@ -631,6 +638,13 @@ export const executeFullStudioMerger = ({
         ...studio,
         balance: 0,
         isActive: false,
+        stats: {
+            ...studio.stats,
+            weeklyRevenue: 0,
+            weeklyExpenses: 0,
+            weeklyProfit: 0,
+            valuation: 0,
+        },
         studioState: {
             ...acquiredState,
             acquisitionOrigin: 'STUDIO_ACQUISITION',

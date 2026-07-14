@@ -28,6 +28,7 @@ const checks = [
       if (!exists('services/healthConditions.ts')) return false;
       const source = read('services/healthConditions.ts');
       return source.includes('workload_headache')
+        && source.includes('back_pain')
         && source.includes('stunt_fracture')
         && source.includes('party_accident')
         && source.includes('cancer_scare')
@@ -56,8 +57,45 @@ const checks = [
     pass: () => {
       const source = read('services/healthConditions.ts');
       return source.includes('applyHealthConditionIncident')
-        && source.includes('Medical Team')
+        && source.includes('services.health.inbox.sender')
         && source.includes('publicity');
+    },
+  },
+  {
+    name: 'care team can quietly handle minor issues without replacing clinic treatment',
+    pass: () => {
+      const source = read('services/healthConditions.ts');
+      const locale = read('services/localization/locales/en.ts');
+      return source.includes('canCareTeamAutoHandleCondition')
+        && source.includes('getCareTeamConditionSupportPower')
+        && source.includes('careTeamMinorConditionIds')
+        && source.includes('lastCareTeamAutoHandleAbsoluteWeek')
+        && source.includes('services.health.careTeam.handled')
+        && locale.includes('Care Team handled {condition} before it became a Health Clinic issue.');
+    },
+  },
+  {
+    name: 'medical prompts throttle minor and moderate repeat alerts',
+    pass: () => {
+      const source = read('App.tsx');
+      return source.includes('getMedicalPromptCooldownWeeks')
+        && source.includes('getMedicalPromptSeverityRank')
+        && source.includes('lastMedicalPromptAbsoluteWeek')
+        && source.includes('promptCooldownWeeks === 0')
+        && source.includes('.sort((a, b) => getMedicalPromptSeverityRank(b.severity) - getMedicalPromptSeverityRank(a.severity))');
+    },
+  },
+  {
+    name: 'guide explains why care team and health clinic both exist',
+    pass: () => {
+      const guide = read('components/GuideView.tsx');
+      const locale = read('services/localization/locales/en.ts');
+      return guide.includes('HEALTH_CARE')
+        && guide.includes('FAQ_HEALTH')
+        && guide.includes('problem.health.title')
+        && locale.includes('Why both exist')
+        && locale.includes('Care Team is weekly prevention and light handling')
+        && locale.includes('Health Clinic is direct treatment');
     },
   },
   {
@@ -101,9 +139,9 @@ const checks = [
     pass: () => {
       const source = read('views/lifestyle/LifestyleActivities.tsx');
       return source.includes('activeHealthConditions')
-        && source.includes('Active Medical Issue')
-        && source.includes('Health cap')
-        && source.includes('Treatment match');
+        && source.includes('activities.wellnessPreview.activeIssue')
+        && source.includes('activities.wellnessPreview.healthCap')
+        && source.includes('activities.wellnessPreview.treatmentMatch');
     },
   },
   {

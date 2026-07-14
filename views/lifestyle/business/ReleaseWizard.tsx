@@ -764,8 +764,9 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
         // Update platform cash reserve
         if (updatedPlayer.world.platforms && updatedPlayer.world.platforms[bid.platformId as any]) {
             const totalCost = bid.amount + (bid.fundingAmount || 0);
-            updatedPlayer.world.platforms[bid.platformId as any].cashReserve -= totalCost;
-            updatedPlayer.world.platforms[bid.platformId as any].recentHits += 1;
+            const platformState = updatedPlayer.world.platforms[bid.platformId as any];
+            platformState.cashReserve = Math.max(0, platformState.cashReserve - totalCost);
+            platformState.recentHits += 1;
         }
 
         const commitmentIndex = updatedPlayer.commitments.findIndex(c => c.id === project.id);
@@ -807,7 +808,12 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                 let startWeek = undefined;
                 let startWeekAbsolute = undefined;
                 if (isStillTheatrical) {
-                    const weeksRemaining = (release.maxTheatricalWeeks || 8) - (release.weeksInTheaters || 0);
+                    const completedTheatricalWeeks = Math.max(
+                        release.weeksInTheaters || 0,
+                        release.weeklyGross?.length || 0,
+                        Math.max(0, release.weekNum - 1)
+                    );
+                    const weeksRemaining = (release.maxTheatricalWeeks || 8) - completedTheatricalWeeks;
                     const waitWeeks = Math.max(1, weeksRemaining + 1);
                     startWeekAbsolute = getAbsoluteWeek(player.age, player.currentWeek) + waitWeeks;
                     startWeek = ((player.currentWeek + waitWeeks - 1) % 52) + 1;

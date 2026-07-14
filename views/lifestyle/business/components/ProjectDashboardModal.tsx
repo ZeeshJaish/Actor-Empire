@@ -58,11 +58,16 @@ const normalizeScorecardSeriesTitle = (value: string = '') => value
 
 const getScorecardSeriesKey = (project: any) => {
     const details = project?.projectDetails || project || {};
-    return details.franchiseId
-        || details.sourceScriptId
-        || project?.franchiseId
-        || project?.sourceScriptId
-        || normalizeScorecardSeriesTitle(project?.name || project?.title || details.title || '');
+    const franchiseId = details.franchiseId || project?.franchiseId;
+    const titleKey = normalizeScorecardSeriesTitle(project?.name || project?.title || details.title || '');
+    const sourceScriptId = details.sourceScriptId || project?.sourceScriptId;
+    return franchiseId
+        ? `franchise:${franchiseId}`
+        : titleKey
+            ? `title:${titleKey}`
+            : sourceScriptId
+                ? `script:${sourceScriptId}`
+                : `project:${project?.id || details.id || 'unknown'}`;
 };
 
 const SeriesScorecardPanel: React.FC<{
@@ -124,7 +129,7 @@ const SeriesScorecardPanel: React.FC<{
                 </div>
             </div>
 
-            <div className="scorecard-season-scroll mt-4 overflow-x-auto no-scrollbar pb-1">
+            <div className="scorecard-season-scroll mt-4 max-h-[460px] overflow-auto no-scrollbar pb-1 pr-1">
                 <div
                     className="grid gap-1 min-w-max"
                     style={{

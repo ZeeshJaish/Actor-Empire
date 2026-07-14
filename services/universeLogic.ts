@@ -5,6 +5,11 @@ import { NPC_DATABASE } from './npcLogic';
 import { generateProjectTitle, getEstimatedBudget, generateProjectDetails } from './roleLogic';
 import { getProjectReleaseSortValue, getProjectReleaseTiming } from './releaseTiming';
 import { getPlayerLanguage, t } from './i18n';
+import { getInheritedStudioProjects } from './legacyLogic';
+
+const resolveUniverseProjectType = (...candidates: unknown[]): 'MOVIE' | 'SERIES' => (
+    candidates.some(candidate => candidate === 'SERIES') ? 'SERIES' : 'MOVIE'
+);
 
 // --- CONFIGURATION ---
 
@@ -1134,7 +1139,7 @@ export const getUniverseDashboardProjects = (
         .map(project => ({
             id: project.id,
             title: project.name,
-            type: project.projectType,
+            type: resolveUniverseProjectType(project.projectType, (project as any).type, (project as any).projectDetails?.type),
             genre: project.genre,
             budgetTier: project.budget >= 50_000_000 ? 'BLOCKBUSTER' : project.budget >= 10_000_000 ? 'HIGH' : project.budget >= 3_000_000 ? 'MID' : 'LOW',
             year: getProjectReleaseTiming(project, { currentAge: player.age }).releaseYear || player.age,
@@ -1169,7 +1174,33 @@ export const getUniverseDashboardProjects = (
             source: 'ACTIVE' as const
         }));
 
-    return [...pastProjects, ...activeUniverseProjects].sort((a, b) => (a.releaseSortValue || a.year) - (b.releaseSortValue || b.year));
+    const inheritedProjects = getInheritedStudioProjects(player)
+        .filter(project => project && ((project.universeId === universeId) || ((project as any).projectDetails?.universeId === universeId)))
+        .map(project => ({
+            id: project.id,
+            title: project.name || project.title,
+            type: resolveUniverseProjectType(project.projectType, project.type, (project as any).projectDetails?.type),
+            genre: project.genre,
+            budgetTier: project.budgetTier || (project.budget >= 50_000_000 ? 'BLOCKBUSTER' : project.budget >= 10_000_000 ? 'HIGH' : project.budget >= 3_000_000 ? 'MID' : 'LOW'),
+            year: getProjectReleaseTiming(project, { currentAge: player.age }).releaseYear || project.releaseYear || project.year || player.age,
+            releaseSortValue: getProjectReleaseSortValue(project, { currentAge: player.age }),
+            gross: project.gross || project.totalGross || 0,
+            rating: project.imdbRating || project.rating || 0,
+            subtype: project.subtype || (project as any).projectDetails?.subtype,
+            isActive: false,
+            universeSagaName: (project as any).universeSagaName || (project as any).projectDetails?.universeSagaName,
+            universePhaseName: (project as any).universePhaseName || (project as any).projectDetails?.universePhaseName,
+            castList: Array.isArray(project.castList) ? project.castList : [],
+            source: 'PAST' as const
+        }));
+
+    const projectsById = new Map<string, UniverseDashboardProject & { releaseSortValue?: number }>();
+    [...pastProjects, ...activeUniverseProjects, ...inheritedProjects].forEach(project => {
+        if (!project?.id) return;
+        if (!projectsById.has(project.id)) projectsById.set(project.id, project);
+    });
+
+    return Array.from(projectsById.values()).sort((a, b) => (a.releaseSortValue || a.year) - (b.releaseSortValue || b.year));
 };
 
 export const buildUniverseRoster = (
@@ -1264,6 +1295,75 @@ export const buildUniverseRoster = (
     return uniqueRoster.sort((a, b) => {
         const appearanceDelta = (b.appearances || 0) - (a.appearances || 0);
         if (appearanceDelta !== 0) return appearanceDelta;
+        return a.name.localeCompare(b.name);
+    });
+};
+
+export interface UniverseCharacterSelectionOption extends UniverseCharacter {
+    id: string;
+    characterId: string;
+    sourceUniverseId: UniverseId;
+    sourceName: string;
+    sourceType: 'UNIVERSE';
+    retiredUniverse: boolean;
+    legacyArchive: boolean;
+}
+
+export const getUniverseCharacterSelectionOptions = (
+    player: Player,
+    rawUniverses: any,
+    options: {
+        targetUniverseId?: UniverseId | null;
+        includeOutsideActiveUniverses?: boolean;
+        includeLegacyArchive?: boolean;
+        studioId?: StudioId;
+        language?: GameLanguage;
+    } = {}
+): UniverseCharacterSelectionOption[] => {
+    const language = options.language || getPlayerLanguage(player);
+    const universes = normalizeUniverseMap(rawUniverses || {}, language);
+    const targetUniverseId = options.targetUniverseId || null;
+    const selectionOptions: UniverseCharacterSelectionOption[] = [];
+    const seen = new Set<string>();
+
+    Object.values(universes).forEach(universe => {
+        if (options.studioId && universe.studioId !== options.studioId) return;
+
+        const retiredUniverse = isUniverseRetired(universe);
+        const isTargetUniverse = !!targetUniverseId && universe.id === targetUniverseId;
+        const includeActiveUniverse = !retiredUniverse && (isTargetUniverse || options.includeOutsideActiveUniverses || !targetUniverseId);
+        const includeLegacyUniverse = retiredUniverse && !!options.includeLegacyArchive;
+
+        if (!includeActiveUniverse && !includeLegacyUniverse) return;
+
+        const projects = getUniverseDashboardProjects(player, universe.id, player.activeReleases || []);
+        buildUniverseRoster(universe, projects, player.name, language).forEach(character => {
+            if (!character?.name?.trim()) return;
+            if (!includeLegacyUniverse && character.status === 'RETIRED') return;
+
+            const characterId = character.characterId || character.id || normalizeUniverseCharacterKey(character.name);
+            const key = `${universe.id}:${normalizeUniverseCharacterKey(characterId || character.name)}`;
+            if (seen.has(key)) return;
+            seen.add(key);
+
+            selectionOptions.push({
+                ...character,
+                id: character.id || characterId,
+                characterId,
+                sourceUniverseId: universe.id,
+                sourceName: retiredUniverse ? `${universe.name} Legacy Archive` : universe.name,
+                sourceType: 'UNIVERSE',
+                retiredUniverse,
+                legacyArchive: retiredUniverse
+            });
+        });
+    });
+
+    return selectionOptions.sort((a, b) => {
+        if (a.legacyArchive !== b.legacyArchive) return a.legacyArchive ? 1 : -1;
+        const aSameUniverse = targetUniverseId && a.sourceUniverseId === targetUniverseId ? 0 : 1;
+        const bSameUniverse = targetUniverseId && b.sourceUniverseId === targetUniverseId ? 0 : 1;
+        if (aSameUniverse !== bSameUniverse) return aSameUniverse - bSameUniverse;
         return a.name.localeCompare(b.name);
     });
 };

@@ -5,6 +5,7 @@ import { Player } from '../types';
 import { APP_DISPLAY_VERSION } from '../services/appVersion';
 import IntroFlow from '../components/IntroFlow';
 import type { NewCareerData, SlotEntry } from '../components/types';
+import type { SaveTransferResult } from '../services/saveTransfer';
 import {
   enableManualPushNotifications,
   getFirebasePushStatus,
@@ -17,6 +18,7 @@ interface StartMenuProps {
   saveSlots: Record<number, Player | null>;
   onSelectSlot: (slot: number) => void;
   onDeleteSlot: (slot: number) => void;
+  onImportData: () => Promise<SaveTransferResult | void>;
   onCreateCareerFromIntro: (data: NewCareerData, slot: number) => void;
   skipIntro?: boolean;
 }
@@ -63,7 +65,7 @@ const toIntroSlots = (saveSlots: Record<number, Player | null>): SlotEntry[] => 
   })
 );
 
-export const StartMenu: React.FC<StartMenuProps> = ({ saveSlots, onSelectSlot, onDeleteSlot, onCreateCareerFromIntro, skipIntro = false }) => {
+export const StartMenu: React.FC<StartMenuProps> = ({ saveSlots, onSelectSlot, onDeleteSlot, onImportData, onCreateCareerFromIntro, skipIntro = false }) => {
   const [pushStatus, setPushStatus] = useState(getFirebasePushStatus);
   const [isPushPromptDismissed, setIsPushPromptDismissed] = useState(false);
   const [isEnablingPush, setIsEnablingPush] = useState(false);
@@ -107,6 +109,7 @@ export const StartMenu: React.FC<StartMenuProps> = ({ saveSlots, onSelectSlot, o
             skipIntro={skipIntro}
             onPlaySlot={(slotIndex) => onSelectSlot(slotIndex + 1)}
             onDeleteSlot={(slotIndex) => onDeleteSlot(slotIndex + 1)}
+            onImportData={onImportData}
             onBeginCareer={(data, slotIndex) => onCreateCareerFromIntro(data, slotIndex + 1)}
         />
 

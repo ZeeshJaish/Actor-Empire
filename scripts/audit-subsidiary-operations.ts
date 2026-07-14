@@ -2,6 +2,7 @@ import { INITIAL_PLAYER } from '../types';
 import { createDefaultStudioState } from '../services/businessLogic';
 import {
     approveSubsidiaryProjectProposal,
+    prepareSubsidiaryProjectsForGameLoop,
     processSubsidiaryAutonomousOperations,
     rejectSubsidiaryProjectProposal,
 } from '../services/subsidiaryOperations';
@@ -128,8 +129,12 @@ if (!autoStarted) {
 if (!processedIndependent.studioState?.scripts.some(script => script.id === autoStarted.startedScriptId)) {
     throw new Error('Independent auto-start must create a real script in the subsidiary vault.');
 }
-if (!processedIndependent.studioState?.concepts.some(concept => concept.id === autoStarted.startedConceptId)) {
-    throw new Error('Independent auto-start must create a real concept in the subsidiary slate.');
+if (!autoStarted.startedCommitmentId || !processed.commitments.some(commitment => commitment.id === autoStarted.startedCommitmentId && commitment.projectDetails?.studioId === independentStudio.id)) {
+    throw new Error('Independent auto-start must create a real production commitment in the subsidiary slate.');
+}
+const autoCommitment = processed.commitments.find(commitment => commitment.id === autoStarted.startedCommitmentId)!;
+if (!autoCommitment.projectDetails?.releaseStrategy || autoCommitment.projectPhase !== 'PRE_PRODUCTION') {
+    throw new Error('Independent auto-started productions must enter the main production loop with a release strategy.');
 }
 if (processedMerged.studioState?.subsidiaryProjectProposals?.length) {
     throw new Error('Full-merger studios should be skipped by autonomous operations.');
@@ -150,11 +155,30 @@ if (approvedProposal?.status !== 'APPROVED') {
 if (!approvedStudio.studioState?.scripts.some(script => script.id === approvedProposal?.startedScriptId)) {
     throw new Error('Approved proposals must create a script in the selected subsidiary.');
 }
-if (!approvedStudio.studioState?.concepts.some(concept => concept.id === approvedProposal?.startedConceptId)) {
-    throw new Error('Approved proposals must create a concept in the selected subsidiary.');
+if (!approvedProposal?.startedCommitmentId || !approved.player.commitments.some(commitment => commitment.id === approvedProposal.startedCommitmentId && commitment.projectDetails?.studioId === controlledStudio.id)) {
+    throw new Error('Approved proposals must create a production commitment in the selected subsidiary.');
 }
 if (!approved.player.news.some(item => item.headline.includes('approves'))) {
     throw new Error('Approving a proposal should create industry news.');
+}
+
+const stuckReleasePlayer: Player = {
+    ...approved.player,
+    commitments: approved.player.commitments.map(commitment => commitment.id === approvedProposal?.startedCommitmentId
+        ? {
+            ...commitment,
+            projectPhase: 'AWAITING_RELEASE',
+            phaseWeeksLeft: 0,
+            projectDetails: commitment.projectDetails
+                ? { ...commitment.projectDetails, releaseStrategy: undefined }
+                : commitment.projectDetails,
+        }
+        : commitment),
+};
+const repairedReleasePlayer = prepareSubsidiaryProjectsForGameLoop(stuckReleasePlayer);
+const repairedCommitment = repairedReleasePlayer.commitments.find(commitment => commitment.id === approvedProposal?.startedCommitmentId);
+if (!repairedCommitment?.projectDetails?.releaseStrategy) {
+    throw new Error('Stuck subsidiary awaiting-release projects must receive an automatic release strategy.');
 }
 
 const rejected = rejectSubsidiaryProjectProposal(processed, controlledStudio.id, pendingProposal.id);

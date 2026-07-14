@@ -73,7 +73,8 @@ const checks = [
       return source.includes('getAvailableNightlifeVenueOptions')
         && source.includes('nightlifeVenueOptions')
         && source.includes('getAvailableNightlifeGuestOptions')
-        && source.includes('Search guest name')
+        && source.includes('activities.searchGuestName')
+        && source.includes('isBuilderOpen && isNightlifePlanner')
         && !source.includes('Actor Database')
         && !source.includes('Invite List')
         && !source.includes('choices={NIGHTLIFE_VENUE_OPTIONS}');
@@ -85,12 +86,13 @@ const checks = [
       const source = read('views/lifestyle/LifestyleActivities.tsx');
       return source.includes('WellnessPreviewCard')
         && source.includes('WELLNESS_PROGRAM_OPTIONS')
-        && source.includes('Care Needed')
-        && source.includes('Clinic Quality')
-        && source.includes('Treatment Depth')
-        && source.includes('Aftercare')
+        && source.includes('activities.careNeeded')
+        && source.includes('activities.clinicQuality')
+        && source.includes('activities.treatmentDepth')
+        && source.includes('activities.aftercare')
         && source.includes('updateWellnessSelection')
-        && source.includes('Confirm recovery');
+        && source.includes('activities.confirmRecovery')
+        && source.includes('isBuilderOpen && isWellnessPlanner');
     },
   },
   {
@@ -115,6 +117,7 @@ const checks = [
       const service = read('services/lifestyleActivities.ts');
       const ui = read('views/lifestyle/LifestyleActivities.tsx');
       const types = read('types.ts');
+      const locale = read('services/localization/locales/en.ts');
       return service.includes("id: 'industry_dinner'")
         && service.includes("name: 'Industry Connections'")
         && service.includes('INDUSTRY_EVENT_OPTIONS')
@@ -125,23 +128,24 @@ const checks = [
         && service.includes('INDUSTRY_ADDON_OPTIONS')
         && service.includes('buildIndustryConnectionsOutcome')
         && service.includes('upsertIndustryRelationships')
-        && service.includes('Casting Office')
-        && service.includes('career chance')
+        && locale.includes('services.lifestyle.industry.outcome.casting.standard.sender')
+        && locale.includes('activities.careerChance')
         && service.includes('getIndustryGuestRsvpChance')
-        && service.includes('invite only, RSVP not guaranteed')
-        && service.includes('No fee was paid')
-        && service.includes('joked about your invite')
+        && locale.includes('invite only, RSVP not guaranteed')
+        && locale.includes('No fee was paid')
+        && locale.includes('joked about your invite')
         && service.includes('baseCost: 35_000')
         && types.includes('industryEventId?: string')
         && types.includes('industryGuestIds?: string[]')
         && types.includes("'INDUSTRY_EVENT'")
         && ui.includes('isIndustryPlanner')
         && ui.includes('IndustryConnectionsPreviewCard')
-        && ui.includes('Industry Guest List')
-        && ui.includes('Search actor/director/producer')
-        && ui.includes('not paid appearance bookings')
+        && ui.includes('activities.industryGuestList')
+        && ui.includes('activities.searchIndustryGuest')
+        && ui.includes('activities.industryPreview.inviteNote')
         && ui.includes('toggleIndustryGuest')
-        && ui.includes('Invite Groups');
+        && ui.includes('activities.inviteGroups')
+        && ui.includes('isBuilderOpen && isIndustryPlanner');
     },
   },
   {
@@ -174,8 +178,9 @@ const checks = [
         && types.includes("'CHARITY_CAUSE'")
         && ui.includes('isCharityPlanner')
         && ui.includes('CharityGalaPreviewCard')
-        && ui.includes('Donation Level')
-        && ui.includes('Press Posture')
+        && ui.includes('activities.donationLevel')
+        && ui.includes('activities.pressPosture')
+        && ui.includes('isBuilderOpen && isCharityPlanner')
         && !ui.includes('Legacy Add Ons');
     },
   },
@@ -188,26 +193,28 @@ const checks = [
       const loop = read('services/gameLoop.ts');
       const messages = read('views/mobile/MessagesApp.tsx');
       const mobile = read('views/mobile/MobilePage.tsx');
+      const locale = read('services/localization/locales/en.ts');
       return service.includes('TRIP_MAX_DAYS = 7')
         && service.includes('getAvailableInviteOptions')
         && service.includes('getCharityDonationChoice')
         && service.includes('charityCustomDonationAmount')
         && service.includes('buildSoloFriendEncounter')
         && service.includes('friendEncounter')
-        && service.includes('currentYearMemories')
+        && ui.includes('currentYearMemories')
         && service.includes('lifetimeTripDays')
         && service.includes('lifetimeCharityGiven')
-        && service.includes('You already took a trip this week')
+        && locale.includes('services.lifestyle.generic.message.tripCooldown')
         && types.includes('charityCustomDonationAmount?: number')
         && types.includes('lifetimeActivityCounts?: Record<string, number>')
         && types.includes('lifetimeFriendEncounters?: number')
         && ui.includes('ActivityResultModal')
-        && ui.includes('Custom Amount')
+        && ui.includes('activities.customAmount')
         && ui.includes('Recent Memories This Year')
-        && ui.includes('Trip Done')
-        && ui.includes('Try next week')
+        && ui.includes('activities.tripDone')
+        && ui.includes('activities.tryNextWeek')
         && ui.includes('getAvailableInviteOptions(selectedActivity, player)')
         && ui.includes('const presets = [3, 5, 7]')
+        && ui.includes('EMPTY_LIFESTYLE_ACTIVITY_QUOTE')
         && service.includes('cooldownWeeks: 1')
         && service.includes("activityId === 'vacation_escape'")
         && service.includes('latestTrip?.createdAbsoluteWeek === currentAbsoluteWeek ? 1 : 0')
@@ -265,7 +272,8 @@ const checks = [
         && ui.includes('AdoptionNameModal')
         && ui.includes('adoptionStage')
         && ui.includes('availableAdoptionProfiles.map')
-        && ui.includes('Proceed to Documentation')
+        && ui.includes('activities.proceedDocumentation')
+        && ui.includes('isBuilderOpen && isAdoptionPlanner')
         && !ui.includes('title="Child Match" choices={ADOPTION_CHILD_OPTIONS}');
     },
   },
@@ -275,6 +283,7 @@ const checks = [
       const service = read('services/lifestyleActivities.ts');
       const ui = read('views/lifestyle/LifestyleActivities.tsx');
       const types = read('types.ts');
+      const locale = read('services/localization/locales/en.ts');
       return service.includes('PET_COMPANION_POOL_REFRESH_WEEKS = 3')
         && service.includes('PET_COMPANION_STORES')
         && service.includes('COMPANION_HOME_OPTIONS')
@@ -288,8 +297,10 @@ const checks = [
         && service.includes('getPetCompanionCategoryOptions')
         && service.includes('getFilteredPetCompanionProfiles')
         && service.includes('listingTitle')
-        && service.includes('Pomeranian Puppy')
-        && service.includes('Newborn German Shepherd')
+        && service.includes("id: 'pomeranian_puppy_kiki'")
+        && service.includes("id: 'german_shepherd_pup_bruno'")
+        && locale.includes('services.lifestyle.pet.profile.pomeranian_puppy_kiki.listingTitle')
+        && locale.includes('services.lifestyle.pet.profile.german_shepherd_pup_bruno.listingTitle')
         && service.includes('Fancy Mouse')
         && service.includes('Corn Snake')
         && service.includes("id: 'rodents'")
@@ -321,15 +332,16 @@ const checks = [
         && ui.includes('min-w-0 flex-1 text-left')
         && ui.includes('leading-tight tracking-[0.12em]')
         && !ui.includes('block truncate text-[13px] font-black uppercase tracking-[0.16em]"')
-        && ui.includes('Brief')
-        && ui.includes('Storefront')
-        && ui.includes('Pet Category')
-        && ui.includes('Checkout Setup')
+        && ui.includes('activities.brief')
+        && ui.includes('activities.storefront')
+        && ui.includes('activities.petCategory')
+        && ui.includes('activities.checkoutSetup')
         && ui.includes('PetNameModal')
         && ui.includes('filteredPetProfiles.map')
         && ui.includes('>{profile.name}</h4>')
-        && ui.includes(">{profile?.name || 'Choose Pet'}</div>")
-        && ui.includes("profile.listingTitle || `${profile.breed} ${profile.species}`")
+        && ui.includes("profile?.name || t(language, 'activities.petPreview.choosePet')")
+        && ui.includes('getPetProfileListingTitle(profile, language)')
+        && ui.includes('isBuilderOpen && isPetPlanner')
         && !ui.includes('Fresh Companion Pool');
     },
   },
@@ -344,7 +356,7 @@ const checks = [
         && social.includes('PET_PLAY')
         && social.includes('PET_GROOM')
         && social.includes('PET_VET')
-        && social.includes('Pet Care')
+        && social.includes('connections.petCare')
         && actions.includes("partner?.relation === 'Pet'")
         && actions.includes('petRarity')
         && actions.includes('PET_FEED')
@@ -362,7 +374,7 @@ const checks = [
     name: 'save migration initializes lifestyle activities',
     pass: () => {
       const source = read('services/saveMigration.ts');
-      return source.includes('SAVE_MIGRATION_VERSION = 12') && source.includes('ensureLifestyleActivityState') && source.includes('lifestyleActivities');
+      return source.includes('SAVE_MIGRATION_VERSION = 15') && source.includes('ensureLifestyleActivityState') && source.includes('lifestyleActivities');
     },
   },
   {

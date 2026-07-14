@@ -376,7 +376,11 @@ export const CareerPage: React.FC<CareerPageProps> = ({ player, onQuitJob, onReh
                                 </div>
                                 <div className="break-words text-base font-black leading-tight text-white">{item.commitment.name}</div>
                                 <div className="mt-1 flex flex-wrap gap-x-2.5 gap-y-1 text-[8px] font-bold uppercase tracking-[0.12em] text-zinc-500">
+                                    <span>Project W{item.projectWeek}/{item.totalProjectWeeks}w</span>
                                     <span>Phase {item.weeksLeft}/{item.phaseDurationWeeks}w</span>
+                                    <span className={item.focusLoadWeeks > item.focusWeeksRemaining ? 'text-rose-300' : 'text-cyan-200'}>
+                                        Focus {item.focusLoadWeeks}w load/{item.focusWeeksRemaining}w left
+                                    </span>
                                     <span className="text-amber-300">Polish +{item.qualityLift}/15</span>
                                     <span>Quality {item.qualityScore}/100</span>
                                 </div>

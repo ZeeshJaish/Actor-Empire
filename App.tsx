@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { INITIAL_PLAYER, Player, Page, Commitment, PressInteraction, SocialEvent, ActorSkills, AdType, Relationship, ProjectDetails, ActiveRelease, PastProject, StreamingState, PregnancyCarrier, ScheduledEvent } from './types';
+import { INITIAL_PLAYER, Player, Page, Commitment, PressInteraction, SocialEvent, ActorSkills, AdType, Relationship, ProjectDetails, ActiveRelease, PastProject, StreamingState, PregnancyCarrier, ScheduledEvent, SponsorshipOffer } from './types';
 import { BottomNav } from './components/BottomNav';
 import { NewPlayerTutorialOverlay } from './components/NewPlayerTutorialOverlay';
 import { ProductionCrisisModal } from './components/ProductionCrisisModal';
@@ -27,30 +27,35 @@ import { generateAuditions, generatePartTimeJobs, rewardGenreExperience } from '
 import { generateWeeklyFeed, calculateInteraction, getGenderedAvatar } from './services/npcLogic';
 import { getRandomAgents, getRandomManagers, getRandomTrainers, getRandomStylists, getRandomTherapists, getRandomPublicists, getRandomWellness, sanitizeTeamPools } from './services/teamLogic';
 import { createBusiness, normalizeStudioState } from './services/businessLogic';
-import { CheckCircle, Heart, ShieldAlert, AlertTriangle, PlayCircle, Skull, Briefcase, Baby } from 'lucide-react'; 
+import { CheckCircle, Heart, ShieldAlert, AlertTriangle, PlayCircle, Skull, Briefcase, Baby, ChevronRight } from 'lucide-react';
 import { useGameActions } from './hooks/useGameActions';
 import { PROPERTY_CATALOG, CAR_CATALOG, MOTORCYCLE_CATALOG, BOAT_CATALOG, AIRCRAFT_CATALOG, CLOTHING_CATALOG } from './services/lifestyleLogic';
 import { showAd, initAds } from './services/adLogic';
 import { ensureTrackingPermission } from './services/trackingService';
 import { saveGameData, loadGameData, deleteGameData } from './services/storage';
-import { createBloodlineSnapshot, getAbsoluteWeek, getLegacyInheritancePreview, getRelationshipAge, inferStreamingStartWeekAbsolute, inheritActorSkills, LEGACY_MIN_PLAYABLE_AGE } from './services/legacyLogic';
-import { applyPremiumPurchase, getRequiredPremiumProductForAsset, hasNoAds, PremiumProductId, restoreWeeklyEnergy, spendPlayerEnergy, syncEnergyDisplay, syncWeeklyEnergyForCommitments } from './services/premiumLogic';
-import { purchasePremiumProduct, restorePremiumPurchases } from './services/iapService';
+import { buildLegacyStudioInheritance, createBloodlineSnapshot, getAbsoluteWeek, getLegacyInheritancePreview, getRelationshipAge, inferStreamingStartWeekAbsolute, inheritActorSkills, LEGACY_MIN_PLAYABLE_AGE } from './services/legacyLogic';
+import { applyPremiumPurchase, getRequiredPremiumProductForAsset, hasNoAds, isNonConsumablePremiumProduct, PremiumProductId, restoreWeeklyEnergy, spendPlayerEnergy, syncEnergyDisplay, syncWeeklyEnergyForCommitments } from './services/premiumLogic';
+import { purchasePremiumProduct, restorePremiumPurchases, startIOSPurchaseUpdatesListener, type IOSPurchaseUpdate } from './services/iapService';
 import { sanitizeAwardRecords } from './services/awardLogic';
 import { RoleType } from './types';
 import { applyParenthoodAbandonment, getPregnancyFeedbackCopy } from './services/familyLogic';
 import { APP_DISPLAY_VERSION } from './services/appVersion';
+import { CHANGELOG_ENTRIES, getChangelogTypeLabel, getLatestChangelogEntry } from './services/changelog';
 import { calculateInstagramPostOutcome, clampInstagramStat, INSTAGRAM_POST_CONFIGS } from './services/instagramLogic';
 import { normalizeUniverseMap } from './services/universeLogic';
 import { hydrateGenreXP } from './services/genreCatalog';
 import { createInstagramReferralOutcome } from './services/instagramOfferLogic';
 import { executeStockTrade } from './services/stockLogic';
 import { migratePlayerSave } from './services/saveMigration';
-import { externalizeCustomPostersInPlayer, stripEmbeddedPosterImageDataForPersistence } from './services/customPosterMedia';
+import { exportSignedSaveArchive, importSignedSaveArchiveFromFile } from './services/saveTransfer';
+import { grantMigrationCarePackageIfEligible, MIGRATION_CARE_PACKAGE_CASH, MIGRATION_CARE_PACKAGE_ENERGY } from './services/migrationCarePackage';
+import { externalizeCustomPostersInPlayer } from './services/customPosterMedia';
+import { compactPlayerForPersistence, FULL_LOCAL_MIRROR_BUDGET_BYTES } from './services/saveCompaction';
 import { buildAvailableNewPlayerTutorialState, writeNewPlayerTutorialState, type NewPlayerTutorialState } from './services/newPlayerTutorial';
 import { acceptOutsideProducerInvestmentOffer, counterOutsideProducerInvestmentOffer } from './services/outsideProductions';
 import { PHASE_ONE_ENERGY_COSTS } from './services/energyCosts';
 import { getPlayerLanguage, isSupportedGameLanguage, t } from './services/i18n';
+import { getHealthConditionLabel } from './services/healthConditions';
 import {
   addBreadcrumb,
   markGameCheckpoint,
@@ -77,13 +82,31 @@ type PendingBabyNaming = {
   shouldCreateScandalNews: boolean;
 };
 
+type PendingMedicalPrompt = {
+  conditionName: string;
+  severity?: string;
+  healthCap?: number;
+};
+
+const getMedicalPromptCooldownWeeks = (severity?: string) => {
+  if (severity === 'MINOR') return 2;
+  if (severity === 'MODERATE') return 4;
+  return 0;
+};
+
+const getMedicalPromptSeverityRank = (severity?: string) => {
+  if (severity === 'CRITICAL') return 4;
+  if (severity === 'SEVERE') return 3;
+  if (severity === 'MODERATE') return 2;
+  if (severity === 'MINOR') return 1;
+  return 0;
+};
+
 const PREGNANCY_TERM_WEEKS = 39;
 const WHATS_NEW_STORAGE_KEY = 'actorEmpireSeenWhatsNewVersion';
+const PREMIUM_ENTITLEMENTS_STORAGE_KEY = 'actorEmpirePremiumEntitlements';
+const PREMIUM_SAVE_SLOT_IDS = [1, 2, 3] as const;
 const AUTOSAVE_DEBOUNCE_MS = 750;
-const RECENT_TIMELINE_WEEKS = 104;
-const RECENT_TIMELINE_MAX_ITEMS = 180;
-const LEGACY_HIGHLIGHT_MAX_ITEMS = 80;
-const FULL_LOCAL_MIRROR_BUDGET_BYTES = 3_500_000;
 const STARTUP_STUDIO_BUMPER_MS = 2400;
 const STARTUP_LOADING_MIN_MS = 8600;
 const STARTUP_LOADING_LINE_KEYS = [
@@ -95,53 +118,67 @@ const STARTUP_LOADING_LINE_KEYS = [
   'startup.loadingLine.saves',
 ];
 
-type CompactTimelineEntry = {
-  id: string;
-  week: number;
-  year: number;
-  absoluteWeek: number;
-  title: string;
-  kind: 'LOG' | 'NEWS' | 'MESSAGE';
-  tone: 'positive' | 'negative' | 'neutral';
-  impact?: 'HIGH' | 'MEDIUM' | 'LOW';
-};
-
-const getApproxAbsoluteWeek = (year: number, week: number) => {
-  const safeYear = Number.isFinite(year) ? year : 18;
-  const safeWeek = Math.min(52, Math.max(1, Number.isFinite(week) ? week : 1));
-  return getAbsoluteWeek(safeYear, safeWeek);
-};
-
-const makeTimelineEntry = (
-  sourceId: string,
-  year: number,
-  week: number,
-  title: string,
-  kind: CompactTimelineEntry['kind'],
-  tone: CompactTimelineEntry['tone'],
-  impact?: CompactTimelineEntry['impact']
-): CompactTimelineEntry => ({
-  id: `${kind}_${sourceId}_${year}_${week}`,
-  year,
-  week,
-  absoluteWeek: getApproxAbsoluteWeek(year, week),
-  title: title.replace(/\s+/g, ' ').trim().slice(0, 180),
-  kind,
-  tone,
-  impact,
-});
-
-const isLegacyWorthyText = (text: string) => {
-  const normalized = text.toLowerCase();
-  return [
-    'award', 'won', 'nominated', 'billion', 'festival', 'married', 'divorce',
-    'child', 'baby', 'scandal', 'lawsuit', 'death', 'passed away', 'founded',
-    'studio', 'franchise', 'universe', 'forbes', 'record', 'hit', 'flop'
-  ].some(keyword => normalized.includes(keyword));
-};
-
 const dedupeAwards = <T extends { type: string; year: number; category: string; projectId: string; outcome: 'WON' | 'NOMINATED' }>(awards: T[] = []): T[] => {
   return sanitizeAwardRecords(awards);
+};
+
+const uniquePermanentPremiumIds = (productIds: PremiumProductId[] = []): PremiumProductId[] => {
+  const seen = new Set<PremiumProductId>();
+  productIds.forEach(productId => {
+    if (isNonConsumablePremiumProduct(productId)) {
+      seen.add(productId);
+    }
+  });
+  return [...seen];
+};
+
+const readStoredPremiumEntitlements = (): PremiumProductId[] => {
+  if (typeof localStorage === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(PREMIUM_ENTITLEMENTS_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return uniquePermanentPremiumIds(Array.isArray(parsed?.productIds) ? parsed.productIds : []);
+  } catch (error) {
+    recordNonFatal(error, 'premium_entitlements_read_failed');
+    return [];
+  }
+};
+
+const rememberPremiumEntitlements = (productIds: PremiumProductId[] = []): PremiumProductId[] => {
+  const permanentProductIds = uniquePermanentPremiumIds(productIds);
+  if (permanentProductIds.length === 0 || typeof localStorage === 'undefined') return permanentProductIds;
+  try {
+    const mergedProductIds = uniquePermanentPremiumIds([...readStoredPremiumEntitlements(), ...permanentProductIds]);
+    localStorage.setItem(PREMIUM_ENTITLEMENTS_STORAGE_KEY, JSON.stringify({
+      productIds: mergedProductIds,
+      updatedAt: Date.now(),
+      appVersion: APP_DISPLAY_VERSION,
+    }));
+    return mergedProductIds;
+  } catch (error) {
+    recordNonFatal(error, 'premium_entitlements_write_failed');
+    return permanentProductIds;
+  }
+};
+
+const applyPremiumEntitlementsToPlayer = (sourcePlayer: Player, productIds: PremiumProductId[]): { player: Player; changed: boolean } => {
+  const permanentProductIds = uniquePermanentPremiumIds(productIds);
+  if (permanentProductIds.length === 0) return { player: sourcePlayer, changed: false };
+  const nextPlayer = JSON.parse(JSON.stringify(sourcePlayer)) as Player;
+  if (!nextPlayer.flags) nextPlayer.flags = {};
+  const before = JSON.stringify({
+    purchases: nextPlayer.flags?.premiumPurchases || [],
+    collections: nextPlayer.flags?.premiumCollections || [],
+  });
+  permanentProductIds.forEach(productId => {
+    applyPremiumPurchase(nextPlayer, productId, getPlayerLanguage(nextPlayer));
+  });
+  const after = JSON.stringify({
+    purchases: nextPlayer.flags?.premiumPurchases || [],
+    collections: nextPlayer.flags?.premiumCollections || [],
+  });
+  return { player: nextPlayer, changed: before !== after };
 };
 
 const normalizeProjectDetails = (details: Partial<ProjectDetails> | undefined): ProjectDetails => {
@@ -315,6 +352,25 @@ const normalizeCommitment = (commitment: Partial<Commitment>): Commitment => ({
     ...(commitment.projectDetails ? { projectDetails: normalizeProjectDetails(commitment.projectDetails) } : {}),
 });
 
+const normalizeSponsorshipOffer = (offer: SponsorshipOffer): SponsorshipOffer => {
+    const req = (offer.requirements || {}) as SponsorshipOffer['requirements'];
+    return {
+        ...offer,
+        id: offer.id || `spon_${Date.now()}`,
+        durationWeeks: Math.max(1, Number(offer.durationWeeks || 1)),
+        weeklyPay: Math.max(0, Number(offer.weeklyPay || 0)),
+        penalty: Math.max(0, Number(offer.penalty || 0)),
+        weeksCompleted: Math.max(0, Number(offer.weeksCompleted || 0)),
+        requirements: {
+            ...req,
+            type: req.type || 'POST',
+            energyCost: Math.max(0, Number(req.energyCost || 0)),
+            totalRequired: Math.max(1, Number(req.totalRequired || 1)),
+            progress: Math.max(0, Number(req.progress || 0)),
+        },
+    };
+};
+
 type GameErrorBoundaryProps = { onRecover: () => void; children: React.ReactNode };
 type GameErrorBoundaryState = { hasError: boolean };
 
@@ -390,11 +446,14 @@ export const App: React.FC = () => {
   const [isFullBleedMobileSurface, setIsFullBleedMobileSurface] = useState(false);
   const [activeSocialEvent, setActiveSocialEvent] = useState<{ event: SocialEvent, partnerId: string } | null>(null);
   const [pendingBabyNaming, setPendingBabyNaming] = useState<PendingBabyNaming | null>(null);
+  const [pendingMedicalPrompt, setPendingMedicalPrompt] = useState<PendingMedicalPrompt | null>(null);
   const [babyFirstNameInput, setBabyFirstNameInput] = useState('');
   const [babySurnameChoice, setBabySurnameChoice] = useState('');
   const [deathScreenPreviewPlayer, setDeathScreenPreviewPlayer] = useState<Player | null>(null);
   const language = getPlayerLanguage(player);
   const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
+  const latestChangelogEntry = getLatestChangelogEntry();
+  const previousChangelogEntries = CHANGELOG_ENTRIES.filter(entry => entry.version !== latestChangelogEntry.version);
   const isStartupLoadingVisible = isInitializing || !startupMinimumElapsed;
   const [showWhatsNewModal, setShowWhatsNewModal] = useState(false);
   const [showPreviousWhatsNewNotes, setShowPreviousWhatsNewNotes] = useState(false);
@@ -405,8 +464,25 @@ export const App: React.FC = () => {
   const [adStep, setAdStep] = useState(0); 
   const [adTotalSteps, setAdTotalSteps] = useState(1);
   const autosaveTimerRef = useRef<number | null>(null);
+  const purchaseUpdateHandlerRef = useRef<(update: IOSPurchaseUpdate) => void>(() => {});
 
   const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
+  const getProcessedStoreTransactionIds = (state: Player): string[] => {
+      if (!state.flags) state.flags = {};
+      if (!Array.isArray(state.flags.processedIOSStoreTransactionIds)) {
+          state.flags.processedIOSStoreTransactionIds = [];
+      }
+      return state.flags.processedIOSStoreTransactionIds as string[];
+  };
+  const hasProcessedStoreTransaction = (state: Player, transactionId?: string) =>
+      !!transactionId && getProcessedStoreTransactionIds(state).includes(transactionId);
+  const markProcessedStoreTransaction = (state: Player, transactionId?: string) => {
+      if (!transactionId) return;
+      const processedIOSStoreTransactionIds = getProcessedStoreTransactionIds(state);
+      if (!processedIOSStoreTransactionIds.includes(transactionId)) {
+          state.flags.processedIOSStoreTransactionIds = [...processedIOSStoreTransactionIds, transactionId].slice(-80);
+      }
+  };
 
   useEffect(() => {
     const timer = window.setTimeout(() => setStartupMinimumElapsed(true), STARTUP_LOADING_MIN_MS);
@@ -454,94 +530,7 @@ export const App: React.FC = () => {
   }, [isStartupLoadingVisible, startupStudioBumperElapsed]);
 
   const preparePlayerForPersistence = (nextPlayer: Player): Player => {
-      const currentAbsoluteWeek = getApproxAbsoluteWeek(nextPlayer.age, nextPlayer.currentWeek);
-      const recentCutoff = currentAbsoluteWeek - RECENT_TIMELINE_WEEKS;
-      const existingTimeline = Array.isArray(nextPlayer.flags?.recentTimeline)
-          ? nextPlayer.flags.recentTimeline
-          : [];
-      const existingHighlights = Array.isArray(nextPlayer.flags?.legacyHighlights)
-          ? nextPlayer.flags.legacyHighlights
-          : [];
-      const logTimeline = Array.isArray(nextPlayer.logs)
-          ? nextPlayer.logs.map((log, index) => makeTimelineEntry(
-              `log_${index}_${log.message}`,
-              log.year,
-              log.week,
-              log.message,
-              'LOG',
-              log.type
-          ))
-          : [];
-      const newsTimeline = Array.isArray(nextPlayer.news)
-          ? nextPlayer.news.map((item: any, index: number) => makeTimelineEntry(
-              item.id || `news_${index}`,
-              item.year || nextPlayer.age,
-              item.week || nextPlayer.currentWeek,
-              item.headline || item.subtext || 'Industry news',
-              'NEWS',
-              item.impactLevel === 'HIGH' ? 'positive' : 'neutral',
-              item.impactLevel
-          ))
-          : [];
-      const timelineById = new Map<string, CompactTimelineEntry>();
-      [...existingTimeline, ...logTimeline, ...newsTimeline]
-          .filter((entry: CompactTimelineEntry) => entry?.title && entry.absoluteWeek >= recentCutoff)
-          .forEach((entry: CompactTimelineEntry) => timelineById.set(entry.id, entry));
-      const recentTimeline = Array.from(timelineById.values())
-          .sort((a, b) => b.absoluteWeek - a.absoluteWeek)
-          .slice(0, RECENT_TIMELINE_MAX_ITEMS);
-      const highlightById = new Map<string, CompactTimelineEntry>();
-      [...existingHighlights, ...recentTimeline.filter(entry => entry.impact === 'HIGH' || isLegacyWorthyText(entry.title))]
-          .filter((entry: CompactTimelineEntry) => entry?.title)
-          .forEach((entry: CompactTimelineEntry) => highlightById.set(entry.id, entry));
-      const legacyHighlights = Array.from(highlightById.values())
-          .sort((a, b) => b.absoluteWeek - a.absoluteWeek)
-          .slice(0, LEGACY_HIGHLIGHT_MAX_ITEMS);
-      const safePlayer: any = stripEmbeddedPosterImageDataForPersistence({
-          ...nextPlayer,
-          logs: Array.isArray(nextPlayer.logs) ? nextPlayer.logs.slice(-50) : [],
-          news: Array.isArray(nextPlayer.news) ? nextPlayer.news.slice(0, 80) : [],
-          inbox: Array.isArray(nextPlayer.inbox) ? nextPlayer.inbox.slice(0, 120) : [],
-          shareholderVotes: Array.isArray(nextPlayer.shareholderVotes) ? nextPlayer.shareholderVotes.slice(0, 24) : [],
-          stockTakeovers: Array.isArray(nextPlayer.stockTakeovers) ? nextPlayer.stockTakeovers.slice(0, 20) : [],
-          flags: {
-              ...(nextPlayer.flags || {}),
-              recentTimeline,
-              legacyHighlights,
-              persistenceOptimizedAtWeek: currentAbsoluteWeek,
-          },
-      } as Player);
-
-      if (safePlayer.instagram) {
-          safePlayer.instagram = {
-              ...safePlayer.instagram,
-              posts: Array.isArray(safePlayer.instagram.posts) ? safePlayer.instagram.posts.slice(0, 200) : [],
-              feed: Array.isArray(safePlayer.instagram.feed) ? safePlayer.instagram.feed.slice(0, 80) : [],
-          };
-      }
-
-      if (safePlayer.x) {
-          safePlayer.x = {
-              ...safePlayer.x,
-              posts: Array.isArray(safePlayer.x.posts) ? safePlayer.x.posts.slice(0, 200) : [],
-              feed: Array.isArray(safePlayer.x.feed) ? safePlayer.x.feed.slice(0, 80) : [],
-          };
-      }
-
-      if (safePlayer.youtube) {
-          safePlayer.youtube = {
-              ...safePlayer.youtube,
-              videos: Array.isArray(safePlayer.youtube.videos)
-                  ? safePlayer.youtube.videos.slice(0, 120).map((video: any) => ({
-                      ...video,
-                      comments: Array.isArray(video.comments) ? video.comments.slice(0, 12) : [],
-                      weeklyHistory: Array.isArray(video.weeklyHistory) ? video.weeklyHistory.slice(-24) : [],
-                  }))
-                  : [],
-          };
-      }
-
-      return safePlayer as Player;
+      return compactPlayerForPersistence(nextPlayer);
   };
   const writeLocalStorageMirror = (slot: number, playerToSave: Player) => {
       try {
@@ -590,9 +579,13 @@ export const App: React.FC = () => {
 
       return options.filter((option, index, arr) => arr.findIndex(other => other.value === option.value) === index);
   };
-  const persistSlotSave = (slot: number, nextPlayer: Player) => {
+  const persistSlotSave = async (
+      slot: number,
+      nextPlayer: Player,
+      options: { rethrow?: boolean } = {}
+  ): Promise<Player> => {
       const playerToSave = preparePlayerForPersistence(nextPlayer);
-      saveGameData(`actorEmpireSave_${slot}`, playerToSave);
+      await saveGameData(`actorEmpireSave_${slot}`, playerToSave, { rethrow: options.rethrow });
 
       const writeLocalMirror = () => {
           writeLocalStorageMirror(slot, playerToSave);
@@ -604,21 +597,53 @@ export const App: React.FC = () => {
       } else {
           globalThis.setTimeout(writeLocalMirror, 0);
       }
+      return playerToSave;
+  };
+  const syncPermanentPremiumEntitlementsToSavedSlots = async (productIds: PremiumProductId[]) => {
+      const entitlementProductIds = rememberPremiumEntitlements(productIds);
+      if (entitlementProductIds.length === 0) return;
+
+      const slotUpdates: Partial<Record<number, Player>> = {};
+      for (const slot of PREMIUM_SAVE_SLOT_IDS) {
+          if (slot === currentSlot) continue;
+          const sourcePlayer = saveSlots[slot] || await loadGameData(`actorEmpireSave_${slot}`);
+          if (!sourcePlayer) continue;
+          const entitlementResult = applyPremiumEntitlementsToPlayer(migratePlayerSave(sourcePlayer), entitlementProductIds);
+          if (!entitlementResult.changed) continue;
+          slotUpdates[slot] = entitlementResult.player;
+          await persistSlotSave(slot, entitlementResult.player);
+      }
+
+      if (Object.keys(slotUpdates).length > 0) {
+          setSaveSlots(prev => ({ ...prev, ...slotUpdates }));
+      }
   };
   const syncCurrentSlotSnapshot = (nextPlayer: Player) => {
       if (!currentSlot) return;
       setSaveSlots(prev => ({ ...prev, [currentSlot]: nextPlayer }));
-      persistSlotSave(currentSlot, nextPlayer);
+      void persistSlotSave(currentSlot, nextPlayer);
   };
 
-  const prepareLoadedPlayerSave = async (slot: number, savedData: Player): Promise<{ player: Player; shouldPersist: boolean }> => {
+  const persistCurrentSlotSnapshot = async (nextPlayer: Player): Promise<Player> => {
+      if (!currentSlot) return preparePlayerForPersistence(nextPlayer);
+      const playerToSave = await persistSlotSave(currentSlot, nextPlayer, { rethrow: true });
+      setSaveSlots(prev => ({ ...prev, [currentSlot]: playerToSave }));
+      return playerToSave;
+  };
+
+  const prepareLoadedPlayerSave = async (
+      slot: number,
+      savedData: Player,
+      source: 'indexeddb-slot' | 'legacy-indexeddb' | 'legacy-localstorage' | 'legacy-single-localstorage' = 'indexeddb-slot',
+  ): Promise<{ player: Player; shouldPersist: boolean; carePackageGranted: boolean }> => {
       const migrated = migratePlayerSave(savedData);
       let optimized = migrated;
       let posterMediaMigrated = false;
+      let carePackageGranted = false;
 
       try {
           const posterResult = await externalizeCustomPostersInPlayer(optimized);
-          optimized = posterResult.player;
+          optimized = migratePlayerSave(posterResult.player);
           posterMediaMigrated = posterResult.migratedCount > 0 || posterResult.bytesRemoved > 0;
           if (posterMediaMigrated) {
               addBreadcrumb('custom_posters:externalized', {
@@ -631,9 +656,21 @@ export const App: React.FC = () => {
           recordNonFatal(error, 'custom_poster_externalize_failed', { slot });
       }
 
+      const carePackage = grantMigrationCarePackageIfEligible(optimized, {
+          source,
+          allowLegacyVersionFallback: source === 'indexeddb-slot',
+      });
+      optimized = carePackage.player;
+      carePackageGranted = carePackage.granted;
+      const existingPermanentEntitlements = uniquePermanentPremiumIds((optimized.flags?.premiumPurchases || []) as PremiumProductId[]);
+      const storedEntitlements = rememberPremiumEntitlements(existingPermanentEntitlements);
+      const entitlementResult = applyPremiumEntitlementsToPlayer(optimized, storedEntitlements);
+      optimized = entitlementResult.player;
+
       return {
           player: optimized,
-          shouldPersist: ((savedData as Player)?.flags?.saveMigrationVersion !== optimized.flags?.saveMigrationVersion) || posterMediaMigrated,
+          shouldPersist: ((savedData as Player)?.flags?.saveMigrationVersion !== optimized.flags?.saveMigrationVersion) || posterMediaMigrated || carePackageGranted || entitlementResult.changed,
+          carePackageGranted,
       };
   };
 
@@ -695,6 +732,46 @@ export const App: React.FC = () => {
   } = useGameActions({ 
       player, setPlayer, setToastMessage, setActivePressEvent, setShowProtectionPrompt, setActiveSocialEvent, setPendingBabyNaming
   });
+
+  useEffect(() => {
+    purchaseUpdateHandlerRef.current = update => {
+      handleGenericUpdate(prev => {
+          const p = JSON.parse(JSON.stringify(prev)) as Player;
+          if (hasProcessedStoreTransaction(p, update.transactionId)) return p;
+          markProcessedStoreTransaction(p, update.transactionId);
+          const message = applyPremiumPurchase(p, update.premiumProductId, getPlayerLanguage(p));
+          setToastMessage({ title: tr('app.purchases.confirmedTitle'), subtext: message });
+          return p;
+      });
+      if (isNonConsumablePremiumProduct(update.premiumProductId)) {
+          void syncPermanentPremiumEntitlementsToSavedSlots([update.premiumProductId]);
+      }
+    };
+  }, [handleGenericUpdate, language]);
+
+  useEffect(() => {
+    let disposed = false;
+    let listenerHandle: { remove: () => Promise<void> } | null = null;
+
+    startIOSPurchaseUpdatesListener(update => {
+      if (!disposed) {
+          purchaseUpdateHandlerRef.current(update);
+      }
+    }).then(handle => {
+      if (disposed) {
+          void handle?.remove();
+          return;
+      }
+      listenerHandle = handle;
+    }).catch(error => {
+      console.warn('[IAP] Failed to start iOS purchase update listener', error);
+    });
+
+    return () => {
+      disposed = true;
+      void listenerHandle?.remove();
+    };
+  }, []);
 
   useEffect(() => {
     if (!pendingBabyNaming) return;
@@ -821,15 +898,17 @@ export const App: React.FC = () => {
             await initAds();
             
             const slots: Record<number, Player | null> = { 1: null, 2: null, 3: null };
+            let migrationCarePackageGranted = false;
             
             // 1. Check IndexedDB for all 3 slots
             for (let i = 1; i <= 3; i++) {
                 const savedData = await loadGameData(`actorEmpireSave_${i}`);
                 if (savedData) {
-                    const prepared = await prepareLoadedPlayerSave(i, savedData);
+                    const prepared = await prepareLoadedPlayerSave(i, savedData, 'indexeddb-slot');
                     slots[i] = prepared.player;
+                    if (prepared.carePackageGranted) migrationCarePackageGranted = true;
                     if (prepared.shouldPersist) {
-                        persistSlotSave(i, prepared.player);
+                        await persistSlotSave(i, prepared.player);
                     }
                 }
             }
@@ -841,8 +920,9 @@ export const App: React.FC = () => {
                 const legacyIndexedDbSave = await loadGameData('actorEmpireSave');
                 if (legacyIndexedDbSave) {
                     console.log("Migrating legacy IndexedDB save to Slot 1...");
-                    const prepared = await prepareLoadedPlayerSave(1, legacyIndexedDbSave);
-                    persistSlotSave(1, prepared.player);
+                    const prepared = await prepareLoadedPlayerSave(1, legacyIndexedDbSave, 'legacy-indexeddb');
+                    if (prepared.carePackageGranted) migrationCarePackageGranted = true;
+                    await persistSlotSave(1, prepared.player);
                     slots[1] = prepared.player;
                 } else {
                     for (let i = 1; i <= 3; i++) {
@@ -850,9 +930,10 @@ export const App: React.FC = () => {
                         if (!legacySlotSave) continue;
                         try {
                             const savedData = JSON.parse(legacySlotSave);
-                            const prepared = await prepareLoadedPlayerSave(i, savedData);
+                            const prepared = await prepareLoadedPlayerSave(i, savedData, 'legacy-localstorage');
+                            if (prepared.carePackageGranted) migrationCarePackageGranted = true;
                             console.log(`Migrating localStorage slot ${i} to IndexedDB...`);
-                            persistSlotSave(i, prepared.player);
+                            await persistSlotSave(i, prepared.player);
                             slots[i] = prepared.player;
                         } catch (e) {
                             console.error(`Legacy slot ${i} corrupt`, e);
@@ -866,9 +947,10 @@ export const App: React.FC = () => {
                         if (legacySave) {
                             try {
                                 const savedData = JSON.parse(legacySave);
-                                const prepared = await prepareLoadedPlayerSave(1, savedData);
+                                const prepared = await prepareLoadedPlayerSave(1, savedData, 'legacy-single-localstorage');
+                                if (prepared.carePackageGranted) migrationCarePackageGranted = true;
                                 console.log("Migrating legacy save to Slot 1...");
-                                persistSlotSave(1, prepared.player);
+                                await persistSlotSave(1, prepared.player);
                                 slots[1] = prepared.player;
                             } catch (e) {
                                 console.error("Legacy save corrupt", e);
@@ -880,6 +962,12 @@ export const App: React.FC = () => {
             }
 
             setSaveSlots(slots);
+            if (migrationCarePackageGranted) {
+                setToastMessage({
+                    title: 'Migration Care Package',
+                    subtext: `$${MIGRATION_CARE_PACKAGE_CASH.toLocaleString()} cash and ${MIGRATION_CARE_PACKAGE_ENERGY} bonus energy added to your migrated save.`,
+                });
+            }
         } catch (e) {
             console.error("Init failed", e);
             recordNonFatal(e, 'app_init_failed');
@@ -901,7 +989,7 @@ export const App: React.FC = () => {
 
     autosaveTimerRef.current = window.setTimeout(() => {
         setSaveSlots(prev => ({ ...prev, [currentSlot]: player }));
-        persistSlotSave(currentSlot, player);
+        void persistSlotSave(currentSlot, player);
         autosaveTimerRef.current = null;
     }, AUTOSAVE_DEBOUNCE_MS);
 
@@ -934,6 +1022,60 @@ export const App: React.FC = () => {
     localStorage.removeItem(`actorEmpireSave_${slot}`);
     if (slot === 1) localStorage.removeItem('actorEmpireSave');
     setSaveSlots(prev => ({ ...prev, [slot]: null }));
+  };
+
+  const handleExportGameData = async () => {
+    try {
+      if (gameStatus === 'PLAYING' && currentSlot) {
+        const playerToSave = preparePlayerForPersistence(player);
+        await saveGameData(`actorEmpireSave_${currentSlot}`, playerToSave);
+        writeLocalStorageMirror(currentSlot, playerToSave);
+        setSaveSlots(prev => ({ ...prev, [currentSlot]: playerToSave }));
+      }
+
+      const result = await exportSignedSaveArchive();
+      setToastMessage({
+        title: 'Save Export Ready',
+        subtext: `${result.saveSlots} save slot${result.saveSlots === 1 ? '' : 's'} signed for transfer.`,
+      });
+      return result;
+    } catch (error) {
+      recordNonFatal(error, 'save_transfer_export_failed', { save_slot: currentSlot });
+      setToastMessage({
+        title: 'Export Failed',
+        subtext: error instanceof Error ? error.message : 'Could not create the save transfer file.',
+      });
+      throw error;
+    }
+  };
+
+  const handleImportGameData = async () => {
+    const confirmed = window.confirm('Importing a transfer file will replace the local Play Store saves on this device. Continue?');
+    if (!confirmed) return;
+
+    try {
+      const result = await importSignedSaveArchiveFromFile({
+        onProgress: progress => setToastMessage({
+          title: 'Importing Save',
+          subtext: progress.message,
+        }),
+      });
+      setToastMessage({
+        title: result.carePackageGranted ? 'Save Imported + Care Package' : 'Save Imported',
+        subtext: result.carePackageGranted
+          ? `${result.saveSlots} save slot${result.saveSlots === 1 ? '' : 's'} restored with ${result.mediaRecords || 0} media file${result.mediaRecords === 1 ? '' : 's'}. Added $${MIGRATION_CARE_PACKAGE_CASH.toLocaleString()} and ${MIGRATION_CARE_PACKAGE_ENERGY} bonus energy. Restarting now.`
+          : `${result.saveSlots} save slot${result.saveSlots === 1 ? '' : 's'} restored with ${result.mediaRecords || 0} media file${result.mediaRecords === 1 ? '' : 's'}. Restarting now.`,
+      });
+      window.setTimeout(() => window.location.reload(), 1200);
+      return result;
+    } catch (error) {
+      recordNonFatal(error, 'save_transfer_import_failed', { save_slot: currentSlot });
+      setToastMessage({
+        title: 'Import Blocked',
+        subtext: error instanceof Error ? error.message : 'That transfer file could not be imported.',
+      });
+      throw error;
+    }
   };
 
   const handleRecoverToMenu = () => {
@@ -1073,6 +1215,9 @@ export const App: React.FC = () => {
               safePlayer.weeklyOpportunities = { auditions: [], jobs: [] };
           }
           
+          if (typeof safePlayer.name !== 'string' || !safePlayer.name.trim()) {
+              safePlayer.name = INITIAL_PLAYER.name;
+          }
           const fallbackHandle = `@${safePlayer.name.replace(/\s+/g, '_').toLowerCase()}`;
 
           if (!safePlayer.instagram) safePlayer.instagram = { ...INITIAL_PLAYER.instagram, handle: fallbackHandle };
@@ -1138,11 +1283,12 @@ export const App: React.FC = () => {
           if (safePlayer.relationships) {
               safePlayer.relationships = safePlayer.relationships.map((rel: any) => {
                   let patchedRel = { ...rel };
+                  const imageUrl = typeof patchedRel.image === 'string' ? patchedRel.image : '';
 
-                  if (patchedRel.id === 'rel_mom' && (patchedRel.image.includes('seed=Mom') || patchedRel.image === '')) {
+                  if (patchedRel.id === 'rel_mom' && (imageUrl.includes('seed=Mom') || imageUrl === '')) {
                       patchedRel = { ...patchedRel, image: 'https://api.dicebear.com/8.x/pixel-art/svg?seed=Sophie' };
                   }
-                  if (patchedRel.id === 'rel_dad' && (patchedRel.image.includes('seed=Dad') || patchedRel.image === '')) {
+                  if (patchedRel.id === 'rel_dad' && (imageUrl.includes('seed=Dad') || imageUrl === '')) {
                       patchedRel = { ...patchedRel, image: 'https://api.dicebear.com/8.x/pixel-art/svg?seed=Arthur' };
                   }
 
@@ -1189,6 +1335,7 @@ export const App: React.FC = () => {
           }
           if (!Array.isArray(safePlayer.flags.premiumPurchases)) safePlayer.flags.premiumPurchases = [];
           if (!Array.isArray(safePlayer.flags.premiumCollections)) safePlayer.flags.premiumCollections = [];
+          if (!Array.isArray(safePlayer.flags.processedIOSStoreTransactionIds)) safePlayer.flags.processedIOSStoreTransactionIds = [];
           if (typeof safePlayer.flags.bailoutAdsUsedThisWeek !== 'number') safePlayer.flags.bailoutAdsUsedThisWeek = 0;
           syncEnergyDisplay(safePlayer);
 
@@ -1356,6 +1503,11 @@ export const App: React.FC = () => {
       week: player.currentWeek,
       screen: activePage,
     });
+    const previousHealthConditionIds = new Set(
+      (Array.isArray(player.activeHealthConditions) ? player.activeHealthConditions : [])
+        .map(condition => condition?.id)
+        .filter(Boolean),
+    );
     try {
         const { player: newPlayerState, triggerAd } = await processGameWeek(player);
         const shouldTriggerBabyQa = !!newPlayerState.flags?.qaBabyNamingNextWeek;
@@ -1411,7 +1563,46 @@ export const App: React.FC = () => {
                 };
             }
         }
-        handleUpdatePlayer(syncedPlayerState);
+        const newMedicalCondition = (Array.isArray(syncedPlayerState.activeHealthConditions) ? syncedPlayerState.activeHealthConditions : [])
+            .filter(condition => condition?.id && !previousHealthConditionIds.has(condition.id))
+            .sort((a, b) => getMedicalPromptSeverityRank(b.severity) - getMedicalPromptSeverityRank(a.severity))[0];
+        let medicalPromptToShow: PendingMedicalPrompt | null = null;
+
+        if (newMedicalCondition) {
+            const currentMedicalPromptWeek = getAbsoluteWeek(syncedPlayerState.age, syncedPlayerState.currentWeek);
+            const lastMedicalPromptWeek = Number(syncedPlayerState.flags?.lastMedicalPromptAbsoluteWeek ?? -999);
+            const promptCooldownWeeks = getMedicalPromptCooldownWeeks(newMedicalCondition.severity);
+            const shouldShowMedicalPrompt = promptCooldownWeeks === 0 || currentMedicalPromptWeek - lastMedicalPromptWeek >= promptCooldownWeeks;
+
+            if (shouldShowMedicalPrompt) {
+                const conditionName = getHealthConditionLabel(newMedicalCondition, getPlayerLanguage(syncedPlayerState));
+                syncedPlayerState = {
+                    ...syncedPlayerState,
+                    flags: {
+                        ...(syncedPlayerState.flags || {}),
+                        lastMedicalPromptAbsoluteWeek: currentMedicalPromptWeek,
+                    },
+                };
+                medicalPromptToShow = {
+                    conditionName,
+                    severity: newMedicalCondition.severity,
+                    healthCap: newMedicalCondition.healthCap,
+                };
+            }
+        }
+
+        const persistedPlayerState = await persistCurrentSlotSnapshot(syncedPlayerState);
+        syncedPlayerState = persistedPlayerState;
+        handleUpdatePlayer(persistedPlayerState);
+        addBreadcrumb('process_week:persisted', {
+            age: syncedPlayerState.age,
+            week: syncedPlayerState.currentWeek,
+            saveSlot: currentSlot,
+        });
+
+        if (medicalPromptToShow) {
+            setPendingMedicalPrompt(medicalPromptToShow);
+        }
 
         if (shouldTriggerBabyQa) {
             setPendingBabyNaming({
@@ -1658,10 +1849,19 @@ export const App: React.FC = () => {
 
       handleGenericUpdate(prev => {
           const p = JSON.parse(JSON.stringify(prev)) as Player;
+          if (hasProcessedStoreTransaction(p, result.transactionId)) {
+              setToastMessage({ title: tr('app.purchases.confirmedTitle'), subtext: result.message });
+              return p;
+          }
+          markProcessedStoreTransaction(p, result.transactionId);
           const message = applyPremiumPurchase(p, productId, getPlayerLanguage(p));
           setToastMessage({ title: tr('app.purchases.confirmedTitle'), subtext: message });
           return p;
       });
+
+      if (isNonConsumablePremiumProduct(productId)) {
+          void syncPermanentPremiumEntitlementsToSavedSlots([productId]);
+      }
   };
 
 	  const handleBuyLifestyleItem = (item: any) => {
@@ -1786,22 +1986,25 @@ export const App: React.FC = () => {
           return;
       }
 
-      if (result.restoredProductIds.length === 0) {
+      const restoredPermanentProductIds = uniquePermanentPremiumIds(result.restoredProductIds);
+      if (restoredPermanentProductIds.length === 0) {
           setToastMessage({ title: tr('app.purchases.nothingToRestoreTitle'), subtext: result.message });
           return;
       }
+      const entitlementProductIds = rememberPremiumEntitlements(restoredPermanentProductIds);
 
       handleGenericUpdate(prev => {
           const p = JSON.parse(JSON.stringify(prev)) as Player;
-          result.restoredProductIds.forEach(productId => {
+          entitlementProductIds.forEach(productId => {
               applyPremiumPurchase(p, productId, getPlayerLanguage(p));
           });
           setToastMessage({
               title: tr('app.purchases.restoredTitle'),
-              subtext: tr('app.purchases.restoredSubtext', { count: result.restoredProductIds.length.toString() })
+              subtext: tr('app.purchases.restoredSubtext', { count: restoredPermanentProductIds.length.toString() })
           });
           return p;
       });
+      void syncPermanentPremiumEntitlementsToSavedSlots(entitlementProductIds);
   };
 
   // --- HANDLERS ---
@@ -1816,22 +2019,24 @@ export const App: React.FC = () => {
           age, 
           gender, 
           avatar,
-          flags: {
-              ...(INITIAL_PLAYER.flags || {}),
-              newPlayerTutorial: buildAvailableNewPlayerTutorialState(),
-          },
-          relationships: parentRelationships,
+	          flags: {
+	              ...(INITIAL_PLAYER.flags || {}),
+	              newPlayerTutorial: buildAvailableNewPlayerTutorialState(),
+	          },
+	          logs: INITIAL_PLAYER.logs.map(log => ({ ...log, year: age })),
+	          relationships: parentRelationships,
           // Set specific handle for all platforms
           instagram: { ...INITIAL_PLAYER.instagram, handle: handle },
           x: { ...INITIAL_PLAYER.x, handle: handle, followers: 0 },
           youtube: { ...INITIAL_PLAYER.youtube, handle: handle }
       };
       const migratedNewPlayer = migratePlayerSave(newPlayer);
+      const entitledNewPlayer = applyPremiumEntitlementsToPlayer(migratedNewPlayer, readStoredPremiumEntitlements()).player;
       const targetSlot = slotOverride ?? currentSlot;
       if (targetSlot) {
-          setSaveSlots(prev => ({ ...prev, [targetSlot]: migratedNewPlayer }));
+          setSaveSlots(prev => ({ ...prev, [targetSlot]: entitledNewPlayer }));
       }
-      setPlayer(migratedNewPlayer); 
+      setPlayer(entitledNewPlayer); 
       setActivePage(Page.HOME);
       setGameStatus('PLAYING'); 
   };
@@ -1856,6 +2061,7 @@ export const App: React.FC = () => {
 
   const handleContinueAsChild = (child: any) => {
       const inheritancePreview = getLegacyInheritancePreview(player);
+      const legacyInheritance = buildLegacyStudioInheritance(player, { isDeceased: !!player.flags?.isDead });
       const inheritedRelationships: Relationship[] = [];
       player.relationships.forEach(rel => {
           if (rel.id === child.id) return; // Skip self
@@ -1865,11 +2071,14 @@ export const App: React.FC = () => {
               inheritedRelationships.push({ ...rel, relation: 'Sibling' });
           }
       });
+      const childAge = getRelationshipAge(child, player.age, player.currentWeek);
+      const yearsToSkip = Math.max(0, LEGACY_MIN_PLAYABLE_AGE - childAge);
       
       // Add the current player as a parent
       inheritedRelationships.push({
-          id: player.id,
-          name: player.name,
+          id: legacyInheritance.parentActor.id,
+          npcId: legacyInheritance.parentActor.id,
+          name: legacyInheritance.parentActor.name,
           relation: player.flags.isDead ? 'Deceased Parent' as any : 'Parent',
           closeness: 100,
           age: player.age,
@@ -1879,8 +2088,6 @@ export const App: React.FC = () => {
           lastInteractionAbsolute: getAbsoluteWeek(player.age, player.currentWeek)
       });
 
-      const childAge = getRelationshipAge(child, player.age, player.currentWeek);
-      const yearsToSkip = Math.max(0, LEGACY_MIN_PLAYABLE_AGE - childAge);
       const advancedRelationships = inheritedRelationships.map(rel => ({
           ...rel,
           age: typeof rel.age === 'number' ? rel.age + yearsToSkip : rel.age,
@@ -1921,12 +2128,16 @@ export const App: React.FC = () => {
           assetStates: clone(player.assetStates || []),
           residenceId: player.residenceId,
           activeVehicleId: player.activeVehicleId,
-          businesses: clone(player.businesses || []),
-          studio: player.studio ? clone(player.studio) : undefined,
+          businesses: legacyInheritance.businesses,
+          studio: legacyInheritance.studio,
           stocks: clone(player.stocks),
           portfolio: clone(inheritancePreview.inheritedPortfolio),
-          world: player.world ? clone(player.world) : INITIAL_PLAYER.world,
+          world: legacyInheritance.world || INITIAL_PLAYER.world,
           relationships: advancedRelationships,
+          flags: {
+              ...(INITIAL_PLAYER.flags || {}),
+              ...legacyInheritance.flags,
+          },
           stats: {
               ...INITIAL_PLAYER.stats,
               health: Math.max(65, Math.floor(player.stats.health * 0.75)),
@@ -1943,8 +2154,47 @@ export const App: React.FC = () => {
           writerStats: inheritedWriterStats,
           directorStats: inheritedDirectorStats,
           instagram: { ...INITIAL_PLAYER.instagram, handle: childHandle },
-          x: { ...INITIAL_PLAYER.x, handle: childHandle, followers: Math.floor(player.stats.followers * 0.04) },
+          x: {
+              ...INITIAL_PLAYER.x,
+              handle: childHandle,
+              followers: Math.floor(player.stats.followers * 0.04),
+              feed: [
+                  {
+                      id: `x_legacy_handoff_${Date.now()}`,
+                      authorId: 'npc_hollywoodlineage',
+                      authorName: 'Hollywood Lineage',
+                      authorHandle: '@HollywoodLineage',
+                      authorAvatar: 'https://api.dicebear.com/8.x/avataaars/svg?seed=HollywoodLineage',
+                      content: `${child.name} takes control of ${legacyInheritance.parentActor.name}'s studio legacy. The family name now has to prove it can survive another generation.`,
+                      timestamp: Date.now(),
+                      likes: Math.max(1200, Math.floor((player.stats.followers || 0) * 0.03)),
+                      retweets: Math.max(220, Math.floor((player.stats.followers || 0) * 0.006)),
+                      replies: Math.max(80, Math.floor((player.stats.followers || 0) * 0.002)),
+                      isPlayer: false,
+                      isLiked: false,
+                      isRetweeted: false,
+                      isVerified: true,
+                      postType: 'CAREER',
+                      sentiment: 'INDUSTRY'
+                  },
+                  ...(INITIAL_PLAYER.x.feed || [])
+              ]
+          },
           youtube: { ...INITIAL_PLAYER.youtube, handle: childHandle },
+          news: [
+              {
+                  id: `news_legacy_handoff_${Date.now()}`,
+                  headline: `${child.name} inherits ${legacyInheritance.parentActor.name}'s studio empire`,
+                  subtext: legacyInheritance.legacyParent.projectCount > 0
+                      ? `The production house catalog and connected franchises remain under family control, but the new heir must build a career of their own.`
+                      : `The family studio passes to a new generation, setting up a fresh career under an old Hollywood name.`,
+                  category: 'INDUSTRY',
+                  week: player.currentWeek,
+                  year: player.age,
+                  impactLevel: legacyInheritance.legacyParent.projectCount > 0 ? 'HIGH' : 'MEDIUM'
+              },
+              ...(INITIAL_PLAYER.news || [])
+          ],
           bloodline: [
               ...(player.bloodline || []),
               createBloodlineSnapshot(player)
@@ -2245,14 +2495,84 @@ export const App: React.FC = () => {
           </div>
       )}
 
-      {toastMessage && (
-          <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[60] bg-zinc-900 border border-zinc-700 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-4 animate-in slide-in-from-top fade-in duration-300 min-w-[300px]">
-              <div className="bg-emerald-500 rounded-full p-1"><CheckCircle size={20} className="text-black" strokeWidth={3}/></div>
-              <div><div className="font-bold text-sm">{toastMessage.title}</div><div className="text-xs text-zinc-400">{toastMessage.subtext}</div></div>
-          </div>
-      )}
+	      {toastMessage && (
+	          <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[60] bg-zinc-900 border border-zinc-700 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-4 animate-in slide-in-from-top fade-in duration-300 min-w-[300px]">
+	              <div className="bg-emerald-500 rounded-full p-1"><CheckCircle size={20} className="text-black" strokeWidth={3}/></div>
+	              <div><div className="font-bold text-sm">{toastMessage.title}</div><div className="text-xs text-zinc-400">{toastMessage.subtext}</div></div>
+	          </div>
+	      )}
 
-      {player.pendingEvent && (player.pendingEvent.type === 'AWARD_CEREMONY' || player.pendingEvent.type === 'PREMIERE') && (<RedCarpetEvent player={player} event={player.pendingEvent} onComplete={handleEventComplete} />)}
+	      {pendingMedicalPrompt && gameStatus === 'PLAYING' && (
+	          <div className="fixed inset-0 z-[155] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm animate-in fade-in duration-200">
+	              <div
+	                  role="dialog"
+	                  aria-modal="true"
+	                  aria-labelledby="medical-attention-title"
+	                  className="relative w-full max-w-sm overflow-hidden rounded-[28px] border border-rose-400/25 bg-[linear-gradient(180deg,#171013_0%,#09090b_100%)] p-5 text-left shadow-[0_28px_80px_rgba(0,0,0,0.55)]"
+	              >
+	                  <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-rose-500 via-amber-400 to-rose-500" />
+	                  <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-rose-500/15 blur-3xl" />
+	                  <div className="relative">
+	                      <div className="mb-4 flex items-start gap-3">
+	                          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-rose-300/25 bg-rose-500/15 text-rose-200">
+	                              <ShieldAlert size={24} />
+	                          </div>
+	                          <div className="min-w-0">
+	                              <div className="text-[10px] font-black uppercase tracking-[0.22em] text-rose-300">Medical Alert</div>
+	                              <h3 id="medical-attention-title" className="mt-1 text-xl font-black leading-tight text-white">
+	                                  Treatment Needed
+	                              </h3>
+	                          </div>
+	                      </div>
+
+	                      <div className="rounded-2xl border border-white/8 bg-black/35 p-4">
+	                          <div className="text-[10px] font-black uppercase tracking-[0.18em] text-zinc-500">Condition</div>
+	                          <div className="mt-1 text-lg font-black text-white">{pendingMedicalPrompt.conditionName}</div>
+	                          <p className="mt-3 text-sm leading-relaxed text-zinc-300">
+	                              Your health needs attention now. Care Team can prevent some small issues, but active conditions still need the Health Clinic before they hurt work, energy, or career momentum.
+	                          </p>
+	                          <div className="mt-4 grid grid-cols-2 gap-2">
+	                              {pendingMedicalPrompt.severity && (
+	                                  <div className="rounded-xl border border-rose-300/15 bg-rose-500/10 px-3 py-2">
+	                                      <div className="text-[9px] font-black uppercase tracking-[0.16em] text-rose-200/70">Severity</div>
+	                                      <div className="mt-1 text-sm font-black uppercase text-rose-100">{pendingMedicalPrompt.severity}</div>
+	                                  </div>
+	                              )}
+	                              {typeof pendingMedicalPrompt.healthCap === 'number' && (
+	                                  <div className="rounded-xl border border-amber-300/15 bg-amber-500/10 px-3 py-2">
+	                                      <div className="text-[9px] font-black uppercase tracking-[0.16em] text-amber-200/70">Health Cap</div>
+	                                      <div className="mt-1 text-sm font-black text-amber-100">{pendingMedicalPrompt.healthCap}%</div>
+	                                  </div>
+	                              )}
+	                          </div>
+	                      </div>
+
+	                      <div className="mt-4 grid grid-cols-1 gap-2">
+	                          <button
+	                              type="button"
+	                              onClick={() => {
+	                                  setPendingMedicalPrompt(null);
+	                                  setLifestyleInitialView('ACTIVITIES');
+	                                  setActivePage(Page.LIFESTYLE);
+	                              }}
+	                              className="flex min-h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-2xl bg-rose-400 px-4 text-sm font-black uppercase tracking-[0.12em] text-black transition-colors hover:bg-rose-300"
+	                          >
+	                              Open Health Clinic <ChevronRight size={16} />
+	                          </button>
+	                          <button
+	                              type="button"
+	                              onClick={() => setPendingMedicalPrompt(null)}
+	                              className="min-h-11 w-full cursor-pointer rounded-2xl border border-white/10 bg-white/[0.04] px-4 text-sm font-bold text-zinc-300 transition-colors hover:bg-white/[0.08]"
+	                          >
+	                              Later
+	                          </button>
+	                      </div>
+	                  </div>
+	              </div>
+	          </div>
+	      )}
+
+	      {player.pendingEvent && (player.pendingEvent.type === 'AWARD_CEREMONY' || player.pendingEvent.type === 'PREMIERE') && (<RedCarpetEvent player={player} event={player.pendingEvent} onComplete={handleEventComplete} />)}
       {player.pendingEvents && player.pendingEvents.length > 0 && (player.pendingEvents[0].type === 'PRODUCTION_CRISIS' || player.pendingEvents[0].type === 'DIRECTOR_DECISION') && (
           <ProductionCrisisModal 
               key={player.pendingEvents[0].id}
@@ -2411,53 +2731,35 @@ export const App: React.FC = () => {
 
       {showWhatsNewModal && gameStatus === 'PLAYING' && (
           <div className="fixed inset-0 z-[140] bg-black/85 backdrop-blur-md overflow-y-auto custom-scrollbar px-3 py-5 sm:p-6 animate-in fade-in duration-200">
-              <div className="bg-zinc-900 border border-zinc-700 rounded-3xl w-full max-w-lg mx-auto max-h-[calc(100dvh-2.5rem)] sm:max-h-[calc(100dvh-3rem)] shadow-2xl flex flex-col relative overflow-hidden">
+              <div className="bg-zinc-900 border border-zinc-700 rounded-3xl w-full max-w-xl mx-auto max-h-[calc(100dvh-2.5rem)] sm:max-h-[calc(100dvh-3rem)] shadow-2xl flex flex-col relative overflow-hidden">
                   <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-500 via-orange-500 to-pink-500"></div>
-                  <div className="min-h-0 flex-1 overflow-y-auto custom-scrollbar p-5 pb-4 sm:p-6">
-                      <div className="mb-6">
-	                          <div className="text-[10px] font-black uppercase tracking-[0.25em] text-amber-400 mb-3">{tr('app.whatsNew.eyebrow')}</div>
-	                          <h3 className="text-2xl font-black text-white mb-2">{tr('app.whatsNew.version', { version: APP_DISPLAY_VERSION })}</h3>
-	                          <p className="text-sm text-zinc-400 leading-relaxed">
-	                              {tr('app.whatsNew.intro')}
-	                          </p>
+                  <div className="min-h-0 flex-1 overflow-y-auto custom-scrollbar p-5 pb-4 sm:p-7">
+                      <div className="mb-5">
+                          <div className="flex items-center justify-between gap-3 mb-4">
+                              <div className="text-[10px] font-black uppercase tracking-[0.25em] text-amber-400">{tr('app.whatsNew.eyebrow')}</div>
+                              <div className="rounded-full border border-amber-400/30 bg-amber-400/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-amber-200">{getChangelogTypeLabel(latestChangelogEntry.type)}</div>
+                          </div>
+                          <h3 className="text-3xl sm:text-4xl font-black text-white mb-3 leading-none">{tr('app.whatsNew.version', { version: APP_DISPLAY_VERSION })}</h3>
+                          <div className="mb-2 text-sm font-black uppercase tracking-[0.2em] text-zinc-500">{latestChangelogEntry.title}</div>
+                          <p className="text-sm sm:text-base text-zinc-300 leading-relaxed">
+                              {latestChangelogEntry.summary}
+                          </p>
                       </div>
 
-                      <div className="space-y-4 text-sm text-zinc-300">
-                          <div className="rounded-2xl border border-amber-500/15 bg-amber-500/10 px-4 py-3">
-	                              <div className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-300 mb-2">{tr('app.whatsNew.studioStreaming')}</div>
-	                              <ul className="space-y-2 leading-relaxed">
-	                                  <li>{tr('app.whatsNew.studioStreaming.1')}</li>
-	                                  <li>{tr('app.whatsNew.studioStreaming.2')}</li>
-	                                  <li>{tr('app.whatsNew.studioStreaming.3')}</li>
-	                              </ul>
-                          </div>
-
-                          <div className="rounded-2xl border border-emerald-500/15 bg-emerald-500/10 px-4 py-3">
-	                              <div className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-300 mb-2">{tr('app.whatsNew.careerFamily')}</div>
-	                              <ul className="space-y-2 leading-relaxed">
-	                                  <li>{tr('app.whatsNew.careerFamily.1')}</li>
-	                                  <li>{tr('app.whatsNew.careerFamily.2')}</li>
-	                                  <li>{tr('app.whatsNew.careerFamily.3')}</li>
-	                              </ul>
-                          </div>
-
-                          <div className="rounded-2xl border border-sky-500/15 bg-sky-500/10 px-4 py-3">
-	                              <div className="text-[10px] font-black uppercase tracking-[0.2em] text-sky-300 mb-2">{tr('app.whatsNew.mobileStability')}</div>
-	                              <ul className="space-y-2 leading-relaxed">
-	                                  <li>{tr('app.whatsNew.mobileStability.1')}</li>
-	                                  <li>{tr('app.whatsNew.mobileStability.2')}</li>
-	                                  <li>{tr('app.whatsNew.mobileStability.3')}</li>
-	                              </ul>
-                          </div>
-
-                          <div className="rounded-2xl border border-violet-500/15 bg-violet-500/10 px-4 py-3">
-	                              <div className="text-[10px] font-black uppercase tracking-[0.2em] text-violet-300 mb-2">{tr('app.whatsNew.uiSaveFixes')}</div>
-	                              <ul className="space-y-2 leading-relaxed">
-	                                  <li>{tr('app.whatsNew.uiSaveFixes.1')}</li>
-	                                  <li>{tr('app.whatsNew.uiSaveFixes.2')}</li>
-	                                  <li>{tr('app.whatsNew.uiSaveFixes.3')}</li>
-	                              </ul>
-                          </div>
+                      <div className="grid grid-cols-1 gap-3 text-sm text-zinc-200">
+                          {latestChangelogEntry.sections.map(section => (
+                              <div key={section.heading} className="rounded-2xl border border-white/10 bg-zinc-950/70 px-4 py-4 shadow-inner shadow-black/20">
+                                  <div className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-300 mb-3">{section.heading}</div>
+                                  <ul className="space-y-2 leading-relaxed text-zinc-200">
+                                      {section.items.map(item => (
+                                          <li key={item} className="flex gap-2">
+                                              <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-300/80" aria-hidden="true" />
+                                              <span>{item}</span>
+                                          </li>
+                                      ))}
+                                  </ul>
+                              </div>
+                          ))}
 
                           <button
                               type="button"
@@ -2466,21 +2768,44 @@ export const App: React.FC = () => {
                           >
                               <div className="flex items-center justify-between gap-3">
                                   <div>
-	                                      <div className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-300">{tr('app.whatsNew.previousNotes')}</div>
-	                                      <p className="mt-1 text-xs leading-relaxed text-zinc-500">{tr('app.whatsNew.previousNotesSubtext')}</p>
+                                      <div className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-300">Previous Updates</div>
+                                      <p className="mt-1 text-xs leading-relaxed text-zinc-500">Open the earlier major and patch notes.</p>
                                   </div>
                                   <span className="text-lg font-black text-zinc-400">{showPreviousWhatsNewNotes ? '-' : '+'}</span>
                               </div>
                           </button>
 
                           {showPreviousWhatsNewNotes && (
-                              <div className="rounded-2xl border border-white/10 bg-zinc-950/80 px-4 py-3">
-	                                  <div className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-300 mb-2">{tr('app.whatsNew.previousHighlights')}</div>
-	                                  <ul className="space-y-2 leading-relaxed text-zinc-400">
-	                                      <li>{tr('app.whatsNew.previousHighlights.1')}</li>
-	                                      <li>{tr('app.whatsNew.previousHighlights.2')}</li>
-	                                      <li>{tr('app.whatsNew.previousHighlights.3')}</li>
-	                                  </ul>
+                              <div className="space-y-3">
+                                  {previousChangelogEntries.map(entry => (
+                                      <div key={entry.version} className="rounded-2xl border border-white/10 bg-zinc-950/80 px-4 py-4">
+                                          <div className="flex flex-wrap items-center justify-between gap-2">
+                                              <div>
+                                                  <div className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">v{entry.version}</div>
+                                                  <div className="mt-1 font-black text-white">{entry.title}</div>
+                                              </div>
+                                              <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.16em] text-zinc-300">
+                                                  {getChangelogTypeLabel(entry.type)}
+                                              </span>
+                                          </div>
+                                          <p className="mt-2 text-xs leading-relaxed text-zinc-400">{entry.summary}</p>
+                                          <div className="mt-3 space-y-3">
+                                              {entry.sections.map(section => (
+                                                  <div key={section.heading}>
+                                                      <div className="text-[9px] font-black uppercase tracking-[0.18em] text-zinc-500">{section.heading}</div>
+                                                      <ul className="mt-2 space-y-1.5 text-xs leading-relaxed text-zinc-400">
+                                                          {section.items.map(item => (
+                                                              <li key={item} className="flex gap-2">
+                                                                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-zinc-500" aria-hidden="true" />
+                                                                  <span>{item}</span>
+                                                              </li>
+                                                          ))}
+                                                      </ul>
+                                                  </div>
+                                              ))}
+                                          </div>
+                                      </div>
+                                  ))}
                               </div>
                           )}
                       </div>
@@ -2512,6 +2837,7 @@ export const App: React.FC = () => {
                 saveSlots={saveSlots}
                 onSelectSlot={handleSelectSlot}
                 onDeleteSlot={handleDeleteSlot}
+                onImportData={handleImportGameData}
                 onCreateCareerFromIntro={handleStartGameFromIntro}
                 skipIntro={skipStartMenuIntro}
             />
@@ -2728,14 +3054,15 @@ export const App: React.FC = () => {
                                         title: tr('app.socialFeedback.referralAcceptedTitle'),
                                         subtext: tr('app.socialFeedback.referralAcceptedSubtext', { result: promisedResult, weeks: weeksLeft.toString() })
                                     });
-                                } else if (accepted && selectedAction?.kind === 'IG_BRAND_OFFER' && selectedAction.payload?.offer) {
-                                    nextPlayer.activeSponsorships = [...nextPlayer.activeSponsorships, selectedAction.payload.offer];
-                                    nextPlayer.logs = [{
-                                        week: p.currentWeek,
-                                        year: p.age,
-                                        message: tr('app.socialFeedback.brandDealAcceptedLog', { brandName: selectedAction.payload.offer.brandName }),
-                                        type: 'positive' as const
-                                    }, ...nextPlayer.logs].slice(0, 50);
+	                                } else if (accepted && selectedAction?.kind === 'IG_BRAND_OFFER' && selectedAction.payload?.offer) {
+	                                    const normalizedOffer = normalizeSponsorshipOffer(selectedAction.payload.offer);
+	                                    nextPlayer.activeSponsorships = [...nextPlayer.activeSponsorships, normalizedOffer];
+	                                    nextPlayer.logs = [{
+	                                        week: p.currentWeek,
+	                                        year: p.age,
+	                                        message: tr('app.socialFeedback.brandDealAcceptedLog', { brandName: normalizedOffer.brandName }),
+	                                        type: 'positive' as const
+	                                    }, ...nextPlayer.logs].slice(0, 50);
                                     setToastMessage({
                                         title: tr('app.socialFeedback.brandDealAcceptedTitle'),
                                         subtext: tr('app.socialFeedback.brandDealAcceptedSubtext')
@@ -2914,7 +3241,35 @@ export const App: React.FC = () => {
                                 });
                                 return result.player;
                             })} 
-                            onPerformSponsorship={(id, type)=>handleGenericUpdate(p=>{ const s = p.activeSponsorships.find(x=>x.id===id); if (!s) return p; const next = { ...p }; spendPlayerEnergy(next, s.requirements.energyCost, `Sponsorship: ${s.brandName || type}`); return next; })}
+                            onPerformSponsorship={(id, type)=>handleGenericUpdate(p=>{
+                                const sponIndex = p.activeSponsorships.findIndex(x=>x.id===id);
+                                if (sponIndex < 0) return p;
+                                const s = p.activeSponsorships[sponIndex];
+                                const req = s.requirements || { type, energyCost: 0, totalRequired: 1, progress: 0 };
+                                const nextProgress = Math.min(Math.max(1, Number(req.totalRequired || 1)), Math.max(0, Number(req.progress || 0)) + 1);
+                                const updatedSponsorships = [...p.activeSponsorships];
+                                updatedSponsorships[sponIndex] = {
+                                    ...s,
+                                    requirements: {
+                                        ...req,
+                                        progress: nextProgress,
+                                    }
+                                };
+                                const next = {
+                                    ...p,
+                                    activeSponsorships: updatedSponsorships,
+                                    logs: nextProgress >= Math.max(1, Number(req.totalRequired || 1))
+                                        ? [{
+                                            week: p.currentWeek,
+                                            year: p.age,
+                                            message: `✅ Completed all deliverables for ${s.brandName || type}. Contract will close cleanly next week.`,
+                                            type: 'positive' as const,
+                                        }, ...(p.logs || [])].slice(0, 80)
+                                        : p.logs
+                                };
+                                spendPlayerEnergy(next, Number(req.energyCost || 0), `Sponsorship: ${s.brandName || type}`);
+                                return next;
+                            })}
                             onDeleteMessage={(id)=>handleGenericUpdate(p=>({ ...p, inbox: p.inbox.filter(m=>m.id!==id) }))} 
                             onTradeStock={handleTradeStock} 
                         />
@@ -2923,6 +3278,8 @@ export const App: React.FC = () => {
                         <SettingsPage 
                             player={player}
                             onUpdatePlayer={handleGenericUpdate}
+                            onExportData={handleExportGameData}
+                            onImportData={handleImportGameData}
                             onBack={() => setActivePage(Page.HOME)} 
                             onMainMenu={() => {
                                 setSkipStartMenuIntro(true);

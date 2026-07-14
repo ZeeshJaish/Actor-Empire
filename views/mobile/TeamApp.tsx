@@ -14,11 +14,13 @@ interface TeamAppProps {
   onPerformSponsorship: (id: string, action: SponsorshipActionType) => void;
   onUpdatePlayer?: (player: Player) => void;
   onShowToast?: (msg: string, color?: string) => void;
+  onOpenMessages?: () => void;
+  onOpenCastLink?: () => void;
 }
 
 type Tab = 'OVERVIEW' | 'AGENT' | 'MANAGER' | 'TRAINER' | 'STYLIST' | 'THERAPIST' | 'PUBLICIST' | 'WELLNESS';
 
-export const TeamApp: React.FC<TeamAppProps> = ({ player, onBack, onHireAgent, onFireAgent, onHireManager, onFireManager, onPerformSponsorship, onUpdatePlayer, onShowToast }) => {
+export const TeamApp: React.FC<TeamAppProps> = ({ player, onBack, onHireAgent, onFireAgent, onHireManager, onFireManager, onPerformSponsorship, onUpdatePlayer, onShowToast, onOpenMessages, onOpenCastLink }) => {
   const [tab, setTab] = useState<Tab>('OVERVIEW');
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
   const [selectedManager, setSelectedManager] = useState<Manager | null>(null);
@@ -84,6 +86,19 @@ export const TeamApp: React.FC<TeamAppProps> = ({ player, onBack, onHireAgent, o
   ];
   const filledLifestyleRoles = lifestyleRoles.filter(role => role.member).length;
   const weeklyLifestyleCost = lifestyleRoles.reduce((sum, role) => sum + (role.member?.weeklyCost || 0), 0);
+  const activeInboxOffers = (player.inbox || []).filter(message => !message.isExpired);
+  const auditionOfferCount = activeInboxOffers.filter(message => (
+      message.type === 'OFFER_AUDITION'
+      || message.type === 'OFFER_ROLE'
+      || message.type === 'OFFER_NEGOTIATION'
+  )).length;
+  const sponsorshipOfferCount = activeInboxOffers.filter(message => (
+      message.type === 'OFFER_SPONSORSHIP'
+      || message.type === 'OFFER_YOUTUBE_BRAND'
+      || message.type === 'OFFER_YOUTUBE_COLLAB'
+      || message.type === 'OFFER_MUSIC_VIDEO_FEATURE'
+  )).length;
+  const activeContractCount = player.activeSponsorships?.length || 0;
 
   const guardTeamChange = () => {
       if (player.flags.teamChangeLocked) {
@@ -309,11 +324,51 @@ export const TeamApp: React.FC<TeamAppProps> = ({ player, onBack, onHireAgent, o
                             <div className="text-xs text-slate-400 font-bold uppercase mb-2">Agent</div>
                             {player.team.agent ? <><div className="font-bold text-slate-900 text-lg mb-1 line-clamp-1">{player.team.agent.name}</div><div className="text-xs text-blue-600">{player.team.agent.tier} Tier</div></> : <div className="text-slate-400 italic text-sm">None hired</div>}
                             <div className="mt-3 text-[10px] font-bold text-slate-400 flex items-center gap-1">Auditions <ChevronRight size={12}/></div>
+                            <div className="mt-3 grid grid-cols-2 gap-2">
+                                <button
+                                    onClick={(event) => {
+                                        event.stopPropagation();
+                                        onOpenMessages?.();
+                                    }}
+                                    className="rounded-xl bg-blue-50 px-2 py-2 text-[10px] font-black uppercase tracking-wider text-blue-700"
+                                >
+                                    Offers {auditionOfferCount > 0 ? `(${auditionOfferCount})` : ''}
+                                </button>
+                                <button
+                                    onClick={(event) => {
+                                        event.stopPropagation();
+                                        onOpenCastLink?.();
+                                    }}
+                                    className="rounded-xl bg-slate-100 px-2 py-2 text-[10px] font-black uppercase tracking-wider text-slate-700"
+                                >
+                                    CastLink
+                                </button>
+                            </div>
                         </div>
                         <div onClick={() => setTab('MANAGER')} className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 active:scale-95 transition-transform">
                             <div className="text-xs text-slate-400 font-bold uppercase mb-2">Manager</div>
                             {player.team.manager ? <><div className="font-bold text-slate-900 text-lg mb-1 line-clamp-1">{player.team.manager.name}</div><div className="text-xs text-blue-600">{player.team.manager.tier} Tier</div></> : <div className="text-slate-400 italic text-sm">None hired</div>}
                             <div className="mt-3 text-[10px] font-bold text-slate-400 flex items-center gap-1">Brand deals <ChevronRight size={12}/></div>
+                            <div className="mt-3 grid grid-cols-2 gap-2">
+                                <button
+                                    onClick={(event) => {
+                                        event.stopPropagation();
+                                        onOpenMessages?.();
+                                    }}
+                                    className="rounded-xl bg-emerald-50 px-2 py-2 text-[10px] font-black uppercase tracking-wider text-emerald-700"
+                                >
+                                    Offers {sponsorshipOfferCount > 0 ? `(${sponsorshipOfferCount})` : ''}
+                                </button>
+                                <button
+                                    onClick={(event) => {
+                                        event.stopPropagation();
+                                        document.getElementById('team-active-contracts')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                    }}
+                                    className="rounded-xl bg-slate-100 px-2 py-2 text-[10px] font-black uppercase tracking-wider text-slate-700"
+                                >
+                                    Active {activeContractCount > 0 ? `(${activeContractCount})` : ''}
+                                </button>
+                            </div>
                         </div>
                     </div>
 
@@ -348,7 +403,7 @@ export const TeamApp: React.FC<TeamAppProps> = ({ player, onBack, onHireAgent, o
                     </div>
 
                     {/* Sponsorships */}
-                    <div>
+                    <div id="team-active-contracts" className="scroll-mt-4">
                         <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 pl-2">Active Contracts</h3>
                         {(player.activeSponsorships?.length || 0) === 0 ? <div className="bg-slate-50 border border-dashed border-slate-300 rounded-xl p-6 text-center text-slate-400 text-sm">No active sponsorships. Hire a manager!</div> : (
                             <div className="space-y-3">

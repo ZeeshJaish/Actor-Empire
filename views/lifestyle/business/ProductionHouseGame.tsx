@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Player, BudgetTier, Genre, ProjectDetails, ActiveRelease, Commitment, Business, LocationDetails, NewsItem, XPost, StudioEquipment, Script, Writer, GameLanguage } from '../../../types';
 import { ArrowLeft, Film, DollarSign, Users, TrendingUp, Calendar, Check, Plus, Star, Award, Zap, Briefcase, LayoutGrid, MapPin, PenTool, Globe, Camera, Clapperboard, ChevronRight, Lock, Building2, BarChart3, ShieldAlert, Crown, LogOut, AlertTriangle, Sparkles, BookOpen, Video, X, Clock, Palette, Lightbulb, Mic, Box, Tv, ArrowDownLeft, ArrowUpRight, WalletCards, Landmark } from 'lucide-react';
 import { NPC_DATABASE, getAvailableTalent, calculateProjectFameMultiplier } from '../../../services/npcLogic';
-import { sellBusiness, liquidateBusiness } from '../../../services/businessLogic';
+import { liquidateBusiness, resolveProjectType } from '../../../services/businessLogic';
 import { NPCActor, NPCTier } from '../../../types';
 import { getDirectorTalent } from '../../../services/roleLogic';
 import { getPlayerLanguage, t } from '../../../services/i18n';
@@ -24,6 +24,7 @@ import { createContinuationScript, getContinuationEligibility } from '../../../s
 import { getStudioGroup } from '../../../services/studioGroup';
 import { StudioGroupView } from './StudioGroupView';
 import { CustomPosterImage } from '../../../components/CustomPosterImage';
+import { StudioSaleEntryCard, StudioSaleRoom } from './components/StudioSaleDeckPanel';
 
 interface ProductionHouseGameProps {
     player: Player;
@@ -96,7 +97,7 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
         const franchises: Record<string, any> = {};
         // Consider ALL past projects to find the absolute latest in a franchise
         player.pastProjects.forEach(p => {
-            if (p.projectType !== 'MOVIE') return;
+            if (resolveProjectType(p.projectType, (p as any).type, (p as any).projectDetails?.type) !== 'MOVIE') return;
             const fId = p.franchiseId || p.id;
             if (!franchises[fId] || (p.installmentNumber || 1) > (franchises[fId].installmentNumber || 1)) {
                 franchises[fId] = p;
@@ -116,7 +117,10 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
     const consistencyBonus = library.filter(p => (p.rating || 0) >= 7.5).length * 0.8;
     // Prestige Score (0-100): rewards quality, awards, consistency, and credible hits.
     const prestigeScore = Math.min(100, Math.floor((avgRating * 6) + (awardsWon * 2.5) + (library.length * 0.8) + (breakoutCount * 1.2) + consistencyBonus));
-    const groupValuation = studioGroup.allStudios.reduce((total, groupStudio) => total + (groupStudio.stats.valuation || 0), 0);
+    const groupValuation = [
+        ...(studioGroup.parentStudio ? [studioGroup.parentStudio] : []),
+        ...studioGroup.subsidiaries,
+    ].reduce((total, groupStudio) => total + (groupStudio.stats.valuation || 0), 0);
     const getStudioSubtypeLabel = (subtype?: string) => subtype === 'MAJOR_STUDIO'
         ? tr('services.business.productionDashboard.studioType.major')
         : tr('services.business.productionDashboard.studioType.indie');
@@ -132,7 +136,7 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
             return {
                 id: c.id,
                 name: script ? script.title : 'Untitled Concept',
-                type: script?.projectType || 'MOVIE',
+                type: resolveProjectType(script?.projectType, (script as any)?.type, (c as any)?.projectType, (c as any)?.type),
                 phase: isScripting ? 'DEVELOPMENT' : 'CONCEPT',
                 risk: 'LOW',
                 budget: 0,
@@ -142,7 +146,7 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
         ...(studio.studioState?.scripts.filter(s => s.status === 'IN_DEVELOPMENT' && !studio.studioState?.concepts?.some(c => c.scriptId === s.id)).map(s => ({ 
             id: s.id, 
             name: s.title,
-            type: s.projectType,
+            type: resolveProjectType(s.projectType, (s as any).type, (s as any).projectDetails?.type),
             phase: 'DEVELOPMENT', 
             risk: 'LOW',
             budget: 0, // Not yet budgeted
@@ -308,12 +312,13 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
         const libraryIndex = player.pastProjects.findIndex(p => p.id === project.id);
         if (libraryIndex !== -1) {
             const pastProject = player.pastProjects[libraryIndex];
+            const pastProjectType = resolveProjectType(pastProject.projectType, (pastProject as any).type, (pastProject as any).projectDetails?.type);
             
             // Move to activeReleases with BIDDING phase
             const newActiveRelease: ActiveRelease = {
                 id: pastProject.id,
                 name: pastProject.name,
-                type: pastProject.type || 'MOVIE',
+                type: pastProjectType,
                 roleType: pastProject.roleType || 'LEAD',
                 weekNum: 0,
                 weeklyGross: [],
@@ -329,7 +334,7 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
                 releasedAtAbsoluteWeek: pastProject.releasedAtAbsoluteWeek,
                 projectDetails: (pastProject as any).projectDetails || {
                     title: pastProject.name,
-                    type: pastProject.type || 'MOVIE',
+                    type: pastProjectType,
                     description: pastProject.description || '',
                     studioId: studio.id,
                     subtype: pastProject.subtype || 'STANDALONE',
@@ -394,6 +399,7 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
     const handleStartWritingSequel = (writer: Writer | null, title: string, isSpinoff: boolean) => {
         if (!sequelSetupProject) return;
         const project = sequelSetupProject.project;
+        const sourceProjectType = resolveProjectType(project.projectType, project.type, project.projectDetails?.type);
         const updatedStudio = { ...studio };
         if (!updatedStudio.studioState) return;
         const continuation = createContinuationScript({
@@ -485,7 +491,7 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
         const lockedFundRecord = (studio.studioState?.lockedStreamingFunds || []).find((fund: any) =>
             fund.sourceProjectId === project.id || fund.sourceProjectId === details.id || fund.sourceProjectId === sourceHiddenStats.nextSeasonFundingSourceProjectId
         );
-        const lockedStreamingFunding = !isSpinoff && (project.type || details.type) === 'SERIES' && (sourceFundingAmount > 0 || lockedFundRecord)
+        const lockedStreamingFunding = !isSpinoff && sourceProjectType === 'SERIES' && (sourceFundingAmount > 0 || lockedFundRecord)
             ? {
                 id: lockedFundRecord?.id || `stream_fund_${project.id}_${Date.now()}`,
                 platformId: lockedFundRecord?.platformId || sourceFundingPlatformId || 'STREAMING_PLATFORM',
@@ -504,7 +510,7 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
         const newScript: Script = {
             ...continuation.script,
             logline: randomLogline,
-            projectType: isSpinoff ? (project.type === 'MOVIE' ? 'SERIES' : 'MOVIE') : (project.type || 'MOVIE'),
+            projectType: isSpinoff ? (sourceProjectType === 'MOVIE' ? 'SERIES' : 'MOVIE') : sourceProjectType,
             targetAudience: project.projectDetails?.targetAudience || project.targetAudience || 'PG-13',
             genres: [project.genre || 'ACTION'],
             quality: writer ? writer.skill : 50,
@@ -1213,7 +1219,8 @@ const StudioFinanceView: React.FC<{
     onExit: () => void;
 }> = ({ player, studio, onBack, onUpdatePlayer, onExit }) => {
     const [showFinanceModal, setShowFinanceModal] = useState(false);
-    const [showExitModal, setShowExitModal] = useState<'SELL' | 'LIQUIDATE' | null>(null);
+    const [showExitModal, setShowExitModal] = useState<'LIQUIDATE' | null>(null);
+    const [showSaleRoom, setShowSaleRoom] = useState(false);
     const [ledgerRange, setLedgerRange] = useState<'12W' | '52W' | 'ALL'>('12W');
     const [visibleLedgerEntries, setVisibleLedgerEntries] = useState(12);
     const language = getPlayerLanguage(player);
@@ -1311,30 +1318,12 @@ const StudioFinanceView: React.FC<{
         return `$${val.toLocaleString()}`;
     };
 
-    const sellCheck = sellBusiness(studio, language);
     const liquidateCheck = liquidateBusiness(studio, language);
 
     const executeExit = () => {
         if (!showExitModal) return;
 
-        if (showExitModal === 'SELL') {
-            const res = sellBusiness(studio, language);
-            if (!res.success) {
-                alert(res.msg);
-                setShowExitModal(null);
-                return;
-            }
-            const updatedBusinesses = player.businesses.filter(b => b.id !== studio.id);
-            const newMoney = player.money + res.payout;
-            onUpdatePlayer({ 
-                ...player, 
-                money: newMoney, 
-                businesses: updatedBusinesses,
-                logs: [...player.logs, { week: player.currentWeek, year: player.age, message: res.msg, type: 'positive' }]
-            });
-            onExit();
-        } 
-        else if (showExitModal === 'LIQUIDATE') {
+        if (showExitModal === 'LIQUIDATE') {
             const res = liquidateBusiness(studio, language);
             const updatedBusinesses = player.businesses.filter(b => b.id !== studio.id);
             const newMoney = player.money + res.payout;
@@ -1547,22 +1536,11 @@ const StudioFinanceView: React.FC<{
                     <div className="relative z-10">
                         <h3 className="font-bold text-white text-sm uppercase tracking-wide mb-4 flex items-center gap-2"><LogOut size={16} className="text-red-500"/> {tr('services.business.productionFinance.exit.title')}</h3>
                         <div className="space-y-3">
-                            {/* Sell Option */}
-                            <button 
-                                onClick={() => setShowExitModal('SELL')} 
-                                disabled={!sellCheck.success}
-                                className={`w-full p-4 rounded-xl border flex flex-col gap-1 transition-all ${
-                                    sellCheck.success 
-                                    ? 'bg-emerald-900/20 border-emerald-500/50 hover:bg-emerald-900/40 text-left' 
-                                    : 'bg-zinc-900/50 border-zinc-800 opacity-60 cursor-not-allowed text-center'
-                                }`}
-                            >
-                                <div className="flex justify-between items-center w-full">
-                                    <div className={`font-bold text-sm ${sellCheck.success ? 'text-emerald-400' : 'text-zinc-500'}`}>{tr('services.business.productionFinance.exit.sellStudio')}</div>
-                                    {sellCheck.success && <div className="text-xs font-mono font-bold text-white">{tr('services.business.productionFinance.exit.estimated', { amount: formatMoney(sellCheck.payout) })}</div>}
-                                </div>
-                                {!sellCheck.success && <div className="text-[10px] text-zinc-500 font-normal">{sellCheck.msg}</div>}
-                            </button>
+                            <StudioSaleEntryCard
+                                player={player}
+                                studio={studio}
+                                onOpen={() => setShowSaleRoom(true)}
+                            />
                             
                             {/* Liquidate Option */}
                             <button 
@@ -1597,13 +1575,10 @@ const StudioFinanceView: React.FC<{
                              <AlertTriangle size={32} className="text-red-500"/>
                         </div>
                         <h3 className="text-2xl font-black text-white mb-2 uppercase tracking-tight">
-                            {showExitModal === 'SELL' ? tr('services.business.productionFinance.exit.sellStudio') : tr('services.business.productionFinance.exit.shutDown')}
+                            {tr('services.business.productionFinance.exit.shutDown')}
                         </h3>
                         <p className="text-sm text-zinc-400 mb-6 leading-relaxed">
-                            {showExitModal === 'SELL' 
-                                ? tr('services.business.productionFinance.exit.confirmSell', { studioName: studio.name })
-                                : tr('services.business.productionFinance.exit.confirmLiquidate')
-                            }
+                            {tr('services.business.productionFinance.exit.confirmLiquidate')}
                         </p>
                         
                         <div className="bg-black/40 p-4 rounded-xl border border-zinc-800 mb-6">
@@ -1612,16 +1587,16 @@ const StudioFinanceView: React.FC<{
                                 <span className={studio.balance >= 0 ? 'text-white' : 'text-rose-500'}>{formatMoney(studio.balance)}</span>
                             </div>
                             <div className="flex justify-between items-center mb-2 text-xs">
-                                <span className="text-zinc-500 font-bold uppercase">{showExitModal === 'SELL' ? tr('services.business.productionFinance.exit.valuation') : tr('services.business.productionFinance.exit.scrapValue')}</span>
+                                <span className="text-zinc-500 font-bold uppercase">{tr('services.business.productionFinance.exit.scrapValue')}</span>
                                 <span className="text-white">
-                                    {showExitModal === 'SELL' ? formatMoney(studio.stats.valuation) : formatMoney(liquidateCheck.payout - studio.balance)}
+                                    {formatMoney(liquidateCheck.payout - studio.balance)}
                                 </span>
                             </div>
                             <div className="border-t border-zinc-700 my-2"></div>
                             <div className="flex justify-between items-center text-sm font-bold">
                                 <span className="text-white uppercase">{tr('services.business.productionFinance.exit.netPayout')}</span>
-                                <span className={showExitModal === 'SELL' ? 'text-emerald-400' : 'text-zinc-200'}>
-                                    {showExitModal === 'SELL' ? formatMoney(sellCheck.payout) : formatMoney(liquidateCheck.payout)}
+                                <span className="text-zinc-200">
+                                    {formatMoney(liquidateCheck.payout)}
                                 </span>
                             </div>
                         </div>
@@ -1633,6 +1608,15 @@ const StudioFinanceView: React.FC<{
                     </div>
                 </div>
             )}
+            {showSaleRoom ? (
+                <StudioSaleRoom
+                    player={player}
+                    studio={studio}
+                    onBack={() => setShowSaleRoom(false)}
+                    onUpdatePlayer={onUpdatePlayer}
+                    onSold={onExit}
+                />
+            ) : null}
         </div>
     );
 };
@@ -1687,6 +1671,13 @@ function sortStudioArchiveByRecent(a: any, b: any) {
 type FilmographySort = 'RECENT' | 'RATING' | 'REVENUE' | 'PROFIT';
 type FilmographyFilter = 'ALL' | 'MOVIE' | 'SERIES' | 'THEATRICAL' | 'STREAMING' | 'FRANCHISE';
 
+const getStudioArchiveProjectType = (project: any) => resolveProjectType(
+    project?.projectType,
+    project?.type,
+    project?.projectDetails?.type,
+    project?.mediaType
+);
+
 const StudioFilmographyView: React.FC<{
     projects: any[];
     studio: Business;
@@ -1698,10 +1689,10 @@ const StudioFilmographyView: React.FC<{
     const [filterMode, setFilterMode] = useState<FilmographyFilter>('ALL');
     const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
 
-    const filteredProjects = useMemo(() => {
-        const filtered = projects.filter(project => {
-            if (filterMode === 'MOVIE') return project.type === 'MOVIE' || project.projectDetails?.type === 'MOVIE';
-            if (filterMode === 'SERIES') return project.type === 'SERIES' || project.projectDetails?.type === 'SERIES';
+	    const filteredProjects = useMemo(() => {
+	        const filtered = projects.filter(project => {
+	            if (filterMode === 'MOVIE') return getStudioArchiveProjectType(project) === 'MOVIE';
+	            if (filterMode === 'SERIES') return getStudioArchiveProjectType(project) === 'SERIES';
             if (filterMode === 'THEATRICAL') return project.phase === 'IN THEATERS' || project.distributionPhase === 'THEATRICAL';
             if (filterMode === 'STREAMING') return project.phase === 'STREAMING' || project.distributionPhase === 'STREAMING' || !!project.streamingRevenue || !!project.views;
             if (filterMode === 'FRANCHISE') return !!(project.franchiseId || project.universeId || project.projectDetails?.franchiseId || project.projectDetails?.universeId);
@@ -1831,10 +1822,10 @@ const getArchiveStatusLabel = (status: string, language: GameLanguage) => {
 };
 
 const FilmographyProjectRow: React.FC<{ project: any; language: GameLanguage; onClick: () => void }> = ({ project, language, onClick }) => {
-    const revenue = getStudioArchiveRevenue(project);
-    const profit = getStudioArchiveProfit(project);
-    const rating = getStudioArchiveRating(project);
-    const type = project.type || project.projectDetails?.type || 'MOVIE';
+	    const revenue = getStudioArchiveRevenue(project);
+	    const profit = getStudioArchiveProfit(project);
+	    const rating = getStudioArchiveRating(project);
+	    const type = getStudioArchiveProjectType(project);
     const genre = project.genre || project.projectDetails?.genre || 'Studio';
     const status = project.phase || (project.distributionPhase === 'STREAMING' ? 'STREAMING' : project.distributionPhase === 'THEATRICAL' ? 'IN THEATERS' : 'RELEASED');
     const releaseLabel = getProjectReleaseLabel(project, {}, { emptyLabel: 'Now' });

@@ -126,8 +126,9 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
       setContractViewData(null);
   };
 
-  const handleOpenContract = () => {
-      if (!selectedMessage) return;
+	  const handleOpenContract = () => {
+	      if (!selectedMessage) return;
+	      if (selectedMessage.isExpired) return;
 
       if (selectedMessage.type === 'OFFER_NEGOTIATION') {
           const data = selectedMessage.data as NegotiationData;
@@ -166,8 +167,9 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
       }
   };
 
-  const handleSignDeal = () => {
-      if (isProcessing || !selectedMessage) return;
+	  const handleSignDeal = () => {
+	      if (isProcessing || !selectedMessage) return;
+	      if (selectedMessage.isExpired) return;
       const needsCollabSigningEnergy = selectedMessage.type === 'OFFER_SPONSORSHIP'
           || selectedMessage.type === 'OFFER_YOUTUBE_COLLAB'
           || selectedMessage.type === 'OFFER_YOUTUBE_BRAND'
@@ -340,10 +342,17 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                                             <div className="min-w-0 truncate font-bold text-slate-900">{msg.sender}</div>
                                             <div className="flex shrink-0 items-center gap-1 text-[10px] font-mono text-slate-400">
                                                 <span>W{msg.weekSent}</span>
-                                                {typeof msg.expiresIn === 'number' && (
-                                                    <>
-                                                        <span className="text-slate-300">•</span>
-                                                        <span className={`font-sans font-semibold ${msg.expiresIn <= 1 ? 'text-rose-500' : 'text-amber-500'}`}>
+	                                                {msg.isExpired ? (
+	                                                    <>
+	                                                        <span className="text-slate-300">•</span>
+	                                                        <span className="font-sans font-black uppercase tracking-wider text-rose-500">
+	                                                            Expired
+	                                                        </span>
+	                                                    </>
+	                                                ) : typeof msg.expiresIn === 'number' && (
+	                                                    <>
+	                                                        <span className="text-slate-300">•</span>
+	                                                        <span className={`font-sans font-semibold ${msg.expiresIn <= 1 ? 'text-rose-500' : 'text-amber-500'}`}>
                                                             {tr('messages.weeksLeft', { count: msg.expiresIn })}
                                                         </span>
                                                     </>
@@ -364,9 +373,14 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
             )}
 
             {/* MESSAGE DETAIL */}
-            {selectedMessage && (
-                <div className="p-4 pb-24">
-                    {selectedMessage.type === 'STUDIO_ACQUISITION' ? (
+	            {selectedMessage && (
+	                <div className="p-4 pb-24">
+	                    {selectedMessage.isExpired && (
+	                        <div className="mb-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">
+	                            This offer has expired. It is kept here briefly so you can see what was missed.
+	                        </div>
+	                    )}
+	                    {selectedMessage.type === 'STUDIO_ACQUISITION' ? (
                         <div className={`overflow-hidden rounded-3xl border shadow-xl ${selectedMessage.data?.decision === 'ACCEPTED'
                             ? 'border-emerald-300 bg-emerald-950 text-white'
                             : selectedMessage.data?.decision === 'REJECTED'
@@ -1246,11 +1260,11 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                                                         )}
                                                     </div>
 
-                                                    <button 
-                                                        onClick={handleOpenContract}
-                                                        disabled={!hasValidContract}
-                                                        className="w-full py-4 bg-white text-slate-900 rounded-xl font-bold text-sm hover:bg-slate-100 transition-colors shadow-lg flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                                    >
+	                                                    <button 
+	                                                        onClick={handleOpenContract}
+	                                                        disabled={!hasValidContract || selectedMessage.isExpired}
+	                                                        className="w-full py-4 bg-white text-slate-900 rounded-xl font-bold text-sm hover:bg-slate-100 transition-colors shadow-lg flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
+	                                                    >
                                                         <CheckCircle size={18}/> {selectedMessage.type === 'OFFER_AUDITION' ? tr('messages.reviewAudition') : tr('messages.reviewContract')}
                                                     </button>
                                                 </>
@@ -1270,13 +1284,13 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                                         <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-emerald-200/25 bg-white/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-emerald-50">
                                             <Zap size={13} /> Signing Focus {collaborationSigningEnergyCost}E
                                         </div>
-                                        <button
-                                            onClick={handleSignDeal}
-                                            disabled={!hasCollabSigningEnergy || isProcessing}
-                                            className="w-full py-4 bg-emerald-500 text-white rounded-xl font-bold text-sm disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/40"
-                                        >
-                                            {hasCollabSigningEnergy ? tr('messages.acceptDeal') : `Need ${collaborationSigningEnergyCost}E`}
-                                        </button>
+	                                        <button
+	                                            onClick={handleSignDeal}
+	                                            disabled={selectedMessage.isExpired || !hasCollabSigningEnergy || isProcessing}
+	                                            className="w-full py-4 bg-emerald-500 text-white rounded-xl font-bold text-sm disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/40"
+	                                        >
+	                                            {selectedMessage.isExpired ? 'Expired' : hasCollabSigningEnergy ? tr('messages.acceptDeal') : `Need ${collaborationSigningEnergyCost}E`}
+	                                        </button>
                                     </div>
                                 </div>
                             )}

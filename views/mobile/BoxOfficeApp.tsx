@@ -278,8 +278,8 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
           breakdown.regionBreakdowns.forEach(region => {
               const current = totals.get(region.regionId) || {
                   id: region.regionId,
-                  label: region.regionLabel,
-                  shortLabel: region.regionShortLabel,
+                  label: getBoxOfficeRegionLabel(language, region.regionId as BoxOfficeRegionId),
+                  shortLabel: getBoxOfficeRegionShortLabel(language, region.regionId as BoxOfficeRegionId),
                   views: 0,
                   revenue: 0
               };

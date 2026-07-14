@@ -54,6 +54,12 @@ type I18nKey = Parameters<typeof t>[1];
 type DeskStage = 'ENTRY' | 'OFFER' | 'FUNDING' | 'REVIEW';
 type FundingPurpose = 'DILIGENCE' | 'OFFER';
 type ClosingStepId = 'PURCHASE_AGREEMENT' | 'ASSETS_LIABILITIES' | 'OWNERSHIP_TRANSFER';
+type AcquisitionRequirementPrompt = {
+    title: string;
+    message: string;
+    detail: string;
+    actionLabel?: string;
+};
 
 interface StudioAcquisitionDeskProps {
     player: Player;
@@ -265,11 +271,11 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
     const [contractPage, setContractPage] = React.useState(0);
     const [stampDropped, setStampDropped] = React.useState(false);
     const [signedAcquisitionLocked, setSignedAcquisitionLocked] = React.useState(false);
+    const [isSigningAcquisition, setIsSigningAcquisition] = React.useState(false);
     const [stockControlComplete, setStockControlComplete] = React.useState(stockControlClosing);
     const [selectedOperatingModel, setSelectedOperatingModel] = React.useState<SubsidiaryOperatingModel | null>(null);
-    const signingTimerRef = React.useRef<ReturnType<typeof window.setInterval> | null>(null);
-    const signingCompleteRef = React.useRef(false);
-    const signingSubmitQueuedRef = React.useRef(false);
+    const [requirementPrompt, setRequirementPrompt] = React.useState<AcquisitionRequirementPrompt | null>(null);
+    const signingActionInFlightRef = React.useRef(false);
 
     const offerPresets = getOfferPresets({ profile, acquisitionCase, minorityPercent });
     const offerAmount = Number(offerAmountInput.replace(/[^\d.]/g, '')) || 0;
@@ -328,6 +334,23 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
     const finalFundingLabel = responseOffer?.funding.source === 'STUDIO'
         ? player.businesses.find(business => business.id === responseOffer.funding.businessId)?.name || tr('studioAcquisitionDesk.funding.studioCapital')
         : tr('studioAcquisitionDesk.funding.personalWealth');
+    const signingFundingOptions = responseOffer
+        ? getFundingOptions({
+            player,
+            profile,
+            amount: finalPrice,
+            expenseType: 'OFFER',
+            language,
+        })
+        : [];
+    const signingFundingOption = responseOffer
+        ? signingFundingOptions.find(option => (
+            option.source === responseOffer.funding.source
+            && (responseOffer.funding.source === 'PERSONAL' || option.businessId === responseOffer.funding.businessId)
+        ))
+        : undefined;
+    const hasSigningFunding = Boolean(signingFundingOption?.affordable);
+    const signingFundingShortfall = Math.max(0, finalPrice - (signingFundingOption?.balance || 0));
     const signatoryName = player.name?.trim() || tr('studioAcquisitionDesk.contract.studioOwner');
     const contractSerial = `${profile.id.replace(/[^A-Z0-9]/g, '').slice(0, 4)}-${player.currentWeek}-${Math.max(0, Math.round(finalPrice / 1_000_000))}`;
     const acceptedContractMode = acquisitionCase?.status === 'ACCEPTED' && Boolean(responseOffer && sellerResponse);
@@ -423,6 +446,26 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
     const contractSigned = signedAcquisitionLocked || acquisitionCase?.status === 'ACQUIRED';
     const acquiredStudio = player.businesses.find(business => business.id === profile.id);
     const configuredOperatingModel = acquiredStudio?.studioState?.operatingModel;
+    const signingRequirementChecks = [
+        {
+            id: 'funding',
+            label: 'Funds',
+            value: hasSigningFunding ? 'Ready' : signingFundingOption ? `Short ${formatMoney(signingFundingShortfall)}` : 'Missing',
+            met: hasSigningFunding,
+        },
+        {
+            id: 'energy',
+            label: 'Energy',
+            value: `${player.energy.current}/${signingEnergyCost}E`,
+            met: hasSigningEnergy,
+        },
+        {
+            id: 'terms',
+            label: 'Terms',
+            value: acceptedContractMode ? 'Accepted' : contractSigned ? 'Signed' : 'Not ready',
+            met: acceptedContractMode || contractSigned,
+        },
+    ];
     const takeoverPercent = Math.max(0, Math.min(100, Math.round(((boundedContractPage + (boundedContractPage === contractPages.length - 1 ? signingProgress / 100 : 0)) / contractPages.length) * 100)));
     const activeStageLabel = boundedContractPage === contractPages.length - 1
         ? (signingProgress > 0 ? tr('studioAcquisitionDesk.contract.signaturePressure') : tr('studioAcquisitionDesk.contract.sealReady'))
@@ -434,10 +477,6 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
         { label: tr('studioAcquisitionDesk.takeover.controlTransfer'), value: contractSigned ? tr('studioAcquisitionDesk.contract.studioAcquired') : `${Math.round(signingProgress)}%`, state: contractSigned ? 'COMPLETE' : boundedContractPage === 3 ? 'LIVE' : 'QUEUED' },
     ];
 
-    React.useEffect(() => () => {
-        if (signingTimerRef.current) window.clearInterval(signingTimerRef.current);
-    }, []);
-
     const toggleCommitment = (commitmentId: AcquisitionCommitmentId) => {
         setSelectedCommitments(current => (
             current.includes(commitmentId)
@@ -446,6 +485,11 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
         ));
         setFeedback(null);
     };
+
+    const showAcquisitionRequirement = React.useCallback((prompt: AcquisitionRequirementPrompt) => {
+        setRequirementPrompt(prompt);
+        setFeedback(prompt.message);
+    }, []);
 
     const applyQuickFill = (preset: 'CONSERVATIVE' | 'FAIR' | 'AGGRESSIVE') => {
         const multiplier = preset === 'CONSERVATIVE' ? 0.88 : preset === 'AGGRESSIVE' ? 1.15 : 1;
@@ -567,44 +611,116 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
 
     const openSigningRoom = () => {
         if (!allClosingStepsReviewed) {
-            setFeedback(tr('studioAcquisitionDesk.feedback.reviewBeforeSigningRoom'));
+            showAcquisitionRequirement({
+                title: 'Closing checklist incomplete',
+                message: tr('studioAcquisitionDesk.feedback.reviewBeforeSigningRoom'),
+                detail: 'Stamp Purchase Agreement, Assets + Liabilities, and Ownership Transfer before entering the final signing room.',
+                actionLabel: 'Review Documents',
+            });
             return;
         }
         if (!hasSigningEnergy) {
-            setFeedback(`Need ${signingEnergyCost} energy to enter the final signing room.`);
+            showAcquisitionRequirement({
+                title: `Need ${signingEnergyCost} energy`,
+                message: `You need ${signingEnergyCost} energy to enter the final signing room.`,
+                detail: `Current energy: ${player.energy.current}/${player.energy.max}. Recover energy, then come back and tap the signing-room button again.`,
+                actionLabel: 'Got It',
+            });
             return;
         }
         setStampDropped(false);
         setSignedAcquisitionLocked(false);
         setSigningProgress(0);
         setContractPage(0);
-        signingCompleteRef.current = false;
-        signingSubmitQueuedRef.current = false;
+        setIsSigningAcquisition(false);
+        signingActionInFlightRef.current = false;
         setSigningRoomOpen(true);
     };
 
     const signAcquisition = () => {
-        if (!signingSubmitQueuedRef.current) return;
+        if (!canSignContract) {
+            showAcquisitionRequirement({
+                title: 'Not ready to sign',
+                message: tr('studioAcquisitionDesk.feedback.reviewBeforeSigning'),
+                detail: 'Move through every contract page and stamp the closing documents first. Once the packet is complete, the tap-to-sign control will file the transfer.',
+                actionLabel: 'Finish Review',
+            });
+            return;
+        }
+        if (!hasSigningEnergy) {
+            showAcquisitionRequirement({
+                title: `Need ${signingEnergyCost} energy`,
+                message: `You need ${signingEnergyCost} energy to sign the studio transfer.`,
+                detail: `Current energy: ${player.energy.current}/${player.energy.max}. The deal is still safe; recover energy and tap to sign again.`,
+                actionLabel: 'Got It',
+            });
+            return;
+        }
+        if (!hasSigningFunding) {
+            const fundingMissing = !signingFundingOption;
+            showAcquisitionRequirement({
+                title: fundingMissing ? 'Funding source missing' : 'Funding shortfall',
+                message: fundingMissing
+                    ? 'The original funding source is no longer available.'
+                    : tr('studioAcquisitionDesk.feedback.closeInsufficientFunds'),
+                detail: fundingMissing
+                    ? `Selected source: ${finalFundingLabel}. Required at closing: ${formatMoney(finalPrice)}. Re-open the acquisition offer and pick a valid funding source.`
+                    : `Selected source: ${finalFundingLabel}. Available: ${formatMoney(signingFundingOption.balance)}. Required at closing: ${formatMoney(finalPrice)}. Short by ${formatMoney(signingFundingShortfall)}.`,
+                actionLabel: fundingMissing ? 'Got It' : 'Check Funds',
+            });
+            return;
+        }
+        if (signingActionInFlightRef.current || isSigningAcquisition || contractSigned) return;
+        signingActionInFlightRef.current = true;
+        setIsSigningAcquisition(true);
+        setFeedback(null);
+        setSigningProgress(100);
+        setStampDropped(true);
         const result = onCompleteAcquisition();
         if (result.success) {
-            setStampDropped(true);
             setSignedAcquisitionLocked(true);
-            setSigningProgress(100);
             setContractPage(contractPages.length - 1);
             setSigningRoomOpen(true);
             setFeedback(tr('studioAcquisitionDesk.feedback.documentsSigned'));
+            setIsSigningAcquisition(false);
             return;
         }
-        signingCompleteRef.current = false;
-        signingSubmitQueuedRef.current = false;
+        signingActionInFlightRef.current = false;
         setStampDropped(false);
         setSignedAcquisitionLocked(false);
         setSigningProgress(0);
-        setFeedback(result.reason === 'INSUFFICIENT_FUNDS'
+        setIsSigningAcquisition(false);
+        const failureMessage = result.reason === 'INSUFFICIENT_FUNDS'
             ? tr('studioAcquisitionDesk.feedback.closeInsufficientFunds')
             : result.reason === 'MINORITY_NOT_OWNERSHIP'
                 ? tr('studioAcquisitionDesk.feedback.minorityNotOwnership')
-                : tr('studioAcquisitionDesk.feedback.notReadyToSign'));
+                : result.reason === 'FUNDING_SOURCE_UNAVAILABLE'
+                    ? 'The original funding source is no longer available.'
+                    : result.reason === 'ALREADY_OWNED'
+                        ? tr('studioAcquisitionDesk.feedback.alreadyOwned')
+                        : tr('studioAcquisitionDesk.feedback.notReadyToSign');
+        showAcquisitionRequirement({
+            title: result.reason === 'INSUFFICIENT_FUNDS'
+                ? 'Funding shortfall'
+                : result.reason === 'MINORITY_NOT_OWNERSHIP'
+                    ? 'Minority stake only'
+                    : result.reason === 'FUNDING_SOURCE_UNAVAILABLE'
+                        ? 'Funding source missing'
+                        : result.reason === 'ALREADY_OWNED'
+                            ? 'Already acquired'
+                            : 'Transfer blocked',
+            message: failureMessage,
+            detail: result.reason === 'INSUFFICIENT_FUNDS'
+                ? `Selected source: ${finalFundingLabel}. Required at closing: ${formatMoney(finalPrice)}. Add cash/capital or use a valid funding source before signing.`
+                : result.reason === 'MINORITY_NOT_OWNERSHIP'
+                    ? 'A minority investment gives you shares, but it cannot create a fully owned studio in your group.'
+                    : result.reason === 'FUNDING_SOURCE_UNAVAILABLE'
+                        ? 'The studio or personal funding source chosen for this offer is unavailable now. Re-open the acquisition offer and pick a valid funding source.'
+                        : result.reason === 'ALREADY_OWNED'
+                            ? `${profile.name} is already inside your owned studio group.`
+                            : 'The seller terms, accepted offer, or closing packet is no longer valid. Review the acquisition file before trying again.',
+            actionLabel: result.reason === 'INSUFFICIENT_FUNDS' ? 'Check Funds' : 'Got It',
+        });
     };
 
     const completeStockControlTransfer = () => {
@@ -623,45 +739,6 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
             : tr('studioAcquisitionDesk.feedback.majorityRequired'));
     };
 
-    const stopSigningHold = (reset = true) => {
-        if (signingTimerRef.current) {
-            window.clearInterval(signingTimerRef.current);
-            signingTimerRef.current = null;
-        }
-        if (reset && !signingCompleteRef.current) setSigningProgress(0);
-    };
-
-    const startSigningHold = () => {
-        if (!canSignContract) {
-            setFeedback(tr('studioAcquisitionDesk.feedback.reviewBeforeSigning'));
-            return;
-        }
-        if (signingTimerRef.current || signingCompleteRef.current) return;
-        signingCompleteRef.current = false;
-        signingSubmitQueuedRef.current = false;
-        setFeedback(null);
-        setSigningProgress(0);
-        signingTimerRef.current = window.setInterval(() => {
-            setSigningProgress(current => {
-                const next = Math.min(100, current + 5);
-                if (next >= 100) {
-                    signingCompleteRef.current = true;
-                    setStampDropped(true);
-                    if (signingTimerRef.current) {
-                        window.clearInterval(signingTimerRef.current);
-                        signingTimerRef.current = null;
-                    }
-                    if (!signingSubmitQueuedRef.current) {
-                        signingSubmitQueuedRef.current = true;
-                        window.setTimeout(signAcquisition, 560);
-                    }
-                    return 100;
-                }
-                return next;
-            });
-        }, 45);
-    };
-
     return (
         <div
             role="dialog"
@@ -672,6 +749,60 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
             <div className="Cinematic Acquisition Screen pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(245,158,11,0.18),transparent_30%),radial-gradient(circle_at_78%_22%,rgba(16,185,129,0.12),transparent_28%),radial-gradient(circle_at_50%_100%,rgba(120,53,15,0.28),transparent_42%),linear-gradient(180deg,#0f0b07_0%,#050506_58%,#020202_100%)]" />
             <div className="pointer-events-none absolute left-1/2 top-0 h-32 w-[min(760px,90vw)] -translate-x-1/2 rounded-full bg-amber-300/10 blur-3xl" />
             <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-[linear-gradient(0deg,rgba(0,0,0,0.82),transparent)]" />
+
+            <AnimatePresence>
+                {requirementPrompt ? (
+                    <motion.div
+                        key="acquisition-requirement-prompt"
+                        role="alertdialog"
+                        aria-modal="true"
+                        aria-labelledby="acquisition-requirement-title"
+                        aria-describedby="acquisition-requirement-detail"
+                        className="absolute inset-0 z-[70] flex items-center justify-center bg-black/68 px-4 backdrop-blur-sm"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                    >
+                        <motion.div
+                            initial={{ opacity: 0, y: 18, scale: 0.96 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: 10, scale: 0.98 }}
+                            transition={{ type: 'spring', stiffness: 360, damping: 30 }}
+                            className="w-full max-w-sm overflow-hidden rounded-[28px] border-2 border-amber-200/60 bg-[linear-gradient(145deg,#1c0f08_0%,#090504_68%,#030202_100%)] text-white shadow-[0_22px_0_#020101,0_32px_90px_rgba(0,0,0,0.62),inset_0_1px_0_rgba(255,236,179,0.14)]"
+                        >
+                            <div className="border-b border-amber-200/15 p-5">
+                                <div className="flex items-start gap-3">
+                                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-amber-200/35 bg-amber-300/12 text-amber-200 shadow-[0_0_24px_rgba(245,158,11,0.16)]">
+                                        <AlertTriangle size={22} strokeWidth={2.8} />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <div className="text-[8px] font-black uppercase tracking-[0.24em] text-amber-300">Signing Requirement</div>
+                                        <h3 id="acquisition-requirement-title" className="mt-1 text-xl font-black uppercase leading-none tracking-[-0.04em] text-white">
+                                            {requirementPrompt.title}
+                                        </h3>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="p-5">
+                                <p className="text-sm font-black leading-snug text-amber-50">
+                                    {requirementPrompt.message}
+                                </p>
+                                <p id="acquisition-requirement-detail" className="mt-3 rounded-2xl border border-white/10 bg-black/30 p-3 text-[11px] font-bold leading-relaxed text-zinc-300">
+                                    {requirementPrompt.detail}
+                                </p>
+                                <button
+                                    type="button"
+                                    autoFocus
+                                    onClick={() => setRequirementPrompt(null)}
+                                    className="mt-5 flex min-h-12 w-full cursor-pointer items-center justify-center rounded-2xl bg-[#d8ab3c] px-4 text-[10px] font-black uppercase tracking-[0.18em] text-black shadow-[0_7px_0_#7a4a0a] transition-transform active:translate-y-1 active:shadow-[0_3px_0_#7a4a0a]"
+                                >
+                                    {requirementPrompt.actionLabel || 'Got It'}
+                                </button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                ) : null}
+            </AnimatePresence>
 
             <header className="Deal Room Viewport relative z-10 shrink-0 border-b border-amber-400/15 bg-[radial-gradient(circle_at_top_right,rgba(245,158,11,0.12),transparent_42%),linear-gradient(180deg,rgba(17,16,12,0.94)_0%,rgba(8,8,8,0.86)_100%)] px-4 pb-3 pt-6 shadow-[0_18px_60px_rgba(0,0,0,0.28)] backdrop-blur-xl sm:pt-8">
                 <div className="mx-auto w-full max-w-6xl">
@@ -1692,9 +1823,9 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.98 }}
                         transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
-                        className="Deal Theater Closing Ritual Fixed Acquisition Viewport Cinematic Acquisition Screen fixed inset-0 z-[9999] overflow-y-auto bg-[#070402] text-white custom-scrollbar"
+                        className="Deal Theater Closing Ritual Fixed Acquisition Viewport Cinematic Acquisition Screen fixed inset-0 z-[9999] overflow-y-auto bg-[radial-gradient(circle_at_50%_-18%,#7a420f_0%,#241205_31%,#070402_58%,#030201_100%)] text-white custom-scrollbar"
                     >
-                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_-18%,#6b3b0e_0%,#241205_32%,transparent_56%),linear-gradient(180deg,#180c04_0%,#070402_46%,#030201_100%)]" />
+                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_-18%,#6b3b0e_0%,#241205_32%,transparent_56%),radial-gradient(circle_at_18%_16%,rgba(255,214,92,0.18),transparent_28%),linear-gradient(180deg,#180c04_0%,#070402_46%,#030201_100%)]" />
                         <div className="Brass Lamp pointer-events-none absolute left-1/2 top-0 h-36 w-[min(760px,88vw)] -translate-x-1/2 rounded-b-full bg-[#ffd45a] opacity-35 blur-3xl" />
                         <div className="Mahogany Closing Table pointer-events-none absolute inset-x-0 bottom-0 h-[34vh] min-h-[240px] bg-[linear-gradient(180deg,rgba(58,25,7,0)_0%,#3b1706_26%,#1b0802_100%)]" />
                         <div className="pointer-events-none absolute inset-0 opacity-[0.045] [background-image:linear-gradient(90deg,#fff_1px,transparent_1px),linear-gradient(#fff_1px,transparent_1px)] [background-size:44px_44px]" />
@@ -1722,12 +1853,11 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
                                     </div>
                                 </div>
                                 <button
-                                    type="button"
-                                    onClick={() => {
-                                        stopSigningHold();
-                                        if (acceptedContractMode) {
-                                            onClose();
-                                            return;
+	                                    type="button"
+	                                    onClick={() => {
+	                                        if (acceptedContractMode) {
+	                                            onClose();
+	                                            return;
                                         }
                                         setSigningRoomOpen(false);
                                     }}
@@ -1866,7 +1996,7 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
                                                             <div className="Signature Tray rounded-[22px] border-2 border-emerald-300/35 bg-[#041611] p-3 sm:p-4">
                                                                 <div className="text-[7px] font-black uppercase tracking-[0.2em] text-emerald-300">Signature Line · Ink Signature</div>
                                                                 <div className="mt-3 flex min-h-16 items-center rounded-[18px] border-2 border-dashed border-emerald-300/30 bg-[#02100c] px-4 sm:min-h-20">
-                                                                    <span className="truncate font-serif text-3xl italic text-emerald-100 sm:text-4xl">{signingProgress > 0 || contractSigned ? signatoryName : 'Hold to write'}</span>
+                                                                    <span className="truncate font-serif text-3xl italic text-emerald-100 sm:text-4xl">{signingProgress > 0 || contractSigned ? signatoryName : 'Tap to write'}</span>
                                                                 </div>
                                                             </div>
                                                             <div className="Live Stamp rounded-[22px] border-2 border-amber-300/35 bg-[#2a1808] p-3 text-center sm:p-4">
@@ -1879,6 +2009,52 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
                                                 </div>
                                             </motion.div>
                                         </AnimatePresence>
+
+                                        {boundedContractPage === contractPages.length - 1 && !contractSigned ? (
+                                            <div className="Requirement Check mt-4 rounded-[22px] border-2 border-[#3a240c] bg-[#0d0704] p-3 shadow-[inset_0_1px_0_rgba(250,204,21,0.07)]">
+                                                <div className="flex items-center justify-between gap-3">
+                                                    <div className="flex min-w-0 items-center gap-2">
+                                                        <Banknote size={13} className="shrink-0 text-amber-300" />
+                                                        <div className="min-w-0">
+                                                            <div className="text-[7px] font-black uppercase tracking-[0.2em] text-amber-300">Requirement Check</div>
+                                                            <div className="mt-0.5 truncate text-[8px] font-black uppercase tracking-[0.14em] text-zinc-500">
+                                                                {finalFundingLabel} · {formatMoney(finalPrice)}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div className={`shrink-0 rounded-full border px-2.5 py-1 text-[7px] font-black uppercase tracking-[0.12em] ${
+                                                        signingRequirementChecks.every(check => check.met)
+                                                            ? 'border-emerald-300/35 bg-emerald-300/10 text-emerald-200'
+                                                            : 'border-amber-300/30 bg-amber-300/10 text-amber-200'
+                                                    }`}>
+                                                        {signingRequirementChecks.every(check => check.met) ? 'All met' : 'Needs attention'}
+                                                    </div>
+                                                </div>
+                                                <div className="mt-3 grid grid-cols-3 gap-2">
+                                                    {signingRequirementChecks.map(check => {
+                                                        const StatusIcon = check.met ? Check : AlertTriangle;
+                                                        return (
+                                                            <div
+                                                                key={check.id}
+                                                                className={`min-w-0 rounded-[16px] border px-2.5 py-2 ${
+                                                                    check.met
+                                                                        ? 'border-emerald-300/24 bg-emerald-300/[0.07] text-emerald-100'
+                                                                        : 'border-rose-300/28 bg-rose-300/[0.08] text-rose-100'
+                                                                }`}
+                                                            >
+                                                                <div className="flex items-center gap-1.5">
+                                                                    <StatusIcon size={11} strokeWidth={3} className={check.met ? 'text-emerald-300' : 'text-rose-300'} />
+                                                                    <span className="truncate text-[7px] font-black uppercase tracking-[0.12em] text-zinc-400">{check.label}</span>
+                                                                </div>
+                                                                <div className={`mt-1 truncate font-mono text-[10px] font-black ${check.met ? 'text-emerald-100' : 'text-rose-100'}`}>
+                                                                    {check.value}
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        ) : null}
 
                                         <div className="mt-4">
                                             {boundedContractPage < contractPages.length - 1 ? (
@@ -1980,24 +2156,32 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
                                                 </div>
                                             ) : (
                                                 <button
-                                                    type="button"
-                                                    aria-label="Sign & Acquire Studio"
-                                                    onPointerDown={startSigningHold}
-                                                    onPointerUp={() => stopSigningHold()}
-                                                    onPointerLeave={() => stopSigningHold()}
-                                                    onPointerCancel={() => stopSigningHold()}
-                                                    onContextMenu={(event) => event.preventDefault()}
-                                                    className="Signature Pressure Stamp Strike relative flex min-h-20 w-full cursor-pointer select-none items-center justify-between overflow-hidden rounded-[28px] border-2 border-amber-300/70 bg-[#120a04] px-5 text-left text-white shadow-[0_12px_0_#050201,0_22px_46px_rgba(0,0,0,0.42)] transition-transform active:translate-y-1 active:shadow-[0_6px_0_#050201]"
+	                                                    type="button"
+	                                                    aria-label="Sign & Acquire Studio"
+	                                                    onClick={signAcquisition}
+	                                                    onPointerUp={(event) => {
+	                                                        event.preventDefault();
+	                                                        signAcquisition();
+	                                                    }}
+	                                                    onTouchEnd={(event) => {
+	                                                        event.preventDefault();
+	                                                        signAcquisition();
+	                                                    }}
+	                                                    onContextMenu={(event) => event.preventDefault()}
+                                                    className="Signature Pressure Stamp Strike relative flex min-h-20 w-full cursor-pointer select-none items-center justify-between overflow-hidden rounded-[28px] border-2 border-amber-200/80 bg-[linear-gradient(135deg,#2c1607_0%,#120a04_46%,#050201_100%)] px-5 text-left text-white shadow-[0_12px_0_#050201,0_22px_46px_rgba(0,0,0,0.42),inset_0_1px_0_rgba(255,236,179,0.12)] transition-transform active:translate-y-1 active:shadow-[0_6px_0_#050201]"
                                                 >
                                                     <div
-                                                        className="absolute inset-y-0 left-0 bg-[#9b7423] transition-[width] duration-75"
+                                                        className="absolute inset-y-0 left-0 bg-[linear-gradient(90deg,rgba(16,185,129,0.36),rgba(250,204,21,0.46))] transition-[width] duration-300"
                                                         style={{ width: `${signingProgress}%` }}
                                                     />
+                                                    <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(255,244,196,0.18),transparent_26%),linear-gradient(90deg,rgba(255,255,255,0.07),transparent_36%)]" />
                                                     <div className="relative z-10">
-                                                        <div className="text-2xl font-black uppercase tracking-[-0.05em]">{signingProgress > 0 ? tr('studioAcquisitionDesk.contract.controlTransferring').toUpperCase() : tr('studioAcquisitionDesk.contract.holdToSign')}</div>
-                                                        <div className="mt-1 text-[8px] font-black uppercase tracking-[0.2em] text-emerald-100/70">Sign & Acquire Studio · Seal Contract</div>
+                                                        <div className="text-2xl font-black uppercase tracking-[-0.05em]">{isSigningAcquisition ? tr('studioAcquisitionDesk.contract.controlTransferring').toUpperCase() : tr('studioAcquisitionDesk.contract.holdToSign')}</div>
+                                                        <div className="mt-1 text-[8px] font-black uppercase tracking-[0.2em] text-emerald-100/70">
+                                                            {!hasSigningFunding ? 'Funding shortfall · Check funds' : hasSigningEnergy ? 'Sign & Acquire Studio · Seal Contract' : `Need ${signingEnergyCost}E to sign`}
+                                                        </div>
                                                     </div>
-                                                    <div className="relative z-10 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#d8ab3c] text-black shadow-[0_7px_0_#7a4a0a]">
+                                                    <div className="relative z-10 flex h-14 w-14 items-center justify-center rounded-2xl bg-[linear-gradient(180deg,#ffe082,#d8ab3c)] text-black shadow-[0_7px_0_#7a4a0a,0_0_24px_rgba(250,204,21,0.24)]">
                                                         <Landmark size={24} />
                                                     </div>
                                                 </button>
@@ -2036,7 +2220,7 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
                                         </div>
                                     </div>
                                     <p className="mt-4 text-[10px] font-bold leading-relaxed text-zinc-500">
-                                        {stampDropped ? 'Ownership Reveal complete. Open Studio Profile or Develop From Catalog after the closing updates.' : 'Clear every clause, then press and hold the transfer control. Release early cancels the signature.'}
+                                        {stampDropped ? 'Ownership Reveal complete. Open Studio Profile or Develop From Catalog after the closing updates.' : 'Clear every clause, then tap the transfer control. If anything is missing, the filing desk will show the exact blocker.'}
                                     </p>
                                 </aside>
                             </motion.div>

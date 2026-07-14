@@ -14,6 +14,7 @@ const expectExcludes = (source, needle, label) => {
 const types = read('types.ts');
 const mediaStorage = read('services/mediaStorage.ts');
 const posterMedia = fs.existsSync('services/customPosterMedia.ts') ? read('services/customPosterMedia.ts') : '';
+const saveCompaction = fs.existsSync('services/saveCompaction.ts') ? read('services/saveCompaction.ts') : '';
 const dashboard = read('views/lifestyle/business/components/ProjectDashboardModal.tsx');
 const productionHouse = read('views/lifestyle/business/ProductionHouseGame.tsx');
 const imdb = read('views/mobile/ImdbApp.tsx');
@@ -30,7 +31,8 @@ expectIncludes(dashboard, 'CustomPosterImage', 'dashboard renders media-backed p
 expectIncludes(productionHouse, 'CustomPosterImage', 'production house cards render media-backed posters');
 expectIncludes(imdb, 'CustomPosterImage', 'IMDb renders media-backed posters');
 expectIncludes(app, 'externalizeCustomPostersInPlayer', 'app migrates legacy base64 posters on load');
-expectIncludes(app, 'stripEmbeddedPosterImageDataForPersistence', 'app prevents duplicate poster imageData from entering saves');
+expectIncludes(saveCompaction, 'stripEmbeddedPosterImageDataForPersistence', 'save compaction prevents duplicate poster imageData from entering saves');
+expectIncludes(app, 'compactPlayerForPersistence', 'app persists through shared save compaction');
 
 const failed = checks.filter(check => !check.pass);
 if (failed.length) {

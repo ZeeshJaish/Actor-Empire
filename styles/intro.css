@@ -466,9 +466,29 @@
   .slot-bar{
     width:100%;
     padding:34px 28px 14px;
-    display:flex;align-items:center;justify-content:space-between;
+    display:flex;align-items:center;justify-content:space-between;gap:16px;
   }
   .slot-bar .kicker{color:var(--gold);font-size:11.5px;text-indent:0;letter-spacing:.34em}
+  .slot-actions{
+    display:flex;align-items:center;justify-content:flex-end;gap:12px;
+    flex:none;
+  }
+  .slot-import{
+    border:0;cursor:pointer;
+    border-radius:999px;
+    background:linear-gradient(180deg,rgba(232,182,76,.18),rgba(232,182,76,.08));
+    color:#f4d28a;
+    font-family:'Archivo',sans-serif;
+    font-size:10px;font-weight:900;letter-spacing:.18em;text-transform:uppercase;
+    padding:9px 13px;
+    display:flex;align-items:center;gap:8px;
+    box-shadow:inset 0 0 0 1px rgba(232,182,76,.28), 0 14px 28px -20px rgba(232,182,76,.65);
+    transition:background .15s ease,color .15s ease,transform .15s ease,opacity .15s ease;
+    white-space:nowrap;
+  }
+  .slot-import:hover{background:rgba(232,182,76,.2);color:#ffe6ad}
+  .slot-import:active{transform:scale(.98)}
+  .slot-import:disabled{cursor:default;opacity:.65;transform:none}
   .back-link{
     background:none;border:0;cursor:pointer;
     color:#84868c;font-family:'Archivo',sans-serif;
@@ -477,6 +497,15 @@
     display:flex;align-items:center;gap:8px;
   }
   .back-link::before{content:'←';font-size:13px;color:var(--gold)}
+  .slot-import-notice{
+    margin:-4px 28px 12px;
+    border-radius:14px;
+    background:rgba(14,165,233,.1);
+    color:#bae6fd;
+    box-shadow:inset 0 0 0 1px rgba(56,189,248,.22);
+    padding:10px 12px;
+    font-size:11px;font-weight:800;line-height:1.35;
+  }
   .slot-list{
     width:100%;padding:4px 22px;
     display:flex;flex-direction:column;gap:16px;
@@ -578,6 +607,12 @@
   #act4.on .slot-card:nth-child(1){animation:riseIn .7s var(--ease-out) .22s forwards}
   #act4.on .slot-card:nth-child(2){animation:riseIn .7s var(--ease-out) .30s forwards}
   #act4.on .slot-card:nth-child(3){animation:riseIn .7s var(--ease-out) .38s forwards}
+
+  @media (max-width:380px){
+    .slot-bar{align-items:flex-start;flex-direction:column}
+    .slot-actions{width:100%;justify-content:space-between}
+    .slot-import{padding:9px 11px;font-size:9.5px;letter-spacing:.14em}
+  }
   #act4.on .menu-foot{animation:riseIn .7s var(--ease-out) .5s forwards}
 
   /* ================================================================

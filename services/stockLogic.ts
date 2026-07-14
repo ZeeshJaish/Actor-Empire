@@ -21,19 +21,142 @@ const KNOWN_OUTSTANDING_SHARES: Record<string, number> = {
     stk_lvmh: 502_000_000,
 };
 
+const KNOWN_REFERENCE_PRICES: Record<string, number> = {
+    stk_apple: 185,
+    stk_amzn: 145,
+    stk_goog: 160,
+    stk_nflx: 620,
+    stk_dis: 110,
+    stk_wbd: 12.5,
+    stk_para: 13,
+    stk_cmcsa: 42,
+    stk_nke: 105,
+    stk_ker: 450,
+    stk_ko: 60,
+    stk_pep: 168,
+    stk_tsla: 175,
+    stk_tm: 230,
+    stk_race: 410,
+    stk_lvmh: 850,
+};
+
+const MARKET_CAP_CEILING_BY_SECTOR: Record<Stock['sector'], number> = {
+    TECH: 5_000_000_000_000,
+    MEDIA: 1_500_000_000_000,
+    FASHION: 1_000_000_000_000,
+    BEVERAGE: 750_000_000_000,
+    AUTOMOTIVE: 1_200_000_000_000,
+};
+
+const MAX_WEEKLY_PRICE_MOVE = 0.18;
+const MIN_UNKNOWN_OUTSTANDING_SHARES = 250_000_000;
+const MAX_UNKNOWN_OUTSTANDING_SHARES_RANGE = 1_750_000_000;
+
 const stableShareHash = (value: string) => Array.from(value).reduce(
     (hash, character) => ((hash * 31) + character.charCodeAt(0)) >>> 0,
     2166136261,
 );
 
-export const getStockOutstandingShares = (stock: Pick<Stock, 'id' | 'outstandingShares'>): number => (
-    Math.max(
-        1,
-        stock.outstandingShares
-        || KNOWN_OUTSTANDING_SHARES[stock.id]
-        || (250_000_000 + (stableShareHash(stock.id) % 1_750_000_000)),
-    )
+const clampFinite = (value: number, min: number, max: number) => (
+    Math.max(min, Math.min(max, Number.isFinite(value) ? value : min))
 );
+
+const roundPrice = (value: number) => Number(Math.max(0.01, value).toFixed(2));
+
+const getGeneratedOutstandingShares = (stockId: string) => (
+    MIN_UNKNOWN_OUTSTANDING_SHARES + (stableShareHash(stockId) % MAX_UNKNOWN_OUTSTANDING_SHARES_RANGE)
+);
+
+export const getStockOutstandingShares = (stock: Pick<Stock, 'id' | 'outstandingShares'>): number => {
+    const explicitShares = Number(stock.outstandingShares);
+    const knownShares = KNOWN_OUTSTANDING_SHARES[stock.id];
+
+    if (knownShares) {
+        if (Number.isFinite(explicitShares) && explicitShares >= knownShares) {
+            return Math.round(explicitShares);
+        }
+        return knownShares;
+    }
+
+    if (Number.isFinite(explicitShares) && explicitShares >= MIN_UNKNOWN_OUTSTANDING_SHARES) {
+        return Math.round(explicitShares);
+    }
+
+    return getGeneratedOutstandingShares(stock.id);
+};
+
+const getStockReferencePrice = (stock: Pick<Stock, 'id'> & Partial<Pick<Stock, 'price'>>): number => {
+    const reference = KNOWN_REFERENCE_PRICES[stock.id];
+    if (reference) return reference;
+    const current = Number(stock.price);
+    return Number.isFinite(current) && current > 0 ? current : 100;
+};
+
+export const getStockPriceCeiling = (
+    stock: Pick<Stock, 'id' | 'outstandingShares'> & Partial<Pick<Stock, 'sector' | 'price'>>,
+): number => {
+    const outstandingShares = getStockOutstandingShares(stock);
+    const referencePrice = getStockReferencePrice(stock);
+    const sectorCap = stock.sector ? MARKET_CAP_CEILING_BY_SECTOR[stock.sector] : undefined;
+    const sectorPriceCeiling = sectorCap ? sectorCap / outstandingShares : referencePrice * 8;
+    return roundPrice(Math.max(referencePrice * 6, sectorPriceCeiling, 10));
+};
+
+export const normalizeStockPrice = (
+    stock: Pick<Stock, 'id' | 'outstandingShares'> & Partial<Pick<Stock, 'sector' | 'price'>>,
+    price: number,
+): number => {
+    const referencePrice = getStockReferencePrice(stock);
+    const floor = Math.max(0.01, referencePrice * 0.04);
+    const ceiling = getStockPriceCeiling(stock);
+    const safePrice = Number.isFinite(price) && price > 0 ? price : referencePrice;
+    return roundPrice(clampFinite(safePrice, floor, ceiling));
+};
+
+export const isRunawayStockPrice = (
+    stock: Pick<Stock, 'id' | 'outstandingShares'> & Partial<Pick<Stock, 'sector' | 'price'>>,
+    price: number,
+): boolean => (
+    !Number.isFinite(price)
+    || price <= 0
+    || price > getStockPriceCeiling(stock) * 1.5
+);
+
+export const normalizeStockPriceHistory = (
+    stock: Pick<Stock, 'id' | 'outstandingShares'> & Partial<Pick<Stock, 'sector' | 'price' | 'priceHistory'>>,
+): number[] => {
+    const currentPrice = normalizeStockPrice(stock, Number(stock.price));
+    const history = (stock.priceHistory || [])
+        .map(value => normalizeStockPrice(stock, Number(value)))
+        .filter(value => Number.isFinite(value) && value > 0)
+        .slice(-20);
+    return history.length ? history : Array(12).fill(currentPrice);
+};
+
+export const getMergedStudioIds = (player?: Pick<Player, 'businesses'>): Set<string> => new Set(
+    (player?.businesses || [])
+        .filter(business => business.type === 'PRODUCTION_HOUSE' && business.studioState?.operatingModel === 'FULL_MERGER')
+        .map(business => business.id),
+);
+
+export const isStockRetiredByMerger = (
+    player: Pick<Player, 'businesses'> | undefined,
+    stock: Pick<Stock, 'relatedStudioId'>,
+): boolean => Boolean(stock.relatedStudioId && getMergedStudioIds(player).has(stock.relatedStudioId));
+
+export const getSoldStudioIds = (player?: Pick<Player, 'flags'>): Set<string> => new Set(
+    Object.keys((player?.flags?.soldStudioIds || {}) as Record<string, unknown>),
+);
+
+export const isStockRetiredBySale = (
+    player: Pick<Player, 'flags'> | undefined,
+    stock: Pick<Stock, 'relatedStudioId'>,
+): boolean => Boolean(stock.relatedStudioId && getSoldStudioIds(player).has(stock.relatedStudioId));
+
+export const getTradableStocks = <T extends Pick<Stock, 'relatedStudioId'>>(
+    stocks: T[],
+    player?: Pick<Player, 'businesses' | 'flags'>,
+): T[] => stocks.filter(stock => !isStockRetiredByMerger(player, stock) && !isStockRetiredBySale(player, stock));
 
 export interface StockTradeQuote {
     shares: number;
@@ -129,13 +252,16 @@ export const applyStockShareIssuance = (
     const issuePercent = Math.max(0.1, Math.min(25, input.issuePercent));
     const sharesIssued = Math.max(1, Math.round(oldOutstandingShares * (issuePercent / 100)));
     const newOutstandingShares = oldOutstandingShares + sharesIssued;
-    const oldPrice = Math.max(0.01, stock.price || 0.01);
+    const oldPrice = normalizeStockPrice(stock, stock.price);
     const issueDiscount = 0.03 + ((stableShareHash(`${stock.id}:${input.week}:${input.reason}`) % 5) / 100);
-    const issuePrice = oldPrice * (1 - issueDiscount);
+    const issuePrice = normalizeStockPrice(stock, oldPrice * (1 - issueDiscount));
     const capitalRaised = roundMoney(sharesIssued * issuePrice);
     const oldMarketCap = oldOutstandingShares * oldPrice;
     const newMarketCap = oldMarketCap + (capitalRaised * 0.55);
-    const newPrice = Math.max(0.01, Number((newMarketCap / newOutstandingShares).toFixed(2)));
+    const newPrice = normalizeStockPrice(
+        { ...stock, outstandingShares: newOutstandingShares },
+        newMarketCap / newOutstandingShares,
+    );
     const dilutionPercent = roundOwnershipPercent((1 - (oldOutstandingShares / newOutstandingShares)) * 100);
     const reasonLabel = getShareIssueReasonLabel(input.reason);
     const news: NewsItem = {
@@ -173,7 +299,7 @@ export const applyStockShareIssuance = (
             ...stock,
             outstandingShares: newOutstandingShares,
             price: newPrice,
-            priceHistory: [...(stock.priceHistory || []), newPrice].slice(-20),
+            priceHistory: [...normalizeStockPriceHistory(stock), newPrice].slice(-20),
             lastShareIssueWeek: input.week,
         },
     };
@@ -194,6 +320,7 @@ export const calculateStockTradeQuote = (
     const requestedShares = Math.max(0, Math.floor(Math.abs(signedShares)));
     const outstandingShares = getStockOutstandingShares(stock);
     const currentShares = Math.max(0, player.portfolio.find(item => item.stockId === stock.id)?.shares || 0);
+    const currentPrice = normalizeStockPrice(stock, stock.price);
     const shares = direction === 'BUY'
         ? Math.min(requestedShares, Math.max(0, outstandingShares - currentShares))
         : Math.min(requestedShares, currentShares);
@@ -203,15 +330,15 @@ export const calculateStockTradeQuote = (
     const ownershipDelta = shares / outstandingShares;
     const liquidityImpact = Math.min(0.12, ownershipDelta * 0.85);
     const priceImpactPercent = liquidityImpact * 100 * (direction === 'BUY' ? 1 : -1);
-    const projectedPrice = Math.max(0.01, stock.price * (1 + (priceImpactPercent / 100)));
-    const estimatedValue = shares * ((stock.price + projectedPrice) / 2);
+    const projectedPrice = normalizeStockPrice(stock, currentPrice * (1 + (priceImpactPercent / 100)));
+    const estimatedValue = shares * ((currentPrice + projectedPrice) / 2);
 
     return {
         shares,
         direction,
         currentOwnershipPercent: getStockOwnershipPercent(currentShares, stock),
         resultingOwnershipPercent: getStockOwnershipPercent(resultingShares, stock),
-        currentPrice: stock.price,
+        currentPrice,
         projectedPrice,
         priceImpactPercent,
         estimatedValue,
@@ -224,12 +351,13 @@ export const getSharesForCashOrder = (
     cashBudget: number,
 ) => {
     const budget = Math.max(0, cashBudget);
-    if (budget < stock.price) return 0;
+    const currentPrice = normalizeStockPrice(stock, stock.price);
+    if (budget < currentPrice) return 0;
     const maxBuyableShares = getAvailableStockShares(player, stock);
     if (maxBuyableShares <= 0) return 0;
 
     let low = 0;
-    let high = Math.min(maxBuyableShares, Math.max(1, Math.floor(budget / Math.max(0.01, stock.price))));
+    let high = Math.min(maxBuyableShares, Math.max(1, Math.floor(budget / currentPrice)));
     while (calculateStockTradeQuote(player, stock, high).estimatedValue <= budget) {
         if (high >= maxBuyableShares) return maxBuyableShares;
         low = high;
@@ -265,7 +393,7 @@ export const executeStockTrade = (
     if (quote.direction === 'BUY') {
         if (player.money < quote.estimatedValue) return { success: false, player, quote, reason: 'INSUFFICIENT_CASH' };
         const existingShares = holding?.shares || 0;
-        const existingInvested = holding?.totalInvested ?? (existingShares * (holding?.averageCost || stock.price));
+        const existingInvested = holding?.totalInvested ?? (existingShares * (holding?.averageCost || quote.currentPrice));
         const totalInvested = existingInvested + quote.estimatedValue;
         const nextShares = existingShares + shares;
         const nextHolding: PortfolioItem = {
@@ -287,7 +415,7 @@ export const executeStockTrade = (
                     ? {
                         ...candidate,
                         price: Number(quote.projectedPrice.toFixed(2)),
-                        priceHistory: [...candidate.priceHistory, quote.projectedPrice].slice(-20),
+                        priceHistory: [...normalizeStockPriceHistory(candidate), quote.projectedPrice].slice(-20),
                     }
                     : candidate),
                 portfolio,
@@ -305,7 +433,7 @@ export const executeStockTrade = (
     }
 
     if (!holding || holding.shares < shares) return { success: false, player, quote, reason: 'INSUFFICIENT_SHARES' };
-    const averageCost = holding.averageCost || stock.price;
+    const averageCost = holding.averageCost || quote.currentPrice;
     const nextShares = holding.shares - shares;
     const remainingInvested = Math.max(0, (holding.totalInvested ?? (holding.shares * averageCost)) - (averageCost * shares));
     const portfolio = nextShares === 0
@@ -329,7 +457,7 @@ export const executeStockTrade = (
                 ? {
                     ...candidate,
                     price: Number(quote.projectedPrice.toFixed(2)),
-                    priceHistory: [...candidate.priceHistory, quote.projectedPrice].slice(-20),
+                    priceHistory: [...normalizeStockPriceHistory(candidate), quote.projectedPrice].slice(-20),
                 }
                 : candidate),
             portfolio,
@@ -377,7 +505,10 @@ export const initializeStocks = (): Stock[] => {
     return INITIAL_STOCKS.map(s => ({
         ...s,
         outstandingShares: getStockOutstandingShares(s),
-        priceHistory: Array(12).fill(s.price).map((p, i) => p * (1 + (Math.random() * 0.1 - 0.05))), // Fake history
+        price: normalizeStockPrice(s, s.price),
+        priceHistory: Array(12)
+            .fill(s.price)
+            .map(p => normalizeStockPrice(s, p * (1 + (Math.random() * 0.1 - 0.05)))), // Fake history
         lastDividendPayoutWeek: 0
     }));
 };
@@ -407,22 +538,33 @@ const shouldIssueSharesThisWeek = (stock: Stock, week: number) => {
 export const processStockMarket = (
     stocks: Stock[],
     week: number,
-    player?: Pick<Player, 'age' | 'world'>,
+    player?: Pick<Player, 'age' | 'world' | 'businesses' | 'flags'>,
 ): MarketUpdateResult => {
     let dividendsTotal = 0;
     const notifications: string[] = [];
     const news: NewsItem[] = [];
     const corporateActions: StockCorporateAction[] = [];
     const updatedStocks = stocks.map(stock => {
-        let newPrice = stock.price;
+        const normalizedPrice = normalizeStockPrice(stock, stock.price);
+        const normalizedHistory = normalizeStockPriceHistory(stock);
+        if (isStockRetiredByMerger(player, stock) || isStockRetiredBySale(player, stock)) {
+            return {
+                ...stock,
+                outstandingShares: getStockOutstandingShares(stock),
+                price: normalizedPrice,
+                priceHistory: normalizedHistory,
+            };
+        }
+        let newPrice = normalizedPrice;
         
         // 1. Random Walk Logic
         const volatility = stock.volatility;
         const trend = (Math.random() - 0.48); // Slight bias upwards (market grows long term)
         const changePercent = trend * volatility; // e.g. 0.02 * 0.05 = 0.001 (0.1%) to 5% swings
         
-        newPrice = newPrice * (1 + changePercent);
-        newPrice = newPrice * getStudioStockPerformanceMultiplier(player, stock);
+        const rawMultiplier = (1 + changePercent) * getStudioStockPerformanceMultiplier(player, stock);
+        const boundedMultiplier = clampFinite(rawMultiplier, 1 - MAX_WEEKLY_PRICE_MOVE, 1 + MAX_WEEKLY_PRICE_MOVE);
+        newPrice = normalizeStockPrice(stock, newPrice * boundedMultiplier);
         
         // 2. Dividend Logic (Quarterly - Every 12 weeks approx)
         let lastPayout = stock.lastDividendPayoutWeek || 0;
@@ -439,8 +581,8 @@ export const processStockMarket = (
         const nextStock: Stock = {
             ...stock,
             outstandingShares: getStockOutstandingShares(stock),
-            price: Number(newPrice.toFixed(2)),
-            priceHistory: [...stock.priceHistory, newPrice].slice(-20),
+            price: newPrice,
+            priceHistory: [...normalizedHistory, newPrice].slice(-20),
             lastDividendPayoutWeek: lastPayout
         };
 
@@ -473,7 +615,12 @@ export const processStockMarket = (
 export const calculatePortfolioValue = (portfolio: PortfolioItem[], stocks: Stock[]): number => {
     return portfolio.reduce((total, item) => {
         const stock = stocks.find(s => s.id === item.stockId);
-        return total + (item.shares * (stock?.price || 0));
+        if (!stock) return total;
+        const shares = Math.min(
+            getStockOutstandingShares(stock),
+            Math.max(0, Math.floor(Number.isFinite(item.shares) ? item.shares : 0)),
+        );
+        return total + (shares * normalizeStockPrice(stock, stock.price));
     }, 0);
 };
 
@@ -505,7 +652,7 @@ export const getEstimatedAnnualDividend = (
     shares: number,
 ) => Math.floor(
     Math.max(0, shares)
-    * Math.max(0, stock.price)
+    * normalizeStockPrice(stock, stock.price)
     * Math.max(0, stock.dividendYield)
     * getStudioDividendMultiplier(player, stock),
 );
@@ -519,10 +666,11 @@ export const getDividendPayout = (
     let total = 0;
     portfolio.forEach(item => {
         const stock = stocks.find(s => s.id === item.stockId);
+        if (stock && player && (isStockRetiredByMerger(player, stock) || isStockRetiredBySale(player, stock))) return;
         if (stock && stock.dividendYield > 0 && stock.lastDividendPayoutWeek === week) {
             total += player
                 ? getEstimatedAnnualDividend(player, stock, item.shares) / 4
-                : ((stock.price * stock.dividendYield * item.shares) / 4);
+                : ((normalizeStockPrice(stock, stock.price) * stock.dividendYield * item.shares) / 4);
         }
     });
     return Math.floor(total);

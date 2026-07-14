@@ -30,9 +30,10 @@ export const ImprovePage: React.FC<ImprovePageProps> = ({ player, onEnroll, onCa
   const getActivityDescription = (activity: ImprovementActivity) => trFallback(activity.descriptionKey || `improve.activity.${activity.id}.desc`, activity.description);
   const getOptionName = (option: ImprovementOption) => trFallback(option.nameKey || `improve.option.${option.id}.name`, option.label);
   const getOptionDescription = (option: ImprovementOption) => trFallback(option.descriptionKey || `improve.option.${option.id}.desc`, option.description);
-  const getGenreTrainingName = (training: GenreTrainingOption) => trFallback(training.labelKey, training.label);
-  const getGenreTrainingDescription = (training: GenreTrainingOption) => trFallback(training.descriptionKey, training.desc);
-  const getWorkshopName = (course: Commitment) => trFallback(course.nameKey || `improve.workshop.${course.id}`, course.name);
+	  const getGenreTrainingName = (training: GenreTrainingOption) => trFallback(training.labelKey, training.label);
+	  const getGenreTrainingDescription = (training: GenreTrainingOption) => trFallback(training.descriptionKey, training.desc);
+	  const getWorkshopName = (course: Commitment) => trFallback(course.nameKey || `improve.workshop.${course.id}`, course.name);
+	  const formatWorkshopGain = (gain: number) => `+${Number(gain || 0).toFixed(1).replace(/\.0$/, '')}`;
   
   // Wellbeing State
   const [selectedCategory, setSelectedCategory] = useState<ImproveCategory>('BODY');
@@ -404,21 +405,21 @@ export const ImprovePage: React.FC<ImprovePageProps> = ({ player, onEnroll, onCa
                                               )}
                                           </div>
                                           <div className="flex flex-wrap gap-2 mt-2">
-                                              {Object.keys(course.skillGains || {}).map(skill => (
-                                                  <span key={skill} className="text-[10px] text-zinc-400 bg-zinc-800/50 px-2 py-0.5 rounded border border-white/5 capitalize">
-                                                      +{skill}
-                                                  </span>
-                                              ))}
-                                              {Object.keys(course.writerGains || {}).map(stat => (
-                                                  <span key={stat} className="text-[10px] text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20 capitalize">
-                                                      +{stat}
-                                                  </span>
-                                              ))}
-                                              {Object.keys(course.directorGains || {}).map(stat => (
-                                                  <span key={stat} className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 capitalize">
-                                                      +{stat}
-                                                  </span>
-                                              ))}
+	                                              {Object.entries(course.skillGains || {}).map(([skill, gain]) => (
+	                                                  <span key={skill} className="text-[10px] text-zinc-400 bg-zinc-800/50 px-2 py-0.5 rounded border border-white/5 capitalize">
+	                                                      {formatWorkshopGain(Number(gain))} {skill}
+	                                                  </span>
+	                                              ))}
+	                                              {Object.entries(course.writerGains || {}).map(([stat, gain]) => (
+	                                                  <span key={stat} className="text-[10px] text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20 capitalize">
+	                                                      {formatWorkshopGain(Number(gain))} {stat}
+	                                                  </span>
+	                                              ))}
+	                                              {Object.entries(course.directorGains || {}).map(([stat, gain]) => (
+	                                                  <span key={stat} className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 capitalize">
+	                                                      {formatWorkshopGain(Number(gain))} {stat}
+	                                                  </span>
+	                                              ))}
                                           </div>
                                       </div>
                                   </div>

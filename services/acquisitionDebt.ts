@@ -19,6 +19,7 @@ export interface AcquisitionDebtEntry {
     missedServiceAmount: number;
     missedPayments: number;
     lastServicedWeekKey?: string;
+    closureReason?: 'ORPHANED_STUDIO_ASSET';
 }
 
 export interface AcquisitionDebtSummary {
@@ -61,11 +62,29 @@ const getRawLedger = (player: Pick<Player, 'flags'>): AcquisitionDebtEntry[] => 
         : []
 );
 
-const getAcquiredCases = (player: Pick<Player, 'flags'>) => (
-    Array.isArray(player.flags?.studioAcquisitionCases)
-        ? player.flags.studioAcquisitionCases.filter((entry: any) => entry?.status === 'ACQUIRED' && entry?.closing)
-        : []
+const getStudioAssetById = (player: Partial<Pick<Player, 'businesses'>>, studioId: string) => (
+    (player.businesses || []).find(business => business.type === 'PRODUCTION_HOUSE' && business.id === studioId)
 );
+
+const getAcquisitionCaseStudioIds = (acquisitionCase: any): string[] => Array.from(new Set([
+    acquisitionCase?.studioId,
+    acquisitionCase?.closing?.acquiredBusinessId,
+].filter(Boolean).map(String)));
+
+const resolveLiveAcquisitionStudioId = (
+    player: Partial<Pick<Player, 'businesses'>>,
+    acquisitionCase: any,
+): string | undefined => (
+    getAcquisitionCaseStudioIds(acquisitionCase).find(studioId => Boolean(getStudioAssetById(player, studioId)))
+);
+
+const getAcquiredCases = (player: Pick<Player, 'flags'> & Partial<Pick<Player, 'businesses'>>) => {
+    const cases = Array.isArray(player.flags?.studioAcquisitionCases)
+        ? player.flags.studioAcquisitionCases.filter((entry: any) => entry?.status === 'ACQUIRED' && entry?.closing)
+        : [];
+    if (!Array.isArray(player.businesses)) return cases;
+    return cases.filter((entry: any) => Boolean(resolveLiveAcquisitionStudioId(player, entry)));
+};
 
 const getCaseDebtPrincipal = (acquisitionCase: any) => roundMoney(
     Math.max(0, Number(acquisitionCase?.closing?.verifiedDebt || 0))
@@ -79,10 +98,10 @@ const getDebtRate = (acquisitionCase: any, principal: number) => {
     return clamp(baseRate + (leverage * 0.08), 0.055, 0.145);
 };
 
-const makeDebtEntry = (acquisitionCase: any): AcquisitionDebtEntry | null => {
+const makeDebtEntry = (acquisitionCase: any, studioIdOverride?: string): AcquisitionDebtEntry | null => {
     const principal = getCaseDebtPrincipal(acquisitionCase);
     if (principal <= 0) return null;
-    const studioId = String(acquisitionCase.studioId);
+    const studioId = String(studioIdOverride || acquisitionCase.studioId);
     const signedYear = Number(acquisitionCase.closing?.signedYear || acquisitionCase.approachedYear || 0);
     const signedWeek = Number(acquisitionCase.closing?.signedWeek || acquisitionCase.approachedWeek || 0);
     const source: AcquisitionDebtSource = acquisitionCase?.closing?.finalPrice === 0
@@ -116,19 +135,62 @@ const normalizeEntry = (entry: AcquisitionDebtEntry): AcquisitionDebtEntry => {
         interestPaidToDate: roundMoney(entry.interestPaidToDate || 0),
         missedServiceAmount: roundMoney(entry.missedServiceAmount || 0),
         missedPayments: Math.max(0, Math.round(entry.missedPayments || 0)),
+        closureReason: entry.closureReason,
     };
 };
 
-export const getAcquisitionDebtLedger = (player: Pick<Player, 'flags'>): AcquisitionDebtEntry[] => (
+const closeOrphanedDebtEntry = (entry: AcquisitionDebtEntry): AcquisitionDebtEntry => ({
+    ...entry,
+    remainingPrincipal: 0,
+    status: 'PAID_OFF',
+    missedServiceAmount: 0,
+    missedPayments: 0,
+    closureReason: 'ORPHANED_STUDIO_ASSET',
+});
+
+const reconcileEntryWithStudioAssets = (
+    entry: AcquisitionDebtEntry,
+    player: Pick<Player, 'flags'> & Partial<Pick<Player, 'businesses'>>,
+): AcquisitionDebtEntry => {
+    const normalized = normalizeEntry(entry);
+    if (normalized.status !== 'ACTIVE' || normalized.remainingPrincipal <= 0) return normalized;
+    if (!Array.isArray(player.businesses)) return normalized;
+    const directStudio = getStudioAssetById(player, normalized.studioId);
+    if (directStudio) return { ...normalized, studioName: directStudio.name || normalized.studioName };
+
+    const matchingCase = getAcquiredCases(player).find((acquisitionCase: any) => (
+        getAcquisitionCaseStudioIds(acquisitionCase).includes(normalized.studioId)
+    ));
+    const resolvedStudioId = matchingCase ? resolveLiveAcquisitionStudioId(player, matchingCase) : undefined;
+    const resolvedStudio = resolvedStudioId ? getStudioAssetById(player, resolvedStudioId) : undefined;
+    if (resolvedStudioId && resolvedStudio) {
+        return {
+            ...normalized,
+            studioId: resolvedStudioId,
+            studioName: resolvedStudio.name || normalized.studioName,
+        };
+    }
+
+    return closeOrphanedDebtEntry(normalized);
+};
+
+export const getAcquisitionDebtLedger = (player: Pick<Player, 'flags'> & Partial<Pick<Player, 'businesses'>>): AcquisitionDebtEntry[] => (
     getRawLedger(player).map(normalizeEntry)
 );
 
 export const syncAcquisitionDebtLedger = (player: Player): Player => {
-    const ledger = getAcquisitionDebtLedger(player);
+    const ledger = getRawLedger(player).map(entry => reconcileEntryWithStudioAssets(entry, player));
     const existingStudioIds = new Set(ledger.map(entry => entry.studioId));
     const newEntries = getAcquiredCases(player)
-        .filter((acquisitionCase: any) => !existingStudioIds.has(String(acquisitionCase.studioId)))
-        .map(makeDebtEntry)
+        .map((acquisitionCase: any) => ({
+            acquisitionCase,
+            studioId: resolveLiveAcquisitionStudioId(player, acquisitionCase) || String(acquisitionCase.studioId),
+        }))
+        .filter(({ acquisitionCase, studioId }) => (
+            !existingStudioIds.has(studioId)
+            && !getAcquisitionCaseStudioIds(acquisitionCase).some(caseStudioId => existingStudioIds.has(caseStudioId))
+        ))
+        .map(({ acquisitionCase, studioId }) => makeDebtEntry(acquisitionCase, studioId))
         .filter((entry): entry is AcquisitionDebtEntry => Boolean(entry));
 
     const nextLedger = [...ledger, ...newEntries].map(normalizeEntry);

@@ -26,7 +26,7 @@ const gameLoopTokens = [
 ];
 
 const migrationTokens = [
-  'SAVE_MIGRATION_VERSION = 12',
+  'SAVE_MIGRATION_VERSION = 15',
   'migrateActiveRelease',
   'migratePastProject',
   'weeklyDistributionBreakdowns',

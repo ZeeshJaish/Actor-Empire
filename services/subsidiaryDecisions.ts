@@ -113,7 +113,11 @@ const getDecisionCadenceWeeks = (personality: SubsidiaryPersonality, seed: strin
 
 const getDecisionPriority = (studio: Business, personality: SubsidiaryPersonality): SubsidiaryDecisionType => {
     const weeklyProfit = studio.stats.weeklyProfit || 0;
-    if (weeklyProfit < 0 || studio.balance < Math.max(40_000_000, (studio.stats.valuation || 0) * 0.04)) return 'EMERGENCY_CAPITAL';
+    const weeklyBurn = Math.max(0, (studio.stats.weeklyExpenses || 0) - (studio.stats.weeklyRevenue || 0), -weeklyProfit);
+    const minimumOperatingCash = Math.max(40_000_000, (studio.stats.valuation || 0) * 0.04);
+    const cashRunwayWeeks = weeklyBurn > 0 ? studio.balance / weeklyBurn : Number.POSITIVE_INFINITY;
+    const underfunded = studio.balance < minimumOperatingCash || (weeklyBurn > 0 && cashRunwayWeeks < 16);
+    if (underfunded) return 'EMERGENCY_CAPITAL';
     if ((studio.stats.recentFlopStreak || 0) >= 2) return 'FLOP_RESPONSE';
     const state = studio.studioState;
     const hasIpLane = !!(state?.ownedRights?.length || state?.purchasedIPTitles?.length);

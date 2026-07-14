@@ -1,5 +1,5 @@
 
-import { Agent, Manager, Player, SponsorshipOffer, SponsorshipCategory, SponsorshipActionType, AuditionOpportunity, BudgetTier, ProjectType, SponsorshipFrequency, TeamMember } from '../types';
+import { Agent, Manager, Player, SponsorshipOffer, SponsorshipCategory, SponsorshipActionType, AuditionOpportunity, BudgetTier, ProjectType, SponsorshipFrequency, TeamMember, RoleType } from '../types';
 import { generateAudition } from './roleLogic'; // We will export this helper from roleLogic
 import { getNextFamousMovie, createFamousOpportunity } from './famousMovieLogic';
 import { generateRandomUniverseOpportunity } from './universeLogic';
@@ -321,8 +321,8 @@ export const generateAgentOffers = (player: Player): AuditionOpportunity | null 
     // Expanded to STANDARD agents (small chance)
     if (['STANDARD', 'ELITE', 'LEGEND'].includes(agent.tier)) {
         let premiumChance = 0.01; // Standard
-        if (agent.tier === 'ELITE') premiumChance = 0.08;
-        if (agent.tier === 'LEGEND') premiumChance = 0.20;
+        if (agent.tier === 'ELITE') premiumChance = 0.10;
+        if (agent.tier === 'LEGEND') premiumChance = 0.23;
         
         // If busy with a blockbuster, drastically reduce premium offers
         const adjustedPremiumChance = hasActiveBlockbuster ? premiumChance * 0.2 : premiumChance;
@@ -349,21 +349,32 @@ export const generateAgentOffers = (player: Player): AuditionOpportunity | null 
     if (agent.studioAccess === 'MID' && Math.random() > 0.4) tier = 'MID';
     if (agent.studioAccess === 'HIGH') {
         const roll = Math.random();
+        const highCutoff = agent.tier === 'LEGEND' ? 0.45 : agent.tier === 'ELITE' ? 0.52 : 0.6;
+        const midCutoff = agent.tier === 'LEGEND' ? 0.12 : agent.tier === 'ELITE' ? 0.16 : 0.2;
         // If already busy with a blockbuster, FORCE low/mid tier offers mostly (80% chance)
         if (hasActiveBlockbuster && roll > 0.2) {
-            tier = Math.random() > 0.5 ? 'MID' : 'LOW';
-        } else if (!hasActiveBlockbuster && roll > 0.6) {
+            const busyHighChance = agent.tier === 'LEGEND' ? 0.12 : agent.tier === 'ELITE' ? 0.08 : 0;
+            if (Math.random() < busyHighChance) tier = 'HIGH';
+            else tier = Math.random() > (agent.tier === 'LEGEND' ? 0.28 : agent.tier === 'ELITE' ? 0.36 : 0.5) ? 'MID' : 'LOW';
+        } else if (!hasActiveBlockbuster && roll > highCutoff) {
             tier = 'HIGH'; // Normal chance if free
-        } else if (!hasActiveBlockbuster && roll > 0.2) {
+        } else if (!hasActiveBlockbuster && roll > midCutoff) {
             tier = 'MID';
         }
     }
 
     // Role Type Bias
     const roleRoll = Math.random();
-    let roleType: any = 'SUPPORTING';
-    if (roleRoll > 0.7) roleType = 'LEAD';
-    else if (roleRoll > 0.4) roleType = 'ENSEMBLE';
+    const playerPull = Math.max(player.stats.fame || 0, player.stats.reputation || 0);
+    const leadCutoff = agent.tier === 'LEGEND'
+        ? playerPull >= 70 ? 0.54 : playerPull >= 40 ? 0.6 : 0.66
+        : agent.tier === 'ELITE'
+            ? playerPull >= 55 ? 0.62 : 0.68
+            : 0.7;
+    const ensembleCutoff = agent.tier === 'LEGEND' ? 0.26 : agent.tier === 'ELITE' ? 0.32 : 0.4;
+    let roleType: RoleType = 'SUPPORTING';
+    if (roleRoll > leadCutoff) roleType = 'LEAD';
+    else if (roleRoll > ensembleCutoff) roleType = 'ENSEMBLE';
     else roleType = 'SUPPORTING';
 
     // NEW: Type Logic based on Specialty

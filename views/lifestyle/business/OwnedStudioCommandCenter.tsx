@@ -10,6 +10,7 @@ import {
     Crown,
     FileKey2,
     Film,
+    Handshake,
     Landmark,
     Layers3,
     ShieldAlert,
@@ -44,6 +45,8 @@ import { resolveSubsidiaryDecision } from '../../../services/subsidiaryDecisions
 import type { DevelopmentLabInitialTab } from './DevelopmentLab';
 import { getTalentInstabilityState } from '../../../services/talentInstability';
 import { getPlayerLanguage, t } from '../../../services/i18n';
+import { StudioSaleEntryCard, StudioSaleRoom } from './components/StudioSaleDeckPanel';
+import { resolveProjectType } from '../../../services/businessLogic';
 
 interface OwnedStudioCommandCenterProps {
     player: Player;
@@ -81,7 +84,7 @@ const CommandSection: React.FC<{
                 {icon}
             </div>
             <div>
-                <div className="text-[6px] font-black uppercase tracking-[0.23em] text-amber-300">{eyebrow}</div>
+                <div className="text-[10px] font-black uppercase text-amber-300">{eyebrow}</div>
                 <h2 className="mt-1 text-[15px] font-black uppercase leading-none text-white">{title}</h2>
             </div>
         </div>
@@ -92,7 +95,7 @@ const CommandSection: React.FC<{
 const Meter: React.FC<{ label: string; value: number; color: string }> = ({ label, value, color }) => (
     <div>
         <div className="flex items-center justify-between gap-3">
-            <span className="text-[6px] font-black uppercase tracking-[0.16em] text-zinc-600">{label}</span>
+            <span className="text-[10px] font-black uppercase text-zinc-600">{label}</span>
             <span className="font-mono text-[9px] font-black text-white">{Math.round(value)}/100</span>
         </div>
         <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-black">
@@ -100,6 +103,144 @@ const Meter: React.FC<{ label: string; value: number; color: string }> = ({ labe
         </div>
     </div>
 );
+
+const posterGradients = [
+    'from-sky-950 via-slate-900 to-black',
+    'from-rose-950 via-stone-950 to-black',
+    'from-amber-950 via-zinc-950 to-black',
+    'from-emerald-950 via-neutral-950 to-black',
+    'from-indigo-950 via-zinc-950 to-black',
+];
+
+const getPosterGradient = (title: string) => posterGradients[
+    Math.abs([...title].reduce((sum, char) => sum + char.charCodeAt(0), 0)) % posterGradients.length
+];
+
+const formatSlateMoney = (value: number) => {
+    const safe = Math.max(0, Number(value) || 0);
+    if (safe >= 1_000_000_000) return `$${(safe / 1_000_000_000).toFixed(1)}B`;
+    if (safe >= 1_000_000) return `$${(safe / 1_000_000).toFixed(1)}M`;
+    if (safe >= 1_000) return `$${(safe / 1_000).toFixed(0)}K`;
+    return `$${safe.toFixed(0)}`;
+};
+
+const parseArchiveRevenue = (project: any) => {
+    if (Number.isFinite(project?.gross)) return Number(project.gross);
+    const result = String(project?.boxOfficeResult || '');
+    const match = result.match(/\$?([\d.]+)\s*([KMBT])?/i);
+    if (!match) return Number(project?.streamingRevenue || 0) + Number(project?.soundtrackRevenue || 0);
+    const value = Number(match[1] || 0);
+    const unit = (match[2] || '').toUpperCase();
+    const multiplier = unit === 'T' ? 1_000_000_000_000 : unit === 'B' ? 1_000_000_000 : unit === 'M' ? 1_000_000 : unit === 'K' ? 1_000 : 1;
+    return (value * multiplier) + Number(project?.streamingRevenue || 0) + Number(project?.soundtrackRevenue || 0);
+};
+
+const phaseTone = (phase: string) => {
+    if (phase === 'DEVELOPMENT') return 'bg-yellow-400 text-black';
+    if (phase === 'PRE-PRODUCTION') return 'bg-orange-400 text-black';
+    if (phase === 'PRODUCTION') return 'bg-rose-500 text-white';
+    if (phase === 'POST-PRODUCTION') return 'bg-sky-500 text-white';
+    if (phase === 'AWAITING RELEASE') return 'bg-amber-300 text-black';
+    if (phase === 'PLANNED RELEASE') return 'bg-emerald-500 text-black';
+    if (phase === 'STREAMING' || phase === 'IN THEATERS') return 'bg-emerald-400 text-black';
+    return 'bg-zinc-700 text-zinc-200';
+};
+
+const SubsidiarySlateTile: React.FC<{
+    project: {
+        id: string;
+        name: string;
+        phase: string;
+        type?: string;
+        budget?: number;
+        phaseWeeksLeft?: number;
+    };
+}> = ({ project }) => (
+    <article className="relative h-[190px] w-[132px] shrink-0 overflow-hidden rounded-[12px] border-2 border-white/[0.08] bg-zinc-950 shadow-[0_7px_0_#020202]">
+        <div className={`absolute inset-0 bg-gradient-to-br ${getPosterGradient(project.name)}`} />
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/70 to-transparent" />
+        <div className="absolute inset-0 flex items-center justify-center p-3">
+            <div className="rotate-[-6deg] text-center font-serif text-2xl font-black uppercase leading-none text-white/20">
+                {project.name}
+            </div>
+        </div>
+        <div className="relative flex h-full flex-col justify-between p-3">
+            <div className="flex justify-end">
+                <span className={`rounded px-1.5 py-0.5 text-[6px] font-black uppercase tracking-[0.12em] ${phaseTone(project.phase)}`}>
+                    {project.phase}
+                </span>
+            </div>
+            <div>
+                <h3 className="line-clamp-2 text-[13px] font-black leading-tight text-white drop-shadow">{project.name}</h3>
+                <div className="mt-2 flex items-end justify-between gap-2">
+                    <div>
+                        <div className="text-[6px] font-black uppercase tracking-wider text-zinc-500">Budget</div>
+                        <div className="font-mono text-[9px] font-black text-zinc-200">{formatSlateMoney(project.budget || 0)}</div>
+                    </div>
+                    {typeof project.phaseWeeksLeft === 'number' ? (
+                        <div className="text-right">
+                            <div className="text-[6px] font-black uppercase tracking-wider text-zinc-500">Left</div>
+                            <div className="flex items-center justify-end gap-1 font-mono text-[9px] font-black text-white">
+                                <Clock3 size={9} className="text-zinc-500" /> {Math.max(0, project.phaseWeeksLeft)}w
+                            </div>
+                        </div>
+                    ) : null}
+                </div>
+            </div>
+        </div>
+    </article>
+);
+
+const SubsidiaryArchiveTile: React.FC<{
+    project: {
+        id: string;
+        name: string;
+        rating?: number;
+        revenue?: number;
+        budget?: number;
+        type?: string;
+    };
+}> = ({ project }) => {
+    const rating = Number(project.rating || 0);
+    const revenue = Number(project.revenue || 0);
+    const budget = Number(project.budget || 0);
+    const outcome = budget > 0 && revenue >= budget * 2
+        ? 'HIT'
+        : budget > 0 && revenue < budget
+            ? 'FLOP'
+            : 'RELEASED';
+    return (
+        <article className="relative h-[190px] w-[132px] shrink-0 overflow-hidden rounded-[12px] border-2 border-white/[0.08] bg-zinc-950 shadow-[0_7px_0_#020202]">
+            <div className={`absolute inset-0 bg-gradient-to-br ${getPosterGradient(project.name)}`} />
+            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/80 to-transparent" />
+            <div className="absolute inset-0 flex items-center justify-center p-3">
+                <div className="rotate-[-6deg] text-center font-serif text-2xl font-black uppercase leading-none text-white/20">
+                    {project.name}
+                </div>
+            </div>
+            <div className="relative flex h-full flex-col justify-between p-3">
+                <div className="flex justify-end">
+                    <span className={`rounded px-1.5 py-0.5 text-[6px] font-black uppercase tracking-[0.12em] ${outcome === 'HIT' ? 'bg-emerald-400 text-black' : outcome === 'FLOP' ? 'bg-rose-500 text-white' : 'bg-zinc-600 text-white'}`}>
+                        {outcome}
+                    </span>
+                </div>
+                <div>
+                    <h3 className="line-clamp-2 text-[13px] font-black leading-tight text-white drop-shadow">{project.name}</h3>
+                    <div className="mt-2 grid grid-cols-2 gap-2">
+                        <div>
+                            <div className="text-[6px] font-black uppercase tracking-wider text-zinc-500">IMDb</div>
+                            <div className="font-mono text-[9px] font-black text-amber-200">{rating ? rating.toFixed(1) : '--'}</div>
+                        </div>
+                        <div className="text-right">
+                            <div className="text-[6px] font-black uppercase tracking-wider text-zinc-500">Gross</div>
+                            <div className="font-mono text-[9px] font-black text-emerald-300">{formatSlateMoney(revenue)}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </article>
+    );
+};
 
 const proposalStatusTone: Record<SubsidiaryProjectProposal['status'], string> = {
     PENDING: 'border-amber-300/35 bg-amber-300/[0.08] text-amber-200',
@@ -139,25 +280,61 @@ export const OwnedStudioCommandCenter: React.FC<OwnedStudioCommandCenterProps> =
     const [treasuryFeedback, setTreasuryFeedback] = React.useState('');
     const [debtPaydownAmount, setDebtPaydownAmount] = React.useState('');
     const [debtFeedback, setDebtFeedback] = React.useState('');
+    const [showSaleRoom, setShowSaleRoom] = React.useState(false);
     const commitments = player.commitments.filter(commitment => commitment.projectDetails?.studioId === studio.id);
     const releases = player.activeReleases.filter(release => release.projectDetails?.studioId === studio.id);
     const pastProjects = player.pastProjects.filter(project => project.studioId === studio.id);
     const activeSlate = [
         ...(studio.studioState?.concepts || []).map(concept => {
             const script = studio.studioState?.scripts?.find(candidate => candidate.id === concept.scriptId);
-            return { id: concept.id, title: script?.title || 'Untitled Development', phase: 'DEVELOPMENT' };
+            return {
+                id: concept.id,
+                name: script?.title || 'Untitled Development',
+                title: script?.title || 'Untitled Development',
+                phase: script?.status === 'IN_DEVELOPMENT' ? 'DEVELOPMENT' : 'CONCEPT',
+                type: resolveProjectType(script?.projectType, (script as any)?.type, (concept as any)?.projectType, (concept as any)?.type),
+                budget: script?.developmentCost || 0,
+            };
         }),
         ...commitments.map(commitment => ({
             id: commitment.id,
+            name: commitment.name,
             title: commitment.name,
-            phase: (commitment.projectPhase || 'PLANNING').replaceAll('_', ' '),
+            phase: commitment.projectPhase === 'AWAITING_RELEASE' && commitment.projectDetails?.releaseStrategy
+                ? 'PLANNED RELEASE'
+                : (commitment.projectPhase || 'PLANNING').replaceAll('_', ' '),
+            type: commitment.projectDetails?.type,
+            budget: commitment.projectDetails?.estimatedBudget || commitment.upfrontCost || 0,
+            phaseWeeksLeft: commitment.phaseWeeksLeft,
         })),
         ...releases.map(release => ({
             id: release.id,
+            name: release.name,
             title: release.name,
-            phase: release.distributionPhase === 'STREAMING' ? 'STREAMING' : 'RELEASE',
+            phase: release.distributionPhase === 'STREAMING' ? 'STREAMING' : 'IN THEATERS',
+            type: resolveProjectType(release.type, release.projectDetails?.type),
+            budget: release.budget,
+            phaseWeeksLeft: release.distributionPhase === 'STREAMING' ? release.streaming?.weekOnPlatform : release.weekNum,
         })),
     ];
+    const archiveSlate = [
+        ...releases.map(release => ({
+            id: release.id,
+            name: release.name,
+            rating: release.imdbRating,
+            revenue: release.totalGross + (release.streamingRevenue || 0) + (release.soundtrackRevenue || 0),
+            budget: release.budget,
+            type: release.type,
+        })),
+        ...pastProjects.map(project => ({
+            id: project.id,
+            name: project.name,
+            rating: project.imdbRating || project.rating,
+            revenue: parseArchiveRevenue(project),
+            budget: Number((project as any).budget || (project as any).projectDetails?.estimatedBudget || 0),
+            type: resolveProjectType(project.projectType, (project as any).projectDetails?.type, project.type),
+        })),
+    ].sort((a, b) => String(b.id).localeCompare(String(a.id)));
     const rightsTitles = [
         ...(studio.studioState?.ownedRights || []).map(right => right.title),
         ...(studio.studioState?.purchasedIPTitles || []),
@@ -380,7 +557,7 @@ export const OwnedStudioCommandCenter: React.FC<OwnedStudioCommandCenterProps> =
                                 key={id}
                                 type="button"
                                 onClick={() => setActiveDeck(id as typeof activeDeck)}
-                                className={`min-h-10 rounded-[13px] px-1 text-[6px] font-black uppercase tracking-[0.11em] transition ${
+                                className={`min-h-10 rounded-[13px] px-1 text-[10px] font-black uppercase transition ${
                                     activeDeck === id
                                         ? 'bg-amber-300 text-black shadow-[0_3px_0_#6b4304]'
                                         : 'text-zinc-600'
@@ -862,20 +1039,27 @@ export const OwnedStudioCommandCenter: React.FC<OwnedStudioCommandCenterProps> =
                             </CommandSection>
                             <CommandSection eyebrow="Production Board" title="Active Slate" icon={<Clapperboard size={19} />}>
                                 {activeSlate.length ? (
-                                    <div className="space-y-2">
-                                        {activeSlate.slice(0, 4).map(project => (
-                                            <div key={project.id} className="flex items-center justify-between gap-3 rounded-[13px] border border-white/[0.06] bg-black/35 px-3 py-2.5">
-                                                <div className="min-w-0">
-                                                    <div className="truncate text-[9px] font-black uppercase text-white">{project.title}</div>
-                                                    <div className="mt-1 text-[5px] font-black uppercase tracking-[0.15em] text-sky-300">{project.phase}</div>
-                                                </div>
-                                                <Film size={14} className="shrink-0 text-zinc-600" />
-                                            </div>
+                                    <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-2 no-scrollbar">
+                                        {activeSlate.slice(0, 10).map(project => (
+                                            <SubsidiarySlateTile key={project.id} project={project} />
                                         ))}
                                     </div>
                                 ) : (
                                     <div className="rounded-[13px] border border-dashed border-white/10 bg-black/25 px-4 py-5 text-center text-[8px] font-bold text-zinc-600">
                                         No active productions under this studio.
+                                    </div>
+                                )}
+                            </CommandSection>
+                            <CommandSection eyebrow="Studio Slate" title="Past Slate" icon={<Film size={19} />}>
+                                {archiveSlate.length ? (
+                                    <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-2 no-scrollbar">
+                                        {archiveSlate.slice(0, 10).map(project => (
+                                            <SubsidiaryArchiveTile key={project.id} project={project} />
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="rounded-[13px] border border-dashed border-white/10 bg-black/25 px-4 py-5 text-center text-[8px] font-bold text-zinc-600">
+                                        No released titles from this acquired studio yet.
                                     </div>
                                 )}
                             </CommandSection>
@@ -922,7 +1106,7 @@ export const OwnedStudioCommandCenter: React.FC<OwnedStudioCommandCenterProps> =
                                                     setTreasuryAction(action);
                                                     setTreasuryFeedback('');
                                                 }}
-                                                className={`min-h-11 rounded-[14px] border-2 px-3 text-[8px] font-black uppercase tracking-[0.14em] ${
+                                                className={`min-h-11 rounded-[14px] border-2 px-3 text-[10px] font-black uppercase ${
                                                     treasuryAction === action
                                                         ? 'border-amber-300 bg-amber-300 text-black shadow-[0_4px_0_#6b4304]'
                                                         : 'border-white/[0.08] bg-black/35 text-zinc-500 shadow-[0_4px_0_#020202]'
@@ -947,20 +1131,20 @@ export const OwnedStudioCommandCenter: React.FC<OwnedStudioCommandCenterProps> =
                                                         : 'border-white/[0.07] bg-black/30 text-zinc-500'
                                                 }`}
                                             >
-                                                <div className="text-[6px] font-black uppercase tracking-[0.16em]">
+                                                <div className="text-[10px] font-black uppercase">
                                                     {treasuryAction === 'INJECT' ? 'From' : 'To'}
                                                 </div>
-                                                <div className="mt-1 text-[9px] font-black uppercase">
+                                                <div className="mt-1 text-[11px] font-black uppercase">
                                                     {counterparty === 'HQ' ? 'HQ Studio' : 'Personal'}
                                                 </div>
-                                                <div className="mt-1 truncate font-mono text-[8px] font-black opacity-70">
+                                                <div className="mt-1 truncate font-mono text-[10px] font-black opacity-70">
                                                     {counterparty === 'HQ' ? formatMoney(parentStudio?.balance || 0) : formatMoney(player.money)}
                                                 </div>
                                             </button>
                                         ))}
                                     </div>
                                     <div className="mt-3 rounded-[14px] border border-white/[0.07] bg-black/35 p-3">
-                                        <label className="text-[6px] font-black uppercase tracking-[0.18em] text-zinc-600">Transfer Amount</label>
+                                        <label className="text-[10px] font-black uppercase text-zinc-600">Transfer Amount</label>
                                         <input
                                             value={treasuryAmount}
                                             onChange={event => {
@@ -975,7 +1159,7 @@ export const OwnedStudioCommandCenter: React.FC<OwnedStudioCommandCenterProps> =
                                     <button
                                         type="button"
                                         onClick={handleTreasuryTransfer}
-                                        className="mt-3 flex min-h-12 w-full items-center justify-center rounded-[16px] border-2 border-emerald-300/35 bg-emerald-300 px-4 text-[9px] font-black uppercase tracking-[0.16em] text-black shadow-[0_5px_0_#064e3b] active:translate-y-0.5 active:shadow-[0_2px_0_#064e3b]"
+                                        className="mt-3 flex min-h-12 w-full items-center justify-center rounded-[16px] border-2 border-emerald-300/35 bg-emerald-300 px-4 text-[11px] font-black uppercase text-black shadow-[0_5px_0_#064e3b] active:translate-y-0.5 active:shadow-[0_2px_0_#064e3b]"
                                     >
                                         {treasuryAction === 'INJECT' ? 'Authorize Injection' : 'Authorize Withdrawal'}
                                     </button>
@@ -985,7 +1169,7 @@ export const OwnedStudioCommandCenter: React.FC<OwnedStudioCommandCenterProps> =
                                             : `Pulls available cash out of ${studio.name} without changing its operating model.`}
                                     </p>
                                     {treasuryFeedback ? (
-                                        <div className="mt-3 rounded-[12px] border border-amber-300/20 bg-amber-300/[0.07] px-3 py-2 text-[8px] font-black uppercase tracking-[0.12em] text-amber-200">
+                                        <div className="mt-3 rounded-[12px] border border-amber-300/20 bg-amber-300/[0.07] px-3 py-2 text-[10px] font-black uppercase text-amber-200">
                                             {treasuryFeedback}
                                         </div>
                                     ) : null}
@@ -995,15 +1179,15 @@ export const OwnedStudioCommandCenter: React.FC<OwnedStudioCommandCenterProps> =
                                 <div className="rounded-[18px] border-2 border-[#203044] bg-[#07111c] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
                                     <div className="grid grid-cols-3 overflow-hidden rounded-[15px] border border-sky-300/15 bg-black/35">
                                         <div className="border-r border-sky-300/10 p-3">
-                                            <div className="text-[5px] font-black uppercase tracking-widest text-zinc-600">Remaining</div>
+                                            <div className="text-[10px] font-black uppercase text-zinc-600">Remaining</div>
                                             <div className={`mt-1 font-mono text-[12px] font-black ${debt > 0 ? 'text-sky-200' : 'text-zinc-500'}`}>{formatMoney(debt)}</div>
                                         </div>
                                         <div className="border-r border-sky-300/10 p-3">
-                                            <div className="text-[5px] font-black uppercase tracking-widest text-zinc-600">Weekly Interest</div>
+                                            <div className="text-[10px] font-black uppercase text-zinc-600">Weekly Interest</div>
                                             <div className={`mt-1 font-mono text-[12px] font-black ${studioWeeklyInterest > 0 ? 'text-amber-200' : 'text-zinc-500'}`}>{formatMoney(studioWeeklyInterest)}</div>
                                         </div>
                                         <div className="p-3">
-                                            <div className="text-[5px] font-black uppercase tracking-widest text-zinc-600">Pressure</div>
+                                            <div className="text-[10px] font-black uppercase text-zinc-600">Pressure</div>
                                             <div className={`mt-1 font-mono text-[12px] font-black ${debtSummary.pressureScore >= 65 ? 'text-rose-300' : debtSummary.pressureScore >= 35 ? 'text-amber-200' : 'text-emerald-300'}`}>
                                                 {debtSummary.pressureScore}%
                                             </div>
@@ -1012,14 +1196,14 @@ export const OwnedStudioCommandCenter: React.FC<OwnedStudioCommandCenterProps> =
                                     <div className="mt-3 rounded-[14px] border border-sky-300/10 bg-black/30 p-3">
                                         <div className="flex items-center justify-between gap-3">
                                             <div>
-                                                <div className="text-[6px] font-black uppercase tracking-[0.18em] text-sky-300">Debt Terms</div>
-                                                <div className="mt-1 text-[8px] font-bold text-zinc-500">
+                                                <div className="text-[10px] font-black uppercase text-sky-300">Debt Terms</div>
+                                                <div className="mt-1 text-[11px] font-bold text-zinc-500">
                                                     {studioDebtEntry
                                                         ? `${(studioDebtEntry.annualInterestRate * 100).toFixed(1)}% annual rate · ${studioDebtEntry.source === 'STOCK_CONTROL_TRANSFER' ? 'Inherited through stock control' : 'Deal financing'}`
                                                         : 'No active acquisition debt for this studio.'}
                                                 </div>
                                             </div>
-                                            <div className="shrink-0 rounded-full border border-sky-300/20 bg-sky-300/[0.07] px-2.5 py-1 text-[6px] font-black uppercase tracking-[0.12em] text-sky-200">
+                                            <div className="shrink-0 rounded-full border border-sky-300/20 bg-sky-300/[0.07] px-2.5 py-1 text-[10px] font-black uppercase text-sky-200">
                                                 {debtSummary.nextServiceLabel}
                                             </div>
                                         </div>
@@ -1034,7 +1218,7 @@ export const OwnedStudioCommandCenter: React.FC<OwnedStudioCommandCenterProps> =
                                         <>
                                             <div className="mt-3 grid grid-cols-[1fr_auto] gap-2">
                                                 <div className="rounded-[14px] border border-white/[0.07] bg-black/35 p-3">
-                                                    <label className="text-[6px] font-black uppercase tracking-[0.18em] text-zinc-600">Pay Down Principal</label>
+                                                    <label className="text-[10px] font-black uppercase text-zinc-600">Pay Down Principal</label>
                                                     <input
                                                         value={debtPaydownAmount}
                                                         onChange={event => {
@@ -1050,7 +1234,7 @@ export const OwnedStudioCommandCenter: React.FC<OwnedStudioCommandCenterProps> =
                                                     type="button"
                                                     disabled={debtParsedAmount <= 0}
                                                     onClick={() => handleDebtPaydown()}
-                                                    className="min-h-16 rounded-[16px] border-2 border-emerald-300/35 bg-emerald-300 px-4 text-[8px] font-black uppercase tracking-[0.14em] text-black shadow-[0_5px_0_#064e3b] active:translate-y-0.5 active:shadow-[0_2px_0_#064e3b] disabled:opacity-40"
+                                                    className="min-h-16 rounded-[16px] border-2 border-emerald-300/35 bg-emerald-300 px-4 text-[10px] font-black uppercase text-black shadow-[0_5px_0_#064e3b] active:translate-y-0.5 active:shadow-[0_2px_0_#064e3b] disabled:opacity-40"
                                                 >
                                                     Pay Down
                                                 </button>
@@ -1066,27 +1250,34 @@ export const OwnedStudioCommandCenter: React.FC<OwnedStudioCommandCenterProps> =
                                                         type="button"
                                                         disabled={Number(value) <= 0 || player.money < Number(value)}
                                                         onClick={() => fillDebtPaydownPreset(Number(value))}
-                                                        className="min-h-10 rounded-[13px] border border-white/[0.08] bg-black/35 px-2 text-[7px] font-black uppercase tracking-[0.13em] text-zinc-300 disabled:text-zinc-700"
+                                                        className="min-h-10 rounded-[13px] border border-white/[0.08] bg-black/35 px-2 text-[10px] font-black uppercase text-zinc-300 disabled:text-zinc-700"
                                                     >
                                                         {label}
                                                     </button>
                                                 ))}
                                             </div>
                                             {debtFeedback ? (
-                                                <div className="mt-3 rounded-[12px] border border-sky-300/20 bg-sky-300/[0.07] px-3 py-2 text-[8px] font-black uppercase tracking-[0.12em] text-sky-200">
+                                                <div className="mt-3 rounded-[12px] border border-sky-300/20 bg-sky-300/[0.07] px-3 py-2 text-[10px] font-black uppercase text-sky-200">
                                                     {debtFeedback}
                                                 </div>
                                             ) : null}
                                         </>
                                     ) : (
                                         <div className="mt-3 rounded-[14px] border border-dashed border-sky-300/15 bg-black/25 px-4 py-5 text-center">
-                                            <div className="text-[8px] font-black uppercase tracking-[0.16em] text-sky-200">No active acquisition debt</div>
-                                            <p className="mt-2 text-[8px] font-bold leading-relaxed text-zinc-600">
+                                            <div className="text-[11px] font-black uppercase text-sky-200">No active acquisition debt</div>
+                                            <p className="mt-2 text-[11px] font-bold leading-relaxed text-zinc-600">
                                                 This studio is operating without inherited acquisition debt. Future deals may still bring liabilities through diligence or financing.
                                             </p>
                                         </div>
                                     )}
                                 </div>
+                            </CommandSection>
+                            <CommandSection eyebrow="Ownership Exit" title="Studio Sale" icon={<Handshake size={19} />}>
+                                <StudioSaleEntryCard
+                                    player={player}
+                                    studio={studio}
+                                    onOpen={() => setShowSaleRoom(true)}
+                                />
                             </CommandSection>
                             <CommandSection eyebrow="Company Ledger" title="Financial Position" icon={<Banknote size={19} />}>
                                 <div className="grid grid-cols-2 gap-2">
@@ -1097,8 +1288,8 @@ export const OwnedStudioCommandCenter: React.FC<OwnedStudioCommandCenterProps> =
                                         ['Lifetime Revenue', formatMoney(studio.stats.lifetimeRevenue || 0), 'text-amber-200'],
                                     ].map(([label, value, color]) => (
                                         <div key={label} className="rounded-[13px] border border-white/[0.06] bg-black/35 p-3">
-                                            <div className="text-[5px] font-black uppercase tracking-[0.14em] text-zinc-600">{label}</div>
-                                            <div className={`mt-1 font-mono text-[11px] font-black ${color}`}>{value}</div>
+                                            <div className="text-[10px] font-black uppercase text-zinc-600">{label}</div>
+                                            <div className={`mt-1 font-mono text-[12px] font-black ${color}`}>{value}</div>
                                         </div>
                                     ))}
                                 </div>
@@ -1106,11 +1297,11 @@ export const OwnedStudioCommandCenter: React.FC<OwnedStudioCommandCenterProps> =
                             <CommandSection eyebrow="Closing Archive" title="Acquisition Record" icon={<Landmark size={19} />}>
                                 <div className="grid grid-cols-2 gap-2">
                                     <div className="rounded-[13px] border border-white/[0.06] bg-black/35 p-3">
-                                        <div className="text-[5px] font-black uppercase tracking-wider text-zinc-600">Purchase Price</div>
+                                        <div className="text-[10px] font-black uppercase text-zinc-600">Purchase Price</div>
                                         <div className="mt-1 font-mono text-[12px] font-black text-amber-200">{formatMoney(acquisitionCase?.closing?.finalPrice || 0)}</div>
                                     </div>
                                     <div className="rounded-[13px] border border-white/[0.06] bg-black/35 p-3">
-                                        <div className="text-[5px] font-black uppercase tracking-wider text-zinc-600">Control Since</div>
+                                        <div className="text-[10px] font-black uppercase text-zinc-600">Control Since</div>
                                         <div className="mt-1 text-[10px] font-black text-white">
                                             Y{acquisitionCase?.closing?.signedYear ?? studio.studioState?.acquiredYear ?? player.age} · W{acquisitionCase?.closing?.signedWeek ?? studio.studioState?.acquiredWeek ?? player.currentWeek}
                                         </div>
@@ -1119,7 +1310,7 @@ export const OwnedStudioCommandCenter: React.FC<OwnedStudioCommandCenterProps> =
                                 {signedCommitments.length ? (
                                     <div className="mt-3 flex flex-wrap gap-2">
                                         {signedCommitments.map(commitment => (
-                                            <span key={commitment.id} className="flex items-center gap-1 rounded-full border border-emerald-300/15 bg-emerald-300/[0.05] px-2.5 py-1 text-[6px] font-black uppercase tracking-wider text-emerald-200">
+                                            <span key={commitment.id} className="flex items-center gap-1 rounded-full border border-emerald-300/15 bg-emerald-300/[0.05] px-2.5 py-1 text-[10px] font-black uppercase text-emerald-200">
                                                 <ShieldCheck size={9} /> {commitment.shortLabel}
                                             </span>
                                         ))}
@@ -1130,6 +1321,15 @@ export const OwnedStudioCommandCenter: React.FC<OwnedStudioCommandCenterProps> =
                     ) : null}
                 </div>
             </main>
+            {showSaleRoom ? (
+                <StudioSaleRoom
+                    player={player}
+                    studio={studio}
+                    onBack={() => setShowSaleRoom(false)}
+                    onUpdatePlayer={onUpdatePlayer}
+                    onSold={onBack}
+                />
+            ) : null}
         </motion.div>
     );
 };

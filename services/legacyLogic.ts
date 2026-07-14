@@ -1,7 +1,219 @@
-import { ActorSkills, BloodlineMember, Player, PortfolioItem, Relationship, StreamingState } from '../types';
+import { ActorSkills, BloodlineMember, NPCActor, Player, PortfolioItem, Relationship, StreamingState, UniverseId, ProjectType } from '../types';
 
 export const LEGACY_MIN_PLAYABLE_AGE = 18;
 export const LEGACY_INHERITANCE_TAX_RATE = 0.25;
+
+const clone = <T,>(value: T): T => value === undefined ? value : JSON.parse(JSON.stringify(value));
+
+const resolveLegacyProjectType = (...candidates: unknown[]): ProjectType => {
+    for (const candidate of candidates) {
+        if (candidate === 'SERIES') return 'SERIES';
+        if (candidate === 'MOVIE') return 'MOVIE';
+    }
+    return 'MOVIE';
+};
+
+export interface LegacyParentContext {
+    playerId: string;
+    actorId: string;
+    name: string;
+    gender: Player['gender'];
+    avatar: string;
+    isDeceased: boolean;
+    inheritedAtAge: number;
+    inheritedAtWeek: number;
+    studioIds: string[];
+    franchiseIds: string[];
+    universeIds: UniverseId[];
+    projectCount: number;
+}
+
+const getLegacyParentActorId = (player: Pick<Player, 'id'>) => `legacy_parent_actor_${String(player.id || 'player').replace(/[^a-z0-9_]/gi, '_')}`;
+
+const getLegacyParentTier = (fame: number): NPCActor['tier'] => {
+    if (fame >= 90) return 'ICON';
+    if (fame >= 75) return 'A_LIST';
+    if (fame >= 50) return 'ESTABLISHED';
+    if (fame >= 25) return 'RISING';
+    return 'INDIE';
+};
+
+export const createLegacyParentActor = (player: Player, isDeceased = !!player.flags?.isDead): NPCActor => {
+    const fame = Math.max(0, Math.min(100, Math.round(player.stats?.fame || 0)));
+    const talent = Math.max(25, Math.min(100, Math.round(player.stats?.talent || fame || 45)));
+
+    return {
+        id: getLegacyParentActorId(player),
+        name: player.name,
+        handle: `@${String(player.name || 'legacy').replace(/\s+/g, '_').toLowerCase()}`,
+        gender: player.gender,
+        avatar: player.avatar,
+        tier: getLegacyParentTier(fame),
+        prestigeBias: (player.stats?.reputation || 0) >= 60 ? 'PRESTIGE' : 'MIXED',
+        openness: isDeceased ? 0 : 82,
+        followers: Math.max(0, Math.floor(player.stats?.followers || 0)),
+        netWorth: Math.max(0, Math.floor(player.money || 0)),
+        occupation: 'ACTOR',
+        age: player.age,
+        bio: isDeceased
+            ? `${player.name} is remembered as a studio founder and performer.`
+            : `${player.name} is a studio founder and performer available for selected productions.`,
+        stats: {
+            fame,
+            talent,
+            reputation: Math.max(0, Math.min(100, Math.round(player.stats?.reputation || 0))),
+            looks: Math.max(0, Math.min(100, Math.round(player.stats?.looks || 50))),
+            body: Math.max(0, Math.min(100, Math.round(player.stats?.body || 50))),
+            skills: clone(player.stats?.skills)
+        },
+        isIndependent: false
+    };
+};
+
+const PLAYER_SELF_REFERENCE_KEYS = new Set([
+    'id',
+    'actorId',
+    'directorId',
+    'npcId',
+    'leadActorId',
+    'performerId'
+]);
+
+export const rewritePlayerSelfReferencesForLegacyParent = <T,>(value: T, parentActor: NPCActor): T => {
+    const rewrite = (entry: any): any => {
+        if (Array.isArray(entry)) return entry.map(rewrite);
+        if (!entry || typeof entry !== 'object') return entry;
+
+        const next: any = {};
+        let rewroteSelfReference = false;
+
+        Object.entries(entry).forEach(([key, rawValue]) => {
+            if (PLAYER_SELF_REFERENCE_KEYS.has(key) && rawValue === 'PLAYER_SELF') {
+                next[key] = parentActor.id;
+                rewroteSelfReference = true;
+                return;
+            }
+            next[key] = rewrite(rawValue);
+        });
+
+        if (rewroteSelfReference) {
+            if ('actorName' in next || 'actorId' in next) next.actorName = parentActor.name;
+            if ('directorName' in next || 'directorId' in next) next.directorName = parentActor.name;
+            if ('name' in next && ('role' in next || 'roleType' in next || 'tier' in next)) next.name = parentActor.name;
+            if ('isPlayer' in next) next.isPlayer = false;
+        }
+
+        return next;
+    };
+
+    return rewrite(clone(value));
+};
+
+const toLegacyStudioProject = (project: any, parentActor: NPCActor, source: 'PAST' | 'ACTIVE') => {
+    const rewritten = rewritePlayerSelfReferencesForLegacyParent(project, parentActor) as any;
+    const id = String(rewritten.id || rewritten.projectId || rewritten.title || rewritten.name || `legacy_project_${source.toLowerCase()}`);
+    const details = rewritten.projectDetails || rewritten;
+    const projectType = resolveLegacyProjectType(rewritten.projectType, details.projectType, rewritten.type, details.type);
+
+    return {
+        ...details,
+        ...rewritten,
+        id,
+        name: rewritten.name || details.title || details.name || 'Inherited Studio Project',
+        title: details.title || rewritten.title || rewritten.name || details.name || 'Inherited Studio Project',
+        legacySourceProjectId: id,
+        legacyParentActorId: parentActor.id,
+        legacyParentName: parentActor.name,
+        isLegacyStudioProject: true,
+        legacySource: source,
+        studioId: rewritten.studioId || details.studioId,
+        franchiseId: rewritten.franchiseId || details.franchiseId,
+        universeId: rewritten.universeId || details.universeId,
+        castList: Array.isArray(rewritten.castList) ? rewritten.castList : Array.isArray(details.castList) ? details.castList : [],
+        gross: rewritten.gross ?? rewritten.totalGross ?? details.gross ?? details.totalGross ?? 0,
+        imdbRating: rewritten.imdbRating ?? details.imdbRating ?? rewritten.rating ?? details.rating ?? 0,
+        rating: rewritten.rating ?? rewritten.imdbRating ?? details.rating ?? details.imdbRating ?? 0,
+        projectType,
+        type: projectType,
+        releaseYear: rewritten.releaseYear || details.releaseYear || rewritten.year || details.year,
+        year: rewritten.year || rewritten.releaseYear || details.year || details.releaseYear
+    };
+};
+
+export const getInheritedStudioProjects = (
+    player: Pick<Player, 'flags'>,
+    studioId?: string
+): any[] => {
+    const projects = Array.isArray(player.flags?.legacyStudioProjects) ? player.flags.legacyStudioProjects : [];
+    return projects.filter((project: any) => !studioId || project.studioId === studioId);
+};
+
+export const buildLegacyStudioInheritance = (
+    player: Player,
+    options: { isDeceased?: boolean } = {}
+) => {
+    const isDeceased = options.isDeceased ?? !!player.flags?.isDead;
+    const parentActor = createLegacyParentActor(player, isDeceased);
+    const inheritedBusinesses = rewritePlayerSelfReferencesForLegacyParent(player.businesses || [], parentActor);
+    const inheritedStudio = player.studio ? rewritePlayerSelfReferencesForLegacyParent(player.studio, parentActor) : undefined;
+    const inheritedWorld = player.world ? rewritePlayerSelfReferencesForLegacyParent(player.world, parentActor) : undefined;
+    const studioIds = inheritedBusinesses
+        .filter((business: any) => business?.type === 'PRODUCTION_HOUSE' && business?.id)
+        .map((business: any) => String(business.id));
+    const studioIdSet = new Set(studioIds);
+    const legacyPastProjects = (player.pastProjects || [])
+        .filter((project: any) => project?.studioId && studioIdSet.has(String(project.studioId)))
+        .map(project => toLegacyStudioProject(project, parentActor, 'PAST'));
+    const legacyActiveProjects = (player.activeReleases || [])
+        .filter((release: any) => release?.projectDetails?.studioId && studioIdSet.has(String(release.projectDetails.studioId)))
+        .map(release => toLegacyStudioProject({
+            ...(release.projectDetails || {}),
+            id: release.id,
+            name: release.name || release.projectDetails?.title,
+            totalGross: release.totalGross,
+            streamingRevenue: release.streamingRevenue,
+            imdbRating: release.imdbRating,
+            releaseYear: release.releaseYear,
+            releaseWeek: release.releaseWeek,
+            releasedAtAbsoluteWeek: release.releasedAtAbsoluteWeek
+        }, parentActor, 'ACTIVE'));
+    const legacyProjects = [...legacyPastProjects, ...legacyActiveProjects];
+    const franchiseIds = Array.from(new Set(legacyProjects.map(project => project.franchiseId).filter(Boolean).map(String)));
+    const universeIds = Array.from(new Set(legacyProjects.map(project => project.universeId).filter(Boolean).map(String))) as UniverseId[];
+    const existingExtraNPCs = Array.isArray(player.flags?.extraNPCs) ? player.flags.extraNPCs : [];
+    const extraNPCs = isDeceased
+        ? existingExtraNPCs.filter((npc: any) => npc?.id !== parentActor.id)
+        : [parentActor, ...existingExtraNPCs.filter((npc: any) => npc?.id !== parentActor.id)];
+
+    const legacyParent: LegacyParentContext = {
+        playerId: player.id,
+        actorId: parentActor.id,
+        name: parentActor.name,
+        gender: parentActor.gender,
+        avatar: parentActor.avatar,
+        isDeceased,
+        inheritedAtAge: player.age,
+        inheritedAtWeek: player.currentWeek,
+        studioIds,
+        franchiseIds,
+        universeIds,
+        projectCount: legacyProjects.length
+    };
+
+    return {
+        parentActor,
+        legacyParent,
+        legacyProjects,
+        businesses: inheritedBusinesses,
+        studio: inheritedStudio,
+        world: inheritedWorld,
+        flags: {
+            legacyParent,
+            legacyStudioProjects: legacyProjects,
+            extraNPCs
+        }
+    };
+};
 
 export const getAbsoluteWeek = (age: number, currentWeek: number): number => {
     const safeAge = Math.max(1, age);
