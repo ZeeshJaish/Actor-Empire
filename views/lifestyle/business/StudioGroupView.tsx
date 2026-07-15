@@ -18,9 +18,11 @@ import type { Business, Player, SubsidiaryOperatingModel } from '../../../types'
 import type { DevelopmentLabInitialTab } from './DevelopmentLab';
 import {
     executeFullStudioMerger,
+    getFullMergerCarveOutTerms,
     getOperatingModels,
     getOperatingModelDefinition,
     getStudioGroup,
+    reverseFullStudioMerger,
     setSubsidiaryOperatingModel,
 } from '../../../services/studioGroup';
 import { getAcquisitionDebtSummary } from '../../../services/acquisitionDebt';
@@ -165,7 +167,9 @@ export const StudioGroupView: React.FC<StudioGroupViewProps> = ({ player, onBack
     const [selectedStudioId, setSelectedStudioId] = React.useState<string | null>(null);
     const [commandStudioId, setCommandStudioId] = React.useState<string | null>(initialCommandStudioId || null);
     const [selectedModel, setSelectedModel] = React.useState<SubsidiaryOperatingModel | null>(null);
+    const [carveOutStudioId, setCarveOutStudioId] = React.useState<string | null>(null);
     const selectedStudio = group.subsidiaries.find(studio => studio.id === selectedStudioId);
+    const carveOutStudio = group.mergedStudios.find(studio => studio.id === carveOutStudioId);
     const commandStudio = group.subsidiaries.find(studio => studio.id === commandStudioId);
     const groupValuation = group.allStudios.reduce((total, studio) => total + (studio.stats.valuation || 0), 0);
     const groupCapital = group.allStudios.reduce((total, studio) => total + (studio.balance || 0), 0);
@@ -202,6 +206,15 @@ export const StudioGroupView: React.FC<StudioGroupViewProps> = ({ player, onBack
         onUpdatePlayer(result.player);
         setSelectedStudioId(null);
         setSelectedModel(null);
+    };
+
+    const confirmCarveOut = () => {
+        if (!carveOutStudio) return;
+        const result = reverseFullStudioMerger({ player, studioId: carveOutStudio.id });
+        if (!result.success) return;
+        onUpdatePlayer(result.player);
+        setCarveOutStudioId(null);
+        setCommandStudioId(result.restoredStudio?.id || null);
     };
 
     if (commandStudio) {
@@ -362,6 +375,13 @@ export const StudioGroupView: React.FC<StudioGroupViewProps> = ({ player, onBack
                                                     <div className="mt-1 text-[8px] font-black uppercase text-amber-200">HQ Asset</div>
                                                 </div>
                                             </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => setCarveOutStudioId(studio.id)}
+                                                className="mt-3 flex min-h-10 w-full items-center justify-between rounded-[12px] border border-sky-300/30 bg-sky-300/[0.08] px-3 text-[7px] font-black uppercase tracking-[0.14em] text-sky-200"
+                                            >
+                                                Restore Subsidiary <ChevronRight size={13} />
+                                            </button>
                                         </div>
                                     );
                                 })}
@@ -380,6 +400,14 @@ export const StudioGroupView: React.FC<StudioGroupViewProps> = ({ player, onBack
                         onSelect={setSelectedModel}
                         onClose={() => setSelectedStudioId(null)}
                         onConfirm={confirmModel}
+                    />
+                ) : null}
+                {carveOutStudio ? (
+                    <CarveOutDialog
+                        player={player}
+                        studio={carveOutStudio}
+                        onClose={() => setCarveOutStudioId(null)}
+                        onConfirm={confirmCarveOut}
                     />
                 ) : null}
             </AnimatePresence>
@@ -484,7 +512,7 @@ const OperatingModelDialog: React.FC<{
                                 'Studio disappears from active Owned Studios.',
                                 'Catalog and production assets become HQ assets.',
                                 'Debt and liabilities are accepted by the parent studio.',
-                                'Reversing the merger will be difficult and expensive.',
+                                'A future carve-out can restore the banner, but will be expensive.',
                             ].map(item => (
                                 <div key={item} className="flex items-center gap-2 rounded-[13px] border border-amber-300/12 bg-black/25 px-3 py-2">
                                     <Check size={13} className="shrink-0 text-amber-300" />
@@ -516,6 +544,84 @@ const OperatingModelDialog: React.FC<{
                 >
                     {confirmingMerger ? 'Confirm Full Merger' : isMerger ? 'Review Merge Consequences' : 'Confirm Operating Model'} <ArrowUpRight size={16} />
                 </button>
+            </motion.section>
+        </motion.div>
+    );
+};
+
+const CarveOutDialog: React.FC<{
+    player: Player;
+    studio: Business;
+    onClose: () => void;
+    onConfirm: () => void;
+}> = ({ player, studio, onClose, onConfirm }) => {
+    const terms = getFullMergerCarveOutTerms({ player, studioId: studio.id });
+    const parentStudio = getStudioGroup(player).parentStudio;
+    if (!terms || !parentStudio) return null;
+    const canAfford = parentStudio.balance >= terms.totalCost;
+
+    return (
+        <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[95] flex items-end bg-black/80 p-3 backdrop-blur-sm sm:items-center sm:justify-center"
+        >
+            <motion.section
+                initial={{ y: 32, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: 32, opacity: 0 }}
+                className="w-full rounded-[28px] border border-sky-300/30 bg-[#080d12] p-5 shadow-[0_26px_90px_rgba(0,0,0,0.7)] sm:max-w-md"
+            >
+                <div className="flex items-start justify-between gap-4">
+                    <div>
+                        <div className="text-[8px] font-black uppercase tracking-[0.24em] text-sky-200">Corporate Restructuring</div>
+                        <h2 className="mt-1 text-2xl font-black uppercase tracking-tight text-white">Restore Subsidiary</h2>
+                        <p className="mt-1 font-serif text-sm font-black uppercase italic text-sky-100">{studio.name}</p>
+                    </div>
+                    <button type="button" onClick={onClose} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-zinc-500">
+                        <X size={18} />
+                    </button>
+                </div>
+
+                <p className="mt-5 text-[10px] font-semibold leading-relaxed text-zinc-400">
+                    Recreate this banner as a controlled subsidiary. Its original staff, catalog, scripts and rights leave HQ once. Active HQ productions and acquisition debt remain with headquarters.
+                </p>
+
+                <div className="mt-4 overflow-hidden rounded-[18px] border border-sky-300/20 bg-black/30">
+                    <div className="flex items-center justify-between border-b border-white/[0.07] px-4 py-3">
+                        <span className="text-[7px] font-black uppercase tracking-[0.16em] text-zinc-500">Restoration capital</span>
+                        <span className="font-mono text-sm font-black text-emerald-300">{formatMoney(terms.restorationCapital)}</span>
+                    </div>
+                    <div className="flex items-center justify-between border-b border-white/[0.07] px-4 py-3">
+                        <span className="text-[7px] font-black uppercase tracking-[0.16em] text-zinc-500">Separation fee</span>
+                        <span className="font-mono text-sm font-black text-rose-300">{formatMoney(terms.reversalFee)}</span>
+                    </div>
+                    <div className="flex items-center justify-between px-4 py-3">
+                        <span className="text-[7px] font-black uppercase tracking-[0.16em] text-sky-200">Total HQ cost</span>
+                        <span className="font-mono text-base font-black text-white">{formatMoney(terms.totalCost)}</span>
+                    </div>
+                </div>
+
+                {!canAfford ? (
+                    <div className="mt-3 rounded-[14px] border border-rose-300/25 bg-rose-300/[0.07] px-3 py-2.5 text-[8px] font-bold leading-relaxed text-rose-200">
+                        HQ needs {formatMoney(terms.totalCost - parentStudio.balance)} more capital before this carve-out can close.
+                    </div>
+                ) : null}
+
+                <div className="mt-4 grid grid-cols-2 gap-2">
+                    <button type="button" onClick={onClose} className="min-h-11 rounded-[14px] border border-white/10 bg-white/[0.04] text-[8px] font-black uppercase tracking-[0.15em] text-zinc-400">
+                        Keep Integrated
+                    </button>
+                    <button
+                        type="button"
+                        disabled={!canAfford}
+                        onClick={onConfirm}
+                        className="min-h-11 rounded-[14px] bg-sky-300 px-3 text-[8px] font-black uppercase tracking-[0.15em] text-slate-950 disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500"
+                    >
+                        Confirm Carve-Out
+                    </button>
+                </div>
             </motion.section>
         </motion.div>
     );

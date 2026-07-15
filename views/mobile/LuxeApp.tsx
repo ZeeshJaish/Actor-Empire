@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { DatingMatch, DatingPreferences, GameLanguage, NewsItem, Player, Relationship, XPost } from '../../types';
 import {
     calculateSwipeSuccess,
+    getLuxeCandidatePool,
     getLuxeCandidates,
     getLuxeInviteOutcome,
     LUXE_INVITE_COSTS,
@@ -22,11 +23,13 @@ import {
     Lock,
     Martini,
     MessageCircle,
+    Search,
     Send,
     ShipWheel,
     SlidersHorizontal,
     Sparkles,
     Wallet,
+    X,
 } from 'lucide-react';
 
 interface LuxeAppProps {
@@ -189,6 +192,7 @@ export const LuxeApp: React.FC<LuxeAppProps> = ({ player, onBack, onUpdatePlayer
     const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
     const [view, setView] = useState<LuxeView>('GATE');
     const [candidates, setCandidates] = useState<DatingMatch[]>([]);
+    const [searchQuery, setSearchQuery] = useState('');
     const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
     const [activeChatMatchId, setActiveChatMatchId] = useState<string | null>(null);
     const [inviteMode, setInviteMode] = useState<InviteMode>('PRIVATE');
@@ -211,7 +215,12 @@ export const LuxeApp: React.FC<LuxeAppProps> = ({ player, onBack, onUpdatePlayer
     const refreshOffset = player.dating.luxeRefreshOffset || 0;
     const rotationSeed = cycleIndex * 11 + refreshOffset * 3;
     const myMatches = player.dating.matches.filter(match => match.isPremium);
-    const selectedCandidate = candidates.find(candidate => candidate.id === selectedCandidateId) || candidates[0] || null;
+    const normalizedSearchQuery = searchQuery.trim().toLowerCase();
+    const visibleCandidates = useMemo(() => {
+        if (!normalizedSearchQuery) return candidates;
+        return getLuxeCandidatePool(player).filter(candidate => candidate.name.toLowerCase().includes(normalizedSearchQuery));
+    }, [candidates, normalizedSearchQuery, player]);
+    const selectedCandidate = visibleCandidates.find(candidate => candidate.id === selectedCandidateId) || visibleCandidates[0] || null;
     const activeChatMatch = myMatches.find(match => match.id === activeChatMatchId) || null;
     const canAskToDate = !!activeChatMatch && activeChatMatch.officialStatus !== 'GHOSTED' && activeChatMatch.officialStatus !== 'DATING' && ((activeChatMatch.dateCount || 0) >= 1 || activeChatMatch.hasGoneOnDate || activeChatMatch.inviteHistory?.some(entry => entry.outcome === 'SUCCESS'));
     const isReadyToMakeOfficial = !!activeChatMatch && activeChatMatch.officialStatus !== 'DATING' && activeChatMatch.officialStatus !== 'GHOSTED' && canAskToDate;
@@ -271,11 +280,11 @@ export const LuxeApp: React.FC<LuxeAppProps> = ({ player, onBack, onUpdatePlayer
     ]);
 
     useEffect(() => {
-        if (!selectedCandidateId && candidates[0]) setSelectedCandidateId(candidates[0].id);
-        if (selectedCandidateId && !candidates.some(candidate => candidate.id === selectedCandidateId)) {
-            setSelectedCandidateId(candidates[0]?.id || null);
+        if (!selectedCandidateId && visibleCandidates[0]) setSelectedCandidateId(visibleCandidates[0].id);
+        if (selectedCandidateId && !visibleCandidates.some(candidate => candidate.id === selectedCandidateId)) {
+            setSelectedCandidateId(visibleCandidates[0]?.id || null);
         }
-    }, [candidates, selectedCandidateId]);
+    }, [visibleCandidates, selectedCandidateId]);
 
     useEffect(() => {
         if (view !== 'CHAT') return;
@@ -874,7 +883,7 @@ export const LuxeApp: React.FC<LuxeAppProps> = ({ player, onBack, onUpdatePlayer
     };
 
     const queuedCandidates = selectedCandidate
-        ? candidates.filter(candidate => candidate.id !== selectedCandidate.id).slice(0, 3)
+        ? visibleCandidates.filter(candidate => candidate.id !== selectedCandidate.id).slice(0, 3)
         : [];
 
     if (!player.dating.isLuxeActive) {
@@ -1182,6 +1191,35 @@ export const LuxeApp: React.FC<LuxeAppProps> = ({ player, onBack, onUpdatePlayer
                             </div>
                             <SlidersHorizontal size={17} className="text-amber-200" />
                         </button>
+
+                        <div className="mt-3 rounded-[20px] border border-white/7 bg-black/25 px-3 py-2.5">
+                            <div className="flex items-center gap-2">
+                                <Search size={16} className="shrink-0 text-amber-200" />
+                                <input
+                                    value={searchQuery}
+                                    onChange={event => setSearchQuery(event.target.value)}
+                                    placeholder={tr('luxe.search.placeholder')}
+                                    className="min-w-0 flex-1 bg-transparent text-sm font-semibold text-white outline-none placeholder:text-zinc-600"
+                                    aria-label={tr('luxe.search.placeholder')}
+                                />
+                                {searchQuery && (
+                                    <button
+                                        onClick={() => setSearchQuery('')}
+                                        className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-zinc-400 transition-colors hover:bg-white/5 hover:text-white"
+                                        aria-label={tr('luxe.search.clear')}
+                                    >
+                                        <X size={15} />
+                                    </button>
+                                )}
+                            </div>
+                            {normalizedSearchQuery && (
+                                <div className="mt-2 text-[9px] font-black uppercase tracking-[0.16em] text-zinc-500">
+                                    {visibleCandidates.length > 0
+                                        ? tr('luxe.search.results', { count: visibleCandidates.length })
+                                        : tr('luxe.search.noResults')}
+                                </div>
+                            )}
+                        </div>
                     </section>
 
                     {!selectedCandidate && (
@@ -1215,7 +1253,7 @@ export const LuxeApp: React.FC<LuxeAppProps> = ({ player, onBack, onUpdatePlayer
                                         <Info size={14} />
                                     </button>
                                     <div className="flex gap-1.5">
-                                    {candidates.map(candidate => (
+                                    {visibleCandidates.map(candidate => (
                                         <button
                                             key={candidate.id}
                                             onClick={() => setSelectedCandidateId(candidate.id)}

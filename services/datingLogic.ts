@@ -63,6 +63,8 @@ const RANDOM_TINDER_SURNAMES = [
     'Roy', 'Santos', 'Shah', 'Stone', 'Taylor', 'Thomas', 'Torres', 'Walker', 'Wilson', 'Young'
 ];
 
+const LUXE_PLAYER_START_AGE = 15;
+
 interface TinderProfileOptions {
     excludeNames?: string[];
     excludeFirstNames?: string[];
@@ -166,15 +168,22 @@ const getMatchReason = (player: Player, npc: NPCActor, compatibility: number) =>
     return `${npc.name.split(' ')[0]} thinks you could be a fun high-status distraction.`;
 };
 
-const estimateNpcAge = (npc: NPCActor) => {
-    if (npc.tier === 'A_LIST') return 32 + Math.floor(Math.random() * 20);
-    if (npc.tier === 'ESTABLISHED') return 27 + Math.floor(Math.random() * 18);
-    return 22 + Math.floor(Math.random() * 12);
+const getStableNpcAge = (npc: NPCActor): number => {
+    if (typeof npc.age === 'number' && Number.isFinite(npc.age)) return npc.age;
+    if (npc.tier === 'A_LIST') return 38;
+    if (npc.tier === 'ESTABLISHED') return 33;
+    return 26;
 };
 
-const npcMatchesPrefs = (npc: NPCActor, prefs: DatingPreferences) => {
+const getNpcLuxeAge = (player: Player, npc: NPCActor): number => {
+    const baseAge = getStableNpcAge(npc);
+    const careerYearsElapsed = Math.max(0, player.age - LUXE_PLAYER_START_AGE);
+    return clamp(baseAge + careerYearsElapsed, 18, 100);
+};
+
+const npcMatchesPrefs = (player: Player, npc: NPCActor, prefs: DatingPreferences) => {
     const preferredGenders = getPreferredGenders(prefs);
-    const age = estimateNpcAge(npc);
+    const age = getNpcLuxeAge(player, npc);
     return preferredGenders.includes(npc.gender) && age >= prefs.minAge && age <= prefs.maxAge;
 };
 
@@ -242,12 +251,12 @@ export const generateTinderProfile = (prefs: DatingPreferences, options: TinderP
     };
 };
 
-export const getLuxeCandidates = (player: Player, limit = 5, rotationSeed = 0): DatingMatch[] => {
+export const getLuxeCandidatePool = (player: Player): DatingMatch[] => {
     const elites = NPC_DATABASE.filter(npc =>
         (npc.netWorth > 1000000 || npc.tier === 'A_LIST' || npc.tier === 'ESTABLISHED') &&
         !player.relationships.some(r => r.npcId === npc.id && r.relation !== 'Connection') &&
         !player.dating.matches.some(m => m.npcId === npc.id) &&
-        npcMatchesPrefs(npc, player.dating.preferences)
+        npcMatchesPrefs(player, npc, player.dating.preferences)
     );
 
     const ranked = elites
@@ -261,7 +270,7 @@ export const getLuxeCandidates = (player: Player, limit = 5, rotationSeed = 0): 
                 ])
             ).slice(0, 3);
 
-            const age = estimateNpcAge(npc);
+            const age = getNpcLuxeAge(player, npc);
             const prestigeTier = getPrestigeTier(npc);
             const relationshipIntent = getRelationshipIntent(npc);
             const privacyStyle = getPrivacyStyle(npc);
@@ -302,13 +311,18 @@ export const getLuxeCandidates = (player: Player, limit = 5, rotationSeed = 0): 
         })
         .sort((a, b) => (b as any).rankingScore - (a as any).rankingScore);
 
+    return ranked.map(({ rankingScore, ...match }) => match as DatingMatch);
+};
+
+export const getLuxeCandidates = (player: Player, limit = 5, rotationSeed = 0): DatingMatch[] => {
+    const ranked = getLuxeCandidatePool(player);
     if (ranked.length === 0) return [];
 
     const listSize = Math.max(3, limit);
     const startIndex = Math.abs(rotationSeed) % ranked.length;
     const rotated = Array.from({ length: Math.min(listSize, ranked.length) }, (_, index) => ranked[(startIndex + index) % ranked.length]);
 
-    return rotated.map(({ rankingScore, ...match }) => match as DatingMatch);
+    return rotated;
 };
 
 export const calculateSwipeSuccess = (player: Player, match: DatingMatch): boolean => {

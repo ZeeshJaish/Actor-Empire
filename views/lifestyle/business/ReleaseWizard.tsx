@@ -824,6 +824,12 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                     // Only switch phase if not theatrical, otherwise gameLoop will handle the transition
                     distributionPhase: isStillTheatrical ? 'THEATRICAL' : 'STREAMING',
                     streamingRevenue: (release.streamingRevenue || 0) + bid.amount,
+                    streamingUpfrontFee: Math.max(0, Number(release.streamingUpfrontFee ?? release.projectDetails?.streamingRevenue ?? 0)) + bid.amount,
+                    streamingRoyaltyRevenue: Math.max(0, Number(
+                        release.streamingRoyaltyRevenue
+                        ?? Math.max(0, Number(release.streamingRevenue || 0) - Number(release.streamingUpfrontFee ?? release.projectDetails?.streamingRevenue ?? 0))
+                    )),
+                    streamingFundingAmount: Math.max(0, Number(release.streamingFundingAmount || 0)) + Math.max(0, Number(bid.fundingAmount || 0)),
                     investorPayouts: nextInvestorPayouts,
                     streaming: {
                         platformId: bid.platformId as any,

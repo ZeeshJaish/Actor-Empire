@@ -1117,10 +1117,10 @@ export const calculateIMDbRating = (commitment: Commitment): number => {
 };
 
 const BOX_OFFICE_CAPS: Record<BudgetTier, { opening: number, total: number }> = {
-    'LOW': { opening: 30000000, total: 150000000 },
-    'MID': { opening: 120000000, total: 500000000 },
-    // Base targets. The active release receives a stable per-project variance/stretch.
-    'HIGH': { opening: 350000000, total: 1600000000 },
+    'LOW': { opening: 30000000, total: 170000000 },
+    'MID': { opening: 120000000, total: 600000000 },
+    // These are market-size anchors, not fixed outcomes. Package and audience response shape the final ceiling.
+    'HIGH': { opening: 350000000, total: 1750000000 },
     'BLOCKBUSTER': { opening: 600000000, total: 3000000000 }
 };
 
@@ -1156,7 +1156,7 @@ export const calculateDynamicBoxOfficeTotalCap = ({
         (hiddenStats.rawHype || 50) * 0.09
     );
     const eventGenre = SPECTACLE_GENRES.has(genre) || format === 'ANIMATED';
-    const variance = 0.92 + (safeRoll * 0.16);
+    const variance = 0.82 + (safeRoll * 0.36);
     const weakPackageDrag = packageStrength < 58
         ? clamp((58 - packageStrength) * 0.006, 0, 0.14)
         : 0;
@@ -1173,7 +1173,7 @@ export const calculateDynamicBoxOfficeTotalCap = ({
             + clamp(((hiddenStats.fameMultiplier || 1) - 1) * 28, -5, 12);
 
         if (eventScore >= 92) {
-            const breakoutRoom = budgetTier === 'BLOCKBUSTER' ? 0.34 : 0.46;
+            const breakoutRoom = budgetTier === 'BLOCKBUSTER' ? 0.45 : 0.36;
             stretch += clamp((eventScore - 88) / 58, 0.08, breakoutRoom);
             label = eventScore >= 102 ? 'BREAKOUT' : 'EVENT';
         } else if (eventScore >= 82) {
@@ -1182,7 +1182,8 @@ export const calculateDynamicBoxOfficeTotalCap = ({
         }
     }
 
-    const totalCap = Math.floor(baseCap * variance * clamp(stretch, 0.72, budgetTier === 'BLOCKBUSTER' ? 1.42 : 1.58));
+    const maxStretch = budgetTier === 'BLOCKBUSTER' ? 1.45 : budgetTier === 'HIGH' ? 1.35 : 1.28;
+    const totalCap = Math.floor(baseCap * variance * clamp(stretch, 0.64, maxStretch));
     return { totalCap: Math.max(1, totalCap), label };
 };
 

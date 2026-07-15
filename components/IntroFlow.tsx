@@ -24,8 +24,8 @@ interface Props {
 }
 
 const DEMO_SLOTS: SlotEntry[] = [
-  { name: 'Tony Stark', age: 20, fame: 100 },
-  { name: 'Tony Stark', age: 18, fame: 0 },
+  { name: 'Tony Stark', age: 20, fame: 100, totalPlayTimeMs: 0 },
+  { name: 'Tony Stark', age: 18, fame: 0, totalPlayTimeMs: 0 },
   null,
 ];
 

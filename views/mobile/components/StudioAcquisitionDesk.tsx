@@ -16,7 +16,6 @@ import {
     Plus,
     Scale,
     ShieldAlert,
-    Sparkles,
     Target,
     TrendingUp,
     UserRound,
@@ -40,6 +39,7 @@ import {
     type AcquisitionOfferType,
     type SellerResponsePosture,
     getAcquisitionCommitments,
+    getAcquisitionEligibility,
 } from '../../../services/studioAcquisition';
 import { getCompanyPosition, getStrategicStakeThreshold } from '../../../services/companyPosition';
 import { formatMoney } from '../../../services/formatUtils';
@@ -48,6 +48,7 @@ import { getPlayerLanguage, t } from '../../../services/i18n';
 import { PHASE_ONE_ENERGY_COSTS } from '../../../services/energyCosts';
 import { showAd } from '../../../services/adLogic';
 import { hasNoAds } from '../../../services/premiumLogic';
+import { getRegulatorAcquisitionControls } from '../../../services/regulatorPressure';
 
 type I18nKey = Parameters<typeof t>[1];
 
@@ -59,6 +60,7 @@ type AcquisitionRequirementPrompt = {
     message: string;
     detail: string;
     actionLabel?: string;
+    onAction?: () => void;
 };
 
 interface StudioAcquisitionDeskProps {
@@ -66,6 +68,7 @@ interface StudioAcquisitionDeskProps {
     profile: ForbesStudioProfile;
     acquisitionCase?: AcquisitionCase;
     onClose: () => void;
+    onOpenStocks: () => void;
     onImmersiveChange?: (immersive: boolean) => void;
     onSetOperatingModel: (model: SubsidiaryOperatingModel) => { success: boolean };
     onRunDiligence: (funding: AcquisitionFundingSelection) => ReturnType<typeof runDueDiligence>;
@@ -201,6 +204,7 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
     profile,
     acquisitionCase,
     onClose,
+    onOpenStocks,
     onImmersiveChange,
     onSetOperatingModel,
     onRunDiligence,
@@ -237,6 +241,8 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
     const acquisitionCommitments = getAcquisitionCommitments(language);
     const operatingModels = getOperatingModels(language);
     const publicCompany = profile.acquisitionState === 'PUBLICLY_TRADED';
+    const openingEligibility = getAcquisitionEligibility(profile, acquisitionCase);
+    const regulatorControls = getRegulatorAcquisitionControls(player);
     const companyPosition = getCompanyPosition(player, profile);
     const stockControlMode = publicCompany && !profile.isPlayerOwned && companyPosition.influenceStatus === 'CONTROLLING_OWNER';
     const stockControlClosing = acquisitionCase?.status === 'ACQUIRED'
@@ -570,10 +576,94 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
         if (result.success) {
             setFeedback(tr('studioAcquisitionDesk.feedback.offerSubmitted'));
         } else {
-            setFeedback(result.reason === 'INSUFFICIENT_FUNDS'
-                ? tr('studioAcquisitionDesk.feedback.sourceInsufficient')
-                : tr('studioAcquisitionDesk.feedback.offerSubmitFailed'));
+            showOpeningOfferBlocker(result.reason);
         }
+    };
+
+    const showOpeningOfferBlocker = (reason?: string) => {
+        const returnToProfile = () => onClose();
+        const returnToFunding = () => {
+            setSelectedFunding(null);
+            setStage('FUNDING');
+        };
+        const returnToTerms = () => setStage('OFFER');
+        const openStocks = () => {
+            onClose();
+            onOpenStocks();
+        };
+
+        const prompts: Record<string, AcquisitionRequirementPrompt> = {
+            NOT_FOR_SALE: {
+                title: 'Market Closed',
+                message: `${profile.name} is not taking private acquisition offers right now.`,
+                detail: 'The company state changed after this deal room was opened. Unknown liabilities are only a risk warning and are not what blocked the offer.',
+                actionLabel: 'Return to Profile',
+                onAction: returnToProfile,
+            },
+            OFFER_ALREADY_SUBMITTED: {
+                title: 'Offer Already Filed',
+                message: 'The board already has an active offer from you.',
+                detail: 'Wait for the seller response, then return here to negotiate, sign, or walk away. A second opening offer cannot be filed over the first one.',
+                actionLabel: 'View Company Profile',
+                onAction: returnToProfile,
+            },
+            STREAMING_PLATFORM_RESERVED: {
+                title: 'Use the Stock Market',
+                message: 'This public streaming company cannot be bought through a private Forbes offer.',
+                detail: 'Build a controlling stake in Stocks first. Once you hold control, the transfer flow becomes available from the company profile.',
+                actionLabel: 'Open Stocks',
+                onAction: openStocks,
+            },
+            PLAYER_OWNED: {
+                title: 'Already In Your Group',
+                message: `${profile.name} is already part of your studio group.`,
+                detail: 'There is no second acquisition price to pay. Manage it from Studio Group instead.',
+                actionLabel: 'Return to Profile',
+                onAction: returnToProfile,
+            },
+            REGULATOR_REVIEW_ACTIVE: {
+                title: 'Regulatory Review Active',
+                message: 'Your current company review must clear before another opening offer can be filed.',
+                detail: `This is your studio group's competition-review timer, not a liability on this target. ${regulatorControls.acquisitionMoratoriumWeeksRemaining} in-game week${regulatorControls.acquisitionMoratoriumWeeksRemaining === 1 ? '' : 's'} remain before new offers can reopen. Your selected terms have not been submitted or charged.`,
+                actionLabel: 'Review Later',
+            },
+            OFFER_TYPE_UNAVAILABLE: {
+                title: 'Public Market Control',
+                message: 'This company does not accept a private full-acquisition offer.',
+                detail: 'Use Stocks to buy a stake or build majority control. Private-company offer terms are not available for this market listing.',
+                actionLabel: 'Open Stocks',
+                onAction: openStocks,
+            },
+            INVALID_OFFER_TERMS: {
+                title: 'Adjust Your Terms',
+                message: 'The opening price is outside the board\'s credible negotiation range.',
+                detail: 'Set a value that matches the market guidance, then return to review. Nothing has been submitted or deducted.',
+                actionLabel: 'Back to Terms',
+                onAction: returnToTerms,
+            },
+            FUNDING_SOURCE_UNAVAILABLE: {
+                title: 'Funding Source Changed',
+                message: 'That source is no longer available for this acquisition.',
+                detail: 'Choose an available funding source and review the company state again before filing the offer.',
+                actionLabel: 'Choose Funding',
+                onAction: returnToFunding,
+            },
+            INSUFFICIENT_FUNDS: {
+                title: 'Funding Fell Short',
+                message: 'The selected source no longer covers this opening position.',
+                detail: 'No acquisition cash was deducted. Pick another source or lower the offer amount before you submit again.',
+                actionLabel: 'Choose Funding',
+                onAction: returnToFunding,
+            },
+        };
+
+        setRequirementPrompt(prompts[reason || ''] || {
+            title: 'Offer Not Filed',
+            message: 'The company could not accept this opening offer in its current state.',
+            detail: 'Refresh the company profile, then review the market state, terms, and funding source before trying again. Nothing has been deducted.',
+            actionLabel: 'Return to Profile',
+            onAction: returnToProfile,
+        });
     };
 
     const submitRevision = () => {
@@ -776,7 +866,7 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
                                         <AlertTriangle size={22} strokeWidth={2.8} />
                                     </div>
                                     <div className="min-w-0">
-                                        <div className="text-[8px] font-black uppercase tracking-[0.24em] text-amber-300">Signing Requirement</div>
+                                        <div className="text-[8px] font-black uppercase tracking-[0.24em] text-amber-300">Deal Status</div>
                                         <h3 id="acquisition-requirement-title" className="mt-1 text-xl font-black uppercase leading-none tracking-[-0.04em] text-white">
                                             {requirementPrompt.title}
                                         </h3>
@@ -793,7 +883,11 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
                                 <button
                                     type="button"
                                     autoFocus
-                                    onClick={() => setRequirementPrompt(null)}
+                                    onClick={() => {
+                                        const action = requirementPrompt.onAction;
+                                        setRequirementPrompt(null);
+                                        action?.();
+                                    }}
                                     className="mt-5 flex min-h-12 w-full cursor-pointer items-center justify-center rounded-2xl bg-[#d8ab3c] px-4 text-[10px] font-black uppercase tracking-[0.18em] text-black shadow-[0_7px_0_#7a4a0a] transition-transform active:translate-y-1 active:shadow-[0_3px_0_#7a4a0a]"
                                 >
                                     {requirementPrompt.actionLabel || 'Got It'}
@@ -1776,11 +1870,46 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
                                             Submitting records your opening position only. No acquisition price is deducted until the seller accepts and you confirm final signing.
                                         </p>
                                     </div>
+                                    {regulatorControls.isOfferBlocked ? (
+                                        <div className="mt-2.5 flex items-start gap-2.5 rounded-xl border border-amber-400/30 bg-amber-400/[0.09] p-3">
+                                            <Scale size={15} className="mt-0.5 shrink-0 text-amber-300" />
+                                            <div>
+                                                <div className="text-[8px] font-black uppercase tracking-[0.14em] text-amber-200">Company Review In Progress</div>
+                                                <p className="mt-1 text-[8px] font-semibold leading-relaxed text-zinc-300">
+                                                    New acquisition offers reopen in <span className="font-black text-amber-200">{regulatorControls.acquisitionMoratoriumWeeksRemaining} in-game week{regulatorControls.acquisitionMoratoriumWeeksRemaining === 1 ? '' : 's'}</span>. This is your group's competition review, not this studio's debt or liabilities.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    ) : null}
                                     {!report ? (
-                                        <div className="mt-2.5 flex items-start gap-2.5 rounded-xl border border-rose-400/15 bg-rose-400/[0.05] p-3">
-                                            <ShieldAlert size={15} className="mt-0.5 shrink-0 text-rose-300" />
-                                            <p className="text-[8px] font-semibold leading-relaxed text-zinc-400">
-                                                Unknown Liabilities remain. Your offer uses public estimates rather than a verified report.
+                                        <div className="mt-2.5 rounded-xl border border-sky-400/20 bg-sky-400/[0.05] p-3">
+                                            <div className="flex items-start gap-2.5">
+                                                <FileSearch size={15} className="mt-0.5 shrink-0 text-sky-300" />
+                                                <div>
+                                                    <div className="text-[8px] font-black uppercase tracking-[0.14em] text-sky-200">Optional Target Due Diligence</div>
+                                                    <p className="mt-1 text-[8px] font-semibold leading-relaxed text-zinc-400">
+                                                        The target studio's debt, contracts, and obligations are public estimates. This does not block your offer and is not about your own pending payments.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setFundingPurpose('DILIGENCE');
+                                                    setSelectedFunding(null);
+                                                    setStage('FUNDING');
+                                                }}
+                                                className="mt-3 flex min-h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-sky-300/25 bg-sky-300/[0.08] px-3 text-[8px] font-black uppercase tracking-[0.13em] text-sky-100 transition-colors hover:bg-sky-300/[0.14]"
+                                            >
+                                                <FileSearch size={13} /> Verify Target Figures · Optional {formatMoney(diligenceFee)}
+                                            </button>
+                                        </div>
+                                    ) : null}
+                                    {!openingEligibility.canApproach ? (
+                                        <div className="mt-2.5 flex items-start gap-2.5 rounded-xl border border-amber-400/20 bg-amber-400/[0.06] p-3">
+                                            <AlertTriangle size={15} className="mt-0.5 shrink-0 text-amber-300" />
+                                            <p className="text-[8px] font-semibold leading-relaxed text-zinc-300">
+                                                This company is no longer available for a new opening offer. Submit will explain the current market status before anything is charged.
                                             </p>
                                         </div>
                                     ) : null}
@@ -2259,10 +2388,14 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
 	                        <button
 	                            type="button"
 	                            onClick={submitOffer}
-                                disabled={!hasStrategyEnergy}
+                                disabled={!hasStrategyEnergy || regulatorControls.isOfferBlocked}
 	                            className="flex min-h-[52px] w-full items-center justify-center gap-2 rounded-xl bg-amber-400 px-4 text-[9px] font-black uppercase tracking-[0.16em] text-black active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500"
 	                        >
-	                            <Sparkles size={15} /> {hasStrategyEnergy ? 'Submit Opening Offer' : `Need ${strategyEnergyCost}E`}
+	                            <ChevronRight size={15} /> {!hasStrategyEnergy
+                                    ? `Need ${strategyEnergyCost}E`
+                                    : regulatorControls.isOfferBlocked
+                                        ? `Review Hold · ${regulatorControls.acquisitionMoratoriumWeeksRemaining}W Remaining`
+                                        : 'Submit Opening Offer'}
 	                        </button>
                     )}
                     </div>

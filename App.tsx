@@ -60,6 +60,7 @@ import {
   addBreadcrumb,
   markGameCheckpoint,
   markTraceAction,
+  markWeekProcessingStage,
   recordFlowFailure,
   recordNonFatal,
   setCrashContext,
@@ -107,6 +108,7 @@ const WHATS_NEW_STORAGE_KEY = 'actorEmpireSeenWhatsNewVersion';
 const PREMIUM_ENTITLEMENTS_STORAGE_KEY = 'actorEmpirePremiumEntitlements';
 const PREMIUM_SAVE_SLOT_IDS = [1, 2, 3] as const;
 const AUTOSAVE_DEBOUNCE_MS = 750;
+const PLAYTIME_FLUSH_INTERVAL_MS = 60_000;
 const STARTUP_STUDIO_BUMPER_MS = 2400;
 const STARTUP_LOADING_MIN_MS = 8600;
 const STARTUP_LOADING_LINE_KEYS = [
@@ -428,6 +430,9 @@ export const App: React.FC = () => {
   const [initialMobileStockId, setInitialMobileStockId] = useState<string | null>(null);
   const [initialMobileAppMode, setInitialMobileAppMode] = useState<'BOXOFFICE' | 'MESSAGES' | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const weekProcessingLockRef = useRef(false);
+  const activeWeekRunIdRef = useRef<string | null>(null);
+  const lastWeekProcessSettledAtRef = useRef(0);
   const [gameStatus, setGameStatus] = useState<GameStatus>('START_MENU');
   const [skipStartMenuIntro, setSkipStartMenuIntro] = useState(true);
   const [saveSlots, setSaveSlots] = useState<Record<number, Player | null>>({ 1: null, 2: null, 3: null });
@@ -465,6 +470,12 @@ export const App: React.FC = () => {
   const [adTotalSteps, setAdTotalSteps] = useState(1);
   const autosaveTimerRef = useRef<number | null>(null);
   const purchaseUpdateHandlerRef = useRef<(update: IOSPurchaseUpdate) => void>(() => {});
+  const playerRef = useRef(player);
+  const activePlayStartedAtRef = useRef<number | null>(null);
+
+  useEffect(() => {
+      playerRef.current = player;
+  }, [player]);
 
   const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
   const getProcessedStoreTransactionIds = (state: Player): string[] => {
@@ -582,10 +593,36 @@ export const App: React.FC = () => {
   const persistSlotSave = async (
       slot: number,
       nextPlayer: Player,
-      options: { rethrow?: boolean } = {}
+      options: { rethrow?: boolean; weekDiagnostic?: { runId: string; screen: string } } = {}
   ): Promise<Player> => {
+      if (options.weekDiagnostic) {
+          markWeekProcessingStage('persist_prepare_start', nextPlayer, {
+              run_id: options.weekDiagnostic.runId,
+              screen: options.weekDiagnostic.screen,
+              save_slot: slot,
+          });
+      }
       const playerToSave = preparePlayerForPersistence(nextPlayer);
+      if (options.weekDiagnostic) {
+          markWeekProcessingStage('persist_prepare_done', playerToSave, {
+              run_id: options.weekDiagnostic.runId,
+              screen: options.weekDiagnostic.screen,
+              save_slot: slot,
+          });
+          markWeekProcessingStage('indexeddb_write_start', playerToSave, {
+              run_id: options.weekDiagnostic.runId,
+              screen: options.weekDiagnostic.screen,
+              save_slot: slot,
+          });
+      }
       await saveGameData(`actorEmpireSave_${slot}`, playerToSave, { rethrow: options.rethrow });
+      if (options.weekDiagnostic) {
+          markWeekProcessingStage('indexeddb_write_done', playerToSave, {
+              run_id: options.weekDiagnostic.runId,
+              screen: options.weekDiagnostic.screen,
+              save_slot: slot,
+          });
+      }
 
       const writeLocalMirror = () => {
           writeLocalStorageMirror(slot, playerToSave);
@@ -624,9 +661,12 @@ export const App: React.FC = () => {
       void persistSlotSave(currentSlot, nextPlayer);
   };
 
-  const persistCurrentSlotSnapshot = async (nextPlayer: Player): Promise<Player> => {
+  const persistCurrentSlotSnapshot = async (
+      nextPlayer: Player,
+      weekDiagnostic?: { runId: string; screen: string },
+  ): Promise<Player> => {
       if (!currentSlot) return preparePlayerForPersistence(nextPlayer);
-      const playerToSave = await persistSlotSave(currentSlot, nextPlayer, { rethrow: true });
+      const playerToSave = await persistSlotSave(currentSlot, nextPlayer, { rethrow: true, weekDiagnostic });
       setSaveSlots(prev => ({ ...prev, [currentSlot]: playerToSave }));
       return playerToSave;
   };
@@ -1000,6 +1040,59 @@ export const App: React.FC = () => {
         }
     };
   }, [player, gameStatus, currentSlot]);
+
+  useEffect(() => {
+    if (gameStatus !== 'PLAYING' || !currentSlot) {
+      activePlayStartedAtRef.current = null;
+      return;
+    }
+
+    const resumeTimer = () => {
+      activePlayStartedAtRef.current = Date.now();
+    };
+
+    const recordActivePlayTime = (persistImmediately = false) => {
+      const startedAt = activePlayStartedAtRef.current;
+      if (!startedAt) return;
+
+      const elapsedMs = Math.max(0, Date.now() - startedAt);
+      if (elapsedMs === 0) return;
+
+      activePlayStartedAtRef.current = Date.now();
+      const currentPlayer = playerRef.current;
+      const updatedPlayer: Player = {
+        ...currentPlayer,
+        totalPlayTimeMs: Math.min(Number.MAX_SAFE_INTEGER, Math.max(0, currentPlayer.totalPlayTimeMs || 0) + elapsedMs),
+      };
+
+      playerRef.current = updatedPlayer;
+      setPlayer(updatedPlayer);
+      setSaveSlots(prev => ({ ...prev, [currentSlot]: updatedPlayer }));
+      if (persistImmediately) void persistSlotSave(currentSlot, updatedPlayer);
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        recordActivePlayTime(true);
+        activePlayStartedAtRef.current = null;
+      } else {
+        resumeTimer();
+      }
+    };
+    const handlePageHide = () => recordActivePlayTime(true);
+
+    resumeTimer();
+    const interval = window.setInterval(() => recordActivePlayTime(), PLAYTIME_FLUSH_INTERVAL_MS);
+    window.addEventListener('pagehide', handlePageHide);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      recordActivePlayTime(true);
+      window.clearInterval(interval);
+      window.removeEventListener('pagehide', handlePageHide);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [gameStatus, currentSlot]);
 
   const handleSelectSlot = (slot: number) => {
     setCurrentSlot(slot);
@@ -1471,12 +1564,33 @@ export const App: React.FC = () => {
   };
 
   const handleNextWeek = async () => {
-    if (isProcessing) return;
+    const now = Date.now();
+    if (weekProcessingLockRef.current || isProcessing) {
+      markWeekProcessingStage('input_rejected_busy', player, {
+        status: 'running',
+        run_id: activeWeekRunIdRef.current || undefined,
+        screen: Page[activePage] || String(activePage),
+        save_slot: currentSlot,
+      });
+      return;
+    }
+    if (now - lastWeekProcessSettledAtRef.current < 500) {
+      markWeekProcessingStage('input_rejected_cooldown', player, {
+        status: 'success',
+        screen: Page[activePage] || String(activePage),
+        save_slot: currentSlot,
+      });
+      return;
+    }
+    weekProcessingLockRef.current = true;
     setIsProcessing(true);
     const traceName = 'process_game_week';
     const startedAt = performance.now();
+    const activePageName = Page[activePage] || String(activePage);
+    const weekRunId = `week_${player.age}_${player.currentWeek}_${Date.now().toString(36)}`;
+    activeWeekRunIdRef.current = weekRunId;
     markTraceAction('process_week_started', {
-      last_screen: Page[activePage] || String(activePage),
+      last_screen: activePageName,
       flow: 'process_week',
       save_slot: currentSlot,
     });
@@ -1491,6 +1605,12 @@ export const App: React.FC = () => {
       week: player.currentWeek,
       pendingEvents: player.pendingEvents?.length || 0,
       commitments: player.commitments?.length || 0,
+    });
+    markWeekProcessingStage('start', player, {
+      status: 'started',
+      run_id: weekRunId,
+      screen: activePageName,
+      save_slot: currentSlot,
     });
     markGameCheckpoint('process_week_start', player, {
       screen: activePage,
@@ -1509,7 +1629,26 @@ export const App: React.FC = () => {
         .filter(Boolean),
     );
     try {
-        const { player: newPlayerState, triggerAd } = await processGameWeek(player);
+        markWeekProcessingStage('game_loop_start', player, {
+            run_id: weekRunId,
+            screen: activePageName,
+            save_slot: currentSlot,
+        });
+        const { player: newPlayerState, triggerAd } = await processGameWeek(player, {
+            onStage: (stage, context) => markWeekProcessingStage(`loop_${stage}`, player, {
+                ...context,
+                run_id: weekRunId,
+                screen: activePageName,
+                save_slot: currentSlot,
+                elapsed_ms: Math.round(performance.now() - startedAt),
+            }),
+        });
+        markWeekProcessingStage('game_loop_done', newPlayerState, {
+            run_id: weekRunId,
+            screen: activePageName,
+            save_slot: currentSlot,
+            elapsed_ms: Math.round(performance.now() - startedAt),
+        });
         const shouldTriggerBabyQa = !!newPlayerState.flags?.qaBabyNamingNextWeek;
         let syncedPlayerState = shouldTriggerBabyQa
             ? {
@@ -1521,6 +1660,12 @@ export const App: React.FC = () => {
             }
             : newPlayerState;
         let babyNamingDue: PendingBabyNaming | null = null;
+        markWeekProcessingStage('post_week_sync_start', syncedPlayerState, {
+            run_id: weekRunId,
+            screen: activePageName,
+            save_slot: currentSlot,
+            elapsed_ms: Math.round(performance.now() - startedAt),
+        });
 
         if (syncedPlayerState.activePregnancy) {
             const pregnancy = syncedPlayerState.activePregnancy;
@@ -1590,8 +1735,17 @@ export const App: React.FC = () => {
                 };
             }
         }
+        markWeekProcessingStage('post_week_sync_done', syncedPlayerState, {
+            run_id: weekRunId,
+            screen: activePageName,
+            save_slot: currentSlot,
+            elapsed_ms: Math.round(performance.now() - startedAt),
+        });
 
-        const persistedPlayerState = await persistCurrentSlotSnapshot(syncedPlayerState);
+        const persistedPlayerState = await persistCurrentSlotSnapshot(syncedPlayerState, {
+            runId: weekRunId,
+            screen: activePageName,
+        });
         syncedPlayerState = persistedPlayerState;
         handleUpdatePlayer(persistedPlayerState);
         addBreadcrumb('process_week:persisted', {
@@ -1646,8 +1800,15 @@ export const App: React.FC = () => {
             week: syncedPlayerState.currentWeek,
             triggerAd,
         });
+        markWeekProcessingStage('success', syncedPlayerState, {
+            status: 'success',
+            run_id: weekRunId,
+            screen: activePageName,
+            save_slot: currentSlot,
+            elapsed_ms: Math.round(performance.now() - startedAt),
+        });
         markTraceAction('process_week_completed', {
-            last_screen: Page[activePage] || String(activePage),
+            last_screen: activePageName,
             flow: 'process_week',
             save_slot: currentSlot,
         });
@@ -1666,8 +1827,16 @@ export const App: React.FC = () => {
         });
     } catch (error) {
         console.error('Week processing failed:', error);
+        markWeekProcessingStage('failed', player, {
+            status: 'failed',
+            run_id: weekRunId,
+            screen: activePageName,
+            save_slot: currentSlot,
+            elapsed_ms: Math.round(performance.now() - startedAt),
+            error,
+        });
         markTraceAction('process_week_failed', {
-            last_screen: Page[activePage] || String(activePage),
+            last_screen: activePageName,
             flow: 'process_week',
             save_slot: currentSlot,
         });
@@ -1693,8 +1862,11 @@ export const App: React.FC = () => {
             subtext: tr('app.feedback.weekProcessingFailedSubtext')
         });
     } finally {
-        stopPerformanceTrace(traceName, { duration_ms: Math.round(performance.now() - startedAt) });
-        setIsProcessing(false);
+      stopPerformanceTrace(traceName, { duration_ms: Math.round(performance.now() - startedAt) });
+      lastWeekProcessSettledAtRef.current = Date.now();
+      activeWeekRunIdRef.current = null;
+      weekProcessingLockRef.current = false;
+      setIsProcessing(false);
     }
   };
 

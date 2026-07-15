@@ -144,6 +144,30 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
       return Math.round(((previous - latest) / previous) * 100);
   };
 
+  const getStreamingContract = (rel: ActiveRelease) => {
+      const explicitUpfrontFee = rel.streamingUpfrontFee ?? rel.projectDetails?.streamingRevenue;
+      const upfrontFee = Math.max(0, Number(
+          explicitUpfrontFee
+          ?? (rel.studioRoyaltyPercentage ? 0 : rel.streamingRevenue || 0)
+      ));
+      const royaltyRevenue = Math.max(0, Number(
+          rel.streamingRoyaltyRevenue
+          ?? Math.max(0, Number(rel.streamingRevenue || 0) - upfrontFee)
+      ));
+      const platformFunding = Math.max(0, Number(
+          rel.streamingFundingAmount
+          ?? rel.projectDetails?.hiddenStats?.nextSeasonFundingAmount
+          ?? 0
+      ));
+
+      return {
+          upfrontFee,
+          royaltyRevenue,
+          platformFunding,
+          totalReceipts: upfrontFee + royaltyRevenue,
+      };
+  };
+
   const getStreamingRolloutStatus = (rel: ActiveRelease) => {
       const streamingState = rel.streaming;
       const weeklyViews = streamingState?.weeklyViews || [];
@@ -700,6 +724,7 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
       const platform = isStreamingRelease ? PLATFORMS[rel.streaming!.platformId] : null;
       const tone = isStreamingRelease ? 'streaming' : 'theatrical';
       const streamingRolloutStatus = isStreamingRelease ? getStreamingRolloutStatus(rel) : null;
+      const streamingContract = isStreamingRelease ? getStreamingContract(rel) : null;
 
       const renderDetailTabs = () => (
           <div className="shrink-0 border-b border-white/10 bg-black/35 px-3 py-2 backdrop-blur-md">
@@ -776,7 +801,7 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
                       {isStreamingRelease ? (
                           <>
 	                              {renderMetric(tr('box.totalViews'), formatViews(rel.streaming!.totalViews))}
-	                              {renderMetric(tr('box.streamingRevenue'), formatMoney(rel.streamingRevenue || 0), 'text-emerald-300')}
+	                              {renderMetric(tr('box.streamingReceipts'), formatMoney(streamingContract!.totalReceipts), 'text-emerald-300')}
 	                              {soundtrackRevenue > 0 && renderMetric(tr('box.soundtrackRevenue'), formatMoney(soundtrackRevenue), 'text-cyan-300')}
 	                              {renderMetric(tr('box.latestWeek'), streamingRolloutStatus?.isPending ? 'Pending' : formatViews(weeklyValues.slice(-1)[0] || 0), streamingRolloutStatus?.isPending ? 'text-indigo-200' : 'text-white')}
 	                              {renderMetric(tr('box.weeklyDrop'), streamingRolloutStatus?.isPending ? 'Waiting' : latestDrop === null ? '-' : `${latestDrop}%`, streamingRolloutStatus?.isPending ? 'text-indigo-200' : latestDrop !== null && latestDrop < 0 ? 'text-emerald-300' : 'text-amber-300')}
@@ -791,6 +816,18 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
                           </>
                       )}
                   </div>
+                  {isStreamingRelease && streamingContract && (
+                      <div className="mt-3 grid grid-cols-2 gap-2 border-t border-white/10 pt-3">
+                          {renderMetric(tr('box.streamingUpfront'), formatMoney(streamingContract.upfrontFee), 'text-sky-200')}
+                          {renderMetric(tr('box.streamingRoyalty'), formatMoney(streamingContract.royaltyRevenue), 'text-emerald-300')}
+                          {streamingContract.platformFunding > 0 && renderMetric(tr('box.streamingFunding'), formatMoney(streamingContract.platformFunding), 'text-indigo-200')}
+                          {streamingContract.royaltyRevenue === 0 && (
+                              <div className="col-span-2 text-[10px] font-bold leading-relaxed text-zinc-500">
+                                  {streamingContract.platformFunding > 0 ? tr('box.streamingFundedSeason') : tr('box.streamingNoBackend')}
+                              </div>
+                          )}
+                      </div>
+                  )}
               </div>
 
               {investorPlan && investorPlan.totalRaised > 0 && (
@@ -979,8 +1016,10 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
                           </div>
                       </div>
                       <div className="mt-3 grid grid-cols-2 gap-2">
-                          {renderMetric(tr('box.studioRoyalty'), formatMoney(rel.streamingRevenue || 0), 'text-emerald-300')}
-                          {renderMetric(tr('box.revenuePerView'), `$${((rel.streamingRevenue || 0) / Math.max(1, rel.streaming!.totalViews)).toFixed(2)}`, 'text-indigo-300')}
+                          {renderMetric(tr('box.streamingUpfront'), formatMoney(getStreamingContract(rel).upfrontFee), 'text-sky-200')}
+                          {renderMetric(tr('box.streamingRoyalty'), formatMoney(getStreamingContract(rel).royaltyRevenue), 'text-emerald-300')}
+                          {getStreamingContract(rel).platformFunding > 0 && renderMetric(tr('box.streamingFunding'), formatMoney(getStreamingContract(rel).platformFunding), 'text-indigo-200')}
+                          {renderMetric(tr('box.revenuePerView'), `$${(getStreamingContract(rel).royaltyRevenue / Math.max(1, rel.streaming!.totalViews)).toFixed(2)}`, 'text-indigo-300')}
                       </div>
                   </div>
               ) : theatricalChains.length === 0 ? (

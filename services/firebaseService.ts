@@ -46,7 +46,8 @@ const AUTH_BOOTSTRAP_TIMEOUT_MS = 12000;
 const FIREBASE_AUTH_STORAGE_KEY = 'actorEmpire.firebaseAnonymousAuth.v1';
 const FIREBASE_AUTH_REFRESH_SAFETY_MS = 5 * 60 * 1000;
 const FIRESTORE_ISSUE_REPORT_COLLECTION = 'issueReports';
-const TRACE_CONTEXT_LIMIT = 18;
+const TRACE_CONTEXT_LIMIT = 30;
+const WEEK_PROCESSING_DEBUG_STORAGE_KEY = 'actorEmpire.weekProcessingDebug.v1';
 const FIREBASE_WEB_CONFIG = {
   authDomain: 'actor-empire-1ff1d.firebaseapp.com',
   projectId: 'actor-empire-1ff1d',
@@ -84,7 +85,49 @@ type TraceContext = {
   save_size?: number;
   save_key?: string;
   flow?: string;
+  week_process_stage?: string;
+  week_process_status?: string;
+  week_process_run_id?: string;
+  week_process_elapsed_ms?: number;
+  week_process_error?: string;
+  acquisition_studio_id?: string;
+  acquisition_state?: string;
+  acquisition_case_status?: string;
+  acquisition_offer_type?: string;
+  acquisition_funding_source?: string;
+  acquisition_offer_m?: number;
+  acquisition_diligence_complete?: boolean;
+  acquisition_result?: string;
+  acquisition_reason?: string;
   updated_at?: string;
+};
+
+type WeekProcessingDebugSnapshot = {
+  run_id?: string;
+  status?: string;
+  stage?: string;
+  age?: number;
+  week?: number;
+  screen?: string;
+  save_slot?: string | number;
+  started_at?: string;
+  updated_at?: string;
+  elapsed_ms?: number;
+  save_size?: number;
+  save_size_mb?: number;
+  pending_events?: number;
+  commitments?: number;
+  active_releases?: number;
+  inbox_messages?: number;
+  production_house_projects?: number;
+  studio_scripts?: number;
+  studio_concepts?: number;
+  pending_return_deals?: number;
+  studio_balance_m?: number;
+  error?: string;
+  slowest_stage?: string;
+  slowest_stage_ms?: number;
+  stage_timeline?: string;
 };
 
 let traceContext: TraceContext = {};
@@ -197,6 +240,9 @@ const getCompactTraceParams = () => sanitizeParams({
   trace_greenlight_step: traceContext.greenlight_step,
   trace_project_phase: traceContext.active_project_phase,
   trace_save_slot: traceContext.save_slot,
+  trace_week_stage: traceContext.week_process_stage,
+  trace_week_status: traceContext.week_process_status,
+  trace_week_ms: traceContext.week_process_elapsed_ms,
 });
 
 export const getTelemetryTraceContext = () => ({ ...traceContext });
@@ -419,6 +465,67 @@ const getReportSaveSlot = (player?: Player | null) => {
   }
   const match = String(traceContext.save_key || '').match(/actorEmpireSave_(\d+)/);
   return match?.[1] ? Number(match[1]) : '';
+};
+
+const readWeekProcessingDebugSnapshot = (): WeekProcessingDebugSnapshot | null => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(WEEK_PROCESSING_DEBUG_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed as WeekProcessingDebugSnapshot : null;
+  } catch {
+    return null;
+  }
+};
+
+const writeWeekProcessingDebugSnapshot = (snapshot: WeekProcessingDebugSnapshot) => {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(WEEK_PROCESSING_DEBUG_STORAGE_KEY, JSON.stringify(snapshot));
+  } catch {
+    // Diagnostics must never block the save or week-processing path.
+  }
+};
+
+const getWeekProcessingDebugFields = () => {
+  const snapshot = readWeekProcessingDebugSnapshot();
+  if (!snapshot) return {};
+  const updatedAtMs = snapshot.updated_at ? Date.parse(snapshot.updated_at) : NaN;
+  const staleMinutes = Number.isFinite(updatedAtMs)
+    ? Math.max(0, Math.round((Date.now() - updatedAtMs) / 60000))
+    : undefined;
+
+  return Object.fromEntries(
+    Object.entries({
+      week_debug_run_id: snapshot.run_id,
+      week_debug_status: snapshot.status,
+      week_debug_stage: snapshot.stage,
+      week_debug_age: snapshot.age,
+      week_debug_week: snapshot.week,
+      week_debug_screen: snapshot.screen,
+      week_debug_save_slot: snapshot.save_slot,
+      week_debug_started_at: snapshot.started_at,
+      week_debug_updated_at: snapshot.updated_at,
+      week_debug_elapsed_ms: snapshot.elapsed_ms,
+      week_debug_save_size: snapshot.save_size,
+      week_debug_save_mb: snapshot.save_size_mb,
+      week_debug_pending_events: snapshot.pending_events,
+      week_debug_commitments: snapshot.commitments,
+      week_debug_active_releases: snapshot.active_releases,
+      week_debug_inbox_messages: snapshot.inbox_messages,
+      week_debug_production_projects: snapshot.production_house_projects,
+      week_debug_studio_scripts: snapshot.studio_scripts,
+      week_debug_studio_concepts: snapshot.studio_concepts,
+      week_debug_pending_return_deals: snapshot.pending_return_deals,
+      week_debug_studio_balance_m: snapshot.studio_balance_m,
+      week_debug_error: snapshot.error,
+      week_debug_slowest_stage: snapshot.slowest_stage,
+      week_debug_slowest_stage_ms: snapshot.slowest_stage_ms,
+      week_debug_stage_timeline: snapshot.stage_timeline,
+      week_debug_stale_minutes: staleMinutes,
+    }).filter(([, value]) => value !== undefined && value !== null && value !== '')
+  );
 };
 
 const shouldSendCheckpointEvent = (checkpoint: string) => {
@@ -748,6 +855,20 @@ export const markTraceAction = (action: string, context: Record<string, unknown>
       'save_size',
       'save_key',
       'flow',
+      'week_process_stage',
+      'week_process_status',
+      'week_process_run_id',
+      'week_process_elapsed_ms',
+      'week_process_error',
+      'acquisition_studio_id',
+      'acquisition_state',
+      'acquisition_case_status',
+      'acquisition_offer_type',
+      'acquisition_funding_source',
+      'acquisition_offer_m',
+      'acquisition_diligence_complete',
+      'acquisition_result',
+      'acquisition_reason',
     ].includes(safeKey)) {
       (updates as Record<string, unknown>)[safeKey] = sanitizeValue(value);
     }
@@ -783,6 +904,137 @@ export const setCrashContext = (player?: Player | null, context: Record<string, 
   if (userId) {
     void runSafely('analytics-user-id', () => FirebaseAnalytics.setUserId({ userId: String(userId) }));
     void runSafely('crashlytics-user-id', () => FirebaseCrashlytics.setUserId({ userId: String(userId) }));
+  }
+};
+
+export const markWeekProcessingStage = (
+  stage: string,
+  player?: Player | null,
+  context: Record<string, unknown> = {}
+) => {
+  const safeStage = sanitizeName(stage, 'stage');
+  const nowIso = new Date().toISOString();
+  const previous = readWeekProcessingDebugSnapshot();
+  const runId = String(context.run_id || previous?.run_id || `week_${Date.now().toString(36)}`).slice(0, 90);
+  const isNewRun = previous?.run_id !== runId || safeStage === 'start';
+  const startedAt = isNewRun ? nowIso : previous?.started_at || nowIso;
+  const startedAtMs = Date.parse(startedAt);
+  const elapsedMs = typeof context.elapsed_ms === 'number'
+    ? Math.max(0, Math.round(context.elapsed_ms))
+    : Number.isFinite(startedAtMs)
+      ? Math.max(0, Date.now() - startedAtMs)
+      : undefined;
+  // Full serialization is expensive on long-running mobile saves. Capture it only
+  // at the start and after compaction, then reuse that size for every checkpoint.
+  const shouldMeasureSaveSize = typeof context.save_size === 'number'
+    || safeStage === 'start'
+    || safeStage === 'persist_prepare_done';
+  const saveSize = typeof context.save_size === 'number'
+    ? context.save_size
+    : shouldMeasureSaveSize
+      ? estimateSaveSize(player)
+      : previous?.save_size || 0;
+  const playerSnapshot = getPlayerSnapshot(player);
+  const productionSnapshot = getProductionHouseSnapshot(player);
+  const status = String(context.status || (safeStage.includes('fail') ? 'failed' : safeStage === 'success' ? 'success' : 'running'));
+  const error = context.error ? getErrorMessage(context.error) : undefined;
+  const screen = context.screen !== undefined ? String(context.screen).slice(0, 90) : previous?.screen;
+  const saveSlot = context.save_slot !== undefined
+    ? context.save_slot as string | number
+    : getReportSaveSlot(player) || previous?.save_slot;
+  const numericContext = (key: string, fallback?: number) => (
+    typeof context[key] === 'number' && Number.isFinite(context[key] as number)
+      ? context[key] as number
+      : fallback
+  );
+
+  const previousUpdatedAtMs = previous?.updated_at ? Date.parse(previous.updated_at) : NaN;
+  const stageDurationMs = !isNewRun && Number.isFinite(previousUpdatedAtMs)
+    ? Math.max(0, Date.now() - previousUpdatedAtMs)
+    : 0;
+  const previousTimeline = isNewRun ? [] : String(previous?.stage_timeline || '')
+    .split('|')
+    .filter(Boolean)
+    .slice(-19);
+  const stageTimeline = [...previousTimeline, `${safeStage}:${stageDurationMs}`].join('|').slice(-900);
+  const previousSlowestMs = isNewRun ? 0 : Number(previous?.slowest_stage_ms || 0);
+  const stageIsSlowest = stageDurationMs >= previousSlowestMs;
+  const slowestStageMs = stageIsSlowest ? stageDurationMs : previousSlowestMs;
+  const slowestStage = stageIsSlowest ? safeStage : previous?.slowest_stage;
+  const snapshot: WeekProcessingDebugSnapshot = {
+    run_id: runId,
+    status,
+    stage: safeStage,
+    age: numericContext('age', playerSnapshot.age as number | undefined),
+    week: numericContext('week', playerSnapshot.week as number | undefined),
+    screen,
+    save_slot: saveSlot,
+    started_at: startedAt,
+    updated_at: nowIso,
+    elapsed_ms: elapsedMs,
+    save_size: saveSize,
+    save_size_mb: saveSize ? Math.round((saveSize / 1000000) * 10) / 10 : 0,
+    pending_events: numericContext('pending_events', playerSnapshot.pending_events as number | undefined),
+    commitments: numericContext('commitments', playerSnapshot.commitments as number | undefined),
+    active_releases: numericContext('active_releases', playerSnapshot.active_releases as number | undefined),
+    inbox_messages: numericContext('inbox_messages', playerSnapshot.inbox_messages as number | undefined),
+    production_house_projects: numericContext('production_house_projects', productionSnapshot.production_house_projects),
+    studio_scripts: numericContext('studio_scripts', productionSnapshot.studio_scripts),
+    studio_concepts: numericContext('studio_concepts', productionSnapshot.studio_concepts),
+    pending_return_deals: numericContext('pending_return_deals', productionSnapshot.pending_return_deals),
+    studio_balance_m: numericContext('studio_balance_m', productionSnapshot.studio_balance_m),
+    error,
+    slowest_stage: slowestStage,
+    slowest_stage_ms: slowestStageMs,
+    stage_timeline: stageTimeline,
+  };
+
+  writeWeekProcessingDebugSnapshot(snapshot);
+  markTraceAction(`week_${safeStage}`, {
+    flow: 'process_week',
+    save_slot: saveSlot,
+    save_size: saveSize,
+    week_process_stage: safeStage,
+    week_process_status: status,
+    week_process_run_id: runId,
+    week_process_elapsed_ms: elapsedMs,
+    week_process_error: error,
+  });
+  // Keep detailed timing locally for the support report. Native bridge calls are
+  // intentionally limited to lifecycle boundaries so tracing never causes a stutter.
+  const shouldPublishNativeCheckpoint = [
+    'start',
+    'game_loop_done',
+    'persist_prepare_done',
+    'indexeddb_write_done',
+    'success',
+    'failed',
+  ].includes(safeStage);
+  if (shouldPublishNativeCheckpoint) {
+    setCrashContext(player, {
+      flow: 'process_week',
+      week_stage: safeStage,
+      week_status: status,
+      week_run_id: runId,
+      week_elapsed_ms: elapsedMs,
+      week_save_size: saveSize,
+      week_error: error,
+      week_slowest_stage: slowestStage,
+      week_slowest_stage_ms: slowestStageMs,
+      save_slot: saveSlot,
+      screen,
+    });
+    addBreadcrumb(`week_processing:${safeStage}`, {
+      run_id: runId,
+      status,
+      elapsed_ms: elapsedMs,
+      save_size: saveSize,
+      slowest_stage: slowestStage,
+      slowest_stage_ms: slowestStageMs,
+      save_slot: saveSlot,
+      screen,
+      error,
+    });
   }
 };
 
@@ -830,6 +1082,15 @@ export const markGameCheckpoint = (
     save_slot: snapshot.save_slot,
     greenlight_step: snapshot.step,
     active_project_phase: snapshot.project_phase || snapshot.active_project_phase,
+    acquisition_studio_id: snapshot.acquisition_studio_id,
+    acquisition_state: snapshot.acquisition_state,
+    acquisition_case_status: snapshot.acquisition_case_status,
+    acquisition_offer_type: snapshot.acquisition_offer_type,
+    acquisition_funding_source: snapshot.acquisition_funding_source,
+    acquisition_offer_m: snapshot.acquisition_offer_m,
+    acquisition_diligence_complete: snapshot.acquisition_diligence_complete,
+    acquisition_result: snapshot.acquisition_result,
+    acquisition_reason: snapshot.acquisition_reason,
   });
   addBreadcrumb(`checkpoint:${safeCheckpoint}`, snapshot);
   setCrashKey('last_checkpoint', safeCheckpoint);
@@ -992,6 +1253,7 @@ export const submitPlayerIssueReport = (
     ...getProductionHouseSnapshot(player),
     recent_logs: getRecentLogSnapshot(player),
     ...getFirestoreTraceFields(),
+    ...getWeekProcessingDebugFields(),
     ...runtimeContext,
     ...(payload.extra || {}),
   };

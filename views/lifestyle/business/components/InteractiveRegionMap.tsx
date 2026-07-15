@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useId, useMemo } from 'react';
 import { geoNaturalEarth1, geoPath } from 'd3-geo';
 import { feature, merge } from 'topojson-client';
 import countriesTopology from 'world-atlas/countries-110m.json';
@@ -49,6 +49,17 @@ export const InteractiveRegionMap: React.FC<InteractiveRegionMapProps> = ({
     visualTone = 'release',
     compact = false
 }) => {
+    // SVG ids are global in the document. Namespace every map instance so Android
+    // WebView cannot resolve this map's gradients/clips against another screen's SVG.
+    const mapInstanceId = useId().replace(/[:]/g, '');
+    const svgIds = {
+        ocean: `regionMapOcean-${mapInstanceId}`,
+        landBase: `regionMapLandBase-${mapInstanceId}`,
+        selectedGloss: `regionMapSelectedGloss-${mapInstanceId}`,
+        glow: `regionMapGlow-${mapInstanceId}`,
+        softShadow: `regionMapSoftShadow-${mapInstanceId}`,
+        clip: (regionId: string) => `regionMapClip-${mapInstanceId}-${regionId}`,
+    };
     const selectedRegionSet = useMemo(() => new Set(selectedRegionIds), [selectedRegionIds]);
     const summary = useMemo(() => getRegionMapSummary(selectedRegionIds), [selectedRegionIds]);
     const canInteract = Boolean(onSelectRegion);
@@ -122,39 +133,39 @@ export const InteractiveRegionMap: React.FC<InteractiveRegionMapProps> = ({
                 aria-label="Interactive box office release region map"
             >
                 <defs>
-                    <linearGradient id="regionMapOcean" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <linearGradient id={svgIds.ocean} x1="0%" y1="0%" x2="100%" y2="100%">
                         <stop offset="0%" stopColor="#38bdf8" />
                         <stop offset="45%" stopColor="#0ea5e9" />
                         <stop offset="100%" stopColor="#0369a1" />
                     </linearGradient>
-                    <linearGradient id="regionMapLandBase" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <linearGradient id={svgIds.landBase} x1="0%" y1="0%" x2="100%" y2="100%">
                         <stop offset="0%" stopColor="#bbf7d0" stopOpacity="0.95" />
                         <stop offset="55%" stopColor="#34d399" stopOpacity="0.82" />
                         <stop offset="100%" stopColor="#22d3ee" stopOpacity="0.78" />
                     </linearGradient>
-                    <linearGradient id="regionMapSelectedGloss" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <linearGradient id={svgIds.selectedGloss} x1="0%" y1="0%" x2="100%" y2="100%">
                         <stop offset="0%" stopColor="#ffffff" stopOpacity="0.28" />
                         <stop offset="44%" stopColor="#ffffff" stopOpacity="0.05" />
                         <stop offset="100%" stopColor="#020617" stopOpacity="0.08" />
                     </linearGradient>
                     {projectedRegions.map(region => (
-                        <clipPath key={`clip-${region.id}`} id={`regionMapClip-${region.id}`}>
+                        <clipPath key={`clip-${region.id}`} id={svgIds.clip(region.id)}>
                             <path d={region.path} />
                         </clipPath>
                     ))}
-                    <filter id="regionMapGlow" x="-25%" y="-25%" width="150%" height="150%">
+                    <filter id={svgIds.glow} x="-25%" y="-25%" width="150%" height="150%">
                         <feGaussianBlur stdDeviation="6" result="blur" />
                         <feMerge>
                             <feMergeNode in="blur" />
                             <feMergeNode in="SourceGraphic" />
                         </feMerge>
                     </filter>
-                    <filter id="regionMapSoftShadow" x="-20%" y="-20%" width="140%" height="140%">
+                    <filter id={svgIds.softShadow} x="-20%" y="-20%" width="140%" height="140%">
                         <feDropShadow dx="0" dy="11" stdDeviation="8" floodColor="#075985" floodOpacity="0.35" />
                     </filter>
                 </defs>
 
-                <rect x="0" y="0" width="1000" height="520" rx="34" fill="url(#regionMapOcean)" />
+                <rect x="0" y="0" width="1000" height="520" rx="34" fill={`url(#${svgIds.ocean})`} />
                 <path d="M58 118 C206 86 316 112 462 96 C642 76 778 44 940 88" fill="none" stroke="#ffffff" strokeOpacity="0.18" strokeWidth="2" />
                 <path d="M62 401 C210 434 366 410 524 433 C680 456 812 480 942 430" fill="none" stroke="#ffffff" strokeOpacity="0.16" strokeWidth="2" />
 
@@ -162,7 +173,7 @@ export const InteractiveRegionMap: React.FC<InteractiveRegionMapProps> = ({
                     {MAP_ROUTE_ARCS.map(path => <path key={path} d={path} />)}
                 </g>
 
-                <g className="region-map-landmass region-map-country-topology" filter="url(#regionMapSoftShadow)">
+                <g className="region-map-landmass region-map-country-topology" filter={`url(#${svgIds.softShadow})`}>
                     {projectedRegions.map(region => {
                         const isSelected = selectedRegionSet.has(region.id);
                         return (
@@ -175,12 +186,12 @@ export const InteractiveRegionMap: React.FC<InteractiveRegionMapProps> = ({
                                         stroke={region.accent}
                                         strokeOpacity="0.72"
                                         strokeWidth="8"
-                                        filter="url(#regionMapGlow)"
+                                        filter={`url(#${svgIds.glow})`}
                                     />
                                 )}
                                 <path
                                     d={region.path}
-                                    fill={isSelected ? region.accent : 'url(#regionMapLandBase)'}
+                                    fill={isSelected ? region.accent : `url(#${svgIds.landBase})`}
                                     fillOpacity={isSelected ? 0.88 : 0.58}
                                     stroke={isSelected ? '#ffffff' : '#ecfeff'}
                                     strokeOpacity={isSelected ? 0.72 : 0.28}
@@ -188,9 +199,9 @@ export const InteractiveRegionMap: React.FC<InteractiveRegionMapProps> = ({
                                 />
                                 <path
                                     d={region.path}
-                                    fill="url(#regionMapSelectedGloss)"
+                                    fill={`url(#${svgIds.selectedGloss})`}
                                     fillOpacity={isSelected ? 0.72 : 0.22}
-                                    clipPath={`url(#regionMapClip-${region.id})`}
+                                    clipPath={`url(#${svgIds.clip(region.id)})`}
                                 />
                             </g>
                         );

@@ -181,4 +181,26 @@ assert(diligencePlayer.money - diligence.player.money > baseFee, 'Regulator pres
 const second = processRegulatorPressure(processed);
 assert((second.pendingEvents || []).filter(item => item.data?.regulatorPressureEventType).length === 1, 'Same-week processing should not duplicate regulator events.');
 
+const reviewReadyPlayer: Player = {
+    ...processed,
+    currentWeek: 141,
+    flags: {
+        ...processed.flags,
+        regulatorPressureState: {
+            ...processedState,
+            acquisitionMoratoriumWeeksRemaining: 1,
+            reviewCooldownWeeksRemaining: 1,
+        },
+    },
+};
+const reviewCleared = processRegulatorPressure(reviewReadyPlayer);
+const reviewControls = getRegulatorAcquisitionControls(reviewCleared);
+assert(!reviewControls.isOfferBlocked, 'A completed review should reopen acquisition offers.');
+assert(reviewCleared.inbox?.some(message => message.data?.decision === 'REVIEW_CLEARED'), 'A completed review should send one clear acquisition inbox notice.');
+assert(reviewCleared.news.some(item => /review.*clear|clear.*review/i.test(`${item.headline} ${item.subtext || ''}`)), 'A completed review should publish a clear industry notice.');
+assert(reviewCleared.logs.some(log => /review.*clear|clear.*review/i.test(log.message)), 'A completed review should create a readable clearance log.');
+
+const cooldownWeek = processRegulatorPressure({ ...reviewCleared, currentWeek: 142 });
+assert(!getRegulatorAcquisitionControls(cooldownWeek).isOfferBlocked, 'A just-cleared review should not immediately restart while its cooling-off period is active.');
+
 console.log('Regulator pressure audit passed.');

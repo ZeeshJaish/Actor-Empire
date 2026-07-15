@@ -53,9 +53,11 @@ interface HomePageProps {
 }
 
 type HomeProductionPhase = NonNullable<Commitment['projectPhase']>;
+type CheatMenuMode = 'NONE' | 'DEV' | 'EDITOR';
 
 const CHEAT_GENRES: Genre[] = ALL_GENRES;
 const DEV_TOOLS_PASSCODE = import.meta.env.VITE_DEV_TOOLS_PASSCODE || 'Kzign@420';
+const EDITOR_TOOLS_PASSCODE = 'editor@123';
 const LEGACY_DEV_TOOLS_PASSCODES = ['actor-dev'];
 const HOME_AVATAR_PRESET_SEEDS = [
   'Opening Night',
@@ -119,7 +121,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
   const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
   
   // Cheat Menu State
-  const [activeCheatMenu, setActiveCheatMenu] = useState<'NONE' | 'DEV'>('NONE');
+  const [activeCheatMenu, setActiveCheatMenu] = useState<CheatMenuMode>('NONE');
   const [showPasswordPrompt, setShowPasswordPrompt] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
   const [passwordError, setPasswordError] = useState(false);
@@ -226,13 +228,15 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
 
   const handleUnlockDevTools = () => {
       const normalizedInput = passwordInput.trim();
+      const isEditorPasscode = normalizedInput === EDITOR_TOOLS_PASSCODE;
       const isValidPasscode =
           normalizedInput === DEV_TOOLS_PASSCODE ||
           LEGACY_DEV_TOOLS_PASSCODES.includes(normalizedInput);
 
-      if (isValidPasscode) {
+      if (isEditorPasscode || isValidPasscode) {
           setShowPasswordPrompt(false);
-          setActiveCheatMenu('DEV');
+          setPasswordInput('');
+          setActiveCheatMenu(isEditorPasscode ? 'EDITOR' : 'DEV');
       } else {
           setPasswordError(true);
           setPasswordInput('');
@@ -340,6 +344,21 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
   const updateEnergy = (value: number) => {
       if (!onUpdatePlayer) return;
       onUpdatePlayer({ ...player, energy: { ...player.energy, current: value } });
+  };
+
+  const runEditorAction = (action: () => void, afterAction?: () => void) => {
+      const originalAlert = typeof window !== 'undefined' ? window.alert : undefined;
+      if (originalAlert) {
+          window.alert = () => undefined;
+      }
+      try {
+          action();
+      } finally {
+          if (originalAlert) {
+              window.alert = originalAlert;
+          }
+      }
+      afterAction?.();
   };
 
   const sendCastingFeedbackQaMessage = (stage: 'APPLICATION' | 'AUDITION') => {
@@ -546,7 +565,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
       if (!onUpdatePlayer) return;
       
       const dummyNomination = {
-          project: { id: 'cheat_proj_award', name: 'The Cheat Code', roleType: 'LEAD', year: player.age } as any,
+          project: { id: 'cheat_proj_award', name: 'The Last Horizon', roleType: 'LEAD', year: player.age } as any,
           score: 100,
           category: 'Best Actor'
       };
@@ -556,7 +575,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
           week: player.currentWeek,
           type: 'AWARD_CEREMONY',
           title: 'The Golden Statues',
-          description: 'The biggest night in Hollywood (Debug Mode).',
+          description: 'The biggest night in Hollywood.',
           data: {
               awardDef: { type: 'ACADEMY', name: 'The Golden Statues', prestige: 3.0 },
               nominations: [dummyNomination]
@@ -573,7 +592,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
   const triggerAwardsPolishQa = () => {
       if (!onUpdatePlayer) return;
 
-      const project = { id: `cheat_awards_polish_${Date.now()}`, name: 'Crown of Debug' };
+      const project = { id: `cheat_awards_polish_${Date.now()}`, name: 'Crown of Stars' };
       const makePlayerNomination = (category: string, playerCreditRole: 'ACTOR' | 'WRITER' | 'DIRECTOR' | 'PRODUCER') => ({
           project,
           score: 118,
@@ -610,10 +629,10 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
           id: `evt_awards_polish_qa_${Date.now()}`,
           week: player.currentWeek,
           type: 'AWARD_CEREMONY',
-          title: 'Awards Polish QA',
-          description: 'Debug ceremony for actor, writer, director, and producer award records.',
+          title: 'Golden Statues Night',
+          description: 'A prestige ceremony spotlighting actor, writer, director, and producer recognition.',
           data: {
-              awardDef: { type: 'OSCAR', name: 'Awards Polish QA', prestige: 3.0 },
+              awardDef: { type: 'OSCAR', name: 'The Golden Statues', prestige: 3.0 },
               awardYear: player.age,
               nominations: playerNominations,
               fullBallot
@@ -661,7 +680,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
           pendingEvent: eventData
       });
       setActiveCheatMenu('NONE');
-      alert('Awards Polish QA ready: actor, writer, director, and producer Oscar categories are queued in one ceremony.');
+      alert('Award night is ready: actor, writer, director, and producer categories are queued in one ceremony.');
   };
 
   const triggerAwardInvite = () => {
@@ -721,7 +740,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
       
       const usedTitles = player.commitments.map(c => c.name);
       const project = generateProjectDetails('HIGH', 'MOVIE', usedTitles, player);
-      project.title = type === 'ROYALTY' ? "The Backend Gamble" : "The Easy Payday";
+      project.title = type === 'ROYALTY' ? "The Last Horizon" : "Silver Meridian";
       
       const basePay = 15000000;
       const pay = type === 'ROYALTY' ? 5000000 : basePay; 
@@ -757,8 +776,8 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
 
           msg = {
               id: `msg_cheat_${Date.now()}`,
-              sender: 'Dev Casting',
-              subject: `Negotiation: ${project.title} (${type})`,
+              sender: 'Atlas Casting',
+              subject: `Negotiation: ${project.title}`,
               text: "We are offering points on the backend. Let's discuss terms.",
               type: 'OFFER_NEGOTIATION',
               data: negotiationData,
@@ -770,8 +789,8 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
           // Standard Fixed
           msg = {
               id: `msg_cheat_${Date.now()}`,
-              sender: 'Dev Casting',
-              subject: `Offer: ${project.title} (${type})`,
+              sender: 'Atlas Casting',
+              subject: `Offer: ${project.title}`,
               text: "Here is a standard fixed-fee contract.",
               type: 'OFFER_ROLE',
               data: offer,
@@ -786,7 +805,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
           inbox: [msg, ...player.inbox]
       });
       setActiveCheatMenu('NONE');
-      alert(`Sent ${type} contract to inbox.`);
+      alert('Film contract sent to inbox.');
   };
 
   const triggerCheatFranchiseContract = (universeId: UniverseId) => {
@@ -1132,7 +1151,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
               videos: player.youtube.videos.length > 0 ? player.youtube.videos : [
                   {
                       id: `cheat_yt_vid_${Date.now()}`,
-                      title: 'Cheat Channel Breakout',
+                      title: 'Premiere Week Breakout',
                       type: 'VLOG',
                       thumbnailColor: 'bg-red-600',
                       views: 1200000,
@@ -1147,7 +1166,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                       controversyScore: 4,
                       trustImpact: 3,
                       weeklyHistory: [1200000],
-                      comments: ['Cheat setup: this channel is ready for QA.', 'The creator arc is online.']
+                      comments: ['The creator arc is online.', 'This behind-the-scenes lane feels premium.']
                   }
               ]
           },
@@ -1160,12 +1179,12 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
               lastYoutubeCollabOfferWeek: 0,
               lastYoutubeBrandOfferWeek: 0
           },
-          logs: [{ week: player.currentWeek, year: player.age, message: `▶️ CHEAT: YouTube creator QA channel boosted.`, type: 'positive' as const }, ...player.logs].slice(0, 50)
+          logs: [{ week: player.currentWeek, year: player.age, message: `▶️ YouTube Studio is ready for promo capture.`, type: 'positive' as const }, ...player.logs].slice(0, 50)
       };
 
       onUpdatePlayer(boostedPlayer);
       setActiveCheatMenu('NONE');
-      alert('YouTube QA channel boosted. Open Phone > Social > YouTube Studio.');
+      alert('YouTube Studio is ready. Open Phone > Social > YouTube Studio.');
   };
 
   const triggerYoutubeOffers = () => {
@@ -1181,7 +1200,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
               videos: player.youtube.videos.length > 0 ? player.youtube.videos : [
                   {
                       id: `cheat_yt_vid_offer_${Date.now()}`,
-                      title: 'Cheat Offer Setup',
+                      title: 'Creator Deal Momentum',
                       type: 'VLOG' as const,
                       thumbnailColor: 'bg-red-600',
                       views: 450000,
@@ -1234,10 +1253,10 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
       onUpdatePlayer({
           ...basePlayer,
           inbox: [...messages, ...player.inbox],
-          logs: [{ week: player.currentWeek, year: player.age, message: `📩 CHEAT: YouTube collab/brand offers sent to Messages.`, type: 'positive' }, ...player.logs].slice(0, 50)
+          logs: [{ week: player.currentWeek, year: player.age, message: `📩 YouTube collab and brand offers sent to Messages.`, type: 'positive' }, ...player.logs].slice(0, 50)
       });
       setActiveCheatMenu('NONE');
-      alert('YouTube collab/brand test offers sent to Messages.');
+      alert('YouTube collab and brand offers sent to Messages.');
   };
 
   const triggerYoutubeRivalry = () => {
@@ -1355,7 +1374,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
               authorHandle: player.instagram.handle,
               authorAvatar: '',
               type: 'RED_CARPET' as const,
-              caption: 'Cheat setup: red carpet post ready for detail view QA.',
+              caption: 'Red carpet night. Flashbulbs, velvet rope, and one very expensive suit.',
               week: player.currentWeek,
               year: player.age,
               likes: 24800,
@@ -1378,7 +1397,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
               authorHandle: player.instagram.handle,
               authorAvatar: '',
               type: 'REEL' as const,
-              caption: 'Testing reels, comments, likes and saves.',
+              caption: 'One take from set. The timeline can decide if this is cinema.',
               week: player.currentWeek,
               year: player.age,
               likes: 12600,
@@ -1419,10 +1438,10 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
               lastInstagramMicroEventAbsWeek: 0,
               lastInstagramDmOfferAbsWeek: 0
           },
-          logs: [{ week: player.currentWeek, year: player.age, message: `📸 CHEAT: Instagram QA profile boosted with test posts.`, type: 'positive' }, ...player.logs].slice(0, 50)
+          logs: [{ week: player.currentWeek, year: player.age, message: `📸 Instagram profile prepared with premium promo posts.`, type: 'positive' }, ...player.logs].slice(0, 50)
       });
       setActiveCheatMenu('NONE');
-      alert('Instagram QA profile boosted. Open Phone > Social > Instagram.');
+      alert('Instagram profile is ready. Open Phone > Social > Instagram.');
   };
 
   const triggerInstagramReferralDM = () => {
@@ -1554,7 +1573,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
       const activeRelease = {
           id: `cheat_ig_release_${Date.now()}`,
           projectId: `cheat_ig_project_${Date.now()}`,
-          title: 'Cheat Premiere Night',
+          title: 'Velvet Premiere Night',
           role: 'LEAD',
           genre: 'DRAMA',
           budget: 45000000,
@@ -1566,7 +1585,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
           audienceScore: 88,
           weeksInRelease: 2,
           status: 'RUNNING',
-          studio: 'Cheat Pictures',
+          studio: 'Monarch Pictures',
           releaseStrategy: 'THEATRICAL',
           maxTheatricalWeeks: 12
       } as unknown as ActiveRelease;
@@ -1607,7 +1626,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                   {
                       id: `cheat_ig_commit_${Date.now()}`,
                       type: 'ACTING_GIG',
-                      title: 'Cheat On-Set Role',
+                      title: 'Neon Justice: On-Set Lead',
                       role: 'Lead',
                       startWeek: player.currentWeek,
                       endWeek: player.currentWeek + 8,
@@ -1623,10 +1642,10 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
           )
               ? player.relationships
               : [relationship, ...player.relationships],
-          logs: [{ week: player.currentWeek, year: player.age, message: `📸 CHEAT: Instagram composer unlock conditions enabled.`, type: 'positive' }, ...player.logs].slice(0, 50)
+          logs: [{ week: player.currentWeek, year: player.age, message: `📸 Instagram composer moments are ready for capture.`, type: 'positive' }, ...player.logs].slice(0, 50)
       });
       setActiveCheatMenu('NONE');
-      alert('Instagram composer test kit ready: BTS, Announcement, Red Carpet, Couple, Brand Fit, and Release posts should be unlocked.');
+      alert('Instagram composer is ready: BTS, Announcement, Red Carpet, Couple, Brand Fit, and Release posts are unlocked.');
   };
 
   const triggerXBootstrap = () => {
@@ -1640,7 +1659,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
               authorName: player.name,
               authorHandle: player.x.handle,
               authorAvatar: '',
-              content: 'Cheat setup: X Studio is ready for compose, post detail, replies, quotes, and timeline QA.',
+              content: 'New film, new pressure, new timeline. This next run is going to be loud.',
               timestamp: player.currentWeek,
               likes: 18500,
               retweets: 4200,
@@ -1709,10 +1728,10 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
               feed: [npcPost, ...playerPosts, ...player.x.feed].slice(0, 80),
               lastPostWeek: player.currentWeek
           },
-          logs: [{ week: player.currentWeek, year: player.age, message: `𝕏 CHEAT: X QA profile boosted with feed/detail posts.`, type: 'positive' }, ...player.logs].slice(0, 50)
+          logs: [{ week: player.currentWeek, year: player.age, message: `𝕏 X profile prepared with timeline-ready promo posts.`, type: 'positive' }, ...player.logs].slice(0, 50)
       });
       setActiveCheatMenu('NONE');
-      alert('X QA profile boosted. Open Phone > X to test feed, profile, compose, and post detail.');
+      alert('X profile is ready. Open Phone > X for feed, profile, compose, and post detail shots.');
   };
 
   const triggerXDramaPost = () => {
@@ -1749,10 +1768,10 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
               feed: [dramaPost, ...player.x.feed].slice(0, 80),
               lastPostWeek: player.currentWeek
           },
-          logs: [{ week: player.currentWeek, year: player.age, message: `🔥 CHEAT: X drama post added for reply/quote testing.`, type: 'neutral' }, ...player.logs].slice(0, 50)
+          logs: [{ week: player.currentWeek, year: player.age, message: `🔥 Viral X drama post added for promo capture.`, type: 'neutral' }, ...player.logs].slice(0, 50)
       });
       setActiveCheatMenu('NONE');
-      alert('X drama post added. Open X, tap the post, then test reply/quote tones.');
+      alert('X drama post added. Open X and tap the post for reply and quote shots.');
   };
 
   const triggerXSmallCreatorReset = () => {
@@ -1791,18 +1810,18 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                   ...player,
                   money: Math.max(player.money, 250000000),
                   businesses: safeBusinesses.map(b => b.id === existingStudio.id ? boostedStudio : b),
-                  logs: [{ week: player.currentWeek, year: player.age, message: `🏢 CHEAT: ${boostedStudio.name} funded for studio QA.`, type: 'positive' }, ...player.logs].slice(0, 50)
+	                  logs: [{ week: player.currentWeek, year: player.age, message: `Studio funding prepared for ${boostedStudio.name}.`, type: 'positive' }, ...player.logs].slice(0, 50)
               },
               studio: boostedStudio
           };
       }
 
       const newStudio = createBusiness(
-          'Cheat Test Studios',
+	          'Monarch Pictures',
           'PRODUCTION_HOUSE',
           'MAJOR_STUDIO',
           { quality: 'LUXURY', pricing: 'HIGH', marketing: 'HIGH' },
-          '🎬',
+	          'MP',
           player.currentWeek
       );
 
@@ -1820,7 +1839,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
               ...player,
               money: Math.max(player.money, 250000000),
               businesses: [...safeBusinesses, fundedStudio],
-              logs: [{ week: player.currentWeek, year: player.age, message: `🏢 CHEAT: Cheat Test Studios created for studio QA.`, type: 'positive' }, ...player.logs].slice(0, 50)
+	              logs: [{ week: player.currentWeek, year: player.age, message: 'Monarch Pictures is ready for production.', type: 'positive' }, ...player.logs].slice(0, 50)
           },
           studio: fundedStudio
       };
@@ -1831,7 +1850,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
       const { updatedPlayer } = ensureCheatStudio();
       onUpdatePlayer(updatedPlayer);
       setActiveCheatMenu('NONE');
-      alert("Studio QA setup ready: production house created/funded.");
+	      alert("Production house is ready.");
   };
 
   const triggerStudioBootstrapAndOpen = () => {
@@ -2464,13 +2483,13 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
           logs: [{
               week: basePlayer.currentWeek,
               year: basePlayer.age,
-              message: 'BOX OFFICE DETAIL QA seeded with regional theatrical receipts and streaming region data.',
+              message: 'Box office detail view prepared with regional theatrical receipts and streaming region data.',
               type: 'positive'
           }, ...basePlayer.logs].slice(0, 50)
       });
       setActiveCheatMenu('NONE');
       onOpenBoxOfficeCheat?.();
-      alert('Box Office QA loaded. Tap Atlas Rising or Northline in Box Office to test the detailed view.');
+      alert('Box Office detail view is ready. Tap Atlas Rising or Northline in Box Office.');
   };
 
   const triggerAudiencePulseQa = () => {
@@ -2758,13 +2777,13 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
           logs: [{
               week: currentWeek,
               year: currentYear,
-              message: 'CHEAT: Audience Pulse QA added a live release and a completed audience verdict for IMDb testing.',
+              message: 'Audience Pulse prepared with a live release and a completed audience verdict.',
               type: 'positive'
           }, ...basePlayer.logs].slice(0, 50)
       } as Player);
       setActiveCheatMenu('NONE');
       setPage?.(Page.MOBILE);
-      alert('Audience Pulse QA loaded. Open Phone > IMDb: Live Audience Drift is still running, Final Audience Verdict is completed. Age Up once to see the live score move.');
+      alert('Audience Pulse is ready. Open Phone > IMDb: Live Audience Drift is running and Final Audience Verdict is completed.');
   };
 
   const triggerSoundtrackRevenueQa = () => {
@@ -2910,7 +2929,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                   year: basePlayer.age,
                   amount: totalSoundtrackRevenue,
                   type: 'SOUNDTRACK' as const,
-                  label: `${project.title} soundtrack QA revenue`,
+                  label: `${project.title} soundtrack revenue`,
                   projectId: releaseId
               },
               ...(studio.financeLedger || [])
@@ -2927,13 +2946,13 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
           logs: [{
               week: basePlayer.currentWeek,
               year: basePlayer.age,
-              message: `🎵 CHEAT: Soundtrack revenue QA loaded for ${project.title}. Current soundtrack take: ${formatMoney(totalSoundtrackRevenue)}.`,
+              message: `🎵 Soundtrack revenue prepared for ${project.title}. Current soundtrack take: ${formatMoney(totalSoundtrackRevenue)}.`,
               type: 'positive'
           }, ...basePlayer.logs].slice(0, 50)
       });
       setActiveCheatMenu('NONE');
       onOpenBoxOfficeCheat?.();
-      alert(`Soundtrack Revenue QA loaded. Open Soundtrack Empire in Box Office, then Age Up once to watch soundtrack revenue increase again.`);
+      alert(`Soundtrack Revenue is ready. Open Soundtrack Empire in Box Office.`);
   };
 
   const triggerStudioAcquisitionSigningCheat = () => {
@@ -3004,7 +3023,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
           logs: [{
               week: player.currentWeek,
               year: player.age,
-              message: `🧾 CHEAT: Studio Acquisition Signing QA prepared for ${studioName}.`,
+              message: `🧾 Studio Acquisition signing prepared for ${studioName}.`,
               type: 'positive' as const,
           }, ...player.logs].slice(0, 50),
       };
@@ -3168,7 +3187,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
       const qaScripts: Script[] = [
           makeScript(
               scriptIds.readyFeature,
-              'Full Slate Ready Feature',
+              'Neon Justice',
               'MOVIE',
               ['ACTION'],
               'READY',
@@ -3179,7 +3198,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
           ),
           makeScript(
               scriptIds.readySeries,
-              'Full Slate Ready Series',
+              'Velvet Empire',
               'SERIES',
               ['CRIME'],
               'READY',
@@ -3190,18 +3209,18 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
           ),
           makeScript(
               scriptIds.development,
-              'Full Slate In Development',
+              'After Midnight',
               'MOVIE',
               ['THRILLER'],
               'IN_DEVELOPMENT',
               57,
               4,
               9,
-              'A script still being written for progress and sorting QA.'
+              'A script still being written while the studio builds momentum.'
           ),
           makeScript(
               scriptIds.concept,
-              'Full Slate Raw Concept',
+              'Laugh Track',
               'MOVIE',
               ['COMEDY'],
               'CONCEPT',
@@ -3212,7 +3231,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
           ),
           makeScript(
               scriptIds.produced,
-              'Full Slate Produced Archive',
+              'Crown Archive',
               'MOVIE',
               ['DRAMA'],
               'PRODUCED',
@@ -3299,11 +3318,11 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
       };
 
       const qaCommitments: Commitment[] = [
-          makeCommitment('PLANNING', 'Full Slate Planning Room', 'MOVIE', 'CRIME', 3, 36_000_000, 74),
-          makeCommitment('PRE_PRODUCTION', 'Full Slate Pre-Production', 'SERIES', 'DRAMA', 5, 64_000_000, 81),
-          makeCommitment('PRODUCTION', 'Full Slate On Set', 'MOVIE', 'ACTION', 6, 118_000_000, 86),
-          makeCommitment('POST_PRODUCTION', 'Full Slate Post House', 'MOVIE', 'SCI_FI', 2, 92_000_000, 83),
-          makeCommitment('AWAITING_RELEASE', 'Full Slate Release Ready', 'SERIES', 'THRILLER', 1, 52_000_000, 80)
+          makeCommitment('PLANNING', 'Shadow Ledger', 'MOVIE', 'CRIME', 3, 36_000_000, 74),
+          makeCommitment('PRE_PRODUCTION', 'Velvet Empire: Season One', 'SERIES', 'DRAMA', 5, 64_000_000, 81),
+          makeCommitment('PRODUCTION', 'Atlas Rising', 'MOVIE', 'ACTION', 6, 118_000_000, 86),
+          makeCommitment('POST_PRODUCTION', 'Orbit House', 'MOVIE', 'SCI_FI', 2, 92_000_000, 83),
+          makeCommitment('AWAITING_RELEASE', 'The Last Horizon', 'SERIES', 'THRILLER', 1, 52_000_000, 80)
       ];
 
       const makeReleaseProject = (title: string, projectType: 'MOVIE' | 'SERIES', genre: Genre, budget: number, quality: number) => {
@@ -3317,8 +3336,8 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
           return project;
       };
 
-      const activeMovie = makeReleaseProject('Full Slate Box Office Run', 'MOVIE', 'ADVENTURE', 145_000_000, 82);
-      const activeSeries = makeReleaseProject('Full Slate Streaming Run', 'SERIES', 'CRIME', 66_000_000, 79);
+      const activeMovie = makeReleaseProject('Atlas Rising: Global Run', 'MOVIE', 'ADVENTURE', 145_000_000, 82);
+      const activeSeries = makeReleaseProject('Night Ledger', 'SERIES', 'CRIME', 66_000_000, 79);
 
       const qaActiveReleases: ActiveRelease[] = [
           {
@@ -3378,7 +3397,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
       const qaPastProjects = [
           {
               id: `${qaPrefix}past_hit_${now}`,
-              name: 'Full Slate Legacy Hit',
+              name: 'Crown City',
               type: 'ACTING_GIG',
               roleType: 'LEAD',
               year: currentAge,
@@ -3409,12 +3428,12 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
               budget: 48_000_000,
               gross: 240_000_000,
               genre: 'DRAMA',
-              description: 'Full slate QA archived hit for history and release-year testing.',
+              description: 'A prestige archive hit that still carries the studio brand.',
               projectType: 'MOVIE'
           },
           {
               id: `${qaPrefix}past_series_${now}`,
-              name: 'Full Slate Season One',
+              name: 'Velvet Empire: Season One',
               type: 'ACTING_GIG',
               roleType: 'LEAD',
               year: Math.max(16, currentAge - 1),
@@ -3446,12 +3465,12 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
               streamingRevenue: 132_000_000,
               totalViews: 52_000_000,
               genre: 'CRIME',
-              description: 'Full slate QA successful series for renewal/history checks.',
+              description: 'A successful streaming season with renewal heat.',
               projectType: 'SERIES'
           },
           {
               id: `${qaPrefix}past_flop_${now}`,
-              name: 'Full Slate Costly Miss',
+              name: 'Midnight Gold',
               type: 'ACTING_GIG',
               roleType: 'LEAD',
               year: Math.max(16, currentAge - 2),
@@ -3481,7 +3500,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
               budget: 155_000_000,
               gross: 42_000_000,
               genre: 'SCI_FI',
-              description: 'Full slate QA flop for valuation and archive sorting checks.',
+              description: 'A costly miss that makes the studio dashboard feel lived in.',
               projectType: 'MOVIE'
           }
       ];
@@ -3525,7 +3544,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
           logs: [{
               week: currentWeek,
               year: basePlayer.age,
-              message: '🧪 CHEAT: Full studio slate loaded across scripts, development, production, releases, and archive.',
+              message: 'Full studio slate prepared across scripts, development, production, releases, and archive.',
               type: 'positive'
           }, ...basePlayer.logs].slice(0, 50)
       };
@@ -3533,7 +3552,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
       onUpdatePlayer(nextPlayer as Player);
       setActiveCheatMenu('NONE');
       onOpenProductionHouseCheat?.();
-      alert('Full Studio Slate loaded. Check Dashboard lanes, Development Lab/Vault, active releases, and Past Projects.');
+      alert('Full Studio Slate is ready. Check Dashboard lanes, Development Lab, active releases, and Past Projects.');
   };
 
   const triggerLegacyProductionHouseMigrationQa = () => {
@@ -4847,7 +4866,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
           budget: Math.round(gross * 0.32),
           gross,
           genre: 'SUPERHERO',
-          description: `Cheat QA franchise entry for ${title}.`,
+          description: `A major franchise chapter for ${title}.`,
           projectType: 'MOVIE',
           franchiseId: scenario === 'CANDIDATE' ? undefined : franchiseId,
           installmentNumber,
@@ -4896,7 +4915,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
           logs: [{
               week: basePlayer.currentWeek,
               year: basePlayer.age,
-              message: `🎞️ CHEAT: ${franchiseName} franchise QA scenario added (${scenario}). Open Studio > Development Lab > Franchise.`,
+              message: `🎞️ ${franchiseName} franchise scenario prepared. Open Studio > Development Lab > Franchise.`,
               type: 'positive'
           }, ...basePlayer.logs].slice(0, 50)
       };
@@ -4904,7 +4923,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
       onUpdatePlayer(nextPlayer);
       setActiveCheatMenu('NONE');
       onOpenProductionHouseCheat?.();
-      alert(`${franchiseName} QA loaded. Open Development Lab > Franchise to test pulse, history, characters, and next-move buttons.`);
+      alert(`${franchiseName} is ready. Open Development Lab > Franchise for pulse, history, characters, and next-move shots.`);
   };
 
   const triggerUniverseQaScenario = (scenario: 'EVENT_READY' | 'FATIGUED' | 'MERCH') => {
@@ -4975,7 +4994,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
           budget: Math.round(gross * 0.3),
           gross,
           genre: 'SUPERHERO',
-          description: `Cheat QA universe entry for ${universeName}.`,
+          description: `A connected universe chapter from ${universeName}.`,
           projectType: 'MOVIE',
           universeId,
           universeSagaName: 'Saga 1',
@@ -5016,7 +5035,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                   appearances: (existing?.appearances || 0) + 1,
                   firstAppearanceTitle: existing?.firstAppearanceTitle || project.name,
                   latestAppearanceTitle: project.name,
-                  description: `Cheat QA character from ${universeName}.`
+                      description: `A fan-tracked character from ${universeName}.`
               });
           });
       });
@@ -5032,7 +5051,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
       const universe = {
           id: universeId,
           name: universeName,
-          description: `Cheat QA universe scenario: ${scenario}.`,
+          description: `A connected screen universe with multiple released chapters and active audience momentum.`,
           studioId: studio.id,
           currentPhase: scenario === 'FATIGUED' ? 'Phase 3' : 'Phase 2',
           currentPhaseName: scenario === 'FATIGUED' ? 'Phase 3' : 'Phase 2',
@@ -5070,7 +5089,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
           logs: [{
               week: basePlayer.currentWeek,
               year: basePlayer.age,
-              message: `🌐 CHEAT: ${universeName} universe QA scenario added (${scenario}). Open Development Lab > Universe or IMDb > Universe.`,
+              message: `🌐 ${universeName} universe scenario prepared. Open Development Lab > Universe or IMDb > Universe.`,
               type: 'positive'
           }, ...basePlayer.logs].slice(0, 50)
       };
@@ -5078,7 +5097,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
       onUpdatePlayer(nextPlayer as Player);
       setActiveCheatMenu('NONE');
       onOpenProductionHouseCheat?.();
-      alert(`${universeName} QA loaded. Test it in Development Lab > Universe and IMDb > Universe.`);
+      alert(`${universeName} is ready. Open Development Lab > Universe or IMDb > Universe.`);
   };
 
   const triggerUniverseLifecycleQa = () => {
@@ -5151,7 +5170,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
           budget: Math.round(gross * 0.32),
           gross,
           genre: 'SCI_FI',
-          description: `Lifecycle QA canon release for ${title}.`,
+          description: `A canon release from the ${title} era.`,
           projectType: 'MOVIE',
           universeId,
           universeSagaName: 'Saga 1',
@@ -5175,7 +5194,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                       appearances: (existing?.appearances || 0) + 1,
                       firstAppearanceTitle: existing?.firstAppearanceTitle || project.name,
                       latestAppearanceTitle: project.name,
-                      description: `Lifecycle QA character for ${project.name}.`
+                      description: `A recurring universe character from ${project.name}.`
                   });
               });
           });
@@ -5240,7 +5259,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
       const activeUniverse = makeUniverse(
           activeUniverseId,
           'Phoenix Circuit',
-          'Lifecycle QA active universe. This should show Retire Universe because history exists and no linked work is in flight.',
+          'An active screen universe with enough history to show legacy management controls.',
           activeProjects,
           '#22d3ee',
           84,
@@ -5250,7 +5269,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
       const retiredBaseUniverse = makeUniverse(
           retiredUniverseId,
           'Obsidian League',
-          'Lifecycle QA retired universe. History stays visible, new phases are locked, and legacy licensing remains reduced.',
+          'A retired screen universe whose history stays visible while new phases are closed.',
           retiredProjects,
           '#a855f7',
           48,
@@ -5266,7 +5285,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
           makeUniverse(
               rebootedUniverseId,
               'Silver Dominion',
-              'Lifecycle QA rebooted universe. This should be active again and show Reboot Era state.',
+              'A rebooted screen universe entering a new era while its older releases remain archived.',
               rebootedProjects,
               '#f59e0b',
               36,
@@ -5341,14 +5360,14 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
           logs: [{
               week: currentWeek,
               year: currentAge,
-              message: '🌐 CHEAT: Universe lifecycle QA kit added. Check Active Canon, Legacy Archive, and Reboot Era behavior.',
+              message: '🌐 Universe lifecycle showcase prepared with Active Canon, Legacy Archive, and Reboot Era.',
               type: 'positive'
           }, ...basePlayer.logs].slice(0, 50)
       } as Player);
 
       setActiveCheatMenu('NONE');
       onOpenProductionHouseCheat?.();
-      alert('Universe lifecycle QA loaded. Open Development Lab > Universe: Phoenix Circuit is active, Obsidian League is archived, and Silver Dominion has a reboot script in Vault.');
+      alert('Universe lifecycle showcase is ready. Open Development Lab > Universe: Phoenix Circuit is active, Obsidian League is archived, and Silver Dominion has a reboot script in Vault.');
   };
 
   const triggerLegacyCharacterPickerQa = () => {
@@ -6568,7 +6587,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                   <div className="w-12 h-12 bg-zinc-800 rounded-full flex items-center justify-center mb-4 text-zinc-400">
                       <Lock size={20} />
                   </div>
-                  <h3 className="text-white font-bold text-lg mb-1">Developer Access</h3>
+                  <h3 className="text-white font-bold text-lg mb-1">Private Access</h3>
                   <p className="text-zinc-500 text-xs mb-6">Enter secure access code to proceed.</p>
                   
                   <div className="w-full relative mb-4">
@@ -6599,10 +6618,19 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
       {/* CHEAT MENU OVERLAY */}
       {activeCheatMenu !== 'NONE' && (
           <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
-              <div className="bg-zinc-900 border border-zinc-700 rounded-3xl w-full max-w-sm max-h-[85vh] overflow-hidden flex flex-col shadow-2xl">
-                  <div className="p-4 border-b border-zinc-700 flex justify-between items-center bg-zinc-800/50">
+              <div className={`border rounded-3xl w-full max-h-[85vh] overflow-hidden flex flex-col shadow-2xl ${
+                  activeCheatMenu === 'EDITOR'
+                      ? 'max-w-lg border-amber-400/30 bg-[radial-gradient(circle_at_top_left,rgba(245,158,11,0.16),transparent_38%),linear-gradient(145deg,#17110b,#070707_68%)]'
+                      : 'max-w-sm border-zinc-700 bg-zinc-900'
+              }`}>
+                  <div className={`p-4 border-b flex justify-between items-center ${
+                      activeCheatMenu === 'EDITOR'
+                          ? 'border-amber-400/20 bg-black/30'
+                          : 'border-zinc-700 bg-zinc-800/50'
+                  }`}>
                       <div className="flex items-center gap-2 font-bold uppercase tracking-widest text-sm text-amber-500">
-                          <Sliders size={16} /> Dev Tools
+                          {activeCheatMenu === 'EDITOR' ? <Camera size={16} /> : <Sliders size={16} />}
+                          {activeCheatMenu === 'EDITOR' ? 'Promo Control Room' : 'Dev Tools'}
                       </div>
                       <button onClick={() => setActiveCheatMenu('NONE')} className="p-1 hover:bg-white/10 rounded-full">
                           <X size={20} className="text-zinc-400" />
@@ -6610,6 +6638,204 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                   </div>
                   
                   <div className="p-5 overflow-y-auto custom-scrollbar space-y-6">
+
+                      {activeCheatMenu === 'EDITOR' && (
+                          <div className="space-y-5">
+                              <div className="rounded-3xl border border-amber-300/20 bg-black/30 p-4">
+                                  <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.24em] text-amber-300">
+                                      <Camera size={14} /> Capture-ready feature launcher
+                                  </div>
+                                  <h3 className="mt-2 font-serif text-2xl font-black uppercase italic leading-none text-white">
+                                      Build the promo reel
+                                  </h3>
+                                  <p className="mt-2 text-xs font-semibold leading-relaxed text-zinc-400">
+                                      Use these to create polished gameplay moments for video capture. Each action prepares a real screen or story beat without exposing internal QA wording.
+                                  </p>
+                              </div>
+
+                              <div className="space-y-2">
+                                  <h4 className="flex items-center gap-2 border-b border-amber-300/15 pb-2 text-[10px] font-black uppercase tracking-[0.22em] text-amber-200">
+                                      <Mail size={12} /> Career moments
+                                  </h4>
+                                  <div className="grid grid-cols-2 gap-2">
+                                      <button
+                                          type="button"
+                                          onClick={() => runEditorAction(() => triggerCheatContract('ROYALTY'), () => setPage?.(Page.MOBILE))}
+                                          className="col-span-2 min-h-14 rounded-2xl border border-amber-300/25 bg-amber-300/10 px-3 text-left text-xs font-black uppercase tracking-[0.12em] text-amber-100 transition-colors hover:bg-amber-300/15"
+                                      >
+                                          Premium Film Contract
+                                          <span className="mt-1 block text-[10px] font-semibold normal-case tracking-normal text-zinc-400">Creates a high-value offer in Messages.</span>
+                                      </button>
+                                      <button
+                                          type="button"
+                                          onClick={() => runEditorAction(() => triggerCheatFranchiseContract('MCU'), () => setPage?.(Page.MOBILE))}
+                                          className="rounded-2xl border border-red-300/25 bg-red-300/10 px-3 py-3 text-left text-[10px] font-black uppercase tracking-[0.12em] text-red-100 transition-colors hover:bg-red-300/15"
+                                      >
+                                          Franchise Deal
+                                      </button>
+                                      <button
+                                          type="button"
+                                          onClick={() => runEditorAction(triggerAwardInvite, () => setPage?.(Page.MOBILE))}
+                                          className="rounded-2xl border border-yellow-300/25 bg-yellow-300/10 px-3 py-3 text-left text-[10px] font-black uppercase tracking-[0.12em] text-yellow-100 transition-colors hover:bg-yellow-300/15"
+                                      >
+                                          Award Invite
+                                      </button>
+                                      <button
+                                          type="button"
+                                          onClick={() => runEditorAction(triggerAwardsPolishQa)}
+                                          className="col-span-2 min-h-12 rounded-2xl border border-violet-300/25 bg-violet-300/10 px-3 text-left text-[10px] font-black uppercase tracking-[0.12em] text-violet-100 transition-colors hover:bg-violet-300/15"
+                                      >
+                                          Award Night Ceremony
+                                      </button>
+                                  </div>
+                              </div>
+
+                              <div className="space-y-2">
+                                  <h4 className="flex items-center gap-2 border-b border-amber-300/15 pb-2 text-[10px] font-black uppercase tracking-[0.22em] text-amber-200">
+                                      <Clapperboard size={12} /> Studio empire
+                                  </h4>
+                                  <div className="grid grid-cols-2 gap-2">
+                                      <button
+                                          type="button"
+                                          onClick={() => runEditorAction(triggerStudioBootstrapAndOpen)}
+                                          className="col-span-2 min-h-14 rounded-2xl border border-emerald-300/25 bg-emerald-300/10 px-3 text-left text-xs font-black uppercase tracking-[0.12em] text-emerald-100 transition-colors hover:bg-emerald-300/15"
+                                      >
+                                          Production House Dashboard
+                                          <span className="mt-1 block text-[10px] font-semibold normal-case tracking-normal text-zinc-400">Funds a studio and opens the studio command screen.</span>
+                                      </button>
+                                      <button
+                                          type="button"
+                                          onClick={() => runEditorAction(triggerFullStudioSlateQa)}
+                                          className="rounded-2xl border border-sky-300/25 bg-sky-300/10 px-3 py-3 text-left text-[10px] font-black uppercase tracking-[0.12em] text-sky-100 transition-colors hover:bg-sky-300/15"
+                                      >
+                                          Full Studio Slate
+                                      </button>
+                                      <button
+                                          type="button"
+                                          onClick={() => runEditorAction(triggerStudioAcquisitionSigningCheat)}
+                                          className="rounded-2xl border border-orange-300/25 bg-orange-300/10 px-3 py-3 text-left text-[10px] font-black uppercase tracking-[0.12em] text-orange-100 transition-colors hover:bg-orange-300/15"
+                                      >
+                                          Studio Acquisition
+                                      </button>
+                                      <button
+                                          type="button"
+                                          onClick={() => runEditorAction(triggerBoxOfficeDepthQa)}
+                                          className="rounded-2xl border border-cyan-300/25 bg-cyan-300/10 px-3 py-3 text-left text-[10px] font-black uppercase tracking-[0.12em] text-cyan-100 transition-colors hover:bg-cyan-300/15"
+                                      >
+                                          Box Office Results
+                                      </button>
+                                      <button
+                                          type="button"
+                                          onClick={() => runEditorAction(triggerAudiencePulseQa, () => setPage?.(Page.MOBILE))}
+                                          className="rounded-2xl border border-yellow-300/25 bg-yellow-300/10 px-3 py-3 text-left text-[10px] font-black uppercase tracking-[0.12em] text-yellow-100 transition-colors hover:bg-yellow-300/15"
+                                      >
+                                          Audience Pulse
+                                      </button>
+                                      <button
+                                          type="button"
+                                          onClick={() => runEditorAction(triggerSoundtrackRevenueQa)}
+                                          className="col-span-2 rounded-2xl border border-teal-300/25 bg-teal-300/10 px-3 py-3 text-left text-[10px] font-black uppercase tracking-[0.12em] text-teal-100 transition-colors hover:bg-teal-300/15"
+                                      >
+                                          Soundtrack Revenue
+                                      </button>
+                                  </div>
+                              </div>
+
+                              <div className="space-y-2">
+                                  <h4 className="flex items-center gap-2 border-b border-amber-300/15 pb-2 text-[10px] font-black uppercase tracking-[0.22em] text-amber-200">
+                                      <Globe size={12} /> Social buzz
+                                  </h4>
+                                  <div className="grid grid-cols-2 gap-2">
+                                      <button
+                                          type="button"
+                                          onClick={() => runEditorAction(triggerXBootstrap, () => setPage?.(Page.MOBILE))}
+                                          className="rounded-2xl border border-blue-300/25 bg-blue-300/10 px-3 py-3 text-left text-[10px] font-black uppercase tracking-[0.12em] text-blue-100 transition-colors hover:bg-blue-300/15"
+                                      >
+                                          X Spotlight Feed
+                                      </button>
+                                      <button
+                                          type="button"
+                                          onClick={() => runEditorAction(triggerXDramaPost, () => setPage?.(Page.MOBILE))}
+                                          className="rounded-2xl border border-rose-300/25 bg-rose-300/10 px-3 py-3 text-left text-[10px] font-black uppercase tracking-[0.12em] text-rose-100 transition-colors hover:bg-rose-300/15"
+                                      >
+                                          X Viral Drama
+                                      </button>
+                                      <button
+                                          type="button"
+                                          onClick={() => runEditorAction(triggerInstagramBootstrap, () => setPage?.(Page.MOBILE))}
+                                          className="rounded-2xl border border-pink-300/25 bg-pink-300/10 px-3 py-3 text-left text-[10px] font-black uppercase tracking-[0.12em] text-pink-100 transition-colors hover:bg-pink-300/15"
+                                      >
+                                          Instagram Profile
+                                      </button>
+                                      <button
+                                          type="button"
+                                          onClick={() => runEditorAction(triggerInstagramUnlockComposer, () => setPage?.(Page.MOBILE))}
+                                          className="rounded-2xl border border-fuchsia-300/25 bg-fuchsia-300/10 px-3 py-3 text-left text-[10px] font-black uppercase tracking-[0.12em] text-fuchsia-100 transition-colors hover:bg-fuchsia-300/15"
+                                      >
+                                          Red Carpet Posts
+                                      </button>
+                                      <button
+                                          type="button"
+                                          onClick={() => runEditorAction(triggerYoutubeBootstrap, () => setPage?.(Page.MOBILE))}
+                                          className="rounded-2xl border border-red-300/25 bg-red-300/10 px-3 py-3 text-left text-[10px] font-black uppercase tracking-[0.12em] text-red-100 transition-colors hover:bg-red-300/15"
+                                      >
+                                          YouTube Studio
+                                      </button>
+                                      <button
+                                          type="button"
+                                          onClick={() => runEditorAction(triggerYoutubeOffers, () => setPage?.(Page.MOBILE))}
+                                          className="rounded-2xl border border-amber-300/25 bg-amber-300/10 px-3 py-3 text-left text-[10px] font-black uppercase tracking-[0.12em] text-amber-100 transition-colors hover:bg-amber-300/15"
+                                      >
+                                          Creator Deals
+                                      </button>
+                                  </div>
+                              </div>
+
+                              <div className="space-y-2">
+                                  <h4 className="flex items-center gap-2 border-b border-amber-300/15 pb-2 text-[10px] font-black uppercase tracking-[0.22em] text-amber-200">
+                                      <Sparkles size={12} /> Big-picture worlds
+                                  </h4>
+                                  <div className="grid grid-cols-2 gap-2">
+                                      <button
+                                          type="button"
+                                          onClick={() => runEditorAction(() => triggerFranchiseQaScenario('HOT'))}
+                                          className="rounded-2xl border border-emerald-300/25 bg-emerald-300/10 px-3 py-3 text-left text-[10px] font-black uppercase tracking-[0.12em] text-emerald-100 transition-colors hover:bg-emerald-300/15"
+                                      >
+                                          Hot Franchise
+                                      </button>
+                                      <button
+                                          type="button"
+                                          onClick={() => runEditorAction(() => triggerUniverseQaScenario('EVENT_READY'))}
+                                          className="rounded-2xl border border-cyan-300/25 bg-cyan-300/10 px-3 py-3 text-left text-[10px] font-black uppercase tracking-[0.12em] text-cyan-100 transition-colors hover:bg-cyan-300/15"
+                                      >
+                                          Universe Event
+                                      </button>
+                                      <button
+                                          type="button"
+                                          onClick={() => runEditorAction(triggerUniverseLifecycleQa)}
+                                          className="rounded-2xl border border-violet-300/25 bg-violet-300/10 px-3 py-3 text-left text-[10px] font-black uppercase tracking-[0.12em] text-violet-100 transition-colors hover:bg-violet-300/15"
+                                      >
+                                          Legacy Archive
+                                      </button>
+                                      <button
+                                          type="button"
+                                          onClick={() => runEditorAction(onShowWhatsNewCheat || (() => undefined))}
+                                          className="rounded-2xl border border-white/20 bg-white/10 px-3 py-3 text-left text-[10px] font-black uppercase tracking-[0.12em] text-white transition-colors hover:bg-white/15"
+                                      >
+                                          Update Showcase
+                                      </button>
+                                  </div>
+                              </div>
+
+                              <button
+                                  type="button"
+                                  onClick={() => setActiveCheatMenu('NONE')}
+                                  className="min-h-12 w-full rounded-2xl bg-[#d8ab3c] px-4 text-xs font-black uppercase tracking-[0.18em] text-black shadow-[0_6px_0_#7a4a0a] transition-transform active:translate-y-1 active:shadow-[0_2px_0_#7a4a0a]"
+                              >
+                                  Close Promo Tools
+                              </button>
+                          </div>
+                      )}
                       
                       {/* DEV ONLY: Scenario Triggers */}
                       {activeCheatMenu === 'DEV' && (
@@ -7118,6 +7344,8 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                           </div>
                       )}
 
+                      {activeCheatMenu === 'DEV' && (
+                          <>
                       {/* ALL TIERS: Core Stats */}
                       <div className="space-y-4">
                           <h4 className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest border-b border-zinc-800 pb-1">Vital Stats</h4>
@@ -7199,13 +7427,17 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                               ))}
                           </div>
                       </div>
+                          </>
+                      )}
 
                   </div>
-                  <div className="p-4 border-t border-zinc-800 bg-zinc-900">
-                      <button onClick={() => setActiveCheatMenu('NONE')} className="w-full py-3 bg-white text-black font-bold rounded-xl hover:bg-zinc-200">
-                          Apply & Close
-                      </button>
-                  </div>
+                  {activeCheatMenu === 'DEV' && (
+                      <div className="p-4 border-t border-zinc-800 bg-zinc-900">
+                          <button onClick={() => setActiveCheatMenu('NONE')} className="w-full py-3 bg-white text-black font-bold rounded-xl hover:bg-zinc-200">
+                              Apply & Close
+                          </button>
+                      </div>
+                  )}
               </div>
           </div>
       )}

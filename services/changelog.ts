@@ -50,6 +50,37 @@ const patchEntry = (version: string, title = 'Patch & Stability'): ChangelogEntr
 
 export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   changelogEntry(
+    '1.0.23',
+    'Studio Flow & Performance',
+    'MINOR',
+    'July 2026',
+    'A focused quality update for smoother studio production, clearer release feedback, richer save-slot details, and more reliable mobile play.',
+    [
+      {
+        heading: 'Studio Production',
+        items: [
+          'Improved production-location rendering and interaction reliability across mobile devices.',
+          'Studio releases now respond more naturally to creative workload, release timing, and audience interest.',
+          'Refined release and streaming feedback so outcomes feel clearer and more varied.',
+        ],
+      },
+      {
+        heading: 'Save & Career',
+        items: [
+          'Save slots now show total time played alongside your career age and fame.',
+          'Improved save and startup reliability for long-running careers.',
+        ],
+      },
+      {
+        heading: 'Polish & Stability',
+        items: [
+          'Improved mobile screen rendering and interaction consistency.',
+          'Fixed reported edge cases across production, releases, and studio management.',
+        ],
+      },
+    ],
+  ),
+  changelogEntry(
     '1.0.22',
     'Living World & Stability',
     'MINOR',

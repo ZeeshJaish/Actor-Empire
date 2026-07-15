@@ -6,6 +6,7 @@ import { showAd } from '../services/adLogic';
 import { addBreadcrumb, recordNonFatal, setCrashContext, trackGameEvent } from '../services/firebaseService';
 import { resolveYoutubeEventChoice, YoutubeEventResolution } from '../services/youtubeEventLogic';
 import { getPlayerLanguage, t } from '../services/i18n';
+import { generateLegalHearing } from '../services/lifeEventLogic';
 
 interface LifeEventModalProps {
     player: Player;
@@ -37,8 +38,13 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
         };
     }, []);
     
-    // Extract the actual LifeEvent data
-    const lifeEvent: LifeEvent = event.data?.lifeEvent;
+    // Legal hearings persist only a case id. Rebuild their live impacts at display time so
+    // callbacks never enter IndexedDB while the hearing remains fully playable.
+    const legalCaseId = typeof event.data?.caseId === 'string' ? event.data.caseId : undefined;
+    const rebuiltLegalHearing = event.type === 'LEGAL_HEARING' && legalCaseId
+        ? generateLegalHearing(player, legalCaseId)
+        : null;
+    const lifeEvent: LifeEvent = rebuiltLegalHearing || event.data?.lifeEvent;
     const getLifeEventTitle = (targetEvent: LifeEvent | undefined = lifeEvent) =>
         localizeText(targetEvent?.title, targetEvent?.titleKey, targetEvent?.textVars);
     const getLifeEventDescription = () =>

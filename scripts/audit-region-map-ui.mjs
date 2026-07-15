@@ -49,6 +49,19 @@ const greenlightSource = read(greenlightPath);
   assert(mapSource.includes(token), `InteractiveRegionMap should include ${token}.`);
 });
 
+[
+  'useId',
+  'mapInstanceId',
+  'svgIds',
+  'regionMapOcean-${mapInstanceId}',
+  'regionMapClip-${mapInstanceId}-${regionId}'
+].forEach(token => {
+  assert(mapSource.includes(token), `InteractiveRegionMap should namespace SVG resource ${token}.`);
+});
+
+assert(!mapSource.includes('id="regionMapOcean"'), 'Map gradients must not use a document-global static id.');
+assert(!mapSource.includes('id="regionMapSoftShadow"'), 'Map filters must not use a document-global static id.');
+
 assert(!mapSource.includes('<img'), 'The region map should be native SVG, not a static image.');
 assert(!mapSource.includes('region-map-radar-sweep'), 'The region map should not feel like a war-room radar dashboard.');
 assert(!mapSource.includes('region-map-sun-glow'), 'The region map should not keep the top-right sun glare overlay.');

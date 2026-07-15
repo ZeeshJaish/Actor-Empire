@@ -51,7 +51,7 @@ import {
     generateCancellationNews
 } from './newsLogic';
 import { generateWeeklyEvent } from './geminiService';
-import { generateLifeEvent, generateLegalHearing, generateLuxeLifeEvent, hasEligibleLuxeEventTarget } from './lifeEventLogic';
+import { generateLifeEvent, generateLuxeLifeEvent, hasEligibleLuxeEventTarget } from './lifeEventLogic';
 import { generateWeeklyFeed, NPC_DATABASE, calculateProjectFameMultiplier, generateNewUnknowns, updateNPCLives, createNPCFromMusicArtist } from './npcLogic';
 import { generateAgentOffers, generateManagerOffer, generateDirectOffer, getRandomAgents, getRandomManagers, getRandomTrainers, getRandomStylists, getRandomTherapists, getRandomPublicists, getRandomWellness, sanitizeTeamPools } from './teamLogic';
 import { processStockMarket, calculatePortfolioValue, getDividendPayout, initializeStocks } from './stockLogic';
@@ -105,6 +105,7 @@ import { applyInvestorPayoutMemory, calculateInvestorPayout, processInvestorLead
 import { buildOutsideProducerInvestmentMessage, generateOutsideProducerInvestmentOffers, getOutsideProducerOfferCadenceWeeks, processOutsideProductionsWeek } from './outsideProductions';
 import { buildEpisodeRatingsStory, generateEpisodeRatings, getEpisodeRatingsGameplayImpact } from './episodeRatings';
 import { calculateProductionRiskProfile } from './productionRisk';
+import { calculateStudioSlateFatigue } from './studioSlateFatigue';
 import { getContinuationPerformanceGross, shouldResolveContinuationDecision } from './releaseContinuationLogic';
 
 // --- CONSTANTS ---
@@ -1406,8 +1407,15 @@ const buildFriendFavorRequest = (player: Player, absoluteWeek: number): Message 
     };
 };
 
+export type ProcessGameWeekDiagnostics = {
+    onStage?: (stage: string, context?: Record<string, unknown>) => void;
+};
+
 // Returns updated player AND a flag if an ad should be triggered
-export const processGameWeek = async (player: Player): Promise<{ player: Player, triggerAd: boolean }> => {
+export const processGameWeek = async (
+    player: Player,
+    diagnostics: ProcessGameWeekDiagnostics = {}
+): Promise<{ player: Player, triggerAd: boolean }> => {
     setCrashContext(player, {
         flow: 'game_loop',
         loop_stage: 'start',
@@ -1420,6 +1428,26 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
     });
     let nextPlayer = JSON.parse(JSON.stringify(player)) as Player;
     let triggerAd = false;
+    const emitLoopStage = (stage: string, context: Record<string, unknown> = {}) => {
+        const stageContext = {
+            age: nextPlayer.age,
+            week: nextPlayer.currentWeek,
+            pending_events: nextPlayer.pendingEvents?.length || 0,
+            commitments: nextPlayer.commitments?.length || 0,
+            active_releases: nextPlayer.activeReleases?.length || 0,
+            inbox_messages: nextPlayer.inbox?.length || 0,
+            businesses: nextPlayer.businesses?.length || 0,
+            ...context,
+        };
+        diagnostics.onStage?.(stage, stageContext);
+        setCrashContext(nextPlayer, {
+            flow: 'game_loop',
+            loop_stage: stage,
+            ...stageContext,
+        });
+        addBreadcrumb(`game_loop:${stage}`, stageContext);
+    };
+    emitLoopStage('state_cloned');
     const language = getPlayerLanguage(nextPlayer);
     const actorArcBeforeWeek = JSON.parse(JSON.stringify(nextPlayer)) as Player;
     const getCommitmentDisplayName = (commitment: Commitment, currentLanguage: GameLanguage = language) => {
@@ -1559,6 +1587,9 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
             : undefined,
         royaltyPercentage: release.royaltyPercentage === undefined ? undefined : ensureFiniteNumber(release.royaltyPercentage),
         studioRoyaltyPercentage: release.studioRoyaltyPercentage === undefined ? undefined : ensureFiniteNumber(release.studioRoyaltyPercentage),
+        streamingUpfrontFee: release.streamingUpfrontFee === undefined ? undefined : ensureFiniteNumber(release.streamingUpfrontFee),
+        streamingRoyaltyRevenue: release.streamingRoyaltyRevenue === undefined ? undefined : ensureFiniteNumber(release.streamingRoyaltyRevenue),
+        streamingFundingAmount: release.streamingFundingAmount === undefined ? undefined : ensureFiniteNumber(release.streamingFundingAmount),
         maxTheatricalWeeks: release.maxTheatricalWeeks === undefined ? undefined : ensureFiniteNumber(release.maxTheatricalWeeks),
         generatedNewsKeys: Array.isArray(release.generatedNewsKeys) ? release.generatedNewsKeys.filter(key => typeof key === 'string') : [],
         projectDetails: normalizeReleaseProjectDetails(release.projectDetails),
@@ -1729,6 +1760,7 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
 
     // RESET TEAM CHANGE FLAGS
     nextPlayer.flags.teamChangeLocked = false; 
+    emitLoopStage('state_normalized');
 
     // --- DEBT CHECK ---
     if (nextPlayer.money < 0) {
@@ -1941,6 +1973,7 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
     const pendingUniversePayouts: { universeId: string; studioId: string; label: string; amount: number }[] = [];
 
     // --- 1. WORLD & INDUSTRY UPDATE ---
+    emitLoopStage('world_industry_start');
     try {
         const worldResult = processWorldTurn(nextPlayer);
         nextPlayer.world = worldResult.world;
@@ -2024,8 +2057,12 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
     } catch (error) {
         console.error('World turn failed during week processing:', error);
     }
+    emitLoopStage('world_industry_done', {
+        pending_universe_payouts: pendingUniversePayouts.length,
+    });
 
     // --- 2. STOCK MARKET UPDATE ---
+    emitLoopStage('markets_start');
     const marketUpdate = processStockMarket(nextPlayer.stocks, nextPlayer.currentWeek, nextPlayer);
     nextPlayer.stocks = marketUpdate.stocks;
     if (marketUpdate.news.length > 0) {
@@ -2054,8 +2091,13 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
     nextPlayer = processTalentInstability(nextPlayer);
     nextPlayer = processAcquisitionMarketPulse(nextPlayer);
     nextPlayer = processStudioSaleRoyalties(nextPlayer);
+    emitLoopStage('markets_done', {
+        stocks: nextPlayer.stocks?.length || 0,
+        portfolio: nextPlayer.portfolio?.length || 0,
+    });
 
     // --- 3. YOUTUBE & TALENT SIMULATION ---
+    emitLoopStage('creator_talent_start');
     try {
         const identityTuning = getYoutubeIdentityTuning(nextPlayer.youtube?.creatorIdentity);
         const ytResult = processYoutubeChannel(nextPlayer);
@@ -3105,8 +3147,13 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
             addTransaction(-member.weeklyCost, 'EXPENSE', `${member.type} Fee (${member.name})`);
         }
     });
+    emitLoopStage('creator_talent_done', {
+        talent_roster: nextPlayer.studio?.talentRoster?.length || 0,
+        team_agents: nextPlayer.team.availableAgents?.length || 0,
+    });
 
     // --- NEW: BUSINESS SIMULATION ---
+    emitLoopStage('business_sim_start');
     if (nextPlayer.businesses && nextPlayer.businesses.length > 0) {
         const updatedBusinesses: Business[] = [];
         nextPlayer.businesses.forEach(biz => {
@@ -3209,6 +3256,10 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
         });
         nextPlayer.businesses = updatedBusinesses;
     } 
+    emitLoopStage('business_sim_done', {
+        businesses: nextPlayer.businesses?.length || 0,
+        rights_inbox: nextPlayer.inbox?.filter(message => message.type === 'RIGHTS_NEGOTIATION' || message.type === 'RIGHTS_REPORT').length || 0,
+    });
 
     if (pendingUniversePayouts.length > 0 && nextPlayer.businesses?.length) {
         let totalUniversePayout = 0;
@@ -3313,6 +3364,7 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
     const BASE_DECAY = 1.0 * difficultyMult; 
     const HEALTH_DECAY = 0.5 * difficultyMult;
     const FAME_DECAY = 0.18; // Middle ground: fame still grows, but weekly momentum no longer snowballs too quickly.
+    emitLoopStage('health_social_start');
 
     const bodyBonus = getBonusGain(trainer);
     nextPlayer.stats.body = Math.max(0, Math.min(100, nextPlayer.stats.body - BASE_DECAY + bodyBonus));
@@ -3579,6 +3631,11 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
     nextPlayer.writerStats = newWriterStats;
     nextPlayer.directorStats = newDirectorStats;
     nextPlayer.stats.talent = calculateGlobalTalent(newSkills, nextPlayer.writerStats, nextPlayer.directorStats);
+    emitLoopStage('health_social_done', {
+        health_conditions: nextPlayer.activeHealthConditions?.length || 0,
+        instagram_posts: nextPlayer.instagram?.posts?.length || 0,
+        x_posts: nextPlayer.x?.posts?.length || 0,
+    });
 
     // --- 5. RELATIONSHIPS DECAY ---
     nextPlayer.relationships = nextPlayer.relationships.map(rel => {
@@ -3668,6 +3725,8 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
         }
     });
     nextPlayer.youtube.activeBrandDeals = remainingYoutubeBrandDeals;
+
+    emitLoopStage('commitments_releases_start');
 
     // --- 7. APPLICATIONS ---
     const nextApplications: Application[] = [];
@@ -3947,7 +4006,7 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
             
             if (updatedC.projectDetails?.releaseStrategy) {
                 if (weeksLeft <= 0) {
-                    const imdb = calculateIMDbRating(updatedC);
+                    let imdb = calculateIMDbRating(updatedC);
                 const budget = updatedC.projectDetails?.estimatedBudget || getEstimatedBudget(updatedC.projectDetails?.budgetTier || 'LOW');
                 const isTV = updatedC.projectDetails?.type === 'SERIES';
                 const isStreamingOnly = isTV || updatedC.projectDetails?.releaseStrategy === 'STREAMING_ONLY';
@@ -3989,7 +4048,18 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                         updatedC.projectDetails.musicPlan
                     );
 
-                    const quality = updatedC.projectDetails.hiddenStats.qualityScore;
+                    const studioSlateFatigue = calculateStudioSlateFatigue(nextPlayer, updatedC.projectDetails, updatedC.id);
+                    updatedC.projectDetails.hiddenStats.studioSlateFatigueScore = studioSlateFatigue.score;
+                    updatedC.projectDetails.hiddenStats.studioSlateFatigueLabel = studioSlateFatigue.label;
+                    if (studioSlateFatigue.label !== 'FRESH') {
+                        const fatigueDetails = studioSlateFatigue.notes.length ? `: ${studioSlateFatigue.notes.join(', ')}` : '';
+                        logsToAdd.push({
+                            msg: `📉 Audience response: "${updatedC.name}" enters a ${studioSlateFatigue.label.toLowerCase()} studio slate${fatigueDetails}.`,
+                            type: 'neutral',
+                        });
+                    }
+                    const quality = Math.max(1, updatedC.projectDetails.hiddenStats.qualityScore - (studioSlateFatigue.reviewPenalty * 2));
+                    imdb = Math.max(1, Math.min(10, imdb - (studioSlateFatigue.reviewPenalty * 0.32)));
                     const isRecast = updatedC.projectDetails.hiddenStats.isRecast;
                     updatedC.projectDetails.reviews = generateReviews(
                         quality,
@@ -4135,6 +4205,9 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                             : undefined,
                         royaltyPercentage: updatedC.royaltyPercentage,
                         studioRoyaltyPercentage: updatedC.projectDetails.hiddenStats.backendPct,
+                        streamingUpfrontFee: isStreamingOnly ? Math.max(0, Number(updatedC.projectDetails.streamingRevenue || 0)) : 0,
+                        streamingRoyaltyRevenue: 0,
+                        streamingFundingAmount: Math.max(0, Number(updatedC.projectDetails.hiddenStats.nextSeasonFundingAmount || 0)),
                         sequelDecisionWeek: isTV ? 6 + Math.floor(Math.random() * 3) : 4 + Math.floor(Math.random() * 7),
                         promotionalBuzz: accumulatedBuzz,
                         maxTheatricalWeeks,
@@ -5069,6 +5142,15 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                 nextPlayer.stats.fame = Math.max(0, Math.min(100, nextPlayer.stats.fame + streamingFamePulse));
             }
 
+            const explicitUpfrontFee = rel.streamingUpfrontFee ?? rel.projectDetails?.streamingRevenue;
+            const inferredUpfrontFee = Math.max(0, Number(
+                explicitUpfrontFee
+                ?? (rel.studioRoyaltyPercentage ? 0 : rel.streamingRevenue || 0)
+            ));
+            const inferredRoyaltyRevenue = Math.max(0, Number(
+                rel.streamingRoyaltyRevenue
+                ?? Math.max(0, Number(rel.streamingRevenue || 0) - inferredUpfrontFee)
+            ));
             let weeklyStreamingRevenue = 0;
             let investorStreamingPayout = 0;
             if (rel.studioRoyaltyPercentage) {
@@ -5109,7 +5191,8 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                     playerStudio.stats.valuation = recalculateBusinessValuation(playerStudio, nextPlayer).stats.valuation;
                 }
             }
-            const newStreamingRevenue = (rel.streamingRevenue || 0) + weeklyStreamingRevenue;
+            const newStreamingRoyaltyRevenue = inferredRoyaltyRevenue + weeklyStreamingRevenue;
+            const newStreamingRevenue = inferredUpfrontFee + newStreamingRoyaltyRevenue;
             const weeklyStreamingBreakdown = calculateStreamingDistributionBreakdown(
                 rel.projectDetails,
                 rel.streaming.platformId,
@@ -5216,6 +5299,8 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                 {
                     ...rel,
                     streamingRevenue: newStreamingRevenue,
+                    streamingUpfrontFee: inferredUpfrontFee,
+                    streamingRoyaltyRevenue: newStreamingRoyaltyRevenue,
                     weeklyStreamingBreakdowns: newWeeklyStreamingBreakdowns,
                     soundtrackRevenue: newSoundtrackRevenue,
                     weeklySoundtrackRevenue: newWeeklySoundtrackRevenue,
@@ -5256,6 +5341,9 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                 }
                     nextPlayer.pastProjects.push(createPastProjectArchiveSnapshot({
                         ...rel,
+                        streamingRevenue: newStreamingRevenue,
+                        streamingUpfrontFee: inferredUpfrontFee,
+                        streamingRoyaltyRevenue: newStreamingRoyaltyRevenue,
                         soundtrackRevenue: newSoundtrackRevenue,
                         weeklySoundtrackRevenue: newWeeklySoundtrackRevenue,
                         soundtrackRevenueBreakdown: newSoundtrackRevenueBreakdown,
@@ -5275,6 +5363,8 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                 processedReleases.push({
                     ...rel,
                     streamingRevenue: newStreamingRevenue,
+                    streamingUpfrontFee: inferredUpfrontFee,
+                    streamingRoyaltyRevenue: newStreamingRoyaltyRevenue,
                     weeklyStreamingBreakdowns: newWeeklyStreamingBreakdowns,
                     soundtrackRevenue: newSoundtrackRevenue,
                     weeklySoundtrackRevenue: newWeeklySoundtrackRevenue,
@@ -5299,8 +5389,14 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
     nextPlayer.activeReleases = processedReleases;
     nextPlayer.news = newNews;
     nextPlayer.inbox = newInbox;
+    emitLoopStage('commitments_releases_done', {
+        processed_releases: processedReleases.length,
+        new_releases: newReleases.length,
+        past_projects: nextPlayer.pastProjects?.length || 0,
+    });
 
     // --- 10. AWARD SEASON LOGIC ---
+    emitLoopStage('awards_start');
     Object.entries(AWARD_CALENDAR).forEach(([weekStr, def]) => {
         if (nextPlayer.currentWeek === def.inviteWeek) {
             const ceremonyWeek = parseInt(weekStr);
@@ -5372,8 +5468,13 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
             if (bestPic) { nextPlayer.news.unshift({ id: `news_award_${Date.now()}`, headline: t(language, 'services.gameLoop.awards.news.winner', { projectName: bestPic.projectName, awardName: awardShow.name }), category: 'INDUSTRY', week: nextPlayer.currentWeek, year: nextPlayer.age, impactLevel: 'MEDIUM' }); }
         }
     }
+    emitLoopStage('awards_done', {
+        awards: nextPlayer.awards?.length || 0,
+        award_history: nextPlayer.world.awardHistory?.length || 0,
+    });
 
     // --- 11. END OF WEEK UPDATES ---
+    emitLoopStage('end_week_start');
     nextPlayer.currentWeek += 1;
     nextPlayer = resolveStudioAcquisitionResponses(nextPlayer);
     if (!hasNoAds(nextPlayer) && nextPlayer.currentWeek % 12 === 0) triggerAd = true;
@@ -5486,17 +5587,16 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
     if (nextPlayer.flags.activeCases && nextPlayer.flags.activeCases.length > 0) {
         nextPlayer.flags.activeCases.forEach((c: LegalCase) => {
             if (c.nextHearingWeek === nextPlayer.currentWeek && c.status === 'ACTIVE') {
-                const lifeEvent = generateLegalHearing(nextPlayer, c.id);
-                if (lifeEvent) {
-                    const hearingEvent: ScheduledEvent = {
-                        id: `hearing_${c.id}_${c.currentHearing}`,
-                        week: nextPlayer.currentWeek,
-                        type: 'LEGAL_HEARING',
-                        title: `${c.title}: Hearing #${c.currentHearing}`,
-                        data: { caseId: c.id, lifeEvent }
-                    };
-                    nextPlayer.scheduledEvents.push(hearingEvent);
-                }
+                // Scheduled events are persisted before the player sees them. Keep this
+                // payload as plain data; LifeEventModal rebuilds the hearing actions later.
+                const hearingEvent: ScheduledEvent = {
+                    id: `hearing_${c.id}_${c.currentHearing}`,
+                    week: nextPlayer.currentWeek,
+                    type: 'LEGAL_HEARING',
+                    title: `${c.title}: Hearing #${c.currentHearing}`,
+                    data: { caseId: c.id, hearing: c.currentHearing }
+                };
+                nextPlayer.scheduledEvents.push(hearingEvent);
             }
         });
     }
@@ -5628,8 +5728,13 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
             return rel;
         });
     }
+    emitLoopStage('end_week_done', {
+        is_dead: Boolean(nextPlayer.flags?.isDead),
+        relationships: nextPlayer.relationships?.length || 0,
+    });
 
     // --- 12. GENERATE EVENTS ---
+    emitLoopStage('weekly_events_start');
     const eventText = await withTimeout(
         generateWeeklyEvent(nextPlayer.age, "Actor", nextPlayer.stats.fame),
         1500,
@@ -5934,9 +6039,14 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
         nextPlayer.weeklyOpportunities = { auditions: generateAuditions(nextPlayer, usedTitles), jobs: generatePartTimeJobs() };
         logsToAdd.push({ msg: "🔄 CastLink updated.", type: 'neutral' });
     }
+    emitLoopStage('weekly_events_done', {
+        inbox_messages: nextPlayer.inbox?.length || 0,
+        weekly_auditions: nextPlayer.weeklyOpportunities?.auditions?.length || 0,
+    });
 
-	nextPlayer.businesses.forEach(business => {
-	    if (business.type !== 'PRODUCTION_HOUSE' || !business.studioState) return;
+    emitLoopStage('studio_funding_start');
+		nextPlayer.businesses.forEach(business => {
+		    if (business.type !== 'PRODUCTION_HOUSE' || !business.studioState) return;
 
 	    const investorLeadership = processInvestorLeadershipChanges({
 	        studio: business,
@@ -6063,11 +6173,16 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
                 msg: t(language, 'services.gameLoop.fundingDefault.log', { platformName, sourceTitle }),
                 type: 'negative'
             });
-        });
-    });
+	        });
+	    });
+    emitLoopStage('studio_funding_done');
 
+    emitLoopStage('subsidiaries_start');
     nextPlayer = processSubsidiaryAutonomousOperations(nextPlayer);
     nextPlayer = processSubsidiaryDecisionEngine(nextPlayer);
+    emitLoopStage('subsidiaries_done', {
+        subsidiaries: nextPlayer.businesses?.filter(business => (business as any).parentStudioId).length || 0,
+    });
 
     const actorArcTransition = getActorCareerArcTransition(actorArcBeforeWeek, nextPlayer);
     if (actorArcTransition) {
@@ -6088,6 +6203,11 @@ export const processGameWeek = async (player: Player): Promise<{ player: Player,
     // Apply Logs - Limit to last 50 entries to prevent storage overflow (CRITICAL FIX)
     const allLogs = [...nextPlayer.logs, ...logsToAdd.map(l => ({ week: nextPlayer.currentWeek, year: nextPlayer.age, message: l.msg, type: l.type }))];
     nextPlayer.logs = allLogs.slice(-50);
+    emitLoopStage('final_trim_done', {
+        logs_added: logsToAdd.length,
+        inbox_messages: nextPlayer.inbox?.length || 0,
+        news_items: nextPlayer.news?.length || 0,
+    });
 
     addBreadcrumb('game_loop:complete', {
         age: nextPlayer.age,

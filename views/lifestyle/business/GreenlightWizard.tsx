@@ -2885,6 +2885,23 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             producerPost: 0,
             qualityLift: 0,
         };
+        const selfRunCast = finalizedCastList.length > 0 && finalizedCastList.every(member => (
+            member.actorId === 'PLAYER_SELF' || member.actorId === 'STUDIO_STAFF'
+        ));
+        const selfRunCrew = fullCrewList.length > 0 && fullCrewList.every(member => (
+            member.id === 'PLAYER_SELF' || member.id === 'STUDIO_STAFF'
+        ));
+        const selfRunProduction = selfRunCast && selfRunCrew;
+        const selfRunLoad = selfRunProduction
+            ? player.commitments.filter(commitment => (
+                commitment.projectDetails?.studioId === studio.id
+                && commitment.projectDetails.hiddenStats?.selfRunProduction
+                && commitment.projectPhase !== 'AWAITING_RELEASE'
+            )).length + 1
+            : 0;
+        // A lean, in-house production is valid. The quality tradeoff begins only
+        // when the same player-led team is already spread across other projects.
+        const selfRunQualityStrain = Math.max(0, selfRunLoad - 1) * 3;
         const projectSubtype = effectiveConnectedIntent === 'EVENT'
             ? 'UNIVERSE_EVENT'
             : effectiveConnectedIntent === 'CROSSOVER'
@@ -2952,7 +2969,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                     castingStrength: currentCastingStrength,
                     distributionPower: Math.min(100, 50 + Math.floor(studioPrestigeScore / 8)),
                     rawHype: currentEstimatedBuzz,
-                    qualityScore: actualQuality, // Store the ACTUAL quality here for future reference
+                    qualityScore: Math.max(1, actualQuality - selfRunQualityStrain),
                     prestigeBonus: (tone < 30 ? 20 : 0) + Math.floor(studioPrestigeScore / 25),
                     fameMultiplier: fameMultiplier,
                     castDepthScore: castDepth.score,
@@ -2973,6 +2990,8 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                     isRecast: isRecast,
                     connectedProjectIntent: effectiveConnectedIntent,
                     linkedUniverseCastCount,
+                    selfRunProduction,
+                    selfRunLoad: selfRunProduction ? selfRunLoad : undefined,
                     ...(lockedStreamingFunding ? {
                         platformId: lockedStreamingFunding.platformId,
                         nextSeasonFundingAmount: lockedStreamingFunding.amount,

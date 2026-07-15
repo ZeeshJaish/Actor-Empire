@@ -61,7 +61,12 @@ const shouldShowPushPrompt = (status: FirebasePushStatus, showMenu: boolean) => 
 const toIntroSlots = (saveSlots: Record<number, Player | null>): SlotEntry[] => (
   [1, 2, 3].map((slot) => {
     const save = saveSlots[slot];
-    return save ? { name: save.name, age: save.age, fame: save.stats.fame } : null;
+    return save ? {
+      name: save.name,
+      age: save.age,
+      fame: save.stats.fame,
+      totalPlayTimeMs: save.totalPlayTimeMs,
+    } : null;
   })
 );
 

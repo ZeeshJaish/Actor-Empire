@@ -13,6 +13,7 @@ export interface RegulatorPressureState {
     controlledMajorStudioCount: number;
     controlledTakeoverCount: number;
     acquisitionMoratoriumWeeksRemaining: number;
+    reviewCooldownWeeksRemaining: number;
     conductAgreementWeeksRemaining: number;
     acquisitionCostMultiplier: number;
     investorConfidencePenalty: number;
@@ -89,6 +90,7 @@ export const getRegulatorPressureState = (player: Player): RegulatorPressureStat
     const takeoverPressure = controlledTakeoverCount * 8;
     const acquisitionPressure = acquiredCaseCount * 5;
     const conductAgreementWeeksRemaining = Math.max(0, Math.round(previous.conductAgreementWeeksRemaining || 0));
+    const reviewCooldownWeeksRemaining = Math.max(0, Math.round(previous.reviewCooldownWeeksRemaining || 0));
     const conductRelief = conductAgreementWeeksRemaining > 0 ? 14 : 0;
     const pressureScore = round(clamp(scalePressure + majorPressure + takeoverPressure + acquisitionPressure + valuationPressure - conductRelief));
     const acquisitionMoratoriumWeeksRemaining = Math.max(0, Math.round(previous.acquisitionMoratoriumWeeksRemaining || 0));
@@ -102,6 +104,7 @@ export const getRegulatorPressureState = (player: Player): RegulatorPressureStat
         controlledMajorStudioCount: majorStudios.length,
         controlledTakeoverCount,
         acquisitionMoratoriumWeeksRemaining,
+        reviewCooldownWeeksRemaining,
         conductAgreementWeeksRemaining,
         acquisitionCostMultiplier: getCostMultiplier(pressureScore, conductAgreementWeeksRemaining),
         investorConfidencePenalty: pressureScore >= 70 ? 5 : pressureScore >= 50 ? 3 : pressureScore >= 35 ? 1 : 0,
@@ -137,6 +140,7 @@ const updateRegulatorState = (
         ...updates,
         pressureScore: clamp(updates.pressureScore ?? current.pressureScore),
         acquisitionMoratoriumWeeksRemaining: Math.max(0, Math.round(updates.acquisitionMoratoriumWeeksRemaining ?? current.acquisitionMoratoriumWeeksRemaining)),
+        reviewCooldownWeeksRemaining: Math.max(0, Math.round(updates.reviewCooldownWeeksRemaining ?? current.reviewCooldownWeeksRemaining)),
         conductAgreementWeeksRemaining: Math.max(0, Math.round(updates.conductAgreementWeeksRemaining ?? current.conductAgreementWeeksRemaining)),
         finesPaidToDate: roundMoney(updates.finesPaidToDate ?? current.finesPaidToDate),
         acquisitionCostMultiplier: updates.acquisitionCostMultiplier ?? getCostMultiplier(updates.pressureScore ?? current.pressureScore, updates.conductAgreementWeeksRemaining ?? current.conductAgreementWeeksRemaining),
@@ -374,6 +378,16 @@ const makeRegulatorPost = (player: Player, state: RegulatorPressureState, langua
     sentiment: state.pressureScore >= 70 ? 'MESSY' : 'INDUSTRY',
 });
 
+const makeReviewClearNews = (player: Player, language: ReturnType<typeof getPlayerLanguage>): NewsItem => ({
+    id: `news_regulator_review_cleared_${player.age}_${player.currentWeek}`,
+    headline: t(language, 'services.regulatorPressure.news.cleared.headline', { name: player.name }),
+    subtext: t(language, 'services.regulatorPressure.news.cleared.subtext'),
+    category: 'INDUSTRY',
+    week: player.currentWeek,
+    year: player.age,
+    impactLevel: 'LOW',
+});
+
 const applyRegulatorStudioEffects = (businesses: Business[], state: RegulatorPressureState) => (
     businesses.map(business => business.type !== 'PRODUCTION_HOUSE'
         ? business
@@ -397,6 +411,7 @@ const agePreviousState = (player: Player): Player => {
             regulatorPressureState: {
                 ...previous,
                 acquisitionMoratoriumWeeksRemaining: Math.max(0, Math.round((previous.acquisitionMoratoriumWeeksRemaining || 0) - 1)),
+                reviewCooldownWeeksRemaining: Math.max(0, Math.round((previous.reviewCooldownWeeksRemaining || 0) - 1)),
                 conductAgreementWeeksRemaining: Math.max(0, Math.round((previous.conductAgreementWeeksRemaining || 0) - 1)),
             },
         },
@@ -418,18 +433,34 @@ export const processRegulatorPressure = (player: Player): Player => {
 
     const agedPlayer = agePreviousState(player);
     let state = getRegulatorPressureState(agedPlayer);
-    const enteringReview = state.pressureScore >= 65 && state.acquisitionMoratoriumWeeksRemaining === 0;
+    const previousMoratoriumWeeks = Math.max(0, Math.round(previous?.acquisitionMoratoriumWeeksRemaining || 0));
+    const reviewCleared = previousMoratoriumWeeks > 0 && state.acquisitionMoratoriumWeeksRemaining === 0;
+    if (reviewCleared) {
+        state = {
+            ...state,
+            reviewCooldownWeeksRemaining: Math.max(state.reviewCooldownWeeksRemaining, state.pressureScore >= 80 ? 12 : 8),
+        };
+    }
+    const enteringReview = !reviewCleared
+        && state.pressureScore >= 65
+        && state.acquisitionMoratoriumWeeksRemaining === 0
+        && state.reviewCooldownWeeksRemaining === 0;
     if (enteringReview) {
         state = {
             ...state,
             acquisitionMoratoriumWeeksRemaining: state.pressureScore >= 80 ? 4 : 2,
+            reviewCooldownWeeksRemaining: state.pressureScore >= 80 ? 16 : 12,
             reviewCount: state.reviewCount + 1,
         };
         state.status = getStatus(state.pressureScore, state.acquisitionMoratoriumWeeksRemaining, state.conductAgreementWeeksRemaining);
     }
 
     const shouldPublish = state.pressureScore >= 40 && state.controlledStudioCount >= 3;
-    const news = shouldPublish ? makeRegulatorNews(agedPlayer, state, language) : undefined;
+    const news = reviewCleared
+        ? makeReviewClearNews(agedPlayer, language)
+        : shouldPublish
+            ? makeRegulatorNews(agedPlayer, state, language)
+            : undefined;
     const xPost = shouldPublish ? makeRegulatorPost(agedPlayer, state, language) : undefined;
     const regulatorEvent = shouldPublish ? createRegulatorEvent(agedPlayer, state) : null;
     const existingPendingEvents = Array.isArray(agedPlayer.pendingEvents) ? agedPlayer.pendingEvents : [];
@@ -451,17 +482,42 @@ export const processRegulatorPressure = (player: Player): Player => {
         lastRegulatorNewsWeek: news ? agedPlayer.currentWeek : previous?.lastRegulatorNewsWeek,
     };
 
+    const reviewClearMessageId = `studio_acquisition_review_cleared_${agedPlayer.age}_${agedPlayer.currentWeek}`;
+    const reviewClearMessage = reviewCleared ? {
+        id: reviewClearMessageId,
+        sender: t(language, 'services.regulatorPressure.inbox.sender'),
+        subject: t(language, 'services.regulatorPressure.inbox.cleared.subject'),
+        text: t(language, 'services.regulatorPressure.inbox.cleared.text'),
+        type: 'STUDIO_ACQUISITION' as const,
+        data: {
+            decision: 'REVIEW_CLEARED',
+            action: 'OPEN_FORBES',
+        },
+        isRead: false,
+        weekSent: agedPlayer.currentWeek,
+    } : null;
+
     return {
         ...agedPlayer,
         businesses: applyRegulatorStudioEffects(agedPlayer.businesses || [], state),
         pendingEvents: cadence.pendingEvents,
         news: news ? [news, ...(agedPlayer.news || []).filter(item => item.id !== news.id)].slice(0, 80) : agedPlayer.news,
+        inbox: reviewClearMessage
+            ? [reviewClearMessage, ...(agedPlayer.inbox || []).filter(message => message.id !== reviewClearMessageId)]
+            : agedPlayer.inbox,
         x: xPost ? { ...agedPlayer.x, feed: [xPost, ...(agedPlayer.x?.feed || [])].slice(0, 80) } : agedPlayer.x,
         flags: {
             ...cadence.flags,
             regulatorPressureState: nextState,
         },
-        logs: shouldPublish
+        logs: reviewCleared
+            ? [{
+                week: agedPlayer.currentWeek,
+                year: agedPlayer.age,
+                message: t(language, 'services.regulatorPressure.log.cleared'),
+                type: 'positive' as const,
+            }, ...(agedPlayer.logs || [])].slice(0, 80)
+            : shouldPublish
             ? [{
                 week: agedPlayer.currentWeek,
                 year: agedPlayer.age,

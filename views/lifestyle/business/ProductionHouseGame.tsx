@@ -20,6 +20,7 @@ import { SequelSetupModal } from './components/SequelSetupModal';
 import { markGameCheckpoint } from '../../../services/firebaseService';
 import { discardUnreleasedScript, renameStudioProjectTitle } from '../../../services/projectNaming';
 import { getProjectReleaseLabel, getProjectReleaseSortValue, getProjectReleaseTiming } from '../../../services/releaseTiming';
+import { getReleaseDisplayPhase } from '../../../services/releasePresentation';
 import { createContinuationScript, getContinuationEligibility } from '../../../services/sequelFlow';
 import { getStudioGroup } from '../../../services/studioGroup';
 import { StudioGroupView } from './StudioGroupView';
@@ -229,7 +230,7 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
         ...activeReleases.map(r => ({
             id: r.id,
             name: r.name,
-            phase: r.distributionPhase === 'STREAMING' ? 'STREAMING' : r.distributionPhase === 'STREAMING_BIDDING' ? 'BIDDING' : 'IN THEATERS',
+            phase: getReleaseDisplayPhase(r),
             rating: r.imdbRating,
             gross: r.totalGross,
             budget: r.budget,
@@ -638,7 +639,7 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
         if (active) {
             return {
                 ...active,
-                phase: active.distributionPhase === 'STREAMING' ? 'STREAMING' : active.distributionPhase === 'STREAMING_BIDDING' ? 'BIDDING' : 'IN THEATERS'
+                phase: getReleaseDisplayPhase(active)
             };
         }
         
@@ -1827,7 +1828,7 @@ const FilmographyProjectRow: React.FC<{ project: any; language: GameLanguage; on
 	    const rating = getStudioArchiveRating(project);
 	    const type = getStudioArchiveProjectType(project);
     const genre = project.genre || project.projectDetails?.genre || 'Studio';
-    const status = project.phase || (project.distributionPhase === 'STREAMING' ? 'STREAMING' : project.distributionPhase === 'THEATRICAL' ? 'IN THEATERS' : 'RELEASED');
+    const status = project.distributionPhase ? getReleaseDisplayPhase(project as ActiveRelease) : (project.phase || 'RELEASED');
     const releaseLabel = getProjectReleaseLabel(project, {}, { emptyLabel: 'Now' });
     const releaseTiming = getProjectReleaseTiming(project, {});
     const runWeek = Number(project.weekNum || project.projectDetails?.weekNum || 0);

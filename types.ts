@@ -877,6 +877,8 @@ export interface StudioState {
     mergerIntegratedWeek?: number;
     mergerIntegratedYear?: number;
     mergerIntegrationCost?: number;
+    mergerPreIntegrationBalance?: number;
+    mergerPreIntegrationStats?: BusinessStats;
     saleDeck?: StudioSaleDeck;
 }
 
@@ -981,6 +983,10 @@ export interface ProjectHiddenStats {
     boxOfficeCapRoll?: number;
     boxOfficeTotalCap?: number;
     boxOfficeCapLabel?: 'STANDARD' | 'EVENT' | 'BREAKOUT' | 'LIMITED';
+    selfRunProduction?: boolean;
+    selfRunLoad?: number;
+    studioSlateFatigueScore?: number;
+    studioSlateFatigueLabel?: 'FRESH' | 'CROWDED' | 'FATIGUED';
 }
 
 export type RareHollywoodChaosKind =
@@ -1595,6 +1601,10 @@ export interface ActiveRelease {
     investorPayouts?: ProjectInvestorPayoutSummary;
     audienceReception?: AudienceReception;
     studioRoyaltyPercentage?: number;
+    // Keep contract cash separate from later view-based royalties. Older saves may only have streamingRevenue.
+    streamingUpfrontFee?: number;
+    streamingRoyaltyRevenue?: number;
+    streamingFundingAmount?: number;
     bids?: { platformId: PlatformId, upfront: number, royalty: number, duration: number, fundingAmount?: number }[];
     sequelDecisionWeek?: number;
     sequelDecisionMade?: boolean;
@@ -3022,6 +3032,7 @@ export interface Player {
     id: string;
     name: string;
     age: number;
+    totalPlayTimeMs: number;
     gender: Gender;
     avatar: string;
     settings: PlayerSettings;
@@ -3147,6 +3158,7 @@ export const INITIAL_PLAYER: Player = {
     id: 'player',
     name: 'New Player',
     age: 15,
+    totalPlayTimeMs: 0,
     gender: 'MALE',
     avatar: 'https://api.dicebear.com/8.x/pixel-art/svg?seed=Felix',
     settings: { language: 'en', smoothMode: false },

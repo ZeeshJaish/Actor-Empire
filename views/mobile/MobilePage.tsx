@@ -849,7 +849,7 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
                         onMarkRead={handleMarkMessageRead}
                         onOpenRightsMarket={props.onOpenRightsMarket}
                         onOpenStudioAcquisition={(studioId) => {
-                            setForbesStudioTargetId(studioId);
+                            setForbesStudioTargetId(studioId || null);
                             setAppMode('FORBES');
                         }}
                         onOpenStock={(stockId) => {

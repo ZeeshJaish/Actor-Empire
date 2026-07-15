@@ -634,6 +634,7 @@ export const migratePlayerSave = (input: Partial<Player> | Player): Player => {
         id: String(base.id || INITIAL_PLAYER.id),
         name: typeof base.name === 'string' && base.name.trim() ? base.name : INITIAL_PLAYER.name,
         age: Math.max(1, Math.round(Number(base.age || INITIAL_PLAYER.age))),
+        totalPlayTimeMs: Math.max(0, Math.min(Number.MAX_SAFE_INTEGER, Math.round(Number(base.totalPlayTimeMs || 0)))),
         currentWeek: Math.max(1, Math.round(Number(base.currentWeek || INITIAL_PLAYER.currentWeek))),
         money: normalizeMigratedCash(base.money, repairRunawayStockCash),
         world: {

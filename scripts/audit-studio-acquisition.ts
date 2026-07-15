@@ -71,6 +71,13 @@ const player: any = {
 
 assert(getAcquisitionEligibility(profile).canApproach, 'Open-to-offers studios should be approachable.');
 assert(!getAcquisitionEligibility({ ...profile, acquisitionState: 'NOT_FOR_SALE' }).canApproach, 'Not-for-sale studios should be blocked.');
+const marketClosedOffer = submitOpeningOffer({
+    player,
+    profile: { ...profile, id: 'CLOSED_TARGET', acquisitionState: 'NOT_FOR_SALE' },
+    offerType: 'FAIR',
+    funding: { source: 'PERSONAL' },
+});
+assert(!marketClosedOffer.success && marketClosedOffer.reason === 'NOT_FOR_SALE', 'A market-closed studio must return its exact blocker reason.');
 assert(!getAcquisitionEligibility({ ...profile, isPlayerOwned: true }).canApproach, 'Player-owned studios should be blocked.');
 assert(getAcquisitionEligibility({ ...profile, acquisitionState: 'PUBLICLY_TRADED' }).allowedOfferTypes.length === 1, 'Public companies should expose minority investment only.');
 const platformEligibility = getAcquisitionEligibility({ ...profile, id: 'NETFLIX', archetype: 'PLATFORM', acquisitionState: 'PUBLICLY_TRADED' });

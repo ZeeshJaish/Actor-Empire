@@ -425,6 +425,8 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
   const cleanedAwards: Award[] = sanitizeAwardRecords(player.awards || []);
   const awardsWon = cleanedAwards.filter(a => a.outcome === 'WON');
   const awardsNom = cleanedAwards.filter(a => a.outcome === 'NOMINATED');
+  const careerNominations = awardsWon.length + awardsNom.length;
+  const awardWinRate = careerNominations > 0 ? Math.round((awardsWon.length / careerNominations) * 100) : 0;
   const musicHeavyProjects = fullList.filter(project => project.musicPlan?.credits?.length);
   const totalSoundtrackRevenue = fullList.reduce((sum, project) => {
       const original = project.originalObject as PastProject | ActiveRelease;
@@ -810,10 +812,17 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
                       <div className="text-[10px] text-zinc-500 uppercase tracking-widest">{tr('imdb.awards.wins')}</div>
                   </div>
                   <div className="bg-black/40 p-3 rounded-xl border border-zinc-800 text-center">
-                      <div className="text-2xl font-mono font-bold text-zinc-400">{awardsWon.length + awardsNom.length}</div>
-                      <div className="text-[10px] text-zinc-500 uppercase tracking-widest">{tr('imdb.awards.nominations')}</div>
+                      <div className="text-2xl font-mono font-bold text-zinc-400">{careerNominations}</div>
+                      <div className="text-[10px] text-zinc-500 uppercase tracking-widest">{tr('imdb.awards.totalNominations')}</div>
+                      <div className="mt-1 text-[8px] font-bold uppercase tracking-wider text-zinc-600">{tr('imdb.awards.nominationsIncludesWins')}</div>
                   </div>
               </div>
+              {careerNominations > 0 && (
+                  <div className="mt-3 flex items-center justify-between rounded-lg border border-white/5 bg-black/25 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+                      <span>{tr('imdb.awards.winRate')}</span>
+                      <span className="font-mono text-amber-300">{awardWinRate}%</span>
+                  </div>
+              )}
           </div>
       </div>
   );

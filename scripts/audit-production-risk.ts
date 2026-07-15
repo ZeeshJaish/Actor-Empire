@@ -116,4 +116,27 @@ const prestigeSeries = calculateProductionRiskProfile(makeProject({
 assert(prestigeSeries.streamingViewMultiplier > weakSeries.streamingViewMultiplier + 0.2, 'Strong episode ratings should clearly beat weak series demand.');
 assert(prestigeSeries.episodeScoreModifier > 0, 'Strong episode ratings should create a positive series modifier.');
 
+const crowdedSelfRunSlate = calculateProductionRiskProfile(makeProject({
+    title: 'Crowded Self-Run Slate',
+    genre: 'DRAMA',
+    budgetTier: 'MID',
+    estimatedBudget: 32_000_000,
+    hiddenStats: {
+        scriptQuality: 82,
+        directorQuality: 81,
+        castingStrength: 76,
+        distributionPower: 70,
+        rawHype: 68,
+        qualityScore: 82,
+        prestigeBonus: 0,
+        castDepthScore: 76,
+        selfRunProduction: true,
+        studioSlateFatigueScore: 56,
+        studioSlateFatigueLabel: 'FATIGUED',
+    },
+}), { budget: 32_000_000, imdbRating: 8.1, productionPerformance: 81 });
+assert(crowdedSelfRunSlate.theatricalDemandMultiplier < smartMidBudget.theatricalDemandMultiplier, 'A crowded self-run slate should lose theatrical demand against an otherwise healthy lean project.');
+assert(crowdedSelfRunSlate.platformBidMultiplier < smartMidBudget.platformBidMultiplier, 'Platform bids should account for audience slate fatigue.');
+assert(crowdedSelfRunSlate.notes.includes('audience slate fatigue'), 'Slate fatigue should explain its market downside.');
+
 console.log('Production risk audit passed.');

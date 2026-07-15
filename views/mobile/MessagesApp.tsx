@@ -16,7 +16,7 @@ interface MessagesAppProps {
   onDelete: (id: string) => void;
   onMarkRead: (id: string) => void;
   onOpenRightsMarket?: (opportunityId?: string) => void;
-  onOpenStudioAcquisition?: (studioId: string) => void;
+  onOpenStudioAcquisition?: (studioId?: string) => void;
   onOpenStock?: (stockId: string) => void;
   onImmersiveReviewChange?: (active: boolean) => void;
 }
@@ -380,8 +380,8 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
 	                            This offer has expired. It is kept here briefly so you can see what was missed.
 	                        </div>
 	                    )}
-	                    {selectedMessage.type === 'STUDIO_ACQUISITION' ? (
-                        <div className={`overflow-hidden rounded-3xl border shadow-xl ${selectedMessage.data?.decision === 'ACCEPTED'
+                    {selectedMessage.type === 'STUDIO_ACQUISITION' ? (
+                        <div className={`overflow-hidden rounded-3xl border shadow-xl ${selectedMessage.data?.decision === 'ACCEPTED' || selectedMessage.data?.decision === 'REVIEW_CLEARED'
                             ? 'border-emerald-300 bg-emerald-950 text-white'
                             : selectedMessage.data?.decision === 'REJECTED'
                                 ? 'border-rose-300 bg-rose-950 text-white'
@@ -393,8 +393,8 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                                         {selectedMessage.data?.decision === 'ACCEPTED' ? <CheckCircle size={23} /> : selectedMessage.data?.decision === 'REJECTED' ? <AlertTriangle size={23} /> : <Landmark size={23} />}
                                     </div>
                                     <div>
-                                        <div className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-300">Acquisition Desk</div>
-                                        <div className="text-xs text-white/50">Confidential board response</div>
+                                        <div className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-300">{selectedMessage.data?.decision === 'REVIEW_CLEARED' ? 'Regulatory Affairs' : 'Acquisition Desk'}</div>
+                                        <div className="text-xs text-white/50">{selectedMessage.data?.decision === 'REVIEW_CLEARED' ? 'Clearance notice' : 'Confidential board response'}</div>
                                     </div>
                                 </div>
                                 <h2 className="text-2xl font-black leading-tight">{selectedMessage.subject}</h2>
@@ -402,12 +402,12 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                             </div>
                             <div className="grid grid-cols-2 border-b border-white/10">
                                 <div className="border-r border-white/10 p-4">
-                                    <div className="text-[8px] font-black uppercase tracking-widest text-white/35">Company</div>
-                                    <div className="mt-1 text-sm font-black">{selectedMessage.data?.studioName}</div>
+                                    <div className="text-[8px] font-black uppercase tracking-widest text-white/35">{selectedMessage.data?.decision === 'REVIEW_CLEARED' ? 'Portfolio review' : 'Company'}</div>
+                                    <div className="mt-1 text-sm font-black">{selectedMessage.data?.decision === 'REVIEW_CLEARED' ? 'Cleared' : selectedMessage.data?.studioName}</div>
                                 </div>
                                 <div className="p-4">
-                                    <div className="text-[8px] font-black uppercase tracking-widest text-white/35">Board Decision</div>
-                                    <div className="mt-1 text-sm font-black capitalize">{String(selectedMessage.data?.decision || '').replaceAll('_', ' ').toLowerCase()}</div>
+                                    <div className="text-[8px] font-black uppercase tracking-widest text-white/35">{selectedMessage.data?.decision === 'REVIEW_CLEARED' ? 'Market access' : 'Board Decision'}</div>
+                                    <div className="mt-1 text-sm font-black capitalize">{selectedMessage.data?.decision === 'REVIEW_CLEARED' ? 'Reopened' : String(selectedMessage.data?.decision || '').replaceAll('_', ' ').toLowerCase()}</div>
                                 </div>
                             </div>
                             {selectedMessage.data?.decision === 'RIVAL_BID' ? (
@@ -432,7 +432,11 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                                     onClick={() => onOpenStudioAcquisition?.(selectedMessage.data?.studioId)}
                                     className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-amber-400 px-4 text-[10px] font-black uppercase tracking-[0.15em] text-black"
                                 >
-                                    {selectedMessage.data?.decision === 'RIVAL_BID' ? 'Enter Bidding War' : 'Review Offer'} <ChevronRight size={17} />
+                                    {selectedMessage.data?.decision === 'REVIEW_CLEARED'
+                                        ? 'Open Forbes'
+                                        : selectedMessage.data?.decision === 'RIVAL_BID'
+                                            ? 'Enter Bidding War'
+                                            : 'Review Offer'} <ChevronRight size={17} />
                                 </button>
                             </div>
                         </div>

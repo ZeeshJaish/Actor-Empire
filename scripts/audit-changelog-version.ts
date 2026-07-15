@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 import { APP_DISPLAY_VERSION } from '../services/appVersion';
 import { CHANGELOG_ENTRIES, getLatestChangelogEntry } from '../services/changelog';
+import { INITIAL_PLAYER } from '../types';
+import { migratePlayerSave } from '../services/saveMigration';
 
 const read = (path: string) => fs.readFileSync(path, 'utf8');
 
@@ -12,11 +14,11 @@ const assert = (condition: unknown, message: string) => {
 
 const latest = getLatestChangelogEntry();
 assert(latest.version === APP_DISPLAY_VERSION, `latest changelog ${latest.version} does not match app version ${APP_DISPLAY_VERSION}`);
-assert(APP_DISPLAY_VERSION === '1.0.22', `app version should be 1.0.22, got ${APP_DISPLAY_VERSION}`);
-const expectedVersions = Array.from({ length: 23 }, (_, index) => `1.0.${22 - index}`);
+assert(APP_DISPLAY_VERSION === '1.0.23', `app version should be 1.0.23, got ${APP_DISPLAY_VERSION}`);
+const expectedVersions = Array.from({ length: 24 }, (_, index) => `1.0.${23 - index}`);
 assert(
   CHANGELOG_ENTRIES.map(entry => entry.version).join('|') === expectedVersions.join('|'),
-  `changelog should include every version from 1.0.22 through 1.0.0 in order`,
+  `changelog should include every version from 1.0.23 through 1.0.0 in order`,
 );
 
 const seenVersions = new Set<string>();
@@ -55,6 +57,8 @@ assert(entryText('1.0.15').includes('Luxe'), '1.0.15 should include Luxe upgrade
 assert(entryText('1.0.16').includes('iOS in-app purchases'), '1.0.16 should include iOS IAP fix');
 assert(entryText('1.0.17').includes('Biopic'), '1.0.17 should include new genres and project types');
 assert(entryText('1.0.18').includes('runaway streaming numbers'), '1.0.18 should include runaway streaming fix');
+assert(entryText('1.0.23').includes('total time played'), '1.0.23 should include save-slot play time');
+assert(!/loophole|box office/i.test(entryText('1.0.23')), '1.0.23 should describe player-facing changes without internal balancing details');
 
 const settingsPage = read('views/SettingsPage.tsx');
 assert(settingsPage.includes("'CHANGELOG'"), 'SettingsPage must include CHANGELOG mode');
@@ -69,24 +73,39 @@ const app = read('App.tsx');
 assert(app.includes('getLatestChangelogEntry'), 'App must render latest changelog in startup What\'s New');
 assert(app.includes('previousChangelogEntries'), 'App must render previous updates in startup What\'s New');
 
+const startMenu = read('views/StartMenu.tsx');
+assert(startMenu.includes('totalPlayTimeMs'), 'StartMenu must pass total play time to save slots');
+const saveSlotScreen = read('components/SaveSlotScreen.tsx');
+assert(saveSlotScreen.includes('formatTotalPlayTime'), 'SaveSlotScreen must format total play time');
+assert(saveSlotScreen.includes('Clock3'), 'SaveSlotScreen must show a compact play-time icon');
+assert(app.includes('visibilitychange'), 'App must pause play-time tracking when the game is backgrounded');
+assert(app.includes('PLAYTIME_FLUSH_INTERVAL_MS'), 'App must periodically record active play time');
+
+const missingPlayTime = migratePlayerSave({ ...INITIAL_PLAYER, totalPlayTimeMs: undefined } as any);
+assert(missingPlayTime.totalPlayTimeMs === 0, 'old saves without play time must migrate to zero');
+const invalidPlayTime = migratePlayerSave({ ...INITIAL_PLAYER, totalPlayTimeMs: -500 } as any);
+assert(invalidPlayTime.totalPlayTimeMs === 0, 'invalid negative play time must be normalized');
+const savedPlayTime = migratePlayerSave({ ...INITIAL_PLAYER, totalPlayTimeMs: 3_726_500 } as any);
+assert(savedPlayTime.totalPlayTimeMs === 3_726_500, 'valid accumulated play time must survive migration');
+
 const packageJson = JSON.parse(read('package.json'));
-assert(packageJson.version === '1.0.22', 'package.json version must be 1.0.22');
+assert(packageJson.version === '1.0.23', 'package.json version must be 1.0.23');
 assert(packageJson.scripts?.['audit:changelog-version'], 'package.json must expose audit:changelog-version');
 
 const packageLock = JSON.parse(read('package-lock.json'));
-assert(packageLock.version === '1.0.22', 'package-lock root version must be 1.0.22');
-assert(packageLock.packages?.['']?.version === '1.0.22', 'package-lock package version must be 1.0.22');
+assert(packageLock.version === '1.0.23', 'package-lock root version must be 1.0.23');
+assert(packageLock.packages?.['']?.version === '1.0.23', 'package-lock package version must be 1.0.23');
 
 const androidGradle = read('android/app/build.gradle');
-assert(androidGradle.includes('versionCode 13'), 'Android versionCode must be 13');
-assert(androidGradle.includes('versionName "1.0.22"'), 'Android versionName must be 1.0.22');
+assert(androidGradle.includes('versionCode 18'), 'Android versionCode must be 18');
+assert(androidGradle.includes('versionName "1.0.23"'), 'Android versionName must be 1.0.23');
 
 const androidMetadata = read('android/app/release/output-metadata.json');
-assert(androidMetadata.includes('"versionCode": 13'), 'Android output metadata versionCode must be 13');
-assert(androidMetadata.includes('"versionName": "1.0.22"'), 'Android output metadata versionName must be 1.0.22');
+assert(androidMetadata.includes('"versionCode": 18'), 'Android output metadata versionCode must be 18');
+assert(androidMetadata.includes('"versionName": "1.0.23"'), 'Android output metadata versionName must be 1.0.23');
 
 const iosProject = read('ios/App/App.xcodeproj/project.pbxproj');
-assert((iosProject.match(/CURRENT_PROJECT_VERSION = 13;/g) || []).length >= 2, 'iOS build number must be 13');
-assert((iosProject.match(/MARKETING_VERSION = 1.0.22;/g) || []).length >= 2, 'iOS marketing version must be 1.0.22');
+assert((iosProject.match(/CURRENT_PROJECT_VERSION = 18;/g) || []).length >= 2, 'iOS build number must be 18');
+assert((iosProject.match(/MARKETING_VERSION = 1.0.23;/g) || []).length >= 2, 'iOS marketing version must be 1.0.23');
 
 console.log('Changelog and version audit passed.');

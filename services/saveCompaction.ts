@@ -80,6 +80,28 @@ const trimHead = <T>(value: T[] | undefined, limit: number): T[] | undefined => 
   Array.isArray(value) ? value.slice(0, limit) : value
 );
 
+const stripEventCallbacks = (value: any, seen = new WeakMap<object, any>()): any => {
+  if (typeof value === 'function') return undefined;
+  if (!value || typeof value !== 'object') return value;
+  if (Array.isArray(value)) return value.map(item => stripEventCallbacks(item, seen));
+
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) return value;
+  if (seen.has(value)) return seen.get(value);
+
+  const copy: Record<string, any> = {};
+  seen.set(value, copy);
+  Object.entries(value).forEach(([key, item]) => {
+    const safeItem = stripEventCallbacks(item, seen);
+    if (safeItem !== undefined) copy[key] = safeItem;
+  });
+  return copy;
+};
+
+const compactEventQueue = (events: any) => (
+  Array.isArray(events) ? events.map(event => stripEventCallbacks(event)) : []
+);
+
 const compactAudienceReception = (audienceReception: any) => {
   if (!audienceReception || typeof audienceReception !== 'object') return audienceReception;
   return {
@@ -303,6 +325,8 @@ export const compactPlayerForPersistence = (nextPlayer: Player): Player => {
     pastProjects: Array.isArray(nextPlayer.pastProjects) ? nextPlayer.pastProjects.map(compactPastProject) : [],
     businesses: Array.isArray(nextPlayer.businesses) ? nextPlayer.businesses.map(compactBusiness) : [],
     world: compactWorld(nextPlayer.world),
+    scheduledEvents: compactEventQueue(nextPlayer.scheduledEvents),
+    pendingEvents: compactEventQueue(nextPlayer.pendingEvents),
     logs: Array.isArray(nextPlayer.logs) ? nextPlayer.logs.slice(-50) : [],
     news: Array.isArray(nextPlayer.news) ? nextPlayer.news.slice(0, 80) : [],
     inbox: Array.isArray(nextPlayer.inbox) ? nextPlayer.inbox.slice(0, 120) : [],

@@ -11,6 +11,8 @@ const required = [
     [service, 'processRegulatorPressure', 'weekly regulator processor'],
     [service, 'regulatorPressureEventType', 'popup discriminator'],
     [service, 'REGULATOR_REVIEW', 'review event type'],
+    [service, 'REVIEW_CLEARED', 'review-cleared inbox action'],
+    [service, 'reviewCooldownWeeksRemaining', 'review cooling-off protection'],
     [service, 'isGolden: true', 'golden safest option'],
     [gameLoop, "import { processRegulatorPressure } from './regulatorPressure';", 'weekly game-loop import'],
     [gameLoop, 'nextPlayer = processRegulatorPressure(nextPlayer);', 'weekly game-loop call'],

@@ -8,6 +8,7 @@ const assert = (condition, message) => {
 const awardLogic = read('services/awardLogic.ts');
 const redCarpet = read('views/RedCarpetEvent.tsx');
 const awardFlow = read('views/AwardNightFlow.tsx');
+const imdb = read('views/mobile/ImdbApp.tsx');
 const home = read('views/HomePage.tsx');
 const pkg = JSON.parse(read('package.json'));
 
@@ -60,6 +61,16 @@ assert(
   !redCarpet.includes('const result = currentResults[0]; // Focusing on primary nomination'),
   'Red carpet ceremony should not only stage the first player nomination.'
 );
+
+[
+  'sanitizeAwardRecords(player.awards || [])',
+  'const careerNominations = awardsWon.length + awardsNom.length;',
+  'imdb.awards.totalNominations',
+  'imdb.awards.nominationsIncludesWins',
+  'awardWinRate',
+].forEach(token => {
+  assert(imdb.includes(token), `IMDb awards should reconcile career totals and explain them: ${token}`);
+});
 
 [
   'triggerAwardsPolishQa',

@@ -164,7 +164,7 @@ export const StorePage: React.FC<StorePageProps> = ({ player, onBack, onWatchAd,
                         <div>
                             <h3 className="font-bold text-white text-lg">{tr('store.premium.title')}</h3>
                             <p className="text-xs text-zinc-500">
-                                {isIOSDevice ? tr('store.premium.iosCatalog') : tr('store.premium.devCatalog')}
+                                {isIOSDevice ? tr('store.premium.iosCatalog') : isAndroidDevice ? tr('store.premium.androidCatalog') : tr('store.premium.devCatalog')}
                             </p>
                         </div>
                         <button

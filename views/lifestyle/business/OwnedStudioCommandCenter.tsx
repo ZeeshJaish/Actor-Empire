@@ -47,6 +47,7 @@ import { getTalentInstabilityState } from '../../../services/talentInstability';
 import { getPlayerLanguage, t } from '../../../services/i18n';
 import { StudioSaleEntryCard, StudioSaleRoom } from './components/StudioSaleDeckPanel';
 import { resolveProjectType } from '../../../services/businessLogic';
+import { getReleaseDisplayPhase } from '../../../services/releasePresentation';
 
 interface OwnedStudioCommandCenterProps {
     player: Player;
@@ -311,7 +312,7 @@ export const OwnedStudioCommandCenter: React.FC<OwnedStudioCommandCenterProps> =
             id: release.id,
             name: release.name,
             title: release.name,
-            phase: release.distributionPhase === 'STREAMING' ? 'STREAMING' : 'IN THEATERS',
+            phase: getReleaseDisplayPhase(release),
             type: resolveProjectType(release.type, release.projectDetails?.type),
             budget: release.budget,
             phaseWeeksLeft: release.distributionPhase === 'STREAMING' ? release.streaming?.weekOnPlatform : release.weekNum,

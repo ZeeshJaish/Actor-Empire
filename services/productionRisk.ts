@@ -52,6 +52,7 @@ export const calculateProductionRiskProfile = (
     const qualityScore = Number(hidden.qualityScore || 50);
     const rawHype = Number(hidden.rawHype || 50);
     const castDepthScore = Number(hidden.castDepthScore ?? 70);
+    const studioSlateFatigueScore = clamp(Number(hidden.studioSlateFatigueScore || 0), 0, 68);
     const productionPerformance = Number(context.productionPerformance ?? qualityScore);
     const imdbScore = Number(context.imdbRating || 0) * 10;
 
@@ -74,11 +75,13 @@ export const calculateProductionRiskProfile = (
     const thinSpectacleDrag = SPECTACLE_GENRES.has(project.genre) && ['HIGH', 'BLOCKBUSTER'].includes(project.budgetTier) && castDepthScore < 58
         ? clamp((58 - castDepthScore) / 160, 0, 0.16)
         : 0;
+    const slateFatigueDrag = clamp(studioSlateFatigueScore / 360, 0, 0.19);
 
     if (budgetDrag > 0.06) notes.push('budget pressure');
     if (starVehicleDrag > 0.04) notes.push('star payroll pressure');
     if (hypeTrapDrag > 0.04) notes.push('hype/quality mismatch');
     if (thinSpectacleDrag > 0.04) notes.push('thin spectacle package');
+    if (slateFatigueDrag > 0.04) notes.push('audience slate fatigue');
     if (efficiencyLift > 0.03) notes.push('efficient budget');
 
     let episodeScoreModifier = 0;
@@ -93,17 +96,17 @@ export const calculateProductionRiskProfile = (
     const prestigeLift = prestigeShield ? 0.04 : 0;
 
     const theatricalDemandMultiplier = roundTwo(clamp(
-        1 + qualityLift + efficiencyLift + prestigeLift + (episodeScoreModifier * 0.28) - budgetDrag - starVehicleDrag - hypeTrapDrag - thinSpectacleDrag,
+        1 + qualityLift + efficiencyLift + prestigeLift + (episodeScoreModifier * 0.28) - budgetDrag - starVehicleDrag - hypeTrapDrag - thinSpectacleDrag - slateFatigueDrag,
         0.45,
         1.28
     ));
     const streamingViewMultiplier = roundTwo(clamp(
-        1 + (qualityLift * 0.85) + prestigeLift + episodeScoreModifier + (efficiencyLift * 0.5) - (budgetDrag * 0.75) - (starVehicleDrag * 0.7) - (hypeTrapDrag * 0.85) - (thinSpectacleDrag * 0.5),
+        1 + (qualityLift * 0.85) + prestigeLift + episodeScoreModifier + (efficiencyLift * 0.5) - (budgetDrag * 0.75) - (starVehicleDrag * 0.7) - (hypeTrapDrag * 0.85) - (thinSpectacleDrag * 0.5) - (slateFatigueDrag * 0.7),
         0.48,
         1.24
     ));
     const platformBidMultiplier = roundTwo(clamp(
-        1 + (qualityLift * 0.75) + (episodeScoreModifier * 0.85) + (prestigeLift * 0.7) - (budgetDrag * 1.05) - starVehicleDrag - hypeTrapDrag - (thinSpectacleDrag * 0.7),
+        1 + (qualityLift * 0.75) + (episodeScoreModifier * 0.85) + (prestigeLift * 0.7) - (budgetDrag * 1.05) - starVehicleDrag - hypeTrapDrag - (thinSpectacleDrag * 0.7) - (slateFatigueDrag * 0.85),
         0.42,
         1.18
     ));
@@ -116,7 +119,8 @@ export const calculateProductionRiskProfile = (
         - (Math.max(0, budgetPressure - 1) * 24)
         - (starVehicleDrag * 110)
         - (hypeTrapDrag * 90)
-        - (thinSpectacleDrag * 80),
+        - (thinSpectacleDrag * 80)
+        - (slateFatigueDrag * 80),
         0,
         100
     ));

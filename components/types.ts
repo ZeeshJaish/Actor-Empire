@@ -4,6 +4,7 @@ export interface SaveSlot {
   name: string;
   age: number;
   fame: number;
+  totalPlayTimeMs: number;
 }
 
 /** null = empty slot ("create a new star") */

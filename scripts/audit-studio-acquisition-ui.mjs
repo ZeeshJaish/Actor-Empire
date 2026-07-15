@@ -65,7 +65,7 @@ const checks = [
     ['Ownership Transfer', 'the ownership transfer review card'],
     ['Binding Clauses', 'the signed commitment clauses'],
     ['Tap To Sign Transfer', 'the tap-to-sign control'],
-    ['Signing Requirement', 'the blocked-signing requirement prompt'],
+    ['Deal Status', 'the reusable acquisition blocker prompt'],
     ['showAcquisitionRequirement', 'the modal blocker feedback path'],
     ['Requirement Check', 'the visible pre-signing requirements summary'],
     ['signingRequirementChecks', 'the money/energy/terms requirement model'],
@@ -152,6 +152,16 @@ const checks = [
     ['Final Board Directive', 'the immediate post-acquisition operating-model decision'],
     ['Confirm Operating Model', 'the operating-model confirmation action'],
     ['onSetOperatingModel', 'the acquisition operating-model callback'],
+    ['showOpeningOfferBlocker', 'the exact opening-offer blocker path'],
+    ['Market Closed', 'the unavailable-company explanation'],
+    ['Unknown liabilities are only a risk warning', 'the liability warning clarification'],
+    ['Open Stocks', 'the public-market acquisition route'],
+    ['forbes_acquisition_offer_attempt', 'the acquisition offer telemetry checkpoint'],
+    ['forbes_acquisition_offer_result', 'the acquisition result telemetry checkpoint'],
+    ['Company Review In Progress', 'the explicit acquisition hold status'],
+    ['Optional Target Due Diligence', 'the non-blocking target research explanation'],
+    ['Verify Target Figures', 'the optional diligence path from final review'],
+    ['Review Hold', 'the disabled action copy during a regulator hold'],
 ];
 
 for (const [needle, description] of checks) {

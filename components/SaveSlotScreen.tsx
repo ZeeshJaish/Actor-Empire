@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Upload } from 'lucide-react';
+import { Clock3, Upload } from 'lucide-react';
 import { logoDataUri } from '../assets/logo';
 import type { ActState, SlotEntry } from './types';
 import { isAndroidSaveTransferSurface, type SaveTransferResult } from '../services/saveTransfer';
@@ -17,6 +17,11 @@ interface Props {
   version?: string;
   credit?: string;
 }
+
+const formatTotalPlayTime = (totalPlayTimeMs: number) => {
+  const totalHours = Math.max(0, totalPlayTimeMs) / 3_600_000;
+  return totalHours < 100 ? `${totalHours.toFixed(1)}h` : `${Math.floor(totalHours)}h`;
+};
 
 /** ACT IV — save slot selection. */
 export default function SaveSlotScreen({
@@ -117,6 +122,10 @@ export default function SaveSlotScreen({
                   </span>
                   <span className="gold">
                     ★ <b>{slot.fame}</b> Fame
+                  </span>
+                  <span className="slot-time" title="Total time played">
+                    <Clock3 size={13} strokeWidth={2.5} aria-hidden="true" />
+                    <b>{formatTotalPlayTime(slot.totalPlayTimeMs)}</b>
                   </span>
                 </div>
               </div>

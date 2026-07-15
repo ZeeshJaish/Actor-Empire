@@ -1,6 +1,9 @@
 import { INITIAL_PLAYER } from '../types';
 import {
+    executeFullStudioMerger,
+    getFullMergerCarveOutTerms,
     getStudioGroup,
+    reverseFullStudioMerger,
     setSubsidiaryOperatingModel,
 } from '../services/studioGroup';
 import type { Business, Player } from '../types';
@@ -103,6 +106,28 @@ const invalid = setSubsidiaryOperatingModel({
 });
 if (invalid.success || invalid.reason !== 'NOT_ACQUIRED_STUDIO') {
     throw new Error('The original studio incorrectly accepted a subsidiary operating model.');
+}
+
+const merger = executeFullStudioMerger({ player, studioId: acquiredStudio.id });
+if (!merger.success) {
+    throw new Error('Could not merge an acquired studio for carve-out QA.');
+}
+const carveOutTerms = getFullMergerCarveOutTerms({ player: merger.player, studioId: acquiredStudio.id });
+if (!carveOutTerms || carveOutTerms.totalCost <= carveOutTerms.restorationCapital) {
+    throw new Error('Carve-out terms should include both restoration capital and a separation fee.');
+}
+const restored = reverseFullStudioMerger({ player: merger.player, studioId: acquiredStudio.id });
+if (!restored.success || !restored.restoredStudio || !restored.parentStudio) {
+    throw new Error('A merged studio should be restorable through the carve-out flow.');
+}
+if (!restored.restoredStudio.isActive || restored.restoredStudio.studioState?.operatingModel !== 'CONTROLLED_SUBSIDIARY') {
+    throw new Error('A carve-out should restore the acquired banner as an active controlled subsidiary.');
+}
+if (restored.parentStudio.balance !== merger.parentStudio!.balance - carveOutTerms.totalCost) {
+    throw new Error('A carve-out should charge its complete cost to HQ exactly once.');
+}
+if (!restored.player.news.some(item => /returns as a separate subsidiary/i.test(item.headline))) {
+    throw new Error('A carve-out should publish an industry news item.');
 }
 
 console.log('Studio Group audit passed.');

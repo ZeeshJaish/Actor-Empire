@@ -23,6 +23,7 @@ import { getOwnedIpPerformance } from '../../../services/ownedIpPerformance';
 import { deriveStudioOriginalRights } from '../../../services/studioOriginalIp';
 import { getPlayerLanguage, t } from '../../../services/i18n';
 import { getInheritedStudioProjects } from '../../../services/legacyLogic';
+import { getReleaseDisplayPhase } from '../../../services/releasePresentation';
 
 interface DevelopmentLabProps {
     player: Player;
@@ -2643,7 +2644,7 @@ const FranchiseManager: React.FC<{
             releaseYear: r.releaseYear,
             releasedAtAbsoluteWeek: r.releasedAtAbsoluteWeek,
             weekNum: r.weekNum,
-            phase: r.distributionPhase === 'STREAMING' ? 'STREAMING' : 'IN THEATERS'
+            phase: getReleaseDisplayPhase(r)
         })),
         ...inheritedStudioProjects
     ];

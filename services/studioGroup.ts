@@ -75,6 +75,34 @@ const getParentStudio = (player: Pick<Player, 'businesses'>, excludeStudioId?: s
 
 const getMergerIntegrationCost = (studio: Business): number => Math.max(5_000_000, Math.round((studio.stats.valuation || 0) * 0.04));
 
+export interface FullMergerCarveOutTerms {
+    reversalFee: number;
+    restorationCapital: number;
+    totalCost: number;
+    estimatedStudioValue: number;
+}
+
+const getFullMergerCarveOutTermsInternal = (studio: Business): FullMergerCarveOutTerms => {
+    const state = studio.studioState;
+    const estimatedStudioValue = Math.max(
+        50_000_000,
+        Math.round(state?.mergerPreIntegrationStats?.valuation || 0),
+        Math.round((state?.mergerIntegrationCost || 0) / 0.04),
+    );
+    const restorationCapital = Math.max(
+        10_000_000,
+        Math.round(state?.mergerPreIntegrationBalance || 0),
+        Math.round(estimatedStudioValue * 0.05),
+    );
+    const reversalFee = Math.max(5_000_000, Math.round(estimatedStudioValue * 0.06));
+    return {
+        reversalFee,
+        restorationCapital,
+        totalCost: reversalFee + restorationCapital,
+        estimatedStudioValue,
+    };
+};
+
 const createStudioFinanceEntry = ({
     id,
     player,
@@ -655,6 +683,8 @@ export const executeFullStudioMerger = ({
             mergerIntegratedWeek: player.currentWeek,
             mergerIntegratedYear: player.age,
             mergerIntegrationCost: integrationCost,
+            mergerPreIntegrationBalance: studio.balance,
+            mergerPreIntegrationStats: { ...studio.stats },
             subsidiaryProjectProposals: (acquiredState.subsidiaryProjectProposals || []).filter(proposal => proposal.status !== 'PENDING'),
         },
     };
@@ -723,5 +753,164 @@ export const executeFullStudioMerger = ({
         parentStudio: updatedParentStudio,
         mergedStudio,
         integrationCost,
+    };
+};
+
+export const getFullMergerCarveOutTerms = ({
+    player,
+    studioId,
+}: {
+    player: Player;
+    studioId: string;
+}): FullMergerCarveOutTerms | null => {
+    const studio = player.businesses.find(business => business.id === studioId && business.type === 'PRODUCTION_HOUSE');
+    if (!studio || studio.studioState?.operatingModel !== 'FULL_MERGER') return null;
+    return getFullMergerCarveOutTermsInternal(studio);
+};
+
+export const reverseFullStudioMerger = ({
+    player,
+    studioId,
+}: {
+    player: Player;
+    studioId: string;
+}): {
+    success: boolean;
+    player: Player;
+    restoredStudio?: Business;
+    parentStudio?: Business;
+    terms?: FullMergerCarveOutTerms;
+    reason?: 'STUDIO_NOT_FOUND' | 'NOT_MERGED' | 'HQ_NOT_FOUND' | 'HQ_INSUFFICIENT_CAPITAL';
+} => {
+    const studio = player.businesses.find(business => business.id === studioId && business.type === 'PRODUCTION_HOUSE');
+    if (!studio?.studioState) return { success: false, player, reason: 'STUDIO_NOT_FOUND' };
+    if (!isAcquiredStudio(studio) || studio.studioState.operatingModel !== 'FULL_MERGER') {
+        return { success: false, player, reason: 'NOT_MERGED' };
+    }
+    const parentStudio = getParentStudio(player, studioId);
+    if (!parentStudio?.studioState) return { success: false, player, reason: 'HQ_NOT_FOUND' };
+
+    const terms = getFullMergerCarveOutTermsInternal(studio);
+    if (parentStudio.balance < terms.totalCost) {
+        return { success: false, player, parentStudio, terms, reason: 'HQ_INSUFFICIENT_CAPITAL' };
+    }
+
+    const parentState = normalizeStudioState(parentStudio.studioState, player.currentWeek);
+    const mergedState = normalizeStudioState(studio.studioState, player.currentWeek);
+    const snapshotStats = mergedState.mergerPreIntegrationStats;
+    const studioStaffIds = new Set((studio.staff || []).map(member => member.id));
+    const scriptIds = new Set((mergedState.scripts || []).map(script => script.id));
+    const conceptIds = new Set((mergedState.concepts || []).map(concept => concept.id));
+    const writerIds = new Set((mergedState.writers || []).map(writer => writer.id));
+    const talentContractIds = new Set((mergedState.talentRoster || []).map(contract => contract.id));
+    const rightIds = new Set((mergedState.ownedRights || []).map(right => right.id));
+    const purchasedTitles = new Set(mergedState.purchasedIPTitles || []);
+    const {
+        mergedIntoStudioId: _mergedIntoStudioId,
+        mergerIntegratedWeek: _mergerIntegratedWeek,
+        mergerIntegratedYear: _mergerIntegratedYear,
+        mergerIntegrationCost: _mergerIntegrationCost,
+        mergerPreIntegrationBalance: _mergerPreIntegrationBalance,
+        mergerPreIntegrationStats: _mergerPreIntegrationStats,
+        ...restoredStudioState
+    } = mergedState;
+
+    const restoredStudio: Business = {
+        ...studio,
+        balance: terms.restorationCapital,
+        isActive: true,
+        stats: snapshotStats
+            ? { ...snapshotStats }
+            : {
+                ...studio.stats,
+                weeklyRevenue: 0,
+                weeklyExpenses: 0,
+                weeklyProfit: 0,
+                valuation: terms.estimatedStudioValue,
+            },
+        studioState: {
+            ...restoredStudioState,
+            acquisitionOrigin: 'STUDIO_ACQUISITION',
+            operatingModel: 'CONTROLLED_SUBSIDIARY',
+            operatingModelChangedWeek: player.currentWeek,
+            operatingModelChangedYear: player.age,
+            financeLedger: [
+                createStudioFinanceEntry({
+                    id: `studio_carve_out_${studio.id}_${player.age}_${player.currentWeek}_${Date.now()}`,
+                    player,
+                    amount: terms.restorationCapital,
+                    type: 'CAPITAL_INJECTION',
+                    label: `${studio.name} restored from HQ integration`,
+                }),
+                ...(restoredStudioState.financeLedger || []),
+            ].slice(0, 200),
+        },
+    };
+
+    const updatedParentStudio: Business = {
+        ...parentStudio,
+        balance: parentStudio.balance - terms.totalCost,
+        staff: parentStudio.staff.filter(member => !studioStaffIds.has(member.id)),
+        stats: snapshotStats
+            ? {
+                ...parentStudio.stats,
+                weeklyRevenue: Math.max(0, (parentStudio.stats.weeklyRevenue || 0) - Math.round((snapshotStats.weeklyRevenue || 0) * 0.85)),
+                weeklyExpenses: Math.max(0, (parentStudio.stats.weeklyExpenses || 0) - Math.round((snapshotStats.weeklyExpenses || 0) * 0.82)),
+                weeklyProfit: (parentStudio.stats.weeklyProfit || 0) - Math.round((snapshotStats.weeklyProfit || 0) * 0.8),
+                lifetimeRevenue: Math.max(0, (parentStudio.stats.lifetimeRevenue || 0) - (snapshotStats.lifetimeRevenue || 0)),
+                valuation: Math.max(0, (parentStudio.stats.valuation || 0) - Math.round((snapshotStats.valuation || 0) * 0.9)),
+            }
+            : parentStudio.stats,
+        studioState: {
+            ...parentState,
+            scripts: parentState.scripts.filter(script => !scriptIds.has(script.id)),
+            concepts: parentState.concepts.filter(concept => !conceptIds.has(concept.id)),
+            writers: parentState.writers.filter(writer => !writerIds.has(writer.id)),
+            talentRoster: (parentState.talentRoster || []).filter(contract => !talentContractIds.has(contract.id)),
+            purchasedIPTitles: (parentState.purchasedIPTitles || []).filter(title => !purchasedTitles.has(title)),
+            ownedRights: (parentState.ownedRights || []).filter(right => !rightIds.has(right.id)),
+            financeLedger: [
+                createStudioFinanceEntry({
+                    id: `studio_carve_out_fee_${studio.id}_${player.age}_${player.currentWeek}_${Date.now()}`,
+                    player,
+                    amount: -terms.totalCost,
+                    type: 'ACQUISITION_MERGER',
+                    label: `${studio.name} carve-out and restoration`,
+                }),
+                ...(parentState.financeLedger || []),
+            ].slice(0, 200),
+        },
+    };
+
+    const newsItem: NewsItem = {
+        id: `news_studio_carve_out_${studio.id}_${player.age}_${player.currentWeek}_${Date.now()}`,
+        headline: `${studio.name} returns as a separate subsidiary`,
+        subtext: `${parentStudio.name} completed a costly carve-out, restoring ${studio.name}'s banner, staff and catalog. Existing HQ productions remain with headquarters.`,
+        category: 'INDUSTRY',
+        week: player.currentWeek,
+        year: player.age,
+        impactLevel: 'MEDIUM',
+    };
+
+    return {
+        success: true,
+        restoredStudio,
+        parentStudio: updatedParentStudio,
+        terms,
+        player: {
+            ...player,
+            businesses: player.businesses.map(business => {
+                if (business.id === updatedParentStudio.id) return updatedParentStudio;
+                if (business.id === restoredStudio.id) return restoredStudio;
+                return business;
+            }),
+            news: [newsItem, ...(player.news || [])].slice(0, 80),
+            logs: [{
+                week: player.currentWeek,
+                year: player.age,
+                message: `${studio.name} was restored as a controlled subsidiary. HQ paid ${terms.totalCost.toLocaleString()} for the carve-out.`,
+                type: 'neutral' as const,
+            }, ...(player.logs || [])].slice(0, 50),
+        },
     };
 };

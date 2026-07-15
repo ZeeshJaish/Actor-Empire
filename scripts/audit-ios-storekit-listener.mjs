@@ -27,6 +27,7 @@ assertIncludes('Store product IDs map back to premium IDs', iapService, 'getPrem
 assertIncludes('Purchases plugin exposes purchaseCompleted listener', iapService, "addListener(eventName: 'purchaseCompleted'");
 assertIncludes('JS starts iOS purchase update listener', iapService, 'startIOSPurchaseUpdatesListener');
 assertIncludes('Direct iOS purchase returns transaction id', iapService, 'transactionId: result?.transactionId');
+assertIncludes('Custom iOS purchase plugin is trusted on native builds', iapService, 'return isCapacitorIOS() || isPurchasesPluginAvailable() ? Purchases : null;');
 
 assertIncludes('App imports iOS purchase listener', app, 'startIOSPurchaseUpdatesListener');
 assertIncludes('App records processed iOS transactions', app, 'processedIOSStoreTransactionIds');

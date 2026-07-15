@@ -35,6 +35,7 @@ import { getMergedStudioIds } from '../../services/stockLogic';
 import { spendPlayerEnergy } from '../../services/premiumLogic';
 import { PHASE_ONE_ENERGY_COSTS } from '../../services/energyCosts';
 import { getInheritedStudioProjects } from '../../services/legacyLogic';
+import { markGameCheckpoint } from '../../services/firebaseService';
 
 interface ForbesAppProps {
   player: Player;
@@ -348,7 +349,14 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePl
                 }}
                 companyPosition={getCompanyPosition(player, selectedStudioProfile)}
                 acquisitionCase={getAcquisitionCase(player, selectedStudioProfile.id)}
-                onApproachStudio={() => setAcquisitionDeskOpen(true)}
+                onApproachStudio={() => {
+                    markGameCheckpoint('forbes_acquisition_desk_open', player, {
+                        acquisition_studio_id: selectedStudioProfile.id,
+                        acquisition_state: selectedStudioProfile.acquisitionState,
+                        acquisition_case_status: getAcquisitionCase(player, selectedStudioProfile.id)?.status || 'NONE',
+                    });
+                    setAcquisitionDeskOpen(true);
+                }}
                 onOpenStocks={onOpenStocks}
                 language={language}
             />
@@ -359,6 +367,7 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePl
                 profile={selectedStudioProfile}
                 acquisitionCase={getAcquisitionCase(player, selectedStudioProfile.id)}
                 onClose={() => setAcquisitionDeskOpen(false)}
+                onOpenStocks={onOpenStocks}
                 onImmersiveChange={onImmersiveChange}
                 onSetOperatingModel={(model) => {
                     const result = setSubsidiaryOperatingModel({
@@ -379,6 +388,15 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePl
                     return result;
                 }}
 	                onSubmitOffer={({ offerType, offerAmount, minorityPercent, funding, commitments }) => {
+	                    markGameCheckpoint('forbes_acquisition_offer_attempt', player, {
+	                        acquisition_studio_id: selectedStudioProfile.id,
+	                        acquisition_state: selectedStudioProfile.acquisitionState,
+	                        acquisition_case_status: getAcquisitionCase(player, selectedStudioProfile.id)?.status || 'NONE',
+	                        acquisition_offer_type: offerType,
+	                        acquisition_funding_source: funding.source,
+	                        acquisition_offer_m: Math.round(offerAmount / 1_000_000),
+	                        acquisition_diligence_complete: getAcquisitionCase(player, selectedStudioProfile.id)?.diligence?.status === 'COMPLETE',
+	                    });
 	                    if (!hasEnergyFor(acquisitionStrategyEnergyCost)) return energyBlockedResult(acquisitionStrategyEnergyCost);
 	                    const result = submitOpeningOffer({
 	                        player,
@@ -389,7 +407,19 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePl
                         funding,
                         commitments,
                     });
-	                    return spendEnergyFromResult(result, acquisitionStrategyEnergyCost);
+	                    const settled = spendEnergyFromResult(result, acquisitionStrategyEnergyCost);
+	                    markGameCheckpoint('forbes_acquisition_offer_result', settled.player, {
+	                        acquisition_studio_id: selectedStudioProfile.id,
+	                        acquisition_state: selectedStudioProfile.acquisitionState,
+	                        acquisition_case_status: getAcquisitionCase(settled.player, selectedStudioProfile.id)?.status || 'NONE',
+	                        acquisition_offer_type: offerType,
+	                        acquisition_funding_source: funding.source,
+	                        acquisition_offer_m: Math.round(offerAmount / 1_000_000),
+	                        acquisition_diligence_complete: getAcquisitionCase(settled.player, selectedStudioProfile.id)?.diligence?.status === 'COMPLETE',
+	                        acquisition_result: settled.success ? 'SUCCESS' : 'BLOCKED',
+	                        acquisition_reason: settled.success ? 'NONE' : (settled.reason || 'UNKNOWN'),
+	                    });
+	                    return settled;
 	                }}
 	                onAcceptCounter={() => {
 	                    if (!hasEnergyFor(acquisitionStrategyEnergyCost)) return energyBlockedResult(acquisitionStrategyEnergyCost);

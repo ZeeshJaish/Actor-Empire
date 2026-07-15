@@ -116,15 +116,31 @@ const isPurchasesPluginAvailable = () => {
 };
 
 const getPurchasesPlugin = () => {
-    return isPurchasesPluginAvailable() ? Purchases : null;
+    // Custom native plugins registered manually in the host app can be callable even
+    // when Capacitor.isPluginAvailable() does not report them in the web registry.
+    // On real iOS builds, trust the native bridge registration and let the method
+    // call surface any true StoreKit error.
+    return isCapacitorIOS() || isPurchasesPluginAvailable() ? Purchases : null;
 };
 
 const getAndroidPurchasesPlugin = () => {
-    return Capacitor.isPluginAvailable('AndroidPurchases') ? AndroidPurchases : null;
+    // AndroidPurchases is also a custom native plugin registered from MainActivity.
+    return isCapacitorAndroid() || Capacitor.isPluginAvailable('AndroidPurchases') ? AndroidPurchases : null;
 };
 
 const getAndroidPurchaseForStoreProduct = (purchases: AndroidPurchaseToken[] | undefined, storeProductId: string) =>
     (purchases || []).find(purchase => purchase.productIds?.includes(storeProductId) && !!purchase.purchaseToken);
+
+const formatAndroidBillingError = (error: any, fallback = 'Purchase failed.') => {
+    const message = String(error?.message || error || fallback);
+    if (/billing service unavailable|service unavailable|billing unavailable|google play/i.test(message)) {
+        return 'Google Play Billing is unavailable on this device. Please install the Play Store build on a Google Play device or test account, then try again.';
+    }
+    if (/product unavailable|item unavailable|not found/i.test(message)) {
+        return 'This item is not available from Google Play yet. Check the Play Console product setup and tester access, then try again.';
+    }
+    return message;
+};
 
 export const getPremiumProductIdForIOSStoreProduct = (storeProductId?: string): PremiumProductId | null => {
     if (!storeProductId) return null;
@@ -265,7 +281,7 @@ export const purchasePremiumProduct = async (productId: PremiumProductId): Promi
                 message: 'Android purchase confirmed.'
             };
         } catch (error: any) {
-            const message = String(error?.message || error || 'Purchase failed.');
+            const message = formatAndroidBillingError(error);
             const cancelled = /cancel/i.test(message);
             return { success: false, cancelled, message: cancelled ? 'Purchase cancelled.' : message };
         }
@@ -332,7 +348,7 @@ export const restorePremiumPurchases = async (): Promise<RestoreResult> => {
             return {
                 success: false,
                 restoredProductIds: [],
-                message: String(error?.message || error || 'Restore failed.')
+                message: formatAndroidBillingError(error, 'Restore failed.')
             };
         }
     }
