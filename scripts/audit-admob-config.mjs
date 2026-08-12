@@ -2,6 +2,7 @@ import fs from 'node:fs';
 
 const read = path => fs.existsSync(path) ? fs.readFileSync(path, 'utf8') : '';
 const checks = [];
+const appSource = read('App.tsx');
 
 const assertIncludes = (label, path, needle) => {
   const content = read(path);
@@ -30,6 +31,28 @@ assertIncludes(
   'services/adLogic.ts',
   "import { AdMob } from '@capacitor-community/admob';"
 );
+assertIncludes(
+  'Rewarded ad retry',
+  'services/adLogic.ts',
+  'for (let attempt = 0; attempt < 2; attempt += 1)'
+);
+assertIncludes(
+  'Rewarded ad telemetry request',
+  'App.tsx',
+  "trackGameEvent('reward_ad_requested'"
+);
+assertIncludes(
+  'Rewarded ad telemetry result',
+  'App.tsx',
+  "trackGameEvent('reward_ad_result'"
+);
+
+const rewardHandlerStart = appSource.indexOf('const handleTriggerRewardAd');
+const rewardHandlerEnd = appSource.indexOf('const handleAdComplete', rewardHandlerStart);
+const rewardHandler = appSource.slice(rewardHandlerStart, rewardHandlerEnd);
+if (rewardHandlerStart < 0 || rewardHandlerEnd < 0 || /if\s*\([^)]*hasNoAds/.test(rewardHandler)) {
+  checks.push('Reward claims must remain available after the No Ads purchase.');
+}
 
 if (checks.length > 0) {
   console.error(checks.join('\n'));

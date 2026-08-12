@@ -447,6 +447,7 @@ export const StudioSaleRoom: React.FC<StudioSaleRoomProps> = ({
     const [docLeaving, setDocLeaving] = React.useState(false);
     const [shaking, setShaking] = React.useState(false);
     const [soldSummary, setSoldSummary] = React.useState<SoldSummary | null>(null);
+    const [showSlateDetails, setShowSlateDetails] = React.useState(false);
     const timers = React.useRef<number[]>([]);
     const pushTimer = (id: number) => { timers.current.push(id); };
     React.useEffect(() => () => { timers.current.forEach(id => window.clearTimeout(id)); }, []);
@@ -826,6 +827,45 @@ export const StudioSaleRoom: React.FC<StudioSaleRoomProps> = ({
                         </div>
                     ))}
                 </div>
+                {readiness.activeSlateItems.length > 0 ? (
+                    <div className="mt-3 rounded-[16px] border border-rose-300/[0.24] bg-rose-300/[0.06] p-3">
+                        <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                                <div className="text-[10px] font-black uppercase tracking-[0.1em] text-rose-200">Closing Queue</div>
+                                <p className="mt-1 text-[10px] font-bold leading-relaxed text-zinc-400">
+                                    These are the only live projects blocking this sale. Finish, release, or move them before opening offers.
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setShowSlateDetails(current => !current)}
+                                className="shrink-0 rounded-[9px] border border-rose-300/25 bg-black/30 px-2.5 py-1.5 text-[8px] font-black uppercase tracking-[0.08em] text-rose-100"
+                            >
+                                {showSlateDetails ? 'Hide' : `View ${readiness.activeSlateItems.length}`}
+                            </button>
+                        </div>
+                        {showSlateDetails ? (
+                            <div className="mt-3 space-y-1.5 border-t border-dashed border-rose-200/[0.14] pt-2.5">
+                                {readiness.activeSlateItems.map(item => (
+                                    <div key={item.id} className="flex items-center justify-between gap-2 rounded-[10px] border border-white/[0.06] bg-black/25 px-2.5 py-2">
+                                        <div className="min-w-0">
+                                            <div className="truncate text-[10px] font-black text-white">{item.name}</div>
+                                            <div className="mt-0.5 truncate text-[8px] font-bold uppercase tracking-[0.06em] text-zinc-500">{item.studioName} · {item.kind === 'RELEASE' ? 'Release' : 'Production'}</div>
+                                        </div>
+                                        <span className="shrink-0 rounded-full border border-amber-300/20 bg-amber-300/[0.06] px-2 py-1 text-[8px] font-black uppercase tracking-[0.06em] text-amber-200">{item.phase}</span>
+                                    </div>
+                                ))}
+                                <button
+                                    type="button"
+                                    onClick={onBack}
+                                    className="mt-1 inline-flex min-h-9 w-full items-center justify-center gap-1.5 rounded-[10px] border border-white/[0.08] bg-black/30 px-3 text-[9px] font-black uppercase tracking-[0.08em] text-zinc-300"
+                                >
+                                    Review Studio Slate <ChevronRight size={13} />
+                                </button>
+                            </div>
+                        ) : null}
+                    </div>
+                ) : null}
             </section>
 
             <button

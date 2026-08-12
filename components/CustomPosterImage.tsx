@@ -44,9 +44,28 @@ export const CustomPosterImage: React.FC<{
     alt: string;
     className?: string;
     fallback?: React.ReactNode;
-}> = ({ poster, alt, className = '', fallback = null }) => {
+    loading?: React.ImgHTMLAttributes<HTMLImageElement>['loading'];
+    decoding?: React.ImgHTMLAttributes<HTMLImageElement>['decoding'];
+}> = ({
+    poster,
+    alt,
+    className = '',
+    fallback = null,
+    loading = 'lazy',
+    decoding = 'async',
+}) => {
     const src = useCustomPosterImageSrc(poster);
+    const [failedSrc, setFailedSrc] = useState<string | null>(null);
 
-    if (!src) return <>{fallback}</>;
-    return <img src={src} alt={alt} className={className} />;
+    if (!src || failedSrc === src) return <>{fallback}</>;
+    return (
+        <img
+            src={src}
+            alt={alt}
+            className={className}
+            loading={loading}
+            decoding={decoding}
+            onError={() => setFailedSrc(src)}
+        />
+    );
 };

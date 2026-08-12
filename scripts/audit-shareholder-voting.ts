@@ -97,6 +97,18 @@ if (inflatedTakeover.ownershipPercent !== 100 || inflatedTakeover.effectiveContr
 const withVote = {
     ...voter,
     shareholderVotes: [vote],
+    inbox: [{
+        id: `msg_${vote.id}`,
+        sender: 'Shareholder Services',
+        subject: 'Shareholder Ballot',
+        text: 'Vote required.',
+        type: 'SHAREHOLDER_VOTE' as const,
+        data: { voteId: vote.id, stockId: vote.stockId },
+        isRead: true,
+        weekSent: vote.createdWeek,
+        expiresIn: 4,
+    }],
+    pendingEvents: [],
 };
 const resolved = resolveShareholderVote(withVote, vote.id, 'FOR');
 if (!resolved.success || resolved.vote?.status !== 'RESOLVED') {
@@ -107,6 +119,47 @@ if (!resolved.player.news.some(item => item.headline.includes('shareholders'))) 
 }
 if (resolved.player.stocks.find(candidate => candidate.id === stock.id)!.price === stock.price) {
     throw new Error('Shareholder vote outcomes should affect stock price.');
+}
+if (resolved.player.inbox.some(message => message.data?.voteId === vote.id)) {
+    throw new Error('Resolving a recovered inbox ballot should remove its stale message.');
+}
+
+const yearEndVoter = {
+    ...makePlayer(12),
+    age: 31,
+    currentWeek: 50,
+};
+const yearEndVote = createShareholderVote(yearEndVoter, stock, 'SLATE_APPROVAL');
+if (!yearEndVote || yearEndVote.dueWeek !== 2 || yearEndVote.dueYear !== 32) {
+    throw new Error(`Year-end ballot due dates should wrap to Age 32 Week 2, received ${yearEndVote?.dueYear}/${yearEndVote?.dueWeek}.`);
+}
+
+const expiredVote = {
+    ...vote,
+    dueWeek: 34,
+    dueYear: 31,
+};
+const expiredPlayer = processShareholderVoting({
+    ...withVote,
+    age: 31,
+    currentWeek: 34,
+    shareholderVotes: [expiredVote],
+    pendingEvents: [{
+        id: `event_${expiredVote.id}`,
+        week: expiredVote.createdWeek,
+        type: 'LIFE_EVENT' as const,
+        title: 'Shareholder Decision',
+        data: { voteId: expiredVote.id },
+    }],
+});
+if (expiredPlayer.shareholderVotes[0]?.status !== 'EXPIRED') {
+    throw new Error('A ballot should close when its four-week voting window ends.');
+}
+if (expiredPlayer.pendingEvents.some(event => event.data?.voteId === expiredVote.id)) {
+    throw new Error('Expired ballots should remove stale decision popups.');
+}
+if (!expiredPlayer.inbox.find(message => message.data?.voteId === expiredVote.id)?.isExpired) {
+    throw new Error('Expired ballots should leave a clear read-only inbox record.');
 }
 
 console.log('Shareholder voting audit passed.');

@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 
-const source = readFileSync('views/lifestyle/business/DevelopmentLab.tsx', 'utf8');
+const source = readFileSync('views/lifestyle/business/components/DevelopmentLabScriptWizard.tsx', 'utf8');
 
 const checks: [string, boolean][] = [
   ['premise length constant exists', source.includes('CUSTOM_PREMISE_MAX_LENGTH')],

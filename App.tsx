@@ -31,9 +31,18 @@ import { CheckCircle, Heart, ShieldAlert, AlertTriangle, PlayCircle, Skull, Brie
 import { useGameActions } from './hooks/useGameActions';
 import { PROPERTY_CATALOG, CAR_CATALOG, MOTORCYCLE_CATALOG, BOAT_CATALOG, AIRCRAFT_CATALOG, CLOTHING_CATALOG } from './services/lifestyleLogic';
 import { showAd, initAds } from './services/adLogic';
+import {
+  beginPendingRewardAd,
+  clearPendingRewardAd,
+  markPendingRewardAdReady,
+  readPendingRewardAd,
+  recordPendingRewardAdStep,
+  type PendingRewardAdReceipt,
+} from './services/rewardedAdRecovery';
 import { ensureTrackingPermission } from './services/trackingService';
-import { saveGameData, loadGameData, deleteGameData } from './services/storage';
+import { createDeferredSaveSlotSummary, createSaveSlotSummary, deleteGameData, getGameSaveSummary, listGameDataKeys, loadGameData, saveGameData, writeGameSaveSummary, type SaveSlotSummary } from './services/storage';
 import { buildLegacyStudioInheritance, createBloodlineSnapshot, getAbsoluteWeek, getLegacyInheritancePreview, getRelationshipAge, inferStreamingStartWeekAbsolute, inheritActorSkills, LEGACY_MIN_PLAYABLE_AGE } from './services/legacyLogic';
+import { handoffOwnedStreamingPlatformToHeir } from './services/streamingLegacy';
 import { applyPremiumPurchase, getRequiredPremiumProductForAsset, hasNoAds, isNonConsumablePremiumProduct, PremiumProductId, restoreWeeklyEnergy, spendPlayerEnergy, syncEnergyDisplay, syncWeeklyEnergyForCommitments } from './services/premiumLogic';
 import { purchasePremiumProduct, restorePremiumPurchases, startIOSPurchaseUpdatesListener, type IOSPurchaseUpdate } from './services/iapService';
 import { sanitizeAwardRecords } from './services/awardLogic';
@@ -50,7 +59,7 @@ import { migratePlayerSave } from './services/saveMigration';
 import { exportSignedSaveArchive, importSignedSaveArchiveFromFile } from './services/saveTransfer';
 import { grantMigrationCarePackageIfEligible, MIGRATION_CARE_PACKAGE_CASH, MIGRATION_CARE_PACKAGE_ENERGY } from './services/migrationCarePackage';
 import { externalizeCustomPostersInPlayer } from './services/customPosterMedia';
-import { compactPlayerForPersistence, FULL_LOCAL_MIRROR_BUDGET_BYTES } from './services/saveCompaction';
+import { compactPlayerForPersistence } from './services/saveCompaction';
 import { buildAvailableNewPlayerTutorialState, writeNewPlayerTutorialState, type NewPlayerTutorialState } from './services/newPlayerTutorial';
 import { acceptOutsideProducerInvestmentOffer, counterOutsideProducerInvestmentOffer } from './services/outsideProductions';
 import { PHASE_ONE_ENERGY_COSTS } from './services/energyCosts';
@@ -61,6 +70,7 @@ import {
   markGameCheckpoint,
   markTraceAction,
   markWeekProcessingStage,
+  recoverInterruptedWeekProcessingTrace,
   recordFlowFailure,
   recordNonFatal,
   setCrashContext,
@@ -71,6 +81,8 @@ import {
 } from './services/firebaseService';
 
 type GameStatus = 'START_MENU' | 'CREATION' | 'PLAYING' | 'DEATH_SCREEN';
+const LOCAL_STORAGE_SAVE_MIRROR_BUDGET_BYTES = 600_000;
+const SAFE_BOOT_SESSION_KEY = 'actorEmpire.safeBootOnce';
 type PendingBabyNaming = {
   partnerId: string;
   partnerName: string;
@@ -426,6 +438,7 @@ export const App: React.FC = () => {
   const [activePage, setActivePage] = useState<Page>(Page.HOME);
   const [lifestyleInitialView, setLifestyleInitialView] = useState<'MAIN' | 'ASSETS' | 'ACTIVITIES' | 'BUSINESS' | 'PRODUCTION_WIZARD' | 'PRODUCTION_GAME' | 'STREAMING_PLATFORM' | null>(null);
   const [rightsMarketOpportunityId, setRightsMarketOpportunityId] = useState<string | null>(null);
+  const [studioContinuationTarget, setStudioContinuationTarget] = useState<{ studioId: string; scriptId: string } | null>(null);
   const [initialForbesStudioId, setInitialForbesStudioId] = useState<string | null>(null);
   const [initialMobileStockId, setInitialMobileStockId] = useState<string | null>(null);
   const [initialMobileAppMode, setInitialMobileAppMode] = useState<'BOXOFFICE' | 'MESSAGES' | null>(null);
@@ -433,11 +446,23 @@ export const App: React.FC = () => {
   const weekProcessingLockRef = useRef(false);
   const activeWeekRunIdRef = useRef<string | null>(null);
   const lastWeekProcessSettledAtRef = useRef(0);
+  const suppressNextAutosaveRef = useRef(false);
+  const skipNextPlayingMigrationRef = useRef(false);
   const [gameStatus, setGameStatus] = useState<GameStatus>('START_MENU');
   const [skipStartMenuIntro, setSkipStartMenuIntro] = useState(true);
   const [saveSlots, setSaveSlots] = useState<Record<number, Player | null>>({ 1: null, 2: null, 3: null });
+  const [saveSlotSummaries, setSaveSlotSummaries] = useState<Record<number, SaveSlotSummary | null>>({ 1: null, 2: null, 3: null });
   const [currentSlot, setCurrentSlot] = useState<number | null>(null);
   const [isInitializing, setIsInitializing] = useState(true); // Loading state for async storage
+  const [safeBootRequested] = useState(() => {
+      try {
+          const requested = sessionStorage.getItem(SAFE_BOOT_SESSION_KEY) === '1';
+          if (requested) sessionStorage.removeItem(SAFE_BOOT_SESSION_KEY);
+          return requested;
+      } catch {
+          return false;
+      }
+  });
   const [startupStudioBumperElapsed, setStartupStudioBumperElapsed] = useState(false);
   const [startupMinimumElapsed, setStartupMinimumElapsed] = useState(false);
   const [startupLoadingLineIndex, setStartupLoadingLineIndex] = useState(0);
@@ -471,6 +496,7 @@ export const App: React.FC = () => {
   const autosaveTimerRef = useRef<number | null>(null);
   const purchaseUpdateHandlerRef = useRef<(update: IOSPurchaseUpdate) => void>(() => {});
   const playerRef = useRef(player);
+  const rewardAdGrantInFlightRef = useRef<Set<string>>(new Set());
   const activePlayStartedAtRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -544,30 +570,42 @@ export const App: React.FC = () => {
       return compactPlayerForPersistence(nextPlayer);
   };
   const writeLocalStorageMirror = (slot: number, playerToSave: Player) => {
+      const slotKey = `actorEmpireSave_${slot}`;
+      const metadataKey = `${slotKey}_meta`;
+      const writeMetadataOnly = () => {
+          localStorage.removeItem(slotKey);
+          if (slot === 1) localStorage.removeItem('actorEmpireSave');
+          localStorage.setItem(metadataKey, JSON.stringify({
+              version: APP_DISPLAY_VERSION,
+              slot,
+              playerName: playerToSave.name,
+              age: playerToSave.age,
+              week: playerToSave.currentWeek,
+              savedAt: Date.now(),
+              storage: 'indexeddb',
+              note: 'Full save stored in IndexedDB. Local mirror skipped to avoid mobile quota pressure.',
+          }));
+      };
       try {
           const serialized = JSON.stringify(playerToSave);
-          if (serialized.length <= FULL_LOCAL_MIRROR_BUDGET_BYTES) {
-              localStorage.setItem(`actorEmpireSave_${slot}`, serialized);
-              if (slot === 1) {
-                  // Keep a shadow copy for migration compatibility with older builds.
-                  localStorage.setItem('actorEmpireSave', serialized);
+          if (serialized.length <= LOCAL_STORAGE_SAVE_MIRROR_BUDGET_BYTES) {
+              try {
+                  localStorage.setItem(slotKey, serialized);
+                  if (slot === 1) {
+                      // Keep a small shadow copy for migration compatibility with older builds.
+                      localStorage.setItem('actorEmpireSave', serialized);
+                  }
+                  localStorage.removeItem(metadataKey);
+                  writeGameSaveSummary(slotKey, playerToSave);
+                  return;
+              } catch {
+                  // A full localStorage origin can still reject a small mirror. IndexedDB is authoritative.
               }
-          } else {
-              localStorage.setItem(`actorEmpireSave_${slot}_meta`, JSON.stringify({
-                  version: APP_DISPLAY_VERSION,
-                  slot,
-                  playerName: playerToSave.name,
-                  age: playerToSave.age,
-                  week: playerToSave.currentWeek,
-                  savedAt: Date.now(),
-                  storage: 'indexeddb',
-                  note: 'Full save stored in IndexedDB. Local mirror skipped to avoid mobile quota pressure.',
-              }));
-              localStorage.removeItem(`actorEmpireSave_${slot}`);
-              if (slot === 1) localStorage.removeItem('actorEmpireSave');
           }
-      } catch (error) {
-          console.error("Local save mirror failed", error);
+          writeMetadataOnly();
+          writeGameSaveSummary(slotKey, playerToSave);
+      } catch {
+          // Mirror metadata is optional and must never block or alarm the player.
       }
   };
   const getSurname = (fullName: string) => {
@@ -616,6 +654,7 @@ export const App: React.FC = () => {
           });
       }
       await saveGameData(`actorEmpireSave_${slot}`, playerToSave, { rethrow: options.rethrow });
+      setSaveSlotSummaries(prev => ({ ...prev, [slot]: createSaveSlotSummary(playerToSave) }));
       if (options.weekDiagnostic) {
           markWeekProcessingStage('indexeddb_write_done', playerToSave, {
               run_id: options.weekDiagnostic.runId,
@@ -683,7 +722,7 @@ export const App: React.FC = () => {
 
       try {
           const posterResult = await externalizeCustomPostersInPlayer(optimized);
-          optimized = migratePlayerSave(posterResult.player);
+          optimized = posterResult.player;
           posterMediaMigrated = posterResult.migratedCount > 0 || posterResult.bytesRemoved > 0;
           if (posterMediaMigrated) {
               addBreadcrumb('custom_posters:externalized', {
@@ -934,80 +973,48 @@ export const App: React.FC = () => {
   useEffect(() => {
     const init = async () => {
         try {
-            await ensureTrackingPermission();
-            await initAds();
+            const summaries: Record<number, SaveSlotSummary | null> = { 1: null, 2: null, 3: null };
             
-            const slots: Record<number, Player | null> = { 1: null, 2: null, 3: null };
-            let migrationCarePackageGranted = false;
-            
-            // 1. Check IndexedDB for all 3 slots
+            // Startup must never hydrate or migrate a full career. Existing saves
+            // receive a tiny deferred card and are opened only after player selection.
+            const indexedDbKeys = new Set(await listGameDataKeys());
             for (let i = 1; i <= 3; i++) {
-                const savedData = await loadGameData(`actorEmpireSave_${i}`);
-                if (savedData) {
-                    const prepared = await prepareLoadedPlayerSave(i, savedData, 'indexeddb-slot');
-                    slots[i] = prepared.player;
-                    if (prepared.carePackageGranted) migrationCarePackageGranted = true;
-                    if (prepared.shouldPersist) {
-                        await persistSlotSave(i, prepared.player);
-                    }
-                }
+                const saveKey = `actorEmpireSave_${i}`;
+                if (!indexedDbKeys.has(saveKey)) continue;
+                const cachedSummary = getGameSaveSummary(saveKey);
+                summaries[i] = cachedSummary || createDeferredSaveSlotSummary(saveKey, 'indexeddb');
             }
             
-            // 2. Migration fallback matrix for older Android builds:
-            // old single-key IndexedDB, old per-slot localStorage, then old single-key localStorage.
-            const hasAnySave = Object.values(slots).some(s => s !== null);
+            // Legacy saves are also represented without parsing them on boot. They
+            // migrate into the normal per-slot IndexedDB key only after selection.
+            const hasAnySave = Object.values(summaries).some(s => s !== null);
             if (!hasAnySave) {
-                const legacyIndexedDbSave = await loadGameData('actorEmpireSave');
-                if (legacyIndexedDbSave) {
-                    console.log("Migrating legacy IndexedDB save to Slot 1...");
-                    const prepared = await prepareLoadedPlayerSave(1, legacyIndexedDbSave, 'legacy-indexeddb');
-                    if (prepared.carePackageGranted) migrationCarePackageGranted = true;
-                    await persistSlotSave(1, prepared.player);
-                    slots[1] = prepared.player;
+                if (indexedDbKeys.has('actorEmpireSave')) {
+                    summaries[1] = createDeferredSaveSlotSummary('actorEmpireSave', 'indexeddb');
                 } else {
-                    for (let i = 1; i <= 3; i++) {
-                        const legacySlotSave = localStorage.getItem(`actorEmpireSave_${i}`);
-                        if (!legacySlotSave) continue;
-                        try {
-                            const savedData = JSON.parse(legacySlotSave);
-                            const prepared = await prepareLoadedPlayerSave(i, savedData, 'legacy-localstorage');
-                            if (prepared.carePackageGranted) migrationCarePackageGranted = true;
-                            console.log(`Migrating localStorage slot ${i} to IndexedDB...`);
-                            await persistSlotSave(i, prepared.player);
-                            slots[i] = prepared.player;
-                        } catch (e) {
-                            console.error(`Legacy slot ${i} corrupt`, e);
-                            recordNonFatal(e, 'legacy_slot_migration_failed', { slot: i });
+                    const localStorageKeys = new Set<string>();
+                    try {
+                        for (let index = 0; index < localStorage.length; index += 1) {
+                            const key = localStorage.key(index);
+                            if (key) localStorageKeys.add(key);
                         }
+                    } catch {
+                        // Local storage is a legacy fallback only.
                     }
 
-                    const hasRecoveredSlot = Object.values(slots).some(s => s !== null);
-                    if (!hasRecoveredSlot) {
-                        const legacySave = localStorage.getItem('actorEmpireSave');
-                        if (legacySave) {
-                            try {
-                                const savedData = JSON.parse(legacySave);
-                                const prepared = await prepareLoadedPlayerSave(1, savedData, 'legacy-single-localstorage');
-                                if (prepared.carePackageGranted) migrationCarePackageGranted = true;
-                                console.log("Migrating legacy save to Slot 1...");
-                                await persistSlotSave(1, prepared.player);
-                                slots[1] = prepared.player;
-                            } catch (e) {
-                                console.error("Legacy save corrupt", e);
-                                recordNonFatal(e, 'legacy_save_migration_failed');
-                            }
+                    for (let i = 1; i <= 3; i++) {
+                        const key = `actorEmpireSave_${i}`;
+                        if (localStorageKeys.has(key)) {
+                            summaries[i] = createDeferredSaveSlotSummary(key, 'localstorage');
                         }
+                    }
+                    if (!Object.values(summaries).some(s => s !== null) && localStorageKeys.has('actorEmpireSave')) {
+                        summaries[1] = createDeferredSaveSlotSummary('actorEmpireSave', 'localstorage');
                     }
                 }
             }
 
-            setSaveSlots(slots);
-            if (migrationCarePackageGranted) {
-                setToastMessage({
-                    title: 'Migration Care Package',
-                    subtext: `$${MIGRATION_CARE_PACKAGE_CASH.toLocaleString()} cash and ${MIGRATION_CARE_PACKAGE_ENERGY} bonus energy added to your migrated save.`,
-                });
-            }
+            setSaveSlotSummaries(summaries);
         } catch (e) {
             console.error("Init failed", e);
             recordNonFatal(e, 'app_init_failed');
@@ -1018,6 +1025,68 @@ export const App: React.FC = () => {
     init();
   }, []);
 
+  useEffect(() => {
+    if (isInitializing || safeBootRequested) return;
+    let cancelled = false;
+    const initializeNativeServices = async () => {
+      try {
+        await ensureTrackingPermission();
+        if (!cancelled) await initAds();
+      } catch (error) {
+        recordNonFatal(error, 'native_services_init_failed');
+      }
+    };
+    void initializeNativeServices();
+    return () => {
+      cancelled = true;
+    };
+  }, [isInitializing, safeBootRequested]);
+
+  useEffect(() => {
+    markTraceAction('app_runtime_ready', { flow: 'app_lifecycle' });
+    const handleVisibility = () => {
+      markTraceAction(document.visibilityState === 'hidden' ? 'app_backgrounded' : 'app_foregrounded', {
+        flow: 'app_lifecycle',
+        last_screen: Page[activePage] || String(activePage),
+        save_slot: currentSlot,
+      });
+    };
+    const handlePageHide = () => markTraceAction('app_page_hidden', {
+      flow: 'app_lifecycle',
+      last_screen: Page[activePage] || String(activePage),
+      save_slot: currentSlot,
+    });
+    const handlePageShow = () => markTraceAction('app_page_shown', {
+      flow: 'app_lifecycle',
+      last_screen: Page[activePage] || String(activePage),
+      save_slot: currentSlot,
+    });
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('pagehide', handlePageHide);
+    window.addEventListener('pageshow', handlePageShow);
+    const handleMemoryWarning = (event: Event) => {
+      const detail = event instanceof CustomEvent ? event.detail : {};
+      markTraceAction('native_memory_warning', {
+        flow: 'app_lifecycle',
+        last_screen: Page[activePage] || String(activePage),
+        save_slot: currentSlot,
+        ...(detail && typeof detail === 'object' ? detail : {}),
+      });
+      setCrashContext(playerRef.current, {
+        native_memory_warning: true,
+        last_screen: Page[activePage] || String(activePage),
+        save_slot: currentSlot,
+      });
+    };
+    window.addEventListener('actor-empire-memory-warning', handleMemoryWarning);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('pagehide', handlePageHide);
+      window.removeEventListener('pageshow', handlePageShow);
+      window.removeEventListener('actor-empire-memory-warning', handleMemoryWarning);
+    };
+  }, [activePage, currentSlot]);
+
   // Auto-save logic
   useEffect(() => {
     if (autosaveTimerRef.current) {
@@ -1026,6 +1095,10 @@ export const App: React.FC = () => {
     }
 
     if (gameStatus !== 'PLAYING' || !currentSlot) return;
+    if (suppressNextAutosaveRef.current) {
+        suppressNextAutosaveRef.current = false;
+        return;
+    }
 
     autosaveTimerRef.current = window.setTimeout(() => {
         setSaveSlots(prev => ({ ...prev, [currentSlot]: player }));
@@ -1054,6 +1127,7 @@ export const App: React.FC = () => {
     const recordActivePlayTime = (persistImmediately = false) => {
       const startedAt = activePlayStartedAtRef.current;
       if (!startedAt) return;
+      if (weekProcessingLockRef.current) return;
 
       const elapsedMs = Math.max(0, Date.now() - startedAt);
       if (elapsedMs === 0) return;
@@ -1094,13 +1168,60 @@ export const App: React.FC = () => {
     };
   }, [gameStatus, currentSlot]);
 
-  const handleSelectSlot = (slot: number) => {
+  const handleSelectSlot = async (slot: number) => {
     setCurrentSlot(slot);
-    const existingSave = saveSlots[slot];
+    let existingSave = saveSlots[slot];
+    if (!existingSave && saveSlotSummaries[slot]) {
+        setIsInitializing(true);
+        markTraceAction('selected_save_load_started', { flow: 'save_select', save_slot: slot });
+        try {
+            const summary = saveSlotSummaries[slot];
+            const storageKey = summary?.storageKey || `actorEmpireSave_${slot}`;
+            const storageKind = summary?.storageKind || 'indexeddb';
+            let savedData: Player | null = null;
+            if (storageKind === 'localstorage') {
+                const raw = localStorage.getItem(storageKey);
+                savedData = raw ? JSON.parse(raw) as Player : null;
+            } else {
+                savedData = await loadGameData(storageKey);
+            }
+            if (!savedData) throw new Error(`Save slot ${slot} could not be loaded.`);
+            const source = storageKind === 'localstorage'
+                ? (storageKey === 'actorEmpireSave' ? 'legacy-single-localstorage' : 'legacy-localstorage')
+                : (storageKey === 'actorEmpireSave' ? 'legacy-indexeddb' : 'indexeddb-slot');
+            const prepared = await prepareLoadedPlayerSave(slot, savedData, source);
+            existingSave = prepared.player;
+            setSaveSlots(prev => ({ ...prev, [slot]: prepared.player }));
+            setSaveSlotSummaries(prev => ({ ...prev, [slot]: createSaveSlotSummary(prepared.player) }));
+            if (prepared.shouldPersist || source !== 'indexeddb-slot') {
+                await persistSlotSave(slot, prepared.player);
+            }
+            if (prepared.carePackageGranted) {
+                setToastMessage({
+                    title: 'Migration Care Package',
+                    subtext: `$${MIGRATION_CARE_PACKAGE_CASH.toLocaleString()} cash and ${MIGRATION_CARE_PACKAGE_ENERGY} bonus energy added to your migrated save.`,
+                });
+            }
+            markTraceAction('selected_save_load_completed', { flow: 'save_select', save_slot: slot });
+        } catch (error) {
+            recordNonFatal(error, 'selected_save_load_failed', { save_slot: slot });
+            setCurrentSlot(null);
+            setToastMessage({
+                title: 'Save Could Not Open',
+                subtext: 'Your save was left untouched. Please try opening this slot again.',
+            });
+            return;
+        } finally {
+            setIsInitializing(false);
+        }
+    }
     if (existingSave) {
-        const migrated = migratePlayerSave(existingSave);
-        setSaveSlots(prev => ({ ...prev, [slot]: migrated }));
-        setPlayer(migrated);
+        recoverInterruptedWeekProcessingTrace(existingSave, { saveSlot: slot, screen: 'START_MENU' });
+        setSaveSlots(prev => ({ ...prev, [slot]: existingSave }));
+        // prepareLoadedPlayerSave already ran the complete save migration. Avoid
+        // another full deep clone during the PLAYING hydration pass on mobile.
+        skipNextPlayingMigrationRef.current = true;
+        setPlayer(existingSave);
         setSkipStartMenuIntro(false);
         setGameStatus('PLAYING');
     } else {
@@ -1111,10 +1232,24 @@ export const App: React.FC = () => {
   };
 
   const handleDeleteSlot = async (slot: number) => {
-    await deleteGameData(`actorEmpireSave_${slot}`);
+    const summary = saveSlotSummaries[slot];
+    const storageKey = summary?.storageKey || `actorEmpireSave_${slot}`;
+    if (summary?.storageKind !== 'localstorage') {
+        await deleteGameData(storageKey);
+    }
+    if (storageKey !== `actorEmpireSave_${slot}`) {
+        await deleteGameData(`actorEmpireSave_${slot}`);
+    }
+    localStorage.removeItem(storageKey);
+    localStorage.removeItem(`${storageKey}_meta`);
     localStorage.removeItem(`actorEmpireSave_${slot}`);
-    if (slot === 1) localStorage.removeItem('actorEmpireSave');
+    localStorage.removeItem(`actorEmpireSave_${slot}_meta`);
+    if (slot === 1) {
+        localStorage.removeItem('actorEmpireSave');
+        localStorage.removeItem('actorEmpireSave_meta');
+    }
     setSaveSlots(prev => ({ ...prev, [slot]: null }));
+    setSaveSlotSummaries(prev => ({ ...prev, [slot]: null }));
   };
 
   const handleExportGameData = async () => {
@@ -1124,6 +1259,7 @@ export const App: React.FC = () => {
         await saveGameData(`actorEmpireSave_${currentSlot}`, playerToSave);
         writeLocalStorageMirror(currentSlot, playerToSave);
         setSaveSlots(prev => ({ ...prev, [currentSlot]: playerToSave }));
+        setSaveSlotSummaries(prev => ({ ...prev, [currentSlot]: createSaveSlotSummary(playerToSave) }));
       }
 
       const result = await exportSignedSaveArchive();
@@ -1186,7 +1322,9 @@ export const App: React.FC = () => {
   useEffect(() => {
     if (gameStatus === 'PLAYING') {
       setPlayer(prev => {
-          const safePlayer = migratePlayerSave(prev) as any;
+          const skipMigration = skipNextPlayingMigrationRef.current;
+          skipNextPlayingMigrationRef.current = false;
+          const safePlayer = (skipMigration ? { ...prev } : migratePlayerSave(prev)) as any;
           if (!safePlayer.world || typeof safePlayer.world !== 'object') {
               safePlayer.world = clone(INITIAL_PLAYER.world);
           } else {
@@ -1582,6 +1720,10 @@ export const App: React.FC = () => {
       });
       return;
     }
+    if (autosaveTimerRef.current) {
+      window.clearTimeout(autosaveTimerRef.current);
+      autosaveTimerRef.current = null;
+    }
     weekProcessingLockRef.current = true;
     setIsProcessing(true);
     const traceName = 'process_game_week';
@@ -1747,6 +1889,7 @@ export const App: React.FC = () => {
             screen: activePageName,
         });
         syncedPlayerState = persistedPlayerState;
+        suppressNextAutosaveRef.current = true;
         handleUpdatePlayer(persistedPlayerState);
         addBreadcrumb('process_week:persisted', {
             age: syncedPlayerState.age,
@@ -1911,6 +2054,26 @@ export const App: React.FC = () => {
       }
 
       const steps = (type === 'REWARDED_STATS') ? 2 : 1;
+      if (!currentSlot) {
+          setToastMessage({
+              title: tr('app.rewards.cancelledTitle'),
+              subtext: tr('app.rewards.cancelledSubtext')
+          });
+          return;
+      }
+      let pendingReceipt: PendingRewardAdReceipt = beginPendingRewardAd({
+          playerId: String(player.id || player.name),
+          saveSlot: currentSlot,
+          type,
+          data,
+          stepsRequired: steps,
+      });
+      const noAdsOwner = hasNoAds(player);
+      trackGameEvent('reward_ad_requested', {
+          reward_type: type,
+          no_ads_owner: noAdsOwner,
+          steps,
+      });
       setAdTotalSteps(steps);
       setAdStep(1);
       setIsShowingAd(true);
@@ -1928,9 +2091,17 @@ export const App: React.FC = () => {
               }
 
               const result = await showAd(type); 
+              trackGameEvent('reward_ad_result', {
+                  reward_type: type,
+                  no_ads_owner: noAdsOwner,
+                  success: result.success,
+                  reason: result.reason || 'NONE',
+                  step: i,
+              });
               
               if (result.success) {
                   successCount++;
+                  pendingReceipt = recordPendingRewardAdStep(pendingReceipt, successCount);
               } else {
                   // If user cancels or ad fails, break loop
                   break;
@@ -1947,8 +2118,10 @@ export const App: React.FC = () => {
       }
       
       if (successCount === steps) {
-          handleAdComplete(type, data);
+          pendingReceipt = markPendingRewardAdReady(pendingReceipt);
+          handleAdComplete(type, data, pendingReceipt.id);
       } else {
+          clearPendingRewardAd(pendingReceipt.id);
           setToastMessage({
               title: tr('app.rewards.cancelledTitle'),
               subtext: tr('app.rewards.cancelledSubtext')
@@ -1956,12 +2129,25 @@ export const App: React.FC = () => {
       }
   };
 
-  const handleAdComplete = (type: AdType, data?: any) => {
+  const handleAdComplete = (type: AdType, data?: any, receiptId?: string) => {
       let toastTitle = tr('app.rewards.receivedTitle');
       let toastSub = "";
+      if (receiptId) rewardAdGrantInFlightRef.current.add(receiptId);
 
       handleGenericUpdate(prev => {
           const p = JSON.parse(JSON.stringify(prev)) as Player;
+          if (!p.flags) p.flags = {};
+          const grantedRewardAdIds = Array.isArray(p.flags.grantedRewardAdIds)
+              ? p.flags.grantedRewardAdIds as string[]
+              : [];
+          if (receiptId && grantedRewardAdIds.includes(receiptId)) {
+              clearPendingRewardAd(receiptId);
+              rewardAdGrantInFlightRef.current.delete(receiptId);
+              return p;
+          }
+          if (receiptId) {
+              p.flags.grantedRewardAdIds = [...grantedRewardAdIds, receiptId].slice(-80);
+          }
           
           if (type === 'REWARDED_CASH') {
               p.money += 5000;
@@ -2005,9 +2191,50 @@ export const App: React.FC = () => {
           }
           
           setToastMessage({ title: toastTitle, subtext: toastSub });
+          if (receiptId && currentSlot) {
+              void persistSlotSave(currentSlot, p, { rethrow: true })
+                  .then(savedPlayer => {
+                      setSaveSlots(previous => ({ ...previous, [currentSlot]: savedPlayer }));
+                      clearPendingRewardAd(receiptId);
+                      rewardAdGrantInFlightRef.current.delete(receiptId);
+                  })
+                  .catch(error => {
+                      rewardAdGrantInFlightRef.current.delete(receiptId);
+                      recordNonFatal(error, 'reward_ad_grant_persist_failed', {
+                          reward_type: type,
+                          save_slot: currentSlot,
+                      });
+                  });
+          }
           return p;
       });
   };
+
+  useEffect(() => {
+      if (gameStatus !== 'PLAYING' || !currentSlot || isShowingAd) return;
+      const pendingReceipt = readPendingRewardAd();
+      if (!pendingReceipt) return;
+      if (rewardAdGrantInFlightRef.current.has(pendingReceipt.id)) return;
+      if (pendingReceipt.playerId !== String(player.id || player.name) || pendingReceipt.saveSlot !== currentSlot) {
+          clearPendingRewardAd(pendingReceipt.id);
+          return;
+      }
+      if (pendingReceipt.status === 'READY_TO_GRANT' && pendingReceipt.completedSteps === pendingReceipt.stepsRequired) {
+          trackGameEvent('reward_ad_recovered', {
+              reward_type: pendingReceipt.type,
+              completed_steps: pendingReceipt.completedSteps,
+          });
+          handleAdComplete(pendingReceipt.type, pendingReceipt.data, pendingReceipt.id);
+          return;
+      }
+
+      trackGameEvent('reward_ad_interrupted', {
+          reward_type: pendingReceipt.type,
+          completed_steps: pendingReceipt.completedSteps,
+          required_steps: pendingReceipt.stepsRequired,
+      });
+      clearPendingRewardAd(pendingReceipt.id);
+  }, [currentSlot, gameStatus, isShowingAd, player.id, player.name]);
 
   const handlePremiumPurchase = async (productId: PremiumProductId) => {
       const result = await purchasePremiumProduct(productId);
@@ -2233,7 +2460,6 @@ export const App: React.FC = () => {
 
   const handleContinueAsChild = (child: any) => {
       const inheritancePreview = getLegacyInheritancePreview(player);
-      const legacyInheritance = buildLegacyStudioInheritance(player, { isDeceased: !!player.flags?.isDead });
       const inheritedRelationships: Relationship[] = [];
       player.relationships.forEach(rel => {
           if (rel.id === child.id) return; // Skip self
@@ -2245,6 +2471,12 @@ export const App: React.FC = () => {
       });
       const childAge = getRelationshipAge(child, player.age, player.currentWeek);
       const yearsToSkip = Math.max(0, LEGACY_MIN_PLAYABLE_AGE - childAge);
+      const playableChildAge = Math.max(childAge, LEGACY_MIN_PLAYABLE_AGE);
+      const legacyInheritance = buildLegacyStudioInheritance(player, {
+          isDeceased: !!player.flags?.isDead,
+          heirAge: playableChildAge,
+          heirWeek: player.currentWeek,
+      });
       
       // Add the current player as a parent
       inheritedRelationships.push({
@@ -2290,7 +2522,7 @@ export const App: React.FC = () => {
           ...INITIAL_PLAYER,
           id: `player_${Date.now()}`,
           name: child.name,
-          age: Math.max(childAge, LEGACY_MIN_PLAYABLE_AGE),
+          age: playableChildAge,
           currentWeek: player.currentWeek,
           gender: child.gender || player.gender,
           avatar: child.image || INITIAL_PLAYER.avatar,
@@ -2302,9 +2534,17 @@ export const App: React.FC = () => {
           activeVehicleId: player.activeVehicleId,
           businesses: legacyInheritance.businesses,
           studio: legacyInheritance.studio,
+          commitments: legacyInheritance.commitments,
+          activeReleases: legacyInheritance.activeReleases,
           stocks: clone(player.stocks),
           portfolio: clone(inheritancePreview.inheritedPortfolio),
           world: legacyInheritance.world || INITIAL_PLAYER.world,
+          ownedStreamingPlatform: handoffOwnedStreamingPlatformToHeir(
+              player,
+              child,
+              playableChildAge,
+              player.currentWeek,
+          ),
           relationships: advancedRelationships,
           flags: {
               ...(INITIAL_PLAYER.flags || {}),
@@ -3006,7 +3246,7 @@ export const App: React.FC = () => {
       <div className={`${isFullBleedMobileSurface ? 'w-screen max-w-none' : 'max-w-md mx-auto border-x border-white/5 pt-safe-top shadow-2xl'} h-screen relative z-10 bg-zinc-950/80 flex flex-col ${player?.settings?.smoothMode ? 'smooth-mode' : ''}`}>
         {gameStatus === 'START_MENU' && (
             <StartMenu 
-                saveSlots={saveSlots}
+                saveSlots={saveSlotSummaries}
                 onSelectSlot={handleSelectSlot}
                 onDeleteSlot={handleDeleteSlot}
                 onImportData={handleImportGameData}
@@ -3022,7 +3262,7 @@ export const App: React.FC = () => {
                     {activePage === Page.CAREER && (<CareerPage player={player} onQuitJob={handleQuitJob} onRehearse={handleRehearse} onOwnedProductionFocus={handleOwnedProductionFocus} />)}
                     {activePage === Page.IMPROVE && (<ImprovePage player={player} onTrain={()=>{}} onEnroll={(c)=>handleGenericUpdate(p=>{ const previousCommitments = p.commitments; const next: Player = { ...p, money: p.money- (c.upfrontCost||0), commitments: [...p.commitments, {...c, id: `c_${Date.now()}`, weeksCompleted:0}] }; syncWeeklyEnergyForCommitments(next, previousCommitments); return next; })} onCancel={(id)=>handleGenericUpdate(p=>{ const previousCommitments = p.commitments; const next: Player = { ...p, commitments: p.commitments.filter(c=>c.id!==id)}; syncWeeklyEnergyForCommitments(next, previousCommitments); return next; })} onPerformAction={handleImproveAction} />)}
                     {activePage === Page.SOCIAL && (<SocialPage player={player} onInteract={handleSocialInteract} onContinueAsChild={handleContinueAsChild} />)}
-                    {activePage === Page.LIFESTYLE && (<LifestylePage player={player} onBuyItem={handleBuyLifestyleItem} onSellItem={handleSellLifestyleItem} onSetResidence={(id)=>handleGenericUpdate(p=>({ ...p, residenceId: id }))} onStartBusiness={()=>{}} onShutdownBusiness={()=>{}} onUpdatePlayer={handleUpdatePlayer} onPremiumPurchase={handlePremiumPurchase} onNavVisibilityChange={setIsBottomNavVisible} initialView={lifestyleInitialView ?? undefined} onInitialViewConsumed={() => setLifestyleInitialView(null)} initialRightsMarketOpportunityId={rightsMarketOpportunityId ?? undefined} onRightsMarketTargetConsumed={() => setRightsMarketOpportunityId(null)} />)}
+                    {activePage === Page.LIFESTYLE && (<LifestylePage player={player} onBuyItem={handleBuyLifestyleItem} onSellItem={handleSellLifestyleItem} onSetResidence={(id)=>handleGenericUpdate(p=>({ ...p, residenceId: id }))} onStartBusiness={()=>{}} onShutdownBusiness={()=>{}} onUpdatePlayer={handleUpdatePlayer} onPremiumPurchase={handlePremiumPurchase} onReturnHome={() => setActivePage(Page.HOME)} onNavVisibilityChange={setIsBottomNavVisible} initialView={lifestyleInitialView ?? undefined} onInitialViewConsumed={() => setLifestyleInitialView(null)} initialRightsMarketOpportunityId={rightsMarketOpportunityId ?? undefined} onRightsMarketTargetConsumed={() => setRightsMarketOpportunityId(null)} initialStudioContinuation={studioContinuationTarget ?? undefined} onStudioContinuationConsumed={() => setStudioContinuationTarget(null)} />)}
                     {activePage === Page.MOBILE && (
                         <MobilePage 
                             player={player} 
@@ -3038,6 +3278,12 @@ export const App: React.FC = () => {
                             onTriggerBabyNaming={handleSchedulePregnancy}
                             onOpenRightsMarket={(opportunityId) => {
                                 setRightsMarketOpportunityId(opportunityId || null);
+                                setLifestyleInitialView('PRODUCTION_GAME');
+                                setActivePage(Page.LIFESTYLE);
+                            }}
+                            onOpenStudioContinuation={(studioId, scriptId) => {
+                                if (!studioId || !scriptId) return;
+                                setStudioContinuationTarget({ studioId, scriptId });
                                 setLifestyleInitialView('PRODUCTION_GAME');
                                 setActivePage(Page.LIFESTYLE);
                             }}

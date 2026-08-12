@@ -5,6 +5,7 @@ export interface SaveSlot {
   age: number;
   fame: number;
   totalPlayTimeMs: number;
+  isPendingSummary?: boolean;
 }
 
 /** null = empty slot ("create a new star") */

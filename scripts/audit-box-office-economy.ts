@@ -51,6 +51,8 @@ const blockbusterStrong = calculateDynamicBoxOfficeTotalCap({
 assert(highStrong.totalCap > 1_400_000_000, 'An exceptional high-budget event should not be capped near $1.4B.');
 assert(highWeak.totalCap < highStrong.totalCap, 'A weak high-budget package must not earn the same ceiling as an excellent one.');
 assert(blockbusterStrong.totalCap > highStrong.totalCap, 'Blockbusters should retain more upside than high-budget films.');
+assert(blockbusterStrong.totalCap > 3_000_000_000, 'An exceptional blockbuster should retain credible upside above $3B.');
+assert(blockbusterStrong.totalCap !== 3_000_000_000, 'Blockbuster outcomes must not land on a fixed $3B ceiling.');
 assert(highStrong.label === 'BREAKOUT', 'An exceptional event should receive a breakout label.');
 
 console.log('Box office economy audit passed.');

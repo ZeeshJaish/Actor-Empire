@@ -4,8 +4,15 @@ const productionHouse = readFileSync('views/lifestyle/business/ProductionHouseGa
 const studioGroup = readFileSync('views/lifestyle/business/StudioGroupView.tsx', 'utf8');
 const commandCenter = readFileSync('views/lifestyle/business/OwnedStudioCommandCenter.tsx', 'utf8');
 const developmentLab = readFileSync('views/lifestyle/business/DevelopmentLab.tsx', 'utf8');
+const developmentLabModules = [
+    readFileSync('views/lifestyle/business/components/DevelopmentLabScriptVault.tsx', 'utf8'),
+    readFileSync('views/lifestyle/business/components/DevelopmentLabMarket.tsx', 'utf8'),
+    readFileSync('views/lifestyle/business/components/DevelopmentLabFranchiseManager.tsx', 'utf8'),
+    readFileSync('views/lifestyle/business/components/DevelopmentLabUniverseManager.tsx', 'utf8'),
+    readFileSync('views/lifestyle/business/components/DevelopmentLabUniverseDashboard.tsx', 'utf8'),
+].join('\n');
 const greenlight = readFileSync('views/lifestyle/business/GreenlightWizard.tsx', 'utf8');
-const source = `${productionHouse}\n${studioGroup}\n${commandCenter}\n${developmentLab}\n${greenlight}`;
+const source = `${productionHouse}\n${studioGroup}\n${commandCenter}\n${developmentLab}\n${developmentLabModules}\n${greenlight}`;
 
 for (const [needle, description] of [
     ['activeStudioId', 'the active studio context in ProductionHouseGame'],
@@ -14,6 +21,7 @@ for (const [needle, description] of [
     ['returnAfterStudioTool', 'the back-routing target for subsidiary tools'],
     ['onGreenlightStudioProject', 'the Studio Group callback for direct greenlight'],
     ['onOpenStudioWorkbench', 'the Studio Group callback for workbench/development routes'],
+    ['onOpenStreamingBids', 'the controlled-subsidiary bid-only route'],
     ['DevelopmentLabInitialTab', 'the typed Development Lab tab launch contract'],
     ['initialTab', 'the Development Lab initial tab prop'],
     ['ownedStudio.command.greenlightProject', 'the direct existing Greenlight Wizard action'],
@@ -39,8 +47,20 @@ if (!productionHouse.includes("setView('STUDIO_GROUP')") || !productionHouse.inc
     throw new Error('Subsidiary tool back navigation must return to Studio Group instead of the HQ dashboard.');
 }
 
+if (
+    !productionHouse.includes("candidate.studioState?.operatingModel === 'CONTROLLED_SUBSIDIARY'")
+    || !productionHouse.includes("release.distributionPhase === 'STREAMING_BIDDING'")
+    || !productionHouse.includes("setView('RELEASE')")
+) {
+    throw new Error('Subsidiary streaming access must validate a controlled studio and a pending bid before opening Release Wizard.');
+}
+
 if (!commandCenter.includes('controlProfile.canDirectProduce')) {
     throw new Error('OwnedStudioCommandCenter must only show direct production controls when the model allows it.');
+}
+
+if (!commandCenter.includes('Review offers') || !commandCenter.includes("project.phase === 'BIDDING'")) {
+    throw new Error('Controlled subsidiary bid cards must expose the focused Review offers action.');
 }
 
 if (commandCenter.includes('Slice 4 Pipeline')) {

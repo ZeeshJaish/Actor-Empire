@@ -5,6 +5,7 @@ import { FirebaseMessaging } from '@capacitor-firebase/messaging';
 import { FirebasePerformance } from '@capacitor-firebase/performance';
 import { APP_DISPLAY_VERSION } from './appVersion';
 import { Player } from '../types';
+import { getAwardEligibilityDiagnostics } from './awardLogic';
 
 let firebaseBootstrapped = false;
 let firebaseAuthBootstrapped = false;
@@ -48,6 +49,7 @@ const FIREBASE_AUTH_REFRESH_SAFETY_MS = 5 * 60 * 1000;
 const FIRESTORE_ISSUE_REPORT_COLLECTION = 'issueReports';
 const TRACE_CONTEXT_LIMIT = 30;
 const WEEK_PROCESSING_DEBUG_STORAGE_KEY = 'actorEmpire.weekProcessingDebug.v1';
+const WEEK_PROCESSING_DEBUG_SLOT_PREFIX = `${WEEK_PROCESSING_DEBUG_STORAGE_KEY}.slot.`;
 const FIREBASE_WEB_CONFIG = {
   authDomain: 'actor-empire-1ff1d.firebaseapp.com',
   projectId: 'actor-empire-1ff1d',
@@ -128,6 +130,7 @@ type WeekProcessingDebugSnapshot = {
   slowest_stage?: string;
   slowest_stage_ms?: number;
   stage_timeline?: string;
+  interrupted_stage?: string;
 };
 
 let traceContext: TraceContext = {};
@@ -467,13 +470,28 @@ const getReportSaveSlot = (player?: Player | null) => {
   return match?.[1] ? Number(match[1]) : '';
 };
 
-const readWeekProcessingDebugSnapshot = (): WeekProcessingDebugSnapshot | null => {
+const normalizeDebugSaveSlot = (saveSlot?: string | number | null) => {
+  if (saveSlot === undefined || saveSlot === null || saveSlot === '') return '';
+  const match = String(saveSlot).match(/(?:actorEmpireSave_)?(\d+)/);
+  return match?.[1] || String(saveSlot).slice(0, 32);
+};
+
+const getWeekProcessingDebugStorageKey = (saveSlot?: string | number | null) => {
+  const normalizedSlot = normalizeDebugSaveSlot(saveSlot);
+  return normalizedSlot ? `${WEEK_PROCESSING_DEBUG_SLOT_PREFIX}${normalizedSlot}` : WEEK_PROCESSING_DEBUG_STORAGE_KEY;
+};
+
+const readWeekProcessingDebugSnapshot = (saveSlot?: string | number | null): WeekProcessingDebugSnapshot | null => {
   if (typeof window === 'undefined') return null;
   try {
-    const raw = window.localStorage.getItem(WEEK_PROCESSING_DEBUG_STORAGE_KEY);
+    const normalizedSlot = normalizeDebugSaveSlot(saveSlot);
+    const raw = window.localStorage.getItem(getWeekProcessingDebugStorageKey(normalizedSlot));
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === 'object' ? parsed as WeekProcessingDebugSnapshot : null;
+    if (!parsed || typeof parsed !== 'object') return null;
+    const snapshot = parsed as WeekProcessingDebugSnapshot;
+    if (normalizedSlot && normalizeDebugSaveSlot(snapshot.save_slot) !== normalizedSlot) return null;
+    return snapshot;
   } catch {
     return null;
   }
@@ -482,14 +500,15 @@ const readWeekProcessingDebugSnapshot = (): WeekProcessingDebugSnapshot | null =
 const writeWeekProcessingDebugSnapshot = (snapshot: WeekProcessingDebugSnapshot) => {
   if (typeof window === 'undefined') return;
   try {
-    window.localStorage.setItem(WEEK_PROCESSING_DEBUG_STORAGE_KEY, JSON.stringify(snapshot));
+    window.localStorage.setItem(getWeekProcessingDebugStorageKey(snapshot.save_slot), JSON.stringify(snapshot));
   } catch {
     // Diagnostics must never block the save or week-processing path.
   }
 };
 
-const getWeekProcessingDebugFields = () => {
-  const snapshot = readWeekProcessingDebugSnapshot();
+const getWeekProcessingDebugFields = (player?: Player | null) => {
+  const reportSlot = getReportSaveSlot(player);
+  const snapshot = readWeekProcessingDebugSnapshot(reportSlot);
   if (!snapshot) return {};
   const updatedAtMs = snapshot.updated_at ? Date.parse(snapshot.updated_at) : NaN;
   const staleMinutes = Number.isFinite(updatedAtMs)
@@ -523,6 +542,7 @@ const getWeekProcessingDebugFields = () => {
       week_debug_slowest_stage: snapshot.slowest_stage,
       week_debug_slowest_stage_ms: snapshot.slowest_stage_ms,
       week_debug_stage_timeline: snapshot.stage_timeline,
+      week_debug_interrupted_stage: snapshot.interrupted_stage,
       week_debug_stale_minutes: staleMinutes,
     }).filter(([, value]) => value !== undefined && value !== null && value !== '')
   );
@@ -914,7 +934,10 @@ export const markWeekProcessingStage = (
 ) => {
   const safeStage = sanitizeName(stage, 'stage');
   const nowIso = new Date().toISOString();
-  const previous = readWeekProcessingDebugSnapshot();
+  const requestedSaveSlot = context.save_slot !== undefined
+    ? context.save_slot as string | number
+    : getReportSaveSlot(player);
+  const previous = readWeekProcessingDebugSnapshot(requestedSaveSlot);
   const runId = String(context.run_id || previous?.run_id || `week_${Date.now().toString(36)}`).slice(0, 90);
   const isNewRun = previous?.run_id !== runId || safeStage === 'start';
   const startedAt = isNewRun ? nowIso : previous?.started_at || nowIso;
@@ -939,9 +962,7 @@ export const markWeekProcessingStage = (
   const status = String(context.status || (safeStage.includes('fail') ? 'failed' : safeStage === 'success' ? 'success' : 'running'));
   const error = context.error ? getErrorMessage(context.error) : undefined;
   const screen = context.screen !== undefined ? String(context.screen).slice(0, 90) : previous?.screen;
-  const saveSlot = context.save_slot !== undefined
-    ? context.save_slot as string | number
-    : getReportSaveSlot(player) || previous?.save_slot;
+  const saveSlot = requestedSaveSlot || previous?.save_slot;
   const numericContext = (key: string, fallback?: number) => (
     typeof context[key] === 'number' && Number.isFinite(context[key] as number)
       ? context[key] as number
@@ -987,6 +1008,7 @@ export const markWeekProcessingStage = (
     slowest_stage: slowestStage,
     slowest_stage_ms: slowestStageMs,
     stage_timeline: stageTimeline,
+    interrupted_stage: previous?.interrupted_stage,
   };
 
   writeWeekProcessingDebugSnapshot(snapshot);
@@ -1036,6 +1058,43 @@ export const markWeekProcessingStage = (
       error,
     });
   }
+};
+
+export const recoverInterruptedWeekProcessingTrace = (
+  player?: Player | null,
+  context: { saveSlot?: string | number; screen?: string } = {},
+) => {
+  const saveSlot = context.saveSlot ?? getReportSaveSlot(player);
+  const previous = readWeekProcessingDebugSnapshot(saveSlot);
+  if (!previous || !['started', 'running'].includes(String(previous.status))) return null;
+
+  const nowIso = new Date().toISOString();
+  const interruptedStage = previous.stage || 'unknown';
+  const snapshot: WeekProcessingDebugSnapshot = {
+    ...previous,
+    status: 'interrupted',
+    stage: 'interrupted_on_resume',
+    interrupted_stage: interruptedStage,
+    updated_at: nowIso,
+    screen: context.screen || previous.screen,
+    save_slot: saveSlot || previous.save_slot,
+    stage_timeline: `${String(previous.stage_timeline || '').slice(-760)}|interrupted_on_resume:0`.replace(/^\|/, ''),
+  };
+  writeWeekProcessingDebugSnapshot(snapshot);
+  markTraceAction('week_interrupted_on_resume', {
+    flow: 'process_week',
+    save_slot: snapshot.save_slot,
+    week_process_stage: interruptedStage,
+    week_process_status: 'interrupted',
+    week_process_run_id: snapshot.run_id,
+    week_process_elapsed_ms: snapshot.elapsed_ms,
+  });
+  addBreadcrumb('week_processing:interrupted_on_resume', {
+    run_id: snapshot.run_id,
+    interrupted_stage: interruptedStage,
+    save_slot: snapshot.save_slot,
+  });
+  return snapshot;
 };
 
 export const recordNonFatal = (
@@ -1253,7 +1312,8 @@ export const submitPlayerIssueReport = (
     ...getProductionHouseSnapshot(player),
     recent_logs: getRecentLogSnapshot(player),
     ...getFirestoreTraceFields(),
-    ...getWeekProcessingDebugFields(),
+    ...getWeekProcessingDebugFields(player),
+    ...(category === 'AWARDS' ? getAwardEligibilityDiagnostics(player) : {}),
     ...runtimeContext,
     ...(payload.extra || {}),
   };

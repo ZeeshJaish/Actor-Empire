@@ -1,0 +1,817 @@
+.ls{--epx-lsink:#14120e;--epx-lspaper:#f2efe6;--epx-lspaper2:#e7e3d6;--epx-lsred:#8e2118;--epx-lsrule:#c9c3b2;
+  --epx-lsok:#1f6b3a;--epx-lswarn:#96650d;--epx-lsbad:#8e2118;
+  --epx-lsamber:#f5b301;--epx-lsgreen:#2fd07a;--epx-lsalert:#ff4a52;
+  position:absolute;inset:0;display:flex;flex-direction:column;overflow:hidden;
+  background:#07080b;font-family:'Inter',system-ui,-apple-system,sans-serif;color:#e8eaf0}
+.ls :where(*){margin:0;padding:0;box-sizing:border-box;min-width:0;-webkit-tap-highlight-color:transparent}
+.ls :where(button){font-family:inherit;border:none;background:none;color:inherit;cursor:pointer;text-align:inherit}
+
+/* ── act rail ── */
+.ls .lstop{flex:0 0 auto;position:relative;padding:calc(30px + env(safe-area-inset-top)) 12px 10px;
+  background:#05060a;border-bottom:1px solid rgba(255,255,255,.07)}
+.ls .lsback{position:absolute;left:6px;top:calc(28px + env(safe-area-inset-top));
+  width:30px;height:30px;font-size:16px;color:#7d8798;z-index:2}
+.ls .lsrail{display:flex;align-items:center;gap:4px;padding-left:26px}
+.ls .lsrailseg{flex:0 0 auto;display:flex;align-items:center;gap:5px;padding:4px 7px;border-radius:2px}
+.ls .lsrailseg i{width:5px;height:5px;background:#31384a}
+.ls .lsrailseg span{font-size:7px;font-weight:900;letter-spacing:.2em;color:#5a6478}
+.ls .lsrailseg.done i{background:#5a6478}
+.ls .lsrailseg.on{flex:1;background:rgba(255,255,255,.05)}
+.ls .lsrailseg.on i{background:var(--epx-lsamber);box-shadow:0 0 8px var(--epx-lsamber)}
+.ls .lsrailseg.on span{color:#f0f3f8}
+
+/* ── scenes ── */
+.ls .lsscene{flex:1;display:flex;flex-direction:column;overflow:hidden;position:relative}
+.ls .lsscene.paper{background:radial-gradient(ellipse 130% 50% at 50% 0%,#191b22,transparent 70%),#0a0b0f}
+.ls .lsscene.term{background:
+  linear-gradient(rgba(245,179,1,.035),transparent 40%),
+  repeating-linear-gradient(rgba(255,255,255,.016) 0 1px,transparent 1px 44px),#05070a}
+.ls .lsscene.reg{background:radial-gradient(ellipse 100% 40% at 50% 0%,#141a24,transparent 70%),#080a0e}
+.ls .lsscene.div{background:radial-gradient(ellipse 90% 46% at 50% 12%,#111b2e,transparent 72%),#060810}
+.ls .lsscene.desk{background:radial-gradient(ellipse 110% 40% at 50% 0%,#101620,transparent 70%),#06070b}
+.ls .lsscene.state{background:#0a0c10}
+.ls .lsscene.room{background:radial-gradient(ellipse 90% 55% at 50% 34%,rgba(245,179,1,.10),transparent 68%),#08090d;
+  align-items:center;justify-content:center}
+.ls .lsroomwrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:24px;text-align:center}
+.ls .lseyebrow{font-size:8px;font-weight:900;letter-spacing:.32em;color:var(--epx-lsamber)}
+.ls .lsroomhead{margin-top:12px;font-size:44px;font-weight:900;letter-spacing:-.03em;
+  font-family:ui-monospace,Menlo,monospace;color:#fff;text-shadow:0 0 40px rgba(245,179,1,.25)}
+.ls .lsroomsub{margin-top:12px;max-width:30ch;font-size:13px;line-height:1.65;color:#9aa6bb;
+  font-family:Georgia,serif}
+
+/* ── PAPER ── */
+.ls .lssheet{flex:1;overflow-y:auto;overflow-x:hidden;margin:12px;padding:22px 20px 26px;
+  position:relative;background:linear-gradient(#f6f3ea,var(--epx-lspaper));color:var(--epx-lsink);
+  box-shadow:0 18px 50px rgba(0,0,0,.6),0 0 0 1px rgba(0,0,0,.5)}
+.ls .lssheet.lsgate{flex:0 1 auto;max-height:calc(100% - 52px);margin:auto 12px}
+.ls .lsletterhead{padding-bottom:11px;border-bottom:2px solid var(--epx-lsink);
+  display:flex;flex-direction:column;gap:3px}
+.ls .lsletterhead b{font-size:12px;font-weight:900;letter-spacing:.16em}
+.ls .lsletterhead span{font-size:7.5px;font-weight:900;letter-spacing:.2em;color:var(--epx-lsred)}
+.ls .lsdoctitle{margin-top:20px;font-family:Georgia,serif;font-size:29px;line-height:1.12;
+  font-weight:700;letter-spacing:-.01em;hyphens:none}
+.ls .lsdocbody{margin-top:14px;font-family:Georgia,serif;font-size:14px;line-height:1.62;color:#2c2a24}
+.ls .lsdocbody.quote{font-style:italic;color:#3a372f}
+.ls .lsdocbody b{font-weight:700;color:var(--epx-lsink)}
+.ls .lsdocrule{margin-top:20px;height:1px;background:var(--epx-lsrule)}
+.ls .lsdoclabel{display:block;margin-top:16px;font-size:8px;font-weight:900;letter-spacing:.22em;
+  color:var(--epx-lsred)}
+.ls .lstable{margin-top:10px;border-top:1px solid var(--epx-lsrule)}
+.ls .lsrow{display:block;width:100%;padding:12px 2px;border-bottom:1px solid var(--epx-lsrule)}
+.ls .lsrowtop{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.ls .lsrowtop b{display:block;font-size:14px;font-weight:700;font-family:Georgia,serif}
+.ls .lsrowtop span{display:block;margin-top:2px;font-size:7.5px;font-weight:900;letter-spacing:.16em;color:#6d675a}
+.ls .lsstance{font-style:normal;flex:0 0 auto;font-size:8px;font-weight:900;letter-spacing:.16em;
+  padding:4px 7px;border:1px solid currentColor}
+.ls .lsrow.for .lsstance{color:var(--epx-lsok)}
+.ls .lsrow.against .lsstance{color:var(--epx-lsred)}
+.ls .lsrow.abstain .lsstance{color:#6d675a}
+.ls .lsrowsaid{margin-top:10px;padding-left:11px;border-left:2px solid var(--epx-lsrule);
+  font-family:Georgia,serif;font-size:13px;line-height:1.6;font-style:italic;color:#3a372f}
+.ls .lsrow.open{background:rgba(0,0,0,.028)}
+.ls .lscarry{margin-top:16px;padding:14px;background:var(--epx-lspaper2);border-left:3px solid var(--epx-lsink)}
+.ls .lscarry span{font-size:7.5px;font-weight:900;letter-spacing:.2em;color:#6d675a}
+.ls .lscarry b{display:block;margin-top:3px;font-size:16px;font-weight:900}
+.ls .lscarry p{margin-top:9px;font-family:Georgia,serif;font-size:12.5px;line-height:1.55;color:#3a372f}
+.ls .lsverdictline{margin-top:18px;padding:9px 12px;font-size:12px;font-weight:900;letter-spacing:.2em;
+  color:var(--epx-lspaper);background:var(--epx-lsok)}
+.ls .lssigblock{margin-top:18px;display:inline-block}
+.ls .lssig{width:160px;height:38px;display:block}
+.ls .lssig path{stroke-dasharray:420;stroke-dashoffset:420}
+.ls .lssig.on path{animation:epx-lsdraw .85s ease-out forwards}
+.ls .lssig.on .lssigline{animation-delay:.5s;animation-duration:.3s}
+@keyframes epx-lsdraw{to{stroke-dashoffset:0}}
+.ls .lssigblock > span{border-top:none;padding-top:0}
+.ls .lsstamp{position:absolute;right:26px;bottom:34px;padding:7px 14px;
+  border:3px solid var(--epx-lsok);color:var(--epx-lsok);transform:rotate(-11deg) scale(2.4);
+  opacity:0;pointer-events:none;transition:transform .16s steps(3,end),opacity .12s}
+.ls .lsstamp.on{opacity:.82;transform:rotate(-11deg) scale(1)}
+.ls .lsstamp span{font-size:15px;font-weight:900;letter-spacing:.2em}
+.ls .lsstampwrap{display:flex;justify-content:center;padding:22px 0 6px}
+.ls .lsstamp.bad{border-color:var(--epx-lsred);color:var(--epx-lsred);position:relative;right:auto;bottom:auto;
+  display:inline-block;margin:0;transform:rotate(-7deg) scale(2.4)}
+.ls .lsstamp.bad.on{transform:rotate(-7deg) scale(1)}
+.ls .lsstamp.bad span{font-size:18px}
+
+/* risk factors, inside the prospectus */
+.ls .lsrisk{margin-top:12px;padding:12px;border:1px solid var(--epx-lsrule);background:rgba(0,0,0,.028)}
+.ls .lsrisktitle{position:relative;display:block}
+.ls .lsrisktitle b{font-size:13px;font-weight:900;font-family:ui-monospace,Menlo,monospace}
+.ls .lsstrike{position:absolute;left:-3px;top:-2px;bottom:-2px;width:0;background:#141414;
+  transform:rotate(-.35deg);transition:width .34s steps(8,end)}
+.ls .lsrisk.struck .lsstrike{width:calc(100% + 6px)}
+.ls .lsrisk p{margin-top:5px;font-family:Georgia,serif;font-size:12.5px;line-height:1.5;color:#4a463d}
+.ls .lsriskacts{display:flex;gap:7px;margin-top:9px}
+.ls .lsriskacts button{padding:7px 11px;font-size:8px;font-weight:900;letter-spacing:.14em;
+  border:1px solid var(--epx-lsrule);color:#4a463d}
+.ls .lsriskacts button.on{background:var(--epx-lsink);color:var(--epx-lspaper);border-color:var(--epx-lsink)}
+.ls .lsriskacts button.on.hide{background:var(--epx-lsred);border-color:var(--epx-lsred)}
+.ls .lsdrawer{margin-top:16px;padding:12px;border:1px dashed var(--epx-lsrule)}
+.ls .lsdrawer span{font-size:8px;font-weight:900;letter-spacing:.2em;color:#6d675a}
+.ls .lsdrawer em{display:block;margin-top:5px;font-style:italic;font-family:Georgia,serif;
+  font-size:12.5px;color:#4a463d}
+.ls .lsdrawer.has{border-color:var(--epx-lsred);border-style:solid}
+.ls .lsdrawer.has em{color:var(--epx-lsred);font-style:normal;font-weight:700}
+
+/* ── TERMINAL ── */
+.ls .lstermwrap{flex:1;overflow-y:auto;padding:14px 12px 4px;
+  font-family:ui-monospace,'SFMono-Regular',Menlo,monospace}
+.ls .lstermhead{padding-bottom:9px;border-bottom:1px solid rgba(245,179,1,.28)}
+.ls .lstermhead b{font-size:12px;font-weight:900;letter-spacing:.16em;color:var(--epx-lsamber)}
+.ls .lstermhead span{display:block;margin-top:3px;font-size:8px;font-weight:700;letter-spacing:.14em;
+  color:#5f6b7e}
+.ls .lscaret{display:inline-block;width:7px;height:11px;margin-left:5px;background:var(--epx-lsamber);
+  vertical-align:-1px;animation:epx-lsblink 1.05s steps(1,end) infinite}
+@keyframes epx-lsblink{0%,55%{opacity:1}56%,100%{opacity:0}}
+.ls .lsdials{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.ls .lsdialbox{padding:11px 10px 8px;background:#0b0f16;border:1px solid #1a2130}
+.ls .lsdialbox > span{font-size:7px;font-weight:900;letter-spacing:.16em;color:#6d7a8e}
+.ls .lsdialbox > b{display:block;margin-top:4px;font-size:23px;font-weight:900;letter-spacing:-.02em;
+  color:var(--epx-lsamber)}
+.ls .lsdialbox.ok{border-color:rgba(47,208,122,.4)}
+.ls .lsdialbox.ok > b{color:var(--epx-lsgreen)}
+.ls .lsdialbox.warn,.ls .lsdialbox.low{border-color:rgba(245,179,1,.5)}
+.ls .lsdialbox.bad{border-color:rgba(255,74,82,.55)}
+.ls .lsdialbox.bad > b{color:var(--epx-lsalert)}
+.ls .lstermdial{-webkit-appearance:none;appearance:none;width:100%;height:26px;background:none;margin-top:6px}
+.ls .lstermdial::-webkit-slider-runnable-track{height:2px;background:#2b3446}
+.ls .lstermdial::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;margin-top:-7px;
+  background:var(--epx-lsamber);box-shadow:0 0 12px rgba(245,179,1,.6)}
+.ls .lsscale{display:flex;justify-content:space-between}
+.ls .lsscale i{font-style:normal;font-size:7px;font-weight:700;color:#4c576a}
+.ls .lsout{margin-top:9px;border:1px solid rgba(245,179,1,.32);background:rgba(245,179,1,.05)}
+.ls .lsoutmain{padding:12px;text-align:center;border-bottom:1px solid rgba(245,179,1,.22)}
+.ls .lsoutmain span{font-size:7.5px;font-weight:900;letter-spacing:.22em;color:#9a8a5e}
+.ls .lsoutmain b{display:block;margin-top:3px;font-size:38px;font-weight:900;letter-spacing:-.03em;
+  color:#fff;text-shadow:0 0 26px rgba(245,179,1,.4)}
+.ls .lsoutgrid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:rgba(245,179,1,.16)}
+.ls .lsoutgrid div{padding:9px;background:#0a0d13}
+.ls .lsoutgrid span{display:block;font-size:6.5px;font-weight:900;letter-spacing:.14em;color:#6d7a8e}
+.ls .lsoutgrid b{display:block;margin-top:2px;font-size:15px;font-weight:900}
+.ls .lsoutgrid b.ok{color:var(--epx-lsgreen)}
+.ls .lsoutgrid b.warn{color:var(--epx-lsamber)}
+.ls .lsoutgrid b.bad{color:var(--epx-lsalert)}
+.ls .lstermlabel{margin-top:14px;font-size:7.5px;font-weight:900;letter-spacing:.22em;color:#6d7a8e}
+.ls .lsrows{margin-top:6px;display:flex;flex-direction:column;gap:1px;background:#151c28}
+.ls .lsrows > div{display:grid;grid-template-columns:1fr auto;align-items:baseline;gap:8px;
+  padding:9px 10px;background:#090c12;border-left:2px solid #2b3446}
+.ls .lsrows > div.ok{border-left-color:var(--epx-lsgreen)}
+.ls .lsrows > div.warn{border-left-color:var(--epx-lsamber)}
+.ls .lsrows > div.bad{border-left-color:var(--epx-lsalert)}
+.ls .lsrows b{font-size:8px;font-weight:900;letter-spacing:.13em;color:#8593a8}
+.ls .lsrows em{font-style:normal;font-size:17px;font-weight:900;letter-spacing:-.02em}
+.ls .lsrows > div.ok em{color:var(--epx-lsgreen)}
+.ls .lsrows > div.warn em{color:var(--epx-lsamber)}
+.ls .lsrows > div.bad em{color:var(--epx-lsalert)}
+.ls .lsrows i{grid-column:1/3;font-style:normal;font-size:8px;color:#59647a}
+.ls .lstermnote{margin-top:12px;padding:10px 12px;border-left:2px solid var(--epx-lsgreen);
+  background:rgba(47,208,122,.07)}
+.ls .lstermnote.warn{border-color:var(--epx-lsamber);background:rgba(245,179,1,.07)}
+.ls .lstermnote.bad{border-color:var(--epx-lsalert);background:rgba(255,74,82,.08)}
+.ls .lstermnote p{font-family:Georgia,serif;font-size:12.5px;line-height:1.55;color:#c3cddc}
+.ls .lstermnote p + p{margin-top:5px}
+
+/* ── RISK REGISTER / DATA ROOM ── */
+.ls .lsregwrap{flex:1;overflow-y:auto;padding:40px 12px 12px}
+.ls .lsregwrap.nocount{padding-top:12px}
+.ls .lsreghead{display:flex;align-items:center;gap:10px;padding-bottom:10px;border-bottom:1px solid #1c2432}
+.ls .lsreghead b{font-size:12px;font-weight:900;letter-spacing:.16em;color:#dbe3ef}
+.ls .lsreghead span{display:block;margin-top:2px;font-size:7.5px;font-weight:900;letter-spacing:.16em;
+  color:#5f6b7e}
+.ls .lsreghead i{margin-left:auto;font-style:normal;font-size:7.5px;font-weight:900;letter-spacing:.16em;
+  padding:4px 8px;border:1px solid currentColor;color:#5f6b7e}
+.ls .lsreghead i.bad{color:var(--epx-lsalert)}
+.ls .lsreghead i.ok{color:var(--epx-lsgreen)}
+.ls .lsreghead i.live{color:var(--epx-lsamber);animation:epx-lsblink 1.4s steps(1,end) infinite}
+.ls .lsregrows{margin-top:12px;display:flex;flex-direction:column;gap:8px}
+.ls .lsregrow{padding:11px;background:#0b0f16;border-left:3px solid #2b3446;
+  animation:epx-lsrise .3s steps(4,end) both;animation-delay:var(--epx-ls-i)}
+@keyframes epx-lsrise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.ls .lsregrow.high{border-left-color:var(--epx-lsalert)}
+.ls .lsregrow.med{border-left-color:var(--epx-lsamber)}
+.ls .lsregrow.low{border-left-color:#3c4859}
+.ls .lsregtop{display:flex;align-items:baseline;gap:9px}
+.ls .lsregtop b{font-family:ui-monospace,Menlo,monospace;font-size:9px;font-weight:900;color:#6d7a8e}
+.ls .lsregtop span{flex:1;font-size:12.5px;font-weight:800;color:#e2e8f2}
+.ls .lsregtop i{font-style:normal;font-size:7px;font-weight:900;letter-spacing:.14em;padding:3px 6px}
+.ls .lsregrow.high .lsregtop i{color:#ffd7d9;background:rgba(255,74,82,.22)}
+.ls .lsregrow.med .lsregtop i{color:#ffe6b0;background:rgba(245,179,1,.18)}
+.ls .lsregrow.low .lsregtop i{color:#b7c2d2;background:rgba(255,255,255,.07)}
+.ls .lsregbar{margin-top:8px;height:4px;background:#1a2130}
+.ls .lsregbar i{display:block;height:100%;transition:width .5s steps(8,end)}
+.ls .lsregrow.high .lsregbar i{background:var(--epx-lsalert)}
+.ls .lsregrow.med .lsregbar i{background:var(--epx-lsamber)}
+.ls .lsregrow.low .lsregbar i{background:#4a586c}
+.ls .lsregrow p{margin-top:7px;font-family:Georgia,serif;font-size:12px;line-height:1.5;color:#93a0b4}
+.ls .lsregsaid{margin-top:16px;text-align:center;font-family:Georgia,serif;font-size:13px;color:#93a0b4}
+.ls .lsinsert{margin-top:14px;padding:12px;background:#0e131c;border:1px solid #223046}
+.ls .lsinsert.bad{border-color:rgba(255,74,82,.45);background:rgba(142,33,24,.14)}
+.ls .lsinsert span{font-size:7.5px;font-weight:900;letter-spacing:.2em;color:#6d7a8e}
+.ls .lsinsert.bad span{color:var(--epx-lsalert)}
+.ls .lsinsert p{margin-top:7px;font-family:Georgia,serif;font-size:14px;line-height:1.55;
+  font-style:italic;color:#dde5f0}
+.ls .lsfinds{margin-top:12px;display:flex;flex-direction:column;gap:7px}
+.ls .lsfind{padding:10px 11px;background:#0b0f16;border-left:3px solid #2b3446;
+  animation:epx-lsrise .26s steps(4,end) both}
+.ls .lsfind.high{border-left-color:var(--epx-lsalert)}
+.ls .lsfind.med{border-left-color:var(--epx-lsamber)}
+.ls .lsfind.low{border-left-color:#3c4859}
+.ls .lsfindtop{display:flex;align-items:center;justify-content:space-between}
+.ls .lsfindtop b{font-family:ui-monospace,Menlo,monospace;font-size:8.5px;font-weight:900;color:#6d7a8e}
+.ls .lsfindtop i{font-style:normal;font-size:6.5px;font-weight:900;letter-spacing:.14em;padding:3px 6px}
+.ls .lsfind.high .lsfindtop i{color:#ffd7d9;background:rgba(255,74,82,.22)}
+.ls .lsfind.med .lsfindtop i{color:#ffe6b0;background:rgba(245,179,1,.18)}
+.ls .lsfind.low .lsfindtop i{color:#b7c2d2;background:rgba(255,255,255,.07)}
+.ls .lsfind span{display:block;margin-top:5px;font-size:12.5px;font-weight:800;color:#e2e8f2}
+.ls .lsfind p{margin-top:4px;font-family:Georgia,serif;font-size:11.5px;line-height:1.5;color:#8d9bb0}
+.ls .lsfindscan{height:3px;background:#111722;overflow:hidden}
+.ls .lsfindscan i{display:block;width:34%;height:100%;background:var(--epx-lsamber);
+  animation:epx-lsscan 1.05s linear infinite}
+@keyframes epx-lsscan{from{transform:translateX(-100%)}to{transform:translateX(300%)}}
+.ls .lsremed{margin-top:14px;padding:12px;background:#0b0f16;border:1px solid #1c2432}
+.ls .lsremedhead{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.ls .lsremedhead span{font-size:7.5px;font-weight:900;letter-spacing:.16em;color:#6d7a8e}
+.ls .lsremedhead b{font-size:26px;font-weight:900;font-family:ui-monospace,Menlo,monospace;
+  color:var(--epx-lsamber)}
+.ls .lsremedout{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:#1c2432;margin-top:4px}
+.ls .lsremedout div{padding:8px;background:#090c12;text-align:center}
+.ls .lsremedout span{display:block;font-size:6.5px;font-weight:900;letter-spacing:.12em;color:#6d7a8e}
+.ls .lsremedout b{display:block;margin-top:3px;font-size:16px;font-weight:900;
+  font-family:ui-monospace,Menlo,monospace}
+.ls .lsremedout b.ok{color:var(--epx-lsgreen)}
+.ls .lsremedout b.warn{color:var(--epx-lsamber)}
+.ls .lsremedout b.bad{color:var(--epx-lsalert)}
+.ls .lsremednote{margin-top:10px;font-family:Georgia,serif;font-size:12px;line-height:1.55;color:#93a0b4}
+
+/* ── DIVISION BOARD ── */
+.ls .lsdivwrap{flex:1;overflow-y:auto;padding:40px 12px 12px}
+.ls .lsdivhead{text-align:center;padding-bottom:12px;border-bottom:1px solid #1b2740}
+.ls .lsdivhead span{font-size:7.5px;font-weight:900;letter-spacing:.2em;color:#63779c}
+.ls .lsdivhead b{display:block;margin-top:4px;font-size:26px;font-weight:900;letter-spacing:-.02em;
+  font-family:ui-monospace,Menlo,monospace;color:#fff}
+.ls .lstally{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;
+  margin-top:12px;padding:12px;background:#0a1120;border:1px solid #1b2740}
+.ls .lstallyside{text-align:center}
+.ls .lstallyside span{display:block;font-size:7.5px;font-weight:900;letter-spacing:.2em;color:#63779c}
+.ls .lstallyside b{display:block;font-size:42px;font-weight:900;line-height:1;
+  font-family:ui-monospace,Menlo,monospace}
+.ls .lstallyside.for b{color:var(--epx-lsgreen);text-shadow:0 0 24px rgba(47,208,122,.4)}
+.ls .lstallyside.against b{color:var(--epx-lsalert);text-shadow:0 0 24px rgba(255,74,82,.35)}
+.ls .lstallymid{text-align:center;padding:0 6px}
+.ls .lstallymid i{display:block;font-style:normal;font-size:6.5px;font-weight:900;letter-spacing:.16em;
+  color:#4d5f80}
+.ls .lstallymid em{display:block;font-style:normal;font-size:17px;font-weight:900;color:#8ea3c6}
+.ls .lsseats{margin-top:10px;display:flex;flex-direction:column;gap:4px}
+.ls .lsseat{display:grid;grid-template-columns:8px 1fr auto;align-items:center;gap:10px;
+  padding:10px 11px;background:#0a1120;border:1px solid #17233a}
+.ls .lsseat i{width:8px;height:26px;background:#25324c}
+.ls .lsseat b{display:block;font-size:12.5px;font-weight:800;color:#dbe5f5}
+.ls .lsseat span{display:block;margin-top:1px;font-size:6.5px;font-weight:900;letter-spacing:.16em;
+  color:#5f719a}
+.ls .lsseat em{font-style:normal;font-size:8px;font-weight:900;letter-spacing:.14em;color:#4d5f80}
+.ls .lsseat.for{background:rgba(47,208,122,.09);border-color:rgba(47,208,122,.34)}
+.ls .lsseat.for i{background:var(--epx-lsgreen);box-shadow:0 0 14px rgba(47,208,122,.6)}
+.ls .lsseat.for em{color:var(--epx-lsgreen)}
+.ls .lsseat.against{background:rgba(255,74,82,.08);border-color:rgba(255,74,82,.32)}
+.ls .lsseat.against i{background:var(--epx-lsalert);box-shadow:0 0 14px rgba(255,74,82,.5)}
+.ls .lsseat.against em{color:var(--epx-lsalert)}
+.ls .lsseat.targeted{border-color:var(--epx-lsamber);box-shadow:0 0 0 1px var(--epx-lsamber)}
+.ls .lsdivreply{margin-top:12px;padding:11px 12px;background:#0a1120;border-left:2px solid var(--epx-lsamber);
+  font-family:Georgia,serif;font-size:13px;line-height:1.55;font-style:italic;color:#cbd8ee}
+.ls .lsdivresult{margin-top:14px;padding:12px;text-align:center;font-size:20px;font-weight:900;
+  letter-spacing:.24em}
+.ls .lsdivresult.ok{color:#0a1120;background:var(--epx-lsgreen)}
+.ls .lsdivresult.bad{color:#fff;background:var(--epx-lsalert)}
+.ls .lslobby{flex:0 0 auto;padding:10px 12px max(12px,env(safe-area-inset-bottom));
+  background:#0a1120;border-top:1px solid var(--epx-lsamber)}
+.ls .lslobby > span{display:block;font-size:7.5px;font-weight:900;letter-spacing:.2em;
+  color:var(--epx-lsamber);margin-bottom:8px}
+.ls .lslobby button{display:block;width:100%;padding:10px 11px;margin-bottom:6px;
+  background:#0d1524;border:1px solid #1e2c46}
+.ls .lslobby button b{display:block;font-size:9px;font-weight:900;letter-spacing:.16em;color:#9fb2d2}
+.ls .lslobby button em{display:block;margin-top:4px;font-style:italic;font-family:Georgia,serif;
+  font-size:12.5px;line-height:1.45;color:#dbe5f5}
+
+/* ── SYNDICATE DESK ── */
+.ls .lsdeskwrap{flex:1;overflow-y:auto;padding:40px 12px 12px}
+.ls .lsdeskhead{display:flex;align-items:center;gap:10px;padding-bottom:10px;border-bottom:1px solid #1a212e}
+.ls .lsdeskhead b{font-size:12px;font-weight:900;letter-spacing:.18em;color:#dbe3ef}
+.ls .lsdeskhead span{display:block;margin-top:2px;font-size:7px;font-weight:900;letter-spacing:.18em;
+  color:#5f6b7e}
+.ls .lsdeskhead i{margin-left:auto;font-style:normal;font-size:7.5px;font-weight:900;letter-spacing:.16em;
+  padding:4px 8px;border:1px solid currentColor;color:#5f6b7e}
+.ls .lsdeskhead i.live{color:var(--epx-lsalert);animation:epx-lsblink 1s steps(1,end) infinite}
+.ls .lsbids{margin-top:12px;display:flex;flex-direction:column;gap:8px}
+.ls .lsbid{display:block;width:100%;padding:12px;background:#0a0d14;border:1px solid #1a2130}
+.ls .lsbid.on{border-color:var(--epx-lsamber);background:rgba(245,179,1,.06)}
+.ls .lsbidtop b{display:block;font-size:14px;font-weight:900;color:#e7edf7}
+.ls .lsbidtop span{display:block;margin-top:1px;font-size:6.5px;font-weight:900;letter-spacing:.16em;
+  color:#5f6b7e}
+.ls .lsbidnum{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-top:8px}
+.ls .lsbidnum em{font-style:normal;font-size:26px;font-weight:900;letter-spacing:-.025em;
+  font-family:ui-monospace,Menlo,monospace;color:#fff}
+.ls .lsbidnum i{font-style:normal;font-size:7px;font-weight:900;letter-spacing:.14em;padding:4px 7px;
+  border:1px solid currentColor}
+.ls .lsbidnum i.firm{color:var(--epx-lsgreen)}
+.ls .lsbidnum i.best{color:var(--epx-lsalert)}
+.ls .lsbidnum i.wait{color:#5f6b7e;animation:epx-lsblink 1s steps(1,end) infinite}
+.ls .lsbidbar{position:relative;margin-top:9px;height:5px;background:#141b27}
+.ls .lsbidbar i{display:block;height:100%;transition:width .12s linear}
+.ls .lsbidbar i.firm{background:var(--epx-lsgreen)}
+.ls .lsbidbar i.best{background:var(--epx-lsalert)}
+.ls .lsbidbar u{position:absolute;right:0;top:-3px;width:1px;height:11px;background:var(--epx-lsamber)}
+.ls .lsbidfoot{display:flex;gap:10px;align-items:center;margin-top:9px}
+.ls .lsbidfoot span{font-size:7px;font-weight:900;letter-spacing:.12em;color:#5f6b7e}
+.ls .lsbidfoot span.picked{margin-left:auto;color:#0a0d14;background:var(--epx-lsamber);padding:3px 7px}
+.ls .lsdesknote{margin-top:14px;font-family:Georgia,serif;font-size:12.5px;line-height:1.55;color:#93a0b4}
+
+/* ── THE COVER ── */
+.ls .lscover{flex:0 1 auto;margin:auto 14px;padding:26px 20px;width:calc(100% - 28px);max-width:420px;
+  background:linear-gradient(#12151d,#0b0e14);border:1px solid rgba(245,179,1,.28);
+  box-shadow:0 24px 60px rgba(0,0,0,.7)}
+.ls .lscoverhead{text-align:center;padding-bottom:14px;border-bottom:1px solid rgba(245,179,1,.2)}
+.ls .lscoverhead span{font-size:7px;font-weight:900;letter-spacing:.28em;color:var(--epx-lsamber)}
+.ls .lscoverhead b{display:block;margin-top:6px;font-size:22px;font-weight:900;letter-spacing:.1em;color:#fff}
+.ls .lscovernum{text-align:center;padding:20px 0}
+.ls .lscovernum span{font-size:7px;font-weight:900;letter-spacing:.24em;color:#6d7a8e}
+.ls .lscovernum b{display:block;margin-top:5px;font-size:44px;font-weight:900;letter-spacing:-.035em;
+  font-family:ui-monospace,Menlo,monospace;color:#fff;text-shadow:0 0 40px rgba(245,179,1,.3)}
+.ls .lscovernum em{display:block;margin-top:5px;font-style:normal;font-size:11px;font-weight:800;color:#8ea3c6}
+.ls .lscovermarks{display:flex;flex-direction:column;gap:6px}
+.ls .lscovermark{display:flex;align-items:center;gap:8px;padding:8px 11px;
+  font-size:9px;font-weight:900;letter-spacing:.14em;color:#f0b6b2;
+  background:rgba(142,33,24,.2);border:1px solid rgba(255,74,82,.4);
+  animation:epx-lsstampin .22s steps(3,end) both}
+@keyframes epx-lsstampin{from{opacity:0;transform:scale(1.5) rotate(-3deg)}to{opacity:1;transform:none}}
+.ls .lscovermark i{width:5px;height:5px;background:var(--epx-lsalert);flex:0 0 auto}
+.ls .lscoverclean{text-align:center;font-family:Georgia,serif;font-size:13px;line-height:1.6;color:#8ea3c6}
+
+/* ── STATE (government paper) ── */
+.ls .lsstatewrap{flex:1;overflow-y:auto;margin:12px;padding:20px 18px 24px;position:relative;
+  background:linear-gradient(#eef1f5,#e3e7ee);color:#16233d;
+  box-shadow:0 18px 50px rgba(0,0,0,.6)}
+.ls .lsstatewrap::before{content:'';position:absolute;inset:0;pointer-events:none;opacity:.045;
+  background-image:repeating-linear-gradient(45deg,#16233d 0 1px,transparent 1px 9px)}
+.ls .lsstatehead{position:relative;display:flex;align-items:center;gap:12px;padding-bottom:12px;
+  border-bottom:3px double #16233d}
+.ls .lscrest{display:flex;flex-direction:column;gap:2px;width:26px;flex:0 0 auto}
+.ls .lscrest i{height:5px;background:#16233d}
+.ls .lscrest i:nth-child(2){width:70%}
+.ls .lscrest i:nth-child(3){width:45%}
+.ls .lsstatehead b{font-size:13px;font-weight:900;letter-spacing:.06em}
+.ls .lsstatehead span{display:block;margin-top:2px;font-size:7.5px;font-weight:900;letter-spacing:.18em;
+  color:#4a5b7d}
+.ls .lsstatemeta{position:relative;display:grid;grid-template-columns:repeat(3,1fr);gap:1px;
+  background:#c3ccda;margin-top:12px}
+.ls .lsstatemeta div{padding:8px;background:#e9edf3}
+.ls .lsstatemeta span{display:block;font-size:6.5px;font-weight:900;letter-spacing:.16em;color:#5c6c8c}
+.ls .lsstatemeta b{display:block;margin-top:2px;font-size:11px;font-weight:900;
+  font-family:ui-monospace,Menlo,monospace}
+.ls .lsstatebody{position:relative;margin-top:14px;font-family:Georgia,serif;font-size:13.5px;
+  line-height:1.6;color:#243450}
+.ls .lsstatenote{position:relative;margin-top:10px;padding:9px 11px;background:#dde3ec;
+  border-left:3px solid #16233d;font-family:Georgia,serif;font-size:12px;line-height:1.5;
+  font-style:italic;color:#31425f}
+.ls .lsqueries{position:relative;margin-top:14px;display:flex;flex-direction:column;gap:8px}
+.ls .lsquery{padding:11px;background:#e9edf3;border:1px solid #c3ccda}
+.ls .lsquery.heavy{border-left:3px solid #8e2118}
+.ls .lsquery.answered{background:#dfe6ef}
+.ls .lsquerytop{display:flex;gap:10px}
+.ls .lsquerytop b{font-family:ui-monospace,Menlo,monospace;font-size:12px;font-weight:900;color:#5c6c8c}
+.ls .lsquerytop p{flex:1;font-family:Georgia,serif;font-size:12.5px;line-height:1.5;color:#243450}
+.ls .lsqueryacts{display:flex;gap:5px;margin-top:9px}
+.ls .lsqueryacts button{flex:1;padding:7px 3px;text-align:center;font-size:7px;font-weight:900;
+  letter-spacing:.08em;border:1px solid #a9b5c8;color:#31425f;background:#f4f7fa}
+.ls .lsqueryacts button.on{background:#16233d;color:#eef1f5;border-color:#16233d}
+.ls .lsstateverdict{position:relative;margin-top:16px;text-align:center}
+.ls .lsstateverdict p{margin-top:22px;font-family:Georgia,serif;font-size:13px;line-height:1.6;
+  color:#243450;text-align:left}
+.ls .lsstateverdict .lsstamp{position:relative;right:auto;bottom:auto;display:inline-block;
+  border-color:#1f6b3a;color:#1f6b3a;transform:rotate(-6deg) scale(2.2)}
+.ls .lsstateverdict .lsstamp.on{transform:rotate(-6deg) scale(1)}
+.ls .lsstateverdict.bad .lsstamp{border-color:#8e2118;color:#8e2118}
+
+/* ── shared ── */
+.ls .lsgatecount{position:absolute;top:0;left:0;right:0;z-index:2;
+  display:flex;align-items:center;gap:5px;padding:12px 16px}
+.ls .lsgatecount i{width:22px;height:3px;background:#2a3040}
+.ls .lsgatecount i.done{background:var(--epx-lsgreen)}
+.ls .lsgatecount i.now{background:var(--epx-lsamber)}
+.ls .lsgatecount span{margin-left:auto;font-size:7.5px;font-weight:900;letter-spacing:.2em;color:#6d7488}
+.ls .lsreading{padding:26px 0 14px;text-align:center}
+.ls .lsdots{display:flex;justify-content:center;gap:6px;margin-bottom:13px}
+.ls .lsdots i{width:8px;height:8px;background:currentColor;opacity:.2;
+  animation:epx-lspulse 1.05s steps(2,end) infinite}
+.ls .lsdots i:nth-child(2){animation-delay:.22s}
+.ls .lsdots i:nth-child(3){animation-delay:.44s}
+@keyframes epx-lspulse{0%,100%{opacity:.16}45%{opacity:.85}}
+.ls .lsreading p{font-size:9px;font-weight:900;letter-spacing:.34em;opacity:.6}
+.ls .lsfoot{flex:0 0 auto;padding:10px 14px max(12px,env(safe-area-inset-bottom));
+  background:linear-gradient(rgba(7,8,11,0),#07080b 40%)}
+.ls .lsfootnote{margin-bottom:9px;text-align:center;font-family:Georgia,serif;font-size:11.5px;
+  line-height:1.5;color:#7d8798}
+.ls .lsgo{width:100%;padding:16px 10px;text-align:center;font-size:11.5px;font-weight:900;
+  letter-spacing:.16em;color:#0a0b0f;
+  background:linear-gradient(180deg,#f7e2a6,var(--epx-lsamber));
+  box-shadow:0 10px 26px rgba(245,179,1,.2)}
+.ls .lsgo.off{background:rgba(255,255,255,.06);color:#5a6478;box-shadow:none}
+.ls .lschoice{flex:0 0 auto;display:flex;flex-direction:column;gap:8px;
+  padding:10px 14px max(12px,env(safe-area-inset-bottom))}
+.ls .lschoicebtn{padding:13px 14px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.04)}
+.ls .lschoicebtn b{display:block;font-size:11px;font-weight:900;letter-spacing:.16em}
+.ls .lschoicebtn span{display:block;margin-top:5px;font-family:Georgia,serif;font-size:12px;
+  line-height:1.5;color:#98a3b6}
+.ls .lschoicebtn.revise{border-color:rgba(47,208,122,.4)}
+.ls .lschoicebtn.revise b{color:#5fd68e}
+.ls .lschoicebtn.force{border-color:rgba(255,74,82,.45);background:rgba(142,33,24,.14)}
+.ls .lschoicebtn.force b{color:#ef6f74}
+
+/* ══ SURFACES ═══════════════════════════════════════════════════════════
+   --lsr    radius scale        --lselev  the only shadow anything needs
+   A panel is a lifted surface, never an outlined box. */
+.ls{--epx-lsr1:12px;--epx-lsr2:16px;--epx-lsr3:22px;
+  --epx-lssurf:rgba(255,255,255,.045);
+  --epx-lssurf2:rgba(255,255,255,.075);
+  --epx-lselev:0 10px 30px rgba(0,0,0,.45);
+  --epx-lselev2:0 18px 48px rgba(0,0,0,.55)}
+
+/* every dark panel in the flow, in one place */
+.ls .lsdialbox,.ls .lsout,.ls .lsrows > div,.ls .lstermnote,.ls .lsregrow,.ls .lsfind,.ls .lsremed,.ls .lsinsert,.ls .lstally,.ls .lsseat,.ls .lsbid,.ls .lslobby button,.ls .lschoicebtn,.ls .lsrailseg.on,.ls .lsdivreply,.ls .lsremedout,.ls .lsoutgrid,.ls .lscover{
+  border-radius:var(--epx-lsr2);border:none;box-shadow:var(--epx-lselev)}
+.ls .lsdialbox,.ls .lsregrow,.ls .lsfind,.ls .lsseat,.ls .lsbid,.ls .lslobby button,.ls .lschoicebtn,.ls .lstally,.ls .lsinsert,.ls .lsremed,.ls .lsdivreply{
+  background:linear-gradient(180deg,var(--epx-lssurf2),var(--epx-lssurf))}
+
+/* the coloured left edge stays — it is the fastest severity read there is —
+   but as an inset rather than a border, so the corner can round */
+.ls .lsregrow,.ls .lsfind,.ls .lsrows > div,.ls .lstermnote,.ls .lsdivreply{border-left:none}
+.ls .lsregrow.high{box-shadow:var(--epx-lselev),inset 3px 0 0 var(--epx-lsalert)}
+.ls .lsregrow.med{box-shadow:var(--epx-lselev),inset 3px 0 0 var(--epx-lsamber)}
+.ls .lsregrow.low{box-shadow:var(--epx-lselev),inset 3px 0 0 #46536a}
+.ls .lsfind.high{box-shadow:var(--epx-lselev),inset 3px 0 0 var(--epx-lsalert)}
+.ls .lsfind.med{box-shadow:var(--epx-lselev),inset 3px 0 0 var(--epx-lsamber)}
+.ls .lsfind.low{box-shadow:var(--epx-lselev),inset 3px 0 0 #46536a}
+.ls .lsrows > div.ok{box-shadow:var(--epx-lselev),inset 3px 0 0 var(--epx-lsgreen)}
+.ls .lsrows > div.warn{box-shadow:var(--epx-lselev),inset 3px 0 0 var(--epx-lsamber)}
+.ls .lsrows > div.bad{box-shadow:var(--epx-lselev),inset 3px 0 0 var(--epx-lsalert)}
+.ls .lstermnote{box-shadow:var(--epx-lselev),inset 3px 0 0 var(--epx-lsgreen)}
+.ls .lstermnote.warn{box-shadow:var(--epx-lselev),inset 3px 0 0 var(--epx-lsamber)}
+.ls .lstermnote.bad{box-shadow:var(--epx-lselev),inset 3px 0 0 var(--epx-lsalert)}
+.ls .lsdivreply{box-shadow:var(--epx-lselev),inset 3px 0 0 var(--epx-lsamber)}
+
+/* selected states glow instead of drawing a heavier line */
+.ls .lsdialbox.ok{box-shadow:var(--epx-lselev),0 0 0 1px rgba(47,208,122,.35)}
+.ls .lsdialbox.warn,.ls .lsdialbox.low{box-shadow:var(--epx-lselev),0 0 0 1px rgba(245,179,1,.4)}
+.ls .lsdialbox.bad{box-shadow:var(--epx-lselev),0 0 0 1px rgba(255,74,82,.45)}
+.ls .lsbid.on{box-shadow:var(--epx-lselev2),0 0 0 1.5px var(--epx-lsamber),0 0 30px -6px var(--epx-lsamber)}
+.ls .lsseat.for{box-shadow:var(--epx-lselev),inset 3px 0 0 var(--epx-lsgreen),0 0 0 1px rgba(47,208,122,.2)}
+.ls .lsseat.against{box-shadow:var(--epx-lselev),inset 3px 0 0 var(--epx-lsalert),0 0 0 1px rgba(255,74,82,.2)}
+.ls .lsseat.targeted{box-shadow:var(--epx-lselev2),0 0 0 1.5px var(--epx-lsamber),0 0 26px -8px var(--epx-lsamber)}
+.ls .lschoicebtn.revise{box-shadow:var(--epx-lselev),inset 3px 0 0 var(--epx-lsgreen)}
+.ls .lschoicebtn.force{box-shadow:var(--epx-lselev),inset 3px 0 0 var(--epx-lsalert)}
+
+/* grids need their own rounding because the children carry the fills */
+.ls .lsoutgrid,.ls .lsremedout,.ls .lsrows,.ls .lsstatemeta{overflow:hidden}
+.ls .lsout{overflow:hidden}
+
+/* ══ BUTTONS ════════════════════════════════════════════════════════════
+   The primary read as a label rather than a control: flat, square, tracked.
+   Now it is a pill with a light direction, a glow, and a real press. */
+.ls .lsgo{border-radius:99px;padding:17px 14px;letter-spacing:.1em;font-size:12.5px;
+  background:linear-gradient(180deg,#ffdf95,var(--epx-lsamber) 55%,#d99a00);
+  box-shadow:0 12px 30px -8px rgba(245,179,1,.65),
+    inset 0 1px 0 rgba(255,255,255,.55),inset 0 -2px 0 rgba(0,0,0,.15);
+  transition:transform .12s cubic-bezier(.2,.8,.2,1),box-shadow .12s ease}
+.ls .lsgo:active{transform:translateY(2px) scale(.985);
+  box-shadow:0 4px 14px -6px rgba(245,179,1,.5),inset 0 1px 0 rgba(255,255,255,.4)}
+.ls .lsgo.off{background:rgba(255,255,255,.05);color:#5a6478;box-shadow:none}
+.ls .lschoicebtn{border-radius:var(--epx-lsr2);transition:transform .12s cubic-bezier(.2,.8,.2,1)}
+.ls .lschoicebtn:active{transform:scale(.985)}
+.ls .lsbid,.ls .lsseat,.ls .lsrow,.ls .lsriskacts button,.ls .lsqueryacts button{
+  transition:transform .12s cubic-bezier(.2,.8,.2,1),box-shadow .16s ease}
+.ls .lsbid:active,.ls .lsseat:active{transform:scale(.985)}
+.ls .lsriskacts button,.ls .lsqueryacts button{border-radius:99px}
+
+/* ══ BREATHING ROOM ═════════════════════════════════════════════════════ */
+.ls .lstermwrap,.ls .lsregwrap,.ls .lsdivwrap,.ls .lsdeskwrap{padding-left:16px;padding-right:16px}
+.ls .lsfoot,.ls .lschoice{padding-left:16px;padding-right:16px}
+.ls .lsdials{gap:10px}
+.ls .lsbids,.ls .lsregrows,.ls .lsfinds{gap:10px}
+.ls .lsseats{gap:6px}
+
+/* ══ SCENE TRANSITIONS ══════════════════════════════════════════════════
+   Every scene used to hard-cut. Now the incoming one rises and sharpens. */
+.ls .lsscene{animation:epx-lsscenein .34s cubic-bezier(.2,.85,.25,1) both}
+@keyframes epx-lsscenein{
+  from{opacity:0;transform:translateY(14px) scale(.985)}
+  to{opacity:1;transform:none}}
+.ls .lssheet,.ls .lscover,.ls .lsstatewrap{animation:epx-lspaperin .42s cubic-bezier(.2,.85,.25,1) both}
+@keyframes epx-lspaperin{
+  from{opacity:0;transform:translateY(22px)}
+  to{opacity:1;transform:none}}
+.ls .lsfoot,.ls .lschoice{animation:epx-lsfootin .38s cubic-bezier(.2,.85,.25,1) .06s both}
+@keyframes epx-lsfootin{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+
+/* ══ THE PLAIN-ENGLISH OPENER ═══════════════════════════════════════════
+   Every screen says what it is and what you are deciding, in one sentence,
+   before it shows you anything. */
+.ls .lswhat{margin:0 0 14px;padding:12px 14px;border-radius:var(--epx-lsr2);
+  background:linear-gradient(180deg,rgba(245,179,1,.11),rgba(245,179,1,.05));
+  box-shadow:inset 0 0 0 1px rgba(245,179,1,.16)}
+.ls .lswhat b{display:block;font-size:9px;font-weight:900;letter-spacing:.2em;color:var(--epx-lsamber)}
+.ls .lswhat p{margin-top:6px;font-family:Georgia,serif;font-size:13px;line-height:1.55;color:#cfd9e8}
+
+/* ── the model, simplified ── */
+.ls .lsdialbox{display:block;width:100%;text-align:left;padding:13px 14px 6px}
+.ls .lsdialbox > span{display:flex;align-items:center;gap:6px;font-size:8px;font-weight:900;
+  letter-spacing:.18em;color:#8494ab}
+.ls .lstype{font-style:normal;margin-left:auto;font-size:6.5px;font-weight:900;letter-spacing:.14em;
+  padding:2px 6px;border-radius:99px;color:var(--epx-lsamber);background:rgba(245,179,1,.14)}
+.ls .lsdialbox > b{display:block;margin-top:5px;font-size:26px;font-weight:900;letter-spacing:-.025em;
+  color:#fff}
+.ls .lsoutmain i{display:block;margin-top:7px;font-style:normal;font-size:11px;font-weight:700;
+  color:#9aa8bf}
+.ls .lsmore{display:flex;align-items:center;width:100%;margin-top:12px;padding:13px 14px;
+  border-radius:99px;font-size:9.5px;font-weight:900;letter-spacing:.16em;color:#9fb0c8;
+  background:var(--epx-lssurf)}
+.ls .lsmore i{margin-left:auto;font-style:normal;font-size:15px;color:var(--epx-lsamber)}
+.ls .lsmore.on{color:var(--epx-lsamber)}
+.ls .lsrows{margin-top:10px;background:none;gap:8px}
+
+/* ── the keypad ── */
+.ls .lspad{position:absolute;inset:0;z-index:40;display:flex;align-items:flex-end;
+  background:rgba(3,4,7,.72);backdrop-filter:blur(10px);
+  animation:epx-lsfade .2s ease both}
+@keyframes epx-lsfade{from{opacity:0}to{opacity:1}}
+.ls .lspadcard{width:100%;padding:20px 16px max(20px,env(safe-area-inset-bottom));
+  border-radius:26px 26px 0 0;background:linear-gradient(180deg,#161b25,#0c1017);
+  box-shadow:0 -20px 60px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.08);
+  animation:epx-lspadin .32s cubic-bezier(.2,.85,.25,1) both}
+@keyframes epx-lspadin{from{transform:translateY(100%)}to{transform:none}}
+.ls .lspadtitle{display:block;text-align:center;font-size:8.5px;font-weight:900;letter-spacing:.2em;
+  color:#8494ab}
+.ls .lspadval{display:block;margin-top:8px;text-align:center;font-size:40px;font-weight:900;
+  letter-spacing:-.035em;font-family:ui-monospace,Menlo,monospace;color:#fff}
+.ls .lspadval.bad{color:var(--epx-lsalert)}
+.ls .lspadhint{display:block;margin-top:6px;text-align:center;font-style:normal;font-size:11px;
+  color:#8494ab;font-family:Georgia,serif}
+.ls .lspadkeys{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:18px}
+.ls .lspadkeys button{padding:16px 0;border-radius:16px;text-align:center;
+  font-size:22px;font-weight:800;font-family:ui-monospace,Menlo,monospace;color:#eef2f8;
+  background:linear-gradient(180deg,rgba(255,255,255,.09),rgba(255,255,255,.045));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.09);
+  transition:transform .1s cubic-bezier(.2,.8,.2,1)}
+.ls .lspadkeys button:active{transform:scale(.94);background:rgba(245,179,1,.18)}
+.ls .lspadkeys button.sm{font-size:11px;font-weight:900;letter-spacing:.12em;color:#9fb0c8}
+.ls .lspadgo{width:100%;margin-top:12px;padding:17px;border-radius:99px;text-align:center;
+  font-size:12px;font-weight:900;letter-spacing:.16em;color:#0a0b0f;
+  background:linear-gradient(180deg,#ffdf95,var(--epx-lsamber) 55%,#d99a00);
+  box-shadow:0 12px 30px -8px rgba(245,179,1,.6)}
+.ls .lspadgo.off{background:rgba(255,255,255,.06);color:#5a6478;box-shadow:none}
+
+/* the last square thing on the screen */
+.ls .lstermdial::-webkit-slider-runnable-track{height:3px;border-radius:99px;
+  background:rgba(255,255,255,.14)}
+.ls .lstermdial::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;margin-top:-10px;
+  border-radius:50%;background:radial-gradient(circle at 36% 30%,#fff3cf,var(--epx-lsamber) 60%,#c98f00);
+  box-shadow:0 3px 12px rgba(0,0,0,.5),0 0 18px -4px var(--epx-lsamber)}
+
+/* ── the price band ── */
+.ls .lsbandbox{margin-top:2px;padding:16px 14px;border-radius:var(--epx-lsr2);
+  background:linear-gradient(180deg,var(--epx-lssurf2),var(--epx-lssurf));box-shadow:var(--epx-lselev)}
+.ls .lsbandnums{display:flex;align-items:center;gap:10px}
+.ls .lsbandnums div{flex:1}
+.ls .lsbandnums div.r{text-align:right}
+.ls .lsbandnums span{display:block;font-size:7px;font-weight:900;letter-spacing:.18em;color:#8494ab}
+.ls .lsbandnums b{display:block;margin-top:3px;font-size:26px;font-weight:900;letter-spacing:-.025em;
+  font-family:ui-monospace,Menlo,monospace;color:#fff}
+.ls .lsbandnums i{flex:0 0 auto;font-style:normal;font-size:7px;font-weight:900;letter-spacing:.14em;
+  padding:4px 8px;border-radius:99px}
+.ls .lsbandnums i.ok{color:var(--epx-lsgreen);background:rgba(47,208,122,.14)}
+.ls .lsbandnums i.tight,.ls .lsbandnums i.wide{color:var(--epx-lsamber);background:rgba(245,179,1,.14)}
+.ls .lsbandtrack{position:relative;height:8px;margin-top:16px;border-radius:99px;
+  background:rgba(255,255,255,.08)}
+.ls .lsbandtrack i{position:absolute;top:0;bottom:0;border-radius:99px;
+  background:linear-gradient(90deg,var(--epx-lsamber),#ffdf95);
+  box-shadow:0 0 22px -4px var(--epx-lsamber)}
+.ls .lsbandtrack u{position:absolute;top:-7px;width:2px;height:22px;background:#fff;opacity:.8}
+.ls .lsbandmodel{margin-top:10px;text-align:center;font-family:Georgia,serif;font-size:12px;
+  color:#8494ab}
+.ls .lsbandmodel b{color:#cfd9e8;font-family:ui-monospace,Menlo,monospace}
+.ls .lsbandrow{display:flex;align-items:center;gap:12px;margin-top:12px}
+.ls .lsbandrow span{flex:0 0 42px;font-size:7px;font-weight:900;letter-spacing:.16em;color:#8494ab}
+.ls .lsbandrow .lstermdial{flex:1;margin-top:0}
+.ls .lsoutgrid.two{margin-top:12px;border-radius:var(--epx-lsr2);overflow:hidden;
+  background:rgba(255,255,255,.06)}
+
+/* ── the anchor book ── */
+.ls .lsanchorbar{margin-top:2px;padding:14px;border-radius:var(--epx-lsr2);
+  background:linear-gradient(180deg,var(--epx-lssurf2),var(--epx-lssurf));box-shadow:var(--epx-lselev)}
+.ls .lsanchorbar div{display:flex;align-items:baseline;justify-content:space-between}
+.ls .lsanchorbar span{font-size:7.5px;font-weight:900;letter-spacing:.18em;color:#8494ab}
+.ls .lsanchorbar b{font-size:28px;font-weight:900;font-family:ui-monospace,Menlo,monospace;
+  color:var(--epx-lsamber)}
+.ls .lsanchortrack{display:block!important;height:6px;margin-top:9px;border-radius:99px;
+  background:rgba(255,255,255,.08);overflow:hidden}
+.ls .lsanchortrack i{display:block;height:100%;border-radius:99px;
+  background:linear-gradient(90deg,var(--epx-lsamber),#ffdf95);
+  transition:width .5s cubic-bezier(.2,.8,.2,1)}
+.ls .lsbid.still{pointer-events:none;animation:epx-lsrise .3s cubic-bezier(.2,.85,.25,1) both}
+.ls .lsbid.out{opacity:.42}
+
+/* ── on air ── */
+.ls .lsscene.air{background:
+  radial-gradient(ellipse 110% 55% at 50% 26%,rgba(232,35,47,.14),transparent 68%),#07080d}
+.ls .lsairtop{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;
+  padding:16px}
+.ls .lsairprice{text-align:right;font-family:ui-monospace,Menlo,monospace}
+.ls .lsairprice span{display:block;font-size:6.5px;font-weight:900;letter-spacing:.2em;color:#8494ab;
+  font-family:'Inter',sans-serif}
+.ls .lsairprice b{font-size:24px;font-weight:900;letter-spacing:-.025em}
+.ls .lsairprice em{margin-left:6px;font-style:normal;font-size:12px;font-weight:900}
+.ls .lsairprice .up{color:var(--epx-lsgreen)} .ls .lsairprice .down{color:var(--epx-lsalert)}
+.ls .lsairwrap{flex:1;overflow-y:auto;padding:8px 16px 4px}
+.ls .lsairwho{font-size:7.5px;font-weight:900;letter-spacing:.22em;color:#e8232f}
+.ls .lsairq{margin-top:10px;font-size:26px;font-weight:900;line-height:1.16;letter-spacing:-.025em;
+  color:#fff;hyphens:none}
+.ls .lsairsaid{margin-top:16px;padding:13px 14px;border-radius:var(--epx-lsr2);
+  font-family:Georgia,serif;font-size:15px;line-height:1.5;color:#fff;
+  background:linear-gradient(180deg,rgba(245,179,1,.16),rgba(245,179,1,.07));
+  box-shadow:inset 0 0 0 1px rgba(245,179,1,.28);
+  animation:epx-lsrise .3s cubic-bezier(.2,.85,.25,1) both}
+.ls .lsairas{margin-top:18px;display:flex;flex-direction:column;gap:9px}
+.ls .lsairas button{padding:13px 14px;border-radius:var(--epx-lsr2);text-align:left;
+  background:linear-gradient(180deg,var(--epx-lssurf2),var(--epx-lssurf));box-shadow:var(--epx-lselev);
+  transition:transform .12s cubic-bezier(.2,.8,.2,1)}
+.ls .lsairas button:active{transform:scale(.985)}
+.ls .lsairas button:disabled{opacity:.35}
+.ls .lsairas b{display:block;font-size:9px;font-weight:900;letter-spacing:.18em;color:var(--epx-lsamber)}
+.ls .lsairas em{display:block;margin-top:5px;font-style:italic;font-family:Georgia,serif;
+  font-size:13px;line-height:1.5;color:#cfd9e8}
+.ls .lsairend{padding:34px 0;text-align:center}
+
+.ls .lsbidbar u{right:auto;background:rgba(255,255,255,.55)}
+.ls .lsbidbar u em{position:absolute;top:-14px;left:50%;transform:translateX(-50%);white-space:nowrap;
+  font-style:normal;font-size:6px;font-weight:900;letter-spacing:.14em;color:#8494ab}
+.ls .lsbidbar{margin-top:20px}
+
+.ls .lsfindfix{display:block;margin-top:7px;padding-top:7px;font-style:normal;font-size:10.5px;
+  font-weight:800;color:#8ea3c6;box-shadow:inset 0 1px 0 rgba(255,255,255,.07)}
+.ls .lsremed .lswhat{margin-bottom:16px}
+.ls .lsremedhead b{white-space:nowrap}
+
+/* ── the book ── */
+.ls .lsdays{display:grid;grid-template-columns:repeat(auto-fit,minmax(0,1fr));gap:8px;margin-top:2px}
+.ls .lsday{padding:11px 10px;border-radius:var(--epx-lsr2);text-align:center;
+  background:var(--epx-lssurf);box-shadow:var(--epx-lselev)}
+.ls .lsday b{display:block;font-size:9px;font-weight:900;letter-spacing:.16em;color:#8494ab}
+.ls .lsday span{display:block;margin-top:3px;font-size:7px;font-weight:900;letter-spacing:.14em;
+  color:#5a6478}
+.ls .lsday.done{background:rgba(47,208,122,.1)}
+.ls .lsday.done b{color:var(--epx-lsgreen)}
+.ls .lsday.now{background:rgba(245,179,1,.14);box-shadow:var(--epx-lselev),0 0 0 1px rgba(245,179,1,.3)}
+.ls .lsday.now b,.ls .lsday.now span{color:var(--epx-lsamber)}
+.ls .lscovbig{margin-top:12px;padding:18px 14px;border-radius:var(--epx-lsr2);text-align:center;
+  background:linear-gradient(180deg,var(--epx-lssurf2),var(--epx-lssurf));box-shadow:var(--epx-lselev)}
+.ls .lscovbig > span{font-size:7.5px;font-weight:900;letter-spacing:.2em;color:#8494ab}
+.ls .lscovbig > b{display:block;margin-top:5px;font-size:52px;font-weight:900;letter-spacing:-.04em;
+  font-family:ui-monospace,Menlo,monospace;line-height:1}
+.ls .lscovbig > b.ok{color:var(--epx-lsgreen);text-shadow:0 0 40px rgba(47,208,122,.35)}
+.ls .lscovbig > b.bad{color:var(--epx-lsalert);text-shadow:0 0 40px rgba(255,74,82,.3)}
+.ls .lscovbig > em{display:block;margin-top:8px;font-style:normal;font-family:Georgia,serif;
+  font-size:12px;line-height:1.5;color:#93a0b4}
+.ls .lsbuckets{margin-top:12px;display:flex;flex-direction:column;gap:9px}
+.ls .lsbucket{padding:12px 13px;border-radius:var(--epx-lsr2);
+  background:linear-gradient(180deg,var(--epx-lssurf2),var(--epx-lssurf));box-shadow:var(--epx-lselev)}
+.ls .lsbuckettop{display:flex;align-items:baseline;justify-content:space-between}
+.ls .lsbuckettop b{font-size:10px;font-weight:900;letter-spacing:.14em;color:#cfd9e8}
+.ls .lsbuckettop em{font-style:normal;font-size:18px;font-weight:900;
+  font-family:ui-monospace,Menlo,monospace}
+.ls .lsbuckettop em.ok{color:var(--epx-lsgreen)} .ls .lsbuckettop em.bad{color:var(--epx-lsalert)}
+.ls .lsbucketbar{position:relative;height:7px;margin-top:9px;border-radius:99px;
+  background:rgba(255,255,255,.08);overflow:hidden}
+.ls .lsbucketbar i{display:block;height:100%;border-radius:99px;
+  transition:width .7s cubic-bezier(.2,.8,.2,1)}
+.ls .lsbucketbar i.ok{background:linear-gradient(90deg,var(--epx-lsgreen),#8bf0bb)}
+.ls .lsbucketbar i.bad{background:linear-gradient(90deg,var(--epx-lsalert),#ff9ba0)}
+.ls .lsbucketbar u{position:absolute;left:50%;top:0;bottom:0;width:1.5px;background:rgba(255,255,255,.5)}
+.ls .lsbucket p{margin-top:7px;font-family:Georgia,serif;font-size:11.5px;line-height:1.45;color:#8494ab}
+
+/* ── allotment ── */
+.ls .lsallot{margin-top:14px}
+.ls .lsallotrow{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:12px 0;border-bottom:1px solid var(--epx-lsrule)}
+.ls .lsallotrow .r{text-align:right}
+.ls .lsallotrow b{display:block;font-size:13px;font-weight:800;font-family:Georgia,serif}
+.ls .lsallotrow .r b{font-family:ui-monospace,Menlo,monospace;font-size:15px;font-weight:900}
+.ls .lsallotrow span{display:block;margin-top:2px;font-size:10px;color:#6d675a}
+
+/* ── listing day ── */
+.ls .lsscene.tape{background:radial-gradient(ellipse 100% 50% at 50% 24%,rgba(47,208,122,.10),transparent 70%),#06080c}
+.ls .lsscene.tape.down{background:radial-gradient(ellipse 100% 50% at 50% 24%,rgba(255,74,82,.10),transparent 70%),#06080c}
+.ls .lstapewrap{flex:1;display:flex;flex-direction:column;padding:18px 16px 8px}
+.ls .lstapehead{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.ls .lstapehead b{font-size:19px;font-weight:900;letter-spacing:.14em;color:var(--epx-lsamber)}
+.ls .lstapehead span{display:block;margin-top:3px;font-size:7.5px;font-weight:900;letter-spacing:.16em;
+  color:#8494ab}
+.ls .lstapehead .r{text-align:right}
+.ls .lstapehead .r b{font-size:36px;font-weight:900;letter-spacing:-.03em;
+  font-family:ui-monospace,Menlo,monospace}
+.ls .lstapehead .r span{display:inline;font-size:13px;font-weight:900;letter-spacing:0;
+  margin-left:6px}
+.ls .lstapehead .r{white-space:nowrap}
+.ls .lstapehead .up{color:var(--epx-lsgreen)} .ls .lstapehead .down{color:var(--epx-lsalert)}
+.ls .lstapechart{position:relative;flex:1;margin-top:18px;min-height:0;
+  background-image:repeating-linear-gradient(rgba(255,255,255,.05) 0 1px,transparent 1px 16%)}
+.ls .lstapechart svg{position:absolute;inset:0;width:100%;height:100%}
+.ls .lstapeline{stroke:var(--epx-lsgreen);stroke-width:2.5;vector-effect:non-scaling-stroke;
+  stroke-linejoin:round}
+.ls .lsscene.tape.down .lstapeline{stroke:var(--epx-lsalert)}
+.ls .lstapefill{fill:rgba(47,208,122,.14)}
+.ls .lsscene.tape.down .lstapefill{fill:rgba(255,74,82,.13)}
+.ls .lstapeissue{position:absolute;left:0;right:0;height:0;
+  border-top:1px dashed rgba(245,179,1,.7);z-index:2}
+.ls .lstapeissue em{position:absolute;right:0;top:-9px;padding:3px 7px;border-radius:99px;
+  font-style:normal;font-size:8px;font-weight:900;letter-spacing:.08em;
+  color:#12101f;background:var(--epx-lsamber)}
+.ls .lstapefoot{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:16px}
+.ls .lstapefoot div{padding:11px 8px;border-radius:var(--epx-lsr2);text-align:center;
+  background:var(--epx-lssurf);box-shadow:var(--epx-lselev)}
+.ls .lstapefoot span{display:block;font-size:6.5px;font-weight:900;letter-spacing:.16em;color:#8494ab}
+.ls .lstapefoot b{display:block;margin-top:3px;font-size:17px;font-weight:900;
+  font-family:ui-monospace,Menlo,monospace}
+.ls .lstapefoot b.up{color:var(--epx-lsgreen)} .ls .lstapefoot b.down{color:var(--epx-lsalert)}
+.ls .lstapeskip{margin-top:12px;text-align:center;font-size:8px;font-weight:900;letter-spacing:.26em;
+  color:#5a6478;animation:epx-lsblink 2s steps(1,end) infinite}
+
+/* ── after ── */
+.ls .lsbill{display:flex;flex-direction:column;gap:9px}
+.ls .lsbillrow{padding:13px 14px;border-radius:var(--epx-lsr2);
+  background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.03));
+  box-shadow:inset 3px 0 0 var(--epx-lsamber)}
+.ls .lsbillrow.bad{box-shadow:inset 3px 0 0 var(--epx-lsalert);background:rgba(142,33,24,.16)}
+.ls .lsbillrow b{display:block;font-size:9.5px;font-weight:900;letter-spacing:.16em;color:var(--epx-lsamber)}
+.ls .lsbillrow.bad b{color:#ef8f92}
+.ls .lsbillrow p{margin-top:6px;font-family:Georgia,serif;font-size:13px;line-height:1.55;color:#cfd9e8}
+
+/* ── typing a figure with the device keyboard ── */
+.ls .lsdialbox > b{cursor:text}
+.ls .lsfigin{display:block;width:100%;margin-top:5px;padding:0;border:none;outline:none;
+  background:none;font-family:ui-monospace,Menlo,monospace;font-size:26px;font-weight:900;
+  letter-spacing:-.025em;color:var(--epx-lsamber);
+  border-bottom:2px solid var(--epx-lsamber)}
+.ls .lsfigin::placeholder{color:#4c576a}
+
+/* ── a signature is a name in a hand ── */
+.ls .lssigblock{margin-top:18px;display:inline-block;min-width:150px}
+/* Two earlier reveals (a CSS mask needing @property, then a max-width wipe)
+   both measured as never running and left the signature invisible. Opacity
+   and a small rise cannot fail. */
+.ls .lssigwipe{display:block;white-space:nowrap;opacity:1}
+.ls .lssigwipe.on{animation:epx-lswrite .7s cubic-bezier(.2,.85,.25,1) both}
+@keyframes epx-lswrite{
+  from{opacity:0;transform:translateX(-10px) rotate(-4deg)}
+  to{opacity:1;transform:none}}
+.ls .lssig{display:inline-block;font-family:'Snell Roundhand','Apple Chancery','Segoe Script',
+  'Brush Script MT','Lucida Handwriting',cursive;font-size:36px;line-height:1.15;
+  color:#1b2a5c;padding:0 8px 2px;white-space:nowrap;font-style:italic;
+  transform:rotate(-2.5deg);transform-origin:left center}
+.ls .lssigblock em{display:block;margin-top:2px;padding-top:5px;font-style:normal;
+  border-top:1px solid var(--epx-lsink);font-size:9px;font-weight:800;letter-spacing:.1em;
+  color:#6d675a}
+.ls .lssignedby{margin-top:18px}
+.ls .lssignedby b{display:block;margin-top:4px;font-size:7.5px;font-weight:900;letter-spacing:.2em;
+  color:var(--epx-lsred)}
+
+/* ── the grey market ── */
+.ls .lsgrey{margin-top:12px;padding:13px 14px;border-radius:var(--epx-lsr2);
+  background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.03));
+  box-shadow:var(--epx-lselev),inset 3px 0 0 #7d5cff}
+.ls .lsgrey div{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.ls .lsgrey span{font-size:7.5px;font-weight:900;letter-spacing:.18em;color:#a08cff}
+.ls .lsgrey b{font-size:24px;font-weight:900;font-family:ui-monospace,Menlo,monospace}
+.ls .lsgrey b.ok{color:var(--epx-lsgreen)} .ls .lsgrey b.bad{color:var(--epx-lsalert)}
+.ls .lsgrey p{margin-top:7px;font-family:Georgia,serif;font-size:11.5px;line-height:1.5;color:#8d9bb0}
+
+/* ── stabilisation ── */
+.ls .lsshoe{margin-top:12px;padding:12px 14px;border-radius:var(--epx-lsr2);
+  background:rgba(245,179,1,.12);box-shadow:inset 3px 0 0 var(--epx-lsamber);
+  animation:epx-lsrise .3s cubic-bezier(.2,.85,.25,1) both}
+.ls .lsshoe b{display:block;font-size:8.5px;font-weight:900;letter-spacing:.2em;color:var(--epx-lsamber)}
+.ls .lsshoe p{margin-top:6px;font-family:Georgia,serif;font-size:12px;line-height:1.5;color:#dfe7f2}
+
+/* ── a rival got away ── */
+.ls .lsrival{margin-top:12px;padding:12px 14px;border-radius:var(--epx-lsr2);
+  background:rgba(142,33,24,.18);box-shadow:inset 3px 0 0 var(--epx-lsalert)}
+.ls .lsrival b{display:block;font-size:8.5px;font-weight:900;letter-spacing:.2em;color:#ef8f92}
+.ls .lsrival p{margin-top:6px;font-family:Georgia,serif;font-size:12px;line-height:1.5;color:#dfe7f2}
+
+/* The ON AIR badge. This screen used to borrow .ndbug from the Market Desk's
+   stylesheet, which only worked when that screen happened to be mounted —
+   under CSS Modules it resolved to nothing. It owns the rule now. */
+.ls .ndbug{display:flex;align-items:center;gap:6px;padding:5px 10px;border-radius:99px;
+  background:#e8232f;font-size:8px;font-weight:900;letter-spacing:.18em;color:#fff;
+  box-shadow:0 4px 18px rgba(232,35,47,.5)}
+.ls .ndbug i{width:6px;height:6px;border-radius:50%;background:#fff;
+  animation:epx-lslive 1.2s steps(2,end) infinite}
+@keyframes epx-lslive{0%,100%{opacity:1}50%{opacity:.2}}

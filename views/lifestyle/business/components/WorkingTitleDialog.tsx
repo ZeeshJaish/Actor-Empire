@@ -1,10 +1,12 @@
 import React, { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { Clapperboard, Info, PenLine, X } from 'lucide-react';
+import type { ProjectType } from '../../../../types';
 import {
     getProjectTitleError,
     normalizeProjectTitle,
     PROJECT_TITLE_MAX_LENGTH
 } from '../../../../services/projectNaming';
+import { ProjectFormatChoice } from './ProjectFormatChoice';
 
 interface WorkingTitleDialogProps {
     mode: 'COMMISSION' | 'RENAME';
@@ -15,8 +17,10 @@ interface WorkingTitleDialogProps {
     eyebrow?: string;
     helperText?: string;
     infoText?: string;
+    allowProjectTypeChoice?: boolean;
+    initialProjectType?: ProjectType;
     onClose: () => void;
-    onConfirm: (title: string) => void;
+    onConfirm: (title: string, projectType?: ProjectType) => void;
 }
 
 export const WorkingTitleDialog: React.FC<WorkingTitleDialogProps> = ({
@@ -28,10 +32,13 @@ export const WorkingTitleDialog: React.FC<WorkingTitleDialogProps> = ({
     eyebrow,
     helperText,
     infoText,
+    allowProjectTypeChoice = false,
+    initialProjectType = 'MOVIE',
     onClose,
     onConfirm
 }) => {
     const [workingTitle, setWorkingTitle] = useState(initialTitle);
+    const [projectType, setProjectType] = useState<ProjectType>(initialProjectType);
     const inputRef = useRef<HTMLInputElement>(null);
     const error = useMemo(() => getProjectTitleError(workingTitle), [workingTitle]);
     const normalizedLength = normalizeProjectTitle(workingTitle).length;
@@ -52,7 +59,7 @@ export const WorkingTitleDialog: React.FC<WorkingTitleDialogProps> = ({
     const handleSubmit = (event: FormEvent) => {
         event.preventDefault();
         if (error) return;
-        onConfirm(normalizeProjectTitle(workingTitle));
+        onConfirm(normalizeProjectTitle(workingTitle), allowProjectTypeChoice ? projectType : undefined);
     };
 
     return (
@@ -111,6 +118,14 @@ export const WorkingTitleDialog: React.FC<WorkingTitleDialogProps> = ({
                             {normalizedLength}/{PROJECT_TITLE_MAX_LENGTH}
                         </span>
                     </div>
+
+                    {allowProjectTypeChoice && (
+                        <ProjectFormatChoice
+                            value={projectType}
+                            onChange={setProjectType}
+                            helperText="Choose how this spin-off will be developed and released."
+                        />
+                    )}
 
                     <div className="flex items-start gap-2 rounded-xl border border-sky-500/15 bg-sky-500/5 px-3 py-3 text-sky-200">
                         <Info size={15} className="mt-0.5 shrink-0 text-sky-400" />

@@ -19,7 +19,7 @@ const pkg = JSON.parse(read('package.json'));
   'scorecardRatingMap',
   'player.pastProjects',
   'player.activeReleases',
-  "project.type === 'SERIES'",
+  "const isSeriesProject = resolvedProjectType === 'SERIES'",
   'scorecardSeasonColumnWidth',
   'scorecardGridMinWidth',
   'scorecard-season-scroll',

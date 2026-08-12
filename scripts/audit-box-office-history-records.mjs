@@ -9,17 +9,23 @@ const required = [
   'allTimeMode, setAllTimeMode',
   'getBoxOfficeArchiveEntries',
   'getAllTimeEntries(allTimeMode)',
-  'Top Worldwide',
-  'Studio Receipts',
-  'Best ROI',
-  'Biggest Opening',
-  'Streaming Hits',
-  'History Included',
-  'Sleeper Hit',
-  'Week-Two Hold',
-  'Top Region',
-  'Best Partner',
-  'Biggest Flop'
+  'ALL_TIME_PAGE_SIZE = 10',
+  'allTimeVisibleCount, setAllTimeVisibleCount',
+  'visibleEntries = entries.slice(0, allTimeVisibleCount)',
+  "setAllTimeVisibleCount(ALL_TIME_PAGE_SIZE)",
+  "setAllTimeVisibleCount(current => Math.min(entries.length, current + ALL_TIME_PAGE_SIZE))",
+  "box.allTime.showMore",
+  'box.records.topWorldwide',
+  'box.metric.studioReceipts',
+  'box.records.bestRoi',
+  'box.records.biggestOpening',
+  'box.records.streamingHits',
+  'box.records.historyIncluded',
+  'box.records.sleeperHit',
+  'box.records.weekTwoHold',
+  'box.records.topRegion',
+  'box.records.bestPartner',
+  'box.records.biggestFlop'
 ];
 
 const missing = required.filter(token => !source.includes(token));
@@ -33,6 +39,10 @@ if (!source.includes('player.pastProjects') || !source.includes("source: 'HISTOR
 
 if (!source.includes('setAllTimeMode(mode.id)')) {
   throw new Error('All-Time page needs selectable category modes.');
+}
+
+if (!source.includes("handleSectionChange(item.id)") || !source.includes("nextSection === 'ALL_TIME'")) {
+  throw new Error('Returning to All-Time should reset progressive reveal to the first page.');
 }
 
 if (!pkg.includes('audit:box-office-history-records')) {

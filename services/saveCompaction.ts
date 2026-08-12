@@ -4,6 +4,7 @@ import {
   externalizeCustomPostersInPlayer,
   stripEmbeddedPosterImageDataForPersistence,
 } from './customPosterMedia';
+import { compactOwnedStreamingPlatformForPersistence } from './ownedStreamingPlatform';
 
 export const FULL_LOCAL_MIRROR_BUDGET_BYTES = 3_500_000;
 
@@ -325,6 +326,7 @@ export const compactPlayerForPersistence = (nextPlayer: Player): Player => {
     pastProjects: Array.isArray(nextPlayer.pastProjects) ? nextPlayer.pastProjects.map(compactPastProject) : [],
     businesses: Array.isArray(nextPlayer.businesses) ? nextPlayer.businesses.map(compactBusiness) : [],
     world: compactWorld(nextPlayer.world),
+    ownedStreamingPlatform: compactOwnedStreamingPlatformForPersistence(nextPlayer.ownedStreamingPlatform, nextPlayer.id),
     scheduledEvents: compactEventQueue(nextPlayer.scheduledEvents),
     pendingEvents: compactEventQueue(nextPlayer.pendingEvents),
     logs: Array.isArray(nextPlayer.logs) ? nextPlayer.logs.slice(-50) : [],

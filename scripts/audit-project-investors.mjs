@@ -9,6 +9,16 @@ const assertIncludes = (file, text, label = text) => {
         throw new Error(`${file} is missing ${label}`);
     }
 };
+const greenlightInvestorSources = [
+    'views/lifestyle/business/GreenlightWizard.tsx',
+    'views/lifestyle/business/components/GreenlightConfirmationStep.tsx',
+    'views/lifestyle/business/components/GreenlightInvestorFinancingSection.tsx',
+].map(read).join('\n');
+const assertGreenlightIncludes = (text, label = text) => {
+    if (!greenlightInvestorSources.includes(text)) {
+        throw new Error(`Greenlight investor modules are missing ${label}`);
+    }
+};
 
 assertIncludes('types.ts', 'export interface ProjectInvestor');
 assertIncludes('types.ts', "export type ProjectInvestorFundingMode = 'LEAD' | 'SYNDICATE';");
@@ -49,17 +59,17 @@ assertIncludes('services/projectInvestors.ts', 'sourceTitle,');
 assertIncludes('services/projectInvestors.ts', 'Lead Investor');
 assertIncludes('services/projectInvestors.ts', 'Risk Money');
 
-assertIncludes('views/lifestyle/business/GreenlightWizard.tsx', 'Investor Financing');
+assertGreenlightIncludes('Investor Financing');
 assertIncludes('views/lifestyle/business/GreenlightWizard.tsx', 'investorRaisePercent');
 assertIncludes('views/lifestyle/business/GreenlightWizard.tsx', 'setInvestorRaisePercent');
-assertIncludes('views/lifestyle/business/GreenlightWizard.tsx', 'Lead Deal');
-assertIncludes('views/lifestyle/business/GreenlightWizard.tsx', 'Syndicate');
+assertGreenlightIncludes('greenlight.investors.mode.lead.label', 'localized lead investor mode');
+assertGreenlightIncludes('greenlight.investors.mode.syndicate.label', 'localized syndicate investor mode');
 assertIncludes('views/lifestyle/business/GreenlightWizard.tsx', 'previewPlan');
 assertIncludes('views/lifestyle/business/GreenlightWizard.tsx', 'Would Commit');
-assertIncludes('views/lifestyle/business/GreenlightWizard.tsx', 'relationshipLabel');
-assertIncludes('views/lifestyle/business/GreenlightWizard.tsx', 'investorTags');
-assertIncludes('views/lifestyle/business/GreenlightWizard.tsx', 'investorFundingOverage');
-assertIncludes('views/lifestyle/business/GreenlightWizard.tsx', 'Capacity');
+assertGreenlightIncludes('relationshipLabel');
+assertGreenlightIncludes('investorTags');
+assertGreenlightIncludes('investorFundingOverage');
+assertGreenlightIncludes('unusedCapacity', 'unused offer capacity');
 assertIncludes('views/lifestyle/business/GreenlightWizard.tsx', 'Committed');
 assertIncludes('views/lifestyle/business/GreenlightWizard.tsx', 'setInvestorRaiseAmount');
 assertIncludes('views/lifestyle/business/GreenlightWizard.tsx', 'selectedInvestorPlan');

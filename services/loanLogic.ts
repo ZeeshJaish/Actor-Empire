@@ -1,15 +1,13 @@
-import { Business, Player, PlayerLoan } from '../types';
+import { Player, PlayerLoan } from '../types';
 import { getAbsoluteWeek } from './legacyLogic';
 import { isStockRetiredByMerger, normalizeStockPrice } from './stockLogic';
+import {
+    getPlayerBusinessEquityValue,
+    isStockRepresentedByControlledStudio,
+} from './studioGroupValuation';
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 const toFinite = (value: number, fallback = 0) => (Number.isFinite(value) ? value : fallback);
-
-const getBusinessValuation = (business: Business) => {
-    const baseBalance = toFinite(business.balance);
-    const statsValuation = toFinite(business.stats?.valuation);
-    return Math.max(baseBalance, statsValuation);
-};
 
 export const getOutstandingLoanBalance = (player: Player): number =>
     (player.finance?.loans || [])
@@ -26,10 +24,10 @@ export const getEstimatedNetWorth = (player: Player): number => {
     const assetValue = (player.customItems || []).reduce((sum, item) => sum + Math.max(0, toFinite((item as any).price)), 0);
     const portfolioValue = (player.portfolio || []).reduce((sum, holding) => {
         const stock = (player.stocks || []).find(s => s.id === holding.stockId);
-        if (!stock || isStockRetiredByMerger(player, stock)) return sum;
+        if (!stock || isStockRetiredByMerger(player, stock) || isStockRepresentedByControlledStudio(player, stock)) return sum;
         return sum + Math.max(0, normalizeStockPrice(stock, stock.price) * toFinite(holding.shares));
     }, 0);
-    const businessValue = (player.businesses || []).reduce((sum, business) => sum + getBusinessValuation(business), 0);
+    const businessValue = getPlayerBusinessEquityValue(player);
     return cash + assetValue + portfolioValue + businessValue;
 };
 

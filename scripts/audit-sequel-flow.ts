@@ -1,6 +1,7 @@
 import {
     createContinuationScript,
     getContinuationEligibility,
+    getContinuationScriptBaseline,
 } from '../services/sequelFlow';
 import { readFileSync } from 'node:fs';
 import {
@@ -156,6 +157,96 @@ assert(created.ok, 'An eligible sequel should be commissioned.');
 assert(created.script?.title === 'First Film: Afterlight', 'The shared flow should normalize the working title.');
 assert(created.script?.installmentNumber === 2, 'The shared flow should create the next installment.');
 assert(created.script?.createdAtWeek === 20, 'The shared flow should stamp the creation week.');
+
+const canonContinuation = createContinuationScript({
+    player: makePlayer(30, 20),
+    studioScripts: [],
+    project: {
+        ...baseProject,
+        universeId: 'audit_universe',
+        projectDetails: {
+            title: 'First Film',
+            type: 'MOVIE',
+            genre: 'SUPERHERO',
+            universeId: 'audit_universe',
+            universeSagaName: 'Saga 2',
+            universePhaseName: 'War Phase',
+            storyCompass: {
+                perspective: 'ENSEMBLE',
+                conflictSource: 'ANTAGONIST',
+                worldRule: 'SUPERPOWERED',
+                tone: 'HEROIC',
+                castShape: 'ENSEMBLE',
+                flexibility: 'PROTECTED',
+                source: 'CANON',
+                confidence: 94,
+            },
+        },
+    } as any,
+    mode: 'SEQUEL',
+    title: 'First Film: United',
+});
+assert(canonContinuation.script?.universeId === 'audit_universe', 'a franchise continuation must stay attached to its universe');
+assert(canonContinuation.script?.universeSagaName === 'Saga 2', 'a continuation must inherit its active saga');
+assert(canonContinuation.script?.universePhaseName === 'War Phase', 'a continuation must inherit its active phase');
+assert(canonContinuation.script?.storyCompass?.perspective === 'ENSEMBLE', 'a continuation must preserve its canon Story Compass');
+
+const movieSpinoff = createContinuationScript({
+    player: makePlayer(30, 20),
+    studioScripts: [],
+    project: baseProject,
+    mode: 'SPINOFF',
+    title: 'First Film: Side Story',
+});
+assert(movieSpinoff.ok, 'An eligible movie spin-off should be commissioned.');
+assert(movieSpinoff.script?.projectType === 'MOVIE', 'A movie spin-off should default to the source format instead of being forced into a series.');
+
+const seriesSpinoffFromMovie = createContinuationScript({
+    player: makePlayer(30, 20),
+    studioScripts: [],
+    project: baseProject,
+    mode: 'SPINOFF',
+    title: 'First Film: The Series',
+    overrides: { projectType: 'SERIES' },
+});
+assert(seriesSpinoffFromMovie.ok, 'A player should be able to commission a series spin-off from a movie.');
+assert(seriesSpinoffFromMovie.script?.projectType === 'SERIES', 'The selected series format must survive shared spin-off creation.');
+
+const renewedSeason = createContinuationScript({
+    player: makePlayer(30, 20),
+    studioScripts: [],
+    project: {
+        ...baseProject,
+        name: 'Audit Show Season 1',
+        type: 'SERIES',
+        projectDetails: {
+            title: 'Audit Show Season 1',
+            type: 'SERIES',
+            episodes: 8,
+        },
+    } as any,
+    mode: 'SEQUEL',
+    title: 'Audit Show Season 2',
+});
+assert(renewedSeason.ok, 'An eligible renewal must create a playable next-season script.');
+assert(renewedSeason.script?.projectType === 'SERIES', 'A season renewal must remain a series in the Studio Vault.');
+assert(renewedSeason.script?.installmentNumber === 2, 'A season renewal must create the next season number.');
+
+const acclaimedSeriesBaseline = getContinuationScriptBaseline({
+    ...baseProject,
+    type: 'SERIES',
+    projectQuality: 92,
+    hiddenStats: { scriptQuality: 94, qualityScore: 93 },
+}, 91);
+assert(acclaimedSeriesBaseline >= 90, 'An acclaimed series with an elite writer should retain a strong sequel-script baseline.');
+
+const weakSeriesBaseline = getContinuationScriptBaseline({
+    ...baseProject,
+    type: 'SERIES',
+    projectQuality: 38,
+    hiddenStats: { scriptQuality: 35, qualityScore: 36 },
+}, 34);
+assert(weakSeriesBaseline < acclaimedSeriesBaseline, 'Continuation quality must still reflect a weaker source project and writer.');
 
 const blockedCreation = createContinuationScript({
     player: makePlayer(30, 13),
@@ -351,9 +442,20 @@ const gameLoopSource = readFileSync('services/gameLoop.ts', 'utf8');
     'Risky Sequel Bet',
     'No Season ${nextSeasonNum}',
     'Season ${nextSeasonNum} Without You',
+    'Season ${nextSeasonNum} Planning Paused',
+    'STUDIO_CONTINUATION',
     'createSequelPassNews',
 ].forEach(needle => {
     assert(gameLoopSource.includes(needle), `Continuation decisions should keep visible news/message copy for: ${needle}`);
 });
+
+const greenlightSource = readFileSync('views/lifestyle/business/greenlightProjectBuilder.ts', 'utf8');
+['writerId: selectedScript.writerId || undefined', 'writerName: creditedWriterName', 'writerSkill: creditedWriterSkill'].forEach(needle => {
+    assert(greenlightSource.includes(needle), `Greenlight must preserve the source writer credit: ${needle}`);
+});
+
+const sequelSetupSource = readFileSync('views/lifestyle/business/components/SequelSetupModal.tsx', 'utf8');
+assert(!sequelSetupSource.includes("name: 'Original Creator'"), 'Continuation setup must not replace a known writer with a generic Original Creator label.');
+assert(sequelSetupSource.includes('Previous Season Writer'), 'Continuation setup should explain the returning writer credit.');
 
 console.log('Sequel flow audit passed.');

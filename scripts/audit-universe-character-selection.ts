@@ -1,6 +1,13 @@
 import assert from 'node:assert/strict';
 import {
+    buildUniverseRoster,
+    getDefaultCharacterStoryRole,
+    getDefaultCharacterStoryFunction,
     getUniverseCharacterSelectionOptions,
+    normalizeCharacterAbilityType,
+    normalizeCharacterNature,
+    normalizeCharacterStoryFunction,
+    normalizeCharacterStoryRole,
     normalizeUniverseForSave,
     retireUniverseForArchive
 } from '../services/universeLogic';
@@ -97,5 +104,75 @@ assert.deepEqual(
 assert.ok(legacyOptions.every(option => option.retiredUniverse), 'legacy options must be marked as retired-universe options');
 assert.ok(legacyOptions.every(option => option.sourceUniverseId === retiredUniverse.id), 'legacy options must preserve their source universe');
 assert.ok(legacyOptions.every(option => /Legacy Archive/.test(option.sourceName)), 'legacy options should label the archive source clearly');
+
+assert.equal(getDefaultCharacterStoryRole('LEAD'), 'HERO', 'new lead characters should receive a useful automatic story-role default');
+assert.equal(getDefaultCharacterStoryRole('SUPPORTING'), 'ALLY', 'new supporting characters should default to ally, not hero');
+assert.equal(getDefaultCharacterStoryRole('CAMEO'), 'OTHER', 'cameos should stay neutral by default');
+assert.equal(normalizeCharacterStoryRole('not-a-role'), 'OTHER', 'unknown and old story-role values must migrate neutrally');
+assert.equal(normalizeCharacterAbilityType(undefined), 'NONE', 'old characters must not be assumed to have powers');
+
+const mixedCreditsUniverse = normalizeUniverseForSave({
+    id: 'MIXED_CREDITS',
+    name: 'Mixed Credits',
+    studioId: 'PLAYER_STUDIO',
+    currentPhase: 'PHASE_1_ORIGINS',
+    saga: 1,
+    momentum: 60,
+    brandPower: 60,
+    marketShare: 5,
+    color: '#8b5cf6',
+    roster: [],
+    slate: [],
+    weeksUntilNextPhase: 52
+} as unknown as Universe, 'MIXED_CREDITS');
+
+const mixedCreditsRoster = buildUniverseRoster(mixedCreditsUniverse, [{
+    id: 'project_1',
+    title: 'The Quiet Enemy',
+    type: 'MOVIE',
+    year: 31,
+    source: 'PAST',
+    castList: [
+        {
+            id: 'actor_1',
+            name: 'Lead Actor',
+            role: 'Lead',
+            isPlayer: false,
+            image: '',
+            type: 'ACTOR',
+            actorId: 'actor_1',
+            actorName: 'Lead Actor',
+            characterId: 'the_enemy',
+            characterName: 'The Enemy',
+            roleType: 'LEAD',
+            storyFunction: 'ANTAGONIST',
+            storyRole: 'VILLAIN',
+            abilityType: 'TECH',
+            nature: 'ROBOT',
+            identitySource: 'PLAYER'
+        },
+        {
+            id: 'director_1',
+            name: 'Project Director',
+            role: 'Director',
+            isPlayer: false,
+            image: '',
+            type: 'DIRECTOR',
+            npcId: 'director_1',
+            actorId: 'director_1',
+            actorName: 'Project Director',
+            characterName: 'Project Director'
+        }
+    ]
+}], player.name);
+
+assert.equal(mixedCreditsRoster.length, 1, 'directors and crew must never enter the universe character roster');
+assert.equal(mixedCreditsRoster[0].storyRole, 'VILLAIN', 'explicit story identity must survive roster construction');
+assert.equal(mixedCreditsRoster[0].abilityType, 'TECH', 'ability profile must survive roster construction');
+assert.equal(mixedCreditsRoster[0].storyFunction, 'ANTAGONIST', 'plot function must survive universe roster construction');
+assert.equal(mixedCreditsRoster[0].nature, 'ROBOT', 'character type must survive universe roster construction');
+assert.equal(mixedCreditsRoster[0].identitySource, 'CANON', 'released universe characters must become protected canon');
+assert.equal(normalizeCharacterStoryFunction(undefined, getDefaultCharacterStoryFunction('LEAD', 'HERO')), 'PROTAGONIST', 'old lead characters should receive a safe plot-function repair');
+assert.equal(normalizeCharacterNature(undefined), 'HUMAN', 'old characters should receive a neutral physical type');
 
 console.log('Universe character selection audit passed.');

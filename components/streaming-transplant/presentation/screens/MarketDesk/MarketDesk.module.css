@@ -1,0 +1,110 @@
+/* Every rule below is scoped under .nd deliberately. The reset that follows
+   has specificity (0,1,0) — identical to a bare .ndthird — so whichever sheet
+   landed later in the document won, and this component's CSS is injected from
+   two places. That intermittently zeroed the layout margins and padding, which
+   is why the top bar and the lower third kept sitting flush to the edge. */
+.nd{--epx-ndred:#e8232f;--epx-ndamber:#ffc233;--epx-ndup:#31dd88;--epx-nddown:#ff5560;
+  position:absolute;inset:0;overflow:hidden;display:block;color:#f2f5fa;
+  background:
+    radial-gradient(ellipse 120% 60% at 50% 34%,rgba(232,35,47,.12),transparent 66%),
+    radial-gradient(ellipse 80% 50% at 12% 96%,rgba(255,194,51,.07),transparent 70%),
+    #06070b;
+  font-family:'Inter',system-ui,-apple-system,sans-serif}
+.nd :where(*){margin:0;padding:0;box-sizing:border-box;min-width:0}
+
+.nd .ndgrain{position:absolute;inset:0;pointer-events:none;opacity:.05;z-index:8;
+  background-image:repeating-linear-gradient(rgba(255,255,255,.65) 0 1px,transparent 1px 3px)}
+
+/* ── the title card ── */
+.nd .ndtitle{position:absolute;left:20px;right:136px;top:32%;z-index:3;
+  transition:opacity .28s ease,transform .34s cubic-bezier(.2,.8,.2,1)}
+.nd .ndtitle.out{opacity:0;transform:translateY(-18px) scale(.97);pointer-events:none}
+.nd .ndtitlekick{display:inline-block;padding:5px 11px;border-radius:99px;
+  background:var(--epx-ndred);font-size:8.5px;font-weight:900;letter-spacing:.24em;color:#fff;
+  box-shadow:0 6px 22px rgba(232,35,47,.45)}
+.nd .ndtitle h1{margin-top:14px;font-size:31px;font-weight:900;line-height:1.02;
+  letter-spacing:-.035em;color:#fff;hyphens:none;text-shadow:0 8px 40px rgba(0,0,0,.6);
+  animation:epx-ndrisein .5s cubic-bezier(.2,.85,.25,1) both}
+.nd .ndtitle p{margin-top:12px;font-size:11px;font-weight:800;letter-spacing:.12em;
+  color:#93a2ba;animation:epx-ndrisein .5s cubic-bezier(.2,.85,.25,1) .1s both}
+@keyframes epx-ndrisein{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+
+/* ── one speaker, filling the frame ── */
+.nd .ndspeak{position:absolute;left:20px;right:136px;top:26%;z-index:3;
+  animation:epx-ndcutin .34s cubic-bezier(.2,.85,.25,1) both}
+@keyframes epx-ndcutin{0%{opacity:0;transform:translateX(22px)}40%{opacity:1}100%{opacity:1;transform:none}}
+.nd .ndwho b{display:block;font-size:27px;font-weight:900;letter-spacing:-.03em;line-height:1.04;
+  color:#fff;text-shadow:0 6px 30px rgba(0,0,0,.55)}
+.nd .ndwho span{display:inline-block;margin-top:9px;padding:4px 10px;border-radius:99px;
+  font-size:8px;font-weight:900;letter-spacing:.2em;color:#ffd9dc;
+  background:rgba(232,35,47,.22);border:1px solid rgba(232,35,47,.4)}
+.nd .ndline{margin-top:18px;font-family:Georgia,serif;font-size:17px;line-height:1.5;color:#dfe7f2;
+  animation:epx-ndrisein .42s cubic-bezier(.2,.85,.25,1) .14s both}
+
+/* ── chrome ── */
+.nd .ndtop{position:absolute;left:0;right:0;top:0;z-index:6;display:flex;align-items:center;
+  gap:9px;padding:30px 16px 10px}
+.nd .ndbug{display:flex;align-items:center;gap:6px;padding:5px 10px;border-radius:99px;
+  background:var(--epx-ndred);font-size:8px;font-weight:900;letter-spacing:.18em;color:#fff;
+  box-shadow:0 4px 18px rgba(232,35,47,.5)}
+.nd .ndbug i{width:6px;height:6px;border-radius:50%;background:#fff;
+  animation:epx-ndlive 1.2s steps(2,end) infinite}
+@keyframes epx-ndlive{0%,100%{opacity:1}50%{opacity:.2}}
+.nd .ndnet{font-size:8px;font-weight:900;letter-spacing:.24em;color:#7f8a9d}
+.nd .ndkick{margin-left:auto;font-size:8px;font-weight:900;letter-spacing:.2em;color:var(--epx-ndamber)}
+
+.nd .ndrail{position:absolute;right:12px;top:78px;z-index:5;width:112px;
+  display:flex;flex-direction:column;gap:8px}
+.nd .ndrailrow{padding:7px 10px;border-radius:12px;background:rgba(28,32,42,.82);
+  font-family:ui-monospace,Menlo,monospace}
+.nd .ndrailrow b{display:block;font-size:7px;font-weight:900;letter-spacing:.08em;color:#8d97a9;
+  white-space:nowrap}
+.nd .ndrailrow em{display:inline-block;margin-top:2px;font-style:normal;font-size:12px;
+  font-weight:900;color:#eef2f8;white-space:nowrap}
+.nd .ndrailrow i{margin-left:4px;font-style:normal;font-size:8px;font-weight:900}
+.nd .ndrailrow i.u{color:var(--epx-ndup)}
+.nd .ndrailrow i.d{color:var(--epx-nddown)}
+.nd .ndrailrow.mine{background:rgba(255,194,51,.16);box-shadow:inset 0 0 0 1px rgba(255,194,51,.32)}
+.nd .ndrailrow.mine em{color:var(--epx-ndamber)}
+
+.nd .ndprice{position:absolute;left:16px;bottom:172px;z-index:6;padding:10px 14px;
+  border-radius:14px;background:rgba(14,17,24,.92);
+  box-shadow:0 10px 32px rgba(0,0,0,.5),inset 0 0 0 1px rgba(255,255,255,.07);
+  font-family:ui-monospace,Menlo,monospace}
+.nd .ndprice span{display:block;font-size:6.5px;font-weight:900;letter-spacing:.2em;color:#7f8a9d;
+  font-family:'Inter',sans-serif}
+.nd .ndprice b{font-size:23px;font-weight:900;letter-spacing:-.025em}
+.nd .ndprice em{margin-left:7px;font-style:normal;font-size:11px;font-weight:900}
+.nd .ndprice.u b,.nd .ndprice.u em{color:var(--epx-ndup)}
+.nd .ndprice.d b,.nd .ndprice.d em{color:var(--epx-nddown)}
+
+.nd .ndprogress{position:absolute;left:16px;right:16px;bottom:154px;z-index:6;display:flex;gap:4px}
+.nd .ndprogress i{flex:1;height:2px;border-radius:99px;background:rgba(255,255,255,.14)}
+.nd .ndprogress i.on{background:var(--epx-ndamber)}
+
+/* ── lower third: the inset comes from the parent's padding, so nothing here
+      depends on a margin surviving the cascade ── */
+.nd .ndlower{position:absolute;left:0;right:0;bottom:0;z-index:6;overflow:hidden;
+  padding:0 12px max(6px,env(safe-area-inset-bottom))}
+.nd .ndthird{width:100%;padding:14px 16px 15px;border-radius:18px;
+  background:linear-gradient(100deg,var(--epx-ndred),#8d0f17);
+  box-shadow:0 12px 34px rgba(232,35,47,.28);
+  transform:translateY(24px);opacity:0}
+.nd.t-good .ndthird{background:linear-gradient(100deg,#16a35c,#075c33);
+  box-shadow:0 12px 34px rgba(22,163,92,.26)}
+.nd .ndthird.on{animation:epx-ndthirdin .38s cubic-bezier(.2,.85,.25,1) forwards}
+@keyframes epx-ndthirdin{to{transform:none;opacity:1}}
+.nd .ndthird span{display:block;font-size:7.5px;font-weight:900;letter-spacing:.26em;color:#ffd9dc}
+.nd.t-good .ndthird span{color:#b9f2d3}
+.nd .ndthird b{display:block;margin-top:5px;font-size:18px;font-weight:900;line-height:1.22;
+  letter-spacing:-.015em;color:#fff;hyphens:none;overflow-wrap:anywhere}
+.nd .ndcrawl{margin:10px -12px 0;overflow:hidden;padding:8px 0;background:rgba(0,0,0,.6);
+  border-top:1px solid rgba(255,255,255,.07)}
+.nd .ndcrawlrun{display:flex;width:max-content;animation:epx-ndcrawl 32s linear infinite}
+.nd .ndcrawlrun i{font-style:normal;padding:0 16px;font-size:9px;font-weight:900;
+  letter-spacing:.12em;color:var(--epx-ndamber);white-space:nowrap;
+  font-family:ui-monospace,Menlo,monospace}
+@keyframes epx-ndcrawl{to{transform:translateX(-50%)}}
+.nd .ndskip{position:absolute;right:16px;bottom:188px;z-index:6;
+  font-size:7px;font-weight:900;letter-spacing:.26em;color:#4f5869;
+  animation:epx-ndlive 2.2s steps(1,end) infinite}

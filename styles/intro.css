@@ -441,6 +441,13 @@
     background:radial-gradient(100% 60% at 50% 20%, #0e0c08 0%, var(--black) 62%);
     justify-content:flex-start;
   }
+  #act4{
+    overflow-x:hidden;
+    overflow-y:auto;
+    overscroll-behavior-y:contain;
+    -webkit-overflow-scrolling:touch;
+    touch-action:pan-y;
+  }
   .menu-head{
     width:100%;
     padding:56px 28px 0;

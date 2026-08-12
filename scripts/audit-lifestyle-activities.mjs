@@ -374,7 +374,7 @@ const checks = [
     name: 'save migration initializes lifestyle activities',
     pass: () => {
       const source = read('services/saveMigration.ts');
-      return source.includes('SAVE_MIGRATION_VERSION = 15') && source.includes('ensureLifestyleActivityState') && source.includes('lifestyleActivities');
+      return source.includes('SAVE_MIGRATION_VERSION = 19') && source.includes('ensureLifestyleActivityState') && source.includes('lifestyleActivities');
     },
   },
   {

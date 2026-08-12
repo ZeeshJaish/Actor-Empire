@@ -1,0 +1,125 @@
+.pr{position:fixed;inset:0;z-index:75;max-width:520px;margin:0 auto;background:#05070d;color:#eef0f5;
+  font-family:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
+  display:flex;flex-direction:column;overflow:hidden;animation:epx-prin .3s ease}
+@keyframes epx-prin{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.pr :where(*){margin:0;padding:0;box-sizing:border-box;min-width:0;-webkit-tap-highlight-color:transparent}
+.pr :where(button){font-family:inherit;border:none;background:none;color:inherit;cursor:pointer;text-align:inherit}
+.pr :where(ul){list-style:none}
+
+.pr .prtop{flex:0 0 auto;display:flex;align-items:center;gap:11px;
+  padding:max(14px,env(safe-area-inset-top)) 14px 12px;
+  background:linear-gradient(#0a0c11,#08090e);border-bottom:1px solid rgba(255,255,255,.07)}
+.pr .prx{flex:0 0 auto;width:34px;height:34px;border-radius:11px;font-size:16px;color:#aeb6c4;
+  display:flex;align-items:center;justify-content:center}
+.pr .prtitle{flex:1;min-width:0}
+.pr .prtitle b{display:block;font-size:14px;font-weight:900;letter-spacing:.14em}
+.pr .prtitle span{font-size:8px;font-weight:900;letter-spacing:.18em;color:#6f7686}
+.pr .prmark{flex:0 0 auto;width:24px;height:24px;color:var(--epx-pr-c)}
+.pr .prmark svg{width:100%;height:100%;display:block}
+
+.pr .prscroll{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding:0 14px}
+.pr .prspace{height:16px}
+.pr .prsec{padding-top:20px}
+.pr .prhead{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:11px}
+.pr .prhead h2{font-size:17px;font-weight:900;letter-spacing:-.01em}
+.pr .prhead span{font-size:9px;color:#7d8698}
+
+/* ── model ── */
+.pr .models{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px}
+.pr .mod{padding:11px 9px 9px;border-radius:13px;background:rgba(255,255,255,.028);
+  border:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column;min-height:118px;
+  transition:border-color .18s,background .18s}
+.pr .mod.on{background:color-mix(in srgb,var(--epx-pr-c) 12%,transparent);
+  border-color:color-mix(in srgb,var(--epx-pr-c) 58%,transparent)}
+.pr .mod b{font-size:11px;font-weight:900}
+.pr .mod span{flex:1;font-size:8.5px;line-height:1.45;color:#7d8698;margin-top:4px}
+.pr .mod em{font-style:normal;font-size:7.5px;font-weight:900;letter-spacing:.06em;color:#aeb6c4;
+  margin-top:7px;padding-top:6px;border-top:1px solid rgba(255,255,255,.08);line-height:1.4}
+.pr .mod.on em{color:var(--epx-pr-c)}
+
+/* ── the columns ── */
+.pr .plans{display:flex;gap:9px;overflow-x:auto;scrollbar-width:none;padding-bottom:3px;
+  scroll-snap-type:x mandatory}
+.pr .plans::-webkit-scrollbar{display:none}
+.pr .plan{flex:0 0 auto;width:152px;scroll-snap-align:start;padding:13px 12px 12px;border-radius:15px;
+  background:rgba(255,255,255,.028);border:1px solid rgba(255,255,255,.09);
+  display:flex;flex-direction:column;transition:border-color .2s,background .2s}
+.pr .plan.on{background:color-mix(in srgb,var(--epx-pr-c) 10%,transparent);
+  border-color:color-mix(in srgb,var(--epx-pr-c) 52%,transparent)}
+.pr .plan.locked{opacity:.62;border-style:dashed}
+.pr .plan.free.on{border-color:rgba(74,222,128,.5);background:rgba(74,222,128,.07)}
+.pr .plantop b{display:block;font-size:15px;font-weight:900;letter-spacing:-.01em}
+.pr .plantop span{display:block;font-size:8.5px;color:#7d8698;margin-top:2px}
+
+.pr .planprice{margin:12px 0 11px}
+.pr .pricerow{display:flex;align-items:center;justify-content:space-between;gap:6px}
+.pr .pricerow button{width:26px;height:26px;border-radius:8px;font-size:16px;font-weight:700;color:#c6ccda;
+  background:rgba(255,255,255,.07);display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+.pr .pricerow button:disabled{color:#39404d;background:rgba(255,255,255,.03)}
+.pr .pricerow b{flex:1;text-align:center;font-size:22px;font-weight:900;letter-spacing:-.02em;
+  font-family:ui-monospace,Menlo,monospace}
+.pr .freeprice{display:block;font-size:22px;font-weight:900;letter-spacing:.02em;color:#4ade80}
+.pr .permo{display:block;margin-top:4px;font-size:8px;font-weight:700;letter-spacing:.08em;color:#7d8698;
+  text-align:center}
+.pr .plan.free .permo{text-align:left}
+
+.pr .planlock{margin:12px 0 11px;padding:10px 9px;border-radius:11px;background:rgba(255,255,255,.04);
+  border:1px dashed rgba(255,255,255,.16);text-align:center}
+.pr .lockglyph{font-style:normal;font-size:13px;display:block;filter:grayscale(1);opacity:.8}
+.pr .planlock span{display:block;margin-top:5px;font-size:7px;font-weight:900;letter-spacing:.18em;color:#6f7686}
+.pr .planlock em{display:block;margin-top:3px;font-style:normal;font-size:9px;font-weight:800;color:#ffb020;
+  line-height:1.35}
+
+.pr .planfeat{flex:1;display:flex;flex-direction:column;gap:5px;margin-bottom:11px}
+.pr .planfeat li{position:relative;padding-left:15px;font-size:9.5px;line-height:1.4;color:#aeb6c4}
+.pr .planfeat li::before{content:'';position:absolute;left:1px;top:4px;width:4px;height:7px;
+  border:solid var(--epx-pr-c);border-width:0 1.6px 1.6px 0;transform:rotate(42deg)}
+.pr .plan.locked .planfeat li::before{border-color:#5f6875}
+
+.pr .planbtn{padding:10px 8px;border-radius:10px;text-align:center;font-size:8.5px;font-weight:900;
+  letter-spacing:.14em;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#8b93a5}
+.pr .planbtn.on{background:var(--epx-pr-c);color:#04141b;border-color:transparent}
+.pr .plan.free .planbtn.on{background:#4ade80;color:#04220f}
+.pr .planbtn:disabled{opacity:.6}
+.pr .planshare{display:block;margin-top:7px;text-align:center;font-size:8px;font-weight:800;
+  letter-spacing:.06em;color:#8b93a5;font-family:ui-monospace,Menlo,monospace}
+
+/* ── what it earns ── */
+.pr .prnums{display:flex;gap:8px}
+.pr .prnums div{flex:1;padding:12px 11px;border-radius:13px;background:rgba(255,255,255,.028);
+  border:1px solid rgba(255,255,255,.08)}
+.pr .prnums span{display:block;font-size:7.5px;font-weight:900;letter-spacing:.16em;color:#6f7686}
+.pr .prnums b{display:block;margin-top:4px;font-size:24px;font-weight:900;letter-spacing:-.02em;
+  font-family:ui-monospace,Menlo,monospace;color:var(--epx-pr-c)}
+.pr .prnums b.warn{color:#ffb020}
+.pr .prnums em{display:block;margin-top:3px;font-style:normal;font-size:8.5px;color:#7d8698}
+
+.pr .prtension{margin-top:9px;padding:11px 12px;border-radius:12px;font-size:11px;line-height:1.6;
+  background:rgba(240,178,48,.08);border:1px solid rgba(240,178,48,.3);color:#ffd58a}
+.pr .prtension b{color:#fff;font-weight:900;font-family:ui-monospace,Menlo,monospace}
+.pr .prproblem{margin-top:8px;padding:10px 11px;border-radius:11px;font-size:10.5px;line-height:1.55;
+  background:rgba(255,90,95,.08);border:1px solid rgba(255,90,95,.3);color:#ffb3b6}
+
+.pr .prdetail{display:block;margin:12px auto 0;font-size:8.5px;font-weight:900;letter-spacing:.16em;
+  color:#8b93a5;border:1px solid rgba(255,255,255,.14);border-radius:99px;padding:8px 14px}
+.pr .prmaths{margin-top:10px;padding:12px;border-radius:13px;background:rgba(255,255,255,.03);
+  border:1px solid rgba(255,255,255,.08)}
+.pr .mrow{display:flex;align-items:baseline;gap:10px;padding:5px 0;
+  border-bottom:1px solid rgba(255,255,255,.06)}
+.pr .mrow:last-of-type{border-bottom:none}
+.pr .mrow span{flex:1;font-size:11px;font-weight:700}
+.pr .mrow em{flex:0 0 44px;text-align:right;font-style:normal;font-size:10px;color:#8b93a5;
+  font-family:ui-monospace,Menlo,monospace}
+.pr .mrow b{flex:0 0 84px;text-align:right;font-size:11px;font-weight:800;
+  font-family:ui-monospace,Menlo,monospace}
+.pr .mrow.total{border-top:1px solid rgba(255,255,255,.14);margin-top:4px;padding-top:8px}
+.pr .mrow.total b{color:var(--epx-pr-c)}
+.pr .prmaths p{margin-top:9px;font-size:9.5px;line-height:1.55;color:#6f7686}
+
+.pr .prfoot{flex:0 0 auto;padding:12px 14px max(12px,env(safe-area-inset-bottom));
+  border-top:1px solid rgba(255,255,255,.08);background:#07080d}
+.pr .prdone{width:100%;padding:15px 10px;border-radius:13px;text-align:center;font-size:11px;
+  font-weight:900;letter-spacing:.14em;background:var(--epx-pr-c);color:#04141b}
+
+@media (max-width:360px){ .pr .models{grid-template-columns:1fr 1fr} }
+@media (prefers-reduced-motion:reduce){ .pr *{animation:none!important;transition:none!important} }

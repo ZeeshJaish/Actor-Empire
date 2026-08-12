@@ -1,7 +1,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { Bell, X } from 'lucide-react';
-import { Player } from '../types';
+import type { SaveSlotSummary } from '../services/storage';
 import { APP_DISPLAY_VERSION } from '../services/appVersion';
 import IntroFlow from '../components/IntroFlow';
 import type { NewCareerData, SlotEntry } from '../components/types';
@@ -15,7 +15,7 @@ import {
 } from '../services/firebaseService';
 
 interface StartMenuProps {
-  saveSlots: Record<number, Player | null>;
+  saveSlots: Record<number, SaveSlotSummary | null>;
   onSelectSlot: (slot: number) => void;
   onDeleteSlot: (slot: number) => void;
   onImportData: () => Promise<SaveTransferResult | void>;
@@ -58,14 +58,15 @@ const shouldShowPushPrompt = (status: FirebasePushStatus, showMenu: boolean) => 
   return !dismissedAt || Date.now() - dismissedAt > PUSH_START_PROMPT_COOLDOWN_MS;
 };
 
-const toIntroSlots = (saveSlots: Record<number, Player | null>): SlotEntry[] => (
+const toIntroSlots = (saveSlots: Record<number, SaveSlotSummary | null>): SlotEntry[] => (
   [1, 2, 3].map((slot) => {
     const save = saveSlots[slot];
     return save ? {
       name: save.name,
       age: save.age,
-      fame: save.stats.fame,
+      fame: save.fame,
       totalPlayTimeMs: save.totalPlayTimeMs,
+      isPendingSummary: save.isPendingSummary,
     } : null;
   })
 );

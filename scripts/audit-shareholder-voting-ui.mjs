@@ -12,8 +12,13 @@ const required = [
     [shareholderVoting, "t(language, 'life.event.shareholder.advisor.label')", 'localized golden rewarded-ad safety option'],
     [shareholderVoting, 'isGolden: true', 'golden option flag'],
     [shareholderVoting, 'resolveShareholderVote', 'popup ballot resolution'],
-    [mobilePage, 'initialStockId', 'message-to-stock targeting'],
-    [messagesApp, 'Open Shareholder Vote', 'direct inbox action'],
+    [mobilePage, 'onResolveShareholderVote', 'message-to-ballot resolver'],
+    [mobilePage, "resolveShareholderVote(props.player!, voteId, selectedVote)", 'exact saved ballot resolution'],
+    [messagesApp, 'activeShareholderVoteId', 'recoverable inbox ballot state'],
+    [messagesApp, 'handleOpenShareholderBallot', 'direct inbox ballot action'],
+    [messagesApp, 'role="dialog"', 'accessible in-phone ballot sheet'],
+    [messagesApp, 'Vote against', 'against ballot action'],
+    [messagesApp, 'Vote for', 'for ballot action'],
     [gameLoop, 'processShareholderVoting(nextPlayer)', 'weekly shareholder-vote engine'],
 ];
 
@@ -27,6 +32,10 @@ for (const retiredStockDecisionCopy of ['Shareholder Ballot', 'Expected Support'
     if (stocksApp.includes(retiredStockDecisionCopy)) {
         throw new Error(`Stocks app should not show shareholder decision copy now that ballots are popup events: ${retiredStockDecisionCopy}`);
     }
+}
+
+if (messagesApp.includes('onOpenStock?.(selectedMessage.data?.stockId)')) {
+    throw new Error('Shareholder inbox action must open the saved ballot, not the generic stock profile.');
 }
 
 console.log('Shareholder voting UI audit passed.');

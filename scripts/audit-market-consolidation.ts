@@ -7,7 +7,11 @@ const assert = (condition: unknown, message: string) => {
     if (!condition) throw new Error(message);
 };
 
-const developmentLab = read('views/lifestyle/business/DevelopmentLab.tsx');
+const developmentLab = [
+    read('views/lifestyle/business/DevelopmentLab.tsx'),
+    read('views/lifestyle/business/components/DevelopmentLabMarket.tsx'),
+    read('views/lifestyle/business/components/DevelopmentLabScriptVault.tsx'),
+].join('\n');
 const productionHouse = read('views/lifestyle/business/ProductionHouseGame.tsx');
 const businessLogic = read('services/businessLogic.ts');
 
@@ -30,13 +34,10 @@ assert(
     'Scripts lane must contain screenplays and adaptable source material',
 );
 
-for (const label of ['Scripts', 'Properties']) {
-    assert(developmentLab.includes(`label: '${label}'`), `Market must expose ${label} lane`);
-}
-assert(!developmentLab.includes("label: 'Stories'"), 'Market must not split adaptable source material into a separate Stories lane');
-for (const label of ['Scripts', 'Rights']) {
-    assert(developmentLab.includes(`label: '${label}'`), `Vault must expose ${label} lane`);
-}
+assert(developmentLab.includes("id: 'SCRIPTS'"), 'Market and Vault must expose Scripts lanes');
+assert(developmentLab.includes("id: 'PROPERTIES'"), 'Market must expose the Properties lane');
+assert(!developmentLab.includes("id: 'STORIES'"), 'Market must not split adaptable source material into a separate Stories lane');
+assert(developmentLab.includes("id: 'RIGHTS'"), 'Vault must expose the Rights lane');
 
 assert(developmentLab.includes('<RightsMarket'), 'Properties lane must embed the existing Rights Market');
 assert(developmentLab.includes("'FRANCHISES'"), 'Development Lab must retain Franchise');

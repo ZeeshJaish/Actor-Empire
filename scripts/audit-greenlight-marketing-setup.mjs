@@ -1,6 +1,13 @@
 import { readFileSync } from 'node:fs';
 
 const greenlight = readFileSync('views/lifestyle/business/GreenlightWizard.tsx', 'utf8');
+const locationStep = readFileSync('views/lifestyle/business/components/GreenlightLocationStep.tsx', 'utf8');
+const header = readFileSync('views/lifestyle/business/components/GreenlightHeader.tsx', 'utf8');
+const utils = readFileSync('views/lifestyle/business/greenlightUtils.ts', 'utf8');
+const marketingBudget = readFileSync('views/lifestyle/business/components/GreenlightMarketingBudgetSection.tsx', 'utf8');
+const storyConnection = readFileSync('views/lifestyle/business/components/GreenlightStoryConnectionSection.tsx', 'utf8');
+const confirmation = readFileSync('views/lifestyle/business/components/GreenlightConfirmationStep.tsx', 'utf8');
+const greenlightModules = `${greenlight}\n${locationStep}\n${header}\n${utils}\n${marketingBudget}\n${storyConnection}\n${confirmation}`;
 const types = readFileSync('types.ts', 'utf8');
 
 const requireIncludes = (source, needle, description) => {
@@ -20,12 +27,12 @@ for (const [needle, description] of [
   ['availableGreenlightFunds', 'wallet-aware campaign reserve cap'],
   ['maxMarketingBudget', 'campaign reserve max based on available studio funding'],
   ['packageBudget', 'combined production plus marketing package cost'],
-  ['Reserved Campaign Budget', 'setup page reserved campaign budget section'],
+  ["translate('greenlight.marketing.reservedCampaignBudget')", 'localized setup page reserved campaign budget section'],
   ['Production Budget', 'confirm page production budget display'],
   ['Total Package', 'setup/confirm total package display'],
   ['Campaign Pool', 'confirm page campaign pool display'],
 ]) {
-  requireIncludes(greenlight, needle, description);
+  requireIncludes(greenlightModules, needle, description);
 }
 
 for (const [needle, description] of [
@@ -36,7 +43,7 @@ for (const [needle, description] of [
   requireIncludes(types, needle, description);
 }
 
-if (greenlight.includes("['Script', 'Director', 'Cast', 'Crew', 'Gear', 'Loc', 'Tone', 'Go']")) {
+if (greenlightModules.includes("['Script', 'Director', 'Cast', 'Crew', 'Gear', 'Loc', 'Tone', 'Go']")) {
   throw new Error('Progress tracker should not still label step 7 as Tone.');
 }
 
@@ -44,7 +51,7 @@ if (greenlight.includes('budgetBreakdown.total * 0.75')) {
   throw new Error('Marketing reserve should not use the old production-percent slider cap.');
 }
 
-const setupSection = greenlight.split("{step === 'SETUP' && (")[1]?.split('{/* Universe & Franchise Connection */')[0] || '';
+const setupSection = greenlight.split("{step === 'SETUP' && (")[1]?.split('{/* Fixed Action Bar */')[0] || '';
 for (const forbidden of ['Production Budget', 'Campaign Pool', 'Total Package']) {
   if (setupSection.includes(forbidden)) {
     throw new Error(`Setup page should not duplicate final billing row: ${forbidden}`);

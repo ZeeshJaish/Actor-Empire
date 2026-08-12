@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { Player, PendingEvent, ClothingItem, Vehicle, Award } from '../types';
 import { CLOTHING_CATALOG, CAR_CATALOG, MOTORCYCLE_CATALOG, BOAT_CATALOG, AIRCRAFT_CATALOG } from '../services/lifestyleLogic';
-import { determineWinners, generateSeasonWinners, AwardResolvedWinner, Nomination, sanitizeAwardHistoryEntries, sanitizeAwardRecords } from '../services/awardLogic';
+import { determineWinners, generateSeasonWinners, AwardResolvedWinner, Nomination, sanitizeAwardCeremonyEvent, sanitizeAwardHistoryEntries, sanitizeAwardRecords } from '../services/awardLogic';
 import { NPC_DATABASE } from '../services/npcLogic';
 import {
   AwardNightConfig,
@@ -52,7 +52,7 @@ const boostMusicAwardPeople = (player: Player, project: any, category: string): 
   const matchingCredits = credits.filter((credit: any) => {
     if (/score/i.test(category)) return /score|orchestra|classical|film/i.test(`${credit.genre} ${credit.songTitle}`);
     if (/music video/i.test(category)) return credit.role === 'MUSIC_VIDEO_TIE_IN';
-    if (/song/i.test(category)) return ['LEAD_SINGLE', 'END_CREDIT_SONG', 'TRAILER_ANTHEM'].includes(credit.role);
+    if (/song/i.test(category)) return ['LEAD_SINGLE', 'END_CREDIT_SONG'].includes(credit.role);
     if (/soundtrack/i.test(category)) return ['SOUNDTRACK_EP', 'PROMO_ALBUM'].includes(credit.role);
     if (/trailer/i.test(category)) return credit.role === 'TRAILER_ANTHEM';
     return false;
@@ -494,7 +494,8 @@ const applyPressResult = (player: Player, pressResult?: AwardPressResult): Playe
   };
 };
 
-export const RedCarpetEvent: React.FC<RedCarpetEventProps> = ({ player, event, onComplete }) => {
+export const RedCarpetEvent: React.FC<RedCarpetEventProps> = ({ player, event: rawEvent, onComplete }) => {
+  const event = useMemo(() => sanitizeAwardCeremonyEvent(rawEvent), [rawEvent]);
   const nominations = useMemo(() => (event.data?.nominations || []) as Nomination[], [event.data?.nominations]);
   const fullBallot = event.data?.fullBallot as Record<string, Nomination[]> | undefined;
   const currentResults = useMemo(() => (

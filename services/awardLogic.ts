@@ -34,7 +34,9 @@ const getFallbackAwardNominee = (cat: string, salt: string) => {
     const isActress = cat.includes('Actress');
     const isActor = cat.includes('Actor') && !cat.includes('Actress');
     const isDirector = cat.includes('Director');
+    const isMusic = /song|score|music composition|music and lyrics/i.test(cat);
     const pool = NPC_DATABASE.filter(n => {
+        if (isMusic) return n.occupation === 'MUSIC_ARTIST';
         if (isActress) return n.gender === 'FEMALE';
         if (isActor) return n.gender === 'MALE';
         if (isDirector) return n.occupation === 'DIRECTOR';
@@ -44,6 +46,7 @@ const getFallbackAwardNominee = (cat: string, salt: string) => {
         const index = Math.abs(Array.from(salt).reduce((sum, char) => sum + char.charCodeAt(0), 0)) % pool.length;
         return pool[index].name;
     }
+    if (isMusic) return 'Music Team';
     if (isDirector) return 'Avery Stone';
     return isActress ? 'Maya Hart' : 'Julian Cross';
 };
@@ -75,7 +78,7 @@ export const AWARD_SHOW_DB: Record<AwardType, AwardShowLore> = {
         name: 'BAFTA Film Awards',
         shortName: 'BAFTA',
         description: '',
-        categories: ["Best Film", "Best Director", "Best Actor", "Best Actress", "Best Supporting Actor", "Best Supporting Actress", "Best Original Song", "Best Score", "Best Soundtrack", "Best Trailer", "Best Music Video Tie-In"],
+        categories: ["Best Film", "Best Director", "Best Actor", "Best Actress", "Best Supporting Actor", "Best Supporting Actress", "Best Score"],
         focus: 'Artistic',
         color: 'text-blue-400'
     },
@@ -88,7 +91,7 @@ export const AWARD_SHOW_DB: Record<AwardType, AwardShowLore> = {
             "Best Motion Picture - Drama", "Best TV Series - Drama", 
             "Best Actor - Motion Picture", "Best Actress - Motion Picture",
             "Best Actor - TV Series", "Best Actress - TV Series",
-            "Best Original Song", "Best Score", "Best Soundtrack", "Best Trailer", "Best Music Video Tie-In"
+            "Best Original Song", "Best Score"
         ],
         focus: 'Commercial',
         color: 'text-rose-400'
@@ -102,7 +105,7 @@ export const AWARD_SHOW_DB: Record<AwardType, AwardShowLore> = {
             "Outstanding Drama Series", "Outstanding Comedy Series", 
             "Outstanding Lead Actor", "Outstanding Lead Actress",
             "Outstanding Supporting Actor", "Outstanding Supporting Actress",
-            "Outstanding Original Song", "Outstanding Score", "Outstanding Soundtrack", "Outstanding Trailer", "Outstanding Music Video Tie-In"
+            "Outstanding Original Song", "Outstanding Score"
         ],
         focus: 'Industry',
         color: 'text-emerald-400'
@@ -117,7 +120,7 @@ export const AWARD_SHOW_DB: Record<AwardType, AwardShowLore> = {
             "Best Actor", "Best Actress",
             "Best Supporting Actor", "Best Supporting Actress", 
             "Best Original Screenplay", "Best Cinematography",
-            "Best Original Song", "Best Score", "Best Soundtrack", "Best Trailer", "Best Music Video Tie-In"
+            "Best Original Song", "Best Score"
         ],
         focus: 'Prestige',
         color: 'text-amber-400'
@@ -174,41 +177,45 @@ export interface AwardResolvedWinner {
     isPlayer: boolean;
 }
 
-const MUSIC_AWARD_CATEGORY_KEYWORDS = ['Song', 'Score', 'Soundtrack', 'Trailer', 'Music Video'];
-
 const isMusicAwardCategory = (category: string): boolean => (
-    MUSIC_AWARD_CATEGORY_KEYWORDS.some(keyword => category.includes(keyword))
+    /song|score|music composition|music and lyrics/i.test(category)
 );
 
 const getNomineeNameForMusicCategory = (project: any, category: string, fallbackName: string): string => {
     const credits = project.musicPlan?.credits || [];
-    if (category.includes('Score')) {
+    if (/score|music composition/i.test(category)) {
         const composer = project.crewList?.find((crew: any) => crew.role === 'COMPOSER');
-        return composer?.name || credits.find((credit: any) => /score|orchestra|classical|film/i.test(`${credit.genre} ${credit.songTitle}`))?.artistName || 'Composer';
+        return composer?.name || credits.find((credit: any) => /score|orchestra|classical|film/i.test(`${credit.genre} ${credit.songTitle}`))?.artistName || fallbackName;
     }
-    if (category.includes('Music Video')) {
-        return credits.find((credit: any) => credit.role === 'MUSIC_VIDEO_TIE_IN')?.artistName || credits[0]?.artistName || fallbackName;
-    }
-    if (category.includes('Song')) {
-        return credits.find((credit: any) => ['LEAD_SINGLE', 'END_CREDIT_SONG', 'TRAILER_ANTHEM'].includes(credit.role))?.artistName || credits[0]?.artistName || fallbackName;
-    }
-    if (category.includes('Soundtrack')) {
-        return credits.find((credit: any) => ['PROMO_ALBUM', 'SOUNDTRACK_EP'].includes(credit.role))?.artistName || credits[0]?.artistName || 'Music Team';
-    }
-    if (category.includes('Trailer')) {
-        return credits.find((credit: any) => credit.role === 'TRAILER_ANTHEM')?.artistName || 'Marketing Team';
+    if (/song|music and lyrics/i.test(category)) {
+        return credits.find((credit: any) => ['LEAD_SINGLE', 'END_CREDIT_SONG'].includes(credit.role))?.artistName || credits[0]?.artistName || fallbackName;
     }
     return fallbackName;
 };
 
-const getPlayerMusicAwardCategory = (awardType: AwardType, baseCategory: 'SONG' | 'SCORE' | 'SOUNDTRACK' | 'TRAILER' | 'VIDEO'): string => {
-    const prefix = awardType === 'EMMY' ? 'Outstanding' : 'Best';
-    if (baseCategory === 'SONG') return `${prefix} Original Song`;
-    if (baseCategory === 'SCORE') return `${prefix} Score`;
-    if (baseCategory === 'SOUNDTRACK') return `${prefix} Soundtrack`;
-    if (baseCategory === 'TRAILER') return `${prefix} Trailer`;
-    return `${prefix} Music Video Tie-In`;
+const getPlayerMusicAwardCategory = (
+    awardType: AwardType,
+    mediaType: ProjectType,
+    baseCategory: 'SONG' | 'SCORE'
+): string | null => {
+    if (awardType === 'EMMY') {
+        if (mediaType !== 'SERIES') return null;
+        return baseCategory === 'SONG' ? 'Outstanding Original Song' : 'Outstanding Score';
+    }
+    if (mediaType !== 'MOVIE') return null;
+    if (awardType === 'BAFTA' && baseCategory === 'SONG') return null;
+    return baseCategory === 'SONG' ? 'Best Original Song' : 'Best Score';
 };
+
+const LEGACY_INFLATED_MUSIC_CATEGORY_PATTERN = /soundtrack|trailer|music video/i;
+
+export const isLegacyInflatedMusicAwardCategory = (
+    awardType: string,
+    category: string
+): boolean => (
+    LEGACY_INFLATED_MUSIC_CATEGORY_PATTERN.test(category)
+    || (awardType === 'BAFTA' && /original song/i.test(category))
+);
 
 const getPlayerAwardNomineeName = (player: Player, playerCreditRole: NonNullable<Nomination['playerCreditRole']>) => {
     if (playerCreditRole === 'PRODUCER') return player.name;
@@ -289,7 +296,9 @@ const shouldReplaceAwardRecord = <T extends AwardLike>(existing: T, candidate: T
 export const sanitizeAwardRecords = <T extends AwardLike>(awards: T[] = []): T[] => {
     const byProject = new Map<string, T>();
 
-    awards.forEach(award => {
+    awards
+    .filter(award => !isLegacyInflatedMusicAwardCategory(award.type, award.category))
+    .forEach(award => {
         const projectKey = getAwardRecordProjectKey(award);
         const existing = byProject.get(projectKey);
         if (!existing || shouldReplaceAwardRecord(existing, award)) {
@@ -332,6 +341,10 @@ export const sanitizeAwardHistoryEntries = <T extends AwardHistoryEntry>(entries
 
     orderedEntries.forEach(({ entry, index }) => {
         (entry.winners || []).forEach((winner, winnerIndex) => {
+            if (isLegacyInflatedMusicAwardCategory(entry.type, winner.category)) {
+                droppedWinnerKeys.add(`${index}::${winnerIndex}`);
+                return;
+            }
             if (!winner.isPlayer) return;
             const winnerKey = `${entry.type}::${winner.category}::${winner.projectName}`;
             if (seenPlayerWinners.has(winnerKey)) {
@@ -346,6 +359,36 @@ export const sanitizeAwardHistoryEntries = <T extends AwardHistoryEntry>(entries
         ...entry,
         winners: (entry.winners || []).filter((_, winnerIndex) => !droppedWinnerKeys.has(`${index}::${winnerIndex}`))
     }));
+};
+
+export const sanitizeAwardCeremonyEvent = <T extends PendingEvent>(event: T): T => {
+    if (event.type !== 'AWARD_CEREMONY') return event;
+    const awardType = event.data?.awardDef?.type as AwardType | undefined;
+    if (!awardType || !AWARD_SHOW_DB[awardType]) return event;
+    const allowedCategories = new Set(AWARD_SHOW_DB[awardType].categories);
+    const nominations = (Array.isArray(event.data?.nominations) ? event.data.nominations : [])
+        .filter((nomination: Nomination) => allowedCategories.has(nomination.category));
+    const sourceBallot = event.data?.fullBallot && typeof event.data.fullBallot === 'object'
+        ? event.data.fullBallot
+        : {};
+    const fullBallot = Object.fromEntries(
+        Object.entries(sourceBallot)
+            .filter(([category]) => allowedCategories.has(category))
+            .map(([category, entries]) => [
+                category,
+                (Array.isArray(entries) ? entries : [])
+                    .filter((nomination: any) => allowedCategories.has(nomination.category || category))
+            ])
+    );
+
+    return {
+        ...event,
+        data: {
+            ...event.data,
+            nominations,
+            fullBallot
+        }
+    };
 };
 
 const getAwardTypeForInviteWeek = (week: number): AwardType | null => {
@@ -378,6 +421,56 @@ export const isProjectEligibleForAwardSeason = (
     awardYear: number
 ): boolean => getProjectAwardSeasonYear(project, awardType) === awardYear;
 
+export const getAwardEligibilityDiagnostics = (player: Player) => {
+    const nextWindow = Object.entries(AWARD_CALENDAR)
+        .map(([ceremonyWeek, definition]) => {
+            const inviteYear = definition.inviteWeek >= player.currentWeek ? player.age : player.age + 1;
+            const weeksUntilInvite = definition.inviteWeek >= player.currentWeek
+                ? definition.inviteWeek - player.currentWeek
+                : (52 - player.currentWeek) + definition.inviteWeek;
+            return { ceremonyWeek: Number(ceremonyWeek), definition, inviteYear, weeksUntilInvite };
+        })
+        .sort((a, b) => a.weeksUntilInvite - b.weeksUntilInvite)[0];
+
+    if (!nextWindow) return {};
+    const awardType = nextWindow.definition.type;
+    const sourceProjects = [
+        ...player.pastProjects.filter(project => !project.isQaArchive).map(project => ({ project, active: false })),
+        ...player.activeReleases.map(project => ({ project, active: true })),
+    ];
+    const seasonal = sourceProjects.filter(({ project, active }) => (
+        (!active || Number((project as any).weekNum || 0) > 2)
+        && isProjectEligibleForAwardSeason(project, awardType, nextWindow.inviteYear)
+    ));
+    const mediaMatches = seasonal.filter(({ project }) => {
+        const mediaType = resolveAwardMediaType(
+            (project as any).projectType,
+            (project as any).type,
+            (project as any).projectDetails?.type,
+        );
+        if (awardType === 'EMMY') return mediaType === 'SERIES';
+        if (awardType === 'GOLDEN_GLOBE') return true;
+        return mediaType === 'MOVIE';
+    });
+    const ratingMatches = mediaMatches.filter(({ project }) => (
+        Number((project as any).rating ?? (project as any).imdbRating ?? 0) >= 7
+    ));
+
+    return {
+        award_debug_next_type: awardType,
+        award_debug_invite_week: nextWindow.definition.inviteWeek,
+        award_debug_ceremony_week: nextWindow.ceremonyWeek,
+        award_debug_weeks_until_invite: nextWindow.weeksUntilInvite,
+        award_debug_target_year: nextWindow.inviteYear,
+        award_debug_total_projects: sourceProjects.length,
+        award_debug_seasonal_projects: seasonal.length,
+        award_debug_media_matches: mediaMatches.length,
+        award_debug_rating_matches: ratingMatches.length,
+        award_debug_existing_records: player.awards?.length || 0,
+        award_debug_history_entries: player.world?.awardHistory?.length || 0,
+    };
+};
+
 const hasExistingPlayerAwardRecord = (
     player: Player,
     projectId: string,
@@ -388,6 +481,49 @@ const hasExistingPlayerAwardRecord = (
     a.category === category &&
     (!awardType || a.type === awardType)
 );
+
+export interface ActorAwardNominationInput {
+    quality?: number;
+    rating?: number;
+    playerRolePerformance?: number;
+    roleType?: string;
+    genre?: string;
+}
+
+const clampAwardScore = (value: number) => Math.max(0, Math.min(100, value));
+
+/**
+ * Actor awards reward the player's work in the role first. The film still needs
+ * enough critical and production strength to enter the conversation, but a
+ * weak performance can no longer ride a great movie to a nomination.
+ */
+export const calculateActorAwardNominationScore = (
+    project: ActorAwardNominationInput,
+    ceremonyWeek: number,
+    luck = Math.random() * 15
+): number => {
+    const qualityScore = clampAwardScore(Number.isFinite(Number(project.quality)) ? Number(project.quality) : 50);
+    const imdbScore = clampAwardScore(
+        (Number.isFinite(Number(project.rating)) ? Number(project.rating) : 5) * 10
+    );
+    const rolePerformance = clampAwardScore(
+        Number.isFinite(Number(project.playerRolePerformance))
+            ? Number(project.playerRolePerformance)
+            : qualityScore
+    );
+
+    let score = (rolePerformance * 0.52) + (imdbScore * 0.28) + (qualityScore * 0.20);
+    if (
+        ceremonyWeek === 10
+        && ['DRAMA', 'THRILLER', 'MYSTERY'].includes(String(project.genre))
+    ) {
+        score += 10;
+    }
+    if (ceremonyWeek === 10 && rolePerformance > 90) score += 5;
+    if (project.roleType === 'SUPPORTING' && rolePerformance >= 88) score += 3;
+
+    return score + Math.max(0, Math.min(15, Number.isFinite(luck) ? luck : 0));
+};
 
 export const checkAwardEligibility = (player: Player, week: number, awardYear = player.age): Nomination[] => {
     // 1. GATHER ALL CANDIDATES (Player + World)
@@ -406,6 +542,7 @@ export const checkAwardEligibility = (player: Player, week: number, awardYear = 
             roleType: p.roleType,
             quality: fromActive ? p.projectDetails.hiddenStats.qualityScore : p.projectQuality,
             rating: fromActive ? p.imdbRating : p.rating,
+            playerRolePerformance: fromActive ? p.productionPerformance : p.playerRolePerformance,
             isPlayer: true,
             genre: fromActive ? p.projectDetails.genre : p.genre,
             mediaType: fromActive
@@ -428,7 +565,7 @@ export const checkAwardEligibility = (player: Player, week: number, awardYear = 
     };
 
     // Player Past Projects (only their exact award season)
-    player.pastProjects.forEach(p => {
+    player.pastProjects.filter(p => !p.isQaArchive).forEach(p => {
         if (isProjectEligibleForAwardSeason(p, awardType, awardYear)) {
             addCandidate(p, false);
         }
@@ -455,8 +592,8 @@ export const checkAwardEligibility = (player: Player, week: number, awardYear = 
                     ? true
                     : project.mediaType === 'MOVIE';
         if (awardType && mediaTypeMatchesAward) {
-            const addMusicNomination = (category: string, score: number, threshold: number) => {
-                if (score < threshold) return;
+            const addMusicNomination = (category: string | null, score: number, threshold: number) => {
+                if (!category || !AWARD_SHOW_DB[awardType].categories.includes(category) || score < threshold) return;
                 const exists = player.awards.some(a =>
                     a.projectId === project.id &&
                     a.category === category &&
@@ -469,7 +606,8 @@ export const checkAwardEligibility = (player: Player, week: number, awardYear = 
                     score,
                     category,
                     isPlayer: true,
-                    nomineeName: getNomineeNameForMusicCategory(project, category, player.name)
+                    nomineeName: getNomineeNameForMusicCategory(project, category, player.name),
+                    playerCreditRole: 'MUSIC'
                 });
             };
 
@@ -485,47 +623,57 @@ export const checkAwardEligibility = (player: Player, week: number, awardYear = 
                 musicPlan
             } as any;
             const musicImpact = credits.length ? calculateProjectMusicImpact(detailsForImpact, musicPlan) : null;
-            const ratingScore = (project.rating || 7) * 10;
-            const qualityScore = project.quality || 60;
+            const ratingScore = clampAwardScore((project.rating || 7) * 10);
+            const qualityScore = clampAwardScore(project.quality || 60);
             const prestigeBase = (ratingScore * 0.35) + (qualityScore * 0.35);
-            const revenueHeat = Math.min(12, Math.log10(Math.max(1, (project.gross || 0) + (project.streamingRevenue || 0) + (project.soundtrackRevenue || 0))) * 1.4);
-            const campaignTrailer = Number(project.hiddenStats?.musicTrailerStrengthLift || 0)
-                + Number(project.campaignForecastSnapshot?.awardsVisibility || 0) * 0.18
-                + Number(project.hiddenStats?.campaignFitScore || 0) * 0.08;
+            const impactScore = clampAwardScore(musicImpact?.score || 0);
+            const awardChanceLift = clampAwardScore(
+                musicImpact?.awardChanceLift
+                || project.hiddenStats?.musicAwardChanceLift
+                || 0
+            );
+            const musicLuck = Math.random() * 4;
+            const prestigeGenreBoost = ['DRAMA', 'BIOPIC', 'MUSICAL', 'ANIMATION', 'FANTASY'].includes(project.genre) ? 4 : 0;
+            const songCredits = credits.filter((credit: any) => ['LEAD_SINGLE', 'END_CREDIT_SONG'].includes(credit.role));
+            const hasOriginalScore = (
+                musicPlan?.strategy === 'COMPOSER_ONLY'
+                || project.crewList?.some((crew: any) => crew.role === 'COMPOSER')
+                || credits.some((credit: any) => /score|orchestra|classical|film/i.test(`${credit.genre} ${credit.songTitle}`))
+            );
 
-            if (credits.some((credit: any) => ['LEAD_SINGLE', 'END_CREDIT_SONG', 'TRAILER_ANTHEM'].includes(credit.role))) {
+            if (songCredits.length > 0) {
+                const bestSongBuzz = Math.max(...songCredits.map((credit: any) => clampAwardScore(Number(credit.buzz || 0) * 7)));
+                const songCraft = clampAwardScore((impactScore * 0.78) + (bestSongBuzz * 0.22));
+                const songScore = clampAwardScore(
+                    (ratingScore * 0.24)
+                    + (qualityScore * 0.24)
+                    + (songCraft * 0.36)
+                    + (awardChanceLift * 0.6)
+                    + prestigeGenreBoost
+                    + musicLuck
+                );
                 addMusicNomination(
-                    getPlayerMusicAwardCategory(awardType, 'SONG'),
-                    prestigeBase + (musicImpact?.awardChanceLift || 0) * 2.5 + (musicImpact?.socialHypeLift || 0) * 0.45 + revenueHeat + Math.random() * 10,
-                    awardType === 'OSCAR' ? 82 : 76
+                    getPlayerMusicAwardCategory(awardType, project.mediaType, 'SONG'),
+                    songScore,
+                    awardType === 'OSCAR' ? 89 : awardType === 'EMMY' ? 86 : 84
                 );
             }
-            if (project.crewList?.some((crew: any) => crew.role === 'COMPOSER') || credits.some((credit: any) => /score|orchestra|classical|film/i.test(`${credit.genre} ${credit.songTitle}`))) {
-                addMusicNomination(
-                    getPlayerMusicAwardCategory(awardType, 'SCORE'),
-                    prestigeBase + (qualityScore * 0.18) + (project.genre === 'DRAMA' || project.genre === 'SCI_FI' || project.genre === 'FANTASY' ? 8 : 0) + Math.random() * 8,
-                    awardType === 'OSCAR' ? 84 : 78
+            if (hasOriginalScore) {
+                const scoreCraft = impactScore > 0
+                    ? impactScore
+                    : clampAwardScore((qualityScore * 0.68) + (ratingScore * 0.32));
+                const scoreNominationScore = clampAwardScore(
+                    (ratingScore * 0.24)
+                    + (qualityScore * 0.24)
+                    + (scoreCraft * 0.36)
+                    + (awardChanceLift * 0.6)
+                    + prestigeGenreBoost
+                    + musicLuck
                 );
-            }
-            if (credits.some((credit: any) => ['SOUNDTRACK_EP', 'PROMO_ALBUM'].includes(credit.role))) {
                 addMusicNomination(
-                    getPlayerMusicAwardCategory(awardType, 'SOUNDTRACK'),
-                    prestigeBase + (musicImpact?.score || 0) * 0.35 + Math.min(14, (project.soundtrackRevenue || 0) / 650_000) + Math.random() * 9,
-                    awardType === 'OSCAR' ? 84 : 77
-                );
-            }
-            if ((musicImpact?.trailerStrengthLift || 0) > 0 || campaignTrailer > 12) {
-                addMusicNomination(
-                    getPlayerMusicAwardCategory(awardType, 'TRAILER'),
-                    prestigeBase + campaignTrailer + (musicImpact?.trailerStrengthLift || 0) * 1.4 + revenueHeat + Math.random() * 9,
-                    awardType === 'OSCAR' ? 83 : 76
-                );
-            }
-            if (credits.some((credit: any) => credit.role === 'MUSIC_VIDEO_TIE_IN')) {
-                addMusicNomination(
-                    getPlayerMusicAwardCategory(awardType, 'VIDEO'),
-                    prestigeBase + (musicImpact?.socialHypeLift || 0) * 0.9 + (musicImpact?.audienceReachLiftPct || 0) * 0.55 + revenueHeat + Math.random() * 9,
-                    awardType === 'OSCAR' ? 84 : 76
+                    getPlayerMusicAwardCategory(awardType, project.mediaType, 'SCORE'),
+                    scoreNominationScore,
+                    awardType === 'OSCAR' ? 89 : awardType === 'BAFTA' ? 86 : awardType === 'EMMY' ? 86 : 84
                 );
             }
 
@@ -588,21 +736,7 @@ export const checkAwardEligibility = (player: Player, week: number, awardYear = 
         // Minor, cameo, and ensemble roles should not be treated as supporting award contenders.
         if (!isLeadRole && !isSupportingRole) return;
 
-        // REVISED SCORE FORMULA
-        // 50% Quality (Hidden) + 50% Rating (Visible)
-        const perfScore = project.quality || 50; 
-        const imdbScore = (project.rating || 5) * 10;
-        
-        let nomScore = (perfScore * 0.5) + (imdbScore * 0.5);
-
-        // Oscar Bias: Drama/Prestige
-        if (week === 10) {
-            if (project.genre === 'DRAMA' || project.genre === 'THRILLER' || project.genre === 'MYSTERY') nomScore += 10;
-            if (perfScore > 90) nomScore += 5; 
-        }
-        
-        // Add random variance (Luck factor)
-        nomScore += Math.random() * 15;
+        const nomScore = calculateActorAwardNominationScore(project, week);
 
         // LOWERED THRESHOLDS for accessibility
         const threshold = week === 10 ? 85 : week === 38 ? 80 : 75; // Oscars 85, Emmys 80, Others 75
@@ -653,11 +787,93 @@ export const checkAwardEligibility = (player: Player, week: number, awardYear = 
     return nominations;
 };
 
-// NEW: Generates the full ballot (NPCs included) for the "Season View"
-export const generateFullBallot = (player: Player, awardType: AwardType, playerNoms: Nomination[]): Record<string, Nomination[]> => {
+const hashToUnit = (value: string): number => {
+    let hash = 2166136261;
+    for (let index = 0; index < value.length; index += 1) {
+        hash ^= value.charCodeAt(index);
+        hash = Math.imul(hash, 16777619);
+    }
+    return (hash >>> 0) / 4294967295;
+};
+
+const getWorldProjectMediaType = (project: IndustryProject): ProjectType => (
+    project.mediaType === 'SERIES' ? 'SERIES' : 'MOVIE'
+);
+
+export const isWorldProjectEligibleForAwardSeason = (
+    project: IndustryProject,
+    awardType: AwardType,
+    awardYear: number
+): boolean => {
+    const mediaType = getWorldProjectMediaType(project);
+    if (awardType === 'EMMY') {
+        if (mediaType !== 'SERIES') return false;
+        const emmyInviteWeek = getAwardDefinitionByType('EMMY')?.inviteWeek || 34;
+        const seasonYear = project.weekReleased > emmyInviteWeek ? project.year + 1 : project.year;
+        return seasonYear === awardYear;
+    }
+    if (awardType === 'GOLDEN_GLOBE') {
+        return project.year + 1 === awardYear;
+    }
+    return mediaType === 'MOVIE' && project.year + 1 === awardYear;
+};
+
+export const getWorldAwardCategoryScore = (
+    project: IndustryProject,
+    category: string
+): number => {
+    const quality = clampAwardScore(project.quality);
+    const ratingScore = clampAwardScore((project.rating ?? (4.8 + quality * 0.045)) * 10);
+    const stableProfile = (field: string, bias = 0) => clampAwardScore(
+        quality + ((hashToUnit(`${project.id}:${field}`) - 0.5) * 30) + bias
+    );
+    const profile = project.awardProfile;
+    const campaign = clampAwardScore(profile?.campaign ?? stableProfile('campaign', -2));
+    const combine = (craft: number, craftWeight = 0.62) => clampAwardScore(
+        (craft * craftWeight)
+        + (quality * 0.2)
+        + (ratingScore * 0.13)
+        + (campaign * 0.05)
+    );
+
+    if (/Actor|Actress/.test(category)) {
+        return combine(profile?.leadPerformance ?? stableProfile('performance'), 0.66);
+    }
+    if (category.includes('Director')) {
+        return combine(profile?.directing ?? stableProfile('directing'), 0.68);
+    }
+    if (category.includes('Screenplay')) {
+        return combine(profile?.screenplay ?? stableProfile('screenplay'), 0.7);
+    }
+    if (category.includes('Cinematography')) {
+        return combine(profile?.cinematography ?? stableProfile('cinematography'), 0.7);
+    }
+    if (/score|music composition/i.test(category)) {
+        return combine(profile?.originalScore ?? stableProfile('original-score', -3), 0.72);
+    }
+    if (/song|music and lyrics/i.test(category)) {
+        const genreBoost = ['MUSICAL', 'ANIMATION', 'BIOPIC'].includes(project.genre) ? 8 : -5;
+        return combine(profile?.originalSong ?? stableProfile('original-song', genreBoost), 0.72);
+    }
+    if (/Picture|Series|Film/.test(category)) {
+        return combine(profile?.picture ?? stableProfile('picture'), 0.58);
+    }
+    return combine(stableProfile(category), 0.6);
+};
+
+// Generates a season-specific ballot. World projects are ranked by the craft
+// relevant to each category instead of being sampled from the entire save.
+export const generateFullBallot = (
+    player: Player,
+    awardType: AwardType,
+    playerNoms: Nomination[],
+    awardYear = player.age
+): Record<string, Nomination[]> => {
     const lore = AWARD_SHOW_DB[awardType];
     const ballot: Record<string, Nomination[]> = {};
-    const worldProjects = player.world.projects || [];
+    const worldProjects = (player.world.projects || []).filter(project => (
+        isWorldProjectEligibleForAwardSeason(project, awardType, awardYear)
+    ));
     
     lore.categories.forEach(cat => {
         const categoryNoms: Nomination[] = [];
@@ -683,13 +899,15 @@ export const generateFullBallot = (player: Player, awardType: AwardType, playerN
             const reallyIsProjectAward = isProjectAward && !isActor && !isActress && !isDirector;
             
             // Type check based on award show
-            const isTVOnly = awardType === 'EMMY' || cat.includes('TV Series');
+            const requiresSeries = awardType === 'EMMY' || /TV Series|Drama Series|Comedy Series/.test(cat);
+            const requiresMovie = !requiresSeries;
 
-            // Find eligible world projects
-            // Filter by quality
             let candidates = worldProjects.filter(p => {
-                if (p.quality < 50) return false; // Lowered threshold slightly to ensure pool isn't empty
-                return true;
+                if (p.quality < 50) return false;
+                const mediaType = getWorldProjectMediaType(p);
+                if (requiresSeries && mediaType !== 'SERIES') return false;
+                if (requiresMovie && mediaType !== 'MOVIE') return false;
+                return getWorldAwardCategoryScore(p, cat) >= (isMusicAward ? 74 : 68);
             });
             
             // Filter candidates by Actor Gender if applicable
@@ -697,17 +915,18 @@ export const generateFullBallot = (player: Player, awardType: AwardType, playerN
             if (isActress) {
                 candidates = candidates.filter(p => {
                     const actor = NPC_DATABASE.find(n => n.id === p.leadActorId);
-                    // If actor found, check gender. If not found, assume 50/50 chance for random fill or allow it
-                    return actor ? actor.gender === 'FEMALE' : Math.random() > 0.5;
+                    return actor ? actor.gender === 'FEMALE' : hashToUnit(`${p.id}:gender`) >= 0.5;
                 });
             } else if (isActor) {
                 candidates = candidates.filter(p => {
                     const actor = NPC_DATABASE.find(n => n.id === p.leadActorId);
-                    return actor ? actor.gender === 'MALE' : Math.random() > 0.5;
+                    return actor ? actor.gender === 'MALE' : hashToUnit(`${p.id}:gender`) < 0.5;
                 });
             }
 
-            candidates = candidates.sort(() => 0.5 - Math.random()).slice(0, spotsLeft);
+            candidates = candidates
+                .sort((a, b) => getWorldAwardCategoryScore(b, cat) - getWorldAwardCategoryScore(a, cat))
+                .slice(0, spotsLeft);
             
             candidates.forEach(p => {
                 // Determine nominee name based on category
@@ -715,12 +934,16 @@ export const generateFullBallot = (player: Player, awardType: AwardType, playerN
                 let nomineeName = p.leadActorName || linkedActor?.name || p.directorName || p.title;
                 if (isActor || isActress) nomineeName = p.leadActorName || linkedActor?.name || getFallbackAwardNominee(cat, p.id || p.title);
                 else if (isDirector) nomineeName = p.directorName || getFallbackAwardNominee(cat, p.id || p.title);
-                else if (isMusicAward) nomineeName = getNomineeNameForMusicCategory(p, cat, 'Music Team');
+                else if (isMusicAward) nomineeName = getNomineeNameForMusicCategory(
+                    p,
+                    cat,
+                    getFallbackAwardNominee(cat, p.id || p.title)
+                );
                 else if (reallyIsProjectAward) nomineeName = "Producers";
 
                 categoryNoms.push({
                     project: { id: p.id, name: p.title },
-                    score: p.quality + (Math.random() * 20), // Simulated score
+                    score: getWorldAwardCategoryScore(p, cat),
                     category: cat,
                     isPlayer: false,
                     nomineeName: nomineeName
@@ -745,7 +968,7 @@ export const generateFullBallot = (player: Player, awardType: AwardType, playerN
 
                 categoryNoms.push({
                     project: { id: `fake_${Math.random()}`, name: fakeTitle },
-                    score: 70 + (Math.random() * 30),
+                    score: 76 + (Math.random() * 22),
                     category: cat,
                     isPlayer: false,
                     nomineeName: reallyIsProjectAward ? "Producers" : randomName
@@ -826,12 +1049,9 @@ export const generateSeasonWinners = (
         winners: []
     };
 
-    const targetYear = year - 1; 
     const worldCandidates = player.world.projects.filter(p => {
-        return (p.year === targetYear || p.year === year) && p.quality > 60;
+        return isWorldProjectEligibleForAwardSeason(p, awardType, year) && p.quality > 55;
     });
-    
-    const usedNames = new Set<string>();
 
     lore.categories.forEach(cat => {
         const playerWin = player.awards.find(a => 
@@ -867,7 +1087,7 @@ export const generateSeasonWinners = (
             const isMusicAward = isMusicAwardCategory(cat);
             const isProjectAward = cat.includes('Picture') || cat.includes('Series') || cat.includes('Musical') || cat.includes('Play') || cat.includes('Film');
 
-            let possibleWinners = [...worldCandidates].filter(p => !usedNames.has(p.title));
+            let possibleWinners = [...worldCandidates];
             
             // Filter by gender if needed
             if (isActress) {
@@ -882,20 +1102,24 @@ export const generateSeasonWinners = (
                 });
             }
             
-            possibleWinners.sort((a,b) => b.quality - a.quality);
-            const top3 = possibleWinners.slice(0, 3);
-            let winnerProj = top3.length > 0 ? top3[Math.floor(Math.random() * top3.length)] : null;
+            possibleWinners.sort((a,b) => (
+                getWorldAwardCategoryScore(b, cat) - getWorldAwardCategoryScore(a, cat)
+            ));
+            const winnerProj = possibleWinners[0] || null;
 
             let winnerName = "Unknown";
             let projName = "Untitled Project";
 
             if (winnerProj) {
                 projName = winnerProj.title;
-                usedNames.add(projName);
 
                 if (isActor || isActress) winnerName = winnerProj.leadActorName || getFallbackAwardNominee(cat, winnerProj.id || winnerProj.title);
                 else if (isDirector) winnerName = winnerProj.directorName || getFallbackAwardNominee(cat, winnerProj.id || winnerProj.title);
-                else if (isMusicAward) winnerName = getNomineeNameForMusicCategory(winnerProj, cat, 'Music Team');
+                else if (isMusicAward) winnerName = getNomineeNameForMusicCategory(
+                    winnerProj,
+                    cat,
+                    getFallbackAwardNominee(cat, winnerProj.id || winnerProj.title)
+                );
                 else if (isProjectAward) winnerName = "Producers";
                 else winnerName = winnerProj.leadActorName; 
             } else {

@@ -3,6 +3,7 @@ import { spendPlayerEnergy } from './premiumLogic';
 import { NPC_DATABASE } from './npcLogic';
 import { applyDivorceOutcome, applyPartnerBreakup } from './familyLogic';
 import { getPlayerLanguage, t } from './i18n';
+import { createStudioNameRightsHearing } from './studioNameRights';
 
 // --- HELPERS ---
 const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
@@ -1462,6 +1463,9 @@ export const generateLifeEvent = (player: Player): LifeEvent | null => {
 export const generateLegalHearing = (player: Player, caseId: string): LifeEvent | null => {
     const activeCase = player.flags.activeCases?.find((c: LegalCase) => c.id === caseId);
     if (!activeCase) return null;
+    if (activeCase.caseType === 'STUDIO_NAME_RIGHTS') {
+        return createStudioNameRightsHearing(player, caseId);
+    }
 
     const advanceCase = (p: Player, c: LegalCase) => {
         const language = getPlayerLanguage(p);

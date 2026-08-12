@@ -7,6 +7,8 @@ const assert = (condition, message) => {
 const boxOfficeSource = fs.readFileSync('views/mobile/BoxOfficeApp.tsx', 'utf8');
 const gameLoopSource = fs.readFileSync('services/gameLoop.ts', 'utf8');
 const releaseWizardSource = fs.readFileSync('views/lifestyle/business/ReleaseWizard.tsx', 'utf8');
+const projectDashboardSource = fs.readFileSync('views/lifestyle/business/components/ProjectDashboardModal.tsx', 'utf8');
+const legacyLogicSource = fs.readFileSync('services/legacyLogic.ts', 'utf8');
 const packageJson = fs.readFileSync('package.json', 'utf8');
 
 assert(
@@ -24,6 +26,14 @@ assert(
   releaseWizardSource.includes('release.weeklyGross?.length || 0') &&
     releaseWizardSource.includes('Math.max(0, release.weekNum - 1)'),
   'Streaming presales should calculate remaining theatrical weeks from actual recorded run progress.'
+);
+
+assert(
+  gameLoopSource.includes('getStreamingWeeksUntilStart(') &&
+    boxOfficeSource.includes('getStreamingWeeksUntilStart(') &&
+    projectDashboardSource.includes('getStreamingWeeksUntilStart(') &&
+    legacyLogicSource.includes('MAX_STREAMING_START_DELAY_WEEKS'),
+  'Streaming logic and player-facing countdowns must share the heir-safe rollout clock.'
 );
 
 assert(

@@ -26,7 +26,7 @@ const gameLoopTokens = [
 ];
 
 const migrationTokens = [
-  'SAVE_MIGRATION_VERSION = 15',
+  'SAVE_MIGRATION_VERSION = 27',
   'migrateActiveRelease',
   'migratePastProject',
   'weeklyDistributionBreakdowns',
@@ -38,6 +38,7 @@ const migrationTokens = [
   'releaseRegionIds',
   'releaseChainSelections',
   'boxOfficeArchiveVersion',
+  'theatricalExtensionHistory',
   'pastProjects:'
 ];
 
@@ -57,7 +58,8 @@ const typeTokens = [
   'weeklySoundtrackBreakdowns?: ProjectSoundtrackRevenueBreakdown[]',
   'marketingChannelAllocations?: MarketingChannelAllocations',
   'releaseRegionIds?: BoxOfficeRegionId[]',
-  'releaseChainSelections?: Partial<Record<BoxOfficeRegionId, CinemaChainId[]>>'
+  'releaseChainSelections?: Partial<Record<BoxOfficeRegionId, CinemaChainId[]>>',
+  'theatricalExtensionHistory?: TheatricalExtensionDecision[]'
 ];
 
 const missingGameLoop = gameLoopTokens.filter(token => !gameLoop.includes(token));

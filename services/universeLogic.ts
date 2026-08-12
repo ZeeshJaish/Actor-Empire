@@ -1,5 +1,5 @@
 
-import { Universe, UniverseId, UniverseContract, Player, ProjectDetails, NewsItem, StudioId, Genre, IndustryProject, NPCActor, UniversePhase, RoleType, ProjectSubtype, ContractFilm, AuditionOpportunity, Gender, ActiveRelease, CastMember, UniverseCharacter, Script, GameLanguage } from '../types';
+import { Universe, UniverseId, UniverseContract, Player, ProjectDetails, NewsItem, StudioId, Genre, IndustryProject, NPCActor, UniversePhase, RoleType, ProjectSubtype, ContractFilm, AuditionOpportunity, Gender, ActiveRelease, CastMember, UniverseCharacter, Script, GameLanguage, CharacterStoryRole, CharacterAbilityType, CharacterStoryFunction, CharacterNature, CharacterIdentitySource } from '../types';
 import { STUDIO_CATALOG } from './studioLogic';
 import { NPC_DATABASE } from './npcLogic';
 import { generateProjectTitle, getEstimatedBudget, generateProjectDetails } from './roleLogic';
@@ -612,6 +612,69 @@ export const normalizeUniverseCharacterKey = (value: string) =>
         .replace(/[^a-z0-9]+/g, '_')
         .replace(/^_+|_+$/g, '') || 'character';
 
+const CHARACTER_STORY_ROLES = new Set<CharacterStoryRole>(['HERO', 'ANTI_HERO', 'VILLAIN', 'ALLY', 'CIVILIAN', 'OTHER']);
+const CHARACTER_ABILITY_TYPES = new Set<CharacterAbilityType>(['NONE', 'TRAINED', 'TECH', 'MAGIC', 'SUPERNATURAL', 'SUPERPOWERED']);
+const CHARACTER_STORY_FUNCTIONS = new Set<CharacterStoryFunction>(['PROTAGONIST', 'ANTAGONIST', 'DEUTERAGONIST', 'RIVAL', 'MENTOR', 'ALLY', 'COMIC_RELIEF', 'CIVILIAN', 'OTHER']);
+const CHARACTER_NATURES = new Set<CharacterNature>(['HUMAN', 'ROBOT', 'ALIEN', 'CREATURE', 'SPIRIT', 'OTHER']);
+const CHARACTER_IDENTITY_SOURCES = new Set<CharacterIdentitySource>(['AUTO', 'PLAYER', 'CANON', 'AUTHOR_INTENT']);
+
+export const getDefaultCharacterStoryRole = (roleType?: RoleType | 'EXTRA' | string): CharacterStoryRole => {
+    if (roleType === 'LEAD') return 'HERO';
+    if (roleType === 'SUPPORTING' || roleType === 'ENSEMBLE') return 'ALLY';
+    return 'OTHER';
+};
+
+export const normalizeCharacterStoryRole = (
+    value: unknown,
+    fallback: CharacterStoryRole = 'OTHER'
+): CharacterStoryRole => {
+    const normalized = String(value || '').toUpperCase() as CharacterStoryRole;
+    return CHARACTER_STORY_ROLES.has(normalized) ? normalized : fallback;
+};
+
+export const normalizeCharacterAbilityType = (
+    value: unknown,
+    fallback: CharacterAbilityType = 'NONE'
+): CharacterAbilityType => {
+    const normalized = String(value || '').toUpperCase() as CharacterAbilityType;
+    return CHARACTER_ABILITY_TYPES.has(normalized) ? normalized : fallback;
+};
+
+export const getDefaultCharacterStoryFunction = (
+    roleType?: RoleType | 'EXTRA' | string,
+    storyRole?: CharacterStoryRole
+): CharacterStoryFunction => {
+    if (storyRole === 'VILLAIN') return 'ANTAGONIST';
+    if (roleType === 'LEAD') return 'PROTAGONIST';
+    if (roleType === 'SUPPORTING' || roleType === 'ENSEMBLE') return 'ALLY';
+    if (roleType === 'CAMEO') return 'COMIC_RELIEF';
+    return storyRole === 'CIVILIAN' ? 'CIVILIAN' : 'OTHER';
+};
+
+export const normalizeCharacterStoryFunction = (
+    value: unknown,
+    fallback: CharacterStoryFunction = 'OTHER'
+): CharacterStoryFunction => {
+    const normalized = String(value || '').toUpperCase() as CharacterStoryFunction;
+    return CHARACTER_STORY_FUNCTIONS.has(normalized) ? normalized : fallback;
+};
+
+export const normalizeCharacterNature = (
+    value: unknown,
+    fallback: CharacterNature = 'HUMAN'
+): CharacterNature => {
+    const normalized = String(value || '').toUpperCase() as CharacterNature;
+    return CHARACTER_NATURES.has(normalized) ? normalized : fallback;
+};
+
+export const normalizeCharacterIdentitySource = (
+    value: unknown,
+    fallback: CharacterIdentitySource = 'CANON'
+): CharacterIdentitySource => {
+    const normalized = String(value || '').toUpperCase() as CharacterIdentitySource;
+    return CHARACTER_IDENTITY_SOURCES.has(normalized) ? normalized : fallback;
+};
+
 export const getUniverseCharacterKeyAliases = (
     universeId: UniverseId | undefined,
     characterId?: string,
@@ -667,6 +730,8 @@ export const getDefaultUniverseRoster = (universeId: UniverseId, language: GameL
             actorName: actor?.name || universeText(language, 'actor.unknown'),
             status: 'ACTIVE' as const,
             fanApproval: 65 + ((index * 7) % 25),
+            storyRole: template.genre === 'SUPERHERO' ? 'HERO' : 'OTHER',
+            abilityType: template.genre === 'SUPERHERO' ? 'SUPERPOWERED' : 'NONE',
             appearances: arc.roadmap.length,
             firstAppearanceTitle: firstRoadmapEntry?.title,
             latestAppearanceTitle: latestRoadmapEntry?.title,
@@ -789,6 +854,14 @@ const normalizeUniverseCharacter = (entry: any, universeId: UniverseId, index = 
         status: safeStatus,
         fanApproval: clampNumber(entry.fanApproval ?? entry.appeal, 55, 0, 100),
         roleType: entry.roleType,
+        storyFunction: normalizeCharacterStoryFunction(
+            entry.storyFunction,
+            getDefaultCharacterStoryFunction(entry.roleType, normalizeCharacterStoryRole(entry.storyRole))
+        ),
+        storyRole: normalizeCharacterStoryRole(entry.storyRole),
+        abilityType: normalizeCharacterAbilityType(entry.abilityType),
+        nature: normalizeCharacterNature(entry.nature),
+        identitySource: normalizeCharacterIdentitySource(entry.identitySource),
         firstAppearanceTitle: isMeaningfulTitle(entry.firstAppearanceTitle) ? entry.firstAppearanceTitle.trim() : firstRoadmapEntry?.title,
         latestAppearanceTitle: isMeaningfulTitle(entry.latestAppearanceTitle) ? entry.latestAppearanceTitle.trim() : latestRoadmapEntry?.title,
         appearances,
@@ -1051,6 +1124,7 @@ const GENERIC_CAST_ROLE_NAMES = new Set([
     'cameo appearance',
     'extra'
 ]);
+const NON_ACTING_UNIVERSE_CREDIT_PATTERN = /\b(director|writer|producer|cinematographer|composer|vfx|supervisor|crew)\b/i;
 
 export const getFallbackCharacterName = (
     member: Partial<CastMember> | any,
@@ -1081,6 +1155,10 @@ const normalizeUniverseCastEntries = (castList: CastMember[] | undefined, projec
 
     return castList
         .filter(member => member && typeof member === 'object')
+        .filter(member => (
+            member.type !== 'DIRECTOR'
+            && !NON_ACTING_UNIVERSE_CREDIT_PATTERN.test(`${member.role || ''} ${member.roleName || ''}`)
+        ))
         .filter(member => (member.actorId || member.npcId) && member.actorId !== 'UNKNOWN')
         .filter(member => String(member.roleType || 'SUPPORTING') !== 'EXTRA')
         .map((member, index) => {
@@ -1100,6 +1178,14 @@ const normalizeUniverseCastEntries = (castList: CastMember[] | undefined, projec
                 status: 'ACTIVE' as const,
                 fanApproval: 50,
                 roleType: member.roleType,
+                storyFunction: normalizeCharacterStoryFunction(
+                    member.storyFunction,
+                    getDefaultCharacterStoryFunction(member.roleType, normalizeCharacterStoryRole(member.storyRole))
+                ),
+                storyRole: normalizeCharacterStoryRole(member.storyRole),
+                abilityType: normalizeCharacterAbilityType(member.abilityType),
+                nature: normalizeCharacterNature(member.nature),
+                identitySource: normalizeCharacterIdentitySource(member.identitySource),
                 appearances: 1,
                 firstAppearanceTitle: projectTitle,
                 latestAppearanceTitle: projectTitle,
@@ -1238,6 +1324,14 @@ export const buildUniverseRoster = (
             status: entry.status || 'ACTIVE',
             fanApproval: typeof entry.fanApproval === 'number' ? entry.fanApproval : typeof entry.appeal === 'number' ? entry.appeal : 50,
             roleType: entry.roleType,
+            storyFunction: normalizeCharacterStoryFunction(
+                entry.storyFunction,
+                getDefaultCharacterStoryFunction(entry.roleType, normalizeCharacterStoryRole(entry.storyRole))
+            ),
+            storyRole: normalizeCharacterStoryRole(entry.storyRole),
+            abilityType: normalizeCharacterAbilityType(entry.abilityType),
+            nature: normalizeCharacterNature(entry.nature),
+            identitySource: normalizeCharacterIdentitySource(entry.identitySource),
             firstAppearanceTitle: isMeaningfulTitle(entry.firstAppearanceTitle) ? entry.firstAppearanceTitle : templateArc?.roadmap[0]?.title,
             latestAppearanceTitle: isMeaningfulTitle(entry.latestAppearanceTitle) ? entry.latestAppearanceTitle : templateArc?.roadmap[(templateArc?.roadmap.length || 1) - 1]?.title,
             appearances: safeAppearances,
@@ -1266,6 +1360,11 @@ export const buildUniverseRoster = (
                 characterId: character.characterId || existing?.characterId,
                 status: wasRecast ? 'RECAST' : (existing?.status || character.status),
                 fanApproval: continuityApproval,
+                storyFunction: existing?.storyFunction || character.storyFunction || getDefaultCharacterStoryFunction(character.roleType, character.storyRole),
+                storyRole: existing?.storyRole || character.storyRole || 'OTHER',
+                abilityType: existing?.abilityType || character.abilityType || 'NONE',
+                nature: existing?.nature || character.nature || 'HUMAN',
+                identitySource: 'CANON' as const,
                 appearances: (existing?.appearances || 0) + 1,
                 firstAppearanceTitle: existing?.firstAppearanceTitle || project.title,
                 latestAppearanceTitle: project.title,

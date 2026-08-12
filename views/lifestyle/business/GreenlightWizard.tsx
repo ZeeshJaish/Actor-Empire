@@ -1,20 +1,18 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
-import { Player, BudgetTier, Genre, ProjectDetails, ActiveRelease, Commitment, Business, LocationDetails, NewsItem, XPost, StudioEquipment, CrewMember, Universe, UniverseId, BoxOfficeRegionId, ProjectMusicStrategy, MusicCreditRole, MusicArtist, ProjectInvestorFundingMode } from '../../../types';
-import { ArrowLeft, Film, DollarSign, Users, TrendingUp, Calendar, Check, Plus, Star, Award, Zap, Briefcase, LayoutGrid, MapPin, PenTool, Globe, Camera, Clapperboard, ChevronRight, Lock, Building2, BarChart3, ShieldAlert, Crown, LogOut, AlertTriangle, Sparkles, BookOpen, Video, X, Clock, Palette, Lightbulb, Mic, Box, Info, CheckCircle, XCircle, Layers, Loader2, Search } from 'lucide-react';
-import { NPC_DATABASE, getAvailableTalent, calculateProjectFameMultiplier, isCastableActor } from '../../../services/npcLogic';
-import { calculateCastDepthScore, getDirectorTalent, getPhaseDuration } from '../../../services/roleLogic';
-import { buildUniverseRoster, getFallbackCharacterName, getUniverseCharacterKeyAliases, getUniverseCharacterSelectionOptions, getUniverseDashboardProjects, isUniverseRetired, normalizeUniverseCharacterKey, normalizeUniverseForSave, normalizeUniverseMap } from '../../../services/universeLogic';
-import { getEquipmentStageName } from './FacilitiesView';
+import { Player, BudgetTier, Genre, ProjectDetails, ActiveRelease, Business, LocationDetails, Universe, UniverseId, ProjectMusicStrategy, MusicCreditRole, MusicArtist, ProjectInvestorFundingMode, StudioContract, RoleType, BackgroundCastingPlan } from '../../../types';
+import { ArrowLeft, Film, DollarSign, TrendingUp, Calendar, Star, Award, Briefcase, LayoutGrid, MapPin, PenTool, Camera, ChevronRight, Lock, BarChart3, LogOut, Sparkles, BookOpen, Video, Clock, Palette, Lightbulb, Box, XCircle, Loader2 } from 'lucide-react';
+import { NPC_DATABASE, getAvailableTalent, isCastableActor } from '../../../services/npcLogic';
+import { getConnectedDirectorCandidates, getDirectorConnectionDiscount } from '../../../services/directorConnectionLogic';
+import { getActorTalent, getDirectorTalent } from '../../../services/roleLogic';
+import { getDefaultCharacterStoryRole, getFallbackCharacterName, getUniverseCharacterKeyAliases, getUniverseCharacterSelectionOptions, isUniverseRetired, normalizeCharacterAbilityType, normalizeCharacterStoryRole, normalizeUniverseCharacterKey, normalizeUniverseMap } from '../../../services/universeLogic';
 import { showAd } from '../../../services/adLogic';
 import { hasNoAds, spendPlayerEnergy } from '../../../services/premiumLogic';
 import { PHASE_ONE_ENERGY_COSTS } from '../../../services/energyCosts';
-import { formatProjectFormatLabel } from '../../../services/genreCatalog';
 import { getPlayerLanguage, t } from '../../../services/i18n';
 import { resolveProjectType } from '../../../services/businessLogic';
 import { addBreadcrumb, markGameCheckpoint, markTraceAction, setCrashContext, startPerformanceTrace, stopPerformanceTrace, trackGameEvent } from '../../../services/firebaseService';
-import { applyLockedSeasonFunding, markHiddenSeasonFundingUsed } from '../../../services/streamingFundingLogic';
-import { InteractiveRegionMap, RegionMapLocationPin } from './components/InteractiveRegionMap';
+import { finalizeOwnedStreamingOriginalGreenlight } from '../../../services/streamingOriginals';
 import {
     calculateProjectMusicImpact,
     buildProjectMusicPlanFromArtists,
@@ -37,181 +35,102 @@ import {
     updateInvestorRelationshipsForPlan
 } from '../../../services/projectInvestors';
 import { getInheritedStudioProjects } from '../../../services/legacyLogic';
-import { createProductionCalendar } from '../../../services/productionCalendar';
+import { getStudioGroup } from '../../../services/studioGroup';
+import { mergeParentStudioTalentRosters } from '../../../services/talentRoster';
+import {
+    getInHouseCastProjectCost,
+    getInHouseCrewProjectCost,
+    getProductionBudgetTier,
+} from '../../../services/studioProductionEconomy';
+import { inferStoryCompass, suggestCharacterIdentity } from '../../../services/characterIdentityLogic';
+import { evaluateCastStoryFit, getCastStoryRead } from '../../../services/characterStoryFit';
+import {
+    GREENLIGHT_GEAR_TIERS,
+    GreenlightEquipmentStep,
+} from './components/GreenlightEquipmentStep';
+import { GreenlightLocationStep } from './components/GreenlightLocationStep';
+import { GreenlightCrewSelector } from './components/GreenlightCrewSelector';
+import { GreenlightScriptStep } from './components/GreenlightScriptStep';
+import { GreenlightDirectorStep } from './components/GreenlightDirectorStep';
+import { GreenlightCrewStep } from './components/GreenlightCrewStep';
+import { GreenlightHeader } from './components/GreenlightHeader';
+import { GreenlightTalentPickerModal } from './components/GreenlightTalentPickerModal';
+import { GreenlightNegotiationModal } from './components/GreenlightNegotiationModal';
+import { GreenlightBuzzStep } from './components/GreenlightBuzzStep';
+import { GreenlightArtDirectionSection } from './components/GreenlightArtDirectionSection';
+import { GreenlightMarketingBudgetSection } from './components/GreenlightMarketingBudgetSection';
+import { GreenlightCastStep } from './components/GreenlightCastStep';
+import { GreenlightSoundtrackSection } from './components/GreenlightSoundtrackSection';
+import { GreenlightStoryConnectionSection } from './components/GreenlightStoryConnectionSection';
+import { GreenlightConfirmationStep } from './components/GreenlightConfirmationStep';
+import {
+    calculateAvailableGreenlightFunds,
+    calculateGreenlightBudget,
+    calculateGreenlightCastingStrength,
+    calculateGreenlightEstimatedQuality,
+    calculateGreenlightFundingPosition,
+    calculateGreenlightPackageBudget,
+    calculateInvestorRaiseAmountFromPercent,
+    calculateInvestorRaisePercent,
+    calculateMaxGreenlightMarketingBudget,
+} from './greenlightCalculations';
+import {
+    resolveGreenlightConnectedIntent,
+    validateGreenlightProject,
+} from './greenlightValidation';
+import { buildGreenlightBuzz } from './greenlightBuzz';
+import {
+    buildGreenlightProject,
+    prepareGreenlightFunding,
+} from './greenlightProjectBuilder';
+import {
+    type GreenlightCastRole,
+    type GreenlightNegotiationState,
+    type GreenlightPacing,
+    type GreenlightStep,
+    type GreenlightVisualStyle,
+} from './greenlightTypes';
+import {
+    type ConnectedProjectIntent,
+    type MarketingBudgetPreset,
+    type MusicArtistSortOption,
+    formatMoney,
+    MARKETING_BUDGET_PRESETS,
+    getMarketingBudgetForPreset,
+    MUSIC_DELIVERABLE_ROLES,
+    MUSIC_ARTIST_SORT_OPTIONS,
+    MUSIC_FAME_SORT_SCORE,
+    MUSIC_AVAILABILITY_SORT_SCORE,
+    getCastableNpcById,
+    isCastableMovieRoleId,
+    getInitialMusicArtistTargetCount,
+    getInitialSelectedMusicCreditRoles,
+    getMusicStrategyForSelectedRoles,
+    returningCrewRoleToStateKey,
+    normalizeCrewReturningRole,
+    normalizeSelectedCrewState,
+    formatReturningRoleLabel,
+    VALID_RETURNING_TALENT_ROLES,
+    getUniversePhaseLabel,
+    toUniverseCharacterId,
+} from './greenlightUtils';
+import { BackgroundCastingPanel } from './components/BackgroundCastingPanel';
+import { buildBackgroundCastingPlan, normalizeBackgroundCastingPlan } from '../../../services/livingEnsemble';
+import {
+    PRODUCTION_LOCATIONS_BY_CONTINENT,
+    getProductionLocation,
+} from '../../../services/productionLocations';
+import {
+    getCrewMarketAbsoluteWeek,
+    getCrewMarketCycle,
+    getCrewMarketRefreshInWeeks,
+    getRotatingCrewCandidates,
+    normalizeCrewSelectionId,
+} from '../../../services/crewMarket';
 
-type ConnectedProjectIntent = 'AUTO' | 'SOLO' | 'CROSSOVER' | 'EVENT' | 'REBOOT';
+export { formatMoney } from './greenlightUtils';
 
-export const formatMoney = (val: number) => {
-    if (val >= 1_000_000_000_000) return `${(val/1_000_000_000_000).toFixed(1)}T`;
-    if (val >= 1_000_000_000) return `${(val/1_000_000_000).toFixed(1)}B`;
-    if (val >= 1_000_000) return `${(val/1_000_000).toFixed(1)}M`;
-    if (val >= 1_000) return `${(val/1_000).toFixed(0)}k`;
-    return `${val}`;
-};
-
-const clampStat = (value: number, min = 0, max = 100) => Math.max(min, Math.min(max, value));
-
-type MarketingBudgetPreset = 'LEAN' | 'STANDARD' | 'HEAVY' | 'EVENT' | 'CUSTOM';
-
-const MARKETING_BUDGET_PRESETS: { id: MarketingBudgetPreset; percent: number }[] = [
-    { id: 'LEAN', percent: 0.08 },
-    { id: 'STANDARD', percent: 0.15 },
-    { id: 'HEAVY', percent: 0.25 },
-    { id: 'EVENT', percent: 0.40 },
-];
-
-const getMarketingBudgetForPreset = (preset: MarketingBudgetPreset, productionBudget: number) => {
-    if (preset === 'CUSTOM') return 0;
-    const option = MARKETING_BUDGET_PRESETS.find(item => item.id === preset) || MARKETING_BUDGET_PRESETS[1];
-    const floor = preset === 'LEAN' ? 250_000 : preset === 'STANDARD' ? 750_000 : preset === 'HEAVY' ? 1_500_000 : 3_000_000;
-    return Math.round(Math.max(floor, productionBudget * option.percent) / 50_000) * 50_000;
-};
-
-const getBudgetTierForAmount = (amount: number): BudgetTier => {
-    if (amount > 50_000_000) return 'BLOCKBUSTER';
-    if (amount > 10_000_000) return 'HIGH';
-    if (amount > 2_000_000) return 'MID';
-    return 'LOW';
-};
-
-const MUSIC_DELIVERABLE_ROLES: MusicCreditRole[] = [
-    'LEAD_SINGLE',
-    'MUSIC_VIDEO_TIE_IN',
-    'PROMO_ALBUM',
-    'SOUNDTRACK_EP',
-    'TRAILER_ANTHEM',
-    'END_CREDIT_SONG'
-];
-
-type MusicArtistSortOption = 'RECOMMENDED' | 'RATING' | 'COST_LOW' | 'COST_HIGH' | 'FAME' | 'FOLLOWERS' | 'AVAILABILITY';
-
-const MUSIC_ARTIST_SORT_OPTIONS: { id: MusicArtistSortOption }[] = [
-    { id: 'RECOMMENDED' },
-    { id: 'RATING' },
-    { id: 'COST_LOW' },
-    { id: 'COST_HIGH' },
-    { id: 'FAME' },
-    { id: 'FOLLOWERS' },
-    { id: 'AVAILABILITY' },
-];
-
-const MUSIC_FAME_SORT_SCORE: Record<MusicArtist['fameTier'], number> = {
-    EMERGING: 1,
-    KNOWN: 2,
-    STAR: 3,
-    SUPERSTAR: 4,
-    LEGEND: 5,
-};
-
-const MUSIC_AVAILABILITY_SORT_SCORE: Record<MusicArtist['availability'], number> = {
-    COMMON: 3,
-    SELECTIVE: 2,
-    RARE: 1,
-};
-
-const getCastableNpcById = (id?: string | null, extraNPCs: any[] = []) => (
-    id
-        ? [...NPC_DATABASE, ...extraNPCs].find(npc => npc.id === id && isCastableActor(npc))
-        : undefined
-);
-
-const isCastableMovieRoleId = (id?: string | null, extraNPCs: any[] = []) => (
-    !id || id === 'UNKNOWN' || id === 'PLAYER_SELF' || id === 'STUDIO_STAFF' || Boolean(getCastableNpcById(id, extraNPCs))
-);
-
-const getInitialMusicArtistTargetCount = (concept?: any): number => {
-    const strategy = (concept?.musicStrategy || concept?.musicPlan?.strategy || 'LEAD_SINGLE') as ProjectMusicStrategy;
-    const savedCount = Number(concept?.selectedMusicArtistTargetCount ?? concept?.musicPlan?.artistTargetCount);
-    if (Number.isFinite(savedCount)) {
-        const bounds = getMusicArtistCountBounds(strategy);
-        return Math.min(bounds.max, Math.max(bounds.min, Math.round(savedCount)));
-    }
-    return getDefaultMusicArtistCount(strategy);
-};
-
-const getInitialSelectedMusicCreditRoles = (concept?: any): MusicCreditRole[] | null => {
-    if (Array.isArray(concept?.selectedMusicCreditRoles)) {
-        return Array.from(new Set(concept.selectedMusicCreditRoles.filter(Boolean))) as MusicCreditRole[];
-    }
-    const roles = Array.isArray(concept?.musicPlan?.selectedCreditRoles)
-        ? concept.musicPlan.selectedCreditRoles
-        : [];
-    const cleanRoles = Array.from(new Set(roles.filter(Boolean))) as MusicCreditRole[];
-    return cleanRoles.length ? cleanRoles : [];
-};
-
-const getMusicStrategyForSelectedRoles = (roles: MusicCreditRole[], fallback: ProjectMusicStrategy): ProjectMusicStrategy => {
-    if (roles.length === 0) return 'COMPOSER_ONLY';
-    if (roles.includes('PROMO_ALBUM')) return 'PROMO_ALBUM';
-    if (roles.includes('MUSIC_VIDEO_TIE_IN')) return 'MUSIC_VIDEO_TIE_IN';
-    if (roles.includes('SOUNDTRACK_EP')) return 'SOUNDTRACK_EP';
-    if (roles.includes('LEAD_SINGLE') || roles.includes('TRAILER_ANTHEM') || roles.includes('END_CREDIT_SONG')) return 'LEAD_SINGLE';
-    return fallback;
-};
-
-const returningCrewRoleToStateKey = (role?: string): 'director' | 'cinematographer' | 'composer' | 'lineProducer' | 'vfx' | null => {
-    if (!role) return null;
-    if (role === 'DIRECTOR') return 'director';
-    if (role === 'CINEMATOGRAPHER') return 'cinematographer';
-    if (role === 'COMPOSER') return 'composer';
-    if (role === 'LINE_PRODUCER') return 'lineProducer';
-    if (role === 'VFX_SUPERVISOR') return 'vfx';
-    return null;
-};
-
-const normalizeCrewReturningRole = (role?: string) => {
-    if (!role) return role;
-    if (role === 'VFX') return 'VFX_SUPERVISOR';
-    return role;
-};
-
-const formatReturningRoleLabel = (role?: string) => {
-    if (!role) return 'Talent';
-    const labels: Record<string, string> = {
-        DIRECTOR: 'Director',
-        CINEMATOGRAPHER: 'Cinematographer',
-        COMPOSER: 'Composer',
-        LINE_PRODUCER: 'Line Producer',
-        VFX_SUPERVISOR: 'VFX Supervisor',
-        LEAD_ACTOR: 'Lead Actor',
-        SUPPORTING_ACTOR: 'Supporting Actor',
-    };
-    return labels[role] || role.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, char => char.toUpperCase());
-};
-
-const VALID_RETURNING_TALENT_ROLES = new Set([
-    'DIRECTOR',
-    'CINEMATOGRAPHER',
-    'COMPOSER',
-    'LINE_PRODUCER',
-    'VFX_SUPERVISOR',
-    'LEAD_ACTOR',
-    'SUPPORTING_ACTOR',
-]);
-
-const getUniversePhaseLabel = (phase?: Universe['currentPhase']) => {
-    if (typeof phase === 'number') return `Phase ${phase}`;
-    if (typeof phase === 'string') {
-        const phaseNumber = phase.match(/(\d+)/)?.[1];
-        if (phaseNumber) return `Phase ${phaseNumber}`;
-        return phase.replace(/_/g, ' ');
-    }
-    return 'Phase 1';
-};
-
-const toUniverseCharacterId = (universeId: UniverseId | 'NEW' | null, characterName?: string) => {
-    const trimmed = characterName?.trim();
-    if (!trimmed || !universeId || universeId === 'NEW') return undefined;
-    return normalizeUniverseCharacterKey(trimmed);
-};
-
-export const GEAR_TIERS: Record<string, { name: string, desc: string, cost: number, quality: number }> = {
-    'TIER_1': { name: 'Indie Kit', desc: 'Basic DSLR and mirrorless setup.', cost: 10000, quality: 2 },
-    'TIER_2': { name: 'Prosumer Setup', desc: 'Mid-tier professional equipment.', cost: 100000, quality: 5 },
-    'TIER_3': { name: 'Standard Industry', desc: 'Industry standard digital cinema gear.', cost: 500000, quality: 8 },
-    'TIER_4': { name: 'High-End Premium', desc: 'Custom large-format rigs and lenses.', cost: 2500000, quality: 15 },
-    'TIER_5': { name: 'Cutting-Edge', desc: 'Experimental tech and massive setups.', cost: 8500000, quality: 30 }
-};
+export const GEAR_TIERS = GREENLIGHT_GEAR_TIERS;
 
 export interface GreenlightWizardProps {
     player: Player;
@@ -223,421 +142,19 @@ export interface GreenlightWizardProps {
     onComplete: () => void;
 }
 
-const CrewSelector: React.FC<{
-    title: string;
-    icon: React.ReactNode;
-    role: string;
-    candidates: any[];
-    selectedId: string | null;
-    onSelect: (id: string) => void;
-    mode: 'HIRE' | 'SELF' | 'IN_HOUSE';
-    onModeChange: (mode: 'HIRE' | 'SELF' | 'IN_HOUSE') => void;
-    player: Player;
-    hiredIds: string[];
-    inHouseQuality: number;
-    inHouseFame: number;
-    inHouseLevel: number;
-    returningTalent?: any[];
-    onNegotiate?: (talentId: string, returningData: any) => void;
-}> = ({ title, icon, role, candidates, selectedId, onSelect, mode, onModeChange, player, hiredIds, inHouseQuality, inHouseFame, inHouseLevel, returningTalent, onNegotiate }) => {
-    const canonicalRole = normalizeCrewReturningRole(role);
-    return (
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 animate-in slide-in-from-bottom-2 duration-500">
-            <h3 className="text-sm font-bold text-white mb-3 flex items-center gap-2">{icon} {title}</h3>
-
-            {/* Mode Selection */}
-            <div className="grid grid-cols-3 gap-2 mb-4">
-                <button
-                    onClick={() => onModeChange('HIRE')}
-                    className={`p-2 rounded-lg border text-center transition-all ${mode === 'HIRE' ? 'bg-blue-500/10 border-blue-500 text-white shadow-[0_0_15px_rgba(59,130,246,0.5)]' : 'bg-black/20 border-zinc-800 text-zinc-500 hover:bg-zinc-800'}`}
-                >
-                    <div className="text-[10px] font-bold uppercase">Hire Talent</div>
-                </button>
-                <button
-                    onClick={() => onModeChange('IN_HOUSE')}
-                    disabled={inHouseLevel === 0}
-                    className={`p-2 rounded-lg border text-center transition-all ${
-                        inHouseLevel === 0 ? 'bg-zinc-900 border-zinc-800 text-zinc-600 cursor-not-allowed opacity-50' :
-                        mode === 'IN_HOUSE' ? 'bg-emerald-500/10 border-emerald-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.5)]' : 'bg-black/20 border-zinc-800 text-zinc-500 hover:bg-zinc-800'
-                    }`}
-                    title={inHouseLevel === 0 ? "Upgrade department in Facilities to unlock In-House talent" : ""}
-                >
-                    <div className="text-[10px] font-bold uppercase">In-House</div>
-                </button>
-                {role === 'DIRECTOR' && (
-                    <button
-                        onClick={() => onModeChange('SELF')}
-                        className={`p-2 rounded-lg border text-center transition-all ${mode === 'SELF' ? 'bg-amber-500/10 border-amber-500 text-white shadow-[0_0_15px_rgba(245,158,11,0.5)]' : 'bg-black/20 border-zinc-800 text-zinc-500 hover:bg-zinc-800'}`}
-                    >
-                        <div className="text-[10px] font-bold uppercase">Direct Self</div>
-                    </button>
-                )}
-            </div>
-
-            {/* Candidates List */}
-            {mode === 'HIRE' && (
-                <div className="space-y-3 max-h-[400px] overflow-y-auto custom-scrollbar pr-1">
-                    {/* Connections Section */}
-                    {role === 'DIRECTOR' && player.relationships.filter(r => r.relation === 'Director' || r.relation === 'Connection').length > 0 && (
-                        <div className="space-y-2 mb-4">
-                            <div className="text-[10px] font-bold text-purple-400 uppercase tracking-widest px-2">Network Connections</div>
-                            {player.relationships
-                                .filter(r => (r.relation === 'Director' || r.relation === 'Connection') && (!hiredIds.includes(r.npcId || r.id) || (r.npcId || r.id) === selectedId))
-                                .map(rel => {
-                                    const npc = candidates.find(c => c.id === (rel.npcId || rel.id));
-                                    if (!npc) return null;
-
-                                    let salary = npc.salary;
-                                    if (!salary) {
-                                        // Use same logic as below but with discount
-                                        if (npc.tier === 'A_LIST') salary = 150000000 + Math.random() * 150000000;
-                                        else if (npc.tier === 'ESTABLISHED') salary = 50000000 + Math.random() * 50000000;
-                                        else if (npc.tier === 'RISING') salary = 10000000 + Math.random() * 20000000;
-                                        else salary = 1000000 + Math.random() * 4000000;
-                                    }
-
-                                    let discount = 0;
-                                    if (rel.closeness > 50) discount = Math.min(0.6, (rel.closeness - 50) / 100 + 0.1);
-                                    salary = Math.floor(salary * (1 - discount));
-
-                                    const isSelected = selectedId === npc.id;
-
-                                    return (
-                                        <button
-                                            key={rel.id}
-                                            onClick={() => onSelect(npc.id)}
-                                            className={`w-full p-4 rounded-xl border flex justify-between items-center transition-all duration-300 group relative overflow-hidden ${
-                                                isSelected
-                                                ? 'bg-purple-900/20 border-purple-500 text-white shadow-[0_0_20px_rgba(168,85,247,0.3)]'
-                                                : 'bg-zinc-900/80 border-purple-900/30 text-zinc-400 hover:bg-zinc-800 hover:border-purple-500/50'
-                                            }`}
-                                        >
-                                            <div className="flex items-center gap-3 relative z-10">
-                                                <img src={rel.image} alt={rel.name} className="w-10 h-10 rounded-full border border-purple-500/30 object-cover" referrerPolicy="no-referrer" />
-                                                <div className="text-left">
-                                                    <div className={`text-sm font-black uppercase tracking-tight ${isSelected ? 'text-white' : 'group-hover:text-white transition-colors'}`}>
-                                                        {rel.name}
-                                                    </div>
-                                                    <div className="text-[9px] text-purple-400 font-bold uppercase tracking-wider">
-                                                        {rel.relation} • Closeness: {rel.closeness}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div className="text-right relative z-10">
-                                                <div className="text-[10px] text-zinc-500 line-through">{formatMoney(npc.salary || salary / (1-discount))}</div>
-                                                <div className="text-sm font-mono font-bold text-emerald-400">{formatMoney(salary)}</div>
-                                            </div>
-                                        </button>
-                                    );
-                                })
-                            }
-                            <div className="h-px bg-zinc-800 my-4 mx-2"></div>
-                        </div>
-                    )}
-
-                    {candidates
-                        .filter(c => !hiredIds.includes(c.id) || c.id === selectedId)
-                        .map(c => {
-                        // Dynamic Salary Calculation if not present
-                        let salary = c.salary;
-                        let isReturning = false;
-                        let returningData = null;
-                        if (returningTalent) {
-                            returningData = returningTalent.find(t => t.id === c.id && t.role === canonicalRole);
-                            if (returningData) {
-                                salary = returningData.newDemand;
-                                isReturning = true;
-                            }
-                        }
-
-                        if (!salary) {
-                            if (role === 'DIRECTOR') {
-                                // INFLATED DIRECTOR SALARIES (User Request: Max 250-300M)
-                                if (c.tier === 'A_LIST') salary = 150000000 + Math.random() * 150000000; // 150M - 300M
-                                else if (c.tier === 'ESTABLISHED') salary = 50000000 + Math.random() * 50000000; // 50M - 100M
-                                else if (c.tier === 'RISING') salary = 10000000 + Math.random() * 20000000; // 10M - 30M
-                                else salary = 1000000 + Math.random() * 4000000; // 1M - 5M (Indie)
-                            } else {
-                                // Standard Actor Salaries
-                                if (c.tier === 'A_LIST') salary = 15000000;
-                                else if (c.tier === 'ESTABLISHED') salary = 5000000;
-                                else if (c.tier === 'RISING') salary = 1000000;
-                                else salary = 250000; // Indie/Unknown
-                            }
-                        }
-
-                        // Stats Display
-                        let talentDisplay = 'Talent: 50';
-                        let fameDisplay = 'Fame: 10';
-
-                        if (c.stats) {
-                            if ('talent' in c.stats) {
-                                talentDisplay = `Talent: ${Math.floor((c.stats as any).talent || 0)}`;
-                            } else if ('vision' in c.stats) {
-                                talentDisplay = `Vision: ${Math.floor((c.stats as any).vision || 0)}`;
-                            }
-
-                            if ('fame' in c.stats) {
-                                fameDisplay = `Fame: ${Math.floor((c.stats as any).fame || 0)}`;
-                            }
-                        }
-
-                        const isSelected = selectedId === c.id;
-                        // Check if already hired in another role (for this movie)
-                        // Note: We need to pass 'castList' or similar to check availability if we want to block double-hiring
-                        // For now, we just rely on the list being filtered before passed here if needed, or visual indicators.
-
-                        return (
-                            <button
-                                key={c.id}
-                                onClick={() => {
-                                    if (isReturning && !returningData?.accepted && returningData?.attemptsLeft === 0) return;
-                                    onSelect(c.id);
-                                }}
-                                className={`w-full p-4 rounded-xl border flex justify-between items-center transition-all duration-300 group relative overflow-hidden ${
-                                    isSelected
-                                    ? 'bg-zinc-800 border-emerald-500 text-white shadow-[0_0_20px_rgba(16,185,129,0.3)]'
-                                    : isReturning && !returningData?.accepted && returningData?.attemptsLeft === 0
-                                        ? 'bg-red-900/10 border-red-900/30 opacity-50 cursor-not-allowed'
-                                        : 'bg-zinc-900/80 border-zinc-800 text-zinc-400 hover:bg-zinc-800 hover:border-zinc-600'
-                                }`}
-                            >
-                                {/* Selection Glow Effect */}
-                                {isSelected && <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/10 to-transparent animate-pulse"></div>}
-
-                                <div className="flex items-center gap-3 relative z-10">
-                                    {c.avatar && (
-                                        <img src={c.avatar} alt={c.name} className="w-10 h-10 rounded-full border border-white/10 object-cover" referrerPolicy="no-referrer" />
-                                    )}
-                                    <div className="text-left">
-                                        <div className={`text-sm font-black uppercase tracking-tight flex items-center gap-2 ${isSelected ? 'text-white' : 'group-hover:text-white transition-colors'}`}>
-                                            {c.name}
-                                            {isReturning && (
-                                                <span className="text-[8px] px-1.5 py-0.5 bg-purple-500/20 text-purple-300 rounded-full border border-purple-500/30">
-                                                    Returning
-                                                </span>
-                                            )}
-                                        </div>
-                                        <div className="text-[10px] opacity-80 flex flex-col gap-1 mt-0.5">
-                                            <div className="flex gap-2 items-center">
-                                                <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
-                                                    c.tier === 'A_LIST' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' :
-                                                    c.tier === 'ESTABLISHED' ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30' :
-                                                    c.tier === 'RISING' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' :
-                                                    'bg-zinc-700 text-zinc-400 border border-zinc-600'
-                                                }`}>
-                                                    {c.tier.replace('_', ' ')}
-                                                </span>
-                                                {/* Explicit Stats Display */}
-                                                <span className="text-[9px] font-mono text-zinc-500 flex gap-2">
-                                                    <span className="text-emerald-400">{talentDisplay}</span>
-                                                    <span className="text-rose-400">{fameDisplay}</span>
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="text-right relative z-10">
-                                    <div className={`text-sm font-mono font-bold ${isSelected ? 'text-white' : 'text-emerald-400'}`}>
-                                        {isReturning && !returningData?.accepted && returningData?.attemptsLeft > 0 && onNegotiate ? (
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    onNegotiate(c.id, returningData);
-                                                }}
-                                                className="px-3 py-1 bg-purple-500/20 text-purple-300 rounded-lg text-xs hover:bg-purple-500/40 transition-colors"
-                                            >
-                                                Negotiate
-                                            </button>
-                                        ) : isReturning && !returningData?.accepted && returningData?.attemptsLeft === 0 ? (
-                                            <span className="text-red-500 text-xs uppercase tracking-wider">Walked Away</span>
-                                        ) : (
-                                            `$${(salary/1000000).toFixed(1)}M`
-                                        )}
-                                    </div>
-                                    <div className="text-[9px] opacity-60 uppercase font-bold tracking-wider">Fee</div>
-                                </div>
-                            </button>
-                        );
-                    })}
-                </div>
-            )}
-
-            {mode === 'IN_HOUSE' && (
-                <div className="p-6 bg-emerald-900/10 border border-emerald-500/20 rounded-xl text-center animate-in fade-in zoom-in duration-300">
-                    <div className="w-12 h-12 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-3 text-emerald-400">
-                        <Users size={24} />
-                    </div>
-                    <div className="text-emerald-400 font-bold text-sm mb-1 uppercase tracking-wider">Studio Staff</div>
-                    <div className="text-[10px] font-mono text-zinc-500 flex gap-2 justify-center mb-2">
-                        <span className="text-emerald-400">Talent: {inHouseQuality}</span>
-                        <span className="text-rose-400">Fame: {inHouseFame}</span>
-                    </div>
-                    <p className="text-xs text-zinc-400 max-w-[200px] mx-auto leading-relaxed">Reliable, salaried employees. No upfront fee, but average creative output.</p>
-                </div>
-            )}
-
-            {mode === 'SELF' && (
-                <div className="p-6 bg-amber-900/10 border border-amber-500/20 rounded-xl text-center animate-in fade-in zoom-in duration-300">
-                    <div className="w-12 h-12 bg-amber-500/20 rounded-full flex items-center justify-center mx-auto mb-3 text-amber-400">
-                        <Crown size={24} />
-                    </div>
-                    <div className="text-amber-400 font-bold text-sm mb-1 uppercase tracking-wider">{player.name}</div>
-                    <div className="text-[10px] font-mono text-zinc-500 flex gap-2 justify-center mb-2">
-                        <span className="text-emerald-400">Talent: {role === 'DIRECTOR' ? Math.round(getDirectorTalent(player.directorStats || { vision: 0, technical: 0, leadership: 0, style: 0 })) : 50}</span>
-                        <span className="text-rose-400">Fame: {player.stats?.fame || 0}</span>
-                    </div>
-                    <p className="text-xs text-zinc-400 max-w-[200px] mx-auto leading-relaxed">Take the helm yourself. Gain XP and creative control. Free.</p>
-                </div>
-            )}
-        </div>
-    );
-};
-
-const LocationSelector: React.FC<{
-    selectedIds: string[];
-    onSelect: (id: string) => void;
-    locations: Record<string, any[]>;
-    findLocation: (id: string | null) => any;
-}> = ({ selectedIds, onSelect, locations }) => {
-    const [selectedContinent, setSelectedContinent] = useState<string | null>(null);
-
-    const continents = [
-        { id: 'NA', name: 'North America', regionId: 'NORTH_AMERICA' as BoxOfficeRegionId },
-        { id: 'SA', name: 'South America', regionId: 'SOUTH_AMERICA' as BoxOfficeRegionId },
-        { id: 'EU', name: 'Europe', regionId: 'EUROPE' as BoxOfficeRegionId },
-        { id: 'AS', name: 'Asia', regionId: 'ASIA' as BoxOfficeRegionId },
-        { id: 'AF', name: 'Africa', regionId: 'AFRICA' as BoxOfficeRegionId },
-        { id: 'OC', name: 'Oceania', regionId: 'OCEANIA' as BoxOfficeRegionId },
-    ];
-    const continentToRegion = Object.fromEntries(continents.map(continent => [continent.id, continent.regionId])) as Record<string, BoxOfficeRegionId>;
-    const regionToContinent = Object.fromEntries(continents.map(continent => [continent.regionId, continent.id])) as Record<BoxOfficeRegionId, string>;
-
-    const locationPins = useMemo<RegionMapLocationPin[]>(() => (
-        Object.entries(locations).flatMap(([continent, locs]) => (
-            (locs as any[]).map(loc => ({
-                id: loc.id,
-                name: loc.name,
-                x: loc.x,
-                y: loc.y,
-                longitude: loc.longitude,
-                latitude: loc.latitude,
-                selected: selectedIds.includes(loc.id),
-                regionId: continentToRegion[continent]
-            }))
-        ))
-    ), [locations, selectedIds]);
-
-    const selectedRegionIds = useMemo<BoxOfficeRegionId[]>(() => {
-        const regionIds = new Set<BoxOfficeRegionId>();
-        if (selectedContinent && continentToRegion[selectedContinent]) {
-            regionIds.add(continentToRegion[selectedContinent]);
-        }
-
-        Object.entries(locations).forEach(([continent, locs]) => {
-            const regionId = continentToRegion[continent];
-            if (!regionId) return;
-            if ((locs as any[]).some(loc => selectedIds.includes(loc.id))) {
-                regionIds.add(regionId);
-            }
-        });
-
-        return Array.from(regionIds);
-    }, [continentToRegion, locations, selectedContinent, selectedIds]);
-
-    const selectLocation = (id: string, regionId?: BoxOfficeRegionId) => {
-        if (regionId && regionToContinent[regionId]) {
-            setSelectedContinent(regionToContinent[regionId]);
-        }
-        onSelect(id);
-    };
-
-    const selectRegion = (regionId: BoxOfficeRegionId) => {
-        if (regionToContinent[regionId]) {
-            setSelectedContinent(regionToContinent[regionId]);
-        }
-    };
-
-    return (
-        <div className="space-y-4 animate-in slide-in-from-bottom-2 duration-500">
-            <div className="relative overflow-hidden rounded-3xl border border-sky-200/30 bg-sky-400/10 p-4 shadow-2xl shadow-sky-950/35">
-                <InteractiveRegionMap
-                    selectedRegionIds={selectedRegionIds}
-                    onSelectRegion={selectRegion}
-                    locationPins={locationPins}
-                    onSelectLocation={selectLocation}
-                    visualTone="production"
-                    compact
-                />
-
-                <div className="absolute top-4 left-4 bg-black/60 backdrop-blur-md px-4 py-2 rounded-xl border border-white/10 text-[10px] font-black text-white flex items-center gap-2 shadow-xl">
-                    <Globe size={14} className="text-sky-200" />
-                    <span className="tracking-widest">GLOBAL PRODUCTION NETWORK</span>
-                </div>
-
-                {selectedIds.length > 0 && (
-                    <div className="absolute bottom-4 right-4 bg-emerald-400 text-black px-4 py-2 rounded-xl text-[10px] font-black shadow-2xl animate-in fade-in slide-in-from-right-4">
-                        SELECTED: {selectedIds.length} LOCATIONS
-                    </div>
-                )}
-            </div>
-
-            {/* Location List for Selected Continent */}
-            {selectedContinent && (
-                <div className="grid grid-cols-1 gap-2 animate-in slide-in-from-bottom-4 pb-28">
-                    <div className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-1">
-                        Sites in {continents.find(c => c.id === selectedContinent)?.name}
-                    </div>
-                    {(locations[selectedContinent] || []).map(loc => {
-                        const isSelected = selectedIds.includes(loc.id);
-                        return (
-                        <button
-                            key={loc.id}
-                            onClick={() => onSelect(loc.id)}
-                            className={`p-4 rounded-xl border text-left transition-all flex justify-between items-center ${
-                                isSelected
-                                ? 'bg-emerald-500/10 border-emerald-500 text-white'
-                                : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-700'
-                            }`}
-                        >
-                            <div>
-                                <div className="text-sm font-bold uppercase flex items-center gap-2">
-                                    {loc.name}
-                                    {isSelected && <Check size={14} className="text-emerald-500" />}
-                                </div>
-                                <div className="text-[10px] opacity-70 mt-0.5">{loc.desc}</div>
-                            </div>
-                            <div className="text-right">
-                                <div className={`text-xs font-bold ${loc.cost > 1000000 ? 'text-rose-400' : 'text-emerald-400'}`}>
-                                    +{formatMoney(loc.cost)}
-                                </div>
-                                <div className="text-[10px] font-mono text-amber-500">
-                                    +{loc.quality} Qual
-                                </div>
-                            </div>
-                        </button>
-                    );
-                    })}
-                </div>
-            )}
-        </div>
-    );
-};
-
 export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, studio, initialConcept, onBack, onOpenScriptMarket, onUpdatePlayer, onComplete }) => {
     const language = getPlayerLanguage(player);
     const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
     const [selectedScriptId, setSelectedScriptId] = useState<string | null>(initialConcept?.scriptId || null);
     const loadedScriptStateRef = useRef<string | null>(initialConcept?.scriptId ? `initial:${initialConcept.scriptId}` : null);
-    type GreenlightStep = 'SELECT_SCRIPT' | 'DIRECTOR' | 'CAST' | 'CREW' | 'EQUIPMENT' | 'LOCATION' | 'SETUP' | 'CONFIRM' | 'BUZZ';
     const initialStep = initialConcept?.lastStep === 'TONE' ? 'SETUP' : (initialConcept?.lastStep || (initialConcept ? 'DIRECTOR' : 'SELECT_SCRIPT'));
     const [step, setStep] = useState<GreenlightStep>(initialStep);
     const isInternallyControlledTalent = (id?: string | null) => id === 'PLAYER_SELF' || id === 'STUDIO_STAFF';
 
     // Setup State
     const [tone, setTone] = useState(initialConcept?.tone || 50); // 0 = Practical, 100 = CGI
-    const [visualStyle, setVisualStyle] = useState<'REALISTIC' | 'STYLISTIC' | 'GRITTY' | 'VIBRANT'>('REALISTIC');
-    const [pacing, setPacing] = useState<'SLOW' | 'MODERATE' | 'FAST' | 'FRENETIC'>('MODERATE');
+    const [visualStyle, setVisualStyle] = useState<GreenlightVisualStyle>('REALISTIC');
+    const [pacing, setPacing] = useState<GreenlightPacing>('MODERATE');
     const [marketingBudgetPreset, setMarketingBudgetPreset] = useState<MarketingBudgetPreset>(initialConcept?.reservedMarketingBudget !== undefined ? 'CUSTOM' : 'STANDARD');
     const [reservedMarketingBudget, setReservedMarketingBudget] = useState(Math.max(0, Math.round(Number(initialConcept?.reservedMarketingBudget || 0))));
     const [musicStrategy, setMusicStrategy] = useState<ProjectMusicStrategy>(initialConcept?.musicStrategy || initialConcept?.musicPlan?.strategy || 'LEAD_SINGLE');
@@ -672,29 +189,19 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         lineProducer: 'HIRE',
         vfx: 'HIRE'
     });
-    const [selectedCrew, setSelectedCrew] = useState<Record<string, string | null>>(initialConcept?.selectedCrew || {
-        director: null,
-        cinematographer: null,
-        composer: null,
-        lineProducer: null,
-        vfx: null
-    });
+    const [selectedCrew, setSelectedCrew] = useState<Record<string, string | null>>(
+        normalizeSelectedCrewState(initialConcept?.selectedCrew)
+    );
 
     // Cast State
-    const [castList, setCastList] = useState<{
-        id: string,
-        role: string,
-        roleType: 'LEAD' | 'SUPPORTING' | 'CAMEO' | 'EXTRA',
-        actorId: string | null,
-        actorName?: string,
-        salary?: number,
-        characterId?: string,
-        characterName?: string,
-        sourceUniverseId?: UniverseId
-    }[]>(initialConcept?.castList || [
-        { id: 'lead_1', role: 'Lead Actor', roleType: 'LEAD', actorId: null },
-        { id: 'supp_1', role: 'Supporting Actor', roleType: 'SUPPORTING', actorId: null }
+    const [castList, setCastList] = useState<GreenlightCastRole[]>(initialConcept?.castList || [
+        { id: 'lead_1', role: 'Lead Actor', roleType: 'LEAD', actorId: null, identitySource: 'AUTO' },
+        { id: 'supp_1', role: 'Supporting Actor', roleType: 'SUPPORTING', actorId: null, identitySource: 'AUTO' }
     ]);
+    const [backgroundCastingPlan, setBackgroundCastingPlan] = useState<BackgroundCastingPlan>(() => (
+        normalizeBackgroundCastingPlan(initialConcept?.backgroundCastingPlan, {})
+    ));
+    const backgroundPlanScriptRef = useRef<string | null>(null);
 
     const [selectedLocations, setSelectedLocations] = useState<string[]>(initialConcept?.selectedLocations || []);
     const [selectedUniverseId, setSelectedUniverseId] = useState<UniverseId | 'NEW' | null>(initialConcept?.universeId || null);
@@ -714,17 +221,30 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         practicalEffects: 'TIER_3'
     });
 
+    const isPrimaryStudio = getStudioGroup(player).parentStudio?.id === studio.id;
+    const playerActingTalent = useMemo(
+        () => getActorTalent(player.stats.skills),
+        [player.stats.skills],
+    );
+    const studioTalentRoster = useMemo(() => {
+        if (!isPrimaryStudio) {
+            return (studio.studioState?.talentRoster || [])
+                .filter(contract => contract.studioId === studio.id);
+        }
+        return mergeParentStudioTalentRosters(
+            studio.id,
+            player.studio?.talentRoster as any,
+            studio.studioState?.talentRoster as any,
+        );
+    }, [isPrimaryStudio, player.studio?.talentRoster, studio.id, studio.studioState?.talentRoster]);
+
     const contractedTalentIds = useMemo(() => {
-        const roster = [
-            ...((player.studio?.talentRoster as any[]) || []),
-            ...((studio.studioState?.talentRoster as any[]) || [])
-        ];
         return new Set(
-            roster
+            studioTalentRoster
                 .filter(contract => contract?.status === 'ACTIVE' && contract?.type === 'MOVIE_DEAL' && (contract?.moviesRemaining ?? 0) > 0 && contract?.npcId)
                 .map(contract => contract.npcId)
         );
-    }, [player.studio?.talentRoster, studio.studioState?.talentRoster]);
+    }, [studioTalentRoster]);
 
     const getReturningTalentKey = (talent: any) => [
         String(talent?.role || 'UNKNOWN_ROLE'),
@@ -739,8 +259,9 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         safeTalentList.forEach((talent: any) => {
             if (!talent || typeof talent !== 'object') return;
 
-            const id = String(talent.id || '');
             const role = String(talent.role || '');
+            const crewStateKey = returningCrewRoleToStateKey(role);
+            const id = String(crewStateKey ? normalizeCrewSelectionId(talent.id) || '' : talent.id || '');
             if (!id || !VALID_RETURNING_TALENT_ROLES.has(role)) return;
 
             const originalSalary = Math.max(0, Number.isFinite(Number(talent.originalSalary)) ? Number(talent.originalSalary) : Number(talent.newDemand || 0));
@@ -821,6 +342,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             crewModes,
             selectedCrew,
             castList,
+            backgroundCastingPlan,
             selectedLocations,
             equipmentChoices,
             tone,
@@ -941,6 +463,30 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             || (selectedScriptId ? normalizeReturningTalentEntries((Array.isArray(studio.studioState?.scripts) ? studio.studioState!.scripts : []).find(s => s.id === selectedScriptId)) : null)
             || (initialConcept ? normalizeReturningTalentEntries((Array.isArray(studio.studioState?.scripts) ? studio.studioState!.scripts : []).find(s => s.id === initialConcept.scriptId)) : null);
     }, [scripts, selectedScriptId, studio.studioState?.scripts, initialConcept?.scriptId, contractedTalentIds]);
+    const selectedStoryCompass = useMemo(() => (
+        selectedScript
+            ? inferStoryCompass(selectedScript, selectedScript.isOriginal === false ? 'MARKET_INFERENCE' : 'SCRIPT_DNA')
+            : null
+    ), [selectedScript]);
+    const backgroundCastingContext = useMemo(() => ({
+        projectId: selectedScript?.id,
+        title: selectedScript?.title,
+        genre: selectedScript?.genres?.[0] as Genre | undefined,
+        projectType: selectedScript ? resolveProjectType(selectedScript.projectType, selectedScript.type, selectedScript.projectDetails?.type) : undefined,
+        episodes: selectedScript?.episodes,
+        castShape: selectedStoryCompass?.castShape,
+        budget: selectedScript?.developmentCost,
+        tags: selectedScript?.tags,
+    }), [selectedScript, selectedStoryCompass]);
+
+    useEffect(() => {
+        if (!selectedScript?.id || backgroundPlanScriptRef.current === selectedScript.id) return;
+        backgroundPlanScriptRef.current = selectedScript.id;
+        const savedConcept = selectedScript.id === initialConcept?.scriptId
+            ? initialConcept
+            : conceptByScriptId.get(selectedScript.id);
+        setBackgroundCastingPlan(normalizeBackgroundCastingPlan(savedConcept?.backgroundCastingPlan, backgroundCastingContext));
+    }, [selectedScript?.id, backgroundCastingContext, conceptByScriptId, initialConcept]);
 
     useEffect(() => {
         if (!selectedScript && step !== 'SELECT_SCRIPT' && step !== 'BUZZ') {
@@ -1034,6 +580,11 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         });
     }, [player, studio.id]);
 
+    const selectableStudioUniverses = useMemo(() => (
+        (Object.values(normalizeUniverseMap(player.world?.universes || {})) as Universe[])
+            .filter(universe => universe.status !== 'RETIRED' && universe.studioId === studio.id)
+    ), [player.world?.universes, studio.id]);
+
     const previousFranchiseInstallments = useMemo(() => {
         if (!selectedScript?.franchiseId) return [];
         const franchiseId = selectedScript.franchiseId;
@@ -1081,6 +632,11 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                     status: 'ACTIVE',
                     fanApproval: 62,
                     roleType: member.roleType,
+                    storyFunction: member.storyFunction,
+                    storyRole: normalizeCharacterStoryRole(member.storyRole),
+                    abilityType: normalizeCharacterAbilityType(member.abilityType),
+                    nature: member.nature,
+                    identitySource: member.identitySource || 'CANON',
                     appearances: 1,
                     latestAppearanceTitle: details.name || details.title || project.name,
                     sourceName,
@@ -1172,6 +728,11 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                         status: 'ACTIVE',
                         fanApproval: 55,
                         roleType: member.roleType,
+                        storyFunction: member.storyFunction,
+                        storyRole: normalizeCharacterStoryRole(member.storyRole),
+                        abilityType: normalizeCharacterAbilityType(member.abilityType),
+                        nature: member.nature,
+                        identitySource: member.identitySource || 'CANON',
                         appearances: 1,
                         latestAppearanceTitle: project.name,
                         sourceName: franchise.name,
@@ -1278,17 +839,12 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                     lineProducer: 'HIRE',
                     vfx: 'HIRE'
                 });
-                setSelectedCrew(existingConcept.selectedCrew || {
-                    director: null,
-                    cinematographer: null,
-                    composer: null,
-                    lineProducer: null,
-                    vfx: null
-                });
+                setSelectedCrew(normalizeSelectedCrewState(existingConcept.selectedCrew));
                 setCastList(existingConcept.castList || [
-                    { id: 'lead_1', role: 'Lead Actor', roleType: 'LEAD', actorId: null },
-                    { id: 'supp_1', role: 'Supporting Actor', roleType: 'SUPPORTING', actorId: null }
+                    { id: 'lead_1', role: 'Lead Actor', roleType: 'LEAD', actorId: null, identitySource: 'AUTO' },
+                    { id: 'supp_1', role: 'Supporting Actor', roleType: 'SUPPORTING', actorId: null, identitySource: 'AUTO' }
                 ]);
+                setBackgroundCastingPlan(normalizeBackgroundCastingPlan(existingConcept.backgroundCastingPlan, backgroundCastingContext));
                 setSelectedLocations(existingConcept.selectedLocations || []);
                 setEquipmentChoices(existingConcept.equipmentChoices || {
                     cameras: 'TIER_3',
@@ -1343,9 +899,10 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                     vfx: null
                 });
                 setCastList([
-                    { id: 'lead_1', role: 'Lead Actor', roleType: 'LEAD', actorId: null },
-                    { id: 'supp_1', role: 'Supporting Actor', roleType: 'SUPPORTING', actorId: null }
+                    { id: 'lead_1', role: 'Lead Actor', roleType: 'LEAD', actorId: null, identitySource: 'AUTO' },
+                    { id: 'supp_1', role: 'Supporting Actor', roleType: 'SUPPORTING', actorId: null, identitySource: 'AUTO' }
                 ]);
+                setBackgroundCastingPlan(buildBackgroundCastingPlan(backgroundCastingContext));
                 setSelectedLocations([]);
                 setEquipmentChoices({
                     cameras: 'TIER_3',
@@ -1372,7 +929,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                 setSelectedInvestorIds([]);
             }
         }
-    }, [selectedScriptId, conceptByScriptId, initialConcept?.scriptId]);
+    }, [selectedScriptId, conceptByScriptId, initialConcept?.scriptId, backgroundCastingContext]);
 
     // Pre-fill sequel cast and crew
     useEffect(() => {
@@ -1439,7 +996,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                         if (roleKey === 'cinematographer' || roleKey === 'composer' || roleKey === 'line_producer' || roleKey === 'vfx_supervisor') {
                             const stateKey = roleKey === 'line_producer' ? 'lineProducer' : (roleKey === 'vfx_supervisor' ? 'vfx' : roleKey);
                             if (!newSelectedCrew[stateKey]) {
-                                newSelectedCrew[stateKey] = c.id;
+                                newSelectedCrew[stateKey] = normalizeCrewSelectionId(c.id);
                                 newCrewModes[stateKey] = c.id === 'PLAYER_SELF' ? 'SELF' : (c.id === 'STUDIO_STAFF' ? 'IN_HOUSE' : 'HIRE');
                             }
                         }
@@ -1471,7 +1028,12 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                             salary: salary,
                             characterId: c.characterId,
                             characterName: c.characterName,
-                            sourceUniverseId: c.sourceUniverseId
+                            sourceUniverseId: c.sourceUniverseId,
+                            storyFunction: c.storyFunction,
+                            storyRole: normalizeCharacterStoryRole(c.storyRole),
+                            abilityType: normalizeCharacterAbilityType(c.abilityType),
+                            nature: c.nature,
+                            identitySource: c.identitySource || 'CANON'
                         };
                     });
                     setCastList(newCastList);
@@ -1519,11 +1081,26 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         }
     }, [selectedScript?.id, selectedScript?.franchiseId, previousFranchiseInstallments]);
 
+    const directorCandidatePool = useMemo(() => [
+        ...NPC_DATABASE,
+        ...(player.flags.extraNPCs || [])
+    ], [player.flags.extraNPCs]);
+    const crewMarketAbsoluteWeek = getCrewMarketAbsoluteWeek(player.age, player.currentWeek);
+    const crewMarketCycle = getCrewMarketCycle(player.age, player.currentWeek);
+    const crewMarketRefreshIn = getCrewMarketRefreshInWeeks(player.age, player.currentWeek);
+
+    const connectedDirectorCandidates = useMemo(() => (
+        getConnectedDirectorCandidates(player.relationships || [], directorCandidatePool)
+    ), [player.relationships, directorCandidatePool]);
+
     // Real NPC Data Integration
     const availableDirectors = useMemo(() => {
         // Refresh every 3 weeks
-        const seedWeek = Math.floor(player.currentWeek / 3);
-        const talent = getAvailableTalent(player.currentWeek, 'DIRECTOR', player.flags.extraNPCs || []);
+        const seedWeek = crewMarketCycle;
+        const talent = getAvailableTalent(crewMarketAbsoluteWeek, 'DIRECTOR', player.flags.extraNPCs || []);
+        connectedDirectorCandidates.forEach(director => {
+            if (!talent.some(candidate => candidate.id === director.id)) talent.unshift(director);
+        });
         const lastInstallment = previousFranchiseInstallments[0];
         const lastDetails = lastInstallment ? (lastInstallment.projectDetails || lastInstallment) : null;
         const returningDirector = currentReturningTalent.find(talentEntry => talentEntry.role === 'DIRECTOR');
@@ -1553,11 +1130,18 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             const seed = t.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
             const rand = (seed % 100) / 100; // 0.00 to 0.99
 
-            let salary = 0;
-            if (t.tier === 'A_LIST') salary = 150000000 + (rand * 150000000); // 150M - 300M
-            else if (t.tier === 'ESTABLISHED') salary = 50000000 + (rand * 50000000); // 50M - 100M
-            else if (t.tier === 'RISING') salary = 10000000 + (rand * 20000000); // 10M - 30M
-            else salary = 1000000 + (rand * 4000000); // 1M - 5M (Indie)
+            let standardSalary = 0;
+            if (t.tier === 'A_LIST') standardSalary = 150000000 + (rand * 150000000); // 150M - 300M
+            else if (t.tier === 'ESTABLISHED') standardSalary = 50000000 + (rand * 50000000); // 50M - 100M
+            else if (t.tier === 'RISING') standardSalary = 10000000 + (rand * 20000000); // 10M - 30M
+            else standardSalary = 1000000 + (rand * 4000000); // 1M - 5M (Indie)
+
+            const relationship = (player.relationships || []).find(rel => (
+                (rel.relation === 'Director' || rel.relation === 'Connection') &&
+                (rel.npcId || rel.id) === t.id
+            ));
+            const connectionDiscount = relationship ? getDirectorConnectionDiscount(relationship.closeness) : 0;
+            const salary = Math.floor(standardSalary * (1 - connectionDiscount));
 
             // Dynamic Fame & Talent (Fluctuation based on 3-week cycle)
             const fluctuation = Math.sin(seedWeek * 0.5 + seed) * 10; // +/- 10 fluctuation
@@ -1567,9 +1151,15 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             const baseTalent = (t.stats as any)?.talent || (t.stats as any)?.vision || 50;
             const currentTalent = Math.max(0, Math.min(100, baseTalent + (fluctuation * 0.5)));
 
-            return { ...t, salary, stats: { ...t.stats, fame: currentFame, talent: currentTalent } };
+            return {
+                ...t,
+                salary,
+                standardSalary,
+                connectionDiscount,
+                stats: { ...t.stats, fame: currentFame, talent: currentTalent }
+            };
         });
-    }, [Math.floor(player.currentWeek / 3), player.flags.extraNPCs, selectedCrew.director, previousFranchiseInstallments, currentReturningTalent]);
+    }, [crewMarketCycle, crewMarketAbsoluteWeek, player.flags.extraNPCs, player.relationships, connectedDirectorCandidates, selectedCrew.director, previousFranchiseInstallments, currentReturningTalent]);
 
     const actorCandidatePool = useMemo(() => [
         ...NPC_DATABASE,
@@ -1583,8 +1173,8 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
     };
 
     const availableActors = useMemo(() => {
-        const seedWeek = Math.floor(player.currentWeek / 3);
-        const talent = getAvailableTalent(player.currentWeek, 'ACTOR', player.flags.extraNPCs || []).filter(isCastableActor);
+        const seedWeek = crewMarketCycle;
+        const talent = getAvailableTalent(crewMarketAbsoluteWeek, 'ACTOR', player.flags.extraNPCs || []).filter(isCastableActor);
 
         // Ensure all selected actors are in the list
         const selectedActorIds = castList.map(c => c.actorId).filter(id => id && id !== 'PLAYER_SELF');
@@ -1596,7 +1186,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         });
 
         // Ensure contracted actors are in the list
-        const contracts = player.studio?.talentRoster?.filter(c => c.type === 'MOVIE_DEAL' && c.moviesRemaining > 0) || [];
+        const contracts = studioTalentRoster.filter(c => c.type === 'MOVIE_DEAL' && c.moviesRemaining > 0);
         contracts.forEach(c => {
             if (!talent.some(t => t.id === c.npcId)) {
                 const selectedNPC = actorCandidatePool.find(n => n.id === c.npcId);
@@ -1638,7 +1228,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
 
             return { ...t, salary, stats: { ...t.stats, fame: currentFame, talent: currentTalent } };
         });
-    }, [Math.floor(player.currentWeek / 3), castList, player.studio?.talentRoster, player.flags.extraNPCs, player.relationships, actorCandidatePool, currentReturningTalent, linkedCharacterOptions, previousCharacterOptions, legacyCharacterOptions, activeUniverseCharacterOptions]);
+    }, [crewMarketCycle, crewMarketAbsoluteWeek, castList, studioTalentRoster, player.flags.extraNPCs, player.relationships, actorCandidatePool, currentReturningTalent, linkedCharacterOptions, previousCharacterOptions, legacyCharacterOptions, activeUniverseCharacterOptions]);
 
     const contractedActors = useMemo(() => {
         return Array.from(contractedTalentIds)
@@ -1663,10 +1253,10 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         let source: any = null;
 
         if (crewStateKey === 'director') source = availableDirectors.find(d => d.id === talent.id);
-        if (crewStateKey === 'cinematographer') source = mockCrew.cinematographers.find(c => c.id === talent.id);
-        if (crewStateKey === 'composer') source = mockCrew.composers.find(c => c.id === talent.id);
-        if (crewStateKey === 'lineProducer') source = mockCrew.producers.find(c => c.id === talent.id);
-        if (crewStateKey === 'vfx') source = mockCrew.vfxTeams.find(c => c.id === talent.id);
+        if (crewStateKey === 'cinematographer') source = crewMarket.cinematographers.find(c => c.id === talent.id);
+        if (crewStateKey === 'composer') source = crewMarket.composers.find(c => c.id === talent.id);
+        if (crewStateKey === 'lineProducer') source = crewMarket.producers.find(c => c.id === talent.id);
+        if (crewStateKey === 'vfx') source = crewMarket.vfxTeams.find(c => c.id === talent.id);
         if (!source) source = availableActors.find(actor => actor.id === talent.id);
         if (!source) source = (Array.isArray(player.relationships) ? player.relationships : []).find(rel => (rel.npcId || rel.id) === talent.id);
 
@@ -1685,113 +1275,59 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         };
     };
 
-    // Mock Data Generators (Refreshes every 3 weeks)
-    const mockCrew = useMemo(() => {
-        const seedWeek = Math.floor(player.currentWeek / 3);
-
-        // Helper to generate deterministic stats based on seed and index
-        const getStats = (base: number, idx: number) => {
-            const fluctuation = Math.sin(seedWeek * 0.5 + idx) * 10;
-            return Math.max(10, Math.min(100, Math.floor(base + fluctuation)));
-        };
+    const crewMarket = useMemo(() => {
+        const pinnedIds = (stateKey: keyof typeof selectedCrew, returningRole: string) => [
+            selectedCrew[stateKey],
+            ...currentReturningTalent
+                .filter(entry => normalizeCrewReturningRole(entry.role) === returningRole)
+                .map(entry => entry.id),
+        ].filter(Boolean) as string[];
 
         return {
-            cinematographers: [
-                { id: 'dp_1', name: 'Roger Deakins', tier: 'LEGEND', salary: 5000000, stats: { lighting: getStats(99, 1), composition: getStats(98, 2), fame: getStats(95, 3), talent: getStats(99, 4) } },
-                { id: 'dp_2', name: 'Hoyte van Hoytema', tier: 'PROFESSIONAL', salary: 3000000, stats: { lighting: getStats(95, 5), composition: getStats(94, 6), fame: getStats(85, 7), talent: getStats(94, 8) } },
-                { id: 'dp_3', name: 'Greig Fraser', tier: 'PROFESSIONAL', salary: 2500000, stats: { lighting: getStats(92, 9), composition: getStats(90, 10), fame: getStats(80, 11), talent: getStats(91, 12) } },
-                { id: 'dp_4', name: 'Indie DP', tier: 'INDIE', salary: 150000, stats: { lighting: getStats(65, 13), composition: getStats(70, 14), fame: getStats(10, 15), talent: getStats(68, 16) } },
-            ],
-            composers: [
-                { id: 'mus_1', name: 'Hans Zimmer', tier: 'LEGEND', salary: 4000000, stats: { melody: getStats(95, 17), atmosphere: getStats(99, 18), fame: getStats(98, 19), talent: getStats(97, 20) } },
-                { id: 'mus_2', name: 'Ludwig Göransson', tier: 'PROFESSIONAL', salary: 2000000, stats: { melody: getStats(92, 21), atmosphere: getStats(94, 22), fame: getStats(88, 23), talent: getStats(93, 24) } },
-                { id: 'mus_3', name: 'Hildur Guðnadóttir', tier: 'PROFESSIONAL', salary: 1800000, stats: { melody: getStats(88, 25), atmosphere: getStats(96, 26), fame: getStats(82, 27), talent: getStats(92, 28) } },
-                { id: 'mus_4', name: 'Synth Wave Artist', tier: 'INDIE', salary: 100000, stats: { melody: getStats(75, 29), atmosphere: getStats(60, 30), fame: getStats(15, 31), talent: getStats(65, 32) } },
-            ],
-            producers: [
-                { id: 'lp_1', name: 'Kevin Feige', tier: 'LEGEND', salary: 10000000, stats: { logistics: getStats(99, 33), thrift: getStats(80, 34), fame: getStats(95, 35), talent: getStats(90, 36) } },
-                { id: 'lp_2', name: 'Efficient Producer', tier: 'PROFESSIONAL', salary: 1000000, stats: { logistics: getStats(85, 37), thrift: getStats(95, 38), fame: getStats(40, 39), talent: getStats(80, 40) } },
-                { id: 'lp_3', name: 'Line Manager', tier: 'INDIE', salary: 150000, stats: { logistics: getStats(60, 41), thrift: getStats(70, 42), fame: getStats(5, 43), talent: getStats(65, 44) } },
-            ],
-            vfxTeams: [
-                { id: 'vfx_1', name: 'Industrial Light & Magic', tier: 'LEGEND', salary: 8000000, stats: { realism: getStats(99, 45), spectacle: getStats(98, 46), fame: getStats(99, 47), talent: getStats(99, 48) } },
-                { id: 'vfx_2', name: 'Weta Digital', tier: 'LEGEND', salary: 7500000, stats: { realism: getStats(98, 49), spectacle: getStats(99, 50), fame: getStats(98, 51), talent: getStats(98, 52) } },
-                { id: 'vfx_3', name: 'Framestore', tier: 'PROFESSIONAL', salary: 4000000, stats: { realism: getStats(90, 53), spectacle: getStats(92, 54), fame: getStats(85, 55), talent: getStats(91, 56) } },
-                { id: 'vfx_4', name: 'Boutique VFX', tier: 'INDIE', salary: 500000, stats: { realism: getStats(70, 57), spectacle: getStats(60, 58), fame: getStats(10, 59), talent: getStats(65, 60) } },
-            ]
+            cinematographers: getRotatingCrewCandidates(
+                'CINEMATOGRAPHER',
+                player.age,
+                player.currentWeek,
+                pinnedIds('cinematographer', 'CINEMATOGRAPHER'),
+            ),
+            composers: getRotatingCrewCandidates(
+                'COMPOSER',
+                player.age,
+                player.currentWeek,
+                pinnedIds('composer', 'COMPOSER'),
+            ),
+            producers: getRotatingCrewCandidates(
+                'LINE_PRODUCER',
+                player.age,
+                player.currentWeek,
+                pinnedIds('lineProducer', 'LINE_PRODUCER'),
+            ),
+            vfxTeams: getRotatingCrewCandidates(
+                'VFX_SUPERVISOR',
+                player.age,
+                player.currentWeek,
+                pinnedIds('vfx', 'VFX_SUPERVISOR'),
+            ),
         };
-    }, [Math.floor(player.currentWeek / 3)]);
+    }, [
+        crewMarketCycle,
+        player.age,
+        player.currentWeek,
+        selectedCrew.cinematographer,
+        selectedCrew.composer,
+        selectedCrew.lineProducer,
+        selectedCrew.vfx,
+        currentReturningTalent,
+    ]);
 
-    const mockLocations = useMemo<Record<string, any[]>>(() => ({
-        'NA': [
-            { id: 'LA', name: 'Los Angeles', desc: 'The heart of Hollywood. Expensive but high quality.', cost: 15000000, quality: 10, x: 15, y: 35, longitude: -118.2437, latitude: 34.0522 },
-            { id: 'ATL', name: 'Atlanta', desc: 'Generous tax credits. Good facilities.', cost: 5000000, quality: 5, x: 22, y: 38, longitude: -84.388, latitude: 33.749 },
-            { id: 'NYC', name: 'New York', desc: 'Iconic urban scenery. Very expensive.', cost: 20000000, quality: 9, x: 25, y: 32, longitude: -74.006, latitude: 40.7128 },
-            { id: 'VAN', name: 'Vancouver', desc: 'Versatile and budget friendly.', cost: 3000000, quality: 6, x: 12, y: 28, longitude: -123.1207, latitude: 49.2827 },
-            { id: 'MEX', name: 'Mexico City', desc: 'Vibrant culture and unique architecture.', cost: 4000000, quality: 7, x: 18, y: 45, longitude: -99.1332, latitude: 19.4326 },
-            { id: 'TOR', name: 'Toronto', desc: 'Urban double for NYC/Chicago.', cost: 3500000, quality: 6, x: 20, y: 30, longitude: -79.3832, latitude: 43.6532 },
-        ],
-        'EU': [
-            { id: 'LDN', name: 'London', desc: 'World-class studios and talent.', cost: 12000000, quality: 9, x: 48, y: 28, longitude: -0.1276, latitude: 51.5072 },
-            { id: 'PAR', name: 'Paris', desc: 'Romantic and historic.', cost: 10000000, quality: 8, x: 50, y: 32, longitude: 2.3522, latitude: 48.8566 },
-            { id: 'PRG', name: 'Prague', desc: 'Old world charm on a budget.', cost: 2000000, quality: 7, x: 54, y: 30, longitude: 14.4378, latitude: 50.0755 },
-            { id: 'ROM', name: 'Rome', desc: 'Eternal city with epic scale.', cost: 9000000, quality: 9, x: 53, y: 36, longitude: 12.4964, latitude: 41.9028 },
-            { id: 'BER', name: 'Berlin', desc: 'Gritty urban and modern tech.', cost: 7000000, quality: 8, x: 53, y: 28, longitude: 13.405, latitude: 52.52 },
-            { id: 'MAD', name: 'Madrid', desc: 'Sunny and historic.', cost: 5000000, quality: 7, x: 46, y: 38, longitude: -3.7038, latitude: 40.4168 },
-        ],
-        'AS': [
-            { id: 'TOK', name: 'Tokyo', desc: 'Neon futuristic vibes.', cost: 14000000, quality: 9, x: 88, y: 35, longitude: 139.6503, latitude: 35.6762 },
-            { id: 'SEO', name: 'Seoul', desc: 'Modern and efficient.', cost: 8000000, quality: 8, x: 84, y: 34, longitude: 126.978, latitude: 37.5665 },
-            { id: 'BOM', name: 'Mumbai', desc: 'The home of Bollywood.', cost: 6000000, quality: 7, x: 72, y: 48, longitude: 72.8777, latitude: 19.076 },
-            { id: 'HKG', name: 'Hong Kong', desc: 'Dense urban neon.', cost: 11000000, quality: 9, x: 80, y: 42, longitude: 114.1694, latitude: 22.3193 },
-            { id: 'BEI', name: 'Beijing', desc: 'Grand scale and history.', cost: 12000000, quality: 8, x: 78, y: 32, longitude: 116.4074, latitude: 39.9042 },
-            { id: 'BKK', name: 'Bangkok', desc: 'Chaotic energy and temples.', cost: 3000000, quality: 6, x: 75, y: 45, longitude: 100.5018, latitude: 13.7563 },
-        ],
-        'SA': [
-            { id: 'RIO', name: 'Rio de Janeiro', desc: 'Stunning natural beauty.', cost: 5000000, quality: 8, x: 32, y: 72, longitude: -43.1729, latitude: -22.9068 },
-            { id: 'BUE', name: 'Buenos Aires', desc: 'European flair in South America.', cost: 4000000, quality: 7, x: 30, y: 85, longitude: -58.3816, latitude: -34.6037 },
-            { id: 'BOG', name: 'Bogota', desc: 'High altitude urban grit.', cost: 2000000, quality: 6, x: 25, y: 58, longitude: -74.0721, latitude: 4.711 },
-            { id: 'LIM', name: 'Lima', desc: 'Coastal desert city.', cost: 2500000, quality: 6, x: 22, y: 65, longitude: -77.0428, latitude: -12.0464 },
-        ],
-        'AF': [
-            { id: 'CPT', name: 'Cape Town', desc: 'Diverse landscapes and great light.', cost: 4000000, quality: 8, x: 53, y: 82, longitude: 18.4241, latitude: -33.9249 },
-            { id: 'CAI', name: 'Cairo', desc: 'Ancient wonders and desert heat.', cost: 7000000, quality: 7, x: 56, y: 42, longitude: 31.2357, latitude: 30.0444 },
-            { id: 'MAR', name: 'Marrakesh', desc: 'Exotic colors and textures.', cost: 3000000, quality: 8, x: 46, y: 42, longitude: -7.9811, latitude: 31.6295 },
-            { id: 'LAG', name: 'Lagos', desc: 'Bustling energy.', cost: 2000000, quality: 5, x: 48, y: 55, longitude: 3.3792, latitude: 6.5244 },
-        ],
-        'OC': [
-            { id: 'SYD', name: 'Sydney', desc: 'Modern harbor and coastal beauty.', cost: 10000000, quality: 9, x: 88, y: 82, longitude: 151.2093, latitude: -33.8688 },
-            { id: 'MEL', name: 'Melbourne', desc: 'Arts and culture hub.', cost: 8000000, quality: 8, x: 86, y: 86, longitude: 144.9631, latitude: -37.8136 },
-            { id: 'AKL', name: 'Auckland', desc: 'Middle-earth landscapes.', cost: 6000000, quality: 10, x: 94, y: 88, longitude: 174.7633, latitude: -36.8485 },
-        ]
-    }), []);
+    const productionLocations = PRODUCTION_LOCATIONS_BY_CONTINENT;
 
     const findLocation = (id: string | null) => {
-        if (!id) return null;
-        let found: any = null;
-        Object.values(mockLocations).forEach((list: any[]) => {
-            const item = list.find(l => l.id === id);
-            if (item) found = item;
-        });
-        return found;
+        return getProductionLocation(id);
     };
 
     const [selectingActorFor, setSelectingActorFor] = useState<string | null>(null);
-    const [negotiationModal, setNegotiationModal] = useState<{
-        talentId: string;
-        roleType: string;
-        roleId?: string; // For cast
-        originalSalary: number;
-        currentDemand: number;
-        attemptsLeft: number;
-        talentName: string;
-        talentImage: string;
-        talentTier: string;
-        feedback?: {
-            message: string;
-            type: 'SUCCESS' | 'FAILURE' | 'FINAL_FAILURE';
-        };
-    } | null>(null);
+    const [negotiationModal, setNegotiationModal] = useState<GreenlightNegotiationState | null>(null);
 
     const [counterOfferInput, setCounterOfferInput] = useState<string>("");
 
@@ -1804,10 +1340,10 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         if (crewStateKey) {
             let crewCandidate: any = null;
             if (crewStateKey === 'director') crewCandidate = availableDirectors.find(d => d.id === talentId);
-            else if (crewStateKey === 'cinematographer') crewCandidate = mockCrew.cinematographers.find(c => c.id === talentId);
-            else if (crewStateKey === 'composer') crewCandidate = mockCrew.composers.find(c => c.id === talentId);
-            else if (crewStateKey === 'lineProducer') crewCandidate = mockCrew.producers.find(c => c.id === talentId);
-            else if (crewStateKey === 'vfx') crewCandidate = mockCrew.vfxTeams.find(c => c.id === talentId);
+            else if (crewStateKey === 'cinematographer') crewCandidate = crewMarket.cinematographers.find(c => c.id === talentId);
+            else if (crewStateKey === 'composer') crewCandidate = crewMarket.composers.find(c => c.id === talentId);
+            else if (crewStateKey === 'lineProducer') crewCandidate = crewMarket.producers.find(c => c.id === talentId);
+            else if (crewStateKey === 'vfx') crewCandidate = crewMarket.vfxTeams.find(c => c.id === talentId);
 
             if (crewCandidate) {
                 talentName = crewCandidate.name;
@@ -1958,6 +1494,179 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         return Math.floor(base * (1 - discount));
     };
 
+    const assignActorToSelectedRole = (actorId: string, actorName: string, salary: number) => {
+        if (!selectingActorFor) return;
+        setCastList(prev => prev.map(role => role.id === selectingActorFor ? {
+            ...role,
+            actorId,
+            actorName,
+            salary,
+        } : role));
+        setSelectingActorFor(null);
+    };
+
+    const acceptNegotiationDemand = () => {
+        if (!negotiationModal) return;
+        const finalDemand = negotiationModal.currentDemand;
+        markGameCheckpoint('greenlight_negotiation_accept_demand', player, {
+            script_title: selectedScript?.title || 'none',
+            talent_name: negotiationModal.talentName,
+            role: negotiationModal.roleType,
+            demand_m: Math.round(finalDemand / 1_000_000),
+            attempts_left: negotiationModal.attemptsLeft,
+            pending_count: unresolvedReturningTalent.length,
+        });
+        updateReturningTalentState(
+            negotiationModal.talentId,
+            negotiationModal.roleType,
+            talent => ({
+                ...talent,
+                accepted: true,
+                negotiated: true,
+                newDemand: finalDemand,
+            }),
+        );
+        assignNegotiatedTalent(
+            negotiationModal.talentId,
+            negotiationModal.talentName,
+            finalDemand,
+            negotiationModal.roleType,
+            negotiationModal.roleId,
+        );
+        setNegotiationModal(previous => previous ? {
+            ...previous,
+            feedback: {
+                message: `${negotiationModal.talentName} has signed the contract!`,
+                type: 'SUCCESS',
+            },
+        } : null);
+        setTimeout(() => setNegotiationModal(null), 1500);
+    };
+
+    const submitNegotiationCounterOffer = () => {
+        if (!negotiationModal) return;
+        const counterOffer = parseInt(counterOfferInput) || 0;
+        if (counterOffer <= 0) return;
+
+        const demandDiff = negotiationModal.currentDemand - negotiationModal.originalSalary;
+        const offerDiff = counterOffer - negotiationModal.originalSalary;
+        const ratio = demandDiff > 0 ? offerDiff / demandDiff : 1;
+        let chance = 0.1 + (ratio * 0.8);
+        if (negotiationModal.talentTier === 'A_LIST') chance *= 0.8;
+        if (negotiationModal.talentTier === 'ESTABLISHED') chance *= 0.9;
+        chance = Math.max(0.05, Math.min(0.95, chance));
+
+        const accepted = Math.random() < chance;
+        markGameCheckpoint('greenlight_negotiation_counter_offer', player, {
+            script_title: selectedScript?.title || 'none',
+            talent_name: negotiationModal.talentName,
+            role: negotiationModal.roleType,
+            offer_m: Math.round(counterOffer / 1_000_000),
+            demand_m: Math.round(negotiationModal.currentDemand / 1_000_000),
+            chance_pct: Math.round(chance * 100),
+            accepted,
+            attempts_left: negotiationModal.attemptsLeft,
+            pending_count: unresolvedReturningTalent.length,
+        });
+
+        if (accepted) {
+            updateReturningTalentState(
+                negotiationModal.talentId,
+                negotiationModal.roleType,
+                talent => ({
+                    ...talent,
+                    accepted: true,
+                    negotiated: true,
+                    newDemand: counterOffer,
+                }),
+            );
+            assignNegotiatedTalent(
+                negotiationModal.talentId,
+                negotiationModal.talentName,
+                counterOffer,
+                negotiationModal.roleType,
+                negotiationModal.roleId,
+            );
+            setNegotiationModal(previous => previous ? {
+                ...previous,
+                feedback: {
+                    message: `Success! ${negotiationModal.talentName} accepted the counter-offer of ${formatMoney(counterOffer)}!`,
+                    type: 'SUCCESS',
+                },
+            } : null);
+            setTimeout(() => setNegotiationModal(null), 2000);
+            return;
+        }
+
+        const newAttempts = negotiationModal.attemptsLeft - 1;
+        updateReturningTalentState(
+            negotiationModal.talentId,
+            negotiationModal.roleType,
+            talent => ({
+                ...talent,
+                attemptsLeft: newAttempts,
+                ...(newAttempts <= 0 ? { negotiated: true, accepted: false } : {}),
+            }),
+        );
+
+        if (newAttempts <= 0) {
+            clearNegotiatedTalent(negotiationModal.talentId, negotiationModal.roleType, negotiationModal.roleId);
+            setNegotiationModal(previous => previous ? {
+                ...previous,
+                attemptsLeft: 0,
+                feedback: {
+                    message: `${negotiationModal.talentName} has walked away from the negotiations.`,
+                    type: 'FINAL_FAILURE',
+                },
+            } : null);
+            setTimeout(() => setNegotiationModal(null), 2000);
+            return;
+        }
+
+        setNegotiationModal(previous => previous ? {
+            ...previous,
+            attemptsLeft: newAttempts,
+            feedback: {
+                message: `${negotiationModal.talentName} rejected the offer. They are standing firm on their demand.`,
+                type: 'FAILURE',
+            },
+        } : null);
+        setTimeout(() => {
+            setNegotiationModal(previous => previous ? { ...previous, feedback: undefined } : null);
+        }, 2000);
+    };
+
+    const walkAwayFromNegotiation = () => {
+        if (!negotiationModal) return;
+        markGameCheckpoint('greenlight_negotiation_walk_away', player, {
+            script_title: selectedScript?.title || 'none',
+            talent_name: negotiationModal.talentName,
+            role: negotiationModal.roleType,
+            attempts_left: negotiationModal.attemptsLeft,
+            pending_count: unresolvedReturningTalent.length,
+        });
+        updateReturningTalentState(
+            negotiationModal.talentId,
+            negotiationModal.roleType,
+            talent => ({
+                ...talent,
+                attemptsLeft: 0,
+                negotiated: true,
+                accepted: false,
+            }),
+        );
+        clearNegotiatedTalent(negotiationModal.talentId, negotiationModal.roleType, negotiationModal.roleId);
+        setNegotiationModal(previous => previous ? {
+            ...previous,
+            attemptsLeft: 0,
+            feedback: {
+                message: `You walked away from the negotiation. ${negotiationModal.talentName} is no longer available for this project.`,
+                type: 'FINAL_FAILURE',
+            },
+        } : null);
+        setTimeout(() => setNegotiationModal(null), 2000);
+    };
+
     const estimateLinkedCharacterSalary = (character: any, roleType: string) => {
         const actorId = character.actorId && character.actorId !== 'UNKNOWN' ? character.actorId : null;
         const actor = actorId ? (availableActors.find(a => a.id === actorId) || getCastableActorById(actorId)) : null;
@@ -1983,6 +1692,11 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             characterId: character.characterId || normalizeUniverseCharacterKey(character.name),
             characterName: character.name,
             sourceUniverseId: character.sourceUniverseId || activeUniverseId || undefined,
+            storyFunction: character.storyFunction || (normalizeCharacterStoryRole(character.storyRole) === 'VILLAIN' ? 'ANTAGONIST' : 'PROTAGONIST'),
+            storyRole: normalizeCharacterStoryRole(character.storyRole),
+            abilityType: normalizeCharacterAbilityType(character.abilityType),
+            nature: character.nature || 'HUMAN',
+            identitySource: 'CANON',
             actorId: actorId || role.actorId,
             actorName: actor?.name || (actorId ? character.actorName : role.actorName),
             salary: actorId ? salary : role.salary
@@ -2015,16 +1729,14 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         return castList.filter(role => isKnownConnectedRole(role)).length;
     }, [castList, linkedCharacterOptions]);
 
-    const effectiveConnectedIntent = useMemo<ConnectedProjectIntent>(() => {
-        if (connectedProjectIntent !== 'AUTO') return connectedProjectIntent;
-        if (selectedScript?.connectedProjectIntent && selectedScript.connectedProjectIntent !== 'AUTO') return selectedScript.connectedProjectIntent;
-        if (selectedScript?.tags?.includes('UNIVERSE_EVENT')) return 'EVENT';
-        if (selectedScript?.tags?.includes('REBOOT')) return 'REBOOT';
-        if (linkedUniverseCastCount >= 3) return 'EVENT';
-        if (linkedUniverseCastCount >= 1) return 'CROSSOVER';
-        if (selectedScript?.sourceMaterial === 'SEQUEL' || selectedFranchiseId) return 'SOLO';
-        return 'SOLO';
-    }, [connectedProjectIntent, selectedScript, linkedUniverseCastCount, selectedFranchiseId]);
+    const effectiveConnectedIntent = useMemo<ConnectedProjectIntent>(() => resolveGreenlightConnectedIntent({
+        requestedIntent: connectedProjectIntent,
+        scriptIntent: selectedScript?.connectedProjectIntent,
+        scriptTags: selectedScript?.tags,
+        linkedKnownCastCount: linkedUniverseCastCount,
+        sourceMaterial: selectedScript?.sourceMaterial,
+        hasSelectedFranchise: Boolean(selectedFranchiseId),
+    }), [connectedProjectIntent, selectedScript, linkedUniverseCastCount, selectedFranchiseId]);
 
     const getInHouseQuality = (role: string) => {
         const depts = studio.studioState?.departments || { writing: 0, directing: 0, casting: 0, production: 0, postProduction: 0 };
@@ -2067,21 +1779,39 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             const quality = role === 'director' ? getDirectorTalent(player.directorStats) : 70;
             return { name: player.name, tier: 'Indie', quality, cost: 0 };
         }
-        if (mode === 'IN_HOUSE') return { name: 'Studio Staff', tier: 'In-House', quality: getInHouseQuality(role), fame: getInHouseFame(role), cost: 0 };
+        if (mode === 'IN_HOUSE') {
+            return {
+                name: 'Studio Staff',
+                tier: 'In-House',
+                quality: getInHouseQuality(role),
+                fame: getInHouseFame(role),
+                cost: getInHouseCrewProjectCost(getInHouseLevel(role)),
+            };
+        }
 
         // Find hired crew
         let candidate: any = null;
         if (role === 'director') candidate = availableDirectors.find(c => c.id === id);
-        else if (role === 'cinematographer') candidate = mockCrew.cinematographers.find(c => c.id === id);
-        else if (role === 'composer') candidate = mockCrew.composers.find(c => c.id === id);
-        else if (role === 'lineProducer') candidate = mockCrew.producers.find(c => c.id === id);
-        else if (role === 'vfx') candidate = mockCrew.vfxTeams.find(c => c.id === id);
+        else if (role === 'cinematographer') candidate = crewMarket.cinematographers.find(c => c.id === id);
+        else if (role === 'composer') candidate = crewMarket.composers.find(c => c.id === id);
+        else if (role === 'lineProducer') candidate = crewMarket.producers.find(c => c.id === id);
+        else if (role === 'vfx') candidate = crewMarket.vfxTeams.find(c => c.id === id);
 
         // Estimate salary for NPCs if not present (simple logic based on tier)
         let cost = 0;
         if (candidate) {
             if (currentReturningTalent.length > 0) {
-                const returning = currentReturningTalent.find(t => t.id === candidate.id && t.role === role.toUpperCase());
+                const returningRole = {
+                    director: 'DIRECTOR',
+                    cinematographer: 'CINEMATOGRAPHER',
+                    composer: 'COMPOSER',
+                    lineProducer: 'LINE_PRODUCER',
+                    vfx: 'VFX_SUPERVISOR',
+                }[role];
+                const returning = currentReturningTalent.find(t => (
+                    t.id === candidate.id
+                    && normalizeCrewReturningRole(t.role) === returningRole
+                ));
                 if (returning && returning.newDemand) {
                     cost = returning.newDemand;
                 }
@@ -2118,82 +1848,36 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
     };
 
     const budgetBreakdown = useMemo(() => {
-        let estimatedBudget = 5000000; // Base production cost
-        const baseCost = 5000000;
-
-        const scriptCost = selectedScript?.developmentCost || 0;
-        estimatedBudget += scriptCost;
-
         const directorData = getCrewData('director');
         const dpData = getCrewData('cinematographer');
         const composerData = getCrewData('composer');
         const lpData = getCrewData('lineProducer');
         const vfxData = getCrewData('vfx');
 
-        estimatedBudget += (directorData.cost || 0);
-        estimatedBudget += (dpData.cost || 0);
-        estimatedBudget += (composerData.cost || 0);
-        estimatedBudget += (lpData.cost || 0);
-        estimatedBudget += (vfxData.cost || 0);
-
-        // Add Cast Costs
-        let castCost = 0;
-        castList.forEach(role => {
-            if (role.actorId) {
-                if (role.actorId === 'PLAYER_SELF' || role.actorId === 'STUDIO_STAFF') {
-                    // No upfront cost for self or studio staff
-                } else if (contractedActors.some(a => a.id === role.actorId)) {
-                    // No upfront cost for contracted actors
-                } else {
-                    const actor = availableActors.find(a => a.id === role.actorId);
-                    if (actor || role.salary) {
-                        // Use the salary already stored in the role, including linked universe actors who may not be in the weekly pool.
-                        castCost += (role.salary || 0);
-                    }
-                }
-            }
+        return calculateGreenlightBudget({
+            scriptCost: selectedScript?.developmentCost || 0,
+            crewCosts: {
+                director: directorData.cost || 0,
+                cinematographer: dpData.cost || 0,
+                composer: composerData.cost || 0,
+                lineProducer: lpData.cost || 0,
+                vfx: vfxData.cost || 0,
+            },
+            castRoles: castList,
+            contractedActorIds: new Set(contractedActors.map(actor => actor.id)),
+            availableActorIds: new Set(availableActors.map(actor => actor.id)),
+            inHouseActorCost: getInHouseCastProjectCost(getInHouseLevel('ACTOR')),
+            backgroundCastingCost: backgroundCastingPlan.estimatedCost,
+            locationCosts: selectedLocations.map(locationId => Number(findLocation(locationId)?.cost) || 0),
+            equipmentChoices,
+            ownedEquipmentLevels: studio.studioState?.equipment || {},
+            gearTiers: GEAR_TIERS,
         });
-        estimatedBudget += castCost;
-
-        // Location Cost & Stats
-        let locationCost = 0;
-
-        if (selectedLocations.length > 0) {
-            selectedLocations.forEach(lid => {
-                const locData = findLocation(lid);
-                if (locData) {
-                    locationCost += Number(locData.cost) || 0;
-                }
-            });
-            estimatedBudget += locationCost;
-        }
-
-        // Equipment Cost
-        let equipmentCost = 0;
-        Object.values(equipmentChoices).forEach(choice => {
-            const choiceStr = choice as string;
-            if (choiceStr !== 'OWNED' && GEAR_TIERS[choiceStr]) {
-                equipmentCost += GEAR_TIERS[choiceStr].cost;
-            }
-        });
-        estimatedBudget += equipmentCost;
-
-        return {
-            total: Number(estimatedBudget) || 0,
-            baseCost,
-            scriptCost,
-            cast: Number(castCost) || 0,
-            director: Number(directorData.cost) || 0,
-            crew: (Number(dpData.cost) || 0) + (Number(composerData.cost) || 0) + (Number(lpData.cost) || 0) + (Number(vfxData.cost) || 0),
-            locationCost,
-            equipmentCost
-        };
-    }, [selectedCrew, crewModes, castList, selectedLocations, availableActors, availableDirectors, player, equipmentChoices, studio, mockLocations, mockCrew]);
-
+    }, [selectedCrew, crewModes, castList, backgroundCastingPlan.estimatedCost, selectedLocations, availableActors, availableDirectors, player, equipmentChoices, studio, productionLocations, crewMarket]);
     const musicPreviewProject = useMemo<ProjectDetails | null>(() => {
         if (!selectedScript) return null;
         const previewBudget = Math.max(1_000_000, budgetBreakdown.total || 1_000_000);
-        const previewTier = getBudgetTierForAmount(previewBudget);
+        const previewTier = getProductionBudgetTier(previewBudget);
         const previewProjectType = resolveProjectType(selectedScript.projectType, (selectedScript as any).type, (selectedScript as any).projectDetails?.type);
         return {
             title: selectedScript.title,
@@ -2413,11 +2097,19 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
     };
 
     const availableGreenlightFunds = useMemo(() => (
-        Math.max(0, Math.round((studio.balance || 0) + (studio.studioState?.productionFund || 0) + lockedStreamingFundingAmount))
+        calculateAvailableGreenlightFunds(
+            studio.balance,
+            studio.studioState?.productionFund || 0,
+            lockedStreamingFundingAmount,
+        )
     ), [studio.balance, studio.studioState?.productionFund, lockedStreamingFundingAmount]);
 
     const maxMarketingBudget = useMemo(() => (
-        Math.max(0, Math.floor((availableGreenlightFunds - (budgetBreakdown.total || 0) - musicBudget) / 50_000) * 50_000)
+        calculateMaxGreenlightMarketingBudget(
+            availableGreenlightFunds,
+            budgetBreakdown.total,
+            musicBudget,
+        )
     ), [availableGreenlightFunds, budgetBreakdown.total, musicBudget]);
 
     useEffect(() => {
@@ -2429,7 +2121,11 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
     }, [marketingBudgetPreset, budgetBreakdown.total, maxMarketingBudget]);
 
     const packageBudget = useMemo(() => (
-        Math.max(0, Math.round((budgetBreakdown.total || 0) + musicBudget + reservedMarketingBudget))
+        calculateGreenlightPackageBudget(
+            budgetBreakdown.total,
+            musicBudget,
+            reservedMarketingBudget,
+        )
     ), [budgetBreakdown.total, musicBudget, reservedMarketingBudget]);
 
     const maxInvestorRaise = useMemo(() => (
@@ -2441,14 +2137,11 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
     ), [investorRaiseAmount, packageBudget, lockedStreamingFundingAmount]);
 
     const investorRaisePercent = useMemo(() => (
-        maxInvestorRaise > 0
-            ? Math.round((normalizedInvestorRaise / maxInvestorRaise) * 100)
-            : 0
+        calculateInvestorRaisePercent(normalizedInvestorRaise, maxInvestorRaise)
     ), [maxInvestorRaise, normalizedInvestorRaise]);
 
     const setInvestorRaisePercent = (percent: number) => {
-        const clamped = Math.max(0, Math.min(100, Math.round(Number(percent) || 0)));
-        const amount = Math.round((maxInvestorRaise * clamped / 100) / 100_000) * 100_000;
+        const amount = calculateInvestorRaiseAmountFromPercent(percent, maxInvestorRaise);
         setInvestorRaiseAmount(amount);
         if (amount <= 0) setSelectedInvestorIds([]);
     };
@@ -2504,10 +2197,111 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
     ), [investorOffers, selectedInvestorIds, normalizedInvestorRaise, packageBudget, lockedStreamingFundingAmount, investorFundingMode, selectedScript?.id, selectedScript?.title, player.currentWeek, player.age]);
 
     const investorRaisedAmount = selectedInvestorPlan?.totalRaised || 0;
-    const netGreenlightCashRequirement = Math.max(0, packageBudget - investorRaisedAmount);
-    const investorFundingShortfall = Math.max(0, normalizedInvestorRaise - investorRaisedAmount);
-    const investorFundingOverage = Math.max(0, investorRaisedAmount - normalizedInvestorRaise);
-    const effectiveStudioFundingPool = studio.balance + (studio.studioState?.productionFund || 0) + lockedStreamingFundingAmount;
+    const {
+        netGreenlightCashRequirement,
+        investorFundingShortfall,
+        investorFundingOverage,
+        effectiveStudioFundingPool,
+    } = calculateGreenlightFundingPosition({
+        packageBudget,
+        investorRaisedAmount,
+        normalizedInvestorRaise,
+        studioBalance: studio.balance,
+        productionFund: studio.studioState?.productionFund || 0,
+        lockedStreamingFundingAmount,
+    });
+    const investorOfferCards = useMemo(() => (
+        investorOffers.map(offer => {
+            const selected = selectedInvestorIds.includes(offer.investorId);
+            const commitment = selectedInvestorPlan?.commitments.find(item => item.investorId === offer.investorId);
+            const previewInvestorIds = selected
+                ? selectedInvestorIds
+                : investorFundingMode === 'LEAD'
+                    ? [offer.investorId]
+                    : [...selectedInvestorIds, offer.investorId];
+            const previewPlan = buildProjectInvestorPlan({
+                offers: investorOffers,
+                selectedInvestorIds: previewInvestorIds,
+                targetRaise: normalizedInvestorRaise,
+                packageBudget,
+                lockedExternalFunding: lockedStreamingFundingAmount,
+                fundingMode: investorFundingMode,
+                sourceProjectId: selectedScript?.id,
+                sourceTitle: selectedScript?.title,
+                week: player.currentWeek,
+                year: player.age,
+            });
+            const previewCommitment = previewPlan?.commitments.find(item => item.investorId === offer.investorId);
+            const displayCommitment = selected ? commitment : previewCommitment;
+            const displayAmount = displayCommitment?.amount || 0;
+            const unusedCapacity = Math.max(0, offer.amount - displayAmount);
+            const dealEquity = displayCommitment?.equityPercent || offer.equityPercent || 0;
+            const cleanEquity = displayCommitment?.cleanEquityPercent || offer.cleanEquityPercent || 0;
+            const equitySpread = Math.round((dealEquity - cleanEquity) * 10) / 10;
+            const cardRole = displayCommitment?.targetRole === 'LEAD'
+                ? 'Lead Investor'
+                : displayCommitment?.targetRole === 'EXCESS'
+                    ? 'Extra Raise'
+                    : displayCommitment?.targetRole === 'SYNDICATE'
+                        ? 'Syndicate'
+                        : offer.fitLabel || 'Investor';
+            const amountLabel = selected
+                ? 'Committed'
+                : displayCommitment?.targetRole === 'EXCESS'
+                    ? 'Would Add'
+                    : 'Would Commit';
+
+            return {
+                investorId: offer.investorId,
+                investorName: offer.investorName,
+                kindLabel: describeInvestorKind(offer.kind, language),
+                ownerName: offer.ownerName,
+                headquarters: offer.headquarters,
+                investorTags: offer.investorTags,
+                reputation: offer.reputation,
+                relationshipLabel: offer.relationshipLabel,
+                note: offer.note,
+                selected,
+                displayAmount: displayAmount || offer.amount,
+                unusedCapacity,
+                dealEquity,
+                cleanEquity,
+                equitySpread,
+                cardRole,
+                amountLabel,
+            };
+        })
+    ), [
+        investorOffers,
+        selectedInvestorIds,
+        selectedInvestorPlan,
+        investorFundingMode,
+        normalizedInvestorRaise,
+        packageBudget,
+        lockedStreamingFundingAmount,
+        selectedScript?.id,
+        selectedScript?.title,
+        player.currentWeek,
+        player.age,
+        language,
+    ]);
+
+    const changeInvestorFundingMode = (mode: ProjectInvestorFundingMode) => {
+        setInvestorFundingMode(mode);
+        if (mode === 'LEAD') {
+            setSelectedInvestorIds(current => current.slice(0, 1));
+        }
+    };
+
+    const toggleSelectedInvestor = (investorId: string) => {
+        setSelectedInvestorIds(current => (
+            investorFundingMode === 'LEAD'
+                ? current.includes(investorId) ? [] : [investorId]
+                : current.includes(investorId)
+                    ? current.filter(id => id !== investorId)
+                    : [...current, investorId]
+        ));
+    };
 
     const unresolvedReturningTalent = useMemo(() => {
         if (currentReturningTalent.length === 0) return [];
@@ -2556,54 +2350,54 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
     const [buzzItems, setBuzzItems] = useState<any[]>([]);
 
     const greenlightEnergyCost = PHASE_ONE_ENERGY_COSTS.GREENLIGHT_OWNED_PROJECT;
-    const greenlightStatus = useMemo(() => {
-        const errors: string[] = [];
-        if (!selectedScript) return { can: false, errors: ["No script selected"] };
-        if (selectedScript.status === 'IN_DEVELOPMENT') errors.push("Scripting is still in progress");
-        if (selectedLocations.length === 0) errors.push("No filming locations selected");
-        if (player.energy.current < greenlightEnergyCost) errors.push(`Greenlight needs ${greenlightEnergyCost} energy`);
-
-        const roles = ['director', 'cinematographer', 'composer', 'lineProducer', 'vfx'] as const;
-        for (const role of roles) {
-            if (crewModes[role] === 'HIRE' && !selectedCrew[role]) {
-                const roleName = role === 'lineProducer' ? 'Line Producer' : (role === 'vfx' ? 'VFX Supervisor' : role.charAt(0).toUpperCase() + role.slice(1));
-                errors.push(`${roleName} is required`);
-            }
-        }
-
-        if (!castList.some(c => c.roleType === 'LEAD' && (c.actorId || c.actorId === 'PLAYER_SELF' || c.actorId === 'STUDIO_STAFF'))) {
-            errors.push("At least one lead actor is required");
-        }
-
-        if (effectiveConnectedIntent === 'CROSSOVER' && linkedUniverseCastCount < 1) {
-            errors.push("Crossover needs at least one known character");
-        }
-
-        if (effectiveConnectedIntent === 'EVENT' && linkedUniverseCastCount < 3) {
-            errors.push("Event film needs at least three known characters");
-        }
-
-        if (effectiveConnectedIntent === 'REBOOT' && !selectedUniverseId && !selectedFranchiseId && !selectedScript.universeId && !selectedScript.franchiseId) {
-            errors.push("Reboot needs a universe or franchise connection");
-        }
-
-        if (unresolvedReturningTalent.length > 0) {
-            const names = unresolvedReturningTalent
-                .map(talent => getReturningTalentDisplay(talent).name)
-                .filter(Boolean)
-                .slice(0, 3);
-            const suffix = unresolvedReturningTalent.length > 3 ? ` +${unresolvedReturningTalent.length - 3} more` : '';
-            errors.push(`Returning talent negotiations pending: ${names.join(', ')}${suffix}`);
-        }
-
-        if (effectiveStudioFundingPool < netGreenlightCashRequirement) {
-            errors.push("Insufficient studio funds for this project plan");
-        }
-
-        return { can: errors.length === 0, errors };
-    }, [selectedScript, selectedLocations, crewModes, selectedCrew, castList, effectiveStudioFundingPool, netGreenlightCashRequirement, unresolvedReturningTalent, effectiveConnectedIntent, linkedUniverseCastCount, selectedUniverseId, selectedFranchiseId, player.energy.current, greenlightEnergyCost]);
+    const greenlightStatus = useMemo(() => validateGreenlightProject({
+        hasSelectedScript: Boolean(selectedScript),
+        scriptStatus: selectedScript?.status,
+        selectedLocationCount: selectedLocations.length,
+        playerEnergy: player.energy.current,
+        energyCost: greenlightEnergyCost,
+        crewModes,
+        selectedCrew,
+        castRoles: castList,
+        effectiveConnectedIntent,
+        linkedKnownCastCount: linkedUniverseCastCount,
+        hasUniverseConnection: Boolean(selectedUniverseId || selectedScript?.universeId),
+        hasFranchiseConnection: Boolean(selectedFranchiseId || selectedScript?.franchiseId),
+        unresolvedReturningTalentNames: unresolvedReturningTalent
+            .map(talent => getReturningTalentDisplay(talent).name)
+            .filter(Boolean),
+        unresolvedReturningTalentCount: unresolvedReturningTalent.length,
+        effectiveStudioFundingPool,
+        netGreenlightCashRequirement,
+    }), [selectedScript, selectedLocations, crewModes, selectedCrew, castList, effectiveStudioFundingPool, netGreenlightCashRequirement, unresolvedReturningTalent, effectiveConnectedIntent, linkedUniverseCastCount, selectedUniverseId, selectedFranchiseId, player.energy.current, greenlightEnergyCost]);
 
     const canGreenlight = greenlightStatus.can;
+    const confirmationUniverseName = selectedUniverseId === 'NEW'
+        ? newUniverseName
+        : selectedUniverseId
+            ? normalizeUniverseMap(player.world?.universes || {})[selectedUniverseId]?.name
+            : undefined;
+    const selectedFranchiseForConfirmation = selectedFranchiseId && selectedFranchiseId !== 'NEW'
+        ? studioFranchises.find(franchise => franchise.id === selectedFranchiseId)
+        : null;
+    const confirmationFranchiseName = selectedFranchiseId === 'NEW'
+        ? 'New Franchise'
+        : selectedFranchiseForConfirmation?.name;
+    const confirmationFranchiseInstallment = selectedFranchiseId && selectedFranchiseId !== 'NEW'
+        ? (selectedFranchiseForConfirmation?.lastInstallment || 0) + 1
+        : undefined;
+    const returningTalentReviewItems = unresolvedReturningTalent.map((talent, index) => {
+        const info = getReturningTalentDisplay(talent);
+        return {
+            key: `${talent.id}_${talent.role}_${talent.characterId || talent.characterName || index}`,
+            image: info.image,
+            name: info.name,
+            roleLabel: info.roleLabel,
+            demand: info.demand,
+            attemptsLeft: info.attemptsLeft,
+            onNegotiate: () => handleNegotiate(talent.id, talent, info.roleId),
+        };
+    });
 
     useEffect(() => {
         markTraceAction('greenlight_step_opened', {
@@ -2692,698 +2486,92 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             }
         }
 
-        const directorData = getCrewData('director');
-
-        // Calculate Budget
-        const estimatedBudget = budgetBreakdown.total;
-        const marketingReserve = Math.max(0, Math.round(reservedMarketingBudget || 0));
-        const soundtrackPlan = selectedMusicPlan || (musicPreviewProject ? buildProjectMusicPlanFromArtists(musicPreviewProject, effectiveMusicStrategy, selectedMusicArtistIds, `${selectedScript?.id || selectedScript?.title || 'project'}_${effectiveMusicStrategy}_${effectiveMusicArtistCount}_${activeMusicCreditRoles.join('_')}`, effectiveMusicArtistCount, activeMusicCreditRoles, isStudioDecidedMusicPlan, musicCatalogArtists) : undefined);
-        const soundtrackBudget = soundtrackPlan?.musicBudget || 0;
-        const soundtrackImpact = musicPreviewProject
-            ? calculateProjectMusicImpact({ ...musicPreviewProject, musicPlan: soundtrackPlan }, soundtrackPlan, musicCatalogArtists)
-            : undefined;
-        const productionBudgetWithMusic = estimatedBudget + soundtrackBudget;
-        const greenlightPackageBudget = productionBudgetWithMusic + marketingReserve;
-        const finalInvestorPlan = selectedInvestorPlan;
-        const finalInvestorRaised = finalInvestorPlan?.totalRaised || 0;
-        const studioCashRequirement = Math.max(0, greenlightPackageBudget - finalInvestorRaised);
-
-        // Location Cost & Stats
-        let locationQualityBonus = 0;
-        let locationName = 'Multiple Locations';
-
-        if (selectedLocations.length > 0) {
-            let totalQuality = 0;
-            selectedLocations.forEach(lid => {
-                const locData = findLocation(lid);
-                if (locData) totalQuality += locData.quality;
-            });
-            locationQualityBonus = Math.round(totalQuality / selectedLocations.length);
-
-            if (selectedLocations.length === 1) {
-                const loc = findLocation(selectedLocations[0]);
-                if (loc) locationName = loc.name;
-            }
-        }
-
-        const safeMovieCastList = castList.filter(c => (
-            isCastableMovieRoleId(c.actorId, player.flags.extraNPCs || [])
-        ));
-
-        // Calculate Fame Multiplier
-        let extraFame = 0;
-        const castIds = safeMovieCastList.map(c => {
-             if (c.actorId === 'PLAYER_SELF') return 'player';
-             if (c.actorId === 'STUDIO_STAFF') {
-                 extraFame += getInHouseFame('ACTOR');
-                 return null;
-             }
-             const rel = player.relationships.find(r => r.id === c.actorId);
-             if (rel) return rel.npcId || rel.id;
-             return c.actorId;
-        }).filter(Boolean) as string[];
-
-        if (directorData.tier === 'In-House') {
-            extraFame += (directorData as any).fame || 0;
-        }
-
-        const fameMultiplier = calculateProjectFameMultiplier(castIds, directorData.name as string, player.stats.fame, player.stats.talent, extraFame);
-        const finalBudgetTier = getBudgetTierForAmount(productionBudgetWithMusic);
-        const castDepth = calculateCastDepthScore(safeMovieCastList.length, selectedScript.genres[0], finalBudgetTier, currentCastingStrength);
-
-        // Calculate Actual Quality (Hidden)
-        // User request: "movie perfomed more good if movie quality is good as oer iuts est quaity but also its not neccesaary that what est quality its there movie actucal quality remain that"
-        // We introduce variance.
-        const qualityVariance = (Math.random() * 20) - 10; // +/- 10 points
-        // User request: "there is no need of safety net." -> Removed baseQuality boost
-
-        const actualQuality = Math.max(1, Math.min(100, currentEstimatedQuality + qualityVariance));
-
-        // Random Pre-Production Duration (4-10 weeks)
-        const preProdDuration = Math.floor(Math.random() * 7) + 4;
-        const productionDuration = getPhaseDuration('PRODUCTION');
-        const postProductionDuration = getPhaseDuration('POST_PRODUCTION');
-        const productionCalendar = createProductionCalendar({
-            preProductionWeeks: preProdDuration,
-            productionWeeks: productionDuration,
-            postProductionWeeks: postProductionDuration,
-            age: player.age,
-            week: player.currentWeek,
-        });
-        const isCreatingNewUniverse = selectedUniverseId === 'NEW' && !!newUniverseName.trim();
-        const normalizedWorldUniverses = normalizeUniverseMap(player.world?.universes || {});
-        const primaryCastUniverseId = safeMovieCastList.find(c => {
-            if (!c.sourceUniverseId) return false;
-            return !isUniverseRetired(normalizedWorldUniverses[c.sourceUniverseId]);
-        })?.sourceUniverseId;
-        const selectedActiveUniverseId = selectedUniverseId && selectedUniverseId !== 'NEW' && !isUniverseRetired(normalizedWorldUniverses[selectedUniverseId])
-            ? selectedUniverseId
-            : undefined;
-        const scriptActiveUniverseId = selectedScript.universeId && !isUniverseRetired(normalizedWorldUniverses[selectedScript.universeId])
-            ? selectedScript.universeId
-            : undefined;
-        const finalUniverseId = isCreatingNewUniverse ? `universe_${Date.now()}` : (selectedActiveUniverseId || scriptActiveUniverseId || primaryCastUniverseId || undefined);
-        const universeColors = ['#e11d48', '#2563eb', '#16a34a', '#d97706', '#7c3aed', '#db2777'];
-        const randomUniverseColor = universeColors[Math.floor(Math.random() * universeColors.length)];
-
-        // --- CHECK RECASTING ---
-        let isRecast = false;
-        if (selectedScript.franchiseId && previousFranchiseInstallments.length > 0) {
-            const lastInstallment = previousFranchiseInstallments[0];
-            const lastDetails = lastInstallment.projectDetails || lastInstallment;
-            // Check if any lead actor changed
-            if (lastDetails.castList) {
-                const oldLeads = lastDetails.castList.filter(c => c.roleType === 'LEAD').map(c => c.actorId);
-                const newLeads = safeMovieCastList.filter(c => c.roleType === 'LEAD').map(c => c.actorId);
-
-                // Simple check: if a new lead wasn't in the old leads, it's a recast
-                for (const newLead of newLeads) {
-                    if (newLead && !oldLeads.includes(newLead)) {
-                        isRecast = true;
-                        break;
-                    }
-                }
-            }
-        }
-
-        const fullCrewList: CrewMember[] = [];
-        const roles: ('director' | 'cinematographer' | 'composer' | 'lineProducer' | 'vfx')[] = ['director', 'cinematographer', 'composer', 'lineProducer', 'vfx'];
-
-        roles.forEach(role => {
-            const mode = crewModes[role];
-            const id = selectedCrew[role];
-            if (mode === 'HIRE' && !id) return;
-
-            const data = getCrewData(role);
-            let roleEnum: CrewMember['role'] = 'DIRECTOR';
-            if (role === 'cinematographer') roleEnum = 'CINEMATOGRAPHER';
-            else if (role === 'composer') roleEnum = 'COMPOSER';
-            else if (role === 'lineProducer') roleEnum = 'LINE_PRODUCER';
-            else if (role === 'vfx') roleEnum = 'VFX_SUPERVISOR';
-
-            let tierEnum: CrewMember['tier'] = 'INDIE';
-            if (data.tier === 'LEGEND' || data.tier === 'AUTEUR' || data.tier === 'PROFESSIONAL' || data.tier === 'INDIE') tierEnum = data.tier as any;
-            else if (data.tier === 'In-House') tierEnum = 'PROFESSIONAL';
-
-            fullCrewList.push({
-                id: mode === 'SELF' ? 'PLAYER_SELF' : mode === 'IN_HOUSE' ? 'STUDIO_STAFF' : (id as string) || `unknown_${role}`,
-                name: data.name,
-                role: roleEnum,
-                stats: { technical: data.quality },
-                salary: data.cost,
-                status: 'SIGNED',
-                tier: tierEnum,
-                isPlayer: mode === 'SELF'
-            });
-        });
-
-        const finalizedCastList = safeMovieCastList.map((c, index) => {
-            const characterName = (c.characterName || '').trim() || getDefaultCharacterName(c, index);
-            const normalizedCharacterId = c.characterId
-                || (finalUniverseId ? toUniverseCharacterId(finalUniverseId as any, characterName) : undefined)
-                || normalizeUniverseCharacterKey(`${selectedScript.title}_${characterName}`);
-
-            return {
-                roleId: c.id,
-                roleName: c.role,
-                roleType: c.roleType,
-                actorId: c.actorId || 'UNKNOWN',
-                name: c.actorName || 'Unknown Actor',
-                characterId: normalizedCharacterId,
-                characterName,
-                salary: c.salary,
-                sourceUniverseId: c.sourceUniverseId,
-                status: 'CONFIRMED' as const,
-                isReturning: currentReturningTalent.some(t => t.id === c.actorId) || false
-            };
-        });
-        const hasLinkedUniverseCast = finalizedCastList.some(c => c.sourceUniverseId);
-        const isPlayerActor = finalizedCastList.some(c => c.actorId === 'PLAYER_SELF' || c.isPlayer);
-        const isPlayerDirector = fullCrewList.some(c => c.role === 'DIRECTOR' && (c.id === 'PLAYER_SELF' || c.isPlayer));
-        const initialPlayerProductionFocus = {
-            isPlayerActor,
+        const {
+            directorData,
+            estimatedBudget,
+            soundtrackPlan,
+            greenlightPackageBudget,
+            finalInvestorPlan,
+            finalInvestorRaised,
+            studioCashRequirement,
+            finalizedCastList,
+            newCommitment,
+            updatedScripts,
+            updatedConcepts,
+            updatedPlayerTalentRoster,
+            updatedStudioTalentRoster,
+            isCreatingNewUniverse,
+            normalizedWorldUniverses,
+            finalUniverseId,
+            randomUniverseColor,
             isPlayerDirector,
-            isPlayerProducer: true,
-            actorPrep: 0,
-            actorSceneRehearsal: 0,
-            actorBigPerformance: 0,
-            actorPerformance: 0,
-            actorPromotion: 0,
-            directorPrep: 0,
-            directorShotDecision: 0,
-            directorMajorCreativePush: 0,
-            directorRiskyDecision: 0,
-            directorPerformance: 0,
-            directorPost: 0,
-            producerScriptPolish: 0,
-            producerCastCrewPrep: 0,
-            producerSetQuality: 0,
-            producerEditNotes: 0,
-            producerReleasePositioning: 0,
-            producerPrep: 0,
-            producerPerformance: 0,
-            producerPost: 0,
-            qualityLift: 0,
-        };
-        const selfRunCast = finalizedCastList.length > 0 && finalizedCastList.every(member => (
-            member.actorId === 'PLAYER_SELF' || member.actorId === 'STUDIO_STAFF'
-        ));
-        const selfRunCrew = fullCrewList.length > 0 && fullCrewList.every(member => (
-            member.id === 'PLAYER_SELF' || member.id === 'STUDIO_STAFF'
-        ));
-        const selfRunProduction = selfRunCast && selfRunCrew;
-        const selfRunLoad = selfRunProduction
-            ? player.commitments.filter(commitment => (
-                commitment.projectDetails?.studioId === studio.id
-                && commitment.projectDetails.hiddenStats?.selfRunProduction
-                && commitment.projectPhase !== 'AWAITING_RELEASE'
-            )).length + 1
-            : 0;
-        // A lean, in-house production is valid. The quality tradeoff begins only
-        // when the same player-led team is already spread across other projects.
-        const selfRunQualityStrain = Math.max(0, selfRunLoad - 1) * 3;
-        const projectSubtype = effectiveConnectedIntent === 'EVENT'
-            ? 'UNIVERSE_EVENT'
-            : effectiveConnectedIntent === 'CROSSOVER'
-                ? 'UNIVERSE_CROSSOVER'
-                : effectiveConnectedIntent === 'REBOOT'
-                    ? 'REBOOT'
-                    : selectedScript.tags?.includes('UNIVERSE_EVENT')
-                        ? 'UNIVERSE_EVENT'
-                        : hasLinkedUniverseCast && selectedScript.sourceMaterial !== 'SEQUEL'
-                            ? 'UNIVERSE_CROSSOVER'
-                            : selectedScript.sourceMaterial === 'SEQUEL'
-                                ? 'SEQUEL'
-                                : selectedScript.sourceMaterial === 'SPINOFF'
-                                    ? 'SPINOFF'
-                                    : 'STANDALONE';
+        } = buildGreenlightProject({
+            player,
+            studio,
+            selectedScript,
+            selectedScriptId,
+            selectedLocations,
+            castList,
+            crewModes,
+            selectedCrew,
+            currentReturningTalent,
+            budgetBreakdown,
+            reservedMarketingBudget,
+            selectedMusicPlan,
+            musicPreviewProject,
+            effectiveMusicStrategy,
+            selectedMusicArtistIds,
+            effectiveMusicArtistCount,
+            activeMusicCreditRoles,
+            isStudioDecidedMusicPlan,
+            musicCatalogArtists,
+            selectedInvestorPlan,
+            currentCastingStrength,
+            currentEstimatedQuality,
+            currentEstimatedBuzz,
+            playerActingTalent,
+            selectedUniverseId,
+            selectedFranchiseId,
+            newUniverseName,
+            previousFranchiseInstallments,
+            selectedStoryCompass,
+            effectiveConnectedIntent,
+            studioPrestigeScore,
+            tone,
+            linkedUniverseCastCount,
+            backgroundCastingPlan,
+            studioFranchises,
+            visualStyle,
+            pacing,
+            equipmentChoices,
+            lockedStreamingFunding,
+            isPrimaryStudio,
+            studioTalentRoster,
+            findLocation,
+            getCrewData,
+            getInHouseFame,
+            getInHouseQuality,
+            getDefaultCharacterName,
+            getCastableActorById,
+        });
 
-        const newCommitmentId = `proj_${Date.now()}`;
-        const newCommitment: Commitment = {
-            id: newCommitmentId,
-            name: selectedScript.title,
-            type: 'JOB',
-            roleType: safeMovieCastList.find(c => c.actorId === 'PLAYER_SELF')?.roleType as any,
-            energyCost: 0,
-            income: 0,
-            payoutType: 'LUMPSUM',
-            projectPhase: 'PRE_PRODUCTION',
-            phaseWeeksLeft: preProdDuration,
-            totalPhaseDuration: preProdDuration,
-            productionCalendar,
-            projectDetails: {
-                title: selectedScript.title,
-                sourceScriptId: selectedScript.id,
-                isOriginal: selectedScript.isOriginal,
-                type: resolveProjectType(selectedScript.projectType, (selectedScript as any).type, (selectedScript as any).projectDetails?.type),
-                format: selectedScript.format || 'LIVE_ACTION',
-                episodes: selectedScript.episodes,
-                description: `A ${selectedScript.genres.join('/')} ${formatProjectFormatLabel(selectedScript.format)} ${resolveProjectType(selectedScript.projectType, (selectedScript as any).type, (selectedScript as any).projectDetails?.type) === 'SERIES' ? 'series' : 'film'} produced by ${studio.name}${selectedScript.subjectName ? ` about ${selectedScript.subjectName}` : ''}.`,
-                studioId: studio.id as any,
-                subtype: projectSubtype,
-                universeId: finalUniverseId,
-                universeSagaName: isCreatingNewUniverse
-                    ? 'Saga 1'
-                    : selectedScript.universeSagaName || ((selectedUniverseId && selectedUniverseId !== 'NEW') ? String(normalizedWorldUniverses[selectedUniverseId]?.currentSagaName || normalizedWorldUniverses[selectedUniverseId]?.saga || 'Saga 1') : undefined),
-                universePhaseName: isCreatingNewUniverse
-                    ? 'Phase 1'
-                    : selectedScript.universePhaseName || ((selectedUniverseId && selectedUniverseId !== 'NEW') ? String(normalizedWorldUniverses[selectedUniverseId]?.currentPhaseName || normalizedWorldUniverses[selectedUniverseId]?.currentPhase || 'Phase 1') : undefined),
-                newUniverseName: isCreatingNewUniverse ? newUniverseName.trim() : undefined,
-                franchiseId: selectedFranchiseId === 'NEW' ? `fran_${Date.now()}` : (selectedFranchiseId || undefined),
-                installmentNumber: (selectedFranchiseId && selectedFranchiseId !== 'NEW') ? (studioFranchises.find(f => f.id === selectedFranchiseId)?.lastInstallment || 0) + 1 : 1,
-                genre: selectedScript.genres[0],
-                subjectName: selectedScript.subjectName,
-                subjectType: selectedScript.subjectType,
-                connectedProjectIntent: effectiveConnectedIntent,
-                targetAudience: selectedScript.targetAudience || 'PG-13',
-                budgetTier: finalBudgetTier,
-                estimatedBudget: productionBudgetWithMusic,
-                reservedMarketingBudget: marketingReserve,
-                marketingBudgetSpent: 0,
-                marketingBudgetRemaining: marketingReserve,
-                visibleHype: 'LOW',
-                playerProductionFocus: initialPlayerProductionFocus,
-                hiddenStats: {
-                    scriptQuality: selectedScript.quality,
-                    directorQuality: directorData.quality,
-                    castingStrength: currentCastingStrength,
-                    distributionPower: Math.min(100, 50 + Math.floor(studioPrestigeScore / 8)),
-                    rawHype: currentEstimatedBuzz,
-                    qualityScore: Math.max(1, actualQuality - selfRunQualityStrain),
-                    prestigeBonus: (tone < 30 ? 20 : 0) + Math.floor(studioPrestigeScore / 25),
-                    fameMultiplier: fameMultiplier,
-                    castDepthScore: castDepth.score,
-                    castDepthNote: castDepth.note,
-                    musicBuzz: soundtrackPlan?.musicBuzz || 0,
-                    musicRisk: soundtrackPlan?.musicRisk || 0,
-                    musicBudget: soundtrackBudget,
-                    musicOpeningLiftPct: soundtrackImpact?.openingWeekendLiftPct || 0,
-                    musicAudienceReachLiftPct: soundtrackImpact?.audienceReachLiftPct || 0,
-                    musicSocialHypeLift: soundtrackImpact?.socialHypeLift || 0,
-                    musicTrailerStrengthLift: soundtrackImpact?.trailerStrengthLift || 0,
-                    musicControversyRisk: soundtrackImpact?.controversyRisk || 0,
-                    musicMismatchBacklashRisk: soundtrackImpact?.mismatchBacklashRisk || 0,
-                    musicAwardChanceLift: soundtrackImpact?.awardChanceLift || 0,
-                    musicStreamingInterestLiftPct: soundtrackImpact?.streamingInterestLiftPct || 0,
-                    musicImpactLabel: soundtrackImpact?.label,
-                    studioPrestigeScore,
-                    isRecast: isRecast,
-                    connectedProjectIntent: effectiveConnectedIntent,
-                    linkedUniverseCastCount,
-                    selfRunProduction,
-                    selfRunLoad: selfRunProduction ? selfRunLoad : undefined,
-                    ...(lockedStreamingFunding ? {
-                        platformId: lockedStreamingFunding.platformId,
-                        nextSeasonFundingAmount: lockedStreamingFunding.amount,
-                        nextSeasonFundingPlatformId: lockedStreamingFunding.platformId,
-                        nextSeasonFundingSourceProjectId: lockedStreamingFunding.sourceProjectId,
-                        nextSeasonFundingUsedByProjectId: newCommitmentId
-                    } : {})
-                },
-                director: {
-                    id: selectedCrew.director || (crewModes.director === 'SELF' ? 'PLAYER_SELF' : 'STUDIO_STAFF'),
-                    name: directorData.name,
-                    tier: directorData.tier,
-                    quality: directorData.quality
-                },
-                directorName: directorData.name,
-                directorId: selectedCrew.director || undefined,
-                visibleDirectorTier: directorData.tier,
-                visibleScriptBuzz: 'High',
-                visibleCastStrength: currentCastingStrength > 80 ? 'Star-Studded' : currentCastingStrength > 62 ? 'Solid' : 'Thin',
-                castList: finalizedCastList,
-                crewList: fullCrewList,
-                location: selectedLocations.length > 0 ? { id: selectedLocations[0], name: locationName, region: 'Global', costModifier: 1, qualityBonus: locationQualityBonus, status: 'PENDING', description: `${selectedLocations.length} locations`, coordinates: {x:0,y:0} } : undefined,
-                tone: tone,
-                visualStyle: visualStyle,
-                pacing: pacing,
-                equipmentChoices: equipmentChoices,
-                musicPlan: soundtrackPlan,
-                investorPlan: finalInvestorPlan
-            }
-        };
-
-        const updatedScripts = studio.studioState!.scripts.map(s =>
-            s.id === selectedScriptId ? { ...s, status: 'PRODUCED' as const, producedAtWeek: player.currentWeek } : s
-        );
-
-        // Remove the concept from the studio state to prevent duplicates in Active Slate
-        const updatedConcepts = studio.studioState!.concepts.filter(c => c.scriptId !== selectedScriptId);
-
-        // Update talent roster to decrement moviesRemaining for contracted actors
-        const usedActorIds = safeMovieCastList.map(c => c.actorId).filter(Boolean);
-
-        // Update both player.studio.talentRoster and studio.studioState.talentRoster for consistency
-        const updateRoster = (roster: any[]) => {
-            return roster?.map(contract => {
-                if (usedActorIds.includes(contract.npcId) && contract.moviesRemaining > 0) {
-                    return { ...contract, moviesRemaining: contract.moviesRemaining - 1 };
-                }
-                return contract;
-            }).filter(c => c.moviesRemaining > 0) || [];
-        };
-
-        const updatedPlayerTalentRoster = updateRoster(player.studio?.talentRoster || []);
-        const updatedStudioTalentRoster = updateRoster(studio.studioState?.talentRoster || []);
-
-        // --- GENERATE BUZZ ITEMS ---
-        const generatedBuzz: any[] = [];
-        // Use the ESTIMATED quality for initial buzz, as the public doesn't know the actual quality yet
-        const buzzQuality = currentEstimatedQuality;
-        const isBlockbuster = estimatedBudget > 100000000;
-        const isHighQuality = buzzQuality > 85;
-        const isLowQuality = buzzQuality < 45;
-        const legacyParent = player.flags?.legacyParent || null;
-        const legacyParentActorId = legacyParent?.actorId;
-        const legacyParentName = legacyParent?.name || 'the previous owner';
-        const parentTitle = legacyParent?.gender === 'FEMALE' ? 'mother' : legacyParent?.gender === 'NON_BINARY' ? 'parent' : 'father';
-        const childTitle = player.gender === 'FEMALE' ? 'daughter' : player.gender === 'NON_BINARY' ? 'child' : 'son';
-
-        // 1. HEADLINE (Always 1)
-        let headlineText = `${studio.name} Greenlights "${selectedScript.title}"`;
-        let headlineSub = `Production set to begin immediately.`;
-
-        if (isHighQuality) {
-            headlineText = `Must-See: ${studio.name} Bets Big on "${selectedScript.title}"`;
-            headlineSub = `Insiders are calling the script a "masterpiece". ${directorData.name} attached to direct.`;
-        } else if (isLowQuality) {
-            headlineText = `Risky Move? ${studio.name} Proceeds with "${selectedScript.title}"`;
-            headlineSub = `Industry analysts question the viability of this project.`;
-        }
-
-        // Check for Premium Equipment in News
-        const premiumEquip = Object.entries(equipmentChoices).filter(([_, choice]) => choice === 'TIER_4' || choice === 'TIER_5');
-        if (premiumEquip.length > 0) {
-            const equipNames = premiumEquip.map(([id]) => id === 'cameras' ? 'custom IMAX rigs' : id === 'lighting' ? 'stadium-grade lighting' : id === 'sound' ? 'Dolby Atmos gear' : 'massive practical sets');
-            headlineSub += ` Studio is sparing no expense, renting ${equipNames.join(' and ')}.`;
-        }
-
-        if (soundtrackPlan?.credits?.length) {
-            const leadCredit = soundtrackPlan.credits[0];
-            headlineSub += ` Music push led by ${leadCredit.artistName} with "${leadCredit.songTitle}".`;
-        }
-
-        if (finalInvestorPlan?.totalRaised) {
-            headlineSub += ` Outside investors covered ${formatMoney(finalInvestorPlan.totalRaised)} for ${finalInvestorPlan.investorEquityPercent}% project equity.`;
-        }
-
-        const newsItem: NewsItem = {
-            id: `news_${Date.now()}`,
-            headline: headlineText,
-            subtext: headlineSub,
-            category: 'INDUSTRY',
-            week: player.currentWeek,
-            year: Math.floor(player.currentWeek / 52) + 2024,
-            impactLevel: isHighQuality ? 'HIGH' : 'MEDIUM'
-        };
-        generatedBuzz.push({ type: 'HEADLINE', data: newsItem });
-
-        const characterNewsItems: NewsItem[] = [];
-        if (finalUniverseId && !isCreatingNewUniverse) {
-            const universe = normalizedWorldUniverses[finalUniverseId as UniverseId];
-            if (universe) {
-                const existingProjects = getUniverseDashboardProjects(player, finalUniverseId as UniverseId, player.activeReleases || []);
-                const existingRoster = buildUniverseRoster(universe, existingProjects, player.name);
-                const existingById = new Map<string, any>();
-                existingRoster.forEach(character => {
-                    getUniverseCharacterKeyAliases(finalUniverseId as UniverseId, character.characterId || character.id, character.name)
-                        .forEach(alias => existingById.set(alias, character));
-                });
-
-                const returningCharacters = finalizedCastList
-                    .map(cast => {
-                        const existing = getUniverseCharacterKeyAliases(finalUniverseId as UniverseId, cast.characterId, cast.characterName)
-                            .map(alias => existingById.get(alias))
-                            .find(Boolean);
-                        if (!existing) return null;
-                        return {
-                            cast,
-                            existing,
-                            isRecast: existing.actorId !== cast.actorId
-                        };
-                    })
-                    .filter(Boolean) as { cast: typeof finalizedCastList[number], existing: any, isRecast: boolean }[];
-
-                const recast = returningCharacters.find(item => item.isRecast);
-                const returnee = returningCharacters.find(item => !item.isRecast);
-                const story = recast || returnee;
-
-                if (story) {
-                    const actorName = story.cast.name || 'Unknown Actor';
-                    const parentLinkedRole = legacyParentActorId && story.existing.actorId === legacyParentActorId;
-                    const oldActorName = parentLinkedRole ? legacyParentName : story.existing.actorId === 'PLAYER_SELF' ? player.name : (story.existing.actorName || 'Unknown Actor');
-                    const headline = parentLinkedRole && story.isRecast
-                        ? `${actorName} takes over ${legacyParentName}'s ${story.cast.characterName} role in "${selectedScript.title}"`
-                        : parentLinkedRole
-                            ? `${player.name} brings ${legacyParentName} back as ${story.cast.characterName} in "${selectedScript.title}"`
-                            : story.isRecast
-                        ? `${actorName} takes over as ${story.cast.characterName} in "${selectedScript.title}"`
-                        : `${story.cast.characterName} returns in "${selectedScript.title}"`;
-                    const subtext = parentLinkedRole && story.isRecast
-                        ? `The franchise keeps ${story.cast.characterName} alive, while fans watch how ${player.name}'s studio handles a role built by their ${parentTitle}.`
-                        : parentLinkedRole
-                            ? `The ${childTitle}-${parentTitle} collaboration turns this connected chapter into a personal industry story.`
-                            : story.isRecast
-                        ? `The universe is keeping ${story.cast.characterName} alive, but fans will be watching the recast closely after ${oldActorName}'s run.`
-                        : `${actorName} is back as ${story.cast.characterName}, giving the universe another connected chapter.`;
-                    const socialContent = parentLinkedRole && story.isRecast
-                        ? `${actorName} stepping into ${story.cast.characterName} after ${legacyParentName}'s run is a serious pressure test.`
-                        : parentLinkedRole
-                            ? `${legacyParentName} returning as ${story.cast.characterName} under ${player.name}'s greenlight is going to have people talking.`
-                            : story.isRecast
-                                ? `Big swing. ${actorName} as ${story.cast.characterName} could either refresh the whole universe or split the fandom.`
-                                : `${story.cast.characterName} coming back in "${selectedScript.title}" is exactly the connected-universe energy fans wanted.`;
-
-                    const characterNews: NewsItem = {
-                        id: `news_character_${Date.now()}`,
-                        headline,
-                        subtext,
-                        category: 'UNIVERSE',
-                        week: player.currentWeek,
-                        year: Math.floor(player.currentWeek / 52) + 2024,
-                        impactLevel: story.isRecast ? 'HIGH' : 'MEDIUM'
-                    };
-                    characterNewsItems.push(characterNews);
-                    generatedBuzz.push({ type: 'HEADLINE', data: characterNews });
-
-                    generatedBuzz.push({
-                        type: 'TWEET',
-                        data: {
-                            id: `x_character_${Date.now()}`,
-                            authorId: 'npc_fandom_wire',
-                            authorName: story.isRecast ? 'FandomWire' : 'Universe Updates',
-                            authorHandle: story.isRecast ? '@FandomWire' : '@UniverseUpdates',
-                            authorAvatar: `https://api.dicebear.com/8.x/avataaars/svg?seed=${story.isRecast ? 'FandomWire' : 'UniverseUpdates'}`,
-                            content: socialContent,
-                            timestamp: Date.now(),
-                            likes: story.isRecast ? 18000 : 12000,
-                            retweets: story.isRecast ? 4200 : 2600,
-                            replies: story.isRecast ? 1900 : 600,
-                            isPlayer: false,
-                            isLiked: false,
-                            isRetweeted: false,
-                            isVerified: true
-                        } as XPost
-                    });
-                }
-            }
-        }
-
-        const legacyArchiveStory = finalizedCastList
-            .map(cast => {
-                const sourceUniverse = cast.sourceUniverseId ? normalizedWorldUniverses[cast.sourceUniverseId] : null;
-                if (!sourceUniverse || !isUniverseRetired(sourceUniverse)) return null;
-                if (finalUniverseId && cast.sourceUniverseId === finalUniverseId) return null;
-                return { cast, sourceUniverse };
-            })
-            .find(Boolean) as { cast: typeof finalizedCastList[number], sourceUniverse: Universe } | undefined;
-
-        if (legacyArchiveStory) {
-            const actorName = legacyArchiveStory.cast.name || 'Unknown Actor';
-            const characterNews: NewsItem = {
-                id: `news_legacy_character_${Date.now()}`,
-                headline: `${legacyArchiveStory.cast.characterName} returns from the ${legacyArchiveStory.sourceUniverse.name} archive`,
-                subtext: `${actorName}'s casting in "${selectedScript.title}" has fans asking if this is a one-off legacy play or the first signal of a bigger revival.`,
-                category: 'UNIVERSE',
-                week: player.currentWeek,
-                year: Math.floor(player.currentWeek / 52) + 2024,
-                impactLevel: 'HIGH'
-            };
-            characterNewsItems.push(characterNews);
-            generatedBuzz.push({ type: 'HEADLINE', data: characterNews });
-            generatedBuzz.push({
-                type: 'TWEET',
-                data: {
-                    id: `x_legacy_character_${Date.now()}`,
-                    authorId: 'npc_archive_watch',
-                    authorName: 'Archive Watch',
-                    authorHandle: '@ArchiveWatch',
-                    authorAvatar: 'https://api.dicebear.com/8.x/avataaars/svg?seed=ArchiveWatch',
-                    content: `${legacyArchiveStory.cast.characterName} showing up after ${legacyArchiveStory.sourceUniverse.name} was retired is not a normal casting choice. This could be tribute, reboot bait, or pure chaos.`,
-                    timestamp: Date.now(),
-                    likes: 21000,
-                    retweets: 5400,
-                    replies: 2600,
-                    isPlayer: false,
-                    isLiked: false,
-                    isRetweeted: false,
-                    isVerified: true
-                } as XPost
-            });
-        }
-
-        const parentCollaborationCast = legacyParentActorId && !legacyParent?.isDeceased
-            ? finalizedCastList.find(cast => cast.actorId === legacyParentActorId)
-            : null;
-        if (parentCollaborationCast) {
-            const collaborationNews: NewsItem = {
-                id: `news_parent_collab_${Date.now()}`,
-                headline: `${player.name} sets ${legacyParentName} for "${selectedScript.title}"`,
-                subtext: isPlayerDirector
-                    ? `The ${childTitle}-${parentTitle} production has extra attention because ${player.name} is calling action on a parent-led performance.`
-                    : `The ${childTitle}-${parentTitle} pairing gives ${studio.name}'s new slate a personal industry hook.`,
-                category: 'INDUSTRY',
-                week: player.currentWeek,
-                year: Math.floor(player.currentWeek / 52) + 2024,
-                impactLevel: 'MEDIUM'
-            };
-            characterNewsItems.push(collaborationNews);
-            generatedBuzz.push({ type: 'HEADLINE', data: collaborationNews });
-            generatedBuzz.push({
-                type: 'TWEET',
-                data: {
-                    id: `x_parent_collab_${Date.now()}`,
-                    authorId: 'npc_setwatch',
-                    authorName: 'SetWatch',
-                    authorHandle: '@SetWatch',
-                    authorAvatar: 'https://api.dicebear.com/8.x/avataaars/svg?seed=SetWatch',
-                    content: `${legacyParentName} joining "${selectedScript.title}" while ${player.name} runs the studio is the kind of casting story people will follow week by week.`,
-                    timestamp: Date.now(),
-                    likes: 9000,
-                    retweets: 1700,
-                    replies: 520,
-                    isPlayer: false,
-                    isLiked: false,
-                    isRetweeted: false,
-                    isVerified: true
-                } as XPost
-            });
-        }
-
-        // 2. SOCIAL POSTS (Increased Count)
-        // User request: "push not just one but more tweets"
-        const socialCount = isHighQuality ? 8 : isLowQuality ? 6 : 5;
-
-        for (let i = 0; i < socialCount; i++) {
-            const isPositive = isHighQuality ? Math.random() > 0.2 : isLowQuality ? Math.random() > 0.8 : Math.random() > 0.4;
-            const isHater = !isPositive && Math.random() > 0.5;
-
-            let content = '';
-            let author = '';
-            let handle = '';
-
-            if (i === 0) {
-                // Industry Account
-                author = 'FilmUpdates';
-                handle = '@FilmUpdates';
-                content = `BREAKING: ${directorData.name} to direct "${selectedScript.title}". ${castList.length > 0 ? 'Cast includes top talent.' : ''} #${selectedScript.genres[0]} #Cinema`;
-            } else if (i === 1) {
-                 // Another Industry Account
-                author = 'Deadline';
-                handle = '@Deadline';
-                content = `EXCLUSIVE: ${studio.name} moves forward with ${selectedScript.genres[0]} project "${selectedScript.title}". Budget estimated at $${(estimatedBudget/1000000).toFixed(0)}M.`;
-            } else {
-                // Random User
-                const users = [
-                    { name: 'MovieBuff99', handle: '@MovieBuff99' },
-                    { name: 'CinemaSinsFan', handle: '@SinsFan' },
-                    { name: 'PopCultureStan', handle: '@PopStan' },
-                    { name: 'TheCritic', handle: '@RealCritic' },
-                    { name: 'BoxOfficePro', handle: '@BoxOffice' },
-                    { name: 'IndieLover', handle: '@IndieFilmz' },
-                    { name: 'BlockbusterKing', handle: '@ActionFan' }
-                ];
-                const user = users[i % users.length];
-                author = user.name;
-                handle = user.handle;
-
-                if (isHighQuality) {
-                    if (isHater) content = `Unpopular opinion: ${directorData.name} is overrated. "${selectedScript.title}" sounds generic. 🤷‍♂️`;
-                    else {
-                        const praises = [
-                            `OMG YES! ${directorData.name} doing a ${selectedScript.genres[0]} movie? Take my money! 🔥🔥🔥`,
-                            `The concept for "${selectedScript.title}" is insane. Oscar contender?`,
-                            `Finally some good news. ${studio.name} is cooking.`,
-                            `I need a trailer NOW.`,
-                            `Cast looks stacked. This is going to be huge.`
-                        ];
-                        content = praises[Math.floor(Math.random() * praises.length)];
-                    }
-                } else if (isLowQuality) {
-                    if (isPositive) content = `Actually, I kinda like the sound of "${selectedScript.title}". Could be a cult classic?`;
-                    else {
-                        const hates = [
-                            `Who asked for this? ${studio.name} is burning money. 🗑️`,
-                            `Another flop incoming.`,
-                            `Why are they making this?`,
-                            `Looks cheap. Pass.`,
-                            `My interest is zero.`
-                        ];
-                        content = hates[Math.floor(Math.random() * hates.length)];
-                    }
-                } else {
-                    const mixed = [
-                        `Interested to see how "${selectedScript.title}" turns out. The cast looks okay.`,
-                        `Could be good, could be bad. We'll see.`,
-                        `Not sure about this one chief.`,
-                        `I'll wait for reviews.`,
-                        `Decent director choice.`
-                    ];
-                    content = mixed[Math.floor(Math.random() * mixed.length)];
-                }
-            }
-
-            const xPost: XPost = {
-                id: `x_${Date.now()}_${i}`,
-                authorId: 'npc_random',
-                authorName: author,
-                authorHandle: handle,
-                authorAvatar: `https://api.dicebear.com/8.x/avataaars/svg?seed=${handle}`,
-                content: content,
-                timestamp: Date.now(),
-                likes: Math.floor(Math.random() * 5000) + 100,
-                retweets: Math.floor(Math.random() * 1000) + 10,
-                replies: Math.floor(Math.random() * 200),
-                isPlayer: false,
-                isLiked: false,
-                isRetweeted: false,
-                isVerified: i === 0
-            };
-            generatedBuzz.push({ type: 'TWEET', data: xPost });
-        }
-
-        if (soundtrackPlan?.credits?.length) {
-            const leadCredit = soundtrackPlan.credits[0];
-            generatedBuzz.push({
-                type: 'TWEET',
-                data: {
-                    id: `x_music_${Date.now()}`,
-                    authorId: 'npc_musicwire',
-                    authorName: 'MusicWire',
-                    authorHandle: '@MusicWire',
-                    authorAvatar: `https://api.dicebear.com/8.x/avataaars/svg?seed=MusicWire`,
-                    content: `${leadCredit.artistName} is attached to "${selectedScript.title}" music. "${leadCredit.songTitle}" could push this movie way outside normal film circles.`,
-                    timestamp: Date.now(),
-                    likes: Math.floor(5000 + (soundtrackPlan.musicBuzz || 0) * 240),
-                    retweets: Math.floor(800 + (soundtrackPlan.musicBuzz || 0) * 60),
-                    replies: Math.floor(100 + (soundtrackPlan.musicRisk || 0) * 12),
-                    isPlayer: false,
-                    isLiked: false,
-                    isRetweeted: false,
-                    isVerified: true
-                } as XPost
-            });
-        }
+        const { generatedBuzz, newsItem, characterNewsItems } = buildGreenlightBuzz({
+            player,
+            studio,
+            selectedScript,
+            directorName: directorData.name,
+            castCount: castList.length,
+            equipmentChoices,
+            soundtrackPlan,
+            investorPlan: finalInvestorPlan,
+            estimatedBudget,
+            estimatedQuality: currentEstimatedQuality,
+            finalizedCastList,
+            finalUniverseId,
+            isCreatingNewUniverse,
+            normalizedWorldUniverses,
+            isPlayerDirector,
+        });
 
         setBuzzItems(generatedBuzz);
 
@@ -3394,84 +2582,34 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             .map(b => b.data)
             .concat(player.x.feed);
 
-        const fundingResult = applyLockedSeasonFunding({
-            budget: studioCashRequirement,
-            lockedFunding: lockedStreamingFunding,
-            lockedStreamingFunds: studio.studioState?.lockedStreamingFunds || [],
-            projectId: newCommitment.id,
-            studioBalance: studio.balance,
-            productionFund: studio.studioState?.productionFund || 0,
-            week: player.currentWeek,
-            year: player.age,
-            newsYear: Math.floor(player.currentWeek / 52) + 2024,
-            projectTitle: newCommitment.name
+        const {
+            fundingResult,
+            lockedFundApplied,
+            unusedFundingReturned,
+            newProductionFund,
+            newStudioBalance,
+            updatedLockedStreamingFunds,
+            fundedCommitment,
+            fundingNewsItems,
+            fundingLogEntries,
+            updatedActiveReleases,
+            updatedCommitments,
+            updatedWorldUniverses,
+            updatedWorldPlatforms,
+        } = prepareGreenlightFunding({
+            player,
+            studio,
+            lockedStreamingFunding,
+            studioCashRequirement,
+            newCommitment,
+            finalInvestorRaised,
+            greenlightPackageBudget,
+            isCreatingNewUniverse,
+            normalizedWorldUniverses,
+            finalUniverseId,
+            newUniverseName,
+            randomUniverseColor,
         });
-        const lockedFundApplied = fundingResult.lockedFundApplied;
-        const unusedFundingReturned = fundingResult.unusedFundingReturned;
-        const newProductionFund = fundingResult.nextProductionFund;
-        const newStudioBalance = fundingResult.nextStudioBalance;
-        const updatedLockedStreamingFunds = fundingResult.updatedLockedStreamingFunds;
-        const fundingNewsItems = fundingResult.news ? [fundingResult.news] : [];
-        const fundingLogEntries = fundingResult.feedbackMessages.map(message => ({
-            week: player.currentWeek,
-            year: player.age,
-            message,
-            type: message.startsWith('Studio added') ? 'neutral' as const : 'positive' as const
-        }));
-        const markSourceSeasonFundingUsed = (details?: ProjectDetails) =>
-            markHiddenSeasonFundingUsed(details, lockedStreamingFunding, newCommitment.id);
-        const fundingSourceMatches = (details?: ProjectDetails, fallbackId?: string) => {
-            if (!lockedStreamingFunding) return false;
-            return fallbackId === lockedStreamingFunding.sourceProjectId
-                || details?.hiddenStats?.nextSeasonFundingSourceProjectId === lockedStreamingFunding.sourceProjectId;
-        };
-        const updatedActiveReleases = lockedStreamingFunding
-            ? player.activeReleases.map(release => {
-                if (!fundingSourceMatches(release.projectDetails, release.id)) return release;
-                const projectDetails = markSourceSeasonFundingUsed(release.projectDetails);
-                return projectDetails ? { ...release, projectDetails } : release;
-            })
-            : player.activeReleases;
-        const updatedCommitments = lockedStreamingFunding
-            ? player.commitments.map(commitment => {
-                if (!fundingSourceMatches(commitment.projectDetails, commitment.id)) return commitment;
-                const projectDetails = markSourceSeasonFundingUsed(commitment.projectDetails);
-                return projectDetails ? { ...commitment, projectDetails } : commitment;
-            })
-            : player.commitments;
-        const updatedWorldUniverses = isCreatingNewUniverse
-            ? {
-                ...normalizedWorldUniverses,
-                [finalUniverseId!]: normalizeUniverseForSave({
-                    id: finalUniverseId!,
-                    name: newUniverseName.trim(),
-                    description: `${studio.name}'s new cinematic universe.`,
-                    studioId: studio.id,
-                    currentPhase: 'PHASE_1_ORIGINS',
-                    saga: 1,
-                    currentSagaName: 'Saga 1',
-                    currentPhaseName: 'Phase 1',
-                    sagas: [],
-                    momentum: 5,
-                    brandPower: 5,
-                    marketShare: 0,
-                    color: randomUniverseColor,
-                    roster: [],
-                    slate: [newCommitment.projectDetails],
-                    weeksUntilNextPhase: 104
-                }, finalUniverseId!)
-            }
-            : normalizedWorldUniverses;
-        const updatedWorldPlatforms = { ...player.world.platforms };
-        if (unusedFundingReturned > 0 && lockedStreamingFunding?.platformId) {
-            const platform = updatedWorldPlatforms[lockedStreamingFunding.platformId as keyof typeof updatedWorldPlatforms];
-            if (platform) {
-                updatedWorldPlatforms[lockedStreamingFunding.platformId as keyof typeof updatedWorldPlatforms] = {
-                    ...platform,
-                    cashReserve: platform.cashReserve + unusedFundingReturned
-                };
-            }
-        }
 
         const updatedPlayerAfterGreenlight: Player = {
             ...player,
@@ -3479,7 +2617,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             logs: [...player.logs, ...fundingLogEntries].slice(-80),
             x: { ...player.x, feed: newXFeed },
             activeReleases: updatedActiveReleases,
-            commitments: [...updatedCommitments, newCommitment],
+            commitments: [...updatedCommitments, fundedCommitment],
             world: {
                 ...player.world,
                 universes: updatedWorldUniverses,
@@ -3514,7 +2652,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                             ...fundingResult.ledgerEntries.map(entry => ({
                                 ...entry,
                                 label: entry.type === 'PRODUCTION_SPEND' && lockedFundApplied > 0
-                                    ? `${newCommitment.name} greenlight spend (${formatMoney(lockedFundApplied)} renewal cap used${unusedFundingReturned > 0 ? `, ${formatMoney(unusedFundingReturned)} unused returned` : ''})`
+                                    ? `${newCommitment.name} greenlight spend (${formatMoney(lockedFundApplied)} ${lockedStreamingFunding?.fundingSource === 'OWNED_STREAMING_PLATFORM' ? 'Original commission' : 'renewal cap'} used${unusedFundingReturned > 0 ? `, ${formatMoney(unusedFundingReturned)} unused returned` : ''})`
                                     : entry.label
                             })),
                             ...((studio.studioState?.financeLedger || []))
@@ -3532,7 +2670,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             })
         };
         spendPlayerEnergy(updatedPlayerAfterGreenlight, greenlightEnergyCost, `Greenlight: ${newCommitment.name}`);
-        onUpdatePlayer(updatedPlayerAfterGreenlight);
+        onUpdatePlayer(finalizeOwnedStreamingOriginalGreenlight(updatedPlayerAfterGreenlight));
         addBreadcrumb('greenlight:success', {
             title: newCommitment.name,
             commitmentId: newCommitment.id,
@@ -3598,88 +2736,201 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
     }, [selectedScript, selectedCrew, castList, player, availableActors, musicBuzzBonus]);
 
     const currentCastingStrength = useMemo(() => {
-        const assignedCast = castList.filter(c => c.actorId);
-        if (assignedCast.length === 0) return 35;
+        const cast = castList
+            .filter(role => role.actorId)
+            .map(role => {
+                if (role.actorId === 'PLAYER_SELF') {
+                    return {
+                        roleType: role.roleType,
+                        talent: playerActingTalent || 50,
+                        fame: player.stats.fame || 0,
+                    };
+                }
+                if (role.actorId === 'STUDIO_STAFF') {
+                    return {
+                        roleType: role.roleType,
+                        talent: getInHouseQuality('ACTOR') || 40,
+                        fame: getInHouseFame('ACTOR') || 10,
+                    };
+                }
+                const actor = availableActors.find(candidate => candidate.id === role.actorId);
+                return {
+                    roleType: role.roleType,
+                    talent: actor?.stats?.talent || 50,
+                    fame: actor?.stats?.fame || 10,
+                };
+            });
 
-        const weightedScores = assignedCast.map(c => {
-            let talent = 50;
-            let fame = 10;
-
-            if (c.actorId === 'PLAYER_SELF') {
-                talent = player.stats.talent || 50;
-                fame = player.stats.fame || 0;
-            } else if (c.actorId === 'STUDIO_STAFF') {
-                talent = getInHouseQuality('ACTOR') || 40;
-                fame = getInHouseFame('ACTOR') || 10;
-            } else {
-                const actor = availableActors.find(a => a.id === c.actorId);
-                talent = actor?.stats?.talent || 50;
-                fame = actor?.stats?.fame || 10;
-            }
-
-            const roleWeight = c.roleType === 'LEAD' ? 1.2 : c.roleType === 'SUPPORTING' ? 0.8 : c.roleType === 'CAMEO' ? 0.35 : 0.15;
-            return { score: (talent * 0.72) + (fame * 0.28), weight: roleWeight };
+        return calculateGreenlightCastingStrength({
+            cast,
+            projectType: selectedScript?.projectType,
+            estimatedBudget: currentEstimatedBudget,
         });
-
-        const totalWeight = weightedScores.reduce((sum, item) => sum + item.weight, 0) || 1;
-        const weightedAverage = weightedScores.reduce((sum, item) => sum + (item.score * item.weight), 0) / totalWeight;
-
-        const requiredCastCount = selectedScript?.projectType === 'SERIES'
-            ? 4
-            : currentEstimatedBudget > 100000000
-                ? 6
-                : currentEstimatedBudget > 25000000
-                    ? 4
-                    : 3;
-
-        const completenessRatio = Math.min(1, assignedCast.length / requiredCastCount);
-        const completenessPenalty = (1 - completenessRatio) * 18;
-        const ensembleBonus = assignedCast.length >= requiredCastCount ? Math.min(6, (assignedCast.length - requiredCastCount) * 1.5) : 0;
-
-        return Math.round(clampStat(weightedAverage - completenessPenalty + ensembleBonus, 20, 98));
     }, [castList, availableActors, player, selectedScript, currentEstimatedBudget, studio]);
+    const liveCharacterStoryFit = useMemo(() => {
+        if (!selectedStoryCompass || !selectedScript) return null;
+        return evaluateCastStoryFit(
+            selectedStoryCompass,
+            castList.map((member, index) => ({
+                ...suggestCharacterIdentity(
+                    selectedStoryCompass,
+                    (member.roleType === 'EXTRA' ? 'CAMEO' : member.roleType) as RoleType,
+                    index,
+                    selectedScript,
+                ),
+                ...member,
+            })),
+        );
+    }, [castList, selectedScript, selectedStoryCompass]);
+
+    const liveCastStoryRead = useMemo(() => {
+        if (!selectedStoryCompass || !selectedScript) return null;
+        return getCastStoryRead(
+            selectedStoryCompass,
+            castList.map((member, index) => {
+                const actor = member.actorId === 'PLAYER_SELF'
+                    ? null
+                    : member.actorId === 'STUDIO_STAFF'
+                        ? null
+                        : getCastableActorById(member.actorId);
+                return {
+                    ...suggestCharacterIdentity(
+                        selectedStoryCompass,
+                        (member.roleType === 'EXTRA' ? 'CAMEO' : member.roleType) as RoleType,
+                        index,
+                        selectedScript,
+                    ),
+                    ...member,
+                    name: member.characterName || member.role,
+                    actorName: member.actorName,
+                    talent: member.actorId === 'PLAYER_SELF'
+                        ? playerActingTalent
+                        : member.actorId === 'STUDIO_STAFF'
+                            ? getInHouseQuality('ACTOR')
+                            : actor?.stats?.talent,
+                    fame: member.actorId === 'PLAYER_SELF'
+                        ? player.stats.fame
+                        : member.actorId === 'STUDIO_STAFF'
+                            ? getInHouseFame('ACTOR')
+                            : actor?.stats?.fame,
+                };
+            }),
+        );
+    }, [castList, selectedScript, selectedStoryCompass, playerActingTalent, player.stats.fame, availableActors, studio]);
+
+    const removeCastRole = (roleId: string) => {
+        setCastList(previous => previous.filter(role => role.id !== roleId));
+    };
+
+    const changeCastRoleType = (roleId: string, roleType: GreenlightCastRole['roleType']) => {
+        setCastList(previous => previous.map(role => {
+            if (role.id !== roleId) return role;
+            const priorDefault = getDefaultCharacterStoryRole(role.roleType);
+            const storyRole = !role.storyRole || role.storyRole === priorDefault
+                ? getDefaultCharacterStoryRole(roleType)
+                : role.storyRole;
+            return {
+                ...role,
+                roleType,
+                storyRole,
+                abilityType: role.abilityType || 'NONE',
+                role: roleType === 'LEAD'
+                    ? 'Lead Actor'
+                    : roleType === 'SUPPORTING'
+                        ? 'Supporting Actor'
+                        : roleType === 'CAMEO'
+                            ? 'Cameo Appearance'
+                            : 'Extra',
+            };
+        }));
+    };
+
+    const changeCastCharacterSelection = (roleId: string, selectedValue: string) => {
+        const selectedCharacter = linkedCharacterOptions.find(character => (
+            getCharacterOptionValue(character) === selectedValue
+        ));
+        if (selectedCharacter) {
+            attachLinkedCharacterToRole(roleId, selectedCharacter);
+            return;
+        }
+        setCastList(previous => previous.map(role => role.id === roleId ? {
+            ...role,
+            characterId: undefined,
+            characterName: '',
+            sourceUniverseId: undefined,
+            storyFunction: undefined,
+            storyRole: undefined,
+            abilityType: undefined,
+            nature: undefined,
+            identitySource: 'AUTO',
+        } : role));
+    };
+
+    const changeCastCharacterName = (roleId: string, value: string) => {
+        setCastList(previous => previous.map(role => role.id === roleId ? {
+            ...role,
+            characterName: value,
+            characterId: activeUniverseId ? toUniverseCharacterId(activeUniverseId, value) : undefined,
+            sourceUniverseId: undefined,
+        } : role));
+    };
+
+    const fillDefaultCastCharacterName = (roleId: string, index: number) => {
+        setCastList(previous => previous.map(role => {
+            if (role.id !== roleId || role.characterName?.trim()) return role;
+            const characterName = getDefaultCharacterName(role, index);
+            return {
+                ...role,
+                characterName,
+                characterId: activeUniverseId
+                    ? toUniverseCharacterId(activeUniverseId, characterName)
+                    : undefined,
+                sourceUniverseId: undefined,
+            };
+        }));
+    };
+
+    const addCastRole = () => {
+        setCastList(previous => [
+            ...previous,
+            {
+                id: `role_${Date.now()}`,
+                role: 'Supporting Actor',
+                roleType: 'SUPPORTING',
+                actorId: null,
+                identitySource: 'AUTO',
+            },
+        ]);
+    };
+
+    const continueFromCast = () => {
+        if (castList.some(role => !role.actorId)) return;
+        saveDraft();
+        setStep('CREW');
+    };
 
     const currentEstimatedQuality = useMemo(() => {
-        let score = 50;
-        // Script
-        if (selectedScript) score += ((selectedScript.quality || 50) - 50) * 0.5;
-        // Director
-        const dirData = getCrewData('director');
-        score += ((dirData.quality || 50) - 50) * 0.4;
-        // Cast
-        score += (currentCastingStrength - 50) * 0.3;
-        // Crew
-        const crewRoles = ['cinematographer', 'composer', 'lineProducer', 'vfx'] as const;
-        const crewQualities = crewRoles.map(r => getCrewData(r).quality || 50);
-        const avgCrew = crewQualities.reduce((a,b) => a+b, 0) / crewQualities.length;
-        score += (avgCrew - 50) * 0.2;
+        const crewQualities = (['cinematographer', 'composer', 'lineProducer', 'vfx'] as const)
+            .map(role => getCrewData(role).quality || 50);
+        const locationQualities = selectedLocations
+            .map(locationId => findLocation(locationId)?.quality)
+            .filter((quality): quality is number => typeof quality === 'number');
 
-        // Equipment
-        let equipmentScore = 0;
-        Object.entries(equipmentChoices).forEach(([key, choice]) => {
-            const choiceStr = choice as string;
-            if (choiceStr === 'OWNED') {
-                const ownedLevel = studio.studioState?.equipment?.[key as keyof StudioEquipment] || 0;
-                equipmentScore += ownedLevel * 3;
-            } else if (GEAR_TIERS[choiceStr]) {
-                equipmentScore += GEAR_TIERS[choiceStr].quality || 0;
-            }
+        return calculateGreenlightEstimatedQuality({
+            scriptQuality: selectedScript?.quality,
+            directorQuality: getCrewData('director').quality || 50,
+            castingStrength: currentCastingStrength,
+            crewQualities,
+            equipmentChoices,
+            ownedEquipmentLevels: studio.studioState?.equipment || {},
+            gearTiers: GEAR_TIERS,
+            locationQualities,
+            storyFitQualityAdjustment: liveCharacterStoryFit?.qualityAdjustment || 0,
+            backgroundAuthenticity: backgroundCastingPlan.authenticity,
+            backgroundReliability: backgroundCastingPlan.reliability,
+            backgroundSetCare: backgroundCastingPlan.setCare,
         });
-        score += equipmentScore / 4; // Average bonus per gear type
-
-        // Location
-        if (selectedLocations.length > 0) {
-             const allLocs = Object.values(mockLocations).flat() as any[];
-             let locScore = 0;
-             selectedLocations.forEach(locId => {
-                 const loc = allLocs.find(l => l.id === locId);
-                 if (loc) locScore += ((loc.quality || 5) - 5) * 2;
-             });
-             score += locScore / selectedLocations.length;
-        }
-        return Math.max(1, Math.min(100, Math.round(score || 50)));
-    }, [selectedScript, selectedCrew, selectedLocations, availableDirectors, mockLocations, crewModes, equipmentChoices, studio, mockCrew, currentCastingStrength]);
-
+    }, [selectedScript, selectedCrew, selectedLocations, availableDirectors, productionLocations, crewModes, equipmentChoices, studio, crewMarket, currentCastingStrength, liveCharacterStoryFit, backgroundCastingPlan]);
     if (!selectedScript && step !== 'SELECT_SCRIPT' && step !== 'BUZZ') {
         return (
             <div className="fixed inset-0 z-[70] bg-[#020a05] text-white flex flex-col items-center justify-center p-8 text-center font-sans">
@@ -3728,926 +2979,164 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                 </div>
             )}
 
-            {/* NEW GAMIFIED HEADER */}
-            <div className="relative shrink-0 z-20 bg-emerald-950/40 backdrop-blur-2xl border-b border-emerald-500/20 shadow-2xl">
-                <div className="max-w-5xl mx-auto w-full px-4 pt-safe-top pb-6">
-                    <div className="flex items-center justify-between gap-2 sm:gap-4 mb-6">
-                        {/* Left: Back */}
-                        <button onClick={onBack} className="p-2 sm:p-2.5 bg-zinc-900/80 hover:bg-zinc-800 rounded-xl text-zinc-400 hover:text-white transition-all border border-zinc-800 shadow-lg group shrink-0">
-                            <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform sm:w-5 sm:h-5" />
-                        </button>
+            <GreenlightHeader
+                step={step}
+                onBack={onBack}
+                onStepChange={setStep}
+                selectedScriptId={selectedScriptId}
+                currentEstimatedBuzz={currentEstimatedBuzz}
+                currentEstimatedQuality={currentEstimatedQuality}
+                budgetBreakdown={budgetBreakdown}
+                musicBudget={musicBudget}
+                reservedMarketingBudget={reservedMarketingBudget}
+                packageBudget={packageBudget}
+                availableFunding={studio.balance + (studio.studioState?.productionFund || 0) + lockedStreamingFundingAmount}
+                formatMoney={formatMoney}
+                translate={tr}
+            />
 
-                        {/* Center: Title & Phase */}
-                        <div className="flex flex-col items-center text-center shrink">
-                            <div className="flex items-center gap-1 sm:gap-2 mb-1">
-                                <Clapperboard className="text-emerald-500 hidden sm:block" size={18} />
-                                <h1 className="text-base sm:text-xl font-black tracking-tighter text-white uppercase italic">GREENLIGHT</h1>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <span className="text-[9px] sm:text-[10px] font-black bg-emerald-500/10 text-emerald-400 px-3 sm:px-4 py-1 rounded-full uppercase tracking-[0.2em] border border-emerald-500/30 shadow-[0_0_20px_rgba(16,185,129,0.2)]">
-                                    {step.replace('_', ' ')}
-                                </span>
-                            </div>
-                        </div>
-
-                        {/* Right: Budget & Quality Combined */}
-                        <div className="flex items-center shrink-0 gap-2">
-                            <div className="bg-black/60 px-3 py-2 sm:px-4 sm:py-3 rounded-2xl border border-amber-500/20 backdrop-blur-xl flex flex-col items-center justify-center shadow-2xl h-full">
-                                <span className="text-[7px] sm:text-[8px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-1">Buzz</span>
-                                <div className="flex items-center gap-1">
-                                    <div className="relative inline-block w-[14px] h-[14px]">
-                                        <Star size={14} className="absolute inset-0 text-zinc-700" />
-                                        <div
-                                            className="absolute inset-0 overflow-hidden"
-                                            style={{ width: `${Math.min(100, Math.max(0, currentEstimatedBuzz))}%` }}
-                                        >
-                                            <Star size={14} className={`fill-amber-400 text-amber-400 ${currentEstimatedBuzz >= 100 ? 'animate-pulse drop-shadow-[0_0_8px_rgba(251,191,36,0.8)]' : ''}`} />
-                                        </div>
-                                    </div>
-                                    <span className="text-sm sm:text-lg font-mono font-black text-amber-400">{currentEstimatedBuzz}</span>
-                                </div>
-                            </div>
-
-                            <div className="bg-black/60 px-3 py-2 sm:px-5 sm:py-3 rounded-2xl border border-emerald-500/20 backdrop-blur-xl flex flex-col items-end shadow-2xl min-w-[110px] sm:min-w-[160px]">
-                                <div className="flex flex-col items-end mb-1 sm:mb-2">
-                                    <div className="flex items-center gap-1 group/budget relative">
-                                        <span className="text-[7px] sm:text-[8px] font-black uppercase tracking-[0.2em] text-zinc-500">Est. Budget</span>
-                                        <Info size={8} className="text-zinc-600 cursor-help" />
-
-                                        {/* Tooltip */}
-                                        <div className="absolute top-full right-0 mt-2 w-48 bg-zinc-950 border border-zinc-800 rounded-xl p-3 shadow-2xl z-50 opacity-0 group-hover/budget:opacity-100 pointer-events-none transition-opacity">
-                                            <div className="space-y-1.5">
-                                                <div className="flex justify-between text-[9px]">
-                                                    <span className="text-zinc-500 uppercase">Base Production</span>
-                                                    <span className="text-white font-mono">{formatMoney(budgetBreakdown.baseCost)}</span>
-                                                </div>
-                                                <div className="flex justify-between text-[9px]">
-                                                    <span className="text-zinc-500 uppercase">{tr('greenlight.budget.scriptIp')}</span>
-                                                    <span className="text-white font-mono">{formatMoney(budgetBreakdown.scriptCost)}</span>
-                                                </div>
-                                                <div className="flex justify-between text-[9px]">
-                                                    <span className="text-zinc-500 uppercase">{tr('greenlight.budget.equipment')}</span>
-                                                    <span className="text-white font-mono">{formatMoney(budgetBreakdown.equipmentCost)}</span>
-                                                </div>
-                                                <div className="flex justify-between text-[9px]">
-                                                    <span className="text-zinc-500 uppercase">{tr('greenlight.budget.soundtrackArtists')}</span>
-                                                    <span className="text-cyan-300 font-mono">{formatMoney(musicBudget)}</span>
-                                                </div>
-                                                <div className="flex justify-between text-[9px]">
-                                                    <span className="text-zinc-500 uppercase">{tr('greenlight.marketing.reservedCampaignBudget')}</span>
-                                                    <span className="text-amber-300 font-mono">{formatMoney(reservedMarketingBudget)}</span>
-                                                </div>
-                                                <div className="pt-1.5 border-t border-zinc-800 flex justify-between text-[10px] font-bold">
-                                                    <span className="text-zinc-400 uppercase">{tr('greenlight.budget.totalPackage')}</span>
-                                                    <span className="text-emerald-400 font-mono">{formatMoney(packageBudget)}</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <span className={`text-sm sm:text-xl font-mono font-black tracking-tighter ${packageBudget > (studio.balance + (studio.studioState?.productionFund || 0) + lockedStreamingFundingAmount) ? 'text-rose-500' : 'text-emerald-400'}`}>
-                                        {formatMoney(packageBudget)}
-                                    </span>
-                                </div>
-                                <div className="flex items-center gap-2 w-full justify-end border-t border-white/5 pt-1 sm:pt-2">
-                                    <span className="text-[7px] sm:text-[8px] font-black uppercase tracking-widest text-zinc-600">Est. Quality</span>
-                                    <span className={`text-[10px] sm:text-xs font-mono font-black ${currentEstimatedQuality > 80 ? 'text-amber-400' : currentEstimatedQuality > 60 ? 'text-emerald-400' : 'text-zinc-400'}`}>
-                                        {currentEstimatedQuality}/100
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* VISUAL PROGRESS TRACKER */}
-                    <div className="relative px-2">
-                        <div className="flex justify-between items-start relative">
-                            {/* Track Line */}
-                            <div className="absolute left-0 right-0 top-[14px] h-0.5 bg-zinc-900/50 -z-10 rounded-full"></div>
-                            <div className="absolute left-0 top-[14px] h-0.5 bg-emerald-500 -z-10 transition-all duration-700 ease-out rounded-full shadow-[0_0_10px_rgba(16,185,129,0.5)]"
-                                style={{ width: `${(['SELECT_SCRIPT', 'DIRECTOR', 'CAST', 'CREW', 'EQUIPMENT', 'LOCATION', 'SETUP', 'CONFIRM', 'BUZZ'].indexOf(step) / 7) * 100}%` }}>
-                            </div>
-
-                            {['Script', 'Director', 'Cast', 'Crew', 'Gear', 'Loc', 'Setup', 'Go'].map((s, idx) => {
-                                const stepIdx = ['SELECT_SCRIPT', 'DIRECTOR', 'CAST', 'CREW', 'EQUIPMENT', 'LOCATION', 'SETUP', 'CONFIRM', 'BUZZ'].indexOf(step);
-                                const isActive = idx === stepIdx;
-                                const isCompleted = idx < stepIdx;
-                                const canNavigate = selectedScriptId !== null && step !== 'BUZZ'; // Lock nav during BUZZ
-
-                                return (
-                                    <button
-                                        key={s}
-                                        onClick={() => {
-                                            if (canNavigate) {
-                                                const steps: GreenlightStep[] = ['SELECT_SCRIPT', 'DIRECTOR', 'CAST', 'CREW', 'EQUIPMENT', 'LOCATION', 'SETUP', 'CONFIRM'];
-                                                setStep(steps[idx] as any);
-                                            }
-                                        }}
-                                        disabled={!canNavigate}
-                                        className={`flex flex-col items-center gap-1.5 relative group ${canNavigate ? 'cursor-pointer' : 'cursor-not-allowed'}`}
-                                    >
-                                        <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[9px] font-black border-2 transition-all duration-500 ${
-                                            isActive
-                                            ? 'bg-emerald-500 border-emerald-300 text-black scale-110 shadow-[0_0_15px_rgba(16,185,129,0.6)] z-10'
-                                            : isCompleted
-                                            ? 'bg-emerald-900 border-emerald-600 text-emerald-400 group-hover:bg-emerald-800'
-                                            : 'bg-zinc-950 border-zinc-800 text-zinc-700 group-hover:border-zinc-600'
-                                        }`}>
-                                            {isCompleted ? <Check size={12} strokeWidth={4} /> : idx + 1}
-                                        </div>
-                                        <span className={`text-[7px] font-bold uppercase tracking-tighter transition-colors duration-300 ${isActive ? 'text-emerald-400' : 'text-zinc-600 group-hover:text-zinc-400'}`}>
-                                            {s}
-                                        </span>
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div className="flex-1 overflow-y-auto custom-scrollbar relative z-10">
+            <div
+                className="relative z-10 flex-1 overscroll-contain overflow-y-auto custom-scrollbar"
+                style={{ WebkitOverflowScrolling: 'touch' }}
+            >
                 {step === 'SELECT_SCRIPT' && (
-                    <div className="space-y-6 max-w-5xl mx-auto px-4 pt-6 pb-44">
-                        {scripts.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center h-[60vh] text-zinc-500 animate-in fade-in zoom-in duration-500">
-                                <div className="w-24 h-24 bg-zinc-900 rounded-full flex items-center justify-center mb-6 shadow-inner">
-                                    <BookOpen size={48} className="opacity-20" />
-                                </div>
-                                <h2 className="text-xl font-bold text-white mb-2">No Scripts Available</h2>
-                                <p className="text-sm max-w-xs text-center leading-relaxed">Your vault is empty. Visit the script market, buy a project, then return here to green-light it.</p>
-                                <button onClick={onOpenScriptMarket || onBack} className="mt-8 px-8 py-3 bg-emerald-500 hover:bg-emerald-400 text-black rounded-xl text-xs font-black uppercase tracking-widest transition-all hover:scale-105 shadow-[0_0_25px_rgba(16,185,129,0.25)]">Open Script Market</button>
-                            </div>
-                        ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-4">
-                                {scripts.map(script => (
-                                    <button
-                                        key={script.id}
-                                        onClick={() => setSelectedScriptId(script.id)}
-                                        className={`relative group text-left transition-all duration-500 hover:-translate-y-2 ${selectedScriptId === script.id ? 'scale-105 z-10' : 'hover:scale-105'}`}
-                                    >
-                                        {/* Script Dossier Visual */}
-                                        <div className={`h-[320px] rounded-xl border-2 p-6 flex flex-col justify-between relative overflow-hidden shadow-2xl ${
-                                            selectedScriptId === script.id
-                                            ? 'bg-zinc-900 border-emerald-500 shadow-[0_0_40px_rgba(16,185,129,0.2)]'
-                                            : 'bg-zinc-900 border-zinc-800 hover:border-zinc-600'
-                                        }`}>
-                                            {/* Background Pattern */}
-                                            <div className="absolute inset-0 opacity-5 pointer-events-none" style={{ backgroundImage: 'radial-gradient(#fff 1px, transparent 1px)', backgroundSize: '10px 10px' }}></div>
-
-                                            {/* Top Section */}
-                                            <div>
-                                                <div className="flex justify-between items-start mb-4">
-                                                    <div className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider border ${
-                                                        script.projectType === 'MOVIE'
-                                                        ? 'bg-blue-500/10 text-blue-400 border-blue-500/30'
-                                                        : 'bg-rose-500/10 text-rose-400 border-rose-500/30'
-                                                    }`}>
-                                                        {script.projectType}
-                                                    </div>
-                                                    {selectedScriptId === script.id && <div className="w-6 h-6 bg-emerald-500 rounded-full flex items-center justify-center text-black shadow-[0_0_10px_rgba(16,185,129,0.8)] animate-in zoom-in"><Check size={14} strokeWidth={3} /></div>}
-                                                </div>
-
-                                                <h3 className={`text-2xl font-black uppercase leading-none mb-2 ${selectedScriptId === script.id ? 'text-white' : 'text-zinc-300 group-hover:text-white'}`}>
-                                                    {script.title}
-                                                </h3>
-                                                <div className="flex flex-wrap gap-1 mb-4">
-                                                    {script.genres.map(g => (
-                                                        <span key={g} className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider">#{g}</span>
-                                                    ))}
-                                                </div>
-
-		                                                <p className="text-xs text-zinc-400 line-clamp-3 leading-relaxed italic">
-		                                                    "{script.logline || "A compelling story waiting to be told..."}"
-		                                                </p>
-		                                            </div>
-
-                                            {/* Bottom Stats */}
-                                            <div className="space-y-3 pt-4 border-t border-zinc-800/50">
-                                                <div className="flex justify-between items-center">
-                                                    <span className="text-[10px] font-bold uppercase text-zinc-600">Script Quality</span>
-                                                    <div className="flex items-center gap-1">
-                                                        <Star size={12} className="text-amber-500 fill-amber-500" />
-                                                        <span className="text-sm font-mono font-bold text-white">{script.quality}/100</span>
-                                                    </div>
-                                                </div>
-                                                <div className="flex justify-between items-center">
-                                                    <span className="text-[10px] font-bold uppercase text-zinc-600">Dev Time</span>
-                                                    <span className="text-xs font-mono text-zinc-400">{script.weeksInDevelopment} Weeks</span>
-                                                </div>
-                                            </div>
-		                                        </div>
-		                                    </button>
-		                                ))}
-                            </div>
-                        )}
-
-                        {/* Fixed Action Bar */}
-                        <div className="fixed bottom-0 left-0 right-0 p-6 pb-safe-lg bg-gradient-to-t from-[#020a05] via-[#020a05]/90 to-transparent pointer-events-none flex justify-center z-30">
-                            <div className="pointer-events-auto flex gap-4 w-full max-w-md">
-                                <button
-                                    onClick={onBack}
-                                    className="flex-1 bg-zinc-900/80 hover:bg-zinc-800 text-zinc-400 hover:text-white font-bold py-4 rounded-xl transition-colors border border-zinc-700 backdrop-blur-md"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={() => selectedScriptId && setStep('DIRECTOR')}
-                                    disabled={!selectedScriptId}
-                                    className={`flex-[2] font-black uppercase tracking-wider py-4 rounded-xl shadow-lg transition-all duration-300 hover:scale-105 flex items-center justify-center gap-2 ${
-                                        selectedScriptId
-                                        ? 'bg-emerald-500 hover:bg-emerald-400 text-black shadow-[0_0_30px_rgba(16,185,129,0.4)]'
-                                        : 'bg-zinc-800 text-zinc-500 cursor-not-allowed'
-                                    }`}
-                                >
-                                    Next: Director
-                                </button>
-                            </div>
-                        </div>
-                    </div>
+                    <GreenlightScriptStep
+                        scripts={scripts}
+                        selectedScriptId={selectedScriptId}
+                        onSelectScript={setSelectedScriptId}
+                        onOpenScriptMarket={onOpenScriptMarket || onBack}
+                        onCancel={onBack}
+                        onNext={() => selectedScriptId && setStep('DIRECTOR')}
+                    />
                 )}
 
-                {/* DIRECTOR STEP */}
                 {step === 'DIRECTOR' && (
-                    <div className="space-y-6 animate-in slide-in-from-right-4 duration-300 max-w-2xl mx-auto px-4 pt-6 pb-44">
-                        <div className="bg-zinc-900/80 backdrop-blur-md border border-zinc-800 rounded-xl p-6 mb-6 shadow-lg">
-                            <h2 className="text-xl font-bold text-white mb-2">Hire a Director</h2>
-                            <p className="text-zinc-400 text-sm">The visionary who will lead your project. Choose wisely—their style affects the movie's outcome.</p>
-                            <div className="mt-4 flex items-center gap-2 text-[10px] font-bold text-amber-500/80 uppercase tracking-widest bg-amber-500/5 px-3 py-2 rounded-lg border border-amber-500/10">
-                                <Clock size={12} />
-                                Roster refreshes every 3 weeks
-                            </div>
-                        </div>
-
-                        <CrewSelector
-                                title="Director"
-                                icon={<Video size={16} />}
-                                role="DIRECTOR"
-                                candidates={availableDirectors}
-                                selectedId={selectedCrew.director}
-                                onSelect={(id) => setSelectedCrew({ ...selectedCrew, director: id })}
-                                mode={crewModes.director}
-                                onModeChange={(m) => setCrewModes({ ...crewModes, director: m })}
-                                player={player}
-                                hiredIds={hiredIds}
-                                inHouseQuality={getInHouseQuality('DIRECTOR')}
-                                inHouseFame={getInHouseFame('DIRECTOR')}
-                                inHouseLevel={getInHouseLevel('DIRECTOR')}
-                                returningTalent={currentReturningTalent}
-                                onNegotiate={(talentId, returningData) => handleNegotiate(talentId, returningData)}
-                            />
-
-                        {/* Fixed Action Bar */}
-                        <div className="fixed bottom-0 left-0 right-0 p-6 pb-safe-lg bg-gradient-to-t from-[#020a05] via-[#020a05]/90 to-transparent pointer-events-none flex justify-center z-30">
-                            <div className="pointer-events-auto flex gap-4 w-full max-w-md">
-                                <button
-                                    onClick={() => initialConcept ? onBack() : setStep('SELECT_SCRIPT')}
-                                    className="flex-1 bg-zinc-900/80 hover:bg-zinc-800 text-white font-bold py-4 rounded-xl border border-zinc-700 backdrop-blur-md transition-colors"
-                                >
-                                    {initialConcept ? 'Exit' : 'Back'}
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        if (crewModes.director === 'HIRE' && !selectedCrew.director) return;
-                                        saveDraft();
-                                        setStep('CAST');
-                                    }}
-                                    disabled={crewModes.director === 'HIRE' && !selectedCrew.director}
-                                    className={`flex-[2] font-black uppercase tracking-wider py-4 rounded-xl shadow-[0_0_30px_rgba(16,185,129,0.4)] transition-all duration-300 hover:scale-105 ${
-                                        (crewModes.director === 'HIRE' && !selectedCrew.director)
-                                        ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed shadow-none'
-                                        : 'bg-emerald-500 hover:bg-emerald-400 text-black'
-                                    }`}
-                                >
-                                    Next: Casting
-                                </button>
-                            </div>
-                        </div>
-                    </div>
+                    <GreenlightDirectorStep
+                        availableDirectors={availableDirectors}
+                        selectedDirectorId={selectedCrew.director}
+                        onSelectDirector={directorId => setSelectedCrew({ ...selectedCrew, director: directorId })}
+                        directorMode={crewModes.director}
+                        onDirectorModeChange={mode => setCrewModes({ ...crewModes, director: mode })}
+                        player={player}
+                        hiredIds={hiredIds}
+                        inHouseQuality={getInHouseQuality('DIRECTOR')}
+                        inHouseFame={getInHouseFame('DIRECTOR')}
+                        inHouseLevel={getInHouseLevel('DIRECTOR')}
+                        returningTalent={currentReturningTalent}
+                        onNegotiate={handleNegotiate}
+                        formatMoney={formatMoney}
+                        isExistingConcept={Boolean(initialConcept)}
+                        onBack={() => initialConcept ? onBack() : setStep('SELECT_SCRIPT')}
+                        onNext={() => {
+                            saveDraft();
+                            setStep('CAST');
+                        }}
+                    />
                 )}
 
                 {/* CAST STEP */}
                 {step === 'CAST' && (
-                    <div className="space-y-6 animate-in slide-in-from-right-4 duration-300 max-w-4xl mx-auto px-4 pt-6 pb-44">
-                        <div className="bg-zinc-900/80 backdrop-blur-md border border-zinc-800 rounded-xl p-6 mb-6 shadow-lg">
-                            <h2 className="text-xl font-bold text-white mb-2">Assemble The Cast</h2>
-                            <p className="text-zinc-400 text-sm">Star power drives box office, but talent drives reviews. Name the characters too, even for standalone projects.</p>
-                        </div>
-
-                        {/* Actor Selection Overlay moved to end of file */}
-
-                        <div className="space-y-3">
-	                            {castList.map((role, idx) => {
-	                                const assignedActor = role.actorId && role.actorId !== 'STUDIO_STAFF' ? availableActors.find(a => a.id === role.actorId) : null;
-	                                const isSelf = role.actorId === 'PLAYER_SELF';
-	                                const isStudio = role.actorId === 'STUDIO_STAFF';
-	                                const isConnection = role.actorId && !assignedActor && !isSelf && !isStudio;
-	                                const connection = isConnection ? player.relationships.find(r => (r.npcId || r.id) === role.actorId) : null;
-                                    const selectedCharacterOption = getRoleCharacterOption(role);
-                                    const selectedCharacterValue = getRoleCharacterOptionValue(role);
-                                    const isKnownRole = !!selectedCharacterOption || isKnownConnectedRole(role);
-                                    const usedCharacterValues = new Set(
-                                        castList
-                                            .filter(otherRole => otherRole.id !== role.id)
-                                            .map(otherRole => getRoleCharacterOptionValue(otherRole))
-                                            .filter(Boolean)
-                                    );
-                                    const availableCharacterOptions = linkedCharacterOptions.filter(character => {
-                                        const value = getCharacterOptionValue(character);
-                                        return value === selectedCharacterValue || !usedCharacterValues.has(value);
-                                    });
-                                    const activeAvailableCharacterOptions = availableCharacterOptions.filter(character => !character.legacyArchive);
-                                    const legacyAvailableCharacterOptions = availableCharacterOptions.filter(character => character.legacyArchive);
-                                    const characterFlowHelp = allowsOutsideConnectedCharacters
-                                        ? 'Crossover/Event: choose from this project plus other owned connected IP.'
-                                        : previousCharacterOptions.length > 0
-                                            ? 'Sequel: continuing characters from the previous movie or franchise.'
-                                            : activeUniverseId
-                                                ? 'Universe: choose characters from the selected universe.'
-                                                : showLegacyCharacterArchive
-                                                    ? 'Legacy Archive: retired-universe names are opt-in and will create comeback buzz.'
-                                                    : 'Standalone: name a new character for this movie.';
-                                    const returningData = role.actorId
-                                        ? currentReturningTalent.find(t => t.id === role.actorId && (t.role === 'LEAD_ACTOR' || t.role === 'SUPPORTING_ACTOR'))
-                                        : null;
-                                    const talentScore = isSelf
-                                        ? Math.round(player.stats.talent || 0)
-                                        : isStudio
-                                            ? getInHouseQuality('ACTOR')
-                                            : assignedActor
-                                                ? Math.round(assignedActor.stats.talent || 50)
-                                                : role.actorId
-                                                    ? 45
-                                                    : null;
-                                    const fameScore = isSelf
-                                        ? Math.round(player.stats.fame || 0)
-                                        : isStudio
-                                            ? getInHouseFame('ACTOR')
-                                            : assignedActor
-                                                ? Math.round(assignedActor.stats.fame || 0)
-                                                : role.actorId
-                                                    ? 15
-                                                    : null;
-                                    const feeDisplay = isSelf || isStudio
-                                        ? 'Free'
-                                        : (role.actorId && contractedActors.some(a => a.id === role.actorId))
-                                            ? 'Contracted'
-                                            : returningData && requiresReturningTalentNegotiation(returningData)
-                                                ? 'Needs Deal'
-                                                : returningData && !returningData.accepted && (returningData.attemptsLeft ?? 0) === 0
-                                                    ? 'Walked Away'
-                                                    : formatMoney(role.salary || 0);
-
-	                                return (
-	                                    <div key={role.id} className="relative overflow-hidden bg-zinc-950/70 border border-zinc-800 rounded-2xl p-4 animate-in slide-in-from-bottom-2 hover:border-zinc-700 transition-all">
-	                                        <button
-	                                            onClick={() => setCastList(prev => prev.filter(r => r.id !== role.id))}
-	                                            className="absolute top-3 right-3 p-2 text-zinc-600 hover:text-rose-500 transition-colors z-10 bg-black/40 rounded-full"
-	                                            title="Remove Role"
-	                                        >
-	                                            <X size={16} />
-	                                        </button>
-
-                                        <div className="grid grid-cols-[56px_1fr] sm:grid-cols-[64px_1fr_auto] gap-4 items-start pr-10 sm:pr-0">
-	                                            <div className={`shrink-0 w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center border overflow-hidden ${assignedActor || isSelf || isStudio || connection ? 'border-emerald-500/30 bg-emerald-500/5' : 'bg-zinc-900 border-zinc-800 text-zinc-600'}`}>
-	                                                {isSelf ? (
-	                                                    <div className="w-full h-full bg-amber-500/10 flex items-center justify-center overflow-hidden">
-	                                                        {player.avatar ? <img src={player.avatar} className="w-full h-full object-cover" referrerPolicy="no-referrer" /> : <Crown size={20} className="text-amber-500" />}
-                                                    </div>
-                                                ) : isStudio ? (
-                                                    <div className="w-full h-full bg-emerald-500/10 flex items-center justify-center overflow-hidden">
-                                                        <Users size={20} className="text-emerald-500" />
-                                                    </div>
-                                                ) : connection ? (
-                                                    <img src={connection.image} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                                                ) : assignedActor ? (
-                                                    <img src={assignedActor.avatar} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                                                ) : (
-	                                                    <Users size={20} />
-	                                                )}
-	                                            </div>
-	                                            <div className="min-w-0 space-y-3">
-	                                                <div className="flex items-start justify-between gap-3">
-                                                        <div className="min-w-0">
-                                                            <div className="flex flex-wrap items-center gap-2 mb-2">
-	                                                    <select
-	                                                        value={role.roleType || 'SUPPORTING'}
-	                                                        onChange={(e) => {
-	                                                            const newType = e.target.value as any;
-	                                                            setCastList(prev => prev.map(r => r.id === role.id ? { ...r, roleType: newType, role: newType === 'LEAD' ? 'Lead Actor' : newType === 'SUPPORTING' ? 'Supporting Actor' : newType === 'CAMEO' ? 'Cameo Appearance' : 'Extra' } : r));
-	                                                        }}
-	                                                        className="bg-black/50 border border-zinc-800 rounded-lg px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-zinc-400 focus:outline-none focus:border-emerald-500 hover:border-zinc-700 transition-colors cursor-pointer"
-	                                                        onClick={(e) => e.stopPropagation()}
-	                                                    >
-	                                                        <option value="LEAD">Lead Role</option>
-	                                                        <option value="SUPPORTING">Supporting</option>
-                                                        <option value="CAMEO">Cameo</option>
-	                                                        <option value="EXTRA">Extra</option>
-	                                                    </select>
-                                                            {returningData && <span className="px-2 py-1 rounded-lg bg-purple-500/10 text-purple-300 text-[9px] font-black uppercase tracking-widest">Returning</span>}
-                                                            {isKnownRole && <span className="px-2 py-1 rounded-lg bg-blue-500/10 text-blue-300 text-[9px] font-black uppercase tracking-widest">Known Character</span>}
-                                                            </div>
-	                                                    {role.actorId ? (
-	                                                        <div className="text-lg sm:text-2xl font-black text-white tracking-tight truncate">
-	                                                            {role.actorName || 'Selected Actor'}
-	                                                        </div>
-	                                                    ) : (
-	                                                        <div className="text-base sm:text-xl font-black text-zinc-500 italic">Pending Audition</div>
-	                                                    )}
-                                                        </div>
-	                                                </div>
-
-	                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                                        {linkedCharacterOptions.length > 0 && (
-                                                            <div>
-                                                                <div className="flex items-center gap-1.5 mb-1">
-                                                                    <label className="block text-[8px] sm:text-[9px] font-black text-zinc-500 uppercase tracking-widest">
-                                                                        Playing Character
-                                                                    </label>
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => setShowCharacterFlowInfo(prev => !prev)}
-                                                                        className={`w-5 h-5 rounded-full border flex items-center justify-center ${
-                                                                            showCharacterFlowInfo
-                                                                                ? 'border-blue-500 bg-blue-500/10 text-blue-300'
-                                                                                : 'border-zinc-700 bg-black/30 text-zinc-500 hover:text-white'
-                                                                        }`}
-                                                                        aria-label="Explain playing character"
-                                                                    >
-                                                                        <Info size={11} />
-                                                                    </button>
-                                                                    {legacyCharacterOptions.length > 0 && (
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => setShowLegacyCharacterArchive(prev => !prev)}
-                                                                            className={`h-5 rounded-full border px-2 text-[8px] font-black uppercase tracking-widest transition-colors ${
-                                                                                showLegacyCharacterArchive
-                                                                                    ? 'border-amber-400 bg-amber-400/10 text-amber-200'
-                                                                                    : 'border-zinc-700 bg-black/30 text-zinc-500 hover:text-white'
-                                                                            }`}
-                                                                            aria-pressed={showLegacyCharacterArchive}
-                                                                        >
-                                                                            Legacy
-                                                                        </button>
-                                                                    )}
-                                                                </div>
-                                                                <select
-                                                                    value={selectedCharacterValue}
-                                                                    onChange={(e) => {
-                                                                        const selectedValue = e.target.value;
-                                                                        const selectedCharacter = linkedCharacterOptions.find(character => getCharacterOptionValue(character) === selectedValue);
-                                                                        if (selectedCharacter) {
-                                                                            attachLinkedCharacterToRole(role.id, selectedCharacter);
-                                                                        } else {
-                                                                            setCastList(prev => prev.map(r => r.id === role.id ? {
-                                                                                ...r,
-                                                                                characterId: undefined,
-                                                                                characterName: '',
-                                                                                sourceUniverseId: undefined
-                                                                            } : r));
-                                                                        }
-                                                                    }}
-                                                                    onClick={(e) => e.stopPropagation()}
-                                                                    className="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500"
-                                                                >
-                                                                    <option value="">Create New Character</option>
-                                                                    {activeAvailableCharacterOptions.length > 0 && (
-                                                                        <optgroup label="Active Canon">
-                                                                            {activeAvailableCharacterOptions.map(character => (
-                                                                                <option key={getCharacterOptionValue(character)} value={getCharacterOptionValue(character)}>
-                                                                                    {character.name} {character.actorName ? `(${character.actorName})` : ''} - {character.sourceName}
-                                                                                </option>
-                                                                            ))}
-                                                                        </optgroup>
-                                                                    )}
-                                                                    {showLegacyCharacterArchive && legacyAvailableCharacterOptions.length > 0 && (
-                                                                        <optgroup label="Legacy Archive">
-                                                                            {legacyAvailableCharacterOptions.map(character => (
-                                                                                <option key={getCharacterOptionValue(character)} value={getCharacterOptionValue(character)}>
-                                                                                    {character.name} {character.actorName ? `(${character.actorName})` : ''} - {character.sourceName}
-                                                                                </option>
-                                                                            ))}
-                                                                        </optgroup>
-                                                                    )}
-                                                                </select>
-                                                                <p className="mt-1 text-[9px] text-zinc-600 leading-snug">{characterFlowHelp}</p>
-                                                            </div>
-                                                        )}
-	                                                    <div className={linkedCharacterOptions.length > 0 ? '' : 'sm:col-span-2'}>
-	                                                        <label className="block text-[8px] sm:text-[9px] font-black text-zinc-500 uppercase tracking-widest mb-1">
-	                                                            {selectedCharacterOption ? 'Character Identity' : 'New Character Name'}
-	                                                        </label>
-                                                            {selectedCharacterOption ? (
-                                                                <div className="min-h-[42px] flex items-center justify-between gap-3 bg-blue-500/5 border border-blue-500/20 rounded-xl px-3 py-2.5">
-                                                                    <div className="min-w-0">
-                                                                        <p className="text-sm font-black text-blue-100 truncate">{role.characterName || selectedCharacterOption.name}</p>
-                                                                        <p className={`text-[9px] font-black uppercase tracking-widest truncate ${selectedCharacterOption.legacyArchive ? 'text-amber-300/80' : 'text-blue-300/70'}`}>
-                                                                            {selectedCharacterOption.legacyArchive ? 'Legacy Archive' : selectedCharacterOption.sourceName}
-                                                                        </p>
-                                                                    </div>
-                                                                    <CheckCircle size={15} className="text-blue-300 shrink-0" />
-                                                                </div>
-                                                            ) : (
-	                                                        <input
-	                                                            value={role.characterName || ''}
-	                                                            onChange={(e) => {
-                                                                const value = e.target.value;
-                                                                setCastList(prev => prev.map(r => r.id === role.id ? {
-                                                                    ...r,
-                                                                    characterName: value,
-                                                                    characterId: activeUniverseId ? toUniverseCharacterId(activeUniverseId, value) : undefined,
-                                                                    sourceUniverseId: undefined
-                                                                } : r));
-                                                            }}
-                                                            onBlur={() => {
-                                                                setCastList(prev => prev.map((r, roleIndex) => r.id === role.id && !r.characterName?.trim() ? {
-                                                                    ...r,
-                                                                    characterName: getDefaultCharacterName(r, roleIndex),
-                                                                    characterId: activeUniverseId ? toUniverseCharacterId(activeUniverseId, getDefaultCharacterName(r, roleIndex)) : undefined,
-                                                                    sourceUniverseId: undefined
-                                                                } : r));
-                                                            }}
-                                                            onClick={(e) => e.stopPropagation()}
-	                                                            placeholder={role.roleType === 'LEAD' ? `e.g. ${selectedScript?.title || 'Iron Man'}` : getDefaultCharacterName(role, idx)}
-	                                                            className="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500"
-	                                                        />
-                                                            )}
-	                                                    </div>
-	                                                </div>
-                                                    {showCharacterFlowInfo && (
-                                                        <div className="bg-black/35 border border-blue-500/20 rounded-xl p-3">
-                                                            <p className="text-[10px] text-zinc-400 leading-relaxed">
-                                                                Existing characters can only be used once in this cast. Sequels continue the last movie's characters, universe projects use that universe roster, and outside owned IP appears only for crossover or event plans.
-                                                            </p>
-                                                        </div>
-                                                    )}
-
-	                                                {role.actorId && (
-	                                                    <div className="grid grid-cols-3 gap-2">
-	                                                        {[
-                                                                ['Talent', talentScore, 'text-emerald-300'],
-                                                                ['Fame', fameScore, 'text-rose-300'],
-                                                                ['Fee', feeDisplay, returningData && requiresReturningTalentNegotiation(returningData) ? 'text-purple-300' : 'text-amber-300']
-                                                            ].map(([label, value, color]) => (
-                                                                <div key={String(label)} className="bg-black/30 border border-zinc-800 rounded-xl px-3 py-2 min-w-0">
-                                                                    <p className="text-[8px] font-black uppercase tracking-widest text-zinc-600">{label}</p>
-                                                                    <p className={`text-xs font-black font-mono truncate ${color}`}>{value}</p>
-                                                                </div>
-                                                            ))}
-	                                                    </div>
-	                                                )}
-	                                            </div>
-	                                        <div className="sm:w-32 flex sm:flex-col gap-2 w-full col-span-2 sm:col-span-1">
-                                                {returningData && requiresReturningTalentNegotiation(returningData) && role.actorId ? (
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            handleNegotiate(role.actorId!, returningData, role.id);
-                                                        }}
-                                                        className="flex-1 sm:flex-none text-[10px] px-4 py-3 rounded-xl uppercase font-black tracking-widest bg-purple-500/15 text-purple-200 border border-purple-500/25 hover:bg-purple-500/25 transition-all"
-                                                    >
-                                                        Negotiate
-                                                    </button>
-                                                ) : null}
-	                                            <button
-	                                                onClick={() => setSelectingActorFor(role.id)}
-	                                                className={`flex-1 sm:flex-none text-[10px] px-4 py-3 rounded-xl border uppercase font-black tracking-widest transition-all ${
-	                                                    assignedActor || isSelf || isStudio || connection
-	                                                    ? 'bg-emerald-500/5 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/10'
-	                                                    : 'bg-zinc-800/50 text-zinc-500 border-zinc-800 hover:bg-zinc-800 hover:text-white'
-	                                                }`}
-	                                            >
-	                                                {assignedActor || isSelf || isStudio || connection ? 'Change' : 'Select'}
-	                                            </button>
-	                                        </div>
-                                        </div>
-	                                    </div>
-	                                );
-                            })}
-                            <button
-                                onClick={() => setCastList([...castList, { id: `role_${Date.now()}`, role: 'Supporting Actor', roleType: 'SUPPORTING', actorId: null }])}
-                                className="w-full py-5 bg-zinc-900/40 border border-dashed border-zinc-800 rounded-2xl text-zinc-500 text-[10px] font-black uppercase tracking-widest hover:text-emerald-400 hover:border-emerald-500/30 hover:bg-emerald-500/5 transition-all flex items-center justify-center gap-3 group"
-                            >
-                                <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center group-hover:bg-emerald-500/20 transition-colors shadow-inner"><Plus size={16} /></div>
-                                Add Another Role
-                            </button>
-                        </div>
-
-                        {/* Fixed Action Bar */}
-                        <div className="fixed bottom-0 left-0 right-0 p-6 pb-safe-lg bg-gradient-to-t from-[#020a05] via-[#020a05]/90 to-transparent pointer-events-none flex justify-center z-30">
-                            <div className="pointer-events-auto flex gap-4 w-full max-w-md">
-                                <button
-                                    onClick={() => setStep('DIRECTOR')}
-                                    className="flex-1 bg-zinc-900/80 hover:bg-zinc-800 text-white font-black uppercase tracking-widest py-5 rounded-2xl border border-zinc-700 backdrop-blur-md transition-all active:scale-95"
-                                >
-                                    Back
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        if (castList.some(c => !c.actorId)) return;
-                                        saveDraft();
-                                        setStep('CREW');
-                                    }}
-                                    disabled={castList.some(c => !c.actorId)}
-                                    className={`flex-[2] font-black uppercase tracking-widest py-5 rounded-2xl shadow-[0_0_40px_rgba(16,185,129,0.4)] transition-all duration-300 hover:scale-[1.02] active:scale-95 ${
-                                        castList.some(c => !c.actorId)
-                                        ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed shadow-none'
-                                        : 'bg-emerald-500 hover:bg-emerald-400 text-black'
-                                    }`}
-                                >
-                                    Next: Crew
-                                </button>
-                            </div>
-                        </div>
-                    </div>
+                    <GreenlightCastStep
+                        player={player}
+                        castList={castList}
+                        availableActors={availableActors}
+                        contractedActors={contractedActors}
+                        currentReturningTalent={currentReturningTalent}
+                        playerActingTalent={playerActingTalent}
+                        selectedStoryCompass={selectedStoryCompass}
+                        liveCastStoryRead={liveCastStoryRead}
+                        linkedCharacterOptions={linkedCharacterOptions}
+                        legacyCharacterOptions={legacyCharacterOptions}
+                        previousCharacterOptions={previousCharacterOptions}
+                        activeUniverseId={activeUniverseId}
+                        allowsOutsideConnectedCharacters={allowsOutsideConnectedCharacters}
+                        showCharacterFlowInfo={showCharacterFlowInfo}
+                        showLegacyCharacterArchive={showLegacyCharacterArchive}
+                        scriptTitle={selectedScript?.title}
+                        getRoleCharacterOption={getRoleCharacterOption}
+                        getRoleCharacterOptionValue={getRoleCharacterOptionValue}
+                        getCharacterOptionValue={getCharacterOptionValue}
+                        isKnownConnectedRole={isKnownConnectedRole}
+                        getDefaultCharacterName={getDefaultCharacterName}
+                        getSuggestedIdentity={(role, index) => suggestCharacterIdentity(
+                            selectedStoryCompass!,
+                            (role.roleType === 'EXTRA' ? 'CAMEO' : role.roleType) as RoleType,
+                            index,
+                            selectedScript || {},
+                        )}
+                        getInHouseQuality={getInHouseQuality}
+                        getInHouseFame={getInHouseFame}
+                        requiresReturningTalentNegotiation={requiresReturningTalentNegotiation}
+                        formatFee={formatMoney}
+                        translate={key => tr(key)}
+                        onRemoveRole={removeCastRole}
+                        onRoleTypeChange={changeCastRoleType}
+                        onToggleCharacterFlowInfo={() => setShowCharacterFlowInfo(previous => !previous)}
+                        onToggleLegacyCharacterArchive={() => setShowLegacyCharacterArchive(previous => !previous)}
+                        onCharacterSelectionChange={changeCastCharacterSelection}
+                        onCharacterNameChange={changeCastCharacterName}
+                        onCharacterNameBlur={fillDefaultCastCharacterName}
+                        onIdentityChange={(roleId, patch) => {
+                            setCastList(previous => previous.map(role => role.id === roleId ? { ...role, ...patch } : role));
+                        }}
+                        onNegotiate={handleNegotiate}
+                        onSelectActor={setSelectingActorFor}
+                        onAddRole={addCastRole}
+                        onBack={() => setStep('DIRECTOR')}
+                        onNext={continueFromCast}
+                    />
                 )}
-
-                {/* CREW STEP */}
                 {step === 'CREW' && (
-                    <div className="space-y-6 animate-in slide-in-from-right-4 duration-300 max-w-4xl mx-auto px-4 pt-6 pb-44">
-                        <div className="bg-zinc-900/80 backdrop-blur-md border border-zinc-800 rounded-xl p-6 mb-6 shadow-lg">
-                            <h2 className="text-xl font-bold text-white mb-2">Build Your Team</h2>
-                            <p className="text-zinc-400 text-sm">Great movies are made by great teams. Hire the best or save money with in-house staff.</p>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <CrewSelector
-                                title="Cinematographer"
-                                icon={<Camera size={16} />}
-                                role="CINEMATOGRAPHER"
-                                candidates={mockCrew.cinematographers}
-                                selectedId={selectedCrew.cinematographer}
-                                onSelect={(id) => setSelectedCrew({ ...selectedCrew, cinematographer: id })}
-                                mode={crewModes.cinematographer}
-                                onModeChange={(m) => setCrewModes({ ...crewModes, cinematographer: m })}
-                                player={player}
-                                hiredIds={hiredIds}
-                                inHouseQuality={getInHouseQuality('CINEMATOGRAPHER')}
-                                inHouseFame={getInHouseFame('CINEMATOGRAPHER')}
-                                inHouseLevel={getInHouseLevel('CINEMATOGRAPHER')}
-                                returningTalent={currentReturningTalent}
-                                onNegotiate={(talentId, returningData) => handleNegotiate(talentId, returningData)}
-                            />
-                            <CrewSelector
-                                title="Composer"
-                                icon={<Mic size={16} />}
-                                role="COMPOSER"
-                                candidates={mockCrew.composers}
-                                selectedId={selectedCrew.composer}
-                                onSelect={(id) => setSelectedCrew({ ...selectedCrew, composer: id })}
-                                mode={crewModes.composer}
-                                onModeChange={(m) => setCrewModes({ ...crewModes, composer: m })}
-                                player={player}
-                                hiredIds={hiredIds}
-                                inHouseQuality={getInHouseQuality('COMPOSER')}
-                                inHouseFame={getInHouseFame('COMPOSER')}
-                                inHouseLevel={getInHouseLevel('COMPOSER')}
-                                returningTalent={currentReturningTalent}
-                                onNegotiate={(talentId, returningData) => handleNegotiate(talentId, returningData)}
-                            />
-                            <CrewSelector
-                                title="Line Producer"
-                                icon={<Briefcase size={16} />}
-                                role="LINE_PRODUCER"
-                                candidates={mockCrew.producers}
-                                selectedId={selectedCrew.lineProducer}
-                                onSelect={(id) => setSelectedCrew({ ...selectedCrew, lineProducer: id })}
-                                mode={crewModes.lineProducer}
-                                onModeChange={(m) => setCrewModes({ ...crewModes, lineProducer: m })}
-                                player={player}
-                                hiredIds={hiredIds}
-                                inHouseQuality={getInHouseQuality('LINE_PRODUCER')}
-                                inHouseFame={getInHouseFame('LINE_PRODUCER')}
-                                inHouseLevel={getInHouseLevel('LINE_PRODUCER')}
-                                returningTalent={currentReturningTalent}
-                                onNegotiate={(talentId, returningData) => handleNegotiate(talentId, returningData)}
-                            />
-                            <CrewSelector
-                                title="VFX & Post"
-                                icon={<Zap size={16} className="text-cyan-400"/>}
-                                role="VFX"
-                                candidates={mockCrew.vfxTeams}
-                                selectedId={selectedCrew.vfx}
-                                onSelect={(id) => setSelectedCrew({ ...selectedCrew, vfx: id })}
-                                mode={crewModes.vfx}
-                                onModeChange={(m) => setCrewModes({ ...crewModes, vfx: m })}
-                                player={player}
-                                hiredIds={hiredIds}
-                                inHouseQuality={getInHouseQuality('VFX')}
-                                inHouseFame={getInHouseFame('VFX')}
-                                inHouseLevel={getInHouseLevel('VFX')}
-                                returningTalent={currentReturningTalent}
-                                onNegotiate={(talentId, returningData) => handleNegotiate(talentId, returningData)}
-                            />
-                        </div>
-
-                        {/* Fixed Action Bar */}
-                        <div className="fixed bottom-0 left-0 right-0 p-6 pb-safe-lg bg-gradient-to-t from-[#020a05] via-[#020a05]/90 to-transparent pointer-events-none flex justify-center z-30">
-                            <div className="pointer-events-auto flex gap-4 w-full max-w-md">
-                                <button
-                                    onClick={() => setStep('CAST')}
-                                    className="flex-1 bg-zinc-900/80 hover:bg-zinc-800 text-white font-bold py-4 rounded-xl border border-zinc-700 backdrop-blur-md transition-colors"
-                                >
-                                    Back
-                                </button>
-                                <button
-                                    onClick={() => setStep('EQUIPMENT')}
-                                    className="flex-[2] bg-emerald-500 hover:bg-emerald-400 text-black font-black uppercase tracking-wider py-4 rounded-xl shadow-[0_0_30px_rgba(16,185,129,0.4)] transition-all duration-300 hover:scale-105"
-                                >
-                                    Next: Equipment
-                                </button>
-                            </div>
-                        </div>
-                    </div>
+                    <GreenlightCrewStep
+                        crewMarket={crewMarket}
+                        crewMarketRefreshIn={crewMarketRefreshIn}
+                        crewMarketCycle={crewMarketCycle}
+                        backgroundCastingPlan={backgroundCastingPlan}
+                        backgroundCastingContext={backgroundCastingContext}
+                        onBackgroundCastingChange={setBackgroundCastingPlan}
+                        selectedCrew={selectedCrew}
+                        crewModes={crewModes}
+                        onSelectCrew={(key, talentId) => setSelectedCrew({ ...selectedCrew, [key]: talentId })}
+                        onCrewModeChange={(key, mode) => setCrewModes({ ...crewModes, [key]: mode })}
+                        player={player}
+                        hiredIds={hiredIds}
+                        getInHouseQuality={getInHouseQuality}
+                        getInHouseFame={getInHouseFame}
+                        getInHouseLevel={getInHouseLevel}
+                        returningTalent={currentReturningTalent}
+                        onNegotiate={handleNegotiate}
+                        formatMoney={formatMoney}
+                        onBack={() => setStep('CAST')}
+                        onNext={() => setStep('EQUIPMENT')}
+                    />
                 )}
 
                 {/* EQUIPMENT STEP */}
                 {step === 'EQUIPMENT' && (
-                    <div className="space-y-6 animate-in slide-in-from-right-4 duration-300 max-w-4xl mx-auto px-4 pt-6 pb-44">
-                        <div className="bg-zinc-900/80 backdrop-blur-md border border-zinc-800 rounded-xl p-6 mb-6 shadow-lg">
-                            <h2 className="text-xl font-bold text-white mb-2">Equipment & Gear</h2>
-                            <p className="text-zinc-400 text-sm">Rent gear or use your studio's owned equipment to boost quality.</p>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {[
-                                {
-                                    id: 'cameras', name: 'Camera Rigs', icon: '🎥', color: 'text-purple-400',
-                                    tiers: {
-                                        'TIER_1': { name: 'Indie Kit', desc: 'Basic DSLR and mirrorless setup.' },
-                                        'TIER_2': { name: 'Prosumer Setup', desc: 'RED Komodo or similar mid-tier.' },
-                                        'TIER_3': { name: 'Panavision Standard', desc: 'Industry standard digital cinema cameras.' },
-                                        'TIER_4': { name: 'IMAX & Arri Rental', desc: 'Custom large-format rigs and lenses.' },
-                                        'TIER_5': { name: 'Experimental Tech', desc: 'Cutting-edge prototypes.' }
-                                    }
-                                },
-                                {
-                                    id: 'lighting', name: 'Lighting & Grip', icon: '💡', color: 'text-amber-400',
-                                    tiers: {
-                                        'TIER_1': { name: 'Basic Reflectors', desc: 'Natural light and bounce boards.' },
-                                        'TIER_2': { name: 'LED Panel Kit', desc: 'Portable LED lighting setup.' },
-                                        'TIER_3': { name: 'CineGrip Co.', desc: 'Standard LED panels and grip trucks.' },
-                                        'TIER_4': { name: 'Luminance Pro', desc: 'Stadium arrays and specialized rigs.' },
-                                        'TIER_5': { name: 'Sun-Sync Tech', desc: 'Massive artificial sunlight arrays.' }
-                                    }
-                                },
-                                {
-                                    id: 'sound', name: 'Sound Engineering', icon: '🎙️', color: 'text-emerald-400',
-                                    tiers: {
-                                        'TIER_1': { name: 'Zoom Recorder', desc: 'Basic field recorder and lavs.' },
-                                        'TIER_2': { name: 'Pro Boom Kit', desc: 'High-quality shotgun mics.' },
-                                        'TIER_3': { name: 'ClearAudio Rentals', desc: 'Professional boom mics and recorders.' },
-                                        'TIER_4': { name: 'Dolby Atmos Stage', desc: 'Full spatial audio capture setup.' },
-                                        'TIER_5': { name: 'Neural Audio Lab', desc: 'AI-enhanced perfect isolation.' }
-                                    }
-                                },
-                                {
-                                    id: 'practicalEffects', name: 'Practical Sets', icon: '📦', color: 'text-blue-400',
-                                    tiers: {
-                                        'TIER_1': { name: 'Garage Studio', desc: 'DIY sets and basic props.' },
-                                        'TIER_2': { name: 'Indie Warehouse', desc: 'Rented space with modular walls.' },
-                                        'TIER_3': { name: 'Studio B Backlot', desc: 'Standard warehouse and basic sets.' },
-                                        'TIER_4': { name: 'Pinewood Stages', desc: 'Massive soundstages and custom builds.' },
-                                        'TIER_5': { name: 'Volume Stage', desc: 'Massive LED volume for virtual production.' }
-                                    }
-                                }
-                            ].map(gear => {
-                                const ownedLevel = studio.studioState?.equipment?.[gear.id as keyof StudioEquipment] || 0;
-                                const choice = equipmentChoices[gear.id];
-
-                                return (
-                                    <div key={gear.id} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-                                        <h3 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
-                                            <span className="text-lg">{gear.icon}</span> {gear.name}
-                                        </h3>
-
-                                        <div className="space-y-2">
-                                            <button
-                                                onClick={() => setEquipmentChoices(prev => ({ ...prev, [gear.id]: 'OWNED' }))}
-                                                disabled={ownedLevel === 0}
-                                                className={`w-full p-3 rounded-lg border text-left transition-all flex justify-between items-center ${
-                                                    choice === 'OWNED' ? 'bg-emerald-500/10 border-emerald-500 text-white' :
-                                                    ownedLevel === 0 ? 'bg-zinc-950 border-zinc-800/50 text-zinc-600 cursor-not-allowed' :
-                                                    'bg-zinc-900 border-zinc-800 text-zinc-400 hover:bg-zinc-800'
-                                                }`}
-                                            >
-                                                <div>
-                                                    <div className="font-bold text-sm">Use Owned Gear</div>
-                                                    <div className="text-[10px] opacity-80">Level {ownedLevel} ({getEquipmentStageName(gear.id, ownedLevel)})</div>
-                                                    <div className="text-[10px] text-emerald-400 font-bold mt-0.5">Quality +{ownedLevel * 3}</div>
-                                                </div>
-                                                <div className="text-right">
-                                                    <div className="font-mono font-bold text-emerald-400">$0</div>
-                                                    <div className="text-[9px] uppercase">Cost</div>
-                                                </div>
-                                            </button>
-
-                                            {Object.entries(GEAR_TIERS).map(([tierKey, tierData]) => {
-                                                const specificData = gear.tiers[tierKey as keyof typeof gear.tiers];
-                                                const isSelected = choice === tierKey;
-
-                                                // Determine color based on tier
-                                                let colorClass = 'text-blue-400';
-                                                let bgClass = 'bg-blue-500/10 border-blue-500';
-                                                if (tierKey === 'TIER_1') { colorClass = 'text-zinc-400'; bgClass = 'bg-zinc-500/10 border-zinc-500'; }
-                                                if (tierKey === 'TIER_2') { colorClass = 'text-green-400'; bgClass = 'bg-green-500/10 border-green-500'; }
-                                                if (tierKey === 'TIER_4') { colorClass = 'text-purple-400'; bgClass = 'bg-purple-500/10 border-purple-500'; }
-                                                if (tierKey === 'TIER_5') { colorClass = 'text-amber-400'; bgClass = 'bg-amber-500/10 border-amber-500'; }
-
-                                                return (
-                                                    <button
-                                                        key={tierKey}
-                                                        onClick={() => setEquipmentChoices(prev => ({ ...prev, [gear.id]: tierKey }))}
-                                                        className={`w-full p-3 rounded-lg border text-left transition-all flex justify-between items-center ${
-                                                            isSelected ? `${bgClass} text-white` :
-                                                            'bg-zinc-900 border-zinc-800 text-zinc-400 hover:bg-zinc-800'
-                                                        }`}
-                                                    >
-                                                        <div>
-                                                            <div className="font-bold text-sm">{specificData.name}</div>
-                                                            <div className="text-[10px] opacity-80">{specificData.desc}</div>
-                                                            <div className={`text-[10px] ${colorClass} font-bold mt-0.5`}>Quality +{tierData.quality}</div>
-                                                        </div>
-                                                        <div className="text-right">
-                                                            <div className={`font-mono font-bold ${colorClass}`}>{formatMoney(tierData.cost)}</div>
-                                                            <div className="text-[9px] uppercase">Cost</div>
-                                                        </div>
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-
-                        {/* Fixed Action Bar */}
-                        <div className="fixed bottom-0 left-0 right-0 p-6 pb-safe-lg bg-gradient-to-t from-[#020a05] via-[#020a05]/90 to-transparent pointer-events-none flex justify-center z-30">
-                            <div className="pointer-events-auto flex gap-4 w-full max-w-md">
-                                <button
-                                    onClick={() => setStep('CREW')}
-                                    className="flex-1 bg-zinc-900/80 hover:bg-zinc-800 text-white font-bold py-4 rounded-xl border border-zinc-700 backdrop-blur-md transition-colors"
-                                >
-                                    Back
-                                </button>
-                                <button
-                                    onClick={() => setStep('LOCATION')}
-                                    className="flex-[2] bg-emerald-500 hover:bg-emerald-400 text-black font-black uppercase tracking-wider py-4 rounded-xl shadow-[0_0_30px_rgba(16,185,129,0.4)] transition-all duration-300 hover:scale-105"
-                                >
-                                    Next: Location
-                                </button>
-                            </div>
-                        </div>
-                    </div>
+                    <GreenlightEquipmentStep
+                        studioEquipment={studio.studioState?.equipment}
+                        choices={equipmentChoices}
+                        onChange={setEquipmentChoices}
+                        onBack={() => setStep('CREW')}
+                        onNext={() => setStep('LOCATION')}
+                        formatMoney={formatMoney}
+                    />
                 )}
 
                 {/* LOCATION STEP */}
                 {step === 'LOCATION' && (
-                    <div className="space-y-6 animate-in slide-in-from-right-4 duration-300 flex flex-col h-full max-w-4xl mx-auto px-4 pt-6 pb-56">
-                        <div className="bg-zinc-900/80 backdrop-blur-md border border-zinc-800 rounded-xl p-6 mb-2 shrink-0 shadow-lg">
-                            <h2 className="text-xl font-bold text-white mb-2">Scout Location</h2>
-                            <p className="text-zinc-400 text-sm">Where will your story be told? Locations affect budget and visual quality.</p>
-                        </div>
-
-                        <div className="flex-1 min-h-[400px] relative">
-                             <LocationSelector
-                                selectedIds={selectedLocations}
-                                onSelect={(id) => {
-                                    setSelectedLocations(prev =>
-                                        prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-                                    );
-                                }}
-                                locations={mockLocations}
-                                findLocation={findLocation}
-                            />
-                        </div>
-
-                        {/* Fixed Action Bar */}
-                        <div className="fixed bottom-0 left-0 right-0 p-6 pb-safe-lg bg-gradient-to-t from-[#020a05] via-[#020a05]/90 to-transparent pointer-events-none flex justify-center z-30">
-                            <div className="pointer-events-auto flex gap-4 w-full max-w-md">
-                                <button
-                                    onClick={() => setStep('EQUIPMENT')}
-                                    className="flex-1 bg-zinc-900/80 hover:bg-zinc-800 text-white font-bold py-4 rounded-xl border border-zinc-700 backdrop-blur-md transition-colors"
-                                >
-                                    Back
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        if (selectedLocations.length === 0) return;
-                                        saveDraft();
-                                        setStep('SETUP');
-                                    }}
-                                    disabled={selectedLocations.length === 0}
-                                    className={`flex-[2] font-black uppercase tracking-wider py-4 rounded-xl shadow-[0_0_30px_rgba(16,185,129,0.4)] transition-all duration-300 hover:scale-105 ${
-                                        selectedLocations.length === 0
-                                        ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed shadow-none'
-                                        : 'bg-emerald-500 hover:bg-emerald-400 text-black'
-                                    }`}
-                                >
-                                    Next: Movie Setup
-                                </button>
-                            </div>
-                        </div>
-                    </div>
+                    <GreenlightLocationStep
+                        selectedIds={selectedLocations}
+                        onChange={setSelectedLocations}
+                        locations={productionLocations}
+                        onBack={() => setStep('EQUIPMENT')}
+                        onNext={() => {
+                            if (selectedLocations.length === 0) return;
+                            saveDraft();
+                            setStep('SETUP');
+                        }}
+                        formatMoney={formatMoney}
+                    />
                 )}
 
                 {/* SETUP STEP */}
@@ -4659,640 +3148,102 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                         </div>
 
                         <div className="space-y-8 pb-20">
-                            {/* Visual Style Selection */}
-                            <div className="space-y-4">
-                                <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-2">
-                                    <Palette size={16} className="text-emerald-400" /> Visual Style
-                                </h3>
-                                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                                    {[
-                                        { id: 'REALISTIC', name: 'Realistic', desc: 'Grounded and authentic.', icon: '🎥' },
-                                        { id: 'STYLISTIC', name: 'Stylistic', desc: 'Bold and artistic.', icon: '🎨' },
-                                        { id: 'GRITTY', name: 'Gritty', desc: 'Dark and raw.', icon: '🌑' },
-                                        { id: 'VIBRANT', name: 'Vibrant', desc: 'Colorful and energetic.', icon: '🌈' },
-                                        { id: 'MINIMALIST', name: 'Minimalist', desc: 'Clean and simple.', icon: '⚪' },
-                                        { id: 'NOIR', name: 'Noir', desc: 'High contrast and moody.', icon: '🕶️' },
-                                    ].map((style) => (
-                                        <button
-                                            key={style.id}
-                                            onClick={() => setVisualStyle(style.id as any)}
-                                            className={`p-4 rounded-xl border text-left transition-all group ${
-                                                visualStyle === style.id
-                                                ? 'bg-emerald-500/10 border-emerald-500 text-white shadow-[0_0_20px_rgba(16,185,129,0.2)]'
-                                                : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-700'
-                                            }`}
-                                        >
-                                            <div className="text-2xl mb-2 group-hover:scale-110 transition-transform">{style.icon}</div>
-                                            <div className="font-black text-xs uppercase tracking-wider mb-1">{style.name}</div>
-                                            <div className="text-[10px] opacity-60 leading-tight">{style.desc}</div>
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
+                            <GreenlightArtDirectionSection
+                                visualStyle={visualStyle}
+                                pacing={pacing}
+                                tone={tone}
+                                onVisualStyleChange={setVisualStyle}
+                                onPacingChange={setPacing}
+                                onToneChange={setTone}
+                            />
+                            <GreenlightSoundtrackSection
+                                effectiveMusicArtistCount={effectiveMusicArtistCount}
+                                selectedMusicByline={selectedMusicByline}
+                                isStudioDecidedMusicPlan={isStudioDecidedMusicPlan}
+                                isCustomMusicPlan={isCustomMusicPlan}
+                                musicBudget={musicBudget}
+                                musicBuzzBonus={musicBuzzBonus}
+                                selectedMusicPlan={selectedMusicPlan}
+                                selectedMusicImpact={selectedMusicImpact}
+                                allMusicDeliverableRoles={allMusicDeliverableRoles}
+                                activeMusicCreditRoles={activeMusicCreditRoles}
+                                activeMusicSlotIndex={activeMusicSlotIndex}
+                                activeMusicSearchRole={activeMusicSearchRole}
+                                musicRoleSearchQueries={musicRoleSearchQueries}
+                                musicRoleSortOptions={musicRoleSortOptions}
+                                musicArtistSortOptions={MUSIC_ARTIST_SORT_OPTIONS}
+                                hasMusicPreviewProject={Boolean(musicPreviewProject)}
+                                getMusicArtistSearchMatches={getMusicArtistSearchMatches}
+                                getMusicCreditRoleLabel={getMusicCreditRoleLabel}
+                                getDisplayedArtistCost={artist => musicPreviewProject
+                                    ? estimateMusicArtistProjectCost(artist, musicPreviewProject)
+                                    : artist.costLow}
+                                formatMoney={formatMoney}
+                                translate={(key, vars) => tr(key, vars)}
+                                onLetStudioDecide={() => {
+                                    if (musicStrategy === 'COMPOSER_ONLY') {
+                                        setMusicStrategy('LEAD_SINGLE');
+                                        setMusicArtistTargetCount(getDefaultMusicArtistCount('LEAD_SINGLE', musicPreviewProject || undefined));
+                                    }
+                                    setSelectedMusicCreditRoles(null);
+                                    setActiveMusicSlotIndex(0);
+                                    setActiveMusicSearchRole(null);
+                                    setMusicRoleSearchQueries({});
+                                    setMusicRoleSortOptions({});
+                                }}
+                                onToggleRole={(role, isIncluded) => {
+                                    if (isStudioDecidedMusicPlan) {
+                                        focusMusicCreditRole(role);
+                                        return;
+                                    }
+                                    if (isIncluded) removeMusicCreditRole(role);
+                                    else focusMusicCreditRole(role);
+                                }}
+                                onFocusRole={(role, roleIndex) => {
+                                    setActiveMusicSearchRole(role);
+                                    setActiveMusicSlotIndex(roleIndex);
+                                }}
+                                onSearchChange={(role, roleIndex, value) => {
+                                    setMusicRoleSearchQueries(current => ({ ...current, [role]: value }));
+                                    setActiveMusicSearchRole(role);
+                                    setActiveMusicSlotIndex(roleIndex);
+                                }}
+                                onSortChange={(role, roleIndex, value) => {
+                                    setMusicRoleSortOptions(current => ({ ...current, [role]: value }));
+                                    setActiveMusicSearchRole(role);
+                                    setActiveMusicSlotIndex(roleIndex);
+                                }}
+                                onAssignArtist={assignMusicArtistToRole}
+                            />
 
-                            {/* Pacing Selection */}
-                            <div className="space-y-4">
-                                <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-2">
-                                    <Clock size={16} className="text-amber-400" /> Pacing
-                                </h3>
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                    {[
-                                        { id: 'SLOW', name: 'Slow Burn', desc: 'Patient and atmospheric.', icon: '🕯️' },
-                                        { id: 'MODERATE', name: 'Moderate', desc: 'Balanced and steady.', icon: '⚖️' },
-                                        { id: 'FAST', name: 'Fast-Paced', desc: 'Quick and engaging.', icon: '⚡' },
-                                        { id: 'FRENETIC', name: 'Frenetic', desc: 'High energy and chaotic.', icon: '🌪️' },
-                                    ].map((p) => (
-                                        <button
-                                            key={p.id}
-                                            onClick={() => setPacing(p.id as any)}
-                                            className={`p-4 rounded-xl border text-center transition-all group ${
-                                                pacing === p.id
-                                                ? 'bg-amber-500/10 border-amber-500 text-white shadow-[0_0_20px_rgba(245,158,11,0.2)]'
-                                                : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-700'
-                                            }`}
-                                        >
-                                            <div className="text-2xl mb-2 group-hover:rotate-12 transition-transform">{p.icon}</div>
-                                            <div className="font-black text-[10px] uppercase tracking-wider mb-1">{p.name}</div>
-                                            <div className="text-[9px] opacity-60 leading-tight">{p.desc}</div>
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* Tone Slider */}
-                            <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6">
-                                <div className="flex justify-between text-sm font-bold mb-4">
-                                    <span className={tone < 50 ? 'text-emerald-400' : 'text-zinc-500'}>Practical Effects</span>
-                                    <span className={tone > 50 ? 'text-purple-400' : 'text-zinc-500'}>CGI Heavy</span>
-                                </div>
-                                <input
-                                    type="range"
-                                    min="0"
-                                    max="100"
-                                    value={tone}
-                                    onChange={(e) => setTone(parseInt(e.target.value))}
-                                    className="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
-                                />
-                                <div className="mt-4 text-center text-xs text-zinc-400">
-                                    {tone < 30 ? 'Focus on practical sets and stunts.' :
-                                     tone > 70 ? 'Heavy reliance on visual effects.' :
-                                    'Balanced approach.'}
-                                </div>
-                            </div>
-
-                            {/* Soundtrack Desk */}
-                            <div className="bg-zinc-950/80 border border-cyan-500/20 rounded-2xl p-4 sm:p-5 space-y-4 shadow-[0_0_24px_rgba(34,211,238,0.08)]">
-                                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                                    <div className="min-w-0">
-                                        <h3 className="text-sm font-black text-cyan-300 uppercase tracking-[0.2em] flex items-center gap-2">
-                                            <Mic size={16} /> Soundtrack Desk
-                                        </h3>
-                                        <div className="mt-2 text-lg sm:text-xl font-black text-white truncate">
-                                            {effectiveMusicArtistCount > 0 ? `${effectiveMusicArtistCount} content type${effectiveMusicArtistCount === 1 ? '' : 's'} planned` : 'Composer score only'}
-                                        </div>
-                                        <div className="mt-1 truncate text-xs font-bold text-zinc-500">
-                                            {selectedMusicByline
-                                                ? `${isStudioDecidedMusicPlan ? 'Studio preview: ' : ''}${selectedMusicByline}`
-                                                : (isCustomMusicPlan ? 'Choose the music work and assign artists.' : 'Let the studio choose the music work.')}
-                                        </div>
-                                    </div>
-                                    <div className="grid grid-cols-3 gap-2 min-w-full lg:min-w-[310px]">
-                                        <div className="rounded-xl bg-black/35 border border-white/10 p-3">
-                                            <div className="text-[8px] font-black uppercase tracking-[0.2em] text-zinc-600">Budget</div>
-                                            <div className="mt-1 text-sm font-black text-cyan-300 font-mono">{formatMoney(musicBudget)}</div>
-                                        </div>
-                                        <div className="rounded-xl bg-black/35 border border-white/10 p-3">
-                                            <div className="text-[8px] font-black uppercase tracking-[0.2em] text-zinc-600">Buzz</div>
-                                            <div className="mt-1 text-sm font-black text-emerald-300">+{musicBuzzBonus}</div>
-                                        </div>
-                                        <div className="rounded-xl bg-black/35 border border-white/10 p-3">
-                                            <div className="text-[8px] font-black uppercase tracking-[0.2em] text-zinc-600">Risk</div>
-                                            <div className={`mt-1 text-sm font-black ${(selectedMusicPlan?.musicRisk || 0) > 28 ? 'text-rose-300' : (selectedMusicPlan?.musicRisk || 0) > 16 ? 'text-amber-300' : 'text-cyan-300'}`}>
-                                                {selectedMusicPlan?.musicRisk || 0}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {selectedMusicImpact && selectedMusicImpact.score > 0 && (
-                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                                        <div className="rounded-xl border border-cyan-300/20 bg-cyan-300/[0.06] p-3">
-                                            <div className="text-[8px] font-black uppercase tracking-[0.18em] text-cyan-100/55">Opening</div>
-                                            <div className="mt-1 font-mono text-sm font-black text-emerald-300">
-                                                {selectedMusicImpact.openingWeekendLiftPct >= 0 ? '+' : ''}{selectedMusicImpact.openingWeekendLiftPct}%
-                                            </div>
-                                        </div>
-                                        <div className="rounded-xl border border-cyan-300/20 bg-cyan-300/[0.06] p-3">
-                                            <div className="text-[8px] font-black uppercase tracking-[0.18em] text-cyan-100/55">Trailer</div>
-                                            <div className="mt-1 font-mono text-sm font-black text-cyan-300">+{selectedMusicImpact.trailerStrengthLift}</div>
-                                        </div>
-                                        <div className="rounded-xl border border-cyan-300/20 bg-cyan-300/[0.06] p-3">
-                                            <div className="text-[8px] font-black uppercase tracking-[0.18em] text-cyan-100/55">Awards</div>
-                                            <div className="mt-1 font-mono text-sm font-black text-purple-200">+{selectedMusicImpact.awardChanceLift}</div>
-                                        </div>
-                                        <div className="rounded-xl border border-white/10 bg-black/25 p-3">
-                                            <div className="text-[8px] font-black uppercase tracking-[0.18em] text-zinc-600">Backlash</div>
-                                            <div className={`mt-1 font-mono text-sm font-black ${selectedMusicImpact.mismatchBacklashRisk >= 38 || selectedMusicImpact.controversyRisk >= 36 ? 'text-amber-300' : 'text-zinc-300'}`}>
-                                                {Math.max(selectedMusicImpact.mismatchBacklashRisk, selectedMusicImpact.controversyRisk)}
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-
-                                <div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/[0.04] p-3 space-y-3">
-                                    <div className="mb-3 flex items-center justify-between gap-3">
-                                        <div className="min-w-0">
-                                            <div className="text-[9px] font-black uppercase tracking-[0.2em] text-cyan-200/60">Content Types</div>
-                                            <div className="mt-0.5 truncate text-sm font-black text-white">
-                                                {isStudioDecidedMusicPlan
-                                                    ? `Studio decides · ${effectiveMusicArtistCount} planned`
-                                                    : effectiveMusicArtistCount > 0
-                                                        ? 'Toggle what you want, then assign artists'
-                                                        : 'All music content is off'}
-                                            </div>
-                                        </div>
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                if (musicStrategy === 'COMPOSER_ONLY') {
-                                                    setMusicStrategy('LEAD_SINGLE');
-                                                    setMusicArtistTargetCount(getDefaultMusicArtistCount('LEAD_SINGLE', musicPreviewProject || undefined));
-                                                }
-                                                setSelectedMusicCreditRoles(null);
-                                                setActiveMusicSlotIndex(0);
-                                                setActiveMusicSearchRole(null);
-                                                setMusicRoleSearchQueries({});
-                                                setMusicRoleSortOptions({});
-                                            }}
-                                            className={`shrink-0 rounded-xl border px-4 py-3 text-[10px] font-black uppercase tracking-[0.16em] transition-colors ${
-                                                !isCustomMusicPlan
-                                                    ? 'border-cyan-200 bg-cyan-300 text-black shadow-[0_0_18px_rgba(34,211,238,0.16)]'
-                                                    : 'border-cyan-400/30 bg-cyan-400/10 text-cyan-200 hover:bg-cyan-300 hover:text-black'
-                                            }`}
-                                        >
-                                            Let Studio Decide
-                                        </button>
-                                    </div>
-                                    <div className="space-y-2">
-                                        {allMusicDeliverableRoles.map((role) => {
-                                            const roleIndex = activeMusicCreditRoles.indexOf(role);
-                                            const isIncluded = roleIndex >= 0;
-                                            const credit = isIncluded ? selectedMusicPlan?.credits?.[roleIndex] : undefined;
-                                            const isActiveSlot = isIncluded && (activeMusicSlotIndex === roleIndex || activeMusicSearchRole === role);
-                                            const roleQuery = musicRoleSearchQueries[role] || '';
-                                            const roleSort = musicRoleSortOptions[role] || 'RECOMMENDED';
-                                            const searchMatches = isIncluded ? getMusicArtistSearchMatches(role) : [];
-                                            return (
-                                                <div
-                                                    key={`plan_${role}`}
-                                                    className={`min-w-0 rounded-xl border p-3 transition-all ${
-                                                        isActiveSlot
-                                                            ? 'border-cyan-300 bg-cyan-400/[0.08] shadow-[0_0_18px_rgba(34,211,238,0.12)]'
-                                                            : isIncluded
-                                                                ? 'border-cyan-400/40 bg-cyan-400/10 hover:border-cyan-300'
-                                                                : 'border-zinc-800 bg-black/20 opacity-70 hover:opacity-100 hover:border-cyan-400/40'
-                                                    }`}
-                                                >
-                                                    <div className="flex items-start justify-between gap-3">
-                                                        <div className="min-w-0">
-                                                            <div className={`text-[9px] font-black uppercase tracking-[0.16em] ${isIncluded ? 'text-cyan-200/60' : 'text-zinc-600'}`}>
-                                                                {getMusicCreditRoleLabel(role)}
-                                                            </div>
-                                                            <div className="mt-1 truncate text-sm font-black text-white">
-                                                                {isIncluded
-                                                                    ? isStudioDecidedMusicPlan
-                                                                        ? `Studio pick: ${credit?.artistName || 'Choosing artist'}`
-                                                                        : (credit?.artistName || 'Choose artist')
-                                                                    : 'Not producing this'}
-                                                            </div>
-                                                            <div className="mt-1 truncate text-[10px] font-bold text-zinc-500">
-                                                                {isIncluded
-                                                                    ? isStudioDecidedMusicPlan
-                                                                        ? 'Auto preview - tap to customize'
-                                                                        : (credit?.songTitle || 'Artist not assigned yet')
-                                                                    : 'Toggle on to add artist'}
-                                                            </div>
-                                                        </div>
-                                                        <button
-                                                            type="button"
-                                                            onClick={(event) => {
-                                                                event.stopPropagation();
-                                                                if (isStudioDecidedMusicPlan) {
-                                                                    focusMusicCreditRole(role);
-                                                                    return;
-                                                                }
-                                                                if (isIncluded) removeMusicCreditRole(role);
-                                                                else focusMusicCreditRole(role);
-                                                            }}
-                                                            className={`shrink-0 rounded-full px-3 py-2 text-[9px] font-black uppercase tracking-[0.14em] ${
-                                                                isIncluded
-                                                                    ? 'bg-cyan-300 text-black hover:bg-cyan-200'
-                                                                    : 'bg-zinc-900 text-zinc-500 hover:bg-cyan-400/10 hover:text-cyan-200'
-                                                            }`}
-                                                        >
-                                                            {isIncluded ? (isStudioDecidedMusicPlan ? 'Auto' : 'On') : 'Off'}
-                                                        </button>
-                                                    </div>
-                                                    {isIncluded && (
-                                                        <div className="mt-3 space-y-2">
-                                                            <div className="grid grid-cols-1 sm:grid-cols-[1fr_132px] gap-2">
-                                                                <div className="relative">
-                                                                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-cyan-200/50" />
-                                                                    <input
-                                                                        value={roleQuery}
-                                                                        onFocus={() => {
-                                                                            setActiveMusicSearchRole(role);
-                                                                            setActiveMusicSlotIndex(roleIndex);
-                                                                        }}
-                                                                        onChange={(event) => {
-                                                                            setMusicRoleSearchQueries(current => ({ ...current, [role]: event.target.value }));
-                                                                            setActiveMusicSearchRole(role);
-                                                                            setActiveMusicSlotIndex(roleIndex);
-                                                                        }}
-                                                                        placeholder={credit?.artistName ? `Change ${credit.artistName}` : `Search artist for ${getMusicCreditRoleLabel(role).toLowerCase()}`}
-                                                                        className="w-full rounded-xl border border-zinc-800 bg-black/35 py-2.5 pl-9 pr-3 text-xs font-bold text-white outline-none transition-colors placeholder:text-zinc-600 focus:border-cyan-300"
-                                                                    />
-                                                                </div>
-                                                                <select
-                                                                    value={roleSort}
-                                                                    onFocus={() => {
-                                                                        setActiveMusicSearchRole(role);
-                                                                        setActiveMusicSlotIndex(roleIndex);
-                                                                    }}
-                                                                    onChange={(event) => {
-                                                                        setMusicRoleSortOptions(current => ({ ...current, [role]: event.target.value as MusicArtistSortOption }));
-                                                                        setActiveMusicSearchRole(role);
-                                                                        setActiveMusicSlotIndex(roleIndex);
-                                                                    }}
-                                                                    className="rounded-xl border border-zinc-800 bg-black/35 px-3 py-2.5 text-[10px] font-black uppercase tracking-[0.12em] text-cyan-100 outline-none transition-colors focus:border-cyan-300"
-                                                                    aria-label={tr('greenlight.music.sortArtistsFor', { role: getMusicCreditRoleLabel(role) })}
-                                                                >
-                                                                    {MUSIC_ARTIST_SORT_OPTIONS.map(option => (
-                                                                        <option key={option.id} value={option.id}>{tr(`greenlight.music.sort.${option.id}`)}</option>
-                                                                    ))}
-                                                                </select>
-                                                            </div>
-                                                            {activeMusicSearchRole === role && (
-                                                                <div className="rounded-xl border border-zinc-800 bg-zinc-950/85 p-2">
-                                                                    {searchMatches.length === 0 ? (
-                                                                        <div className="p-3 text-xs font-bold text-zinc-500">
-                                                                            {tr('greenlight.music.noArtistsMatch')}
-                                                                        </div>
-                                                                    ) : (
-                                                                        <div className="flex gap-2 overflow-x-auto pb-1 custom-scrollbar">
-                                                                            {searchMatches.map((artist) => {
-                                                                                const displayedCost = musicPreviewProject ? estimateMusicArtistProjectCost(artist, musicPreviewProject) : artist.costLow;
-                                                                                const isAssigned = credit?.artistId === artist.id;
-                                                                                return (
-                                                                                    <button
-                                                                                        key={`${role}_${artist.id}`}
-                                                                                        type="button"
-                                                                                        onClick={() => assignMusicArtistToRole(role, artist.id)}
-                                                                                        className={`min-w-[180px] max-w-[180px] rounded-xl border p-3 text-left transition-colors ${
-                                                                                            isAssigned
-                                                                                                ? 'border-cyan-200 bg-cyan-300 text-black'
-                                                                                                : 'border-zinc-800 bg-black/35 hover:border-cyan-300/70 hover:bg-cyan-400/10'
-                                                                                        }`}
-                                                                                    >
-                                                                                        <div className={`truncate text-xs font-black ${isAssigned ? 'text-black' : 'text-white'}`}>{artist.stageName}</div>
-                                                                                        <div className={`mt-1 truncate text-[9px] font-black uppercase tracking-[0.14em] ${isAssigned ? 'text-black/55' : 'text-cyan-200/55'}`}>
-                                                                                            {artist.genre} • {artist.fameTier}
-                                                                                        </div>
-                                                                                        <div className="mt-3 grid grid-cols-2 gap-2">
-                                                                                            <div>
-                                                                                                <div className={`text-[8px] font-black uppercase tracking-[0.16em] ${isAssigned ? 'text-black/45' : 'text-zinc-600'}`}>Rating</div>
-                                                                                                <div className={`mt-0.5 text-sm font-black ${isAssigned ? 'text-black' : 'text-emerald-300'}`}>{artist.reputation}/100</div>
-                                                                                            </div>
-                                                                                            <div className="text-right">
-                                                                                                <div className={`text-[8px] font-black uppercase tracking-[0.16em] ${isAssigned ? 'text-black/45' : 'text-zinc-600'}`}>Cost</div>
-                                                                                                <div className={`mt-0.5 font-mono text-sm font-black ${isAssigned ? 'text-black' : 'text-cyan-300'}`}>{formatMoney(displayedCost)}</div>
-                                                                                            </div>
-                                                                                        </div>
-                                                                                        <div className={`mt-2 truncate text-[9px] font-black uppercase tracking-[0.12em] ${isAssigned ? 'text-black/50' : 'text-zinc-500'}`}>
-                                                                                            {artist.availability} • {artist.audience}
-                                                                                        </div>
-                                                                                    </button>
-                                                                                );
-                                                                            })}
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Marketing Budget Allotment */}
-                            <div className="bg-zinc-950/70 border border-amber-500/20 rounded-2xl p-5 space-y-5 shadow-[0_0_24px_rgba(245,158,11,0.08)]">
-                                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-                                    <div>
-                                        <h3 className="text-sm font-bold text-amber-300 uppercase tracking-wider flex items-center gap-2">
-                                            <DollarSign size={16} /> {tr('greenlight.marketing.reservedCampaignBudget')}
-                                        </h3>
-                                        <p className="mt-1 text-xs text-zinc-500 leading-relaxed">
-                                            {tr('greenlight.marketing.reservedCampaignBody')}
-                                        </p>
-                                    </div>
-                                    <div className="text-left sm:text-right">
-                                        <div className="text-[10px] font-black uppercase tracking-[0.18em] text-zinc-600">{tr('greenlight.marketing.reserved')}</div>
-                                        <div className="font-mono text-3xl font-black text-amber-300">{formatMoney(reservedMarketingBudget)}</div>
-                                    </div>
-                                </div>
-
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                    {MARKETING_BUDGET_PRESETS.map(option => {
-                                        const amount = getMarketingBudgetForPreset(option.id, budgetBreakdown.total);
-                                        const isSelected = marketingBudgetPreset === option.id;
-                                        return (
-                                            <button
-                                                key={option.id}
-                                                onClick={() => {
-                                                    setMarketingBudgetPreset(option.id);
-                                                    setReservedMarketingBudget(amount);
-                                                }}
-                                                className={`p-4 rounded-xl border text-left transition-all ${
-                                                    isSelected
-                                                        ? 'bg-amber-500/10 border-amber-400 text-white shadow-[0_0_20px_rgba(245,158,11,0.18)]'
-                                                        : 'bg-zinc-900/80 border-zinc-800 text-zinc-400 hover:border-amber-500/40 hover:text-white'
-                                                }`}
-                                            >
-                                                <div className="flex items-center justify-between gap-2">
-                                                    <div className="text-[11px] font-black uppercase tracking-widest">{tr(`greenlight.marketing.preset.${option.id}.label`)}</div>
-                                                    <div className="font-mono text-xs font-black text-amber-300">{formatMoney(amount)}</div>
-                                                </div>
-                                                <div className="mt-2 text-[10px] text-zinc-500 leading-tight">{tr(`greenlight.marketing.preset.${option.id}.note`)}</div>
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-
-                                <div className={`rounded-xl border p-4 transition-all ${
-                                    marketingBudgetPreset === 'CUSTOM'
-                                        ? 'border-amber-500/50 bg-amber-500/5'
-                                        : 'border-zinc-800 bg-black/25'
-                                }`}>
-                                    <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                                        <button
-                                            onClick={() => setMarketingBudgetPreset('CUSTOM')}
-                                            className={`shrink-0 px-4 py-3 rounded-lg border text-[10px] font-black uppercase tracking-widest transition-colors ${
-                                                marketingBudgetPreset === 'CUSTOM'
-                                                    ? 'border-amber-400 bg-amber-400 text-black'
-                                                    : 'border-zinc-700 bg-zinc-900 text-zinc-400 hover:text-white'
-                                            }`}
-                                        >
-                                            {tr('greenlight.marketing.custom')}
-                                        </button>
-                                        <div className="flex-1">
-                                            <input
-                                                type="range"
-                                                min="0"
-                                                max={maxMarketingBudget}
-                                                step="50000"
-                                                value={reservedMarketingBudget}
-                                                onChange={(event) => {
-                                                    setMarketingBudgetPreset('CUSTOM');
-                                                    setReservedMarketingBudget(Math.min(maxMarketingBudget, Math.max(0, Number(event.target.value) || 0)));
-                                                }}
-                                                className="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-amber-400"
-                                            />
-                                            <div className="mt-2 flex justify-between text-[9px] font-bold uppercase tracking-widest text-zinc-600">
-                                                <span>No reserve</span>
-                                                <span>Max {formatMoney(maxMarketingBudget)}</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Universe & Franchise Connection */}
-                            <div className="space-y-6">
-                                <div className="bg-zinc-950/60 border border-zinc-800 rounded-2xl p-4 space-y-3">
-                                    <div className="flex items-center justify-between gap-3">
-                                        <div className="flex items-center gap-2 min-w-0">
-                                            <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-2">
-                                                <Clapperboard size={16} className="text-emerald-400" /> Story Connection
-                                            </h3>
-                                            <button
-                                                type="button"
-                                                onClick={() => setShowStoryConnectionInfo(prev => !prev)}
-                                                className={`w-6 h-6 rounded-full border flex items-center justify-center transition-colors ${
-                                                    showStoryConnectionInfo
-                                                        ? 'border-emerald-500 bg-emerald-500/10 text-emerald-300'
-                                                        : 'border-zinc-700 bg-black/30 text-zinc-500 hover:text-white hover:border-zinc-500'
-                                                }`}
-                                                aria-label="Explain story connection"
-                                            >
-                                                <Info size={13} />
-                                            </button>
-                                        </div>
-                                        <span className="text-[9px] font-black uppercase tracking-widest text-zinc-500">
-                                            {linkedUniverseCastCount} known cast
-                                        </span>
-                                    </div>
-                                    {showStoryConnectionInfo && (
-                                        <div className="bg-black/35 border border-emerald-500/20 rounded-xl p-3 space-y-2">
-                                            <p className="text-xs text-zinc-300 leading-relaxed">
-                                                This tells the game what kind of IP movie you are making, so it can set validation, subtype, continuity risk, and fan expectations.
-                                            </p>
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                                {(['AUTO', 'SOLO', 'CROSSOVER', 'EVENT', 'REBOOT'] as ConnectedProjectIntent[]).map((id) => (
-                                                    <div key={id} className="bg-zinc-950/80 border border-zinc-800 rounded-lg p-2">
-                                                        <p className="text-[9px] font-black uppercase tracking-widest text-emerald-300">{tr(`greenlight.connectedIntent.${id}.label`)}</p>
-                                                        <p className="text-[10px] text-zinc-500 leading-relaxed mt-1">{tr(`greenlight.connectedIntent.${id}.body`)}</p>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-                                    <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-                                        {([
-                                            { id: 'AUTO' },
-                                            { id: 'SOLO' },
-                                            { id: 'CROSSOVER' },
-                                            { id: 'EVENT' },
-                                            { id: 'REBOOT' }
-                                        ].map(option => {
-                                            const isSelected = connectedProjectIntent === option.id;
-                                            const isEffective = effectiveConnectedIntent === option.id || (connectedProjectIntent === 'AUTO' && option.id === effectiveConnectedIntent);
-                                            return (
-                                                <button
-                                                    key={option.id}
-                                                    onClick={() => setConnectedProjectIntent(option.id as ConnectedProjectIntent)}
-                                                    className={`p-3 rounded-xl border text-left transition-all ${
-                                                        isSelected
-                                                            ? 'bg-emerald-500/10 border-emerald-500 text-white'
-                                                            : isEffective
-                                                                ? 'bg-blue-500/10 border-blue-500/30 text-blue-100'
-                                                                : 'bg-black/25 border-zinc-800 text-zinc-500 hover:text-white hover:border-zinc-700'
-                                                    }`}
-                                                >
-                                                    <div className="text-[10px] font-black uppercase tracking-widest">{tr(`greenlight.connectedIntent.${option.id}.label`)}</div>
-                                                    <div className="mt-1 text-[9px] opacity-60 leading-tight">{tr(`greenlight.connectedIntent.${option.id}.hint`)}</div>
-                                                </button>
-                                            );
-                                        }))}
-                                    </div>
-                                    <p className="text-[10px] text-zinc-500 uppercase tracking-widest">
-                                        Current plan: <span className="text-emerald-300">{effectiveConnectedIntent}</span>
-                                        {effectiveConnectedIntent === 'EVENT' ? ' • needs three known characters' : effectiveConnectedIntent === 'CROSSOVER' ? ' • needs one known character' : ''}
-                                    </p>
-                                </div>
-
-                                <div className="flex items-center justify-between">
-                                    <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-2">
-                                        <Globe size={16} className="text-blue-400" /> Universe Connection
-                                    </h3>
-                                    {selectedUniverseId && (
-                                        <button
-                                            onClick={() => setSelectedUniverseId(null)}
-                                            className="text-[10px] font-bold text-zinc-500 hover:text-white uppercase tracking-widest"
-                                        >
-                                            Disconnect
-                                        </button>
-                                    )}
-                                </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    {(Object.values(normalizeUniverseMap(player.world?.universes || {})) as Universe[]).filter(u => u.status !== 'RETIRED' && u.studioId === studio.id).map((universe) => (
-                                        <button
-                                            key={universe.id}
-                                            onClick={() => setSelectedUniverseId(universe.id)}
-                                            className={`p-4 rounded-xl border text-left transition-all group relative overflow-hidden ${
-                                                selectedUniverseId === universe.id
-                                                ? 'bg-zinc-900 border-blue-500 text-white shadow-[0_0_20px_rgba(59,130,246,0.2)]'
-                                                : 'bg-zinc-900/50 border-zinc-800 text-zinc-400 hover:border-zinc-700'
-                                            }`}
-                                        >
-                                            <div
-                                                className="absolute top-0 right-0 w-16 h-16 opacity-10 blur-xl pointer-events-none"
-                                                style={{ backgroundColor: universe.color }}
-                                            />
-                                            <div className="flex items-center gap-2 mb-2">
-                                                <div
-                                                    className="w-2 h-2 rounded-full"
-                                                    style={{ backgroundColor: universe.color }}
-                                                />
-                                                <div className="font-black text-xs uppercase tracking-tight">{universe.name}</div>
-                                            </div>
-                                            <div className="text-[10px] opacity-60 leading-tight mb-3 line-clamp-2">{universe.description}</div>
-                                            <div className="flex justify-between items-center mt-auto">
-                                                <div className="text-[9px] font-bold text-blue-400 uppercase">{getUniversePhaseLabel(universe.currentPhase)}</div>
-                                                <div className="text-[9px] font-mono text-zinc-500">MOM: {universe.momentum}%</div>
-                                            </div>
-                                        </button>
-                                    ))}
-
-                                    {/* Create New Universe Option */}
-                                    <button
-                                        onClick={() => setSelectedUniverseId(selectedUniverseId === 'NEW' ? null : 'NEW')}
-                                        className={`p-4 rounded-xl border text-left transition-all group relative overflow-hidden ${
-                                            selectedUniverseId === 'NEW'
-                                            ? 'bg-blue-500/10 border-blue-500 text-white shadow-[0_0_20px_rgba(59,130,246,0.2)]'
-                                            : 'bg-zinc-900/50 border-zinc-800 text-zinc-400 hover:border-zinc-700'
-                                        }`}
-                                    >
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center text-blue-400">
-                                                <Plus size={16} />
-                                            </div>
-                                            <div>
-                                                <div className="font-black text-xs uppercase tracking-tight">Create New Universe</div>
-                                                <div className="text-[10px] text-zinc-500">Found a new cinematic universe.</div>
-                                            </div>
-                                        </div>
-                                    </button>
-                                </div>
-
-                                {selectedUniverseId === 'NEW' && (
-                                    <div className="mt-4 p-4 bg-blue-500/5 border border-blue-500/20 rounded-xl space-y-3">
-                                        <label className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">Universe Name</label>
-                                        <input
-                                            type="text"
-                                            value={newUniverseName}
-                                            onChange={(e) => setNewUniverseName(e.target.value)}
-                                            placeholder="e.g. The Cosmic Saga"
-                                            className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-blue-500 transition-colors"
-                                        />
-                                        <p className="text-[10px] text-zinc-500 italic">This will establish a new IP owned by your studio.</p>
-                                    </div>
-                                )}
-
-                                {/* Franchise Selection */}
-                                <div className="space-y-4 pt-4 border-t border-zinc-800/50">
-                                    <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-2">
-                                        <Layers size={16} className="text-amber-400" /> Franchise Connection
-                                    </h3>
-
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        {/* Existing Franchises */}
-                                        {studioFranchises.map((f) => (
-                                            <button
-                                                key={f.id}
-                                                onClick={() => setSelectedFranchiseId(f.id)}
-                                                className={`p-4 rounded-xl border text-left transition-all ${
-                                                    selectedFranchiseId === f.id
-                                                    ? 'bg-amber-500/10 border-amber-500 text-white shadow-[0_0_20px_rgba(245,158,11,0.2)]'
-                                                    : 'bg-zinc-900/50 border-zinc-800 text-zinc-400 hover:border-zinc-700'
-                                                }`}
-                                            >
-                                                <div className="flex justify-between items-start mb-2">
-                                                    <div className="font-black text-xs uppercase tracking-tight">{f.name}</div>
-                                                    <div className="text-[9px] bg-zinc-800 px-1.5 py-0.5 rounded text-zinc-500 font-bold uppercase">{f.genre}</div>
-                                                </div>
-                                                <div className="flex justify-between items-center mt-2">
-                                                    <div className="text-[10px] text-zinc-500">Part {f.lastInstallment + 1}</div>
-                                                    <div className="text-[10px] text-amber-400 font-bold uppercase">Established</div>
-                                                </div>
-                                            </button>
-                                        ))}
-
-                                        {/* New Franchise Option */}
-                                        <button
-                                            onClick={() => setSelectedFranchiseId(selectedFranchiseId === 'NEW' ? null : 'NEW')}
-                                            className={`p-4 rounded-xl border text-left transition-all ${
-                                                selectedFranchiseId === 'NEW'
-                                                ? 'bg-emerald-500/10 border-emerald-500 text-white shadow-[0_0_20px_rgba(16,185,129,0.2)]'
-                                                : 'bg-zinc-900/50 border-zinc-800 text-zinc-400 hover:border-zinc-700'
-                                            }`}
-                                        >
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center text-emerald-400">
-                                                    <Plus size={16} />
-                                                </div>
-                                                <div>
-                                                    <div className="font-black text-xs uppercase tracking-tight">Start New Franchise</div>
-                                                    <div className="text-[10px] text-zinc-500">Establish this project as a series starter.</div>
-                                                </div>
-                                            </div>
-                                        </button>
-
-                                        {/* Standalone Option */}
-                                        <button
-                                            onClick={() => setSelectedFranchiseId(null)}
-                                            className={`p-4 rounded-xl border text-left transition-all ${
-                                                selectedFranchiseId === null
-                                                ? 'bg-zinc-800 border-zinc-600 text-white'
-                                                : 'bg-zinc-900/50 border-zinc-800 text-zinc-400 hover:border-zinc-700'
-                                            }`}
-                                        >
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center text-zinc-500">
-                                                    <X size={16} />
-                                                </div>
-                                                <div>
-                                                    <div className="font-black text-xs uppercase tracking-tight">Standalone Project</div>
-                                                    <div className="text-[10px] text-zinc-500">No franchise or universe connection.</div>
-                                                </div>
-                                            </div>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
+                            <GreenlightMarketingBudgetSection
+                                marketingBudgetPreset={marketingBudgetPreset}
+                                reservedMarketingBudget={reservedMarketingBudget}
+                                productionBudget={budgetBreakdown.total}
+                                maxMarketingBudget={maxMarketingBudget}
+                                onPresetChange={setMarketingBudgetPreset}
+                                onReservedBudgetChange={setReservedMarketingBudget}
+                                formatMoney={formatMoney}
+                                translate={tr}
+                            />
+                            <GreenlightStoryConnectionSection
+                                connectedProjectIntent={connectedProjectIntent}
+                                effectiveConnectedIntent={effectiveConnectedIntent}
+                                linkedUniverseCastCount={linkedUniverseCastCount}
+                                showStoryConnectionInfo={showStoryConnectionInfo}
+                                selectableUniverses={selectableStudioUniverses}
+                                selectedUniverseId={selectedUniverseId}
+                                newUniverseName={newUniverseName}
+                                franchises={studioFranchises}
+                                selectedFranchiseId={selectedFranchiseId}
+                                translate={key => tr(key)}
+                                getUniversePhaseLabel={getUniversePhaseLabel}
+                                onToggleStoryConnectionInfo={() => setShowStoryConnectionInfo(previous => !previous)}
+                                onConnectedProjectIntentChange={setConnectedProjectIntent}
+                                onUniverseChange={setSelectedUniverseId}
+                                onNewUniverseNameChange={setNewUniverseName}
+                                onFranchiseChange={setSelectedFranchiseId}
+                            />
                         </div>
 
                         {/* Fixed Action Bar */}
@@ -5320,1356 +3271,102 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
 
                 {/* CONFIRM STEP */}
                 {step === 'CONFIRM' && selectedScript && (
-                    <div className="max-w-2xl mx-auto px-4 pt-10 pb-nav-safe-lg animate-in slide-in-from-bottom-4 duration-500 space-y-8">
-                        {/* Production Budget Approval Document */}
-                        <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-2xl">
-                            {/* Header */}
-                            <div className="bg-zinc-950 p-6 border-b border-zinc-800 flex justify-between items-center">
-                                <div>
-                                    <div className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-1">Production Approval</div>
-                                    <h2 className="text-xl font-black text-white uppercase tracking-tight">{selectedScript.title}</h2>
-                                </div>
-                                <div className="text-right">
-                                    <div className="text-[10px] font-mono text-zinc-500">REF: {Date.now().toString().slice(-8)}</div>
-                                    <div className="text-emerald-500 font-bold text-xs uppercase">Ready for Greenlight</div>
-                                </div>
-                            </div>
-
-                            {/* Universe & Franchise Summary */}
-                            {(selectedUniverseId || selectedFranchiseId || effectiveConnectedIntent !== 'SOLO') && (
-                                <div className="px-6 py-3 bg-zinc-950/50 border-b border-zinc-800 flex flex-wrap gap-4">
-                                    <div className="flex items-center gap-2">
-                                        <Clapperboard size={12} className="text-emerald-400" />
-                                        <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
-                                            Type: <span className="text-white">{effectiveConnectedIntent}</span>
-                                        </span>
-                                    </div>
-                                    {selectedUniverseId && (
-                                        <div className="flex items-center gap-2">
-                                            <Globe size={12} className="text-blue-400" />
-                                            <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
-                                                Universe: <span className="text-white">
-                                                    {selectedUniverseId === 'NEW' ? newUniverseName : normalizeUniverseMap(player.world?.universes || {})[selectedUniverseId]?.name}
-                                                </span>
-                                            </span>
-                                        </div>
-                                    )}
-                                    {selectedFranchiseId && (
-                                        <div className="flex items-center gap-2">
-                                            <Layers size={12} className="text-amber-400" />
-                                            <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
-                                                Franchise: <span className="text-white">
-                                                    {selectedFranchiseId === 'NEW' ? 'New Franchise' : studioFranchises.find(f => f.id === selectedFranchiseId)?.name}
-                                                    {selectedFranchiseId !== 'NEW' && ` (Part ${(studioFranchises.find(f => f.id === selectedFranchiseId)?.lastInstallment || 0) + 1})`}
-                                                </span>
-                                            </span>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-
-	                            {/* Body */}
-	                            <div className="p-6 space-y-6">
-                                {linkedCastSummary.length > 0 && (
-                                    <div className="bg-blue-500/5 border border-blue-500/20 rounded-xl p-4">
-                                        <div className="flex items-center justify-between gap-3 mb-3">
-                                            <div>
-                                                <h3 className="text-[10px] font-bold text-blue-300 uppercase tracking-widest">Connected Cast</h3>
-                                                <p className="text-[10px] text-zinc-500 mt-1">
-                                                    {linkedCastSummary.length} universe character{linkedCastSummary.length === 1 ? '' : 's'} attached • {effectiveConnectedIntent}
-                                                </p>
-                                            </div>
-                                            {unresolvedReturningTalent.length > 0 && (
-                                                <span className="bg-amber-500/10 text-amber-300 border border-amber-500/20 rounded-full px-2 py-1 text-[8px] font-black uppercase tracking-widest">
-                                                    {unresolvedReturningTalent.length} Pending
-                                                </span>
-                                            )}
-                                        </div>
-                                        <div className="space-y-2">
-                                            {linkedCastSummary.slice(0, 4).map(role => (
-                                                <div key={role.id} className="flex items-center justify-between gap-3 bg-black/25 border border-white/5 rounded-lg px-3 py-2">
-                                                    <div className="min-w-0">
-                                                        <p className="text-xs font-black text-white truncate">{role.characterName || role.roleName}</p>
-                                                        <p className="text-[9px] text-zinc-500 uppercase tracking-widest truncate">
-                                                            {role.actorName || 'Casting needed'} • {role.roleType}
-                                                        </p>
-                                                    </div>
-                                                    <div className="text-right shrink-0">
-                                                        <p className="text-xs font-mono font-bold text-zinc-200">{formatMoney(role.salary || 0)}</p>
-                                                        <p className={`text-[8px] font-black uppercase tracking-widest ${
-                                                            role.negotiationStatus === 'Negotiating' ? 'text-amber-300' :
-                                                            role.negotiationStatus === 'Declined' ? 'text-rose-300' :
-                                                            role.negotiationStatus === 'Uncast' ? 'text-zinc-500' :
-                                                            'text-emerald-300'
-                                                        }`}>
-                                                            {role.negotiationStatus}
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                            {linkedCastSummary.length > 4 && (
-                                                <p className="text-[9px] font-bold uppercase tracking-widest text-zinc-500">
-                                                    +{linkedCastSummary.length - 4} more connected role{linkedCastSummary.length - 4 === 1 ? '' : 's'}
-                                                </p>
-                                            )}
-                                        </div>
-                                    </div>
-                                )}
-
-	                                {/* Above the Line */}
-	                                <div>
-                                    <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3 border-b border-zinc-800 pb-1">Above The Line</h3>
-                                    <div className="space-y-2 text-sm">
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-zinc-300">Script Rights</span>
-                                            <span className="font-mono text-white">Included</span>
-                                        </div>
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-zinc-300">Director ({getCrewData('director').name})</span>
-                                            <span className="font-mono text-white">{formatMoney(budgetBreakdown.director)}</span>
-                                        </div>
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-zinc-300">Principal Cast</span>
-                                            <span className="font-mono text-white">{formatMoney(budgetBreakdown.cast)}</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Below the Line */}
-                                <div>
-                                    <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3 border-b border-zinc-800 pb-1">Below The Line</h3>
-                                    <div className="space-y-2 text-sm">
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-zinc-300">Production Crew</span>
-                                            <span className="font-mono text-white">{formatMoney(budgetBreakdown.crew)}</span>
-                                        </div>
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-zinc-300">Locations ({selectedLocations.length})</span>
-                                            <span className="font-mono text-white">{formatMoney(budgetBreakdown.locationCost)}</span>
-                                        </div>
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-zinc-300">Equipment & Gear</span>
-                                            <span className="font-mono text-white">{formatMoney(budgetBreakdown.equipmentCost)}</span>
-                                        </div>
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-zinc-300">Script & IP Rights</span>
-                                            <span className="font-mono text-white">{formatMoney(budgetBreakdown.scriptCost)}</span>
-                                        </div>
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-zinc-300">Base Production Costs</span>
-                                            <span className="font-mono text-white">{formatMoney(budgetBreakdown.baseCost)}</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Soundtrack Desk */}
-                                {selectedMusicPlan && (
-                                    <div>
-                                        <h3 className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest mb-3 border-b border-cyan-500/20 pb-1">Soundtrack Desk</h3>
-                                        <div className="space-y-2 text-sm">
-                                            <div className="flex justify-between items-center gap-4">
-                                                <span className="text-zinc-300">
-                                                    {getMusicStrategyLabel(selectedMusicPlan.strategy)}
-                                                    {selectedMusicPlan.artistTargetCount ? ` • ${selectedMusicPlan.artistTargetCount} artists` : ''}
-                                                </span>
-                                                <span className="font-mono text-cyan-300">{formatMoney(musicBudget)}</span>
-                                            </div>
-                                            {selectedMusicPlan.credits.map(credit => (
-                                                <div key={`${credit.artistId}_${credit.role}`} className="flex justify-between items-center gap-4 text-xs">
-                                                    <span className="min-w-0 truncate text-zinc-500">{credit.artistName} • {getMusicCreditRoleLabel(credit.role)}</span>
-                                                    <span className="font-mono text-zinc-400">{formatMoney(credit.estimatedCost)}</span>
-                                                </div>
-                                            ))}
-                                            <p className="text-[10px] text-zinc-500 leading-relaxed">
-                                                Music can add social reach and soundtrack buzz, with some image risk if the artist or campaign feels mismatched.
-                                            </p>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Campaign Reserve */}
-                                <div>
-                                    <h3 className="text-[10px] font-bold text-amber-500 uppercase tracking-widest mb-3 border-b border-amber-500/20 pb-1">Release Reserve</h3>
-                                    <div className="space-y-2 text-sm">
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-zinc-300">Production Budget</span>
-                                            <span className="font-mono text-white">{formatMoney(budgetBreakdown.total + musicBudget)}</span>
-                                        </div>
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-zinc-300">Campaign Pool</span>
-                                            <span className="font-mono text-amber-300">{formatMoney(reservedMarketingBudget)}</span>
-                                        </div>
-                                        <p className="text-[10px] text-zinc-500 leading-relaxed">
-                                            This pool is reserved for Release Strategy. Any unspent campaign budget returns to the studio wallet after the campaign is locked.
-                                        </p>
-                                    </div>
-                                </div>
-
-                                {/* Total */}
-                                <div className="bg-zinc-950 rounded-lg p-4 flex justify-between items-center border border-zinc-800 mt-4">
-                                    <div>
-                                        <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Total Package</div>
-                                        <div className="text-xs text-zinc-600">Production, music, and reserved marketing</div>
-                                    </div>
-                                    <div className="text-right">
-                                        <div className={`text-2xl font-black font-mono ${netGreenlightCashRequirement > effectiveStudioFundingPool ? 'text-rose-500' : 'text-emerald-400'}`}>
-                                            {formatMoney(packageBudget)}
-                                        </div>
-                                        {investorRaisedAmount > 0 && (
-                                            <div className="text-[10px] font-mono text-emerald-300 mt-1 uppercase">
-                                                Studio Cash Need: {formatMoney(netGreenlightCashRequirement)}
-                                            </div>
-                                        )}
-                                        {previousInstallmentCost && (
-                                            <div className="text-[10px] font-mono text-zinc-500 mt-1 uppercase">
-                                                Last Part: {formatMoney(previousInstallmentCost)}
-                                                <span className={`ml-2 ${packageBudget > previousInstallmentCost ? 'text-rose-400' : 'text-emerald-400'}`}>
-                                                    ({packageBudget > previousInstallmentCost ? '+' : ''}{(((packageBudget - previousInstallmentCost) / previousInstallmentCost) * 100).toFixed(1)}%)
-                                                </span>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {/* Production Fund */}
-                                {(studio.studioState?.productionFund || 0) > 0 && (
-                                    <div className="bg-emerald-950/30 rounded-lg p-4 flex justify-between items-center border border-emerald-500/30 mt-2">
-                                        <div>
-                                            <div className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Available Production Fund</div>
-                                            <div className="text-xs text-emerald-600/70">From previous streaming deals</div>
-                                        </div>
-                                        <div className="text-xl font-black font-mono text-emerald-400">
-                                            - {formatMoney(studio.studioState!.productionFund!)}
-                                        </div>
-                                    </div>
-                                )}
-
-                                {lockedStreamingFundingAmount > 0 && (
-                                    <div className="bg-sky-950/30 rounded-lg p-4 flex justify-between items-center border border-sky-500/30 mt-2">
-                                        <div>
-                                            <div className="text-[10px] font-bold text-sky-400 uppercase tracking-widest">Locked Next Season Cap</div>
-                                            <div className="text-xs text-sky-300/70">
-                                                {lockedStreamingFunding?.platformName || 'Streaming platform'} funds this season first. Any unused cap returns to the platform.
-                                            </div>
-                                        </div>
-                                        <div className="text-xl font-black font-mono text-sky-300">
-                                            - {formatMoney(lockedStreamingFundingAmount)}
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Investor Financing */}
-                                <div className="bg-zinc-950/70 rounded-xl border border-zinc-800 p-4 space-y-4">
-                                    <div className="flex items-start justify-between gap-4">
-                                        <div>
-                                            <h3 className="text-[10px] font-bold text-emerald-300 uppercase tracking-widest flex items-center gap-2">
-                                                <Building2 size={13} /> Investor Financing
-                                            </h3>
-                                            <p className="text-[10px] text-zinc-500 mt-1 leading-relaxed">
-                                                Set a target, then pick one lead investor or a syndicate. You can raise more than target, but the extra dilution is shown before confirm.
-                                            </p>
-                                        </div>
-                                        <button
-                                            onClick={() => {
-                                                setInvestorRaiseAmount(0);
-                                                setSelectedInvestorIds([]);
-                                            }}
-                                            className="shrink-0 rounded-full border border-zinc-700 px-3 py-1 text-[9px] font-black uppercase tracking-widest text-zinc-400 hover:text-white hover:border-zinc-500"
-                                        >
-                                            No Investor
-                                        </button>
-                                    </div>
-
-                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                                        <div className="rounded-lg bg-black/35 border border-white/5 p-3">
-                                            <div className="text-[8px] font-black uppercase tracking-widest text-zinc-500">Target Raise</div>
-                                            <div className="mt-2 flex items-center gap-1">
-                                                <span className="text-zinc-500 font-mono text-sm">$</span>
-                                                <input
-                                                    type="number"
-                                                    min={0}
-                                                    max={Math.round(maxInvestorRaise / 1_000_000)}
-                                                    step={0.1}
-                                                    value={Math.round(normalizedInvestorRaise / 100_000) / 10}
-                                                    onChange={(event) => setInvestorRaiseAmount(Math.round((Number(event.target.value) || 0) * 1_000_000))}
-                                                    className="w-full bg-transparent text-xl font-black font-mono text-white focus:outline-none"
-                                                    aria-label="Investor raise amount in millions"
-                                                />
-                                                <span className="text-zinc-500 font-black text-xs">M</span>
-                                            </div>
-                                            <div className="text-[8px] font-bold uppercase tracking-widest text-zinc-600 mt-1">Max {formatMoney(maxInvestorRaise)}</div>
-                                        </div>
-                                        <div className="rounded-lg bg-black/35 border border-white/5 p-3">
-                                            <div className="text-[8px] font-black uppercase tracking-widest text-zinc-500">Selected</div>
-                                            <div className="text-xl font-black font-mono text-emerald-300 mt-2">{formatMoney(investorRaisedAmount)}</div>
-                                            <div className={`text-[8px] font-bold uppercase tracking-widest mt-1 ${
-                                                investorFundingOverage > 0 ? 'text-cyan-300' : investorFundingShortfall > 0 ? 'text-amber-300' : 'text-zinc-600'
-                                            }`}>
-                                                {investorFundingOverage > 0
-                                                    ? `${formatMoney(investorFundingOverage)} over`
-                                                    : investorFundingShortfall > 0
-                                                        ? `${formatMoney(investorFundingShortfall)} short`
-                                                        : 'Target met'}
-                                            </div>
-                                        </div>
-                                        <div className="rounded-lg bg-black/35 border border-white/5 p-3">
-                                            <div className="text-[8px] font-black uppercase tracking-widest text-zinc-500">Investors Own</div>
-                                            <div className="text-xl font-black font-mono text-cyan-300 mt-2">{selectedInvestorPlan?.investorEquityPercent || 0}%</div>
-                                            <div className="text-[8px] font-bold uppercase tracking-widest text-zinc-600 mt-1">Deal terms</div>
-                                        </div>
-                                        <div className="rounded-lg bg-black/35 border border-white/5 p-3">
-                                            <div className="text-[8px] font-black uppercase tracking-widest text-zinc-500">Studio Need</div>
-                                            <div className={`text-xl font-black font-mono mt-2 ${effectiveStudioFundingPool >= netGreenlightCashRequirement ? 'text-white' : 'text-rose-400'}`}>
-                                                {formatMoney(netGreenlightCashRequirement)}
-                                            </div>
-                                            <div className="text-[8px] font-bold uppercase tracking-widest text-zinc-600 mt-1">After investors</div>
-                                        </div>
-                                    </div>
-
-                                    {normalizedInvestorRaise > 0 && investorRaisedAmount > 0 && (
-                                        <div className={`rounded-xl border p-3 ${
-                                            investorFundingOverage > 0
-                                                ? 'border-cyan-400/25 bg-cyan-400/10'
-                                                : investorFundingShortfall > 0
-                                                    ? 'border-amber-400/25 bg-amber-400/10'
-                                                    : 'border-emerald-400/25 bg-emerald-400/10'
-                                        }`}>
-                                            <div className="flex items-center justify-between gap-3">
-                                                <div>
-                                                    <div className="text-[9px] font-black uppercase tracking-[0.2em] text-zinc-400">
-                                                        Funding Read
-                                                    </div>
-                                                    <div className="mt-1 text-sm font-black text-white">
-                                                        {investorFundingOverage > 0
-                                                            ? `You are raising ${formatMoney(investorFundingOverage)} more than target.`
-                                                            : investorFundingShortfall > 0
-                                                                ? `${formatMoney(investorFundingShortfall)} still needs studio cash or another investor.`
-                                                                : 'Target is fully covered.'}
-                                                    </div>
-                                                </div>
-                                                <div className="shrink-0 rounded-full border border-white/10 bg-black/30 px-3 py-2 text-right">
-                                                    <div className="text-[8px] font-black uppercase tracking-widest text-zinc-500">Studio Keeps</div>
-                                                    <div className="text-sm font-black text-emerald-200">{selectedInvestorPlan?.studioEquityPercent || 100}%</div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    <div className="rounded-xl border border-zinc-800 bg-black/25 p-3 space-y-3">
-                                        <div className="flex items-center justify-between gap-3">
-                                            <div>
-                                                <div className="text-[9px] font-black uppercase tracking-[0.2em] text-zinc-500">Raise Target</div>
-                                                <div className="text-[10px] text-zinc-500 mt-1">Exact percent of available project gap.</div>
-                                            </div>
-                                            <div className="flex items-center rounded-xl border border-cyan-400/25 bg-cyan-400/10 overflow-hidden">
-                                                <button
-                                                    onClick={() => setInvestorRaisePercent(investorRaisePercent - 1)}
-                                                    className="h-10 w-10 text-lg font-black text-cyan-100 hover:bg-white/10"
-                                                    aria-label="Decrease investor raise percent"
-                                                >
-                                                    -
-                                                </button>
-                                                <div className="h-10 min-w-[88px] border-x border-cyan-400/20 flex items-center justify-center gap-1 px-3">
-                                                    <input
-                                                        type="number"
-                                                        min={0}
-                                                        max={100}
-                                                        step={1}
-                                                        value={investorRaisePercent}
-                                                        onChange={(event) => setInvestorRaisePercent(Number(event.target.value))}
-                                                        className="w-11 bg-transparent text-center text-lg font-black font-mono text-cyan-100 focus:outline-none"
-                                                        aria-label="Investor raise percent"
-                                                    />
-                                                    <span className="text-xs font-black text-cyan-200">%</span>
-                                                </div>
-                                                <button
-                                                    onClick={() => setInvestorRaisePercent(investorRaisePercent + 1)}
-                                                    className="h-10 w-10 text-lg font-black text-cyan-100 hover:bg-white/10"
-                                                    aria-label="Increase investor raise percent"
-                                                >
-                                                    +
-                                                </button>
-                                            </div>
-                                        </div>
-                                        <div className="grid grid-cols-4 gap-2">
-                                            {[0, 25, 50, 100].map((percent) => {
-                                                const active = investorRaisePercent === percent || (percent === 100 && normalizedInvestorRaise === maxInvestorRaise);
-                                                return (
-                                                    <button
-                                                        key={percent}
-                                                        onClick={() => setInvestorRaisePercent(percent)}
-                                                        className={`rounded-lg border px-2 py-2 text-[9px] font-black uppercase tracking-widest transition-colors ${
-                                                            active
-                                                                ? 'bg-emerald-400 text-black border-emerald-300'
-                                                                : 'bg-black/25 text-zinc-400 border-zinc-800 hover:border-zinc-600'
-                                                        }`}
-                                                    >
-                                                        {percent === 0 ? tr('greenlight.investors.raise.none') : percent === 100 ? tr('greenlight.investors.raise.max') : `${percent}%`}
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-
-                                    {normalizedInvestorRaise > 0 && (
-                                        <div className="grid grid-cols-2 gap-2">
-                                            {([
-                                                {
-                                                    id: 'LEAD' as ProjectInvestorFundingMode,
-                                                    label: tr('greenlight.investors.mode.lead.label'),
-                                                    stat: tr('greenlight.investors.mode.lead.stat'),
-                                                    note: tr('greenlight.investors.mode.lead.note')
-                                                },
-                                                {
-                                                    id: 'SYNDICATE' as ProjectInvestorFundingMode,
-                                                    label: tr('greenlight.investors.mode.syndicate.label'),
-                                                    stat: tr('greenlight.investors.mode.syndicate.stat'),
-                                                    note: tr('greenlight.investors.mode.syndicate.note')
-                                                }
-                                            ]).map(option => {
-                                                const active = investorFundingMode === option.id;
-                                                return (
-                                                    <button
-                                                        key={option.id}
-                                                        onClick={() => {
-                                                            setInvestorFundingMode(option.id);
-                                                            if (option.id === 'LEAD') setSelectedInvestorIds(current => current.slice(0, 1));
-                                                        }}
-                                                        className={`min-h-[116px] rounded-xl border p-3 text-left transition-all cursor-pointer flex flex-col justify-between ${
-                                                            active
-                                                                ? 'border-emerald-400 bg-emerald-400/10 shadow-[0_0_18px_rgba(16,185,129,0.14)]'
-                                                                : 'border-zinc-800 bg-black/25 hover:border-zinc-600'
-                                                        }`}
-                                                    >
-                                                        <div>
-                                                            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
-                                                                <span className="min-w-0 text-sm font-black text-white leading-tight">{option.label}</span>
-                                                                <span className={`shrink-0 rounded-md px-1.5 py-1 text-[7px] font-black uppercase tracking-[0.14em] whitespace-nowrap ${
-                                                                    active ? 'bg-emerald-300 text-black' : 'bg-white/5 text-zinc-500'
-                                                                }`}>
-                                                                    {option.stat}
-                                                                </span>
-                                                            </div>
-                                                            <p className="mt-2 text-[9px] leading-relaxed text-zinc-500">{option.note}</p>
-                                                        </div>
-                                                        <div className={`mt-3 h-1 rounded-full ${
-                                                            active ? 'bg-emerald-300' : 'bg-zinc-800'
-                                                            }`}>
-                                                        </div>
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-                                    )}
-
-                                    {normalizedInvestorRaise > 0 && (
-                                        <div className="space-y-2">
-                                            <div className="flex items-center justify-between gap-3">
-                                                <div className="text-[9px] font-black uppercase tracking-[0.2em] text-zinc-500">
-                                                    {investorFundingMode === 'LEAD' ? tr('greenlight.investors.offers.lead') : tr('greenlight.investors.offers.syndicate')}
-                                                </div>
-                                                <div className="text-[9px] font-black uppercase tracking-[0.2em] text-zinc-600">
-                                                    {tr('greenlight.investors.offers.selected', { count: selectedInvestorPlan?.commitments.length || 0 })}
-                                                </div>
-                                            </div>
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                                {investorOffers.map(offer => {
-                                                    const selected = selectedInvestorIds.includes(offer.investorId);
-                                                    const commitment = selectedInvestorPlan?.commitments.find(item => item.investorId === offer.investorId);
-                                                    const previewInvestorIds = selected
-                                                        ? selectedInvestorIds
-                                                        : investorFundingMode === 'LEAD'
-                                                            ? [offer.investorId]
-                                                            : [...selectedInvestorIds, offer.investorId];
-                                                    const previewPlan = buildProjectInvestorPlan({
-                                                        offers: investorOffers,
-                                                        selectedInvestorIds: previewInvestorIds,
-                                                        targetRaise: normalizedInvestorRaise,
-                                                        packageBudget,
-                                                        lockedExternalFunding: lockedStreamingFundingAmount,
-                                                        fundingMode: investorFundingMode,
-                                                        sourceProjectId: selectedScript?.id,
-                                                        sourceTitle: selectedScript?.title,
-                                                        week: player.currentWeek,
-                                                        year: player.age
-                                                    });
-                                                    const previewCommitment = previewPlan?.commitments.find(item => item.investorId === offer.investorId);
-                                                    const displayCommitment = selected ? commitment : previewCommitment;
-                                                    const displayAmount = displayCommitment?.amount || 0;
-                                                    const unusedCapacity = Math.max(0, offer.amount - displayAmount);
-                                                    const dealEquity = displayCommitment?.equityPercent || offer.equityPercent || 0;
-                                                    const cleanEquity = displayCommitment?.cleanEquityPercent || offer.cleanEquityPercent || 0;
-                                                    const equitySpread = Math.round((dealEquity - cleanEquity) * 10) / 10;
-                                                    const cardRole = displayCommitment?.targetRole === 'LEAD'
-                                                        ? 'Lead Investor'
-                                                        : displayCommitment?.targetRole === 'EXCESS'
-                                                            ? 'Extra Raise'
-                                                            : displayCommitment?.targetRole === 'SYNDICATE'
-                                                                ? 'Syndicate'
-                                                                : offer.fitLabel || 'Investor';
-                                                    const amountLabel = selected
-                                                        ? 'Committed'
-                                                        : displayCommitment?.targetRole === 'EXCESS'
-                                                            ? 'Would Add'
-                                                            : 'Would Commit';
-                                                    return (
-                                                        <button
-                                                            key={offer.investorId}
-                                                            onClick={() => setSelectedInvestorIds(current => (
-                                                                investorFundingMode === 'LEAD'
-                                                                    ? current.includes(offer.investorId) ? [] : [offer.investorId]
-                                                                    : current.includes(offer.investorId)
-                                                                        ? current.filter(id => id !== offer.investorId)
-                                                                        : [...current, offer.investorId]
-                                                            ))}
-                                                            className={`rounded-xl border p-3 text-left transition-all cursor-pointer min-h-[196px] flex flex-col ${
-                                                                selected
-                                                                    ? 'bg-emerald-500/10 border-emerald-400 shadow-[0_0_18px_rgba(16,185,129,0.16)]'
-                                                                    : 'bg-black/25 border-zinc-800 hover:border-zinc-600'
-                                                            }`}
-                                                        >
-                                                            <div className="flex items-start justify-between gap-3">
-                                                                <div className="min-w-0">
-                                                                    <div className="text-sm font-black text-white truncate">{offer.investorName}</div>
-                                                                    <div className="text-[8px] font-black uppercase tracking-widest text-zinc-500">
-                                                                        {describeInvestorKind(offer.kind, language)} • Rep {offer.reputation} • {offer.relationshipLabel}
-                                                                    </div>
-                                                                    {offer.ownerName && (
-                                                                        <div className="mt-1 text-[9px] font-bold text-zinc-500 truncate">
-                                                                            Owner: {offer.ownerName}{offer.headquarters ? ` • ${offer.headquarters}` : ''}
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                                <div className={`w-6 h-6 rounded-full border flex items-center justify-center shrink-0 ${
-                                                                    selected ? 'bg-emerald-400 border-emerald-300 text-black' : 'border-zinc-700 text-zinc-600'
-                                                                }`}>
-                                                                    {selected && <Check size={14} />}
-                                                                </div>
-                                                            </div>
-                                                            <div className="mt-3 grid grid-cols-[1fr_auto] items-end gap-2">
-                                                                <div>
-                                                                    <div className="text-[8px] font-black uppercase tracking-widest text-zinc-500">
-                                                                        {amountLabel}
-                                                                    </div>
-                                                                    <span className="text-lg font-black font-mono text-emerald-300">
-                                                                        {formatMoney(displayAmount || offer.amount)}
-                                                                    </span>
-                                                                </div>
-                                                                <span className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2 py-1 text-[8px] font-black uppercase tracking-widest text-cyan-200 whitespace-nowrap">
-                                                                    {dealEquity}% equity
-                                                                </span>
-                                                            </div>
-                                                            <div className="mt-2 flex items-center justify-between gap-2">
-                                                                <span className={`rounded-full px-2 py-1 text-[8px] font-black uppercase tracking-widest ${
-                                                                    selected
-                                                                        ? 'bg-emerald-400/15 text-emerald-200 border border-emerald-400/25'
-                                                                        : 'bg-white/5 text-zinc-500 border border-white/10'
-                                                                }`}>
-                                                                    {cardRole}
-                                                                </span>
-                                                                <span className={`text-[8px] font-bold uppercase tracking-widest ${
-                                                                    equitySpread > 0.2 ? 'text-amber-300' : equitySpread < -0.2 ? 'text-emerald-300' : 'text-zinc-500'
-                                                                }`}>
-                                                                    {equitySpread > 0.2
-                                                                        ? `+${equitySpread}% premium`
-                                                                        : equitySpread < -0.2
-                                                                            ? `${equitySpread}% discount`
-                                                                            : 'clean terms'}
-                                                                </span>
-                                                            </div>
-                                                            <div className="mt-2 flex items-center justify-between gap-2">
-                                                                <span className="text-[8px] font-bold uppercase tracking-widest text-zinc-600">
-                                                                    Clean {cleanEquity}%
-                                                                </span>
-                                                                {unusedCapacity > 0 && (
-                                                                    <span className="text-[8px] font-bold uppercase tracking-widest text-zinc-500">
-                                                                        {formatMoney(unusedCapacity)} unused cap
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                            <div className="mt-2 flex flex-wrap gap-1">
-                                                                {offer.investorTags.slice(0, 3).map(tag => (
-                                                                    <span
-                                                                        key={tag}
-                                                                        className="rounded-md border border-white/10 bg-white/5 px-1.5 py-1 text-[7px] font-black uppercase tracking-[0.12em] text-zinc-500"
-                                                                    >
-                                                                        {tag}
-                                                                    </span>
-                                                                ))}
-                                                            </div>
-                                                            <p className="mt-auto pt-2 text-[10px] text-zinc-500 leading-relaxed line-clamp-2">{offer.note}</p>
-                                                        </button>
-                                                    );
-                                                })}
-                                            </div>
-                                            {investorOffers.length === 0 && (
-                                                <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 text-[10px] text-amber-100/70 leading-relaxed">
-                                                    No serious investor wants this raise yet. Lower the amount, improve the package, or rebuild studio confidence with stronger releases.
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Footer / Signature */}
-                            <div className="bg-zinc-950 p-4 border-t border-zinc-800 flex justify-between items-center">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-500">
-                                        <Users size={14} />
-                                    </div>
-                                    <div className="text-xs">
-                                        <div className="text-zinc-500 uppercase text-[9px] font-bold">Authorized By</div>
-                                        <div className="text-white font-bold">{player.name}</div>
-                                    </div>
-                                </div>
-                                <div className="text-[10px] font-mono text-zinc-600">
-                                    {new Date().toLocaleDateString()}
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Greenlight Action */}
-                        <div className="space-y-4">
-                            {!canGreenlight && greenlightStatus.errors.length > 0 && (
-                                <div className="bg-rose-950/30 border border-rose-500/30 rounded-xl p-4 animate-in fade-in slide-in-from-top-2">
-                                    <div className="flex items-center gap-2 text-rose-400 font-bold text-xs uppercase tracking-wider mb-2">
-                                        <AlertTriangle size={14} /> Missing Requirements
-                                    </div>
-                                    <ul className="space-y-1">
-                                        {greenlightStatus.errors.map((err, i) => (
-                                            <li key={i} className="text-[11px] text-rose-200/70 flex items-center gap-2">
-                                                <div className="w-1 h-1 rounded-full bg-rose-500"></div>
-                                                {err}
-                                            </li>
-                                        ))}
-                                    </ul>
-                                    {unresolvedReturningTalent.length > 0 && (
-                                        <div className="mt-4 pt-4 border-t border-rose-500/20 space-y-2">
-                                            <div className="flex items-center justify-between gap-3">
-                                                <div className="text-[10px] font-black uppercase tracking-[0.18em] text-rose-200/80">
-                                                    Pending Return Deals
-                                                </div>
-                                                <div className="text-[10px] font-black text-white/70">
-                                                    {unresolvedReturningTalent.length} left
-                                                </div>
-                                            </div>
-                                            {unresolvedReturningTalent.slice(0, 6).map((talent, index) => {
-                                                const info = getReturningTalentDisplay(talent);
-                                                return (
-                                                    <div key={`${talent.id}_${talent.role}_${talent.characterId || talent.characterName || index}`} className="rounded-xl border border-rose-500/20 bg-black/25 p-3 flex items-center gap-3">
-                                                        <img
-                                                            src={info.image}
-                                                            alt={info.name}
-                                                            className="w-10 h-10 rounded-xl object-cover border border-white/10 bg-zinc-900"
-                                                            referrerPolicy="no-referrer"
-                                                        />
-                                                        <div className="min-w-0 flex-1">
-                                                            <div className="text-sm font-black text-white truncate">{info.name}</div>
-                                                            <div className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">
-                                                                {info.roleLabel} • Demand {formatMoney(info.demand)} • {info.attemptsLeft} tries
-                                                            </div>
-                                                        </div>
-                                                        <button
-                                                            onClick={() => handleNegotiate(talent.id, talent, info.roleId)}
-                                                            className="shrink-0 px-3 py-2 rounded-lg bg-rose-500 text-white text-[10px] font-black uppercase tracking-widest hover:bg-rose-400 transition-colors"
-                                                        >
-                                                            Negotiate
-                                                        </button>
-                                                    </div>
-                                                );
-                                            })}
-                                            {unresolvedReturningTalent.length > 6 && (
-                                                <div className="rounded-xl border border-rose-500/10 bg-black/20 p-3 text-[10px] font-black uppercase tracking-widest text-rose-200/70 text-center">
-                                                    {unresolvedReturningTalent.length - 6} more return deals are hidden here. Use Repair Return Deals if this came from QA stress data.
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-
-                                <div className={`mb-3 flex items-center justify-between rounded-xl border px-4 py-3 text-[10px] font-black uppercase tracking-[0.18em] ${player.energy.current >= greenlightEnergyCost ? 'border-emerald-400/20 bg-emerald-400/10 text-emerald-200' : 'border-rose-400/25 bg-rose-400/10 text-rose-200'}`}>
-                                    <span>Producer Focus</span>
-                                    <span className="flex items-center gap-1"><Zap size={13} fill="currentColor" /> {greenlightEnergyCost}E</span>
-                                </div>
-
-	                            <button
-	                                onClick={handleGreenlight}
-	                                disabled={!canGreenlight}
-                                className={`w-full font-black text-xl py-6 rounded-xl transition-all flex items-center justify-center gap-3 ${
-                                    canGreenlight
-                                    ? 'bg-emerald-500 hover:bg-emerald-400 text-black shadow-[0_0_40px_rgba(16,185,129,0.4)] hover:shadow-[0_0_60px_rgba(16,185,129,0.6)] hover:scale-105'
-                                    : 'bg-zinc-800 text-zinc-500 cursor-not-allowed'
-                                }`}
-                            >
-                                <Zap size={24} fill={canGreenlight ? "black" : "none"} />
-	                                {selectedScript?.status === 'IN_DEVELOPMENT' ? "SCRIPTING IN PROGRESS..." : (canGreenlight ? `GREENLIGHT PROJECT · ${greenlightEnergyCost}E` : "MISSING REQUIREMENTS")}
-	                            </button>
-                        </div>
-                    </div>
+                    <GreenlightConfirmationStep
+                        projectTitle={selectedScript.title}
+                        scriptStatus={selectedScript.status}
+                        effectiveConnectedIntent={effectiveConnectedIntent}
+                        hasUniverseConnection={Boolean(selectedUniverseId)}
+                        universeName={confirmationUniverseName}
+                        hasFranchiseConnection={Boolean(selectedFranchiseId)}
+                        franchiseName={confirmationFranchiseName}
+                        franchiseInstallment={confirmationFranchiseInstallment}
+                        linkedCastSummary={linkedCastSummary}
+                        returningTalentReviewItems={returningTalentReviewItems}
+                        directorName={getCrewData('director').name}
+                        backgroundPerformerCount={backgroundCastingPlan.performerCount}
+                        selectedLocationCount={selectedLocations.length}
+                        budgetBreakdown={budgetBreakdown}
+                        selectedMusicPlan={selectedMusicPlan || null}
+                        musicBudget={musicBudget}
+                        reservedMarketingBudget={reservedMarketingBudget}
+                        packageBudget={packageBudget}
+                        netGreenlightCashRequirement={netGreenlightCashRequirement}
+                        effectiveStudioFundingPool={effectiveStudioFundingPool}
+                        investorRaisedAmount={investorRaisedAmount}
+                        previousInstallmentCost={previousInstallmentCost}
+                        productionFund={studio.studioState?.productionFund || 0}
+                        lockedStreamingFundingAmount={lockedStreamingFundingAmount}
+                        lockedStreamingFundingSource={lockedStreamingFunding?.fundingSource}
+                        lockedStreamingPlatformName={lockedStreamingFunding?.platformName}
+                        investorFinancingProps={{
+                            maxInvestorRaise,
+                            normalizedInvestorRaise,
+                            investorRaisedAmount,
+                            investorFundingOverage,
+                            investorFundingShortfall,
+                            selectedInvestorPlan,
+                            effectiveStudioFundingPool,
+                            netGreenlightCashRequirement,
+                            investorRaisePercent,
+                            investorFundingMode,
+                            offerCards: investorOfferCards,
+                            formatMoney,
+                            translate: (key, vars) => tr(key, vars),
+                            onClearInvestors: () => {
+                                setInvestorRaiseAmount(0);
+                                setSelectedInvestorIds([]);
+                            },
+                            onRaiseAmountChange: setInvestorRaiseAmount,
+                            onRaisePercentChange: setInvestorRaisePercent,
+                            onFundingModeChange: changeInvestorFundingMode,
+                            onToggleInvestor: toggleSelectedInvestor,
+                        }}
+                        authorizedBy={player.name}
+                        canGreenlight={canGreenlight}
+                        greenlightErrors={greenlightStatus.errors}
+                        playerEnergy={player.energy.current}
+                        greenlightEnergyCost={greenlightEnergyCost}
+                        formatMoney={formatMoney}
+                        getMusicStrategyLabel={getMusicStrategyLabel}
+                        getMusicCreditRoleLabel={getMusicCreditRoleLabel}
+                        onGreenlight={handleGreenlight}
+                    />
                 )}
-
-                {/* BUZZ STEP (Post-Greenlight) */}
                 {step === 'BUZZ' && (
-                    <div className="max-w-2xl mx-auto px-4 pt-10 pb-nav-safe-lg animate-in slide-in-from-bottom-4 duration-500 space-y-6">
-                        <div className="text-center mb-8">
-                            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-emerald-500/20 text-emerald-400 mb-4 animate-bounce">
-                                <Sparkles size={32} />
-                            </div>
-                            <h2 className="text-3xl font-black text-white uppercase tracking-tight mb-2">Project Greenlit!</h2>
-                            <p className="text-zinc-400">Production has officially begun. The industry is already talking.</p>
-                        </div>
-
-                        {/* Buzz Feed */}
-                        <div className="space-y-4">
-                            <h3 className="text-xs font-black text-zinc-500 uppercase tracking-[0.2em] flex items-center gap-2 mb-4">
-                                <TrendingUp size={14} className="text-amber-500" /> Early Buzz
-                            </h3>
-
-                            {buzzItems.map((item, idx) => {
-                                if (item.type === 'HEADLINE') {
-                                    const news = item.data as NewsItem;
-                                    return (
-                                        <div key={idx} className="bg-zinc-900 border-l-4 border-emerald-500 p-5 rounded-r-xl shadow-lg transform hover:scale-[1.02] transition-transform">
-                                            <div className="flex justify-between items-start mb-2">
-                                                <div className="text-[10px] text-emerald-500 font-bold uppercase">Variety • Breaking News</div>
-                                                <div className="text-[10px] text-zinc-600">Just now</div>
-                                            </div>
-                                            <div className="text-white font-bold text-lg leading-tight mb-2">
-                                                {news.headline}
-                                            </div>
-                                            <div className="text-zinc-400 text-xs">
-                                                {news.subtext}
-                                            </div>
-                                        </div>
-                                    );
-                                } else if (item.type === 'TWEET') {
-                                    const tweet = item.data as XPost;
-                                    return (
-                                        <div key={idx} className="bg-zinc-900 p-5 rounded-xl border border-zinc-800 shadow-lg transform hover:scale-[1.02] transition-transform">
-                                            <div className="flex items-center gap-3 mb-3">
-                                                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${tweet.isVerified ? 'bg-blue-500/20 text-blue-400' : 'bg-purple-500/20 text-purple-400'}`}>
-                                                    {tweet.isVerified ? <Film size={14} /> : <Users size={14} />}
-                                                </div>
-                                                <div>
-                                                    <div className="text-xs font-bold text-white flex items-center gap-1">
-                                                        {tweet.authorName}
-                                                        {tweet.isVerified && <span className="text-blue-400 text-[10px]">✓</span>}
-                                                    </div>
-                                                    <div className="text-[10px] text-zinc-500">{tweet.authorHandle} • Just now</div>
-                                                </div>
-                                            </div>
-                                            <div className="text-sm text-zinc-200 mb-3">
-                                                {tweet.content}
-                                            </div>
-                                            <div className="flex gap-6 text-xs text-zinc-500 font-mono">
-                                                <span className="flex items-center gap-1">💬 {tweet.replies}</span>
-                                                <span className="flex items-center gap-1">🔁 {tweet.retweets}</span>
-                                                <span className="flex items-center gap-1">❤️ {tweet.likes}</span>
-                                            </div>
-                                        </div>
-                                    );
-                                }
-                                return null;
-                            })}
-                        </div>
-
-                        <button
-                            onClick={onComplete}
-                            className="w-full mt-8 bg-zinc-800 hover:bg-zinc-700 text-white font-bold py-4 rounded-xl transition-all border border-zinc-700 hover:border-zinc-600 shadow-lg"
-                        >
-                            Return to Studio
-                        </button>
-                    </div>
+                    <GreenlightBuzzStep buzzItems={buzzItems} onComplete={onComplete} />
                 )}
             </div>
 
             {/* Actor Selection Overlay */}
             {selectingActorFor && (
-                <div className="fixed inset-0 z-[80] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
-                    <div className="bg-zinc-950 w-full max-w-md rounded-2xl border border-zinc-800 shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
-                        <div className="p-4 border-b border-zinc-800 flex justify-between items-center bg-zinc-900/50">
-                            <h3 className="font-bold text-white">Select Actor</h3>
-                            <button onClick={() => setSelectingActorFor(null)} className="p-2 hover:bg-zinc-800 rounded-full text-zinc-400 hover:text-white transition-colors"><X size={20}/></button>
-                        </div>
-                        <div className="flex-1 overflow-y-auto p-2 space-y-4 custom-scrollbar">
-
-                            {/* 1. SELF OPTION */}
-                            <div className="space-y-2">
-                                <div className="text-[10px] font-bold text-zinc-500 uppercase px-2">You</div>
-                                <button
-                                    onClick={() => {
-                                        setCastList(prev => prev.map(r => r.id === selectingActorFor ? {
-                                            ...r,
-                                            actorId: 'PLAYER_SELF',
-                                            actorName: player.name,
-                                            salary: 0
-                                        } : r));
-                                        setSelectingActorFor(null);
-                                    }}
-                                    className="w-full p-3 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-xl text-left flex justify-between items-center transition-all group"
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-12 h-12 rounded-full bg-amber-500/20 flex items-center justify-center border border-amber-500/50">
-                                            <Crown size={20} className="text-amber-500" />
-                                        </div>
-                                        <div>
-                                            <div className="font-bold text-white group-hover:text-amber-400 transition-colors">{player.name}</div>
-                                            <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Acting Talent: {Math.round(player.stats.talent || 0)}</div>
-                                        </div>
-                                    </div>
-                                    <div className="text-right">
-                                        <div className="font-mono font-bold text-emerald-400">Free</div>
-                                    </div>
-                                </button>
-                            </div>
-
-                            {/* 2. STUDIO ROSTER OPTION */}
-                            {contractedActors.length > 0 && (
-                                <div className="space-y-2">
-                                    <div className="text-[10px] font-bold text-zinc-500 uppercase px-2">Studio Roster</div>
-                                    {contractedActors
-                                        .filter(actor => {
-                                            const currentActorId = castList.find(c => c.id === selectingActorFor)?.actorId;
-                                            return !hiredIds.includes(actor.id) || actor.id === currentActorId;
-                                        })
-                                        .map(actor => (
-                                            <button
-                                                key={actor.id}
-                                                onClick={() => {
-                                                    setCastList(prev => prev.map(r => r.id === selectingActorFor ? {
-                                                        ...r,
-                                                        actorId: actor.id,
-                                                        actorName: actor.name,
-                                                        salary: 0
-                                                    } : r));
-                                                    setSelectingActorFor(null);
-                                                }}
-                                                className="w-full p-3 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 rounded-xl text-left flex justify-between items-center transition-all group"
-                                            >
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-12 h-12 rounded-full bg-zinc-800 overflow-hidden border border-emerald-500/50">
-                                                        <img src={actor.avatar} alt={actor.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                                                    </div>
-                                                    <div>
-                                                        <div className="font-bold text-white group-hover:text-emerald-400 transition-colors">{actor.name}</div>
-                                                        <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">
-                                                            {actor.tier} • Talent: {Math.round(actor.stats?.talent || 0)}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <div className="text-right">
-                                                    <div className="font-mono font-bold text-emerald-400">Contracted</div>
-                                                </div>
-                                            </button>
-                                        ))}
-                                </div>
-                            )}
-
-                            {/* 3. CONNECTIONS OPTION */}
-                            {player.relationships.length > 0 && (
-                                <div className="space-y-2">
-                                    <div className="text-[10px] font-bold text-zinc-500 uppercase px-2">Connections (Nepotism)</div>
-                                    {player.relationships
-                                        .filter(rel => {
-                                            const npcId = rel.npcId || rel.id;
-                                            const currentActorId = castList.find(c => c.id === selectingActorFor)?.actorId;
-                                            const connectedActor = availableActors.find(a => a.id === npcId);
-                                            return Boolean(connectedActor) && (!hiredIds.includes(npcId) || npcId === currentActorId);
-                                        })
-                                        .map(rel => {
-                                            const connectedActor = availableActors.find(a => a.id === (rel.npcId || rel.id));
-
-                                            let isReturning = false;
-                                            let returningData = null;
-                                            if (currentReturningTalent.length > 0) {
-                                                returningData = currentReturningTalent.find(t => t.id === (rel.npcId || rel.id) && (t.role === 'LEAD_ACTOR' || t.role === 'SUPPORTING_ACTOR'));
-                                                if (returningData) {
-                                                    isReturning = true;
-                                                }
-                                            }
-
-                                            return (
-                                                <button
-                                                    key={rel.id}
-                                                    onClick={() => {
-                                                        if (isReturning && !returningData?.accepted && returningData?.attemptsLeft === 0) return;
-                                                        const currentRole = castList.find(c => c.id === selectingActorFor);
-                                                        const salary = connectedActor ? calculateActorSalary(connectedActor, currentRole?.roleType || 'SUPPORTING', rel.closeness) : 0;
-                                                        setCastList(prev => prev.map(r => r.id === selectingActorFor ? {
-                                                            ...r,
-                                                            actorId: rel.npcId || rel.id,
-                                                            actorName: rel.name,
-                                                            salary: salary
-                                                        } : r));
-                                                        setSelectingActorFor(null);
-                                                    }}
-                                                    className={`w-full p-3 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 rounded-xl text-left flex justify-between items-center transition-all group ${
-                                                        isReturning && !returningData?.accepted && returningData?.attemptsLeft === 0
-                                                            ? 'opacity-50 cursor-not-allowed bg-red-900/10 border-red-900/30'
-                                                            : ''
-                                                    }`}
-                                                >
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-12 h-12 rounded-full bg-zinc-800 overflow-hidden border border-purple-500/50">
-                                                            <img src={rel.image} alt={rel.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                                                        </div>
-                                                        <div>
-                                                            <div className="font-bold text-white group-hover:text-purple-400 transition-colors flex items-center gap-2">
-                                                                {rel.name}
-                                                                {isReturning && (
-                                                                    <span className="text-[8px] px-1.5 py-0.5 bg-purple-500/20 text-purple-300 rounded-full border border-purple-500/30">
-                                                                        Returning
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                            <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">
-                                                                {rel.relation} • Closeness: {rel.closeness}
-                                                                {connectedActor && ` • Talent: ${Math.round(connectedActor.stats?.talent || 0)}`}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div className="text-right">
-                                                        {isReturning && !returningData?.accepted && returningData?.attemptsLeft > 0 ? (
-                                                            <button
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    handleNegotiate(rel.npcId || rel.id, returningData, selectingActorFor || undefined);
-                                                                }}
-                                                                className="px-3 py-1 bg-purple-500/20 text-purple-300 rounded-lg text-xs hover:bg-purple-500/40 transition-colors"
-                                                            >
-                                                                Negotiate
-                                                            </button>
-                                                        ) : isReturning && !returningData?.accepted && returningData?.attemptsLeft === 0 ? (
-                                                            <span className="text-red-500 text-xs uppercase tracking-wider">Walked Away</span>
-                                                        ) : (
-                                                            <div className="font-mono font-bold text-emerald-400">Discounted</div>
-                                                        )}
-                                                    </div>
-                                                </button>
-                                            );
-                                        })}
-                                </div>
-                            )}
-
-                            {/* 4. TALENT POOL */}
-                            <div className="space-y-2">
-                                <div className="text-[10px] font-bold text-zinc-500 uppercase px-2">Talent Pool</div>
-                                {availableActors
-                                    .filter(actor => {
-                                        const currentActorId = castList.find(c => c.id === selectingActorFor)?.actorId;
-                                        const isContracted = contractedActors.some(a => a.id === actor.id);
-                                        return (!hiredIds.includes(actor.id) || actor.id === currentActorId) && !isContracted;
-                                    })
-                                    .map(actor => {
-                                        // Calculate dynamic salary for display
-                                        const currentRole = castList.find(c => c.id === selectingActorFor);
-                                        const roleType = currentRole?.roleType || 'SUPPORTING';
-                                        const salary = calculateActorSalary(actor, roleType);
-
-                                        let isReturning = false;
-                                        let returningData = null;
-                                        if (currentReturningTalent.length > 0) {
-                                            returningData = currentReturningTalent.find(t => t.id === actor.id && (t.role === 'LEAD_ACTOR' || t.role === 'SUPPORTING_ACTOR'));
-                                            if (returningData) {
-                                                isReturning = true;
-                                            }
-                                        }
-
-                                        return (
-                                            <button
-                                                key={actor.id}
-                                                onClick={() => {
-                                                    if (isReturning && !returningData?.accepted && returningData?.attemptsLeft === 0) return;
-                                                    const currentRole = castList.find(c => c.id === selectingActorFor);
-                                                    const roleType = currentRole?.roleType || 'SUPPORTING';
-                                                    const salary = calculateActorSalary(actor, roleType);
-                                                    setCastList(prev => prev.map(r => r.id === selectingActorFor ? {
-                                                        ...r,
-                                                        actorId: actor.id,
-                                                        actorName: actor.name,
-                                                        salary: salary
-                                                    } : r));
-                                                    setSelectingActorFor(null);
-                                                }}
-                                                className={`w-full p-3 bg-black/20 hover:bg-zinc-800 border border-zinc-800 rounded-xl text-left flex justify-between items-center transition-all group ${
-                                                    isReturning && !returningData?.accepted && returningData?.attemptsLeft === 0
-                                                        ? 'opacity-50 cursor-not-allowed bg-red-900/10 border-red-900/30'
-                                                        : 'hover:border-emerald-500/30'
-                                                }`}
-                                            >
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-12 h-12 rounded-full bg-zinc-800 overflow-hidden border border-zinc-700 group-hover:border-emerald-500/50 transition-colors">
-                                                        <img src={actor.avatar} alt={actor.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                                                    </div>
-                                                    <div>
-                                                        <div className="font-bold text-white group-hover:text-emerald-400 transition-colors flex items-center gap-2">
-                                                            {actor.name}
-                                                            {currentReturningTalent.some(t => t.id === actor.id) && (
-                                                                <span className="text-[8px] px-1.5 py-0.5 bg-purple-500/20 text-purple-300 rounded-full border border-purple-500/30">
-                                                                    Returning
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                        <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">
-                                                            {actor.tier.replace('_', ' ')} • Fame: {Math.round(actor.stats?.fame || 0)} • Talent: {Math.round(actor.stats?.talent || 0)}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <div className="text-emerald-400 font-mono text-sm font-bold">
-                                                    {isReturning && !returningData?.accepted && returningData?.attemptsLeft > 0 ? (
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleNegotiate(actor.id, returningData, selectingActorFor || undefined);
-                                                            }}
-                                                            className="px-3 py-1 bg-purple-500/20 text-purple-300 rounded-lg text-xs hover:bg-purple-500/40 transition-colors"
-                                                        >
-                                                            Negotiate
-                                                        </button>
-                                                    ) : isReturning && !returningData?.accepted && returningData?.attemptsLeft === 0 ? (
-                                                        <span className="text-red-500 text-xs uppercase tracking-wider">Walked Away</span>
-                                                    ) : (
-                                                        formatMoney(salary)
-                                                    )}
-                                                </div>
-                                            </button>
-                                        );
-                                    })}
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <GreenlightTalentPickerModal
+                    roleId={selectingActorFor}
+                    player={player}
+                    playerActingTalent={playerActingTalent}
+                    castList={castList}
+                    contractedActors={contractedActors}
+                    hiredIds={hiredIds}
+                    availableActors={availableActors}
+                    returningTalent={currentReturningTalent}
+                    calculateActorSalary={calculateActorSalary}
+                    formatMoney={formatMoney}
+                    onSelectActor={assignActorToSelectedRole}
+                    onNegotiate={handleNegotiate}
+                    onClose={() => setSelectingActorFor(null)}
+                />
             )}
-
             {/* Negotiation Modal */}
             {negotiationModal && (
-                <div className="fixed inset-0 z-[90] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
-                    <div className="bg-zinc-950 w-full max-w-md max-h-[90vh] rounded-2xl border border-zinc-800 shadow-2xl overflow-hidden flex flex-col">
-                        <div className="p-6 border-b border-white/5 flex justify-between items-center bg-zinc-900/50 shrink-0">
-                            <h3 className="font-bold text-white flex items-center gap-3">
-                                <div className="p-2 bg-purple-500/20 rounded-lg">
-                                    <Briefcase size={18} className="text-purple-400" />
-                                </div>
-                                <span className="uppercase tracking-widest text-xs font-black">Contract Negotiation</span>
-                            </h3>
-                            <button onClick={() => setNegotiationModal(null)} className="p-2 hover:bg-white/10 rounded-full text-zinc-400 hover:text-white transition-colors"><X size={20}/></button>
-                        </div>
-                        <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-8 relative">
-                            <div className="flex items-center gap-5">
-                                <div className="relative">
-                                    <img src={negotiationModal.talentImage} alt={negotiationModal.talentName} className="w-20 h-20 rounded-2xl border-2 border-purple-500/30 object-cover shadow-xl" referrerPolicy="no-referrer" />
-                                    <div className="absolute -bottom-2 -right-2 bg-purple-500 text-black text-[8px] font-black px-2 py-1 rounded-md uppercase tracking-tighter">Returning</div>
-                                </div>
-                                <div>
-                                    <div className="text-2xl font-black text-white tracking-tight">{negotiationModal.talentName}</div>
-                                    <div className="text-[10px] font-bold text-purple-400 uppercase tracking-[0.2em]">{negotiationModal.talentTier.replace('_', ' ')}</div>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="bg-white/[0.03] p-5 rounded-3xl border border-white/5">
-                                    <div className="text-[9px] font-black text-zinc-500 uppercase tracking-widest mb-2">Previous Salary</div>
-                                    <div className="text-xl font-mono text-zinc-300 font-bold">{formatMoney(negotiationModal.originalSalary)}</div>
-                                </div>
-                                <div className="bg-purple-500/5 p-5 rounded-3xl border border-purple-500/20 relative overflow-hidden">
-                                    <div className="absolute top-0 right-0 px-3 py-1 bg-purple-500/20 text-purple-300 text-[9px] font-black rounded-bl-xl">
-                                        +{Math.round(((negotiationModal.currentDemand - negotiationModal.originalSalary) / negotiationModal.originalSalary) * 100)}%
-                                    </div>
-                                    <div className="text-[9px] font-black text-purple-400 uppercase tracking-widest mb-2">New Demand</div>
-                                    <div className="text-xl font-mono text-purple-300 font-bold">{formatMoney(negotiationModal.currentDemand)}</div>
-                                </div>
-                            </div>
-
-                            <div className="space-y-4">
-                                <div className="text-[10px] font-black text-zinc-500 uppercase tracking-widest flex items-center gap-2">
-                                    <div className="w-4 h-[1px] bg-zinc-800"></div>
-                                    Propose Counter-Offer
-                                </div>
-                                <div className="relative group">
-                                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-500 font-mono font-bold text-lg">$</div>
-                                    <input
-                                        type="number"
-                                        value={counterOfferInput}
-                                        onChange={(e) => setCounterOfferInput(e.target.value)}
-                                        className="w-full bg-white/[0.03] border border-white/10 rounded-2xl py-4 pl-10 pr-4 text-xl font-mono font-bold text-emerald-400 focus:outline-none focus:border-emerald-500/50 focus:bg-emerald-500/5 transition-all"
-                                        placeholder="Enter amount..."
-                                    />
-                                    <div className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-zinc-600 uppercase tracking-widest pointer-events-none">USD</div>
-                                </div>
-                                <div className="flex justify-between text-[10px] font-bold px-2">
-                                    <button onClick={() => setCounterOfferInput(negotiationModal.originalSalary.toString())} className="text-zinc-500 hover:text-white transition-colors">Match Previous</button>
-                                    <button onClick={() => setCounterOfferInput(Math.round(negotiationModal.originalSalary + (negotiationModal.currentDemand - negotiationModal.originalSalary) * 0.5).toString())} className="text-zinc-500 hover:text-white transition-colors">Split Difference</button>
-                                </div>
-                            </div>
-
-                            <div className="bg-amber-500/5 border border-amber-500/20 rounded-2xl p-4 flex items-start gap-4">
-                                <AlertTriangle size={20} className="text-amber-500 shrink-0" />
-                                <div className="text-xs text-amber-200/70 leading-relaxed">
-                                    You have <strong className="text-amber-400">{negotiationModal.attemptsLeft}</strong> negotiation attempts remaining. If they reject your final offer, they will <span className="text-rose-400 font-bold">walk away</span> from the project.
-                                </div>
-                            </div>
-
-                            <div className="space-y-3 pt-2">
-                                    <button
-                                        onClick={() => {
-                                            // Accept Demand
-                                            const finalDemand = negotiationModal.currentDemand;
-                                            markGameCheckpoint('greenlight_negotiation_accept_demand', player, {
-                                                script_title: selectedScript?.title || 'none',
-                                                talent_name: negotiationModal.talentName,
-                                                role: negotiationModal.roleType,
-                                                demand_m: Math.round(finalDemand / 1000000),
-                                                attempts_left: negotiationModal.attemptsLeft,
-                                                pending_count: unresolvedReturningTalent.length,
-                                            });
-                                            updateReturningTalentState(
-                                                negotiationModal.talentId,
-                                                negotiationModal.roleType,
-                                                talent => ({
-                                                    ...talent,
-                                                    accepted: true,
-                                                    negotiated: true,
-                                                    newDemand: finalDemand
-                                                })
-                                            );
-
-                                            assignNegotiatedTalent(
-                                                negotiationModal.talentId,
-                                                negotiationModal.talentName,
-                                                finalDemand,
-                                                negotiationModal.roleType,
-                                                negotiationModal.roleId
-                                            );
-
-                                            setNegotiationModal(prev => prev ? {
-                                                ...prev,
-                                                feedback: {
-                                                    message: `${negotiationModal.talentName} has signed the contract!`,
-                                                    type: 'SUCCESS'
-                                                }
-                                            } : null);
-
-                                            setTimeout(() => setNegotiationModal(null), 1500);
-                                        }}
-                                        className="w-full py-4 bg-white/5 hover:bg-white/10 text-white font-black uppercase tracking-widest rounded-2xl transition-all border border-white/10 active:scale-95"
-                                    >
-                                        Accept Demand ({formatMoney(negotiationModal.currentDemand)})
-                                    </button>
-
-                                <button
-                                    onClick={() => {
-                                        const counterOffer = parseInt(counterOfferInput) || 0;
-                                        if (counterOffer <= 0) return;
-
-                                        // Logic for counter offer
-                                        // Probability of acceptance depends on how close it is to their demand
-                                        const demandDiff = negotiationModal.currentDemand - negotiationModal.originalSalary;
-                                        const offerDiff = counterOffer - negotiationModal.originalSalary;
-
-                                        // Ratio of offer to demand (0 to 1+)
-                                        const ratio = demandDiff > 0 ? offerDiff / demandDiff : 1;
-
-                                        // Base chance: 10% if matching original, 90% if matching demand
-                                        let chance = 0.1 + (ratio * 0.8);
-
-                                        // Adjust for tier
-                                        if (negotiationModal.talentTier === 'A_LIST') chance *= 0.8;
-                                        if (negotiationModal.talentTier === 'ESTABLISHED') chance *= 0.9;
-
-                                        // Cap chance
-                                        chance = Math.max(0.05, Math.min(0.95, chance));
-
-                                        const accepted = Math.random() < chance;
-                                        markGameCheckpoint('greenlight_negotiation_counter_offer', player, {
-                                            script_title: selectedScript?.title || 'none',
-                                            talent_name: negotiationModal.talentName,
-                                            role: negotiationModal.roleType,
-                                            offer_m: Math.round(counterOffer / 1000000),
-                                            demand_m: Math.round(negotiationModal.currentDemand / 1000000),
-                                            chance_pct: Math.round(chance * 100),
-                                            accepted,
-                                            attempts_left: negotiationModal.attemptsLeft,
-                                            pending_count: unresolvedReturningTalent.length,
-                                        });
-
-                                        if (accepted) {
-                                            updateReturningTalentState(
-                                                negotiationModal.talentId,
-                                                negotiationModal.roleType,
-                                                talent => ({
-                                                    ...talent,
-                                                    accepted: true,
-                                                    negotiated: true,
-                                                    newDemand: counterOffer
-                                                })
-                                            );
-
-                                            assignNegotiatedTalent(
-                                                negotiationModal.talentId,
-                                                negotiationModal.talentName,
-                                                counterOffer,
-                                                negotiationModal.roleType,
-                                                negotiationModal.roleId
-                                            );
-
-                                            setNegotiationModal(prev => prev ? {
-                                                ...prev,
-                                                feedback: {
-                                                    message: `Success! ${negotiationModal.talentName} accepted the counter-offer of ${formatMoney(counterOffer)}!`,
-                                                    type: 'SUCCESS'
-                                                }
-                                            } : null);
-
-                                            setTimeout(() => setNegotiationModal(null), 2000);
-                                        } else {
-                                            const newAttempts = negotiationModal.attemptsLeft - 1;
-
-                                            updateReturningTalentState(
-                                                negotiationModal.talentId,
-                                                negotiationModal.roleType,
-                                                talent => {
-                                                    const updatedTalent = {
-                                                        ...talent,
-                                                        attemptsLeft: newAttempts
-                                                    };
-                                                    if (newAttempts <= 0) {
-                                                        updatedTalent.negotiated = true;
-                                                        updatedTalent.accepted = false;
-                                                    }
-                                                    return updatedTalent;
-                                                }
-                                            );
-
-                                            if (newAttempts <= 0) {
-                                                // Walked away
-                                                clearNegotiatedTalent(
-                                                    negotiationModal.talentId,
-                                                    negotiationModal.roleType,
-                                                    negotiationModal.roleId
-                                                );
-
-                                                setNegotiationModal(prev => prev ? {
-                                                    ...prev,
-                                                    attemptsLeft: 0,
-                                                    feedback: {
-                                                        message: `${negotiationModal.talentName} has walked away from the negotiations.`,
-                                                        type: 'FINAL_FAILURE'
-                                                    }
-                                                } : null);
-                                                setTimeout(() => setNegotiationModal(null), 2000);
-                                            } else {
-                                                setNegotiationModal(prev => prev ? {
-                                                    ...prev,
-                                                    attemptsLeft: newAttempts,
-                                                    feedback: {
-                                                        message: `${negotiationModal.talentName} rejected the offer. They are standing firm on their demand.`,
-                                                        type: 'FAILURE'
-                                                    }
-                                                } : null);
-                                                setTimeout(() => {
-                                                    setNegotiationModal(prev => prev ? { ...prev, feedback: undefined } : null);
-                                                }, 2000);
-                                            }
-                                        }
-                                    }}
-                                    className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 text-black font-black uppercase tracking-widest rounded-2xl transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
-                                >
-                                    Send Counter-Offer
-                                </button>
-
-                                <button
-                                    disabled={!!negotiationModal.feedback}
-                                    onClick={() => {
-                                        markGameCheckpoint('greenlight_negotiation_walk_away', player, {
-                                            script_title: selectedScript?.title || 'none',
-                                            talent_name: negotiationModal.talentName,
-                                            role: negotiationModal.roleType,
-                                            attempts_left: negotiationModal.attemptsLeft,
-                                            pending_count: unresolvedReturningTalent.length,
-                                        });
-                                        updateReturningTalentState(
-                                            negotiationModal.talentId,
-                                            negotiationModal.roleType,
-                                            talent => ({
-                                                ...talent,
-                                                attemptsLeft: 0,
-                                                negotiated: true,
-                                                accepted: false
-                                            })
-                                        );
-                                        clearNegotiatedTalent(
-                                            negotiationModal.talentId,
-                                            negotiationModal.roleType,
-                                            negotiationModal.roleId
-                                        );
-
-                                        setNegotiationModal(prev => prev ? {
-                                            ...prev,
-                                            attemptsLeft: 0,
-                                            feedback: {
-                                                message: `You walked away from the negotiation. ${negotiationModal.talentName} is no longer available for this project.`,
-                                                type: 'FINAL_FAILURE'
-                                            }
-                                        } : null);
-
-                                        setTimeout(() => setNegotiationModal(null), 2000);
-                                    }}
-                                    className="w-full py-4 text-zinc-500 hover:text-rose-400 text-[10px] font-black uppercase tracking-widest transition-colors"
-                                >
-                                    End Negotiations (Recast)
-                                </button>
-                            </div>
-
-                            {/* Feedback Overlay */}
-                            {negotiationModal.feedback && (
-                                <div className="absolute inset-0 z-10 bg-zinc-950/95 backdrop-blur-md flex flex-col items-center justify-center p-8 text-center animate-in fade-in zoom-in duration-300">
-                                    <motion.div
-                                        initial={{ scale: 0.5, opacity: 0 }}
-                                        animate={{ scale: 1, opacity: 1 }}
-                                        className={`w-20 h-20 rounded-full flex items-center justify-center mb-6 shadow-2xl ${
-                                            negotiationModal.feedback.type === 'SUCCESS'
-                                            ? 'bg-emerald-500/20 text-emerald-400 border-2 border-emerald-500/50 shadow-emerald-500/20'
-                                            : 'bg-rose-500/20 text-rose-400 border-2 border-rose-500/50 shadow-rose-500/20'
-                                        }`}
-                                    >
-                                        {negotiationModal.feedback.type === 'SUCCESS' ? <CheckCircle size={40} /> : <XCircle size={40} />}
-                                    </motion.div>
-                                    <motion.h4
-                                        initial={{ y: 10, opacity: 0 }}
-                                        animate={{ y: 0, opacity: 1 }}
-                                        transition={{ delay: 0.1 }}
-                                        className={`text-2xl font-black uppercase tracking-tight mb-2 ${
-                                            negotiationModal.feedback.type === 'SUCCESS' ? 'text-emerald-400' : 'text-rose-400'
-                                        }`}
-                                    >
-                                        {negotiationModal.feedback.type === 'SUCCESS' ? 'Offer Accepted!' :
-                                         negotiationModal.feedback.type === 'FINAL_FAILURE' ? 'Negotiation Failed' : 'Offer Rejected'}
-                                    </motion.h4>
-                                    <motion.p
-                                        initial={{ y: 10, opacity: 0 }}
-                                        animate={{ y: 0, opacity: 1 }}
-                                        transition={{ delay: 0.2 }}
-                                        className="text-zinc-400 text-sm leading-relaxed max-w-[280px]"
-                                    >
-                                        {negotiationModal.feedback.message}
-                                    </motion.p>
-                                    {negotiationModal.feedback.type === 'FAILURE' && (
-                                        <motion.div
-                                            initial={{ opacity: 0 }}
-                                            animate={{ opacity: 1 }}
-                                            transition={{ delay: 0.3 }}
-                                            className="mt-8 text-[10px] font-black text-zinc-500 uppercase tracking-widest bg-white/5 px-3 py-1 rounded-full border border-white/5"
-                                        >
-                                            Attempts remaining: {negotiationModal.attemptsLeft}
-                                        </motion.div>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
+                <GreenlightNegotiationModal
+                    negotiation={negotiationModal}
+                    counterOfferInput={counterOfferInput}
+                    onCounterOfferInputChange={setCounterOfferInput}
+                    onAcceptDemand={acceptNegotiationDemand}
+                    onSubmitCounterOffer={submitNegotiationCounterOffer}
+                    onWalkAway={walkAwayFromNegotiation}
+                    onClose={() => setNegotiationModal(null)}
+                    formatMoney={formatMoney}
+                />
             )}
         </div>
     );

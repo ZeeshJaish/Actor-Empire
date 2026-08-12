@@ -1,10 +1,13 @@
 
-import { GameLanguage, Player, NewsItem, NewsCategory, ActiveRelease, Commitment, ProjectType, BudgetTier, RightsDealType } from '../types';
+import { GameLanguage, Player, NewsItem, NewsCategory, ActiveRelease, Commitment, ProjectType, BudgetTier, RightsDealType, XPost, CastStoryArchetype } from '../types';
 import { NPC_DATABASE } from './npcLogic';
 import { STUDIO_CATALOG } from './studioLogic';
 import { getAwardGossipTemplate, getAwardSnubTemplate } from './awardLogic';
-import { normalizeUniverseMap } from './universeLogic';
+import { buildUniverseRoster, getUniverseDashboardProjects, normalizeUniverseMap } from './universeLogic';
 import { getPlayerLanguage, t } from './i18n';
+import { getCriticTradeNarrative, getOpeningTradeNarrative } from './releaseMediaNarrative';
+import { inferStoryCompass } from './characterIdentityLogic';
+import { getCastStoryRead } from './characterStoryFit';
 
 const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
 const NEWS_VARIANT_SEPARATOR = ' || ';
@@ -12,6 +15,14 @@ const pickNewsVariant = (language: GameLanguage, key: string, vars: Record<strin
     pick(t(language, key, vars).split(NEWS_VARIANT_SEPARATOR));
 const hasPublishedReleaseNews = (rel: ActiveRelease, key: string): boolean =>
     Array.isArray(rel.generatedNewsKeys) && rel.generatedNewsKeys.includes(key);
+const stableRoll = (seed: string): number => {
+    let hash = 2166136261;
+    for (let index = 0; index < seed.length; index += 1) {
+        hash ^= seed.charCodeAt(index);
+        hash = Math.imul(hash, 16777619);
+    }
+    return (hash >>> 0) / 4294967295;
+};
 
 // ... (Generate Personal News, Top Stories, Industry News functions remain same)
 
@@ -45,11 +56,24 @@ const generateTopStories = (player: Player): NewsItem[] => {
     const language = getPlayerLanguage(player);
 
     player.activeReleases.forEach(rel => {
-        if (rel.weekNum === 1) {
+        // A release is created at week 1 and its first theatrical accounting
+        // pass advances it to week 2 before news is generated. Support both
+        // values so the opening story is never silently skipped.
+        if (rel.weekNum === 1 || rel.weekNum === 2) {
             const budget = rel.budget;
             const gross = rel.weeklyGross[0];
-            
-            if (gross > budget * 0.5) {
+
+            const contextualOpeningStory = getOpeningTradeNarrative(player, rel);
+            if (contextualOpeningStory) {
+                const newsKey = `news_bo_context_${rel.id}`;
+                if (hasPublishedReleaseNews(rel, newsKey)) return;
+                news.push({
+                    id: newsKey,
+                    headline: contextualOpeningStory.headline,
+                    subtext: contextualOpeningStory.subtext,
+                    category: 'TOP_STORY', week, year, impactLevel: 'HIGH'
+                });
+            } else if (gross > budget * 0.5) {
                 const newsKey = `news_bo_hit_${rel.id}`;
                 if (hasPublishedReleaseNews(rel, newsKey)) return;
                 const isUniverse = rel.projectDetails.universeId != null;
@@ -81,14 +105,15 @@ const generateTopStories = (player: Player): NewsItem[] => {
             }
         }
         if (rel.weekNum === 2 && rel.imdbRating) {
+            const contextualCriticStory = getCriticTradeNarrative(player, rel);
             if (rel.imdbRating >= 8.5) {
                 const newsKey = `news_crit_high_${rel.id}`;
                 if (hasPublishedReleaseNews(rel, newsKey)) return;
                 const isUniverse = rel.projectDetails.universeId != null;
                 news.push({
                     id: newsKey,
-                    headline: pickNewsVariant(language, isUniverse ? 'services.news.release.criticLoved.universeHeadline' : 'services.news.release.criticLoved.headline', { title: rel.name }),
-                    subtext: t(language, 'services.news.release.criticLoved.subtext', { rating: rel.imdbRating }),
+                    headline: contextualCriticStory?.headline || pickNewsVariant(language, isUniverse ? 'services.news.release.criticLoved.universeHeadline' : 'services.news.release.criticLoved.headline', { title: rel.name }),
+                    subtext: contextualCriticStory?.subtext || t(language, 'services.news.release.criticLoved.subtext', { rating: rel.imdbRating }),
                     category: 'TOP_STORY', week, year, impactLevel: 'MEDIUM'
                 });
             } else if (rel.imdbRating <= 4.0) {
@@ -97,8 +122,8 @@ const generateTopStories = (player: Player): NewsItem[] => {
                 const isUniverse = rel.projectDetails.universeId != null;
                 news.push({
                     id: newsKey,
-                    headline: pickNewsVariant(language, isUniverse ? 'services.news.release.criticHated.universeHeadline' : 'services.news.release.criticHated.headline', { title: rel.name }),
-                    subtext: t(language, 'services.news.release.criticHated.subtext'),
+                    headline: contextualCriticStory?.headline || pickNewsVariant(language, isUniverse ? 'services.news.release.criticHated.universeHeadline' : 'services.news.release.criticHated.headline', { title: rel.name }),
+                    subtext: contextualCriticStory?.subtext || t(language, 'services.news.release.criticHated.subtext'),
                     category: 'TOP_STORY', week, year, impactLevel: 'MEDIUM'
                 });
             }
@@ -336,24 +361,121 @@ const generateUniverseNews = (player: Player): NewsItem[] => {
     const year = player.age;
     const language = getPlayerLanguage(player);
 
-    // Find if player has a studio with universes
-    const studio = player.businesses?.find(b => b.type === 'PRODUCTION_HOUSE');
-    if (studio && player.world?.universes) {
-        const universes = Object.values(normalizeUniverseMap(player.world.universes || {})).filter(u => u.studioId === studio.id);
-        if (universes.length > 0 && Math.random() < 0.4) { // 40% chance per week if they have a universe
-            const randomUniverse = pick(universes);
-            const headline = t(language, 'services.news.universe.background.headline', { universeName: randomUniverse.name });
+    if (!player.world?.universes) return news;
+
+    const ownedStudioIds = new Set(
+        (player.businesses || [])
+            .filter(business => business.type === 'PRODUCTION_HOUSE')
+            .map(business => business.id)
+    );
+    const universes = Object.values(normalizeUniverseMap(player.world.universes || {}))
+        .filter(universe => ownedStudioIds.has(universe.studioId));
+
+    player.activeReleases
+        .filter(release => release.projectDetails?.universeId && (release.weekNum === 1 || release.weekNum === 2))
+        .forEach(release => {
+            const universe = universes.find(candidate => candidate.id === release.projectDetails.universeId);
+            if (!universe) return;
+            const newsKey = `news_uni_cast_${release.id}`;
+            if (hasPublishedReleaseNews(release, newsKey)) return;
+            const compass = release.projectDetails.storyCompass || inferStoryCompass(release.projectDetails, 'CANON');
+            const castRead = getCastStoryRead(compass, release.projectDetails.castList || []);
             news.push({
-                id: `news_uni_buzz_${Date.now()}`,
-                headline,
+                id: newsKey,
+                headline: t(language, `services.news.universe.cast.${castRead.archetype}.headline`, {
+                    title: release.name,
+                    universeName: universe.name,
+                }),
+                subtext: t(language, `services.news.universe.cast.${castRead.archetype}.subtext`, {
+                    title: release.name,
+                    universeName: universe.name,
+                    read: castRead.summary,
+                }),
                 category: 'UNIVERSE',
-                week, year, impactLevel: 'MEDIUM'
+                week,
+                year,
+                impactLevel: castRead.balanceScore >= 78 || castRead.balanceScore < 52 ? 'HIGH' : 'MEDIUM',
+                projectId: release.id,
+                universeId: universe.id,
             });
-        }
+        });
+
+    if (universes.length > 0 && stableRoll(`${year}:${week}:universe-background`) < 0.34) {
+        const universeIndex = Math.floor(stableRoll(`${year}:${week}:universe-choice`) * universes.length);
+        const selectedUniverse = universes[Math.min(universes.length - 1, universeIndex)];
+        const projects = getUniverseDashboardProjects(player, selectedUniverse.id, player.activeReleases || []);
+        const roster = buildUniverseRoster(selectedUniverse, projects, player.name, language);
+        const recastCount = roster.filter(character => character.status === 'RECAST').length;
+        const villainCount = roster.filter(character => character.storyRole === 'VILLAIN').length;
+        const angle = recastCount > 0
+            ? 'RECAST'
+            : selectedUniverse.momentum >= 72
+                ? 'MOMENTUM'
+                : selectedUniverse.momentum <= 35
+                    ? 'DIRECTION'
+                    : villainCount === 0 && projects.length >= 2
+                        ? 'THREAT'
+                        : 'NEXT_CHAPTER';
+        news.push({
+            id: `news_uni_buzz_${selectedUniverse.id}_${year}_${week}`,
+            headline: t(language, `services.news.universe.background.${angle}.headline`, {
+                universeName: selectedUniverse.name,
+            }),
+            subtext: t(language, `services.news.universe.background.${angle}.subtext`, {
+                universeName: selectedUniverse.name,
+                recasts: recastCount,
+            }),
+            category: 'UNIVERSE',
+            week,
+            year,
+            impactLevel: angle === 'DIRECTION' || angle === 'RECAST' ? 'MEDIUM' : 'LOW',
+            universeId: selectedUniverse.id,
+        });
     }
 
     return news;
 };
+
+const universeSocialCopy = (
+    archetype: CastStoryArchetype | undefined,
+    title: string,
+    headline: string | undefined,
+) => {
+    if (archetype === 'HERO_TEAM_VS_VILLAIN') return `${title} really said assemble everybody and give them ONE threat to fear. That matchup has event-movie energy. #UniverseWatch`;
+    if (archetype === 'VILLAIN_LED') return `${title} letting the villain own the point of view? Risky, messy, and exactly why everyone is talking. #VillainEra`;
+    if (archetype === 'RIVALS') return `${title} understands that a great universe needs rivals who make each other better. #ChooseYourSide`;
+    if (archetype === 'ENSEMBLE') return `${title} is treating the whole team like the main character. The lineup discourse has begun. #UniverseWatch`;
+    if (archetype === 'HERO_VS_VILLAIN') return `${title} keeps the pitch clean: one hero, one villain, nowhere to hide. #FinalShowdown`;
+    return `${headline || title} The next chapter already has fans mapping every connection. #UniverseWatch`;
+};
+
+export const generateUniverseSocialReactions = (player: Player): XPost[] => (
+    (player.activeReleases || [])
+        .filter(release => release.projectDetails?.universeId && (release.weekNum === 1 || release.weekNum === 2))
+        .slice(0, 2)
+        .map((release, index) => ({
+            id: `x_uni_cast_${release.id}`,
+            authorId: `universe_watch_${index}`,
+            authorName: index === 0 ? 'Universe Watch' : 'Canon Central',
+            authorHandle: index === 0 ? '@UniverseWatch' : '@CanonCentral',
+            authorAvatar: '',
+            content: universeSocialCopy(
+                release.projectDetails?.hiddenStats?.castStoryArchetype,
+                release.name,
+                release.projectDetails?.hiddenStats?.castStoryHeadline,
+            ),
+            timestamp: player.currentWeek,
+            likes: 900 + Math.round((release.projectDetails?.hiddenStats?.rawHype || 30) * 47),
+            retweets: 120 + Math.round((release.projectDetails?.hiddenStats?.rawHype || 30) * 8),
+            replies: 80 + Math.round((release.projectDetails?.hiddenStats?.rawHype || 30) * 5),
+            isPlayer: false,
+            isLiked: false,
+            isRetweeted: false,
+            isVerified: true,
+            postType: 'FILM_OPINION',
+            sentiment: 'INDUSTRY',
+        }))
+);
 
 export const generateWeeklyNews = (player: Player): NewsItem[] => {
     const topStories = generateTopStories(player);

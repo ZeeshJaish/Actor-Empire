@@ -112,6 +112,41 @@ assert(
     'Studio-scoped paydown should reduce that studio principal.',
 );
 
+const fullyPaid = payDownAcquisitionDebt(
+    {
+        ...serviced.player,
+        money: summary.totalRemainingPrincipal + 1_000_000_000,
+    },
+    summary.totalRemainingPrincipal,
+    'WARNER_BROS',
+);
+assert(fullyPaid.success, 'Player should be able to clear the full studio acquisition debt.');
+assert(fullyPaid.summary.totalRemainingPrincipal === 0, 'A full payoff should leave zero active acquisition debt.');
+assert(
+    fullyPaid.player.flags?.acquisitionDebtLedger?.find(entry => entry.studioId === 'WARNER_BROS')?.status === 'PAID_OFF',
+    'A fully paid studio debt should remain in the ledger as a closed entry.',
+);
+const cashAfterFullPayoff = fullyPaid.player.money;
+const weekAfterPayoff = processAcquisitionDebtService({
+    ...fullyPaid.player,
+    currentWeek: fullyPaid.player.currentWeek + 1,
+});
+assert(weekAfterPayoff.servicedAmount === 0, 'A paid-off acquisition debt must not charge interest next week.');
+assert(weekAfterPayoff.unpaidAmount === 0, 'A paid-off acquisition debt must not create a missed payment next week.');
+assert(weekAfterPayoff.player.money === cashAfterFullPayoff, 'Advancing after payoff must not change cash for acquisition debt.');
+const resyncedAfterPayoff = syncAcquisitionDebtLedger(weekAfterPayoff.player);
+assert(
+    getAcquisitionDebtSummary(resyncedAfterPayoff).totalRemainingPrincipal === 0,
+    'Debt sync must not recreate a paid-off studio liability from its original deal record.',
+);
+assert(
+    resyncedAfterPayoff.flags?.acquisitionDebtLedger?.filter(entry => (
+        entry.studioId === 'WARNER_BROS'
+        && entry.status === 'ACTIVE'
+    )).length === 0,
+    'A settled studio must not regain an active debt entry.',
+);
+
 const unrelatedLedgerPlayer: Player = {
     ...serviced.player,
     money: 500_000_000,

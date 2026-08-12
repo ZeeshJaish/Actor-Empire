@@ -4,6 +4,91 @@ import { addBreadcrumb, markTraceAction, recordNonFatal, startPerformanceTrace, 
 const DB_NAME = 'ActorEmpireDB';
 const STORE_NAME = 'saves';
 const DB_VERSION = 1;
+const SAVE_SUMMARY_PREFIX = 'actorEmpire.saveSummary.v1.';
+
+export type SaveSlotSummary = {
+  name: string;
+  age: number;
+  week: number;
+  fame: number;
+  totalPlayTimeMs: number;
+  savedAt: number;
+  isPendingSummary?: boolean;
+  storageKey?: string;
+  storageKind?: 'indexeddb' | 'localstorage';
+};
+
+export const createSaveSlotSummary = (data: any): SaveSlotSummary => ({
+  name: String(data?.name || 'Actor'),
+  age: Math.max(0, Math.round(Number(data?.age) || 0)),
+  week: Math.max(1, Math.round(Number(data?.currentWeek) || 1)),
+  fame: Math.max(0, Number(data?.stats?.fame) || 0),
+  totalPlayTimeMs: Math.max(0, Math.round(Number(data?.totalPlayTimeMs) || 0)),
+  savedAt: Date.now(),
+});
+
+export const writeGameSaveSummary = (key: string, data: any) => {
+  try {
+    localStorage.setItem(`${SAVE_SUMMARY_PREFIX}${key}`, JSON.stringify(createSaveSlotSummary(data)));
+  } catch {
+    // Summary caching is optional; the full IndexedDB save remains authoritative.
+  }
+};
+
+export const getGameSaveSummary = (key: string): SaveSlotSummary | null => {
+  try {
+    const raw = localStorage.getItem(`${SAVE_SUMMARY_PREFIX}${key}`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<SaveSlotSummary>;
+    if (!parsed || typeof parsed.name !== 'string' || !Number.isFinite(parsed.age)) return null;
+    return {
+      name: parsed.name,
+      age: Math.max(0, Math.round(Number(parsed.age) || 0)),
+      week: Math.max(1, Math.round(Number(parsed.week) || 1)),
+      fame: Math.max(0, Number(parsed.fame) || 0),
+      totalPlayTimeMs: Math.max(0, Math.round(Number(parsed.totalPlayTimeMs) || 0)),
+      savedAt: Math.max(0, Math.round(Number(parsed.savedAt) || 0)),
+      isPendingSummary: false,
+      storageKey: key,
+      storageKind: 'indexeddb',
+    };
+  } catch {
+    return null;
+  }
+};
+
+export const createDeferredSaveSlotSummary = (
+  key: string,
+  storageKind: 'indexeddb' | 'localstorage',
+): SaveSlotSummary => {
+  try {
+    const raw = localStorage.getItem(`${key}_meta`);
+    const metadata = raw ? JSON.parse(raw) as Record<string, unknown> : {};
+    return {
+      name: String(metadata.playerName || 'Saved Career'),
+      age: Math.max(0, Math.round(Number(metadata.age) || 0)),
+      week: Math.max(1, Math.round(Number(metadata.week) || 1)),
+      fame: Math.max(0, Number(metadata.fame) || 0),
+      totalPlayTimeMs: Math.max(0, Math.round(Number(metadata.totalPlayTimeMs) || 0)),
+      savedAt: Math.max(0, Math.round(Number(metadata.savedAt) || 0)),
+      isPendingSummary: true,
+      storageKey: key,
+      storageKind,
+    };
+  } catch {
+    return {
+      name: 'Saved Career',
+      age: 0,
+      week: 1,
+      fame: 0,
+      totalPlayTimeMs: 0,
+      savedAt: 0,
+      isPendingSummary: true,
+      storageKey: key,
+      storageKind,
+    };
+  }
+};
 
 const getSaveStats = (data: any) => ({
   age: data?.age,
@@ -65,6 +150,7 @@ export const saveGameData = async (
             reject(request.error);
         };
         request.onsuccess = () => {
+            writeGameSaveSummary(key, data);
             markTraceAction('save_write_completed', { save_key: key, save_slot: data?.flags?.lastLoadedSlot || key });
             addBreadcrumb('save_game:success', { key, ...getSaveStats(data) });
             resolve();
@@ -129,6 +215,11 @@ export const deleteGameData = async (key: string): Promise<void> => {
             reject(request.error);
         };
         request.onsuccess = () => {
+            try {
+              localStorage.removeItem(`${SAVE_SUMMARY_PREFIX}${key}`);
+            } catch {
+              // IndexedDB deletion already succeeded.
+            }
             addBreadcrumb('delete_game:success', { key });
             resolve();
         };
@@ -136,6 +227,21 @@ export const deleteGameData = async (key: string): Promise<void> => {
   } catch (err) {
       console.error("Failed to delete game data", err);
       recordNonFatal(err, 'delete_game_failed', { key });
+  }
+};
+
+export const listGameDataKeys = async (): Promise<string[]> => {
+  try {
+    const db = await openDB();
+    return await new Promise((resolve, reject) => {
+      const transaction = db.transaction(STORE_NAME, 'readonly');
+      const request = transaction.objectStore(STORE_NAME).getAllKeys();
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve(request.result.map(key => String(key)));
+    });
+  } catch (error) {
+    recordNonFatal(error, 'indexeddb_list_keys_failed');
+    return [];
   }
 };
 
@@ -185,6 +291,14 @@ export const replaceAllGameData = async (entries: Array<{ key: string; value: an
         };
         clearRequest.onsuccess = () => resolve();
       });
+
+      try {
+        Object.keys(localStorage)
+          .filter(key => key.startsWith(SAVE_SUMMARY_PREFIX))
+          .forEach(key => localStorage.removeItem(key));
+      } catch {
+        // Imported saves will rebuild their summaries below.
+      }
 
       for (const entry of entries) {
         await saveGameData(entry.key, entry.value);

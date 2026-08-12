@@ -42,10 +42,26 @@ const KNOWN_REFERENCE_PRICES: Record<string, number> = {
 
 const MARKET_CAP_CEILING_BY_SECTOR: Record<Stock['sector'], number> = {
     TECH: 5_000_000_000_000,
-    MEDIA: 1_500_000_000_000,
-    FASHION: 1_000_000_000_000,
+    MEDIA: 750_000_000_000,
+    FASHION: 650_000_000_000,
     BEVERAGE: 750_000_000_000,
-    AUTOMOTIVE: 1_200_000_000_000,
+    AUTOMOTIVE: 1_000_000_000_000,
+};
+
+const REFERENCE_MARKET_CAP_BY_SECTOR: Record<Stock['sector'], number> = {
+    TECH: 250_000_000_000,
+    MEDIA: 40_000_000_000,
+    FASHION: 50_000_000_000,
+    BEVERAGE: 80_000_000_000,
+    AUTOMOTIVE: 150_000_000_000,
+};
+
+const MARKET_CAP_GROWTH_MULTIPLE_BY_SECTOR: Record<Stock['sector'], number> = {
+    TECH: 2,
+    MEDIA: 3,
+    FASHION: 3,
+    BEVERAGE: 3,
+    AUTOMOTIVE: 3,
 };
 
 const MAX_WEEKLY_PRICE_MOVE = 0.18;
@@ -67,39 +83,48 @@ const getGeneratedOutstandingShares = (stockId: string) => (
     MIN_UNKNOWN_OUTSTANDING_SHARES + (stableShareHash(stockId) % MAX_UNKNOWN_OUTSTANDING_SHARES_RANGE)
 );
 
+const getStockBaseOutstandingShares = (stock: Pick<Stock, 'id'>): number => (
+    KNOWN_OUTSTANDING_SHARES[stock.id] || getGeneratedOutstandingShares(stock.id)
+);
+
+export const getStockMaximumOutstandingShares = (stock: Pick<Stock, 'id'>): number => (
+    Math.round(getStockBaseOutstandingShares(stock) * 3)
+);
+
 export const getStockOutstandingShares = (stock: Pick<Stock, 'id' | 'outstandingShares'>): number => {
     const explicitShares = Number(stock.outstandingShares);
-    const knownShares = KNOWN_OUTSTANDING_SHARES[stock.id];
-
-    if (knownShares) {
-        if (Number.isFinite(explicitShares) && explicitShares >= knownShares) {
-            return Math.round(explicitShares);
-        }
-        return knownShares;
-    }
-
-    if (Number.isFinite(explicitShares) && explicitShares >= MIN_UNKNOWN_OUTSTANDING_SHARES) {
-        return Math.round(explicitShares);
-    }
-
-    return getGeneratedOutstandingShares(stock.id);
+    const baseShares = getStockBaseOutstandingShares(stock);
+    const maximumShares = getStockMaximumOutstandingShares(stock);
+    if (!Number.isFinite(explicitShares)) return baseShares;
+    return Math.round(clampFinite(explicitShares, baseShares, maximumShares));
 };
 
-const getStockReferencePrice = (stock: Pick<Stock, 'id'> & Partial<Pick<Stock, 'price'>>): number => {
+const getStockReferencePrice = (stock: Pick<Stock, 'id'> & Partial<Pick<Stock, 'sector' | 'price'>>): number => {
     const reference = KNOWN_REFERENCE_PRICES[stock.id];
     if (reference) return reference;
-    const current = Number(stock.price);
-    return Number.isFinite(current) && current > 0 ? current : 100;
+    const baseShares = getStockBaseOutstandingShares(stock);
+    const referenceMarketCap = stock.sector
+        ? REFERENCE_MARKET_CAP_BY_SECTOR[stock.sector]
+        : 75_000_000_000;
+    return roundPrice(Math.max(1, referenceMarketCap / baseShares));
+};
+
+export const getStockMarketCapCeiling = (
+    stock: Pick<Stock, 'id'> & Partial<Pick<Stock, 'sector' | 'price'>>,
+): number => {
+    const baseShares = getStockBaseOutstandingShares(stock);
+    const referenceMarketCap = baseShares * getStockReferencePrice(stock);
+    const sector = stock.sector;
+    const growthMultiple = sector ? MARKET_CAP_GROWTH_MULTIPLE_BY_SECTOR[sector] : 3;
+    const sectorCeiling = sector ? MARKET_CAP_CEILING_BY_SECTOR[sector] : 750_000_000_000;
+    return Math.min(sectorCeiling, referenceMarketCap * growthMultiple);
 };
 
 export const getStockPriceCeiling = (
     stock: Pick<Stock, 'id' | 'outstandingShares'> & Partial<Pick<Stock, 'sector' | 'price'>>,
 ): number => {
     const outstandingShares = getStockOutstandingShares(stock);
-    const referencePrice = getStockReferencePrice(stock);
-    const sectorCap = stock.sector ? MARKET_CAP_CEILING_BY_SECTOR[stock.sector] : undefined;
-    const sectorPriceCeiling = sectorCap ? sectorCap / outstandingShares : referencePrice * 8;
-    return roundPrice(Math.max(referencePrice * 6, sectorPriceCeiling, 10));
+    return roundPrice(Math.max(1, getStockMarketCapCeiling(stock) / outstandingShares));
 };
 
 export const normalizeStockPrice = (
@@ -250,7 +275,8 @@ export const applyStockShareIssuance = (
 ): StockShareIssuanceResult => {
     const oldOutstandingShares = getStockOutstandingShares(stock);
     const issuePercent = Math.max(0.1, Math.min(25, input.issuePercent));
-    const sharesIssued = Math.max(1, Math.round(oldOutstandingShares * (issuePercent / 100)));
+    const remainingIssuanceRoom = Math.max(0, getStockMaximumOutstandingShares(stock) - oldOutstandingShares);
+    const sharesIssued = Math.min(remainingIssuanceRoom, Math.max(1, Math.round(oldOutstandingShares * (issuePercent / 100))));
     const newOutstandingShares = oldOutstandingShares + sharesIssued;
     const oldPrice = normalizeStockPrice(stock, stock.price);
     const issueDiscount = 0.03 + ((stableShareHash(`${stock.id}:${input.week}:${input.reason}`) % 5) / 100);
@@ -528,6 +554,7 @@ const getAutomaticShareIssueReason = (stock: Stock): StockShareIssueReason => {
 };
 
 const shouldIssueSharesThisWeek = (stock: Stock, week: number) => {
+    if (getStockOutstandingShares(stock) >= getStockMaximumOutstandingShares(stock)) return false;
     if (week < 12) return false;
     if (stock.lastShareIssueWeek && week - stock.lastShareIssueWeek < 52) return false;
     const cadence = 52 + (stableShareHash(`${stock.id}:cadence`) % 53);

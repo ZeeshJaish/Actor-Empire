@@ -14,6 +14,7 @@ const ADMOB_IDS = {
 
 export interface AdResult {
     success: boolean;
+    reason?: 'NOT_COMPLETED' | 'UNAVAILABLE' | 'ERROR';
 }
 
 declare global {
@@ -32,7 +33,7 @@ declare global {
 
 let initialized = false;
 
-const isRewardedType = (type: AdType) => type !== 'INTERSTITIAL';
+export const isRewardedType = (type: AdType) => type !== 'INTERSTITIAL';
 
 const requestConsent = async () => {
     if (!AdMob?.requestConsentInfo) return;
@@ -88,7 +89,7 @@ export const showAd = async (type: AdType): Promise<AdResult> => {
     if (isNative) {
         await initAds();
 
-        if (!AdMob) return { success: false };
+        if (!AdMob) return { success: false, reason: 'UNAVAILABLE' };
 
         const platform = (window.Capacitor?.getPlatform?.() === 'ios' ? 'ios' : 'android') as 'ios' | 'android';
         const ids = ADMOB_IDS[platform];
@@ -102,17 +103,28 @@ export const showAd = async (type: AdType): Promise<AdResult> => {
                 return { success: true };
             }
 
-            await AdMob.prepareRewardVideoAd({
-                adId: ids.rewarded,
-            });
+            for (let attempt = 0; attempt < 2; attempt += 1) {
+                try {
+                    await AdMob.prepareRewardVideoAd({
+                        adId: ids.rewarded,
+                    });
 
-            const reward = await AdMob.showRewardVideoAd();
-            if (!reward) return { success: false };
+                    const reward = await AdMob.showRewardVideoAd();
+                    if (reward) return { success: true };
+                    return { success: false, reason: 'NOT_COMPLETED' };
+                } catch (error) {
+                    if (attempt === 1) {
+                        console.error('Rewarded ad failed:', error);
+                        return { success: false, reason: 'ERROR' };
+                    }
+                    await new Promise(resolve => setTimeout(resolve, 600));
+                }
+            }
 
-            return { success: true };
+            return { success: false, reason: 'UNAVAILABLE' };
         } catch (err) {
             console.error('Ad failed:', err);
-            return { success: false };
+            return { success: false, reason: 'ERROR' };
         }
     }
 
@@ -124,7 +136,10 @@ export const showAd = async (type: AdType): Promise<AdResult> => {
                 beforeAd: () => console.log('Web ad starting...'),
                 afterAd: () => console.log('Web ad finished.'),
                 adBreakDone: (placementInfo: any) => {
-                    resolve({ success: placementInfo?.breakStatus === 'viewed' });
+                    resolve({
+                        success: placementInfo?.breakStatus === 'viewed',
+                        reason: placementInfo?.breakStatus === 'viewed' ? undefined : 'NOT_COMPLETED',
+                    });
                 },
             });
         });

@@ -54,7 +54,22 @@ const businessDashboardSource = read('views/lifestyle/business/BusinessDashboard
 const businessWizardSource = read('views/lifestyle/business/BusinessWizard.tsx');
 const productionWizardSource = read('views/lifestyle/business/ProductionWizard.tsx');
 const greenlightWizardSource = read('views/lifestyle/business/GreenlightWizard.tsx');
-const developmentLabSource = read('views/lifestyle/business/DevelopmentLab.tsx');
+const greenlightMarketingSource = read('views/lifestyle/business/components/GreenlightMarketingBudgetSection.tsx');
+const greenlightSoundtrackSource = read('views/lifestyle/business/components/GreenlightSoundtrackSection.tsx');
+const greenlightStoryConnectionSource = read('views/lifestyle/business/components/GreenlightStoryConnectionSection.tsx');
+const greenlightConfirmationSource = read('views/lifestyle/business/components/GreenlightConfirmationStep.tsx');
+const greenlightInvestorFinancingSource = read('views/lifestyle/business/components/GreenlightInvestorFinancingSection.tsx');
+const greenlightUiSource = `${greenlightWizardSource}\n${greenlightMarketingSource}\n${greenlightSoundtrackSource}\n${greenlightStoryConnectionSource}\n${greenlightConfirmationSource}\n${greenlightInvestorFinancingSource}`;
+const developmentLabSource = [
+  read('views/lifestyle/business/DevelopmentLab.tsx'),
+  read('views/lifestyle/business/components/DevelopmentLabScriptVault.tsx'),
+  read('views/lifestyle/business/components/DevelopmentLabScriptWizard.tsx'),
+  read('views/lifestyle/business/components/DevelopmentLabMarket.tsx'),
+  read('views/lifestyle/business/components/DevelopmentLabFranchiseManager.tsx'),
+  read('views/lifestyle/business/components/DevelopmentLabUniverseManager.tsx'),
+  read('views/lifestyle/business/components/DevelopmentLabUniverseDashboard.tsx'),
+  read('views/lifestyle/business/components/DevelopmentLabUniverseMerch.tsx'),
+].join('\n');
 const ownedStudioCommandSource = read('views/lifestyle/business/OwnedStudioCommandCenter.tsx');
 const productionHouseSource = read('views/lifestyle/business/ProductionHouseGame.tsx');
 const releaseWizardSource = read('views/lifestyle/business/ReleaseWizard.tsx');
@@ -567,8 +582,9 @@ const spanishStaticUiPolishKeys = [
   'settings.optionalContent',
   'settings.externalTalent',
   'settings.externalTalentSub',
-  'settings.creatorPacks',
-  'settings.gameplayRules',
+  'settings.createMods',
+  'settings.createModsSub',
+  'settings.comingFutureUpdates',
   'settings.saveLockedPacks',
   'settings.saveLockedPacksSub',
   'settings.availableCountryPacks',
@@ -5814,19 +5830,19 @@ const phase5GreenlightChoiceHardcodedMarkers = [
   'Syndicate Offers',
   "{selectedInvestorPlan?.commitments.length || 0} selected",
   'No artists match this search.',
-].filter((marker) => greenlightWizardSource.includes(marker));
+].filter((marker) => greenlightUiSource.includes(marker));
 
 if (phase5GreenlightChoiceHardcodedMarkers.length > 0) {
   failures.push(`greenlight choice control copy is still hard-coded: ${phase5GreenlightChoiceHardcodedMarkers.join(', ')}`);
 }
 
 const phase5GreenlightChoiceRefs = [
-  [greenlightWizardSource, "tr('greenlight.marketing.reservedCampaignBudget')", 'greenlight marketing heading localization'],
-  [greenlightWizardSource, "tr(`greenlight.marketing.preset.${option.id}.label`)", 'greenlight marketing preset localization'],
-  [greenlightWizardSource, "tr(`greenlight.music.sort.${option.id}`)", 'greenlight music sort localization'],
-  [greenlightWizardSource, "tr(`greenlight.connectedIntent.${option.id}.label`)", 'greenlight connected intent localization'],
-  [greenlightWizardSource, "tr('greenlight.investors.mode.lead.label')", 'greenlight investor mode localization'],
-  [greenlightWizardSource, "tr('greenlight.investors.offers.selected'", 'greenlight investor selection localization'],
+  [greenlightUiSource, "'greenlight.marketing.reservedCampaignBudget'", 'greenlight marketing heading localization'],
+  [greenlightUiSource, "`greenlight.marketing.preset.${option.id}.label`", 'greenlight marketing preset localization'],
+  [greenlightUiSource, "`greenlight.music.sort.${option.id}`", 'greenlight music sort localization'],
+  [greenlightUiSource, "`greenlight.connectedIntent.${intent}.label`", 'greenlight connected intent localization'],
+  [greenlightUiSource, "'greenlight.investors.mode.lead.label'", 'greenlight investor mode localization'],
+  [greenlightUiSource, "'greenlight.investors.offers.selected'", 'greenlight investor selection localization'],
   [english, 'greenlight.marketing.reservedCampaignBudget', 'greenlight EN marketing keys'],
   [english, 'greenlight.connectedIntent.AUTO.label', 'greenlight EN connected intent keys'],
   [english, 'greenlight.investors.mode.lead.label', 'greenlight EN investor keys'],

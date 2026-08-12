@@ -61,8 +61,8 @@ export const ProductionCrisisModal: React.FC<ProductionCrisisModalProps> = ({ pl
         if (opt.isGolden) {
             setIsProcessingAd(true);
             try {
-                const success = await showAd('REWARDED_BAILOUT');
-                if (success) {
+                const result = await showAd('REWARDED_BAILOUT');
+                if (result.success) {
                     try {
                         onChoice(opt.index);
                     } catch (error) {

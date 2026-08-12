@@ -43,6 +43,47 @@ const formatMoneyShort = (value: number) => {
     return `$${safe}`;
 };
 
+export type SubsidiaryRevenueSource = 'THEATRICAL' | 'STREAMING' | 'HYBRID' | 'OTHER' | 'NONE';
+
+const asPositiveMoney = (value: unknown) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+};
+
+const parseArchivedGross = (project: any) => {
+    const directGross = Math.max(asPositiveMoney(project?.gross), asPositiveMoney(project?.totalGross));
+    if (directGross > 0) return directGross;
+    const match = String(project?.boxOfficeResult || '').match(/\$?([\d.]+)\s*([KMBT])?/i);
+    if (!match) return 0;
+    const value = Number(match[1] || 0);
+    const unit = (match[2] || '').toUpperCase();
+    const multiplier = unit === 'T' ? 1_000_000_000_000 : unit === 'B' ? 1_000_000_000 : unit === 'M' ? 1_000_000 : unit === 'K' ? 1_000 : 1;
+    return Number.isFinite(value) ? Math.max(0, value * multiplier) : 0;
+};
+
+// Old saves store streaming income in different fields. Read the highest known
+// total instead of adding overlapping values, so an archive can never double-pay.
+export const getSubsidiaryProjectRevenueBreakdown = (project: any) => {
+    const theatrical = parseArchivedGross(project);
+    const legacyStreaming = asPositiveMoney(project?.streamingRevenue);
+    const upfront = asPositiveMoney(project?.streamingUpfrontFee);
+    const royalties = asPositiveMoney(project?.streamingRoyaltyRevenue);
+    const soundtrack = asPositiveMoney(project?.soundtrackRevenue);
+    const streaming = Math.max(legacyStreaming, upfront + royalties);
+    const total = theatrical + streaming + soundtrack;
+    const source: SubsidiaryRevenueSource = theatrical > 0 && streaming > 0
+        ? 'HYBRID'
+        : theatrical > 0
+            ? 'THEATRICAL'
+            : streaming > 0
+                ? 'STREAMING'
+                : soundtrack > 0
+                    ? 'OTHER'
+                    : 'NONE';
+
+    return { theatrical, streaming, soundtrack, total, source };
+};
+
 const absoluteWeek = (year: number, week: number) => (year * 52) + week;
 
 const getSeedIndex = (seed: string, count: number) => {
@@ -58,9 +99,9 @@ const getSeedIndex = (seed: string, count: number) => {
 const pickSeeded = <T,>(items: T[], seed: string): T => items[getSeedIndex(seed, items.length)];
 
 const getCadenceWeeks = (mandate: StudioOperatingMandate) => {
-    if (mandate.releasePace === 'AGGRESSIVE') return 10;
-    if (mandate.releasePace === 'CAREFUL') return 24;
-    return 16;
+    if (mandate.releasePace === 'AGGRESSIVE') return 14;
+    if (mandate.releasePace === 'CAREFUL') return 26;
+    return 18;
 };
 
 const getSubsidiaryPhaseDuration = (phase: 'PRE_PRODUCTION' | 'PRODUCTION' | 'POST_PRODUCTION', seed: string) => {
@@ -106,6 +147,14 @@ const getBudgetValue = (tier: BudgetTier, projectType: ProjectType, mandate: Stu
     return Math.round(base * seriesMultiplier * prestigeTrim * boldLift);
 };
 
+const hasAutonomousProductionRunway = (studio: Business, estimatedBudget: number) => {
+    const operatingReserve = Math.max(
+        5_000_000,
+        Math.min(75_000_000, Math.round(estimatedBudget * 0.2)),
+    );
+    return Number(studio.balance || 0) >= estimatedBudget + operatingReserve;
+};
+
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 
 const seededRange = (seed: string, min: number, max: number) => (
@@ -125,6 +174,21 @@ const getSubsidiaryReleaseScale = (tier: BudgetTier, mandate: StudioOperatingMan
     if (tier === 'BLOCKBUSTER' || tier === 'HIGH') return 'GLOBAL';
     if (tier === 'MID' || mandate.objective === 'COMMERCIAL_FIRST') return 'MASS';
     return 'LIMITED';
+};
+
+const getSubsidiaryStreamingContract = (
+    estimatedBudget: number,
+    qualityScore: number,
+    distributionPower: number,
+    seed: string,
+) => {
+    const qualityMultiplier = 0.62 + (clamp(qualityScore, 25, 100) / 100) * 0.42;
+    const distributionMultiplier = 0.82 + (clamp(distributionPower, 25, 100) / 100) * 0.24;
+    const marketVariance = 0.92 + (getSeedIndex(`${seed}:streaming-deal`, 17) / 100);
+    return {
+        upfront: Math.max(1_000_000, Math.round(estimatedBudget * qualityMultiplier * distributionMultiplier * marketVariance)),
+        backendPct: clamp(6 + Math.round((qualityScore + distributionPower - 100) / 16), 6, 14),
+    };
 };
 
 const getProposalSubtype = (proposal: SubsidiaryProjectProposal): ProjectSubtype => {
@@ -195,6 +259,10 @@ const buildSubsidiaryProjectDetails = (
         98
     );
     const directorName = getDirectorName(seed);
+    const releaseStrategy = getSubsidiaryReleaseStrategy(proposal.projectType, proposal.mandateSnapshot);
+    const streamingContract = releaseStrategy === 'STREAMING_ONLY'
+        ? getSubsidiaryStreamingContract(proposal.estimatedBudget, qualityScore, distributionPower, seed)
+        : undefined;
 
     return {
         title: proposal.title,
@@ -212,7 +280,8 @@ const buildSubsidiaryProjectDetails = (
         budgetTier: proposal.budgetTier,
         estimatedBudget: proposal.estimatedBudget,
         releaseScale: getSubsidiaryReleaseScale(proposal.budgetTier, proposal.mandateSnapshot),
-        releaseStrategy: getSubsidiaryReleaseStrategy(proposal.projectType, proposal.mandateSnapshot),
+        releaseStrategy,
+        streamingRevenue: streamingContract?.upfront,
         visibleHype: rawHype >= 78 ? 'HIGH' : rawHype >= 48 ? 'MID' : 'LOW',
         hiddenStats: {
             scriptQuality,
@@ -223,6 +292,8 @@ const buildSubsidiaryProjectDetails = (
             qualityScore,
             prestigeBonus: proposal.mandateSnapshot.objective === 'PRESTIGE_FIRST' ? 8 : 0,
             studioPrestigeScore: Math.round(studio.stats.investorConfidence || studio.stats.brandHealth || 50),
+            backendPct: streamingContract?.backendPct,
+            subsidiaryStreamingContract: Boolean(streamingContract),
         },
         directorName,
         director: {
@@ -429,6 +500,7 @@ export const planSubsidiaryProject = (player: Player, studio: Business): Subsidi
     const genre = chooseGenre(mandate, studio, `${seed}:genre`);
     const budgetTier = getBudgetTier(mandate, sourceDecision.source, studio);
     const estimatedBudget = getBudgetValue(budgetTier, projectType, mandate);
+    if (!hasAutonomousProductionRunway(studio, estimatedBudget)) return null;
     const title = createTitle(seed, genre, sourceDecision.sourceLabel);
     const logic = [
         ...sourceDecision.logic,
@@ -698,7 +770,7 @@ const reviveDormantSubsidiaryProduction = (
     if (!profile.canAutoProduce && mandate.autoProduction !== 'APPROVED') return player;
     const activeCount = (player.commitments || []).filter(commitment => commitment.projectDetails?.studioId === studio.id).length
         + (player.activeReleases || []).filter(release => release.projectDetails?.studioId === studio.id).length;
-    const capacity = mandate.releasePace === 'AGGRESSIVE' ? 4 : mandate.releasePace === 'CAREFUL' ? 2 : 3;
+    const capacity = mandate.releasePace === 'AGGRESSIVE' ? 3 : mandate.releasePace === 'CAREFUL' ? 1 : 2;
     if (activeCount >= capacity) return player;
     const dormantProposal = [...(studioState.subsidiaryProjectProposals || [])]
         .filter(proposal => (
@@ -732,6 +804,32 @@ export const prepareSubsidiaryProjectsForGameLoop = (player: Player): Player => 
     );
     if (!acquiredStudioIds.size) return player;
     let repairedCount = 0;
+    const repairStreamingTerms = (details: ProjectDetails, mandate: StudioOperatingMandate) => {
+        const releaseStrategy = details.releaseStrategy || getSubsidiaryReleaseStrategy(details.type, mandate);
+        const hasStreamingTerms = Number(details.streamingRevenue || 0) > 0 && Number(details.hiddenStats?.backendPct || 0) > 0;
+        if (releaseStrategy !== 'STREAMING_ONLY' || hasStreamingTerms) {
+            return {
+                ...details,
+                releaseStrategy,
+            };
+        }
+        const contract = getSubsidiaryStreamingContract(
+            Math.max(1_000_000, Number(details.estimatedBudget || 0)),
+            Number(details.hiddenStats?.qualityScore || 60),
+            Number(details.hiddenStats?.distributionPower || 55),
+            `${details.sourceScriptId || details.title}:legacy-subsidiary-streaming`,
+        );
+        return {
+            ...details,
+            releaseStrategy,
+            streamingRevenue: contract.upfront,
+            hiddenStats: {
+                ...details.hiddenStats,
+                backendPct: contract.backendPct,
+                subsidiaryStreamingContract: true,
+            },
+        };
+    };
     const commitments = (player.commitments || []).map(commitment => {
         const studioId = commitment.projectDetails?.studioId;
         if (
@@ -739,7 +837,6 @@ export const prepareSubsidiaryProjectsForGameLoop = (player: Player): Player => 
             || commitment.projectPhase !== 'AWAITING_RELEASE'
             || !studioId
             || !acquiredStudioIds.has(studioId)
-            || commitment.projectDetails?.releaseStrategy
         ) {
             return commitment;
         }
@@ -757,21 +854,45 @@ export const prepareSubsidiaryProjectsForGameLoop = (player: Player): Player => 
             } as StudioOperatingMandate
             : undefined;
         if (!mandate || !commitment.projectDetails) return commitment;
+        const repairedDetails = repairStreamingTerms(commitment.projectDetails, mandate);
+        const changed = repairedDetails.releaseStrategy !== commitment.projectDetails.releaseStrategy
+            || repairedDetails.streamingRevenue !== commitment.projectDetails.streamingRevenue
+            || repairedDetails.hiddenStats.backendPct !== commitment.projectDetails.hiddenStats.backendPct;
+        if (!changed) return commitment;
         repairedCount += 1;
         return {
             ...commitment,
             phaseWeeksLeft: 0,
             projectDetails: {
-                ...commitment.projectDetails,
-                releaseStrategy: getSubsidiaryReleaseStrategy(commitment.projectDetails.type, mandate),
-                releaseScale: commitment.projectDetails.releaseScale || getSubsidiaryReleaseScale(commitment.projectDetails.budgetTier, mandate),
+                ...repairedDetails,
+                releaseScale: repairedDetails.releaseScale || getSubsidiaryReleaseScale(repairedDetails.budgetTier, mandate),
             },
+        };
+    });
+    const activeReleases = (player.activeReleases || []).map(release => {
+        const studioId = release.projectDetails?.studioId;
+        if (!studioId || !acquiredStudioIds.has(studioId) || release.distributionPhase !== 'STREAMING') return release;
+        const studio = player.businesses.find(candidate => candidate.id === studioId);
+        if (!studio) return release;
+        const repairedDetails = repairStreamingTerms(release.projectDetails, getStudioOperatingMandate(studio));
+        if (
+            repairedDetails.streamingRevenue === release.projectDetails.streamingRevenue
+            && repairedDetails.hiddenStats.backendPct === release.projectDetails.hiddenStats.backendPct
+        ) return release;
+        repairedCount += 1;
+        return {
+            ...release,
+            projectDetails: repairedDetails,
+            streamingRevenue: Math.max(Number(release.streamingRevenue || 0), Number(repairedDetails.streamingRevenue || 0)),
+            streamingUpfrontFee: Math.max(Number(release.streamingUpfrontFee || 0), Number(repairedDetails.streamingRevenue || 0)),
+            studioRoyaltyPercentage: Math.max(Number(release.studioRoyaltyPercentage || 0), Number(repairedDetails.hiddenStats.backendPct || 0)),
         };
     });
     if (!repairedCount) return player;
     return {
         ...player,
         commitments,
+        activeReleases,
         logs: [{
             week: player.currentWeek,
             year: player.age,

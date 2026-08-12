@@ -1,7 +1,10 @@
 import { existsSync, readFileSync } from 'node:fs';
 
 const brief = readFileSync('views/lifestyle/business/components/OwnedRightDevelopmentBrief.tsx', 'utf8');
-const lab = readFileSync('views/lifestyle/business/DevelopmentLab.tsx', 'utf8');
+const lab = [
+  readFileSync('views/lifestyle/business/DevelopmentLab.tsx', 'utf8'),
+  readFileSync('views/lifestyle/business/components/DevelopmentLabScriptVault.tsx', 'utf8'),
+].join('\n');
 const market = readFileSync('views/lifestyle/business/components/RightsMarket.tsx', 'utf8');
 const dealRoom = readFileSync('views/lifestyle/business/components/RightsDealRoom.tsx', 'utf8');
 const dossierPath = 'views/lifestyle/business/components/OwnedIpDossier.tsx';
@@ -33,19 +36,19 @@ for (const [source, forbidden] of [
 }
 
 for (const required of [
-  'IP Performance Dossier',
-  'Performance Pulse',
+  "tr('ownedIp.dossier.title')",
+  "tr('ownedIp.performance.title')",
   'Screen History',
-  'Development Pipeline',
+  "tr('ownedIp.pipeline.title')",
   'Open Project',
-  'Develop IP',
+  "tr('ownedIp.action.developIp')",
   'bg-[#060608]',
-  'Studio Original',
-  'Expansion Command',
-  'Franchise Command',
-  'Universe Command',
-  'Hold IP',
-  'Renew Licence',
+  "tr('ownedIp.ownership.studioOriginal')",
+  "tr('ownedIp.section.expansion')",
+  "tr('ownedIp.action.franchiseCommand')",
+  "tr('ownedIp.action.universeCommand')",
+  "tr('ownedIp.action.holdIp')",
+  "tr('ownedIp.action.renewLicence'",
 ]) {
   if (!dossier.includes(required)) failures.push(`Owned IP dossier is missing: ${required}`);
 }
@@ -56,7 +59,7 @@ if (!dossier.includes('<div\n            role="dialog"')) failures.push('Owned I
 
 if (!lab.includes('onOpenProject')) failures.push('Development Lab does not expose the existing Project Dashboard handoff.');
 if (!productionHouse.includes('onOpenProject')) failures.push('Production House does not wire the existing Project Dashboard handoff.');
-for (const required of ['All IP', 'Originals', 'ipSourceFilter']) {
+for (const required of ['developmentLab.vault.filter.allIp', 'developmentLab.vault.filter.originals', 'ipSourceFilter']) {
   if (!lab.includes(required)) failures.push(`Unified IP Library filter is missing: ${required}`);
 }
 
@@ -66,16 +69,16 @@ if (brief.includes('window.setTimeout(onAuthorized')) {
 
 for (const required of [
   'Owned',
-  'Owned IP',
-  'IP Library',
+  'developmentLab.vault.ownedIp',
+  'developmentLab.vault.ipLibrary',
   'Develop IP',
   'Projects Made',
   'Lifetime Gross',
   'Unproven',
-  'Character IP',
-  'Story World IP',
-  'Franchise IP',
-  'Catalog IP',
+  'developmentLab.ipType.CHARACTER',
+  'developmentLab.ipType.STORY_WORLD',
+  'developmentLab.ipType.FRANCHISE',
+  'developmentLab.ipType.CATALOG',
   'activeReleases',
   'pastProjects',
   'subjectName',

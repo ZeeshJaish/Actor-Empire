@@ -73,22 +73,26 @@ const roleLogic = read('services/roleLogic.ts');
 assert(roleLogic.includes('buildAutomaticProjectMusicPlan'), 'generated offers receive music plans');
 
 const greenlight = read('views/lifestyle/business/GreenlightWizard.tsx');
+const greenlightSoundtrack = read('views/lifestyle/business/components/GreenlightSoundtrackSection.tsx');
+const greenlightUtils = read('views/lifestyle/business/greenlightUtils.ts');
+const greenlightModules = `${greenlight}\n${greenlightSoundtrack}\n${greenlightUtils}`;
 assert(greenlight.includes('buildProjectMusicPlanFromArtists'), 'Greenlight-created projects receive selected music plans');
 assert(greenlight.includes('getMusicArtistCatalog(player.world)'), 'Greenlight artist picker can include generated music artists');
-assert(greenlight.includes('Soundtrack Desk'), 'Greenlight setup exposes soundtrack desk controls');
-assert(greenlight.includes('Content Types') && greenlight.includes('Let Studio Decide'), 'Greenlight soundtrack desk exposes direct music content choices');
-assert(greenlight.includes('Toggle on to add artist') && greenlight.includes('Search artist for'), 'Greenlight content rows clearly connect toggles to inline artist assignment');
-assert(greenlight.includes('musicRoleSearchQueries') && greenlight.includes('assignMusicArtistToRole'), 'Greenlight soundtrack desk assigns artists per music content type');
-assert(greenlight.includes('All music content is off'), 'Greenlight soundtrack desk supports turning every music content type off');
-assert(greenlight.includes('overflow-x-auto') && greenlight.includes('Rating'), 'Greenlight artist picker uses a horizontal rated artist rail');
-assert(greenlight.includes('musicRoleSortOptions') && greenlight.includes('MUSIC_ARTIST_SORT_OPTIONS'), 'Greenlight artist rails expose per-row sorting');
-assert(greenlight.includes('Cost Low') && greenlight.includes('Followers') && greenlight.includes('Available'), 'Greenlight artist sorting includes cost, reach, and availability options');
+assert(greenlight.includes('<GreenlightSoundtrackSection'), 'Greenlight setup renders the extracted soundtrack desk');
+assert(greenlightModules.includes('Soundtrack Desk'), 'Greenlight setup exposes soundtrack desk controls');
+assert(greenlightModules.includes('Content Types') && greenlightModules.includes('Let Studio Decide'), 'Greenlight soundtrack desk exposes direct music content choices');
+assert(greenlightModules.includes('Toggle on to add artist') && greenlightModules.includes('Search artist for'), 'Greenlight content rows clearly connect toggles to inline artist assignment');
+assert(greenlightModules.includes('musicRoleSearchQueries') && greenlightModules.includes('assignMusicArtistToRole'), 'Greenlight soundtrack desk assigns artists per music content type');
+assert(greenlightModules.includes('All music content is off'), 'Greenlight soundtrack desk supports turning every music content type off');
+assert(greenlightModules.includes('overflow-x-auto') && greenlightModules.includes('Rating'), 'Greenlight artist picker uses a horizontal rated artist rail');
+assert(greenlightModules.includes('musicRoleSortOptions') && greenlightModules.includes('MUSIC_ARTIST_SORT_OPTIONS'), 'Greenlight artist rails expose per-row sorting');
+assert(greenlightUtils.includes("'COST_LOW'") && greenlightUtils.includes("'FOLLOWERS'") && greenlightUtils.includes("'AVAILABILITY'"), 'Greenlight artist sorting includes cost, reach, and availability options');
 assert(greenlight.includes('selectedMusicCreditRoles'), 'Greenlight persists selected music deliverables in drafts');
 assert(greenlight.includes('selectedMusicArtistTargetCount'), 'Greenlight persists selected music artist count in drafts');
 assert(greenlight.includes('selectedMusicArtistIds'), 'Greenlight persists selected music artists in drafts');
 assert(greenlight.includes('getMusicArtistSearchMatches'), 'Greenlight inline artist search filters the full catalog');
 assert(greenlight.includes('musicBudget'), 'Greenlight package budget includes soundtrack artist cost');
-assert(greenlight.includes('selectedMusicImpact') && greenlight.includes('Opening') && greenlight.includes('Backlash'), 'Greenlight shows practical soundtrack impact chips');
+assert(greenlightModules.includes('selectedMusicImpact') && greenlightModules.includes('Opening') && greenlightModules.includes('Backlash'), 'Greenlight shows practical soundtrack impact chips');
 
 const detailView = read('components/ProjectDetailView.tsx');
 assert(detailView.includes('Music by'), 'contract detail view shows Music by');
@@ -104,8 +108,9 @@ assert(imdb.includes('Soundtrack Desk') && imdb.includes('selectedProjectMusicMo
 assert(imdb.includes('selectedProjectSoundtrackRevenue') && imdb.includes('getMusicCreditRoleLabel(credit.role)'), 'IMDb soundtrack desk shows revenue and role-based artist assignments');
 
 const awardLogic = read('services/awardLogic.ts');
-assert(awardLogic.includes('Best Original Song') && awardLogic.includes('Best Music Video Tie-In'), 'awards include music and campaign categories');
-assert(awardLogic.includes('getPlayerMusicAwardCategory') && awardLogic.includes('calculateProjectMusicImpact'), 'award eligibility scores music campaign categories');
+assert(awardLogic.includes('Best Original Song') && awardLogic.includes('Best Score'), 'awards include legitimate original song and score categories');
+assert(awardLogic.includes('LEGACY_INFLATED_MUSIC_CATEGORY_PATTERN') && awardLogic.includes('isLegacyInflatedMusicAwardCategory'), 'awards remove legacy campaign-only categories');
+assert(awardLogic.includes('getPlayerMusicAwardCategory') && awardLogic.includes('calculateProjectMusicImpact'), 'award eligibility scores legitimate music categories');
 assert(awardLogic.includes('getNomineeNameForMusicCategory') && awardLogic.includes("occupation === 'MUSIC_ARTIST'"), 'award ballots use music artists for music categories');
 
 const redCarpet = read('views/RedCarpetEvent.tsx');

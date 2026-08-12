@@ -447,7 +447,7 @@ export const TeamApp: React.FC<TeamAppProps> = ({ player, onBack, onHireAgent, o
                                                     'bg-blue-600 hover:bg-blue-700 text-white shadow-md'
                                                 }`}
                                             >
-                                                {isDone ? <><CheckCircle size={14}/> Contract Fulfilled</> : 
+                                                {isDone ? <><CheckCircle size={14}/> Deliverables Complete · Campaign Active</> :
                                                 <>{spon.requirements.type === 'POST' ? <Send size={14}/> : <Camera size={14}/>} {spon.requirements.type === 'POST' ? 'Post Ad' : 'Go to Shoot'} <span className="opacity-70 font-normal">(-{spon.requirements.energyCost}E)</span></>}
                                             </button>
                                         </div>

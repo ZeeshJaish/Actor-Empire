@@ -57,8 +57,15 @@ assert.equal(reboot.script.title, 'Audit Universe: Reborn');
 assert.equal(reboot.script.connectedProjectIntent, 'REBOOT');
 assert.equal(reboot.script.universeId, retiredUniverse.id);
 
-const developmentLab = read('views/lifestyle/business/DevelopmentLab.tsx');
-const greenlight = read('views/lifestyle/business/GreenlightWizard.tsx');
+const developmentLab = [
+    read('views/lifestyle/business/components/DevelopmentLabUniverseManager.tsx'),
+    read('views/lifestyle/business/components/DevelopmentLabUniverseDashboard.tsx'),
+    read('views/lifestyle/business/components/DevelopmentLabUniverseMerch.tsx')
+].join('\n');
+const greenlight = [
+    read('views/lifestyle/business/GreenlightWizard.tsx'),
+    read('views/lifestyle/business/greenlightProjectBuilder.ts')
+].join('\n');
 const homePage = read('views/HomePage.tsx');
 
 assert.match(developmentLab, /universeManager\.legacyArchive/, 'universe manager should expose a legacy archive');

@@ -3,12 +3,13 @@ import { readFileSync } from 'node:fs';
 const groupView = readFileSync('views/lifestyle/business/StudioGroupView.tsx', 'utf8');
 const commandCenter = readFileSync('views/lifestyle/business/OwnedStudioCommandCenter.tsx', 'utf8');
 const productionHouse = readFileSync('views/lifestyle/business/ProductionHouseGame.tsx', 'utf8');
+const divisionCard = readFileSync('views/lifestyle/business/components/StudioDivisionCard.tsx', 'utf8');
 const acquisitionDesk = readFileSync('views/mobile/components/StudioAcquisitionDesk.tsx', 'utf8');
 const forbes = readFileSync('views/mobile/ForbesApp.tsx', 'utf8');
 const groupLogic = readFileSync('services/studioGroup.ts', 'utf8');
 const englishLocale = readFileSync('services/localization/locales/en.ts', 'utf8');
 const portugueseLocale = readFileSync('services/localization/locales/pt-BR.ts', 'utf8');
-const source = `${groupView}\n${commandCenter}\n${productionHouse}\n${acquisitionDesk}\n${forbes}\n${groupLogic}\n${englishLocale}\n${portugueseLocale}`;
+const source = `${groupView}\n${commandCenter}\n${productionHouse}\n${divisionCard}\n${acquisitionDesk}\n${forbes}\n${groupLogic}\n${englishLocale}\n${portugueseLocale}`;
 
 for (const [needle, description] of [
     ['Studio Group', 'the Studio Group navigation and title'],
@@ -17,9 +18,12 @@ for (const [needle, description] of [
     ['Independent Label', 'the independent operating model'],
     ['Controlled Subsidiary', 'the controlled operating model'],
     ['Full Merger', 'the full-merger operating model'],
-    ['Group Valuation', 'the group valuation metric'],
-    ['Group Capital', 'the group capital metric'],
-    ['Weekly Result', 'the group profit metric'],
+    ['Parent Company', 'the ownership-weighted parent-company metric'],
+    ['Combined Studios', 'the consolidated operating-value metric'],
+    ['Owner Weekly', 'the ownership-weighted weekly result'],
+    ['HQ Operations', 'the standalone parent operating value'],
+    ['Owned Stakes', 'the parent holdings value'],
+    ['Acquisition Debt', 'the acquisition debt deduction'],
     ['Operating Model', 'the operating-model command'],
     ['Change Operating Model', 'the later model-change action'],
     ['Confirm Operating Model', 'the immediate post-acquisition confirmation'],
@@ -103,6 +107,14 @@ if (groupView.includes('Risk') || groupView.includes('riskLevel')) {
 
 if (groupView.includes('Ownership Line')) {
     throw new Error('Studio Group still renders the rejected ownership tail and circle.');
+}
+
+if (commandCenter.includes('min-w-0 truncate font-serif text-2xl')) {
+    throw new Error('Owned Studio Command Center still truncates the studio name.');
+}
+
+if (!commandCenter.includes('break-words') || !commandCenter.includes('Rebrand')) {
+    throw new Error('Owned Studio Command Center must show the full wrapping name and a labeled rebrand control.');
 }
 
 console.log('Studio Group UI audit passed.');

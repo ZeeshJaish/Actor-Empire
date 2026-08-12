@@ -1,12 +1,13 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Player, BudgetTier, Genre, ProjectDetails, ActiveRelease, Commitment, Business, LocationDetails, NewsItem, XPost, StudioEquipment, Script, Writer, GameLanguage } from '../../../types';
-import { ArrowLeft, Film, DollarSign, Users, TrendingUp, Calendar, Check, Plus, Star, Award, Zap, Briefcase, LayoutGrid, MapPin, PenTool, Globe, Camera, Clapperboard, ChevronRight, Lock, Building2, BarChart3, ShieldAlert, Crown, LogOut, AlertTriangle, Sparkles, BookOpen, Video, X, Clock, Palette, Lightbulb, Mic, Box, Tv, ArrowDownLeft, ArrowUpRight, WalletCards, Landmark } from 'lucide-react';
+import { Player, BudgetTier, Genre, ProjectDetails, ProjectType, ActiveRelease, Commitment, Business, LocationDetails, NewsItem, XPost, StudioEquipment, Script, Writer, GameLanguage } from '../../../types';
+import { ArrowLeft, Film, DollarSign, Users, TrendingUp, Calendar, Check, Plus, Star, Award, Zap, Briefcase, LayoutGrid, MapPin, PenTool, Globe, Camera, Clapperboard, ChevronRight, Building2, BarChart3, ShieldAlert, Crown, LogOut, AlertTriangle, Sparkles, BookOpen, Video, X, Clock, Palette, Lightbulb, Mic, Box, Tv, ArrowDownLeft, ArrowUpRight, WalletCards, Landmark } from 'lucide-react';
 import { NPC_DATABASE, getAvailableTalent, calculateProjectFameMultiplier } from '../../../services/npcLogic';
 import { liquidateBusiness, resolveProjectType } from '../../../services/businessLogic';
 import { NPCActor, NPCTier } from '../../../types';
 import { getDirectorTalent } from '../../../services/roleLogic';
 import { getPlayerLanguage, t } from '../../../services/i18n';
+import { getInheritedStudioProjects } from '../../../services/legacyLogic';
 
 
 import { DevelopmentLab, DevelopmentLabInitialTab } from './DevelopmentLab';
@@ -21,11 +22,14 @@ import { markGameCheckpoint } from '../../../services/firebaseService';
 import { discardUnreleasedScript, renameStudioProjectTitle } from '../../../services/projectNaming';
 import { getProjectReleaseLabel, getProjectReleaseSortValue, getProjectReleaseTiming } from '../../../services/releaseTiming';
 import { getReleaseDisplayPhase } from '../../../services/releasePresentation';
-import { createContinuationScript, getContinuationEligibility } from '../../../services/sequelFlow';
+import { createContinuationScript, getContinuationEligibility, getContinuationScriptBaseline } from '../../../services/sequelFlow';
 import { getStudioGroup } from '../../../services/studioGroup';
+import { getStudioGroupValuation } from '../../../services/studioGroupValuation';
 import { StudioGroupView } from './StudioGroupView';
 import { CustomPosterImage } from '../../../components/CustomPosterImage';
 import { StudioSaleEntryCard, StudioSaleRoom } from './components/StudioSaleDeckPanel';
+import { getProjectFundingEconomics, getProjectMarketOutcomeRevenue } from '../../../services/projectFundingEconomics';
+import { StudioDivisionCard } from './components/StudioDivisionCard';
 
 interface ProductionHouseGameProps {
     player: Player;
@@ -33,6 +37,12 @@ interface ProductionHouseGameProps {
     onUpdatePlayer: (p: Player) => void;
     initialRightsMarketOpportunityId?: string;
     onRightsMarketTargetConsumed?: () => void;
+    initialStudioContinuation?: { studioId: string; scriptId: string };
+    onStudioContinuationConsumed?: () => void;
+    initialStreamingOriginal?: { studioId: string; scriptId: string; commissionId: string };
+    onStreamingOriginalConsumed?: () => void;
+    onStreamingOriginalGreenlightComplete?: () => void;
+    onOpenOwnedStreamingDelivery?: () => void;
 }
 
 type StudioView = 'DASHBOARD' | 'STUDIO_GROUP' | 'DEVELOPMENT' | 'PRE_PROD' | 'PRODUCTION' | 'RELEASE' | 'RELEASES' | 'OFFICE' | 'FINANCE' | 'GREENLIGHT' | 'TALENT' | 'FILMOGRAPHY';
@@ -47,7 +57,7 @@ const formatMoney = (val: number) => {
     return `$${val}`;
 };
 
-export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player, onBack, onUpdatePlayer, initialRightsMarketOpportunityId, onRightsMarketTargetConsumed }) => {
+export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player, onBack, onUpdatePlayer, initialRightsMarketOpportunityId, onRightsMarketTargetConsumed, initialStudioContinuation, onStudioContinuationConsumed, initialStreamingOriginal, onStreamingOriginalConsumed, onStreamingOriginalGreenlightComplete, onOpenOwnedStreamingDelivery }) => {
     const [view, setView] = useState<StudioView>('DASHBOARD');
     const [rightsMarketTargetId, setRightsMarketTargetId] = useState<string | null>(null);
     const [selectedProjectDashboard, setSelectedProjectDashboard] = useState<any>(null);
@@ -55,9 +65,12 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
     const [activeStudioId, setActiveStudioId] = useState<string | null>(null);
     const [returnAfterStudioTool, setReturnAfterStudioTool] = useState<'STUDIO_GROUP' | null>(null);
     const [studioGroupCommandReturnId, setStudioGroupCommandReturnId] = useState<string | null>(null);
+    const [streamingCommissionTargetId, setStreamingCommissionTargetId] = useState<string | null>(null);
+    const [selectedConcept, setSelectedConcept] = useState<any>(null);
     const [subsidiaryLaunch, setSubsidiaryLaunch] = useState<{
         tab: DevelopmentLabInitialTab;
         projectType?: 'MOVIE' | 'SERIES';
+        initialScriptId?: string;
     } | null>(null);
 
     useEffect(() => {
@@ -72,6 +85,54 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
     const activeStudio = studioGroup.allStudios.find(candidate => candidate.id === activeStudioId && candidate.studioState?.operatingModel !== 'FULL_MERGER')
         || parentStudio;
     const studio = activeStudio;
+
+    useEffect(() => {
+        if (!initialStudioContinuation) return;
+        const targetStudio = studioGroup.allStudios.find(candidate => (
+            candidate.id === initialStudioContinuation.studioId
+            && candidate.studioState?.scripts?.some(script => script.id === initialStudioContinuation.scriptId)
+        ));
+        if (!targetStudio) {
+            onStudioContinuationConsumed?.();
+            return;
+        }
+        setActiveStudioId(targetStudio.id);
+        setStudioGroupCommandReturnId(targetStudio.id);
+        setReturnAfterStudioTool('STUDIO_GROUP');
+        setSelectedProjectDashboard(null);
+        setRightsMarketTargetId(null);
+        setSubsidiaryLaunch({ tab: 'VAULT', initialScriptId: initialStudioContinuation.scriptId });
+        setView('DEVELOPMENT');
+        onStudioContinuationConsumed?.();
+    }, [initialStudioContinuation, onStudioContinuationConsumed, studioGroup.allStudios]);
+
+    useEffect(() => {
+        if (!initialStreamingOriginal) return;
+        const targetStudio = studioGroup.allStudios.find(candidate => (
+            candidate.id === initialStreamingOriginal.studioId
+            && candidate.studioState?.scripts?.some(script => script.id === initialStreamingOriginal.scriptId)
+        ));
+        const concept = targetStudio?.studioState?.concepts?.find(candidate => candidate.scriptId === initialStreamingOriginal.scriptId);
+        if (!targetStudio) {
+            onStreamingOriginalConsumed?.();
+            return;
+        }
+        setActiveStudioId(targetStudio.id);
+        setStudioGroupCommandReturnId(targetStudio.id);
+        setReturnAfterStudioTool(null);
+        setSelectedProjectDashboard(null);
+        setRightsMarketTargetId(null);
+        setSubsidiaryLaunch(null);
+        setSelectedConcept(concept || {
+            id: `concept_${initialStreamingOriginal.scriptId}`,
+            scriptId: initialStreamingOriginal.scriptId,
+            lastStep: 'DIRECTOR',
+        });
+        setStreamingCommissionTargetId(initialStreamingOriginal.commissionId);
+        setView('GREENLIGHT');
+        onStreamingOriginalConsumed?.();
+    }, [initialStreamingOriginal, onStreamingOriginalConsumed, studioGroup.allStudios]);
+
     if (!studio) return <div className="p-10 text-white">Error: Studio not found.</div>;
     const language = getPlayerLanguage(player);
     const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
@@ -91,7 +152,13 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
 
     // 2. Releases (Active & Past)
     const activeReleases = player.activeReleases.filter(r => r.projectDetails.studioId === studio.id);
-    const library = player.pastProjects.filter(p => p.studioId === studio.id);
+    const library = [
+        ...player.pastProjects.filter(p => p.studioId === studio.id),
+        ...getInheritedStudioProjects(player, studio.id).filter(project => (
+            !player.pastProjects.some(past => past.id === project.id)
+            && !player.activeReleases.some(release => release.id === project.id)
+        ))
+    ];
 
     // Calculate Latest Installments for Sequel Button
     const latestInstallmentIds = useMemo(() => {
@@ -118,10 +185,7 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
     const consistencyBonus = library.filter(p => (p.rating || 0) >= 7.5).length * 0.8;
     // Prestige Score (0-100): rewards quality, awards, consistency, and credible hits.
     const prestigeScore = Math.min(100, Math.floor((avgRating * 6) + (awardsWon * 2.5) + (library.length * 0.8) + (breakoutCount * 1.2) + consistencyBonus));
-    const groupValuation = [
-        ...(studioGroup.parentStudio ? [studioGroup.parentStudio] : []),
-        ...studioGroup.subsidiaries,
-    ].reduce((total, groupStudio) => total + (groupStudio.stats.valuation || 0), 0);
+    const groupValuation = getStudioGroupValuation(player).parentCompanyValue;
     const getStudioSubtypeLabel = (subtype?: string) => subtype === 'MAJOR_STUDIO'
         ? tr('services.business.productionDashboard.studioType.major')
         : tr('services.business.productionDashboard.studioType.indie');
@@ -157,11 +221,21 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
         ...preProdProjects.map(p => ({ ...p, phase: 'PRE-PRODUCTION', risk: 'LOW' })),
         ...productionProjects.map(p => ({ ...p, phase: 'PRODUCTION', risk: 'HIGH' })),
         ...postProjects.map(p => ({ ...p, phase: 'POST-PRODUCTION', risk: 'MEDIUM' })),
-        ...awaitingReleaseProjects.map(p => ({ 
-            ...p, 
-            phase: p.projectDetails?.releaseStrategy ? 'PLANNED RELEASE' : 'AWAITING RELEASE', 
-            risk: 'LOW' 
-        }))
+        ...awaitingReleaseProjects.map(p => {
+            const fundingEconomics = getProjectFundingEconomics(p);
+            const needsFundedPremiereConfirmation = fundingEconomics.platformFunding > 0
+                && p.projectDetails?.hiddenStats?.platformFundedPremiereConfirmed !== true;
+
+            return {
+                ...p,
+                phase: needsFundedPremiereConfirmation || !p.projectDetails?.releaseStrategy
+                    ? p.projectDetails?.hiddenStats?.ownedStreamingOriginal
+                        ? 'AWAITING PLATFORM DELIVERY'
+                        : 'AWAITING RELEASE'
+                    : 'PLANNED RELEASE',
+                risk: 'LOW'
+            };
+        })
     ];
 
     const openGreenlight = (source: string, concept?: any) => {
@@ -200,6 +274,45 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
         setView('GREENLIGHT');
     };
 
+    const openStudioFacilities = (studioId: string) => {
+        setActiveStudioId(studioId);
+        setStudioGroupCommandReturnId(studioId);
+        setReturnAfterStudioTool('STUDIO_GROUP');
+        setView('OFFICE');
+    };
+
+    const openStudioTalent = (studioId: string) => {
+        setActiveStudioId(studioId);
+        setStudioGroupCommandReturnId(studioId);
+        setReturnAfterStudioTool('STUDIO_GROUP');
+        setView('TALENT');
+    };
+
+    const openSubsidiaryStreamingBids = (studioId: string, projectId: string) => {
+        const targetStudio = studioGroup.subsidiaries.find(candidate => (
+            candidate.id === studioId
+            && candidate.studioState?.operatingModel === 'CONTROLLED_SUBSIDIARY'
+        ));
+        const targetRelease = player.activeReleases.find(release => (
+            release.id === projectId
+            && release.projectDetails?.studioId === studioId
+            && release.distributionPhase === 'STREAMING_BIDDING'
+        ));
+        if (!targetStudio || !targetRelease) return;
+
+        // This is deliberately a bid-only route. It preserves the subsidiary
+        // context for payment, opens the existing Release Wizard, and returns
+        // directly to this subsidiary's command center.
+        setActiveStudioId(targetStudio.id);
+        setStudioGroupCommandReturnId(targetStudio.id);
+        setReturnAfterStudioTool('STUDIO_GROUP');
+        setSelectedProjectDashboard(targetRelease);
+        setSelectedConcept(null);
+        setRightsMarketTargetId(null);
+        setSubsidiaryLaunch(null);
+        setView('RELEASE');
+    };
+
     const openScriptMarketFromGreenlight = () => {
         setSelectedConcept(null);
         setSelectedProjectDashboard(null);
@@ -210,6 +323,15 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
 
     const closeStudioTool = () => {
         setSelectedConcept(null);
+        if (returnAfterStudioTool === 'STUDIO_GROUP') {
+            setView('STUDIO_GROUP');
+            return;
+        }
+        setView('DASHBOARD');
+    };
+
+    const closeReleaseTool = () => {
+        setSelectedProjectDashboard(null);
         if (returnAfterStudioTool === 'STUDIO_GROUP') {
             setView('STUDIO_GROUP');
             return;
@@ -397,7 +519,7 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
         setSequelSetupProject({ project, isSpinoff: true });
     };
 
-    const handleStartWritingSequel = (writer: Writer | null, title: string, isSpinoff: boolean) => {
+    const handleStartWritingSequel = (writer: Writer | null, title: string, isSpinoff: boolean, selectedProjectType: ProjectType) => {
         if (!sequelSetupProject) return;
         const project = sequelSetupProject.project;
         const sourceProjectType = resolveProjectType(project.projectType, project.type, project.projectDetails?.type);
@@ -408,10 +530,15 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
             studioScripts: updatedStudio.studioState.scripts || [],
             project,
             mode: isSpinoff ? 'SPINOFF' : 'SEQUEL',
-            title
+            title,
+            overrides: {
+                projectType: isSpinoff ? selectedProjectType : sourceProjectType,
+            },
         });
         if (!continuation.ok || !continuation.script) return;
         const isInternallyControlledTalent = (id: string) => id === 'PLAYER_SELF' || id === 'STUDIO_STAFF';
+        const lockedWriterSkill = Math.max(10, Math.min(100, Math.round(Number(writer?.skill || 50))));
+        const sequelBaseline = getContinuationScriptBaseline(project, lockedWriterSkill);
 
         // Deduct writer fee
         if (writer) {
@@ -511,10 +638,16 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
         const newScript: Script = {
             ...continuation.script,
             logline: randomLogline,
-            projectType: isSpinoff ? (sourceProjectType === 'MOVIE' ? 'SERIES' : 'MOVIE') : sourceProjectType,
+            projectType: continuation.script.projectType,
             targetAudience: project.projectDetails?.targetAudience || project.targetAudience || 'PG-13',
             genres: [project.genre || 'ACTION'],
-            quality: writer ? writer.skill : 50,
+            // Generated and legacy "Original Creator" entries are not always in
+            // studioState.writers. Keep their real craft score on the script so
+            // the development loop never silently falls back to 50.
+            quality: lockedWriterSkill,
+            assignedSkill: lockedWriterSkill,
+            assignedSpeed: writer?.speed || 10,
+            baseQuality: sequelBaseline,
             status: 'IN_DEVELOPMENT',
             writerId: writer ? writer.id : 'studio',
             author: writer ? writer.name : 'In-House Writers',
@@ -629,8 +762,6 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
     };
 
 
-    const [selectedConcept, setSelectedConcept] = useState<any>(null);
-
     const currentProject = React.useMemo(() => {
         if (!selectedProjectDashboard) return null;
         
@@ -672,7 +803,7 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
     };
 
     if (view === 'FINANCE') {
-        return <StudioFinanceView player={player} studio={studio} onBack={() => setView('DASHBOARD')} onUpdatePlayer={onUpdatePlayer} onExit={onBack} />;
+        return <StudioFinanceView player={player} studio={studio} onBack={closeStudioTool} onUpdatePlayer={onUpdatePlayer} onExit={onBack} />;
     }
 
     if (view === 'STUDIO_GROUP') {
@@ -684,6 +815,9 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
                 initialCommandStudioId={studioGroupCommandReturnId}
                 onGreenlightStudioProject={onGreenlightStudioProject}
                 onOpenStudioWorkbench={(studioId, tab) => openStudioWorkbench(studioId, tab)}
+                onOpenStudioFacilities={openStudioFacilities}
+                onOpenStudioTalent={openStudioTalent}
+                onOpenStreamingBids={openSubsidiaryStreamingBids}
             />
         );
     }
@@ -698,15 +832,15 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
         }} initialRightsMarketOpportunityId={rightsMarketTargetId || undefined} onRightsMarketTargetConsumed={() => {
             setRightsMarketTargetId(null);
             onRightsMarketTargetConsumed?.();
-        }} initialTab={subsidiaryLaunch?.tab} initialProjectType={subsidiaryLaunch?.projectType} />;
+        }} initialTab={subsidiaryLaunch?.tab} initialProjectType={subsidiaryLaunch?.projectType} initialScriptId={subsidiaryLaunch?.initialScriptId} />;
     }
 
     if (view === 'OFFICE') {
-        return <FacilitiesView player={player} studio={studio} onBack={() => setView('DASHBOARD')} onUpdatePlayer={onUpdatePlayer} />;
+        return <FacilitiesView player={player} studio={studio} onBack={closeStudioTool} onUpdatePlayer={onUpdatePlayer} />;
     }
 
     if (view === 'TALENT') {
-        return <StudioPage player={player} onUpdatePlayer={onUpdatePlayer} onBack={() => setView('DASHBOARD')} />;
+        return <StudioPage player={player} studioId={studio.id} onUpdatePlayer={onUpdatePlayer} onBack={closeStudioTool} />;
     }
 
     if (view === 'RELEASE' && currentProject) {
@@ -716,13 +850,9 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
                 studio={studio} 
                 project={currentProject} 
                 isPostTheatricalBidding={currentProject.distributionPhase === 'STREAMING_BIDDING' || currentProject.distributionPhase === 'THEATRICAL' || currentProject.phase === 'BIDDING' || currentProject.phase === 'RELEASED' || currentProject.phase === 'IN THEATERS'}
-                onBack={() => { 
-                    setView('DASHBOARD'); 
-                }} 
+                onBack={closeReleaseTool}
                 onUpdatePlayer={onUpdatePlayer} 
-                onComplete={() => { 
-                    setView('DASHBOARD'); 
-                }} 
+                onComplete={closeReleaseTool}
             />
         );
     }
@@ -741,6 +871,10 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
                     onStartStreamingBidding={handleStartStreamingBidding}
                     onRenameProject={handleRenameProject}
                     onConfigureRelease={(p) => {
+                        if (p.projectDetails?.hiddenStats?.ownedStreamingOriginal) {
+                            onOpenOwnedStreamingDelivery?.();
+                            return;
+                        }
                         setSelectedProjectDashboard(p);
                         setView('RELEASE');
                     }}
@@ -775,7 +909,12 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
                         onOpenScriptMarket={openScriptMarketFromGreenlight}
                         onUpdatePlayer={onUpdatePlayer} 
                         onComplete={() => {
-                            closeStudioTool();
+                            if (streamingCommissionTargetId) {
+                                setStreamingCommissionTargetId(null);
+                                onStreamingOriginalGreenlightComplete?.();
+                            } else {
+                                closeStudioTool();
+                            }
                         }}
                     />
                 </motion.div>
@@ -966,7 +1105,7 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
                         <div className="pointer-events-none absolute inset-x-4 top-0 h-px bg-gradient-to-r from-transparent via-amber-200/25 to-transparent" />
                         <div className="grid grid-cols-2 gap-2.5">
                         {/* Development Division */}
-                        <DivisionCard 
+                        <StudioDivisionCard
                             title={tr('studio.devLab')}
                             subtitle={tr('services.business.productionDashboard.division.devSubtitle')}
                             icon={<PenTool size={20}/>}
@@ -981,7 +1120,7 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
                         />
 
                         {/* Production Infrastructure */}
-                        <DivisionCard 
+                        <StudioDivisionCard
                             title={tr('studio.facilities')}
                             subtitle={tr('services.business.productionDashboard.division.facilitiesSubtitle')}
                             icon={<Building2 size={20}/>}
@@ -993,7 +1132,7 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
                         />
 
                         {/* Talent Division */}
-                        <DivisionCard 
+                        <StudioDivisionCard
                             title={tr('studio.talent')}
                             subtitle={tr('services.business.productionDashboard.division.talentSubtitle')}
                             icon={<Users size={20}/>}
@@ -1005,7 +1144,7 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
                         />
 
                         {/* Finance Division */}
-                        <DivisionCard 
+                        <StudioDivisionCard
                             title={tr('studio.finance')}
                             subtitle={tr('services.business.productionDashboard.division.financeSubtitle')}
                             icon={<DollarSign size={20}/>}
@@ -1016,7 +1155,7 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
                             onClick={() => setView('FINANCE')}
                         />
 
-                        <DivisionCard
+                        <StudioDivisionCard
                             wide
                             eyebrow={tr('services.business.productionDashboard.division.groupEyebrow')}
                             title={tr('services.business.productionDashboard.division.groupTitle')}
@@ -1227,7 +1366,13 @@ const StudioFinanceView: React.FC<{
     const language = getPlayerLanguage(player);
     const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
     const studioActiveReleases = useMemo(() => player.activeReleases.filter(r => r.projectDetails?.studioId === studio.id), [player.activeReleases, studio.id]);
-    const studioLibrary = useMemo(() => player.pastProjects.filter(p => p.studioId === studio.id), [player.pastProjects, studio.id]);
+    const studioLibrary = useMemo(() => [
+        ...player.pastProjects.filter(p => p.studioId === studio.id),
+        ...getInheritedStudioProjects(player, studio.id).filter(project => (
+            !player.pastProjects.some(past => past.id === project.id)
+            && !player.activeReleases.some(release => release.id === project.id)
+        ))
+    ], [player, studio.id]);
     const totalProjectGross = useMemo(() => studioActiveReleases.reduce((sum, r) => sum + (r.totalGross || 0), 0) + studioLibrary.reduce((sum, p) => sum + (p.gross || 0), 0), [studioActiveReleases, studioLibrary]);
     const totalStreamingRevenue = useMemo(() => studioActiveReleases.reduce((sum, r) => sum + (r.streamingRevenue || 0), 0) + studioLibrary.reduce((sum, p) => sum + (p.streamingRevenue || 0), 0), [studioActiveReleases, studioLibrary]);
     const totalSoundtrackRevenue = useMemo(() => studioActiveReleases.reduce((sum, r) => sum + (r.soundtrackRevenue || 0), 0) + studioLibrary.reduce((sum, p) => sum + (p.soundtrackRevenue || 0), 0), [studioActiveReleases, studioLibrary]);
@@ -1653,7 +1798,12 @@ const getStudioArchiveRevenue = (project: any) => {
 };
 
 const getStudioArchiveProfit = (project: any) => {
-    return getStudioArchiveRevenue(project) - (project.budget || project.projectDetails?.estimatedBudget || 0);
+    const budget = project.budget || project.projectDetails?.estimatedBudget || 0;
+    const fundingEconomics = getProjectFundingEconomics(project, budget);
+    const studioCost = fundingEconomics.platformFunding > 0
+        ? fundingEconomics.studioCashAtRisk
+        : budget;
+    return getStudioArchiveRevenue(project) - studioCost;
 };
 
 const getStudioArchiveRating = (project: any) => {
@@ -1941,13 +2091,22 @@ const ActiveProjectCard: React.FC<{ project: any, onClick?: () => void, onDelete
     const showTime = ['PRE-PRODUCTION', 'PRODUCTION', 'POST-PRODUCTION', 'AWAITING RELEASE', 'PLANNED RELEASE'].includes(project.phase);
     const weeksLeft = project.phaseWeeksLeft || 0;
 
-    const typeBorder = project.type === 'MOVIE' ? 'border-blue-500/60 shadow-blue-900/10' : 
-                       project.type === 'SERIES' ? 'border-red-500/60 shadow-red-900/10' : 
+    const projectType = resolveProjectType(project.projectType, project.type, project.projectDetails?.type);
+    const typeBorder = projectType === 'MOVIE' ? 'border-blue-500/60 shadow-blue-900/10' :
+                       projectType === 'SERIES' ? 'border-red-500/60 shadow-red-900/10' :
                        'border-zinc-800';
 
     return (
         <div 
             onClick={onClick}
+            onKeyDown={(event) => {
+                if (!onClick || (event.key !== 'Enter' && event.key !== ' ')) return;
+                event.preventDefault();
+                onClick();
+            }}
+            role={onClick ? 'button' : undefined}
+            tabIndex={onClick ? 0 : undefined}
+            aria-label={onClick ? `${project.name} · ${project.phase}` : undefined}
             className={`min-w-[140px] w-[140px] h-[210px] rounded-lg bg-zinc-900 border-2 flex flex-col relative overflow-hidden group shrink-0 cursor-pointer hover:scale-105 transition-all duration-300 shadow-lg ${typeBorder}`}
         >
             {/* Delete Button for Concepts */}
@@ -2041,20 +2200,23 @@ const ArchiveProjectCard: React.FC<{ project: any, isLatestInstallment?: boolean
 
     const hasAwards = project.awards && project.awards.filter((a: any) => a.outcome === 'WON').length > 0;
     
-    const typeBorder = project.type === 'MOVIE' ? 'border-blue-500/60 shadow-blue-900/10' : 
-                       project.type === 'SERIES' ? 'border-red-500/60 shadow-red-900/10' : 
+    const projectType = resolveProjectType(project.projectType, project.type, project.projectDetails?.type);
+    const typeBorder = projectType === 'MOVIE' ? 'border-blue-500/60 shadow-blue-900/10' :
+                       projectType === 'SERIES' ? 'border-red-500/60 shadow-red-900/10' :
                        'border-zinc-800';
 
     let outcomeLabel = null;
     let outcomeColor = "";
     const projectRevenue = getStudioArchiveRevenue(project);
-    if (projectRevenue > (project.budget || 0) * 5) {
+    const projectBudget = project.budget || 0;
+    const marketOutcomeRevenue = getProjectMarketOutcomeRevenue(project, projectRevenue, projectBudget);
+    if (marketOutcomeRevenue > projectBudget * 5) {
         outcomeLabel = "BLOCKBUSTER";
         outcomeColor = "bg-purple-500 text-white";
-    } else if (projectRevenue > (project.budget || 0) * 2) {
+    } else if (marketOutcomeRevenue > projectBudget * 2) {
         outcomeLabel = "HIT";
         outcomeColor = "bg-emerald-500 text-white";
-    } else if (projectRevenue < (project.budget || 0)) {
+    } else if (marketOutcomeRevenue < projectBudget) {
         outcomeLabel = "FLOP";
         outcomeColor = "bg-rose-500 text-white";
     } else {
@@ -2065,6 +2227,14 @@ const ArchiveProjectCard: React.FC<{ project: any, isLatestInstallment?: boolean
     return (
         <div 
             onClick={onClick}
+            onKeyDown={(event) => {
+                if (!onClick || (event.key !== 'Enter' && event.key !== ' ')) return;
+                event.preventDefault();
+                onClick();
+            }}
+            role={onClick ? 'button' : undefined}
+            tabIndex={onClick ? 0 : undefined}
+            aria-label={onClick ? `${project.name} · ${outcomeLabel}` : undefined}
             className={`min-w-[140px] w-[140px] h-[210px] rounded-lg bg-zinc-900 border-2 flex flex-col relative overflow-hidden shrink-0 cursor-pointer hover:scale-105 transition-all duration-300 shadow-lg ${typeBorder}`}
         >
             {/* Poster Area */}
@@ -2148,93 +2318,5 @@ const ArchiveProjectCard: React.FC<{ project: any, isLatestInstallment?: boolean
                 </div>
             </div>
         </div>
-    );
-};
-
-type DivisionAccent = 'BLUE' | 'EMERALD' | 'PURPLE' | 'ORANGE' | 'GOLD';
-
-const DIVISION_TONES: Record<DivisionAccent, {
-    frame: string;
-    key: string;
-    light: string;
-    stat: string;
-}> = {
-    BLUE: {
-        frame: 'border-blue-400/25',
-        key: 'bg-[#10213a] text-blue-200 shadow-[0_5px_0_#071223]',
-        light: 'bg-blue-300 shadow-[0_0_8px_rgba(147,197,253,0.95)]',
-        stat: 'text-blue-300',
-    },
-    EMERALD: {
-        frame: 'border-emerald-400/25',
-        key: 'bg-[#0a2b21] text-emerald-200 shadow-[0_5px_0_#03140f]',
-        light: 'bg-emerald-300 shadow-[0_0_8px_rgba(110,231,183,0.95)]',
-        stat: 'text-emerald-300',
-    },
-    PURPLE: {
-        frame: 'border-purple-400/25',
-        key: 'bg-[#29143a] text-purple-200 shadow-[0_5px_0_#13081d]',
-        light: 'bg-purple-300 shadow-[0_0_8px_rgba(216,180,254,0.95)]',
-        stat: 'text-purple-300',
-    },
-    ORANGE: {
-        frame: 'border-orange-400/25',
-        key: 'bg-[#371b08] text-orange-200 shadow-[0_5px_0_#1d0c03]',
-        light: 'bg-orange-300 shadow-[0_0_8px_rgba(253,186,116,0.95)]',
-        stat: 'text-orange-300',
-    },
-    GOLD: {
-        frame: 'border-amber-300/40',
-        key: 'bg-[#3a2608] text-amber-100 shadow-[0_5px_0_#1c1002]',
-        light: 'bg-amber-200 shadow-[0_0_9px_rgba(253,230,138,1)]',
-        stat: 'text-amber-200',
-    },
-};
-
-const DivisionCard: React.FC<{
-    title: string;
-    subtitle: string;
-    eyebrow?: string;
-    icon: React.ReactNode;
-    accent: DivisionAccent;
-    stats: { label: string; value: string }[];
-    onClick: () => void;
-    locked?: boolean;
-    wide?: boolean;
-}> = ({ title, subtitle, eyebrow, icon, accent, stats, onClick, locked, wide }) => {
-    const tone = DIVISION_TONES[accent];
-    return (
-        <button
-            type="button"
-            onClick={locked ? undefined : onClick}
-            className={`division-command-card control-key group relative min-h-[88px] w-full rounded-[16px] border-2 bg-[#11100f] p-2.5 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_5px_0_#030303] transition-all active:translate-y-[3px] active:shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_2px_0_#030303] ${wide ? 'col-span-2 min-h-[92px]' : ''} ${locked ? 'cursor-not-allowed border-white/[0.06] opacity-45' : `${tone.frame} hover:bg-[#171512]`}`}
-        >
-            <span className={`status-light absolute right-2.5 top-2.5 h-1.5 w-1.5 rounded-full ${tone.light}`} />
-            <div className={`relative flex h-full items-center gap-2.5 pr-3 ${wide ? 'sm:gap-4' : ''}`}>
-                <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] border border-white/10 ${tone.key} transition-transform group-active:translate-y-[2px]`}>
-                        {icon}
-                </div>
-
-                <div className="min-w-0 flex-1">
-                    {eyebrow ? <div className="mb-1 text-[7px] font-black uppercase tracking-[0.22em] text-amber-300">{eyebrow}</div> : null}
-                    <div className="truncate text-[12px] font-black uppercase leading-none text-white">{title}</div>
-                    <div className="mt-1 truncate text-[6px] font-black uppercase tracking-[0.15em] text-zinc-600">{subtitle}</div>
-                    {!locked && stats.length > 0 ? (
-                        <div className={`mt-2 flex min-w-0 items-center gap-2 ${wide ? 'justify-between' : ''}`}>
-                            {stats.slice(0, wide ? 2 : 1).map((stat, index) => (
-                                <div key={stat.label} className={`min-w-0 ${wide && index > 0 ? 'text-right' : ''}`}>
-                                    <span className="block truncate text-[5px] font-black uppercase tracking-[0.12em] text-zinc-700">{stat.label}</span>
-                                    <span className={`mt-0.5 block truncate font-mono text-[9px] font-black ${tone.stat}`}>{stat.value}</span>
-                                </div>
-                            ))}
-                        </div>
-                    ) : null}
-                </div>
-
-                <div className="absolute bottom-0 right-0 flex h-5 w-4 items-center justify-center text-zinc-700 transition-colors group-hover:text-white">
-                    {locked ? <Lock size={11} /> : <ChevronRight size={15} />}
-                </div>
-            </div>
-        </button>
     );
 };

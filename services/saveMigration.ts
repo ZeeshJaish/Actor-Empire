@@ -1,5 +1,6 @@
-import { INITIAL_PLAYER, type Message, type NewsItem, type Player, type PortfolioItem, type Relationship, type ScheduledEvent, type Stock, type StockTakeoverCase } from '../types';
+import { INITIAL_PLAYER, type Business, type Message, type NewsItem, type Player, type PortfolioItem, type Relationship, type ScheduledEvent, type Stock, type StockTakeoverCase } from '../types';
 import { ensureLifestyleActivityState } from './lifestyleActivities';
+import { inferStreamingStartWeekAbsolute } from './legacyLogic';
 import { normalizeNewPlayerTutorialState } from './newPlayerTutorial';
 import { createGlobalActorPackNPCs } from './npcLogic';
 import {
@@ -9,9 +10,20 @@ import {
     normalizeStockPrice,
     normalizeStockPriceHistory,
 } from './stockLogic';
+import { normalizeCompanyEquityPositions } from './privateEquityLogic';
+import { repairAcquiredStudioAssetPortfolios } from './studioAcquisitionAssets';
+import {
+    ABSOLUTE_THEATRICAL_WEEK_CAP,
+    MAX_THEATRICAL_EXTENSION_WEEKS,
+} from './theatricalRunLogic';
+import { migrateLegacyCharacterIdentity } from './characterIdentityMigration';
+import { mergeParentStudioTalentRosters } from './talentRoster';
+import { normalizeBackgroundCastingPlan, normalizeLivingEnsembleState } from './livingEnsemble';
+import { normalizeOwnedStreamingPlatformState } from './ownedStreamingPlatform';
 
-const SAVE_MIGRATION_VERSION = 15;
+const SAVE_MIGRATION_VERSION = 27;
 const RUNAWAY_STOCK_CASH_CEILING = 10_000_000_000_000;
+const ACQUISITION_RIVAL_BID_MAX_ROUNDS = 3;
 
 const clone = <T,>(value: T): T => value === undefined ? value : JSON.parse(JSON.stringify(value));
 const clamp = (value: number, min = 0, max = 100) => Math.max(min, Math.min(max, Number.isFinite(value) ? value : min));
@@ -22,6 +34,19 @@ const toMoneySeries = (value: unknown): number[] => toArray<unknown>(value)
     .filter(amount => amount >= 0);
 const toObjectSeries = <T,>(value: unknown): T[] => toArray<T>(value)
     .filter(item => item && typeof item === 'object');
+const normalizeTheatricalExtensionHistory = (value: unknown) => toObjectSeries<any>(value)
+    .map(item => ({
+        reviewWeek: Math.max(1, Math.round(Number(item.reviewWeek || 1))),
+        addedWeeks: Math.max(1, Math.min(2, Math.round(Number(item.addedWeeks || 1)))),
+        reason: ['STRONG_HOLD', 'BREAKOUT_DEMAND', 'SLEEPER_MOMENTUM'].includes(String(item.reason))
+            ? item.reason
+            : 'STRONG_HOLD',
+        weeklyGross: clampMoney(Number(item.weeklyGross || 0)),
+        holdPercent: Math.max(0, Math.min(200, Math.round(Number(item.holdPercent || 0)))),
+        marketDemand: Math.max(72, Math.min(136, Math.round(Number(item.marketDemand || 100)))),
+    }))
+    .filter((item, index, items) => items.findIndex(candidate => candidate.reviewWeek === item.reviewWeek) === index)
+    .slice(-MAX_THEATRICAL_EXTENSION_WEEKS);
 
 type MigratedAwardLike = {
     type?: string;
@@ -39,6 +64,41 @@ type MigratedAwardHistoryEntry = {
         projectName?: string;
         isPlayer?: boolean;
     }>;
+};
+
+const isLegacyInflatedMusicAwardCategory = (awardType: string, category: string): boolean => (
+    /soundtrack|trailer|music video/i.test(category)
+    || (awardType === 'BAFTA' && /original song/i.test(category))
+);
+
+const sanitizeMigratedAwardEvent = <T extends ScheduledEvent>(event: T): T => {
+    if (event.type !== 'AWARD_CEREMONY') return event;
+    const awardType = String(event.data?.awardDef?.type || '');
+    const nominations = toObjectSeries<any>(event.data?.nominations)
+        .filter(nomination => !isLegacyInflatedMusicAwardCategory(awardType, String(nomination.category || '')));
+    const sourceBallot = event.data?.fullBallot && typeof event.data.fullBallot === 'object'
+        ? event.data.fullBallot
+        : {};
+    const fullBallot = Object.fromEntries(
+        Object.entries(sourceBallot)
+            .filter(([category]) => !isLegacyInflatedMusicAwardCategory(awardType, category))
+            .map(([category, entries]) => [
+                category,
+                toObjectSeries<any>(entries)
+                    .filter(nomination => !isLegacyInflatedMusicAwardCategory(
+                        awardType,
+                        String(nomination.category || category)
+                    ))
+            ])
+    );
+    return {
+        ...event,
+        data: {
+            ...event.data,
+            nominations,
+            fullBallot
+        }
+    };
 };
 
 const isPlainRecord = (value: unknown): value is Record<string, unknown> => (
@@ -128,7 +188,9 @@ const shouldReplaceMigratedAward = (existing: MigratedAwardLike, candidate: Migr
 
 const sanitizeMigratedAwardRecords = <T extends MigratedAwardLike>(awards: T[] = []): T[] => {
     const byProject = new Map<string, T>();
-    awards.forEach(award => {
+    awards
+    .filter(award => !isLegacyInflatedMusicAwardCategory(String(award.type || ''), String(award.category || '')))
+    .forEach(award => {
         const key = `${award.type || 'UNKNOWN'}::${award.category || 'UNKNOWN'}::${award.projectId || 'UNKNOWN'}`;
         const existing = byProject.get(key);
         if (!existing || shouldReplaceMigratedAward(existing, award)) byProject.set(key, award);
@@ -157,6 +219,13 @@ const sanitizeMigratedAwardHistory = <T extends MigratedAwardHistoryEntry>(entri
         .sort((a, b) => (Number(a.entry.year || 0) - Number(b.entry.year || 0)) || (a.index - b.index))
         .forEach(({ entry, index }) => {
             toObjectSeries<NonNullable<MigratedAwardHistoryEntry['winners']>[number]>(entry.winners).forEach((winner, winnerIndex) => {
+                if (isLegacyInflatedMusicAwardCategory(
+                    String(entry.type || ''),
+                    String(winner.category || '')
+                )) {
+                    droppedWinnerKeys.add(`${index}::${winnerIndex}`);
+                    return;
+                }
                 if (!winner.isPlayer) return;
                 const winnerKey = `${entry.type || 'UNKNOWN'}::${winner.category || 'UNKNOWN'}::${winner.projectName || 'UNKNOWN'}`;
                 if (seenPlayerWinners.has(winnerKey)) {
@@ -276,15 +345,27 @@ export const migrateStocksForSave = (stocks: Partial<Stock>[] | undefined): Stoc
     return dedupeByKey(migrated, stock => stock.id);
 };
 
-const migratePortfolio = (portfolio: Partial<PortfolioItem>[] | undefined, stocks: Stock[]): PortfolioItem[] => {
+const migratePortfolio = (
+    portfolio: Partial<PortfolioItem>[] | undefined,
+    stocks: Stock[],
+    rawStocks: Partial<Stock>[] | undefined,
+): PortfolioItem[] => {
     const stockIds = new Set(stocks.map(stock => stock.id));
+    const rawStockById = new Map(toArray<Partial<Stock>>(rawStocks).map(stock => [String(stock.id || ''), stock]));
     return dedupeByKey(toArray<Partial<PortfolioItem>>(portfolio)
         .filter(position => stockIds.has(String(position.stockId || '')))
         .map(position => {
             const stock = stocks.find(candidate => candidate.id === position.stockId);
             const outstandingShares = stock ? getStockOutstandingShares(stock) : 0;
-            const shares = Math.min(outstandingShares, Math.max(0, Math.floor(Number(position.shares || 0))));
-            const averageCost = Math.max(0, Number(position.averageCost || stock?.price || 0));
+            const rawStock = rawStockById.get(String(position.stockId || ''));
+            const rawOutstandingShares = Math.max(0, Number(rawStock?.outstandingShares || 0));
+            const rawShares = Math.max(0, Math.floor(Number(position.shares || 0)));
+            const repairedOwnershipShares = rawOutstandingShares > outstandingShares && rawOutstandingShares > 0
+                ? Math.round(Math.min(1, rawShares / rawOutstandingShares) * outstandingShares)
+                : rawShares;
+            const shares = Math.min(outstandingShares, repairedOwnershipShares);
+            const rawAverageCost = Math.max(0, Number(position.averageCost || stock?.price || 0));
+            const averageCost = stock ? Math.min(rawAverageCost, getStockPriceCeiling(stock)) : rawAverageCost;
             const rawTotalInvested = Math.max(0, Number(position.totalInvested ?? (shares * averageCost)));
             const totalInvested = Math.min(rawTotalInvested, shares * Math.max(averageCost, stock?.price || 0));
             return {
@@ -366,10 +447,20 @@ const migrateProjectDetails = (details: any) => {
     next.campaignForecastSnapshot = next.campaignForecastSnapshot && typeof next.campaignForecastSnapshot === 'object' ? next.campaignForecastSnapshot : undefined;
     next.campaignRealitySnapshot = next.campaignRealitySnapshot && typeof next.campaignRealitySnapshot === 'object' ? next.campaignRealitySnapshot : undefined;
     next.audienceReception = next.audienceReception && typeof next.audienceReception === 'object' ? next.audienceReception : undefined;
+    if (next.backgroundCastingPlan && typeof next.backgroundCastingPlan === 'object') {
+        next.backgroundCastingPlan = normalizeBackgroundCastingPlan(next.backgroundCastingPlan, {
+            title: next.title,
+            genre: next.genre,
+            projectType: next.type,
+            episodes: next.episodes,
+            castShape: next.storyCompass?.castShape,
+            budget: next.estimatedBudget,
+        });
+    }
     return next;
 };
 
-const migrateActiveRelease = (release: any): any => {
+const migrateActiveRelease = (release: any, playerAge: number, currentWeek: number): any => {
     const next = release && typeof release === 'object' ? { ...release } : {};
     next.weekNum = Math.max(1, Math.round(Number(next.weekNum || 1)));
     next.weeklyGross = toMoneySeries(next.weeklyGross);
@@ -379,6 +470,19 @@ const migrateActiveRelease = (release: any): any => {
     next.weeklyExhibitorReceipts = toMoneySeries(next.weeklyExhibitorReceipts);
     next.totalExhibitorReceipts = clampMoney(Number(next.totalExhibitorReceipts || next.weeklyExhibitorReceipts.reduce((sum: number, value: number) => sum + value, 0)));
     next.weeklyDistributionBreakdowns = toObjectSeries(next.weeklyDistributionBreakdowns);
+    next.maxTheatricalWeeks = Math.max(1, Math.min(
+        ABSOLUTE_THEATRICAL_WEEK_CAP,
+        Math.round(Number(next.maxTheatricalWeeks || 12))
+    ));
+    next.baseTheatricalWeeks = Math.max(1, Math.min(
+        next.maxTheatricalWeeks,
+        Math.round(Number(next.baseTheatricalWeeks || next.maxTheatricalWeeks))
+    ));
+    next.theatricalExtensionWeeks = Math.max(0, Math.min(
+        MAX_THEATRICAL_EXTENSION_WEEKS,
+        Math.round(Number(next.theatricalExtensionWeeks || (next.maxTheatricalWeeks - next.baseTheatricalWeeks)))
+    ));
+    next.theatricalExtensionHistory = normalizeTheatricalExtensionHistory(next.theatricalExtensionHistory);
     next.budget = clampMoney(Number(next.budget || 0));
     next.productionPerformance = clamp(Number(next.productionPerformance ?? 50));
     next.promotionalBuzz = clamp(Number(next.promotionalBuzz || 0));
@@ -400,6 +504,7 @@ const migrateActiveRelease = (release: any): any => {
             totalViews: clampMoney(Number(next.streaming.totalViews || 0)),
             weeklyViews: toMoneySeries(next.streaming.weeklyViews),
             isLeaving: Boolean(next.streaming.isLeaving),
+            startWeekAbsolute: inferStreamingStartWeekAbsolute(next.streaming, playerAge, currentWeek),
         }
         : next.streaming;
     next.bids = toObjectSeries(next.bids).map((bid: any) => ({
@@ -412,9 +517,26 @@ const migrateActiveRelease = (release: any): any => {
     return next;
 };
 
+const inferMigratedPastProjectType = (project: any): 'MOVIE' | 'SERIES' => {
+    const candidates = [
+        project?.projectType,
+        project?.projectDetails?.type,
+        project?.mediaType,
+        project?.formatType,
+        project?.type,
+    ].map(value => String(value || '').trim().toUpperCase());
+    if (candidates.some(value => value === 'SERIES' || value === 'TV' || value === 'SHOW')) return 'SERIES';
+    const seriesStatus = String(project?.futurePotential?.seriesStatus || '').trim().toUpperCase();
+    if (seriesStatus && seriesStatus !== 'N/A') return 'SERIES';
+    if (Array.isArray(project?.episodeRatings) && project.episodeRatings.length > 0) return 'SERIES';
+    if (Array.isArray(project?.projectDetails?.episodeRatings) && project.projectDetails.episodeRatings.length > 0) return 'SERIES';
+    return 'MOVIE';
+};
+
 const migratePastProject = (project: any, index: number): any => {
     const next = project && typeof project === 'object' ? { ...project } : {};
     const releaseTiming = migratePastProjectReleaseTiming(next);
+    const inferredProjectType = inferMigratedPastProjectType(next);
     next.id = String(next.id || `past_project_${index}`);
     next.name = String(next.name || 'Untitled Project');
     next.type = 'ACTING_GIG';
@@ -450,6 +572,7 @@ const migratePastProject = (project: any, index: number): any => {
     next.castList = toObjectSeries(next.castList);
     next.reviews = toObjectSeries(next.reviews);
     next.episodeRatings = normalizeEpisodeRatings(next.episodeRatings);
+    next.projectType = next.episodeRatings.length > 0 ? 'SERIES' : inferredProjectType;
     next.campaignRealitySnapshot = next.campaignRealitySnapshot && typeof next.campaignRealitySnapshot === 'object' ? next.campaignRealitySnapshot : undefined;
     next.campaignFitSnapshot = next.campaignFitSnapshot && typeof next.campaignFitSnapshot === 'object' ? next.campaignFitSnapshot : undefined;
     next.campaignForecastSnapshot = next.campaignForecastSnapshot && typeof next.campaignForecastSnapshot === 'object' ? next.campaignForecastSnapshot : undefined;
@@ -471,7 +594,24 @@ const migratePastProject = (project: any, index: number): any => {
     next.releaseRegionIds = toArray<string>(next.releaseRegionIds).map(String);
     next.releaseChainSelections = next.releaseChainSelections && typeof next.releaseChainSelections === 'object' ? next.releaseChainSelections : {};
     next.boxOfficeArchiveVersion = Math.max(1, Math.round(Number(next.boxOfficeArchiveVersion || 1)));
+    next.baseTheatricalWeeks = next.baseTheatricalWeeks === undefined
+        ? undefined
+        : Math.max(1, Math.min(ABSOLUTE_THEATRICAL_WEEK_CAP, Math.round(Number(next.baseTheatricalWeeks || 1))));
+    next.theatricalExtensionWeeks = Math.max(0, Math.min(
+        MAX_THEATRICAL_EXTENSION_WEEKS,
+        Math.round(Number(next.theatricalExtensionWeeks || 0))
+    ));
+    next.theatricalExtensionHistory = normalizeTheatricalExtensionHistory(next.theatricalExtensionHistory);
     next.awards = sanitizeMigratedAwardRecords(toObjectSeries<MigratedAwardLike>(next.awards));
+    if (next.backgroundCastingPlan && typeof next.backgroundCastingPlan === 'object') {
+        next.backgroundCastingPlan = normalizeBackgroundCastingPlan(next.backgroundCastingPlan, {
+            projectId: next.id,
+            title: next.name,
+            genre: next.genre,
+            projectType: next.projectType,
+            budget: next.budget,
+        });
+    }
     return next;
 };
 
@@ -489,6 +629,7 @@ const migratePhaseState = (state: any, defaults: Record<string, any>) => {
 const migrateFlags = (flags: any, player: Player) => {
     const nextFlags = flags && typeof flags === 'object' ? { ...flags } : {};
     const previousSaveMigrationVersion = Number(nextFlags.saveMigrationVersion || 0);
+    nextFlags.livingEnsembleState = normalizeLivingEnsembleState(nextFlags.livingEnsembleState);
     nextFlags.worldReactionState = migratePhaseState(nextFlags.worldReactionState, {
         lastProcessedWeek: 0,
         controlledStudioCount: 0,
@@ -535,7 +676,8 @@ const migrateFlags = (flags: any, player: Player) => {
         processedCaseIds: toArray<string>(nextFlags.acquisitionMarketPulseState?.processedCaseIds).map(String),
         lastHeadlineIds: toArray<string>(nextFlags.acquisitionMarketPulseState?.lastHeadlineIds).map(String),
     };
-    nextFlags.acquisitionDebtLedger = toArray<any>(nextFlags.acquisitionDebtLedger).map((entry, index) => ({
+    let legacyImportedDebtRepaired = false;
+    let acquisitionDebtLedger = toArray<any>(nextFlags.acquisitionDebtLedger).map((entry, index) => ({
         ...entry,
         id: String(entry?.id || `debt_${index}`),
         studioId: String(entry?.studioId || 'UNKNOWN_STUDIO'),
@@ -545,6 +687,80 @@ const migrateFlags = (flags: any, player: Player) => {
         annualInterestRate: Math.max(0, Math.min(0.5, Number(entry?.annualInterestRate || 0))),
         status: entry?.status === 'PAID_OFF' || entry?.status === 'DEFAULTED' ? entry.status : 'ACTIVE',
     }));
+    const importedLegacyDebtNeedsRepair = Boolean(nextFlags.saveTransferImportedAt)
+        && nextFlags.acquisitionDebtLegacyBaselineVersion !== 1;
+    if (importedLegacyDebtNeedsRepair) {
+        const acquiredStudioIds = new Set(
+            toArray<any>(nextFlags.studioAcquisitionCases)
+                .filter(acquisitionCase => acquisitionCase?.status === 'ACQUIRED' && acquisitionCase?.closing)
+                .flatMap(acquisitionCase => [acquisitionCase.studioId, acquisitionCase.closing?.acquiredBusinessId])
+                .filter(Boolean)
+                .map(String),
+        );
+        acquisitionDebtLedger = acquisitionDebtLedger.map(entry => {
+            if (
+                entry.trackingOrigin === 'SIGNED'
+                || !acquiredStudioIds.has(String(entry.studioId))
+                || entry.status === 'PAID_OFF'
+            ) return entry;
+            legacyImportedDebtRepaired = true;
+            return {
+                ...entry,
+                originalPrincipal: 0,
+                remainingPrincipal: 0,
+                annualInterestRate: 0,
+                interestPaidToDate: 0,
+                missedServiceAmount: 0,
+                missedPayments: 0,
+                status: 'PAID_OFF',
+                closureReason: 'LEGACY_SAVE_BASELINE',
+            };
+        });
+    }
+    // Acquisition debt was added after some players had already bought studios.
+    // Do not reconstruct a brand-new payable debt balance from those historical
+    // closing records: the old save has no reliable way to tell whether the
+    // liabilities were settled before export. A paid-off ledger marker prevents
+    // the weekly loop from silently charging an imported legacy save.
+    const ledgerStudioIds = new Set(acquisitionDebtLedger.map(entry => String(entry.studioId)));
+    const legacyDebtBaselines = toArray<any>(nextFlags.studioAcquisitionCases).flatMap((acquisitionCase, index) => {
+        if (acquisitionCase?.status !== 'ACQUIRED' || !acquisitionCase?.closing) return [];
+        const candidateStudioIds = [
+            acquisitionCase.studioId,
+            acquisitionCase.closing.acquiredBusinessId,
+        ].filter(Boolean).map(String);
+        if (candidateStudioIds.some(studioId => ledgerStudioIds.has(studioId))) return [];
+
+        const liveStudioId = candidateStudioIds.find(studioId => player.businesses.some(business => (
+            business.type === 'PRODUCTION_HOUSE' && business.id === studioId
+        )));
+        if (!liveStudioId) return [];
+
+        ledgerStudioIds.add(liveStudioId);
+        return [{
+            id: `legacy_acquisition_debt_settled_${liveStudioId}_${index}`,
+            studioId: liveStudioId,
+            studioName: String(acquisitionCase.studioName || liveStudioId),
+            originalPrincipal: 0,
+            remainingPrincipal: 0,
+            annualInterestRate: 0,
+            originatedWeek: Math.max(0, Math.round(Number(acquisitionCase.closing.signedWeek || 0))),
+            originatedYear: Math.max(0, Math.round(Number(acquisitionCase.closing.signedYear || 0))),
+            source: acquisitionCase.closing.finalPrice === 0 ? 'STOCK_CONTROL_TRANSFER' : 'NEGOTIATED_ACQUISITION',
+            status: 'PAID_OFF',
+            interestPaidToDate: 0,
+            missedServiceAmount: 0,
+            missedPayments: 0,
+            closureReason: 'LEGACY_SAVE_BASELINE',
+        }];
+    });
+    nextFlags.acquisitionDebtLedger = [...acquisitionDebtLedger, ...legacyDebtBaselines];
+    if (legacyDebtBaselines.length > 0 || legacyImportedDebtRepaired) {
+        nextFlags.acquisitionDebtLegacyBaselineVersion = 1;
+        if (legacyImportedDebtRepaired) {
+            nextFlags.acquisitionDebtLegacyRefundWeekKey = `${player.age}:${player.currentWeek}`;
+        }
+    }
     const enabledGlobalActorPacks = toArray<string>(nextFlags.enabledGlobalActorPacks).map(String);
     if (enabledGlobalActorPacks.length > 0) {
         const existingExtraNPCs = toObjectSeries<any>(nextFlags.extraNPCs);
@@ -564,7 +780,31 @@ const migrateFlags = (flags: any, player: Player) => {
         nextFlags.enabledGlobalActorPacks = enabledGlobalActorPacks;
         nextFlags.extraNPCs = [...existingExtraNPCs, ...missingPackNPCs];
     }
-    if (!Array.isArray(nextFlags.studioAcquisitionCases)) nextFlags.studioAcquisitionCases = [];
+    nextFlags.studioAcquisitionCases = toArray<any>(nextFlags.studioAcquisitionCases).map(acquisitionCase => {
+        const responseRound = Math.max(1, Math.round(Number(
+            acquisitionCase?.sellerResponse?.round
+            || acquisitionCase?.offer?.round
+            || 1,
+        )));
+        if (acquisitionCase?.status !== 'RIVAL_BID' || responseRound <= ACQUISITION_RIVAL_BID_MAX_ROUNDS || !acquisitionCase?.offer) {
+            return acquisitionCase;
+        }
+        // Saved Round 4 / 3 auctions must receive the final board response on
+        // the next processed week instead of trapping the player in a bid loop.
+        return {
+            ...acquisitionCase,
+            status: 'OFFER_SUBMITTED',
+            offer: {
+                ...acquisitionCase.offer,
+                round: ACQUISITION_RIVAL_BID_MAX_ROUNDS,
+            },
+            sellerResponse: undefined,
+        };
+    });
+    nextFlags.companyEquityPositions = normalizeCompanyEquityPositions({
+        ...player,
+        flags: nextFlags,
+    }).slice(0, 40);
     if (!nextFlags.stockTakeoverEventDismissals || typeof nextFlags.stockTakeoverEventDismissals !== 'object') nextFlags.stockTakeoverEventDismissals = {};
     const tutorialState = normalizeNewPlayerTutorialState(nextFlags.newPlayerTutorial);
     if (tutorialState) nextFlags.newPlayerTutorial = tutorialState;
@@ -625,28 +865,205 @@ const normalizeRelationship = (relationship: any, index: number): Relationship =
     return next;
 };
 
+const acquiredStudioStaffSalary = (weeklyRevenue: number, index: number): number => {
+    const scaleAllowance = Math.min(1_200_000, Math.max(0, weeklyRevenue) * 0.006);
+    return Math.round(650_000 + scaleAllowance + (index * 75_000));
+};
+
+// Older acquisition saves treated historical deal liabilities as weekly operating
+// expenses. Repair only that clearly stale state; legitimate loss-making studios
+// and player-hired staff remain untouched.
+const repairAcquiredStudioFinance = (player: Player): Player => {
+    const activeDebtStudioIds = new Set(
+        toArray<any>(player.flags?.acquisitionDebtLedger)
+            .filter(entry => entry?.status === 'ACTIVE' && Number(entry?.remainingPrincipal || 0) > 0)
+            .map(entry => String(entry.studioId || '')),
+    );
+    const acquiredCases = new Map<string, any>();
+    toArray<any>(player.flags?.studioAcquisitionCases).forEach(acquisitionCase => {
+        if (acquisitionCase?.status !== 'ACQUIRED' || !acquisitionCase?.closing) return;
+        acquiredCases.set(String(acquisitionCase.studioId || ''), acquisitionCase);
+        acquiredCases.set(String(acquisitionCase.closing.acquiredBusinessId || ''), acquisitionCase);
+    });
+
+    let repaired = false;
+    const businesses = player.businesses.map((business): Business => {
+        const acquisitionCase = acquiredCases.get(business.id);
+        if (!acquisitionCase || business.type !== 'PRODUCTION_HOUSE') return business;
+
+        const expectedWeeklyRevenue = Math.max(0, Number(acquisitionCase.closing.expectedAnnualIncome || 0) / 52);
+        const weeklyRevenue = Math.max(0, Number(business.stats?.weeklyRevenue || 0));
+        const weeklyRevenueBasis = Math.max(weeklyRevenue, expectedWeeklyRevenue);
+        let staffChanged = false;
+        const staff = (business.staff || []).map((member, index) => {
+            if (!String(member.id || '').startsWith(`${business.id}_staff_`)) return member;
+            const salary = acquiredStudioStaffSalary(weeklyRevenueBasis, index);
+            if (Number(member.salary || 0) === salary) return member;
+            staffChanged = true;
+            return { ...member, salary };
+        });
+        const staffCosts = staff.reduce((total, member) => total + Math.max(0, Number(member.salary || 0)), 0);
+        const normalExpenseFloor = Math.round(Math.max(
+            staffCosts,
+            Math.max(1, Number(business.stats?.locations || 1)) * 200_000,
+            weeklyRevenueBasis * 0.18,
+        ));
+        const currentExpenses = Math.max(0, Number(business.stats?.weeklyExpenses || 0));
+        const hasActiveDebt = activeDebtStudioIds.has(business.id);
+        const staleDebtExpense = !hasActiveDebt
+            && currentExpenses > Math.max(normalExpenseFloor * 4, weeklyRevenueBasis * 1.25);
+
+        if (!staffChanged && !staleDebtExpense) return business;
+        repaired = true;
+        const weeklyExpenses = staleDebtExpense ? normalExpenseFloor : currentExpenses;
+        return {
+            ...business,
+            staff,
+            stats: {
+                ...business.stats,
+                weeklyExpenses,
+                weeklyProfit: Math.round(weeklyRevenue - weeklyExpenses),
+            },
+        };
+    });
+
+    return repaired ? { ...player, businesses } : player;
+};
+
+// Continuation commissioning used to store only writerId. Market writers and
+// the Original Creator are display-only entries, so their ID cannot be looked
+// up later in studioState.writers and the completed script fell back to 50.
+const repairInDevelopmentContinuationScripts = (player: Player): Player => {
+    let repaired = false;
+    const businesses = player.businesses.map((business): Business => {
+        const scripts = business.studioState?.scripts;
+        if (!Array.isArray(scripts)) return business;
+        let scriptsChanged = false;
+        const repairedScripts = scripts.map(script => {
+            if (
+                script.status !== 'IN_DEVELOPMENT'
+                || !['SEQUEL', 'SPINOFF'].includes(String(script.sourceMaterial || ''))
+            ) {
+                return script;
+            }
+            const displayedQuality = Number(script.quality);
+            const knownWriterSkill = Number(script.assignedSkill);
+            const stableWriterSkill = Number.isFinite(knownWriterSkill)
+                ? Math.max(10, Math.min(100, Math.round(knownWriterSkill)))
+                : Number.isFinite(displayedQuality) && displayedQuality > 0
+                    ? Math.max(10, Math.min(100, Math.round(displayedQuality)))
+                    : 50;
+            const knownBaseline = Number(script.baseQuality);
+            const stableBaseline = Number.isFinite(knownBaseline) && knownBaseline > 0
+                ? Math.max(10, Math.min(100, Math.round(knownBaseline)))
+                : stableWriterSkill;
+            if (script.assignedSkill === stableWriterSkill && script.baseQuality === stableBaseline) return script;
+            scriptsChanged = true;
+            return {
+                ...script,
+                assignedSkill: stableWriterSkill,
+                baseQuality: stableBaseline,
+            };
+        });
+        if (!scriptsChanged) return business;
+        repaired = true;
+        return {
+            ...business,
+            studioState: {
+                ...business.studioState!,
+                scripts: repairedScripts,
+            },
+        };
+    });
+    return repaired ? { ...player, businesses } : player;
+};
+
+const reverseLegacyImportedAcquisitionDebtCharge = (player: Player): Player => {
+    const refundWeekKey = player.flags?.acquisitionDebtLegacyRefundWeekKey;
+    if (
+        typeof refundWeekKey !== 'string'
+        || player.flags?.acquisitionDebtLegacyRefundApplied === true
+        || refundWeekKey !== `${player.age}:${player.currentWeek}`
+    ) return player;
+
+    const reversedTransactionIds = new Set(
+        toArray<any>(player.finance?.history)
+            .filter(transaction => (
+                typeof transaction?.id === 'string'
+                && transaction.id.startsWith('tx_acq_debt_')
+                && transaction.week === player.currentWeek
+                && transaction.year === player.age
+            ))
+            .map(transaction => transaction.id),
+    );
+    const refundAmount = toArray<any>(player.finance?.history)
+        .filter(transaction => reversedTransactionIds.has(transaction.id))
+        .reduce((sum, transaction) => sum + Math.max(0, -Number(transaction.amount || 0)), 0);
+    const nextFlags = {
+        ...player.flags,
+        acquisitionDebtLegacyRefundApplied: true,
+    };
+    if (refundAmount <= 0) {
+        return { ...player, flags: nextFlags };
+    }
+
+    return {
+        ...player,
+        money: Math.max(0, Number(player.money || 0)) + refundAmount,
+        finance: {
+            ...player.finance,
+            history: toArray<any>(player.finance?.history).filter(transaction => !reversedTransactionIds.has(transaction.id)),
+        },
+        flags: nextFlags,
+        logs: [{
+            week: player.currentWeek,
+            year: player.age,
+            message: 'Your imported studio history was updated. A legacy debt charge was reversed and your cash was restored.',
+            type: 'positive' as const,
+        }, ...toArray<any>(player.logs)].slice(0, 50),
+    };
+};
+
 export const migratePlayerSave = (input: Partial<Player> | Player): Player => {
     const base: Player = mergeDefaults(INITIAL_PLAYER, input);
+    const migratedAge = Math.max(1, Math.round(Number(base.age || INITIAL_PLAYER.age)));
+    const migratedCurrentWeek = Math.min(52, Math.max(1, Math.round(Number(base.currentWeek || INITIAL_PLAYER.currentWeek))));
     const stocks = migrateStocksForSave(base.stocks as Partial<Stock>[] | undefined);
     const repairRunawayStockCash = hasRunawayStockValues(base.stocks as Partial<Stock>[] | undefined, stocks);
+    const migratedPendingEvent = base.pendingEvent
+        ? sanitizeMigratedAwardEvent(base.pendingEvent)
+        : null;
     const playerWithStocks: Player = {
         ...base,
         id: String(base.id || INITIAL_PLAYER.id),
         name: typeof base.name === 'string' && base.name.trim() ? base.name : INITIAL_PLAYER.name,
-        age: Math.max(1, Math.round(Number(base.age || INITIAL_PLAYER.age))),
+        age: migratedAge,
         totalPlayTimeMs: Math.max(0, Math.min(Number.MAX_SAFE_INTEGER, Math.round(Number(base.totalPlayTimeMs || 0)))),
-        currentWeek: Math.max(1, Math.round(Number(base.currentWeek || INITIAL_PLAYER.currentWeek))),
+        currentWeek: migratedCurrentWeek,
         money: normalizeMigratedCash(base.money, repairRunawayStockCash),
         world: {
             ...base.world,
             awardHistory: sanitizeMigratedAwardHistory(toObjectSeries<MigratedAwardHistoryEntry>(base.world?.awardHistory)) as any,
         },
         stocks,
-        portfolio: migratePortfolio(base.portfolio as Partial<PortfolioItem>[] | undefined, stocks),
+        portfolio: migratePortfolio(
+            base.portfolio as Partial<PortfolioItem>[] | undefined,
+            stocks,
+            base.stocks as Partial<Stock>[] | undefined,
+        ),
         shareholderVotes: toArray<any>(base.shareholderVotes).filter(vote => stocks.some(stock => stock.id === vote?.stockId)).slice(0, 24),
         stockTakeovers: migrateTakeovers(base.stockTakeovers as Partial<StockTakeoverCase>[] | undefined, stocks, base),
-        activeReleases: toObjectSeries<any>(base.activeReleases).map(migrateActiveRelease),
+        ownedStreamingPlatform: normalizeOwnedStreamingPlatformState(base.ownedStreamingPlatform, String(base.id || INITIAL_PLAYER.id)),
+        activeReleases: toObjectSeries<any>(base.activeReleases).map(release => (
+            migrateActiveRelease(release, migratedAge, migratedCurrentWeek)
+        )),
         awards: sanitizeMigratedAwardRecords(toObjectSeries<MigratedAwardLike>(base.awards)) as any,
+        scheduledEvents: toObjectSeries<ScheduledEvent>(base.scheduledEvents)
+            .map(sanitizeMigratedAwardEvent),
+        pendingEvent: migratedPendingEvent?.type === 'AWARD_CEREMONY'
+            && !toObjectSeries<any>(migratedPendingEvent.data?.nominations).length
+                ? null
+                : migratedPendingEvent,
         pastProjects: dedupeByKey(
             toObjectSeries<any>(base.pastProjects).map(migratePastProject),
             project => project.id
@@ -680,8 +1097,44 @@ export const migratePlayerSave = (input: Partial<Player> | Player): Player => {
         lifestyleActivities: ensureLifestyleActivityState(base.lifestyleActivities),
         activeHealthConditions: toArray<any>(base.activeHealthConditions).slice(0, 6),
     };
-    return {
+    const migratedPlayer = {
         ...playerWithStocks,
         flags: migrateFlags(base.flags, playerWithStocks),
+    };
+    const repairedPlayer = migrateLegacyCharacterIdentity(reverseLegacyImportedAcquisitionDebtCharge(
+        repairAcquiredStudioAssetPortfolios(
+            repairInDevelopmentContinuationScripts(repairAcquiredStudioFinance(migratedPlayer)),
+        ),
+    ));
+    const productionHouses = repairedPlayer.businesses.filter(business => business.type === 'PRODUCTION_HOUSE');
+    const parentStudio = productionHouses.find(business => (
+        business.studioState?.acquisitionOrigin !== 'STUDIO_ACQUISITION'
+        && business.config?.productionType !== 'Acquired Studio'
+    )) || productionHouses[0];
+
+    if (!parentStudio) return repairedPlayer;
+
+    const reconciledRoster = mergeParentStudioTalentRosters(
+        parentStudio.id,
+        repairedPlayer.studio?.talentRoster as any,
+        parentStudio.studioState?.talentRoster as any,
+    );
+
+    return {
+        ...repairedPlayer,
+        studio: {
+            ...repairedPlayer.studio,
+            talentRoster: reconciledRoster,
+        },
+        businesses: repairedPlayer.businesses.map(business => (
+            business.id === parentStudio.id
+                ? {
+                    ...business,
+                    studioState: business.studioState
+                        ? { ...business.studioState, talentRoster: reconciledRoster }
+                        : business.studioState,
+                }
+                : business
+        )),
     };
 };

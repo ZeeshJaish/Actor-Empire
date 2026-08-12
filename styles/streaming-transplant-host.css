@@ -1,0 +1,18 @@
+/*
+ * Host isolation only. The EMPIRE+ ZIP uses deliberately short class names in
+ * its standalone prototype. Actor Empire's intro stylesheet also owns `.hero`
+ * and `.kicker`, so reset only the leaked host properties at the integration
+ * boundary. All authored ZIP dimensions, colours and typography remain owned
+ * by the exact component-local styles.
+ */
+.streaming-zip-viewport .hq .hqheroes > .hero {
+  position: static;
+  inset: auto;
+  transform: none;
+  text-align: initial;
+  pointer-events: auto;
+}
+
+.streaming-zip-viewport .hq .kicker {
+  text-indent: 0;
+}

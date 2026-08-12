@@ -10,6 +10,8 @@ const redCarpet = read('views/RedCarpetEvent.tsx');
 const awardFlow = read('views/AwardNightFlow.tsx');
 const imdb = read('views/mobile/ImdbApp.tsx');
 const home = read('views/HomePage.tsx');
+const productionQa = read('views/home/homeProductionQaActions.ts');
+const homeQaSource = `${home}\n${productionQa}`;
 const pkg = JSON.parse(read('package.json'));
 
 [
@@ -82,7 +84,7 @@ assert(
   'fullBallot',
   'playerCreditRole',
 ].forEach(token => {
-  assert(home.includes(token), `Home cheat menu should expose awards polish QA: ${token}`);
+  assert(homeQaSource.includes(token), `Home cheat menu should expose awards polish QA: ${token}`);
 });
 
 assert(

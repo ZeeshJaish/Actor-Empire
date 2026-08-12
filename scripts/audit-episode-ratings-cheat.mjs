@@ -5,6 +5,8 @@ const assert = (condition, message) => {
 };
 
 const home = fs.readFileSync('views/HomePage.tsx', 'utf8');
+const studioProductionQa = fs.readFileSync('views/home/homeStudioProductionQaActions.ts', 'utf8');
+const homeQaSource = `${home}\n${studioProductionQa}`;
 const packageJson = fs.readFileSync('package.json', 'utf8');
 
 [
@@ -19,14 +21,14 @@ const packageJson = fs.readFileSync('package.json', 'utf8');
   ['setPage?.(Page.MOBILE)', 'direct phone navigation'],
   ['onOpenProductionHouseCheat?.()', 'direct production house navigation'],
 ].forEach(([needle, description]) => {
-  assert(home.includes(needle), `HomePage should include ${description}: ${needle}`);
+  assert(homeQaSource.includes(needle), `HomePage should include ${description}: ${needle}`);
 });
 
 [
   'Episode Ratings IMDb QA season',
   'Cheat QA prestige series for IMDb episode rating heatmap testing.',
 ].forEach(needle => {
-  assert(!home.includes(needle), `Episode ratings seeded project copy should not leak QA text: ${needle}`);
+  assert(!homeQaSource.includes(needle), `Episode ratings seeded project copy should not leak QA text: ${needle}`);
 });
 
 assert(

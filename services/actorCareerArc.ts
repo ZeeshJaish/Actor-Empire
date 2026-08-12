@@ -1,4 +1,5 @@
 import { PastProject, Player } from '../types';
+import { getRoleIdentityArcCandidate } from './actorRoleIdentity';
 
 export type ActorCareerArcId =
     | 'NEWCOMER'
@@ -14,7 +15,12 @@ export type ActorCareerArcId =
     | 'CULT_FAVORITE'
     | 'STEADY_WORKER'
     | 'REINVENTION'
-    | 'UNDER_PRESSURE';
+    | 'UNDER_PRESSURE'
+    | 'VILLAIN_ERA'
+    | 'HEROIC_RUN'
+    | 'ANTI_HERO_PHASE'
+    | 'SCENE_STEALER'
+    | 'TYPECAST_PRESSURE';
 
 export interface ActorCareerArc {
     id: ActorCareerArcId;
@@ -99,6 +105,26 @@ const ARC_META: Record<ActorCareerArcId, ActorCareerArcMeta> = {
         id: 'UNDER_PRESSURE',
         toneClass: 'border-red-400/40 bg-red-400/10 text-red-200',
     },
+    VILLAIN_ERA: {
+        id: 'VILLAIN_ERA',
+        toneClass: 'border-red-400/40 bg-red-400/10 text-red-100',
+    },
+    HEROIC_RUN: {
+        id: 'HEROIC_RUN',
+        toneClass: 'border-sky-300/40 bg-sky-300/10 text-sky-100',
+    },
+    ANTI_HERO_PHASE: {
+        id: 'ANTI_HERO_PHASE',
+        toneClass: 'border-violet-400/40 bg-violet-400/10 text-violet-100',
+    },
+    SCENE_STEALER: {
+        id: 'SCENE_STEALER',
+        toneClass: 'border-fuchsia-300/40 bg-fuchsia-300/10 text-fuchsia-100',
+    },
+    TYPECAST_PRESSURE: {
+        id: 'TYPECAST_PRESSURE',
+        toneClass: 'border-orange-400/40 bg-orange-400/10 text-orange-100',
+    },
 };
 
 const getArcTranslationKey = (id: ActorCareerArcId, suffix: 'label' | 'summary' | 'detail' | 'changeLog') => (
@@ -127,7 +153,7 @@ const uniqueSignals = (signals: ActorCareerArcSignal[]): ActorCareerArcSignal[] 
 };
 
 const getTransitionTone = (id: ActorCareerArcId): ActorCareerArcTransition['tone'] => {
-    if (id === 'FLOP_ERA' || id === 'UNDER_PRESSURE') return 'negative';
+    if (id === 'FLOP_ERA' || id === 'UNDER_PRESSURE' || id === 'TYPECAST_PRESSURE') return 'negative';
     if (id === 'STEADY_WORKER' || id === 'NEWCOMER') return 'neutral';
     return 'positive';
 };
@@ -175,7 +201,9 @@ export const getActorCareerArc = (player: Player): ActorCareerArc => {
     const fame = Number(player.stats?.fame || 0);
     const reputation = Number(player.stats?.reputation || 0);
     const experience = Number(player.stats?.experience || 0);
-    const projects = [...(player.pastProjects || [])].sort((a, b) => getProjectSortWeek(b) - getProjectSortWeek(a));
+    const projects = [...(player.pastProjects || [])]
+        .filter(project => !project.isQaArchive)
+        .sort((a, b) => getProjectSortWeek(b) - getProjectSortWeek(a));
     const recentProjects = projects.slice(0, 5);
     const recentThree = recentProjects.slice(0, 3);
     const latest = recentProjects[0];
@@ -222,6 +250,11 @@ export const getActorCareerArc = (player: Player): ActorCareerArc => {
         return arc('FLOP_ERA', [
             { key: 'home.actorArc.signal.flopCluster', vars: { count: recentThree.filter(isFlopProject).length } },
         ]);
+    }
+
+    const roleIdentityArc = getRoleIdentityArcCandidate(player);
+    if (roleIdentityArc) {
+        return arc(roleIdentityArc.id, roleIdentityArc.signals);
     }
 
     if (fame >= 82 && recentHits >= 2 && recentGross >= 500_000_000) {

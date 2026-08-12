@@ -64,6 +64,16 @@ export interface StudioSaleReadiness {
     requirements: StudioSaleRequirement[];
     blockers: string[];
     valuation: StudioSaleValuation;
+    activeSlateItems: StudioSaleSlateItem[];
+}
+
+export interface StudioSaleSlateItem {
+    id: string;
+    name: string;
+    studioId: string;
+    studioName: string;
+    phase: string;
+    kind: 'PRODUCTION' | 'RELEASE';
 }
 
 export interface StudioSaleWindowState {
@@ -181,15 +191,63 @@ const getOpenSubsidiaries = (player: Player, studio: Business) => {
     ));
 };
 
-const getActiveSlateCount = (player: Player, studioIds: string[]) => {
+const ACTIVE_PRODUCTION_PHASES = new Set([
+    'PLANNING',
+    'PRE_PRODUCTION',
+    'AUDITION',
+    'PRODUCTION',
+    'POST_PRODUCTION',
+    'SCHEDULED',
+    'AWAITING_RELEASE',
+]);
+
+const formatSlatePhase = (phase: string) => phase
+    .replace(/_/g, ' ')
+    .toLowerCase()
+    .replace(/\b\w/g, character => character.toUpperCase());
+
+const isLiveStudioCommitment = (commitment: any) => {
+    const phase = String(commitment?.projectPhase || '');
+    if (ACTIVE_PRODUCTION_PHASES.has(phase)) return true;
+    // Older saves may not have a phase, but an explicitly running timer is still live work.
+    return !phase && (Number(commitment?.phaseWeeksLeft) > 0 || Number(commitment?.durationLeft) > 0);
+};
+
+export const getStudioSaleActiveSlateItems = (player: Player, studioIds: string[]): StudioSaleSlateItem[] => {
     const targetIds = new Set(studioIds);
-    const commitments = (player.commitments || []).filter(commitment => (
-        targetIds.has(String(commitment.projectDetails?.studioId || ''))
-    ));
-    const releases = (player.activeReleases || []).filter(release => (
-        targetIds.has(String(release.projectDetails?.studioId || ''))
-    ));
-    return commitments.length + releases.length;
+    const studioNames = new Map((player.businesses || []).map(studio => [String(studio.id), studio.name]));
+    const commitments = (player.commitments || [])
+        .filter(commitment => targetIds.has(String(commitment.projectDetails?.studioId || '')) && isLiveStudioCommitment(commitment))
+        .map((commitment: any) => {
+            const studioId = String(commitment.projectDetails?.studioId);
+            return {
+                id: `commitment:${commitment.id}`,
+                name: commitment.projectDetails?.title || commitment.name || 'Untitled production',
+                studioId,
+                studioName: studioNames.get(studioId) || 'Production house',
+                phase: formatSlatePhase(String(commitment.projectPhase || 'IN_PROGRESS')),
+                kind: 'PRODUCTION' as const,
+            };
+        });
+    const releases = (player.activeReleases || [])
+        .filter(release => targetIds.has(String(release.projectDetails?.studioId || '')) && release.status !== 'FINISHED')
+        .map(release => {
+            const studioId = String(release.projectDetails?.studioId);
+            const phase = release.distributionPhase === 'THEATRICAL'
+                ? 'In theaters'
+                : release.distributionPhase === 'STREAMING_BIDDING'
+                    ? 'Streaming bids'
+                    : 'Streaming run';
+            return {
+                id: `release:${release.id}`,
+                name: release.name || release.projectDetails?.title || 'Untitled release',
+                studioId,
+                studioName: studioNames.get(studioId) || 'Production house',
+                phase,
+                kind: 'RELEASE' as const,
+            };
+        });
+    return [...commitments, ...releases];
 };
 
 const getCatalogValue = (player: Player, studioIds: string[]) => {
@@ -362,7 +420,8 @@ export const getStudioSaleReadiness = (player: Player, studio: Business): Studio
     const valuation = getStudioSaleValuation(player, studio);
     const includedStudioIds = getIncludedStudioIds(player, studio);
     const bundledSubsidiaryCount = Math.max(0, includedStudioIds.length - 1);
-    const activeSlateCount = getActiveSlateCount(player, includedStudioIds);
+    const activeSlateItems = getStudioSaleActiveSlateItems(player, includedStudioIds);
+    const activeSlateCount = activeSlateItems.length;
     const openSubsidiaries = getOpenSubsidiaries(player, studio);
     const activeDeck = studio.studioState?.saleDeck;
     const alreadyListed = Boolean(activeDeck && !['CLOSED', 'WITHDRAWN'].includes(activeDeck.status));
@@ -412,6 +471,7 @@ export const getStudioSaleReadiness = (player: Player, studio: Business): Studio
         requirements,
         blockers,
         valuation,
+        activeSlateItems,
     };
 };
 

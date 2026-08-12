@@ -7,7 +7,7 @@ import { getProjectIdentityLabel } from '../../services/genreCatalog';
 import { getProjectReleaseLabel, getProjectReleaseTiming } from '../../services/releaseTiming';
 import { AWARD_CALENDAR, AwardShowLore, AwardDefinition, Nomination, sanitizeAwardRecords, getAwardCeremonyYear, getAwardShowLore } from '../../services/awardLogic';
 import { ArrowLeft, Star, Film, ChevronRight, User, TrendingUp, DollarSign, Eye, Award as AwardIcon, Calendar, BookOpen, Clock, List, MessageSquare, Users, Globe, Zap, LayoutGrid, Shield, ArrowRight, Tv, Music2, Handshake, Mountain, Car, Sparkles } from 'lucide-react';
-import { buildUniverseRoster, calculateUniverseProductWeeklyRevenue, getFallbackCharacterName, getUniverseDashboardProjects, getUniverseReleaseActivity, normalizeUniverseForSave, normalizeUniverseMap } from '../../services/universeLogic';
+import { buildUniverseRoster, calculateUniverseProductWeeklyRevenue, getFallbackCharacterName, getUniverseDashboardProjects, getUniverseReleaseActivity, normalizeCharacterAbilityType, normalizeCharacterStoryRole, normalizeUniverseForSave, normalizeUniverseMap } from '../../services/universeLogic';
 import { calculateProjectMusicImpact, getMusicCreditRoleLabel, getMusicStrategyLabel, getProjectMusicPlan } from '../../services/musicIndustry';
 import { getPlayerLanguage, t } from '../../services/i18n';
 import { inferSeasonNumber } from '../../services/episodeRatings';
@@ -47,6 +47,7 @@ interface DisplayProject {
     sourceScriptId?: string;
     seasonNumber?: number;
     episodeRatings?: SeasonEpisodeRatings[];
+    isLegacyArchive?: boolean;
 }
 
 type Tab = 'PROFILE' | 'FILMOGRAPHY' | 'AWARDS' | 'FRANCHISES' | 'SEASON'; // Added SEASON
@@ -312,6 +313,7 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
   const [activeTab, setActiveTab] = useState<Tab>('PROFILE');
   const [awardView, setAwardView] = useState<AwardView>('HOME');
   const [creditFilter, setCreditFilter] = useState<'ALL' | 'MOVIE' | 'TV'>('ALL');
+  const [filmographyScope, setFilmographyScope] = useState<'CURRENT' | 'ARCHIVE'>('CURRENT');
   const [selectedProject, setSelectedProject] = useState<DisplayProject | null>(null);
   const [selectedShow, setSelectedShow] = useState<SelectedShow | null>(null);
   const [selectedUniverse, setSelectedUniverse] = useState<Universe | null>(null);
@@ -414,6 +416,49 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
   }).reverse();
 
   const fullList = [...activeList, ...pastList];
+  const legacyCareerArchive = player.flags?.legacyCareerArchive || (
+      Array.isArray(player.flags?.legacyStudioProjects)
+          ? {
+              parent: player.flags?.legacyParent,
+              pastProjects: player.flags.legacyStudioProjects,
+              activeReleases: [],
+              awards: []
+          }
+          : undefined
+  );
+  const legacyParentName = legacyCareerArchive?.parent?.name || player.flags?.legacyParent?.name || 'Previous generation';
+  const legacyActiveList: DisplayProject[] = (Array.isArray(legacyCareerArchive?.activeReleases) ? legacyCareerArchive.activeReleases : []).map((r: any) => {
+      const timing = getProjectReleaseTiming(r, releaseFallback);
+      return {
+          id: String(r.id), name: r.name || r.projectDetails?.title || 'Untitled', year: timing.releaseYear || r.releaseYear || player.age, role: r.roleType || 'Role', rating: r.imdbRating || 0, status: 'ACTIVE' as const,
+          gross: r.totalGross, budget: r.budget, description: r.projectDetails?.description, cast: r.projectDetails?.castList,
+          reviews: r.projectDetails?.reviews, audienceReception: r.audienceReception || r.projectDetails?.audienceReception,
+          streamingViews: r.streaming?.totalViews, originalObject: r,
+          mediaType: resolveProjectType(r.type, r.projectDetails?.type, r.projectType), customPoster: r.projectDetails?.customPoster, identityLabel: getProjectIdentityLabel(r.projectDetails || r),
+          musicPlan: getProjectMusicPlan(r.projectDetails || r), franchiseId: r.projectDetails?.franchiseId, sourceScriptId: r.projectDetails?.sourceScriptId,
+          seasonNumber: inferSeasonNumber(r.projectDetails || r), episodeRatings: r.projectDetails?.episodeRatings,
+          campaignRealitySnapshot: r.projectDetails?.campaignRealitySnapshot,
+          releaseLabel: getProjectReleaseLabel(r, releaseFallback), releaseDetailLabel: getProjectReleaseLabel(r, releaseFallback, { includeWeek: true }),
+          isLegacyArchive: true
+      };
+  });
+  const legacyPastList: DisplayProject[] = (Array.isArray(legacyCareerArchive?.pastProjects) ? legacyCareerArchive.pastProjects : []).map((p: any) => {
+      const timing = getProjectReleaseTiming(p, releaseFallback);
+      return {
+          id: String(p.id), name: p.name || p.title || 'Untitled', year: timing.releaseYear || p.year, role: p.roleType || 'Role', rating: p.imdbRating || p.rating || 0, status: 'ARCHIVED' as const,
+          gross: p.gross, budget: p.budget, description: p.description, cast: p.castList, reviews: p.reviews, audienceReception: p.audienceReception,
+          streamingViews: p.totalViews, awards: p.awards, originalObject: p,
+          mediaType: resolveProjectType(p.projectType, p.type, p.projectDetails?.type), customPoster: p.customPoster, identityLabel: getProjectIdentityLabel(p),
+          musicPlan: getArchivedProjectMusicPlan(p), franchiseId: p.franchiseId, sourceScriptId: p.sourceScriptId,
+          seasonNumber: inferSeasonNumber(p), episodeRatings: p.episodeRatings, campaignRealitySnapshot: p.campaignRealitySnapshot,
+          releaseLabel: getProjectReleaseLabel(p, releaseFallback), releaseDetailLabel: getProjectReleaseLabel(p, releaseFallback, { includeWeek: true }),
+          isLegacyArchive: true
+      };
+  }).reverse();
+  const legacyFullList = [...legacyActiveList, ...legacyPastList];
+  const legacyAwards = Array.isArray(legacyCareerArchive?.awards) ? legacyCareerArchive.awards : [];
+  const legacyAwardWins = legacyAwards.filter((award: Award) => award.outcome === 'WON').length;
+  const filmographyList = filmographyScope === 'ARCHIVE' ? legacyFullList : fullList;
   
   // Calculate Average Rating
   const ratedProjects = fullList.filter(p => p.rating > 0);
@@ -434,7 +479,7 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
   }, 0);
   const musicAwardWins = awardsWon.filter(award => /song|score|soundtrack|music video|trailer/i.test(`${award.category || ''} ${award.name || ''}`));
 
-  const filteredCredits = fullList.filter(p => {
+  const filteredCredits = filmographyList.filter(p => {
       if (creditFilter === 'ALL') return true;
       if (creditFilter === 'MOVIE') return p.mediaType === 'MOVIE';
       if (creditFilter === 'TV') return p.mediaType === 'SERIES';
@@ -1088,6 +1133,14 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
                                       </div>
                                       <div className={`shrink-0 text-[10px] font-bold px-2 py-1 rounded uppercase ${char.status === 'ACTIVE' ? 'bg-emerald-900/30 text-emerald-500' : char.status === 'RECAST' ? 'bg-amber-500/15 text-amber-300' : 'bg-zinc-800 text-zinc-500'}`}>{getCharacterStatusLabel(char.status)}</div>
                                   </div>
+                                  <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                                      <span className="rounded-full border border-violet-400/20 bg-violet-400/10 px-2 py-1 text-[8px] font-black uppercase tracking-widest text-violet-200">
+                                          {tr(`character.identity.storyRole.${normalizeCharacterStoryRole(char.storyRole)}` as any)}
+                                      </span>
+                                      <span className="rounded-full border border-sky-400/20 bg-sky-400/10 px-2 py-1 text-[8px] font-black uppercase tracking-widest text-sky-200">
+                                          {tr(`character.identity.ability.${normalizeCharacterAbilityType(char.abilityType)}` as any)}
+                                      </span>
+                                  </div>
                                   <div className="mt-3 grid grid-cols-1 gap-1.5 text-[10px] uppercase tracking-widest">
                                       <div className="flex gap-2 min-w-0">
                                           <span className="text-zinc-600 shrink-0">{tr('imdb.franchise.first')}</span>
@@ -1147,7 +1200,7 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
 	    const returnStatusMeta = getReturnStatusMeta(futurePotential?.playerReturnStatus);
 	    const selectedProjectSeriesKey = selectedProject.mediaType === 'SERIES' ? getDisplayProjectSeriesKey(selectedProject) : '';
 	    const selectedProjectEpisodeRatings = selectedProject.mediaType === 'SERIES'
-	        ? fullList
+        ? (selectedProject.isLegacyArchive ? legacyFullList : fullList)
 	            .filter(project => project.mediaType === 'SERIES' && getDisplayProjectSeriesKey(project) === selectedProjectSeriesKey)
 	            .flatMap(project => project.episodeRatings || [])
 	            .filter((season, index, seasons) => seasons.findIndex(item => item.season === season.season) === index)
@@ -1648,6 +1701,29 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
              {/* FILMOGRAPHY TAB */}
              {activeTab === 'FILMOGRAPHY' && (
                  <div className="p-4">
+                     {legacyFullList.length > 0 && (
+                         <div className="mb-4 rounded-xl border border-zinc-800 bg-zinc-900/60 p-2">
+                             <div className="grid grid-cols-2 gap-2">
+                                 <button
+                                     onClick={() => setFilmographyScope('CURRENT')}
+                                     className={`min-h-11 rounded-lg px-3 text-[10px] font-black uppercase tracking-wide ${filmographyScope === 'CURRENT' ? 'bg-yellow-400 text-black' : 'bg-zinc-950 text-zinc-400'}`}
+                                 >
+                                     My Credits
+                                 </button>
+                                 <button
+                                     onClick={() => setFilmographyScope('ARCHIVE')}
+                                     className={`min-h-11 rounded-lg px-3 text-[10px] font-black uppercase tracking-wide ${filmographyScope === 'ARCHIVE' ? 'bg-yellow-400 text-black' : 'bg-zinc-950 text-zinc-400'}`}
+                                 >
+                                     {legacyParentName}'s Archive
+                                 </button>
+                             </div>
+                             <p className="px-1 pt-2 text-[10px] leading-relaxed text-zinc-500">
+                                 {filmographyScope === 'ARCHIVE'
+                                     ? `${legacyFullList.length} titles and ${legacyAwardWins} awards are preserved here. These credits do not count as your personal roles.`
+                                     : 'Your credits begin with this generation.'}
+                             </p>
+                         </div>
+                     )}
                      <div className="flex items-center justify-between mb-4">
                          <h3 className="text-yellow-400 font-bold uppercase tracking-widest text-xs flex items-center gap-2">
                             {tr('imdb.profile.filmography')} <span className="bg-zinc-700 text-white px-1.5 py-0.5 rounded-full text-[10px]">{filteredCredits.length}</span>

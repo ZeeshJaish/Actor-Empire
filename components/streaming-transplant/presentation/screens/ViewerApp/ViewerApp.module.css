@@ -1,0 +1,185 @@
+.va{position:fixed;inset:0;max-width:520px;margin:0 auto;background:#07080c;color:#eef0f5;
+  font-family:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;overflow:hidden;
+  animation:epx-vain .5s cubic-bezier(.25,1,.3,1) both}
+@keyframes epx-vain{from{opacity:0;transform:scale(.9)}to{opacity:1;transform:scale(1)}}
+.va :where(*){margin:0;padding:0;box-sizing:border-box;min-width:0;-webkit-tap-highlight-color:transparent}
+.va :where(button){font-family:inherit;border:none;background:none;color:inherit;cursor:pointer;text-align:inherit}
+
+.va .exitpill{position:fixed;left:50%;transform:translateX(-50%);bottom:max(14px,env(safe-area-inset-bottom));
+  z-index:40;font-size:10px;font-weight:900;letter-spacing:.12em;padding:10px 18px;border-radius:99px;
+  background:rgba(10,12,17,.86);border:1px solid rgba(255,255,255,.18);color:#e7ebf2;
+  backdrop-filter:blur(8px);box-shadow:0 8px 24px rgba(0,0,0,.5)}
+
+.va .prelaunch{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:12px;padding:30px;text-align:center}
+.va .plmark{width:44px;height:44px;color:var(--epx-va-c)}
+.va .plmark svg{width:100%;height:100%;display:block}
+.va .prelaunch b{font-size:20px;font-weight:900}
+.va .prelaunch p{font-size:12px;color:#7d8698;line-height:1.55;max-width:250px}
+
+.va .ascroll{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;
+  padding-bottom:74px}
+.va .ascroll::-webkit-scrollbar{display:none}
+
+.va .topbar2{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:9px;
+  padding:max(12px,env(safe-area-inset-top)) 14px 10px;
+  background:linear-gradient(rgba(7,8,12,.96),rgba(7,8,12,.5) 70%,transparent)}
+.va .tmark{width:20px;height:20px;color:var(--epx-va-c);flex:0 0 auto}
+.va .tmark svg{width:100%;height:100%;display:block}
+.va .topbar2 b{font-size:15px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:42%}
+.va .tnav{flex:1;display:flex;gap:12px;justify-content:flex-end}
+.va .tnav span{font-size:10px;color:#c6ccda}
+.va .tav{width:19px;height:19px;border-radius:4px;background:linear-gradient(150deg,#4a5568,#2a3140);flex:0 0 auto}
+
+/* hero */
+.va .bighero{position:relative;display:block;width:100%;aspect-ratio:3/3.4;overflow:hidden;text-align:left;
+  margin-top:-56px;
+  background:linear-gradient(168deg,hsl(var(--epx-va-h) 60% 34%),hsl(var(--epx-va-h) 55% 12%) 64%,#07080c)}
+.va .hghost{position:absolute;left:-3%;right:-3%;top:24%;font-size:44px;font-weight:900;line-height:.9;
+  color:#fff;opacity:.1;text-transform:uppercase;letter-spacing:-.02em;word-break:break-word}
+.va .hbody{position:absolute;left:0;right:0;bottom:0;padding:16px 15px 20px;
+  background:linear-gradient(transparent,rgba(7,8,12,.9) 42%,#07080c)}
+.va .otag{display:inline-flex;align-items:center;gap:5px;font-size:8px;font-weight:900;letter-spacing:.2em;color:#fff}
+.va .otag i{width:11px;height:11px;color:var(--epx-va-c)}
+.va .otag i svg{width:100%;height:100%;display:block}
+.va .hbody b{display:block;margin-top:6px;font-size:27px;line-height:1.03;color:#fff}
+.va .hmeta{display:block;margin-top:4px;font-size:10px;color:#aeb6c4}
+.va .hacts{display:flex;gap:8px;margin-top:13px}
+.va .pbtn,.va .lbtn{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:800;
+  padding:10px 20px;border-radius:6px}
+.va .pbtn{background:#fff;color:#07080c}
+.va .tri{width:0;height:0;border-left:9px solid currentColor;border-top:6px solid transparent;
+  border-bottom:6px solid transparent}
+.va .lbtn{background:rgba(255,255,255,.22);color:#fff}
+
+/* rows */
+.va .arow{padding:14px 0 2px}
+.va .arowhead{font-size:13px;font-weight:800;color:#e7ebf2;padding:0 14px 9px}
+.va .arail{display:flex;gap:7px;overflow-x:auto;scrollbar-width:none;padding:0 14px 4px}
+.va .arail::-webkit-scrollbar{display:none}
+.va .agrid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;padding:0 14px}
+.va .acard{position:relative;flex:0 0 auto;width:92px;aspect-ratio:2/3;border-radius:5px;overflow:hidden;
+  background:linear-gradient(165deg,hsl(var(--epx-va-h) 58% 36%),hsl(var(--epx-va-h) 52% 13%))}
+.va .agrid .acard{width:100%}
+.va .cghost{position:absolute;left:-4%;right:-4%;top:9%;font-size:19px;font-weight:900;line-height:.92;
+  color:#fff;opacity:.13;text-transform:uppercase;word-break:break-word}
+.va .crank{position:absolute;left:3px;bottom:16px;font-size:36px;font-weight:900;line-height:.78;color:#fff;
+  opacity:.92;text-shadow:0 2px 8px rgba(0,0,0,.8)}
+.va .com{position:absolute;top:4px;left:4px;width:11px;height:11px;color:#fff;opacity:.94;z-index:2}
+.va .com svg{width:100%;height:100%;display:block}
+.va .cleave{position:absolute;left:0;right:0;top:0;padding:3px;font-size:6.5px;font-weight:900;
+  letter-spacing:.06em;text-align:center;color:#fff;background:rgba(0,0,0,.62)}
+.va .cprog{position:absolute;left:5px;right:5px;bottom:15px;height:3px;border-radius:2px;
+  background:rgba(255,255,255,.3);overflow:hidden}
+.va .cprog i{display:block;height:100%;background:var(--epx-va-c)}
+.va .ccap{position:absolute;left:0;right:0;bottom:0;padding:3px 5px 4px;font-size:7.5px;font-weight:700;
+  color:#dfe4ee;background:rgba(7,8,12,.86);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+.va .livebar{display:flex;align-items:center;justify-content:center;gap:7px;margin-top:20px;
+  font-size:10px;color:#8b93a5}
+.va .dot{width:6px;height:6px;border-radius:50%;background:#ff3b30;box-shadow:0 0 8px rgba(255,59,48,.8);
+  animation:epx-lpulse 1.8s ease-in-out infinite}
+@keyframes epx-lpulse{0%,100%{opacity:1}50%{opacity:.35}}
+.va .append{text-align:center;padding:14px;font-size:9px;font-weight:900;letter-spacing:.14em;color:var(--epx-va-c)}
+
+/* ── title page ── */
+.va .tpage{position:absolute;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  animation:epx-tpin .3s cubic-bezier(.2,1,.3,1) both}
+@keyframes epx-tpin{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+.va .tpage::-webkit-scrollbar{display:none}
+.va .tart{position:relative;width:100%;aspect-ratio:3/2.5;overflow:hidden;
+  background:linear-gradient(168deg,hsl(var(--epx-va-h) 60% 36%),hsl(var(--epx-va-h) 55% 12%) 68%,#07080c)}
+.va .tghost{position:absolute;left:-3%;right:-3%;top:26%;font-size:42px;font-weight:900;line-height:.9;
+  color:#fff;opacity:.11;text-transform:uppercase;word-break:break-word}
+.va .tbody{padding:0 15px;margin-top:-42px;position:relative;z-index:2}
+.va .tbody h1{font-size:26px;line-height:1.05;margin-top:6px}
+.va .tmeta2{margin-top:5px;font-size:10.5px;color:#aeb6c4}
+.va .tlog{margin-top:10px;font-size:12px;line-height:1.55;color:#c6ccda}
+.va .playbig{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:15px;
+  padding:13px;border-radius:7px;background:#fff;color:#07080c;font-size:14px;font-weight:800}
+.va .trow2{display:flex;gap:7px;margin-top:9px}
+.va .tchip{flex:1;text-align:center;font-size:10px;font-weight:700;padding:9px 4px;border-radius:6px;
+  background:rgba(255,255,255,.08);color:#dfe4ee}
+.va .tleave{margin-top:12px;padding:10px 12px;border-radius:10px;font-size:10.5px;line-height:1.5;
+  background:rgba(255,176,32,.1);border:1px solid rgba(255,176,32,.3);color:#ffd79a}
+.va .tlive{display:flex;align-items:center;gap:7px;margin-top:13px;font-size:10px;color:#8b93a5;font-style:italic}
+.va .eps,.va .more{margin-top:22px}
+.va .epshead{font-size:13px;font-weight:800;margin-bottom:9px}
+.va .ep{display:flex;align-items:center;gap:11px;width:100%;padding:10px;border-radius:10px;
+  background:rgba(255,255,255,.04);margin-bottom:6px}
+.va .epn{flex:0 0 auto;width:20px;text-align:center;font-size:15px;font-weight:800;color:#8b93a5}
+.va .epid{flex:1;min-width:0}
+.va .epid b{display:block;font-size:12px;font-weight:700}
+.va .epid span{font-size:9.5px;color:#7d8698}
+.va .eptri{width:0;height:0;border-left:9px solid #c6ccda;border-top:6px solid transparent;
+  border-bottom:6px solid transparent;flex:0 0 auto}
+.va .mgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+.va .mcard{position:relative;aspect-ratio:2/3;border-radius:5px;overflow:hidden;
+  background:linear-gradient(165deg,hsl(var(--epx-va-h) 58% 36%),hsl(var(--epx-va-h) 52% 13%))}
+.va .tfootspace{height:92px}
+
+/* ── the player ── */
+.va .player{position:fixed;inset:0;z-index:60;background:#000;max-width:520px;margin:0 auto;
+  animation:epx-plin .3s both}
+@keyframes epx-plin{from{opacity:0}to{opacity:1}}
+.va .pexit{position:absolute;top:max(14px,env(safe-area-inset-top));right:14px;z-index:70;
+  width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.14);color:#fff;font-size:15px;
+  display:flex;align-items:center;justify-content:center}
+
+/* the ident you paid for */
+.va .ident{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:16px;background:#000}
+.va .ident .imark{width:78px;height:78px;color:var(--epx-va-c);
+  filter:drop-shadow(0 0 26px color-mix(in srgb,var(--epx-va-c) 66%,transparent));
+  animation:epx-identin2 .9s cubic-bezier(.2,1,.3,1) both}
+@keyframes epx-identin2{from{opacity:0;transform:scale(2.1)}to{opacity:1;transform:scale(1)}}
+.va .ident .imark svg{width:100%;height:100%;display:block}
+.va .iname{font-size:26px;font-weight:900;letter-spacing:.16em;color:#fff;animation:epx-cupz .5s .45s both}
+@keyframes epx-cupz{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.va .iwave{display:flex;align-items:center;gap:4px;height:40px;animation:epx-cupz .5s .6s both}
+.va .iwave i{width:5px;border-radius:3px;height:100%;transform-origin:center;
+  animation:epx-iwv .8s ease-in-out infinite alternate}
+@keyframes epx-iwv{from{transform:scaleY(calc(var(--epx-va-m,1) * .5))}to{transform:scaleY(var(--epx-va-m,1))}}
+.va .skip{position:absolute;bottom:56px;right:20px;font-size:11px;font-weight:900;letter-spacing:.14em;
+  padding:10px 16px;border-radius:6px;background:rgba(255,255,255,.16);color:#fff;
+  border:1px solid rgba(255,255,255,.28);animation:epx-cupz .3s both}
+
+/* the picture */
+.va .pic{position:absolute;inset:0;overflow:hidden;
+  background:radial-gradient(ellipse 80% 70% at 40% 40%,hsl(var(--epx-va-h) 58% 30%),#05060a 72%)}
+.va .picghost{position:absolute;left:-4%;right:-4%;top:36%;font-size:48px;font-weight:900;line-height:.9;
+  color:#fff;opacity:.07;text-transform:uppercase;text-align:center;word-break:break-word}
+.va .wmk{position:absolute;top:16px;right:16px;width:20px;height:20px;color:#fff;opacity:.7}
+.va .wmk svg{width:100%;height:100%;display:block}
+
+.va .buffer{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:11px;background:rgba(0,0,0,.62);text-align:center;padding:24px}
+.va .spin{width:34px;height:34px;border-radius:50%;border:3px solid rgba(255,255,255,.18);
+  border-top-color:#fff;animation:epx-spin2 .85s linear infinite}
+@keyframes epx-spin2{to{transform:rotate(360deg)}}
+.va .buffer b{font-size:14px;font-weight:800}
+.va .buffer span{font-size:10.5px;color:#aeb6c4;max-width:230px;line-height:1.5}
+
+.va .pctl2{position:absolute;left:0;right:0;bottom:0;padding:16px 16px max(20px,env(safe-area-inset-bottom));
+  background:linear-gradient(transparent,rgba(0,0,0,.85) 60%)}
+.va .pscrub2{height:3px;border-radius:2px;background:rgba(255,255,255,.26);overflow:hidden}
+.va .pscrub2 i{display:block;height:100%;background:var(--epx-va-c);transition:width .09s linear}
+.va .prow2{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px}
+.va .prow2 b{font-size:13px;font-weight:800;color:#fff}
+.va .qual{font-size:8.5px;font-weight:900;letter-spacing:.12em;padding:4px 8px;border-radius:4px;
+  background:rgba(255,255,255,.16);color:#fff}
+.va .qual.qsd{background:rgba(255,90,95,.24);color:#ff8b8f}
+.va .qual.q4k{background:rgba(74,222,128,.2);color:#4ade80}
+
+@media (prefers-reduced-motion:reduce){ .va *,.va .player *{animation:none!important} }
+
+/* ── INHERITED FROM THE GLOBAL SHELL ──────────────────────────────────
+   These 1 rules were being supplied by EmpirePlusV2's global
+   stylesheet through generic class names. Copied in so this screen owns its
+   own appearance and depends on no ambient CSS.
+
+   They are APPENDED, not prepended: the sheet opens with a
+   `:where(*){margin:0;padding:0}` reset of equal specificity, so anything
+   placed above it loses on source order and the padding silently goes to 0.
+   ──────────────────────────────────────────────────────────────────── */
+.va .qual{display:flex;align-items:center;gap:9px;background:rgba(12,14,20,.85);border:1px solid var(--epx-va-line);border-radius:10px;padding:8px 11px;animation:up .5s both;opacity:.5;backdrop-filter:blur(4px)}

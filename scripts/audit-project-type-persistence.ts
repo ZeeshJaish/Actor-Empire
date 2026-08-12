@@ -61,8 +61,8 @@ assert(
     'Greenlight script normalization must read legacy script.type.'
 );
 assert(
-    readSource('views/lifestyle/business/DevelopmentLab.tsx').includes('(initialScript as any)?.type'),
-    'Development Lab editor must initialize from legacy script.type.'
+    readSource('views/lifestyle/business/components/DevelopmentLabScriptWizard.tsx').includes('(initialScript as any)?.type'),
+    'Development Lab Script Wizard must initialize from legacy script.type.'
 );
 assert(
     readSource('services/gameLoop.ts').includes('resolveProjectType(safeDetails.type, safeDetails.projectType'),

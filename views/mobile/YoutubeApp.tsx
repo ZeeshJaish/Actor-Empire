@@ -1,13 +1,13 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ClothingItem, Player, Property, Vehicle, YoutubeBrandDeal, YoutubeCollabOffer, YoutubeCreatorIdentity, YoutubeMerchTier, YoutubeUploadPlan, YoutubeVideo, YoutubeVideoType } from '../../types';
-import { calculateYoutubeCreatorScore, generateYoutubeFeed, getWeeksSinceYoutubeUpload, getYoutubePublicImageLabel, YOUTUBE_MONETIZATION_SUBS, YOUTUBE_MONETIZATION_VIEWS } from '../../services/youtubeLogic';
+import { calculateYoutubeCreatorScore, generateYoutubeFeed, getWeeksSinceYoutubeUpload, getYoutubeMerchDropFailure, getYoutubePublicImageLabel, resolveYoutubeMerchDrop, YOUTUBE_MERCH_COOLDOWN_WEEKS, YOUTUBE_MERCH_TIERS, YOUTUBE_MONETIZATION_SUBS, YOUTUBE_MONETIZATION_VIEWS } from '../../services/youtubeLogic';
 import { spendPlayerEnergy } from '../../services/premiumLogic';
 import { loadMediaBlob, pruneMediaStore, saveMediaBlob } from '../../services/mediaStorage';
 import { AIRCRAFT_CATALOG, BOAT_CATALOG, CAR_CATALOG, CLOTHING_CATALOG, MOTORCYCLE_CATALOG, PROPERTY_CATALOG } from '../../services/lifestyleLogic';
 import { getLifestyleAssetImageInfo } from '../../services/lifestyleAssetImages';
 import { getPlayerLanguage, t } from '../../services/i18n';
-import { ArrowLeft, Play, TrendingUp, DollarSign, Users, Plus, Lock, Home, Layout, Search, Bell, MonitorPlay, Sparkles, Handshake, ShieldCheck, Flame, MessageCircle, Trophy, ShoppingBag, Radio, ImagePlus, ThumbsUp, ThumbsDown, Share2, MoreHorizontal } from 'lucide-react';
+import { ArrowLeft, Play, TrendingUp, DollarSign, Users, Plus, Lock, Home, Layout, Search, Bell, MonitorPlay, Sparkles, Handshake, ShieldCheck, Flame, MessageCircle, Trophy, ShoppingBag, Radio, ImagePlus, ThumbsUp, ThumbsDown, Share2, MoreHorizontal, ReceiptText, TrendingDown } from 'lucide-react';
 
 interface YoutubeAppProps {
   player: Player;
@@ -216,12 +216,6 @@ const CREATOR_MILESTONES = [
     { id: 'views_1000000', labelKey: 'youtube.milestone.views_1000000.label', target: 1000000, type: 'views' },
     { id: 'subs_1000000', labelKey: 'youtube.milestone.subs_1000000.label', target: 1000000, type: 'subs' },
 ];
-
-const MERCH_TIERS: Record<YoutubeMerchTier, { labelKey: string; cost: number; energy: number; trustReq: number; margin: number; heat: number }> = {
-    BASIC: { labelKey: 'youtube.merch.BASIC.label', cost: 5000, energy: 14, trustReq: 35, margin: 0.28, heat: 1 },
-    PREMIUM: { labelKey: 'youtube.merch.PREMIUM.label', cost: 25000, energy: 22, trustReq: 50, margin: 0.42, heat: 4 },
-    LUXURY: { labelKey: 'youtube.merch.LUXURY.label', cost: 100000, energy: 34, trustReq: 68, margin: 0.62, heat: 8 },
-};
 
 const VIDEO_COMMENT_BANK_KEYS: Record<YoutubeVideoType, string[]> = {
     VLOG: [
@@ -434,7 +428,7 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
         };
     };
     const getMerchTierConfig = (tierKey: YoutubeMerchTier) => {
-        const config = MERCH_TIERS[tierKey];
+        const config = YOUTUBE_MERCH_TIERS[tierKey];
         return { ...config, label: tr(config.labelKey) };
     };
     const getMilestoneConfig = (milestone: typeof CREATOR_MILESTONES[number]) => ({
@@ -497,14 +491,23 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
         if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
         return Math.floor(num).toLocaleString();
     };
-    const moneyShort = (value: number) => `$${formatNumber(value)}`;
+    const moneyShort = (value: number) => `${value < 0 ? '-' : ''}$${formatNumber(Math.abs(value))}`;
 
     const unlockedMilestones = Array.isArray(player.flags?.youtubeMilestonesUnlocked)
         ? player.flags.youtubeMilestonesUnlocked
         : [];
     const absoluteWeek = player.age * 52 + player.currentWeek;
     const canLivestream = absoluteWeek - (channel.lastLivestreamWeek || 0) >= 1;
-    const canMerchDrop = absoluteWeek - (channel.lastMerchDropWeek || 0) >= 6;
+    const canMerchDrop = absoluteWeek - (channel.lastMerchDropWeek || 0) >= YOUTUBE_MERCH_COOLDOWN_WEEKS;
+    const lastMerchOutcome = channel.lastMerchOutcome;
+    const lastMerchTier = lastMerchOutcome ? getMerchTierConfig(lastMerchOutcome.tier) : null;
+    const lastMerchOutcomeLabel = lastMerchOutcome && lastMerchTier
+        ? lastMerchOutcome.result === 'SOLD_OUT'
+            ? tr('youtube.merch.result.soldOut', { tier: lastMerchTier.label })
+            : lastMerchOutcome.result === 'UNDERPERFORMED'
+                ? tr('youtube.merch.result.underperformed', { tier: lastMerchTier.label })
+                : tr('youtube.merch.result.profit', { tier: lastMerchTier.label })
+        : channel.lastMerchResult;
     const canEarnLivestreamDonations = channel.isMonetized && channel.subscribers >= 1000;
     const currentIdentityKey = channel.creatorIdentity || 'ACTOR_VLOGGER';
     const currentIdentity = getCreatorIdentityConfig(currentIdentityKey);
@@ -995,54 +998,20 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
 
     const handleMerchDrop = (tierKey: YoutubeMerchTier) => {
         const tier = getMerchTierConfig(tierKey);
-        const trust = channel.audienceTrust ?? 55;
-        const mood = channel.fanMood ?? 55;
-        if (!canMerchDrop) {
-            alert(tr('youtube.alert.merchCooldown'));
-            return;
-        }
-        if (trust < tier.trustReq) {
-            alert(tr('youtube.alert.audienceTrustRequired', { trust: tier.trustReq }));
-            return;
-        }
-        if (player.energy.current < tier.energy) {
-            alert(tr('youtube.alert.notEnoughEnergy'));
-            return;
-        }
-        if (player.money < tier.cost) {
-            alert(tr('youtube.alert.notEnoughMoney'));
-            return;
-        }
+        const failure = getYoutubeMerchDropFailure(player, tierKey);
+        if (failure === 'COOLDOWN') return alert(tr('youtube.alert.merchCooldown'));
+        if (failure === 'TRUST_REQUIRED') return alert(tr('youtube.alert.audienceTrustRequired', { trust: tier.trustReq }));
+        if (failure === 'NOT_ENOUGH_ENERGY') return alert(tr('youtube.alert.notEnoughEnergy'));
+        if (failure === 'NOT_ENOUGH_MONEY') return alert(tr('youtube.alert.notEnoughMoney'));
         if (!beginYoutubeMoneyAction(`merch_${tierKey}`)) return;
 
-        const demand = Math.max(0.25, (mood / 100) + (trust / 180) + (channel.subscribers >= 100000 ? 0.25 : 0) - ((channel.controversy ?? 0) / 180) + currentIdentity.merchBoost);
-        const gross = Math.floor(channel.subscribers * tier.margin * demand * (0.7 + Math.random() * 0.65));
-        const profit = gross - tier.cost;
-        const soldOut = profit > tier.cost * 1.2;
-        const flop = profit < 0;
-        const result = soldOut ? tr('youtube.merch.result.soldOut', { tier: tier.label }) : flop ? tr('youtube.merch.result.underperformed', { tier: tier.label }) : tr('youtube.merch.result.profit', { tier: tier.label });
-
-        const nextPlayer = {
-            ...player,
-            money: player.money - tier.cost + gross,
-            youtube: {
-                ...channel,
-                lifetimeEarnings: channel.lifetimeEarnings + Math.max(0, profit),
-                fanMood: Math.max(0, Math.min(100, mood + (soldOut ? 6 : flop ? -5 : 2) + currentIdentity.mood)),
-                audienceTrust: Math.max(0, Math.min(100, trust + (flop ? -4 : 1) + currentIdentity.trust)),
-                controversy: Math.max(0, Math.min(100, (channel.controversy ?? 0) + tier.heat + (flop ? 5 : 0) + currentIdentity.heat)),
-                lastMerchDropWeek: absoluteWeek,
-                lastMerchResult: result
-            },
-            logs: [...player.logs, {
-                week: player.currentWeek,
-                year: player.age,
-                message: tr('youtube.log.merchResult', { result, gross: gross.toLocaleString(), profit: profit.toLocaleString() }),
-                type: flop ? 'negative' as const : 'positive' as const
-            }]
-        };
-        spendPlayerEnergy(nextPlayer, tier.energy, `YouTube: Merch ${tier.label}`);
-        onUpdatePlayer(nextPlayer);
+        const resolution = resolveYoutubeMerchDrop(player, tierKey, Math.random, language);
+        if (!resolution.success) {
+            youtubeActionLockRef.current = null;
+            setYoutubeActionInProgress(null);
+            return;
+        }
+        onUpdatePlayer(resolution.player);
     };
 
     const handleUpload = async () => {
@@ -1976,25 +1945,102 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
                                 </div>
 
                                 <div className="grid grid-cols-3 gap-2">
-                                    {(Object.keys(MERCH_TIERS) as YoutubeMerchTier[]).map(tierKey => {
+                                    {(Object.keys(YOUTUBE_MERCH_TIERS) as YoutubeMerchTier[]).map(tierKey => {
                                         const tier = getMerchTierConfig(tierKey);
-                                        const disabled = !canMerchDrop || !!youtubeActionInProgress || player.money < tier.cost || player.energy.current < tier.energy || (channel.audienceTrust ?? 55) < tier.trustReq;
+                                        const failure = getYoutubeMerchDropFailure(player, tierKey);
+                                        const disabled = Boolean(failure) || !!youtubeActionInProgress;
+                                        const requirement = failure === 'TRUST_REQUIRED'
+                                            ? tr('youtube.trustValue', { value: tier.trustReq })
+                                            : failure === 'NOT_ENOUGH_ENERGY'
+                                                ? tr('youtube.merch.requirement.energy', { energy: tier.energy })
+                                                : failure === 'NOT_ENOUGH_MONEY'
+                                                    ? tr('youtube.merch.requirement.cash', { cash: moneyShort(tier.cost) })
+                                                    : failure === 'COOLDOWN'
+                                                        ? tr('youtube.merch.requirement.cooldown')
+                                                        : `${moneyShort(tier.cost)} • ${tier.energy}E`;
                                         return (
                                             <button
                                                 key={tierKey}
                                                 onClick={() => handleMerchDrop(tierKey)}
                                                 disabled={disabled}
-                                                className="p-2 rounded-xl bg-zinc-950 border border-zinc-800 disabled:opacity-40 text-left"
+                                                aria-label={`${tier.label}. ${requirement}`}
+                                                className="cursor-pointer rounded-xl border border-zinc-800 bg-zinc-950 p-2 text-left transition-colors duration-200 hover:border-zinc-600 hover:bg-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 disabled:cursor-not-allowed disabled:opacity-40"
                                             >
                                                 <div className="text-[10px] font-black text-white">{tier.label}</div>
-                                                <div className="text-[9px] text-zinc-500 mt-1">${formatNumber(tier.cost)} • {tier.energy}E</div>
+                                                <div className="mt-1 text-[9px] text-zinc-500">{requirement}</div>
                                             </button>
                                         );
                                     })}
                                 </div>
-                                {channel.lastMerchResult && (
-                                    <div className="mt-3 text-[11px] text-zinc-400">Last drop: {channel.lastMerchResult}</div>
-                                )}
+                                {lastMerchOutcome ? (
+                                    <div
+                                        aria-live="polite"
+                                        className={`relative mt-4 overflow-hidden rounded-2xl border ${
+                                            lastMerchOutcome.netProfit >= 0
+                                                ? 'border-emerald-400/25 bg-gradient-to-br from-emerald-500/10 via-zinc-950 to-zinc-950'
+                                                : 'border-rose-400/25 bg-gradient-to-br from-rose-500/10 via-zinc-950 to-zinc-950'
+                                        }`}
+                                    >
+                                        <div className="pointer-events-none absolute -right-8 -top-10 h-28 w-28 rounded-full bg-white/5 blur-2xl" />
+                                        <div className="relative flex items-start justify-between gap-3 px-4 pb-4 pt-4">
+                                            <div className="flex min-w-0 items-start gap-3">
+                                                <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border ${
+                                                    lastMerchOutcome.netProfit >= 0
+                                                        ? 'border-emerald-300/25 bg-emerald-400/10 text-emerald-300'
+                                                        : 'border-rose-300/25 bg-rose-400/10 text-rose-300'
+                                                }`}>
+                                                    {lastMerchOutcome.netProfit >= 0 ? <TrendingUp size={18} /> : <TrendingDown size={18} />}
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <div className="text-[9px] font-black uppercase tracking-[0.2em] text-zinc-500">
+                                                        {tr('youtube.merch.outcome.latest')}
+                                                    </div>
+                                                    <div className="mt-1 text-sm font-black leading-tight text-white">
+                                                        {lastMerchOutcomeLabel}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="shrink-0 text-right">
+                                                <div className="text-[8px] font-black uppercase tracking-widest text-zinc-500">
+                                                    {tr(lastMerchOutcome.netProfit >= 0 ? 'youtube.merch.outcome.netProfit' : 'youtube.merch.outcome.netLoss')}
+                                                </div>
+                                                <div className={`mt-1 font-mono text-lg font-black ${
+                                                    lastMerchOutcome.netProfit >= 0 ? 'text-emerald-300' : 'text-rose-300'
+                                                }`}>
+                                                    {lastMerchOutcome.netProfit >= 0 ? '+' : ''}{moneyShort(lastMerchOutcome.netProfit)}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="relative grid grid-cols-2 border-y border-white/10">
+                                            <div className="border-r border-white/10 px-4 py-3">
+                                                <div className="text-[8px] font-black uppercase tracking-widest text-zinc-600">
+                                                    {tr('youtube.merch.outcome.grossSales')}
+                                                </div>
+                                                <div className="mt-1 font-mono text-xs font-bold text-white">
+                                                    {moneyShort(lastMerchOutcome.grossRevenue)}
+                                                </div>
+                                            </div>
+                                            <div className="px-4 py-3">
+                                                <div className="text-[8px] font-black uppercase tracking-widest text-zinc-600">
+                                                    {tr('youtube.merch.outcome.productionCost')}
+                                                </div>
+                                                <div className="mt-1 font-mono text-xs font-bold text-zinc-300">
+                                                    −{moneyShort(lastMerchOutcome.productionCost)}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="relative flex items-center gap-2 px-4 py-3 text-[10px] font-semibold text-zinc-400">
+                                            <ReceiptText size={14} className="shrink-0 text-zinc-500" />
+                                            {tr('youtube.merch.outcome.cashSettled')}
+                                        </div>
+                                    </div>
+                                ) : channel.lastMerchResult ? (
+                                    <div className="mt-3 text-[11px] text-zinc-400">
+                                        {tr('youtube.merch.outcome.legacy')}: {lastMerchOutcomeLabel}
+                                    </div>
+                                ) : null}
                             </div>
                             </>
                             )}

@@ -701,14 +701,14 @@ record('awards:history', 'winner_history_uses_award_year', () => {
   checks += 2;
 });
 
-record('awards:sanitize', 'does_not_mutate_record_years', () => {
+record('awards:sanitize', 'collapses_repeat_year_bug', () => {
   const awards = sanitizeAwardRecords([
     { id: 'a1', name: 'The Oscars', type: 'OSCAR', year: 17, category: 'Best Actor', projectId: 'p1', projectName: 'Old', outcome: 'NOMINATED' },
     { id: 'a2', name: 'The Oscars', type: 'OSCAR', year: 17, category: 'Best Actor', projectId: 'p1', projectName: 'Old', outcome: 'WON' },
     { id: 'a3', name: 'The Oscars', type: 'OSCAR', year: 18, category: 'Best Actor', projectId: 'p1', projectName: 'Old', outcome: 'NOMINATED' },
   ] as any[]);
   if (!awards.some((award: any) => award.year === 17 && award.outcome === 'WON')) throw new Error('Missing preserved old win');
-  if (!awards.some((award: any) => award.year === 18)) throw new Error('Sanitizer collapsed different award years');
+  if (awards.length !== 1) throw new Error('Sanitizer retained a repeated project/show/category in a later year');
   checks += 2;
 });
 

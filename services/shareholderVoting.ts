@@ -28,10 +28,47 @@ export interface ShareholderVoteResult {
 }
 
 const VOTE_CYCLE_WEEKS = 12;
+const WEEKS_PER_YEAR = 52;
 
 const clamp = (value: number, min = 0, max = 100) => Math.max(min, Math.min(max, value));
 
 const roundVotingPower = (value: number) => Math.round(value * 100) / 100;
+
+const getAbsoluteWeek = (year: number, week: number) => (
+    (Math.max(1, Math.round(Number(year) || 1)) - 1) * WEEKS_PER_YEAR
+    + Math.min(WEEKS_PER_YEAR, Math.max(1, Math.round(Number(week) || 1)))
+    - 1
+);
+
+const addWeeks = (year: number, week: number, weeks: number) => {
+    const absoluteWeek = getAbsoluteWeek(year, week) + Math.max(0, Math.round(weeks));
+    return {
+        year: Math.floor(absoluteWeek / WEEKS_PER_YEAR) + 1,
+        week: (absoluteWeek % WEEKS_PER_YEAR) + 1,
+    };
+};
+
+const getVoteDueDate = (vote: ShareholderVote) => {
+    const rawDueWeek = Math.max(1, Math.round(Number(vote.dueWeek) || 1));
+    const normalizedDueWeek = ((rawDueWeek - 1) % WEEKS_PER_YEAR) + 1;
+    const inferredDueYear = Math.max(1, Math.round(Number(vote.createdYear) || 1))
+        + Math.floor((rawDueWeek - 1) / WEEKS_PER_YEAR);
+    return {
+        week: normalizedDueWeek,
+        year: Number.isFinite(vote.dueYear)
+            ? Math.max(1, Math.round(Number(vote.dueYear)))
+            : inferredDueYear,
+    };
+};
+
+export const isShareholderVoteExpired = (
+    vote: ShareholderVote,
+    player: Pick<Player, 'age' | 'currentWeek'>,
+) => {
+    if (vote.status === 'EXPIRED') return true;
+    const due = getVoteDueDate(vote);
+    return getAbsoluteWeek(player.age, player.currentWeek) >= getAbsoluteWeek(due.year, due.week);
+};
 
 const getHoldingPercent = (player: Pick<Player, 'portfolio'>, stock: Stock) => {
     const shares = Math.max(0, player.portfolio.find(item => item.stockId === stock.id)?.shares || 0);
@@ -162,6 +199,8 @@ export const createShareholderVote = (
     const template = getVoteTemplate(language, type, stock);
     const expectedSupport = clamp(48 + (ownershipPercent * 0.65) + (stock.dividendYield * 120) - (stock.volatility * 90), 28, 82);
 
+    const dueDate = addWeeks(player.age, player.currentWeek, 4);
+
     return {
         id: `vote_${stock.id}_${type}_${player.age}_${player.currentWeek}`,
         stockId: stock.id,
@@ -176,7 +215,8 @@ export const createShareholderVote = (
         expectedSupport: Math.round(expectedSupport),
         createdWeek: player.currentWeek,
         createdYear: player.age,
-        dueWeek: player.currentWeek + 4,
+        dueWeek: dueDate.week,
+        dueYear: dueDate.year,
     };
 };
 
@@ -198,9 +238,43 @@ const createVoteMessage = (vote: ShareholderVote, language: GameLanguage = 'en')
 export const processShareholderVoting = (player: Player): Player => {
     const language = getPlayerLanguage(player);
     const existingVotes = Array.isArray(player.shareholderVotes) ? player.shareholderVotes : [];
-    let nextVotes = existingVotes;
+    const currentAbsoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
+    const expiredVoteIds = new Set<string>();
+    const normalizedVotes = existingVotes.map(vote => {
+        if (vote.status !== 'OPEN') return vote;
+        const due = getVoteDueDate(vote);
+        if (currentAbsoluteWeek < getAbsoluteWeek(due.year, due.week)) {
+            if (vote.dueWeek === due.week && vote.dueYear === due.year) return vote;
+            return { ...vote, dueWeek: due.week, dueYear: due.year };
+        }
+        expiredVoteIds.add(vote.id);
+        return {
+            ...vote,
+            status: 'EXPIRED' as const,
+            dueWeek: due.week,
+            dueYear: due.year,
+        };
+    });
+    let nextVotes = normalizedVotes.every((vote, index) => vote === existingVotes[index])
+        ? existingVotes
+        : normalizedVotes;
     let nextInbox = Array.isArray(player.inbox) ? player.inbox : [];
     let nextPendingEvents = Array.isArray(player.pendingEvents) ? player.pendingEvents : [];
+
+    if (expiredVoteIds.size > 0) {
+        nextInbox = nextInbox.map(message => {
+            if (!expiredVoteIds.has(String(message.data?.voteId || ''))) return message;
+            return {
+                ...message,
+                isExpired: true,
+                expiresIn: undefined,
+                expiredAtWeek: player.currentWeek,
+                expiredNoticeWeeks: Math.max(2, Number(message.expiredNoticeWeeks || 0)),
+            };
+        });
+        nextPendingEvents = nextPendingEvents.filter(event => !expiredVoteIds.has(String(event.data?.voteId || '')));
+    }
+
     const hasOpenVoteForStock = (stockId: string) => nextVotes.some(vote => vote.stockId === stockId && vote.status === 'OPEN');
 
     player.stocks
@@ -209,10 +283,16 @@ export const processShareholderVoting = (player: Player): Player => {
             if (hasOpenVoteForStock(stock.id)) return;
             const ownershipPercent = getHoldingPercent(player, stock);
             if (ownershipPercent < 10) return;
-            const lastVote = existingVotes
+            const lastVote = nextVotes
                 .filter(vote => vote.stockId === stock.id)
-                .sort((a, b) => b.createdWeek - a.createdWeek)[0];
-            if (lastVote && player.currentWeek - lastVote.createdWeek < VOTE_CYCLE_WEEKS) return;
+                .sort((a, b) => (
+                    getAbsoluteWeek(b.createdYear, b.createdWeek)
+                    - getAbsoluteWeek(a.createdYear, a.createdWeek)
+                ))[0];
+            if (
+                lastVote
+                && currentAbsoluteWeek - getAbsoluteWeek(lastVote.createdYear, lastVote.createdWeek) < VOTE_CYCLE_WEEKS
+            ) return;
 
             const vote = createShareholderVote(player, stock, undefined, language);
             if (!vote) return;
@@ -341,7 +421,9 @@ export const resolveShareholderVote = (
     const votes = Array.isArray(player.shareholderVotes) ? player.shareholderVotes : [];
     const vote = votes.find(candidate => candidate.id === voteId);
     if (!vote) return { success: false, player, reason: 'VOTE_NOT_FOUND' };
-    if (vote.status !== 'OPEN') return { success: false, player, vote, reason: 'VOTE_CLOSED' };
+    if (vote.status !== 'OPEN' || isShareholderVoteExpired(vote, player)) {
+        return { success: false, player, vote, reason: 'VOTE_CLOSED' };
+    }
 
     const support = selectedVote === 'FOR'
         ? vote.expectedSupport + (vote.playerVotingPower * 0.55) + (options.golden ? 18 : 0)

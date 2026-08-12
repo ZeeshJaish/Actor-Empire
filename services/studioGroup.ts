@@ -19,6 +19,7 @@ import type {
 } from '../types';
 import { normalizeStudioState } from './businessLogic';
 import { t } from './i18n';
+import { getStudioOwnershipPercent } from './studioOwnership';
 
 export interface OperatingModelDefinition {
     id: SubsidiaryOperatingModel;
@@ -55,6 +56,16 @@ export interface SubsidiaryControlProfile {
 
 export type StudioTreasuryAction = 'INJECT' | 'WITHDRAW';
 export type StudioTreasuryCounterparty = 'PERSONAL' | 'HQ';
+
+export interface StudioTreasuryWithdrawalQuote {
+    ownershipPercent: number;
+    operatingReserve: number;
+    distributableCash: number;
+    maxOwnerProceeds: number;
+    requestedOwnerProceeds: number;
+    grossDistribution: number;
+    minorityDistribution: number;
+}
 
 const uniqueById = <T extends { id: string }>(items: T[]): T[] => {
     const seen = new Set<string>();
@@ -434,6 +445,36 @@ export const setStudioOperatingMandate = ({
     };
 };
 
+export const getStudioTreasuryWithdrawalQuote = (
+    player: Player,
+    studio: Business,
+    requestedOwnerProceeds = 0,
+): StudioTreasuryWithdrawalQuote => {
+    const ownershipPercent = getStudioOwnershipPercent(player, studio);
+    const ownershipShare = ownershipPercent / 100;
+    const studioBalance = Math.max(0, Math.floor(Number(studio.balance) || 0));
+    const weeklyExpenses = Math.max(0, Number(studio.stats?.weeklyExpenses || 0));
+    const valuationReserve = Math.min(75_000_000, Math.max(0, Number(studio.stats?.valuation || 0)) * 0.02);
+    const targetReserve = Math.max(5_000_000, weeklyExpenses * 4, valuationReserve);
+    const operatingReserve = Math.min(studioBalance, Math.ceil(targetReserve));
+    const distributableCash = Math.max(0, studioBalance - operatingReserve);
+    const maxOwnerProceeds = Math.max(0, Math.floor(distributableCash * ownershipShare));
+    const safeRequestedProceeds = Math.max(0, Math.floor(Number(requestedOwnerProceeds) || 0));
+    const grossDistribution = safeRequestedProceeds > 0 && ownershipShare > 0
+        ? Math.ceil(safeRequestedProceeds / ownershipShare)
+        : 0;
+
+    return {
+        ownershipPercent,
+        operatingReserve,
+        distributableCash,
+        maxOwnerProceeds,
+        requestedOwnerProceeds: safeRequestedProceeds,
+        grossDistribution,
+        minorityDistribution: Math.max(0, grossDistribution - safeRequestedProceeds),
+    };
+};
+
 export const performStudioTreasuryTransfer = ({
     player,
     studioId,
@@ -451,6 +492,7 @@ export const performStudioTreasuryTransfer = ({
     player: Player;
     studio?: Business;
     parentStudio?: Business;
+    withdrawalQuote?: StudioTreasuryWithdrawalQuote;
     reason?:
         | 'INVALID_AMOUNT'
         | 'STUDIO_NOT_FOUND'
@@ -459,7 +501,8 @@ export const performStudioTreasuryTransfer = ({
         | 'HQ_NOT_FOUND'
         | 'INSUFFICIENT_PERSONAL_CASH'
         | 'INSUFFICIENT_HQ_CAPITAL'
-        | 'INSUFFICIENT_STUDIO_CAPITAL';
+        | 'INSUFFICIENT_STUDIO_CAPITAL'
+        | 'EXCEEDS_DISTRIBUTABLE_CASH';
 } => {
     const safeAmount = Math.floor(Number(amount) || 0);
     if (safeAmount <= 0) return { success: false, player, reason: 'INVALID_AMOUNT' };
@@ -479,24 +522,50 @@ export const performStudioTreasuryTransfer = ({
     if (action === 'INJECT' && counterparty === 'HQ' && (parentStudio?.balance || 0) < safeAmount) {
         return { success: false, player, studio, parentStudio, reason: 'INSUFFICIENT_HQ_CAPITAL' };
     }
-    if (action === 'WITHDRAW' && studio.balance < safeAmount) {
-        return { success: false, player, studio, parentStudio, reason: 'INSUFFICIENT_STUDIO_CAPITAL' };
+    const withdrawalQuote = action === 'WITHDRAW'
+        ? getStudioTreasuryWithdrawalQuote(player, studio, safeAmount)
+        : undefined;
+    if (withdrawalQuote && safeAmount > withdrawalQuote.maxOwnerProceeds) {
+        return {
+            success: false,
+            player,
+            studio,
+            parentStudio,
+            withdrawalQuote,
+            reason: 'EXCEEDS_DISTRIBUTABLE_CASH',
+        };
+    }
+    const studioCashMovement = action === 'WITHDRAW'
+        ? withdrawalQuote?.grossDistribution || 0
+        : safeAmount;
+    if (action === 'WITHDRAW' && studio.balance < studioCashMovement) {
+        return {
+            success: false,
+            player,
+            studio,
+            parentStudio,
+            withdrawalQuote,
+            reason: 'INSUFFICIENT_STUDIO_CAPITAL',
+        };
     }
 
     const counterpartyLabel = counterparty === 'HQ' ? 'Headquarters' : 'Personal balance';
+    const minorityLabel = withdrawalQuote && withdrawalQuote.minorityDistribution > 0
+        ? `; minority shareholders received ${withdrawalQuote.minorityDistribution.toLocaleString()}`
+        : '';
     const studioLedgerEntry = createStudioFinanceEntry({
         id: `studio_treasury_${action.toLowerCase()}_${counterparty.toLowerCase()}_${studio.id}_${player.age}_${player.currentWeek}_${Date.now()}`,
         player,
-        amount: action === 'INJECT' ? safeAmount : -safeAmount,
+        amount: action === 'INJECT' ? safeAmount : -studioCashMovement,
         type: action === 'INJECT' ? 'CAPITAL_INJECTION' : 'CAPITAL_WITHDRAWAL',
         label: action === 'INJECT'
             ? `${counterpartyLabel} capital injection`
-            : `Withdrawal to ${counterpartyLabel}`,
+            : `Owner distribution to ${counterpartyLabel}${minorityLabel}`,
     });
 
     const updatedStudio: Business = {
         ...studio,
-        balance: action === 'INJECT' ? studio.balance + safeAmount : studio.balance - safeAmount,
+        balance: action === 'INJECT' ? studio.balance + safeAmount : studio.balance - studioCashMovement,
         studioState: {
             ...studio.studioState,
             financeLedger: [
@@ -555,7 +624,9 @@ export const performStudioTreasuryTransfer = ({
         year: player.age,
         message: action === 'INJECT'
             ? `💸 ${counterpartyLabel} injected ${safeAmount.toLocaleString()} into ${studio.name}.`
-            : `🏦 ${studio.name} withdrew ${safeAmount.toLocaleString()} to ${counterpartyLabel}.`,
+            : withdrawalQuote && withdrawalQuote.minorityDistribution > 0
+                ? `🏦 ${studio.name} distributed ${studioCashMovement.toLocaleString()}; your ${withdrawalQuote.ownershipPercent.toFixed(1)}% share sent ${safeAmount.toLocaleString()} to ${counterpartyLabel}.`
+                : `🏦 ${studio.name} sent ${safeAmount.toLocaleString()} to ${counterpartyLabel}.`,
         type: 'neutral',
     };
 
@@ -575,6 +646,7 @@ export const performStudioTreasuryTransfer = ({
         player: nextPlayer,
         studio: updatedStudio,
         parentStudio: updatedParentStudio,
+        withdrawalQuote,
     };
 };
 

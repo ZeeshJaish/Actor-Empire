@@ -4,14 +4,17 @@ import { Users, Briefcase, Star, TrendingUp, DollarSign, X, Check, AlertCircle, 
 import { getAvailableTalent, NPC_DATABASE } from '../services/npcLogic';
 import { calculateNPCAsk, evaluateOffer, createContract, getTalentNegotiationProfile } from '../services/talentService';
 import { getPlayerLanguage, t } from '../services/i18n';
+import { getStudioGroup } from '../services/studioGroup';
+import { mergeParentStudioTalentRosters } from '../services/talentRoster';
 
 interface StudioPageProps {
     player: Player;
+    studioId?: string;
     onUpdatePlayer: (player: Player) => void;
     onBack: () => void;
 }
 
-export const StudioPage: React.FC<StudioPageProps> = ({ player, onUpdatePlayer, onBack }) => {
+export const StudioPage: React.FC<StudioPageProps> = ({ player, studioId, onUpdatePlayer, onBack }) => {
     const [activeTab, setActiveTab] = useState<'ROSTER' | 'MARKET'>('ROSTER');
     const [selectedNPC, setSelectedNPC] = useState<NPCActor | null>(null);
     const [paymentMode, setPaymentMode] = useState<PaymentMode>('UPFRONT');
@@ -19,10 +22,19 @@ export const StudioPage: React.FC<StudioPageProps> = ({ player, onUpdatePlayer, 
     const [offerAmountStr, setOfferAmountStr] = useState<string>('');
     const [negotiationResult, setNegotiationResult] = useState<{ success: boolean, message: string, maintenanceFee?: number, profileLabel?: string } | null>(null);
 
-    const studio = player.businesses.find(b => b.type === 'PRODUCTION_HOUSE');
+    const studioGroup = getStudioGroup(player);
+    const studio = player.businesses.find(b => b.type === 'PRODUCTION_HOUSE' && b.id === studioId)
+        || studioGroup.parentStudio;
+    const isPrimaryStudio = Boolean(studio && studioGroup.parentStudio?.id === studio.id);
     const language = getPlayerLanguage(player);
     const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
-    const signedContracts = studio?.studioState?.talentRoster || player.studio?.talentRoster || [];
+    const signedContracts = isPrimaryStudio && studio
+        ? mergeParentStudioTalentRosters(
+            studio.id,
+            player.studio?.talentRoster as any,
+            studio.studioState?.talentRoster as any,
+        )
+        : (studio?.studioState?.talentRoster || []).filter(contract => contract.studioId === studio?.id);
     
     // Initialize memory if needed
     const studioMemory = player.studioMemory || {};
@@ -64,6 +76,19 @@ export const StudioPage: React.FC<StudioPageProps> = ({ player, onUpdatePlayer, 
             language
         );
 
+        if (
+            result.success
+            && paymentMode === 'UPFRONT'
+            && !isPrimaryStudio
+            && result.totalContractValue > studio.balance
+        ) {
+            setNegotiationResult({
+                success: false,
+                message: `${studio.name} needs $${result.totalContractValue.toLocaleString()} in its own treasury to sign this deal. Add capital in Finance, then try again.`,
+            });
+            return;
+        }
+
         setNegotiationResult(result);
 
         const updatedPlayer = { ...player };
@@ -72,7 +97,8 @@ export const StudioPage: React.FC<StudioPageProps> = ({ player, onUpdatePlayer, 
         if (!updatedPlayer.studioMemory.cooldowns) updatedPlayer.studioMemory.cooldowns = {};
 
         if (result.success && result.maintenanceFee !== undefined) {
-            const newContract = createContract(
+            const newContract: StudioContract = {
+                ...createContract(
                 selectedNPC.id,
                 'MOVIE_DEAL',
                 paymentMode,
@@ -80,21 +106,46 @@ export const StudioPage: React.FC<StudioPageProps> = ({ player, onUpdatePlayer, 
                 result.totalContractValue,
                 result.maintenanceFee,
                 player.currentWeek
-            );
+                ),
+                studioId: studio.id,
+            };
 
-            // Sync with both global studio and business studioState
-            if (!updatedPlayer.studio) updatedPlayer.studio = { isUnlocked: true, baseType: 'GARAGE', talentRoster: [], lastTalentRefreshWeek: 0 };
-            if (!updatedPlayer.studio.talentRoster) updatedPlayer.studio.talentRoster = [];
-            updatedPlayer.studio.talentRoster.push(newContract);
+            // The legacy global roster is the parent/HQ mirror only. Subsidiary
+            // contracts stay on their own studioState and treasury.
+            if (isPrimaryStudio) {
+                if (!updatedPlayer.studio) updatedPlayer.studio = { isUnlocked: true, baseType: 'GARAGE', talentRoster: [], lastTalentRefreshWeek: 0 };
+                if (!updatedPlayer.studio.talentRoster) updatedPlayer.studio.talentRoster = [];
+                updatedPlayer.studio.talentRoster.push(newContract);
+            }
 
             updatedPlayer.businesses = updatedPlayer.businesses.map(b => {
                 if (b.id === studio.id) {
                     const studioState = b.studioState || { scripts: [], concepts: [], writers: [], ipMarket: [], lastMarketRefreshWeek: 0, lastWriterRefreshWeek: 0 };
+                    const upfrontCost = paymentMode === 'UPFRONT' ? result.totalContractValue : 0;
                     return {
                         ...b,
+                        balance: isPrimaryStudio ? b.balance : b.balance - upfrontCost,
                         studioState: {
                             ...studioState,
-                            talentRoster: [...(studioState.talentRoster || []), newContract]
+                            talentRoster: [
+                                ...(isPrimaryStudio
+                                    ? (studioState.talentRoster || []).filter(contract => contract.id !== newContract.id)
+                                    : (studioState.talentRoster || []).filter(contract => contract.studioId === studio.id)),
+                                newContract,
+                            ],
+                            financeLedger: upfrontCost > 0 && !isPrimaryStudio
+                                ? [
+                                    {
+                                        id: `studio_talent_upfront_${studio.id}_${newContract.id}`,
+                                        week: player.currentWeek,
+                                        year: player.age,
+                                        amount: -upfrontCost,
+                                        type: 'PRODUCTION_SPEND' as const,
+                                        label: `${selectedNPC.name} talent contract`,
+                                    },
+                                    ...(studioState.financeLedger || []),
+                                ].slice(0, 200)
+                                : studioState.financeLedger,
                         }
                     };
                 }
@@ -102,7 +153,7 @@ export const StudioPage: React.FC<StudioPageProps> = ({ player, onUpdatePlayer, 
             });
             
             // Pay upfront if applicable
-            if (paymentMode === 'UPFRONT') {
+            if (paymentMode === 'UPFRONT' && isPrimaryStudio) {
                 updatedPlayer.money -= result.totalContractValue;
                 updatedPlayer.finance.history.unshift({
                     id: `tx_upfront_${Date.now()}`,
@@ -144,14 +195,19 @@ export const StudioPage: React.FC<StudioPageProps> = ({ player, onUpdatePlayer, 
     const attemptsLeft = 3 - currentAttempts;
 
     return (
-        <div className="flex flex-col h-full animate-in fade-in duration-500">
+        <div className="fixed inset-0 z-[60] flex min-h-[100dvh] flex-col overflow-hidden bg-[#050505] px-5 pt-[max(1.5rem,env(safe-area-inset-top))] text-white animate-in fade-in duration-500">
             {/* Header */}
             <div className="flex items-center justify-between mb-6">
                 <div>
                     <h1 className="text-3xl font-black text-white uppercase tracking-tighter italic">Talent Management</h1>
-                    <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest">Farm System & Roster</p>
+                    <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest">{studio?.name || 'Studio'} · Roster</p>
                 </div>
-                <button onClick={onBack} className="p-2 bg-zinc-900 rounded-full hover:bg-zinc-800 transition-colors">
+                <button
+                    type="button"
+                    onClick={onBack}
+                    aria-label={`Back to ${studio?.name || 'studio'}`}
+                    className="flex h-11 w-11 touch-manipulation items-center justify-center rounded-full bg-zinc-900 transition-colors hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
+                >
                     <X size={20} />
                 </button>
             </div>
@@ -173,7 +229,7 @@ export const StudioPage: React.FC<StudioPageProps> = ({ player, onUpdatePlayer, 
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 pb-32">
+            <div className="min-h-0 flex-1 overflow-y-auto custom-scrollbar pr-1 pb-[calc(2rem+env(safe-area-inset-bottom))]">
                 {activeTab === 'ROSTER' ? (
                     <div className="space-y-4">
                         {signedContracts.length === 0 ? (
@@ -282,7 +338,7 @@ export const StudioPage: React.FC<StudioPageProps> = ({ player, onUpdatePlayer, 
                             <div className="space-y-6 relative z-10">
                                 <div className="text-sm leading-relaxed">
                                     <p className="mb-4">
-                                        This Agreement is made and entered into by and between <strong>{player.businesses?.[0]?.name || 'The Studio'}</strong> ("Studio") and <strong>{selectedNPC.name}</strong> ("Artist").
+                                        This Agreement is made and entered into by and between <strong>{studio?.name || 'The Studio'}</strong> ("Studio") and <strong>{selectedNPC.name}</strong> ("Artist").
                                     </p>
                                     
                                     {/* Stats Block */}

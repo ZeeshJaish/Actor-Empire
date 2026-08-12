@@ -13,16 +13,16 @@ const packageJson = fs.readFileSync('package.json', 'utf8');
   'getSimulatedMarketEntries',
   'getRankMovementLabel',
   'getWeeklyStatusTag',
-  'Top 10',
-  'Market Rank',
-  'Studio Receipts',
-  'Run W',
-  'HOLD',
-  'Breakout',
-  'Heavy Drop',
-  'Sleeper',
-  'Blockbuster',
-  'Flop Watch'
+  "tr('box.top10Gross')",
+  "tr('box.marketRank'",
+  "tr('box.metric.studioReceipts')",
+  "tr('box.runWeekShort')",
+  "tr('box.rankHold')",
+  "tr('box.status.breakout')",
+  "tr('box.status.heavyDrop')",
+  "tr('box.status.sleeper')",
+  "tr('box.status.blockbuster')",
+  "tr('box.status.flopWatch')"
 ].forEach(token => {
   assert(source.includes(token), `Weekly market chart should include ${token}.`);
 });

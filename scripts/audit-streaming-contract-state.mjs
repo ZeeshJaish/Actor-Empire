@@ -11,7 +11,10 @@ const boxOffice = fs.readFileSync('views/mobile/BoxOfficeApp.tsx', 'utf8');
 const releasePresentation = fs.readFileSync('services/releasePresentation.ts', 'utf8');
 const productionHouse = fs.readFileSync('views/lifestyle/business/ProductionHouseGame.tsx', 'utf8');
 const ownedStudio = fs.readFileSync('views/lifestyle/business/OwnedStudioCommandCenter.tsx', 'utf8');
-const developmentLab = fs.readFileSync('views/lifestyle/business/DevelopmentLab.tsx', 'utf8');
+const developmentLab = [
+  fs.readFileSync('views/lifestyle/business/DevelopmentLab.tsx', 'utf8'),
+  fs.readFileSync('views/lifestyle/business/components/DevelopmentLabFranchiseManager.tsx', 'utf8'),
+].join('\n');
 
 [
   'streamingUpfrontFee?: number;',

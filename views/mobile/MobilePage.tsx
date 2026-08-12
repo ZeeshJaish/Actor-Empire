@@ -26,7 +26,10 @@ import { getAbsoluteWeek } from '../../services/legacyLogic';
 import { spendPlayerEnergy } from '../../services/premiumLogic';
 import { normalizeUniverseMap } from '../../services/universeLogic';
 import { getPlayerLanguage, t } from '../../services/i18n';
+import { applyOpportunityIdentityToProject } from '../../services/characterIdentityLogic';
 import { PHASE_ONE_ENERGY_COSTS } from '../../services/energyCosts';
+import { resolveShareholderVote } from '../../services/shareholderVoting';
+import { addBreadcrumb, markTraceAction, setCrashContext, setCurrentGameScreen } from '../../services/firebaseService';
 
 type MobileAppMode = 'HOME' | 'CASTLINK' | 'IMDB' | 'BOXOFFICE' | 'INSTAGRAM' | 'X' | 'YOUTUBE' | 'NEWS' | 'TEAM' | 'MESSAGES' | 'FORBES' | 'STOCKS' | 'DATING_FOLDER' | 'SOCIAL_FOLDER' | 'TINDER' | 'LUXE' | 'BANK' | 'GUIDE';
 
@@ -66,6 +69,7 @@ interface MobilePageProps {
   onTradeStock?: (stockId: string, amount: number) => void;
   onUpdatePlayer?: (player: Player) => void; 
   onOpenRightsMarket?: (opportunityId?: string) => void;
+  onOpenStudioContinuation?: (studioId?: string, scriptId?: string) => void;
   onNavVisibilityChange?: (visible: boolean) => void;
   onFullBleedChange?: (enabled: boolean) => void;
   initialForbesStudioId?: string;
@@ -91,6 +95,7 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
   const [appMode, setAppMode] = useState<MobileAppMode>('HOME');
   const [toast, setToast] = useState<{msg: string, color: string} | null>(null);
   const [forbesStudioTargetId, setForbesStudioTargetId] = useState<string | null>(null);
+  const [forbesStudioTargetName, setForbesStudioTargetName] = useState<string | null>(null);
   const [initialStockId, setInitialStockId] = useState<string | null>(null);
   const [isImmersiveForbesScene, setIsImmersiveForbesScene] = useState(false);
   const [isImmersiveMessageReview, setIsImmersiveMessageReview] = useState(false);
@@ -133,6 +138,35 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
   useEffect(() => {
       if (appMode !== 'MESSAGES') setIsImmersiveMessageReview(false);
   }, [appMode]);
+
+  useEffect(() => {
+      if (!props.player) return;
+      const screenName = `MOBILE_${appMode}`;
+      setCurrentGameScreen(screenName);
+      markTraceAction('mobile_app_changed', {
+          last_screen: screenName,
+          last_event_id: appMode,
+          flow: 'mobile_apps',
+      });
+      setCrashContext(props.player, {
+          screen: screenName,
+          mobile_app: appMode,
+          inbox_messages: props.player.inbox?.length || 0,
+          unread_messages: props.player.inbox?.filter(message => !message.isRead).length || 0,
+          active_sponsorships: props.player.activeSponsorships?.length || 0,
+      });
+      addBreadcrumb('mobile_app:open', {
+          app: appMode,
+          messages: props.player.inbox?.length || 0,
+      });
+  }, [
+      appMode,
+      props.player?.activeSponsorships?.length,
+      props.player?.age,
+      props.player?.currentWeek,
+      props.player?.id,
+      props.player?.inbox,
+  ]);
 
   if (!props.player) return null; 
 
@@ -293,7 +327,7 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
               income: 0,
               lumpSum: opp.estimatedIncome,
               payoutType: 'LUMPSUM',
-              projectDetails: opp.project,
+              projectDetails: applyOpportunityIdentityToProject(opp, updatedPlayer),
               projectPhase: 'AUDITION',
               phaseWeeksLeft: auditionDuration,
               totalPhaseDuration: auditionDuration,
@@ -391,6 +425,11 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
                       title: film.title, 
                       subtype: film.type 
                   };
+                  const identifiedFilmDetails = applyOpportunityIdentityToProject({
+                      ...opp,
+                      roleType: film.role,
+                      project: filmDetails,
+                  }, updatedPlayer);
 
                   const newComm: Commitment = {
                       id: `uni_job_${Date.now()}_${index}`,
@@ -401,7 +440,7 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
                       income: 0,
                       lumpSum: perFilmSalary,
                       payoutType: 'LUMPSUM',
-                      projectDetails: filmDetails,
+                      projectDetails: identifiedFilmDetails,
                       // First movie starts now, others are SCHEDULED
                       projectPhase: isFirst ? 'PRE_PRODUCTION' : 'SCHEDULED', 
                       phaseWeeksLeft: isFirst ? getPhaseDuration('PRE_PRODUCTION') : film.weeksOffset, // Use offset as waiting time
@@ -425,7 +464,7 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
                   income: 0,
                   lumpSum: salary,
                   payoutType: 'LUMPSUM',
-                  projectDetails: opp.project,
+                  projectDetails: applyOpportunityIdentityToProject(opp, updatedPlayer),
                   projectPhase: 'PRE_PRODUCTION', 
                   phaseWeeksLeft: getPhaseDuration('PRE_PRODUCTION'),
                   totalPhaseDuration: getPhaseDuration('PRE_PRODUCTION'),
@@ -848,13 +887,28 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
                         onDelete={props.onDeleteMessage!} 
                         onMarkRead={handleMarkMessageRead}
                         onOpenRightsMarket={props.onOpenRightsMarket}
-                        onOpenStudioAcquisition={(studioId) => {
+                        onOpenStudioContinuation={props.onOpenStudioContinuation}
+                        onOpenStudioAcquisition={(studioId, studioName) => {
                             setForbesStudioTargetId(studioId || null);
+                            setForbesStudioTargetName(studioName || null);
                             setAppMode('FORBES');
                         }}
-                        onOpenStock={(stockId) => {
-                            setInitialStockId(stockId);
-                            setAppMode('STOCKS');
+                        onResolveShareholderVote={(voteId, selectedVote) => {
+                            const result = resolveShareholderVote(props.player!, voteId, selectedVote);
+                            if (!result.success) {
+                                return {
+                                    success: false,
+                                    message: result.reason === 'VOTE_CLOSED'
+                                        ? 'Voting has already closed. Nothing was changed.'
+                                        : 'This ballot is no longer available. Nothing was changed.',
+                                };
+                            }
+                            handleUpdatePlayer(result.player);
+                            showToast('Shareholder vote submitted.', 'bg-emerald-500');
+                            return {
+                                success: true,
+                                message: result.vote?.outcomeSummary || 'Your vote was recorded and the market response was applied.',
+                            };
                         }}
                         onImmersiveReviewChange={setIsImmersiveMessageReview}
                     />
@@ -888,7 +942,12 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
                         onOpenStocks={() => setAppMode('STOCKS')}
                         onImmersiveChange={setIsImmersiveForbesScene}
                         initialStudioId={forbesStudioTargetId || undefined}
-                        onInitialStudioConsumed={() => setForbesStudioTargetId(null)}
+                        initialStudioName={forbesStudioTargetName || undefined}
+                        onInitialStudioConsumed={() => {
+                            setForbesStudioTargetId(null);
+                            setForbesStudioTargetName(null);
+                        }}
+                        onInitialStudioUnavailable={() => showToast('That acquisition file is no longer available in Forbes.', 'bg-rose-500')}
                     />
                 )}
                 {appMode === 'STOCKS' && (

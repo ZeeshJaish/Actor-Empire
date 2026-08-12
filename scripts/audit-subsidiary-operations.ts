@@ -2,6 +2,7 @@ import { INITIAL_PLAYER } from '../types';
 import { createDefaultStudioState } from '../services/businessLogic';
 import {
     approveSubsidiaryProjectProposal,
+    getSubsidiaryProjectRevenueBreakdown,
     prepareSubsidiaryProjectsForGameLoop,
     processSubsidiaryAutonomousOperations,
     rejectSubsidiaryProjectProposal,
@@ -70,7 +71,7 @@ const createStudio = (id: string, name: string, model: Business['studioState']['
             status: 'ACTIVE',
         }] : [],
         operatingMandate: {
-            focus: id === 'controlled_studio' ? 'FRANCHISE_EXPANSION' : 'COMMERCIAL_HITS',
+            focus: id === 'controlled_studio' ? 'FRANCHISE_EXPANSION' : id === 'independent_studio' ? 'SERIES_FIRST' : 'COMMERCIAL_HITS',
             budgetAppetite: id === 'controlled_studio' ? 'PREMIUM' : 'STANDARD',
             releasePace: 'AGGRESSIVE',
             ipStrategy: id === 'controlled_studio' ? 'OWNED_IP' : 'ORIGINALS',
@@ -87,12 +88,13 @@ const controlledStudio = createStudio('controlled_studio', 'Artisan Pictures', '
 const independentStudio = createStudio('independent_studio', 'Velvet Pictures', 'INDEPENDENT_LABEL');
 const mergedStudio = createStudio('merged_studio', 'Old Banner', 'FULL_MERGER');
 const pausedStudio = createStudio('paused_studio', 'Quiet Label', 'CONTROLLED_SUBSIDIARY');
+const underfundedStudio = createStudio('underfunded_studio', 'Thin Capital Label', 'INDEPENDENT_LABEL', 10_000_000);
 
 const player: Player = {
     ...INITIAL_PLAYER,
     age: 31,
     currentWeek: 20,
-    businesses: [parentStudio, controlledStudio, independentStudio, mergedStudio, pausedStudio],
+    businesses: [parentStudio, controlledStudio, independentStudio, mergedStudio, pausedStudio, underfundedStudio],
     news: [],
     inbox: [],
     logs: [],
@@ -107,6 +109,7 @@ const processedControlled = processed.businesses.find(business => business.id ==
 const processedIndependent = processed.businesses.find(business => business.id === independentStudio.id)!;
 const processedMerged = processed.businesses.find(business => business.id === mergedStudio.id)!;
 const processedPaused = processed.businesses.find(business => business.id === pausedStudio.id)!;
+const processedUnderfunded = processed.businesses.find(business => business.id === underfundedStudio.id)!;
 
 const pendingProposal = processedControlled.studioState?.subsidiaryProjectProposals?.find(proposal => proposal.status === 'PENDING');
 if (!pendingProposal) {
@@ -136,11 +139,23 @@ const autoCommitment = processed.commitments.find(commitment => commitment.id ==
 if (!autoCommitment.projectDetails?.releaseStrategy || autoCommitment.projectPhase !== 'PRE_PRODUCTION') {
     throw new Error('Independent auto-started productions must enter the main production loop with a release strategy.');
 }
+if (
+    autoCommitment.projectDetails.type !== 'SERIES'
+    || autoCommitment.projectDetails.releaseStrategy !== 'STREAMING_ONLY'
+    || Number(autoCommitment.projectDetails.streamingRevenue || 0) <= 0
+    || Number(autoCommitment.projectDetails.hiddenStats.backendPct || 0) <= 0
+    || !autoCommitment.projectDetails.hiddenStats.subsidiaryStreamingContract
+) {
+    throw new Error('Autonomous subsidiary series must receive a real streaming contract before production starts.');
+}
 if (processedMerged.studioState?.subsidiaryProjectProposals?.length) {
     throw new Error('Full-merger studios should be skipped by autonomous operations.');
 }
 if (processedPaused.studioState?.subsidiaryProjectProposals?.length) {
     throw new Error('Paused mandates should not create autonomous proposals.');
+}
+if (processedUnderfunded.studioState?.subsidiaryProjectProposals?.length) {
+    throw new Error('Autonomous labels must keep an operating reserve instead of greenlighting a project they cannot fund.');
 }
 
 const approved = approveSubsidiaryProjectProposal(processed, controlledStudio.id, pendingProposal.id);
@@ -181,6 +196,42 @@ if (!repairedCommitment?.projectDetails?.releaseStrategy) {
     throw new Error('Stuck subsidiary awaiting-release projects must receive an automatic release strategy.');
 }
 
+const repairedStreamingReleasePlayer = prepareSubsidiaryProjectsForGameLoop({
+    ...processed,
+    commitments: [],
+    activeReleases: [{
+        id: 'legacy_subsidiary_series',
+        name: 'Legacy Label Series',
+        type: 'SERIES',
+        roleType: 'LEAD',
+        projectDetails: {
+            ...autoCommitment.projectDetails,
+            streamingRevenue: 0,
+            hiddenStats: {
+                ...autoCommitment.projectDetails.hiddenStats,
+                backendPct: 0,
+                subsidiaryStreamingContract: false,
+            },
+        },
+        distributionPhase: 'STREAMING',
+        weekNum: 1,
+        weeklyGross: [],
+        totalGross: 0,
+        budget: autoCommitment.projectDetails.estimatedBudget,
+        status: 'RUNNING',
+        productionPerformance: 70,
+        streaming: { platformId: 'NETFLIX', weekOnPlatform: 1, totalViews: 0, weeklyViews: [], isLeaving: false },
+    } as any],
+});
+const repairedStreamingRelease = repairedStreamingReleasePlayer.activeReleases[0];
+if (
+    Number(repairedStreamingRelease.projectDetails.streamingRevenue || 0) <= 0
+    || Number(repairedStreamingRelease.studioRoyaltyPercentage || 0) <= 0
+    || !repairedStreamingRelease.projectDetails.hiddenStats.subsidiaryStreamingContract
+) {
+    throw new Error('Older autonomous streaming releases must be repaired with income terms before their next streaming week.');
+}
+
 const rejected = rejectSubsidiaryProjectProposal(processed, controlledStudio.id, pendingProposal.id);
 if (!rejected.success) {
     throw new Error('Rejecting a fresh pending proposal should succeed.');
@@ -188,6 +239,17 @@ if (!rejected.success) {
 const rejectedStudio = rejected.player.businesses.find(business => business.id === controlledStudio.id)!;
 if (rejectedStudio.studioState?.subsidiaryProjectProposals?.find(proposal => proposal.id === pendingProposal.id)?.status !== 'REJECTED') {
     throw new Error('Rejected proposals must be marked rejected.');
+}
+
+const streamingArchiveRevenue = getSubsidiaryProjectRevenueBreakdown({
+    gross: 0,
+    streamingRevenue: 32_000_000,
+    streamingUpfrontFee: 20_000_000,
+    streamingRoyaltyRevenue: 12_000_000,
+    soundtrackRevenue: 3_000_000,
+});
+if (streamingArchiveRevenue.source !== 'STREAMING' || streamingArchiveRevenue.total !== 35_000_000) {
+    throw new Error('Streaming-led subsidiary releases must show their existing streaming and soundtrack revenue, not a false zero-gross result.');
 }
 
 console.log('Subsidiary operations audit passed.');

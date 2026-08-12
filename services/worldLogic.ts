@@ -12,6 +12,21 @@ import { getPlayerLanguage, t } from './i18n';
 // Helpers
 const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
 const GENRES: Genre[] = ALL_GENRES;
+const clampScore = (value: number) => Math.max(0, Math.min(100, Math.round(value)));
+const getWorldAbsoluteWeek = (year: number, week: number) => ((year - 1) * 52) + (week - 1);
+const getWorldYearWeek = (absoluteWeek: number) => ({
+    year: Math.floor(Math.max(0, absoluteWeek) / 52) + 1,
+    week: (Math.max(0, absoluteWeek) % 52) + 1,
+});
+const normalizeScheduledIndustryProject = (project: IndustryProject): IndustryProject => {
+    if (project.weekReleased >= 1 && project.weekReleased <= 52) return project;
+    const normalized = getWorldYearWeek(getWorldAbsoluteWeek(project.year, project.weekReleased));
+    return {
+        ...project,
+        year: normalized.year,
+        weekReleased: normalized.week,
+    };
+};
 
 export const FESTIVALS: Festival[] = [
     { id: 'sundance', name: '', nameKey: 'services.worldLogic.festival.sundance.name', weeks: [3, 4], prestigeReq: 60, cost: 100000, description: '', descriptionKey: 'services.worldLogic.festival.sundance.description' },
@@ -122,22 +137,54 @@ export const generateIndustryProject = (
 
     const targetAudiences: TargetAudience[] = ['G', 'PG', 'PG-13', 'R', 'NC-17'];
     const targetAudience = targetAudiences[Math.floor(Math.random() * targetAudiences.length)];
+    const rating = Math.round(Math.max(4, Math.min(9.8, (
+        (quality + (Math.random() * 22) - 8) / 10
+    ))) * 10) / 10;
+    const prestigeGenreBoost = ['DRAMA', 'BIOPIC', 'MUSICAL', 'DOCUMENTARY'].includes(genre) ? 7 : 0;
+    const musicGenreBoost = ['MUSICAL', 'ANIMATION', 'BIOPIC', 'DRAMA', 'FANTASY'].includes(genre) ? 9 : 0;
+    const campaign = clampScore(
+        (tier === 'HIGH' ? 76 : tier === 'MID' ? 62 : 45)
+        + (Math.random() * 24 - 8)
+    );
+    const picture = clampScore(
+        (quality * 0.58)
+        + (rating * 3.2)
+        + prestigeGenreBoost
+        + (campaign * 0.08)
+        + (Math.random() * 12 - 6)
+    );
 
     return {
         id: `ind_proj_${Date.now()}_${Math.random()}`,
         title: generateProjectTitle([]), 
         genre,
+        mediaType: 'MOVIE',
         targetAudience,
         studioId,
         budgetTier: tier,
         quality,
+        rating,
         boxOffice: Math.floor(boxOffice),
         year,
         weekReleased: currentWeek,
         leadActorId: lead.id,
         leadActorName: lead.name,
         directorName: director.name,
-        reviews: review
+        reviews: review,
+        awardProfile: {
+            leadPerformance: clampScore((leadTalent * 0.58) + (quality * 0.34) + (Math.random() * 18 - 5)),
+            directing: clampScore((directorSkill * 0.58) + (quality * 0.34) + (Math.random() * 16 - 5)),
+            screenplay: clampScore((quality * 0.72) + prestigeGenreBoost + (Math.random() * 26 - 10)),
+            cinematography: clampScore((quality * 0.68) + (tier === 'HIGH' ? 9 : 3) + (Math.random() * 22 - 8)),
+            picture,
+            originalScore: clampScore((quality * 0.62) + musicGenreBoost + (Math.random() * 28 - 12)),
+            originalSong: clampScore(
+                (quality * 0.48)
+                + (['MUSICAL', 'ANIMATION', 'BIOPIC'].includes(genre) ? 24 : 2)
+                + (Math.random() * 34 - 15)
+            ),
+            campaign
+        }
     };
 };
 
@@ -155,22 +202,33 @@ export const processWorldTurn = (player: Player): { world: WorldState, news: New
     // --- A. MAINTAIN RIVAL SCHEDULE ---
     // Ensure we have at least 12 weeks of upcoming rivals
     if (!newWorld.upcomingRivals) newWorld.upcomingRivals = [];
-    
-    // Remove rivals that were released this week or earlier
-    newWorld.upcomingRivals = newWorld.upcomingRivals.filter(r => r.weekReleased > player.currentWeek);
+    const currentAbsoluteWeek = getWorldAbsoluteWeek(player.age, player.currentWeek);
+    newWorld.upcomingRivals = newWorld.upcomingRivals
+        .map(normalizeScheduledIndustryProject)
+        .filter(project => getWorldAbsoluteWeek(project.year, project.weekReleased) >= currentAbsoluteWeek);
 
-    // Fill up the schedule
-    while (newWorld.upcomingRivals.length < 24) { // 2 movies per week for 12 weeks
-        const releaseWeek = player.currentWeek + Math.floor(newWorld.upcomingRivals.length / 2) + 1;
-        const project = generateIndustryProject(releaseWeek, player.age);
-        newWorld.upcomingRivals.push(project);
+    // Keep two rival releases queued for each of the next 12 weeks, including
+    // weeks that cross a birthday/year boundary.
+    for (let offset = 1; offset <= 12; offset += 1) {
+        const targetAbsoluteWeek = currentAbsoluteWeek + offset;
+        const target = getWorldYearWeek(targetAbsoluteWeek);
+        let scheduledForTarget = newWorld.upcomingRivals.filter(project => (
+            getWorldAbsoluteWeek(project.year, project.weekReleased) === targetAbsoluteWeek
+        )).length;
+        while (scheduledForTarget < 2) {
+            newWorld.upcomingRivals.push(generateIndustryProject(target.week, target.year));
+            scheduledForTarget += 1;
+        }
     }
 
-    // Sort by week
-    newWorld.upcomingRivals.sort((a, b) => a.weekReleased - b.weekReleased);
+    newWorld.upcomingRivals.sort((a, b) => (
+        getWorldAbsoluteWeek(a.year, a.weekReleased) - getWorldAbsoluteWeek(b.year, b.weekReleased)
+    ));
 
     // --- B. RELEASE RIVALS FOR THIS WEEK ---
-    const rivalsToRelease = newWorld.upcomingRivals.filter(r => r.weekReleased === player.currentWeek);
+    const rivalsToRelease = newWorld.upcomingRivals.filter(project => (
+        getWorldAbsoluteWeek(project.year, project.weekReleased) === currentAbsoluteWeek
+    ));
     rivalsToRelease.forEach(project => {
         newWorld.projects.unshift(project);
         newWorld = applyStudioProjectOutcome(newWorld, project).world;
@@ -229,6 +287,9 @@ export const processWorldTurn = (player: Player): { world: WorldState, news: New
         const releaseNews = getIndustryReleaseNews(project, player, language);
         if (releaseNews) news.push(releaseNews);
     });
+    newWorld.upcomingRivals = newWorld.upcomingRivals.filter(project => (
+        getWorldAbsoluteWeek(project.year, project.weekReleased) > currentAbsoluteWeek
+    ));
 
     // --- C. SIMULATE NPC ECONOMY (Passive) ---
     // Apply small market fluctuations to all NPCs to keep the Forbes list dynamic
@@ -294,11 +355,6 @@ export const processWorldTurn = (player: Player): { world: WorldState, news: New
         }
     });
 
-    // Keep last 100 projects
-    if (newWorld.projects.length > 100) {
-        newWorld.projects = newWorld.projects.slice(0, 100);
-    }
-
     // --- B. GENERATE NEW RELEASES & PAY NPCs ---
     if (Math.random() < 0.7) { 
         const project = generateIndustryProject(player.currentWeek, player.age);
@@ -359,6 +415,14 @@ export const processWorldTurn = (player: Player): { world: WorldState, news: New
         const releaseNews = getIndustryReleaseNews(project, player, language);
         if (releaseNews) news.push(releaseNews);
     }
+
+    // Preserve the current and previous release years in full so early-year
+    // contenders still exist when the following award season arrives.
+    const awardsWindowProjects = newWorld.projects.filter(project => project.year >= player.age - 1);
+    const olderProjects = newWorld.projects
+        .filter(project => project.year < player.age - 1)
+        .slice(0, 20);
+    newWorld.projects = [...awardsWindowProjects, ...olderProjects].slice(0, 320);
 
     return { world: newWorld, news, logs };
 };

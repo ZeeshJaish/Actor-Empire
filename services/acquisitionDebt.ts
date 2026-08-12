@@ -3,6 +3,7 @@ import { getPlayerLanguage, t } from './i18n';
 
 export type AcquisitionDebtStatus = 'ACTIVE' | 'PAID_OFF';
 export type AcquisitionDebtSource = 'NEGOTIATED_ACQUISITION' | 'STOCK_CONTROL_TRANSFER';
+export type AcquisitionDebtTrackingOrigin = 'SIGNED' | 'RECONCILED';
 
 export interface AcquisitionDebtEntry {
     id: string;
@@ -19,7 +20,8 @@ export interface AcquisitionDebtEntry {
     missedServiceAmount: number;
     missedPayments: number;
     lastServicedWeekKey?: string;
-    closureReason?: 'ORPHANED_STUDIO_ASSET';
+    trackingOrigin?: AcquisitionDebtTrackingOrigin;
+    closureReason?: 'ORPHANED_STUDIO_ASSET' | 'LEGACY_SAVE_BASELINE';
 }
 
 export interface AcquisitionDebtSummary {
@@ -98,7 +100,11 @@ const getDebtRate = (acquisitionCase: any, principal: number) => {
     return clamp(baseRate + (leverage * 0.08), 0.055, 0.145);
 };
 
-const makeDebtEntry = (acquisitionCase: any, studioIdOverride?: string): AcquisitionDebtEntry | null => {
+const makeDebtEntry = (
+    acquisitionCase: any,
+    studioIdOverride?: string,
+    trackingOrigin: AcquisitionDebtTrackingOrigin = 'RECONCILED',
+): AcquisitionDebtEntry | null => {
     const principal = getCaseDebtPrincipal(acquisitionCase);
     if (principal <= 0) return null;
     const studioId = String(studioIdOverride || acquisitionCase.studioId);
@@ -121,6 +127,7 @@ const makeDebtEntry = (acquisitionCase: any, studioIdOverride?: string): Acquisi
         interestPaidToDate: 0,
         missedServiceAmount: 0,
         missedPayments: 0,
+        trackingOrigin,
     };
 };
 
@@ -178,7 +185,10 @@ export const getAcquisitionDebtLedger = (player: Pick<Player, 'flags'> & Partial
     getRawLedger(player).map(normalizeEntry)
 );
 
-export const syncAcquisitionDebtLedger = (player: Player): Player => {
+export const syncAcquisitionDebtLedger = (
+    player: Player,
+    trackingOrigin: AcquisitionDebtTrackingOrigin = 'RECONCILED',
+): Player => {
     const ledger = getRawLedger(player).map(entry => reconcileEntryWithStudioAssets(entry, player));
     const existingStudioIds = new Set(ledger.map(entry => entry.studioId));
     const newEntries = getAcquiredCases(player)
@@ -190,7 +200,7 @@ export const syncAcquisitionDebtLedger = (player: Player): Player => {
             !existingStudioIds.has(studioId)
             && !getAcquisitionCaseStudioIds(acquisitionCase).some(caseStudioId => existingStudioIds.has(caseStudioId))
         ))
-        .map(({ acquisitionCase, studioId }) => makeDebtEntry(acquisitionCase, studioId))
+        .map(({ acquisitionCase, studioId }) => makeDebtEntry(acquisitionCase, studioId, trackingOrigin))
         .filter((entry): entry is AcquisitionDebtEntry => Boolean(entry));
 
     const nextLedger = [...ledger, ...newEntries].map(normalizeEntry);

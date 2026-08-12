@@ -28,6 +28,7 @@ import {
     analyzeCustomOffer,
     getFundingOptions,
     getOfferPresets,
+    completeAcquisitionTransaction,
     completeStudioAcquisition,
     completeStockControlAcquisition,
     runDueDiligence,
@@ -40,8 +41,10 @@ import {
     type SellerResponsePosture,
     getAcquisitionCommitments,
     getAcquisitionEligibility,
+    updateAcquisitionPresentation,
 } from '../../../services/studioAcquisition';
 import { getCompanyPosition, getStrategicStakeThreshold } from '../../../services/companyPosition';
+import { getStockOutstandingShares } from '../../../services/stockLogic';
 import { formatMoney } from '../../../services/formatUtils';
 import { getOperatingModels } from '../../../services/studioGroup';
 import { getPlayerLanguage, t } from '../../../services/i18n';
@@ -49,6 +52,7 @@ import { PHASE_ONE_ENERGY_COSTS } from '../../../services/energyCosts';
 import { showAd } from '../../../services/adLogic';
 import { hasNoAds } from '../../../services/premiumLogic';
 import { getRegulatorAcquisitionControls } from '../../../services/regulatorPressure';
+import { StudioAcquisitionDealRoom, type StudioAcqConfig } from './StudioAcquisitionDealRoom';
 
 type I18nKey = Parameters<typeof t>[1];
 
@@ -83,8 +87,9 @@ interface StudioAcquisitionDeskProps {
     onReviseOffer: (offerAmount: number) => { success: boolean };
     onBeatRival: (offerAmount: number) => { success: boolean };
     onWalkAway: () => { success: boolean };
-    onCompleteAcquisition: () => ReturnType<typeof completeStudioAcquisition>;
+    onCompleteAcquisition: () => ReturnType<typeof completeAcquisitionTransaction>;
     onCompleteStockControl: () => ReturnType<typeof completeStockControlAcquisition>;
+    onUpdatePresentation: (patch: NonNullable<AcquisitionCase['presentation']>) => ReturnType<typeof updateAcquisitionPresentation>;
 }
 
 const POSTURE_COPY: Record<SellerResponsePosture, { labelKey: I18nKey; noteKey: I18nKey; color: string; bar: string }> = {
@@ -199,7 +204,7 @@ const FundingOptionCard: React.FC<{
     );
 };
 
-export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
+const LegacyStudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
     player,
     profile,
     acquisitionCase,
@@ -241,9 +246,15 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
     const acquisitionCommitments = getAcquisitionCommitments(language);
     const operatingModels = getOperatingModels(language);
     const publicCompany = profile.acquisitionState === 'PUBLICLY_TRADED';
-    const openingEligibility = getAcquisitionEligibility(profile, acquisitionCase);
+    const openingEligibility = getAcquisitionEligibility(profile, acquisitionCase, player);
     const regulatorControls = getRegulatorAcquisitionControls(player);
     const companyPosition = getCompanyPosition(player, profile);
+    const acquiredStudio = player.businesses.find(business => business.id === profile.id);
+    const playerAlreadyOwnsStudio = Boolean(acquiredStudio);
+    const acquisitionComplete = playerAlreadyOwnsStudio || (
+        acquisitionCase?.status === 'ACQUIRED'
+        && acquisitionCase.closing?.outcome !== 'MINORITY_STAKE'
+    );
     const stockControlMode = publicCompany && !profile.isPlayerOwned && companyPosition.influenceStatus === 'CONTROLLING_OWNER';
     const stockControlClosing = acquisitionCase?.status === 'ACQUIRED'
         && acquisitionCase.closing?.finalPrice === 0
@@ -359,8 +370,8 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
     const signingFundingShortfall = Math.max(0, finalPrice - (signingFundingOption?.balance || 0));
     const signatoryName = player.name?.trim() || tr('studioAcquisitionDesk.contract.studioOwner');
     const contractSerial = `${profile.id.replace(/[^A-Z0-9]/g, '').slice(0, 4)}-${player.currentWeek}-${Math.max(0, Math.round(finalPrice / 1_000_000))}`;
-    const acceptedContractMode = acquisitionCase?.status === 'ACCEPTED' && Boolean(responseOffer && sellerResponse);
-    const signingRoomVisible = signingRoomOpen || acceptedContractMode;
+    const acceptedContractMode = !playerAlreadyOwnsStudio && acquisitionCase?.status === 'ACCEPTED' && Boolean(responseOffer && sellerResponse);
+    const signingRoomVisible = !playerAlreadyOwnsStudio && (signingRoomOpen || acceptedContractMode);
     const showStockControlReview = stockControlMode || stockControlComplete || stockControlClosing;
 
     React.useEffect(() => {
@@ -449,8 +460,7 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
     const boundedContractPage = Math.min(contractPage, contractPages.length - 1);
     const activeContractPage = contractPages[boundedContractPage];
     const canSignContract = boundedContractPage === contractPages.length - 1 && (allClosingStepsReviewed || acceptedContractMode || signingRoomOpen);
-    const contractSigned = signedAcquisitionLocked || acquisitionCase?.status === 'ACQUIRED';
-    const acquiredStudio = player.businesses.find(business => business.id === profile.id);
+    const contractSigned = signedAcquisitionLocked || acquisitionComplete;
     const configuredOperatingModel = acquiredStudio?.studioState?.operatingModel;
     const signingRequirementChecks = [
         {
@@ -728,6 +738,10 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
     };
 
     const signAcquisition = () => {
+        if (playerAlreadyOwnsStudio) {
+            setFeedback(`${profile.name} is already in your owned studio group.`);
+            return;
+        }
         if (!canSignContract) {
             showAcquisitionRequirement({
                 title: 'Not ready to sign',
@@ -1037,29 +1051,29 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
                             key={`response-${acquisitionCase?.status}`}
                             initial={{ opacity: 0, y: 8 }}
                             animate={{ opacity: 1, y: 0 }}
-                            className={`overflow-hidden rounded-3xl border ${acquisitionCase?.status === 'ACCEPTED' || acquisitionCase?.status === 'ACQUIRED'
+                            className={`overflow-hidden rounded-3xl border ${acquisitionCase?.status === 'ACCEPTED' || acquisitionComplete
                                 ? 'border-emerald-400/35 bg-[linear-gradient(145deg,rgba(16,185,129,0.14),rgba(8,8,10,0.97))]'
                                 : acquisitionCase?.status === 'COUNTERED' || acquisitionCase?.status === 'RIVAL_BID'
                                     ? 'border-amber-400/35 bg-[linear-gradient(145deg,rgba(245,158,11,0.13),rgba(8,8,10,0.97))]'
                                     : 'border-rose-400/30 bg-[linear-gradient(145deg,rgba(244,63,94,0.12),rgba(8,8,10,0.97))]'}`}
                         >
                             <div className="border-b border-white/[0.07] p-4">
-                                <div className={`flex h-12 w-12 items-center justify-center rounded-2xl border ${acquisitionCase?.status === 'ACCEPTED' || acquisitionCase?.status === 'ACQUIRED'
+                                <div className={`flex h-12 w-12 items-center justify-center rounded-2xl border ${acquisitionCase?.status === 'ACCEPTED' || acquisitionComplete
                                     ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300'
                                     : acquisitionCase?.status === 'COUNTERED' || acquisitionCase?.status === 'RIVAL_BID'
                                         ? 'border-amber-400/30 bg-amber-400/10 text-amber-300'
                                         : 'border-rose-400/30 bg-rose-400/10 text-rose-300'}`}
                                 >
-                                    {acquisitionCase?.status === 'ACCEPTED' || acquisitionCase?.status === 'ACQUIRED' ? <Check size={22} strokeWidth={3} /> : <AlertTriangle size={22} />}
+                                    {acquisitionCase?.status === 'ACCEPTED' || acquisitionComplete ? <Check size={22} strokeWidth={3} /> : <AlertTriangle size={22} />}
                                 </div>
-                                <div className={`mt-4 text-[8px] font-black uppercase tracking-[0.22em] ${acquisitionCase?.status === 'ACCEPTED' || acquisitionCase?.status === 'ACQUIRED'
+                                <div className={`mt-4 text-[8px] font-black uppercase tracking-[0.22em] ${acquisitionCase?.status === 'ACCEPTED' || acquisitionComplete
                                     ? 'text-emerald-300'
                                     : acquisitionCase?.status === 'COUNTERED' || acquisitionCase?.status === 'RIVAL_BID' ? 'text-amber-300' : 'text-rose-300'}`}
                                 >
-                                    {acquisitionCase?.status === 'ACQUIRED' ? 'DEAL SIGNED' : acquisitionCase?.status === 'ACCEPTED' ? 'TERMS AGREED' : acquisitionCase?.status === 'COUNTERED' ? 'SELLER COUNTER' : acquisitionCase?.status === 'RIVAL_BID' ? 'BIDDING WAR' : 'OFFER DECLINED'}
+                                    {acquisitionComplete ? 'DEAL SIGNED' : acquisitionCase?.status === 'ACCEPTED' ? 'TERMS AGREED' : acquisitionCase?.status === 'COUNTERED' ? 'SELLER COUNTER' : acquisitionCase?.status === 'RIVAL_BID' ? 'BIDDING WAR' : 'OFFER DECLINED'}
                                 </div>
                                 <h3 className="mt-1 text-2xl font-black uppercase tracking-tight">
-                                    {acquisitionCase?.status === 'ACQUIRED' ? 'Studio Now Owned' : acquisitionCase?.status === 'ACCEPTED' ? 'Board Approval Secured' : acquisitionCase?.status === 'COUNTERED' ? 'Your Move' : acquisitionCase?.status === 'RIVAL_BID' ? 'Rival At The Table' : 'Approach Closed'}
+                                    {acquisitionComplete ? 'Studio Now Owned' : acquisitionCase?.status === 'ACCEPTED' ? 'Board Approval Secured' : acquisitionCase?.status === 'COUNTERED' ? 'Your Move' : acquisitionCase?.status === 'RIVAL_BID' ? 'Rival At The Table' : 'Approach Closed'}
                                 </h3>
                                 <p className="mt-2 text-[10px] font-semibold leading-relaxed text-zinc-400">{sellerResponse.summary}</p>
                                 {responseCommitments.length > 0 ? (
@@ -1096,15 +1110,15 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
                                 </div>
                                     <div className="p-4">
                                     <div className="text-[6px] font-black uppercase tracking-widest text-zinc-600">
-                                        {acquisitionCase?.status === 'COUNTERED' ? 'Seller Terms' : acquisitionCase?.status === 'RIVAL_BID' ? 'Rival Bid' : acquisitionCase?.status === 'ACCEPTED' || acquisitionCase?.status === 'ACQUIRED' ? 'Agreed Value' : 'Outcome'}
+                                        {acquisitionCase?.status === 'COUNTERED' ? 'Seller Terms' : acquisitionCase?.status === 'RIVAL_BID' ? 'Rival Bid' : acquisitionCase?.status === 'ACCEPTED' || acquisitionComplete ? 'Agreed Value' : 'Outcome'}
                                     </div>
-                                    <div className={`mt-1 font-mono text-sm font-black ${acquisitionCase?.status === 'ACCEPTED' || acquisitionCase?.status === 'ACQUIRED' ? 'text-emerald-300' : acquisitionCase?.status === 'COUNTERED' || acquisitionCase?.status === 'RIVAL_BID' ? 'text-amber-300' : 'text-rose-300'}`}>
+                                    <div className={`mt-1 font-mono text-sm font-black ${acquisitionCase?.status === 'ACCEPTED' || acquisitionComplete ? 'text-emerald-300' : acquisitionCase?.status === 'COUNTERED' || acquisitionCase?.status === 'RIVAL_BID' ? 'text-amber-300' : 'text-rose-300'}`}>
                                         {acquisitionCase?.status === 'REJECTED' ? 'Rejected' : formatMoney(sellerResponse.agreedAmount || sellerResponse.counterAmount || sellerResponse.rivalAmount || responseOffer.amount)}
                                     </div>
                                 </div>
                             </div>
 
-                            {acquisitionCase?.status === 'ACQUIRED' ? (
+                            {acquisitionComplete ? (
                                 <div className="space-y-3 p-4">
                                     <div className="relative overflow-hidden rounded-3xl border border-emerald-300/30 bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.24),transparent_45%),radial-gradient(circle_at_bottom_left,rgba(245,158,11,0.16),transparent_38%),rgba(0,0,0,0.28)] p-4">
                                         <div className="pointer-events-none absolute -right-7 top-5 rotate-[-16deg] rounded border-2 border-emerald-300/35 px-6 py-2 text-[17px] font-black uppercase tracking-[0.2em] text-emerald-300/45">
@@ -2122,12 +2136,18 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
 
                                                     {boundedContractPage === contractPages.length - 1 ? (
                                                         <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_0.72fr]">
-                                                            <div className="Signature Tray rounded-[22px] border-2 border-emerald-300/35 bg-[#041611] p-3 sm:p-4">
+                                                            <button
+                                                                type="button"
+                                                                aria-label="Sign transfer on signature line"
+                                                                disabled={isSigningAcquisition || contractSigned}
+                                                                onClick={signAcquisition}
+                                                                className="Signature Tray rounded-[22px] border-2 border-emerald-300/35 bg-[#041611] p-3 text-left transition-colors hover:border-emerald-200/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-200/80 disabled:cursor-default disabled:opacity-70 sm:p-4"
+                                                            >
                                                                 <div className="text-[7px] font-black uppercase tracking-[0.2em] text-emerald-300">Signature Line · Ink Signature</div>
                                                                 <div className="mt-3 flex min-h-16 items-center rounded-[18px] border-2 border-dashed border-emerald-300/30 bg-[#02100c] px-4 sm:min-h-20">
-                                                                    <span className="truncate font-serif text-3xl italic text-emerald-100 sm:text-4xl">{signingProgress > 0 || contractSigned ? signatoryName : 'Tap to write'}</span>
+                                                                    <span className="truncate font-serif text-3xl italic text-emerald-100 sm:text-4xl">{signingProgress > 0 || contractSigned ? signatoryName : 'Tap to sign'}</span>
                                                                 </div>
-                                                            </div>
+                                                            </button>
                                                             <div className="Live Stamp rounded-[22px] border-2 border-amber-300/35 bg-[#2a1808] p-3 text-center sm:p-4">
                                                                 <div className="text-[7px] font-black uppercase tracking-[0.18em] text-amber-300">Live Stamp</div>
                                                                 <div className="mt-2 text-4xl font-black tracking-[-0.08em] text-white sm:text-5xl">{Math.round(signingProgress)}%</div>
@@ -2286,17 +2306,8 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
                                             ) : (
                                                 <button
 	                                                    type="button"
-	                                                    aria-label="Sign & Acquire Studio"
+	                                                    aria-label="Seal and acquire studio"
 	                                                    onClick={signAcquisition}
-	                                                    onPointerUp={(event) => {
-	                                                        event.preventDefault();
-	                                                        signAcquisition();
-	                                                    }}
-	                                                    onTouchEnd={(event) => {
-	                                                        event.preventDefault();
-	                                                        signAcquisition();
-	                                                    }}
-	                                                    onContextMenu={(event) => event.preventDefault()}
                                                     className="Signature Pressure Stamp Strike relative flex min-h-20 w-full cursor-pointer select-none items-center justify-between overflow-hidden rounded-[28px] border-2 border-amber-200/80 bg-[linear-gradient(135deg,#2c1607_0%,#120a04_46%,#050201_100%)] px-5 text-left text-white shadow-[0_12px_0_#050201,0_22px_46px_rgba(0,0,0,0.42),inset_0_1px_0_rgba(255,236,179,0.12)] transition-transform active:translate-y-1 active:shadow-[0_6px_0_#050201]"
                                                 >
                                                     <div
@@ -2402,5 +2413,157 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
                 </footer>
             ) : null}
         </div>
+    );
+};
+
+/** Every Forbes studio now enters the same cinematic deal room. Market type
+ * changes the terms and ownership math, not the quality of the experience. */
+export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = (props) => {
+    const {
+        player,
+        profile,
+        acquisitionCase,
+        onSetOperatingModel,
+        onRunDiligence,
+        onSubmitOffer,
+        onAcceptCounter,
+        onReviseOffer,
+        onBeatRival,
+        onWalkAway,
+        onCompleteAcquisition,
+        onUpdatePresentation,
+    } = props;
+    const language = getPlayerLanguage(player);
+    const report = acquisitionCase?.diligence?.report;
+    const fundingAmount = acquisitionCase?.offer?.amount || report?.adjustedEnterpriseValue || profile.valuation;
+    const studioFunding = getFundingOptions({
+        player,
+        profile,
+        amount: fundingAmount,
+        expenseType: 'OFFER',
+        language,
+    }).filter(option => option.source === 'STUDIO')
+        .sort((left, right) => right.balance - left.balance)[0];
+    const keyTalent = profile.keyTalent
+        .map(talent => `${talent.name} - ${talent.role}`)
+        .slice(0, 4);
+    const totalOutcomes = Math.max(1, profile.hits + profile.flops);
+    const companyPosition = getCompanyPosition(player, profile);
+    const linkedStock = (player.stocks || []).find(stock => (
+        stock.id === companyPosition.linkedStockId || stock.relatedStudioId === profile.id
+    ));
+    const outstandingShares = linkedStock ? getStockOutstandingShares(linkedStock) : 0;
+    const controlGapPercent = Math.max(0, 50 - companyPosition.ownershipPercent);
+    // Private tender blocks below 5% are impractical. The extra shares simply
+    // become the player's post-closing buffer above 50% control.
+    const tenderPercent = profile.acquisitionState === 'PUBLICLY_TRADED'
+        ? controlGapPercent <= 0 ? 0 : Math.min(49, Math.max(5, controlGapPercent))
+        : 0;
+    const sharesRequiredForControl = linkedStock
+        ? Math.max(0, Math.ceil(outstandingShares * (tenderPercent / 100)))
+        : 0;
+    const acquisitionValuation = report?.adjustedEnterpriseValue || profile.valuation;
+    const privateControlConversion = acquisitionCase?.controlConversion?.kind === 'PRIVATE_STAKE_TO_CONTROL'
+        ? acquisitionCase.controlConversion
+        : undefined;
+    const remainingControlPercent = privateControlConversion?.remainingPercent ?? tenderPercent;
+    const controlBlockValue = privateControlConversion
+        ? Math.round(Math.max(0, acquisitionValuation) * (privateControlConversion.remainingPercent / 100))
+        : Math.round(Math.max(0, acquisitionValuation) * 0.5);
+    const existingStakeCredit = privateControlConversion
+        ? privateControlConversion.existingPositionValue
+        : Math.min(
+            controlBlockValue,
+            Math.round(Math.max(0, acquisitionValuation) * Math.min(50, companyPosition.ownershipPercent) / 100),
+        );
+    const privateStudioFunding = studioFunding
+        ? { source: 'STUDIO' as const, businessId: studioFunding.businessId }
+        : undefined;
+    const mediaHandles = (player.x?.feed || []).reduce((handles: string[], post: any) => {
+        const handle = typeof post.authorHandle === 'string' ? post.authorHandle.trim() : '';
+        if (handle && !handles.includes(handle)) handles.push(handle);
+        return handles;
+    }, [] as string[]).slice(0, 12);
+    const config: StudioAcqConfig = {
+        playerName: player.name,
+        groupName: player.studio?.name || player.businesses.find(business => business.type === 'PRODUCTION_HOUSE')?.name || 'Your Studio Group',
+        studioName: profile.name,
+        archetype: profile.archetype,
+        rank: profile.rank,
+        valuation: acquisitionValuation,
+        catalogCount: profile.catalog.length,
+        hitRate: Math.round((profile.hits / totalOutcomes) * 100),
+        reputation: Math.round(profile.reputation),
+        keyTalent,
+        verifiedDebt: report?.verifiedDebt ?? Math.max(0, profile.debt),
+        hiddenLiabilities: report?.hiddenLiabilities ?? Math.round(Math.max(0, profile.valuation) * 0.035),
+        expectedIncome: report?.expectedAnnualIncome ?? Math.max(0, profile.profitability),
+        riskFlags: report?.obligations?.length
+            ? [report.primaryRisk, ...report.obligations]
+            : ['Market estimates only until diligence is complete.', 'Seller obligations will be verified before closing.'],
+        diligenceFee: calculateDueDiligenceFee(profile),
+        personalBalance: Math.max(0, player.money),
+        studioCapitalName: studioFunding?.label || 'No studio capital available',
+        studioCapitalBalance: Math.max(0, studioFunding?.balance || 0),
+        studioComplianceRisk: studioFunding?.complianceRisk || 0,
+        playerEnergy: player.energy.current,
+        strategyEnergyCost: PHASE_ONE_ENERGY_COSTS.ACQUISITION_STRATEGY_ACTION,
+        signingEnergyCost: PHASE_ONE_ENERGY_COSTS.STUDIO_ACQUISITION_SIGNING,
+        commitments: getAcquisitionCommitments(language).map(commitment => ({
+            id: commitment.id,
+            label: commitment.shortLabel,
+            note: commitment.description,
+        })),
+        rivalStudioName: acquisitionCase?.sellerResponse?.rivalStudioName || 'A rival studio',
+        contractSerial: `${profile.id.replace(/[^a-z0-9]/gi, '').slice(0, 4).toUpperCase()}-${player.age}-${String(player.currentWeek).padStart(2, '0')}`,
+        operatingModels: getOperatingModels(language).map(model => ({
+            id: model.id,
+            label: model.label,
+            control: model.control,
+            benefits: model.benefits,
+            tradeoff: model.tradeoffs.join(' '),
+        })),
+        marketType: profile.acquisitionState === 'PUBLICLY_TRADED' ? 'PUBLIC' : 'PRIVATE',
+        currentWeek: player.currentWeek,
+        currentYear: player.age,
+        currentOwnershipPercent: companyPosition.ownershipPercent,
+        strategicThresholdPercent: companyPosition.strategicThreshold,
+        controlTargetPercent: 50,
+        remainingControlPercent,
+        sharesOwned: companyPosition.shares,
+        sharesRequiredForControl,
+        outstandingShares,
+        stockSymbol: companyPosition.linkedStockSymbol || linkedStock?.symbol,
+        stockCostBasis: companyPosition.stockCostBasis,
+        stockMarketValue: companyPosition.stockValue,
+        controlBlockValue,
+        existingStakeCredit,
+        isPrivateControlUpgrade: Boolean(privateControlConversion),
+        offerReferenceValue: privateControlConversion ? controlBlockValue : undefined,
+        mediaHandles,
+        transactionOutcome: acquisitionCase?.closing?.outcome
+            || (profile.acquisitionState === 'PUBLICLY_TRADED'
+                ? 'CONTROL'
+                : acquisitionCase?.offer?.type === 'MINORITY' ? 'MINORITY_STAKE' : 'FULL_BUYOUT'),
+        rivalMaxRounds: acquisitionCase?.sellerResponse?.maxRounds || 3,
+    };
+
+    return (
+        <StudioAcquisitionDealRoom
+            config={config}
+            acquisitionCase={acquisitionCase}
+            studioFunding={privateStudioFunding}
+            onClose={props.onClose}
+            onRunDiligence={onRunDiligence}
+            onSubmitOffer={onSubmitOffer}
+            onAcceptCounter={onAcceptCounter}
+            onReviseOffer={onReviseOffer}
+            onBeatRival={onBeatRival}
+            onWalkAway={onWalkAway}
+            onCompleteAcquisition={onCompleteAcquisition}
+            onSetOperatingModel={onSetOperatingModel}
+            onUpdatePresentation={onUpdatePresentation}
+            onImmersiveChange={props.onImmersiveChange}
+        />
     );
 };

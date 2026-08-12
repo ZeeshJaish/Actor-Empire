@@ -3,6 +3,10 @@ import { motion } from 'motion/react';
 import { Player, Business, StudioDepartments, StudioEquipment } from '../../../types';
 import { formatMoney } from '../../../services/formatUtils';
 import { getPlayerLanguage, t } from '../../../services/i18n';
+import {
+    getInfrastructureLineAnnualOverhead,
+    getStudioAnnualInfrastructureOverhead,
+} from '../../../services/studioProductionEconomy';
 import { ArrowLeft, Building2, PenTool, Video, Users, Clapperboard, MonitorPlay, Camera, Lightbulb, Mic, Box, Zap } from 'lucide-react';
 
 interface FacilitiesViewProps {
@@ -13,30 +17,24 @@ interface FacilitiesViewProps {
 }
 
 const DEPARTMENTS = [
-    { id: 'writing', name: 'Writing Room', icon: '✍️', desc: 'Improves quality of In-House Scripts.' },
-    { id: 'directing', name: 'Directing Roster', icon: '🎬', desc: 'Determines skill of In-House Directors.' },
-    { id: 'casting', name: 'Casting Dept', icon: '🎭', desc: 'Improves quality of In-House Actors.' },
-    { id: 'production', name: 'Production Crew', icon: '🎥', desc: 'Base efficiency and quality of shoots.' },
-    { id: 'postProduction', name: 'Post-Production', icon: '🖥️', desc: 'VFX and editing polish.' }
+    { id: 'writing', name: 'Writing Room', Icon: PenTool, desc: 'Improves quality of In-House Scripts.' },
+    { id: 'directing', name: 'Directing Roster', Icon: Video, desc: 'Determines skill of In-House Directors.' },
+    { id: 'casting', name: 'Casting Dept', Icon: Users, desc: 'Improves quality of In-House Actors.' },
+    { id: 'production', name: 'Production Crew', Icon: Clapperboard, desc: 'Base efficiency and quality of shoots.' },
+    { id: 'postProduction', name: 'Post-Production', Icon: MonitorPlay, desc: 'VFX and editing polish.' }
 ];
 
 const EQUIPMENT = [
-    { id: 'cameras', name: 'Camera Rigs', icon: '🎥', desc: 'From basic DSLRs to custom IMAX 70mm.' },
-    { id: 'lighting', name: 'Lighting & Grip', icon: '💡', desc: 'From basic LED panels to stadium arrays.' },
-    { id: 'sound', name: 'Sound Engineering', icon: '🎙️', desc: 'From boom mics to Dolby Atmos stages.' },
-    { id: 'practicalEffects', name: 'Practical Sets', icon: '📦', desc: 'From empty warehouses to massive backlots.' }
+    { id: 'cameras', name: 'Camera Rigs', Icon: Camera, desc: 'From basic DSLRs to custom IMAX 70mm.' },
+    { id: 'lighting', name: 'Lighting & Grip', Icon: Lightbulb, desc: 'From basic LED panels to stadium arrays.' },
+    { id: 'sound', name: 'Sound Engineering', Icon: Mic, desc: 'From boom mics to Dolby Atmos stages.' },
+    { id: 'practicalEffects', name: 'Practical Sets', Icon: Box, desc: 'From empty warehouses to massive backlots.' }
 ];
 
 const getUpgradeCost = (currentLevel: number, isDept: boolean) => {
     if (currentLevel >= 10) return 0;
     const base = isDept ? 500000 : 1000000;
     return base * Math.pow(1.5, currentLevel);
-};
-
-const getAnnualOverhead = (level: number, isDept: boolean) => {
-    if (level === 0) return 0;
-    const base = isDept ? 250000 : 100000; // Annual cost per level
-    return base * level;
 };
 
 export const getEquipmentStageName = (id: string, level: number) => {
@@ -102,30 +100,43 @@ export const FacilitiesView: React.FC<FacilitiesViewProps> = ({ player, studio, 
 
     const depts = studio.studioState?.departments || { writing: 0, directing: 0, casting: 0, production: 0, postProduction: 0 };
     const equip = studio.studioState?.equipment || { cameras: 0, lighting: 0, sound: 0, practicalEffects: 0 };
+    const acquisitionPortfolio = studio.studioState?.acquisitionPortfolio;
 
-    let totalAnnualOverhead = 0;
-    Object.values(depts).forEach(lvl => totalAnnualOverhead += getAnnualOverhead(lvl as number, true));
-    Object.values(equip).forEach(lvl => totalAnnualOverhead += getAnnualOverhead(lvl as number, false));
+    const totalAnnualOverhead = getStudioAnnualInfrastructureOverhead(depts, equip);
 
     return (
         <div className="h-full bg-black text-white flex flex-col absolute inset-0 pt-5">
             {/* Header */}
-            <div className="shrink-0 z-50 bg-zinc-950 border-b border-zinc-800 px-4 py-4 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                    <button onClick={onBack} className="w-10 h-10 bg-zinc-900 rounded-full flex items-center justify-center hover:bg-zinc-800 transition-colors">
-                        <ArrowLeft size={20} />
-                    </button>
-                    <div>
-                        <h1 className="text-xl font-black uppercase tracking-tight flex items-center gap-2">
-                            <Building2 size={20} className="text-emerald-500" /> Facilities
-                        </h1>
-                        <div className="text-xs text-zinc-400 font-medium">Manage Studio Infrastructure</div>
+            <div className="shrink-0 z-50 bg-zinc-950 border-b border-zinc-800 px-4 py-4">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <button onClick={onBack} className="w-10 h-10 bg-zinc-900 rounded-full flex items-center justify-center hover:bg-zinc-800 transition-colors">
+                            <ArrowLeft size={20} />
+                        </button>
+                        <div className="min-w-0">
+                            <h1 className="text-xl font-black uppercase tracking-tight flex items-center gap-2">
+                                <Building2 size={20} className="text-emerald-500" /> Facilities
+                            </h1>
+                            <div className="text-xs text-zinc-400 font-medium">Manage Studio Infrastructure</div>
+                        </div>
+                    </div>
+                    <div className="text-right">
+                        <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Studio Funds</div>
+                        <div className="text-lg font-mono font-bold text-emerald-400">{formatMoney(studio.balance)}</div>
                     </div>
                 </div>
-                <div className="text-right">
-                    <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Studio Funds</div>
-                    <div className="text-lg font-mono font-bold text-emerald-400">{formatMoney(studio.balance)}</div>
-                </div>
+                {acquisitionPortfolio?.facilityLabels.length ? (
+                    <div className="mt-3 flex items-start gap-2 border-t border-white/[0.06] pt-2 text-[8px] font-black uppercase tracking-[0.13em]">
+                        <span className="shrink-0 text-emerald-300">Inherited base</span>
+                        <span className="text-zinc-700">·</span>
+                        <span className="min-w-0 flex-1 leading-relaxed text-zinc-500">
+                            {acquisitionPortfolio.facilityLabels.join(' · ')}
+                        </span>
+                        {acquisitionPortfolio.facilitiesEstimated && (
+                            <span className="shrink-0 text-amber-200/65">Estimate</span>
+                        )}
+                    </div>
+                ) : null}
             </div>
 
             <div className="p-4 flex-1 overflow-y-auto pb-32">
@@ -159,6 +170,7 @@ export const FacilitiesView: React.FC<FacilitiesViewProps> = ({ player, studio, 
                 {/* Content */}
                 <div className="space-y-4">
                     {(activeTab === 'DEPARTMENTS' ? DEPARTMENTS : EQUIPMENT).map(item => {
+                        const ItemIcon = item.Icon;
                         const currentLevel = activeTab === 'DEPARTMENTS' 
                             ? depts[item.id as keyof StudioDepartments] 
                             : equip[item.id as keyof StudioEquipment];
@@ -171,7 +183,7 @@ export const FacilitiesView: React.FC<FacilitiesViewProps> = ({ player, studio, 
                             <div key={item.id} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 group hover:border-zinc-700 transition-colors">
                                 <div className="flex items-start sm:items-center gap-4 flex-1">
                                     <div className={`w-12 h-12 shrink-0 rounded-full flex items-center justify-center text-xl ${currentLevel > 0 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-zinc-800 text-zinc-500'}`}>
-                                        {item.icon}
+                                        <ItemIcon size={20} />
                                     </div>
                                     <div className="flex-1">
                                         <div className="flex items-center gap-2">
@@ -201,7 +213,7 @@ export const FacilitiesView: React.FC<FacilitiesViewProps> = ({ player, studio, 
                                                     </>
                                                 )}
                                                 <div className="text-[10px] text-rose-400 font-mono">
-                                                    Overhead: {formatMoney(getAnnualOverhead(currentLevel, activeTab === 'DEPARTMENTS'))}/yr
+                                                    Overhead: {formatMoney(getInfrastructureLineAnnualOverhead(currentLevel, activeTab === 'DEPARTMENTS'))}/yr
                                                 </div>
                                             </div>
                                         )}

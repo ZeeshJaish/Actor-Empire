@@ -1,12 +1,15 @@
 import { INITIAL_PLAYER } from '../types';
 import {
     applyStockShareIssuance,
+    getStockMarketCapCeiling,
+    getStockMaximumOutstandingShares,
     getStockOutstandingShares,
     getStockPriceCeiling,
     initializeStocks,
     processStockMarket,
 } from '../services/stockLogic';
 import { getEntertainmentStockSnapshot } from '../services/entertainmentStockMarket';
+import { migratePlayerSave } from '../services/saveMigration';
 
 const assert = (condition: unknown, message: string) => {
     if (!condition) throw new Error(message);
@@ -50,6 +53,29 @@ assert(issuance.action.news.subtext?.includes('dilut'), 'Share issuance news sho
 assert(issuance.action.notification.includes(disney.symbol), 'Share issuance should provide a stock ticker notification.');
 assert(issuance.stock.price !== disney.price, 'Share issuance should reprice the stock from the new share structure.');
 assert(issuance.stock.price <= getStockPriceCeiling(issuance.stock), 'Share issuance should keep repriced shares under the market cap ceiling.');
+assert(
+    getStockOutstandingShares(issuance.stock) * issuance.stock.price <= getStockMarketCapCeiling(issuance.stock) + getStockOutstandingShares(issuance.stock),
+    'Share issuance should keep total company value under its market cap ceiling.',
+);
+
+const corruptedOutstandingShares = 1e24;
+const repairedSave = migratePlayerSave({
+    ...INITIAL_PLAYER,
+    stocks: stocks.map(stock => stock.id === disney.id
+        ? { ...stock, outstandingShares: corruptedOutstandingShares, price: 1e18, priceHistory: [1e18] }
+        : stock),
+    portfolio: [{
+        stockId: disney.id,
+        shares: corruptedOutstandingShares * 0.1,
+        averageCost: 1e18,
+        totalInvested: 1e30,
+    }],
+});
+const repairedDisney = repairedSave.stocks.find(stock => stock.id === disney.id)!;
+const repairedPosition = repairedSave.portfolio.find(position => position.stockId === disney.id)!;
+assert(repairedDisney.outstandingShares! <= getStockMaximumOutstandingShares(repairedDisney), 'Corrupt share counts should be repaired to the company maximum.');
+assert(repairedDisney.price <= getStockPriceCeiling(repairedDisney), 'Corrupt prices should be repaired during save migration.');
+assert(Math.abs((repairedPosition.shares / repairedDisney.outstandingShares!) - 0.1) < 0.001, 'Repair should preserve the player ownership percentage.');
 
 const originalRandom = Math.random;
 let runawayStocks = stocks.map(stock => stock.id === disney.id

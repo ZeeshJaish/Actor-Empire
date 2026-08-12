@@ -3,16 +3,20 @@ import { motion } from 'motion/react';
 import {
     ArrowLeft,
     Banknote,
+    Building2,
     CheckCircle2,
     ChevronRight,
     Clapperboard,
     Clock3,
     Crown,
+    DollarSign,
     FileKey2,
     Film,
     Handshake,
     Landmark,
     Layers3,
+    PenTool,
+    Pencil,
     ShieldAlert,
     ShieldCheck,
     Sparkles,
@@ -31,6 +35,7 @@ import {
     getStudioGroup,
     getStudioMandateGroups,
     getStudioOperatingMandate,
+    getStudioTreasuryWithdrawalQuote,
     getSubsidiaryControlProfile,
     performStudioTreasuryTransfer,
     setStudioOperatingMandate,
@@ -39,6 +44,7 @@ import {
 } from '../../../services/studioGroup';
 import {
     approveSubsidiaryProjectProposal,
+    getSubsidiaryProjectRevenueBreakdown,
     rejectSubsidiaryProjectProposal,
 } from '../../../services/subsidiaryOperations';
 import { resolveSubsidiaryDecision } from '../../../services/subsidiaryDecisions';
@@ -48,6 +54,9 @@ import { getPlayerLanguage, t } from '../../../services/i18n';
 import { StudioSaleEntryCard, StudioSaleRoom } from './components/StudioSaleDeckPanel';
 import { resolveProjectType } from '../../../services/businessLogic';
 import { getReleaseDisplayPhase } from '../../../services/releasePresentation';
+import { StudioRenameSheet } from './components/StudioRenameSheet';
+import { getStudioRenameAvailability } from '../../../services/studioRebrand';
+import { StudioDivisionCard } from './components/StudioDivisionCard';
 
 interface OwnedStudioCommandCenterProps {
     player: Player;
@@ -57,6 +66,9 @@ interface OwnedStudioCommandCenterProps {
     onUpdatePlayer: (player: Player) => void;
     onGreenlightProject: () => void;
     onOpenWorkbench: (tab: DevelopmentLabInitialTab) => void;
+    onOpenFacilities: () => void;
+    onOpenTalent: () => void;
+    onOpenStreamingBids: (projectId: string) => void;
 }
 
 const formatMoney = (value: number) => {
@@ -125,17 +137,6 @@ const formatSlateMoney = (value: number) => {
     return `$${safe.toFixed(0)}`;
 };
 
-const parseArchiveRevenue = (project: any) => {
-    if (Number.isFinite(project?.gross)) return Number(project.gross);
-    const result = String(project?.boxOfficeResult || '');
-    const match = result.match(/\$?([\d.]+)\s*([KMBT])?/i);
-    if (!match) return Number(project?.streamingRevenue || 0) + Number(project?.soundtrackRevenue || 0);
-    const value = Number(match[1] || 0);
-    const unit = (match[2] || '').toUpperCase();
-    const multiplier = unit === 'T' ? 1_000_000_000_000 : unit === 'B' ? 1_000_000_000 : unit === 'M' ? 1_000_000 : unit === 'K' ? 1_000 : 1;
-    return (value * multiplier) + Number(project?.streamingRevenue || 0) + Number(project?.soundtrackRevenue || 0);
-};
-
 const phaseTone = (phase: string) => {
     if (phase === 'DEVELOPMENT') return 'bg-yellow-400 text-black';
     if (phase === 'PRE-PRODUCTION') return 'bg-orange-400 text-black';
@@ -156,7 +157,8 @@ const SubsidiarySlateTile: React.FC<{
         budget?: number;
         phaseWeeksLeft?: number;
     };
-}> = ({ project }) => (
+    onOpenStreamingBids?: () => void;
+}> = ({ project, onOpenStreamingBids }) => (
     <article className="relative h-[190px] w-[132px] shrink-0 overflow-hidden rounded-[12px] border-2 border-white/[0.08] bg-zinc-950 shadow-[0_7px_0_#020202]">
         <div className={`absolute inset-0 bg-gradient-to-br ${getPosterGradient(project.name)}`} />
         <div className="absolute inset-0 bg-gradient-to-t from-black via-black/70 to-transparent" />
@@ -173,6 +175,15 @@ const SubsidiarySlateTile: React.FC<{
             </div>
             <div>
                 <h3 className="line-clamp-2 text-[13px] font-black leading-tight text-white drop-shadow">{project.name}</h3>
+                {onOpenStreamingBids ? (
+                    <button
+                        type="button"
+                        onClick={onOpenStreamingBids}
+                        className="mt-2 flex w-full items-center justify-between rounded-[9px] border border-sky-300/40 bg-sky-300 px-2 py-1.5 text-left text-[6px] font-black uppercase tracking-[0.1em] text-sky-950 shadow-[0_3px_0_#082f49] active:translate-y-0.5 active:shadow-[0_1px_0_#082f49]"
+                    >
+                        Review offers <ChevronRight size={10} />
+                    </button>
+                ) : null}
                 <div className="mt-2 flex items-end justify-between gap-2">
                     <div>
                         <div className="text-[6px] font-black uppercase tracking-wider text-zinc-500">Budget</div>
@@ -200,16 +211,25 @@ const SubsidiaryArchiveTile: React.FC<{
         revenue?: number;
         budget?: number;
         type?: string;
+        revenueSource?: 'THEATRICAL' | 'STREAMING' | 'HYBRID' | 'OTHER' | 'NONE';
     };
 }> = ({ project }) => {
     const rating = Number(project.rating || 0);
     const revenue = Number(project.revenue || 0);
     const budget = Number(project.budget || 0);
-    const outcome = budget > 0 && revenue >= budget * 2
+    const isStreamingFirst = project.revenueSource === 'STREAMING';
+    const hitMultiplier = isStreamingFirst ? 1.35 : 2;
+    const flopMultiplier = isStreamingFirst ? 0.35 : 1;
+    const outcome = budget > 0 && revenue >= budget * hitMultiplier
         ? 'HIT'
-        : budget > 0 && revenue < budget
+        : budget > 0 && revenue < budget * flopMultiplier
             ? 'FLOP'
             : 'RELEASED';
+    const revenueLabel = project.revenueSource === 'THEATRICAL'
+        ? 'Gross'
+        : project.revenueSource === 'STREAMING'
+            ? 'Streaming'
+            : 'Revenue';
     return (
         <article className="relative h-[190px] w-[132px] shrink-0 overflow-hidden rounded-[12px] border-2 border-white/[0.08] bg-zinc-950 shadow-[0_7px_0_#020202]">
             <div className={`absolute inset-0 bg-gradient-to-br ${getPosterGradient(project.name)}`} />
@@ -233,7 +253,7 @@ const SubsidiaryArchiveTile: React.FC<{
                             <div className="font-mono text-[9px] font-black text-amber-200">{rating ? rating.toFixed(1) : '--'}</div>
                         </div>
                         <div className="text-right">
-                            <div className="text-[6px] font-black uppercase tracking-wider text-zinc-500">Gross</div>
+                            <div className="text-[6px] font-black uppercase tracking-wider text-zinc-500">{revenueLabel}</div>
                             <div className="font-mono text-[9px] font-black text-emerald-300">{formatSlateMoney(revenue)}</div>
                         </div>
                     </div>
@@ -264,6 +284,9 @@ export const OwnedStudioCommandCenter: React.FC<OwnedStudioCommandCenterProps> =
     onUpdatePlayer,
     onGreenlightProject,
     onOpenWorkbench,
+    onOpenFacilities,
+    onOpenTalent,
+    onOpenStreamingBids,
 }) => {
     const language = getPlayerLanguage(player);
     const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
@@ -282,6 +305,9 @@ export const OwnedStudioCommandCenter: React.FC<OwnedStudioCommandCenterProps> =
     const [debtPaydownAmount, setDebtPaydownAmount] = React.useState('');
     const [debtFeedback, setDebtFeedback] = React.useState('');
     const [showSaleRoom, setShowSaleRoom] = React.useState(false);
+    const [showRenameStudio, setShowRenameStudio] = React.useState(false);
+    const [renameFeedback, setRenameFeedback] = React.useState('');
+    const renameAvailability = getStudioRenameAvailability(player, studio);
     const commitments = player.commitments.filter(commitment => commitment.projectDetails?.studioId === studio.id);
     const releases = player.activeReleases.filter(release => release.projectDetails?.studioId === studio.id);
     const pastProjects = player.pastProjects.filter(project => project.studioId === studio.id);
@@ -318,23 +344,35 @@ export const OwnedStudioCommandCenter: React.FC<OwnedStudioCommandCenterProps> =
             phaseWeeksLeft: release.distributionPhase === 'STREAMING' ? release.streaming?.weekOnPlatform : release.weekNum,
         })),
     ];
+    const subsidiaryTalentCount = (studio.studioState?.talentRoster || [])
+        .filter(contract => contract.studioId === studio.id && contract.status === 'ACTIVE')
+        .length;
+    const studioTier = studio.subtype === 'MAJOR_STUDIO' ? 'Major' : 'Indie';
     const archiveSlate = [
-        ...releases.map(release => ({
-            id: release.id,
-            name: release.name,
-            rating: release.imdbRating,
-            revenue: release.totalGross + (release.streamingRevenue || 0) + (release.soundtrackRevenue || 0),
-            budget: release.budget,
-            type: release.type,
-        })),
-        ...pastProjects.map(project => ({
-            id: project.id,
-            name: project.name,
-            rating: project.imdbRating || project.rating,
-            revenue: parseArchiveRevenue(project),
-            budget: Number((project as any).budget || (project as any).projectDetails?.estimatedBudget || 0),
-            type: resolveProjectType(project.projectType, (project as any).projectDetails?.type, project.type),
-        })),
+        ...releases.map(release => {
+            const revenue = getSubsidiaryProjectRevenueBreakdown(release);
+            return {
+                id: release.id,
+                name: release.name,
+                rating: release.imdbRating,
+                revenue: revenue.total,
+                revenueSource: revenue.source,
+                budget: release.budget,
+                type: release.type,
+            };
+        }),
+        ...pastProjects.map(project => {
+            const revenue = getSubsidiaryProjectRevenueBreakdown(project);
+            return {
+                id: project.id,
+                name: project.name,
+                rating: project.imdbRating || project.rating,
+                revenue: revenue.total,
+                revenueSource: revenue.source,
+                budget: Number((project as any).budget || (project as any).projectDetails?.estimatedBudget || 0),
+                type: resolveProjectType(project.projectType, (project as any).projectDetails?.type, project.type),
+            };
+        }),
     ].sort((a, b) => String(b.id).localeCompare(String(a.id)));
     const rightsTitles = [
         ...(studio.studioState?.ownedRights || []).map(right => right.title),
@@ -352,7 +390,9 @@ export const OwnedStudioCommandCenter: React.FC<OwnedStudioCommandCenterProps> =
     const debtSummary = getAcquisitionDebtSummary(player);
     const studioDebtEntry = debtSummary.entries.find(entry => entry.studioId === studio.id);
     const legacyDebt = (acquisitionCase?.closing?.verifiedDebt || 0) + (acquisitionCase?.closing?.hiddenLiabilities || 0);
-    const debt = studioDebtEntry?.remainingPrincipal ?? legacyDebt;
+    // Closing liabilities are historical deal context. Only a live ledger entry
+    // is an amount the player still owes and should affect this finance view.
+    const debt = studioDebtEntry?.remainingPrincipal || 0;
     const studioWeeklyInterest = studioDebtEntry
         ? Math.round(studioDebtEntry.remainingPrincipal * studioDebtEntry.annualInterestRate / 52 / 1_000) * 1_000
         : 0;
@@ -360,6 +400,7 @@ export const OwnedStudioCommandCenter: React.FC<OwnedStudioCommandCenterProps> =
     const signedCommitments = ACQUISITION_COMMITMENTS.filter(commitment => acquisitionCase?.offer?.commitments?.includes(commitment.id));
     const parentStudio = getStudioGroup(player).parentStudio;
     const treasuryParsedAmount = Number.parseInt(treasuryAmount.replace(/[^\d]/g, ''), 10) || 0;
+    const withdrawalQuote = getStudioTreasuryWithdrawalQuote(player, studio, treasuryParsedAmount);
     const debtParsedAmount = Number.parseInt(debtPaydownAmount.replace(/[^\d]/g, ''), 10) || 0;
     const proposals = [...(studio.studioState?.subsidiaryProjectProposals || [])].sort((a, b) => {
         const aTime = (a.createdYear * 52) + a.createdWeek;
@@ -454,6 +495,7 @@ export const OwnedStudioCommandCenter: React.FC<OwnedStudioCommandCenterProps> =
                 INSUFFICIENT_PERSONAL_CASH: 'Personal balance is lower than that injection.',
                 INSUFFICIENT_HQ_CAPITAL: 'Headquarters capital is lower than that injection.',
                 INSUFFICIENT_STUDIO_CAPITAL: 'This studio cannot cover that withdrawal.',
+                EXCEEDS_DISTRIBUTABLE_CASH: `Board limit: you can receive up to ${formatMoney(result.withdrawalQuote?.maxOwnerProceeds || 0)} right now.`,
                 MERGED_STUDIO: 'Merged studios no longer have separate treasury controls.',
                 HQ_NOT_FOUND: 'No headquarters studio found for this transfer.',
             };
@@ -462,7 +504,13 @@ export const OwnedStudioCommandCenter: React.FC<OwnedStudioCommandCenterProps> =
         }
         onUpdatePlayer(result.player);
         setTreasuryAmount('');
-        setTreasuryFeedback(treasuryAction === 'INJECT' ? 'Capital injection complete.' : 'Earnings withdrawal complete.');
+        setTreasuryFeedback(
+            treasuryAction === 'INJECT'
+                ? 'Capital injection complete.'
+                : result.withdrawalQuote && result.withdrawalQuote.minorityDistribution > 0
+                    ? `${formatMoney(result.withdrawalQuote.requestedOwnerProceeds)} moved to ${treasuryCounterparty === 'HQ' ? 'HQ' : 'personal cash'}; ${formatMoney(result.withdrawalQuote.minorityDistribution)} went to outside shareholders.`
+                    : 'Earnings withdrawal complete.',
+        );
     };
 
     const handleDebtPaydown = (amount = debtParsedAmount) => {
@@ -485,6 +533,11 @@ export const OwnedStudioCommandCenter: React.FC<OwnedStudioCommandCenterProps> =
         if (amount <= 0) return;
         setDebtPaydownAmount(formatDebtInputAmount(amount));
         setDebtFeedback('Amount staged. Tap Pay Down to confirm.');
+    };
+
+    const openRenameStudio = () => {
+        setRenameFeedback('');
+        setShowRenameStudio(true);
     };
 
     const authority = model?.id === 'INDEPENDENT_LABEL'
@@ -514,15 +567,53 @@ export const OwnedStudioCommandCenter: React.FC<OwnedStudioCommandCenterProps> =
                     </button>
                     <div className="min-w-0 flex-1">
                         <div className="text-[7px] font-black uppercase tracking-[0.27em] text-amber-300">{tr('ownedStudio.header.title')}</div>
-                        <h1 className="mt-1 truncate font-serif text-2xl font-black uppercase italic tracking-tight">{studio.name}</h1>
-                        <div className="mt-2 flex items-center gap-2">
+                        <div className="mt-1 min-w-0 pr-1">
+                            <h1
+                                className={`min-w-0 break-words font-serif font-black uppercase italic tracking-tight text-white ${
+                                    studio.name.length > 40
+                                        ? 'text-[18px] leading-[1.02]'
+                                        : studio.name.length > 28
+                                            ? 'text-xl leading-[1.02]'
+                                            : 'text-2xl leading-none'
+                                }`}
+                            >
+                                {studio.name}
+                            </h1>
+                        </div>
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
                             <span className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[6px] font-black uppercase tracking-[0.14em] text-zinc-400">
                                 {tr('ownedStudio.header.ownedStudio')}
                             </span>
                             <span className={`rounded-full border px-2.5 py-1 text-[6px] font-black uppercase tracking-[0.14em] ${model ? 'border-amber-300/25 bg-amber-300/[0.08] text-amber-200' : 'border-rose-300/25 bg-rose-300/[0.08] text-rose-200'}`}>
                                 {model?.label || tr('ownedStudio.header.decisionRequired')}
                             </span>
+                            <button
+                                type="button"
+                                onClick={openRenameStudio}
+                                disabled={!renameAvailability.allowed}
+                                aria-label={`Rename ${studio.name}`}
+                                title={renameAvailability.message || `Rebrand ${studio.name}`}
+                                className="flex min-h-8 cursor-pointer items-center gap-1.5 rounded-full border border-amber-300/30 bg-amber-300/[0.09] px-3 text-[6px] font-black uppercase tracking-[0.14em] text-amber-100 shadow-[0_3px_0_#060401] transition-colors duration-200 hover:bg-amber-300/[0.16] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200 active:translate-y-0.5 active:shadow-[0_1px_0_#060401] disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.03] disabled:text-zinc-500 disabled:shadow-none"
+                            >
+                                {renameAvailability.allowed ? <Pencil size={11} /> : <Clock3 size={11} />}
+                                {renameAvailability.allowed
+                                    ? 'Rebrand'
+                                    : renameAvailability.cooldownWeeks > 0
+                                        ? `Rebrand · ${renameAvailability.cooldownWeeks}W`
+                                        : 'Court Case Active'}
+                            </button>
                         </div>
+                        {!renameAvailability.allowed ? (
+                            <div role="status" className="mt-2 flex items-start gap-1.5 text-[7px] font-bold leading-snug text-zinc-500">
+                                <Clock3 size={10} className="mt-0.5 shrink-0 text-amber-300/70" />
+                                <span>{renameAvailability.message}</span>
+                            </div>
+                        ) : null}
+                        {renameFeedback ? (
+                            <div role="status" className="mt-2 text-[7px] font-bold leading-snug text-emerald-300">
+                                {renameFeedback}
+                            </div>
+                        ) : null}
                     </div>
                 </div>
                 <div className="relative mt-5 grid grid-cols-3 overflow-hidden rounded-[18px] border-2 border-[#29251f] bg-black shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
@@ -866,34 +957,67 @@ export const OwnedStudioCommandCenter: React.FC<OwnedStudioCommandCenterProps> =
                                     <div className="text-[7px] font-black uppercase tracking-[0.2em] text-amber-300">{controlProfile.controlCopy}</div>
                                     <p className="mt-2 text-[10px] font-bold leading-relaxed text-zinc-400">{controlProfile.productionCopy}</p>
                                     {controlProfile.canDirectProduce ? (
-                                        <div className="mt-4 space-y-2">
-                                            <button
-                                                type="button"
-                                                onClick={onGreenlightProject}
-                                                className="flex min-h-16 w-full items-center justify-between rounded-[18px] border-2 border-amber-300 bg-amber-300 px-4 text-left text-black shadow-[0_6px_0_#6b4304] active:translate-y-0.5 active:shadow-[0_3px_0_#6b4304]"
-                                            >
-                                                <div>
-                                                    <div className="text-[11px] font-black uppercase tracking-[0.16em]">{tr('ownedStudio.command.greenlightProject')}</div>
-                                                    <div className="mt-1 text-[7px] font-black uppercase tracking-[0.14em] text-black/55">{tr('ownedStudio.command.existingWizard', { studio: studio.name })}</div>
+                                        <div className="mt-4">
+                                            <div className="mb-3 border-l-2 border-sky-300/45 pl-3">
+                                                <div className="text-[6px] font-black uppercase tracking-[0.18em] text-sky-200">Subsidiary divisions</div>
+                                                <p className="mt-1 text-[8px] font-bold leading-relaxed text-zinc-500">
+                                                    Staff, upgrades, equipment and project cash below belong to {studio.name}.
+                                                </p>
+                                            </div>
+                                            <div className="relative overflow-hidden rounded-[20px] border-2 border-[#29251f] bg-[#0a0908] p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_8px_0_#020202]">
+                                                <div className="pointer-events-none absolute inset-x-4 top-0 h-px bg-gradient-to-r from-transparent via-amber-200/25 to-transparent" />
+                                                <div className="grid grid-cols-2 gap-2.5">
+                                                    <StudioDivisionCard
+                                                        title={tr('studio.devLab')}
+                                                        subtitle={tr('services.business.productionDashboard.division.devSubtitle')}
+                                                        icon={<PenTool size={20} />}
+                                                        accent="BLUE"
+                                                        stats={[{ label: tr('services.business.productionDashboard.division.scripts'), value: String(studio.studioState?.scripts?.length || 0) }]}
+                                                        onClick={() => onOpenWorkbench('VAULT')}
+                                                        ariaLabel={`Open ${studio.name} development lab`}
+                                                    />
+                                                    <StudioDivisionCard
+                                                        title={tr('studio.facilities')}
+                                                        subtitle={tr('services.business.productionDashboard.division.facilitiesSubtitle')}
+                                                        icon={<Building2 size={20} />}
+                                                        accent="EMERALD"
+                                                        stats={[{ label: tr('services.business.productionDashboard.division.tier'), value: studioTier }]}
+                                                        onClick={onOpenFacilities}
+                                                        ariaLabel={`Open ${studio.name} facilities`}
+                                                    />
+                                                    <StudioDivisionCard
+                                                        title={tr('studio.talent')}
+                                                        subtitle={tr('services.business.productionDashboard.division.talentSubtitle')}
+                                                        icon={<Users size={20} />}
+                                                        accent="PURPLE"
+                                                        stats={[{ label: tr('services.business.productionDashboard.division.stars'), value: String(subsidiaryTalentCount) }]}
+                                                        onClick={onOpenTalent}
+                                                        ariaLabel={`Open ${studio.name} talent roster`}
+                                                    />
+                                                    <StudioDivisionCard
+                                                        title={tr('studio.finance')}
+                                                        subtitle={tr('services.business.productionDashboard.division.financeSubtitle')}
+                                                        icon={<DollarSign size={20} />}
+                                                        accent="ORANGE"
+                                                        stats={[{ label: tr('services.business.productionDashboard.division.capital'), value: formatMoney(studio.balance) }]}
+                                                        onClick={() => setActiveDeck('FINANCE')}
+                                                        ariaLabel={`Open ${studio.name} finance`}
+                                                    />
+                                                    <StudioDivisionCard
+                                                        wide
+                                                        eyebrow="Production command"
+                                                        title={tr('ownedStudio.command.greenlightProject')}
+                                                        subtitle={tr('ownedStudio.command.existingWizard', { studio: studio.name })}
+                                                        icon={<Clapperboard size={22} />}
+                                                        accent="GOLD"
+                                                        stats={[
+                                                            { label: 'Active slate', value: String(activeSlate.length) },
+                                                            { label: 'Available cash', value: formatMoney(studio.balance) },
+                                                        ]}
+                                                        onClick={onGreenlightProject}
+                                                        ariaLabel={`Greenlight a project for ${studio.name}`}
+                                                    />
                                                 </div>
-                                                <Clapperboard size={20} />
-                                            </button>
-                                            <div className="grid grid-cols-2 gap-2">
-                                                {[
-                                                    'VAULT',
-                                                    'IP_MARKET',
-                                                    'FRANCHISES',
-                                                    'UNIVERSE',
-                                                ].map((tab) => (
-                                                    <button
-                                                        key={tab}
-                                                        type="button"
-                                                        onClick={() => onOpenWorkbench(tab as DevelopmentLabInitialTab)}
-                                                        className="min-h-11 rounded-[14px] border border-white/[0.08] bg-black/35 px-3 text-left text-[7px] font-black uppercase tracking-[0.12em] text-zinc-300"
-                                                    >
-                                                        {tr(`ownedStudio.workbench.${tab}`)}
-                                                    </button>
-                                                ))}
                                             </div>
                                             <div className="hidden">
                                                 {/* Audit anchors: script and IP still route through existing studio-scoped systems. */}
@@ -1042,7 +1166,16 @@ export const OwnedStudioCommandCenter: React.FC<OwnedStudioCommandCenterProps> =
                                 {activeSlate.length ? (
                                     <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-2 no-scrollbar">
                                         {activeSlate.slice(0, 10).map(project => (
-                                            <SubsidiarySlateTile key={project.id} project={project} />
+                                            <SubsidiarySlateTile
+                                                key={project.id}
+                                                project={project}
+                                                onOpenStreamingBids={
+                                                    studio.studioState?.operatingModel === 'CONTROLLED_SUBSIDIARY'
+                                                    && project.phase === 'BIDDING'
+                                                        ? () => onOpenStreamingBids(project.id)
+                                                        : undefined
+                                                }
+                                            />
                                         ))}
                                     </div>
                                 ) : (
@@ -1145,8 +1278,26 @@ export const OwnedStudioCommandCenter: React.FC<OwnedStudioCommandCenterProps> =
                                         ))}
                                     </div>
                                     <div className="mt-3 rounded-[14px] border border-white/[0.07] bg-black/35 p-3">
-                                        <label className="text-[10px] font-black uppercase text-zinc-600">Transfer Amount</label>
+                                        <div className="flex items-center justify-between gap-3">
+                                            <label htmlFor={`studio-treasury-${studio.id}`} className="text-[10px] font-black uppercase text-zinc-500">
+                                                {treasuryAction === 'WITHDRAW' ? 'Amount you receive' : 'Transfer amount'}
+                                            </label>
+                                            {treasuryAction === 'WITHDRAW' ? (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setTreasuryAmount(formatDebtInputAmount(withdrawalQuote.maxOwnerProceeds));
+                                                        setTreasuryFeedback('');
+                                                    }}
+                                                    disabled={withdrawalQuote.maxOwnerProceeds <= 0}
+                                                    className="cursor-pointer rounded-full border border-amber-300/25 bg-amber-300/[0.07] px-2.5 py-1 text-[7px] font-black uppercase tracking-[0.12em] text-amber-200 transition-colors duration-200 hover:bg-amber-300/[0.14] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200 disabled:cursor-not-allowed disabled:opacity-40"
+                                                >
+                                                    Use max
+                                                </button>
+                                            ) : null}
+                                        </div>
                                         <input
+                                            id={`studio-treasury-${studio.id}`}
                                             value={treasuryAmount}
                                             onChange={event => {
                                                 setTreasuryAmount(event.target.value);
@@ -1157,6 +1308,35 @@ export const OwnedStudioCommandCenter: React.FC<OwnedStudioCommandCenterProps> =
                                             className="mt-2 w-full bg-transparent font-mono text-2xl font-black text-white outline-none placeholder:text-zinc-800"
                                         />
                                     </div>
+                                    {treasuryAction === 'WITHDRAW' ? (
+                                        <div className="mt-3 border-y border-white/[0.08] py-3">
+                                            <div className="grid grid-cols-3 gap-3">
+                                                <div>
+                                                    <div className="text-[7px] font-black uppercase tracking-[0.12em] text-zinc-500">Your ownership</div>
+                                                    <div className="mt-1 font-mono text-[12px] font-black text-sky-200">{withdrawalQuote.ownershipPercent.toFixed(1)}%</div>
+                                                </div>
+                                                <div className="border-x border-white/[0.08] px-3">
+                                                    <div className="text-[7px] font-black uppercase tracking-[0.12em] text-zinc-500">Studio reserve</div>
+                                                    <div className="mt-1 font-mono text-[12px] font-black text-zinc-200">{formatMoney(withdrawalQuote.operatingReserve)}</div>
+                                                </div>
+                                                <div className="text-right">
+                                                    <div className="text-[7px] font-black uppercase tracking-[0.12em] text-zinc-500">Available to you</div>
+                                                    <div className="mt-1 font-mono text-[12px] font-black text-emerald-300">{formatMoney(withdrawalQuote.maxOwnerProceeds)}</div>
+                                                </div>
+                                            </div>
+                                            {treasuryParsedAmount > 0 && withdrawalQuote.minorityDistribution > 0 ? (
+                                                <p className="mt-3 text-[9px] font-bold leading-relaxed text-zinc-400">
+                                                    To pay you {formatMoney(withdrawalQuote.requestedOwnerProceeds)}, the studio distributes {formatMoney(withdrawalQuote.grossDistribution)}. Outside shareholders receive {formatMoney(withdrawalQuote.minorityDistribution)}.
+                                                </p>
+                                            ) : (
+                                                <p className="mt-3 text-[9px] font-bold leading-relaxed text-zinc-500">
+                                                    {withdrawalQuote.ownershipPercent < 100
+                                                        ? 'The board protects operating cash. Your maximum also reflects the percentage of this studio you own.'
+                                                        : 'The board protects enough cash to keep the studio operating. Everything above that reserve is available to you.'}
+                                                </p>
+                                            )}
+                                        </div>
+                                    ) : null}
                                     <button
                                         type="button"
                                         onClick={handleTreasuryTransfer}
@@ -1170,7 +1350,7 @@ export const OwnedStudioCommandCenter: React.FC<OwnedStudioCommandCenterProps> =
                                             : `Pulls available cash out of ${studio.name} without changing its operating model.`}
                                     </p>
                                     {treasuryFeedback ? (
-                                        <div className="mt-3 rounded-[12px] border border-amber-300/20 bg-amber-300/[0.07] px-3 py-2 text-[10px] font-black uppercase text-amber-200">
+                                        <div aria-live="polite" className="mt-3 rounded-[12px] border border-amber-300/20 bg-amber-300/[0.07] px-3 py-2 text-[10px] font-black uppercase text-amber-200">
                                             {treasuryFeedback}
                                         </div>
                                     ) : null}
@@ -1201,7 +1381,7 @@ export const OwnedStudioCommandCenter: React.FC<OwnedStudioCommandCenterProps> =
                                                 <div className="mt-1 text-[11px] font-bold text-zinc-500">
                                                     {studioDebtEntry
                                                         ? `${(studioDebtEntry.annualInterestRate * 100).toFixed(1)}% annual rate · ${studioDebtEntry.source === 'STOCK_CONTROL_TRANSFER' ? 'Inherited through stock control' : 'Deal financing'}`
-                                                        : 'No active acquisition debt for this studio.'}
+                                                        : 'Acquisition debt cleared for this studio.'}
                                                 </div>
                                             </div>
                                             <div className="shrink-0 rounded-full border border-sky-300/20 bg-sky-300/[0.07] px-2.5 py-1 text-[10px] font-black uppercase text-sky-200">
@@ -1265,9 +1445,11 @@ export const OwnedStudioCommandCenter: React.FC<OwnedStudioCommandCenterProps> =
                                         </>
                                     ) : (
                                         <div className="mt-3 rounded-[14px] border border-dashed border-sky-300/15 bg-black/25 px-4 py-5 text-center">
-                                            <div className="text-[11px] font-black uppercase text-sky-200">No active acquisition debt</div>
+                                            <div className="text-[11px] font-black uppercase text-sky-200">Acquisition debt cleared</div>
                                             <p className="mt-2 text-[11px] font-bold leading-relaxed text-zinc-600">
-                                                This studio is operating without inherited acquisition debt. Future deals may still bring liabilities through diligence or financing.
+                                                {legacyDebt > 0
+                                                    ? `The original ${formatMoney(legacyDebt)} deal liabilities are settled and no longer affect this studio's weekly result.`
+                                                    : 'This studio has no inherited acquisition debt. Future deals may still bring liabilities through diligence or financing.'}
                                             </p>
                                         </div>
                                     )}
@@ -1329,6 +1511,25 @@ export const OwnedStudioCommandCenter: React.FC<OwnedStudioCommandCenterProps> =
                     onBack={() => setShowSaleRoom(false)}
                     onUpdatePlayer={onUpdatePlayer}
                     onSold={onBack}
+                />
+            ) : null}
+            {showRenameStudio ? (
+                <StudioRenameSheet
+                    player={player}
+                    studio={studio}
+                    onClose={() => setShowRenameStudio(false)}
+                    onRenamed={(updatedPlayer, newName) => {
+                        onUpdatePlayer(updatedPlayer);
+                        setShowRenameStudio(false);
+                        const lawsuitFiled = updatedPlayer.flags?.activeCases?.some((legalCase: any) => (
+                            legalCase.caseType === 'STUDIO_NAME_RIGHTS'
+                            && legalCase.studioId === studio.id
+                            && legalCase.status === 'ACTIVE'
+                        ));
+                        setRenameFeedback(lawsuitFiled
+                            ? `${newName} is live. The former owners filed a claim; first hearing is next week.`
+                            : `${newName} is live. The rebrand is now in industry news.`);
+                    }}
                 />
             ) : null}
         </motion.div>

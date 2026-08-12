@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
-import { ArrowLeft, Twitter, Send, Star, Globe, LogOut, Coffee, Bug, Puzzle, Lock, CheckCircle2, Users, ChevronRight, FileText, SlidersHorizontal, ShieldCheck, Gauge, Database, Copy, Smartphone, MessageCircle, LifeBuoy, Bell, Download, Upload } from 'lucide-react';
+import { ArrowLeft, Twitter, Send, Star, Globe, LogOut, Coffee, Bug, Puzzle, Lock, CheckCircle2, Users, ChevronRight, FileText, ShieldCheck, Gauge, Database, Copy, Smartphone, MessageCircle, LifeBuoy, Bell, Download, Upload } from 'lucide-react';
 import { GameLanguage, Player } from '../types';
 import { APP_DISPLAY_VERSION } from '../services/appVersion';
 import { CHANGELOG_ENTRIES, getChangelogTypeLabel, getLatestChangelogEntry, type ChangelogEntry, type ChangelogUpdateType } from '../services/changelog';
@@ -1121,29 +1121,25 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
             </div>
           </button>
 
-          <div className="w-full rounded-3xl border border-white/5 bg-zinc-900/40 p-5 opacity-70">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-zinc-800 text-zinc-500 flex items-center justify-center shrink-0">
-                <Star size={22}/>
+          <div
+            aria-disabled="true"
+            className="w-full overflow-hidden rounded-3xl border border-zinc-700/80 bg-zinc-900 p-5"
+          >
+            <div className="flex items-start gap-4">
+              <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-zinc-800 text-zinc-300">
+                <Puzzle size={22}/>
+                <span className="absolute -bottom-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full border-2 border-zinc-900 bg-amber-400 text-black">
+                  <Lock size={10} strokeWidth={3}/>
+                </span>
               </div>
-              <div className="flex-1 min-w-0">
-                <div className="font-black text-zinc-300">{tr('settings.creatorPacks')}</div>
-                <div className="text-xs text-zinc-500 mt-1">{tr('settings.creatorPacksSub')}</div>
+              <div className="min-w-0 flex-1">
+                <div className="font-black text-white">{tr('settings.createMods')}</div>
+                <div className="mt-1 text-xs leading-relaxed text-zinc-400">{tr('settings.createModsSub')}</div>
+                <div className="mt-3 inline-flex max-w-full items-center gap-1.5 rounded-full border border-amber-400/25 bg-amber-400/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-amber-300">
+                  <Lock size={11} className="shrink-0"/>
+                  <span>{tr('settings.comingFutureUpdates')}</span>
+                </div>
               </div>
-              <span className="text-[10px] bg-zinc-800 px-2 py-1 rounded text-zinc-500 font-bold uppercase">{tr('common.later')}</span>
-            </div>
-          </div>
-
-          <div className="w-full rounded-3xl border border-white/5 bg-zinc-900/40 p-5 opacity-70">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-zinc-800 text-zinc-500 flex items-center justify-center shrink-0">
-                <SlidersHorizontal size={22}/>
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="font-black text-zinc-300">{tr('settings.gameplayRules')}</div>
-                <div className="text-xs text-zinc-500 mt-1">{tr('settings.gameplayRulesSub')}</div>
-              </div>
-              <span className="text-[10px] bg-zinc-800 px-2 py-1 rounded text-zinc-500 font-bold uppercase">{tr('common.later')}</span>
             </div>
           </div>
         </div>

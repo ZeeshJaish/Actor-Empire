@@ -14,6 +14,9 @@ import { ALL_GENRES } from './genreCatalog';
 import { getAbsoluteWeek } from './legacyLogic';
 import { buildAutomaticProjectMusicPlan } from './musicIndustry';
 import { getPlayerLanguage, t } from './i18n';
+import { enrichAuditionOpportunity, inferStoryCompass, suggestCharacterIdentity } from './characterIdentityLogic';
+import { getRoleMasteryLanes } from './actorRoleIdentity';
+import { getRoleOfferMessageLine } from './roleMarketDemand';
 
 // --- CONSTANTS ---
 
@@ -332,12 +335,16 @@ export const generateBreakthroughAuditionInvite = (
             };
             opportunity.estimatedIncome = Math.floor(opportunity.estimatedIncome * 0.65);
 
+            const enrichedOpportunity = enrichAuditionOpportunity(opportunity, player);
             return {
                 kind: 'BLOCKBUSTER_EXTRA',
-                opportunity,
+                opportunity: enrichedOpportunity,
                 sender: t(language, 'services.weeklyOffer.breakthrough.blockbuster.sender', { projectTitle: famousProject.title }),
                 subject: t(language, 'services.weeklyOffer.breakthrough.blockbuster.subject', { projectTitle: famousProject.title }),
-                text: t(language, 'services.weeklyOffer.breakthrough.blockbuster.text', { role: roleLabel })
+                text: [
+                    t(language, 'services.weeklyOffer.breakthrough.blockbuster.text', { role: roleLabel }),
+                    getRoleOfferMessageLine(enrichedOpportunity),
+                ].filter(Boolean).join(' ')
             };
         }
     }
@@ -355,9 +362,12 @@ export const generateBreakthroughAuditionInvite = (
         opportunity,
         sender: t(language, 'services.weeklyOffer.breakthrough.freshFace.sender'),
         subject: t(language, 'services.weeklyOffer.breakthrough.freshFace.subject', { projectName: opportunity.projectName }),
-        text: t(language, 'services.weeklyOffer.breakthrough.freshFace.text', {
-            role: getWeeklyOfferRoleLabel(language, roleType)
-        })
+        text: [
+            t(language, 'services.weeklyOffer.breakthrough.freshFace.text', {
+                role: getWeeklyOfferRoleLabel(language, roleType)
+            }),
+            getRoleOfferMessageLine(opportunity),
+        ].filter(Boolean).join(' ')
     };
 };
 
@@ -373,8 +383,9 @@ export const evaluateCastingApplication = (
     const reputation = clamp(player.stats.reputation || 0, 0, 100);
     const experience = clamp(player.stats.experience || 0, 0, 100);
     const directorStyle = getCastingDirectorStyle(project.directorName);
+    const roleIdentityFit = Number(opportunity.roleFit?.score || 50);
 
-    let fitScore = (talent * 0.30) + (genreFit * 0.30) + (fame * 0.20) + (reputation * 0.12) + (experience * 0.08);
+    let fitScore = (talent * 0.27) + (genreFit * 0.27) + (fame * 0.18) + (reputation * 0.11) + (experience * 0.07) + (roleIdentityFit * 0.10);
 
     if (directorStyle === 'CRAFT_FIRST') fitScore += (talent - 50) * 0.10;
     if (directorStyle === 'STAR_DRIVEN') fitScore += (fame - 50) * 0.12;
@@ -497,9 +508,16 @@ export const checkAuditionPass = (player: Player, commitment: Commitment): { pas
     const prep = commitment.auditionPerformance || 0;
     const talent = getActorTalent(player.stats.skills);
     const genreFit = calculateGenreFit(player, commitment.projectDetails);
+    const playerCharacter = commitment.projectDetails.castList?.find(member => member.isPlayer || member.actorId === 'PLAYER_SELF');
+    const identityLane = playerCharacter?.storyRole
+        ? getRoleMasteryLanes(player).find(lane => lane.role === playerCharacter.storyRole)
+        : undefined;
     
     const masteryBonus = genreFit.fitScore >= 85 ? 8 : genreFit.fitScore >= 65 ? 5 : genreFit.fitScore >= 40 ? 2 : 0;
-    let playerScore = (prep * 0.4) + (talent * 0.3) + (genreFit.fitScore * 0.3) + masteryBonus;
+    const identityMasteryBonus = identityLane
+        ? Math.min(10, Math.max(0, (identityLane.mastery - 45) * 0.18))
+        : 0;
+    let playerScore = (prep * 0.4) + (talent * 0.3) + (genreFit.fitScore * 0.3) + masteryBonus + identityMasteryBonus;
     
     if (player.activeUniverseContract && commitment.projectDetails.universeId === player.activeUniverseContract.universeId) {
         playerScore += 50; 
@@ -794,6 +812,7 @@ export const generateProjectDetails = (tier: BudgetTier, type: ProjectType, used
         visibleCastStrength: hidden.castingStrength > 80 ? 'Star-Studded' : hidden.castingStrength > 60 ? 'Solid' : 'Unknown',
         episodes: type === 'SERIES' ? 8 + Math.floor(Math.random() * 5) : undefined
     };
+    project.storyCompass = inferStoryCompass(project);
     project.musicPlan = buildAutomaticProjectMusicPlan(project);
     return project;
 };
@@ -819,7 +838,7 @@ export const generateAudition = (
 
     const config = { ...ROLE_DEFINITIONS[roleType], energyCost };
 
-    return {
+    return enrichAuditionOpportunity({
         id: `aud_${Date.now()}_${Math.random()}`,
         roleType,
         projectName: project.title,
@@ -828,13 +847,29 @@ export const generateAudition = (
         project,
         estimatedIncome: income,
         source
-    };
+    }, player);
 };
 
 export const generateAuditions = (player: Player, usedTitles: string[]): AuditionOpportunity[] => {
     const count = 3 + Math.floor(Math.random() * 3);
     const opps: AuditionOpportunity[] = [];
     const access = getCastingOpportunityAccess(player);
+    const addOpportunity = (candidate: AuditionOpportunity) => {
+        let opportunity = enrichAuditionOpportunity(candidate, player);
+        const sameMarketRoleOffers = opps.filter(existing => (
+            existing.characterProfile?.storyRole === opportunity.characterProfile?.storyRole
+            && existing.industryContext?.kind === 'TYPECAST'
+        )).length;
+        if (opportunity.industryContext?.kind === 'TYPECAST' && sameMarketRoleOffers >= 2) {
+            opportunity = enrichAuditionOpportunity({
+                ...opportunity,
+                characterProfile: undefined,
+                roleFit: undefined,
+                industryContext: undefined,
+            }, player, { forceRange: true });
+        }
+        opps.push(opportunity);
+    };
     
     for(let i=0; i<count; i++) {
         // Director Favor (Direct Bookings)
@@ -848,7 +883,7 @@ export const generateAuditions = (player: Player, usedTitles: string[]): Auditio
                 opp.projectName = `${npc.name}'s Next Project`;
                 opp.source = 'DIRECT';
                 opp.estimatedIncome = Math.floor(opp.estimatedIncome * 1.2); // Better pay from friends
-                opps.push(opp);
+                addOpportunity(opp);
                 continue;
             }
         }
@@ -860,7 +895,7 @@ export const generateAuditions = (player: Player, usedTitles: string[]): Auditio
                 : generateFamousSeriesOpportunity(player);
             
             if (famousOpp) {
-                opps.push(famousOpp);
+                addOpportunity(famousOpp);
                 continue;
             }
         }
@@ -876,7 +911,7 @@ export const generateAuditions = (player: Player, usedTitles: string[]): Auditio
         else if (r < access.leadRoleChance + access.supportingRoleChance) role = 'SUPPORTING';
         else if (r < access.leadRoleChance + access.supportingRoleChance + 0.28) role = 'CAMEO';
 
-        opps.push(generateAudition(role, tier, usedTitles, player, 'CASTING_APP'));
+        addOpportunity(generateAudition(role, tier, usedTitles, player, 'CASTING_APP'));
     }
     return opps;
 };
@@ -917,6 +952,7 @@ export const generatePartTimeJobs = (): Commitment[] => {
 
 export const generateCastList = (player: Player, project: ProjectDetails, playerRole: RoleType): CastMember[] => {
     const cast: CastMember[] = [];
+    const storyCompass = inferStoryCompass(project);
     cast.push({
         id: 'player',
         name: player.name,
@@ -926,7 +962,8 @@ export const generateCastList = (player: Player, project: ProjectDetails, player
         type: 'ACTOR',
         actorId: 'PLAYER_SELF',
         actorName: player.name,
-        roleType: playerRole
+        roleType: playerRole,
+        ...suggestCharacterIdentity(storyCompass, playerRole, 0, project)
     });
 
     let count = 2;
@@ -935,7 +972,7 @@ export const generateCastList = (player: Player, project: ProjectDetails, player
 
     const pool = [...NPC_DATABASE].filter(npc => isCastableActor(npc)).sort(() => 0.5 - Math.random()).slice(0, count);
     
-    pool.forEach(npc => {
+    pool.forEach((npc, index) => {
         cast.push({
             id: npc.id,
             name: npc.name,
@@ -946,7 +983,8 @@ export const generateCastList = (player: Player, project: ProjectDetails, player
             npcId: npc.id,
             actorId: npc.id,
             actorName: npc.name,
-            roleType: 'SUPPORTING'
+            roleType: 'SUPPORTING',
+            ...suggestCharacterIdentity(storyCompass, 'SUPPORTING', index + 1, project)
         });
     });
 
@@ -971,7 +1009,8 @@ export const generateReviews = (
     budgetTier: BudgetTier = 'MID',
     format: ProjectFormat = 'LIVE_ACTION',
     subjectName?: string,
-    language: GameLanguage = 'en'
+    language: GameLanguage = 'en',
+    productionBudget?: number
 ): Review[] => {
     const reviews: Review[] = [];
     const count = 6;
@@ -987,6 +1026,43 @@ export const generateReviews = (
     const mixedLines = splitLocalizedList(language, 'services.role.review.mixed.general', reviewVars);
     const negativeLines = splitLocalizedList(language, 'services.role.review.negative.general', reviewVars);
     const thinCastLines = splitLocalizedList(language, 'services.role.review.thinCast', reviewVars);
+    const budgetInMillions = Math.max(0, Number(productionBudget || 0)) / 1_000_000;
+    const budgetLabel = budgetInMillions >= 100
+        ? `$${Math.round(budgetInMillions)}M`
+        : `$${budgetInMillions.toFixed(1)}M`;
+    const isLeanProduction = budgetInMillions > 0 && budgetInMillions <= 12;
+    const isExpensiveProduction = budgetInMillions >= 120;
+    const budgetAwareLines: Record<'POSITIVE' | 'MIXED' | 'NEGATIVE', string[]> = isExpensiveProduction
+        ? {
+            POSITIVE: [
+                `At ${budgetLabel}, the scale matters—but the craft gives it a purpose.`,
+                `A large budget is visible here, and this time it supports a story worth seeing on a big screen.`
+            ],
+            MIXED: [
+                `The ${budgetLabel} scale is impressive, even if the emotional return is smaller than the spend.`,
+                `Every dollar is on screen, but the film still struggles to find a human center.`
+            ],
+            NEGATIVE: [
+                `For a ${budgetLabel} production, the storytelling feels strangely underfunded.`,
+                `The expense is obvious; the reason for it never is.`
+            ]
+        }
+        : isLeanProduction
+            ? {
+                POSITIVE: [
+                    `Made for ${budgetLabel}, it finds more atmosphere and confidence than productions ten times its size.`,
+                    `The modest budget becomes a strength because the film knows exactly where to put its attention.`
+                ],
+                MIXED: [
+                    `The ${budgetLabel} footprint gives it focus, though a few corners still show.`,
+                    `A lean production with genuine ideas, even if the execution cannot always keep up.`
+                ],
+                NEGATIVE: [
+                    `A small budget can be a virtue; here it mostly exposes how little has been developed.`,
+                    `Restraint is not the problem—the thin storytelling is.`
+                ]
+            }
+            : { POSITIVE: [], MIXED: [], NEGATIVE: [] };
     let genrePositiveLines = splitLocalizedList(language, `services.role.review.positive.${genreKey}`, reviewVars);
     let genreMixedLines = splitLocalizedList(language, `services.role.review.mixed.${genreKey}`, reviewVars);
     let genreNegativeLines = splitLocalizedList(language, `services.role.review.negative.${genreKey}`, reviewVars);
@@ -1001,11 +1077,16 @@ export const generateReviews = (
         if (quality > 70) sentiment = 'POSITIVE';
         if (quality < 40) sentiment = 'NEGATIVE';
         if (isThinSpectacle && sentiment === 'POSITIVE' && Math.random() < 0.55) sentiment = 'MIXED';
-        if (Math.random() > 0.8) sentiment = sentiment === 'POSITIVE' ? 'MIXED' : 'POSITIVE';
+        // Keep the lead review anchored to the project's actual result so
+        // budget-aware coverage cannot randomly contradict the release.
+        if (i > 0 && Math.random() > 0.8) sentiment = sentiment === 'POSITIVE' ? 'MIXED' : 'POSITIVE';
 
         let text = "";
         if (isThinSpectacle && i === 1) {
             text = pick(thinCastLines);
+        }
+        if (!text && i === 0 && budgetAwareLines[sentiment].length > 0) {
+            text = pick(budgetAwareLines[sentiment]);
         }
         if (sentiment === 'POSITIVE') {
             text = text || pick(genrePositiveLines.length > 0 ? genrePositiveLines : positiveLines);
@@ -1121,7 +1202,9 @@ const BOX_OFFICE_CAPS: Record<BudgetTier, { opening: number, total: number }> = 
     'MID': { opening: 120000000, total: 600000000 },
     // These are market-size anchors, not fixed outcomes. Package and audience response shape the final ceiling.
     'HIGH': { opening: 350000000, total: 1750000000 },
-    'BLOCKBUSTER': { opening: 600000000, total: 3000000000 }
+    // Keep $3B as a rare milestone rather than a visible hard wall. Exceptional
+    // event films can still stretch above it through the dynamic cap calculation.
+    'BLOCKBUSTER': { opening: 600000000, total: 2650000000 }
 };
 
 export const getBoxOfficeCaps = (budgetTier: BudgetTier): { opening: number, total: number } => {
@@ -1220,6 +1303,7 @@ export const calculateWeeklyBoxOffice = (
     const fameMultiplier = stats.fameMultiplier || 1.0;
     const castDepthScore = stats.castDepthScore ?? 70;
     const studioPrestigeScore = stats.studioPrestigeScore ?? 0;
+    const campaignReachMod = Math.max(0.38, Math.min(1.28, stats.campaignReachMultiplier ?? 1));
     const musicOpeningLiftPct = stats.musicOpeningLiftPct || 0;
     const musicAudienceReachLiftPct = stats.musicAudienceReachLiftPct || 0;
     const musicMismatchBacklashRisk = stats.musicMismatchBacklashRisk || 0;
@@ -1249,7 +1333,7 @@ export const calculateWeeklyBoxOffice = (
         const fameMod = 0.85 + ((fameMultiplier - 1) * 0.7);
         const musicOpeningMod = Math.max(0.88, Math.min(1.28, 1 + (musicOpeningLiftPct / 100) + (musicTrailerStrengthLift / 250) - (musicMismatchBacklashRisk / 900) - (musicControversyRisk / 1200)));
 
-        let rawOpening = budget * baseMultiplier * distMod * buzzMod * packageMod * qualityMod * fameMod * castDepthMod * studioPrestigeMod * studioReputationMod * formatAudienceMod * marketDemandMod * musicOpeningMod;
+        let rawOpening = budget * baseMultiplier * distMod * buzzMod * packageMod * qualityMod * fameMod * castDepthMod * studioPrestigeMod * studioReputationMod * formatAudienceMod * marketDemandMod * musicOpeningMod * campaignReachMod;
         rawOpening *= (0.8 + Math.random() * 0.4); // Variance
 
         // Genre Adjustment
@@ -1314,13 +1398,31 @@ export const calculateWeeklyBoxOffice = (
     dropRate += musicControversyRisk / 760;
     dropRate -= musicAudienceReachLiftPct / 520;
 
+    // A lean launch limits the opening, but an exceptional small production can
+    // still break out through a stable, pre-rolled word-of-mouth path. This
+    // preserves indie upside without making zero marketing a guaranteed exploit.
+    const sleeperRoll = stats.boxOfficeCapRoll ?? 0.5;
+    const sleeperEligible =
+        ['LOW', 'MID'].includes(budgetTier)
+        && campaignReachMod < 0.78
+        && qualityScore >= 84
+        && scriptQuality >= 82
+        && directorQuality >= 78;
+    const sleeperBreakout = sleeperEligible && sleeperRoll >= 0.86;
+    if (sleeperBreakout && week <= 5) {
+        dropRate -= 0.18 + Math.min(0.1, (qualityScore - 84) / 80);
+    }
+
     const variance = (Math.random() * 0.1) - 0.05; 
     dropRate += variance;
 
     if (week >= 4) dropRate += 0.05;
     if (week >= 8) dropRate += 0.10;
 
-    const retention = Math.max(0.05, 1 - dropRate);
+    let retention = Math.max(0.05, 1 - dropRate);
+    if (sleeperBreakout && week === 2 && sleeperRoll >= 0.96 && qualityScore >= 90) {
+        retention = Math.max(retention, 1.28);
+    }
     const musicLegsMod = Math.max(0.92, Math.min(1.14, 1 + (musicAudienceReachLiftPct / 260) - (musicMismatchBacklashRisk / 1100) - (musicControversyRisk / 1500)));
     return Math.floor(prevGross * retention * formatAudienceMod * marketDemandMod * studioReputationMod * musicLegsMod);
 };

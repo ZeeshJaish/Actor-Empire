@@ -1,13 +1,14 @@
 
 import React, { useEffect, useState } from 'react';
 import { Player, Message, AuditionOpportunity, SponsorshipOffer, NegotiationData, ScheduledEvent, YoutubeBrandDeal, YoutubeCollabOffer, YoutubeMusicVideoFeatureOffer, OutsideProducerInvestmentOffer } from '../../types';
-import { ArrowLeft, Star, DollarSign, Calendar, CheckCircle, Lock, Trash2, Mail, Heart, Play, Users, Clapperboard, FileSearch, ShieldCheck, TrendingUp, AlertTriangle, FileSignature, Swords, ChevronRight, Landmark, Vote, Music2, Zap } from 'lucide-react';
+import { ArrowLeft, Star, DollarSign, Calendar, CheckCircle, Lock, Trash2, Mail, Heart, Play, Users, Clapperboard, FileSearch, ShieldCheck, TrendingUp, AlertTriangle, FileSignature, Swords, ChevronRight, Landmark, Vote, Music2, Zap, X, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { ProjectDetailView } from '../../components/ProjectDetailView';
 import { APP_DISPLAY_VERSION } from '../../services/appVersion';
 import { getPlayerLanguage, t } from '../../services/i18n';
 import { formatProjectMusicByline } from '../../services/musicIndustry';
 import { calculateOutsideInvestmentAcceptanceChance } from '../../services/outsideProductions';
 import { PHASE_ONE_ENERGY_COSTS } from '../../services/energyCosts';
+import { getCharacterIdentityLabels, getOpportunityCharacterProfile } from '../../services/characterIdentityLogic';
 
 interface MessagesAppProps {
   player: Player;
@@ -16,14 +17,20 @@ interface MessagesAppProps {
   onDelete: (id: string) => void;
   onMarkRead: (id: string) => void;
   onOpenRightsMarket?: (opportunityId?: string) => void;
-  onOpenStudioAcquisition?: (studioId?: string) => void;
-  onOpenStock?: (stockId: string) => void;
+  onOpenStudioAcquisition?: (studioId?: string, studioName?: string) => void;
+  onOpenStudioContinuation?: (studioId?: string, scriptId?: string) => void;
+  onResolveShareholderVote?: (
+      voteId: string,
+      selectedVote: 'FOR' | 'AGAINST',
+  ) => { success: boolean; message: string };
   onImmersiveReviewChange?: (active: boolean) => void;
 }
 
-export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAccept, onDelete, onMarkRead, onOpenRightsMarket, onOpenStudioAcquisition, onOpenStock, onImmersiveReviewChange }) => {
+export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAccept, onDelete, onMarkRead, onOpenRightsMarket, onOpenStudioAcquisition, onOpenStudioContinuation, onResolveShareholderVote, onImmersiveReviewChange }) => {
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [activeShareholderVoteId, setActiveShareholderVoteId] = useState<string | null>(null);
+  const [shareholderVoteFeedback, setShareholderVoteFeedback] = useState<{ success: boolean; message: string } | null>(null);
   const [outsideCounterCash, setOutsideCounterCash] = useState<number>(0);
   const [outsideCounterStake, setOutsideCounterStake] = useState<number>(0);
   const [outsideCounterFeedback, setOutsideCounterFeedback] = useState<OutsideProducerInvestmentOffer['lastCounterFeedback'] | null>(null);
@@ -47,6 +54,24 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
       ? selectedMessage.data?.negotiation?.status
       : undefined;
   const selectedRightsAccepted = selectedRightsStatus === 'ACCEPTED' || selectedRightsStatus === 'READY_TO_SIGN';
+  const selectedStudioAcquisitionMessage = selectedMessage?.type === 'STUDIO_ACQUISITION'
+      ? selectedMessage
+      : null;
+  const selectedStudioAcquisitionExpired = Boolean(selectedStudioAcquisitionMessage?.isExpired);
+  const selectedStudioContinuationMessage = selectedMessage?.type === 'STUDIO_CONTINUATION'
+      ? selectedMessage
+      : null;
+  const selectedStudioContinuationExpired = Boolean(selectedStudioContinuationMessage?.isExpired);
+  const selectedShareholderVoteId = selectedMessage?.type === 'SHAREHOLDER_VOTE'
+      ? String(selectedMessage.data?.voteId || '')
+      : '';
+  const selectedShareholderVote = selectedShareholderVoteId
+      ? (player.shareholderVotes || []).find(vote => vote.id === selectedShareholderVoteId)
+      : undefined;
+  const selectedShareholderVoteClosed = Boolean(
+      selectedMessage?.isExpired
+      || selectedShareholderVote?.status === 'EXPIRED',
+  );
   const selectedFriendFavor = selectedMessage?.type === 'SYSTEM' && selectedMessage.data?.kind === 'FRIEND_FAVOR'
       ? selectedMessage.data
       : null;
@@ -61,6 +86,50 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
       message?.id === 'msg_dev_welcome' ||
       (message?.sender === 'Zeesh (Developer)' && message?.subject === 'A Note from the Creator')
   );
+  const openCurrentStudioAcquisition = () => {
+      if (!selectedStudioAcquisitionMessage || selectedStudioAcquisitionExpired) return;
+      onOpenStudioAcquisition?.(
+          selectedStudioAcquisitionMessage.data?.studioId,
+          selectedStudioAcquisitionMessage.data?.studioName,
+      );
+  };
+  const openCurrentStudioContinuation = () => {
+      if (!selectedStudioContinuationMessage || selectedStudioContinuationExpired) return;
+      onOpenStudioContinuation?.(
+          selectedStudioContinuationMessage.data?.studioId,
+          selectedStudioContinuationMessage.data?.scriptId,
+      );
+  };
+  const closeShareholderBallot = () => {
+      setActiveShareholderVoteId(null);
+      setShareholderVoteFeedback(null);
+      if (
+          selectedMessage?.type === 'SHAREHOLDER_VOTE'
+          && !(player.inbox || []).some(message => message.id === selectedMessage.id)
+      ) {
+          setSelectedMessage(null);
+      }
+  };
+  const handleOpenShareholderBallot = () => {
+      setShareholderVoteFeedback(null);
+      if (!selectedShareholderVoteId || !selectedShareholderVote) return;
+      setActiveShareholderVoteId(selectedShareholderVoteId);
+  };
+  const handleResolveShareholderBallot = (selectedVote: 'FOR' | 'AGAINST') => {
+      if (!activeShareholderVoteId || !onResolveShareholderVote || isProcessing) return;
+      setIsProcessing(true);
+      try {
+          const result = onResolveShareholderVote(activeShareholderVoteId, selectedVote);
+          setShareholderVoteFeedback(result);
+      } catch {
+          setShareholderVoteFeedback({
+              success: false,
+              message: 'The ballot could not be submitted. Your vote was not recorded, so you can safely try again.',
+          });
+      } finally {
+          setIsProcessing(false);
+      }
+  };
   useEffect(() => {
       onImmersiveReviewChange?.(outsideInvestmentReview);
       return () => onImmersiveReviewChange?.(false);
@@ -122,6 +191,8 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
           setOutsideCounterFeedback(null);
       }
       setOutsideInvestmentReview(false);
+      setActiveShareholderVoteId(null);
+      setShareholderVoteFeedback(null);
       setSelectedMessage(openedMessage);
       setContractViewData(null);
   };
@@ -377,10 +448,51 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
 	                <div className="p-4 pb-24">
 	                    {selectedMessage.isExpired && (
 	                        <div className="mb-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">
-	                            This offer has expired. It is kept here briefly so you can see what was missed.
+	                            {selectedMessage.type === 'SHAREHOLDER_VOTE'
+                                    ? 'This voting window has closed. It is kept here briefly as a record.'
+                                    : 'This offer has expired. It is kept here briefly so you can see what was missed.'}
 	                        </div>
 	                    )}
-                    {selectedMessage.type === 'STUDIO_ACQUISITION' ? (
+                    {selectedMessage.type === 'STUDIO_CONTINUATION' ? (
+                        <div className="overflow-hidden rounded-3xl border border-emerald-300 bg-emerald-950 text-white shadow-xl">
+                            <div className="border-b border-white/10 px-6 py-7">
+                                <div className="mb-5 flex items-center gap-3">
+                                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-emerald-200/30 bg-white/5 text-emerald-200">
+                        <Clapperboard size={23} />
+                                    </div>
+                                    <div>
+                                        <div className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-200">Studio Renewal</div>
+                                        <div className="text-xs text-white/50">Next-season package</div>
+                                    </div>
+                                </div>
+                                <h2 className="text-2xl font-black leading-tight">{selectedMessage.subject}</h2>
+                                <p className="mt-3 text-sm font-semibold leading-relaxed text-white/65">{selectedMessage.text}</p>
+                            </div>
+                            <div className="grid grid-cols-2 border-b border-white/10">
+                                <div className="border-r border-white/10 p-4">
+                                    <div className="text-[8px] font-black uppercase tracking-widest text-white/35">Platform</div>
+                                    <div className="mt-1 text-sm font-black">{selectedMessage.data?.platformName || 'Network'}</div>
+                                </div>
+                                <div className="p-4">
+                                    <div className="text-[8px] font-black uppercase tracking-widest text-white/35">Returning cast</div>
+                                    <div className="mt-1 text-sm font-black leading-tight">{selectedMessage.data?.castStatus || 'Review package'}</div>
+                                </div>
+                            </div>
+                            <div className="p-4">
+                                {selectedStudioContinuationExpired ? (
+                                    <p className="mb-3 text-center text-xs font-semibold leading-relaxed text-white/60">This renewal notice has expired. Open your Studio Vault to review the current slate.</p>
+                                ) : null}
+                                <button
+                                    type="button"
+                                    onClick={openCurrentStudioContinuation}
+                                    disabled={selectedStudioContinuationExpired || !onOpenStudioContinuation || !selectedMessage.data?.scriptId}
+                                    className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-emerald-300 px-4 text-[10px] font-black uppercase tracking-[0.15em] text-emerald-950 disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/40"
+                                >
+                                    {selectedStudioContinuationExpired ? 'Renewal Notice Expired' : 'Open Season Package'} <ChevronRight size={17} />
+                                </button>
+                            </div>
+                        </div>
+                    ) : selectedMessage.type === 'STUDIO_ACQUISITION' ? (
                         <div className={`overflow-hidden rounded-3xl border shadow-xl ${selectedMessage.data?.decision === 'ACCEPTED' || selectedMessage.data?.decision === 'REVIEW_CLEARED'
                             ? 'border-emerald-300 bg-emerald-950 text-white'
                             : selectedMessage.data?.decision === 'REJECTED'
@@ -427,22 +539,33 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                                 </div>
                             ) : null}
                             <div className="p-4">
+                                {selectedStudioAcquisitionExpired ? (
+                                    <p className="mb-3 text-center text-xs font-semibold leading-relaxed text-white/60">
+                                        This deal notice has expired. It is kept as a record only; use Forbes to review the studio's current market status.
+                                    </p>
+                                ) : null}
                                 <button
                                     type="button"
-                                    onClick={() => onOpenStudioAcquisition?.(selectedMessage.data?.studioId)}
-                                    className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-amber-400 px-4 text-[10px] font-black uppercase tracking-[0.15em] text-black"
+                                    onClick={openCurrentStudioAcquisition}
+                                    disabled={selectedStudioAcquisitionExpired || !onOpenStudioAcquisition}
+                                    className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-amber-400 px-4 text-[10px] font-black uppercase tracking-[0.15em] text-black disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/40"
                                 >
-                                    {selectedMessage.data?.decision === 'REVIEW_CLEARED'
+                                    {selectedStudioAcquisitionExpired
+                                        ? 'Deal Notice Expired'
+                                        : selectedMessage.data?.decision === 'REVIEW_CLEARED'
                                         ? 'Open Forbes'
                                         : selectedMessage.data?.decision === 'RIVAL_BID'
                                             ? 'Enter Bidding War'
-                                            : 'Review Offer'} <ChevronRight size={17} />
+                                            : selectedMessage.data?.decision === 'REJECTED'
+                                                ? 'View Current Status'
+                                                : 'Review Offer'} <ChevronRight size={17} />
                                 </button>
                             </div>
                         </div>
                     ) : selectedMessage.type === 'SHAREHOLDER_VOTE' ? (
-                        <div className="overflow-hidden rounded-3xl border border-sky-200 bg-slate-950 text-white shadow-xl">
-                            <div className="border-b border-white/10 px-6 py-7">
+                        <div className="overflow-hidden rounded-3xl border border-sky-200/70 bg-slate-950 text-white shadow-xl">
+                            <div className="relative border-b border-white/10 px-6 py-7">
+                                <div className="pointer-events-none absolute -right-12 -top-12 h-36 w-36 rounded-full bg-sky-400/10 blur-3xl" />
                                 <div className="mb-5 flex items-center gap-3">
                                     <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-sky-300/40 bg-sky-400/10 text-sky-200">
                                         <Vote size={22} />
@@ -458,20 +581,57 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                             <div className="grid grid-cols-2 border-b border-white/10">
                                 <div className="border-r border-white/10 p-4">
                                     <div className="text-[8px] font-black uppercase tracking-widest text-white/35">Company</div>
-                                    <div className="mt-1 text-sm font-black">{selectedMessage.data?.stockId || 'Stock'}</div>
+                                    <div className="mt-1 text-sm font-black leading-tight">
+                                        {selectedShareholderVote?.companyName || selectedMessage.data?.stockId || 'Company unavailable'}
+                                    </div>
                                 </div>
                                 <div className="p-4">
-                                    <div className="text-[8px] font-black uppercase tracking-widest text-white/35">Action</div>
-                                    <div className="mt-1 text-sm font-black">Vote required</div>
+                                    <div className="text-[8px] font-black uppercase tracking-widest text-white/35">Ballot status</div>
+                                    <div className={`mt-1 text-sm font-black ${
+                                        selectedShareholderVote?.status === 'RESOLVED'
+                                            ? 'text-emerald-300'
+                                            : selectedShareholderVoteClosed
+                                                ? 'text-rose-300'
+                                                : 'text-sky-200'
+                                    }`}>
+                                        {selectedShareholderVote?.status === 'RESOLVED'
+                                            ? 'Vote submitted'
+                                            : selectedShareholderVoteClosed
+                                                ? 'Voting closed'
+                                                : selectedShareholderVote
+                                                    ? 'Your vote is ready'
+                                                    : 'Ballot unavailable'}
+                                    </div>
                                 </div>
                             </div>
                             <div className="p-4">
+                                {!selectedShareholderVote ? (
+                                    <p className="mb-3 text-center text-xs font-semibold leading-relaxed text-white/55">
+                                        This message no longer has a matching ballot. No vote or market change was recorded.
+                                    </p>
+                                ) : selectedShareholderVoteClosed ? (
+                                    <p className="mb-3 text-center text-xs font-semibold leading-relaxed text-white/55">
+                                        The voting window has ended. This notice is kept only as a record.
+                                    </p>
+                                ) : null}
                                 <button
                                     type="button"
-                                    onClick={() => onOpenStock?.(selectedMessage.data?.stockId)}
-                                    className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-sky-300 px-4 text-[10px] font-black uppercase tracking-[0.15em] text-slate-950"
+                                    onClick={handleOpenShareholderBallot}
+                                    disabled={
+                                        !selectedShareholderVote
+                                        || selectedShareholderVoteClosed
+                                        || selectedShareholderVote.status === 'RESOLVED'
+                                        || !onResolveShareholderVote
+                                    }
+                                    className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-sky-300 px-4 text-[10px] font-black uppercase tracking-[0.15em] text-slate-950 transition active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/40"
                                 >
-                                    Open Shareholder Vote <ChevronRight size={17} />
+                                    {selectedShareholderVote?.status === 'RESOLVED'
+                                        ? 'Vote Already Submitted'
+                                        : selectedShareholderVoteClosed
+                                            ? 'Ballot Closed'
+                                            : selectedShareholderVote
+                                                ? 'Review Ballot'
+                                                : 'Ballot Unavailable'} <ChevronRight size={17} />
                                 </button>
                             </div>
                         </div>
@@ -1234,13 +1394,30 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                                             const safePay = typeof pay === 'number' && Number.isFinite(pay) ? pay : 0;
                                             const hasValidContract = !!opp;
                                             const musicByline = opp?.project ? formatProjectMusicByline(opp.project, 2) : '';
+                                            const identityLabels = opp
+                                                ? getCharacterIdentityLabels(getOpportunityCharacterProfile(opp)).slice(0, 3)
+                                                : [];
 
                                             return (
                                                 <>
                                                     <h3 className="text-2xl font-bold mb-1 leading-tight">{opp?.projectName || tr('messages.offerUnavailable')}</h3>
-                                                    <p className="text-sm text-slate-400 mb-6">
-                                                        {opp ? `${opp.roleType} Role • ${opp.genre}` : tr('messages.contractMissing')}
+                                                    <p className="text-sm text-slate-400">
+                                                        {opp ? `${opp.roleType} billing • ${opp.genre}` : tr('messages.contractMissing')}
                                                     </p>
+                                                    {identityLabels.length > 0 && (
+                                                        <div className="mb-6 mt-3 flex flex-wrap gap-2">
+                                                            {identityLabels.map(label => (
+                                                                <span key={label} className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-cyan-100">
+                                                                    {label}
+                                                                </span>
+                                                            ))}
+                                                            {opp?.roleFit && (
+                                                                <span className="rounded-full border border-amber-300/20 bg-amber-300/10 px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-amber-100">
+                                                                    {opp.roleFit.label.replaceAll('_', ' ')} · {opp.roleFit.score}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    )}
                                                     {musicByline && (
                                                         <div className="mb-6 flex items-start gap-2 rounded-2xl border border-cyan-400/20 bg-cyan-400/10 p-3">
                                                             <Music2 size={14} className="mt-0.5 shrink-0 text-cyan-300" />
@@ -1420,6 +1597,138 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                 </div>
             )}
         </div>
+
+        {activeShareholderVoteId && selectedShareholderVote && (
+            <div
+                className="absolute inset-0 z-[80] flex items-end bg-slate-950/75 p-3 backdrop-blur-sm"
+                onClick={closeShareholderBallot}
+            >
+                <section
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="shareholder-ballot-title"
+                    onClick={event => event.stopPropagation()}
+                    className="relative max-h-[88%] w-full overflow-y-auto rounded-[2rem] border border-sky-300/30 bg-[#071019] text-white shadow-2xl shadow-sky-950/70"
+                    style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
+                >
+                    <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-white/10 bg-[#071019]/95 px-5 py-5 backdrop-blur-xl">
+                        <div className="flex min-w-0 items-center gap-3">
+                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-sky-300/35 bg-sky-300/10 text-sky-200">
+                                <Vote size={21} />
+                            </div>
+                            <div className="min-w-0">
+                                <div className="text-[9px] font-black uppercase tracking-[0.22em] text-sky-300">
+                                    Shareholder ballot
+                                </div>
+                                <div className="truncate text-xs font-bold text-white/45">
+                                    {selectedShareholderVote.companyName} · {selectedShareholderVote.stockSymbol}
+                                </div>
+                            </div>
+                        </div>
+                        <button
+                            type="button"
+                            aria-label="Close shareholder ballot"
+                            onClick={closeShareholderBallot}
+                            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-white/65 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+                        >
+                            <X size={21} />
+                        </button>
+                    </div>
+
+                    <div className="px-5 py-6">
+                        {shareholderVoteFeedback?.success || selectedShareholderVote.status === 'RESOLVED' ? (
+                            <div className="py-5 text-center">
+                                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-emerald-300/35 bg-emerald-300/10 text-emerald-300">
+                                    <CheckCircle size={31} />
+                                </div>
+                                <div className="mt-5 text-[10px] font-black uppercase tracking-[0.24em] text-emerald-300">
+                                    Vote recorded
+                                </div>
+                                <h2 id="shareholder-ballot-title" className="mt-2 text-2xl font-black leading-tight">
+                                    Your ballot is complete
+                                </h2>
+                                <p className="mx-auto mt-3 max-w-sm text-sm font-semibold leading-relaxed text-white/60">
+                                    {shareholderVoteFeedback?.message || selectedShareholderVote.outcomeSummary || 'Your vote was submitted and the market response has been applied.'}
+                                </p>
+                                <button
+                                    type="button"
+                                    onClick={closeShareholderBallot}
+                                    className="mt-7 min-h-12 w-full rounded-2xl bg-emerald-300 px-5 text-[11px] font-black uppercase tracking-[0.18em] text-emerald-950 transition active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-100"
+                                >
+                                    Return to inbox
+                                </button>
+                            </div>
+                        ) : (
+                            <>
+                                <div className="border-l-2 border-sky-300 pl-4">
+                                    <div className="text-[9px] font-black uppercase tracking-[0.2em] text-white/35">
+                                        Board proposal
+                                    </div>
+                                    <h2 id="shareholder-ballot-title" className="mt-2 text-2xl font-black leading-tight">
+                                        {selectedShareholderVote.title}
+                                    </h2>
+                                    <p className="mt-3 text-sm font-semibold leading-relaxed text-white/60">
+                                        {selectedShareholderVote.summary}
+                                    </p>
+                                </div>
+
+                                <div className="mt-6 grid grid-cols-2 border-y border-white/10 py-4">
+                                    <div className="border-r border-white/10 pr-4">
+                                        <div className="text-[8px] font-black uppercase tracking-[0.18em] text-white/35">Your voting power</div>
+                                        <div className="mt-1 font-mono text-xl font-black text-sky-200">
+                                            {selectedShareholderVote.playerVotingPower.toFixed(2)}%
+                                        </div>
+                                    </div>
+                                    <div className="pl-4">
+                                        <div className="text-[8px] font-black uppercase tracking-[0.18em] text-white/35">Decision window</div>
+                                        <div className="mt-1 text-sm font-black text-white">
+                                            W{selectedShareholderVote.dueWeek} · Age {selectedShareholderVote.dueYear || selectedShareholderVote.createdYear}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="mt-6 space-y-2">
+                                    {selectedShareholderVote.stakes.map((stake, index) => (
+                                        <div key={`${selectedShareholderVote.id}_stake_${index}`} className="flex items-start gap-3 py-1.5">
+                                            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-sky-300" />
+                                            <span className="text-xs font-semibold leading-relaxed text-white/60">{stake}</span>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {shareholderVoteFeedback && !shareholderVoteFeedback.success ? (
+                                    <div className="mt-5 rounded-2xl border border-rose-300/25 bg-rose-300/10 px-4 py-3 text-xs font-semibold leading-relaxed text-rose-100">
+                                        {shareholderVoteFeedback.message}
+                                    </div>
+                                ) : null}
+
+                                <div className="mt-7 grid grid-cols-2 gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => handleResolveShareholderBallot('AGAINST')}
+                                        disabled={isProcessing}
+                                        className="flex min-h-14 items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/5 px-3 text-[10px] font-black uppercase tracking-[0.15em] text-white transition hover:bg-white/10 active:scale-[0.99] disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+                                    >
+                                        <ThumbsDown size={17} /> Vote against
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleResolveShareholderBallot('FOR')}
+                                        disabled={isProcessing}
+                                        className="flex min-h-14 items-center justify-center gap-2 rounded-2xl bg-sky-300 px-3 text-[10px] font-black uppercase tracking-[0.15em] text-slate-950 transition hover:bg-sky-200 active:scale-[0.99] disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                                    >
+                                        <ThumbsUp size={17} /> Vote for
+                                    </button>
+                                </div>
+                                <p className="mt-4 text-center text-[10px] font-semibold leading-relaxed text-white/35">
+                                    Your choice is final and may move the company&apos;s share price.
+                                </p>
+                            </>
+                        )}
+                    </div>
+                </section>
+            </div>
+        )}
     </div>
   );
 };

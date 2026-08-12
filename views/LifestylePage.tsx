@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Player, Property, Vehicle, ClothingItem } from '../types';
 import { ArrowLeft, CalendarDays, Check, CreditCard, Store, Briefcase, ChevronRight, Clapperboard, Sparkles, Tv, Star, WalletCards, Ticket } from 'lucide-react';
 import { LifestyleAssets } from './lifestyle/LifestyleAssets';
@@ -15,6 +15,8 @@ import { getLifestyleAssetImageInfo } from '../services/lifestyleAssetImages';
 import { AssetShareModal, type ShareableAsset } from './lifestyle/components/AssetShareModal';
 import StreamingLockedScreen from '../components/StreamingLockedScreen';
 import CinemaLockedScreen from '../components/CinemaLockedScreen';
+import { getPlayerBusinessEquityValue } from '../services/studioGroupValuation';
+import { evaluateStreamingEligibility } from '../services/streamingEligibility';
 
 interface LifestylePageProps {
   player: Player;
@@ -25,11 +27,14 @@ interface LifestylePageProps {
   onShutdownBusiness: () => void; 
   onUpdatePlayer?: (player: Player) => void; 
   onPremiumPurchase: (productId: PremiumProductId) => void;
+  onReturnHome?: () => void;
   onNavVisibilityChange?: (visible: boolean) => void;
   initialView?: 'MAIN' | 'ASSETS' | 'ACTIVITIES' | 'BUSINESS' | 'PRODUCTION_WIZARD' | 'PRODUCTION_GAME' | 'STREAMING_PLATFORM' | 'CINEMA_CHAIN';
   onInitialViewConsumed?: () => void;
   initialRightsMarketOpportunityId?: string;
   onRightsMarketTargetConsumed?: () => void;
+  initialStudioContinuation?: { studioId: string; scriptId: string };
+  onStudioContinuationConsumed?: () => void;
 }
 
 const CustomizationHeroImage: React.FC<{ item: Property | Vehicle }> = ({ item }) => {
@@ -51,11 +56,12 @@ const CustomizationHeroImage: React.FC<{ item: Property | Vehicle }> = ({ item }
   );
 };
 
-export const LifestylePage: React.FC<LifestylePageProps> = ({ player, onBuyItem, onSellItem, onSetResidence, onUpdatePlayer, onPremiumPurchase, onNavVisibilityChange, initialView, onInitialViewConsumed, initialRightsMarketOpportunityId, onRightsMarketTargetConsumed }) => {
+export const LifestylePage: React.FC<LifestylePageProps> = ({ player, onBuyItem, onSellItem, onSetResidence, onUpdatePlayer, onPremiumPurchase, onReturnHome, onNavVisibilityChange, initialView, onInitialViewConsumed, initialRightsMarketOpportunityId, onRightsMarketTargetConsumed, initialStudioContinuation, onStudioContinuationConsumed }) => {
   const [view, setView] = useState<'MAIN' | 'ASSETS' | 'ACTIVITIES' | 'BUSINESS' | 'PRODUCTION_WIZARD' | 'PRODUCTION_GAME' | 'STREAMING_PLATFORM' | 'CINEMA_CHAIN'>('MAIN');
   const [customizationItem, setCustomizationItem] = useState<Property | Vehicle | null>(null);
   const [selectedCustomizations, setSelectedCustomizations] = useState<CustomizationOption[]>([]);
   const [purchaseCelebrationAsset, setPurchaseCelebrationAsset] = useState<ShareableAsset | null>(null);
+  const [streamingOriginalTarget, setStreamingOriginalTarget] = useState<{ studioId: string; scriptId: string; commissionId: string } | null>(null);
   const language = getPlayerLanguage(player);
   const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
   const trFallback = (key: string, fallback: string) => {
@@ -84,6 +90,12 @@ export const LifestylePage: React.FC<LifestylePageProps> = ({ player, onBuyItem,
 
   // Check if player owns a Production House
   const productionStudio = player.businesses.find(b => b.type === 'PRODUCTION_HOUSE');
+  const streamingEligibility = useMemo(() => evaluateStreamingEligibility(player), [player]);
+  const streamingAccessBadge = player.ownedStreamingPlatform.lifecycle !== 'LOCKED'
+      ? 'Studio Ready'
+      : streamingEligibility.eligible
+          ? 'Launch Ready'
+          : `${Math.round(streamingEligibility.readiness * 100)}%`;
 
   const handleProductionClick = () => {
       if (productionStudio) {
@@ -277,10 +289,19 @@ export const LifestylePage: React.FC<LifestylePageProps> = ({ player, onBuyItem,
 
   if (view === 'PRODUCTION_WIZARD') return <ProductionWizard player={player} onCancel={() => setView('MAIN')} onUpdatePlayer={onUpdatePlayer!} onComplete={() => setView('PRODUCTION_GAME')} />;
 
-  if (view === 'PRODUCTION_GAME') return <ProductionHouseGame player={player} onBack={() => setView('MAIN')} onUpdatePlayer={onUpdatePlayer!} initialRightsMarketOpportunityId={initialRightsMarketOpportunityId} onRightsMarketTargetConsumed={onRightsMarketTargetConsumed} />;
+  if (view === 'PRODUCTION_GAME') return <ProductionHouseGame player={player} onBack={() => setView('MAIN')} onUpdatePlayer={onUpdatePlayer!} initialRightsMarketOpportunityId={initialRightsMarketOpportunityId} onRightsMarketTargetConsumed={onRightsMarketTargetConsumed} initialStudioContinuation={initialStudioContinuation} onStudioContinuationConsumed={onStudioContinuationConsumed} initialStreamingOriginal={streamingOriginalTarget || undefined} onStreamingOriginalConsumed={() => setStreamingOriginalTarget(null)} onStreamingOriginalGreenlightComplete={() => setView('STREAMING_PLATFORM')} onOpenOwnedStreamingDelivery={() => setView('STREAMING_PLATFORM')} />;
 
   if (view === 'STREAMING_PLATFORM') return (
-      <StreamingLockedScreen onBack={() => setView('MAIN')} />
+      <StreamingLockedScreen
+          player={player}
+          onUpdatePlayer={onUpdatePlayer}
+          onBack={() => setView('MAIN')}
+          onReturnToGame={onReturnHome || (() => setView('MAIN'))}
+          onOpenOriginalProduction={target => {
+              setStreamingOriginalTarget(target);
+              setView('PRODUCTION_GAME');
+          }}
+      />
   );
 
   if (view === 'CINEMA_CHAIN') return (
@@ -298,7 +319,7 @@ export const LifestylePage: React.FC<LifestylePageProps> = ({ player, onBuyItem,
                 <div className="text-3xl font-bold text-white tracking-tight mb-4">${Math.round(player.money).toLocaleString()}</div>
                 <div className="flex gap-4">
                     <div><div className="text-[10px] text-zinc-600 uppercase font-bold">{tr('lifestyle.assets')}</div><div className="text-sm font-mono text-zinc-300">~{formatCompactMoney(player.assets.length * 50000)}</div></div>
-                    <div><div className="text-[10px] text-zinc-600 uppercase font-bold">{tr('lifestyle.equity')}</div><div className="text-sm font-mono text-emerald-400">{formatCompactMoney(player.businesses.reduce((sum, b) => sum + b.stats.valuation, 0))}</div></div>
+                    <div><div className="text-[10px] text-zinc-600 uppercase font-bold">{tr('lifestyle.equity')}</div><div className="text-sm font-mono text-emerald-400">{formatCompactMoney(getPlayerBusinessEquityValue(player))}</div></div>
                 </div>
             </div>
         </div>
@@ -353,7 +374,7 @@ export const LifestylePage: React.FC<LifestylePageProps> = ({ player, onBuyItem,
                         <div className="font-bold text-xl text-white">{tr('lifestyle.streamingPlatform')}</div>
                         <div className="text-sm text-zinc-400">{tr('lifestyle.streamingSub')}</div>
                     </div>
-                    <div className="shrink-0 rounded-full border border-purple-400/30 bg-purple-500/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-purple-200">Preview</div>
+                    <div className="shrink-0 rounded-full border border-purple-400/30 bg-purple-500/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-purple-200">{streamingAccessBadge}</div>
                     <ChevronRight className="shrink-0 text-zinc-700 group-hover:text-purple-300 transition-colors"/>
                 </div>
             </button>

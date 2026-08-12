@@ -1,0 +1,100 @@
+.rs{position:fixed;inset:0;z-index:78;max-width:520px;margin:0 auto;background:#05070d;color:#eef0f5;
+  font-family:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
+  display:flex;flex-direction:column;overflow:hidden;animation:epx-rsin .3s ease}
+@keyframes epx-rsin{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+.rs :where(*){margin:0;padding:0;box-sizing:border-box;min-width:0;-webkit-tap-highlight-color:transparent}
+.rs :where(button){font-family:inherit;border:none;background:none;color:inherit;cursor:pointer;text-align:inherit}
+.rs :where(dl,.rs dt,.rs dd){margin:0}
+
+.rs .rstop{flex:0 0 auto;display:flex;align-items:center;gap:11px;
+  padding:max(14px,env(safe-area-inset-top)) 14px 12px;
+  background:linear-gradient(#0a0c11,#08090e);border-bottom:1px solid rgba(255,255,255,.07)}
+.rs .rsx{flex:0 0 auto;width:34px;height:34px;border-radius:11px;font-size:16px;color:#aeb6c4;
+  display:flex;align-items:center;justify-content:center}
+.rs .rstitle{flex:1;min-width:0}
+.rs .rstitle b{display:block;font-size:14px;font-weight:900;letter-spacing:.14em}
+.rs .rstitle span{font-size:8px;font-weight:900;letter-spacing:.18em;color:#6f7686}
+.rs .rsmark{flex:0 0 auto;width:24px;height:24px;color:var(--epx-rs-c)}
+.rs .rsmark svg{width:100%;height:100%;display:block}
+
+.rs .rsalready{flex:0 0 auto;display:flex;background:#08090e;border-bottom:1px solid rgba(255,255,255,.07)}
+.rs .rsalready div{flex:1;padding:9px 12px;border-right:1px solid rgba(255,255,255,.06)}
+.rs .rsalready div:last-child{border-right:none}
+.rs .rsalready span{display:block;font-size:7px;font-weight:900;letter-spacing:.14em;color:#6f7686}
+.rs .rsalready b{display:block;margin-top:3px;font-size:15px;font-weight:800;
+  font-family:ui-monospace,Menlo,monospace}
+.rs .rsalready b.warn{color:#ffb020}
+
+.rs .rsscroll{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding:14px 14px 0}
+.rs .rsspace{height:16px}
+
+.rs .rskinds{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px}
+.rs .rsk{padding:11px 9px 9px;border-radius:13px;background:rgba(255,255,255,.028);
+  border:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column;min-height:112px;
+  transition:border-color .18s,background .18s}
+.rs .rsk.on{background:color-mix(in srgb,var(--epx-rs-c) 12%,transparent);
+  border-color:color-mix(in srgb,var(--epx-rs-c) 58%,transparent)}
+.rs .rsk b{font-size:11px;font-weight:900;line-height:1.25}
+.rs .rsk span{flex:1;font-size:8.5px;line-height:1.4;color:#7d8698;margin-top:4px}
+.rs .rsk em{font-style:normal;font-size:7.5px;font-weight:900;letter-spacing:.05em;color:#aeb6c4;
+  margin-top:7px;padding-top:6px;border-top:1px solid rgba(255,255,255,.08);line-height:1.35}
+.rs .rsk.on em{color:var(--epx-rs-c)}
+
+.rs .rspicks{display:flex;gap:7px;margin-top:12px}
+.rs .rspick{flex:1;padding:10px 8px;border-radius:12px;background:rgba(255,255,255,.028);
+  border:1px solid rgba(255,255,255,.08);text-align:center}
+.rs .rspick.on{background:color-mix(in srgb,var(--epx-rs-c) 13%,transparent);
+  border-color:color-mix(in srgb,var(--epx-rs-c) 55%,transparent)}
+.rs .rspick b{display:block;font-size:15px;font-weight:900;font-family:ui-monospace,Menlo,monospace}
+.rs .rspick span{display:block;font-size:8.5px;color:#7d8698;margin-top:2px}
+.rs .rspick.on span{color:var(--epx-rs-c)}
+
+.rs .rsempty{margin-top:14px;padding:22px 16px;border-radius:14px;text-align:center;
+  font-size:11.5px;line-height:1.65;color:#8b93a5;border:1px dashed rgba(255,255,255,.14)}
+
+/* ── the document: paper, because paper is what this is ── */
+.rs .sheet{margin-top:13px;padding:16px 15px 14px;border-radius:4px;
+  background:linear-gradient(#f6f4ee,#eae7de);color:#141414;
+  box-shadow:0 12px 34px rgba(0,0,0,.6);
+  font-family:ui-monospace,'SFMono-Regular',Menlo,monospace;
+  animation:epx-sheetin .35s cubic-bezier(.2,1,.4,1)}
+@keyframes epx-sheetin{from{opacity:0;transform:translateY(10px) rotate(-.3deg)}to{opacity:1;transform:none}}
+.rs .shhead{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;
+  padding-bottom:11px;border-bottom:2px solid #141414}
+.rs .shfrom b{display:block;font-size:12px;font-weight:800;letter-spacing:.06em;line-height:1.25}
+.rs .shfrom span{display:block;font-size:8.5px;color:#5a5a52;margin-top:3px;letter-spacing:.04em}
+.rs .shseal{flex:0 0 auto;width:26px;height:26px;border-radius:50%;border:1.6px solid #141414;
+  position:relative}
+.rs .shseal::after{content:'';position:absolute;inset:4px;border-radius:50%;border:1px solid #141414;
+  opacity:.5}
+
+.rs .shtitle{padding:12px 0 10px;text-align:center;border-bottom:1px solid rgba(20,20,20,.2)}
+.rs .shtitle b{display:block;font-size:14px;font-weight:800;letter-spacing:.22em}
+.rs .shtitle span{display:block;font-size:7px;letter-spacing:.14em;color:#6a6a60;margin-top:4px}
+
+.rs .shterms{padding:10px 0 4px}
+.rs .shterms > div{display:flex;align-items:baseline;gap:10px;padding:6px 0;
+  border-bottom:1px dotted rgba(20,20,20,.22)}
+.rs .shterms > div.hi{background:rgba(20,20,20,.05);margin:0 -6px;padding:6px}
+.rs .shterms dt{flex:0 0 96px;font-size:9px;letter-spacing:.06em;color:#5a5a52;text-transform:uppercase}
+.rs .shterms dd{flex:1;font-size:11.5px;font-weight:700;text-align:right}
+.rs .shterms > div.hi dd{font-weight:800}
+
+.rs .shnote{margin-top:11px;font-size:10px;line-height:1.6;color:#3a3a34;
+  font-family:'Inter',system-ui,sans-serif}
+.rs .shsign{margin-top:18px;display:flex;justify-content:flex-end}
+.rs .sigline{width:66%;text-align:left}
+.rs .sigline i{display:block;height:26px;border-bottom:1.4px solid #141414}
+.rs .sigline span{display:block;margin-top:5px;font-size:8px;color:#5a5a52;letter-spacing:.04em}
+.rs .sigline em{display:block;margin-top:2px;font-style:normal;font-size:9px;font-weight:800}
+
+.rs .rsfoot{flex:0 0 auto;display:flex;gap:8px;padding:12px 14px max(12px,env(safe-area-inset-bottom));
+  border-top:1px solid rgba(255,255,255,.08);background:#07080d}
+.rs .rscancel{flex:0 0 auto;padding:15px 18px;border-radius:13px;font-size:10px;font-weight:900;
+  letter-spacing:.12em;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14)}
+.rs .rssign{flex:1;padding:15px 10px;border-radius:13px;text-align:center;font-size:11px;
+  font-weight:900;letter-spacing:.12em;background:var(--epx-rs-c);color:#04141b}
+.rs .rssign:disabled{background:rgba(255,255,255,.06);color:#5f6875}
+
+@media (max-width:360px){ .rs .rskinds{grid-template-columns:1fr 1fr} }
+@media (prefers-reduced-motion:reduce){ .rs *{animation:none!important;transition:none!important} }

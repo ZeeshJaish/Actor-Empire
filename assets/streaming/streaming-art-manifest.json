@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "pipeline": {
+    "sourceDirectory": "assets/streaming/source",
+    "archiveDirectory": "assets/streaming/scenes",
+    "runtimeDirectory": "public/assets/streaming/scenes",
+    "format": "webp",
+    "width": 1400,
+    "height": 788,
+    "quality": 84
+  },
+  "artDirection": {
+    "family": "Actor Empire cinematic illustrated realism",
+    "rendering": "fine modern pixel clusters with dimensional lighting",
+    "avoid": [
+      "flat icons",
+      "generic SaaS dashboards",
+      "photographic stock imagery",
+      "unreadable generated UI text"
+    ]
+  },
+  "scenes": [
+    {
+      "id": "registration",
+      "source": "registration.png",
+      "runtime": "registration.webp",
+      "purpose": "platform charter and incorporation"
+    },
+    {
+      "id": "level0Hq",
+      "source": "hq-level-0.png",
+      "runtime": "hq-level-0.webp",
+      "purpose": "empty founder headquarters before infrastructure"
+    },
+    {
+      "id": "commandDeck",
+      "source": "command-deck.png",
+      "runtime": "command-deck.webp",
+      "purpose": "upgraded headquarters command scene"
+    },
+    {
+      "id": "contentStudio",
+      "source": "content-studio.png",
+      "runtime": "content-studio.webp",
+      "purpose": "catalog, Originals and slate programming"
+    },
+    {
+      "id": "noc",
+      "source": "network-operations-centre.png",
+      "runtime": "network-operations-centre.webp",
+      "purpose": "servers, capacity, reliability and technology"
+    },
+    {
+      "id": "marketRoom",
+      "source": "market-room.png",
+      "runtime": "market-room.webp",
+      "purpose": "audience intelligence, regional expansion and competition"
+    },
+    {
+      "id": "companyFinance",
+      "source": "company-finance.png",
+      "runtime": "company-finance.webp",
+      "purpose": "treasury, ownership, executives and governance"
+    },
+    {
+      "id": "viewerLab",
+      "source": "viewer-lab.png",
+      "runtime": "viewer-lab.webp",
+      "purpose": "public product preview across phone, web and television"
+    }
+  ]
+}

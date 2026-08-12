@@ -1,0 +1,466 @@
+.cine{position:absolute;inset:0;overflow:hidden;background:#04050a;color:#eef0f5;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  display:flex;align-items:center;justify-content:center;--epx-sig:#1fd9ff;--epx-sig2:#0a5f7d}
+.cine *{box-sizing:border-box}
+.cine .cine-grain{position:absolute;inset:0;pointer-events:none;z-index:40;opacity:.035;
+  background:repeating-conic-gradient(#fff 0 .4deg,transparent .4deg .8deg)}
+.cine .cine-skip{position:absolute;bottom:24px;left:50%;transform:translateX(-50%);z-index:45;font-size:8.5px;
+  letter-spacing:.3em;text-transform:uppercase;color:rgba(255,255,255,.28);animation:epx-cblink 2s infinite}
+@keyframes epx-cblink{50%{opacity:.25}}
+@keyframes epx-cup{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes epx-cin{from{opacity:0}to{opacity:1}}
+@keyframes epx-cslam{0%{opacity:0;transform:rotate(var(--epx-r,0deg)) scale(1.7)}60%{opacity:1;transform:rotate(var(--epx-r,0deg)) scale(.96)}100%{transform:rotate(var(--epx-r,0deg)) scale(1)}}
+
+/* 1 · the call */
+
+/* 2 · clearance */
+.cine .c-clear{width:min(340px,88%);animation:epx-cin .4s both}
+.cine .c-clear .filehead{font-size:9px;font-weight:900;letter-spacing:.3em;color:var(--epx-sig);
+  border-bottom:1px solid rgba(255,255,255,.12);padding-bottom:10px;margin-bottom:14px}
+.cine .c-clear .fileline{display:flex;align-items:center;gap:11px;padding:11px 0;border-bottom:1px solid rgba(255,255,255,.05);
+  animation:epx-cup .4s both}
+.cine .c-clear .tick{width:20px;height:20px;border-radius:50%;background:color-mix(in srgb,var(--epx-sig) 22%,transparent);
+  color:var(--epx-sig);display:flex;align-items:center;justify-content:center;font-size:11px;font-style:normal;flex-shrink:0}
+.cine .c-clear .fileline span{font-size:11.5px;font-weight:700;color:#c6ccda}
+
+/* 3 · the money */
+
+/* 4 · apparatus */
+.cine .c-apparatus{width:min(340px,88%);display:flex;flex-direction:column;gap:7px}
+.cine .c-apparatus .acard{background:#efe9da;color:#1a1610;border-radius:4px;padding:10px 12px;
+  display:flex;justify-content:space-between;align-items:baseline;gap:10px;
+  transform:rotate(var(--epx-r));box-shadow:0 12px 26px rgba(0,0,0,.6);animation:epx-cslam .3s both}
+.cine .c-apparatus .acard span{font-size:9px;font-weight:900;letter-spacing:.12em;color:#5d5647}
+.cine .c-apparatus .acard b{font-size:11px;font-weight:900;color:#1d6b3f;letter-spacing:.06em;flex-shrink:0}
+
+/* 5 · the room */
+.cine .c-room{position:absolute;inset:0}
+.cine .c-room .ceil i{position:absolute;left:50%;transform:translateX(-50%);height:3px;border-radius:2px;
+  background:#f2efe4;opacity:0;animation:epx-lightsnap .12s steps(2) forwards;
+  box-shadow:0 0 30px 6px rgba(240,236,220,.28)}
+@keyframes epx-lightsnap{to{opacity:.55}}
+.cine .c-room .floorplane{position:absolute;left:0;right:0;bottom:0;height:44%;
+  background:linear-gradient(#0a0d14,#06080e);border-top:1px solid #141926}
+/* the end wall the screen hangs on, so the room has a back to it */
+.cine .c-room .endwall{position:absolute;left:0;right:0;top:0;bottom:44%;pointer-events:none;
+  background:radial-gradient(ellipse 62% 74% at 50% 62%,rgba(126,146,178,.075),transparent 72%)}
+.cine .c-room .roomset{position:absolute;left:50%;top:34%;width:46%;transform:translateX(-50%);
+  animation:epx-cinC 1s .7s both}
+
+/* empty desk banks receding toward the end wall — nobody has been hired yet */
+.cine .c-room .floorplan{position:absolute;left:0;right:0;top:58%;bottom:22%;display:flex;
+  flex-direction:column;align-items:center;justify-content:space-around}
+.cine .c-room .deskrow{display:flex;justify-content:center;gap:7%;width:var(--epx-cine-w);opacity:var(--epx-cine-o);
+  animation:epx-deskin .5s cubic-bezier(.2,1,.3,1) both}
+@keyframes epx-deskin{from{opacity:0;transform:translateY(9px)}to{opacity:var(--epx-cine-o);transform:none}}
+.cine .c-room .bank{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px}
+.cine .c-room .chairs{display:flex;justify-content:center;gap:26%;width:78%}
+.cine .c-room .chairs span{width:26%;aspect-ratio:1/.8;border-radius:3px 3px 1px 1px;
+  background:linear-gradient(#1e2634,#11161e)}
+.cine .c-room .desk2{width:100%;height:7px;border-radius:2px;
+  background:linear-gradient(#333d4e,#171e29);
+  box-shadow:0 6px 14px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.12)}
+.cine .c-room .roomcap{position:absolute;left:0;right:0;bottom:13%;text-align:center;animation:epx-cinC .8s 1.5s both}
+.cine .c-room .roomcap span{display:block;font-size:9.5px;letter-spacing:.24em;color:#7d8698;font-weight:800}
+.cine .c-room .roomcap em{display:block;margin-top:8px;font-size:8.5px;letter-spacing:.18em;color:#464e5c;font-style:normal;font-weight:700}
+@keyframes epx-cinC{from{opacity:0}to{opacity:1}}
+
+/* ACTIVATION · certificate */
+
+/* ACTIVATION · DRM + devices */
+.cine .drmrow{display:flex;gap:8px}
+
+/* ACTIVATION · ident */
+.cine .c-ident{display:flex;flex-direction:column;align-items:center;gap:16px;animation:epx-cin .4s both}
+.cine .c-ident .identmark{width:82px;height:82px;color:var(--epx-cine-c);
+  filter:drop-shadow(0 0 34px color-mix(in srgb,var(--epx-cine-c) 70%,transparent));animation:epx-identin .9s cubic-bezier(.2,1.2,.3,1) both}
+@keyframes epx-identin{0%{opacity:0;transform:scale(2.1);filter:blur(14px)}100%{opacity:1;transform:scale(1);filter:blur(0)}}
+.cine .c-ident .identname{font-size:32px;font-weight:900;letter-spacing:.12em;animation:epx-cup .6s .3s both}
+.cine .c-ident .identwave{display:flex;align-items:center;gap:4px;height:46px}
+.cine .c-ident .identwave i{width:5px;border-radius:3px;height:100%;transform-origin:center;
+  animation:epx-iwave .8s ease-in-out infinite alternate}
+@keyframes epx-iwave{from{transform:scaleY(calc(var(--epx-cine-m,1) * .5))}to{transform:scaleY(var(--epx-cine-m,1))}}
+
+
+/* ============================================================
+   "THE FOUNDING" — the desk sequence
+   ============================================================ */
+.cine.found{background:#07070a}
+.cine.found .lamp{position:absolute;left:50%;top:-16%;width:150%;height:96%;transform:translateX(-50%);
+  pointer-events:none;background:radial-gradient(ellipse 42% 60% at 50% 34%,rgba(255,236,196,.20),rgba(255,236,196,.05) 46%,transparent 72%)}
+.cine.found .desk{position:absolute;left:0;right:0;bottom:0;height:52%;pointer-events:none;
+  background:linear-gradient(#1a1410 0%,#120e0b 42%,#0a0807 100%);
+  box-shadow:inset 0 1px 0 rgba(255,220,170,.10)}
+.cine.found .stage{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:0 16px}
+.cine.found.offdesk .lamp,.cine.found.offdesk .desk{opacity:0;transition:opacity .7s}
+/* One tap finishes whatever is mid-flight — but never touch looping animations,
+   or the blinking cursor gets crushed to a 0.01s strobe, because the last beat
+   holds the rush class on indefinitely while it waits for the player's button. */
+.cine.found.rush *:not(.loop){animation-duration:.01s!important;animation-delay:0s!important}
+
+/* ── shared paper stock ── */
+.cine.found .paper{position:relative;width:min(340px,94%);background:#efe9da;color:#1a1610;border-radius:3px;
+  padding:16px 16px 18px;box-shadow:0 26px 46px rgba(0,0,0,.72),0 2px 0 rgba(255,255,255,.28) inset;
+  background-image:linear-gradient(#efe9da,#e7e0cf);animation:epx-paperin .5s cubic-bezier(.2,1,.3,1) both}
+@keyframes epx-paperin{from{opacity:0;transform:translateY(-26px) rotate(-3deg) scale(1.04)}
+  to{opacity:1;transform:translateY(0) rotate(var(--epx-r,0deg)) scale(1)}}
+.cine.found .phead{display:flex;justify-content:space-between;align-items:baseline;gap:8px;
+  border-bottom:1.5px solid #1a1610;padding-bottom:7px}
+.cine.found .phead span{font-size:8.5px;font-weight:900;letter-spacing:.2em;color:#1a1610}
+.cine.found .phead em{font-style:normal;font-size:7px;font-weight:900;letter-spacing:.14em;color:#8a7a52}
+.cine.found .psub{margin-top:6px;font-size:7.5px;font-weight:800;letter-spacing:.13em;color:#8a7a52}
+
+/* ── stamps ── */
+.cine.found .pstamp{position:absolute;display:flex;flex-direction:column;align-items:center;
+  border:3px solid;font-size:11px;font-weight:900;letter-spacing:.14em;padding:5px 10px;border-radius:4px;
+  animation:epx-cslam .3s both;text-align:center}
+.cine.found .pstamp em{font-style:normal;font-size:6.5px;letter-spacing:.1em;margin-top:2px;opacity:.85}
+.cine.found .pstamp.red{color:#8f1524;border-color:#8f1524}
+.cine.found .pstamp.green{color:#1d6b3f;border-color:#1d6b3f}
+.cine.found .pstamp.rcv{bottom:18px;right:20px;--epx-r:-9deg;animation-delay:.85s}
+.cine.found .pstamp.esc{bottom:12px;right:12px;--epx-r:-8deg;animation-delay:1.9s}
+.cine.found .pstamp.green{bottom:30px;right:14px;--epx-r:11deg;animation-delay:.6s;font-size:11px}
+.cine.found .pstamp.big{font-size:19px;padding:9px 18px;border-width:4px}
+.cine.found .pstamp.approve{top:44%;left:50%;margin-left:-84px;color:#1d6b3f;border-color:#1d6b3f;
+  --epx-r:-13deg;animation-delay:.5s}
+
+/* ── 1 · the folder ── */
+.cine.found .folder{position:relative;width:min(320px,92%);aspect-ratio:1/1.16;background:#c9a86b;
+  border-radius:3px 3px 4px 4px;box-shadow:0 30px 54px rgba(0,0,0,.76),inset 0 1px 0 rgba(255,255,255,.3);
+  background-image:linear-gradient(160deg,#d3b276,#b8975c);animation:epx-folderin .6s cubic-bezier(.2,1,.3,1) both}
+@keyframes epx-folderin{from{opacity:0;transform:translateY(-70px) rotate(-6deg)}to{opacity:1;transform:none}}
+.cine.found .ftab2{position:absolute;top:-13px;left:16px;width:38%;height:14px;background:#c9a86b;
+  border-radius:3px 3px 0 0;background-image:linear-gradient(#d3b276,#c5a367)}
+.cine.found .fface{position:absolute;left:9%;right:9%;top:13%}
+.cine.found .fkicker{display:block;font-size:7.5px;font-weight:900;letter-spacing:.19em;color:#5c4820}
+.cine.found .fface b{display:block;font-family:Georgia,serif;font-size:23px;font-weight:900;
+  letter-spacing:.02em;color:#3b2c10;margin-top:3px;line-height:1.1}
+.cine.found .frule{height:1.5px;background:#7c6533;margin:11px 0 12px;opacity:.55}
+.cine.found .fmeta{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:8px;
+  padding:5px 0;line-height:1.25;border-bottom:1px dotted rgba(92,72,32,.4)}
+.cine.found .fmeta span{font-weight:900;letter-spacing:.14em;color:#6d5726}
+.cine.found .fmeta b{font-weight:900;color:#3b2c10}
+.cine.found .ffoot{margin-top:26px}
+.cine.found .ffoot .bars{display:flex;align-items:flex-end;gap:2px;height:26px}
+.cine.found .ffoot .bars i{height:100%;background:#3b2c10;opacity:.62}
+.cine.found .ffoot span{display:block;margin-top:7px;font-size:6px;font-weight:900;
+  letter-spacing:.15em;color:#6d5726}
+.cine.found .folder.shut{animation:epx-foldershut .5s cubic-bezier(.3,1,.4,1) both}
+@keyframes epx-foldershut{from{opacity:0;transform:scale(1.07) rotate(2deg)}to{opacity:1;transform:none}}
+
+/* ── 2 · the applicant dossier ── */
+.cine.found .dbody{display:flex;gap:12px;margin-top:12px}
+.cine.found .dphotowrap{position:relative;flex:0 0 74px}
+.cine.found .dphoto{position:relative;width:100%;height:88px;background:#20242c;border:1px solid #b6ac93;
+  display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:2px}
+.cine.found .dphoto img,.cine.found .dphoto canvas{width:100%;height:100%;object-fit:cover;image-rendering:pixelated}
+.cine.found .dphoto span{position:absolute;bottom:2px;left:0;right:0;text-align:center;font-size:5.5px;
+  font-weight:900;letter-spacing:.16em;color:rgba(255,255,255,.5)}
+.cine.found .dphotowrap .clip{position:absolute;top:-9px;left:50%;margin-left:-7px;width:14px;height:26px;z-index:5;
+  border:2px solid #9aa1ad;border-top-color:#c2c8d2;border-radius:7px;background:transparent;
+  box-shadow:0 1px 2px rgba(0,0,0,.35)}
+.cine.found .dfields{flex:1;min-width:0}
+.cine.found .dfield{display:flex;justify-content:space-between;gap:8px;align-items:center;
+  padding:4px 0;line-height:1.25;border-bottom:1px dotted #b6ac93;animation:epx-typein .3s both}
+@keyframes epx-typein{from{opacity:0;transform:translateX(-7px)}to{opacity:1;transform:none}}
+.cine.found .dfield span{font-size:7px;font-weight:900;letter-spacing:.13em;color:#8a7a52;white-space:nowrap}
+.cine.found .dfield b{font-size:10px;font-weight:900;text-align:right}
+.cine.found .dfield.credits{display:block;border-bottom:none;padding-top:6px}
+.cine.found .dfield.credits b{display:block;text-align:left;margin-top:3px;font-size:8.5px;
+  font-family:Georgia,serif;font-style:italic;font-weight:700}
+.cine.found .dchecks{margin-top:11px;border-top:1.5px solid #1a1610;padding-top:9px;display:flex;
+  flex-direction:column;gap:6px}
+.cine.found .dcheck{display:flex;align-items:center;gap:7px;animation:epx-cslam .28s both}
+.cine.found .dcheck i{flex:0 0 auto;width:14px;height:14px;border-radius:50%;background:#1d6b3f;color:#efe9da;
+  font-style:normal;font-size:9px;font-weight:900;display:flex;align-items:center;justify-content:center}
+.cine.found .dcheck span{font-size:8px;font-weight:900;letter-spacing:.13em;color:#1d6b3f}
+
+/* ── 3 · the bank letter ── */
+.cine.found .bhead{display:flex;align-items:center;gap:9px}
+.cine.found .blogo{display:flex;align-items:flex-end;gap:2px;height:20px}
+.cine.found .blogo i{width:4px;background:#1a1610;border-radius:1px}
+.cine.found .blogo i:nth-child(1){height:60%}
+.cine.found .blogo i:nth-child(2){height:100%}
+.cine.found .blogo i:nth-child(3){height:78%}
+.cine.found .bname b{display:block;font-family:Georgia,serif;font-size:14px;font-weight:900;letter-spacing:.08em}
+.cine.found .bname em{font-style:normal;font-size:6.5px;font-weight:900;letter-spacing:.18em;color:#8a7a52}
+.cine.found .brule{height:1.5px;background:#1a1610;margin:9px 0 11px}
+.cine.found .btitle{font-size:8px;font-weight:900;letter-spacing:.22em;color:#8a7a52}
+.cine.found .bamt{font-family:ui-monospace,Menlo,monospace;font-size:27px;font-weight:800;
+  letter-spacing:-.02em;margin:7px 0 13px}
+.cine.found .bamt em{font-style:normal;font-size:11px;color:#8a7a52;margin-left:3px}
+.cine.found .brow{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:8px;
+  padding:6px 0;line-height:1.25;border-bottom:1px dotted #b6ac93}
+.cine.found .brow span{font-weight:900;letter-spacing:.14em;color:#8a7a52}
+.cine.found .brow b{font-weight:900;font-family:ui-monospace,Menlo,monospace}
+.cine.found .paper.bank{padding-bottom:78px}
+
+/* ── 4 · the filings, stacking ── */
+.cine.found .filestack{position:relative;width:min(340px,94%);height:min(372px,60vh)}
+.cine.found .paper.filing{position:absolute;left:0;top:0;width:100%;height:100%;padding-bottom:66px}
+.cine.found .fbody{margin-top:12px}
+.cine.found .fbox{border:2px dashed #8a7a52;border-radius:3px;padding:16px 12px;text-align:center;margin-top:8px}
+.cine.found .fboxlab{display:block;font-size:6.5px;font-weight:900;letter-spacing:.24em;color:#8a7a52}
+.cine.found .fblank{margin-top:9px;font-family:Georgia,serif;font-style:italic;font-size:14px;color:#a99a72}
+.cine.found .frack{display:flex;align-items:flex-end;gap:3px;height:52px;margin-bottom:11px;
+  border-bottom:1.5px solid #1a1610;padding-bottom:2px}
+.cine.found .frack i{flex:1;background:#1a1610;opacity:.72;border-radius:1px 1px 0 0}
+.cine.found .frow{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:8px;
+  padding:6px 0;line-height:1.25;border-bottom:1px dotted #b6ac93}
+.cine.found .frow span{flex:0 0 auto;font-weight:900;letter-spacing:.14em;color:#8a7a52}
+.cine.found .frow b{flex:0 0 auto;font-weight:900;font-family:ui-monospace,Menlo,monospace}
+.cine.found .ftab{width:100%;border-collapse:collapse;margin-top:6px}
+.cine.found .ftab td{font-size:9px;font-weight:800;font-family:ui-monospace,Menlo,monospace;
+  padding:6px 0;line-height:1.3;vertical-align:middle;border-bottom:1px dotted #b6ac93}
+.cine.found .ftab td:nth-child(2){text-align:center;color:#8a7a52;font-size:8px}
+.cine.found .ftab td:last-child{text-align:right}
+.cine.found .flegal{font-family:Georgia,serif;font-size:7.5px;line-height:1.5;color:#4a4232;
+  margin:0 0 11px;text-align:justify}
+.cine.found .fsigrow{display:flex;gap:12px;margin-top:16px}
+.cine.found .fsig{flex:1;min-width:0}
+.cine.found .fsig .fink{display:block;font-family:Georgia,serif;font-style:italic;font-weight:600;
+  font-size:9px;color:#2c3a5c;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  border-bottom:1.5px solid #1a1610;padding-bottom:2px}
+.cine.found .fsig em{display:block;margin-top:4px;font-style:normal;font-size:6.5px;font-weight:900;
+  letter-spacing:.16em;color:#8a7a52}
+.cine.found .fcards{display:flex;gap:5px;margin:4px 0 11px}
+.cine.found .fcards i{flex:1;font-style:normal;font-size:7px;font-weight:900;letter-spacing:.06em;
+  text-align:center;border:1.5px solid #1a1610;border-radius:2px;padding:5px 0;color:#1a1610}
+.cine.found .pfoot{position:absolute;left:16px;right:16px;bottom:13px;display:flex;
+  justify-content:space-between;gap:8px;border-top:1px solid #c3b899;padding-top:6px}
+.cine.found .pfoot span,.cine.found .pfoot em{font-style:normal;font-size:6px;font-weight:900;
+  letter-spacing:.15em;color:#8a7a52}
+.cine.found .fcount{position:absolute;left:0;right:0;bottom:8%;text-align:center;font-size:8px;
+  font-weight:900;letter-spacing:.24em;color:#5f5847}
+
+/* ── 7 · push into the blank screen ── */
+.cine.found .c-screen{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:18px;padding:0 24px}
+/* the room carries through, so the push-in reads as a move, not a cut to a void */
+.cine.found .roomwall{position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(ellipse 70% 46% at 50% 42%,rgba(120,140,170,.09),transparent 70%),
+             linear-gradient(#0b0d12 0%,#090b0f 58%,#05070a 58.2%,#05070a 100%)}
+
+/* ── the panel, built like a real wall-mounted set ──
+   Beat 6 renders it dark on the office wall; beat 7 renders the SAME component
+   with .on and pushes into it, so the move reads as one camera push. */
+.cine.found .tvrig{position:relative;width:100%}
+.cine.found .c-screen .tvrig{width:min(332px,93%);
+  animation:epx-tvpush 1.5s cubic-bezier(.25,1,.3,1) both}
+@keyframes epx-tvpush{from{opacity:0;transform:scale(.4)}to{opacity:1;transform:scale(1)}}
+.cine.found .bigtv{position:relative;width:100%;aspect-ratio:16/9;border-radius:7px;
+  padding:7px 7px 13px;                                  /* bezel — thicker chin, like a real set */
+  background:linear-gradient(#2c333f 0%,#1b212b 38%,#141a23 100%);
+  box-shadow:0 2px 0 rgba(255,255,255,.10) inset,0 -2px 0 rgba(0,0,0,.6) inset,
+             0 30px 54px rgba(0,0,0,.85),0 0 90px rgba(31,217,255,.10)}
+.cine.found .tvglass{position:relative;width:100%;height:100%;border-radius:3px;overflow:hidden;
+  display:flex;align-items:center;justify-content:center;background:#04060a;
+  box-shadow:0 0 0 1px #000 inset,0 6px 22px rgba(0,0,0,.9) inset}
+.cine.found .tvrig.on .tvglass{box-shadow:0 0 0 1px #000 inset,0 6px 22px rgba(0,0,0,.9) inset,
+  0 0 46px rgba(31,217,255,.09) inset;animation:epx-tvwake .5s .55s both}
+@keyframes epx-tvwake{0%{filter:brightness(.2)}22%{filter:brightness(2.6)}100%{filter:brightness(1)}}
+/* the firmware message every real set shows with nothing plugged in.
+   It does not clear — the screen has nothing to show until the player names it. */
+.cine.found .osd{border:1px solid rgba(255,255,255,.3);background:rgba(6,9,14,.62);
+  color:#c8cede;font-size:10px;font-weight:900;letter-spacing:.3em;
+  padding:8px 14px;border-radius:2px;animation:epx-osd .45s .8s both}
+@keyframes epx-osd{from{opacity:0}to{opacity:1}}
+/* glass reflection across the panel */
+.cine.found .tvsheen{position:absolute;left:7px;right:7px;top:7px;bottom:13px;border-radius:3px;
+  pointer-events:none;background:linear-gradient(122deg,rgba(255,255,255,.05) 0%,
+  rgba(255,255,255,.035) 26%,rgba(255,255,255,0) 36%,rgba(255,255,255,0) 45%,
+  rgba(255,255,255,.022) 52%,rgba(255,255,255,0) 60%)}
+/* standby light on the chin */
+.cine.found .tvled{position:absolute;left:50%;bottom:4px;width:4px;height:4px;margin-left:-2px;
+  border-radius:50%;background:#c2701f;box-shadow:0 0 6px rgba(194,112,31,.7);opacity:.55}
+.cine.found .tvrig.on .tvled{background:var(--epx-sig);box-shadow:0 0 7px var(--epx-sig);opacity:1;
+  animation:epx-tvled 2.6s ease-in-out .55s infinite}
+@keyframes epx-tvled{0%,100%{opacity:.9}50%{opacity:.35}}
+/* wall bracket + the shadow it throws */
+.cine.found .tvmount{position:absolute;left:50%;top:100%;width:24%;height:9px;margin-left:-12%;
+  border-radius:0 0 4px 4px;background:linear-gradient(#151a22,#0c1016);
+  box-shadow:0 10px 26px rgba(0,0,0,.7)}
+.cine.found .namebtn{border:none;border-radius:99px;padding:15px 30px;font-size:14px;font-weight:900;
+  letter-spacing:.03em;color:#04141b;background:linear-gradient(160deg,#7ef0ff,var(--epx-sig));
+  box-shadow:0 12px 32px rgba(31,217,255,.34);animation:epx-cup .5s 1.5s both}
+
+/* ============================================================
+   ACTIVATION — the machine switching on
+   ============================================================ */
+
+/* 1 · the escrow letter, resolved */
+.cine.found .paper.bank.release{padding-bottom:96px}
+.cine.found .brow b.newref{color:#1d6b3f}
+.cine.found .pstamp.esc.struck{opacity:.5;animation:epx-cslam .3s both}
+.cine.found .pstamp .strike{position:absolute;left:-6%;right:-6%;top:50%;height:2.5px;
+  background:currentColor;transform-origin:left;animation:epx-strike .45s .5s cubic-bezier(.3,1,.4,1) both}
+@keyframes epx-strike{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+.cine.found .pstamp.rel{bottom:46px;left:16px;--epx-r:-7deg;font-size:15px;animation-delay:1.05s}
+.cine.found .acctline{position:absolute;left:0;right:0;bottom:12%;text-align:center;
+  animation:epx-cup .5s 1.7s both;padding:0 20px}
+.cine.found .acctline span{display:block;font-size:8px;font-weight:900;letter-spacing:.2em;color:var(--epx-sig)}
+.cine.found .acctline b{display:block;margin-top:6px;font-family:ui-monospace,Menlo,monospace;
+  font-size:26px;font-weight:800;color:#fff}
+.cine.found .acctline em{display:block;margin-top:5px;font-style:italic;font-size:10px;
+  font-family:Georgia,serif;color:#7d8698}
+
+/* 2 · the register */
+.cine.found .paper.ledger2{padding-bottom:22px}
+.cine.found .regrows{margin-top:11px}
+.cine.found .regrow{position:relative;display:flex;align-items:baseline;gap:8px;padding:7px 0;
+  border-bottom:1px solid #cdc2a6}
+.cine.found .regrow b{flex:0 0 auto;font-family:ui-monospace,Menlo,monospace;font-size:9px;font-weight:800}
+.cine.found .regrow span{flex:1;min-width:0;font-family:Georgia,serif;font-size:11px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cine.found .regrow em{flex:0 0 auto;font-style:normal;font-size:6.5px;font-weight:900;
+  letter-spacing:.12em;color:#8a7a52}
+.cine.found .regrow.old{opacity:.5}
+/* your line is written in, left to right, in ink */
+.cine.found .regrow.mine{color:#2c3a5c}
+.cine.found .regrow.mine b,.cine.found .regrow.mine span,.cine.found .regrow.mine em{
+  -webkit-mask-image:linear-gradient(90deg,#000 0,#000 var(--epx-w2,0%),transparent var(--epx-w2,0%));
+  mask-image:linear-gradient(90deg,#000 0,#000 var(--epx-w2,0%),transparent var(--epx-w2,0%));
+  animation:epx-writein 1.5s .35s ease-out both}
+@keyframes epx-writein{from{--epx-w2:0%}to{--epx-w2:100%}}
+@property --epx-w2{syntax:'<percentage>';inherits:false;initial-value:0%}
+.cine.found .regrow.mine .nib{position:absolute;top:6px;width:1.5px;height:16px;background:#2c3a5c;
+  animation:epx-nibrun 1.5s .35s ease-out both}
+@keyframes epx-nibrun{from{left:0;opacity:1}90%{opacity:1}to{left:100%;opacity:0}}
+.cine.found .regfoot{margin-top:14px;font-size:6.5px;font-weight:900;letter-spacing:.18em;color:#8a7a52}
+.cine.found .assigned{position:absolute;left:0;right:0;bottom:13%;text-align:center;animation:epx-cup .5s 1.5s both}
+.cine.found .assigned span{display:block;font-size:8px;font-weight:900;letter-spacing:.22em;color:var(--epx-sig)}
+.cine.found .assigned b{display:flex;justify-content:center;gap:5px;margin-top:8px}
+.cine.found .assigned b i{font-style:normal;font-family:ui-monospace,Menlo,monospace;font-size:30px;
+  font-weight:800;color:#fff;animation:epx-digit .3s both}
+@keyframes epx-digit{from{opacity:0;transform:translateY(-8px) scale(1.3)}to{opacity:1;transform:none}}
+
+/* 3 · the certificate, embossed */
+.cine.found .paper.cert2{text-align:center;padding:20px 18px 84px}
+.cine.found .cert2 .certhead{font-size:8px;font-weight:900;letter-spacing:.26em;color:#7a6a45}
+.cine.found .cert2 .certno{margin-top:5px;font-size:7px;font-weight:900;letter-spacing:.18em;color:#8a7a52}
+.cine.found .cert2 .certname{font-size:27px;font-weight:900;letter-spacing:.03em;margin:11px 0 9px;
+  color:#1a1610;line-height:1.05}
+.cine.found .cert2 .certbody{font-family:Georgia,serif;font-size:8.5px;line-height:1.6;color:#4a4232;
+  padding:0 6px;margin-bottom:12px}
+.cine.found .cert2 .certrow{display:flex;justify-content:space-between;align-items:center;gap:8px;
+  font-size:8px;padding:5px 0;line-height:1.25;border-top:1px dotted #b6ac93;text-align:left}
+.cine.found .cert2 .certrow span{font-weight:900;letter-spacing:.14em;color:#8a7a52}
+.cine.found .cert2 .certrow b{font-weight:900}
+/* pressed into the sheet rather than printed on it */
+.cine.found .emboss{position:absolute;left:16px;bottom:16px;width:62px;height:62px;border-radius:50%;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  color:#c3b899;background:linear-gradient(150deg,#e4ddcb,#f4efe2);
+  box-shadow:inset 2px 2px 4px rgba(120,108,80,.5),inset -2px -2px 4px rgba(255,255,255,.9),
+             0 1px 0 rgba(255,255,255,.7);
+  animation:epx-embosspress .5s .55s cubic-bezier(.2,1.4,.4,1) both}
+@keyframes epx-embosspress{0%{opacity:0;transform:scale(1.6)}60%{opacity:1;transform:scale(.95)}100%{transform:scale(1)}}
+.cine.found .emboss svg{width:22px;height:22px;color:#b3a683;
+  filter:drop-shadow(1px 1px 0 rgba(255,255,255,.8))}
+.cine.found .emboss span{font-size:5px;font-weight:900;letter-spacing:.14em;color:#b3a683}
+.cine.found .regsig{position:absolute;right:16px;bottom:20px;width:44%;text-align:left}
+.cine.found .regsig .rsname{display:block;font-family:Georgia,serif;font-style:italic;font-weight:600;
+  font-size:15px;color:#2c3a5c;
+  -webkit-mask-image:linear-gradient(90deg,#000 0,#000 var(--epx-w3,0%),transparent var(--epx-w3,0%));
+  mask-image:linear-gradient(90deg,#000 0,#000 var(--epx-w3,0%),transparent var(--epx-w3,0%));
+  animation:epx-regink 1s 1.05s ease-out both}
+@keyframes epx-regink{from{--epx-w3:0%}to{--epx-w3:100%}}
+@property --epx-w3{syntax:'<percentage>';inherits:false;initial-value:0%}
+.cine.found .regsig i{display:block;height:1.5px;background:#1a1610;margin:2px 0 3px}
+.cine.found .regsig em{font-style:normal;font-size:6px;font-weight:900;letter-spacing:.16em;color:#8a7a52}
+
+.cine.found .cklabel{font-size:8.5px;font-weight:900;letter-spacing:.34em;color:var(--epx-cine-c);
+  text-align:center;margin-bottom:16px}
+
+/* 4 · protection — three attacks that fail */
+.cine.found .c-prot{width:min(340px,92%);animation:epx-cin .35s both}
+.cine.found .protplayer{position:relative;width:100%;aspect-ratio:16/9;border-radius:7px;overflow:hidden;
+  background:#04060a;border:1px solid #2a3140}
+.cine.found .ppart{position:absolute;inset:0;
+  background:radial-gradient(ellipse 80% 70% at 34% 36%,color-mix(in srgb,var(--epx-cine-c) 44%,transparent),transparent 70%),
+             linear-gradient(150deg,var(--epx-cine-c2),#05070a)}
+.cine.found .ppwm{position:absolute;top:8px;right:9px;width:15px;height:15px;color:#fff;opacity:.85}
+.cine.found .ppwm svg{width:100%;height:100%;display:block}
+.cine.found .pptitle{position:absolute;left:11px;bottom:20px;font-size:11px;font-weight:900;
+  letter-spacing:.08em;color:#fff}
+.cine.found .ppscrub{position:absolute;left:11px;right:11px;bottom:11px;height:2.5px;border-radius:2px;
+  background:rgba(255,255,255,.24);overflow:hidden}
+.cine.found .ppscrub i{display:block;width:38%;height:100%;background:var(--epx-cine-c)}
+.cine.found .blackout{position:absolute;inset:0;background:#000;display:flex;align-items:center;
+  justify-content:center;animation:epx-blackout 1.5s both}
+.cine.found .blackout b{font-family:ui-monospace,Menlo,monospace;font-size:12px;font-weight:800;
+  letter-spacing:.18em;color:#ff5a5f}
+@keyframes epx-blackout{0%{opacity:0}8%{opacity:1}12%{opacity:.2}16%{opacity:1}80%{opacity:1}100%{opacity:0}}
+.cine.found .atklist{margin-top:12px;display:flex;flex-direction:column;gap:6px}
+.cine.found .atk{display:flex;align-items:center;gap:9px;padding:9px 11px;border-radius:11px;
+  background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.08);opacity:.35;transition:.3s}
+.cine.found .atk.done{opacity:1;border-color:rgba(74,222,128,.34);background:rgba(74,222,128,.07)}
+.cine.found .atk.now{opacity:1;border-color:rgba(255,90,95,.5);background:rgba(255,90,95,.09)}
+.cine.found .atk .x{flex:0 0 auto;width:16px;height:16px;border-radius:50%;font-style:normal;
+  font-size:9px;font-weight:900;display:flex;align-items:center;justify-content:center;
+  background:rgba(255,255,255,.1);color:#7d8698}
+.cine.found .atk.done .x{background:#1d6b3f;color:#fff}
+.cine.found .atk.now .x{background:#ff5a5f;color:#fff}
+.cine.found .atxt{flex:1;min-width:0}
+.cine.found .atxt b{display:block;font-size:10px;font-weight:900;letter-spacing:.08em}
+.cine.found .atxt span{font-size:8.5px;color:#7d8698}
+.cine.found .atk em{flex:0 0 auto;font-style:normal;font-size:8px;font-weight:900;letter-spacing:.14em;color:#5f6875}
+.cine.found .atk.done em{color:#4ade80}
+
+/* 5 · the certification bench */
+.cine.found .c-bench{width:min(350px,92%);animation:epx-cin .35s both}
+.cine.found .benchgrid{display:flex;flex-direction:column;gap:15px}
+.cine.found .benchrow{display:flex;flex-direction:column;align-items:center;gap:7px}
+.cine.found .benchrow .rowlab{font-size:6.5px;font-weight:900;letter-spacing:.26em;color:#4b5261}
+.cine.found .benchline{display:flex;align-items:flex-end;justify-content:center;gap:14px}
+.cine.found .bd{display:flex;flex-direction:column;align-items:center;gap:4px;opacity:.3;transition:.28s}
+.cine.found .bd.run,.cine.found .bd.pass,.cine.found .bd.flake{opacity:1}
+.cine.found .bscreen{position:relative;background:#0d1016;border:1.5px solid #232a38;border-radius:4px;
+  overflow:hidden;transition:.28s;display:block}
+.cine.found .bd.phone .bscreen{width:36px;aspect-ratio:9/17}
+.cine.found .bd.tv .bscreen{width:74px;aspect-ratio:16/9}
+.cine.found .bd.stick .bscreen{width:52px;aspect-ratio:4/3}
+/* the storefront, in miniature */
+.cine.found .bhero{position:absolute;left:8%;right:8%;top:10%;height:34%;border-radius:2px;
+  background:color-mix(in srgb,var(--epx-cine-c) 55%,#0d1016);opacity:0;transition:.3s}
+.cine.found .brow1,.cine.found .brow2{position:absolute;left:8%;right:8%;height:12%;border-radius:1px;
+  background:#2a3140;opacity:0;transition:.3s}
+.cine.found .brow1{top:50%}
+.cine.found .brow2{top:66%}
+.cine.found .bd.run .bhero,.cine.found .bd.pass .bhero,.cine.found .bd.flake .bhero,.cine.found .bd.run .brow1,.cine.found .bd.pass .brow1,.cine.found .bd.flake .brow1,.cine.found .bd.run .brow2,.cine.found .bd.pass .brow2,.cine.found .bd.flake .brow2{opacity:1}
+.cine.found .bmk{position:absolute;top:3px;right:3px;width:7px;height:7px;color:#fff;opacity:0;transition:.3s}
+.cine.found .bmk svg{width:100%;height:100%;display:block}
+.cine.found .bd.pass .bmk{opacity:.9}
+.cine.found .bd.run .bscreen{border-color:color-mix(in srgb,var(--epx-cine-c) 60%,transparent);
+  box-shadow:0 0 14px color-mix(in srgb,var(--epx-cine-c) 30%,transparent)}
+.cine.found .bd.pass .bscreen{border-color:rgba(74,222,128,.6);box-shadow:0 0 12px rgba(74,222,128,.24)}
+.cine.found .bd.flake .bscreen{border-color:rgba(255,90,95,.75);
+  box-shadow:0 0 16px rgba(255,90,95,.4);animation:epx-flake .3s steps(2) infinite}
+@keyframes epx-flake{50%{opacity:.35}}
+.cine.found .bd b{font-size:7.5px;font-weight:900;letter-spacing:.06em;color:#6f7686}
+.cine.found .bd.run b,.cine.found .bd.pass b,.cine.found .bd.flake b{color:#c6ccda}
+.cine.found .bd em{font-style:normal;font-size:6px;font-weight:900;letter-spacing:.1em;color:#5f6875;
+  text-align:center;min-height:8px}
+.cine.found .bd.run em{color:var(--epx-cine-c)}
+.cine.found .bd.pass em{color:#4ade80}
+.cine.found .bd.flake em{color:#ff5a5f}
+.cine.found .benchstatus{margin-top:16px;text-align:center;font-size:9px;font-weight:900;
+  letter-spacing:.18em;color:#8b93a5}
+
+/* 7 · the office, now staffed */
+.cine .c-room.staffed .chairs span.taken{background:linear-gradient(#3c4b63,#1b2431);
+  box-shadow:0 0 10px color-mix(in srgb,var(--epx-cine-c) 30%,transparent)}
+.cine .c-room.staffed .livemk{display:block;width:26%;margin:0 auto;color:var(--epx-cine-c);
+  filter:drop-shadow(0 0 10px color-mix(in srgb,var(--epx-cine-c) 70%,transparent))}
+.cine .c-room.staffed .livemk svg{width:100%;height:auto;display:block}
+
+/* ACTIVATION · back to the wall */
+.cine .c-live{position:absolute;inset:0}
+.cine .c-live .livewall{position:absolute;inset:0;animation:epx-cin .6s both}
+/* the wall itself carries the reveal — the overlay is one line of caption, nothing more */
+.cine .c-live .liveover{position:absolute;left:0;right:0;bottom:0;height:34%;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:20px;
+  justify-content:center;text-align:center;padding:0 30px 12%;pointer-events:auto;
+  background:linear-gradient(rgba(4,5,10,0),rgba(4,5,10,.82) 62%)}
+.cine .c-live p{font-family:Georgia,serif;font-style:italic;font-size:16px;color:#c8cede;animation:epx-cup .6s 1.15s both;pointer-events:none}
+.cine .c-live .livebtn{position:relative;z-index:60;animation:epx-cup .5s 1.5s both;margin-bottom:8px;min-height:54px;max-width:min(88vw,420px);height:auto;padding:14px 24px;line-height:1.15;white-space:normal;pointer-events:auto;touch-action:manipulation}
+
+@media (prefers-reduced-motion: reduce){.cine *{animation-duration:.001s!important;transition-duration:.001s!important}}

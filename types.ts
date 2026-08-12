@@ -15,6 +15,171 @@ export type Gender = 'MALE' | 'FEMALE' | 'NON_BINARY' | 'ALL';
 export type PregnancyCarrier = 'PLAYER' | 'PARTNER' | 'NONE';
 export type Genre = 'ACTION' | 'DRAMA' | 'COMEDY' | 'ROMANCE' | 'THRILLER' | 'MYSTERY' | 'HORROR' | 'SCI_FI' | 'ADVENTURE' | 'SUPERHERO' | 'MUSICAL' | 'BIOPIC' | 'SPORTS' | 'ANIMATION' | 'FANTASY' | 'CRIME' | 'DOCUMENTARY';
 export type RoleType = 'MINOR' | 'CAMEO' | 'SUPPORTING' | 'ENSEMBLE' | 'LEAD';
+export type CharacterStoryRole = 'HERO' | 'ANTI_HERO' | 'VILLAIN' | 'ALLY' | 'CIVILIAN' | 'OTHER';
+export type CharacterAbilityType = 'NONE' | 'TRAINED' | 'TECH' | 'MAGIC' | 'SUPERNATURAL' | 'SUPERPOWERED';
+export type CharacterStoryFunction = 'PROTAGONIST' | 'ANTAGONIST' | 'DEUTERAGONIST' | 'RIVAL' | 'MENTOR' | 'ALLY' | 'COMIC_RELIEF' | 'CIVILIAN' | 'OTHER';
+export type CharacterNature = 'HUMAN' | 'ROBOT' | 'ALIEN' | 'CREATURE' | 'SPIRIT' | 'OTHER';
+export type CharacterIdentitySource = 'AUTO' | 'PLAYER' | 'CANON' | 'AUTHOR_INTENT';
+export type StoryPerspective = 'PROTAGONIST_LED' | 'VILLAIN_LED' | 'DUAL' | 'ENSEMBLE';
+export type StoryConflictSource = 'ANTAGONIST' | 'RIVAL' | 'INTERNAL' | 'SOCIETY' | 'NATURE' | 'MYSTERY';
+export type StoryWorldRule = 'GROUNDED' | 'TECHNOLOGY' | 'MAGIC' | 'SUPERNATURAL' | 'SUPERPOWERED' | 'MIXED';
+export type StoryTone = 'HEROIC' | 'MORALLY_GREY' | 'DARK' | 'TRAGIC' | 'COMEDIC';
+export type StoryCastShape = 'INTIMATE' | 'BALANCED' | 'ENSEMBLE';
+
+export interface StoryCompass {
+    perspective: StoryPerspective;
+    conflictSource: StoryConflictSource;
+    worldRule: StoryWorldRule;
+    tone: StoryTone;
+    castShape: StoryCastShape;
+    flexibility: 'OPEN' | 'ADAPTABLE' | 'PROTECTED';
+    source: 'SCRIPT_DNA' | 'AUTHOR_INTENT' | 'MARKET_INFERENCE' | 'CANON';
+    confidence: number;
+}
+
+export interface CharacterIdentityProfile {
+    storyFunction: CharacterStoryFunction;
+    storyRole: CharacterStoryRole;
+    abilityType: CharacterAbilityType;
+    nature: CharacterNature;
+    identitySource: CharacterIdentitySource;
+}
+
+export type CharacterStoryFitLabel = 'NATURAL_FIT' | 'BOLD_INTERPRETATION' | 'STORY_CONFLICT';
+
+export interface CharacterStoryFit {
+    score: number;
+    label: CharacterStoryFitLabel;
+    qualityAdjustment: number;
+    summary: string;
+    strengths: string[];
+    warnings: string[];
+}
+
+export type CastStoryArchetype =
+    | 'HERO_TEAM_VS_VILLAIN'
+    | 'HERO_VS_VILLAIN'
+    | 'VILLAIN_LED'
+    | 'RIVALS'
+    | 'DUAL_LEADS'
+    | 'ENSEMBLE'
+    | 'CHARACTER_DRIVEN'
+    | 'OPEN_CONFLICT';
+
+export interface CastStoryRead {
+    archetype: CastStoryArchetype;
+    headline: string;
+    summary: string;
+    balanceScore: number;
+    protagonistCount: number;
+    antagonistCount: number;
+    heroCount: number;
+    villainCount: number;
+    allyCount: number;
+    warnings: string[];
+    strengths: string[];
+}
+
+export type BackgroundEnsembleScale = 'LEAN' | 'STORY_FIT' | 'FULL_WORLD' | 'EPIC';
+export type BackgroundCastingSource = 'AGENCY' | 'LOCAL' | 'OPEN_CALL' | 'COMMUNITY' | 'SPECIALIST';
+export type BackgroundPayStandard = 'COMPLIANT' | 'FAIR_PAY' | 'PREMIUM' | 'COMMUNITY_SUPPORTED';
+export type BackgroundCastingControl = 'DEPARTMENT' | 'REVIEW' | 'CUSTOM';
+
+export interface BackgroundCastingPlan {
+    version: 1;
+    scale: BackgroundEnsembleScale;
+    source: BackgroundCastingSource;
+    payStandard: BackgroundPayStandard;
+    control: BackgroundCastingControl;
+    performerCount: number;
+    recurringDayPlayers: number;
+    specialistRoles: string[];
+    estimatedCost: number;
+    authenticity: number;
+    reliability: number;
+    setCare: number;
+    localGoodwill: number;
+    discoveryPotential: number;
+}
+
+export type EnsembleCareerStage =
+    | 'UNCREDITED_EXTRA'
+    | 'FEATURED_EXTRA'
+    | 'DAY_PLAYER'
+    | 'MINOR_SPEAKING'
+    | 'SUPPORTING'
+    | 'ESTABLISHED';
+
+export type EnsembleOriginRole =
+    | 'CROWD_PERFORMER'
+    | 'TAXI_DRIVER'
+    | 'DANCER'
+    | 'STUNT_PERFORMER'
+    | 'SOLDIER'
+    | 'MEDICAL_WORKER'
+    | 'REPORTER'
+    | 'CREW_ASSISTANT'
+    | 'LOCAL_PERFORMER';
+
+export type EnsembleCareerRoute =
+    | 'WORKHORSE'
+    | 'BREAKOUT'
+    | 'PRESTIGE'
+    | 'ACTION'
+    | 'MUSIC_CROSSOVER'
+    | 'CREATOR'
+    | 'ADVOCATE';
+
+export interface LivingEnsembleCareerSeed {
+    id: string;
+    projectId: string;
+    projectTitle: string;
+    projectGenre: Genre;
+    originRole: EnsembleOriginRole;
+    originRoleLabel: string;
+    originWeek: number;
+    originYear: number;
+    originAbsoluteWeek: number;
+    name: string;
+    gender: Gender;
+    talent: number;
+    ambition: number;
+    professionalism: number;
+    potential: number;
+    treatmentScore: number;
+    relationshipWarmth: number;
+    route: EnsembleCareerRoute;
+    currentStage: EnsembleCareerStage;
+    progress: number;
+    nextReviewAbsoluteWeek: number;
+    breakoutEligible: boolean;
+    promotedNpcId?: string;
+    storyBeatCount: number;
+    lastStoryAbsoluteWeek?: number;
+    retired?: boolean;
+}
+
+export interface LivingEnsembleStoryRecord {
+    id: string;
+    seedId: string;
+    projectId: string;
+    npcId?: string;
+    combinationKey: string;
+    headline: string;
+    subtext: string;
+    absoluteWeek: number;
+    year: number;
+    week: number;
+}
+
+export interface LivingEnsembleState {
+    version: 1;
+    seeds: LivingEnsembleCareerSeed[];
+    stories: LivingEnsembleStoryRecord[];
+    registeredProjectIds: string[];
+    recentCombinationKeys: string[];
+    lastProcessedQuarter: number;
+}
 export type BudgetTier = 'LOW' | 'MID' | 'HIGH' | 'BLOCKBUSTER';
 export type TargetAudience = 'G' | 'PG' | 'PG-13' | 'R' | 'NC-17';
 export type ProjectType = 'MOVIE' | 'SERIES';
@@ -36,6 +201,7 @@ export type YoutubeVideoType = 'VLOG' | 'SKIT' | 'Q_AND_A' | 'TRAILER' | 'COVER'
 export type YoutubeMessageType = 'OFFER_YOUTUBE_COLLAB' | 'OFFER_YOUTUBE_BRAND' | 'OFFER_MUSIC_VIDEO_FEATURE';
 export type YoutubeUploadPlan = 'SAFE' | 'VIRAL_BAIT' | 'BTS' | 'PROJECT_PROMO' | 'SPONSOR_HEAVY';
 export type YoutubeMerchTier = 'BASIC' | 'PREMIUM' | 'LUXURY';
+export type YoutubeMerchResult = 'SOLD_OUT' | 'PROFIT' | 'UNDERPERFORMED';
 export type YoutubeCreatorIdentity = 'ACTOR_VLOGGER' | 'CHAOS_CREATOR' | 'PRESTIGE_FILMMAKER' | 'LIFESTYLE_ICON' | 'CONTROVERSY_MAGNET';
 export type BusinessType = 'RESTAURANT' | 'CAFE' | 'FASHION' | 'FITNESS' | 'MERCH' | 'PRODUCTION_HOUSE';
 export type BusinessSubtype = 'FAST_FOOD' | 'CASUAL_DINING' | 'FINE_DINING' | 'COFFEE_SHOP' | 'ARTISAN_BAKERY' | 'STREETWEAR' | 'LUXURY_BRAND' | 'LOCAL_GYM' | 'WELLNESS_STUDIO' | 'ONLINE_STORE' | 'INDIE_STUDIO' | 'MAJOR_STUDIO';
@@ -238,6 +404,8 @@ export type SeriesStatus = 'N/A' | 'RUNNING' | 'CANCELLED' | 'ENDED';
 export type PlayerReturnStatus = 'RETURNING' | 'WRITTEN_OFF' | 'KILLED_OFF';
 export type NPCTier = 'A_LIST' | 'ESTABLISHED' | 'RISING' | 'INDIE' | 'ICON' | 'UNKNOWN';
 export type NPCPrestige = 'COMMERCIAL' | 'PRESTIGE' | 'MIXED';
+export type CrewOccupation = 'CINEMATOGRAPHER' | 'COMPOSER' | 'LINE_PRODUCER' | 'VFX_SUPERVISOR';
+export type CrewMarketTier = 'LEGEND' | 'PROFESSIONAL' | 'INDIE';
 export type ActorTrait = 'DIVA' | 'METHOD' | 'WORKAHOLIC' | 'UNRELIABLE' | 'EASY_GOING' | 'BOX_OFFICE_POISON' | 'PROFESSIONAL' | 'AMBITIOUS';
 export type ContractType = 'MOVIE_DEAL';
 export type PaymentMode = 'UPFRONT' | 'WEEKLY_INSTALLMENTS';
@@ -387,6 +555,8 @@ export interface Script {
     baseQuality?: number;
     logline?: string;
     attributes?: ScriptAttributes;
+    /** Flexible creative intent. It guides casting without fixing cast size. */
+    storyCompass?: StoryCompass;
     sourceMaterial?: 'ORIGINAL' | 'ADAPTATION' | 'SEQUEL' | 'SPINOFF';
     sourceMaterialType?: 'BOOK' | 'ARTICLE' | 'SCREENPLAY' | 'GAME' | 'GRAPHIC_NOVEL' | 'SPEC_SCRIPT' | 'LIFE_RIGHTS' | 'DOCUMENTARY_SUBJECT';
     subjectName?: string;
@@ -444,8 +614,14 @@ export interface ProjectConcept {
         salary?: number,
         characterId?: string,
         characterName?: string,
-        sourceUniverseId?: UniverseId
+        sourceUniverseId?: UniverseId,
+        storyFunction?: CharacterStoryFunction,
+        storyRole?: CharacterStoryRole,
+        abilityType?: CharacterAbilityType,
+        nature?: CharacterNature,
+        identitySource?: CharacterIdentitySource
     }[];
+    backgroundCastingPlan?: BackgroundCastingPlan;
     selectedLocations: string[]; // Changed from selectedLocation: string | null
     tone: number;
     reservedMarketingBudget?: number;
@@ -467,6 +643,8 @@ export interface ProjectConcept {
     format?: ProjectFormat;
     subjectName?: string;
     subjectType?: ScriptSubjectType;
+    /** Shared story intent used by scripts, Greenlight, offers, and reactions. */
+    storyCompass?: StoryCompass;
     connectedProjectIntent?: 'AUTO' | 'SOLO' | 'CROSSOVER' | 'EVENT' | 'REBOOT';
     universeId?: UniverseId;
     franchiseId?: string;
@@ -486,6 +664,44 @@ export interface StudioEquipment {
     lighting: number;
     sound: number;
     practicalEffects: number;
+}
+
+export interface StudioLegacyCatalogItem {
+    id: string;
+    title: string;
+    year: number;
+    week: number;
+    revenue: number;
+    quality: number;
+    outcome: string;
+    genre: Genre;
+    projectType: ProjectType;
+    source: 'WORLD_CATALOG' | 'VENTURE_HISTORY' | 'ACQUISITION_SUMMARY';
+    universeId?: UniverseId;
+    franchiseId?: string;
+}
+
+export interface StudioLegacyFranchise {
+    id: string;
+    name: string;
+    catalogItemIds: string[];
+    universeId?: UniverseId;
+    estimated: boolean;
+}
+
+export interface StudioAcquisitionPortfolio {
+    version: 1;
+    sourceStudioId: StudioId;
+    importedWeek: number;
+    importedYear: number;
+    assetDataSource: 'SAVE_DATA' | 'MIXED' | 'FORBES_ESTIMATE';
+    catalog: StudioLegacyCatalogItem[];
+    franchises: StudioLegacyFranchise[];
+    declaredFranchiseCount: number;
+    universeIds: UniverseId[];
+    universeNames: string[];
+    facilityLabels: string[];
+    facilitiesEstimated: boolean;
 }
 
 export type RightsPropertyType = 'CHARACTER' | 'FRANCHISE' | 'CATALOG' | 'STORY_WORLD';
@@ -838,6 +1054,8 @@ export interface StudioState {
     ipMarket: Script[];
     lastMarketRefreshWeek: number;
     lastWriterRefreshWeek: number;
+    lastMarketRefreshAbsoluteWeek?: number;
+    lastWriterRefreshAbsoluteWeek?: number;
     lastTalentRefreshWeek?: number;
     departments?: StudioDepartments;
     equipment?: StudioEquipment;
@@ -861,6 +1079,11 @@ export interface StudioState {
     acquisitionOrigin?: 'STUDIO_ACQUISITION';
     acquiredWeek?: number;
     acquiredYear?: number;
+    acquisitionPortfolio?: StudioAcquisitionPortfolio;
+    formerNames?: string[];
+    lastRenamedWeek?: number;
+    lastRenamedYear?: number;
+    brokenAcquisitionCommitments?: Array<'PRESERVE_STUDIO_NAME'>;
     operatingModel?: SubsidiaryOperatingModel;
     operatingModelChangedWeek?: number;
     operatingModelChangedYear?: number;
@@ -906,6 +1129,9 @@ export interface LockedStreamingFunding {
     reason?: string;
     warningStage?: 'FIRST' | 'FINAL';
     deadlineExtensionWeeks?: number;
+    /** Links a platform commission to the existing studio Greenlight workflow. */
+    ownedStreamingCommissionId?: string;
+    fundingSource?: 'EXTERNAL_PLATFORM' | 'OWNED_STREAMING_PLATFORM';
 }
 
 export type NextSeasonFundingTier = 'CONSERVATIVE' | 'STANDARD' | 'PREMIUM' | 'BREAKOUT' | 'RISKY_BET';
@@ -922,7 +1148,7 @@ export interface StudioFinanceEntry {
     week: number;
     year: number;
     amount: number;
-    type: 'THEATRICAL' | 'STREAMING_DEAL' | 'STREAMING_ROYALTY' | 'SOUNDTRACK' | 'UNIVERSE' | 'CAPITAL_INJECTION' | 'CAPITAL_WITHDRAWAL' | 'PRODUCTION_SPEND' | 'FUNDING_SURPLUS' | 'INVESTOR_FUNDING' | 'INVESTOR_PAYOUT' | 'ACQUISITION_MERGER' | 'IP_ACQUISITION' | 'STUDIO_SALE';
+    type: 'THEATRICAL' | 'STREAMING_DEAL' | 'STREAMING_ROYALTY' | 'SOUNDTRACK' | 'UNIVERSE' | 'CAPITAL_INJECTION' | 'CAPITAL_WITHDRAWAL' | 'PRODUCTION_SPEND' | 'FUNDING_SURPLUS' | 'INVESTOR_FUNDING' | 'INVESTOR_PAYOUT' | 'ACQUISITION_MERGER' | 'IP_ACQUISITION' | 'STUDIO_SALE' | 'REBRAND' | 'LEGAL';
     label: string;
     projectId?: string;
 }
@@ -953,6 +1179,8 @@ export interface ProjectHiddenStats {
     campaignTimeline?: CampaignTimeline;
     campaignRealityChecked?: boolean;
     campaignRealityOutcome?: CampaignRealityOutcome;
+    campaignReachMultiplier?: number;
+    campaignReachLabel?: 'LIMITED' | 'TARGETED' | 'WIDE' | 'EVENT';
     backendPct?: number;
     musicBuzz?: number;
     musicRisk?: number;
@@ -972,6 +1200,22 @@ export interface ProjectHiddenStats {
     nextSeasonFundingUsedByProjectId?: string;
     nextSeasonFundingTier?: NextSeasonFundingTier;
     nextSeasonFundingReason?: string;
+    // Exact current-season financing. Keep this separate from nextSeasonFundingAmount,
+    // which is a future renewal cap until a continuation actually uses it.
+    platformProductionFundingApplied?: number;
+    productionFundApplied?: number;
+    studioCashAtRisk?: number;
+    investorFundingApplied?: number;
+    greenlightPackageBudget?: number;
+    platformFundedPremiere?: boolean;
+    platformFundedPremiereConfirmed?: boolean;
+    ownedStreamingCommissionId?: string;
+    ownedStreamingOriginal?: boolean;
+    ownedStreamingCommissionedBy?: string;
+    ownedStreamingPhysicalProducerName?: string;
+    ownedStreamingReleaseScope?: StreamingOriginalReleaseScope;
+    ownedStreamingReleasePattern?: StreamingOriginalReleasePattern;
+    ownedStreamingLocalizationPackage?: StreamingOriginalLocalizationPackage;
     rareChaosResolved?: boolean;
     rareChaosKind?: RareHollywoodChaosKind;
     rareChaosReason?: string;
@@ -983,10 +1227,29 @@ export interface ProjectHiddenStats {
     boxOfficeCapRoll?: number;
     boxOfficeTotalCap?: number;
     boxOfficeCapLabel?: 'STANDARD' | 'EVENT' | 'BREAKOUT' | 'LIMITED';
+    // Marks a streaming deal generated by an autonomous subsidiary rather than the player-facing deal room.
+    subsidiaryStreamingContract?: boolean;
+    subsidiaryStreamingUpfrontPaid?: boolean;
     selfRunProduction?: boolean;
     selfRunLoad?: number;
     studioSlateFatigueScore?: number;
     studioSlateFatigueLabel?: 'FRESH' | 'CROWDED' | 'FATIGUED';
+    /** One bounded story-coherence result. Downstream ratings and reviews read this snapshot; they do not re-penalize it. */
+    characterStoryFitScore?: number;
+    characterStoryFitLabel?: CharacterStoryFitLabel;
+    characterStoryFitAdjustment?: number;
+    characterStoryFitSummary?: string;
+    characterStoryFitStrengths?: string[];
+    characterStoryFitWarnings?: string[];
+    /** Compact cast-versus-conflict read reused by canon screens, news, and social reactions. */
+    castStoryArchetype?: CastStoryArchetype;
+    castStoryHeadline?: string;
+    castStorySummary?: string;
+    castStoryBalanceScore?: number;
+    backgroundAuthenticity?: number;
+    backgroundReliability?: number;
+    backgroundSetCare?: number;
+    backgroundDiscoveryPotential?: number;
 }
 
 export type RareHollywoodChaosKind =
@@ -1066,6 +1329,11 @@ export interface CastMember {
     characterId?: string;
     characterName?: string;
     sourceUniverseId?: UniverseId;
+    storyFunction?: CharacterStoryFunction;
+    storyRole?: CharacterStoryRole;
+    abilityType?: CharacterAbilityType;
+    nature?: CharacterNature;
+    identitySource?: CharacterIdentitySource;
 }
 
 export interface Review {
@@ -1444,6 +1712,12 @@ export interface OutsideProductionInvestment {
 export interface ProjectDetails {
     title: string;
     sourceScriptId?: string;
+    // Persist the credited writer when a script is greenlit. The studio roster
+    // can change later, but continuations still need to know who wrote the
+    // previous installment.
+    writerId?: string;
+    writerName?: string;
+    writerSkill?: number;
     isOriginal?: boolean;
     type: ProjectType;
     description: string;
@@ -1453,6 +1727,8 @@ export interface ProjectDetails {
     format?: ProjectFormat;
     subjectName?: string;
     subjectType?: ScriptSubjectType;
+    /** Shared story intent used by scripts, Greenlight, offers, and reactions. */
+    storyCompass?: StoryCompass;
     connectedProjectIntent?: 'AUTO' | 'SOLO' | 'CROSSOVER' | 'EVENT' | 'REBOOT';
     targetAudience?: TargetAudience;
     budgetTier: BudgetTier;
@@ -1474,6 +1750,7 @@ export interface ProjectDetails {
     newUniverseName?: string;
     isFamous?: boolean;
     castList?: CastMember[];
+    backgroundCastingPlan?: BackgroundCastingPlan;
     crewList?: CrewMember[]; // NEW: Crew roster
     location?: LocationDetails; // NEW: Filming location
     reviews?: Review[];
@@ -1503,10 +1780,26 @@ export interface ProjectDetails {
     totalCampaignSpend?: number;
     releaseDate?: number; // Week of release
     streamingRevenue?: number;
+    releasePlanningDraft?: ReleasePlanningDraft;
     customPoster?: CustomPoster;
     musicPlan?: ProjectMusicPlan;
     investorPlan?: ProjectInvestorPlan;
     investorPayouts?: ProjectInvestorPayoutSummary;
+}
+
+export interface ReleasePlanningDraft {
+    step: number;
+    releaseType: 'THEATRICAL' | 'STREAMING_ONLY' | null;
+    screeningStrategy: ScreeningStrategy | null;
+    selectedRegionIds: BoxOfficeRegionId[];
+    distributionChainSelections: Partial<Record<BoxOfficeRegionId, CinemaChainId[]>>;
+    campaignPositioning: CampaignPositioning;
+    campaignTimeline: CampaignTimeline;
+    channelAllocations: MarketingChannelAllocations;
+    selectedPlatform: string | null;
+    festivalPremiere: string | null;
+    releaseWeek: number;
+    updatedAt: number;
 }
 
 export interface CrewMember {
@@ -1556,6 +1849,2002 @@ export interface StreamingState {
     startWeekAbsolute?: number;
 }
 
+/**
+ * The player's owned streaming company is intentionally separate from
+ * StreamingState, which tracks a single title licensed to a third-party
+ * platform. Catalog entries reference existing project IDs so movie and show
+ * data continues to have one source of truth.
+ */
+export type OwnedStreamingPlatformLifecycle = 'LOCKED' | 'ELIGIBLE' | 'FOUNDING' | 'ACTIVE' | 'SUSPENDED';
+export type StreamingInfrastructureStrategy = 'UNDECIDED' | 'CLOUD_FIRST' | 'OWNED_INFRASTRUCTURE' | 'HYBRID';
+export type StreamingLogoKey = 'FRAME_PLAY' | 'SIGNAL_RING' | 'SPOTLIGHT' | 'WORDMARK';
+export type StreamingSoundIdentKey = 'PULSE' | 'ASCENT' | 'PREMIERE' | 'SILENT';
+export type StreamingBrandPromiseId =
+    | 'EVENT_HOUSE'
+    | 'BINGE_MACHINE'
+    | 'FANDOM_FOREVER'
+    | 'WORLD_STAGE'
+    | 'EVERYONES_SCREEN'
+    | 'TECHNOLOGY_FIRST'
+    | 'BALANCED';
+/** Retained only to migrate founding records created before schema v7. */
+export type StreamingLaunchScale = 'FOCUSED' | 'NATIONAL' | 'GLOBAL';
+/** Retained only to migrate founding records created before schema v7. */
+export type StreamingFundingPlan = 'FOUNDER_FUNDED' | 'GROWTH_LOAN' | 'MINORITY_ROUND';
+export type StreamingTechnologyBranch =
+    | 'DELIVERY_CAPACITY'
+    | 'PLAYBACK_QUALITY'
+    | 'RELIABILITY'
+    | 'DATA_RECOMMENDATIONS'
+    | 'SECURITY'
+    | 'CONTENT_OPERATIONS'
+    | 'ADVERTISING_COMMERCE'
+    | 'PRODUCT_EXPERIENCE';
+
+export type StreamingProductLineId =
+    | 'CORE'
+    | 'KIDS'
+    | 'FREE'
+    | 'LIVE'
+    | 'FAN'
+    | 'STORE'
+    | 'INTERACTIVE';
+export type StreamingProductLaunchMode = 'VALIDATED' | 'BALANCED' | 'FIRST_TO_MARKET';
+export type StreamingProductLineStatus = 'UNDER_DEVELOPMENT' | 'ACTIVE' | 'PAUSED';
+export type StreamingProductRisk = 'LOW' | 'MODERATE' | 'HIGH';
+
+export interface OwnedStreamingProductBenefit {
+    acquisitionRateDelta: number;
+    churnRateDelta: number;
+    engagementRateDelta: number;
+    weeklyRevenuePerSubscriber: number;
+    productExperienceLevel: number;
+    advertisingCommerceLevel: number;
+}
+
+export interface OwnedStreamingProductLine {
+    id: string;
+    idempotencyKey: string;
+    lineId: Exclude<StreamingProductLineId, 'CORE'>;
+    title: string;
+    status: StreamingProductLineStatus;
+    launchMode: StreamingProductLaunchMode;
+    capitalCost: number;
+    weeklyOperatingCost: number;
+    staffRequired: number;
+    peakLoadPercent: number;
+    developmentWeeks: number;
+    benefit: OwnedStreamingProductBenefit;
+    risk: StreamingProductRisk;
+    riskNote: string;
+    strategicConsequence: string;
+    startedAtAbsoluteWeek: number;
+    readyAtAbsoluteWeek: number;
+    launchedAtAbsoluteWeek: number | null;
+    lastStatusChangedAtAbsoluteWeek: number;
+}
+
+export interface OwnedStreamingPlatformIdentity {
+    name: string;
+    slug: string;
+    primaryColor: string;
+    secondaryColor: string;
+    logoKey: StreamingLogoKey;
+    soundIdentKey: StreamingSoundIdentKey;
+    brandPromiseId: StreamingBrandPromiseId;
+    /** Player-authored public copy. Strategy remains driven by brandPromiseId. */
+    publicManifesto: string;
+    /** Countries where viewers may subscribe on opening day. */
+    dayOneMarketIds?: string[];
+    /** Legacy pre-Day-One-Markets field. New companies choose servers in Build. */
+    launchServerCityId: string | null;
+    foundedAtAbsoluteWeek: number;
+}
+
+export interface OwnedStreamingFoundingDraft {
+    currentStep: number;
+    name: string;
+    logoKey: StreamingLogoKey;
+    primaryColor: string;
+    secondaryColor: string;
+    soundIdentKey: StreamingSoundIdentKey;
+    brandPromiseId: StreamingBrandPromiseId;
+    publicManifesto: string;
+    dayOneMarketIds?: string[];
+    /** Legacy resume compatibility only; new founding drafts always keep this null. */
+    launchServerCityId: string | null;
+    updatedAtAbsoluteWeek: number;
+}
+
+export type OwnedStreamingIncorporationModel = 'FIXED_V7' | 'LEGACY_PRE_V7';
+
+export interface OwnedStreamingLegacyFoundingTerms {
+    launchScale: StreamingLaunchScale;
+    fundingPlan: StreamingFundingPlan;
+    launchBudget: number;
+    foundingExecutiveIds: string[];
+}
+
+export interface OwnedStreamingFoundingProfile {
+    incorporationModel: OwnedStreamingIncorporationModel;
+    founderCashCharged: number;
+    setupCostsConsumed: number;
+    openingTreasuryCash: number;
+    outsideCapitalRaisedAtIncorporation: number;
+    debtPrincipalAtIncorporation: number;
+    founderOwnershipPercentAtIncorporation: number;
+    founderWasCeoAtIncorporation: true;
+    incorporatedAtAbsoluteWeek: number;
+    legacyTerms?: OwnedStreamingLegacyFoundingTerms;
+}
+
+export type StreamingHqSection = 'HOME' | 'CONTENT' | 'TECH' | 'MARKET' | 'COMPANY';
+export type StreamingHqTourStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED' | 'SKIPPED';
+
+export type StreamingExecutiveRole =
+    | 'COO'
+    | 'CTO'
+    | 'CFO'
+    | 'CHIEF_CONTENT_OFFICER'
+    | 'PRODUCT_HEAD'
+    | 'MARKETING_HEAD'
+    | 'ADVERTISING_HEAD'
+    | 'INTERNATIONAL_HEAD'
+    | 'SECURITY_TRUST_HEAD';
+export type StreamingExecutiveAppointmentStatus = 'ACTIVE' | 'RESIGNED' | 'DISMISSED';
+export type StreamingExecutiveStrategy =
+    | 'GROWTH_FIRST'
+    | 'CREATIVE_FIRST'
+    | 'TECHNOLOGY_FIRST'
+    | 'MARGIN_FIRST'
+    | 'TRUST_FIRST'
+    | 'GLOBAL_FIRST'
+    | 'BALANCED';
+export type StreamingExecutiveLevel = 1 | 2 | 3 | 4 | 5;
+
+export interface OwnedStreamingExecutiveAppointment {
+    id: string;
+    executiveId: string;
+    role: StreamingExecutiveRole;
+    nameAtAppointment: string;
+    status: StreamingExecutiveAppointmentStatus;
+    origin: 'PLAYER_HIRED' | 'INTERNAL_PROMOTION' | 'LEGACY_FOUNDING';
+    appointedAtAbsoluteWeek: number;
+    endedAtAbsoluteWeek: number | null;
+    weeklyCompensation: number;
+    skill: number;
+    loyalty: number;
+    ambition: number;
+    ethics: number;
+    preferredStrategy: StreamingExecutiveStrategy;
+    founderRelationship: number;
+    internalRelationship: number;
+    performance: number;
+    level: StreamingExecutiveLevel;
+    experience: number;
+}
+
+export type StreamingExecutiveDevelopmentTrack =
+    | 'ROLE_MASTERY'
+    | 'FOUNDER_ALIGNMENT'
+    | 'ETHICS_TRUST'
+    | 'PERFORMANCE_COACHING';
+
+export interface OwnedStreamingExecutiveDevelopment {
+    id: string;
+    idempotencyKey: string;
+    executiveId: string;
+    track: StreamingExecutiveDevelopmentTrack;
+    status: 'IN_PROGRESS' | 'COMPLETED';
+    capitalCost: number;
+    developmentWeeks: number;
+    startedAtAbsoluteWeek: number;
+    readyAtAbsoluteWeek: number;
+    completedAtAbsoluteWeek: number | null;
+}
+
+export type StreamingIncidentPolicy = 'CONTAIN_FIRST' | 'TRANSPARENT_FIRST' | 'SERVICE_FIRST';
+
+export interface OwnedStreamingDelegationMandate {
+    maximumRightsBid: number;
+    minimumCapacityHeadroomPercent: number;
+    weeklyCampaignLimit: number;
+    renewalMinimumMarginPercent: number;
+    incidentPolicy: StreamingIncidentPolicy;
+    updatedAtAbsoluteWeek: number;
+}
+
+export interface OwnedStreamingLeadershipState {
+    currentCeo: {
+        holderType: 'FOUNDER' | 'EXECUTIVE';
+        executiveId: string | null;
+        sinceAbsoluteWeek: number;
+    };
+    appointments: OwnedStreamingExecutiveAppointment[];
+    developmentPrograms: OwnedStreamingExecutiveDevelopment[];
+    delegation: OwnedStreamingDelegationMandate;
+}
+
+export type StreamingBoardSeatType = 'INDEPENDENT' | 'INVESTOR_NOMINEE';
+export type StreamingBoardMotionId =
+    | 'RIGHTS_AUTHORITY'
+    | 'CAPACITY_GUARDRAIL'
+    | 'GROWTH_AUTHORITY'
+    | 'TRUST_CHARTER';
+
+export interface OwnedStreamingBoardDirector {
+    id: string;
+    candidateId: string;
+    name: string;
+    seatType: StreamingBoardSeatType;
+    status: 'ACTIVE' | 'DEPARTED';
+    preferredStrategy: StreamingExecutiveStrategy;
+    independence: number;
+    founderRelationship: number;
+    weeklyCompensation: number;
+    appointedAtAbsoluteWeek: number;
+    endedAtAbsoluteWeek: number | null;
+    linkedInvestorId: string | null;
+}
+
+export interface OwnedStreamingBoardVote {
+    directorId: string;
+    directorName: string;
+    vote: 'FOR' | 'AGAINST';
+    rationale: string;
+}
+
+export interface OwnedStreamingBoardMotion {
+    id: string;
+    idempotencyKey: string;
+    motionId: StreamingBoardMotionId;
+    title: string;
+    status: 'APPROVED' | 'REJECTED';
+    binding: boolean;
+    founderVote: 'FOR' | 'AGAINST';
+    votes: OwnedStreamingBoardVote[];
+    boardConfidenceDelta: number;
+    calledAtAbsoluteWeek: number;
+    resolvedAtAbsoluteWeek: number;
+    consequence: string;
+}
+
+export interface OwnedStreamingCelebrityInvestor {
+    id: string;
+    candidateId: string;
+    name: string;
+    status: 'ACCEPTED' | 'DECLINED';
+    investedCapital: number;
+    ownershipPercent: number;
+    boardSeatGranted: boolean;
+    profitParticipationPercent: number;
+    influenceDemand: string;
+    decisionAtAbsoluteWeek: number;
+}
+
+export interface OwnedStreamingGovernanceState {
+    boardConfidence: number;
+    directors: OwnedStreamingBoardDirector[];
+    motions: OwnedStreamingBoardMotion[];
+    celebrityInvestors: OwnedStreamingCelebrityInvestor[];
+}
+
+export type StreamingRivalStrategy =
+    | 'SCALE_DOMINANCE'
+    | 'PRESTIGE_FIRST'
+    | 'FRANCHISE_FORTRESS'
+    | 'AGILE_CURATOR'
+    | 'ATTENTION_ECOSYSTEM';
+
+export type StreamingRivalMoveType =
+    | 'COUNTER_PROGRAM'
+    | 'RIGHTS_OVERBID'
+    | 'EXECUTIVE_POACH'
+    | 'PRICE_CUT'
+    | 'BUNDLE_LAUNCH'
+    | 'RESCUE_CANCELLED_SHOW'
+    | 'ALLIANCE_SIGNAL';
+
+export type StreamingRivalMoveStatus =
+    | 'OPEN'
+    | 'MISFIRED'
+    | 'DEFENDED'
+    | 'ACCEPTED_PRESSURE'
+    | 'EXPIRED';
+
+export type StreamingRivalResponseId =
+    | 'STAY_COURSE'
+    | 'DEFEND_POSITION'
+    | 'COUNTER_PROGRAM'
+    | 'BACKCHANNEL'
+    | 'MATCH_PACKAGE'
+    | 'EXPAND_MANDATE'
+    | 'LET_DEPART';
+
+export interface OwnedStreamingRivalMemory {
+    respect: number;
+    resentment: number;
+    encounters: number;
+    rivalWins: number;
+    playerDefences: number;
+    lastMoveType: StreamingRivalMoveType | null;
+}
+
+export interface OwnedStreamingRivalProfile {
+    platformId: PlatformId;
+    platformName: string;
+    ceoName: string;
+    ceoPersonality: string;
+    strategy: StreamingRivalStrategy;
+    cashReserveMillions: number;
+    subscribersMillions: number;
+    technology: number;
+    catalogPower: number;
+    prestige: number;
+    aggression: number;
+    preferredGenres: string[];
+    preferredRegions: StreamingRegionId[];
+    cooldownUntilAbsoluteWeek: number;
+    lastMoveAbsoluteWeek: number | null;
+    mistakes: number;
+    memory: OwnedStreamingRivalMemory;
+}
+
+export interface OwnedStreamingRivalMove {
+    id: string;
+    idempotencyKey: string;
+    platformId: PlatformId;
+    platformName: string;
+    ceoName: string;
+    type: StreamingRivalMoveType;
+    title: string;
+    detail: string;
+    status: StreamingRivalMoveStatus;
+    cashCostMillions: number;
+    rivalCashBeforeMillions: number;
+    rivalCashAfterMillions: number;
+    createdAtAbsoluteWeek: number;
+    pressureStartsAbsoluteWeek: number;
+    expiresAtAbsoluteWeek: number;
+    acquisitionRateDelta: number;
+    churnRateDelta: number;
+    prestigeDelta: number;
+    targetExecutiveId: string | null;
+    targetExecutiveName: string | null;
+    responseId: StreamingRivalResponseId | null;
+    responseCost: number;
+    responseAtAbsoluteWeek: number | null;
+    outcomeNote: string;
+}
+
+export type StreamingRegionId =
+    | 'HOME_MARKET'
+    | 'NORTH_AMERICA'
+    | 'LATIN_AMERICA'
+    | 'EUROPE'
+    | 'SOUTH_ASIA'
+    | 'EAST_ASIA'
+    | 'MIDDLE_EAST_AFRICA';
+
+export type StreamingRegionalLaunchApproach =
+    | 'LOCAL_PARTNERSHIP'
+    | 'PREMIUM_ENTRY'
+    | 'MASS_MARKET';
+
+export interface OwnedStreamingRegionalLaunch {
+    id: string;
+    idempotencyKey: string;
+    regionId: StreamingRegionId;
+    regionName: string;
+    approach: StreamingRegionalLaunchApproach;
+    status: 'ACTIVE' | 'IN_PROGRESS';
+    capitalCost: number;
+    weeklyOperatingCost: number;
+    addressableAudienceMillions: number;
+    acquisitionRateDelta: number;
+    peakLoadPercent: number;
+    localizationDepth: number;
+    startedAtAbsoluteWeek: number;
+    readyAtAbsoluteWeek: number;
+    launchedAtAbsoluteWeek: number | null;
+}
+
+export interface OwnedStreamingMarketShareEntry {
+    id: PlatformId | 'PLAYER';
+    name: string;
+    subscribersMillions: number;
+    sharePercent: number;
+}
+
+export interface OwnedStreamingMarketShareSnapshot {
+    id: string;
+    absoluteWeek: number;
+    entries: OwnedStreamingMarketShareEntry[];
+}
+
+export type StreamingAwardCategoryId =
+    | 'PLATFORM_OF_THE_YEAR'
+    | 'ORIGINAL_OF_THE_YEAR'
+    | 'AUDIENCE_CHOICE'
+    | 'TECHNICAL_EXCELLENCE'
+    | 'GLOBAL_BREAKTHROUGH';
+
+export interface OwnedStreamingAwardNominee {
+    id: PlatformId | 'PLAYER';
+    name: string;
+    score: number;
+    evidence: string;
+}
+
+export interface OwnedStreamingAwardResult {
+    categoryId: StreamingAwardCategoryId;
+    categoryName: string;
+    nominees: OwnedStreamingAwardNominee[];
+    winnerId: PlatformId | 'PLAYER';
+    winnerName: string;
+    playerNominated: boolean;
+    playerWon: boolean;
+}
+
+export interface OwnedStreamingAwardSeason {
+    id: string;
+    idempotencyKey: string;
+    seasonNumber: number;
+    absoluteWeek: number;
+    results: OwnedStreamingAwardResult[];
+    playerNominations: number;
+    playerWins: number;
+}
+
+export interface OwnedStreamingCompetitiveWorldState {
+    initializedAtAbsoluteWeek: number | null;
+    lastSimulatedAbsoluteWeek: number | null;
+    rivalryHeat: number;
+    globalPrestige: number;
+    rivals: OwnedStreamingRivalProfile[];
+    moves: OwnedStreamingRivalMove[];
+    regionalLaunches: OwnedStreamingRegionalLaunch[];
+    marketShareHistory: OwnedStreamingMarketShareSnapshot[];
+    awardSeasons: OwnedStreamingAwardSeason[];
+}
+
+export type StreamingAcquisitionDealStructure = 'FULL_ACQUISITION' | 'STRATEGIC_MERGER';
+
+export type StreamingAcquisitionStatus =
+    | 'SCOUTED'
+    | 'VALUED'
+    | 'OFFER_COUNTERED'
+    | 'DILIGENCE'
+    | 'COUNTERBID'
+    | 'APPROVALS'
+    | 'APPROVAL_BLOCKED'
+    | 'REGULATORY_REVIEW'
+    | 'REGULATORY_BLOCKED'
+    | 'FINANCING'
+    | 'READY_TO_SIGN'
+    | 'SIGNED'
+    | 'WITHDRAWN';
+
+export type StreamingAcquisitionCommitmentId =
+    | 'SERVICE_CONTINUITY'
+    | 'EMPLOYEE_PROTECTION'
+    | 'CREATOR_GUARANTEE'
+    | 'DATA_SEPARATION';
+
+export type StreamingRegulatoryStrategy = 'CLEAN_COMMITMENTS' | 'ASSET_CARVEOUT' | 'CONTEST_REVIEW';
+
+export type StreamingAcquisitionFundingSource = 'TREASURY' | 'ACQUISITION_DEBT' | 'HYBRID';
+
+export type StreamingIntegrationMode =
+    | 'PRESERVE_BRAND'
+    | 'SUB_PLATFORM'
+    | 'MERGE_CATALOGS'
+    | 'BUNDLE'
+    | 'FULL_ABSORPTION'
+    | 'TECH_ONLY'
+    | 'CATALOG_ONLY'
+    | 'SUNSET_MIGRATE';
+
+export interface OwnedStreamingAcquisitionValuation {
+    standaloneValue: number;
+    subscriberValue: number;
+    catalogValue: number;
+    technologyValue: number;
+    brandValue: number;
+    strategicPremium: number;
+    debtAndLiabilities: number;
+    fairValue: number;
+    sellerFloor: number;
+    valuationCost: number;
+    valuedAtAbsoluteWeek: number;
+}
+
+export interface OwnedStreamingAcquisitionOffer {
+    dealStructure: StreamingAcquisitionDealStructure;
+    offeredPrice: number;
+    commitments: StreamingAcquisitionCommitmentId[];
+    sellerResponse: 'COUNTERED' | 'ACCEPTED';
+    sellerCounterPrice: number | null;
+    submittedAtAbsoluteWeek: number;
+    revision: number;
+}
+
+export interface OwnedStreamingDiligenceIssue {
+    id: string;
+    title: string;
+    detail: string;
+    severity: 'WATCH' | 'MATERIAL' | 'SEVERE';
+    valueImpact: number;
+    integrationRisk: number;
+}
+
+export interface OwnedStreamingDueDiligence {
+    commissionedCost: number;
+    issues: OwnedStreamingDiligenceIssue[];
+    adjustedFairValue: number;
+    verifiedDebt: number;
+    contentLiability: number;
+    technicalDebt: number;
+    churnExposure: number;
+    completedAtAbsoluteWeek: number;
+}
+
+export interface OwnedStreamingAcquisitionCounterbid {
+    bidderPlatformId: PlatformId;
+    bidderName: string;
+    bidderCeoName: string;
+    amount: number;
+    pursuitCostMillions: number;
+    playerRequiredBid: number;
+    status: 'OPEN' | 'BEATEN' | 'WON_BY_RIVAL';
+    createdAtAbsoluteWeek: number;
+    resolvedAtAbsoluteWeek: number | null;
+}
+
+export interface OwnedStreamingAcquisitionApproval {
+    binding: boolean;
+    status: 'APPROVED' | 'REJECTED';
+    founderVote: 'FOR';
+    votes: OwnedStreamingBoardVote[];
+    confidenceDelta: number;
+    commitments: StreamingAcquisitionCommitmentId[];
+    resolvedAtAbsoluteWeek: number;
+}
+
+export interface OwnedStreamingRegulatoryReview {
+    scrutinyScore: number;
+    strategy: StreamingRegulatoryStrategy;
+    status: 'CLEARED' | 'CLEARED_WITH_REMEDIES' | 'BLOCKED';
+    remedyCost: number;
+    subscriberRetentionPercent: number;
+    catalogRetentionPercent: number;
+    technologyRetentionPercent: number;
+    rationale: string;
+    resolvedAtAbsoluteWeek: number;
+}
+
+export interface OwnedStreamingAcquisitionFinancing {
+    source: StreamingAcquisitionFundingSource;
+    totalConsideration: number;
+    treasuryContribution: number;
+    debtPrincipal: number;
+    equityConsideration: number;
+    weeklyInterestRate: number;
+    lenderName: string | null;
+    founderOwnershipBefore: number;
+    founderOwnershipAfter: number;
+    lockedAtAbsoluteWeek: number;
+}
+
+export interface OwnedStreamingAcquisitionCase {
+    id: string;
+    idempotencyKey: string;
+    targetPlatformId: PlatformId;
+    targetPlatformName: string;
+    targetCeoName: string;
+    status: StreamingAcquisitionStatus;
+    openedAtAbsoluteWeek: number;
+    updatedAtAbsoluteWeek: number;
+    valuation: OwnedStreamingAcquisitionValuation | null;
+    offer: OwnedStreamingAcquisitionOffer | null;
+    diligence: OwnedStreamingDueDiligence | null;
+    counterbid: OwnedStreamingAcquisitionCounterbid | null;
+    approval: OwnedStreamingAcquisitionApproval | null;
+    regulatoryReview: OwnedStreamingRegulatoryReview | null;
+    financing: OwnedStreamingAcquisitionFinancing | null;
+    integrationMode: StreamingIntegrationMode | null;
+    finalPurchasePrice: number | null;
+    signedAtAbsoluteWeek: number | null;
+    acquiredSubscriberCount: number;
+    outcomeNote: string | null;
+}
+
+export interface OwnedStreamingAcquisitionIntegration {
+    id: string;
+    idempotencyKey: string;
+    acquisitionCaseId: string;
+    targetPlatformId: PlatformId;
+    targetPlatformName: string;
+    mode: StreamingIntegrationMode;
+    status: 'IN_PROGRESS' | 'INTEGRATED';
+    capitalReserve: number;
+    weeklyOperatingCost: number;
+    integrationWeeks: number;
+    subscriberRetentionPercent: number;
+    acquiredSubscriberCount: number;
+    catalogAssetCount: number;
+    technologyLevelDelta: number;
+    acquisitionRateDelta: number;
+    churnRateDelta: number;
+    reliabilityRisk: number;
+    startedAtAbsoluteWeek: number;
+    readyAtAbsoluteWeek: number;
+    completedAtAbsoluteWeek: number | null;
+}
+
+export interface OwnedStreamingCorporateDevelopmentState {
+    acquisitionCases: OwnedStreamingAcquisitionCase[];
+    integrations: OwnedStreamingAcquisitionIntegration[];
+    acquiredPlatformIds: PlatformId[];
+}
+
+export type StreamingPublicCompanyLifecycle = 'PRIVATE' | 'IPO_PREPARATION' | 'ROADSHOW' | 'PUBLIC';
+export type StreamingIpoNarrative = 'AUDIENCE_SCALE' | 'PROFITABLE_GROWTH' | 'TECHNOLOGY_NETWORK' | 'GLOBAL_ORIGINALS';
+export type StreamingGuidanceTone = 'CONSERVATIVE' | 'BALANCED' | 'AMBITIOUS';
+
+export interface OwnedStreamingIpoPlan {
+    ticker: string;
+    venueName: string;
+    narrative: StreamingIpoNarrative;
+    offerPercent: number;
+    targetCapital: number;
+    lowPrice: number;
+    highPrice: number;
+    institutionalDemandScore: number;
+    retailDemandScore: number;
+    roadshowStops: string[];
+    startedAtAbsoluteWeek: number;
+}
+
+export interface OwnedStreamingIpoJourney {
+    id: string;
+    idempotencyKey: string;
+    status: 'ACTIVE' | 'COMPLETED';
+    startedAtAbsoluteWeek: number;
+    updatedAtAbsoluteWeek: number;
+    lastProcessedAbsoluteWeek: number;
+    scene: string;
+    ask: number;
+    shares: number;
+    revision: number;
+    bankId: string | null;
+    marks: Array<{ id: string; label: string; short: string; bookCost: number }>;
+    omit: Record<string, boolean>;
+    answers: Record<string, 'FULL' | 'BRIEF' | 'RESTATE'>;
+    attempt: number;
+    diligenceWeeks: number;
+    cut: number;
+    lowPrice: number;
+    highPrice: number;
+    anchorDiscountAccepted: boolean | null;
+    employeeQuotaPercent: number;
+    interviewMove: number;
+    book: { cover: number; buckets: number[]; price: number; extended: boolean } | null;
+    closePrice: number;
+    ticker: string;
+}
+
+export interface OwnedStreamingListingRecord {
+    listedAtAbsoluteWeek: number;
+    ticker: string;
+    venueName: string;
+    offerPercent: number;
+    sharesOutstanding: number;
+    publicShares: number;
+    offerPrice: number;
+    capitalRaised: number;
+    founderOwnershipBefore: number;
+    founderOwnershipAfter: number;
+    preIpoShares: number;
+    newShares: number;
+    employeeQuotaPercent: number;
+    underwriterId: string;
+    underwriterName: string;
+    firmBook: boolean;
+    bookCoverage: number;
+    anchorDiscountAccepted: boolean;
+    governanceMarks: string[];
+    diligenceWeeks: number;
+    regulatorAttempts: number;
+}
+
+export interface OwnedStreamingMarketQuote {
+    id: string;
+    absoluteWeek: number;
+    open: number;
+    high: number;
+    low: number;
+    close: number;
+    volume: number;
+    marketCap: number;
+    changePercent: number;
+    drivers: string[];
+}
+
+export interface OwnedStreamingPublicGuidance {
+    id: string;
+    cycleNumber: number;
+    tone: StreamingGuidanceTone;
+    issuedAtAbsoluteWeek: number;
+    subscriberTarget: number;
+    revenueTarget: number;
+    cashContributionTarget: number;
+    playbackTarget: number;
+    status: 'ACTIVE' | 'RESOLVED';
+}
+
+export interface OwnedStreamingEarningsRecord {
+    id: string;
+    cycleNumber: number;
+    reportedAtAbsoluteWeek: number;
+    guidanceId: string | null;
+    outcome: 'BEAT' | 'MIXED' | 'MISS';
+    score: number;
+    subscriberActual: number;
+    revenueActual: number;
+    cashContributionActual: number;
+    playbackActual: number;
+    stockReactionPercent: number;
+    headline: string;
+}
+
+export type StreamingShareholderVoteType = 'DIRECTOR_MANDATE' | 'EXECUTIVE_PAY' | 'CAPITAL_AUTHORITY' | 'STRATEGIC_REVIEW';
+
+export interface OwnedStreamingShareholderVote {
+    id: string;
+    cycleNumber: number;
+    type: StreamingShareholderVoteType;
+    title: string;
+    summary: string;
+    status: 'OPEN' | 'APPROVED' | 'REJECTED';
+    createdAtAbsoluteWeek: number;
+    dueAtAbsoluteWeek: number;
+    institutionalSupport: number;
+    founderVote: 'FOR' | 'AGAINST' | null;
+    finalSupport: number | null;
+    consequence: string | null;
+}
+
+export type StreamingActivistDemand = 'MARGIN_DISCIPLINE' | 'SLATE_REFRESH' | 'BOARD_SEAT' | 'ASSET_REVIEW';
+
+export interface OwnedStreamingActivistCampaign {
+    id: string;
+    investorName: string;
+    ownershipPercent: number;
+    demand: StreamingActivistDemand;
+    status: 'ACTIVE' | 'NEGOTIATED' | 'DEFEATED' | 'ACCEPTED';
+    pressure: number;
+    openedAtAbsoluteWeek: number;
+    resolvedAtAbsoluteWeek: number | null;
+    response: 'ENGAGE' | 'REFUSE' | 'ACCEPT' | null;
+    consequence: string | null;
+}
+
+export type StreamingTakeoverDefence = 'INDEPENDENCE_CAMPAIGN' | 'WHITE_KNIGHT' | 'RIGHTS_PLAN' | 'NEGOTIATE';
+
+export interface OwnedStreamingHostileTakeover {
+    id: string;
+    bidderPlatformId: PlatformId;
+    bidderName: string;
+    offerPrice: number;
+    premiumPercent: number;
+    bidderSupportPercent: number;
+    status: 'ACTIVE' | 'DEFENDED' | 'SETTLED' | 'BIDDER_WITHDREW';
+    openedAtAbsoluteWeek: number;
+    resolvedAtAbsoluteWeek: number | null;
+    defence: StreamingTakeoverDefence | null;
+    consequence: string | null;
+}
+
+export interface OwnedStreamingPublicCompanyState {
+    lifecycle: StreamingPublicCompanyLifecycle;
+    ipoPlan: OwnedStreamingIpoPlan | null;
+    ipoJourney: OwnedStreamingIpoJourney | null;
+    listing: OwnedStreamingListingRecord | null;
+    quoteHistory: OwnedStreamingMarketQuote[];
+    guidance: OwnedStreamingPublicGuidance[];
+    earnings: OwnedStreamingEarningsRecord[];
+    shareholderVotes: OwnedStreamingShareholderVote[];
+    activistCampaigns: OwnedStreamingActivistCampaign[];
+    hostileTakeovers: OwnedStreamingHostileTakeover[];
+}
+
+export type StreamingCrisisType =
+    | 'PLATFORM_OUTAGE'
+    | 'ACCOUNT_BREACH'
+    | 'CONTENT_LEAK'
+    | 'RECOMMENDATION_BACKLASH'
+    | 'RIGHTS_COMPLIANCE'
+    | 'EMPLOYEE_ALLEGATION';
+
+export type StreamingCrisisSeverity = 'MINOR' | 'SERIOUS' | 'MAJOR' | 'CRITICAL';
+export type StreamingCrisisStage = 'DETECTED' | 'RECOVERING' | 'RESOLVED';
+export type StreamingCrisisCompensation = 'NONE' | 'TARGETED' | 'FULL';
+export type StreamingCrisisCommunication = 'HOLDING_STATEMENT' | 'FACTUAL_UPDATE' | 'FULL_DISCLOSURE';
+
+export interface OwnedStreamingCrisis {
+    id: string;
+    idempotencyKey: string;
+    type: StreamingCrisisType;
+    severity: StreamingCrisisSeverity;
+    stage: StreamingCrisisStage;
+    title: string;
+    detail: string;
+    cause: string;
+    detectedAtAbsoluteWeek: number;
+    affectedSubscribers: number;
+    estimatedRevenueAtRisk: number;
+    responseDoctrine: StreamingIncidentPolicy | null;
+    compensation: StreamingCrisisCompensation | null;
+    communication: StreamingCrisisCommunication | null;
+    responseCost: number;
+    weeklyRecoveryCost: number;
+    recoveryReadyAtAbsoluteWeek: number | null;
+    resolvedAtAbsoluteWeek: number | null;
+    outcomeNote: string | null;
+}
+
+export type StreamingShadowOperationType =
+    | 'INTELLIGENCE_PURCHASE'
+    | 'WHISPER_CAMPAIGN'
+    | 'CONTRACT_PRESSURE'
+    | 'COVERT_CONTENT_LEAK'
+    | 'CORPORATE_ESPIONAGE'
+    | 'SERVICE_DISRUPTION_ATTEMPT';
+
+export type StreamingShadowOperationStatus =
+    | 'EVIDENCE_PENDING'
+    | 'EXPOSED'
+    | 'CLEARED';
+
+export interface OwnedStreamingShadowOperation {
+    id: string;
+    idempotencyKey: string;
+    type: StreamingShadowOperationType;
+    targetPlatformId: PlatformId;
+    targetPlatformName: string;
+    status: StreamingShadowOperationStatus;
+    cashCost: number;
+    successEstimatePercent: number;
+    exposureRiskPercent: number;
+    expectedImpact: string;
+    committedAtAbsoluteWeek: number;
+    evidenceDueAtAbsoluteWeek: number;
+    succeeded: boolean;
+    outcomeNote: string;
+    exposureConsequence: string | null;
+}
+
+export type StreamingTrustInitiativeType =
+    | 'SECURITY_DRILL'
+    | 'WHISTLEBLOWER_CHANNEL'
+    | 'TRANSPARENCY_REPORT'
+    | 'INDEPENDENT_AUDIT';
+
+export interface OwnedStreamingTrustInitiative {
+    id: string;
+    idempotencyKey: string;
+    type: StreamingTrustInitiativeType;
+    title: string;
+    cashCost: number;
+    completedAtAbsoluteWeek: number;
+    outcomeNote: string;
+}
+
+export interface OwnedStreamingRegulatoryCase {
+    id: string;
+    idempotencyKey: string;
+    title: string;
+    status: 'OPEN' | 'CLOSED';
+    scrutinyAtOpening: number;
+    openedAtAbsoluteWeek: number;
+    response: 'COOPERATE' | 'CONTEST' | 'REMEDIATE' | null;
+    responseCost: number;
+    resolvedAtAbsoluteWeek: number | null;
+    outcomeNote: string | null;
+}
+
+export interface OwnedStreamingWhistleblowerReport {
+    id: string;
+    idempotencyKey: string;
+    title: string;
+    allegation: string;
+    status: 'OPEN' | 'RESOLVED';
+    sourceConfidence: number;
+    openedAtAbsoluteWeek: number;
+    response: 'PROTECT_AND_INVESTIGATE' | 'DISCREDIT' | 'DISCLOSE' | null;
+    responseCost: number;
+    resolvedAtAbsoluteWeek: number | null;
+    outcomeNote: string | null;
+}
+
+export interface OwnedStreamingCrisisSecurityState {
+    publicTrust: number;
+    regulatoryScrutiny: number;
+    employeeLoyalty: number;
+    evidenceTrail: number;
+    securityPressure: number;
+    lastEvaluatedAbsoluteWeek: number | null;
+    crises: OwnedStreamingCrisis[];
+    shadowOperations: OwnedStreamingShadowOperation[];
+    trustInitiatives: OwnedStreamingTrustInitiative[];
+    regulatoryCases: OwnedStreamingRegulatoryCase[];
+    whistleblowerReports: OwnedStreamingWhistleblowerReport[];
+}
+
+export type StreamingCapitalActionType =
+    | 'INCORPORATION'
+    | 'FOUNDER_CONTRIBUTION'
+    | 'LOAN_DRAW'
+    | 'LOAN_REPAYMENT'
+    | 'EQUITY_ISSUANCE';
+
+export interface OwnedStreamingCapitalAction {
+    id: string;
+    idempotencyKey: string;
+    type: StreamingCapitalActionType;
+    absoluteWeek: number;
+    amount: number;
+    treasuryDelta: number;
+    personalCashDelta: number;
+    debtDelta: number;
+    ownershipBefore: number;
+    ownershipAfter: number;
+}
+
+export interface OwnedStreamingLoanPosition {
+    id: string;
+    lenderName: string;
+    status: 'ACTIVE' | 'REPAID' | 'LEGACY_NO_TERMS';
+    principal: number;
+    outstandingPrincipal: number;
+    weeklyInterestRate: number;
+    openedAtAbsoluteWeek: number;
+}
+
+export interface OwnedStreamingEquityPosition {
+    id: string;
+    holderName: string;
+    ownershipPercent: number;
+    investedCapital: number;
+    issuedAtAbsoluteWeek: number;
+}
+
+export interface OwnedStreamingFinanceState {
+    capitalActions: OwnedStreamingCapitalAction[];
+    loans: OwnedStreamingLoanPosition[];
+    equityHolders: OwnedStreamingEquityPosition[];
+}
+
+export interface OwnedStreamingHqOnboardingState {
+    status: StreamingHqTourStatus;
+    currentStep: number;
+    visitedSections: StreamingHqSection[];
+    startedAtAbsoluteWeek: number | null;
+    completedAtAbsoluteWeek: number | null;
+}
+
+export type StreamingCapacityPackageId = 'STARTER' | 'ESSENTIAL' | 'GROWTH' | 'PREMIERE';
+export type StreamingInfrastructureRolloutPace = 'SAFE' | 'STANDARD' | 'RUSHED';
+export type StreamingSubscriptionTierId = 'BASIC' | 'PREMIUM' | 'FAMILY';
+export type StreamingLoadTestStatus = 'PASS' | 'CONDITIONAL' | 'FAIL';
+export type StreamingNetworkNodeRole = 'CORE_ORIGIN' | 'REGIONAL_HUB' | 'EDGE_CACHE';
+
+export interface OwnedStreamingNetworkPlacement {
+    cityId: string;
+    racks: number;
+    role: StreamingNetworkNodeRole;
+}
+
+export interface OwnedStreamingInfrastructureSetupDraft {
+    currentStep: number;
+    strategy: Exclude<StreamingInfrastructureStrategy, 'UNDECIDED'>;
+    capacityPackageId: StreamingCapacityPackageId;
+    rolloutPace: StreamingInfrastructureRolloutPace;
+    subscriptionPrices: Record<StreamingSubscriptionTierId, number>;
+    /** Physical network plan. The first core origin normally comes from founding. */
+    networkPlacements: OwnedStreamingNetworkPlacement[];
+    lastLoadTestSignature: string | null;
+    updatedAtAbsoluteWeek: number;
+}
+
+export interface OwnedStreamingLoadTestSnapshot {
+    configurationSignature: string;
+    forecastLowConcurrentStreams: number;
+    forecastLikelyConcurrentStreams: number;
+    forecastHighConcurrentStreams: number;
+    testedBurstCapacity: number;
+    headroomPercent: number;
+    status: StreamingLoadTestStatus;
+    driverKeys: string[];
+    completedAtAbsoluteWeek: number;
+}
+
+export interface OwnedStreamingInfrastructureSetup {
+    capacityPackageId: StreamingCapacityPackageId;
+    rolloutPace: StreamingInfrastructureRolloutPace;
+    storageCapacityHours: number;
+    reliabilityTarget: number;
+    weeklyOperatingCost: number;
+    staffRequired: number;
+    capitalInvested: number;
+    technicalDebt: number;
+    networkPlacements: OwnedStreamingNetworkPlacement[];
+    readyAtAbsoluteWeek: number;
+    revision: number;
+    committedAtAbsoluteWeek: number;
+    loadTest: OwnedStreamingLoadTestSnapshot;
+}
+
+export type StreamingTechnologyCampusBranch =
+    | 'DELIVERY_CAPACITY'
+    | 'PLAYBACK_QUALITY'
+    | 'RELIABILITY'
+    | 'DATA_RECOMMENDATIONS'
+    | 'SECURITY'
+    | 'CONTENT_OPERATIONS';
+export type StreamingTechnologyBuildMode = 'HARDENED' | 'BALANCED' | 'SPRINT';
+export type StreamingTechnologyProjectStatus = 'UNDER_CONSTRUCTION' | 'COMPLETED';
+export type StreamingTechnologyRisk = 'LOW' | 'MODERATE' | 'HIGH';
+
+export interface OwnedStreamingTechnologyBenefit {
+    baselineConcurrentStreamsDelta: number;
+    burstConcurrentStreamsDelta: number;
+    reliabilityDelta: number;
+    playbackQualityDelta: number;
+    recommendationDelta: number;
+    securityDelta: number;
+    contentOperationsDelta: number;
+}
+
+export interface OwnedStreamingTechnologyProject {
+    id: string;
+    idempotencyKey: string;
+    definitionId: string;
+    branch: StreamingTechnologyCampusBranch;
+    title: string;
+    targetLevel: number;
+    buildMode: StreamingTechnologyBuildMode;
+    status: StreamingTechnologyProjectStatus;
+    capitalCost: number;
+    weeklyOperatingCostDelta: number;
+    staffRequired: number;
+    constructionWeeks: number;
+    benefit: OwnedStreamingTechnologyBenefit;
+    risk: StreamingTechnologyRisk;
+    riskNote: string;
+    technicalDebtDelta: number;
+    startedAtAbsoluteWeek: number;
+    readyAtAbsoluteWeek: number;
+    completedAtAbsoluteWeek: number | null;
+}
+
+export type StreamingStarterCatalogPackageId = 'CURATED_PREMIERE' | 'BROAD_APPEAL' | 'PRESTIGE_VAULT';
+export type StreamingLicenseTerritory = 'DOMESTIC' | 'MULTI_REGION' | 'GLOBAL';
+export type StreamingLicenseExclusivity = 'NON_EXCLUSIVE' | 'EXCLUSIVE';
+export type StreamingCatalogNegotiationStatus = 'BUILDING' | 'COUNTERED' | 'READY_TO_SIGN';
+export type StreamingCatalogLicenseStatus = 'ACTIVE' | 'EXPIRED' | 'TERMINATED';
+export type StreamingRightsSellerType = 'STUDIO' | 'PLATFORM';
+export type StreamingRightsWindowType = 'FIRST_WINDOW' | 'SECOND_WINDOW' | 'PERMANENT';
+export type StreamingRightsNegotiationKind = 'ACQUIRE' | 'RENEW' | 'SUBLICENSE_OUT';
+export type StreamingRightsNegotiationStatus =
+    | 'OPEN'
+    | 'COUNTERED'
+    | 'READY_TO_SIGN'
+    | 'SIGNED'
+    | 'LOST'
+    | 'WITHDRAWN'
+    | 'EXPIRED';
+export type StreamingRightsChangeOfControl = 'NONE' | 'NOTICE' | 'CONSENT_REQUIRED';
+export type StreamingRightsObligationType = 'MARKETING_SPEND' | 'VIEWERSHIP_THRESHOLD';
+export type StreamingRightsObligationStatus = 'PENDING' | 'ON_TRACK' | 'SATISFIED' | 'BREACHED';
+
+export interface OwnedStreamingCatalogSetupDraft {
+    currentStep: number;
+    selectedOwnedProjectIds: string[];
+    packageId: StreamingStarterCatalogPackageId;
+    opportunityProjectId: string | null;
+    territory: StreamingLicenseTerritory;
+    durationWeeks: number;
+    exclusivity: StreamingLicenseExclusivity;
+    minimumGuarantee: number;
+    platformRevenueShare: number;
+    negotiationStatus: StreamingCatalogNegotiationStatus;
+    counterMinimumGuarantee: number | null;
+    counterPlatformRevenueShare: number | null;
+    negotiationRound: number;
+    updatedAtAbsoluteWeek: number;
+}
+
+export interface OwnedStreamingStarterCatalog {
+    packageId: StreamingStarterCatalogPackageId;
+    ownedProjectIds: string[];
+    licensedProjectIds: string[];
+    establishedAtAbsoluteWeek: number;
+}
+
+export interface OwnedStreamingCatalogLicense {
+    id: string;
+    sourceProjectId: string;
+    titleAtSigning: string;
+    projectType?: 'MOVIE' | 'SERIES';
+    genre?: string;
+    licensorName: string;
+    territory: StreamingLicenseTerritory;
+    durationWeeks: number;
+    exclusivity: StreamingLicenseExclusivity;
+    minimumGuarantee: number;
+    platformRevenueShare: number;
+    licensorRevenueShare: number;
+    signedAtAbsoluteWeek: number;
+    startsAtAbsoluteWeek: number;
+    expiresAtAbsoluteWeek: number;
+    status: StreamingCatalogLicenseStatus;
+    origin?: 'STARTER' | 'STUDIO_MARKET' | 'PLATFORM_TRADE' | 'RENEWAL';
+    sellerType?: StreamingRightsSellerType;
+    sellerPlatformId?: PlatformId | null;
+    windowType?: StreamingRightsWindowType;
+    permanentPurchase?: boolean;
+    marketingGuarantee?: number;
+    viewershipBonusThreshold?: number;
+    viewershipBonusAmount?: number;
+    renewalOption?: boolean;
+    sublicensingAllowed?: boolean;
+    sequelRightsIncluded?: boolean;
+    changeOfControl?: StreamingRightsChangeOfControl;
+    cancellationPenalty?: number;
+    renewedFromLicenseId?: string | null;
+}
+
+export interface OwnedStreamingRightsNegotiation {
+    id: string;
+    idempotencyKey: string;
+    kind: StreamingRightsNegotiationKind;
+    sourceProjectId: string;
+    sourceLicenseId: string | null;
+    title: string;
+    projectType: 'MOVIE' | 'SERIES';
+    genre: string;
+    sellerType: StreamingRightsSellerType;
+    sellerId: string;
+    sellerName: string;
+    buyerPlatformId: PlatformId | null;
+    buyerName: string | null;
+    territory: StreamingLicenseTerritory;
+    durationWeeks: number;
+    exclusivity: StreamingLicenseExclusivity;
+    windowType: StreamingRightsWindowType;
+    minimumGuarantee: number;
+    platformRevenueShare: number;
+    marketingGuarantee: number;
+    viewershipBonusThreshold: number;
+    viewershipBonusAmount: number;
+    renewalOption: boolean;
+    sublicensingAllowed: boolean;
+    sequelRightsIncluded: boolean;
+    changeOfControl: StreamingRightsChangeOfControl;
+    cancellationPenalty: number;
+    rivalPlatformId: PlatformId | null;
+    rivalPlatformName: string | null;
+    rivalBidAmount: number;
+    marketHeat: 'COOL' | 'ACTIVE' | 'HOT';
+    status: StreamingRightsNegotiationStatus;
+    round: number;
+    counterMinimumGuarantee: number | null;
+    counterPlatformRevenueShare: number | null;
+    createdAtAbsoluteWeek: number;
+    updatedAtAbsoluteWeek: number;
+    expiresAtAbsoluteWeek: number;
+}
+
+export interface OwnedStreamingSublicenseDeal {
+    id: string;
+    sourceLicenseId: string;
+    sourceProjectId: string;
+    title: string;
+    buyerPlatformId: PlatformId;
+    buyerName: string;
+    territory: StreamingLicenseTerritory;
+    durationWeeks: number;
+    exclusivity: StreamingLicenseExclusivity;
+    upfrontFee: number;
+    sellerRevenueShare: number;
+    buyerRevenueShare: number;
+    signedAtAbsoluteWeek: number;
+    startsAtAbsoluteWeek: number;
+    expiresAtAbsoluteWeek: number;
+    status: 'ACTIVE' | 'EXPIRED' | 'TERMINATED';
+    changeOfControl: StreamingRightsChangeOfControl;
+    cancellationPenalty: number;
+}
+
+export interface OwnedStreamingRightsObligation {
+    id: string;
+    licenseId: string;
+    sourceProjectId: string;
+    title: string;
+    type: StreamingRightsObligationType;
+    targetAmount: number;
+    observedAmount: number;
+    dueAtAbsoluteWeek: number;
+    status: StreamingRightsObligationStatus;
+    breachPenalty: number;
+    successPayment: number;
+    resolvedAtAbsoluteWeek: number | null;
+}
+
+export type StreamingOriginalGapId =
+    | 'SERIES_RETENTION'
+    | 'GENRE_WHITE_SPACE'
+    | 'PRESTIGE_ANCHOR'
+    | 'BROAD_AUDIENCE';
+export type StreamingOriginalCommissionStatus = 'READY_FOR_GREENLIGHT' | 'GREENLIT' | 'IN_PRODUCTION' | 'DELIVERED' | 'RELEASED';
+export type StreamingOriginalReleasePattern = 'SINGLE_PREMIERE' | 'FULL_SEASON' | 'WEEKLY' | 'SPLIT_VOLUME';
+export type StreamingSlateMarketingPlan = 'LEAN' | 'STANDARD' | 'EVENT';
+export type StreamingSlateEntrySource = 'ORIGINAL' | 'OWNED_LIBRARY' | 'LICENSED_WINDOW';
+export type StreamingOriginalStrategy =
+    | 'EVENT_BLOCKBUSTER'
+    | 'WEEKLY_RETENTION'
+    | 'PRESTIGE_LIMITED'
+    | 'REGIONAL_BREAKOUT'
+    | 'KIDS_EVERGREEN'
+    | 'REALITY_ENGAGEMENT'
+    | 'DOCUMENTARY_HALO'
+    | 'EXPERIMENTAL_CULT';
+export type StreamingOriginalLocalizationPackage = 'DOMESTIC' | 'MULTI_REGION' | 'GLOBAL';
+export type StreamingOriginalReleaseScope = 'DOMESTIC' | 'MULTI_REGION' | 'GLOBAL';
+export type StreamingOriginalLifecycleDecisionType = 'RENEW' | 'CANCEL' | 'LICENSE_WINDOW' | 'FRANCHISE';
+
+export interface OwnedStreamingOriginalContract {
+    platformRightsPercent: number;
+    producerBackendPercent: number;
+    exclusiveWindowWeeks: number;
+    sequelRightsIncluded: boolean;
+}
+
+export interface OwnedStreamingOriginalLocalization {
+    packageId: StreamingOriginalLocalizationPackage;
+    subtitleLanguageCount: number;
+    dubbedLanguageCount: number;
+    cashCost: number;
+    committedAtAbsoluteWeek: number;
+    readyAtAbsoluteWeek: number;
+}
+
+export interface OwnedStreamingOriginalReleasePlan {
+    scope: StreamingOriginalReleaseScope;
+    releasePattern: StreamingOriginalReleasePattern;
+    marketingPlan: StreamingSlateMarketingPlan;
+    premiereAtAbsoluteWeek: number;
+    authorizedAtAbsoluteWeek: number;
+}
+
+export interface OwnedStreamingOriginalLifecycleDecision {
+    id: string;
+    type: StreamingOriginalLifecycleDecisionType;
+    decidedAtAbsoluteWeek: number;
+    evidenceWeeks: number;
+    evidenceSummary: string;
+    exclusiveWindowWeeks: number | null;
+}
+
+export interface OwnedStreamingOriginalCommissionDraft {
+    currentStep: number;
+    gapId: StreamingOriginalGapId;
+    title: string;
+    projectType: ProjectType;
+    genre: Genre;
+    episodes: number;
+    targetAudience: TargetAudience;
+    producerStudioId: string | null;
+    productionBudgetCap: number;
+    updatedAtAbsoluteWeek: number;
+    strategy?: StreamingOriginalStrategy;
+    platformRightsPercent?: number;
+    exclusiveWindowWeeks?: number;
+    sequelRightsIncluded?: boolean;
+    parentCommissionId?: string | null;
+    lineageId?: string | null;
+    seasonNumber?: number;
+}
+
+export interface OwnedStreamingOriginalCommission {
+    id: string;
+    scriptId: string;
+    canonicalProjectId: string | null;
+    title: string;
+    gapId: StreamingOriginalGapId;
+    projectType: ProjectType;
+    genre: Genre;
+    episodes: number;
+    producerStudioId: string;
+    producerStudioName: string;
+    commissionedByPlatformName: string;
+    productionBudgetCap: number;
+    productionFundingApplied: number;
+    status: StreamingOriginalCommissionStatus;
+    commissionedAtAbsoluteWeek: number;
+    greenlitAtAbsoluteWeek: number | null;
+    strategy?: StreamingOriginalStrategy;
+    parentCommissionId?: string | null;
+    lineageId?: string;
+    seasonNumber?: number;
+    contract?: OwnedStreamingOriginalContract;
+    localization?: OwnedStreamingOriginalLocalization | null;
+    releasePlan?: OwnedStreamingOriginalReleasePlan | null;
+    lifecycleDecision?: OwnedStreamingOriginalLifecycleDecision | null;
+}
+
+export interface OwnedStreamingSlateEntry {
+    id: string;
+    projectId: string;
+    title: string;
+    source: StreamingSlateEntrySource;
+    projectType: ProjectType;
+    genre: string;
+    launchWeek: number;
+    releasePattern: StreamingOriginalReleasePattern;
+    marketingPlan: StreamingSlateMarketingPlan;
+}
+
+export interface OwnedStreamingLaunchSlate {
+    entries: OwnedStreamingSlateEntry[];
+    programmedAtAbsoluteWeek: number;
+    revision: number;
+}
+
+export type StreamingLaunchCapacityPlan = 'STANDARD' | 'CLOUD_BURST' | 'STAGGERED_PREMIERE';
+export type StreamingLaunchOutcomeTier = 'SMOOTH_OPENING' | 'PRESSURED_OPENING' | 'DEGRADED_OPENING';
+
+/**
+ * Immutable Phase 8 launch-night facts. Phase 9 may present and expand these
+ * results, but it must never reroll them when a cinematic is skipped/replayed.
+ */
+export interface OwnedStreamingLaunchCommit {
+    id: string;
+    idempotencyKey: string;
+    committedAtAbsoluteWeek: number;
+    capacityPlan: StreamingLaunchCapacityPlan;
+    capacityPlanCost: number;
+    readinessScore: number;
+    forecastLikelyConcurrentStreams: number;
+    forecastHighConcurrentStreams: number;
+    protectedPeakConcurrentStreams: number;
+    launchHeadroomPercent: number;
+    initialSubscribers: number;
+    openingDemandIndex: number;
+    playbackSuccessRate: number;
+    outcomeTier: StreamingLaunchOutcomeTier;
+    openingTitleCount: number;
+    openingOriginalTitle: string;
+}
+
+export interface OwnedStreamingPlatformMetrics {
+    subscribers: number;
+    netSubscriberMovement: number;
+    churnRate: number;
+    engagementRate: number;
+    averageRevenuePerUser: number;
+    cashRunwayWeeks: number;
+    technologyHealth: number;
+}
+
+export type StreamingWeeklyPlanId =
+    | 'AUDIENCE_PUSH'
+    | 'RELIABILITY_GUARD'
+    | 'RETENTION_SPOTLIGHT';
+
+export interface OwnedStreamingWeeklyDecision {
+    id: string;
+    idempotencyKey: string;
+    planId: StreamingWeeklyPlanId;
+    label: string;
+    selectedAtAbsoluteWeek: number;
+    targetAbsoluteWeek: number;
+    cashCost: number;
+    status: 'LOCKED' | 'APPLIED';
+    appliedAtAbsoluteWeek: number | null;
+    outcomeNote: string | null;
+}
+
+export type StreamingCampaignChannelId = 'TRAILER' | 'BILLBOARD' | 'SOCIAL' | 'REGIONAL';
+export type StreamingHomepagePlacement = 'NONE' | 'HERO' | 'TOP_TEN' | 'GENRE_SPOTLIGHT';
+export type StreamingRecommendationObjective = 'BALANCED' | 'RETENTION' | 'CATALOG_DISCOVERY' | 'BREAKOUT';
+export type StreamingArtworkVariant = 'FACE_FORWARD' | 'WORLD_BUILDING' | 'MYSTERY_HOOK';
+
+export interface OwnedStreamingGrowthAttribution {
+    attributedViewingAccounts: number;
+    attributedJoins: number;
+    costPerAttributedJoin: number | null;
+    artworkWinner: StreamingArtworkVariant | null;
+    artworkWinnerLiftPercent: number | null;
+    observedDiscoveryMix: OwnedStreamingTitleDiscoveryMix | null;
+    summary: string;
+}
+
+export interface OwnedStreamingGrowthAction {
+    id: string;
+    idempotencyKey: string;
+    projectId: string;
+    title: string;
+    selectedAtAbsoluteWeek: number;
+    targetAbsoluteWeek: number;
+    channels: StreamingCampaignChannelId[];
+    homepagePlacement: StreamingHomepagePlacement;
+    recommendationObjective: StreamingRecommendationObjective;
+    explorationPercent: number;
+    artworkVariants: StreamingArtworkVariant[];
+    cashCost: number;
+    status: 'LOCKED' | 'APPLIED';
+    appliedAtAbsoluteWeek: number | null;
+    outcome: OwnedStreamingGrowthAttribution | null;
+}
+
+export interface OwnedStreamingWeeklyCausalDriver {
+    id: string;
+    label: string;
+    detail: string;
+    impact: 'POSITIVE' | 'NEGATIVE' | 'NEUTRAL';
+}
+
+export interface OwnedStreamingWeeklyOperations {
+    programWeek: number;
+    releaseTitles: string[];
+    joinedSubscribers: number;
+    cancellations: number;
+    reactivations: number;
+    subscriptionRevenue: number;
+    partnerRevenueShareCost: number;
+    infrastructureCost: number;
+    leadershipCost: number;
+    financingCost: number;
+    weeklyPlanCost: number;
+    growthPlanCost?: number;
+    rightsComplianceCost?: number;
+    technologyCampusCost?: number;
+    productSuiteCost?: number;
+    productRevenue?: number;
+    productPeakLoadPercent?: number;
+    governanceCost?: number;
+    competitiveOperationsCost?: number;
+    acquisitionIntegrationCost?: number;
+    crisisRecoveryCost?: number;
+    totalCashCost: number;
+    netCashContribution: number;
+    contentAmortization: number;
+    accountingContribution: number;
+    peakConcurrentStreams: number;
+    capacityUtilizationPercent: number;
+    playbackSuccessRate: number;
+    appliedDecisionId: string | null;
+    appliedGrowthActionId?: string | null;
+    headline: string;
+    summary: string;
+    nextWeekHook: string;
+    causalDrivers: OwnedStreamingWeeklyCausalDriver[];
+    titlePerformance?: OwnedStreamingTitleWeekPerformance[];
+}
+
+export interface OwnedStreamingTitleDiscoveryMix {
+    homepagePercent: number;
+    recommendationsPercent: number;
+    searchPercent: number;
+    directPercent: number;
+}
+
+export interface OwnedStreamingTitleWeekPerformance {
+    id: string;
+    projectId: string;
+    title: string;
+    source: StreamingSlateEntrySource;
+    projectType: ProjectType;
+    genre: string;
+    absoluteWeek: number;
+    programWeek: number;
+    weeksAvailable: number;
+    viewingAccounts: number;
+    hoursViewed: number;
+    completionRate: number;
+    repeatViewingRate: number;
+    satisfactionScore: number;
+    discoveryMix: OwnedStreamingTitleDiscoveryMix;
+    attributedSubscriptionRevenue: number;
+    allocatedCashCost: number;
+    allocatedContentAmortization: number;
+    cashContribution: number;
+    accountingContribution: number;
+    playbackSuccessRate: number;
+}
+
+export interface OwnedStreamingWeeklySnapshot extends OwnedStreamingPlatformMetrics {
+    id: string;
+    absoluteWeek: number;
+    causeMarkers: string[];
+    operations?: OwnedStreamingWeeklyOperations;
+}
+
+export type StreamingCycleReviewKind = 'FOUR_WEEK_BEAT' | 'TWELVE_WEEK_REVIEW';
+export type StreamingStrategicIdentity =
+    | 'AUDIENCE_HUNTER'
+    | 'RETENTION_HOUSE'
+    | 'RELIABLE_OPERATOR'
+    | 'EVENT_DESTINATION'
+    | 'CASH_COMPOUNDER'
+    | 'BALANCED_SERVICE'
+    | 'FRAGILE_MOMENTUM';
+export type StreamingCyclePerformanceTier = 'BREAKOUT' | 'GROWING' | 'STEADY' | 'UNDER_PRESSURE';
+export type StreamingTechnicalVerdict = 'RESILIENT' | 'HEALTHY' | 'WATCH_LOAD' | 'AT_RISK';
+export type StreamingRivalPressure = 'LOW' | 'MEDIUM' | 'HIGH';
+
+export interface OwnedStreamingRivalMovement {
+    platformId: PlatformId;
+    platformName: string;
+    pressure: StreamingRivalPressure;
+    signal: string;
+}
+
+export interface OwnedStreamingCycleReview {
+    id: string;
+    idempotencyKey: string;
+    ledgerFactId: string;
+    kind: StreamingCycleReviewKind;
+    cycleNumber: number;
+    startAbsoluteWeek: number;
+    endAbsoluteWeek: number;
+    weeksIncluded: number;
+    strategicIdentity: StreamingStrategicIdentity;
+    performanceTier: StreamingCyclePerformanceTier;
+    subscriberStart: number;
+    subscriberEnd: number;
+    subscriberNetMovement: number;
+    averageChurnRate: number;
+    averageEngagementRate: number;
+    averagePlaybackSuccessRate: number;
+    peakCapacityUtilizationPercent: number;
+    totalSubscriptionRevenue: number;
+    totalCashContribution: number;
+    totalAccountingContribution: number;
+    technicalVerdict: StreamingTechnicalVerdict;
+    rivalMovement: OwnedStreamingRivalMovement;
+    hits: string[];
+    misses: string[];
+    headline: string;
+    boardVerdict: string;
+    nextMandate: string;
+    acknowledgedAtAbsoluteWeek: number | null;
+}
+
+export type StreamingLegacyIdentity =
+    | 'AUDIENCE_ARCHITECT'
+    | 'ORIGINALS_TITAN'
+    | 'TECHNOLOGY_PIONEER'
+    | 'GLOBAL_BRIDGE'
+    | 'TRUSTED_STEWARD'
+    | 'CORPORATE_STRATEGIST'
+    | 'COMEBACK_BUILDER'
+    | 'BALANCED_EMPIRE';
+
+export type StreamingEraMandate =
+    | 'BALANCED'
+    | 'AUDIENCE_GROWTH'
+    | 'ORIGINALS_PRESTIGE'
+    | 'TECHNOLOGY_LEADERSHIP'
+    | 'GLOBAL_EXPANSION'
+    | 'TRUST_AND_RESILIENCE'
+    | 'CASH_DISCIPLINE';
+
+export type StreamingFounderOfficeRole =
+    | 'FOUNDER_CEO'
+    | 'EXECUTIVE_CHAIR'
+    | 'FOUNDER_EMERITUS';
+
+export interface OwnedStreamingSuccessionPlan {
+    id: string;
+    candidateType: 'EXECUTIVE' | 'FAMILY_HEIR';
+    candidateId: string;
+    candidateName: string;
+    readinessScore: number;
+    selectedAtAbsoluteWeek: number;
+    mandate: StreamingEraMandate;
+    status: 'DESIGNATED' | 'TRANSITIONED';
+}
+
+export interface OwnedStreamingCompanyEra {
+    id: string;
+    eraNumber: number;
+    title: string;
+    leaderName: string;
+    leaderType: 'FOUNDER' | 'EXECUTIVE' | 'FAMILY_HEIR';
+    mandate: StreamingEraMandate;
+    legacyIdentity: StreamingLegacyIdentity;
+    startedAtAbsoluteWeek: number;
+    endedAtAbsoluteWeek: number;
+    closingReason: 'FOUNDER_TRANSITION' | 'GENERATION_HANDOFF' | 'NEW_MANDATE';
+    subscriberStart: number;
+    subscriberEnd: number;
+    treasuryEnd: number;
+    globalPrestigeEnd: number;
+    publicTrustEnd: number;
+    highlightFactIds: string[];
+}
+
+export interface OwnedStreamingLegacyMontageChapter {
+    id: string;
+    title: string;
+    caption: string;
+    absoluteWeek: number;
+    factId: string;
+}
+
+export interface OwnedStreamingLegacyMontage {
+    id: string;
+    idempotencyKey: string;
+    eraNumber: number;
+    createdAtAbsoluteWeek: number;
+    identity: StreamingLegacyIdentity;
+    title: string;
+    chapters: OwnedStreamingLegacyMontageChapter[];
+}
+
+export interface OwnedStreamingLegacyState {
+    founderOfficeRole: StreamingFounderOfficeRole;
+    currentEraNumber: number;
+    currentEraStartedAtAbsoluteWeek: number;
+    currentMandate: StreamingEraMandate;
+    successionPlan: OwnedStreamingSuccessionPlan | null;
+    closedEras: OwnedStreamingCompanyEra[];
+    montages: OwnedStreamingLegacyMontage[];
+    endlessMode: boolean;
+    transitionCount: number;
+}
+
+export type OwnedStreamingLedgerEventType =
+    | 'FOUNDATION_CREATED'
+    | 'FOUNDER_CAPITAL_CONTRIBUTED'
+    | 'LOAN_DRAWN'
+    | 'LOAN_REPAID'
+    | 'EQUITY_ISSUED'
+    | 'EXECUTIVE_APPOINTED'
+    | 'EXECUTIVE_DEPARTED'
+    | 'EXECUTIVE_DEVELOPMENT_STARTED'
+    | 'EXECUTIVE_DEVELOPMENT_COMPLETED'
+    | 'DELEGATION_MANDATE_UPDATED'
+    | 'BOARD_DIRECTOR_APPOINTED'
+    | 'BOARD_VOTE_RESOLVED'
+    | 'CELEBRITY_INVESTMENT_ACCEPTED'
+    | 'RIVAL_MOVE_COMMITTED'
+    | 'RIVAL_MOVE_RESPONDED'
+    | 'REGIONAL_LAUNCH_STARTED'
+    | 'REGIONAL_LAUNCH_COMPLETED'
+    | 'MARKET_SHARE_COMMITTED'
+    | 'STREAMING_AWARDS_RESOLVED'
+    | 'ACQUISITION_SCOUTED'
+    | 'ACQUISITION_VALUED'
+    | 'ACQUISITION_OFFER_SUBMITTED'
+    | 'ACQUISITION_DILIGENCE_COMPLETED'
+    | 'ACQUISITION_COUNTERBID_RESOLVED'
+    | 'ACQUISITION_APPROVAL_RESOLVED'
+    | 'ACQUISITION_REGULATORY_RESOLVED'
+    | 'ACQUISITION_FINANCING_LOCKED'
+    | 'STREAMING_PLATFORM_ACQUIRED'
+    | 'ACQUISITION_INTEGRATION_COMPLETED'
+    | 'IPO_ROADSHOW_STARTED'
+    | 'IPO_LISTED'
+    | 'PUBLIC_GUIDANCE_ISSUED'
+    | 'PUBLIC_EARNINGS_REPORTED'
+    | 'SHAREHOLDER_VOTE_RESOLVED'
+    | 'ACTIVIST_CAMPAIGN_RESOLVED'
+    | 'HOSTILE_TAKEOVER_OPENED'
+    | 'HOSTILE_TAKEOVER_DEFENDED'
+    | 'CRISIS_DETECTED'
+    | 'CRISIS_RESPONSE_LOCKED'
+    | 'CRISIS_RECOVERED'
+    | 'TRUST_INITIATIVE_COMPLETED'
+    | 'SHADOW_OPERATION_COMMITTED'
+    | 'SHADOW_EVIDENCE_RESOLVED'
+    | 'REGULATORY_CASE_OPENED'
+    | 'REGULATORY_CASE_RESOLVED'
+    | 'WHISTLEBLOWER_REPORT_OPENED'
+    | 'WHISTLEBLOWER_REPORT_RESOLVED'
+    | 'SUCCESSION_PLAN_UPDATED'
+    | 'SUCCESSOR_APPOINTED'
+    | 'FOUNDER_ROLE_CHANGED'
+    | 'COMPANY_ERA_CLOSED'
+    | 'COMPANY_ERA_OPENED'
+    | 'LEGACY_FILM_COMMITTED'
+    | 'GENERATION_HANDOFF'
+    | 'INFRASTRUCTURE_COMMITTED'
+    | 'TECHNOLOGY_PROJECT_STARTED'
+    | 'TECHNOLOGY_PROJECT_COMPLETED'
+    | 'PRODUCT_DEVELOPMENT_STARTED'
+    | 'PRODUCT_LAUNCHED'
+    | 'PRODUCT_STATUS_CHANGED'
+    | 'CATALOG_IMPORTED'
+    | 'LICENSE_NEGOTIATION_UPDATED'
+    | 'LICENSE_SIGNED'
+    | 'ORIGINAL_COMMISSIONED'
+    | 'ORIGINAL_GREENLIT'
+    | 'ORIGINAL_LOCALIZATION_COMMITTED'
+    | 'ORIGINAL_RELEASE_AUTHORIZED'
+    | 'ORIGINAL_LIFECYCLE_DECIDED'
+    | 'LAUNCH_SLATE_PROGRAMMED'
+    | 'LAUNCH_COMMITTED'
+    | 'LIFECYCLE_CHANGED'
+    | 'WEEKLY_PLAN_SELECTED'
+    | 'GROWTH_ACTION_LOCKED'
+    | 'GROWTH_ACTION_APPLIED'
+    | 'WEEK_CHECKPOINT'
+    | 'METRICS_COMMITTED'
+    | 'QUARTER_BEAT_COMMITTED'
+    | 'SEASON_REVIEW_COMMITTED'
+    | 'CINEMATIC_QUEUED'
+    | 'MILESTONE_REACHED'
+    | 'SYSTEM_REPAIR';
+
+export interface OwnedStreamingLedgerEntry {
+    id: string;
+    idempotencyKey: string;
+    absoluteWeek: number;
+    type: OwnedStreamingLedgerEventType;
+    summary: string;
+    source: 'MIGRATION' | 'FOUNDING' | 'WEEK_PROCESSOR' | 'PLAYER_ACTION' | 'SYSTEM';
+    metadata?: Record<string, string | number | boolean | null>;
+}
+
+export type OwnedStreamingCinematicType =
+    | 'FOUNDING_KEYNOTE'
+    | 'LAUNCH_NIGHT'
+    | 'BREAKOUT_HIT'
+    | 'PLATFORM_OUTAGE'
+    | 'BOARD_REVIEW'
+    | 'CELEBRITY_INVESTOR_REVEAL'
+    | 'PLATFORM_WAR_DECLARATION'
+    | 'STREAMING_AWARDS_CEREMONY'
+    | 'ACQUISITION_SIGNING'
+    | 'IPO_LISTING'
+    | 'HOSTILE_TAKEOVER_DEFENCE'
+    | 'CRISIS_EXPOSURE'
+    | 'WHISTLEBLOWER_REVEAL'
+    | 'REGULATORY_HEARING'
+    | 'SHADOW_OPERATION'
+    | 'LEGACY_MONTAGE'
+    | 'SUCCESSION_CEREMONY'
+    | 'NEW_ERA_KEYNOTE'
+    | 'FIRST_ORIGINAL_ANNOUNCEMENT'
+    | 'MILESTONE';
+
+export interface OwnedStreamingCinematicEvent {
+    id: string;
+    idempotencyKey: string;
+    type: OwnedStreamingCinematicType;
+    status: 'QUEUED' | 'VIEWED' | 'DISMISSED';
+    priority: 'STANDARD' | 'IMPORTANT' | 'MAJOR';
+    availableAtAbsoluteWeek: number;
+    title: string;
+    factIds: string[];
+}
+
+export interface OwnedStreamingPlatformState {
+    schemaVersion: number;
+    lifecycle: OwnedStreamingPlatformLifecycle;
+    identity: OwnedStreamingPlatformIdentity | null;
+    foundingDraft: OwnedStreamingFoundingDraft | null;
+    foundingProfile: OwnedStreamingFoundingProfile | null;
+    leadership: OwnedStreamingLeadershipState;
+    governance: OwnedStreamingGovernanceState;
+    competitiveWorld: OwnedStreamingCompetitiveWorldState;
+    corporateDevelopment: OwnedStreamingCorporateDevelopmentState;
+    publicCompany: OwnedStreamingPublicCompanyState;
+    crisisSecurity: OwnedStreamingCrisisSecurityState;
+    legacy: OwnedStreamingLegacyState;
+    finance: OwnedStreamingFinanceState;
+    hqOnboarding: OwnedStreamingHqOnboardingState;
+    infrastructureSetupDraft: OwnedStreamingInfrastructureSetupDraft | null;
+    infrastructureSetup: OwnedStreamingInfrastructureSetup | null;
+    technologyProjects: OwnedStreamingTechnologyProject[];
+    productLines: OwnedStreamingProductLine[];
+    catalogSetupDraft: OwnedStreamingCatalogSetupDraft | null;
+    starterCatalog: OwnedStreamingStarterCatalog | null;
+    catalogLicenses: OwnedStreamingCatalogLicense[];
+    rightsNegotiations: OwnedStreamingRightsNegotiation[];
+    sublicenseDeals: OwnedStreamingSublicenseDeal[];
+    rightsObligations: OwnedStreamingRightsObligation[];
+    originalCommissionDraft: OwnedStreamingOriginalCommissionDraft | null;
+    originalCommissions: OwnedStreamingOriginalCommission[];
+    launchSlateDraft: OwnedStreamingLaunchSlate | null;
+    launchSlate: OwnedStreamingLaunchSlate | null;
+    launchCommit: OwnedStreamingLaunchCommit | null;
+    subscriptionPrices: Record<StreamingSubscriptionTierId, number>;
+    founderOwnershipPercent: number;
+    treasuryCash: number;
+    debtPrincipal: number;
+    infrastructureStrategy: StreamingInfrastructureStrategy;
+    capacity: {
+        baselineConcurrentStreams: number;
+        burstConcurrentStreams: number;
+    };
+    technologyLevels: Record<StreamingTechnologyBranch, number>;
+    metrics: OwnedStreamingPlatformMetrics;
+    catalogProjectIds: string[];
+    simulationSeed: string;
+    lastProcessedAbsoluteWeek: number | null;
+    processedWeekKeys: string[];
+    weeklyDecisions: OwnedStreamingWeeklyDecision[];
+    growthActions: OwnedStreamingGrowthAction[];
+    lastAcknowledgedWeeklyReportAbsoluteWeek: number | null;
+    weeklyHistory: OwnedStreamingWeeklySnapshot[];
+    cycleReviews: OwnedStreamingCycleReview[];
+    eventLedger: OwnedStreamingLedgerEntry[];
+    cinematicQueue: OwnedStreamingCinematicEvent[];
+    milestoneKeys: string[];
+}
+
+export const OWNED_STREAMING_PLATFORM_SCHEMA_VERSION = 22;
+
+export const createInitialOwnedStreamingPlatformState = (playerId = ''): OwnedStreamingPlatformState => ({
+    schemaVersion: OWNED_STREAMING_PLATFORM_SCHEMA_VERSION,
+    lifecycle: 'LOCKED',
+    identity: null,
+    foundingDraft: null,
+    foundingProfile: null,
+    leadership: {
+        currentCeo: {
+            holderType: 'FOUNDER',
+            executiveId: null,
+            sinceAbsoluteWeek: 0,
+        },
+        appointments: [],
+        developmentPrograms: [],
+        delegation: {
+            maximumRightsBid: 50_000_000,
+            minimumCapacityHeadroomPercent: 20,
+            weeklyCampaignLimit: 10_000_000,
+            renewalMinimumMarginPercent: 15,
+            incidentPolicy: 'SERVICE_FIRST',
+            updatedAtAbsoluteWeek: 0,
+        },
+    },
+    governance: {
+        boardConfidence: 72,
+        directors: [],
+        motions: [],
+        celebrityInvestors: [],
+    },
+    competitiveWorld: {
+        initializedAtAbsoluteWeek: null,
+        lastSimulatedAbsoluteWeek: null,
+        rivalryHeat: 0,
+        globalPrestige: 0,
+        rivals: [],
+        moves: [],
+        regionalLaunches: [],
+        marketShareHistory: [],
+        awardSeasons: [],
+    },
+    corporateDevelopment: {
+        acquisitionCases: [],
+        integrations: [],
+        acquiredPlatformIds: [],
+    },
+    publicCompany: {
+        lifecycle: 'PRIVATE',
+        ipoPlan: null,
+        ipoJourney: null,
+        listing: null,
+        quoteHistory: [],
+        guidance: [],
+        earnings: [],
+        shareholderVotes: [],
+        activistCampaigns: [],
+        hostileTakeovers: [],
+    },
+    crisisSecurity: {
+        publicTrust: 72,
+        regulatoryScrutiny: 0,
+        employeeLoyalty: 75,
+        evidenceTrail: 0,
+        securityPressure: 15,
+        lastEvaluatedAbsoluteWeek: null,
+        crises: [],
+        shadowOperations: [],
+        trustInitiatives: [],
+        regulatoryCases: [],
+        whistleblowerReports: [],
+    },
+    legacy: {
+        founderOfficeRole: 'FOUNDER_CEO',
+        currentEraNumber: 1,
+        currentEraStartedAtAbsoluteWeek: 0,
+        currentMandate: 'BALANCED',
+        successionPlan: null,
+        closedEras: [],
+        montages: [],
+        endlessMode: false,
+        transitionCount: 0,
+    },
+    finance: {
+        capitalActions: [],
+        loans: [],
+        equityHolders: [],
+    },
+    hqOnboarding: {
+        status: 'NOT_STARTED',
+        currentStep: 0,
+        visitedSections: [],
+        startedAtAbsoluteWeek: null,
+        completedAtAbsoluteWeek: null,
+    },
+    infrastructureSetupDraft: null,
+    infrastructureSetup: null,
+    technologyProjects: [],
+    productLines: [],
+    catalogSetupDraft: null,
+    starterCatalog: null,
+    catalogLicenses: [],
+    rightsNegotiations: [],
+    sublicenseDeals: [],
+    rightsObligations: [],
+    originalCommissionDraft: null,
+    originalCommissions: [],
+    launchSlateDraft: null,
+    launchSlate: null,
+    launchCommit: null,
+    subscriptionPrices: {
+        BASIC: 7.99,
+        PREMIUM: 13.99,
+        FAMILY: 18.99,
+    },
+    founderOwnershipPercent: 100,
+    treasuryCash: 0,
+    debtPrincipal: 0,
+    infrastructureStrategy: 'UNDECIDED',
+    capacity: {
+        baselineConcurrentStreams: 0,
+        burstConcurrentStreams: 0,
+    },
+    technologyLevels: {
+        DELIVERY_CAPACITY: 0,
+        PLAYBACK_QUALITY: 0,
+        RELIABILITY: 0,
+        DATA_RECOMMENDATIONS: 0,
+        SECURITY: 0,
+        CONTENT_OPERATIONS: 0,
+        ADVERTISING_COMMERCE: 0,
+        PRODUCT_EXPERIENCE: 0,
+    },
+    metrics: {
+        subscribers: 0,
+        netSubscriberMovement: 0,
+        churnRate: 0,
+        engagementRate: 0,
+        averageRevenuePerUser: 0,
+        cashRunwayWeeks: 0,
+        technologyHealth: 0,
+    },
+    catalogProjectIds: [],
+    simulationSeed: playerId ? `owned-streaming:${playerId}` : '',
+    lastProcessedAbsoluteWeek: null,
+    processedWeekKeys: [],
+    weeklyDecisions: [],
+    growthActions: [],
+    lastAcknowledgedWeeklyReportAbsoluteWeek: null,
+    weeklyHistory: [],
+    cycleReviews: [],
+    eventLedger: [],
+    cinematicQueue: [],
+    milestoneKeys: [],
+});
+
 export interface FuturePotential {
     sequelChance: number;
     franchiseChance: number;
@@ -1567,6 +3856,17 @@ export interface FuturePotential {
     seriesStatus: SeriesStatus;
     playerReturnStatus?: PlayerReturnStatus;
     returnStatusNote?: string;
+}
+
+export type TheatricalExtensionReason = 'STRONG_HOLD' | 'BREAKOUT_DEMAND' | 'SLEEPER_MOMENTUM';
+
+export interface TheatricalExtensionDecision {
+    reviewWeek: number;
+    addedWeeks: number;
+    reason: TheatricalExtensionReason;
+    weeklyGross: number;
+    holdPercent: number;
+    marketDemand: number;
 }
 
 export interface ActiveRelease {
@@ -1589,6 +3889,9 @@ export interface ActiveRelease {
     imdbRating?: number;
     productionPerformance: number;
     maxTheatricalWeeks?: number;
+    baseTheatricalWeeks?: number;
+    theatricalExtensionWeeks?: number;
+    theatricalExtensionHistory?: TheatricalExtensionDecision[];
     weeksInTheaters?: number;
     streaming?: StreamingState;
     streamingRevenue?: number;
@@ -1605,6 +3908,9 @@ export interface ActiveRelease {
     streamingUpfrontFee?: number;
     streamingRoyaltyRevenue?: number;
     streamingFundingAmount?: number;
+    platformProductionFunding?: number;
+    studioCashAtRisk?: number;
+    productionFundApplied?: number;
     bids?: { platformId: PlatformId, upfront: number, royalty: number, duration: number, fundingAmount?: number }[];
     sequelDecisionWeek?: number;
     sequelDecisionMade?: boolean;
@@ -1634,6 +3940,8 @@ export interface PastProject {
     name: string;
     type: 'ACTING_GIG';
     roleType: RoleType;
+    playerCharacterProfile?: CharacterIdentityProfile;
+    playerRolePerformance?: number;
     year: number;
     earnings: number;
     rating: number;
@@ -1649,6 +3957,9 @@ export interface PastProject {
     totalViews?: number;
     weeklyViews?: number[];
     streamingRevenue?: number;
+    platformProductionFunding?: number;
+    studioCashAtRisk?: number;
+    productionFundApplied?: number;
     weeklyStreamingBreakdowns?: StreamingDistributionBreakdown[];
     soundtrackRevenue?: number;
     weeklySoundtrackRevenue?: number[];
@@ -1657,6 +3968,7 @@ export interface PastProject {
     investorPlan?: ProjectInvestorPlan;
     investorPayouts?: ProjectInvestorPayoutSummary;
     castList?: CastMember[];
+    backgroundCastingPlan?: BackgroundCastingPlan;
     reviews?: Review[];
     audienceReception?: AudienceReception;
     episodeRatings?: SeasonEpisodeRatings[];
@@ -1682,6 +3994,9 @@ export interface PastProject {
     releaseRegionIds?: BoxOfficeRegionId[];
     releaseChainSelections?: Partial<Record<BoxOfficeRegionId, CinemaChainId[]>>;
     boxOfficeArchiveVersion?: number;
+    baseTheatricalWeeks?: number;
+    theatricalExtensionWeeks?: number;
+    theatricalExtensionHistory?: TheatricalExtensionDecision[];
     genre: Genre;
     format?: ProjectFormat;
     subjectName?: string;
@@ -1700,6 +4015,8 @@ export interface PastProject {
     releaseYear?: number;
     releasedAtAbsoluteWeek?: number;
     customPoster?: CustomPoster;
+    /** Developer-only archive fixture. It renders in Box Office but must not affect the player's career or awards. */
+    isQaArchive?: boolean;
     musicPlan?: ProjectMusicPlan;
     sourceScriptId?: string;
     isOriginal?: boolean;
@@ -1766,6 +4083,26 @@ export interface AuditionOpportunity {
     source: 'CASTING_APP' | 'AGENT' | 'DIRECTOR' | 'DIRECT';
     royaltyPercentage?: number;
     universeContract?: UniverseContract;
+    /** The authored character offer, separate from billing size such as LEAD. */
+    characterProfile?: CharacterIdentityProfile;
+    characterName?: string;
+    /** How the authored character fits this script, separate from the actor's career/typecasting fit. */
+    characterStoryFit?: CharacterStoryFit;
+    roleFit?: {
+        score: number;
+        label: 'NATURAL_FIT' | 'STRONG_FIT' | 'STRETCH' | 'AGAINST_TYPE';
+        reasons: string[];
+    };
+    /** Why the market produced this role, derived from recent work rather than stored as permanent state. */
+    industryContext?: {
+        kind: 'OPEN' | 'MOMENTUM' | 'TYPECAST' | 'RANGE';
+        marketRole?: CharacterStoryRole;
+        originalRole: CharacterStoryRole;
+        demand: number;
+        typecastingPressure: number;
+        label: string;
+        reason: string;
+    };
 }
 
 export interface NegotiationData {
@@ -1960,6 +4297,14 @@ export interface LegalCase {
     playerDefense: number; // 0-100
     status: 'ACTIVE' | 'WON' | 'LOST' | 'SETTLED';
     history: { hearing: number, choice: string }[];
+    caseType?: 'STUDIO_NAME_RIGHTS' | string;
+    studioId?: string;
+    claimantName?: string;
+    protectedStudioName?: string;
+    rebrandedStudioName?: string;
+    settlementDemand?: number;
+    legalFeePerHearing?: number;
+    restorationCost?: number;
 }
 
 export interface ScheduledEvent {
@@ -2024,6 +4369,17 @@ export interface YoutubeChannel {
     lastLivestreamWeek: number;
     lastMerchDropWeek: number;
     lastMerchResult?: string;
+    lastMerchOutcome?: {
+        id: string;
+        tier: YoutubeMerchTier;
+        result: YoutubeMerchResult;
+        grossRevenue: number;
+        productionCost: number;
+        netProfit: number;
+        cashAfter: number;
+        week: number;
+        year: number;
+    };
     creatorIdentity: YoutubeCreatorIdentity;
     lastIdentityChangeWeek: number;
 }
@@ -2036,6 +4392,8 @@ export interface NewsItem {
     week: number;
     year: number;
     impactLevel: 'LOW' | 'MEDIUM' | 'HIGH';
+    projectId?: string;
+    universeId?: UniverseId;
 }
 
 export interface Message {
@@ -2043,7 +4401,7 @@ export interface Message {
     sender: string;
     subject: string;
     text: string;
-    type: 'OFFER_ROLE' | 'OFFER_AUDITION' | 'OFFER_SPONSORSHIP' | 'OFFER_NEGOTIATION' | 'OFFER_EVENT' | 'OFFER_OUTSIDE_PRODUCER_INVESTMENT' | YoutubeMessageType | 'TEXT' | 'SYSTEM' | 'CASTING_FEEDBACK' | 'RIGHTS_REPORT' | 'RIGHTS_NEGOTIATION' | 'STUDIO_ACQUISITION' | 'SHAREHOLDER_VOTE';
+    type: 'OFFER_ROLE' | 'OFFER_AUDITION' | 'OFFER_SPONSORSHIP' | 'OFFER_NEGOTIATION' | 'OFFER_EVENT' | 'OFFER_OUTSIDE_PRODUCER_INVESTMENT' | YoutubeMessageType | 'TEXT' | 'SYSTEM' | 'CASTING_FEEDBACK' | 'RIGHTS_REPORT' | 'RIGHTS_NEGOTIATION' | 'STUDIO_ACQUISITION' | 'STUDIO_CONTINUATION' | 'SHAREHOLDER_VOTE';
     data?: AuditionOpportunity | SponsorshipOffer | NegotiationData | ScheduledEvent | YoutubeCollabOffer | YoutubeBrandDeal | YoutubeMusicVideoFeatureOffer | any;
     isRead: boolean;
     weekSent: number;
@@ -2157,6 +4515,8 @@ export interface XPost {
 
 export interface StudioContract {
     id: string;
+    /** Owning production house. Missing on older saves means the parent/HQ studio. */
+    studioId?: string;
     npcId: string;
     type: ContractType;
     paymentMode: PaymentMode;
@@ -2181,7 +4541,11 @@ export interface NPCActor {
     openness: number;
     followers: number;
     netWorth: number;
-    occupation: 'ACTOR' | 'DIRECTOR' | 'MUSIC_ARTIST' | 'INVESTOR';
+    occupation: 'ACTOR' | 'DIRECTOR' | 'MUSIC_ARTIST' | 'INVESTOR' | 'EXECUTIVE' | CrewOccupation;
+    crewRole?: CrewOccupation;
+    crewTier?: CrewMarketTier;
+    salary?: number;
+    specialties?: string[];
     bio: string;
     age?: number;
     forbesCategory?: string;
@@ -2294,12 +4658,13 @@ export interface ShareholderVote {
     title: string;
     summary: string;
     stakes: string[];
-    status: 'OPEN' | 'RESOLVED';
+    status: 'OPEN' | 'RESOLVED' | 'EXPIRED';
     playerVotingPower: number;
     expectedSupport: number;
     createdWeek: number;
     createdYear: number;
     dueWeek: number;
+    dueYear?: number;
     selectedVote?: 'FOR' | 'AGAINST';
     outcomeSummary?: string;
     resolvedWeek?: number;
@@ -2394,10 +4759,12 @@ export interface IndustryProject {
     id: string;
     title: string;
     genre: Genre;
+    mediaType?: ProjectType;
     targetAudience?: TargetAudience;
     studioId: StudioId;
     budgetTier: BudgetTier;
     quality: number;
+    rating?: number;
     boxOffice: number;
     year: number;
     weekReleased: number;
@@ -2405,6 +4772,16 @@ export interface IndustryProject {
     leadActorName: string;
     directorName: string;
     reviews: string;
+    awardProfile?: {
+        leadPerformance: number;
+        directing: number;
+        screenplay: number;
+        cinematography: number;
+        picture: number;
+        originalScore: number;
+        originalSong: number;
+        campaign: number;
+    };
     universeId?: UniverseId;
     isFamous?: boolean; 
 }
@@ -2418,6 +4795,11 @@ export interface UniverseCharacter {
     fanApproval: number;
     characterId?: string;
     roleType?: RoleType;
+    storyFunction?: CharacterStoryFunction;
+    storyRole?: CharacterStoryRole;
+    abilityType?: CharacterAbilityType;
+    nature?: CharacterNature;
+    identitySource?: CharacterIdentitySource;
     firstAppearanceTitle?: string;
     latestAppearanceTitle?: string;
     appearances?: number;
@@ -3120,6 +5502,7 @@ export interface Player {
     shareholderVotes: ShareholderVote[];
     stockTakeovers: StockTakeoverCase[];
     world: WorldState;
+    ownedStreamingPlatform: OwnedStreamingPlatformState;
     flags: Record<string, any>;
     weeklyOpportunities: {
         auditions: AuditionOpportunity[];
@@ -3233,6 +5616,7 @@ export const INITIAL_PLAYER: Player = {
     portfolio: [],
     shareholderVotes: [],
     stockTakeovers: [],
+    ownedStreamingPlatform: createInitialOwnedStreamingPlatformState(),
     world: { 
         projects: [], 
         trendingGenre: 'ACTION', 

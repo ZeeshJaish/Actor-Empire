@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { Player, PendingEvent, ScreeningStrategy, ProjectHiddenStats, NextSeasonFundingTier, CampaignPositioning, CampaignTimeline, MarketingChannelAllocations, MarketingChannelId, BoxOfficeRegionId, CinemaChainId, CinemaChain, CinemaChainRegionalTerms } from '../../../types';
+import { Player, PendingEvent, ScreeningStrategy, ProjectHiddenStats, NextSeasonFundingTier, CampaignPositioning, CampaignTimeline, MarketingChannelAllocations, MarketingChannelId, BoxOfficeRegionId, CinemaChainId, CinemaChain, CinemaChainRegionalTerms, ReleasePlanningDraft } from '../../../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowLeft, Film, Tv, Calendar, TrendingUp, CheckCircle2, Camera, Star, Globe, Youtube, Share2, Megaphone, Music2, Zap } from 'lucide-react';
+import { ArrowLeft, Film, Tv, Calendar, TrendingUp, CheckCircle2, Camera, Star, Globe, Youtube, Share2, Megaphone, Music2, Zap, ShieldCheck } from 'lucide-react';
 import { FESTIVALS, CALENDAR_EVENTS } from '../../../services/worldLogic';
 import { mergeUniverseRosterWithProject, normalizeUniverseMap } from '../../../services/universeLogic';
 import { getAbsoluteWeek } from '../../../services/legacyLogic';
@@ -17,6 +17,8 @@ import { applyInvestorPayoutMemory, calculateInvestorPayout } from '../../../ser
 import { getPlayerLanguage, t } from '../../../services/i18n';
 import { spendPlayerEnergy } from '../../../services/premiumLogic';
 import { PHASE_ONE_ENERGY_COSTS } from '../../../services/energyCosts';
+import { getProjectFundingEconomics } from '../../../services/projectFundingEconomics';
+import { calculateCampaignReachProfile } from '../../../services/studioProductionEconomy';
 
 interface ReleaseWizardProps {
     player: Player;
@@ -34,6 +36,13 @@ const appendInvestorPayoutSummary = (summary: any, payout: number) => {
         lifetimeInvestorPayout: Math.max(0, Math.round(Number(summary?.lifetimeInvestorPayout) || 0)) + safePayout,
         weeklyInvestorPayouts: [...(Array.isArray(summary?.weeklyInvestorPayouts) ? summary.weeklyInvestorPayouts : []), safePayout].slice(-52)
     };
+};
+
+const formatContractMoney = (value: number) => {
+    if (value <= 0) return '$0';
+    if (value >= 1_000_000_000) return `$${(value / 1_000_000_000).toFixed(2)}B`;
+    if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
+    return `$${Math.round(value / 1_000).toLocaleString()}k`;
 };
 
 const CAMPAIGN_POSITIONING_ACCENTS: Record<CampaignPositioning, { icon: React.ReactNode; tone: string; bar: string }> = {
@@ -353,29 +362,92 @@ export const calculateStreamingAuctionOffer = (
 };
 
 export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, project, onBack, onUpdatePlayer, onComplete, isPostTheatricalBidding }) => {
-    const [step, setStep] = useState(isPostTheatricalBidding ? 2 : 1);
+    const savedDraft = project.projectDetails?.releasePlanningDraft as ReleasePlanningDraft | undefined;
+    const [step, setStep] = useState(savedDraft?.step || (isPostTheatricalBidding ? 2 : 1));
+    const contentScrollRef = React.useRef<HTMLDivElement>(null);
     const [releaseType, setReleaseType] = useState<'THEATRICAL' | 'STREAMING_ONLY' | null>(
-        isPostTheatricalBidding ? 'STREAMING_ONLY' : (project.projectDetails?.type === 'SERIES' ? 'STREAMING_ONLY' : null)
+        savedDraft?.releaseType ?? (isPostTheatricalBidding ? 'STREAMING_ONLY' : (project.projectDetails?.type === 'SERIES' ? 'STREAMING_ONLY' : null))
     );
-    const [screeningStrategy, setScreeningStrategy] = useState<ScreeningStrategy | null>(project.projectDetails?.screeningStrategy || null);
+    const [screeningStrategy, setScreeningStrategy] = useState<ScreeningStrategy | null>(savedDraft?.screeningStrategy ?? project.projectDetails?.screeningStrategy ?? null);
     const [selectedRegionIds, setSelectedRegionIds] = useState<BoxOfficeRegionId[]>(
-        normalizeReleaseRegionIds(project.projectDetails?.releaseRegionIds || [])
+        normalizeReleaseRegionIds(savedDraft?.selectedRegionIds || project.projectDetails?.releaseRegionIds || [])
     );
     const [distributionChainSelections, setDistributionChainSelections] = useState<Partial<Record<BoxOfficeRegionId, CinemaChainId[]>>>(
-        normalizeDistributionChainSelectionRecord(project.projectDetails?.releaseChainSelections)
+        normalizeDistributionChainSelectionRecord(savedDraft?.distributionChainSelections || project.projectDetails?.releaseChainSelections)
     );
-    const [campaignPositioning, setCampaignPositioning] = useState<CampaignPositioning>(project.projectDetails?.campaignPositioning || 'MASS_EVENT');
-    const [campaignTimeline, setCampaignTimeline] = useState<CampaignTimeline>(project.projectDetails?.campaignTimeline || 'BALANCED_ROLLOUT');
-    const [channelAllocations, setChannelAllocations] = useState<MarketingChannelAllocations>(project.projectDetails?.marketingChannelAllocations || {});
-    const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
-    const [festivalPremiere, setFestivalPremiere] = useState<string | null>(null);
-    const [releaseWeek, setReleaseWeek] = useState<number>(player.currentWeek + 4); 
+    const [campaignPositioning, setCampaignPositioning] = useState<CampaignPositioning>(savedDraft?.campaignPositioning || project.projectDetails?.campaignPositioning || 'MASS_EVENT');
+    const [campaignTimeline, setCampaignTimeline] = useState<CampaignTimeline>(savedDraft?.campaignTimeline || project.projectDetails?.campaignTimeline || 'BALANCED_ROLLOUT');
+    const [channelAllocations, setChannelAllocations] = useState<MarketingChannelAllocations>(savedDraft?.channelAllocations || project.projectDetails?.marketingChannelAllocations || {});
+    const [selectedPlatform, setSelectedPlatform] = useState<string | null>(savedDraft?.selectedPlatform || null);
+    const [festivalPremiere, setFestivalPremiere] = useState<string | null>(savedDraft?.festivalPremiere || null);
+    const [releaseWeek, setReleaseWeek] = useState<number>(savedDraft?.releaseWeek || player.currentWeek + 4);
+    const releaseDraftClearedRef = React.useRef(false);
+    const lastPersistedDraftRef = React.useRef(savedDraft ? JSON.stringify({ ...savedDraft, updatedAt: 0 }) : '');
     const language = getPlayerLanguage(player);
     const tr = (key: string, vars?: Record<string, string | number>) => t(language, key, vars);
     const streamingDealEnergyCost = PHASE_ONE_ENERGY_COSTS.STREAMING_DEAL_ACCEPT;
     const releaseStrategyEnergyCost = PHASE_ONE_ENERGY_COSTS.RELEASE_STRATEGY_LOCK;
     const hasStreamingDealEnergy = player.energy.current >= streamingDealEnergyCost;
     const hasReleaseStrategyEnergy = player.energy.current >= releaseStrategyEnergyCost;
+    const buildReleasePlanningDraft = (): ReleasePlanningDraft => ({
+        step,
+        releaseType,
+        screeningStrategy,
+        selectedRegionIds: normalizeReleaseRegionIds(selectedRegionIds),
+        distributionChainSelections: normalizeDistributionChainSelectionRecord(distributionChainSelections),
+        campaignPositioning,
+        campaignTimeline,
+        channelAllocations,
+        selectedPlatform,
+        festivalPremiere,
+        releaseWeek,
+        updatedAt: Date.now(),
+    });
+    const writeReleasePlanningDraft = (sourcePlayer: Player, draft: ReleasePlanningDraft): Player => {
+        const updateDetails = (details: any) => ({ ...details, releasePlanningDraft: draft });
+        return {
+            ...sourcePlayer,
+            commitments: sourcePlayer.commitments.map(commitment => (
+                commitment.id === project.id && commitment.projectDetails
+                    ? { ...commitment, projectDetails: updateDetails(commitment.projectDetails) }
+                    : commitment
+            )),
+            activeReleases: sourcePlayer.activeReleases.map(release => (
+                release.id === project.id
+                    ? { ...release, projectDetails: updateDetails(release.projectDetails) }
+                    : release
+            )),
+        };
+    };
+    React.useEffect(() => {
+        if (releaseDraftClearedRef.current) return;
+        const draft = buildReleasePlanningDraft();
+        const comparableDraft = JSON.stringify({ ...draft, updatedAt: 0 });
+        if (comparableDraft === lastPersistedDraftRef.current) return;
+
+        const timer = window.setTimeout(() => {
+            const nextPlayer = writeReleasePlanningDraft(player, draft);
+            lastPersistedDraftRef.current = comparableDraft;
+            onUpdatePlayer(nextPlayer);
+        }, 250);
+
+        return () => window.clearTimeout(timer);
+    }, [
+        campaignPositioning,
+        campaignTimeline,
+        channelAllocations,
+        distributionChainSelections,
+        festivalPremiere,
+        onUpdatePlayer,
+        player,
+        project.id,
+        releaseType,
+        releaseWeek,
+        screeningStrategy,
+        selectedPlatform,
+        selectedRegionIds,
+        step,
+    ]);
     const trFallback = (key: string, fallback: string) => {
         const translated = tr(key);
         return translated === key ? fallback : translated;
@@ -397,10 +469,12 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
         return tr(`services.worldLogic.season.${season}`);
     };
     const projectHiddenStats = project.projectDetails?.hiddenStats || {};
-    const lockedPremierePlatformId = projectHiddenStats.nextSeasonFundingUsedByProjectId === project.id
+    const lockedPremiereEconomics = getProjectFundingEconomics(project);
+    const hasUnconfirmedFundedPremiere = lockedPremiereEconomics.platformFunding > 0
+        && projectHiddenStats.platformFundedPremiereConfirmed !== true;
+    const lockedPremierePlatformId = hasUnconfirmedFundedPremiere
         ? (projectHiddenStats.nextSeasonFundingPlatformId || projectHiddenStats.platformId || null)
         : null;
-    const lockedPremiereFundingAmount = Math.max(0, Math.floor(Number(projectHiddenStats.nextSeasonFundingAmount || 0)));
     const lockedPremiereFundingTier = projectHiddenStats.nextSeasonFundingTier;
     const lockedPremiereFundingReason = projectHiddenStats.nextSeasonFundingReason;
     const lockedPremierePlatform = lockedPremierePlatformId
@@ -420,12 +494,18 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
             timestamp: Date.now()
         }
         : null;
+    const lockedPremiereFundingApplied = lockedPremiereEconomics.platformFunding;
+    const lockedPremiereStudioCashAtRisk = lockedPremiereEconomics.studioCashAtRisk;
     const normalizedSelectedRegionIds = useMemo(() => normalizeReleaseRegionIds(selectedRegionIds), [selectedRegionIds]);
     const regionMapSummary = useMemo(() => getRegionMapSummary(normalizedSelectedRegionIds), [normalizedSelectedRegionIds]);
     const inferredScreeningStrategy = useMemo(
         () => inferScreeningStrategyFromRegionCount(normalizedSelectedRegionIds.length),
         [normalizedSelectedRegionIds.length]
     );
+
+    React.useEffect(() => {
+        contentScrollRef.current?.scrollTo({ top: 0, behavior: 'auto' });
+    }, [step]);
     const effectiveScreeningStrategy = screeningStrategy || inferredScreeningStrategy;
     const boxOfficeRegionById = useMemo(() => (
         Object.fromEntries(BOX_OFFICE_REGIONS.map(region => [
@@ -667,6 +747,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
 
         const updatedPlayer = { ...player };
         const platformName = PLATFORMS.find(p => p.id === bid.platformId)?.name || 'Platform';
+        const isFundedPremiereConfirmation = bid.id.startsWith('locked_premiere_');
         const isSeriesDeal = (project.projectDetails?.type || project.type) === 'SERIES';
         const investorPlan = project.investorPlan || project.projectDetails?.investorPlan;
         const investorStreamingDealPayout = calculateInvestorPayout(investorPlan, bid.amount);
@@ -702,7 +783,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                 if (!b.studioState) b.studioState = {} as any;
                 const ledger = Array.isArray(b.studioState.financeLedger) ? b.studioState.financeLedger : [];
 	                b.studioState.financeLedger = [
-                    {
+                    ...(!isFundedPremiereConfirmation ? [{
                         id: `studio_ledger_bid_${project.id}_${player.age}_${player.currentWeek}`,
                         week: player.currentWeek,
                         year: player.age,
@@ -712,7 +793,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                             ? `${project.name} ${platformName} deal after investor split`
                             : `${project.name} ${platformName} deal`,
                         projectId: project.id
-                    },
+                    }] : []),
                     ...(investorStreamingDealPayout > 0 ? [{
                         id: `studio_ledger_investor_payout_deal_${project.id}_${player.age}_${player.currentWeek}`,
                         week: player.currentWeek,
@@ -749,7 +830,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
         } else {
             // Add upfront cash to player's money if no studio
             updatedPlayer.money += netStreamingDealAmount;
-            updatedPlayer.finance.history.unshift({
+            if (!isFundedPremiereConfirmation) updatedPlayer.finance.history.unshift({
                 id: Math.random().toString(),
                 week: updatedPlayer.currentWeek,
                 year: updatedPlayer.age,
@@ -787,6 +868,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                         ...commitment.projectDetails.hiddenStats,
                         platformId: bid.platformId,
                         backendPct: bid.backendPct || 0,
+                        ...(isFundedPremiereConfirmation ? { platformFundedPremiereConfirmed: true } : {}),
                         ...(lockedFunding ? {
                             nextSeasonFundingAmount: lockedFunding.amount,
                             nextSeasonFundingPlatformId: lockedFunding.platformId,
@@ -843,11 +925,15 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                     studioRoyaltyPercentage: bid.backendPct || 0,
                     projectDetails: {
                         ...release.projectDetails,
+                        releasePlanningDraft: isPostTheatricalBidding
+                            ? undefined
+                            : release.projectDetails.releasePlanningDraft,
                         investorPayouts: nextInvestorPayouts,
                         hiddenStats: {
                             ...release.projectDetails.hiddenStats,
                             platformId: bid.platformId,
                             backendPct: bid.backendPct || release.projectDetails.hiddenStats.backendPct || 0,
+                            ...(isFundedPremiereConfirmation ? { platformFundedPremiereConfirmed: true } : {}),
                             ...(lockedFunding ? {
                                 nextSeasonFundingAmount: lockedFunding.amount,
                                 nextSeasonFundingPlatformId: lockedFunding.platformId,
@@ -865,6 +951,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
         onUpdatePlayer(updatedPlayer);
         
         if (isPostTheatricalBidding) {
+            releaseDraftClearedRef.current = true;
             onComplete();
         } else {
             setStep(3); // Move to Campaign step
@@ -889,6 +976,13 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
     const campaignForecast = useMemo(() => {
         return calculateCampaignForecast(project.projectDetails || project, campaignPositioning, normalizedChannelMix.allocations, campaignFit, campaignTimeline);
     }, [project, campaignPositioning, normalizedChannelMix.allocations, campaignFit, campaignTimeline]);
+    const campaignReachPreview = useMemo(() => calculateCampaignReachProfile({
+        productionBudget: project.projectDetails?.estimatedBudget || project.budget || 0,
+        marketingSpend: totalCampaignCost,
+        rawHype: project.projectDetails?.hiddenStats?.rawHype,
+        fameMultiplier: project.projectDetails?.hiddenStats?.fameMultiplier,
+        distributionPower: project.projectDetails?.hiddenStats?.distributionPower,
+    }), [project, totalCampaignCost]);
     const musicImpact = useMemo(() => {
         const details = project.projectDetails || project;
         return calculateProjectMusicImpact(details, details?.musicPlan);
@@ -1176,6 +1270,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
 
         const campaignSpend = totalCampaignCost;
         const unusedCampaignReserve = hasReservedMarketingPool ? campaignBudgetRemaining : 0;
+        const campaignReach = campaignReachPreview;
 
         if (!hasReservedMarketingPool) {
             if (campaignSpend > 0) {
@@ -1243,6 +1338,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                 totalPhaseDuration: releaseWeek - player.currentWeek,
                 projectDetails: commitment.projectDetails ? {
                     ...commitment.projectDetails,
+                    releasePlanningDraft: undefined,
                     releaseStrategy: releaseType as any,
                     screeningStrategy: effectiveScreeningStrategy as any,
                     releaseRegionIds: releaseType === 'THEATRICAL'
@@ -1270,7 +1366,9 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                         falseMarketingRisk: campaignFit.falseMarketingRisk,
                         campaignOverspendRisk: campaignFit.overspendRisk,
                         campaignPromise: campaignPositioning,
-                        campaignTimeline
+                        campaignTimeline,
+                        campaignReachMultiplier: campaignReach.multiplier,
+                        campaignReachLabel: campaignReach.label,
                     }
                 } : undefined
             };
@@ -1299,6 +1397,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
         }
 
         spendPlayerEnergy(updatedPlayer, releaseStrategyEnergyCost, `Release strategy: ${project.name}`);
+        releaseDraftClearedRef.current = true;
         onUpdatePlayer(updatedPlayer);
         onComplete();
     };
@@ -1306,6 +1405,9 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
     const nextStep = () => setStep(step + 1);
     const prevStep = () => {
         if (step === 2 && isPostTheatricalBidding) {
+            const draft = buildReleasePlanningDraft();
+            lastPersistedDraftRef.current = JSON.stringify({ ...draft, updatedAt: 0 });
+            onUpdatePlayer(writeReleasePlanningDraft(player, draft));
             onBack();
         } else {
             setStep(step - 1);
@@ -1332,9 +1434,11 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
     };
 
     const handleBack = () => {
+        const draft = buildReleasePlanningDraft();
+        const updatedPlayer = writeReleasePlanningDraft(player, draft);
+        lastPersistedDraftRef.current = JSON.stringify({ ...draft, updatedAt: 0 });
         if (highestBid) {
             // Save bid progress to prevent exploits
-            const updatedPlayer = { ...player };
             let found = false;
             const cIdx = updatedPlayer.commitments.findIndex(c => c.id === project.id);
             if (cIdx !== -1) {
@@ -1348,8 +1452,8 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                     found = true;
                 }
             }
-            if (found) onUpdatePlayer(updatedPlayer);
         }
+        onUpdatePlayer(updatedPlayer);
         onBack();
     };
 
@@ -1366,26 +1470,26 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
             </div>
 
             {/* Header */}
-            <div className="relative z-10 flex items-center justify-between p-6 border-b border-white/5 bg-black/20 backdrop-blur-xl">
-                <div className="flex items-center gap-4">
-                    <button onClick={handleBack} className="w-10 h-10 rounded-full border border-white/10 flex items-center justify-center hover:bg-white/10 transition-colors">
+            <div className="relative z-10 flex flex-col gap-3 border-b border-white/5 bg-black/20 px-4 pb-4 pt-[calc(env(safe-area-inset-top)+1rem)] backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between sm:p-6">
+                <div className="flex min-w-0 w-full items-center gap-3 sm:w-auto sm:gap-4">
+                    <button onClick={handleBack} aria-label="Back" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 transition-colors hover:bg-white/10">
                         <ArrowLeft size={18} />
                     </button>
-                    <div>
-                        <h1 className="font-serif text-2xl tracking-tight text-white/90">Release Strategy</h1>
-                        <p className="text-[10px] text-amber-500/80 font-bold tracking-[0.2em] uppercase">{project.name}</p>
+                    <div className="min-w-0">
+                        <h1 className="whitespace-nowrap font-serif text-xl tracking-tight text-white/90 sm:text-2xl">Release Strategy</h1>
+                        <p className="truncate text-[9px] font-bold uppercase tracking-[0.18em] text-amber-500/80 sm:text-[10px] sm:tracking-[0.2em]">{project.name}</p>
                     </div>
                 </div>
-                <div className="flex gap-1.5">
+                <div className="flex w-full gap-1.5 sm:w-auto">
                     {!isPostTheatricalBidding && Array.from({ length: 6 }, (_, i) => i + 1).map(s => (
-                        <div key={s} className={`w-8 h-1 rounded-full transition-all duration-500 ${s === step ? 'bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.5)]' : s < step ? 'bg-white/40' : 'bg-white/10'}`} />
+                        <div key={s} className={`h-1 flex-1 rounded-full transition-all duration-500 sm:w-8 sm:flex-none ${s === step ? 'bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.5)]' : s < step ? 'bg-white/40' : 'bg-white/10'}`} />
                     ))}
                 </div>
             </div>
 
             {/* Content */}
-            <div className="relative z-10 flex-1 overflow-y-auto p-6 custom-scrollbar">
-                <div className="max-w-3xl mx-auto py-8">
+            <div ref={contentScrollRef} className="relative z-10 flex-1 overflow-y-auto p-4 custom-scrollbar sm:p-6">
+                <div className="mx-auto max-w-3xl py-6 sm:py-8">
                     <AnimatePresence mode="wait">
                         {/* Step 1: Release Type */}
                         {step === 1 && (
@@ -1634,7 +1738,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
 
                         {/* Step 2: Platform Bidding (Streaming) */}
                         {step === 2 && releaseType === 'STREAMING_ONLY' && (
-                            <motion.div key="step2s" initial={{ opacity: 0, scale: 0.95, filter: 'blur(10px)' }} animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }} exit={{ opacity: 0, scale: 1.05, filter: 'blur(10px)' }} transition={{ duration: 0.4 }} className="space-y-8">
+                            <motion.div key="step2s" initial={{ opacity: 0, scale: 0.95, filter: 'blur(10px)' }} animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }} exit={{ opacity: 0, scale: 1.05, filter: 'blur(10px)' }} transition={{ duration: 0.4 }} className={lockedPremiereBid ? 'space-y-4' : 'space-y-8'}>
                                 <div className="text-center space-y-4">
                                     <h2 className="text-5xl md:text-7xl font-serif font-light tracking-tight text-white/90">The War Room</h2>
                                     <p className="text-lg text-white/50 font-light tracking-wide">
@@ -1645,42 +1749,49 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                                 </div>
 
                                 {auctionState === 'IDLE' && (
-                                    <div className="flex flex-col items-center justify-center py-20 space-y-8">
+                                    <div className={`flex flex-col items-center justify-center space-y-6 ${lockedPremiereBid ? 'py-0 sm:py-6' : 'py-20'}`}>
                                         <div className="text-center max-w-md">
                                             {lockedPremiereBid ? (
                                                 <>
-                                                    <div className="mb-6 rounded-3xl border border-sky-400/30 bg-sky-500/10 p-6">
-                                                        <div className="text-[10px] font-black uppercase tracking-[0.35em] text-sky-300 mb-3">Season 2 Funded</div>
-                                                        <div className="text-2xl font-black text-white mb-2">
-                                                            Season funded by {lockedPremierePlatform?.name}
+                                                    <div className="border-y border-sky-300/25 bg-gradient-to-r from-sky-400/[0.04] via-sky-400/[0.11] to-transparent px-2 py-5 text-left sm:py-7">
+                                                        <div className="flex items-center gap-3">
+                                                            <ShieldCheck size={22} className="text-sky-300" />
+                                                            <div className="text-[10px] font-black uppercase tracking-[0.35em] text-sky-300">Commissioned season</div>
                                                         </div>
-                                                        <div className="text-sm font-mono text-sky-200 mb-4">
-                                                            Funding cap: ${lockedPremiereFundingAmount > 0 ? (lockedPremiereFundingAmount / 1000000).toFixed(1) : '0.0'}M
+                                                        <div className="mt-3 text-2xl font-serif italic text-white sm:mt-4 sm:text-3xl">
+                                                            {lockedPremierePlatform?.name} premiere secured
                                                         </div>
-                                                        {lockedPremiereFundingTier && (
-                                                            <div className="mb-3 inline-flex rounded-full border border-sky-300/30 bg-sky-300/10 px-3 py-1 text-[9px] font-black uppercase tracking-[0.25em] text-sky-200">
-                                                                {lockedPremiereFundingTier.replace('_', ' ')} cap
+                                                        <p className="mt-2 text-sm leading-relaxed text-white/65 sm:mt-3">
+                                                            {lockedPremierePlatform?.name} already contributed {formatContractMoney(lockedPremiereFundingApplied)} to make this season. Confirming the premiere does not create a second upfront payment.
+                                                        </p>
+                                                        <div className="mt-4 grid grid-cols-3 border-y border-white/10 py-3 sm:mt-6 sm:py-4">
+                                                            <div className="pr-3">
+                                                                <div className="text-[8px] font-black uppercase tracking-[0.22em] text-zinc-500">Platform covered</div>
+                                                                <div className="mt-1 font-mono text-sm font-black text-sky-200">{formatContractMoney(lockedPremiereFundingApplied)}</div>
                                                             </div>
-                                                        )}
-                                                        {lockedPremiereFundingReason && (
-                                                            <p className="mb-4 text-sm text-sky-100/75 leading-relaxed">
-                                                                {lockedPremiereFundingReason}
-                                                            </p>
-                                                        )}
-                                                        <p className="text-white/75 leading-relaxed">
-                                                            No bidding room because the platform already committed. If production goes over cap, the studio pays the extra; if it comes under cap, unused funding returns to the platform.
+                                                            <div className="border-x border-white/10 px-3">
+                                                                <div className="text-[8px] font-black uppercase tracking-[0.22em] text-zinc-500">Studio at risk</div>
+                                                                <div className="mt-1 font-mono text-sm font-black text-white">{formatContractMoney(lockedPremiereStudioCashAtRisk)}</div>
+                                                            </div>
+                                                            <div className="pl-3">
+                                                                <div className="text-[8px] font-black uppercase tracking-[0.22em] text-zinc-500">New rights fee</div>
+                                                                <div className="mt-1 text-sm font-black text-emerald-300">Included</div>
+                                                            </div>
+                                                        </div>
+                                                        <p className="mt-3 text-xs leading-relaxed text-zinc-400 sm:mt-4">
+                                                            The season’s success will be judged using its funded cost, ratings and audience performance—not as an unpaid full-budget release.
                                                         </p>
                                                     </div>
                                                     <button
                                                         onClick={() => handleAcceptBid(lockedPremiereBid)}
                                                         disabled={!hasStreamingDealEnergy}
-                                                        className={`px-12 py-4 rounded-full font-bold tracking-widest uppercase text-xs transition-all ${
+                                                        className={`px-12 py-4 rounded-full font-bold tracking-widest uppercase text-xs transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 ${
                                                             hasStreamingDealEnergy
-                                                                ? 'bg-sky-400 text-black hover:scale-105 shadow-[0_0_30px_rgba(56,189,248,0.3)]'
+                                                                ? 'bg-sky-400 text-black hover:bg-sky-300 shadow-[0_0_30px_rgba(56,189,248,0.3)] cursor-pointer'
                                                                 : 'bg-white/10 text-white/35 cursor-not-allowed'
                                                         }`}
                                                     >
-                                                        {hasStreamingDealEnergy ? `Premiere on ${lockedPremierePlatform?.name} · ${streamingDealEnergyCost}E` : `Need ${streamingDealEnergyCost}E`}
+                                                        {hasStreamingDealEnergy ? `Confirm ${lockedPremierePlatform?.name} Premiere · ${streamingDealEnergyCost}E` : `Need ${streamingDealEnergyCost}E`}
                                                     </button>
                                                 </>
                                             ) : (
@@ -1958,20 +2069,37 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                                             <div className="font-mono text-lg text-amber-300 mt-2">{campaignForecast.weekTwoDropRisk}%</div>
                                         </div>
                                     </div>
-                                    <div className="grid grid-cols-3 border-t border-white/10">
+                                    <div className="grid grid-cols-2 md:grid-cols-4 border-t border-white/10">
                                         <div className="p-4 border-r border-white/10">
                                             <div className="text-[9px] text-white/40 uppercase tracking-widest font-bold">Streaming Bid</div>
                                             <div className="font-mono text-base text-sky-300 mt-1">+{campaignForecast.streamingBidBoost}%</div>
                                         </div>
-                                        <div className="p-4 border-r border-white/10">
+                                        <div className="p-4 md:border-r border-white/10">
                                             <div className="text-[9px] text-white/40 uppercase tracking-widest font-bold">Awards</div>
                                             <div className="font-mono text-base text-purple-200 mt-1">{campaignForecast.awardsVisibility}%</div>
                                         </div>
-                                        <div className="p-4">
+                                        <div className="p-4 border-r border-t md:border-t-0 border-white/10">
                                             <div className="text-[9px] text-white/40 uppercase tracking-widest font-bold">Franchise</div>
                                             <div className="font-mono text-base text-amber-300 mt-1">{campaignForecast.franchiseValueImpact >= 0 ? '+' : ''}{campaignForecast.franchiseValueImpact}%</div>
                                         </div>
+                                        <div className="p-4 border-t md:border-t-0 border-white/10">
+                                            <div className="text-[9px] text-white/40 uppercase tracking-widest font-bold">Launch Reach</div>
+                                            <div className={`font-mono text-base mt-1 ${
+                                                campaignReachPreview.label === 'LIMITED'
+                                                    ? 'text-rose-300'
+                                                    : campaignReachPreview.label === 'TARGETED'
+                                                        ? 'text-amber-300'
+                                                        : 'text-emerald-300'
+                                            }`}>
+                                                {campaignReachPreview.label === 'LIMITED' ? 'Limited' : campaignReachPreview.label === 'TARGETED' ? 'Targeted' : campaignReachPreview.label === 'WIDE' ? 'Wide' : 'Event'}
+                                            </div>
+                                        </div>
                                     </div>
+                                    {campaignReachPreview.label === 'LIMITED' && (
+                                        <div className="border-t border-white/10 px-4 py-3 text-[10px] leading-relaxed text-white/45">
+                                            A quiet launch starts with fewer viewers. Exceptional reviews can still create a rare sleeper run through word of mouth.
+                                        </div>
+                                    )}
                                 </div>
 
                                 {musicImpact.score > 0 && (

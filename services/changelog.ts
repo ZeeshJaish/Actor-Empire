@@ -50,6 +50,81 @@ const patchEntry = (version: string, title = 'Patch & Stability'): ChangelogEntr
 
 export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   changelogEntry(
+    '1.0.25',
+    'Living Productions & Fairer Competition',
+    'MINOR',
+    'July 2026',
+    'A production-world update with deeper Greenlight choices, rotating crews, tougher awards, clearer project feedback, and more reliable long-career play.',
+    [
+      {
+        heading: 'Living Productions',
+        items: [
+          'Greenlight now lets you plan background casts with a responsive live set preview, real costs, day players, and specialist performers.',
+          'Background performers can build careers over time and return in larger roles, creating new long-term stories across your projects.',
+          'Crew markets now refresh every three weeks with a wider rotating pool of cinematographers, composers, line producers, and VFX supervisors.',
+        ],
+      },
+      {
+        heading: 'Awards & World Competition',
+        items: [
+          'Player projects now face stronger competition from world films and music releases during nominations and award voting.',
+          'Eligibility rules reduce repeat nominations and stop the same project from winning the same awards year after year.',
+          'Award outcomes now respond more clearly to quality, popularity, prestige, campaign strength, and category fit.',
+        ],
+      },
+      {
+        heading: 'Project Feedback & Stability',
+        items: [
+          'Project performance feedback now gives a clearer breakdown of what helped or hurt each role and release.',
+          'Improved release continuity, long-career world activity, save migrations, and reported gameplay edge cases.',
+          'Refined mobile layouts and Greenlight interactions for clearer, more reliable production planning.',
+        ],
+      },
+    ],
+  ),
+  changelogEntry(
+    '1.0.24',
+    'Studio Continuity & Reliability',
+    'PATCH',
+    'July 2026',
+    'A player-report update focused on dependable studio ownership, real season continuations, clearer deals, and safer long-career play.',
+    [
+      {
+        heading: 'Series & Continuations',
+        items: [
+          'Renewed player-made series now receive a real linked next-season package in the Studio Vault.',
+          'Renewal messages take you directly to the next season when it is ready to plan, instead of promising a continuation that cannot be started.',
+          'Improved sequel, returning-talent, and continuation handoffs across studio projects.',
+        ],
+      },
+      {
+        heading: 'Subsidiary Studios',
+        items: [
+          'Independent subsidiary studios now manage their slates, releases, and quiet periods more reliably.',
+          'Studio archives now present theatrical, streaming, and soundtrack performance more accurately after release.',
+          'Improved active and past slate continuity so studio projects stay visible in the right place.',
+        ],
+      },
+      {
+        heading: 'Acquisitions & Ownership',
+        items: [
+          'Improved acquisition, bidding, board-decision, and signing flow reliability.',
+          'Forbes and Studio Group now keep ownership, merged studios, and independent subsidiaries in sync more consistently.',
+          'Expired, rejected, and completed deal messages now lead to the correct current state instead of reopening outdated actions.',
+          'Acquisition news and social reactions now better reflect the studios, people, and rivals involved in your deal.',
+        ],
+      },
+      {
+        heading: 'Stability & Mobile Play',
+        items: [
+          'Improved week progression safeguards, save recovery, and long-career reliability.',
+          'Improved startup and large-save handling to reduce interrupted sessions and black-screen recovery cases.',
+          'Fixed additional mobile interaction, message-routing, and screen-state edge cases.',
+        ],
+      },
+    ],
+  ),
+  changelogEntry(
     '1.0.23',
     'Studio Flow & Performance',
     'MINOR',

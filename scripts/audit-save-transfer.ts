@@ -264,7 +264,7 @@ assert(Array.isArray(compacted.flags.legacyHighlights), 'Compaction should prese
 
 const appSource = readFileSync('App.tsx', 'utf8');
 assert(
-  appSource.includes('const persistedPlayerState = await persistCurrentSlotSnapshot(syncedPlayerState);'),
+  appSource.includes('const persistedPlayerState = await persistCurrentSlotSnapshot(syncedPlayerState, {'),
   'Week advance should await persistence before showing the processed week.'
 );
 assert(

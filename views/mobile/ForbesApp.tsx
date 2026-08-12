@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Business, NPCActor, Player } from '../../types';
 import { formatMoney } from '../../services/formatUtils';
 import { getGenderedAvatar, NPC_DATABASE } from '../../services/npcLogic';
@@ -21,13 +21,15 @@ import { StudioAcquisitionDesk } from './components/StudioAcquisitionDesk';
 import { getCompanyPosition } from '../../services/companyPosition';
 import {
     acceptAcquisitionCounter,
+    beginPrivateControlAcquisition,
     beatAcquisitionRivalBid,
-    completeStudioAcquisition,
+    completeAcquisitionTransaction,
     completeStockControlAcquisition,
     getAcquisitionCase,
     reviseAcquisitionOffer,
     runDueDiligence,
     submitOpeningOffer,
+    updateAcquisitionPresentation,
     walkAwayFromAcquisition,
 } from '../../services/studioAcquisition';
 import { setSubsidiaryOperatingModel } from '../../services/studioGroup';
@@ -36,6 +38,11 @@ import { spendPlayerEnergy } from '../../services/premiumLogic';
 import { PHASE_ONE_ENERGY_COSTS } from '../../services/energyCosts';
 import { getInheritedStudioProjects } from '../../services/legacyLogic';
 import { markGameCheckpoint } from '../../services/firebaseService';
+import {
+    acceptPrivateEquityExit,
+    declinePrivateEquityExit,
+    requestPrivateEquityExit,
+} from '../../services/privateEquityLogic';
 
 interface ForbesAppProps {
   player: Player;
@@ -44,12 +51,23 @@ interface ForbesAppProps {
   onOpenStocks: () => void;
   onImmersiveChange?: (immersive: boolean) => void;
   initialStudioId?: string;
+  initialStudioName?: string;
   onInitialStudioConsumed?: () => void;
+  onInitialStudioUnavailable?: () => void;
 }
 
 type Tab = 'ACTORS' | 'STUDIOS' | 'STREAMING' | 'MY_RANK';
 
-const FORBES_CELEB_OCCUPATIONS = new Set<NPCActor['occupation']>(['ACTOR', 'DIRECTOR', 'MUSIC_ARTIST', 'INVESTOR']);
+const FORBES_CELEB_OCCUPATIONS = new Set<NPCActor['occupation']>([
+    'ACTOR',
+    'DIRECTOR',
+    'MUSIC_ARTIST',
+    'INVESTOR',
+    'CINEMATOGRAPHER',
+    'COMPOSER',
+    'LINE_PRODUCER',
+    'VFX_SUPERVISOR',
+]);
 const FORBES_PERSON_CATEGORY_PATTERN = /\b(actor|director|artist|creator|influencer|icon|mogul|investor|producer|writer|filmmaker)\b/i;
 const FORBES_BRAND_CATEGORY_PATTERN = /\b(brand|company|corporation|label|product)\b/i;
 
@@ -61,12 +79,16 @@ const isForbesCelebRankingEntry = (npc: Pick<NPCActor, 'occupation' | 'forbesCat
     return FORBES_CELEB_OCCUPATIONS.has(npc.occupation) || FORBES_PERSON_CATEGORY_PATTERN.test(category);
 };
 
-const getForbesCelebAvatar = (npc: Pick<NPCActor, 'gender' | 'name'>): string => getGenderedAvatar(npc.gender, npc.name);
+const getForbesCelebAvatar = (npc: Pick<NPCActor, 'avatar' | 'gender' | 'name'>): string => npc.avatar || getGenderedAvatar(npc.gender, npc.name);
 
-export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePlayer, onOpenStocks, onImmersiveChange, initialStudioId, onInitialStudioConsumed }) => {
+export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePlayer, onOpenStocks, onImmersiveChange, initialStudioId, initialStudioName, onInitialStudioConsumed, onInitialStudioUnavailable }) => {
   const [tab, setTab] = useState<Tab>('ACTORS');
   const [selectedStudioProfile, setSelectedStudioProfile] = useState<ForbesStudioProfileData | null>(null);
   const [acquisitionDeskOpen, setAcquisitionDeskOpen] = useState(false);
+  const latestPlayerRef = useRef(player);
+  useEffect(() => {
+      latestPlayerRef.current = player;
+  }, [player]);
   const language = getPlayerLanguage(player);
   const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
   const acquisitionStrategyEnergyCost = PHASE_ONE_ENERGY_COSTS.ACQUISITION_STRATEGY_ACTION;
@@ -82,6 +104,9 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePl
       if (!result.success) return result;
       const nextPlayer = { ...result.player };
       spendPlayerEnergy(nextPlayer, cost, `Acquisition desk: ${cost}E action`);
+      // Keep follow-up actions on the same deal tied to the state we just
+      // saved, even if React has not delivered the updated player prop yet.
+      latestPlayerRef.current = nextPlayer;
       onUpdatePlayer(nextPlayer);
       return { ...result, player: nextPlayer };
   };
@@ -153,10 +178,14 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePl
         };
     });
 
+  const marketStudios = (player.world.studios ? (Object.values(player.world.studios) as any[]) : (Object.values(STUDIO_CATALOG) as any[]))
+      .filter(studio => !mergedStudioIds.has(studio.id));
+  const playerOwnedStudioById = new Map(playerOwnedStudios.map(studio => [studio.id, studio]));
+  // A newly acquired studio may still exist in the market snapshot. The save
+  // owns the truth, so its player-owned entry must replace the market version.
   const studioRanking = [
-      ...(player.world.studios ? (Object.values(player.world.studios) as any[]) : (Object.values(STUDIO_CATALOG) as any[]))
-          .filter(studio => !mergedStudioIds.has(studio.id)),
-      ...playerOwnedStudios
+      ...marketStudios.map(studio => playerOwnedStudioById.get(studio.id) || studio),
+      ...playerOwnedStudios.filter(studio => !marketStudios.some(marketStudio => marketStudio.id === studio.id)),
   ].filter((studio, idx, arr) => arr.findIndex(entry => entry.id === studio.id) === idx)
     .sort((a, b) => b.valuation - a.valuation);
 
@@ -164,7 +193,9 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePl
       const playerBusiness = playerOwnedStudios.some(entry => entry.id === studio.id)
           ? (player.businesses || []).find(business => business.id === studio.id && business.type === 'PRODUCTION_HOUSE')
           : undefined;
-      const inheritedStudioReleases = playerBusiness ? getInheritedStudioProjects(player, studio.id) : [];
+      const inheritedStudioReleases = playerBusiness
+          ? getInheritedStudioProjects(player, studio.id).filter(project => !player.activeReleases.some(release => release.id === project.id))
+          : [];
       const playerStudioReleases = playerBusiness ? [
           ...player.pastProjects.filter(project => project.studioId === studio.id),
           ...inheritedStudioReleases
@@ -261,14 +292,22 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePl
   };
 
   useEffect(() => {
-      if (!initialStudioId) return;
-      const targetIndex = studioRanking.findIndex(studio => studio.id === initialStudioId);
-      if (targetIndex < 0) return;
+      if (!initialStudioId && !initialStudioName) return;
+      const normalizedTargetName = String(initialStudioName || '').trim().toLocaleLowerCase();
+      const targetIndex = studioRanking.findIndex(studio => (
+          studio.id === initialStudioId
+          || (normalizedTargetName.length > 0 && String(studio.name || '').trim().toLocaleLowerCase() === normalizedTargetName)
+      ));
+      if (targetIndex < 0) {
+          onInitialStudioUnavailable?.();
+          onInitialStudioConsumed?.();
+          return;
+      }
       setTab('STUDIOS');
       openStudioProfile(studioRanking[targetIndex], targetIndex + 1);
       setAcquisitionDeskOpen(true);
       onInitialStudioConsumed?.();
-  }, [initialStudioId]);
+  }, [initialStudioId, initialStudioName, player.world.studios, player.businesses]);
 
   // STREAMERS
   const platformRanking = player.world.platforms
@@ -333,6 +372,7 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePl
     <div className="absolute inset-0 bg-black flex flex-col z-40 text-white animate-in slide-in-from-right duration-300 font-sans">
         {selectedStudioProfile && (
             <ForbesStudioProfile
+                player={player}
                 profile={selectedStudioProfile}
                 onClose={() => {
                     setAcquisitionDeskOpen(false);
@@ -358,6 +398,57 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePl
                     setAcquisitionDeskOpen(true);
                 }}
                 onOpenStocks={onOpenStocks}
+                onStartPrivateControl={() => {
+                    const result = beginPrivateControlAcquisition({
+                        player: latestPlayerRef.current,
+                        profile: selectedStudioProfile,
+                    });
+                    if (result.success) {
+                        latestPlayerRef.current = result.player;
+                        onUpdatePlayer(result.player);
+                        markGameCheckpoint('forbes_private_control_route_open', result.player, {
+                            acquisition_studio_id: selectedStudioProfile.id,
+                            existing_stake_percent: result.acquisitionCase?.controlConversion?.existingPercent || 0,
+                            remaining_stake_percent: result.acquisitionCase?.controlConversion?.remainingPercent || 0,
+                        });
+                        setAcquisitionDeskOpen(true);
+                    }
+                    return result;
+                }}
+                onRequestPrivateExit={(percentForSale) => {
+                    const result = requestPrivateEquityExit({
+                        player: latestPlayerRef.current,
+                        studioId: selectedStudioProfile.id,
+                        percentForSale,
+                    });
+                    if (result.success) {
+                        latestPlayerRef.current = result.player;
+                        onUpdatePlayer(result.player);
+                    }
+                    return result;
+                }}
+                onAcceptPrivateExit={() => {
+                    const result = acceptPrivateEquityExit({
+                        player: latestPlayerRef.current,
+                        studioId: selectedStudioProfile.id,
+                    });
+                    if (result.success) {
+                        latestPlayerRef.current = result.player;
+                        onUpdatePlayer(result.player);
+                    }
+                    return result;
+                }}
+                onDeclinePrivateExit={() => {
+                    const result = declinePrivateEquityExit({
+                        player: latestPlayerRef.current,
+                        studioId: selectedStudioProfile.id,
+                    });
+                    if (result.success) {
+                        latestPlayerRef.current = result.player;
+                        onUpdatePlayer(result.player);
+                    }
+                    return result;
+                }}
                 language={language}
             />
         )}
@@ -371,11 +462,14 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePl
                 onImmersiveChange={onImmersiveChange}
                 onSetOperatingModel={(model) => {
                     const result = setSubsidiaryOperatingModel({
-                        player,
+                        player: latestPlayerRef.current,
                         studioId: selectedStudioProfile.id,
                         model,
                     });
-                    if (result.success) onUpdatePlayer(result.player);
+                    if (result.success) {
+                        latestPlayerRef.current = result.player;
+                        onUpdatePlayer(result.player);
+                    }
                     return result;
                 }}
                 onRunDiligence={(funding) => {
@@ -446,31 +540,46 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePl
                 }}
 	                onCompleteAcquisition={() => {
 	                    if (!hasEnergyFor(acquisitionSigningEnergyCost)) return energyBlockedResult(acquisitionSigningEnergyCost);
-	                    const result = completeStudioAcquisition({
+	                    const result = completeAcquisitionTransaction({
 	                        player,
 	                        profile: selectedStudioProfile,
 	                    });
-		                    if (result.success) {
-		                        const resultAfterEnergy = spendEnergyFromResult(result, acquisitionSigningEnergyCost);
-		                        onUpdatePlayer(resultAfterEnergy.player);
-		                        setSelectedStudioProfile(current => current ? {
-		                            ...current,
-		                            isPlayerOwned: true,
-	                            acquisitionState: 'NOT_FOR_SALE',
-	                            capital: resultAfterEnergy.acquiredBusiness?.balance ?? current.capital,
-	                            ownershipStructure: 'Privately held · Player controlled',
-	                            assetDataSource: 'SAVE_DATA',
-	                        } : current);
+	                    if (result.success) {
+	                        const resultAfterEnergy = spendEnergyFromResult(result, acquisitionSigningEnergyCost);
+	                        const acquiredBusiness = 'acquiredBusiness' in resultAfterEnergy
+	                            ? resultAfterEnergy.acquiredBusiness
+	                            : undefined;
+	                        if (acquiredBusiness) {
+	                            setSelectedStudioProfile(current => current ? {
+	                                ...current,
+	                                isPlayerOwned: true,
+	                                acquisitionState: 'NOT_FOR_SALE',
+	                                capital: acquiredBusiness.balance ?? current.capital,
+	                                ownershipStructure: current.acquisitionState === 'PUBLICLY_TRADED'
+	                                    ? 'Public-market control · Player controlled'
+	                                    : 'Privately held · Player controlled',
+	                                assetDataSource: 'SAVE_DATA',
+	                            } : current);
+	                        }
 	                        return resultAfterEnergy;
 	                    }
 	                    return result;
 	                }}
+	                onUpdatePresentation={(patch) => {
+	                    const result = updateAcquisitionPresentation({
+	                        player,
+	                        studioId: selectedStudioProfile.id,
+	                        patch,
+	                    });
+	                    if (result.success) onUpdatePlayer(result.player);
+	                    return result;
+	                }}
 	                onCompleteStockControl={() => {
 	                    if (!hasEnergyFor(stockControlEnergyCost)) return energyBlockedResult(stockControlEnergyCost);
-	                    const result = completeStockControlAcquisition({
+	                    const result = completeAcquisitionTransaction({
 	                        player,
 	                        profile: selectedStudioProfile,
-		                    });
+	                    });
 		                    if (result.success) {
 		                        const resultAfterEnergy = spendEnergyFromResult(result, stockControlEnergyCost);
 		                        onUpdatePlayer(resultAfterEnergy.player);
@@ -580,7 +689,7 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePl
                                                 <span className="block">{studio.isPlayerOwned ? tr('forbes.playerOwned').split(' ')[0] : studio.isNpcVenture ? tr('forbes.npcVenture').split(' ')[0] : tr('forbes.marketLeader').split(' ')[0]}</span>
                                                 <span className="block">{studio.isPlayerOwned ? tr('forbes.playerOwned').split(' ').slice(1).join(' ') : studio.isNpcVenture ? tr('forbes.npcVenture').split(' ').slice(1).join(' ') : tr('forbes.marketLeader').split(' ').slice(1).join(' ')}</span>
                                             </div>
-                                            {studio.isPlayerOwned && <span className="ml-auto shrink-0 rounded bg-amber-500 px-1.5 py-0.5 text-[7px] font-black text-black">{tr('forbes.you')}</span>}
+                                            {studio.isPlayerOwned && <span className="ml-auto shrink-0 rounded border border-amber-200/70 bg-amber-400 px-2 py-1 text-[7px] font-black uppercase tracking-[0.12em] text-black">Owned by You</span>}
                                     </div>
                                     {studio.isNpcVenture && studio.ownerName && (
                                         <div className="mt-2 truncate text-[8px] uppercase tracking-widest font-black text-zinc-600">

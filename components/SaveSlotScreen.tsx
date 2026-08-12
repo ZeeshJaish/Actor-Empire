@@ -117,16 +117,22 @@ export default function SaveSlotScreen({
                 </div>
                 <div className="slot-name">{slot.name}</div>
                 <div className="slot-stats">
-                  <span>
-                    Age <b>{slot.age}</b>
-                  </span>
-                  <span className="gold">
-                    ★ <b>{slot.fame}</b> Fame
-                  </span>
-                  <span className="slot-time" title="Total time played">
-                    <Clock3 size={13} strokeWidth={2.5} aria-hidden="true" />
-                    <b>{formatTotalPlayTime(slot.totalPlayTimeMs)}</b>
-                  </span>
+                  {slot.isPendingSummary ? (
+                    <span>Career details load safely when opened</span>
+                  ) : (
+                    <>
+                      <span>
+                        Age <b>{slot.age}</b>
+                      </span>
+                      <span className="gold">
+                        ★ <b>{slot.fame}</b> Fame
+                      </span>
+                      <span className="slot-time" title="Total time played">
+                        <Clock3 size={13} strokeWidth={2.5} aria-hidden="true" />
+                        <b>{formatTotalPlayTime(slot.totalPlayTimeMs)}</b>
+                      </span>
+                    </>
+                  )}
                 </div>
               </div>
               <div className="slot-go">

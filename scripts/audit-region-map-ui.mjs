@@ -11,12 +11,14 @@ const read = (path) => fs.readFileSync(path, 'utf8');
 const mapPath = 'views/lifestyle/business/components/InteractiveRegionMap.tsx';
 const releasePath = 'views/lifestyle/business/ReleaseWizard.tsx';
 const greenlightPath = 'views/lifestyle/business/GreenlightWizard.tsx';
+const greenlightLocationPath = 'views/lifestyle/business/components/GreenlightLocationStep.tsx';
 
 assert(fs.existsSync(mapPath), 'InteractiveRegionMap component is missing.');
 
 const mapSource = read(mapPath);
 const releaseSource = read(releasePath);
 const greenlightSource = read(greenlightPath);
+const greenlightLocationSource = read(greenlightLocationPath);
 
 [
   'interactive-region-map',
@@ -85,15 +87,16 @@ assert(!mapSource.includes('market weight'), 'The map should not expose internal
 [
   'InteractiveRegionMap',
   'locationPins',
-  'longitude: loc.longitude',
-  'latitude: loc.latitude',
+  'longitude: site.longitude',
+  'latitude: site.latitude',
   'onSelectLocation',
   'visualTone="production"',
   'GLOBAL PRODUCTION NETWORK'
 ].forEach(token => {
-  assert(greenlightSource.includes(token), `GreenlightWizard should include ${token}.`);
+  assert(greenlightLocationSource.includes(token), `Greenlight location step should include ${token}.`);
 });
 
 assert(!greenlightSource.includes('Simplified World Map Paths'), 'Greenlight should not keep the old low-quality local map.');
+assert(!greenlightLocationSource.includes('Simplified World Map Paths'), 'Greenlight location step should not keep the old low-quality local map.');
 
 console.log('Region map UI audit passed.');

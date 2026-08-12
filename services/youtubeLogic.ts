@@ -1,14 +1,68 @@
 
-import { GameLanguage, Gender, NPCActor, NPCPrestige, NPCTier, Player, YoutubeBrandDeal, YoutubeChannel, YoutubeCollabOffer, YoutubeCreatorIdentity, YoutubeMusicVideoFeatureOffer, YoutubeVideo, YoutubeVideoType } from '../types';
+import { GameLanguage, Gender, NPCActor, NPCPrestige, NPCTier, Player, YoutubeBrandDeal, YoutubeChannel, YoutubeCollabOffer, YoutubeCreatorIdentity, YoutubeMerchResult, YoutubeMerchTier, YoutubeMusicVideoFeatureOffer, YoutubeVideo, YoutubeVideoType } from '../types';
 import { getGenderedAvatar, NPC_DATABASE } from './npcLogic';
 import { MOD_TALENT_ROWS, ModTalentRow } from './modTalentData';
 import { MOD_TALENT_SUPPLEMENT_ROWS } from './modTalentSupplement';
 import { hydrateGenreXP } from './genreCatalog';
 import { getMusicArtistCatalog } from './musicIndustry';
 import { getPlayerLanguage, t } from './i18n';
+import { spendPlayerEnergy } from './premiumLogic';
 
 export const YOUTUBE_MONETIZATION_SUBS = 1000;
 export const YOUTUBE_MONETIZATION_VIEWS = 4000;
+export const YOUTUBE_MERCH_COOLDOWN_WEEKS = 6;
+
+export interface YoutubeMerchTierConfig {
+    labelKey: string;
+    cost: number;
+    energy: number;
+    trustReq: number;
+    margin: number;
+    heat: number;
+}
+
+export const YOUTUBE_MERCH_TIERS: Record<YoutubeMerchTier, YoutubeMerchTierConfig> = {
+    BASIC: { labelKey: 'youtube.merch.BASIC.label', cost: 5_000, energy: 14, trustReq: 35, margin: 0.28, heat: 1 },
+    PREMIUM: { labelKey: 'youtube.merch.PREMIUM.label', cost: 25_000, energy: 22, trustReq: 50, margin: 0.42, heat: 4 },
+    LUXURY: { labelKey: 'youtube.merch.LUXURY.label', cost: 100_000, energy: 34, trustReq: 68, margin: 0.62, heat: 8 },
+};
+
+export type YoutubeMerchFailureReason =
+    | 'COOLDOWN'
+    | 'TRUST_REQUIRED'
+    | 'NOT_ENOUGH_ENERGY'
+    | 'NOT_ENOUGH_MONEY';
+
+export interface YoutubeMerchQuote {
+    tier: YoutubeMerchTier;
+    grossRevenue: number;
+    productionCost: number;
+    netProfit: number;
+    result: YoutubeMerchResult;
+}
+
+export interface YoutubeMerchResolution {
+    success: boolean;
+    player: Player;
+    quote?: YoutubeMerchQuote;
+    reason?: YoutubeMerchFailureReason;
+}
+
+const YOUTUBE_MERCH_IDENTITY_BOOST: Record<YoutubeCreatorIdentity, number> = {
+    ACTOR_VLOGGER: 0,
+    CHAOS_CREATOR: 0,
+    PRESTIGE_FILMMAKER: -0.03,
+    LIFESTYLE_ICON: 0.18,
+    CONTROVERSY_MAGNET: -0.04,
+};
+
+const YOUTUBE_MERCH_IDENTITY_EFFECTS: Record<YoutubeCreatorIdentity, { mood: number; trust: number; heat: number }> = {
+    ACTOR_VLOGGER: { mood: 1, trust: 1, heat: -1 },
+    CHAOS_CREATOR: { mood: 2, trust: -1, heat: 3 },
+    PRESTIGE_FILMMAKER: { mood: -1, trust: 2, heat: -2 },
+    LIFESTYLE_ICON: { mood: 2, trust: 1, heat: 0 },
+    CONTROVERSY_MAGNET: { mood: 3, trust: -2, heat: 5 },
+};
 
 const YOUTUBE_COLLAB_CONCEPTS = [
     "24 Hours On My Set",
@@ -36,6 +90,195 @@ const pick = <T>(arr: readonly T[]): T => arr[Math.floor(Math.random() * arr.len
 const clamp = (value: number, min = 0, max = 100): number => Math.max(min, Math.min(max, value));
 
 const M = 1000000;
+
+const getYoutubeAbsoluteWeek = (player: Pick<Player, 'age' | 'currentWeek'>) => (
+    Math.max(1, Math.round(Number(player.age) || 1)) * 52
+    + Math.min(52, Math.max(1, Math.round(Number(player.currentWeek) || 1)))
+);
+
+export const getYoutubeMerchDropFailure = (
+    player: Player,
+    tier: YoutubeMerchTier,
+): YoutubeMerchFailureReason | undefined => {
+    const config = YOUTUBE_MERCH_TIERS[tier];
+    const channel = player.youtube;
+    const currentAbsoluteWeek = getYoutubeAbsoluteWeek(player);
+    if (currentAbsoluteWeek - Math.max(0, Number(channel.lastMerchDropWeek) || 0) < YOUTUBE_MERCH_COOLDOWN_WEEKS) {
+        return 'COOLDOWN';
+    }
+    if (Math.max(0, Number(channel.audienceTrust) || 0) < config.trustReq) {
+        return 'TRUST_REQUIRED';
+    }
+    if (Math.max(0, Number(player.energy?.current) || 0) < config.energy) {
+        return 'NOT_ENOUGH_ENERGY';
+    }
+    if (Math.max(0, Number(player.money) || 0) < config.cost) {
+        return 'NOT_ENOUGH_MONEY';
+    }
+    return undefined;
+};
+
+export const calculateYoutubeMerchQuote = (
+    player: Player,
+    tier: YoutubeMerchTier,
+    random: () => number = Math.random,
+): YoutubeMerchQuote => {
+    const config = YOUTUBE_MERCH_TIERS[tier];
+    const channel = player.youtube;
+    const mood = clamp(Number(channel.fanMood) || 55);
+    const trust = clamp(Number(channel.audienceTrust) || 55);
+    const controversy = clamp(Number(channel.controversy) || 0);
+    const subscribers = Math.max(0, Math.floor(Number(channel.subscribers) || 0));
+    const identity = channel.creatorIdentity || 'ACTOR_VLOGGER';
+    const identityBoost = YOUTUBE_MERCH_IDENTITY_BOOST[identity] || 0;
+    const demand = Math.max(
+        0.25,
+        (mood / 100)
+        + (trust / 180)
+        + (subscribers >= 100_000 ? 0.25 : 0)
+        - (controversy / 180)
+        + identityBoost,
+    );
+    const rawSalesRoll = Number(random());
+    const salesRoll = clamp(Number.isFinite(rawSalesRoll) ? rawSalesRoll : 0.5, 0, 1);
+    const grossRevenue = Math.max(
+        0,
+        Math.floor(subscribers * config.margin * demand * (0.7 + salesRoll * 0.65)),
+    );
+    const netProfit = grossRevenue - config.cost;
+    const result: YoutubeMerchResult = netProfit > config.cost * 1.2
+        ? 'SOLD_OUT'
+        : netProfit < 0
+            ? 'UNDERPERFORMED'
+            : 'PROFIT';
+
+    return {
+        tier,
+        grossRevenue,
+        productionCost: config.cost,
+        netProfit,
+        result,
+    };
+};
+
+const getYoutubeMerchResultLabel = (
+    language: GameLanguage,
+    quote: YoutubeMerchQuote,
+) => {
+    const tierLabel = t(language, YOUTUBE_MERCH_TIERS[quote.tier].labelKey);
+    if (quote.result === 'SOLD_OUT') {
+        return t(language, 'youtube.merch.result.soldOut', { tier: tierLabel });
+    }
+    if (quote.result === 'UNDERPERFORMED') {
+        return t(language, 'youtube.merch.result.underperformed', { tier: tierLabel });
+    }
+    return t(language, 'youtube.merch.result.profit', { tier: tierLabel });
+};
+
+export const resolveYoutubeMerchDrop = (
+    player: Player,
+    tier: YoutubeMerchTier,
+    random: () => number = Math.random,
+    language: GameLanguage = getPlayerLanguage(player),
+): YoutubeMerchResolution => {
+    const reason = getYoutubeMerchDropFailure(player, tier);
+    if (reason) return { success: false, player, reason };
+
+    const config = YOUTUBE_MERCH_TIERS[tier];
+    const quote = calculateYoutubeMerchQuote(player, tier, random);
+    const identityEffects = YOUTUBE_MERCH_IDENTITY_EFFECTS[player.youtube.creatorIdentity || 'ACTOR_VLOGGER'];
+    const absoluteWeek = getYoutubeAbsoluteWeek(player);
+    const outcomeId = `youtube_merch_${player.age}_${player.currentWeek}_${tier}`;
+    const resultLabel = getYoutubeMerchResultLabel(language, quote);
+    const cashAfter = Math.max(0, (Number(player.money) || 0) + quote.netProfit);
+    const salesTransactionId = `tx_${outcomeId}_sales`;
+    const costTransactionId = `tx_${outcomeId}_cost`;
+    const existingHistory = Array.isArray(player.finance?.history) ? player.finance.history : [];
+    const nextPlayer: Player = {
+        ...player,
+        money: cashAfter,
+        energy: { ...player.energy },
+        flags: { ...player.flags },
+        youtube: {
+            ...player.youtube,
+            lifetimeEarnings: Math.max(0, Number(player.youtube.lifetimeEarnings) || 0) + Math.max(0, quote.netProfit),
+            fanMood: clamp(
+                (Number(player.youtube.fanMood) || 55)
+                + (quote.result === 'SOLD_OUT' ? 6 : quote.result === 'UNDERPERFORMED' ? -5 : 2)
+                + identityEffects.mood,
+            ),
+            audienceTrust: clamp(
+                (Number(player.youtube.audienceTrust) || 55)
+                + (quote.result === 'UNDERPERFORMED' ? -4 : 1)
+                + identityEffects.trust,
+            ),
+            controversy: clamp(
+                (Number(player.youtube.controversy) || 0)
+                + config.heat
+                + (quote.result === 'UNDERPERFORMED' ? 5 : 0)
+                + identityEffects.heat,
+            ),
+            lastMerchDropWeek: absoluteWeek,
+            lastMerchResult: resultLabel,
+            lastMerchOutcome: {
+                id: outcomeId,
+                tier,
+                result: quote.result,
+                grossRevenue: quote.grossRevenue,
+                productionCost: quote.productionCost,
+                netProfit: quote.netProfit,
+                cashAfter,
+                week: player.currentWeek,
+                year: player.age,
+            },
+        },
+        finance: {
+            ...player.finance,
+            history: [
+                {
+                    id: salesTransactionId,
+                    week: player.currentWeek,
+                    year: player.age,
+                    amount: quote.grossRevenue,
+                    category: 'BUSINESS' as const,
+                    description: t(language, 'youtube.finance.merchSales', {
+                        tier: t(language, config.labelKey),
+                    }),
+                },
+                {
+                    id: costTransactionId,
+                    week: player.currentWeek,
+                    year: player.age,
+                    amount: -quote.productionCost,
+                    category: 'EXPENSE' as const,
+                    description: t(language, 'youtube.finance.merchProduction', {
+                        tier: t(language, config.labelKey),
+                    }),
+                },
+                ...existingHistory.filter(transaction => (
+                    transaction.id !== salesTransactionId
+                    && transaction.id !== costTransactionId
+                )),
+            ].slice(0, 200),
+        },
+        logs: [
+            ...(Array.isArray(player.logs) ? player.logs : []),
+            {
+                week: player.currentWeek,
+                year: player.age,
+                message: t(language, 'youtube.log.merchResult', {
+                    result: resultLabel,
+                    gross: quote.grossRevenue.toLocaleString(),
+                    profit: quote.netProfit.toLocaleString(),
+                }),
+                type: quote.result === 'UNDERPERFORMED' ? 'negative' as const : 'positive' as const,
+            },
+        ].slice(-50),
+    };
+
+    spendPlayerEnergy(nextPlayer, config.energy, `YouTube: Merch ${t(language, config.labelKey)}`);
+    return { success: true, player: nextPlayer, quote };
+};
 
 interface GlobalCreatorProfile {
     id: string;

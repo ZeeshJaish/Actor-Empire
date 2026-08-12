@@ -2,6 +2,7 @@ import { INITIAL_PLAYER } from '../types';
 import { createDefaultStudioState } from '../services/businessLogic';
 import {
     executeFullStudioMerger,
+    getStudioTreasuryWithdrawalQuote,
     performStudioTreasuryTransfer,
 } from '../services/studioGroup';
 import { getTradableStocks, initializeStocks } from '../services/stockLogic';
@@ -211,6 +212,106 @@ const studioAfterWithdrawal = withdrawnToHq.player.businesses.find(business => b
 if (hqAfterWithdrawal.balance !== parentStudio.balance + 40_000_000) throw new Error('HQ withdrawal should increase parent studio capital.');
 if (!studioAfterWithdrawal.studioState?.financeLedger?.some(entry => entry.type === 'CAPITAL_WITHDRAWAL' && entry.label.includes('Headquarters'))) {
     throw new Error('Subsidiary treasury action should be recorded in studio ledger.');
+}
+
+const partialControlStock = {
+    ...acquiredStudioStock,
+    outstandingShares: acquiredStudioStock.outstandingShares,
+};
+const partialControlShares = Math.round((Number(partialControlStock.outstandingShares) * 52) / 100);
+const partialControlPlayer: Player = {
+    ...player,
+    stocks: [partialControlStock as any],
+    portfolio: [{
+        stockId: partialControlStock.id,
+        shares: partialControlShares,
+        averageCost: partialControlStock.price,
+        totalInvested: partialControlStock.price * partialControlShares,
+    }],
+    stockTakeovers: [{
+        id: 'takeover_artisan',
+        stockId: partialControlStock.id,
+        stockSymbol: partialControlStock.symbol,
+        companyName: acquiredStudio.name,
+        relatedStudioId: acquiredStudio.id,
+        route: 'CONTROL_TRANSFER',
+        status: 'CONTROLLED',
+        ownershipPercent: 52,
+        alliedSupportPercent: 0,
+        effectiveControlPercent: 52,
+        supportScore: 80,
+        rivalDefenceRisk: 10,
+        cost: 0,
+        summary: 'Control secured',
+        createdWeek: player.currentWeek,
+        createdYear: player.age,
+        resolvedWeek: player.currentWeek,
+        resolvedYear: player.age,
+        acquiredBusinessId: acquiredStudio.id,
+    }],
+};
+const partialQuote = getStudioTreasuryWithdrawalQuote(partialControlPlayer, acquiredStudio);
+if (partialQuote.ownershipPercent !== 52) {
+    throw new Error('Treasury quote should use the live controlled ownership percentage.');
+}
+const dilutedControlPlayer: Player = {
+    ...partialControlPlayer,
+    stocks: [{
+        ...partialControlStock,
+        outstandingShares: Math.round(Number(partialControlStock.outstandingShares) * 1.3),
+    } as any],
+};
+const dilutedQuote = getStudioTreasuryWithdrawalQuote(dilutedControlPlayer, acquiredStudio);
+if (dilutedQuote.ownershipPercent !== 40) {
+    throw new Error('Newly issued shares should dilute the owner share used by treasury distributions.');
+}
+if (dilutedQuote.maxOwnerProceeds >= partialQuote.maxOwnerProceeds) {
+    throw new Error('Dilution should reduce the maximum cash attributable to the owner.');
+}
+if (partialQuote.operatingReserve <= 0 || partialQuote.maxOwnerProceeds >= acquiredStudio.balance) {
+    throw new Error('Treasury quote should protect an operating reserve and limit owner proceeds.');
+}
+const partialWithdrawal = performStudioTreasuryTransfer({
+    player: partialControlPlayer,
+    studioId: acquiredStudio.id,
+    action: 'WITHDRAW',
+    counterparty: 'PERSONAL',
+    amount: partialQuote.maxOwnerProceeds,
+});
+if (!partialWithdrawal.success || !partialWithdrawal.withdrawalQuote) {
+    throw new Error('A partial owner should be able to take the quoted maximum distribution.');
+}
+if (partialWithdrawal.player.money !== partialControlPlayer.money + partialQuote.maxOwnerProceeds) {
+    throw new Error('A partial owner should receive only their ownership share of the distribution.');
+}
+if (partialWithdrawal.withdrawalQuote.minorityDistribution <= 0) {
+    throw new Error('The remainder of a partial-owner distribution should go to outside shareholders.');
+}
+if (partialWithdrawal.studio?.balance !== partialQuote.operatingReserve) {
+    throw new Error('A maximum distribution should leave the protected operating reserve in the studio.');
+}
+const postWithdrawalQuote = getStudioTreasuryWithdrawalQuote(
+    partialWithdrawal.player,
+    partialWithdrawal.studio!,
+);
+if (postWithdrawalQuote.maxOwnerProceeds !== 0) {
+    throw new Error('The owner must not repeatedly drain the protected studio reserve.');
+}
+const overLimitWithdrawal = performStudioTreasuryTransfer({
+    player: partialControlPlayer,
+    studioId: acquiredStudio.id,
+    action: 'WITHDRAW',
+    counterparty: 'PERSONAL',
+    amount: partialQuote.maxOwnerProceeds + 1,
+});
+if (overLimitWithdrawal.success || overLimitWithdrawal.reason !== 'EXCEEDS_DISTRIBUTABLE_CASH') {
+    throw new Error('A partial owner must not withdraw above the ownership-aware board limit.');
+}
+if (overLimitWithdrawal.player.money !== partialControlPlayer.money) {
+    throw new Error('A blocked treasury withdrawal must not change player cash.');
+}
+if (overLimitWithdrawal.studio?.balance !== acquiredStudio.balance) {
+    throw new Error('A blocked treasury withdrawal must not change studio cash.');
 }
 
 const insufficient = performStudioTreasuryTransfer({

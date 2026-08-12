@@ -21,7 +21,7 @@ import {
     Users,
 } from 'lucide-react';
 import type { ForbesStudioProfile as ForbesStudioProfileData, StudioAcquisitionState } from '../../../services/forbesStudioProfile';
-import type { GameLanguage } from '../../../types';
+import type { GameLanguage, Player } from '../../../types';
 import {
     getForbesOwnershipCommand,
     type ApplyForbesOwnershipDiscoveryResult,
@@ -30,12 +30,21 @@ import { t } from '../../../services/i18n';
 import { formatMoney } from '../../../services/formatUtils';
 import type { CompanyPosition } from '../../../services/companyPosition';
 import {
+    ACQUISITION_MAX_OFFER_ATTEMPTS,
     getAcquisitionEligibility,
+    getAcquisitionOfferAttemptCount,
+    getAcquisitionOfferAttemptsRemaining,
+    getAcquisitionReapproachWeeksRemaining,
     type AcquisitionCase,
+    type PrivateControlAcquisitionStartResult,
 } from '../../../services/studioAcquisition';
 import { ForbesCompanyPosition } from './ForbesCompanyPosition';
+import type {
+    PrivateEquityActionResult,
+} from '../../../services/privateEquityLogic';
 
 interface ForbesStudioProfileProps {
+    player: Player;
     profile: ForbesStudioProfileData;
     onClose: () => void;
     ownershipCommandRecorded: boolean;
@@ -44,6 +53,10 @@ interface ForbesStudioProfileProps {
     acquisitionCase?: AcquisitionCase;
     onApproachStudio: () => void;
     onOpenStocks: () => void;
+    onRequestPrivateExit: (percentForSale: number) => PrivateEquityActionResult;
+    onAcceptPrivateExit: () => PrivateEquityActionResult;
+    onDeclinePrivateExit: () => PrivateEquityActionResult;
+    onStartPrivateControl: () => PrivateControlAcquisitionStartResult;
     language: GameLanguage;
 }
 
@@ -59,6 +72,7 @@ const ACQUISITION_STATES: Record<StudioAcquisitionState, { labelKey: Parameters<
 const formatCompactMoney = (value: number) => value === 0 ? '$0' : formatMoney(value);
 
 export const ForbesStudioProfile: React.FC<ForbesStudioProfileProps> = ({
+    player,
     profile,
     onClose,
     ownershipCommandRecorded,
@@ -67,16 +81,28 @@ export const ForbesStudioProfile: React.FC<ForbesStudioProfileProps> = ({
     acquisitionCase,
     onApproachStudio,
     onOpenStocks,
+    onRequestPrivateExit,
+    onAcceptPrivateExit,
+    onDeclinePrivateExit,
+    onStartPrivateControl,
     language,
 }) => {
     const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
     const acquisition = ACQUISITION_STATES[profile.acquisitionState];
     const isProfitable = profile.profitability >= 0;
     const [ownershipCommandFeedback, setOwnershipCommandFeedback] = React.useState<string | null>(null);
-    const acquisitionEligibility = getAcquisitionEligibility(profile, acquisitionCase);
+    const acquisitionEligibility = getAcquisitionEligibility(profile, acquisitionCase, player);
+    const reapproachWeeksRemaining = getAcquisitionReapproachWeeksRemaining(acquisitionCase, player);
+    const offersUsed = getAcquisitionOfferAttemptCount(acquisitionCase);
+    const offersRemaining = getAcquisitionOfferAttemptsRemaining(acquisitionCase);
+    const privateControlAvailable = profile.acquisitionState !== 'PUBLICLY_TRADED'
+        && profile.acquisitionState !== 'NOT_FOR_SALE'
+        && !profile.isPlayerOwned
+        && companyPosition.negotiatedPercent > 0;
+    const hasLegacyFinalRejection = acquisitionCase?.status === 'REJECTED' && offersRemaining === 0;
     const canOpenAcquisition = acquisitionEligibility.canApproach
         || acquisitionCase?.status === 'DRAFT'
-        || ['OFFER_SUBMITTED', 'COUNTERED', 'RIVAL_BID', 'ACCEPTED', 'REJECTED'].includes(acquisitionCase?.status || '');
+        || ['OFFER_SUBMITTED', 'COUNTERED', 'RIVAL_BID', 'ACCEPTED'].includes(acquisitionCase?.status || '');
     const acquisitionStatusCopy = acquisitionCase?.status === 'COUNTERED'
         ? { title: tr('forbes.studioProfile.status.countered.title'), note: tr('forbes.studioProfile.status.countered.note'), action: tr('forbes.studioProfile.status.countered.action') }
         : acquisitionCase?.status === 'RIVAL_BID'
@@ -84,7 +110,13 @@ export const ForbesStudioProfile: React.FC<ForbesStudioProfileProps> = ({
             : acquisitionCase?.status === 'ACCEPTED'
                 ? { title: tr('forbes.studioProfile.status.accepted.title'), note: tr('forbes.studioProfile.status.accepted.note'), action: tr('forbes.studioProfile.status.accepted.action') }
                 : acquisitionCase?.status === 'REJECTED'
-                    ? { title: tr('forbes.studioProfile.status.rejected.title'), note: tr('forbes.studioProfile.status.rejected.note'), action: tr('forbes.studioProfile.status.rejected.action') }
+                    ? {
+                        title: `Offer ${offersUsed} of ${ACQUISITION_MAX_OFFER_ATTEMPTS} declined`,
+                        note: offersRemaining > 0
+                            ? `The board said no, but you can revise the terms. ${offersRemaining} ${offersRemaining === 1 ? 'offer' : 'offers'} left before discussions close.`
+                            : 'The board closed discussions after the final offer.',
+                        action: offersRemaining > 0 ? `Revise offer (${offersRemaining} left)` : 'Discussions closed',
+                    }
                     : acquisitionCase?.status === 'OFFER_SUBMITTED'
                         ? { title: tr('forbes.studioProfile.status.offerSubmitted.title'), note: tr('forbes.studioProfile.status.offerSubmitted.note'), action: tr('forbes.studioProfile.status.offerSubmitted.action') }
                         : null;
@@ -136,6 +168,11 @@ export const ForbesStudioProfile: React.FC<ForbesStudioProfileProps> = ({
                         <h2 className="max-w-full break-words font-serif text-[clamp(1.85rem,8vw,2.65rem)] font-black uppercase italic leading-[0.9] tracking-[-0.045em] text-[#f4f0e7]">
                             {profile.name}
                         </h2>
+                        {profile.isPlayerOwned && (
+                            <div className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-emerald-400/40 bg-emerald-400/10 px-2.5 py-1 text-[7px] font-black uppercase tracking-[0.18em] text-emerald-300">
+                                <Crown size={11} /> Your Studio
+                            </div>
+                        )}
                     </div>
 
                     <div className="mt-3 rounded-xl border border-white/[0.07] bg-white/[0.025] px-3 py-2.5">
@@ -161,8 +198,19 @@ export const ForbesStudioProfile: React.FC<ForbesStudioProfileProps> = ({
                     <p className="text-[11px] font-semibold leading-relaxed opacity-75">{tr(acquisition.noteKey)}</p>
                 </section>
 
-                <ForbesCompanyPosition position={companyPosition} onOpenStocks={onOpenStocks} />
+                <ForbesCompanyPosition
+                    position={companyPosition}
+                    onOpenStocks={onOpenStocks}
+                    playerAge={player.age}
+                    currentWeek={player.currentWeek}
+                    onRequestPrivateExit={onRequestPrivateExit}
+                    onAcceptPrivateExit={onAcceptPrivateExit}
+                    onDeclinePrivateExit={onDeclinePrivateExit}
+                    privateControlAvailable={privateControlAvailable}
+                    onStartPrivateControl={onStartPrivateControl}
+                />
 
+                {!privateControlAvailable ? (
                 <section className="mb-5 overflow-hidden rounded-2xl border border-amber-400/20 bg-[linear-gradient(145deg,rgba(245,158,11,0.08),rgba(12,12,14,0.96))]">
                     <div className="border-b border-white/[0.07] px-4 py-3">
                         <div className="flex items-center gap-2 text-[8px] font-black uppercase tracking-[0.22em] text-amber-300">
@@ -203,6 +251,17 @@ export const ForbesStudioProfile: React.FC<ForbesStudioProfileProps> = ({
                                     <Target size={16} />
                                     {acquisitionStatusCopy?.action || tr('forbes.studioProfile.status.available.action')}
                                 </button>
+                            </>
+                        ) : acquisitionEligibility.reason === 'COOLDOWN_ACTIVE' ? (
+                            <>
+                                <p className="mb-3 text-[10px] font-semibold leading-relaxed text-zinc-500">
+                                    {hasLegacyFinalRejection
+                                        ? `${profile.name} has already declined all ${ACQUISITION_MAX_OFFER_ATTEMPTS} offers in this round. Advance one in-game week to register the cooldown, then check back later. No money or energy was used.`
+                                        : `${profile.name} is not taking a new offer yet. Check back in ${reapproachWeeksRemaining} in-game ${reapproachWeeksRemaining === 1 ? 'week' : 'weeks'}. No money or energy was used.`}
+                                </p>
+                                <div className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-sky-400/25 bg-sky-400/[0.08] px-4 text-[9px] font-black uppercase tracking-[0.17em] text-sky-300">
+                                    <ShieldCheck size={16} /> Monitor Studio
+                                </div>
                             </>
                         ) : ownershipCommand ? (
                             <>
@@ -245,6 +304,7 @@ export const ForbesStudioProfile: React.FC<ForbesStudioProfileProps> = ({
                         )}
                     </div>
                 </section>
+                ) : null}
 
                 <section className="mb-5">
                     <div className="mb-2.5 flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.24em] text-zinc-500">

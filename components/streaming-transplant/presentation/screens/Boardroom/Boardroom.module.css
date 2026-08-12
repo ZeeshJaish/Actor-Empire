@@ -1,0 +1,208 @@
+.br{position:fixed;inset:0;max-width:520px;margin:0 auto;background:#050609;color:#eef0f5;
+  font-family:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
+  display:flex;flex-direction:column;overflow:hidden}
+.br :where(*){margin:0;padding:0;box-sizing:border-box;min-width:0;-webkit-tap-highlight-color:transparent}
+.br :where(button){font-family:inherit;border:none;background:none;color:inherit;cursor:pointer;text-align:inherit}
+
+.br .brtop{display:flex;align-items:center;gap:11px;padding:max(14px,env(safe-area-inset-top)) 14px 12px;
+  background:linear-gradient(#0a0c11,#08090e);border-bottom:1px solid rgba(255,255,255,.07)}
+.br .brback{flex:0 0 auto;width:34px;height:34px;border-radius:11px;font-size:17px;color:#aeb6c4;
+  display:flex;align-items:center;justify-content:center}
+.br .brback:active{background:rgba(255,255,255,.07)}
+.br .brtitle{flex:1;min-width:0}
+.br .brtitle b{display:block;font-size:14px;font-weight:900;letter-spacing:.14em}
+.br .brtitle span{font-size:8px;font-weight:900;letter-spacing:.2em;color:#6f7686}
+.br .brmark{flex:0 0 auto;width:24px;height:24px;color:var(--epx-br-c);opacity:.9}
+.br .brmark svg{width:100%;height:100%;display:block}
+
+.br .brstats{display:flex;background:#08090e;border-bottom:1px solid rgba(255,255,255,.07)}
+.br .brstats div{flex:1;padding:10px 11px;border-right:1px solid rgba(255,255,255,.06)}
+.br .brstats div:last-child{border-right:none}
+.br .brstats span{display:block;font-size:7.5px;font-weight:900;letter-spacing:.14em;color:#6f7686}
+.br .brstats b{display:block;margin-top:3px;font-size:15px;font-weight:800}
+.br .brstats b.green{color:#4ade80}
+.br .brstats b.bad{color:#ff5a5f}
+.br .brstats b.muted{color:#6f7686;font-size:13px}
+
+.br .brtabs{display:flex;gap:5px;padding:11px 14px 0}
+.br .brtabs button{position:relative;flex:1;padding:9px 3px;border-radius:10px;background:rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.08);font-size:8px;font-weight:900;letter-spacing:.08em;
+  color:#8b93a5;text-align:center}
+.br .brtabs button.on{background:color-mix(in srgb,var(--epx-br-c) 15%,transparent);
+  border-color:color-mix(in srgb,var(--epx-br-c) 50%,transparent);color:var(--epx-br-c)}
+.br .tdot{position:absolute;top:5px;right:6px;width:6px;height:6px;border-radius:50%;background:#ff5a5f;
+  box-shadow:0 0 7px rgba(255,90,95,.9)}
+
+.br .brscroll{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding:0 14px}
+.br .brfoot{height:30px}
+.br .brsec{padding-top:18px}
+.br .brhead{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:11px}
+.br .brhead h2{font-size:16px;font-weight:900;letter-spacing:-.01em}
+.br .brhead span{font-size:9.5px;color:#7d8698}
+.br .bradd{font-size:9px;font-weight:900;letter-spacing:.12em;color:var(--epx-br-c);
+  border:1px solid color-mix(in srgb,var(--epx-br-c) 45%,transparent);border-radius:99px;padding:7px 11px}
+.br .brnote{padding:11px 12px;border-radius:12px;font-size:10px;line-height:1.55;color:#8b93a5;
+  background:rgba(255,255,255,.028);border:1px solid rgba(255,255,255,.07);margin-bottom:10px}
+.br .brwarn{margin-top:11px;padding:11px 12px;border-radius:12px;font-size:10px;line-height:1.55;
+  background:rgba(255,90,95,.08);border:1px solid rgba(255,90,95,.3);color:#ffb3b6}
+.br .brpending{padding:26px 14px;text-align:center}
+.br .brpending b{display:block;font-size:13px;font-weight:800}
+.br .brpending span{display:block;margin-top:5px;font-size:10.5px;color:#7d8698;line-height:1.5}
+
+/* ── the balance ── */
+.br .balance{margin-top:16px;padding:15px 14px;border-radius:15px;
+  background:linear-gradient(150deg,color-mix(in srgb,var(--epx-br-c) 13%,#0b0d13),#0b0d13 70%);
+  border:1px solid color-mix(in srgb,var(--epx-br-c) 34%,transparent)}
+.br .balance span{display:block;font-size:8px;font-weight:900;letter-spacing:.2em;color:#7d8698}
+.br .balance b{display:block;margin-top:5px;font-size:30px;font-weight:900;letter-spacing:-.02em;color:#4ade80}
+.br .balance em{display:block;margin-top:5px;font-style:normal;font-size:10.5px;font-weight:700}
+.br .balance em.good{color:#4ade80}
+.br .balance em.warn{color:#ffb020}
+.br .balance em.bad{color:#ff5a5f}
+
+/* ── the statement ── */
+.br .statement{border-radius:14px;background:rgba(255,255,255,.028);
+  border:1px solid rgba(255,255,255,.07);overflow:hidden}
+.br .stgroup{padding:12px 13px;border-bottom:1px solid rgba(255,255,255,.07)}
+.br .stlabel{font-size:7.5px;font-weight:900;letter-spacing:.18em;color:#6f7686;margin-bottom:8px}
+.br .stline{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:5px 0}
+.br .stid{flex:1;min-width:0}
+.br .stid b{font-size:11.5px;font-weight:700}
+.br .stid span{display:block;font-size:8.5px;color:#6f7686;margin-top:1px}
+.br .stline em{flex:0 0 auto;font-style:normal;font-size:12px;font-weight:800;
+  font-family:ui-monospace,Menlo,monospace}
+.br .stline em.in{color:#4ade80}
+.br .stline em.out{color:#ff8b8f}
+.br .stsub{display:flex;justify-content:space-between;gap:10px;margin-top:8px;padding-top:8px;
+  border-top:1px solid rgba(255,255,255,.09)}
+.br .stsub span{font-size:9.5px;font-weight:800;color:#8b93a5}
+.br .stsub em{font-style:normal;font-size:12px;font-weight:800;font-family:ui-monospace,Menlo,monospace}
+.br .stnet{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 13px}
+.br .stnet span{font-size:9px;font-weight:900;letter-spacing:.16em;color:#8b93a5}
+.br .stnet b{font-size:22px;font-weight:900;font-family:ui-monospace,Menlo,monospace}
+.br .stnet.pos{background:rgba(74,222,128,.08)}
+.br .stnet.pos b{color:#4ade80}
+.br .stnet.neg{background:rgba(255,90,95,.08)}
+.br .stnet.neg b{color:#ff5a5f}
+
+/* ── the table: governance you can look at ── */
+.br .tableroom{position:relative;width:100%;aspect-ratio:1/.82;border-radius:16px;
+  background:radial-gradient(ellipse 70% 60% at 50% 45%,rgba(255,255,255,.045),transparent 72%),#0a0c11;
+  border:1px solid rgba(255,255,255,.07)}
+.br .tabletop{position:absolute;left:22%;right:22%;top:26%;bottom:26%;border-radius:50%/38%;
+  background:linear-gradient(150deg,#2a3140,#161b24);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.09),0 12px 26px rgba(0,0,0,.55)}
+.br .seat{position:absolute;transform:translate(-50%,-50%);width:36px;height:36px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;letter-spacing:.02em}
+.br .seat.founder{background:var(--epx-br-c);color:#04141b;box-shadow:0 0 0 3px color-mix(in srgb,var(--epx-br-c) 30%,transparent)}
+.br .seat.exec{background:#2b3444;color:#dfe4ee;border:1px solid rgba(255,255,255,.14)}
+.br .seat.investor{background:#3a3050;color:#e6dcff;border:1px solid rgba(190,160,255,.3)}
+.br .seat.empty{background:transparent;border:2px dashed rgba(255,255,255,.2)}
+.br .seatx{width:11px;height:11px;border-radius:50%;background:rgba(255,255,255,.09)}
+.br .seatkey{display:flex;gap:14px;justify-content:center;margin-top:11px}
+.br .seatkey span{display:flex;align-items:center;gap:5px;font-size:8.5px;color:#7d8698}
+.br .seatkey .k{width:10px;height:10px;border-radius:50%}
+.br .seatkey .k.founder{background:var(--epx-br-c)}
+.br .seatkey .k.exec{background:#2b3444;border:1px solid rgba(255,255,255,.2)}
+.br .seatkey .k.empty{border:2px dashed rgba(255,255,255,.25)}
+
+/* ── leadership ── */
+.br .execrow{display:flex;align-items:center;gap:11px;padding:11px;border-radius:13px;
+  background:rgba(255,255,255,.028);border:1px solid rgba(255,255,255,.07);margin-bottom:7px}
+.br .execav{flex:0 0 auto;width:38px;height:38px;border-radius:50%;background:#232b38;
+  display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;color:#c6ccda}
+.br .execid{flex:1;min-width:0}
+.br .execid b{display:block;font-size:12.5px;font-weight:800}
+.br .execid span{display:block;font-size:9px;color:#7d8698}
+.br .execunl{color:#8b93a5!important;margin-top:2px;font-size:8.5px!important}
+.br .execnum{flex:0 0 auto;width:78px;text-align:right}
+.br .execnum em{display:block;font-style:normal;font-size:11px;font-weight:800;
+  font-family:ui-monospace,Menlo,monospace}
+.br .loyal{height:4px;border-radius:2px;background:rgba(255,255,255,.1);margin:6px 0 3px;overflow:hidden}
+.br .loyal i{display:block;height:100%;border-radius:2px;background:var(--epx-br-c)}
+.br .execnum span{font-size:7.5px;color:#6f7686}
+
+/* ── succession & legacy ── */
+.br .succard{display:flex;align-items:center;gap:10px;width:100%;padding:13px;border-radius:14px;
+  background:rgba(255,255,255,.028);border:1px solid rgba(255,255,255,.08)}
+.br .sucid{flex:1;min-width:0}
+.br .sucid span{display:block;font-size:7.5px;font-weight:900;letter-spacing:.18em;color:#6f7686}
+.br .sucid b{display:block;margin-top:4px;font-size:15px;font-weight:800}
+.br .sucid em{display:block;font-style:normal;font-size:9.5px;color:#7d8698;margin-top:2px}
+.br .chev{font-style:normal;font-size:17px;color:#5f6875;flex:0 0 auto}
+.br .legacy{margin-top:8px;padding:13px;border-radius:14px;
+  background:linear-gradient(150deg,color-mix(in srgb,var(--epx-br-c) 12%,#0b0d13),#0b0d13 72%);
+  border:1px solid color-mix(in srgb,var(--epx-br-c) 30%,transparent)}
+.br .legacy span{display:block;font-size:7.5px;font-weight:900;letter-spacing:.18em;color:var(--epx-br-c)}
+.br .legacy b{display:block;margin-top:5px;font-size:19px;font-weight:900;letter-spacing:-.01em}
+.br .legacy em{display:block;margin-top:4px;font-style:italic;font-size:9.5px;color:#8b93a5}
+
+/* ── cap table ── */
+.br .capbar{display:flex;gap:2px;height:16px;border-radius:5px;overflow:hidden;margin-bottom:13px}
+.br .capbar i{display:block;height:100%;background:#333c4c}
+.br .capbar i.you{background:var(--epx-br-c)}
+.br .holder{display:flex;align-items:center;gap:10px;padding:11px;border-radius:12px;
+  background:rgba(255,255,255,.028);border:1px solid rgba(255,255,255,.07);margin-bottom:7px}
+.br .holder.you{border-color:color-mix(in srgb,var(--epx-br-c) 40%,transparent);
+  background:color-mix(in srgb,var(--epx-br-c) 8%,transparent)}
+.br .hchip{flex:0 0 auto;width:12px;height:12px;border-radius:3px;background:#333c4c}
+.br .hchip.you{background:var(--epx-br-c)}
+.br .hid{flex:1;min-width:0}
+.br .hid b{display:block;font-size:12.5px;font-weight:800}
+.br .hid span{font-size:9px;color:#7d8698}
+.br .holder em{flex:0 0 auto;font-style:normal;font-size:15px;font-weight:800;
+  font-family:ui-monospace,Menlo,monospace}
+.br .govnote{margin-top:6px;padding:11px 12px;border-radius:12px;font-size:10px;line-height:1.55}
+.br .govnote.safe{background:rgba(74,222,128,.07);border:1px solid rgba(74,222,128,.26);color:#a7e8c0}
+.br .govnote.risk{background:rgba(255,90,95,.08);border:1px solid rgba(255,90,95,.3);color:#ffb3b6}
+
+.br .bigbtn{display:block;width:100%;margin-top:12px;padding:14px;border-radius:14px;text-align:center;
+  background:var(--epx-br-c);color:#04141b;font-size:12px;font-weight:900;letter-spacing:.12em}
+.br .bigbtn span{display:block;margin-top:4px;font-size:9px;font-weight:700;letter-spacing:.02em;opacity:.72}
+.br .bigbtn.dead,.br .bigbtn:disabled{background:rgba(255,255,255,.06);color:#5f6875}
+
+/* ── markets ── */
+.br .ticker{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:16px;
+  padding:14px;border-radius:15px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08)}
+.br .tkid b{display:block;font-size:18px;font-weight:900;letter-spacing:.06em}
+.br .tkid span{font-size:9.5px;color:#7d8698}
+.br .tkprice{text-align:right}
+.br .tkprice b{display:block;font-size:24px;font-weight:900;font-family:ui-monospace,Menlo,monospace}
+.br .tkprice em{font-style:normal;font-size:11px;font-weight:800}
+.br .tkprice em.up{color:#4ade80}
+.br .tkprice em.down{color:#ff5a5f}
+.br .plotwrap{margin-top:10px}
+.br .shareplot{display:block;width:100%;height:auto}
+.br .plotaxis{display:flex;justify-content:space-between;margin-top:-6px;padding:0 4px}
+.br .plotaxis span{font-size:8.5px;color:#5f6875}
+.br .mcap{display:flex;align-items:baseline;justify-content:space-between;margin-top:10px;padding:12px 13px;
+  border-radius:13px;background:rgba(255,255,255,.028);border:1px solid rgba(255,255,255,.07)}
+.br .mcap span{font-size:8.5px;font-weight:900;letter-spacing:.16em;color:#7d8698}
+.br .mcap b{font-size:19px;font-weight:800;font-family:ui-monospace,Menlo,monospace}
+
+.br .ipocheck{display:flex;align-items:flex-start;gap:11px;padding:11px 12px;border-radius:12px;
+  background:rgba(255,255,255,.026);border:1px solid rgba(255,255,255,.07);margin-bottom:7px}
+.br .ipocheck.done{background:rgba(74,222,128,.06);border-color:rgba(74,222,128,.24)}
+.br .ipodot{flex:0 0 auto;width:20px;height:20px;border-radius:50%;font-style:normal;font-size:11px;
+  font-weight:900;display:flex;align-items:center;justify-content:center;
+  background:rgba(255,255,255,.08);color:#6f7686;margin-top:1px}
+.br .ipocheck.done .ipodot{background:#1d6b3f;color:#fff}
+.br .ipoid{flex:1;min-width:0}
+.br .ipoid b{display:block;font-size:12px;font-weight:800}
+.br .ipoid span{display:block;font-size:9.5px;color:#7d8698;margin-top:2px;line-height:1.45}
+
+@media (prefers-reduced-motion:reduce){ .br *{animation:none!important;transition:none!important} }
+
+/* ── INHERITED FROM THE GLOBAL SHELL ──────────────────────────────────
+   These 2 rules were being supplied by EmpirePlusV2's global
+   stylesheet through generic class names. Copied in so this screen owns its
+   own appearance and depends on no ambient CSS.
+
+   They are APPENDED, not prepended: the sheet opens with a
+   `:where(*){margin:0;padding:0}` reset of equal specificity, so anything
+   placed above it loses on source order and the padding silently goes to 0.
+   ──────────────────────────────────────────────────────────────────── */
+.br .tabletop{position:absolute;left:12%;right:12%;top:34%;bottom:22%;border-radius:50%/40%;
+  background:linear-gradient(160deg,#191d27,#0d1016);border:1px solid #262b36;
+  box-shadow:inset 0 6px 22px rgba(0,0,0,.6),0 0 40px color-mix(in srgb,var(--epx-br-c) 12%,transparent)}
+.br .execrow{width:100%;display:flex;align-items:center;gap:11px;border:1px solid var(--epx-br-line);background:var(--epx-br-panel);border-radius:13px;padding:11px;margin-bottom:7px}

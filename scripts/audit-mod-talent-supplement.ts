@@ -29,7 +29,7 @@ for (const country of countries) {
   }
 }
 
-assert(saveMigrationSource.includes('const SAVE_MIGRATION_VERSION = 15'), 'Save migration version should bump for existing enabled country packs.');
+assert(saveMigrationSource.includes('const SAVE_MIGRATION_VERSION = 19'), 'Save migration version should remain current for existing enabled country packs.');
 assert(saveMigrationSource.includes('createGlobalActorPackNPCs'), 'Save migration should sync missing expanded pack NPCs for existing saves.');
 assert(saveMigrationSource.includes('enabledGlobalActorPacks.flatMap'), 'Save migration should inspect already-enabled global actor packs.');
 

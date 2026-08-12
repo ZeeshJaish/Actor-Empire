@@ -5,6 +5,8 @@ import { createMarketTrends } from './marketTrends';
 import { advanceRightsInvestigations, RIGHTS_MARKET_CYCLE_WEEKS } from './rightsMarket';
 import { advanceRightsNegotiations } from './rightsNegotiation';
 import { t } from './i18n';
+import { getStudioAnnualInfrastructureOverhead } from './studioProductionEconomy';
+import { getAbsoluteWeek } from './legacyLogic';
 
 export interface BusinessBlueprint {
     type: BusinessType;
@@ -1011,6 +1013,7 @@ export const processBusinessWeek = (
     playerFame: number,
     week: number,
     language: GameLanguage = 'en',
+    year: number = 1,
 ): {
     updated: Business;
     alerts: string[];
@@ -1237,8 +1240,25 @@ export const processBusinessWeek = (
     if (blueprint.model === 'SERVICE') cogs = Math.floor(revenue * 0.18);
     if (blueprint.model === 'PRODUCT') cogs = productCogs;
     
-    const totalExpenses = totalOpEx + staffWages + cogs + totalMarketingSpend;
+    const infrastructureOverhead = b.type === 'PRODUCTION_HOUSE' && b.studioState
+        ? Math.ceil(getStudioAnnualInfrastructureOverhead(
+            b.studioState.departments,
+            b.studioState.equipment
+        ) / 52)
+        : 0;
+    const totalExpenses = totalOpEx + staffWages + cogs + totalMarketingSpend + infrastructureOverhead;
     const profit = revenue - totalExpenses;
+
+    if (infrastructureOverhead > 0 && b.studioState) {
+        b.studioState.financeLedger = [{
+            id: `studio_infrastructure_${b.id}_${year}_${week}`,
+            week,
+            year,
+            amount: -infrastructureOverhead,
+            type: 'PRODUCTION_SPEND' as const,
+            label: 'Facilities, equipment and department overhead',
+        }, ...(b.studioState.financeLedger || [])].slice(0, 80);
+    }
     
     b.balance += profit;
     b.stats.weeklyRevenue = revenue;
@@ -1257,14 +1277,18 @@ export const processBusinessWeek = (
                 if (updatedWeeks >= script.totalDevelopmentWeeks) {
                     // Script is finished
                     // Use assignedSkill if available, otherwise fallback to writer lookup
-                    let writerSkill = script.assignedSkill || 50;
-                    if (!script.assignedSkill && script.writerId) {
+                    let writerSkill = Number.isFinite(Number(script.assignedSkill))
+                        ? Number(script.assignedSkill)
+                        : 50;
+                    if (!Number.isFinite(Number(script.assignedSkill)) && script.writerId) {
                         const writer = b.studioState?.writers.find(w => w.id === script.writerId);
                         writerSkill = writer?.skill || 50;
                     }
                     
                     // Final quality is a mix of base quality and writer skill with significant randomization
-                    const baseQuality = script.baseQuality || 50;
+                    const baseQuality = Number.isFinite(Number(script.baseQuality))
+                        ? Number(script.baseQuality)
+                        : 50;
                     
                     // Base average weighted towards writer skill
                     const average = (baseQuality * 0.3) + (writerSkill * 0.7);
@@ -1319,17 +1343,39 @@ export const processBusinessWeek = (
         });
 
         // 6. PRODUCTION HOUSE SPECIFIC: MARKET & WRITER REFRESH
+        const currentAbsoluteWeek = getAbsoluteWeek(year, week);
+        const inferLegacyAbsoluteRefreshWeek = (absoluteValue: unknown, legacyWeek: unknown) => {
+            if (Number.isFinite(Number(absoluteValue))) return Number(absoluteValue);
+            const safeLegacyWeek = Math.min(52, Math.max(1, Number(legacyWeek || week)));
+            const elapsedInCycle = (week - safeLegacyWeek + 52) % 52;
+            return currentAbsoluteWeek - elapsedInCycle;
+        };
+        const lastMarketRefreshAbsoluteWeek = inferLegacyAbsoluteRefreshWeek(
+            b.studioState.lastMarketRefreshAbsoluteWeek,
+            b.studioState.lastMarketRefreshWeek,
+        );
+        const lastWriterRefreshAbsoluteWeek = inferLegacyAbsoluteRefreshWeek(
+            b.studioState.lastWriterRefreshAbsoluteWeek,
+            b.studioState.lastWriterRefreshWeek,
+        );
+
         // Refresh IP Market every 3 weeks
-        if (week - (b.studioState.lastMarketRefreshWeek || 0) >= 3) {
+        if (currentAbsoluteWeek - lastMarketRefreshAbsoluteWeek >= 3) {
             b.studioState.marketTrends = createMarketTrends(week);
             b.studioState.ipMarket = generateIPMarket(5, b.studioState.purchasedIPTitles || [], week);
             b.studioState.lastMarketRefreshWeek = week;
+            b.studioState.lastMarketRefreshAbsoluteWeek = currentAbsoluteWeek;
+        } else {
+            b.studioState.lastMarketRefreshAbsoluteWeek = lastMarketRefreshAbsoluteWeek;
         }
         
         // Refresh Writers every 3 weeks
-        if (week - (b.studioState.lastWriterRefreshWeek || 0) >= 3) {
+        if (currentAbsoluteWeek - lastWriterRefreshAbsoluteWeek >= 3) {
             b.studioState.writers = generateWriters(10);
             b.studioState.lastWriterRefreshWeek = week;
+            b.studioState.lastWriterRefreshAbsoluteWeek = currentAbsoluteWeek;
+        } else {
+            b.studioState.lastWriterRefreshAbsoluteWeek = lastWriterRefreshAbsoluteWeek;
         }
 
         // Business processing represents the week the player is advancing into.

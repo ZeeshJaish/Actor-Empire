@@ -2,8 +2,100 @@ import { ActorSkills, BloodlineMember, NPCActor, Player, PortfolioItem, Relation
 
 export const LEGACY_MIN_PLAYABLE_AGE = 18;
 export const LEGACY_INHERITANCE_TAX_RATE = 0.25;
+export const MAX_STREAMING_START_DELAY_WEEKS = 26;
 
 const clone = <T,>(value: T): T => value === undefined ? value : JSON.parse(JSON.stringify(value));
+
+export const getAbsoluteWeek = (age: number, currentWeek: number): number => {
+    const safeAge = Math.max(1, age);
+    const safeWeek = Math.min(52, Math.max(1, currentWeek));
+    return (safeAge - 1) * 52 + (safeWeek - 1);
+};
+
+const getWrappedWeekDistance = (currentWeek: number, targetWeek: number): number => {
+    const safeCurrentWeek = Math.min(52, Math.max(1, Math.floor(currentWeek)));
+    const safeTargetWeek = Math.min(52, Math.max(1, Math.floor(targetWeek)));
+    return (safeTargetWeek - safeCurrentWeek + 52) % 52;
+};
+
+const hasStreamingAudienceHistory = (streaming: Partial<StreamingState>): boolean => (
+    (typeof streaming.totalViews === 'number' && streaming.totalViews > 0)
+    || (Array.isArray(streaming.weeklyViews) && streaming.weeklyViews.length > 0)
+    || Math.max(1, Math.floor(streaming.weekOnPlatform ?? 1)) > 1
+);
+
+/**
+ * Returns the real remaining rollout delay while repairing legacy/heir saves
+ * whose old character-age clock made the date appear years in the future.
+ */
+export const getStreamingWeeksUntilStart = (
+    streaming: Partial<StreamingState> | undefined,
+    playerAge: number,
+    currentWeek: number
+): number => {
+    if (!streaming || hasStreamingAudienceHistory(streaming)) return 0;
+
+    const currentAbsoluteWeek = getAbsoluteWeek(playerAge, currentWeek);
+    if (typeof streaming.startWeekAbsolute === 'number' && Number.isFinite(streaming.startWeekAbsolute)) {
+        const explicitDelay = Math.ceil(streaming.startWeekAbsolute - currentAbsoluteWeek);
+        if (explicitDelay <= 0) return 0;
+        if (explicitDelay <= MAX_STREAMING_START_DELAY_WEEKS) return explicitDelay;
+    }
+
+    if (typeof streaming.startWeek === 'number' && Number.isFinite(streaming.startWeek)) {
+        return getWrappedWeekDistance(currentWeek, streaming.startWeek);
+    }
+
+    // A streaming presale never needs a multi-year wait. If an older save has
+    // only the broken absolute value, release it on the next weekly advance.
+    return typeof streaming.startWeekAbsolute === 'number' ? 1 : 0;
+};
+
+const rebaseInheritedActiveReleaseTiming = (
+    release: any,
+    parentAge: number,
+    parentWeek: number,
+    heirAge: number,
+    heirWeek: number
+) => {
+    const parentAbsoluteWeek = getAbsoluteWeek(parentAge, parentWeek);
+    const heirAbsoluteWeek = getAbsoluteWeek(heirAge, heirWeek);
+    const clockShift = heirAbsoluteWeek - parentAbsoluteWeek;
+    const shiftAbsoluteWeek = (value: unknown): number | undefined => {
+        const numericValue = Number(value);
+        return Number.isFinite(numericValue)
+            ? Math.max(0, Math.round(numericValue + clockShift))
+            : undefined;
+    };
+
+    const next = { ...release };
+    const releasedAtAbsoluteWeek = shiftAbsoluteWeek(release?.releasedAtAbsoluteWeek);
+    if (releasedAtAbsoluteWeek !== undefined) next.releasedAtAbsoluteWeek = releasedAtAbsoluteWeek;
+
+    if (release?.projectDetails && typeof release.projectDetails === 'object') {
+        const projectReleasedAtAbsoluteWeek = shiftAbsoluteWeek(release.projectDetails.releasedAtAbsoluteWeek);
+        next.projectDetails = {
+            ...release.projectDetails,
+            ...(projectReleasedAtAbsoluteWeek !== undefined ? { releasedAtAbsoluteWeek: projectReleasedAtAbsoluteWeek } : {}),
+        };
+    }
+
+    if (release?.streaming && typeof release.streaming === 'object') {
+        const inheritedStartAbsoluteWeek = inferStreamingStartWeekAbsolute(release.streaming, parentAge, parentWeek);
+        const rebasedStartAbsoluteWeek = inheritedStartAbsoluteWeek === undefined
+            ? undefined
+            : Math.max(0, inheritedStartAbsoluteWeek + clockShift);
+        next.streaming = {
+            ...release.streaming,
+            ...(rebasedStartAbsoluteWeek !== undefined ? {
+                startWeekAbsolute: rebasedStartAbsoluteWeek,
+                startWeek: (rebasedStartAbsoluteWeek % 52) + 1,
+            } : {}),
+        };
+    }
+
+    return next;
+};
 
 const resolveLegacyProjectType = (...candidates: unknown[]): ProjectType => {
     for (const candidate of candidates) {
@@ -26,6 +118,13 @@ export interface LegacyParentContext {
     franchiseIds: string[];
     universeIds: UniverseId[];
     projectCount: number;
+}
+
+export interface LegacyCareerArchive {
+    parent: LegacyParentContext;
+    pastProjects: any[];
+    activeReleases: any[];
+    awards: any[];
 }
 
 const getLegacyParentActorId = (player: Pick<Player, 'id'>) => `legacy_parent_actor_${String(player.id || 'player').replace(/[^a-z0-9_]/gi, '_')}`;
@@ -150,7 +249,7 @@ export const getInheritedStudioProjects = (
 
 export const buildLegacyStudioInheritance = (
     player: Player,
-    options: { isDeceased?: boolean } = {}
+    options: { isDeceased?: boolean; heirAge?: number; heirWeek?: number } = {}
 ) => {
     const isDeceased = options.isDeceased ?? !!player.flags?.isDead;
     const parentActor = createLegacyParentActor(player, isDeceased);
@@ -161,6 +260,37 @@ export const buildLegacyStudioInheritance = (
         .filter((business: any) => business?.type === 'PRODUCTION_HOUSE' && business?.id)
         .map((business: any) => String(business.id));
     const studioIdSet = new Set(studioIds);
+    const legacyCareerPastProjects = (player.pastProjects || [])
+        .map(project => ({
+            ...rewritePlayerSelfReferencesForLegacyParent(project, parentActor),
+            isLegacyCareerProject: true,
+            legacyParentActorId: parentActor.id,
+            legacyParentName: parentActor.name,
+        }));
+    const legacyCareerActiveReleases = (player.activeReleases || [])
+        .map(release => ({
+            ...rewritePlayerSelfReferencesForLegacyParent(release, parentActor),
+            isLegacyCareerProject: true,
+            legacyParentActorId: parentActor.id,
+            legacyParentName: parentActor.name,
+        }));
+    // The heir runs the inherited studio, while the parent remains credited on work already in motion.
+    const inheritedStudioActiveReleases = legacyCareerActiveReleases
+        .filter((release: any) => release?.projectDetails?.studioId && studioIdSet.has(String(release.projectDetails.studioId)))
+        .map(release => (
+            typeof options.heirAge === 'number'
+                ? rebaseInheritedActiveReleaseTiming(
+                    release,
+                    player.age,
+                    player.currentWeek,
+                    options.heirAge,
+                    options.heirWeek ?? player.currentWeek
+                )
+                : release
+        ));
+    const inheritedStudioCommitments = (player.commitments || [])
+        .filter((commitment: any) => commitment?.projectDetails?.studioId && studioIdSet.has(String(commitment.projectDetails.studioId)))
+        .map(commitment => rewritePlayerSelfReferencesForLegacyParent(commitment, parentActor));
     const legacyPastProjects = (player.pastProjects || [])
         .filter((project: any) => project?.studioId && studioIdSet.has(String(project.studioId)))
         .map(project => toLegacyStudioProject(project, parentActor, 'PAST'));
@@ -199,26 +329,29 @@ export const buildLegacyStudioInheritance = (
         universeIds,
         projectCount: legacyProjects.length
     };
+    const legacyCareerArchive: LegacyCareerArchive = {
+        parent: legacyParent,
+        pastProjects: legacyCareerPastProjects,
+        activeReleases: legacyCareerActiveReleases,
+        awards: clone(player.awards || []),
+    };
 
     return {
         parentActor,
         legacyParent,
         legacyProjects,
+        activeReleases: inheritedStudioActiveReleases,
+        commitments: inheritedStudioCommitments,
         businesses: inheritedBusinesses,
         studio: inheritedStudio,
         world: inheritedWorld,
         flags: {
             legacyParent,
             legacyStudioProjects: legacyProjects,
+            legacyCareerArchive,
             extraNPCs
         }
     };
-};
-
-export const getAbsoluteWeek = (age: number, currentWeek: number): number => {
-    const safeAge = Math.max(1, age);
-    const safeWeek = Math.min(52, Math.max(1, currentWeek));
-    return (safeAge - 1) * 52 + (safeWeek - 1);
 };
 
 export const getElapsedWeeks = (
@@ -259,27 +392,21 @@ export const inferStreamingStartWeekAbsolute = (
     currentWeek: number
 ): number | undefined => {
     if (!streaming) return undefined;
-    if (typeof streaming.startWeekAbsolute === 'number') return streaming.startWeekAbsolute;
-
     const currentAbsoluteWeek = getAbsoluteWeek(playerAge, currentWeek);
     const safeWeekOnPlatform = Math.max(1, Math.floor(streaming.weekOnPlatform ?? 1));
-    const hasStreamingHistory =
-        (typeof streaming.totalViews === 'number' && streaming.totalViews > 0) ||
-        (Array.isArray(streaming.weeklyViews) && streaming.weeklyViews.length > 0) ||
-        safeWeekOnPlatform > 1;
 
-    if (hasStreamingHistory) {
+    if (hasStreamingAudienceHistory(streaming)) {
         return Math.max(0, currentAbsoluteWeek - Math.max(0, safeWeekOnPlatform - 1));
     }
 
-    if (typeof streaming.startWeek === 'number') {
-        if (currentWeek < streaming.startWeek) {
-            return currentAbsoluteWeek + (streaming.startWeek - currentWeek);
+    if (typeof streaming.startWeekAbsolute === 'number' && Number.isFinite(streaming.startWeekAbsolute)) {
+        const explicitDelay = streaming.startWeekAbsolute - currentAbsoluteWeek;
+        if (explicitDelay <= MAX_STREAMING_START_DELAY_WEEKS) {
+            return Math.max(0, streaming.startWeekAbsolute);
         }
-        return currentAbsoluteWeek;
     }
 
-    return currentAbsoluteWeek;
+    return currentAbsoluteWeek + getStreamingWeeksUntilStart(streaming, playerAge, currentWeek);
 };
 
 export const getGenerationNumber = (player: Player): number => {

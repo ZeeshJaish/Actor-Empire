@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
-import { Player, Business, PastProject, Writer } from '../../../../types';
+import { Player, Business, PastProject, ProjectType, Writer } from '../../../../types';
 import { formatMoney } from '../../../../services/formatUtils';
 import { X, PenTool, DollarSign, Users, TrendingUp } from 'lucide-react';
 import { generateWriters } from '../../../../src/data/generators';
+import { resolveProjectType } from '../../../../services/businessLogic';
 import {
     getProjectTitleError,
     normalizeProjectTitle,
     PROJECT_TITLE_MAX_LENGTH
 } from '../../../../services/projectNaming';
+import { ProjectFormatChoice } from './ProjectFormatChoice';
 
 
 interface SequelSetupModalProps {
@@ -15,7 +17,7 @@ interface SequelSetupModalProps {
     player: Player;
     studio: Business;
     onClose: () => void;
-    onStartWriting: (writer: Writer | null, title: string, isSpinoff: boolean) => void;
+    onStartWriting: (writer: Writer | null, title: string, isSpinoff: boolean, projectType: ProjectType) => void;
     isSpinoff?: boolean;
 }
 
@@ -26,28 +28,43 @@ export const SequelSetupModal: React.FC<SequelSetupModalProps> = ({ project, pla
     const [selectedWriter, setSelectedWriter] = useState<Writer | null>(null);
     const [useOriginalWriter, setUseOriginalWriter] = useState(true);
     const [step, setStep] = useState<'SETUP' | 'CONFIRM'>('SETUP');
+    const sourceProjectType = resolveProjectType(project.projectType, project.type, project.projectDetails?.type);
+    const [projectType, setProjectType] = useState<ProjectType>(sourceProjectType);
     const titleError = getProjectTitleError(title);
 
-    const originalWriterId = project.projectDetails?.hiddenStats?.scriptQuality ? 'writer_original' : null; 
+    const projectDetails = project.projectDetails || {};
+    const sourceScript = (studio.studioState?.scripts || []).find(script => script.id === projectDetails.sourceScriptId);
+    const sourceWriterId = projectDetails.writerId || sourceScript?.writerId || null;
+    const rosterWriter = sourceWriterId
+        ? (studio.studioState?.writers || []).find(writer => writer.id === sourceWriterId)
+        : undefined;
+    const isGenericWriterCredit = (name?: string) => !name || ['In-House Writers', 'Original Creator'].includes(name);
+    const savedWriterName = !isGenericWriterCredit(projectDetails.writerName) ? projectDetails.writerName : undefined;
+    const authoredName = !isGenericWriterCredit(sourceScript?.author)
+        ? sourceScript.author
+        : undefined;
+    const originalWriterName = savedWriterName || rosterWriter?.name || authoredName || 'Previous Season Writer';
+    const originalWriterSkill = Number(projectDetails.writerSkill ?? sourceScript?.assignedSkill ?? rosterWriter?.skill ?? projectDetails.hiddenStats?.scriptQuality ?? 50);
+    const originalWriterId = sourceWriterId || `previous_writer_${project.id}`;
     const previousSalary = Math.floor(project.budget * 0.05);
     const newSalary = Math.floor(previousSalary * 1.5); // 50% bump
 
-    const originalWriter: Writer | null = originalWriterId ? {
+    const originalWriter: Writer = {
         id: originalWriterId,
-        name: 'Original Creator',
-        skill: project.projectDetails?.hiddenStats?.scriptQuality || 50,
+        name: originalWriterName,
+        skill: Math.max(10, Math.min(100, Math.round(Number.isFinite(originalWriterSkill) ? originalWriterSkill : 50))),
         fee: newSalary,
         speed: 5,
         tier: 'COMMON',
         stats: { creativity: 50, dialogue: 50, structure: 50, pacing: 50 }
-    } : null;
+    };
 
     const availableWriters = studio.studioState?.writers?.length ? studio.studioState.writers : generateWriters(3);
 
     const handleStart = () => {
         if (titleError) return;
         const writerToUse = useOriginalWriter ? originalWriter : selectedWriter;
-        onStartWriting(writerToUse, normalizeProjectTitle(title), !!isSpinoff);
+        onStartWriting(writerToUse, normalizeProjectTitle(title), !!isSpinoff, projectType);
     };
 
     if (step === 'CONFIRM') {
@@ -59,7 +76,7 @@ export const SequelSetupModal: React.FC<SequelSetupModalProps> = ({ project, pla
                     </div>
                     <h2 className="text-2xl font-bold text-white mb-2">Script in Development!</h2>
                     <p className="text-zinc-400 mb-8">
-                        Your writer has started working on <strong>{title}</strong>. 
+                        Your writer has started working on the {projectType === 'SERIES' ? 'series' : 'feature film'} <strong>{title}</strong>.
                         You can track its progress in the <strong>Development Lab</strong>. 
                         Once the script is finished, you can greenlight the project and negotiate with returning talent!
                     </p>
@@ -110,37 +127,43 @@ export const SequelSetupModal: React.FC<SequelSetupModalProps> = ({ project, pla
                         </div>
                     </div>
 
+                    {isSpinoff && (
+                        <ProjectFormatChoice
+                            value={projectType}
+                            onChange={setProjectType}
+                            helperText="A spin-off can stay in the same format as its source or expand into a different one."
+                        />
+                    )}
+
                     <div className="space-y-4">
                         <h3 className="text-lg font-semibold text-white flex items-center gap-2">
                             <Users className="w-5 h-5 text-purple-400" />
                             Writer Selection
                         </h3>
                         
-                        {originalWriter && (
-                            <div 
-                                onClick={() => setUseOriginalWriter(true)}
-                                className={`p-4 rounded-xl border cursor-pointer transition-all ${useOriginalWriter ? 'bg-blue-500/10 border-blue-500' : 'bg-zinc-950 border-zinc-800 hover:border-zinc-700'}`}
-                            >
-                                <div className="flex justify-between items-center">
-                                    <div>
-                                        <div className="font-semibold text-white flex items-center gap-2">
-                                            {originalWriter.name}
-                                            <span className="text-xs px-2 py-0.5 bg-purple-500/20 text-purple-300 rounded-full">Original Creator</span>
-                                        </div>
-                                        <div className="text-sm text-zinc-400 mt-1">Skill: {originalWriter.skill}/100</div>
-                                        <div className="text-xs text-zinc-500 mt-1">Previous Salary: {formatMoney(previousSalary)}</div>
+                        <div
+                            onClick={() => setUseOriginalWriter(true)}
+                            className={`p-4 rounded-xl border cursor-pointer transition-all ${useOriginalWriter ? 'bg-blue-500/10 border-blue-500' : 'bg-zinc-950 border-zinc-800 hover:border-zinc-700'}`}
+                        >
+                            <div className="flex justify-between items-center">
+                                <div>
+                                    <div className="font-semibold text-white flex items-center gap-2">
+                                        {originalWriter.name}
+                                        <span className="text-xs px-2 py-0.5 bg-purple-500/20 text-purple-300 rounded-full">Previous Season Writer</span>
                                     </div>
-                                    <div className="text-right">
-                                        <div className="text-red-400 font-medium flex items-center justify-end gap-1">
-                                            {formatMoney(originalWriter.fee)}
-                                        </div>
-                                        <div className="text-xs text-red-400/80 flex items-center justify-end gap-1 mt-1">
-                                            <TrendingUp className="w-3 h-3" /> +50% Demand
-                                        </div>
+                                    <div className="text-sm text-zinc-400 mt-1">Skill: {originalWriter.skill}/100</div>
+                                    <div className="text-xs text-zinc-500 mt-1">Previous Salary: {formatMoney(previousSalary)}</div>
+                                </div>
+                                <div className="text-right">
+                                    <div className="text-red-400 font-medium flex items-center justify-end gap-1">
+                                        {formatMoney(originalWriter.fee)}
+                                    </div>
+                                    <div className="text-xs text-red-400/80 flex items-center justify-end gap-1 mt-1">
+                                        <TrendingUp className="w-3 h-3" /> +50% Demand
                                     </div>
                                 </div>
                             </div>
-                        )}
+                        </div>
 
                         <div className="pt-4 border-t border-zinc-800">
                             <h4 className="text-sm font-medium text-zinc-400 mb-3">Or Hire New Writer</h4>

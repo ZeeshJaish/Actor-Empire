@@ -1765,8 +1765,8 @@ const STYLE = `
 .cer-beams i:nth-child(1){left:12%;animation:an-sweepL 12s ease-in-out infinite}
 .cer-beams i:nth-child(2){right:12%;animation:an-sweepR 10s ease-in-out infinite}
 .cer-stage{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px;text-align:center;z-index:5}
-.cer-skip{position:absolute;top:22px;right:18px;z-index:40}
-.cer-progress{position:absolute;top:30px;left:50%;transform:translateX(-50%);display:flex;gap:6px;z-index:40}
+.cer-skip{position:absolute;top:calc(14px + env(safe-area-inset-top, 0px));right:calc(18px + env(safe-area-inset-right, 0px));z-index:40}
+.cer-progress{position:absolute;top:calc(14px + env(safe-area-inset-top, 0px));left:50%;transform:translateX(-50%);display:flex;gap:6px;z-index:40}
 .cer-progress i{width:20px;height:3px;border-radius:2px;background:#232028;transition:background .4s}
 .cer-progress i.done{background:var(--gold)}
 .cer-progress i.you{outline:1px solid rgba(240,180,41,.5);outline-offset:2px}

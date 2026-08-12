@@ -48,6 +48,11 @@ mustInclude(saveSlotScreen, 'onDeleteSlot?: (slotIndex: number) => void', 'SaveS
 mustInclude(saveSlotScreen, 'slot-delete', 'SaveSlotScreen renders delete controls');
 mustInclude(saveSlotScreen, 'setConfirmDeleteSlot', 'SaveSlotScreen confirms before deleting');
 
+const introCss = read('styles/intro.css');
+mustInclude(introCss, '#act4{', 'Save-slot phase has its own layout rule');
+mustInclude(introCss, 'overflow-y:auto', 'Save-slot phase can scroll when content exceeds the viewport');
+mustInclude(introCss, 'touch-action:pan-y', 'Save-slot phase accepts vertical touch scrolling');
+
 const lifestyle = read('views/LifestylePage.tsx');
 mustInclude(lifestyle, "import StreamingLockedScreen from '../components/StreamingLockedScreen'", 'Lifestyle uses package streaming lock');
 mustInclude(lifestyle, "import CinemaLockedScreen from '../components/CinemaLockedScreen'", 'Lifestyle uses package cinema lock');

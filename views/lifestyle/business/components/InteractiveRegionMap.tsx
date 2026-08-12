@@ -18,11 +18,13 @@ export interface RegionMapLocationPin {
 
 interface InteractiveRegionMapProps {
     selectedRegionIds: BoxOfficeRegionId[];
+    activeRegionId?: BoxOfficeRegionId | null;
     onSelectRegion?: (regionId: BoxOfficeRegionId) => void;
     locationPins?: RegionMapLocationPin[];
     onSelectLocation?: (locationId: string, regionId?: BoxOfficeRegionId) => void;
     visualTone?: 'release' | 'production';
     compact?: boolean;
+    showPreview?: boolean;
 }
 
 const MAP_ROUTE_ARCS = [
@@ -43,11 +45,13 @@ const WORLD_VISIBLE_FEATURES = {
 
 export const InteractiveRegionMap: React.FC<InteractiveRegionMapProps> = ({
     selectedRegionIds,
+    activeRegionId = null,
     onSelectRegion,
     locationPins = [],
     onSelectLocation,
     visualTone = 'release',
-    compact = false
+    compact = false,
+    showPreview = true,
 }) => {
     // SVG ids are global in the document. Namespace every map instance so Android
     // WebView cannot resolve this map's gradients/clips against another screen's SVG.
@@ -176,6 +180,7 @@ export const InteractiveRegionMap: React.FC<InteractiveRegionMapProps> = ({
                 <g className="region-map-landmass region-map-country-topology" filter={`url(#${svgIds.softShadow})`}>
                     {projectedRegions.map(region => {
                         const isSelected = selectedRegionSet.has(region.id);
+                        const isActive = activeRegionId === region.id;
                         return (
                             <g key={`land-${region.id}`}>
                                 {isSelected && (
@@ -186,6 +191,16 @@ export const InteractiveRegionMap: React.FC<InteractiveRegionMapProps> = ({
                                         stroke={region.accent}
                                         strokeOpacity="0.72"
                                         strokeWidth="8"
+                                        filter={`url(#${svgIds.glow})`}
+                                    />
+                                )}
+                                {isActive && (
+                                    <path
+                                        d={region.path}
+                                        fill="transparent"
+                                        stroke="#ffffff"
+                                        strokeOpacity="0.92"
+                                        strokeWidth="4"
                                         filter={`url(#${svgIds.glow})`}
                                     />
                                 )}
@@ -211,6 +226,7 @@ export const InteractiveRegionMap: React.FC<InteractiveRegionMapProps> = ({
                 <g>
                     {projectedRegions.map(region => {
                         const isSelected = selectedRegionSet.has(region.id);
+                        const isActive = activeRegionId === region.id;
                         return (
                             <path
                                 key={region.id}
@@ -218,15 +234,16 @@ export const InteractiveRegionMap: React.FC<InteractiveRegionMapProps> = ({
                                 role="button"
                                 aria-label={`${region.label} release region`}
                                 aria-pressed={isSelected}
+                                aria-current={isActive ? 'true' : undefined}
                                 tabIndex={canInteract ? 0 : -1}
                                 onClick={() => onSelectRegion?.(region.id)}
                                 onKeyDown={event => handleKeyDown(event, region.id)}
                                 className="region-map-hit-area cursor-pointer transition-all duration-200 outline-none"
                                 fill="#ffffff"
                                 fillOpacity={0.001}
-                                stroke={isSelected ? region.accent : '#ffffff'}
-                                strokeOpacity={isSelected ? 0.48 : 0}
-                                strokeWidth={isSelected ? 4 : 1}
+                                stroke={isActive ? '#ffffff' : isSelected ? region.accent : '#ffffff'}
+                                strokeOpacity={isActive ? 0.82 : isSelected ? 0.48 : 0}
+                                strokeWidth={isActive ? 5 : isSelected ? 4 : 1}
                             />
                         );
                     })}
@@ -235,6 +252,7 @@ export const InteractiveRegionMap: React.FC<InteractiveRegionMapProps> = ({
                 <g pointerEvents="none">
                     {projectedRegions.map(region => {
                         const isSelected = selectedRegionSet.has(region.id);
+                        const isActive = activeRegionId === region.id;
                         return (
                             <g key={region.id} className="region-map-label">
                                 <text
@@ -244,14 +262,14 @@ export const InteractiveRegionMap: React.FC<InteractiveRegionMapProps> = ({
                                     textAnchor="middle"
                                     fill={isSelected ? '#f8fafc' : '#f0fdfa'}
                                     opacity={isSelected ? 1 : 0.86}
-                                    fontSize={isSelected ? 18 : 15}
+                                    fontSize={isSelected || isActive ? 18 : 15}
                                     fontWeight={900}
                                     letterSpacing="2"
                                     style={{ textShadow: '0 2px 8px rgba(7,89,133,0.65)' }}
                                 >
                                     {region.shortLabel}
                                 </text>
-                                {isSelected && !showProductionPins && (
+                                {(isSelected || isActive) && !showProductionPins && (
                                     <text
                                         className="region-map-continent-name"
                                         x={region.labelX}
@@ -263,7 +281,7 @@ export const InteractiveRegionMap: React.FC<InteractiveRegionMapProps> = ({
                                         fontWeight={900}
                                         letterSpacing="1.4"
                                     >
-                                        {region.label.toUpperCase()}
+                                        {isActive ? 'VIEWING' : region.label.toUpperCase()}
                                     </text>
                                 )}
                             </g>
@@ -316,7 +334,7 @@ export const InteractiveRegionMap: React.FC<InteractiveRegionMapProps> = ({
                 )}
             </svg>
 
-            {!showProductionPins && (
+            {!showProductionPins && showPreview && (
                 <div className={`mt-3 flex ${compact ? 'flex-col gap-2' : 'flex-col gap-3 md:flex-row md:items-center md:justify-between'}`}>
                     <div>
                         <div className="text-[9px] font-black uppercase tracking-[0.24em] text-amber-300/90">Region preview</div>

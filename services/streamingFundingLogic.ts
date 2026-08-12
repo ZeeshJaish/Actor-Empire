@@ -259,6 +259,9 @@ export const applyLockedSeasonFunding = ({
     const studioSpend = remainingBudgetToPay;
     const nextStudioBalance = safeStudioBalance - studioSpend;
     const platformName = lockedFunding?.platformName || 'Platform';
+    const fundingLabel = lockedFunding?.fundingSource === 'OWNED_STREAMING_PLATFORM'
+        ? 'Original commission'
+        : 'renewal cap';
     const sourceTitle = lockedFunding?.sourceTitle || projectTitle;
     const feedbackMessages: string[] = [];
     let news: NewsItem | null = null;
@@ -272,14 +275,19 @@ export const applyLockedSeasonFunding = ({
         label: lockedFundApplied > 0
             ? studioSpend > 0
                 ? `${projectTitle} over-cap spend (${platformName} covered ${formatMoneyShort(lockedFundApplied)})`
-                : `${projectTitle} greenlight fully covered by ${platformName} renewal cap`
+                : `${projectTitle} greenlight fully covered by ${platformName} ${fundingLabel}`
             : `${projectTitle} greenlight spend`,
         projectId
     });
 
     if (lockedFundApplied > 0 && lockedFunding) {
-        feedbackMessages.push(`${platformName} renewed ${sourceTitle}. Season 2 funding cap used: ${formatMoneyShort(lockedFundApplied)}.`);
-        feedbackMessages.push(`${platformName} already committed Season 2 funding, so the bidding room stayed closed.`);
+        const isOwnedOriginal = lockedFunding.fundingSource === 'OWNED_STREAMING_PLATFORM';
+        feedbackMessages.push(isOwnedOriginal
+            ? `${platformName} commissioned ${sourceTitle}. Production funding used: ${formatMoneyShort(lockedFundApplied)}.`
+            : `${platformName} renewed ${sourceTitle}. Season 2 funding cap used: ${formatMoneyShort(lockedFundApplied)}.`);
+        feedbackMessages.push(isOwnedOriginal
+            ? `${platformName} owns the commissioned platform window, so no outside bidding room opens.`
+            : `${platformName} already committed Season 2 funding, so the bidding room stayed closed.`);
         if (studioSpend > 0) {
             feedbackMessages.push(`Studio added ${formatMoneyShort(studioSpend)} above the ${platformName} cap.`);
         }
@@ -290,13 +298,15 @@ export const applyLockedSeasonFunding = ({
         const financeNote = studioSpend > 0
             ? `The platform covered ${formatMoneyShort(lockedFundApplied)} and the studio added ${formatMoneyShort(studioSpend)} above the platform cap.`
             : unusedFundingReturned > 0
-                ? `The season came in under cap, so unused funding returned to the platform.`
-                : `${platformName} covered the full season budget.`;
+                ? `The production came in under cap, so unused funding returned to the platform.`
+                : `${platformName} covered the full production budget.`;
 
         news = {
             id: `news_season_funding_${projectId}_${Date.now()}`,
-            headline: `${platformName} renews ${sourceTitle}`,
-            subtext: `${projectTitle} moves forward with committed Season 2 funding. ${financeNote}`,
+            headline: isOwnedOriginal ? `${platformName} commissions ${sourceTitle}` : `${platformName} renews ${sourceTitle}`,
+            subtext: isOwnedOriginal
+                ? `${projectTitle} moves forward as a commissioned platform Original. ${financeNote}`
+                : `${projectTitle} moves forward with committed Season 2 funding. ${financeNote}`,
             category: 'INDUSTRY',
             week,
             year: newsYear,

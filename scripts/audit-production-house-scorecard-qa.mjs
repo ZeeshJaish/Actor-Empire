@@ -7,6 +7,8 @@ const assert = (condition, message) => {
 
 const productionHouse = read('views/lifestyle/business/ProductionHouseGame.tsx');
 const home = read('views/HomePage.tsx');
+const studioProductionQa = read('views/home/homeStudioProductionQaActions.ts');
+const homeQaSource = `${home}\n${studioProductionQa}`;
 const gameLoop = read('services/gameLoop.ts');
 const messages = read('views/mobile/MessagesApp.tsx');
 const mobile = read('views/mobile/MobilePage.tsx');
@@ -33,7 +35,7 @@ const pkg = JSON.parse(read('package.json'));
   'Open Production House > Past Projects',
   'onOpenProductionHouseCheat?.()',
 ].forEach(token => {
-  assert(home.includes(token), `HomePage should include Production House episode QA support: ${token}`);
+  assert(homeQaSource.includes(token), `HomePage should include Production House episode QA support: ${token}`);
 });
 
 [

@@ -1,10 +1,21 @@
 import type { Business, BusinessStaff, GameLanguage, NewsItem, Player, XPost } from '../types';
 import type { ForbesStudioProfile, StudioAcquisitionState } from './forbesStudioProfile';
 import { createDefaultStudioState } from './businessLogic';
-import { getCompanyPosition } from './companyPosition';
+import { getCompanyEquityPositions, getCompanyPosition } from './companyPosition';
+import {
+    calculateStockTradeQuote,
+    executeStockTrade,
+    getStockOutstandingShares,
+} from './stockLogic';
 import { isStreamingPlatformStudio } from './studioClassification';
 import { getRegulatorAcquisitionControls, getRegulatorAdjustedDiligenceFee } from './regulatorPressure';
 import { getPlayerLanguage, t } from './i18n';
+import { syncAcquisitionDebtLedger } from './acquisitionDebt';
+import {
+    buildPortfolioOwnedRights,
+    buildStudioAcquisitionPortfolio,
+    deriveAcquiredStudioFacilities,
+} from './studioAcquisitionAssets';
 
 export type AcquisitionCaseStatus = 'DRAFT' | 'OFFER_SUBMITTED' | 'COUNTERED' | 'RIVAL_BID' | 'ACCEPTED' | 'REJECTED' | 'CLOSED' | 'ACQUIRED';
 export type AcquisitionOfferType = 'CONSERVATIVE' | 'FAIR' | 'AGGRESSIVE' | 'MINORITY';
@@ -72,6 +83,18 @@ export interface AcquisitionCase {
     approachedWeek: number;
     approachedYear: number;
     status: AcquisitionCaseStatus;
+    /** A closed approach returns to the market after a short cooling-off period. */
+    reapproachAfterWeek?: number;
+    reapproachAfterYear?: number;
+    controlConversion?: {
+        kind: 'PRIVATE_STAKE_TO_CONTROL';
+        existingPercent: number;
+        remainingPercent: number;
+        existingCostBasis: number;
+        existingPositionValue: number;
+        initiatedWeek: number;
+        initiatedYear: number;
+    };
     diligence?: {
         status: 'COMPLETE';
         fee: number;
@@ -104,6 +127,10 @@ export interface AcquisitionCase {
         respondedYear: number;
         summary: string;
     };
+    presentation?: {
+        responseSeenKey?: string;
+        closingStage?: 'RESPONSE' | 'CLOSING' | 'SIGNING';
+    };
     closing?: {
         finalPrice: number;
         acquiredBusinessId?: string;
@@ -114,15 +141,63 @@ export interface AcquisitionCase {
         hiddenLiabilities: number;
         expectedAnnualIncome: number;
         assetSummary: string;
+        outcome?: 'MINORITY_STAKE' | 'CONTROL' | 'FULL_BUYOUT';
     };
 }
 
 export interface AcquisitionEligibility {
     canApproach: boolean;
-    reason?: 'PLAYER_OWNED' | 'NOT_FOR_SALE' | 'OFFER_ALREADY_SUBMITTED' | 'STREAMING_PLATFORM_RESERVED';
+    reason?: 'PLAYER_OWNED' | 'NOT_FOR_SALE' | 'OFFER_ALREADY_SUBMITTED' | 'STREAMING_PLATFORM_RESERVED' | 'COOLDOWN_ACTIVE';
     allowedOfferTypes: AcquisitionOfferType[];
     recommendedOfferType: AcquisitionOfferType;
 }
+
+export const ACQUISITION_REAPPROACH_COOLDOWN_WEEKS = 8;
+export const ACQUISITION_MAX_OFFER_ATTEMPTS = 3;
+// Board notices are short-lived pointers into the live Forbes deal state.
+// The deal itself remains authoritative in the acquisition case, never in an inbox card.
+export const ACQUISITION_INBOX_NOTICE_WEEKS = 8;
+const GAME_WEEKS_PER_YEAR = 52;
+
+const toGameWeekIndex = (year: number, week: number) => (
+    Math.max(0, year) * GAME_WEEKS_PER_YEAR + Math.max(1, week)
+);
+
+const getGameWeekAfter = (year: number, week: number, weeks: number) => {
+    const nextIndex = toGameWeekIndex(year, week) + Math.max(0, weeks);
+    return {
+        year: Math.floor((nextIndex - 1) / GAME_WEEKS_PER_YEAR),
+        week: ((nextIndex - 1) % GAME_WEEKS_PER_YEAR) + 1,
+    };
+};
+
+export const getAcquisitionReapproachWeeksRemaining = (
+    acquisitionCase: AcquisitionCase | undefined,
+    player?: Pick<Player, 'age' | 'currentWeek'>,
+) => {
+    if (
+        acquisitionCase?.status !== 'CLOSED'
+        || !player
+        || typeof acquisitionCase.reapproachAfterYear !== 'number'
+        || typeof acquisitionCase.reapproachAfterWeek !== 'number'
+    ) return 0;
+
+    return Math.max(0, toGameWeekIndex(
+        acquisitionCase.reapproachAfterYear,
+        acquisitionCase.reapproachAfterWeek,
+    ) - toGameWeekIndex(player.age, player.currentWeek));
+};
+
+export const getAcquisitionOfferAttemptCount = (acquisitionCase?: AcquisitionCase) => (
+    Math.min(
+        ACQUISITION_MAX_OFFER_ATTEMPTS,
+        Math.max(0, Math.round(acquisitionCase?.offer?.round || 0)),
+    )
+);
+
+export const getAcquisitionOfferAttemptsRemaining = (acquisitionCase?: AcquisitionCase) => (
+    Math.max(0, ACQUISITION_MAX_OFFER_ATTEMPTS - getAcquisitionOfferAttemptCount(acquisitionCase))
+);
 
 export interface AcquisitionFundingOption {
     source: AcquisitionFundingSource;
@@ -175,12 +250,15 @@ interface AcquisitionProfile extends Pick<
     | 'rightsCount'
     | 'franchiseCount'
     | 'universeCount'
+    | 'universeNames'
     | 'facilities'
+    | 'facilitiesEstimated'
     | 'keyTalent'
     | 'catalog'
     | 'rightsHighlights'
     | 'ownershipStructure'
     | 'archetype'
+    | 'assetDataSource'
 > {}
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
@@ -315,12 +393,30 @@ const addAcquisitionMediaPulse = (
         year: player.age,
         impactLevel: copy.impact,
     };
+    const existingX = player.x || { handle: '@player', followers: 0, posts: [], feed: [], lastPostWeek: 0 };
+    const existingFeed = Array.isArray(existingX.feed) ? existingX.feed : [];
+    const sourcePosts = existingFeed.filter(post => !post.isPlayer && typeof post.authorHandle === 'string' && post.authorHandle.trim().length > 0);
+    const fallbackSources = [
+        { authorId: 'studio_dealwire', authorName: 'Studio Dealwire', authorHandle: '@studiodealwire', authorAvatar: '' },
+        { authorId: 'market_mood', authorName: 'Market Mood', authorHandle: '@marketmood', authorAvatar: '' },
+        { authorId: 'dealroom_wire', authorName: 'Dealroom Wire', authorHandle: '@dealroomwire', authorAvatar: '' },
+        { authorId: 'board_watch', authorName: 'Board Watch', authorHandle: '@boardwatch', authorAvatar: '' },
+    ];
+    const sourceIndex = stableHash(`${idBase}:author`) % Math.max(1, sourcePosts.length || fallbackSources.length);
+    const source = sourcePosts[sourceIndex]
+        ? {
+            authorId: sourcePosts[sourceIndex].authorId,
+            authorName: sourcePosts[sourceIndex].authorName,
+            authorHandle: sourcePosts[sourceIndex].authorHandle,
+            authorAvatar: sourcePosts[sourceIndex].authorAvatar,
+        }
+        : fallbackSources[sourceIndex % fallbackSources.length];
     const socialPost: XPost = {
         id: `x_${idBase}`,
-        authorId: 'studio_dealwire',
-        authorName: 'Studio Dealwire',
-        authorHandle: '@studiodealwire',
-        authorAvatar: 'https://api.dicebear.com/8.x/pixel-art/svg?seed=StudioDealwire',
+        authorId: source.authorId,
+        authorName: source.authorName,
+        authorHandle: source.authorHandle,
+        authorAvatar: source.authorAvatar || `https://api.dicebear.com/8.x/pixel-art/svg?seed=${encodeURIComponent(source.authorHandle)}`,
         content: copy.social,
         timestamp: Date.now(),
         likes: 420 + (stableHash(`${idBase}:likes`) % 48_000),
@@ -334,8 +430,6 @@ const addAcquisitionMediaPulse = (
         sentiment: copy.sentiment,
     };
     const existingNews = Array.isArray(player.news) ? player.news : [];
-    const existingX = player.x || { handle: '@player', followers: 0, posts: [], feed: [], lastPostWeek: 0 };
-    const existingFeed = Array.isArray(existingX.feed) ? existingX.feed : [];
     return {
         ...player,
         news: existingNews.some(item => item.id === newsItem.id)
@@ -388,14 +482,45 @@ const persistCase = (player: Player, acquisitionCase: AcquisitionCase): Player =
     };
 };
 
+export const updateAcquisitionPresentation = ({
+    player,
+    studioId,
+    patch,
+}: {
+    player: Player;
+    studioId: string;
+    patch: NonNullable<AcquisitionCase['presentation']>;
+}): { success: boolean; player: Player; acquisitionCase?: AcquisitionCase; reason?: 'CASE_NOT_FOUND' } => {
+    const acquisitionCase = getAcquisitionCase(player, studioId);
+    if (!acquisitionCase) return { success: false, player, reason: 'CASE_NOT_FOUND' };
+    const nextCase: AcquisitionCase = {
+        ...acquisitionCase,
+        presentation: {
+            ...acquisitionCase.presentation,
+            ...patch,
+        },
+    };
+    return {
+        success: true,
+        player: persistCase(player, nextCase),
+        acquisitionCase: nextCase,
+    };
+};
+
 export const getAcquisitionEligibility = (
     profile: Pick<ForbesStudioProfile, 'isPlayerOwned' | 'acquisitionState'> & Partial<Pick<ForbesStudioProfile, 'id' | 'archetype'>>,
     existingCase?: AcquisitionCase,
+    player?: Pick<Player, 'age' | 'currentWeek'>,
 ): AcquisitionEligibility => {
-    const allowedOfferTypes: AcquisitionOfferType[] = profile.acquisitionState === 'PUBLICLY_TRADED'
+    const privateControlConversion = existingCase?.controlConversion?.kind === 'PRIVATE_STAKE_TO_CONTROL';
+    const allowedOfferTypes: AcquisitionOfferType[] = privateControlConversion
+        ? ['CONSERVATIVE', 'FAIR', 'AGGRESSIVE']
+        : profile.acquisitionState === 'PUBLICLY_TRADED'
         ? ['MINORITY']
         : ['CONSERVATIVE', 'FAIR', 'AGGRESSIVE', 'MINORITY'];
-    const recommendedOfferType: AcquisitionOfferType = (
+    const recommendedOfferType: AcquisitionOfferType = privateControlConversion
+        ? 'FAIR'
+        : (
         profile.acquisitionState === 'SEEKING_INVESTMENT'
         || profile.acquisitionState === 'PUBLICLY_TRADED'
     ) ? 'MINORITY' : 'FAIR';
@@ -403,16 +528,143 @@ export const getAcquisitionEligibility = (
     if (profile.isPlayerOwned) {
         return { canApproach: false, reason: 'PLAYER_OWNED', allowedOfferTypes: [], recommendedOfferType };
     }
-    if (profile.acquisitionState === 'NOT_FOR_SALE') {
-        return { canApproach: false, reason: 'NOT_FOR_SALE', allowedOfferTypes: [], recommendedOfferType };
-    }
     if (isStreamingPlatformStudio(profile)) {
         return { canApproach: false, reason: 'STREAMING_PLATFORM_RESERVED', allowedOfferTypes: [], recommendedOfferType };
+    }
+    const reapproachWeeksRemaining = getAcquisitionReapproachWeeksRemaining(existingCase, player);
+    if (existingCase?.status === 'CLOSED' && reapproachWeeksRemaining > 0) {
+        return { canApproach: false, reason: 'COOLDOWN_ACTIVE', allowedOfferTypes: [], recommendedOfferType };
+    }
+    // Older saves could leave the final declined offer as REJECTED. Treat it
+    // as closed immediately so an old inbox card cannot reopen an endless deal.
+    if (
+        existingCase?.status === 'REJECTED'
+        && getAcquisitionOfferAttemptCount(existingCase) >= ACQUISITION_MAX_OFFER_ATTEMPTS
+    ) {
+        return { canApproach: false, reason: 'COOLDOWN_ACTIVE', allowedOfferTypes: [], recommendedOfferType };
+    }
+    // A shareholder can value, hold, or sell a private stake, but cannot use it
+    // to bypass a board that is explicitly not entertaining control proposals.
+    if (
+        profile.acquisitionState === 'NOT_FOR_SALE'
+        && existingCase?.status !== 'CLOSED'
+    ) {
+        return { canApproach: false, reason: 'NOT_FOR_SALE', allowedOfferTypes: [], recommendedOfferType };
     }
     if (existingCase && ['OFFER_SUBMITTED', 'COUNTERED', 'RIVAL_BID', 'ACCEPTED'].includes(existingCase.status)) {
         return { canApproach: false, reason: 'OFFER_ALREADY_SUBMITTED', allowedOfferTypes, recommendedOfferType };
     }
     return { canApproach: true, allowedOfferTypes, recommendedOfferType };
+};
+
+export type PrivateControlAcquisitionStartResult = {
+    success: boolean;
+    player: Player;
+    acquisitionCase?: AcquisitionCase;
+    reason?:
+        | 'POSITION_NOT_FOUND'
+        | 'PUBLIC_COMPANY'
+        | 'ALREADY_OWNED'
+        | 'EXIT_ACTIVE'
+        | 'COOLDOWN_ACTIVE'
+        | 'NOT_FOR_SALE'
+        | 'INVALID_POSITION';
+};
+
+export const beginPrivateControlAcquisition = ({
+    player,
+    profile,
+}: {
+    player: Player;
+    profile: AcquisitionProfile;
+}): PrivateControlAcquisitionStartResult => {
+    if (profile.acquisitionState === 'PUBLICLY_TRADED') {
+        return { success: false, player, reason: 'PUBLIC_COMPANY' };
+    }
+    if (profile.isPlayerOwned || (player.businesses || []).some(business => business.id === profile.id)) {
+        return { success: false, player, reason: 'ALREADY_OWNED' };
+    }
+    if (profile.acquisitionState === 'NOT_FOR_SALE') {
+        return { success: false, player, reason: 'NOT_FOR_SALE' };
+    }
+
+    const positions = getCompanyEquityPositions(player).filter(position => position.studioId === profile.id);
+    if (positions.length === 0) return { success: false, player, reason: 'POSITION_NOT_FOUND' };
+    if (positions.some(position => Boolean(position.exit))) {
+        return { success: false, player, reason: 'EXIT_ACTIVE' };
+    }
+
+    const existingPercent = Math.round(Math.min(
+        49,
+        positions.reduce((sum, position) => sum + Math.max(0, Number(position.percent) || 0), 0),
+    ) * 100) / 100;
+    if (existingPercent <= 0 || existingPercent >= 100) {
+        return { success: false, player, reason: 'INVALID_POSITION' };
+    }
+
+    const existingCase = getAcquisitionCase(player, profile.id);
+    if (
+        existingCase?.controlConversion?.kind === 'PRIVATE_STAKE_TO_CONTROL'
+        && existingCase.status !== 'ACQUIRED'
+        && existingCase.status !== 'CLOSED'
+    ) {
+        return { success: true, player, acquisitionCase: existingCase };
+    }
+    if (
+        existingCase?.controlConversion?.kind === 'PRIVATE_STAKE_TO_CONTROL'
+        && existingCase.status === 'CLOSED'
+        && getAcquisitionReapproachWeeksRemaining(existingCase, player) > 0
+    ) {
+        return { success: false, player, acquisitionCase: existingCase, reason: 'COOLDOWN_ACTIVE' };
+    }
+
+    const existingCostBasis = Math.round(positions.reduce(
+        (sum, position) => sum + Math.max(0, Number(position.investedAmount) || 0),
+        0,
+    ));
+    const currentCompanyValuation = Math.max(
+        1,
+        Math.round(positions.reduce(
+            (highest, position) => Math.max(highest, Number(position.currentCompanyValuation) || 0),
+            0,
+        )),
+        Math.round(Number(profile.valuation) || 0),
+    );
+    const existingPositionValue = Math.round(currentCompanyValuation * (existingPercent / 100));
+    const remainingPercent = Math.round((100 - existingPercent) * 100) / 100;
+    const controlCase: AcquisitionCase = {
+        studioId: profile.id,
+        studioName: profile.name,
+        acquisitionState: profile.acquisitionState,
+        publicValuation: currentCompanyValuation,
+        approachedWeek: player.currentWeek,
+        approachedYear: player.age,
+        status: 'DRAFT',
+        controlConversion: {
+            kind: 'PRIVATE_STAKE_TO_CONTROL',
+            existingPercent,
+            remainingPercent,
+            existingCostBasis,
+            existingPositionValue,
+            initiatedWeek: player.currentWeek,
+            initiatedYear: player.age,
+        },
+    };
+    const nextPlayer = persistCase({
+        ...player,
+        logs: [{
+            week: player.currentWeek,
+            year: player.age,
+            message: `Control strategy opened for ${profile.name}. Your existing ${existingPercent.toFixed(1)}% stake is credited; negotiations cover the remaining ${remainingPercent.toFixed(1)}%.`,
+            type: 'neutral' as const,
+        }, ...(player.logs || [])].slice(0, 50),
+    }, controlCase);
+
+    return {
+        success: true,
+        player: nextPlayer,
+        acquisitionCase: controlCase,
+    };
 };
 
 export const calculateDueDiligenceFee = (
@@ -605,7 +857,12 @@ const getSigningLiabilities = (
     )),
 });
 
-const buildAcquiredStudioStaff = (profile: AcquisitionProfile): BusinessStaff[] => (
+const getAcquiredStudioStaffWeeklySalary = (weeklyRevenue: number, index: number): number => {
+    const scaleAllowance = Math.min(1_200_000, Math.max(0, weeklyRevenue) * 0.006);
+    return roundMoney(650_000 + scaleAllowance + (index * 75_000));
+};
+
+const buildAcquiredStudioStaff = (profile: AcquisitionProfile, weeklyRevenue: number): BusinessStaff[] => (
     profile.keyTalent.length
         ? profile.keyTalent
         : [{ name: 'Transition Leadership', role: 'Studio Management' }]
@@ -614,7 +871,7 @@ const buildAcquiredStudioStaff = (profile: AcquisitionProfile): BusinessStaff[] 
     name: talent.name,
     role: talent.role,
     skill: clamp(Math.round((profile.reputation || 55) + 8 - (index * 4)), 45, 96),
-    salary: roundMoney(650_000 + (profile.valuation * 0.0015) + (index * 75_000)),
+    salary: getAcquiredStudioStaffWeeklySalary(weeklyRevenue, index),
     morale: clamp(62 + Math.round((profile.reputation || 55) / 6), 55, 88),
 }));
 
@@ -628,13 +885,26 @@ const buildAcquiredStudioBusiness = ({
     closing: NonNullable<AcquisitionCase['closing']>;
 }): Business => {
     const studioState = createDefaultStudioState(player.currentWeek);
+    const acquisitionPortfolio = buildStudioAcquisitionPortfolio({ player, profile });
+    const inheritedRights = buildPortfolioOwnedRights({
+        portfolio: acquisitionPortfolio,
+        studioName: profile.name,
+    });
+    const inheritedFacilities = deriveAcquiredStudioFacilities({
+        valuation: profile.valuation,
+        reputation: profile.reputation,
+        facilityLabels: acquisitionPortfolio.facilityLabels,
+        facilitiesEstimated: acquisitionPortfolio.facilitiesEstimated,
+    });
     const resolvedRights = [
         ...(profile.rightsHighlights || []),
         ...(profile.catalog || []).map(project => project.title),
     ].filter((title, index, titles) => title && titles.indexOf(title) === index).slice(0, 12);
     const weeklyRevenue = roundMoney(Math.max(0, closing.expectedAnnualIncome / 52));
-    const weeklyDebtService = roundMoney((closing.verifiedDebt + closing.hiddenLiabilities) / 156);
-    const weeklyProfit = roundMoney((closing.expectedAnnualIncome / 52) - weeklyDebtService);
+    // Acquisition debt is tracked and serviced by the dedicated debt ledger.
+    // Do not bake it into the studio operating statement as a second expense.
+    const weeklyExpenses = roundMoney(weeklyRevenue * 0.72);
+    const weeklyProfit = roundMoney(weeklyRevenue - weeklyExpenses);
     const reputation = clamp(Math.round(profile.reputation || 50), 0, 100);
 
     return {
@@ -658,7 +928,7 @@ const buildAcquiredStudioBusiness = ({
         },
         stats: {
             weeklyRevenue,
-            weeklyExpenses: Math.max(0, weeklyRevenue - weeklyProfit),
+            weeklyExpenses,
             weeklyProfit,
             lifetimeRevenue: Math.max(0, (profile.catalog || []).reduce((sum, project) => sum + (project.revenue || 0), 0)),
             valuation: Math.max(0, profile.valuation || 0),
@@ -674,7 +944,7 @@ const buildAcquiredStudioBusiness = ({
             processedReleaseOutcomeIds: (profile.catalog || []).map(project => project.id).slice(0, 12),
             locations: Math.max(1, profile.facilities.length || 1),
         },
-        staff: buildAcquiredStudioStaff(profile),
+        staff: buildAcquiredStudioStaff(profile, weeklyRevenue),
         products: [],
         hiringPool: [],
         lastHiringRefreshWeek: player.currentWeek,
@@ -684,7 +954,11 @@ const buildAcquiredStudioBusiness = ({
             acquisitionOrigin: 'STUDIO_ACQUISITION',
             acquiredWeek: player.currentWeek,
             acquiredYear: player.age,
+            acquisitionPortfolio,
             purchasedIPTitles: resolvedRights,
+            ownedRights: inheritedRights,
+            departments: inheritedFacilities.departments,
+            equipment: inheritedFacilities.equipment,
             financeLedger: [{
                 id: `studio_acquisition_${profile.id}_${player.currentWeek}`,
                 week: player.currentWeek,
@@ -716,7 +990,7 @@ export const runDueDiligence = ({
 } => {
     const language = getPlayerLanguage(player);
     const existingCase = getAcquisitionCase(player, profile.id);
-    if (!getAcquisitionEligibility(profile, existingCase).canApproach && existingCase?.status !== 'DRAFT') {
+    if (!getAcquisitionEligibility(profile, existingCase, player).canApproach && existingCase?.status !== 'DRAFT') {
         return { success: false, player, reason: 'INELIGIBLE' };
     }
     if (existingCase?.diligence?.status === 'COMPLETE') {
@@ -774,6 +1048,30 @@ export const runDueDiligence = ({
     };
 };
 
+const getAcquisitionBlockReferenceValue = ({
+    profile,
+    acquisitionCase,
+    offerType,
+}: {
+    profile: Pick<ForbesStudioProfile, 'valuation'>;
+    acquisitionCase?: AcquisitionCase;
+    offerType: AcquisitionOfferType;
+}): number => {
+    const enterpriseValue = acquisitionCase?.diligence?.report.adjustedEnterpriseValue
+        || acquisitionCase?.publicValuation
+        || profile.valuation;
+    if (
+        offerType !== 'MINORITY'
+        && acquisitionCase?.controlConversion?.kind === 'PRIVATE_STAKE_TO_CONTROL'
+    ) {
+        return Math.max(
+            1,
+            Math.round(enterpriseValue * (acquisitionCase.controlConversion.remainingPercent / 100)),
+        );
+    }
+    return Math.max(1, enterpriseValue);
+};
+
 export const getOfferPresets = ({
     profile,
     acquisitionCase,
@@ -783,27 +1081,36 @@ export const getOfferPresets = ({
     acquisitionCase?: AcquisitionCase;
     minorityPercent?: number;
 }): Record<AcquisitionOfferType, AcquisitionOfferPreset> => {
-    const referenceValue = acquisitionCase?.diligence?.report.adjustedEnterpriseValue || profile.valuation;
+    const fullReferenceValue = getAcquisitionBlockReferenceValue({
+        profile,
+        acquisitionCase,
+        offerType: 'FAIR',
+    });
+    const minorityReferenceValue = getAcquisitionBlockReferenceValue({
+        profile,
+        acquisitionCase,
+        offerType: 'MINORITY',
+    });
     const safeMinorityPercent = clamp(Math.round(minorityPercent), 5, 49);
     return {
         CONSERVATIVE: {
             type: 'CONSERVATIVE',
-            amount: roundMoney(referenceValue * 0.88),
+            amount: roundMoney(fullReferenceValue * 0.88),
             valueDeltaPercent: -12,
         },
         FAIR: {
             type: 'FAIR',
-            amount: roundMoney(referenceValue),
+            amount: roundMoney(fullReferenceValue),
             valueDeltaPercent: 0,
         },
         AGGRESSIVE: {
             type: 'AGGRESSIVE',
-            amount: roundMoney(referenceValue * 1.15),
+            amount: roundMoney(fullReferenceValue * 1.15),
             valueDeltaPercent: 15,
         },
         MINORITY: {
             type: 'MINORITY',
-            amount: roundMoney(referenceValue * (safeMinorityPercent / 100) * 1.05),
+            amount: roundMoney(minorityReferenceValue * (safeMinorityPercent / 100) * 1.05),
             percent: safeMinorityPercent,
             valueDeltaPercent: 5,
         },
@@ -835,7 +1142,11 @@ export const analyzeCustomOffer = ({
     existingOwnershipPercent?: number;
     strategicThreshold?: number;
 }): CustomOfferAnalysis => {
-    const referenceValue = acquisitionCase?.diligence?.report.adjustedEnterpriseValue || Math.max(0, profile.valuation);
+    const referenceValue = getAcquisitionBlockReferenceValue({
+        profile,
+        acquisitionCase,
+        offerType,
+    });
     const normalizedAmount = Number.isFinite(offerAmount) ? Math.max(0, Math.round(offerAmount)) : 0;
     const normalizedMinorityPercent = Number.isFinite(minorityPercent)
         ? Math.round((minorityPercent || 0) * 100) / 100
@@ -903,11 +1214,11 @@ export const submitOpeningOffer = ({
     success: boolean;
     player: Player;
     acquisitionCase?: AcquisitionCase;
-    reason?: 'PLAYER_OWNED' | 'NOT_FOR_SALE' | 'OFFER_ALREADY_SUBMITTED' | 'STREAMING_PLATFORM_RESERVED' | 'REGULATOR_REVIEW_ACTIVE' | 'OFFER_TYPE_UNAVAILABLE' | 'INVALID_OFFER_TERMS' | 'FUNDING_SOURCE_UNAVAILABLE' | 'INSUFFICIENT_FUNDS';
+    reason?: 'PLAYER_OWNED' | 'NOT_FOR_SALE' | 'OFFER_ALREADY_SUBMITTED' | 'STREAMING_PLATFORM_RESERVED' | 'COOLDOWN_ACTIVE' | 'REGULATOR_REVIEW_ACTIVE' | 'OFFER_TYPE_UNAVAILABLE' | 'INVALID_OFFER_TERMS' | 'FUNDING_SOURCE_UNAVAILABLE' | 'INSUFFICIENT_FUNDS';
 } => {
     const language = getPlayerLanguage(player);
     const existingCase = getAcquisitionCase(player, profile.id);
-    const eligibility = getAcquisitionEligibility(profile, existingCase);
+    const eligibility = getAcquisitionEligibility(profile, existingCase, player);
     if (!eligibility.canApproach) {
         return {
             success: false,
@@ -947,6 +1258,14 @@ export const submitOpeningOffer = ({
     if (!option) return { success: false, player, reason: 'FUNDING_SOURCE_UNAVAILABLE' };
     if (!option.affordable) return { success: false, player, reason: 'INSUFFICIENT_FUNDS' };
 
+    const startsNewNegotiationCycle = existingCase?.status === 'CLOSED';
+    const nextOfferRound = startsNewNegotiationCycle
+        ? 1
+        : getAcquisitionOfferAttemptCount(existingCase) + 1;
+    if (nextOfferRound > ACQUISITION_MAX_OFFER_ATTEMPTS) {
+        return { success: false, player, reason: 'COOLDOWN_ACTIVE' };
+    }
+
     const acquisitionCase: AcquisitionCase = {
         ...(existingCase || {
             studioId: profile.id,
@@ -957,7 +1276,11 @@ export const submitOpeningOffer = ({
             approachedYear: player.age,
             status: 'DRAFT' as const,
         }),
+        approachedWeek: startsNewNegotiationCycle ? player.currentWeek : existingCase?.approachedWeek || player.currentWeek,
+        approachedYear: startsNewNegotiationCycle ? player.age : existingCase?.approachedYear || player.age,
         status: 'OFFER_SUBMITTED',
+        reapproachAfterWeek: undefined,
+        reapproachAfterYear: undefined,
         offer: {
             type: offerType,
             amount: resolvedOfferAmount,
@@ -968,9 +1291,11 @@ export const submitOpeningOffer = ({
             commitments: normalizeCommitments(commitments),
             submittedWeek: player.currentWeek,
             submittedYear: player.age,
-            round: (existingCase?.offer?.round || 0) + 1,
+            round: nextOfferRound,
         },
         sellerResponse: undefined,
+        // A revised file needs a fresh board reveal, never the previous response scene.
+        presentation: undefined,
     };
     const updatedPlayer = addAcquisitionMediaPulse(persistCase(player, acquisitionCase), {
         moment: 'OFFER_SUBMITTED',
@@ -996,11 +1321,15 @@ export const submitOpeningOffer = ({
 
 const getOfferComparisonValue = (acquisitionCase: AcquisitionCase): number => {
     const enterpriseValue = acquisitionCase.diligence?.report.adjustedEnterpriseValue || acquisitionCase.publicValuation;
-    if (acquisitionCase.offer?.type !== 'MINORITY') return Math.max(1, enterpriseValue);
+    if (acquisitionCase.offer?.type !== 'MINORITY') {
+        return acquisitionCase.controlConversion?.kind === 'PRIVATE_STAKE_TO_CONTROL'
+            ? Math.max(1, Math.round(enterpriseValue * (acquisitionCase.controlConversion.remainingPercent / 100)))
+            : Math.max(1, enterpriseValue);
+    }
     return Math.max(1, enterpriseValue * ((acquisitionCase.offer.minorityPercent || 25) / 100));
 };
 
-const RIVAL_BID_MAX_ROUNDS = 3;
+const RIVAL_BID_MAX_ROUNDS = ACQUISITION_MAX_OFFER_ATTEMPTS;
 const RIVAL_STUDIO_NAMES = [
     'Northstar Studios',
     'Crownline Pictures',
@@ -1083,7 +1412,7 @@ const getSellerResponse = (acquisitionCase: AcquisitionCase, player: Pick<Player
             }),
         };
     }
-    if (round >= RIVAL_BID_MAX_ROUNDS && effectiveOfferRatio >= 0.72) {
+    if (round >= RIVAL_BID_MAX_ROUNDS) {
         return {
             decision: 'REJECTED' as const,
             round,
@@ -1120,26 +1449,99 @@ const getSellerResponse = (acquisitionCase: AcquisitionCase, player: Pick<Player
 
 export const resolveStudioAcquisitionResponses = (player: Player): Player => {
     const cases = getAcquisitionCases(player);
-    const responses = cases.filter(acquisitionCase => acquisitionCase.status === 'OFFER_SUBMITTED' && acquisitionCase.offer);
-    if (responses.length === 0) return player;
-
     let updatedPlayer = player;
+
+    // Migrate old final declines into the same explicit cooldown used by new
+    // negotiations. This blocks stale inbox messages from reviving them.
+    cases
+        .filter(acquisitionCase => (
+            acquisitionCase.status === 'REJECTED'
+            && getAcquisitionOfferAttemptCount(acquisitionCase) >= ACQUISITION_MAX_OFFER_ATTEMPTS
+        ))
+        .forEach(acquisitionCase => {
+            const reapproachAt = getGameWeekAfter(
+                updatedPlayer.age,
+                updatedPlayer.currentWeek,
+                ACQUISITION_REAPPROACH_COOLDOWN_WEEKS,
+            );
+            updatedPlayer = persistCase(updatedPlayer, {
+                ...acquisitionCase,
+                status: 'CLOSED',
+                reapproachAfterWeek: reapproachAt.week,
+                reapproachAfterYear: reapproachAt.year,
+                sellerResponse: acquisitionCase.sellerResponse
+                    ? {
+                        ...acquisitionCase.sellerResponse,
+                        summary: `${acquisitionCase.studioName} declined the final offer and closed discussions for now. You can make a fresh approach in ${ACQUISITION_REAPPROACH_COOLDOWN_WEEKS} in-game weeks.`,
+                    }
+                    : acquisitionCase.sellerResponse,
+            });
+        });
+
+    // Old builds could persist a rival bid after the three-round limit. Put the
+    // case back into the final board-response lane rather than making players
+    // continue an impossible fourth round.
+    cases
+        .filter(acquisitionCase => (
+            acquisitionCase.status === 'RIVAL_BID'
+            && acquisitionCase.offer
+            && Math.max(1, acquisitionCase.sellerResponse?.round || acquisitionCase.offer.round || 1) > RIVAL_BID_MAX_ROUNDS
+        ))
+        .forEach(acquisitionCase => {
+            updatedPlayer = persistCase(updatedPlayer, {
+                ...acquisitionCase,
+                status: 'OFFER_SUBMITTED',
+                offer: {
+                    ...acquisitionCase.offer!,
+                    round: RIVAL_BID_MAX_ROUNDS,
+                    submittedWeek: updatedPlayer.currentWeek,
+                    submittedYear: updatedPlayer.age,
+                },
+                sellerResponse: undefined,
+                presentation: undefined,
+            });
+        });
+
+    const responses = getAcquisitionCases(updatedPlayer)
+        .filter(acquisitionCase => acquisitionCase.status === 'OFFER_SUBMITTED' && acquisitionCase.offer);
+    if (responses.length === 0) return updatedPlayer;
+
     responses.forEach(acquisitionCase => {
         const language = getPlayerLanguage(updatedPlayer);
         const sellerResponse = getSellerResponse(acquisitionCase, updatedPlayer);
-        const nextStatus: AcquisitionCaseStatus = sellerResponse.decision;
+        const closesNegotiation = sellerResponse.decision === 'REJECTED'
+            && getAcquisitionOfferAttemptCount(acquisitionCase) >= ACQUISITION_MAX_OFFER_ATTEMPTS;
+        const reapproachAt = closesNegotiation
+            ? getGameWeekAfter(
+                updatedPlayer.age,
+                updatedPlayer.currentWeek,
+                ACQUISITION_REAPPROACH_COOLDOWN_WEEKS,
+            )
+            : undefined;
+        const resolvedResponse = closesNegotiation
+            ? {
+                ...sellerResponse,
+                summary: `${acquisitionCase.studioName} declined the third offer and closed discussions for now. You can try again in ${ACQUISITION_REAPPROACH_COOLDOWN_WEEKS} in-game weeks.`,
+            }
+            : sellerResponse;
+        const nextStatus: AcquisitionCaseStatus = closesNegotiation ? 'CLOSED' : sellerResponse.decision;
         const updatedCase: AcquisitionCase = {
             ...acquisitionCase,
             status: nextStatus,
-            sellerResponse,
+            reapproachAfterWeek: reapproachAt?.week,
+            reapproachAfterYear: reapproachAt?.year,
+            sellerResponse: resolvedResponse,
+            // Every board answer is a new decision. Clear the old ceremony
+            // checkpoint so reopening the file cannot skip or strand this result.
+            presentation: undefined,
         };
         updatedPlayer = addAcquisitionMediaPulse(persistCase(updatedPlayer, updatedCase), {
             moment: sellerResponse.decision,
             studioId: acquisitionCase.studioId,
             studioName: acquisitionCase.studioName,
-            amount: sellerResponse.agreedAmount || sellerResponse.counterAmount || sellerResponse.rivalAmount || acquisitionCase.offer?.amount,
-            rivalStudioName: sellerResponse.rivalStudioName,
-            round: sellerResponse.round,
+            amount: resolvedResponse.agreedAmount || resolvedResponse.counterAmount || resolvedResponse.rivalAmount || acquisitionCase.offer?.amount,
+            rivalStudioName: resolvedResponse.rivalStudioName,
+            round: resolvedResponse.round,
         });
         const subject = t(language, `services.studioAcquisition.inbox.subject.${sellerResponse.decision}`, { studio: acquisitionCase.studioName });
         const messageId = `studio_acquisition_${acquisitionCase.studioId}_r${sellerResponse.round}_${sellerResponse.decision}`;
@@ -1151,7 +1553,7 @@ export const resolveStudioAcquisitionResponses = (player: Player): Player => {
                     id: messageId,
                     sender: t(language, 'services.studioAcquisition.inbox.sender'),
                     subject,
-                    text: sellerResponse.summary,
+                    text: resolvedResponse.summary,
                     type: 'STUDIO_ACQUISITION' as const,
                     data: {
                         studioId: acquisitionCase.studioId,
@@ -1165,6 +1567,7 @@ export const resolveStudioAcquisitionResponses = (player: Player): Player => {
                     },
                     isRead: false,
                     weekSent: updatedPlayer.currentWeek,
+                    expiresIn: ACQUISITION_INBOX_NOTICE_WEEKS,
                 }, ...(updatedPlayer.inbox || [])],
             logs: [{
                 week: updatedPlayer.currentWeek,
@@ -1203,6 +1606,7 @@ export const acceptAcquisitionCounter = ({
                     studio: acquisitionCase.studioName,
                 }),
             },
+            presentation: undefined,
         };
     const casePlayer = addAcquisitionMediaPulse(persistCase(player, acceptedCase), {
         moment: 'COUNTER_ACCEPTED',
@@ -1260,9 +1664,15 @@ export const reviseAcquisitionOffer = ({
             amount: normalizedAmount,
             submittedWeek: player.currentWeek,
             submittedYear: player.age,
-            round: (acquisitionCase.sellerResponse?.round || acquisitionCase.offer.round || 1) + 1,
+            // Seller back-and-forth has the same finite board-round limit as
+            // rival auctions, so it cannot grow into an endless negotiation.
+            round: Math.min(
+                RIVAL_BID_MAX_ROUNDS,
+                (acquisitionCase.sellerResponse?.round || acquisitionCase.offer.round || 1) + 1,
+            ),
         },
         sellerResponse: undefined,
+        presentation: undefined,
     };
     return {
         success: true,
@@ -1306,9 +1716,15 @@ export const beatAcquisitionRivalBid = ({
             amount: normalizedAmount,
             submittedWeek: player.currentWeek,
             submittedYear: player.age,
-            round: (acquisitionCase.sellerResponse?.round || acquisitionCase.offer.round || 1) + 1,
+            // The next board answer is terminal at the cap. This also rescues
+            // stale Round 4 / 3 cases when a player chooses to beat the bid.
+            round: Math.min(
+                RIVAL_BID_MAX_ROUNDS,
+                (acquisitionCase.sellerResponse?.round || acquisitionCase.offer.round || 1) + 1,
+            ),
         },
         sellerResponse: undefined,
+        presentation: undefined,
     };
     return {
         success: true,
@@ -1368,23 +1784,52 @@ export const completeStudioAcquisition = ({
         signedYear: player.age,
         funding,
         ...liabilities,
-        assetSummary: t(language, 'services.studioAcquisition.closing.assetSummary.full', {
-            facilities: profile.facilities.length,
-            rights: profile.rightsCount,
-            talent: profile.keyTalent.length,
-        }),
+        outcome: 'FULL_BUYOUT',
+        assetSummary: acquisitionCase.controlConversion?.kind === 'PRIVATE_STAKE_TO_CONTROL'
+            ? `${acquisitionCase.controlConversion.existingPercent.toFixed(1)}% existing stake credited; ${acquisitionCase.controlConversion.remainingPercent.toFixed(1)}% acquired for ${formatAcquisitionMoney(finalPrice)}`
+            : t(language, 'services.studioAcquisition.closing.assetSummary.full', {
+                facilities: profile.facilities.length,
+                rights: profile.rightsCount,
+                talent: profile.keyTalent.length,
+            }),
     };
     const chargedPlayer = deductImmediateExpense(player, finalPrice, funding);
-    const acquiredBusiness = buildAcquiredStudioBusiness({ player: chargedPlayer, profile, closing });
+    const controlConversion = acquisitionCase.controlConversion;
+    const convertedPlayer: Player = controlConversion?.kind === 'PRIVATE_STAKE_TO_CONTROL'
+        ? {
+            ...chargedPlayer,
+            flags: {
+                ...chargedPlayer.flags,
+                companyEquityPositions: getCompanyEquityPositions(chargedPlayer)
+                    .filter(position => position.studioId !== profile.id),
+                privateEquityConversionHistory: [{
+                    id: `private_control_${profile.id}_${player.age}_${player.currentWeek}`,
+                    studioId: profile.id,
+                    studioName: profile.name,
+                    existingPercent: controlConversion.existingPercent,
+                    remainingPercent: controlConversion.remainingPercent,
+                    existingCostBasis: controlConversion.existingCostBasis,
+                    existingPositionValue: controlConversion.existingPositionValue,
+                    remainingPurchasePrice: finalPrice,
+                    totalCashBasis: controlConversion.existingCostBasis + finalPrice,
+                    week: player.currentWeek,
+                    year: player.age,
+                }, ...(Array.isArray(chargedPlayer.flags?.privateEquityConversionHistory)
+                    ? chargedPlayer.flags.privateEquityConversionHistory
+                    : [])].slice(0, 20),
+            },
+        }
+        : chargedPlayer;
+    const acquiredBusiness = buildAcquiredStudioBusiness({ player: convertedPlayer, profile, closing });
     const acquiredCase: AcquisitionCase = {
         ...acquisitionCase,
         status: 'ACQUIRED',
         closing,
     };
     const withBusiness: Player = {
-        ...chargedPlayer,
+        ...convertedPlayer,
         businesses: [
-            ...chargedPlayer.businesses.filter(business => business.id !== profile.id),
+            ...convertedPlayer.businesses.filter(business => business.id !== profile.id),
             acquiredBusiness,
         ],
     };
@@ -1499,6 +1944,7 @@ export const completeStockControlAcquisition = ({
         verifiedDebt,
         hiddenLiabilities,
         expectedAnnualIncome,
+        outcome: 'CONTROL',
         assetSummary: t(language, 'services.studioAcquisition.closing.assetSummary.stockControl', {
             facilities: profile.facilities.length,
             rights: profile.rightsCount,
@@ -1586,6 +2032,219 @@ export const completeStockControlAcquisition = ({
     };
 };
 
+const completeMinorityStudioInvestment = ({
+    player,
+    profile,
+}: {
+    player: Player;
+    profile: AcquisitionProfile;
+}): {
+    success: boolean;
+    player: Player;
+    acquisitionCase?: AcquisitionCase;
+    reason?: 'CASE_NOT_ACCEPTED' | 'FUNDING_SOURCE_UNAVAILABLE' | 'INSUFFICIENT_FUNDS' | 'ALREADY_OWNED';
+} => {
+    const acquisitionCase = getAcquisitionCase(player, profile.id);
+    if (!acquisitionCase || acquisitionCase.status !== 'ACCEPTED' || acquisitionCase.offer?.type !== 'MINORITY') {
+        return { success: false, player, acquisitionCase, reason: 'CASE_NOT_ACCEPTED' };
+    }
+    if ((player.businesses || []).some(business => business.id === profile.id) || profile.isPlayerOwned) {
+        return { success: false, player, acquisitionCase, reason: 'ALREADY_OWNED' };
+    }
+
+    const finalPrice = getFinalAcquisitionPrice(acquisitionCase);
+    const funding = acquisitionCase.offer.funding;
+    const fundingOption = resolveFundingOption(getFundingOptions({
+        player,
+        profile,
+        amount: finalPrice,
+        expenseType: 'OFFER',
+        language: getPlayerLanguage(player),
+    }), funding);
+    if (!fundingOption) return { success: false, player, acquisitionCase, reason: 'FUNDING_SOURCE_UNAVAILABLE' };
+    if (!fundingOption.affordable) return { success: false, player, acquisitionCase, reason: 'INSUFFICIENT_FUNDS' };
+
+    const purchasedPercent = clamp(acquisitionCase.offer.minorityPercent || 25, 5, 49);
+    const previousPositions = getCompanyEquityPositions(player);
+    const existingPercent = previousPositions
+        .filter(position => position.studioId === profile.id)
+        .reduce((sum, position) => sum + position.percent, 0);
+    const nextPosition = {
+        studioId: profile.id,
+        studioName: profile.name,
+        percent: Math.min(49, existingPercent + purchasedPercent),
+        investedAmount: previousPositions
+            .filter(position => position.studioId === profile.id)
+            .reduce((sum, position) => sum + Math.max(0, position.investedAmount || 0), finalPrice),
+        acquiredWeek: player.currentWeek,
+        acquiredYear: player.age,
+        entryCompanyValuation: Math.max(1, profile.valuation || Math.round(finalPrice / (purchasedPercent / 100))),
+        currentCompanyValuation: Math.max(1, profile.valuation || Math.round(finalPrice / (purchasedPercent / 100))),
+        annualProfitEstimate: Math.round(Number(profile.profitability || 0)),
+        lastReviewAbsoluteWeek: ((Math.max(1, player.age) - 1) * 52) + Math.max(0, player.currentWeek - 1),
+        lastQuarterChangePercent: 0,
+        lastQuarterOutcome: 'VALUE_REVIEW' as const,
+        lastQuarterSummary: 'Position opened. The first private market review is due next quarter.',
+        lifetimeDistributions: 0,
+        nextExitEligibleAbsoluteWeek: ((Math.max(1, player.age) - 1) * 52) + Math.max(0, player.currentWeek - 1) + 26,
+    };
+    const chargedPlayer = deductImmediateExpense(player, finalPrice, funding);
+    const closing: NonNullable<AcquisitionCase['closing']> = {
+        finalPrice,
+        signedWeek: player.currentWeek,
+        signedYear: player.age,
+        funding,
+        verifiedDebt: 0,
+        hiddenLiabilities: 0,
+        expectedAnnualIncome: Math.round(Math.max(0, profile.profitability || 0) * (purchasedPercent / 100)),
+        assetSummary: `${purchasedPercent.toFixed(1)}% strategic equity position`,
+        outcome: 'MINORITY_STAKE',
+    };
+    const closedCase: AcquisitionCase = {
+        ...acquisitionCase,
+        status: 'ACQUIRED',
+        closing,
+    };
+    const withPosition: Player = {
+        ...chargedPlayer,
+        flags: {
+            ...chargedPlayer.flags,
+            companyEquityPositions: [
+                ...previousPositions.filter(position => position.studioId !== profile.id),
+                nextPosition,
+            ],
+        },
+        logs: [{
+            week: player.currentWeek,
+            year: player.age,
+            message: `Strategic stake secured: ${purchasedPercent.toFixed(1)}% of ${profile.name} for ${formatAcquisitionMoney(finalPrice)}.`,
+            type: 'positive' as const,
+        }, ...(chargedPlayer.logs || [])].slice(0, 50),
+    };
+    return {
+        success: true,
+        acquisitionCase: closedCase,
+        player: persistCase(withPosition, closedCase),
+    };
+};
+
+const completePublicTenderAcquisition = ({
+    player,
+    profile,
+}: {
+    player: Player;
+    profile: AcquisitionProfile;
+}): {
+    success: boolean;
+    player: Player;
+    acquisitionCase?: AcquisitionCase;
+    acquiredBusiness?: Business;
+    reason?: 'CASE_NOT_ACCEPTED' | 'CONTROL_NOT_READY' | 'STOCK_NOT_FOUND' | 'FUNDING_SOURCE_UNAVAILABLE' | 'INSUFFICIENT_FUNDS' | 'ALREADY_OWNED' | 'STREAMING_PLATFORM_RESERVED';
+} => {
+    const acquisitionCase = getAcquisitionCase(player, profile.id);
+    const position = getCompanyPosition(player, profile);
+    if (position.ownershipPercent >= 50) return completeStockControlAcquisition({ player, profile });
+    if (!acquisitionCase || acquisitionCase.status !== 'ACCEPTED' || acquisitionCase.offer?.type !== 'MINORITY') {
+        return { success: false, player, acquisitionCase, reason: 'CASE_NOT_ACCEPTED' };
+    }
+    const stock = (player.stocks || []).find(candidate => candidate.id === position.linkedStockId || candidate.relatedStudioId === profile.id);
+    if (!stock) return { success: false, player, acquisitionCase, reason: 'STOCK_NOT_FOUND' };
+
+    const outstandingShares = getStockOutstandingShares(stock);
+    const stockControlTarget = Math.max(0, 50 - position.negotiatedPercent);
+    const targetShares = Math.ceil(outstandingShares * (stockControlTarget / 100));
+    const minimumSharesForControl = Math.max(0, targetShares - position.shares);
+    const requestedTenderShares = Math.ceil(outstandingShares * (Math.max(0, acquisitionCase.offer.minorityPercent || 0) / 100));
+    const sharesNeeded = Math.max(minimumSharesForControl, requestedTenderShares);
+    if (sharesNeeded <= 0) return completeStockControlAcquisition({ player, profile });
+
+    const quote = calculateStockTradeQuote(player, stock, sharesNeeded);
+    const finalPrice = getFinalAcquisitionPrice(acquisitionCase);
+    const funding = acquisitionCase.offer.funding;
+    const fundingOption = resolveFundingOption(getFundingOptions({
+        player,
+        profile,
+        amount: finalPrice,
+        expenseType: 'OFFER',
+        language: getPlayerLanguage(player),
+    }), funding);
+    if (!fundingOption) return { success: false, player, acquisitionCase, reason: 'FUNDING_SOURCE_UNAVAILABLE' };
+    if (!fundingOption.affordable) return { success: false, player, acquisitionCase, reason: 'INSUFFICIENT_FUNDS' };
+
+    // The accepted tender price is authoritative. The stock service still owns
+    // share counts, ownership math, price impact, history, and portfolio cost.
+    const tradeBase: Player = {
+        ...player,
+        money: Math.max(player.money, quote.estimatedValue) + quote.estimatedValue,
+    };
+    const tradeResult = executeStockTrade(tradeBase, stock.id, sharesNeeded);
+    if (!tradeResult.success) {
+        return { success: false, player, acquisitionCase, reason: 'CONTROL_NOT_READY' };
+    }
+    const chargedPlayer = deductImmediateExpense(player, finalPrice, funding);
+    const tenderedPlayer: Player = {
+        ...tradeResult.player,
+        money: chargedPlayer.money,
+        businesses: chargedPlayer.businesses,
+        flags: chargedPlayer.flags,
+        inbox: chargedPlayer.inbox,
+        news: tradeResult.player.news,
+        x: tradeResult.player.x,
+    };
+    const controlResult = completeStockControlAcquisition({ player: tenderedPlayer, profile });
+    if (!controlResult.success || !controlResult.acquisitionCase?.closing) return controlResult;
+
+    const closing = {
+        ...controlResult.acquisitionCase.closing,
+        finalPrice,
+        funding,
+        outcome: 'CONTROL' as const,
+        assetSummary: `${position.ownershipPercent.toFixed(2)}% existing stake credited; ${quote.shares.toLocaleString()} ${stock.symbol} shares tendered for the remaining control block`,
+    };
+    const closedCase: AcquisitionCase = {
+        ...controlResult.acquisitionCase,
+        closing,
+    };
+    const completedPlayer = persistCase({
+        ...controlResult.player,
+        inbox: (controlResult.player.inbox || []).map(message => (
+            message.type === 'STUDIO_ACQUISITION' && message.data?.studioId === profile.id
+                ? { ...message, data: { ...message.data, agreedAmount: finalPrice, stockControl: true } }
+                : message
+        )),
+    }, closedCase);
+    return {
+        ...controlResult,
+        acquisitionCase: closedCase,
+        player: completedPlayer,
+    };
+};
+
+export const completeAcquisitionTransaction = ({
+    player,
+    profile,
+}: {
+    player: Player;
+    profile: AcquisitionProfile;
+}) => {
+    const acquisitionCase = getAcquisitionCase(player, profile.id);
+    let result;
+    if (profile.acquisitionState === 'PUBLICLY_TRADED') {
+        result = completePublicTenderAcquisition({ player, profile });
+    } else if (acquisitionCase?.offer?.type === 'MINORITY') {
+        result = completeMinorityStudioInvestment({ player, profile });
+    } else {
+        result = completeStudioAcquisition({ player, profile });
+    }
+
+    // New acquisitions must carry their debt ledger from the signing moment.
+    // This keeps future deals on the normal debt path while legacy migrations
+    // can safely preserve their historical balances.
+    return result.success
+        ? { ...result, player: syncAcquisitionDebtLedger(result.player, 'SIGNED') }
+        : result;
+};
+
 export const walkAwayFromAcquisition = ({
     player,
     studioId,
@@ -1597,9 +2256,19 @@ export const walkAwayFromAcquisition = ({
     if (!acquisitionCase || !['COUNTERED', 'RIVAL_BID', 'ACCEPTED', 'REJECTED'].includes(acquisitionCase.status)) {
         return { success: false, player, reason: 'CASE_NOT_ACTIONABLE' };
     }
+    const reapproachAt = getGameWeekAfter(
+        player.age,
+        player.currentWeek,
+        ACQUISITION_REAPPROACH_COOLDOWN_WEEKS,
+    );
     return {
         success: true,
-        player: addAcquisitionMediaPulse(persistCase(player, { ...acquisitionCase, status: 'CLOSED' }), {
+        player: addAcquisitionMediaPulse(persistCase(player, {
+            ...acquisitionCase,
+            status: 'CLOSED',
+            reapproachAfterWeek: reapproachAt.week,
+            reapproachAfterYear: reapproachAt.year,
+        }), {
             moment: 'WALKED_AWAY',
             studioId,
             studioName: acquisitionCase.studioName,

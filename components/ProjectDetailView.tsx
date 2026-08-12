@@ -5,6 +5,8 @@ import { formatMoney } from '../services/formatUtils';
 import { STUDIO_CATALOG } from '../services/studioLogic';
 import { calculateProjectMusicImpact, formatProjectMusicByline, getMusicCreditRoleLabel, getMusicStrategyLabel, getProjectMusicPlan } from '../services/musicIndustry';
 import { ArrowLeft, Film, Tv, Info, DollarSign, Crown, CheckCircle, Shield, Zap, User, TrendingUp, Users, Globe, List, Percent, Minus, Plus, Sparkles, Handshake, Calendar, BarChart3, Clock, AlertCircle, Music2 } from 'lucide-react';
+import { getCharacterIdentityLabels, getOpportunityCharacterProfile, inferStoryCompass } from '../services/characterIdentityLogic';
+import { evaluateCharacterProfileFit, formatCharacterStoryFitLabel } from '../services/characterStoryFit';
 
 interface ProjectDetailViewProps {
     opportunity: AuditionOpportunity;
@@ -84,6 +86,17 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
             ? 'This project only'
             : 'Project-only cap table';
     const investorPayoutTotal = Math.max(0, Number(project.investorPayouts?.lifetimeInvestorPayout || 0));
+    const characterProfile = getOpportunityCharacterProfile(opportunity);
+    const characterLabels = getCharacterIdentityLabels(characterProfile);
+    const characterStoryFit = opportunity.characterStoryFit || evaluateCharacterProfileFit(
+        inferStoryCompass(project),
+        characterProfile,
+        opportunity.roleType,
+    );
+    const industryContext = opportunity.industryContext;
+    const industryContextTone = industryContext?.kind === 'RANGE'
+        ? 'border-cyan-300/40 text-cyan-300'
+        : 'border-amber-300/40 text-amber-300';
     
     // Formatting
     const displaySalary = isNegotiating ? currentOffer : opportunity.estimatedIncome;
@@ -187,6 +200,54 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
 
             {/* SCROLL CONTENT */}
             <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-4 bg-zinc-950">
+                <section className="border-y border-cyan-300/15 bg-cyan-300/[0.035] px-1 py-4">
+                    <div className="flex items-center justify-between gap-3">
+                        <div>
+                            <div className="text-[10px] font-black uppercase tracking-[0.2em] text-cyan-300">Your Part</div>
+                            <div className="mt-1 text-sm font-bold text-white">
+                                {opportunity.characterName || `${characterProfile.storyRole.replaceAll('_', ' ')} ${opportunity.roleType.toLowerCase()} role`}
+                            </div>
+                        </div>
+                        {opportunity.roleFit && (
+                            <div className="text-right">
+                                <div className="text-[8px] font-black uppercase tracking-widest text-zinc-600">Role fit</div>
+                                <div className="text-sm font-black text-amber-300">{opportunity.roleFit.score}/100</div>
+                            </div>
+                        )}
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                        {characterLabels.map(label => (
+                            <span key={label} className="rounded-full border border-cyan-300/15 px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-cyan-100/80">
+                                {label}
+                            </span>
+                        ))}
+                    </div>
+                    <div className={`mt-4 border-l-2 pl-3 ${
+                        characterStoryFit.label === 'NATURAL_FIT'
+                            ? 'border-emerald-300 text-emerald-300'
+                            : characterStoryFit.label === 'BOLD_INTERPRETATION'
+                                ? 'border-amber-300 text-amber-300'
+                                : 'border-rose-300 text-rose-300'
+                    }`}>
+                        <div className="text-[9px] font-black uppercase tracking-[0.18em]">
+                            Story read · {formatCharacterStoryFitLabel(characterStoryFit.label)}
+                        </div>
+                        <p className="mt-1.5 text-[11px] font-medium leading-5 text-zinc-400">
+                            {characterStoryFit.warnings[0] || characterStoryFit.strengths[0] || characterStoryFit.summary}
+                        </p>
+                    </div>
+                    {industryContext && (
+                        <div className={`mt-4 border-l-2 pl-3 ${industryContextTone}`}>
+                            <div className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.18em]">
+                                <TrendingUp size={12} aria-hidden="true" />
+                                Why this offer · {industryContext.label}
+                            </div>
+                            <p className="mt-1.5 text-[11px] font-medium leading-5 text-zinc-400">
+                                {industryContext.reason}
+                            </p>
+                        </div>
+                    )}
+                </section>
                 
                 {/* 1. UNIVERSE CONTRACT CARD */}
                 {universe && (

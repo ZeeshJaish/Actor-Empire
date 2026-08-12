@@ -1,6 +1,7 @@
 import type { Player, ProjectType, Script } from '../types';
 import { getAbsoluteWeek } from './legacyLogic';
 import { normalizeProjectTitle } from './projectNaming';
+import { inferStoryCompass } from './characterIdentityLogic';
 
 export const CONTINUATION_COOLDOWN_WEEKS = 4;
 
@@ -45,12 +46,43 @@ const getInstallmentNumber = (project: any) => {
 
 const getProjectType = (project: any): ProjectType => {
     const details = getProjectDetails(project);
-    return (project?.projectType || project?.type || details.type || 'MOVIE') as ProjectType;
+    const candidates = [
+        project?.projectType,
+        details?.projectType,
+        details?.type,
+        project?.type,
+    ];
+    return candidates.find(type => type === 'MOVIE' || type === 'SERIES') || 'MOVIE';
 };
 
 const getGenre = (project: any) => {
     const details = getProjectDetails(project);
     return project?.genre || details.genre || 'DRAMA';
+};
+
+const clampQuality = (value: number, fallback = 50) => {
+    const numericValue = Number(value);
+    if (!Number.isFinite(numericValue)) return fallback;
+    return Math.max(10, Math.min(100, Math.round(numericValue)));
+};
+
+// A continuation should carry forward some of the creative confidence earned by
+// the source project. This is deliberately a baseline, not a guaranteed hit.
+export const getContinuationScriptBaseline = (project: any, writerSkill: number): number => {
+    const details = getProjectDetails(project);
+    const hidden = details?.hiddenStats || project?.hiddenStats || {};
+    const sourceQuality = clampQuality(
+        hidden.scriptQuality
+        ?? hidden.qualityScore
+        ?? project?.projectQuality
+        ?? details?.projectQuality
+        ?? project?.productionPerformance
+        ?? details?.productionPerformance
+        ?? (Number(project?.imdbRating ?? details?.imdbRating) * 10),
+        55,
+    );
+    const stableWriterSkill = clampQuality(writerSkill);
+    return clampQuality((sourceQuality * 0.55) + (stableWriterSkill * 0.45));
 };
 
 const getReleaseAbsoluteWeek = (player: Player, project: any): number | null => {
@@ -212,11 +244,10 @@ export const createContinuationScript = (request: CreateContinuationRequest): {
 
     const { player, project, mode, overrides } = request;
     const sourceType = getProjectType(project);
+    const sourceDetails = getProjectDetails(project);
     const franchiseId = getFranchiseId(project)!;
     const installmentNumber = mode === 'SPINOFF' ? 1 : getInstallmentNumber(project) + 1;
-    const projectType: ProjectType = mode === 'SPINOFF'
-        ? (sourceType === 'MOVIE' ? 'SERIES' : 'MOVIE')
-        : sourceType;
+    const projectType: ProjectType = sourceType;
 
     const script: Script = {
         id: `script_${mode.toLowerCase()}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
@@ -239,6 +270,12 @@ export const createContinuationScript = (request: CreateContinuationRequest): {
                     : 'SOLO',
         tags: [mode, 'FRANCHISE'],
         createdAtWeek: player.currentWeek,
+        storyCompass: overrides?.storyCompass
+            || sourceDetails.storyCompass
+            || inferStoryCompass(sourceDetails, sourceDetails.universeId ? 'CANON' : undefined),
+        universeId: overrides?.universeId ?? sourceDetails.universeId ?? project?.universeId,
+        universeSagaName: overrides?.universeSagaName ?? sourceDetails.universeSagaName ?? project?.universeSagaName,
+        universePhaseName: overrides?.universePhaseName ?? sourceDetails.universePhaseName ?? project?.universePhaseName,
         ...overrides,
         title,
         franchiseId,

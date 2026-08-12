@@ -1,9 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Film, Tv, Users, DollarSign, Star, TrendingUp, Calendar, Check, Activity, Layers, Zap, Info, ChevronRight, Play, Settings, Camera, Award, BarChart3, Globe, BookOpen, Edit3, Sparkles } from 'lucide-react';
+import { X, Film, Tv, Users, DollarSign, Star, TrendingUp, Calendar, Check, Activity, Layers, Zap, Info, ChevronRight, Play, Settings, Camera, Award, BarChart3, Globe, BookOpen, Edit3, Sparkles, ShieldCheck } from 'lucide-react';
 import { Player, Studio, CustomPoster, PlatformId, SeasonEpisodeRatings } from '../../../../types';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
-import { getAbsoluteWeek } from '../../../../services/legacyLogic';
+import { getStreamingWeeksUntilStart } from '../../../../services/legacyLogic';
 import { canRenameProjectTitle } from '../../../../services/projectNaming';
 import { WorkingTitleDialog } from './WorkingTitleDialog';
 import { getContinuationEligibility } from '../../../../services/sequelFlow';
@@ -11,8 +11,12 @@ import { getProjectReleaseLabel, getProjectReleaseTiming } from '../../../../ser
 import { getPlayerLanguage, t } from '../../../../services/i18n';
 import { createCustomPosterBlobFromFile, saveCustomPosterMedia } from '../../../../services/customPosterMedia';
 import { CustomPosterImage } from '../../../../components/CustomPosterImage';
+import { getProjectFundingEconomics, getProjectMarketOutcomeRevenue, getStudioReturnPercent } from '../../../../services/projectFundingEconomics';
+import { resolveProjectType } from '../../../../services/businessLogic';
+import { getProjectAlumniStories } from '../../../../services/livingEnsemble';
 
 const formatMoney = (val: number) => {
+    if (val === 0) return '$0';
     if (val >= 1_000_000_000_000) return `$${(val/1_000_000_000_000).toFixed(2)}T`;
     if (val >= 1_000_000_000) return `$${(val/1_000_000_000).toFixed(2)}B`;
     if (val >= 1_000_000) return `$${(val/1_000_000).toFixed(1)}M`;
@@ -195,6 +199,7 @@ interface ProjectDashboardModalProps {
 export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ project, player, studio, onClose, onUpdatePlayer, onMakeSequel, onMakeSpinoff, onStartStreamingBidding, onRenameProject }) => {
     const [view, setView] = useState<'DETAILS'>('DETAILS');
     const [isRenamingTitle, setIsRenamingTitle] = useState(false);
+    const [isFundingExplainerOpen, setIsFundingExplainerOpen] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const language = getPlayerLanguage(player);
     const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
@@ -209,7 +214,21 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
     const currentPhaseLabel = phaseKey ? tr(`projectDashboard.phase.${phaseKey}`) : String(project.phase || tr('projectDashboard.phase.PLANNING')).replace(/[_-]/g, ' ');
     const timelineValue = runWeek > 0 ? tr('projectDashboard.timeline.runWeek', { week: runWeek }) : releaseTiming.releaseWeek ? tr('projectDashboard.timeline.week', { week: releaseTiming.releaseWeek }) : currentPhaseLabel;
     const timelineCaption = runWeek > 0 ? currentPhaseLabel : releaseTiming.releaseWeek ? releaseSummaryLabel : tr('projectDashboard.timeline.currentStage');
-    const isSeriesProject = project.type === 'SERIES' || project.projectDetails?.type === 'SERIES' || project.projectType === 'SERIES' || project.projectDetails?.mediaType === 'SERIES';
+    const resolvedProjectType = resolveProjectType(
+        project.projectType,
+        project.type,
+        project.projectDetails?.type,
+        project.projectDetails?.mediaType,
+    );
+    const resolvedProjectGenre = project.genre || project.projectDetails?.genre || tr('projectDashboard.genre.drama');
+    const projectBuzz = Number.isFinite(Number(project.promotionalBuzz))
+        ? Number(project.promotionalBuzz)
+        : Number.isFinite(Number(project.projectDetails?.hiddenStats?.rawHype))
+            ? Number(project.projectDetails.hiddenStats.rawHype)
+            : 0;
+    const backgroundCastingPlan = project.projectDetails?.backgroundCastingPlan;
+    const projectAlumniStories = getProjectAlumniStories(player, String(project.id || project.projectDetails?.id || ''));
+    const isSeriesProject = resolvedProjectType === 'SERIES';
     const selectedScorecardKey = getScorecardSeriesKey(project);
     const scorecardRatingMap = new Map<number, SeasonEpisodeRatings>();
     if (isSeriesProject) {
@@ -321,6 +340,15 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
     const investorPayouts = project.investorPayouts || project.projectDetails?.investorPayouts;
     const investorPayoutTotal = Math.max(0, Number(investorPayouts?.lifetimeInvestorPayout || 0));
     const studioNetAfterInvestors = Math.max(0, studioReceipts - investorPayoutTotal);
+    const fundingEconomics = getProjectFundingEconomics(project, budget);
+    const platformFunding = fundingEconomics.platformFunding;
+    const isPlatformFundedPremiere = fundingEconomics.isPlatformFundedPremiere && platformFunding > 0;
+    const studioReturnPercent = getStudioReturnPercent(project, studioNetAfterInvestors, budget);
+    const fundingPlatformId = project.streaming?.platformId
+        || project.streamingPlatform
+        || project.projectDetails?.hiddenStats?.nextSeasonFundingPlatformId
+        || project.projectDetails?.hiddenStats?.platformId;
+    const fundingPlatformName = PLATFORMS.find(platform => platform.id === fundingPlatformId)?.name || 'Streaming platform';
     const investorOwnerNames = investorPlan?.commitments
         ?.map(item => item.ownerName)
         .filter((name): name is string => Boolean(name))
@@ -333,11 +361,12 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
         if (relatedNews.length > 0) return relatedNews;
 
         const title = project.name || project.title || tr('projectDashboard.untitledProject');
-        const genre = (project.genre || tr('projectDashboard.genre.drama')).toLowerCase();
+        const genre = String(resolvedProjectGenre).toLowerCase();
         const phase = project.phase;
         const quality = project.projectDetails?.hiddenStats?.qualityScore || 50;
-        const hype = project.promotionalBuzz || 50;
-        const roi = budget > 0 ? (actualGross - budget) / budget : 0;
+        const hype = projectBuzz;
+        const marketOutcomeRevenue = getProjectMarketOutcomeRevenue(project, projectRevenue, budget);
+        const roi = budget > 0 ? (marketOutcomeRevenue - budget) / budget : 0;
 
         const buzzItems: any[] = [];
 
@@ -611,7 +640,7 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
         { subject: tr('projectDashboard.radar.direction'), A: project.projectDetails?.hiddenStats?.directionQuality || 85, fullMark: 100 },
         { subject: tr('projectDashboard.radar.acting'), A: project.projectDetails?.hiddenStats?.actingQuality || 80, fullMark: 100 },
         { subject: tr('projectDashboard.radar.visuals'), A: project.projectDetails?.hiddenStats?.visualQuality || 75, fullMark: 100 },
-        { subject: tr('projectDashboard.radar.buzz'), A: project.promotionalBuzz || 50, fullMark: 100 },
+        { subject: tr('projectDashboard.radar.buzz'), A: projectBuzz, fullMark: 100 },
     ];
 
     // Get all staff
@@ -722,9 +751,9 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                         {displayTitle}
                                     </h1>
                                     <div className="flex items-center gap-3 text-xs font-bold text-zinc-400 uppercase tracking-widest">
-                                        <span>{project.type === 'SERIES' ? tr('projectDashboard.type.originalSeries') : tr('projectDashboard.type.featureFilm')}</span>
+                                        <span>{isSeriesProject ? tr('projectDashboard.type.originalSeries') : tr('projectDashboard.type.featureFilm')}</span>
                                         <span className="w-1 h-1 bg-zinc-600 rounded-full"></span>
-                                        <span>{project.genre || tr('projectDashboard.genre.drama')}</span>
+                                        <span>{resolvedProjectGenre}</span>
                                     </div>
                                     {canRenameTitle && (
                                         <button
@@ -753,9 +782,9 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                     {displayTitle}
                                 </motion.h1>
                                 <div className="flex items-center gap-4 text-sm font-bold text-zinc-500 uppercase tracking-[0.3em]">
-                                    <span>{project.type === 'SERIES' ? tr('projectDashboard.type.originalSeries') : tr('projectDashboard.type.featureFilm')}</span>
+                                    <span>{isSeriesProject ? tr('projectDashboard.type.originalSeries') : tr('projectDashboard.type.featureFilm')}</span>
                                     <span className="w-1.5 h-1.5 bg-amber-500 rounded-full"></span>
-                                    <span>{project.genre || tr('projectDashboard.genre.drama')}</span>
+                                    <span>{resolvedProjectGenre}</span>
                                     {(project.rating || project.imdbRating) && (
                                         <>
                                             <span className="w-1.5 h-1.5 bg-zinc-700 rounded-full"></span>
@@ -801,7 +830,7 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                         <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">{tr('projectDashboard.metric.buzzLevel')}</div>
                                         <div className="flex items-baseline gap-1 overflow-hidden">
                                             <div className="text-2xl sm:text-3xl font-bold text-amber-500 tracking-tight">
-                                                {Math.round(project.promotionalBuzz || project.projectDetails?.hiddenStats?.qualityScore || 50)}
+                                                {Math.round(projectBuzz)}
                                             </div>
                                             <div className="text-[10px] sm:text-sm font-bold text-zinc-600">/ 100</div>
                                         </div>
@@ -825,11 +854,57 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                         </div>
                                     </div>
 
+                                    {isReleaseHistoryPhase && isPlatformFundedPremiere && (
+                                        <section className="relative col-span-2 overflow-hidden rounded-[30px] border border-sky-300/15 bg-[radial-gradient(circle_at_12%_0%,rgba(56,189,248,0.16),transparent_42%),linear-gradient(118deg,rgba(14,116,144,0.16),rgba(8,15,25,0.72)_48%,rgba(30,41,59,0.28))] px-5 py-6 shadow-[0_20px_55px_rgba(8,47,73,0.16)] sm:px-7">
+                                            <div className="pointer-events-none absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-sky-200 via-sky-400/50 to-transparent" />
+                                            <div className="relative">
+                                                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                                                    <div className="flex items-start gap-3.5">
+                                                        <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-sky-300/20 bg-sky-300/10 text-sky-200">
+                                                            <ShieldCheck size={20} />
+                                                        </div>
+                                                        <div className="min-w-0">
+                                                            <div className="text-[10px] font-black uppercase tracking-[0.28em] text-sky-200">{fundingPlatformName} deal briefing</div>
+                                                            <p className="mt-2 max-w-2xl text-sm font-medium leading-relaxed text-zinc-200 sm:text-[15px]">
+                                                                {fundingPlatformName} covered {formatMoney(platformFunding)} of this season before release. The $0 streaming line means no second payment is due.
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setIsFundingExplainerOpen(true)}
+                                                        className="inline-flex shrink-0 items-center gap-2 self-start rounded-full border border-sky-200/20 bg-sky-200/10 px-3 py-2 text-[9px] font-black uppercase tracking-[0.15em] text-sky-100 transition-colors hover:border-sky-200/45 hover:bg-sky-200/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-200"
+                                                    >
+                                                        <Info size={13} /> How this works
+                                                    </button>
+                                                </div>
+                                                <div className="mt-5 grid grid-cols-1 divide-y divide-sky-100/10 rounded-2xl border border-sky-100/10 bg-slate-950/20 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+                                                    <div className="px-4 py-3.5">
+                                                        <div className="text-[8px] font-black uppercase tracking-[0.2em] text-sky-100/45">{fundingPlatformName} covered</div>
+                                                        <div className="mt-1 font-mono text-base font-black text-sky-100">{formatMoney(platformFunding)}</div>
+                                                    </div>
+                                                    <div className="px-4 py-3.5">
+                                                        <div className="text-[8px] font-black uppercase tracking-[0.2em] text-sky-100/45">Your cash at risk</div>
+                                                        <div className="mt-1 font-mono text-base font-black text-white">{formatMoney(fundingEconomics.studioCashAtRisk)}</div>
+                                                    </div>
+                                                    <div className="px-4 py-3.5">
+                                                        <div className="text-[8px] font-black uppercase tracking-[0.2em] text-sky-100/45">Funding status</div>
+                                                        <div className="mt-1 text-sm font-black text-emerald-300">
+                                                            {fundingEconomics.studioCashAtRisk <= 0 ? 'Fully platform funded' : 'Shared funding'}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </section>
+                                    )}
+
                                     {/* Financial Performance (Moved Up) */}
                                     {['RELEASED', 'STREAMING', 'IN THEATERS', 'BIDDING'].includes(project.phase) && (
                                         <>
                                             <div className="p-5 sm:p-6 bg-emerald-500/5 rounded-3xl border border-emerald-500/10 backdrop-blur-sm flex flex-col justify-center h-[120px] relative overflow-hidden group">
-                                                <div className="text-[10px] font-black uppercase tracking-widest text-emerald-500/60 mb-2 relative z-10">{tr('projectDashboard.revenue.projectRevenue')}</div>
+                                                <div className="text-[10px] font-black uppercase tracking-widest text-emerald-500/60 mb-2 relative z-10">
+                                                    {isPlatformFundedPremiere ? 'Cash earned after funding' : tr('projectDashboard.revenue.projectRevenue')}
+                                                </div>
                                                 <div className="text-2xl sm:text-3xl font-bold text-white tracking-tight truncate relative z-10">
                                                     {formatMoney(projectRevenue)}
                                                 </div>
@@ -873,24 +948,65 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                                     </div>
                                                 </div>
                                             )}
-                                            <div className="p-5 sm:p-6 bg-amber-500/5 rounded-3xl border border-amber-500/10 backdrop-blur-sm flex flex-col justify-center h-[120px]">
-                                                <div className="text-[10px] font-black uppercase tracking-widest text-amber-500/60 mb-2">ROI</div>
-                                                <div className={`text-2xl sm:text-3xl font-bold tracking-tight ${(projectRevenue - budget) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                                    {budget ? (((projectRevenue - budget) / budget) * 100).toFixed(0) : 0}%
+                                            <div className={`relative rounded-3xl border border-amber-500/10 bg-amber-500/5 p-5 backdrop-blur-sm sm:p-6 ${
+                                                isPlatformFundedPremiere && studioReturnPercent === null
+                                                    ? 'flex min-h-[158px] flex-col justify-between'
+                                                    : 'flex h-[120px] flex-col justify-center'
+                                            }`}>
+                                                <div className="flex items-center justify-between gap-3 text-[10px] font-black uppercase tracking-widest text-amber-500/60 mb-2">
+                                                    <span>{isPlatformFundedPremiere ? 'Studio return' : 'ROI'}</span>
+                                                    {isPlatformFundedPremiere && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setIsFundingExplainerOpen(true)}
+                                                            aria-label="Explain studio return"
+                                                            className="flex h-6 w-6 items-center justify-center rounded-full border border-amber-300/20 bg-amber-300/10 text-amber-100 transition-colors hover:border-amber-200/50 hover:bg-amber-200/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200"
+                                                        >
+                                                            <Info size={13} />
+                                                        </button>
+                                                    )}
                                                 </div>
+                                                <div className={`font-bold tracking-tight ${
+                                                    isPlatformFundedPremiere && studioReturnPercent === null
+                                                        ? 'text-[26px] leading-[1.05] text-sky-200 sm:text-3xl'
+                                                        : (studioReturnPercent ?? ((projectRevenue - budget) / Math.max(1, budget) * 100)) >= 0
+                                                            ? 'text-2xl text-emerald-400 sm:text-3xl'
+                                                            : 'text-2xl text-rose-400 sm:text-3xl'
+                                                }`}>
+                                                    {isPlatformFundedPremiere
+                                                        ? studioReturnPercent === null
+                                                            ? 'No cash at risk'
+                                                            : `${studioReturnPercent >= 0 ? '+' : ''}${studioReturnPercent.toFixed(0)}%`
+                                                        : `${budget ? (((projectRevenue - budget) / budget) * 100).toFixed(0) : 0}%`}
+                                                </div>
+                                                {isPlatformFundedPremiere && (
+                                                    <div className={`mt-2 font-bold ${
+                                                        fundingEconomics.studioCashAtRisk <= 0
+                                                            ? 'text-[10px] leading-relaxed text-zinc-500'
+                                                            : 'text-[9px] uppercase tracking-wider text-zinc-600'
+                                                    }`}>
+                                                        {fundingEconomics.studioCashAtRisk <= 0 ? `${fundingPlatformName} covered the production cost` : `${formatMoney(fundingEconomics.studioCashAtRisk)} studio cash exposed`}
+                                                    </div>
+                                                )}
                                             </div>
-                                            <div className="p-5 sm:p-6 bg-white/[0.03] rounded-3xl border border-white/5 backdrop-blur-sm flex flex-col justify-center h-[120px]">
-                                                <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">{tr('projectDashboard.revenue.sources')}</div>
-                                                <div className="flex items-center justify-between gap-3 text-xs font-bold text-zinc-300">
+                                            <div className="min-h-[148px] p-5 sm:p-6 bg-white/[0.03] rounded-3xl border border-white/5 backdrop-blur-sm">
+                                                <div className="mb-3 text-[10px] font-black uppercase tracking-widest text-zinc-500">{tr('projectDashboard.revenue.sources')}</div>
+                                                <div className="flex items-center justify-between gap-3 text-[11px] font-bold text-zinc-300 sm:text-xs">
                                                     <span>{tr('projectDashboard.revenue.theaters')}</span>
                                                     <span className="font-mono text-white">{formatMoney(actualGross)}</span>
                                                 </div>
-                                                <div className="mt-1 flex items-center justify-between gap-3 text-xs font-bold text-zinc-300">
+                                                <div className="mt-1.5 flex items-center justify-between gap-3 text-[11px] font-bold text-zinc-300 sm:text-xs">
                                                     <span>{tr('projectDashboard.revenue.streaming')}</span>
                                                     <span className="font-mono text-white">{formatMoney(streamingRevenue)}</span>
                                                 </div>
+                                                {isPlatformFundedPremiere && (
+                                                    <div className="mt-1.5 flex items-center justify-between gap-3 text-[11px] font-bold text-sky-100 sm:text-xs">
+                                                        <span>Production funding</span>
+                                                        <span className="font-mono">{formatMoney(platformFunding)}</span>
+                                                    </div>
+                                                )}
                                                 {soundtrackRevenue > 0 && (
-                                                    <div className="mt-1 flex items-center justify-between gap-3 text-xs font-bold text-zinc-300">
+                                                    <div className="mt-1.5 flex items-center justify-between gap-3 text-[11px] font-bold text-zinc-300 sm:text-xs">
                                                         <span>{tr('projectDashboard.revenue.soundtrack')}</span>
                                                         <span className="font-mono text-cyan-300">{formatMoney(soundtrackRevenue)}</span>
                                                     </div>
@@ -1089,6 +1205,61 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                     </div>
                                 </div>
 
+                                {(backgroundCastingPlan || projectAlumniStories.length > 0) && (
+                                    <div className="md:col-span-2 rounded-[28px] border border-emerald-400/15 bg-emerald-400/[0.035] p-5 sm:p-6">
+                                        <div className="flex items-start justify-between gap-4">
+                                            <div>
+                                                <div className="flex items-center gap-3">
+                                                    <div className="h-px w-8 bg-emerald-400" />
+                                                    <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-emerald-300">Project Alumni</h3>
+                                                </div>
+                                                <p className="mt-2 max-w-xl text-xs leading-relaxed text-zinc-500">
+                                                    Background performers are tracked quietly. Only meaningful career developments appear here.
+                                                </p>
+                                            </div>
+                                            {backgroundCastingPlan && (
+                                                <div className="shrink-0 text-right">
+                                                    <p className="font-mono text-xl font-black text-white">{backgroundCastingPlan.performerCount}</p>
+                                                    <p className="text-[8px] font-black uppercase tracking-widest text-zinc-600">Performers</p>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {backgroundCastingPlan && (
+                                            <div className="mt-4 grid grid-cols-3 gap-2">
+                                                {[
+                                                    ['Set care', backgroundCastingPlan.setCare],
+                                                    ['Authenticity', backgroundCastingPlan.authenticity],
+                                                    ['Discovery', backgroundCastingPlan.discoveryPotential],
+                                                ].map(([label, value]) => (
+                                                    <div key={String(label)} className="rounded-xl border border-white/5 bg-black/20 px-3 py-3">
+                                                        <p className="font-mono text-sm font-black text-white">{value}</p>
+                                                        <p className="mt-1 text-[8px] font-black uppercase tracking-wider text-zinc-600">{label}</p>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+
+                                        {projectAlumniStories.length > 0 ? (
+                                            <div className="mt-5 space-y-3">
+                                                {projectAlumniStories.slice(0, 4).map(story => (
+                                                    <article key={story.id} className="border-l-2 border-emerald-400/50 pl-4">
+                                                        <p className="text-sm font-black text-white">{story.headline}</p>
+                                                        <p className="mt-1 text-[11px] leading-relaxed text-zinc-500">{story.subtext}</p>
+                                                        <p className="mt-2 text-[8px] font-black uppercase tracking-widest text-zinc-700">
+                                                            Year {story.year} · Week {story.week}
+                                                        </p>
+                                                    </article>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <p className="mt-5 border-l-2 border-zinc-800 pl-4 text-[11px] leading-relaxed text-zinc-600">
+                                                No alumni story has become significant yet. Most background careers remain private unless they cross your world again.
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
+
 
                                  {/* Actions */}
                                 <div className="md:col-span-2 flex flex-col sm:flex-row gap-4 mt-8">
@@ -1109,13 +1280,11 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                         </button>
                                     )}
                                     {project.streaming && (() => {
-                                        const currentAbsoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
-                                        const weeksUntilStreaming =
-                                            typeof project.streaming.startWeekAbsolute === 'number'
-                                                ? project.streaming.startWeekAbsolute - currentAbsoluteWeek
-                                                : (project.streaming.startWeek && player.currentWeek < project.streaming.startWeek
-                                                    ? project.streaming.startWeek - player.currentWeek
-                                                    : 0);
+                                        const weeksUntilStreaming = getStreamingWeeksUntilStart(
+                                            project.streaming,
+                                            player.age,
+                                            player.currentWeek
+                                        );
 
                                         if (weeksUntilStreaming <= 0) return null;
 
@@ -1210,6 +1379,56 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                         </div>
                     </div>
                 </div>
+                <AnimatePresence>
+                    {isFundingExplainerOpen && (
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="absolute inset-0 z-[70] flex items-end bg-black/70 p-4 backdrop-blur-sm sm:items-center sm:justify-center"
+                            role="dialog"
+                            aria-modal="true"
+                            aria-labelledby="funding-explainer-title"
+                        >
+                            <motion.div
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: 20 }}
+                                className="w-full max-w-md rounded-[28px] border border-sky-200/20 bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.16),transparent_48%),#0b111a] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.6)]"
+                            >
+                                <div className="flex items-start justify-between gap-5">
+                                    <div>
+                                        <div className="text-[10px] font-black uppercase tracking-[0.24em] text-sky-200">Funding explained</div>
+                                        <h3 id="funding-explainer-title" className="mt-2 font-serif text-3xl italic text-white">No cash at risk</h3>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsFundingExplainerOpen(false)}
+                                        aria-label="Close funding explanation"
+                                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-zinc-300 transition-colors hover:bg-white/[0.12] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-200"
+                                    >
+                                        <X size={18} />
+                                    </button>
+                                </div>
+                                <p className="mt-4 text-sm leading-relaxed text-zinc-300">
+                                    {fundingPlatformName} paid the full {formatMoney(platformFunding)} production cost before this season released. Your studio did not put production cash into it.
+                                </p>
+                                <div className="mt-5 space-y-3 border-y border-white/10 py-5 text-sm leading-relaxed text-zinc-300">
+                                    <p><span className="font-black text-sky-100">Why there is no ROI percentage:</span> a profit or loss percentage would be misleading when your studio invested $0.</p>
+                                    <p><span className="font-black text-emerald-200">Cash still matters:</span> any later streaming, soundtrack, or other income still goes to your studio.</p>
+                                    <p><span className="font-black text-amber-100">Shared funding:</span> if a platform covers only part of a season, return is measured only against the part your studio paid.</p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsFundingExplainerOpen(false)}
+                                    className="mt-5 w-full rounded-2xl bg-sky-300 px-4 py-3.5 text-xs font-black uppercase tracking-[0.18em] text-slate-950 transition-colors hover:bg-sky-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                                >
+                                    Got it
+                                </button>
+                            </motion.div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
                 {isRenamingTitle && (
                     <WorkingTitleDialog
                         mode="RENAME"

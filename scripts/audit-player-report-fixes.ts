@@ -49,16 +49,23 @@ const sponsorshipPlayer = makePlayer();
 sponsorshipPlayer.activeSponsorships = [completedSponsorship];
 const sponsorshipResult = await processGameWeek(sponsorshipPlayer);
 const sponsorshipLogs = sponsorshipResult.player.logs || [];
-assert(sponsorshipResult.player.activeSponsorships.length === 0, 'Completed sponsorship should close on the next weekly tick.');
+assert(sponsorshipResult.player.activeSponsorships.length === 1, 'Completed deliverables should not erase a paid multi-week campaign.');
+assert(sponsorshipResult.player.activeSponsorships[0]?.durationWeeks === 5, 'Completed sponsorship should keep counting down its paid campaign term.');
 assert(
-    sponsorshipLogs.some(log => /Contract fulfilled/.test(log.message)),
-    'Completed sponsorship should create a fulfilled log.'
+    sponsorshipResult.player.finance.history.some(transaction => transaction.amount === completedSponsorship.weeklyPay),
+    'Completed sponsorship should still pay the promised weekly amount.'
 );
 assert(
     !sponsorshipLogs.some(log => /CONTRACT BREACHED/.test(log.message)),
     'Completed sponsorship should not breach after the player finished all deliverables.'
 );
-assert(sponsorshipResult.player.stats.reputation > sponsorshipPlayer.stats.reputation, 'Completed sponsorship should reward reputation.');
+assert(sponsorshipResult.player.stats.reputation === sponsorshipPlayer.stats.reputation, 'Sponsorship reputation should be awarded once when the paid campaign ends.');
+
+const finalWeekSponsorshipPlayer = makePlayer();
+finalWeekSponsorshipPlayer.activeSponsorships = [{ ...completedSponsorship, durationWeeks: 1 }];
+const finalWeekSponsorshipResult = await processGameWeek(finalWeekSponsorshipPlayer);
+assert(finalWeekSponsorshipResult.player.activeSponsorships.length === 0, 'Completed sponsorship should close after its final paid week.');
+assert(finalWeekSponsorshipResult.player.stats.reputation > finalWeekSponsorshipPlayer.stats.reputation, 'Completed campaign should reward reputation once at the end.');
 
 const expiringOffer: Message = {
     id: 'qa_expiring_offer',
@@ -171,7 +178,10 @@ assert(app.includes('PREMIUM_ENTITLEMENTS_STORAGE_KEY'), 'Permanent purchases sh
 assert(app.includes('uniquePermanentPremiumIds(result.restoredProductIds)'), 'Restore should filter to permanent premium products.');
 assert(app.includes('syncPermanentPremiumEntitlementsToSavedSlots'), 'Permanent purchases should sync across local save slots.');
 assert(app.includes('applyPremiumEntitlementsToPlayer(migratedNewPlayer'), 'New careers should inherit permanent premium entitlements.');
-assert(gameLoop.includes("type: 'OFFER_ROLE', data: agentOffer") && gameLoop.includes('expiresIn: 4'), 'Agent role offers should stay available for 4 weeks.');
+assert(
+    /const agentOffer = generateAgentOffers[\s\S]{0,1600}type:\s*'OFFER_ROLE'[\s\S]{0,500}expiresIn:\s*4/.test(gameLoop),
+    'Agent role offers should stay available for 4 weeks.'
+);
 assert(teamLogic.includes("agent.tier === 'LEGEND' ? 0.45") && teamLogic.includes("agent.tier === 'ELITE' ? 0.52"), 'Elite and Legend agents should slightly improve budget-tier quality.');
 assert(teamLogic.includes('const leadCutoff') && teamLogic.includes("agent.tier === 'LEGEND'"), 'Elite and Legend agents should slightly improve role quality.');
 assert(imdbApp.includes('max-h-[420px] overflow-auto'), 'IMDb long episode heatmap should scroll vertically.');

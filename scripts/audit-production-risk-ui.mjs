@@ -8,6 +8,8 @@ const assert = (condition, message) => {
 const gameLoop = read('services/gameLoop.ts');
 const productionHouse = read('views/lifestyle/business/ProductionHouseGame.tsx');
 const home = read('views/HomePage.tsx');
+const studioProductionQa = read('views/home/homeStudioProductionQaActions.ts');
+const homeQaSource = `${home}\n${studioProductionQa}`;
 const pkg = JSON.parse(read('package.json'));
 
 [
@@ -42,7 +44,7 @@ const pkg = JSON.parse(read('package.json'));
   'Surprise Hit',
   'Prestige Series',
 ].forEach(token => {
-  assert(home.includes(token), `Cheat menu should include production risk QA support: ${token}`);
+  assert(homeQaSource.includes(token), `Cheat menu should include production risk QA support: ${token}`);
 });
 
 assert(

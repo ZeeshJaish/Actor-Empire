@@ -1,12 +1,18 @@
 import {
+    ACQUISITION_INBOX_NOTICE_WEEKS,
     ACQUISITION_COMMITMENTS,
+    ACQUISITION_MAX_OFFER_ATTEMPTS,
     acceptAcquisitionCounter,
     analyzeCustomOffer,
     beatAcquisitionRivalBid,
     calculateDueDiligenceFee,
+    completeAcquisitionTransaction,
     completeStudioAcquisition,
     getAcquisitionCase,
     getAcquisitionEligibility,
+    getAcquisitionOfferAttemptCount,
+    getAcquisitionOfferAttemptsRemaining,
+    getAcquisitionReapproachWeeksRemaining,
     getFundingOptions,
     getOfferPresets,
     resolveStudioAcquisitionResponses,
@@ -15,6 +21,8 @@ import {
     submitOpeningOffer,
     walkAwayFromAcquisition,
 } from '../services/studioAcquisition';
+import { getStockOutstandingShares } from '../services/stockLogic';
+import { getCompanyPosition } from '../services/companyPosition';
 
 const assert = (condition: unknown, message: string) => {
     if (!condition) throw new Error(message);
@@ -112,8 +120,8 @@ assert(
     'Diligence should create a public media pulse for the acquisition process.',
 );
 assert(
-    firstDiligence.player.x.feed.some((post: any) => post.authorHandle === '@studiodealwire' && post.content.includes('serious homework')),
-    'Diligence should create industry social chatter.',
+    firstDiligence.player.x.feed.some((post: any) => !post.isPlayer && post.authorHandle && post.content.includes('serious homework')),
+    'Diligence should create industry social chatter from an in-world account.',
 );
 
 const deterministicDiligence = runDueDiligence({
@@ -293,13 +301,67 @@ assert(getAcquisitionCase(resolvedResponses, 'COUNTER_TARGET')?.status === 'COUN
 assert(getAcquisitionCase(resolvedResponses, 'WEAK_TARGET')?.status === 'REJECTED', 'A weak offer should be rejected.');
 assert(resolvedResponses.inbox.filter((message: any) => message.type === 'STUDIO_ACQUISITION').length === 3, 'Each seller response should create one acquisition message.');
 assert(
+    resolvedResponses.inbox
+        .filter((message: any) => message.type === 'STUDIO_ACQUISITION')
+        .every((message: any) => message.expiresIn === ACQUISITION_INBOX_NOTICE_WEEKS),
+    'Acquisition inbox notices must expire instead of permanently reopening old deal states.',
+);
+assert(
     resolvedResponses.news.some((item: any) => item.headline.includes('board accepts')) &&
     resolvedResponses.news.some((item: any) => item.headline.includes('counters')) &&
     resolvedResponses.news.some((item: any) => item.headline.includes('rejects')),
     'Seller responses should create accepted, countered, and rejected news beats.',
 );
+
+const secondWeakOffer = submitOpeningOffer({
+    player: resolvedResponses,
+    profile: { ...profile, id: 'WEAK_TARGET', name: 'Weak Target' },
+    offerType: 'CONSERVATIVE',
+    offerAmount: 70_000_000,
+    funding: { source: 'PERSONAL' },
+});
+assert(secondWeakOffer.success, 'The second offer should be available after an initial rejection.');
+assert(getAcquisitionCase(secondWeakOffer.player, 'WEAK_TARGET')?.offer?.round === 2, 'The second offer should record round two.');
+const secondWeakResolved = resolveStudioAcquisitionResponses(secondWeakOffer.player);
+assert(getAcquisitionCase(secondWeakResolved, 'WEAK_TARGET')?.status === 'REJECTED', 'A second weak offer should receive a final chance to revise.');
+assert(getAcquisitionOfferAttemptsRemaining(getAcquisitionCase(secondWeakResolved, 'WEAK_TARGET')) === 1, 'One offer should remain after the second rejection.');
+const finalWeakOffer = submitOpeningOffer({
+    player: secondWeakResolved,
+    profile: { ...profile, id: 'WEAK_TARGET', name: 'Weak Target' },
+    offerType: 'CONSERVATIVE',
+    offerAmount: 70_000_000,
+    funding: { source: 'PERSONAL' },
+});
+assert(finalWeakOffer.success, 'The final allowed offer should be submitable.');
+const finalWeakResolved = resolveStudioAcquisitionResponses(finalWeakOffer.player);
+const finalWeakCase = getAcquisitionCase(finalWeakResolved, 'WEAK_TARGET');
+assert(finalWeakCase?.status === 'CLOSED', 'The third rejected offer should close negotiations instead of reopening the deal.');
+assert(getAcquisitionOfferAttemptCount(finalWeakCase) === ACQUISITION_MAX_OFFER_ATTEMPTS, 'The closed case should preserve the three-offer history.');
+assert(getAcquisitionReapproachWeeksRemaining(finalWeakCase, finalWeakResolved) === 8, 'A final rejection should start the full re-approach cooldown immediately.');
 assert(
-    resolvedResponses.x.feed.filter((post: any) => post.authorHandle === '@studiodealwire').length >= 6,
+    getAcquisitionEligibility({ ...profile, id: 'WEAK_TARGET', acquisitionState: 'NOT_FOR_SALE' }, finalWeakCase, finalWeakResolved).reason === 'COOLDOWN_ACTIVE',
+    'A closed final rejection must block reopening through old inbox messages.',
+);
+const reopenedAfterFinalRejection = {
+    ...finalWeakResolved,
+    currentWeek: ((finalWeakResolved.currentWeek + 8 - 1) % 52) + 1,
+    age: finalWeakResolved.age + Math.floor((finalWeakResolved.currentWeek + 8 - 1) / 52),
+};
+assert(
+    getAcquisitionEligibility({ ...profile, id: 'WEAK_TARGET', acquisitionState: 'NOT_FOR_SALE' }, finalWeakCase, reopenedAfterFinalRejection).canApproach,
+    'The seller should return to the market after the final-rejection cooldown.',
+);
+const freshCycleOffer = submitOpeningOffer({
+    player: reopenedAfterFinalRejection,
+    profile: { ...profile, id: 'WEAK_TARGET', name: 'Weak Target', acquisitionState: 'NOT_FOR_SALE' },
+    offerType: 'CONSERVATIVE',
+    offerAmount: 70_000_000,
+    funding: { source: 'PERSONAL' },
+});
+assert(freshCycleOffer.success, 'A cooled-off studio should accept a fresh opening offer.');
+assert(getAcquisitionCase(freshCycleOffer.player, 'WEAK_TARGET')?.offer?.round === 1, 'A new negotiation cycle must restart at offer one of three.');
+assert(
+    resolvedResponses.x.feed.filter((post: any) => post.id?.startsWith('x_studio_acquisition_') && !post.isPlayer).length >= 6,
     'Seller responses should create social feed reactions in addition to opening-offer chatter.',
 );
 
@@ -347,6 +409,21 @@ assert(
 
 const walkedAway = walkAwayFromAcquisition({ player: resolvedResponses, studioId: 'COUNTER_TARGET' });
 assert(walkedAway.success && getAcquisitionCase(walkedAway.player, 'COUNTER_TARGET')?.status === 'CLOSED', 'Walking away should close the case.');
+const walkedAwayCase = getAcquisitionCase(walkedAway.player, 'COUNTER_TARGET');
+assert(
+    getAcquisitionEligibility({ ...profile, id: 'COUNTER_TARGET', acquisitionState: 'NOT_FOR_SALE' }, walkedAwayCase, walkedAway.player).reason === 'COOLDOWN_ACTIVE',
+    'A walked-away studio should show a temporary re-approach cooldown instead of a permanent market lock.',
+);
+const reopenedPlayer = {
+    ...walkedAway.player,
+    currentWeek: ((walkedAway.player.currentWeek + 8 - 1) % 52) + 1,
+    age: walkedAway.player.age + Math.floor((walkedAway.player.currentWeek + 8 - 1) / 52),
+};
+assert(getAcquisitionReapproachWeeksRemaining(walkedAwayCase, reopenedPlayer) === 0, 'The cooldown should finish after eight in-game weeks.');
+assert(
+    getAcquisitionEligibility({ ...profile, id: 'COUNTER_TARGET', acquisitionState: 'NOT_FOR_SALE' }, walkedAwayCase, reopenedPlayer).canApproach,
+    'A cooled-off studio should return to the acquisition market even if its older public snapshot says not for sale.',
+);
 assert(
     walkedAway.player.news.some((item: any) => item.headline.includes('walks away')),
     'Walking away should create a closed-approach news beat.',
@@ -429,7 +506,34 @@ const finalRoundPlayer = {
     },
 };
 const finalRoundResolved = resolveStudioAcquisitionResponses(finalRoundPlayer);
-assert(getAcquisitionCase(finalRoundResolved, 'RIVAL_TARGET')?.status === 'REJECTED', 'Final-round rival pressure should not loop forever.');
+assert(getAcquisitionCase(finalRoundResolved, 'RIVAL_TARGET')?.status === 'CLOSED', 'Final-round rival pressure should close the negotiation instead of looping forever.');
+
+const staleRivalCase = {
+    ...rivalCase!,
+    status: 'RIVAL_BID' as const,
+    offer: {
+        ...rivalCase!.offer!,
+        amount: 100_000_000,
+        round: 4,
+    },
+    sellerResponse: {
+        ...rivalCase!.sellerResponse!,
+        decision: 'RIVAL_BID' as const,
+        round: 4,
+        maxRounds: 3,
+    },
+};
+const staleRivalPlayer = {
+    ...rivalResolved,
+    flags: {
+        ...rivalResolved.flags,
+        studioAcquisitionCases: [staleRivalCase],
+    },
+};
+const staleRivalResolved = resolveStudioAcquisitionResponses(staleRivalPlayer);
+const repairedRivalCase = getAcquisitionCase(staleRivalResolved, 'RIVAL_TARGET');
+assert(repairedRivalCase?.status === 'CLOSED', 'A saved Round 4 / 3 case must resolve into a closed cooldown instead of remaining in a rival-bid loop.');
+assert(repairedRivalCase?.offer?.round === 3, 'Stale rival bidding should be normalized back to the maximum valid round.');
 
 const signingOpening = submitOpeningOffer({
     player,
@@ -441,7 +545,7 @@ const signingOpening = submitOpeningOffer({
 });
 const signingResolved = resolveStudioAcquisitionResponses(signingOpening.player);
 assert(getAcquisitionCase(signingResolved, 'SIGNING_TARGET')?.status === 'ACCEPTED', 'Signing fixture should reach accepted terms.');
-const signedDeal = completeStudioAcquisition({
+const signedDeal = completeAcquisitionTransaction({
     player: signingResolved,
     profile: { ...profile, id: 'SIGNING_TARGET', name: 'Signing Target' },
 });
@@ -453,6 +557,12 @@ assert(acquiredBusiness?.name === 'Signing Target', 'The acquired business shoul
 assert(acquiredBusiness?.studioState?.scripts && Array.isArray(acquiredBusiness.studioState.scripts), 'The acquired studio should use the existing studio state shape.');
 assert(acquiredBusiness?.stats?.valuation === profile.valuation, 'The acquired studio should carry the Forbes valuation into business stats.');
 assert(getAcquisitionCase(signedDeal.player, 'SIGNING_TARGET')?.status === 'ACQUIRED', 'Signing should mark the acquisition case acquired.');
+assert(
+    signedDeal.player.flags.acquisitionDebtLedger.some((entry: any) => (
+        entry.studioId === 'SIGNING_TARGET' && entry.trackingOrigin === 'SIGNED'
+    )),
+    'New full acquisitions should write a signed debt ledger immediately.',
+);
 assert(
     signedDeal.player.inbox.find((message: any) => message.data?.studioId === 'SIGNING_TARGET')?.data?.decision === 'ACQUIRED',
     'Signing should give the acquisition message a completed acquired state.',
@@ -497,6 +607,113 @@ assert(
 assert(
     studioFundedSigned.player.businesses.some((business: any) => business.id === 'STUDIO_SIGNING_TARGET' && business.type === 'PRODUCTION_HOUSE'),
     'Studio-funded signing should still create the acquired production house.',
+);
+
+const publicProfile: any = {
+    ...profile,
+    id: 'PUBLIC_TARGET',
+    name: 'Public Target Media',
+    acquisitionState: 'PUBLICLY_TRADED',
+    ownershipStructure: 'Public company · Institutional ownership',
+};
+const publicStock: any = {
+    id: 'stk_public_target',
+    symbol: 'PTM',
+    name: 'Public Target Media',
+    sector: 'MEDIA',
+    price: 100,
+    outstandingShares: 1_000_000,
+    volatility: 0.12,
+    dividendYield: 0.01,
+    relatedStudioId: publicProfile.id,
+    priceHistory: [100],
+    lastDividendPayoutWeek: 0,
+};
+const publicOutstandingShares = getStockOutstandingShares(publicStock);
+const publicBuyer: any = {
+    ...player,
+    money: 500_000_000,
+    stocks: [publicStock],
+    portfolio: [{
+        stockId: publicStock.id,
+        shares: Math.floor(publicOutstandingShares * 0.2),
+        averageCost: 100,
+        totalInvested: Math.floor(publicOutstandingShares * 0.2) * 100,
+    }],
+};
+const publicOpening = submitOpeningOffer({
+    player: publicBuyer,
+    profile: publicProfile,
+    offerType: 'MINORITY',
+    offerAmount: 35_000_000,
+    minorityPercent: 30,
+    funding: { source: 'PERSONAL' },
+});
+assert(publicOpening.success, 'A credible public control tender should be fileable through the common acquisition service.');
+const publicPositionBeforeTender = getCompanyPosition(publicOpening.player, publicProfile);
+assert(
+    publicPositionBeforeTender.stockCostBasis === Math.floor(publicOutstandingShares * 0.2) * 100,
+    'The public-control ledger should retain the cash already committed to owned shares.',
+);
+assert(publicPositionBeforeTender.ownershipPercent === 20, 'The public-control ledger should count the existing stock stake before tendering.');
+const filedPublicCase = getAcquisitionCase(publicOpening.player, publicProfile.id)!;
+const acceptedPublicCase = {
+    ...filedPublicCase,
+    status: 'ACCEPTED' as const,
+    sellerResponse: {
+        decision: 'ACCEPTED' as const,
+        agreedAmount: 35_000_000,
+        round: 1,
+        respondedWeek: player.currentWeek + 1,
+        respondedYear: player.age,
+        summary: 'The board accepted the public control tender.',
+    },
+};
+const acceptedPublicBuyer = {
+    ...publicOpening.player,
+    flags: {
+        ...publicOpening.player.flags,
+        studioAcquisitionCases: [acceptedPublicCase],
+    },
+};
+const publicSigned = completeAcquisitionTransaction({ player: acceptedPublicBuyer, profile: publicProfile });
+assert(publicSigned.success, 'An accepted public tender should close through the shared final signature action.');
+assert(
+    publicSigned.player.flags.acquisitionDebtLedger.some((entry: any) => (
+        entry.studioId === publicProfile.id && entry.trackingOrigin === 'SIGNED'
+    )),
+    'New acquisitions should create their debt ledger at signing, rather than waiting for a later save migration.',
+);
+assert(publicSigned.player.money === publicBuyer.money - 35_000_000, 'Public tender closing should charge the accepted tender price exactly once.');
+const publicHoldingShares = publicSigned.player.portfolio.find((holding: any) => holding.stockId === publicStock.id)?.shares;
+const expectedPublicShares = Math.max(
+    Math.ceil(publicOutstandingShares * 0.5),
+    Math.floor(publicOutstandingShares * 0.2) + Math.ceil(publicOutstandingShares * 0.3),
+);
+assert(publicHoldingShares === expectedPublicShares, `Existing shares should be credited and only the tender block added (${publicHoldingShares} vs ${expectedPublicShares}).`);
+assert(
+    (publicSigned.acquisitionCase?.closing?.assetSummary || '').includes('shares tendered'),
+    'The closing record should describe the tendered shares instead of treating prior stock ownership as a new charge.',
+);
+assert(publicSigned.player.businesses.some((business: any) => business.id === publicProfile.id), 'A completed public tender should create the controlled studio business.');
+assert(getAcquisitionCase(publicSigned.player, publicProfile.id)?.closing?.outcome === 'CONTROL', 'Public tender closing should record a control outcome.');
+
+const majorityControlPlayer = {
+    ...publicBuyer,
+    portfolio: [{
+        stockId: publicStock.id,
+        shares: Math.ceil(publicOutstandingShares * 0.52),
+        averageCost: publicStock.price,
+        totalInvested: Math.ceil(publicOutstandingShares * 0.52) * publicStock.price,
+    }],
+};
+const majorityControlSigned = completeAcquisitionTransaction({ player: majorityControlPlayer, profile: publicProfile });
+assert(majorityControlSigned.success, 'A player who already controls a public studio should complete the stock-control transfer.');
+assert(
+    majorityControlSigned.player.flags.acquisitionDebtLedger.some((entry: any) => (
+        entry.studioId === publicProfile.id && entry.trackingOrigin === 'SIGNED'
+    )),
+    'Direct stock-control transfers must create the same signed debt ledger as every other new acquisition.',
 );
 
 console.log('Studio acquisition audit passed.');

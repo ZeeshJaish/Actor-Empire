@@ -6,13 +6,24 @@ const root = process.cwd();
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 
 const files = {
-  greenlight: read('views/lifestyle/business/GreenlightWizard.tsx'),
-  developmentLab: read('views/lifestyle/business/DevelopmentLab.tsx'),
+  greenlight: [
+    read('views/lifestyle/business/GreenlightWizard.tsx'),
+    read('views/lifestyle/business/components/GreenlightCastStep.tsx'),
+    read('views/lifestyle/business/greenlightValidation.ts'),
+    read('views/lifestyle/business/greenlightProjectBuilder.ts'),
+  ].join('\n'),
+  developmentLab: [
+    read('views/lifestyle/business/DevelopmentLab.tsx'),
+    read('views/lifestyle/business/components/DevelopmentLabUniverseManager.tsx'),
+    read('views/lifestyle/business/components/DevelopmentLabUniverseDashboard.tsx'),
+    read('views/lifestyle/business/components/DevelopmentLabUniverseMerch.tsx'),
+  ].join('\n'),
   productionHouse: read('views/lifestyle/business/ProductionHouseGame.tsx'),
   releaseWizard: read('views/lifestyle/business/ReleaseWizard.tsx'),
   universeLogic: read('services/universeLogic.ts'),
   sequelFlow: read('services/sequelFlow.ts'),
   gameLoop: read('services/gameLoop.ts'),
+  newsLogic: read('services/newsLogic.ts'),
   homePage: read('views/HomePage.tsx'),
   types: read('types.ts'),
 };
@@ -106,7 +117,7 @@ check('greenlight: character flow info state exists', has('greenlight', 'showCha
 check('greenlight: previous franchise installments are detected', has('greenlight', 'previousFranchiseInstallments'));
 check('greenlight: previous movie characters become options', has('greenlight', 'previousCharacterOptions'));
 check('greenlight: outside owned IP is gated to crossover/event', has('greenlight', "return intent === 'CROSSOVER' || intent === 'EVENT'"));
-check('greenlight: linked options only include active universe unless crossover/event', has('greenlight', 'universe.id === activeUniverseId || allowsOutsideConnectedCharacters'));
+check('greenlight: linked options target the active universe unless crossover/event', has('greenlight', 'targetUniverseId: activeUniverseId') && has('greenlight', 'includeOutsideActiveUniverses: allowsOutsideConnectedCharacters'));
 check('greenlight: character option values include universe source', has('greenlight', 'UNIVERSE:${character.sourceUniverseId}:${characterKey}'));
 check('greenlight: cast slot filters already-used known characters', has('greenlight', 'usedCharacterValues'));
 check('greenlight: selected character remains selectable in its own slot', has('greenlight', 'value === selectedCharacterValue || !usedCharacterValues.has(value)'));
@@ -117,8 +128,8 @@ check('greenlight: returning director is inserted into negotiation list', has('g
 check('greenlight: available directors includes selected or returning director', has('greenlight', 'requiredDirectorId'));
 check('greenlight: sequel cast prefill preserves character ids', has('greenlight', 'characterId: c.characterId'));
 check('greenlight: sequel cast prefill preserves source universe ids', has('greenlight', 'sourceUniverseId: c.sourceUniverseId'));
-check('greenlight: crossover requires known cast', has('greenlight', "effectiveConnectedIntent === 'CROSSOVER' && linkedUniverseCastCount < 1"));
-check('greenlight: event requires three known cast', has('greenlight', "effectiveConnectedIntent === 'EVENT' && linkedUniverseCastCount < 3"));
+check('greenlight: crossover requires known cast', has('greenlight', "effectiveConnectedIntent === 'CROSSOVER' && linkedKnownCastCount < 1"));
+check('greenlight: event requires three known cast', has('greenlight', "effectiveConnectedIntent === 'EVENT' && linkedKnownCastCount < 3"));
 check('greenlight: final project stores connected intent', has('greenlight', 'connectedProjectIntent: effectiveConnectedIntent'));
 check('greenlight: final project stores linked known cast count', has('greenlight', 'linkedUniverseCastCount'));
 
@@ -133,6 +144,12 @@ check('release: release normalizes universe map before roster merge', has('relea
 check('release: release merges final cast into universe roster', has('releaseWizard', 'mergeUniverseRosterWithProject('));
 check('game loop: weekly simulation normalizes universes', has('gameLoop', 'normalizeUniverseMap(nextPlayer.world.universes)'));
 check('game loop: weekly simulation updates universe release activity', has('gameLoop', 'getUniverseReleaseActivity'));
+check('universe news: released casts use the shared story read', has('newsLogic', 'getCastStoryRead'));
+check('universe news: cast coverage uses stable release ids', has('newsLogic', 'news_uni_cast_'));
+check('universe news: contextual background angles are supported', has('newsLogic', "? 'THREAT'") && has('newsLogic', "angle === 'RECAST'"));
+check('universe social: role-aware reactions are generated', has('newsLogic', 'generateUniverseSocialReactions'));
+check('game loop: universe social reactions join the weekly feed', has('gameLoop', 'generateUniverseSocialReactions(nextPlayer)'));
+check('game loop: universe cast coverage is persisted against repeat publishing', has('gameLoop', 'bo|crit|uni_cast'));
 
 check('universe logic: alias keys support legacy and current ids', has('universeLogic', 'getUniverseCharacterKeyAliases'));
 check('universe logic: roster lookup uses aliases', has('universeLogic', 'findUniverseRosterMatch'));

@@ -5,6 +5,7 @@ import {
     completeStudioSaleTransfer,
     createStudioSaleDeck,
     getStudioSaleEffectiveTransferTerms,
+    getStudioSaleActiveSlateItems,
     getStudioSalePricingBounds,
     getStudioSaleReadiness,
     getStudioSaleValuation,
@@ -269,6 +270,54 @@ assert(
     readiness.requirements.some(requirement => /Group package includes 2 acquired banners/.test(requirement.detail)),
     'Readiness should disclose that acquired studios are bundled into the parent sale.',
 );
+
+const staleSlatePlayer: Player = {
+    ...player,
+    commitments: [{
+        id: 'completed_studio_project',
+        name: 'Old completed project',
+        type: 'ACTING_GIG',
+        energyCost: 0,
+        income: 0,
+        payoutType: 'LUMPSUM',
+        projectPhase: 'COMPLETED' as any,
+        projectDetails: { studioId: parentStudio.id, title: 'Old completed project' },
+    } as any],
+    activeReleases: [{
+        id: 'finished_studio_release',
+        name: 'Old finished release',
+        status: 'FINISHED',
+        distributionPhase: 'STREAMING',
+        projectDetails: { studioId: acquiredStudio.id, title: 'Old finished release' },
+    } as any],
+};
+const staleSlateReadiness = getStudioSaleReadiness(staleSlatePlayer, parentStudio);
+assert(staleSlateReadiness.canList, 'Completed commitments and finished releases must not block a studio sale.');
+
+const liveSlatePlayer: Player = {
+    ...player,
+    commitments: [{
+        id: 'live_child_production',
+        name: 'Moonfall Again',
+        type: 'ACTING_GIG',
+        energyCost: 0,
+        income: 0,
+        payoutType: 'LUMPSUM',
+        projectPhase: 'POST_PRODUCTION',
+        projectDetails: { studioId: acquiredStudio.id, title: 'Moonfall Again' },
+    } as any],
+    activeReleases: [{
+        id: 'live_hq_release',
+        name: 'City Lights',
+        status: 'RUNNING',
+        distributionPhase: 'THEATRICAL',
+        projectDetails: { studioId: parentStudio.id, title: 'City Lights' },
+    } as any],
+};
+const liveSlateItems = getStudioSaleActiveSlateItems(liveSlatePlayer, [parentStudio.id, acquiredStudio.id]);
+assert(liveSlateItems.length === 2, 'Only genuinely live projects should block the sale.');
+assert(liveSlateItems.some(item => item.name === 'Moonfall Again' && item.studioName === acquiredStudio.name && item.phase === 'Post Production'), 'A bundled subsidiary blocker must identify its studio and phase.');
+assert(liveSlateItems.some(item => item.name === 'City Lights' && item.kind === 'RELEASE' && item.phase === 'In theaters'), 'A running release must remain a named sale blocker.');
 
 const bounds = getStudioSalePricingBounds(valuation);
 const floorAboveAsk = createStudioSaleDeck(player, parentStudio.id, bounds.minAsk, bounds.minAsk + 100_000_000);

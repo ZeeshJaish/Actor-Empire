@@ -26,6 +26,10 @@ import {
     setSubsidiaryOperatingModel,
 } from '../../../services/studioGroup';
 import { getAcquisitionDebtSummary } from '../../../services/acquisitionDebt';
+import {
+    getStudioGroupValuation,
+    getStudioOwnershipPercent,
+} from '../../../services/studioGroupValuation';
 import { OwnedStudioCommandCenter } from './OwnedStudioCommandCenter';
 import { getPlayerLanguage } from '../../../services/i18n';
 
@@ -36,6 +40,9 @@ interface StudioGroupViewProps {
     initialCommandStudioId?: string | null;
     onGreenlightStudioProject: (studioId: string) => void;
     onOpenStudioWorkbench: (studioId: string, tab: DevelopmentLabInitialTab) => void;
+    onOpenStudioFacilities: (studioId: string) => void;
+    onOpenStudioTalent: (studioId: string) => void;
+    onOpenStreamingBids: (studioId: string, projectId: string) => void;
 }
 
 const formatMoney = (value: number) => {
@@ -69,6 +76,8 @@ const SubsidiaryPanel: React.FC<{
         + (studio.studioState?.purchasedIPTitles?.length || 0)
         + player.pastProjects.filter(project => project.studioId === studio.id).length;
     const weeklyResult = studio.stats.weeklyProfit || 0;
+    const ownershipPercent = getStudioOwnershipPercent(player, studio);
+    const ownerWeeklyResult = weeklyResult * (ownershipPercent / 100);
     const momentum = Math.round(studio.stats.studioMomentum || studio.stats.hype || 0);
     const accent = model?.accent === 'SKY'
         ? { line: 'bg-sky-300', border: 'border-sky-300/35', text: 'text-sky-200', surface: 'bg-sky-300/[0.07]' }
@@ -92,9 +101,12 @@ const SubsidiaryPanel: React.FC<{
                         </div>
                         <div className="min-w-0">
                             <div className="text-[6px] font-black uppercase tracking-[0.22em] text-zinc-600">Owned Studio</div>
-                            <h3 className="mt-1 line-clamp-2 font-serif text-[15px] font-black uppercase italic leading-[0.95] tracking-tight text-white">
+                            <h3 className="mt-1 break-words font-serif text-[15px] font-black uppercase italic leading-[0.98] tracking-tight text-white">
                                 {studio.name}
                             </h3>
+                            <div className="mt-1 font-mono text-[6px] font-black uppercase tracking-[0.12em] text-zinc-500">
+                                {ownershipPercent.toFixed(ownershipPercent % 1 ? 1 : 0)}% owned
+                            </div>
                         </div>
                     </div>
                     <div className={`shrink-0 rounded-full border px-2.5 py-1 text-[6px] font-black uppercase tracking-[0.14em] ${model ? modelTone[model.accent] : 'border-rose-300/30 bg-rose-300/[0.08] text-rose-200'}`}>
@@ -115,10 +127,10 @@ const SubsidiaryPanel: React.FC<{
                         </div>
                     </div>
                     <div className="rounded-[15px] border border-white/[0.07] bg-black/40 p-3">
-                        <div className="text-[6px] font-black uppercase tracking-[0.16em] text-zinc-600">Weekly Result</div>
-                        <div className={`mt-2 flex items-center gap-1 font-mono text-[12px] font-black ${weeklyResult >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>
-                            {weeklyResult >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-                            {formatMoney(weeklyResult)}
+                        <div className="text-[6px] font-black uppercase tracking-[0.16em] text-zinc-600">Your Weekly Share</div>
+                        <div className={`mt-2 flex items-center gap-1 font-mono text-[12px] font-black ${ownerWeeklyResult >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>
+                            {ownerWeeklyResult >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+                            {formatMoney(ownerWeeklyResult)}
                         </div>
                     </div>
                 </div>
@@ -160,7 +172,7 @@ const SubsidiaryPanel: React.FC<{
     );
 };
 
-export const StudioGroupView: React.FC<StudioGroupViewProps> = ({ player, onBack, onUpdatePlayer, initialCommandStudioId, onGreenlightStudioProject, onOpenStudioWorkbench }) => {
+export const StudioGroupView: React.FC<StudioGroupViewProps> = ({ player, onBack, onUpdatePlayer, initialCommandStudioId, onGreenlightStudioProject, onOpenStudioWorkbench, onOpenStudioFacilities, onOpenStudioTalent, onOpenStreamingBids }) => {
     const language = getPlayerLanguage(player);
     const operatingModels = getOperatingModels(language);
     const group = getStudioGroup(player);
@@ -171,9 +183,7 @@ export const StudioGroupView: React.FC<StudioGroupViewProps> = ({ player, onBack
     const selectedStudio = group.subsidiaries.find(studio => studio.id === selectedStudioId);
     const carveOutStudio = group.mergedStudios.find(studio => studio.id === carveOutStudioId);
     const commandStudio = group.subsidiaries.find(studio => studio.id === commandStudioId);
-    const groupValuation = group.allStudios.reduce((total, studio) => total + (studio.stats.valuation || 0), 0);
-    const groupCapital = group.allStudios.reduce((total, studio) => total + (studio.balance || 0), 0);
-    const weeklyResult = group.allStudios.reduce((total, studio) => total + (studio.stats.weeklyProfit || 0), 0);
+    const valuation = getStudioGroupValuation(player);
     const integratedValue = group.mergedStudios.reduce((total, studio) => total + (studio.stats.valuation || 0), 0);
     const debtSummary = getAcquisitionDebtSummary(player);
     const mergedStudioIds = new Set(group.mergedStudios.map(studio => studio.id));
@@ -228,6 +238,9 @@ export const StudioGroupView: React.FC<StudioGroupViewProps> = ({ player, onBack
                     onUpdatePlayer={onUpdatePlayer}
                     onGreenlightProject={() => onGreenlightStudioProject(commandStudio.id)}
                     onOpenWorkbench={(tab) => onOpenStudioWorkbench(commandStudio.id, tab)}
+                    onOpenFacilities={() => onOpenStudioFacilities(commandStudio.id)}
+                    onOpenTalent={() => onOpenStudioTalent(commandStudio.id)}
+                    onOpenStreamingBids={(projectId) => onOpenStreamingBids(commandStudio.id, projectId)}
                 />
                 <AnimatePresence>
                     {selectedStudio ? (
@@ -259,16 +272,16 @@ export const StudioGroupView: React.FC<StudioGroupViewProps> = ({ player, onBack
                 </div>
                 <div className="relative mt-4 grid grid-cols-3 overflow-hidden rounded-[17px] border-2 border-[#29251f] bg-black/55">
                     <div className="border-r border-white/[0.08] p-3">
-                        <div className="text-[6px] font-black uppercase tracking-widest text-zinc-600">Group Valuation</div>
-                        <div className="mt-1 font-mono text-sm font-black text-white">{formatMoney(groupValuation)}</div>
+                        <div className="text-[6px] font-black uppercase leading-tight tracking-widest text-zinc-600">Parent Company</div>
+                        <div className="mt-1 font-mono text-sm font-black text-white">{formatMoney(valuation.parentCompanyValue)}</div>
                     </div>
                     <div className="border-r border-white/[0.08] p-3">
-                        <div className="text-[6px] font-black uppercase tracking-widest text-zinc-600">Group Capital</div>
-                        <div className="mt-1 font-mono text-sm font-black text-emerald-300">{formatMoney(groupCapital)}</div>
+                        <div className="text-[6px] font-black uppercase leading-tight tracking-widest text-zinc-600">Combined Studios</div>
+                        <div className="mt-1 font-mono text-sm font-black text-sky-200">{formatMoney(valuation.groupOperatingValue)}</div>
                     </div>
                     <div className="p-3">
-                        <div className="text-[6px] font-black uppercase tracking-widest text-zinc-600">Weekly Result</div>
-                        <div className={`mt-1 font-mono text-sm font-black ${weeklyResult >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>{formatMoney(weeklyResult)}</div>
+                        <div className="text-[6px] font-black uppercase leading-tight tracking-widest text-zinc-600">Owner Weekly</div>
+                        <div className={`mt-1 font-mono text-sm font-black ${valuation.ownerWeeklyResult >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>{formatMoney(valuation.ownerWeeklyResult)}</div>
                     </div>
                 </div>
             </div>
@@ -284,13 +297,31 @@ export const StudioGroupView: React.FC<StudioGroupViewProps> = ({ player, onBack
                                     </div>
                                     <div className="min-w-0">
                                         <div className="text-[6px] font-black uppercase tracking-[0.22em] text-amber-300">Group Headquarters</div>
-                                        <div className="mt-1 truncate font-serif text-[15px] font-black uppercase italic leading-none text-white">{group.parentStudio.name}</div>
-                                        <div className="mt-1.5 font-mono text-[9px] font-black text-amber-200">
-                                            {formatMoney(group.parentStudio.stats.valuation)} <span className="text-[5px] uppercase tracking-wider text-zinc-600">HQ Value</span>
-                                        </div>
+                                        <div className="mt-1 break-words font-serif text-[15px] font-black uppercase italic leading-[1.02] text-white">{group.parentStudio.name}</div>
                                     </div>
                                 </div>
                             </div>
+                            <div className="mt-3 grid grid-cols-2 overflow-hidden rounded-[14px] border border-amber-300/15 bg-black/30">
+                                <div className="border-b border-r border-white/[0.07] p-2.5">
+                                    <div className="text-[5px] font-black uppercase tracking-wider text-zinc-600">HQ Operations</div>
+                                    <div className="mt-1 font-mono text-[10px] font-black text-white">{formatMoney(valuation.hqOperatingValue)}</div>
+                                </div>
+                                <div className="border-b border-white/[0.07] p-2.5">
+                                    <div className="text-[5px] font-black uppercase tracking-wider text-zinc-600">Owned Stakes</div>
+                                    <div className="mt-1 font-mono text-[10px] font-black text-emerald-200">+{formatMoney(valuation.parentHoldingsValue)}</div>
+                                </div>
+                                <div className="border-r border-white/[0.07] p-2.5">
+                                    <div className="text-[5px] font-black uppercase tracking-wider text-zinc-600">Acquisition Debt</div>
+                                    <div className="mt-1 font-mono text-[10px] font-black text-rose-300">-{formatMoney(valuation.acquisitionDebt)}</div>
+                                </div>
+                                <div className="p-2.5">
+                                    <div className="text-[5px] font-black uppercase tracking-wider text-zinc-600">Parent Value</div>
+                                    <div className="mt-1 font-mono text-[10px] font-black text-amber-200">{formatMoney(valuation.parentCompanyValue)}</div>
+                                </div>
+                            </div>
+                            <p className="mt-2 text-[7px] font-bold leading-relaxed text-zinc-500">
+                                Parent value uses only the stake you own in each subsidiary, then subtracts acquisition debt. Combined Studios shows 100% of controlled operations, including outside shareholders.
+                            </p>
                         </div>
                     ) : null}
 
@@ -350,7 +381,7 @@ export const StudioGroupView: React.FC<StudioGroupViewProps> = ({ player, onBack
                                             <div className="flex items-center justify-between gap-3">
                                                 <div className="min-w-0">
                                                     <div className="text-[6px] font-black uppercase tracking-[0.2em] text-zinc-600">Former Studio Banner</div>
-                                                    <div className="mt-1 truncate font-serif text-[15px] font-black uppercase italic text-white">{studio.name}</div>
+                                                    <div className="mt-1 break-words font-serif text-[15px] font-black uppercase italic leading-[1.02] text-white">{studio.name}</div>
                                                     {studioDebt > 0 ? (
                                                         <div className="mt-1 font-mono text-[8px] font-black uppercase tracking-wider text-rose-300">
                                                             HQ assumed debt {formatMoney(studioDebt)}

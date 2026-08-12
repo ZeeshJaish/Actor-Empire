@@ -1,9 +1,11 @@
 
 import React, { useState } from 'react';
 import { Player, AuditionOpportunity, Commitment } from '../../types';
-import { ArrowLeft, Star, Briefcase, ChevronRight, Zap, DollarSign, XCircle, Crown, CheckCircle, Film, Tv } from 'lucide-react';
+import { ArrowLeft, Star, Briefcase, ChevronRight, Zap, DollarSign, XCircle, Crown, CheckCircle, Film, Tv, TrendingUp } from 'lucide-react';
 import { ProjectDetailView } from '../../components/ProjectDetailView';
 import { getPlayerLanguage, t } from '../../services/i18n';
+import { getCharacterIdentityLabels, getOpportunityCharacterProfile, inferStoryCompass } from '../../services/characterIdentityLogic';
+import { evaluateCharacterProfileFit, formatCharacterStoryFitLabel } from '../../services/characterStoryFit';
 
 interface CastLinkAppProps {
   player: Player;
@@ -132,6 +134,15 @@ export const CastLinkApp: React.FC<CastLinkAppProps> = ({ player, onBack, onAudi
                             const applied = isApplied(audition.projectName);
                             const isFamous = audition.project.isFamous;
                             const isTV = audition.project.type === 'SERIES';
+                            const characterProfile = getOpportunityCharacterProfile(audition);
+                            const identityLabels = getCharacterIdentityLabels(characterProfile);
+                            const characterStoryFit = audition.characterStoryFit || evaluateCharacterProfileFit(
+                                inferStoryCompass(audition.project),
+                                characterProfile,
+                                audition.roleType,
+                            );
+                            const industryContext = audition.industryContext;
+                            const isRangeMove = industryContext?.kind === 'RANGE';
                             
                             return (
                                 <div 
@@ -156,7 +167,49 @@ export const CastLinkApp: React.FC<CastLinkAppProps> = ({ player, onBack, onAudi
                                         </div>
                                     </div>
 
-                                    <div className="text-xs font-bold text-indigo-600 mb-2">{tr('castLink.roleLabel', { roleType: audition.roleType })}</div>
+                                    <div className="mb-2 flex flex-wrap items-center gap-1.5">
+                                        <span className="text-xs font-bold text-indigo-600">{tr('castLink.roleLabel', { roleType: audition.roleType })}</span>
+                                        {identityLabels.map(label => (
+                                            <span key={label} className="rounded-full border border-indigo-100 bg-indigo-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-indigo-500">
+                                                {label}
+                                            </span>
+                                        ))}
+                                    </div>
+                                    <div className={`mb-2 border-l-2 pl-2.5 ${
+                                        characterStoryFit.label === 'NATURAL_FIT'
+                                            ? 'border-emerald-400'
+                                            : characterStoryFit.label === 'BOLD_INTERPRETATION'
+                                                ? 'border-amber-400'
+                                                : 'border-rose-400'
+                                    }`}>
+                                        <div className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-600">
+                                            Story read · {formatCharacterStoryFitLabel(characterStoryFit.label)}
+                                        </div>
+                                        <div className="mt-0.5 line-clamp-2 text-[10px] font-medium leading-4 text-slate-500">
+                                            {characterStoryFit.summary}
+                                        </div>
+                                    </div>
+                                    {industryContext && (
+                                        <div className={`mb-2 flex items-start gap-2 border-l-2 pl-2.5 ${
+                                            isRangeMove ? 'border-cyan-400' : 'border-amber-400'
+                                        }`}>
+                                            <TrendingUp
+                                                size={13}
+                                                aria-hidden="true"
+                                                className={`mt-0.5 shrink-0 ${isRangeMove ? 'text-cyan-600' : 'text-amber-600'}`}
+                                            />
+                                            <div className="min-w-0">
+                                                <div className={`text-[9px] font-black uppercase tracking-[0.16em] ${
+                                                    isRangeMove ? 'text-cyan-700' : 'text-amber-700'
+                                                }`}>
+                                                    {industryContext.label}
+                                                </div>
+                                                <div className="mt-0.5 line-clamp-2 text-[10px] font-medium leading-4 text-slate-500">
+                                                    {industryContext.reason}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
                                     <div className="flex justify-between items-center text-xs text-slate-500 border-t border-slate-100 pt-2">
                                         <span className="font-mono text-emerald-600 font-bold">${audition.estimatedIncome.toLocaleString()}</span>
                                         <span className="flex items-center gap-1 text-rose-400 font-bold"><Zap size={10}/> 25E</span>

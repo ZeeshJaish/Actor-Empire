@@ -2,6 +2,7 @@ import { INITIAL_PLAYER, type Player } from '../types';
 import { migratePlayerSave } from '../services/saveMigration';
 import { getStockOutstandingShares, getStockOwnershipPercent, getStockPriceCeiling } from '../services/stockLogic';
 import { grantMigrationCarePackageIfEligible, MIGRATION_CARE_PACKAGE_CASH, MIGRATION_CARE_PACKAGE_ENERGY } from '../services/migrationCarePackage';
+import { processAcquisitionDebtService } from '../services/acquisitionDebt';
 
 const assert = (condition: unknown, message: string) => {
     if (!condition) throw new Error(message);
@@ -120,6 +121,73 @@ assert(legacyMessy.flags.worldReactionState.antiMonopolyPressure === 100, 'World
 assert(legacyMessy.flags.regulatorPressureState.pressureScore === 100, 'Regulator pressure should be clamped.');
 assert(Array.isArray(legacyMessy.flags.acquisitionMarketPulseState.processedCaseIds), 'Market pulse processed case ids should be normalized.');
 assert(legacyMessy.flags.saveMigrationVersion >= 10, 'Migration should stamp the save migration version.');
+
+const legacyInflatedAwards = migratePlayerSave({
+    ...INITIAL_PLAYER,
+    awards: [
+        {
+            id: 'real_actor_win',
+            name: 'The Oscars',
+            type: 'OSCAR',
+            year: 30,
+            category: 'Best Actor',
+            projectId: 'real_project',
+            projectName: 'Real Project',
+            outcome: 'WON',
+        },
+        {
+            id: 'legacy_trailer_win',
+            name: 'The Oscars',
+            type: 'OSCAR',
+            year: 30,
+            category: 'Best Trailer',
+            projectId: 'real_project',
+            projectName: 'Real Project',
+            outcome: 'WON',
+        },
+    ],
+    scheduledEvents: [{
+        id: 'legacy_award_event',
+        week: 10,
+        type: 'AWARD_CEREMONY',
+        title: 'The Oscars',
+        data: {
+            awardDef: { type: 'OSCAR' },
+            nominations: [
+                { category: 'Best Actor', project: { id: 'real_project', name: 'Real Project' } },
+                { category: 'Best Trailer', project: { id: 'real_project', name: 'Real Project' } },
+            ],
+            fullBallot: {
+                'Best Actor': [],
+                'Best Trailer': [],
+            },
+        },
+    }],
+    pendingEvent: {
+        id: 'legacy_pending_award_event',
+        week: 10,
+        type: 'AWARD_CEREMONY',
+        title: 'The Oscars',
+        data: {
+            awardDef: { type: 'OSCAR' },
+            nominations: [{ category: 'Best Trailer', project: { id: 'real_project', name: 'Real Project' } }],
+            fullBallot: { 'Best Trailer': [] },
+        },
+    },
+} as any);
+assert(
+    legacyInflatedAwards.awards.length === 1 && legacyInflatedAwards.awards[0].category === 'Best Actor',
+    'Migration should remove inflated campaign-only awards while preserving legitimate awards.'
+);
+assert(
+    legacyInflatedAwards.scheduledEvents[0].data.nominations.length === 1
+    && !legacyInflatedAwards.scheduledEvents[0].data.fullBallot['Best Trailer'],
+    'Migration should clean legacy categories from scheduled ceremonies.'
+);
+assert(
+    legacyInflatedAwards.pendingEvent === null,
+    'Migration should dismiss an in-progress ceremony containing only removed legacy categories.'
+);
 
 const ownershipGlitch = migratePlayerSave({
     ...INITIAL_PLAYER,
@@ -292,5 +360,214 @@ const secondImportedReward = grantMigrationCarePackageIfEligible(secondImportedS
     sourceFingerprint: 'second-signed-import-fingerprint',
 });
 assert(!secondImportedReward.granted, 'Device ledger should prevent care package farming across multiple imported saves.');
+
+const staleAcquisitionFinance = migratePlayerSave({
+    ...INITIAL_PLAYER,
+    id: 'stale_acquisition_finance',
+    businesses: [{
+        id: 'SEARCHLIGHT',
+        name: 'Searchlight Pictures',
+        type: 'PRODUCTION_HOUSE',
+        subtype: 'MAJOR_STUDIO',
+        logo: 'FILM',
+        color: 'bg-amber-500',
+        foundedWeek: 10,
+        balance: 777_800_000,
+        isActive: true,
+        config: { quality: 'PREMIUM', pricing: 'MARKET', marketing: 'MEDIUM' },
+        stats: {
+            weeklyRevenue: 123_500_000,
+            weeklyExpenses: 1_203_000_000,
+            weeklyProfit: -1_079_500_000,
+            lifetimeRevenue: 6_400_000_000,
+            valuation: 4_200_000_000,
+            brandHealth: 70,
+            customerSatisfaction: 70,
+            riskLevel: 40,
+            hype: 60,
+            studioMomentum: 60,
+            investorConfidence: 60,
+            locations: 1,
+        },
+        staff: [{ id: 'SEARCHLIGHT_staff_1', name: 'Transition Lead', role: 'Studio Management', skill: 80, salary: 7_000_000, morale: 75 }],
+        products: [],
+        hiringPool: [],
+        lastHiringRefreshWeek: 10,
+        history: [],
+    }],
+    flags: {
+        studioAcquisitionCases: [{
+            studioId: 'SEARCHLIGHT',
+            studioName: 'Searchlight Pictures',
+            status: 'ACQUIRED',
+            closing: {
+                acquiredBusinessId: 'SEARCHLIGHT',
+                expectedAnnualIncome: 6_422_000_000,
+                verifiedDebt: 42_000_000_000,
+                hiddenLiabilities: 0,
+            },
+        }],
+        acquisitionDebtLedger: [{
+            id: 'paid_off_searchlight',
+            studioId: 'SEARCHLIGHT',
+            status: 'PAID_OFF',
+            remainingPrincipal: 0,
+        }],
+    },
+} as any);
+const repairedStudio = staleAcquisitionFinance.businesses.find(business => business.id === 'SEARCHLIGHT')!;
+assert(repairedStudio.stats.weeklyExpenses < 30_000_000, 'A settled acquisition must not keep historical liabilities as a weekly studio expense.');
+assert(repairedStudio.stats.weeklyProfit > 90_000_000, 'Settled acquisition finance should restore the studio operating result.');
+assert(repairedStudio.staff[0].salary < 2_000_000, 'Legacy acquired-studio staff salaries should be repaired to a revenue-based scale.');
+
+const staleRivalBidSave = migratePlayerSave({
+    ...INITIAL_PLAYER,
+    id: 'stale_rival_bid_save',
+    flags: {
+        studioAcquisitionCases: [{
+            studioId: 'STALE_RIVAL',
+            studioName: 'Stale Rival Studio',
+            status: 'RIVAL_BID',
+            offer: { amount: 150_000_000, round: 4 },
+            sellerResponse: { decision: 'RIVAL_BID', round: 4, maxRounds: 3 },
+        }],
+    },
+} as any);
+const migratedStaleRival = staleRivalBidSave.flags.studioAcquisitionCases.find((item: any) => item.studioId === 'STALE_RIVAL');
+assert(migratedStaleRival?.status === 'OFFER_SUBMITTED', 'Migration should release stale round-four acquisition cases for a final board decision.');
+assert(migratedStaleRival?.offer?.round === 3, 'Migration should clamp stale acquisition rounds to the three-round maximum.');
+
+const legacyImportedAcquisition = migratePlayerSave({
+    ...INITIAL_PLAYER,
+    id: 'legacy_imported_acquisition',
+    money: 14_000_000,
+    businesses: [{
+        id: 'LEGACY_ACQUIRED_STUDIO',
+        name: 'Legacy Acquired Studio',
+        type: 'PRODUCTION_HOUSE',
+        subtype: 'MAJOR_STUDIO',
+        logo: 'FILM',
+        color: 'bg-amber-500',
+        foundedWeek: 10,
+        balance: 300_000_000,
+        isActive: true,
+        config: { quality: 'PREMIUM', pricing: 'MARKET', marketing: 'MEDIUM' },
+        stats: { weeklyRevenue: 30_000_000, weeklyExpenses: 18_000_000, weeklyProfit: 12_000_000, lifetimeRevenue: 900_000_000, valuation: 5_000_000_000, brandHealth: 70, customerSatisfaction: 70, riskLevel: 35, hype: 58, studioMomentum: 60, investorConfidence: 65, locations: 1 },
+        staff: [], products: [], hiringPool: [], lastHiringRefreshWeek: 10, history: [],
+    }],
+    flags: {
+        studioAcquisitionCases: [{
+            studioId: 'LEGACY_ACQUIRED_STUDIO',
+            studioName: 'Legacy Acquired Studio',
+            status: 'ACQUIRED',
+            closing: {
+                acquiredBusinessId: 'LEGACY_ACQUIRED_STUDIO',
+                signedWeek: 10,
+                signedYear: 30,
+                finalPrice: 0,
+                verifiedDebt: 14_000_000_000,
+                hiddenLiabilities: 2_000_000_000,
+            },
+        }],
+    },
+} as any);
+assert(
+    legacyImportedAcquisition.flags.acquisitionDebtLedger.some((entry: any) => (
+        entry.studioId === 'LEGACY_ACQUIRED_STUDIO' && entry.status === 'PAID_OFF'
+    )),
+    'Legacy imported acquisitions without an existing debt ledger should receive a settled baseline marker.',
+);
+const legacyDebtWeek = processAcquisitionDebtService(legacyImportedAcquisition);
+assert(legacyDebtWeek.servicedAmount === 0, 'Legacy imported acquisitions must not create a new weekly debt charge.');
+assert(legacyDebtWeek.player.money === legacyImportedAcquisition.money, 'Legacy migration must preserve the player cash balance.');
+
+const previouslyChargedImportedAcquisition = migratePlayerSave({
+    ...legacyImportedAcquisition,
+    money: 0,
+    finance: {
+        ...legacyImportedAcquisition.finance,
+        history: [{
+            id: 'tx_acq_debt_legacy_recovery',
+            week: legacyImportedAcquisition.currentWeek,
+            year: legacyImportedAcquisition.age,
+            amount: -14_000_000,
+            category: 'EXPENSE',
+            description: 'Acquisition Debt Interest',
+        }, ...legacyImportedAcquisition.finance.history],
+    },
+    flags: {
+        ...legacyImportedAcquisition.flags,
+        saveTransferImportedAt: '2026-07-24T00:00:00.000Z',
+        acquisitionDebtLegacyBaselineVersion: undefined,
+        acquisitionDebtLedger: [{
+            id: 'acq_debt_legacy_acquired_studio_30_10',
+            studioId: 'LEGACY_ACQUIRED_STUDIO',
+            studioName: 'Legacy Acquired Studio',
+            originalPrincipal: 16_000_000_000,
+            remainingPrincipal: 16_000_000_000,
+            annualInterestRate: 0.08,
+            originatedWeek: 10,
+            originatedYear: 30,
+            source: 'STOCK_CONTROL_TRANSFER',
+            status: 'ACTIVE',
+            interestPaidToDate: 14_000_000,
+            missedServiceAmount: 0,
+            missedPayments: 0,
+        }],
+    },
+} as any);
+assert(previouslyChargedImportedAcquisition.money === 14_000_000, 'The migration should restore the most recent incorrect legacy debt charge.');
+assert(
+    !previouslyChargedImportedAcquisition.finance.history.some((transaction: any) => transaction.id === 'tx_acq_debt_legacy_recovery'),
+    'The reversed legacy debt charge must be removed from finance history.',
+);
+assert(
+    previouslyChargedImportedAcquisition.flags.acquisitionDebtLedger[0].status === 'PAID_OFF',
+    'An imported legacy debt ledger without a signing marker must be settled during recovery.',
+);
+
+const legacyContinuationSave = migratePlayerSave({
+    ...INITIAL_PLAYER,
+    id: 'legacy_continuation_save',
+    businesses: [{
+        id: 'LEGACY_STUDIO',
+        name: 'Legacy Studio',
+        type: 'PRODUCTION_HOUSE',
+        subtype: 'INDEPENDENT',
+        logo: 'FILM',
+        color: 'bg-amber-500',
+        foundedWeek: 1,
+        balance: 100_000_000,
+        isActive: true,
+        config: { quality: 'PREMIUM', pricing: 'MARKET', marketing: 'MEDIUM' },
+        stats: { weeklyRevenue: 0, weeklyExpenses: 0, weeklyProfit: 0, lifetimeRevenue: 0, valuation: 100_000_000, brandHealth: 70, customerSatisfaction: 70, riskLevel: 20, hype: 50, studioMomentum: 50, investorConfidence: 50, locations: 1 },
+        staff: [],
+        products: [],
+        hiringPool: [],
+        lastHiringRefreshWeek: 1,
+        history: [],
+        studioState: {
+            scripts: [{ id: 'legacy_sequel', title: 'Legacy Sequel', status: 'IN_DEVELOPMENT', sourceMaterial: 'SEQUEL', quality: 88 }],
+        },
+    }],
+} as any);
+const migratedContinuation = legacyContinuationSave.businesses[0].studioState?.scripts?.find((script: any) => script.id === 'legacy_sequel');
+assert(migratedContinuation?.assignedSkill === 88, 'Legacy continuation scripts should retain their selected writer quality after migration.');
+assert(migratedContinuation?.baseQuality === 88, 'Legacy continuation scripts should receive a durable completion baseline after migration.');
+
+const legacySeriesArchive = migratePlayerSave({
+    ...INITIAL_PLAYER,
+    id: 'legacy_series_archive',
+    pastProjects: [{
+        id: 'legacy_series_1',
+        name: 'Signal Room',
+        type: 'ACTING_GIG',
+        year: 28,
+        futurePotential: { seriesStatus: 'RUNNING' },
+        episodeRatings: [{ season: 1, episodes: [{ episode: 1, rating: 8.6 }, { episode: 2, rating: 8.9 }] }],
+    }],
+} as any);
+assert(legacySeriesArchive.pastProjects[0].projectType === 'SERIES', 'Legacy archive entries with episode evidence must stay classified as series.');
+assert(legacySeriesArchive.pastProjects[0].episodeRatings?.length === 1, 'Series migration must preserve the existing episode scorecard.');
 
 console.log('Save migration audit passed.');

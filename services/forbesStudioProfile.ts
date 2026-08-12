@@ -29,6 +29,9 @@ export interface ForbesCatalogTitle {
     revenue: number;
     quality: number;
     outcome: string;
+    genre?: IndustryProject['genre'];
+    universeId?: IndustryProject['universeId'];
+    source?: 'WORLD_CATALOG' | 'VENTURE_HISTORY' | 'PLAYER_ARCHIVE';
 }
 
 export interface ForbesStudioTalent {
@@ -103,6 +106,9 @@ const getCatalog = ({ studio, worldProjects, venture, playerProjects }: ForbesSt
             revenue: Math.max(0, project.boxOffice || 0),
             quality: Math.max(0, project.quality || 0),
             outcome: project.reviews || 'MIXED',
+            genre: project.genre,
+            universeId: project.universeId,
+            source: 'WORLD_CATALOG' as const,
         }));
     const ventureCatalog = (venture?.history || []).map(project => ({
         id: project.id,
@@ -112,6 +118,7 @@ const getCatalog = ({ studio, worldProjects, venture, playerProjects }: ForbesSt
         revenue: Math.max(0, project.revenue || 0),
         quality: Math.max(0, project.quality || 0),
         outcome: project.outcome,
+        source: 'VENTURE_HISTORY' as const,
     }));
 
     return [...worldCatalog, ...ventureCatalog, ...(playerProjects || [])]
