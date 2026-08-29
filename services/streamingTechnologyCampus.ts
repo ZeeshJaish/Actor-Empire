@@ -15,6 +15,13 @@ import {
     normalizeOwnedStreamingPlatformState,
 } from './ownedStreamingPlatform';
 import { resolveStreamingCompanyCapabilities } from './streamingCompany';
+import {
+    findStreamingResearchDefinitionForTechnology,
+    getStreamingResearchInstallationBlockers,
+    getStreamingResearchWeeklyCost,
+    markStreamingResearchInstallationOperating,
+    markStreamingResearchInstallationStarted,
+} from './streamingResearchLifecycle';
 
 export interface StreamingTechnologyDefinition {
     id: string;
@@ -248,6 +255,15 @@ const getDefinitionBlockers = (
         if (prerequisite && !isDefinitionInstalled(platform, prerequisite)) blockers.push(`${prerequisite.title} required`);
     }
     if (item.ctoRequired && !activeCto(platform)) blockers.push('Active CTO required');
+    const researchDefinition = findStreamingResearchDefinitionForTechnology(item.id);
+    if (researchDefinition) {
+        const program = platform.researchPrograms.find(candidate => candidate.definitionId === researchDefinition.id);
+        if (!program || !['READY_TO_INSTALL', 'INSTALLING', 'OPERATING'].includes(program.stage)) {
+            blockers.push(`${researchDefinition.title} research and IP clearance required`);
+        } else if (program.stage === 'READY_TO_INSTALL') {
+            blockers.push(...getStreamingResearchInstallationBlockers(platform, researchDefinition));
+        }
+    }
     const staffCapacity = getStreamingTechnologyStaffCapacity(platform);
     if (staffCapacity < item.staffRequired) blockers.push(`${item.staffRequired} engineering staff required`);
     return blockers;
@@ -362,15 +378,22 @@ export const startStreamingTechnologyProject = (
             technicalDebtDelta: preview.technicalDebtDelta,
         },
     };
+    const platformWithInstallation = markStreamingResearchInstallationStarted(
+        {
+            ...platform,
+            treasuryCash: platform.treasuryCash - preview.capitalCost,
+            technologyProjects: [...platform.technologyProjects, project],
+            eventLedger: [...platform.eventLedger, ledger],
+        },
+        'TECHNOLOGY_PROJECT',
+        item.id,
+        `${item.title} · ${item.branch.replaceAll('_', ' ')}`,
+        project.readyAtAbsoluteWeek,
+    );
     return {
         player: {
             ...player,
-            ownedStreamingPlatform: compactOwnedStreamingPlatformForPersistence({
-                ...platform,
-                treasuryCash: platform.treasuryCash - preview.capitalCost,
-                technologyProjects: [...platform.technologyProjects, project],
-                eventLedger: [...platform.eventLedger, ledger],
-            }, player.id),
+            ownedStreamingPlatform: compactOwnedStreamingPlatformForPersistence(platformWithInstallation, player.id),
         },
         changed: true,
         project,
@@ -444,6 +467,9 @@ export const completeDueStreamingTechnologyProjects = (
             ...completedProjects.filter(project => project.targetLevel >= 50).map(project => `frontier-technology:${project.branch}`),
         ])),
     };
+    completedProjects.forEach(project => {
+        platform = markStreamingResearchInstallationOperating(platform, 'TECHNOLOGY_PROJECT', project.definitionId, absoluteWeek);
+    });
     return { platform, completedProjects, ledgerEntries };
 };
 
@@ -451,6 +477,7 @@ export const getStreamingTechnologyWeeklyCost = (platform: OwnedStreamingPlatfor
     platform.technologyProjects
         .filter(project => project.status === 'COMPLETED')
         .reduce((sum, project) => sum + project.weeklyOperatingCostDelta, 0)
+    + getStreamingResearchWeeklyCost(platform)
 );
 
 export const getStreamingTechnologyCompanyGate = (player: Player): {

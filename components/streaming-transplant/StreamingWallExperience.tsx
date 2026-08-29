@@ -37,8 +37,8 @@ export interface WallProps {
   avatarUrl?: string;
   rivals: WallRival[];
   requirements: Requirement[];
-  setupCost: string;      // "$70M"
-  treasury: string;       // "$15M"
+  setupCost: string;      // "$85M"
+  treasury: string;       // "$0"
   totalCost: string;      // "$85M"
   onEnter: () => void;
   onClose: () => void;
@@ -318,7 +318,7 @@ export const WallOfScreens: React.FC<WallProps> = ({
   const skip = () => { if (!claimed && beat < 2) { setLit(rivals.length); setRackLive(RACK.length); setBeat(2); } };
 
   return (
-    <div className={cx(css.wall2, css['b' + (beat)], (claimed ? css.claimed : ''))} onClick={skip}
+    <div className={cx(css.wall2, css['b' + (beat)], (claimed ? css.claimed : ''))} data-epx-root onClick={skip}
       style={claimed ? { ['--epx-wall2-own' as string]: claimed.color } : undefined}>
       {/* ── the room ── */}
       <div className={css.room}>
@@ -405,7 +405,7 @@ export const WallOfScreens: React.FC<WallProps> = ({
           </div>
 
           <div className={css.cost}>
-            {totalCost} to incorporate — <b>{setupCost}</b> registration, legal &amp; foundational rights · <b>{treasury}</b> opening treasury.
+            {totalCost} to incorporate — <b>{setupCost}</b> fully consumed by registration, legal &amp; foundational rights · operating treasury opens at <b>{treasury}</b>.
           </div>
 
           <div className={css.gbtns}>

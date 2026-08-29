@@ -6,6 +6,7 @@ interface GreenlightScriptStepProps {
     selectedScriptId: string | null;
     onSelectScript: (scriptId: string) => void;
     onOpenScriptMarket: () => void;
+    onOpenDevelopmentLab?: () => void;
     onCancel: () => void;
     onNext: () => void;
 }
@@ -15,6 +16,7 @@ export const GreenlightScriptStep: React.FC<GreenlightScriptStepProps> = ({
     selectedScriptId,
     onSelectScript,
     onOpenScriptMarket,
+    onOpenDevelopmentLab,
     onCancel,
     onNext,
 }) => (
@@ -26,7 +28,12 @@ export const GreenlightScriptStep: React.FC<GreenlightScriptStepProps> = ({
                 </div>
                 <h2 className="text-xl font-bold text-white mb-2">No Scripts Available</h2>
                 <p className="text-sm max-w-xs text-center leading-relaxed">Your vault is empty. Visit the script market, buy a project, then return here to green-light it.</p>
-                <button type="button" onClick={onOpenScriptMarket} className="mt-8 px-8 py-3 bg-emerald-500 hover:bg-emerald-400 text-black rounded-xl text-xs font-black uppercase tracking-widest transition-all hover:scale-105 shadow-[0_0_25px_rgba(16,185,129,0.25)]">Open Script Market</button>
+                <div className="mt-8 flex flex-wrap justify-center gap-3">
+                    <button type="button" onClick={onOpenScriptMarket} className="px-6 py-3 bg-emerald-500 hover:bg-emerald-400 text-black rounded-xl text-xs font-black uppercase tracking-widest transition-all hover:scale-105 shadow-[0_0_25px_rgba(16,185,129,0.25)]">Open Script Market</button>
+                    {onOpenDevelopmentLab && (
+                        <button type="button" onClick={onOpenDevelopmentLab} className="px-6 py-3 border border-violet-400/40 bg-violet-950/50 text-violet-200 rounded-xl text-xs font-black uppercase tracking-widest transition-all hover:bg-violet-900/60">Develop Script</button>
+                    )}
+                </div>
             </div>
         ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-4">

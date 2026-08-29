@@ -738,6 +738,14 @@ const auditPlatforms = [
   { id: 'YOUTUBE', name: 'YouTube Premium', baseBid: 3000000, qualityReq: 38, color: '#FF0000', maxBudget: 35000000 },
 ];
 
+record('production:bidding', 'legacy_helper_is_deterministic', () => {
+  const args = [auditPlatforms[0], 100_000_000, 78, false, 0, undefined, false] as const;
+  const first = calculateStreamingAuctionOffer(...args);
+  const replay = calculateStreamingAuctionOffer(...args);
+  if (JSON.stringify(first) !== JSON.stringify(replay)) throw new Error('Legacy bidding helper rerolled identical market inputs');
+  checks += 1;
+});
+
 [28, 40, 52, 66, 78, 88, 95].forEach(packageScore => {
   [false, true].forEach(isSeries => {
     [false, true].forEach(isPostTheatrical => {

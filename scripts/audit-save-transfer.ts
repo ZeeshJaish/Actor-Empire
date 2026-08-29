@@ -1,10 +1,27 @@
-import { INITIAL_PLAYER, type Player } from '../types';
+import {
+  INITIAL_PLAYER,
+  type OwnedStreamingCatalogLicense,
+  type PlatformAiContentPlan,
+  type PlatformAiReleaseEntry,
+  type PlatformAiReleaseMemory,
+  type Player,
+} from '../types';
 import { compactPlayerForPersistence } from '../services/saveCompaction';
+import { migratePlayerSave } from '../services/saveMigration';
+import { normalizePlatformAiState } from '../services/platformAi';
 import { __saveTransferTest } from '../services/saveTransfer';
 import { readFileSync } from 'node:fs';
 
 const assert = (condition: unknown, message: string) => {
   if (!condition) throw new Error(message);
+};
+
+const assertDoesNotThrow = <T>(fn: () => T, message: string): T => {
+  try {
+    return fn();
+  } catch (error) {
+    throw new Error(`${message} ${error instanceof Error ? error.message : String(error)}`);
+  }
 };
 
 const assertThrowsMessage = (fn: () => unknown, needle: string, message: string) => {
@@ -261,6 +278,281 @@ assert(compacted.flags.extraNPCs.some((npc: any) => npc.id === 'npc_background_5
 assert(!compacted.flags.extraNPCs.some((npc: any) => npc.id === 'npc_background_0'), 'Compaction should remove stale unreferenced generated NPCs.');
 assert(Array.isArray(compacted.flags.recentTimeline) && compacted.flags.recentTimeline.length > 0, 'Compaction should preserve old history through recent timeline.');
 assert(Array.isArray(compacted.flags.legacyHighlights), 'Compaction should preserve major history through legacy highlights.');
+
+const referenceAwarePlayer = structuredClone(bulkyPlayer) as any;
+const lateProject = (id: string, extra: Record<string, unknown> = {}) => ({
+  ...referenceAwarePlayer.world.projects[0],
+  id,
+  title: `Late ${id}`,
+  ...extra,
+});
+const lateReferencedProjectIds = [
+  'late-slate-project',
+  'late-release-entry-project',
+  'late-streaming-window-project',
+  'late-release-memory-project',
+  'late-rights-project',
+  'late-production-project',
+  'late-award-project',
+  'late-player-project',
+  'late-acquired-player-project',
+];
+const referencePlan = (
+  id: string,
+  sourceProjectIds: string[],
+  releaseEntries: PlatformAiReleaseEntry[] = [],
+): PlatformAiContentPlan => ({
+  id,
+  platformId: 'NETFLIX',
+  controllerAtCommitment: 'AI',
+  source: 'LICENSED_RELEASED_TITLE',
+  status: 'RIGHTS_READY',
+  title: `Reference plan ${id}`,
+  projectType: 'MOVIE',
+  genre: 'DRAMA',
+  targetAudience: 'PG-13',
+  sourceProjectIds,
+  rightsContractIds: [],
+  cataloguePackageId: null,
+  commissionId: null,
+  sourceStudioId: null,
+  streamingWindow: 'POST_THEATRICAL_WINDOW',
+  localizationLevel: 'DUBS_AND_SUBTITLES',
+  releaseCountryIds: ['US'],
+  minimumGuaranteeMillions: 0,
+  rightsCostMillions: 0,
+  productionFundingMillions: 0,
+  paidSpendMillions: 0,
+  marketingReserveMillions: 0,
+  contingencyMillions: 0,
+  committedAtAbsoluteWeek: 990,
+  rightsReadyAtAbsoluteWeek: 991,
+  localizationReadyAtAbsoluteWeek: null,
+  premiereAtAbsoluteWeek: null,
+  releasePattern: null,
+  releaseEntries,
+  scheduledAtAbsoluteWeek: null,
+  releasedAtAbsoluteWeek: null,
+  industryProductionId: null,
+  forecast: { strategic: 50, creative: 50, commercial: 50, prestige: 50, risk: 50 },
+});
+referenceAwarePlayer.world.projects = [
+  ...referenceAwarePlayer.world.projects,
+  ...lateReferencedProjectIds.map(id => lateProject(
+    id,
+    id === 'late-streaming-window-project' ? { streamingWindows: [{ id: 'late-canonical-window' }] } : {},
+  )),
+];
+referenceAwarePlayer.world.projects.find((project: any) => project.id === 'late-player-project').studioId = 'PLAYER_STUDIO';
+const acquiredSourceStudioId = 'ACQUIRED_STUDIO_SOURCE';
+referenceAwarePlayer.businesses[0].studioState.acquisitionPortfolio = {
+  sourceStudioId: acquiredSourceStudioId,
+};
+referenceAwarePlayer.world.projects.find((project: any) => project.id === 'late-acquired-player-project').studioId = acquiredSourceStudioId;
+const netflix = normalizePlatformAiState(
+  referenceAwarePlayer.world.platforms.NETFLIX,
+  referenceAwarePlayer.id,
+  1_000,
+);
+netflix.ai.slate = [referencePlan('late-reference-plan', ['late-slate-project'], [{
+    id: 'late-reference-entry',
+    sourceProjectId: 'late-release-entry-project',
+    canonicalProjectId: 'late-release-entry-project',
+    rightsContractId: null,
+    premiereAtAbsoluteWeek: 995,
+    localizationReadyAtAbsoluteWeek: 994,
+    countryIds: ['US'],
+    releasePattern: 'MOVIE_SINGLE_PREMIERE',
+    installmentAbsoluteWeeks: [995],
+    status: 'SCHEDULED',
+    releasedAtAbsoluteWeek: null,
+    streamingWindowId: null,
+  }])];
+netflix.ai.releaseMemory = [{
+  projectId: 'late-release-memory-project',
+  releasedAtAbsoluteWeek: 990,
+  genre: 'DRAMA',
+  targetAudience: 'PG-13',
+  leadActorId: null,
+  directorId: null,
+  quality: 70,
+  commercialScore: 70,
+  prestigeScore: 70,
+  subscriberImpactMillions: 0.1,
+  outcome: 'SOLID',
+  awardWins: 0,
+  observedAwardKeys: [],
+} satisfies PlatformAiReleaseMemory];
+netflix.ai.rightsContracts = [{
+  id: 'late-reference-right',
+  sourceProjectId: 'late-rights-project',
+  titleAtSigning: 'Late Rights Project',
+  licensorName: 'Audit Licensor',
+  territory: 'GLOBAL',
+  durationWeeks: 104,
+  exclusivity: 'NON_EXCLUSIVE',
+  minimumGuarantee: 0,
+  platformRevenueShare: 70,
+  licensorRevenueShare: 30,
+  signedAtAbsoluteWeek: 990,
+  startsAtAbsoluteWeek: 991,
+  expiresAtAbsoluteWeek: 1095,
+  status: 'ACTIVE',
+} satisfies OwnedStreamingCatalogLicense];
+(netflix.ai as any).pendingAudienceSettlements = [
+  ...Array.from({ length: 8 }, (_, index) => ({
+    id: `settled-transfer-audience-${index}`,
+    streamingWindowId: `settled-transfer-window-${index}`,
+    projectId: `settled-transfer-project-${index}`,
+    planId: `settled-transfer-plan-${index}`,
+    subscriberImpactMillions: 0.1,
+    status: 'SETTLED',
+    createdAtAbsoluteWeek: index,
+    settledAtAbsoluteWeek: index + 1,
+  })),
+  ...Array.from({ length: 105 }, (_, index) => ({
+    id: `pending-transfer-audience-${index}`,
+    streamingWindowId: `pending-transfer-window-${index}`,
+    projectId: `pending-transfer-project-${index}`,
+    planId: `pending-transfer-plan-${index}`,
+    subscriberImpactMillions: index ? -0.25 : 0.5,
+    status: 'PENDING',
+    createdAtAbsoluteWeek: 200 + index,
+    settledAtAbsoluteWeek: null,
+  })),
+];
+referenceAwarePlayer.world.platforms.NETFLIX = netflix;
+referenceAwarePlayer.world.industryProductions = {
+  'late-reference-production': {
+    id: 'late-reference-production',
+    canonicalProjectId: 'late-production-project',
+    title: 'Late Production Project',
+    projectType: 'MOVIE',
+    genre: 'DRAMA',
+    producerStudioId: 'WARNER_BROS',
+    status: 'DELIVERED',
+    productionCalendar: { startAbsoluteWeek: 970, plannedEndAbsoluteWeek: 990, currentMilestone: 'DELIVERY', milestones: [] },
+    budgetMillions: 40,
+    paidMillions: 40,
+    talentBookingIds: [],
+    writerSource: 'IN_HOUSE_TEAM',
+    writerId: null,
+    writerName: 'Audit Writer',
+    writerSkill: 80,
+    createdAtAbsoluteWeek: 970,
+    updatedAtAbsoluteWeek: 990,
+  },
+};
+referenceAwarePlayer.world.awardHistory = [{
+  year: 40,
+  type: 'OSCARS',
+  winners: [{
+    category: 'Best Picture',
+    winnerName: 'Audit Producers',
+    projectName: 'Late Award Project',
+    projectId: 'late-award-project',
+    isPlayer: false,
+  }],
+}];
+
+const productionRoundTrip = migratePlayerSave(compactPlayerForPersistence(referenceAwarePlayer));
+const productionRoundTripProjectIds = new Set(productionRoundTrip.world.projects.map(project => project.id));
+for (const projectId of lateReferencedProjectIds) {
+  assert(
+    productionRoundTripProjectIds.has(projectId),
+    `Production compaction and migration must retain late canonical reference ${projectId}.`,
+  );
+}
+const productionRoundTripAudienceSettlements = (productionRoundTrip.world.platforms!.NETFLIX.ai as any).pendingAudienceSettlements;
+assert(
+  Array.isArray(productionRoundTrip.world.platforms!.NETFLIX.ai!.externalRecapitalizations),
+  'Save transfer must preserve the canonical Platform AI recapitalization collection.',
+);
+assert(
+  productionRoundTrip.world.platforms!.NETFLIX.ai!.administration === null,
+  'Save transfer must preserve an explicit empty Platform AI administration state.',
+);
+assert(productionRoundTripAudienceSettlements.length === 105, 'Production compaction and migration must retain pending audience work beyond settled-history capacity.');
+assert(productionRoundTripAudienceSettlements.filter((item: any) => item.status === 'PENDING').length === 105, 'Production compaction and migration must retain every pending audience settlement.');
+assert(productionRoundTripAudienceSettlements.filter((item: any) => item.status === 'SETTLED').length === 0, 'Production compaction and migration must retain zero settled audience rows when capacity is zero.');
+
+const malformedRightsTransferPlayer = structuredClone(referenceAwarePlayer) as any;
+const validTransferRight = malformedRightsTransferPlayer.world.platforms.NETFLIX.ai.rightsContracts[0];
+malformedRightsTransferPlayer.world.platforms.NETFLIX.ai.rightsContracts = [
+  validTransferRight,
+  null,
+  {},
+  { ...validTransferRight, id: '' },
+  { ...validTransferRight, id: 'malformed-numeric-right', minimumGuarantee: Number.NaN },
+  { ...validTransferRight, id: 'malformed-range-right', platformRevenueShare: 110, licensorRevenueShare: -10 },
+];
+const compactedMalformedRights = assertDoesNotThrow(
+  () => compactPlayerForPersistence(malformedRightsTransferPlayer),
+  'Save compaction must validate malformed rights rows before renewal filtering dereferences them.',
+);
+assert(
+  JSON.stringify(compactedMalformedRights.world.platforms!.NETFLIX.ai!.rightsContracts.map(contract => contract.id))
+    === JSON.stringify([validTransferRight.id]),
+  'Save compaction must retain valid rights while dropping null and malformed rows.',
+);
+const migratedMalformedRights = assertDoesNotThrow(
+  () => migratePlayerSave(compactedMalformedRights),
+  'Migration must be able to repair a save after malformed rights rows are compacted safely.',
+);
+assert(
+  JSON.stringify(migratedMalformedRights.world.platforms!.NETFLIX.ai!.rightsContracts.map(contract => contract.id))
+    === JSON.stringify([validTransferRight.id]),
+  'Malformed rights rows must not reappear after migration.',
+);
+
+const overCapReferencePlayer = structuredClone(bulkyPlayer) as any;
+const overCapReferenceIds = Array.from({ length: 905 }, (_, index) => `over-cap-reference-${index}`);
+overCapReferencePlayer.world.projects = [
+  ...overCapReferencePlayer.world.projects,
+  ...overCapReferenceIds.map(id => lateProject(id)),
+];
+const overCapNetflix = normalizePlatformAiState(
+  overCapReferencePlayer.world.platforms.NETFLIX,
+  overCapReferencePlayer.id,
+  1_000,
+);
+overCapNetflix.ai.slate = [referencePlan('over-cap-plan', overCapReferenceIds)];
+overCapReferencePlayer.world.platforms.NETFLIX = overCapNetflix;
+const overCapRoundTrip = migratePlayerSave(compactPlayerForPersistence(overCapReferencePlayer));
+const overCapRoundTripIds = new Set(overCapRoundTrip.world.projects.map(project => project.id));
+assert(overCapReferenceIds.every(id => overCapRoundTripIds.has(id)), 'Reference overflow must retain every canonical project beyond the legacy cap.');
+assert(overCapRoundTrip.world.projects.length >= overCapReferenceIds.length, 'Reference overflow may exceed 900 rather than corrupt canonical state.');
+
+const duplicateReferencePlayer = structuredClone(bulkyPlayer) as any;
+const duplicateReferenceId = 'duplicate-canonical-reference';
+const firstDuplicatePayload = lateProject(duplicateReferenceId, { title: 'First canonical payload' });
+duplicateReferencePlayer.world.projects = [
+  firstDuplicatePayload,
+  ...Array.from({ length: 904 }, (_, index) => lateProject(duplicateReferenceId, {
+    title: `Conflicting duplicate payload ${index}`,
+  })),
+  ...Array.from({ length: 905 }, (_, index) => lateProject('', {
+    title: `Ordinary id-less project ${index}`,
+  })),
+];
+const duplicateReferenceNetflix = normalizePlatformAiState(
+  duplicateReferencePlayer.world.platforms.NETFLIX,
+  duplicateReferencePlayer.id,
+  1_000,
+);
+duplicateReferenceNetflix.ai.slate = [referencePlan('duplicate-reference-plan', [duplicateReferenceId, ''])];
+duplicateReferencePlayer.world.platforms.NETFLIX = duplicateReferenceNetflix;
+const duplicateRoundTrip = migratePlayerSave(JSON.parse(JSON.stringify(
+  compactPlayerForPersistence(duplicateReferencePlayer),
+)));
+const duplicateRows = duplicateRoundTrip.world.projects.filter(project => project.id === duplicateReferenceId);
+assert(duplicateRoundTrip.world.projects.length === 900, 'Duplicate referenced IDs must not multiply rows or defeat the 900-project cap.');
+assert(duplicateRows.length === 1, 'Compaction must retain one unambiguous canonical row per usable project ID.');
+assert(duplicateRows[0].title === 'First canonical payload', 'Canonical project deduplication must preserve the first source occurrence.');
+assert(
+  duplicateRoundTrip.world.projects.filter(project => !project.id).length === 899,
+  'Projects without usable IDs may fill ordinary capacity but must not be promoted as references.',
+);
 
 const appSource = readFileSync('App.tsx', 'utf8');
 assert(

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Player, BudgetTier, Genre, ProjectDetails, ProjectType, ActiveRelease, Commitment, Business, LocationDetails, NewsItem, XPost, StudioEquipment, Script, Writer, GameLanguage } from '../../../types';
+import { Player, BudgetTier, Genre, ProjectDetails, ProjectType, ActiveRelease, Commitment, Business, LocationDetails, NewsItem, XPost, StudioEquipment, Script, Writer, GameLanguage, PlatformAiPlayerCommissionOffer } from '../../../types';
 import { ArrowLeft, Film, DollarSign, Users, TrendingUp, Calendar, Check, Plus, Star, Award, Zap, Briefcase, LayoutGrid, MapPin, PenTool, Globe, Camera, Clapperboard, ChevronRight, Building2, BarChart3, ShieldAlert, Crown, LogOut, AlertTriangle, Sparkles, BookOpen, Video, X, Clock, Palette, Lightbulb, Mic, Box, Tv, ArrowDownLeft, ArrowUpRight, WalletCards, Landmark } from 'lucide-react';
 import { NPC_DATABASE, getAvailableTalent, calculateProjectFameMultiplier } from '../../../services/npcLogic';
 import { liquidateBusiness, resolveProjectType } from '../../../services/businessLogic';
@@ -30,6 +30,11 @@ import { CustomPosterImage } from '../../../components/CustomPosterImage';
 import { StudioSaleEntryCard, StudioSaleRoom } from './components/StudioSaleDeckPanel';
 import { getProjectFundingEconomics, getProjectMarketOutcomeRevenue } from '../../../services/projectFundingEconomics';
 import { StudioDivisionCard } from './components/StudioDivisionCard';
+import {
+    buildPlatformCommissionActiveCardPresentation,
+    buildPlatformCommissionFilmography,
+    transferPlatformAiPlayerCommission,
+} from '../../../services/platformAi';
 
 interface ProductionHouseGameProps {
     player: Player;
@@ -43,6 +48,8 @@ interface ProductionHouseGameProps {
     onStreamingOriginalConsumed?: () => void;
     onStreamingOriginalGreenlightComplete?: () => void;
     onOpenOwnedStreamingDelivery?: () => void;
+    initialPlatformCommission?: { studioId: string; offerId: string };
+    onPlatformCommissionConsumed?: () => void;
 }
 
 type StudioView = 'DASHBOARD' | 'STUDIO_GROUP' | 'DEVELOPMENT' | 'PRE_PROD' | 'PRODUCTION' | 'RELEASE' | 'RELEASES' | 'OFFICE' | 'FINANCE' | 'GREENLIGHT' | 'TALENT' | 'FILMOGRAPHY';
@@ -57,7 +64,16 @@ const formatMoney = (val: number) => {
     return `$${val}`;
 };
 
-export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player, onBack, onUpdatePlayer, initialRightsMarketOpportunityId, onRightsMarketTargetConsumed, initialStudioContinuation, onStudioContinuationConsumed, initialStreamingOriginal, onStreamingOriginalConsumed, onStreamingOriginalGreenlightComplete, onOpenOwnedStreamingDelivery }) => {
+const getCommitmentCommissionSourceLabel = (
+    commitment: Commitment,
+    offers: Record<string, PlatformAiPlayerCommissionOffer> | undefined,
+): string | undefined => {
+    const offerId = commitment.projectDetails?.hiddenStats?.playerPlatformCommissionOfferId;
+    const offer = offerId ? offers?.[offerId] : undefined;
+    return offer ? buildPlatformCommissionActiveCardPresentation(offer).sourceLabel : undefined;
+};
+
+export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player, onBack, onUpdatePlayer, initialRightsMarketOpportunityId, onRightsMarketTargetConsumed, initialStudioContinuation, onStudioContinuationConsumed, initialStreamingOriginal, onStreamingOriginalConsumed, onStreamingOriginalGreenlightComplete, onOpenOwnedStreamingDelivery, initialPlatformCommission, onPlatformCommissionConsumed }) => {
     const [view, setView] = useState<StudioView>('DASHBOARD');
     const [rightsMarketTargetId, setRightsMarketTargetId] = useState<string | null>(null);
     const [selectedProjectDashboard, setSelectedProjectDashboard] = useState<any>(null);
@@ -66,6 +82,7 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
     const [returnAfterStudioTool, setReturnAfterStudioTool] = useState<'STUDIO_GROUP' | null>(null);
     const [studioGroupCommandReturnId, setStudioGroupCommandReturnId] = useState<string | null>(null);
     const [streamingCommissionTargetId, setStreamingCommissionTargetId] = useState<string | null>(null);
+    const [platformCommissionTargetId, setPlatformCommissionTargetId] = useState<string | null>(null);
     const [selectedConcept, setSelectedConcept] = useState<any>(null);
     const [subsidiaryLaunch, setSubsidiaryLaunch] = useState<{
         tab: DevelopmentLabInitialTab;
@@ -133,6 +150,22 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
         onStreamingOriginalConsumed?.();
     }, [initialStreamingOriginal, onStreamingOriginalConsumed, studioGroup.allStudios]);
 
+    useEffect(() => {
+        if (!initialPlatformCommission) return;
+        const offer = player.world.platformAiPlayerCommissionOffers?.[initialPlatformCommission.offerId];
+        const targetStudio = studioGroup.allStudios.find(candidate => candidate.id === initialPlatformCommission.studioId);
+        if (!offer || offer.status !== 'ACCEPTED' || !targetStudio) {
+            onPlatformCommissionConsumed?.();
+            return;
+        }
+        setActiveStudioId(targetStudio.id);
+        setReturnAfterStudioTool(null);
+        setSelectedConcept(null);
+        setPlatformCommissionTargetId(offer.id);
+        setView('GREENLIGHT');
+        onPlatformCommissionConsumed?.();
+    }, [initialPlatformCommission, onPlatformCommissionConsumed, player.world.platformAiPlayerCommissionOffers, studioGroup.allStudios]);
+
     if (!studio) return <div className="p-10 text-white">Error: Studio not found.</div>;
     const language = getPlayerLanguage(player);
     const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
@@ -149,16 +182,25 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
     const productionProjects = studioCommitments.filter(c => c.projectPhase === 'PRODUCTION');
     const postProjects = studioCommitments.filter(c => c.projectPhase === 'POST_PRODUCTION');
     const awaitingReleaseProjects = studioCommitments.filter(c => c.projectPhase === 'AWAITING_RELEASE');
+    const acceptedPlatformCommissions = (Object.values(player.world.platformAiPlayerCommissionOffers || {}) as PlatformAiPlayerCommissionOffer[])
+        .filter(offer => offer.studioId === studio.id && offer.status === 'ACCEPTED');
 
     // 2. Releases (Active & Past)
     const activeReleases = player.activeReleases.filter(r => r.projectDetails.studioId === studio.id);
-    const library = [
+    const ownedLibrary = [
         ...player.pastProjects.filter(p => p.studioId === studio.id),
         ...getInheritedStudioProjects(player, studio.id).filter(project => (
             !player.pastProjects.some(past => past.id === project.id)
             && !player.activeReleases.some(release => release.id === project.id)
         ))
     ];
+    const commissionFilmography = buildPlatformCommissionFilmography({
+        ownedProjects: ownedLibrary,
+        offers: player.world.platformAiPlayerCommissionOffers,
+        studioId: studio.id,
+    });
+    const library = commissionFilmography.displayProjects as any[];
+    const evaluationLibrary = commissionFilmography.evaluationProjects;
 
     // Calculate Latest Installments for Sequel Button
     const latestInstallmentIds = useMemo(() => {
@@ -175,16 +217,16 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
     }, [player.pastProjects]);
 
     // Calculate Studio Metrics
-    const totalGross = activeReleases.reduce((sum, r) => sum + r.totalGross + (r.streamingRevenue || 0) + (r.soundtrackRevenue || 0), 0) + library.reduce((sum, p) => sum + (p.gross || 0) + (p.streamingRevenue || 0) + (p.soundtrackRevenue || 0), 0);
-    const avgRating = library.length > 0 ? library.reduce((sum, p) => sum + (p.rating || 0), 0) / library.length : 0;
+    const totalGross = activeReleases.reduce((sum, r) => sum + r.totalGross + (r.streamingRevenue || 0) + (r.soundtrackRevenue || 0), 0) + evaluationLibrary.reduce((sum, p) => sum + (p.gross || 0) + (p.streamingRevenue || 0) + (p.soundtrackRevenue || 0), 0);
+    const avgRating = evaluationLibrary.length > 0 ? evaluationLibrary.reduce((sum, p) => sum + (p.rating || 0), 0) / evaluationLibrary.length : 0;
     
     // Calculate Awards Won
-    const awardsWon = library.reduce((sum, p) => sum + (p.awards?.filter(a => a.outcome === 'WON').length || 0), 0);
+    const awardsWon = evaluationLibrary.reduce((sum, p) => sum + (p.awards?.filter(a => a.outcome === 'WON').length || 0), 0);
     
-    const breakoutCount = library.filter(p => ((p.gross || 0) + (p.streamingRevenue || 0)) > 200_000_000).length;
-    const consistencyBonus = library.filter(p => (p.rating || 0) >= 7.5).length * 0.8;
+    const breakoutCount = evaluationLibrary.filter(p => ((p.gross || 0) + (p.streamingRevenue || 0)) > 200_000_000).length;
+    const consistencyBonus = evaluationLibrary.filter(p => (p.rating || 0) >= 7.5).length * 0.8;
     // Prestige Score (0-100): rewards quality, awards, consistency, and credible hits.
-    const prestigeScore = Math.min(100, Math.floor((avgRating * 6) + (awardsWon * 2.5) + (library.length * 0.8) + (breakoutCount * 1.2) + consistencyBonus));
+    const prestigeScore = Math.min(100, Math.floor((avgRating * 6) + (awardsWon * 2.5) + (evaluationLibrary.length * 0.8) + (breakoutCount * 1.2) + consistencyBonus));
     const groupValuation = getStudioGroupValuation(player).parentCompanyValue;
     const getStudioSubtypeLabel = (subtype?: string) => subtype === 'MAJOR_STUDIO'
         ? tr('services.business.productionDashboard.studioType.major')
@@ -195,6 +237,19 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
 
     // Active Slate List (Combined for the Netflix-style row)
     const activeSlate = [
+        ...acceptedPlatformCommissions.map(offer => {
+            const presentation = buildPlatformCommissionActiveCardPresentation(offer);
+            return {
+                id: offer.id,
+                name: presentation.title,
+                type: offer.projectType,
+                phase: presentation.phase,
+                sourceLabel: presentation.sourceLabel,
+                risk: 'CONTRACT',
+                budget: presentation.productionBudget,
+                commissionOffer: offer,
+            };
+        }),
         ...(studio.studioState?.concepts?.map(c => {
             const script = studio.studioState?.scripts.find(s => s.id === c.scriptId);
             const isScripting = script?.status === 'IN_DEVELOPMENT';
@@ -217,10 +272,10 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
             budget: 0, // Not yet budgeted
             customPoster: s.customPoster
         })) || []),
-        ...developmentProjects.map(p => ({ ...p, phase: 'PLANNING', risk: 'LOW' })),
-        ...preProdProjects.map(p => ({ ...p, phase: 'PRE-PRODUCTION', risk: 'LOW' })),
-        ...productionProjects.map(p => ({ ...p, phase: 'PRODUCTION', risk: 'HIGH' })),
-        ...postProjects.map(p => ({ ...p, phase: 'POST-PRODUCTION', risk: 'MEDIUM' })),
+        ...developmentProjects.map(p => ({ ...p, phase: 'PLANNING', risk: 'LOW', sourceLabel: getCommitmentCommissionSourceLabel(p, player.world.platformAiPlayerCommissionOffers) })),
+        ...preProdProjects.map(p => ({ ...p, phase: 'PRE-PRODUCTION', risk: 'LOW', sourceLabel: getCommitmentCommissionSourceLabel(p, player.world.platformAiPlayerCommissionOffers) })),
+        ...productionProjects.map(p => ({ ...p, phase: 'PRODUCTION', risk: 'HIGH', sourceLabel: getCommitmentCommissionSourceLabel(p, player.world.platformAiPlayerCommissionOffers) })),
+        ...postProjects.map(p => ({ ...p, phase: 'POST-PRODUCTION', risk: 'MEDIUM', sourceLabel: getCommitmentCommissionSourceLabel(p, player.world.platformAiPlayerCommissionOffers) })),
         ...awaitingReleaseProjects.map(p => {
             const fundingEconomics = getProjectFundingEconomics(p);
             const needsFundedPremiereConfirmation = fundingEconomics.platformFunding > 0
@@ -228,6 +283,7 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
 
             return {
                 ...p,
+                sourceLabel: getCommitmentCommissionSourceLabel(p, player.world.platformAiPlayerCommissionOffers),
                 phase: needsFundedPremiereConfirmation || !p.projectDetails?.releaseStrategy
                     ? p.projectDetails?.hiddenStats?.ownedStreamingOriginal
                         ? 'AWAITING PLATFORM DELIVERY'
@@ -250,6 +306,22 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
             concept_phase: concept?.phase || 'new_project',
         });
         setView('GREENLIGHT');
+    };
+
+    const handleTransferPlatformCommission = (offerId: string) => {
+        const offer = player.world.platformAiPlayerCommissionOffers?.[offerId];
+        if (!offer) return;
+        if (!window.confirm(`Return "${offer.title}" to ${offer.platformName}? Unpaid producer fees will be forfeited and future offers will cool down.`)) return;
+        const transferred = transferPlatformAiPlayerCommission({
+            player,
+            offerId,
+            absoluteWeek: (player.age * 52) + player.currentWeek,
+        });
+        if (transferred.changed) {
+            setPlatformCommissionTargetId(null);
+            setSelectedProjectDashboard(null);
+            onUpdatePlayer(transferred.player);
+        }
     };
 
     const openStudioWorkbench = (studioId: string, tab: DevelopmentLabInitialTab, projectType?: 'MOVIE' | 'SERIES') => {
@@ -321,6 +393,14 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
         setView('DEVELOPMENT');
     };
 
+    const openScriptDevelopmentFromGreenlight = () => {
+        setSelectedConcept(null);
+        setSelectedProjectDashboard(null);
+        setRightsMarketTargetId(null);
+        setSubsidiaryLaunch({ tab: 'NEW_CONCEPT', projectType: platformCommissionTargetId ? player.world.platformAiPlayerCommissionOffers?.[platformCommissionTargetId]?.projectType : undefined });
+        setView('DEVELOPMENT');
+    };
+
     const closeStudioTool = () => {
         setSelectedConcept(null);
         if (returnAfterStudioTool === 'STUDIO_GROUP') {
@@ -388,7 +468,11 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
             franchiseId: p.franchiseId,
             installmentNumber: p.installmentNumber,
             genre: p.genre,
-            projectDetails: p
+            projectDetails: p,
+            sourceLabel: p.sourceLabel,
+            isPlatformCommissionCredit: p.isPlatformCommissionCredit,
+            countsTowardOwnedStudioEvaluation: p.countsTowardOwnedStudioEvaluation,
+            producerFee: p.producerFee,
         }))
     ];
     const sortedPastProjectsSlate = [...pastProjectsSlate].sort(sortStudioArchiveByRecent);
@@ -903,15 +987,20 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
                         player={player} 
                         studio={studio} 
                         initialConcept={selectedConcept}
+                        platformCommissionOffer={platformCommissionTargetId ? player.world.platformAiPlayerCommissionOffers?.[platformCommissionTargetId] : undefined}
                         onBack={() => {
                             closeStudioTool();
                         }} 
                         onOpenScriptMarket={openScriptMarketFromGreenlight}
+                        onOpenScriptDevelopment={openScriptDevelopmentFromGreenlight}
                         onUpdatePlayer={onUpdatePlayer} 
                         onComplete={() => {
                             if (streamingCommissionTargetId) {
                                 setStreamingCommissionTargetId(null);
                                 onStreamingOriginalGreenlightComplete?.();
+                            } else if (platformCommissionTargetId) {
+                                setPlatformCommissionTargetId(null);
+                                closeStudioTool();
                             } else {
                                 closeStudioTool();
                             }
@@ -1008,7 +1097,7 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
                         <div className="w-px h-8 bg-zinc-800 shrink-0"></div>
                         <div className="flex flex-col shrink-0">
                             <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest flex items-center gap-1.5 mb-0.5"><Film size={10} className="text-blue-400"/> {tr('services.business.productionDashboard.metric.totalFilms')}</span>
-                            <span className="text-white font-bold text-sm">{library.length}</span>
+                            <span className="text-white font-bold text-sm">{evaluationLibrary.length}</span>
                         </div>
                         <div className="w-px h-8 bg-zinc-800 shrink-0"></div>
                         <div className="flex flex-col shrink-0">
@@ -1049,7 +1138,11 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
                                 key={p.id || idx} 
                                 project={p} 
                                 onClick={() => {
-                                    if (p.phase === 'CONCEPT' || (p.phase === 'DEVELOPMENT' && p.concept)) {
+                                    if (p.commissionOffer) {
+                                        setSelectedConcept(null);
+                                        setPlatformCommissionTargetId(p.commissionOffer.id);
+                                        openGreenlight('platform_commission_tile');
+                                    } else if (p.phase === 'CONCEPT' || (p.phase === 'DEVELOPMENT' && p.concept)) {
                                         setSelectedConcept(p.concept);
                                         openGreenlight('active_slate_concept', p.concept);
                                     } else if (p.phase === 'AWAITING RELEASE') {
@@ -1059,7 +1152,13 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
                                         setSelectedProjectDashboard(p);
                                     }
                                 }}
-                                onDelete={(p.phase === 'CONCEPT' || (p.phase === 'DEVELOPMENT' && p.concept)) ? () => handleDeleteConcept(p.id) : undefined}
+                                onDelete={p.commissionOffer?.id
+                                    ? () => handleTransferPlatformCommission(p.commissionOffer.id)
+                                    : p.projectDetails?.hiddenStats?.playerPlatformCommissionOfferId
+                                        ? () => handleTransferPlatformCommission(p.projectDetails.hiddenStats.playerPlatformCommissionOfferId)
+                                        : (p.phase === 'CONCEPT' || (p.phase === 'DEVELOPMENT' && p.concept))
+                                            ? () => handleDeleteConcept(p.id)
+                                            : undefined}
                             />
                         ))}
                     </div>
@@ -1858,9 +1957,10 @@ const StudioFilmographyView: React.FC<{
         });
     }, [projects, filterMode, sortMode]);
 
-    const totalRevenue = projects.reduce((sum, project) => sum + getStudioArchiveRevenue(project), 0);
-    const avgRating = projects.length > 0 ? projects.reduce((sum, project) => sum + getStudioArchiveRating(project), 0) / projects.length : 0;
-    const bestHit = [...projects].sort((a, b) => getStudioArchiveRevenue(b) - getStudioArchiveRevenue(a))[0];
+    const evaluationProjects = projects.filter(project => project.countsTowardOwnedStudioEvaluation !== false);
+    const totalRevenue = evaluationProjects.reduce((sum, project) => sum + getStudioArchiveRevenue(project), 0);
+    const avgRating = evaluationProjects.length > 0 ? evaluationProjects.reduce((sum, project) => sum + getStudioArchiveRating(project), 0) / evaluationProjects.length : 0;
+    const bestHit = [...evaluationProjects].sort((a, b) => getStudioArchiveRevenue(b) - getStudioArchiveRevenue(a))[0];
 
     return (
         <div className="absolute inset-0 bg-[#050505] text-white flex flex-col font-sans overflow-hidden">
@@ -1874,12 +1974,12 @@ const StudioFilmographyView: React.FC<{
                         <h1 className="text-2xl font-black tracking-tight text-white leading-tight truncate">{tr('studio.filmography.title', { studio: studio.name })}</h1>
                     </div>
                     <div className="rounded-full border border-amber-500/20 bg-amber-500/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-amber-300">
-                        {tr('studio.filmography.titles', { count: projects.length })}
+                        {tr('studio.filmography.titles', { count: evaluationProjects.length })}
                     </div>
                 </div>
 
                 <div className="mt-5 grid grid-cols-3 gap-2">
-                    <FilmographyMetric label={tr('studio.filmography.projects')} value={`${projects.length}`} />
+                    <FilmographyMetric label={tr('studio.filmography.projects')} value={`${evaluationProjects.length}`} />
                     <FilmographyMetric label={tr('studio.filmography.avgRating')} value={avgRating > 0 ? avgRating.toFixed(1) : '-.--'} />
                     <FilmographyMetric label={tr('studio.filmography.revenue')} value={formatMoney(totalRevenue)} />
                 </div>
@@ -2077,6 +2177,8 @@ const ActiveProjectCard: React.FC<{ project: any, onClick?: () => void, onDelete
     if (project.phase === 'POST-PRODUCTION') phaseColor = "bg-blue-500 text-white";
     if (project.phase === 'AWAITING RELEASE') phaseColor = "bg-amber-500 text-black";
     if (project.phase === 'PLANNED RELEASE') phaseColor = "bg-emerald-600 text-white";
+    if (project.phase === 'PLATFORM COMMISSION') phaseColor = "bg-violet-600 text-white";
+    if (project.phase === 'SCRIPT REQUIRED') phaseColor = "bg-violet-600 text-white";
     if (project.phase === 'RELEASED') phaseColor = "bg-emerald-500 text-black";
 
     const budget = project.projectDetails?.estimatedBudget || project.budget || 0;
@@ -2110,9 +2212,10 @@ const ActiveProjectCard: React.FC<{ project: any, onClick?: () => void, onDelete
             className={`min-w-[140px] w-[140px] h-[210px] rounded-lg bg-zinc-900 border-2 flex flex-col relative overflow-hidden group shrink-0 cursor-pointer hover:scale-105 transition-all duration-300 shadow-lg ${typeBorder}`}
         >
             {/* Delete Button for Concepts */}
-            {project.phase === 'CONCEPT' && onDelete && (
+            {onDelete && (
                 <button 
                     onClick={(e) => { e.stopPropagation(); onDelete(); }}
+                    title={project.commissionOffer || project.projectDetails?.hiddenStats?.playerPlatformCommissionOfferId ? 'Return commission' : 'Delete concept'}
                     className="absolute top-2 left-2 z-30 p-1.5 bg-black/50 hover:bg-red-500 text-zinc-400 hover:text-white rounded-full transition-colors backdrop-blur-sm border border-white/10"
                 >
                     <X size={12} />
@@ -2157,7 +2260,12 @@ const ActiveProjectCard: React.FC<{ project: any, onClick?: () => void, onDelete
 
             {/* Content */}
             <div className="absolute inset-0 p-3 flex flex-col justify-between">
-                <div className="flex justify-end">
+                <div className="flex justify-between items-start gap-1">
+                    {project.sourceLabel ? (
+                        <div className="max-w-[82px] truncate rounded-md border border-violet-300/30 bg-violet-950/85 px-1.5 py-0.5 text-[7px] font-black uppercase tracking-[0.12em] text-violet-200 shadow-sm">
+                            {project.sourceLabel}
+                        </div>
+                    ) : <div />}
                     <div className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider ${phaseColor} shadow-sm`}>
                         {project.phase}
                     </div>
@@ -2210,7 +2318,10 @@ const ArchiveProjectCard: React.FC<{ project: any, isLatestInstallment?: boolean
     const projectRevenue = getStudioArchiveRevenue(project);
     const projectBudget = project.budget || 0;
     const marketOutcomeRevenue = getProjectMarketOutcomeRevenue(project, projectRevenue, projectBudget);
-    if (marketOutcomeRevenue > projectBudget * 5) {
+    if (project.isPlatformCommissionCredit) {
+        outcomeLabel = null;
+        outcomeColor = "";
+    } else if (marketOutcomeRevenue > projectBudget * 5) {
         outcomeLabel = "BLOCKBUSTER";
         outcomeColor = "bg-purple-500 text-white";
     } else if (marketOutcomeRevenue > projectBudget * 2) {
@@ -2275,11 +2386,18 @@ const ArchiveProjectCard: React.FC<{ project: any, isLatestInstallment?: boolean
             {/* Content */}
             <div className="absolute inset-0 p-3 flex flex-col justify-between pointer-events-none">
                 <div className="flex justify-between items-start">
-                    {outcomeLabel ? (
-                        <div className={`text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md shadow-sm ${outcomeColor}`}>
-                            {outcomeLabel}
-                        </div>
-                    ) : <div></div>}
+                    <div className="flex max-w-[82px] flex-col items-start gap-1">
+                        {project.sourceLabel && (
+                            <div className="max-w-full truncate rounded-md border border-violet-300/30 bg-violet-950/85 px-1.5 py-0.5 text-[7px] font-black uppercase tracking-[0.12em] text-violet-200 shadow-sm">
+                                {project.sourceLabel}
+                            </div>
+                        )}
+                        {outcomeLabel && (
+                            <div className={`text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md shadow-sm ${outcomeColor}`}>
+                                {outcomeLabel}
+                            </div>
+                        )}
+                    </div>
                     <div className="flex gap-1">
                         {(project.rating || project.imdbRating) && (
                             <div className="bg-yellow-500 text-black px-1.5 py-0.5 rounded-md shadow-sm text-[8px] font-black flex items-center gap-0.5">
@@ -2300,13 +2418,13 @@ const ArchiveProjectCard: React.FC<{ project: any, isLatestInstallment?: boolean
                     
                     <div className="flex justify-between items-end mt-1">
                         <div>
-                            <div className="text-[8px] text-zinc-400 uppercase font-bold">Budget</div>
+                            <div className="text-[8px] text-zinc-400 uppercase font-bold">{project.isPlatformCommissionCredit ? 'Production Cap' : 'Budget'}</div>
                             <div className="text-[10px] font-mono font-bold text-zinc-300">{formatMoney(project.budget || 0)}</div>
                         </div>
                         <div className="text-right">
-                            <div className="text-[8px] text-zinc-400 uppercase font-bold">Project Revenue</div>
+                            <div className="text-[8px] text-zinc-400 uppercase font-bold">{project.isPlatformCommissionCredit ? 'Producer Fee' : 'Project Revenue'}</div>
                             <div className="text-[10px] font-mono font-bold text-emerald-400">
-                                {formatMoney(projectRevenue)}
+                                {formatMoney(project.isPlatformCommissionCredit ? project.producerFee || 0 : projectRevenue)}
                             </div>
                             {project.views && (
                                 <div className="text-[7px] text-zinc-500 font-bold">

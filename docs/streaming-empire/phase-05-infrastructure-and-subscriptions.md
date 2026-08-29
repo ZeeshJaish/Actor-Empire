@@ -38,10 +38,10 @@ Demand is a planning range derived from:
 - delivery and reliability technology
 - selected architecture and rollout
 
-The first draft suggests Hybrid, Standard, and the $7.5M Starter Rack so the
-fixed $15M opening treasury can fund a real Level 0 configuration. Reach is not
-selected here: it is recalculated from canonical capacity and technology after
-company actions.
+The first draft suggests Hybrid, Standard, and the $7.5M Starter Rack. Because
+treasury opens at $0, the founder must first inject enough company capital in
+Finance. Reach is not selected here: it is recalculated from canonical capacity
+and technology after company actions.
 
 It is never presented as guaranteed subscribers. Load-test status is:
 

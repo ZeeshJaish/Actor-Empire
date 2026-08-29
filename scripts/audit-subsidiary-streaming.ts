@@ -179,6 +179,12 @@ const independentDealEntries = independentBidStudio.studioState?.financeLedger?.
 )) || [];
 assert(independentBidRelease?.distributionPhase === 'STREAMING', 'Independent subsidiaries must close their own post-theatrical streaming deal.');
 assert(independentBidRelease?.streaming?.platformId === 'APPLE_TV', 'Independent subsidiaries must automatically choose the strongest available upfront offer.');
+assert(
+    Boolean(independentBidRelease?.streamingContractId)
+    && independentBidRelease?.streamingContractId === independentBidRelease?.streaming?.contractId
+    && independentBidWeek.player.world.streamingRightsContracts?.[independentBidRelease!.streamingContractId!]?.minimumGuarantee === 42_000_000,
+    'An automatically accepted subsidiary offer must persist one referenced canonical contract.',
+);
 assert(independentBidRelease?.bids === undefined, 'An automatically closed independent-label deal must clear its pending bids.');
 assert(
     independentDealEntries.length === 1 && independentDealEntries[0].amount === 42_000_000,

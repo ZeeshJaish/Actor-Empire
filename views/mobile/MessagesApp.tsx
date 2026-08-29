@@ -3,12 +3,15 @@ import React, { useEffect, useState } from 'react';
 import { Player, Message, AuditionOpportunity, SponsorshipOffer, NegotiationData, ScheduledEvent, YoutubeBrandDeal, YoutubeCollabOffer, YoutubeMusicVideoFeatureOffer, OutsideProducerInvestmentOffer } from '../../types';
 import { ArrowLeft, Star, DollarSign, Calendar, CheckCircle, Lock, Trash2, Mail, Heart, Play, Users, Clapperboard, FileSearch, ShieldCheck, TrendingUp, AlertTriangle, FileSignature, Swords, ChevronRight, Landmark, Vote, Music2, Zap, X, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { ProjectDetailView } from '../../components/ProjectDetailView';
+import PlatformCommissionBriefCard from '../../components/PlatformCommissionBriefCard';
+import StreamingPlatformBrand from '../../components/StreamingPlatformBrand';
 import { APP_DISPLAY_VERSION } from '../../services/appVersion';
 import { getPlayerLanguage, t } from '../../services/i18n';
 import { formatProjectMusicByline } from '../../services/musicIndustry';
 import { calculateOutsideInvestmentAcceptanceChance } from '../../services/outsideProductions';
 import { PHASE_ONE_ENERGY_COSTS } from '../../services/energyCosts';
 import { getCharacterIdentityLabels, getOpportunityCharacterProfile } from '../../services/characterIdentityLogic';
+import { resolveStreamingPlatformBrandById } from '../../services/streamingPlatformBrandRegistry';
 
 interface MessagesAppProps {
   player: Player;
@@ -19,6 +22,7 @@ interface MessagesAppProps {
   onOpenRightsMarket?: (opportunityId?: string) => void;
   onOpenStudioAcquisition?: (studioId?: string, studioName?: string) => void;
   onOpenStudioContinuation?: (studioId?: string, scriptId?: string) => void;
+  onDeclinePlatformCommission?: (offerId: string) => void;
   onResolveShareholderVote?: (
       voteId: string,
       selectedVote: 'FOR' | 'AGAINST',
@@ -26,7 +30,7 @@ interface MessagesAppProps {
   onImmersiveReviewChange?: (active: boolean) => void;
 }
 
-export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAccept, onDelete, onMarkRead, onOpenRightsMarket, onOpenStudioAcquisition, onOpenStudioContinuation, onResolveShareholderVote, onImmersiveReviewChange }) => {
+export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAccept, onDelete, onMarkRead, onOpenRightsMarket, onOpenStudioAcquisition, onOpenStudioContinuation, onDeclinePlatformCommission, onResolveShareholderVote, onImmersiveReviewChange }) => {
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [activeShareholderVoteId, setActiveShareholderVoteId] = useState<string | null>(null);
@@ -82,6 +86,14 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
       ? (player.outsideProductions || []).find(item => item.id === selectedOutsideProducerUpdate.outsideProductionId || item.projectId === selectedOutsideProducerUpdate.projectId)
       : null;
   const isOutsideInvestmentMessage = selectedMessage?.type === 'OFFER_OUTSIDE_PRODUCER_INVESTMENT' && Boolean(selectedMessage.data);
+  const selectedPlatformCommission = selectedMessage?.type === 'OFFER_PLATFORM_COMMISSION'
+      ? player.world.platformAiPlayerCommissionOffers?.[String(selectedMessage.data?.offerId || '')]
+      : undefined;
+  const resolveMessagePlatformBrand = (message: Message) => {
+      if (message.type !== 'OFFER_PLATFORM_COMMISSION') return null;
+      const offer = player.world.platformAiPlayerCommissionOffers?.[String(message.data?.offerId || '')];
+      return offer ? resolveStreamingPlatformBrandById(offer.platformId, offer.platformName) : null;
+  };
   const isDeveloperMessage = (message?: Message | null) => Boolean(
       message?.id === 'msg_dev_welcome' ||
       (message?.sender === 'Zeesh (Developer)' && message?.subject === 'A Note from the Creator')
@@ -379,12 +391,25 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                         </div>
                     ) : (
                         <div className="divide-y divide-slate-200 bg-white">
-                            {messages.map(msg => (
-                                <button 
+                            {messages.map(msg => {
+                                const platformBrand = resolveMessagePlatformBrand(msg);
+                                return (
+                                <button
                                     key={msg.id} 
                                     onClick={() => handleOpenMessage(msg)}
                                     className={`w-full p-4 flex gap-4 text-left hover:bg-slate-50 transition-colors ${!msg.isRead ? 'bg-blue-50/60' : ''}`}
                                 >
+                                    {platformBrand ? (
+                                        <div
+                                            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border shadow-sm"
+                                            style={{
+                                                backgroundColor: platformBrand.surfaceColor,
+                                                borderColor: `${platformBrand.primaryColor}55`,
+                                            }}
+                                        >
+                                            <StreamingPlatformBrand brand={platformBrand} variant="MARK" size="MD" decorative />
+                                        </div>
+                                    ) : (
                                     <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white text-lg font-bold shrink-0 shadow-sm ${
                                         msg.type.includes('OFFER') ? 'bg-gradient-to-br from-indigo-500 to-purple-600' : 
                                         msg.type === 'CASTING_FEEDBACK' ? 'bg-gradient-to-br from-sky-600 to-indigo-700' :
@@ -408,6 +433,7 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                                                     ? <FileSignature size={20} />
                                                 : msg.sender[0]}
                                     </div>
+                                    )}
                                     <div className="flex-1 min-w-0">
                                         <div className="mb-1 flex items-center justify-between gap-3">
                                             <div className="min-w-0 truncate font-bold text-slate-900">{msg.sender}</div>
@@ -437,7 +463,8 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                                     </div>
                                     {!msg.isRead && <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 self-start"></div>}
                                 </button>
-                            ))}
+                                );
+                            })}
                         </div>
                     )}
                 </div>
@@ -896,7 +923,8 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                     ) : (
                         // STANDARD MESSAGE LAYOUT
                         <>
-                            {!(isOutsideInvestmentMessage && outsideInvestmentReview) && (
+                            {!(isOutsideInvestmentMessage && outsideInvestmentReview)
+                                && selectedMessage.type !== 'OFFER_PLATFORM_COMMISSION' && (
                                 <>
                                     {/* Header Card */}
                                     <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 text-center mb-6">
@@ -948,6 +976,20 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                                         </button>
                                     </div>
                                 </div>
+                            )}
+
+                            {selectedMessage.type === 'OFFER_PLATFORM_COMMISSION' && selectedPlatformCommission && (
+                                <PlatformCommissionBriefCard
+                                    offer={selectedPlatformCommission}
+                                    expired={Boolean(selectedMessage.isExpired)}
+                                    processing={isProcessing}
+                                    onAccept={handleSignDeal}
+                                    onPass={() => {
+                                        onDeclinePlatformCommission?.(selectedPlatformCommission.id);
+                                        setSelectedMessage(null);
+                                    }}
+                                    formatMoney={formatMoney}
+                                />
                             )}
 
                             {selectedMessage.type === 'OFFER_OUTSIDE_PRODUCER_INVESTMENT' && selectedMessage.data && (() => {

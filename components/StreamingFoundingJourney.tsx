@@ -15,29 +15,16 @@ import {
   saveStreamingFoundingDraft,
   STREAMING_INCORPORATION_ECONOMY,
 } from '../services/streamingFounding';
-import {
-  createDefaultStreamingInfrastructureDraft,
-  saveStreamingInfrastructureDraft,
-} from '../services/streamingInfrastructure';
-import {
-  getStreamingFoundingExecutiveCandidates,
-  hireStreamingExecutive,
-} from '../services/streamingCompany';
-import { getGenderedAvatar } from '../services/npcAvatar';
 import { formatMoney } from '../services/formatUtils';
 import {
   Brand,
   Mark,
   PROMISES,
-  RegionId,
   brandColor,
   hslHex,
 } from './streaming-transplant/StreamingBrandVisuals';
 import { WallOfScreens } from './streaming-transplant/StreamingWallExperience';
-import {
-  Activation,
-  MachineWakesUp,
-} from './streaming-transplant/StreamingCinematicsExperience';
+import { MachineWakesUp } from './streaming-transplant/StreamingCinematicsExperience';
 import {
   DEFAULT_CONFIG,
   EpConfig,
@@ -45,18 +32,14 @@ import {
 } from './streaming-transplant/StreamingPrototypeOrchestrator';
 import shellCss from './streaming-transplant/presentation/screens/Shell/Shell.module.css';
 import { cx } from './streaming-transplant/presentation/cx';
-import {
-  getStreamingDayOneRegionIds,
-  normalizeStreamingDayOneMarketIds,
-} from '../services/streamingDayOneMarkets';
 
-type FoundingScene = 'WALL' | 'CASE' | 'WIZARD' | 'ACTIVATION';
+type FoundingScene = 'WALL' | 'CASE' | 'WIZARD';
 
 interface Props {
   player: Player;
   onUpdatePlayer?: (player: Player) => void;
   onBack: () => void;
-  onOpenHeadquarters: () => void;
+  onOpenHeadquarters: (destination?: 'HOME' | 'FINANCE') => void;
 }
 
 const PROMISE_TO_VISUAL: Record<StreamingBrandPromiseId, string> = {
@@ -104,14 +87,17 @@ const SOUND_TO_VISUAL: Record<StreamingSoundIdentKey, string> = {
   ASCENT: 'RISE',
   PREMIERE: 'ANTHEM',
   SILENT: 'HUSH',
-};
-
-const VISUAL_TO_SOUND: Record<string, StreamingSoundIdentKey> = {
-  PULSE: 'PULSE',
-  RISE: 'ASCENT',
-  ANTHEM: 'PREMIERE',
-  STORM: 'PREMIERE',
-  HUSH: 'SILENT',
+  CHOIR: 'ANTHEM',
+  MACHINE: 'PULSE',
+  SPARK: 'RISE',
+  IMPACT: 'PULSE',
+  ORBIT: 'PULSE',
+  BLOOM: 'RISE',
+  PRISM: 'ANTHEM',
+  EMBER: 'HUSH',
+  SIGNAL: 'PULSE',
+  HORIZON: 'RISE',
+  ANALOG: 'HUSH',
 };
 
 const hexToHsl = (value: string): { hue: number; sat: number } => {
@@ -148,8 +134,8 @@ const brandFromPlayer = (player: Player): Brand => {
   const logo = identity?.logoKey || draft?.logoKey || 'FRAME_PLAY';
   return {
     name: identity?.name || draft?.name || '',
-    markId: LOGO_TO_VISUAL[logo],
-    customMark: null,
+    markId: identity?.visualMarkId || draft?.visualMarkId || LOGO_TO_VISUAL[logo],
+    customMark: identity?.customMarkDataUrl || draft?.customMarkDataUrl || null,
     hue: main.hue,
     sat: Math.max(36, main.sat),
     identId: SOUND_TO_VISUAL[sound],
@@ -160,25 +146,18 @@ const brandFromPlayer = (player: Player): Brand => {
       || PROMISES.find(option => option.id === visualPromiseId)?.manifesto
       || 'Built for every kind of night.',
     layoutId: 'HERO_IMG',
-    typeId: 'GROTESK',
+    typeId: identity?.typefaceId || draft?.typefaceId || 'GROTESK',
     accentHue: accent.hue,
     identMode: sound === 'SILENT' ? 'none' : 'badge',
     identLen: 2,
     ratingId: 'TEEN',
-    lockupId: 'SIDE',
+    lockupId: identity?.wordmarkStyleId || draft?.wordmarkStyleId || 'SIDE',
     serverCity: identity?.launchServerCityId || draft?.launchServerCityId || null,
   };
 };
 
-const roleForWizard = (role: string): string => {
-  if (role === 'MARKETING_HEAD') return 'Marketing';
-  if (role === 'CHIEF_CONTENT_OFFICER') return 'Chief Content Officer';
-  return role;
-};
-
 const foundingConfig = (player: Player): EpConfig => {
   const eligibility = evaluateStreamingEligibility(player);
-  const realCandidates = getStreamingFoundingExecutiveCandidates(player, 4);
   const titles = [...player.pastProjects, ...player.activeReleases]
     .slice(-5)
     .reverse()
@@ -207,18 +186,6 @@ const foundingConfig = (player: Player): EpConfig => {
       need: metric.target,
       kind: metric.unit === 'MONEY' ? 'money' : 'stat',
     })),
-    execs: realCandidates.map(candidate => ({
-      id: candidate.id,
-      role: roleForWizard(candidate.role),
-      name: candidate.name,
-      avatarUrl: getGenderedAvatar(candidate.gender, candidate.name),
-      trait: `${candidate.style} · ${candidate.specialty}`,
-      skill: candidate.skill,
-      unlocks: candidate.strength,
-      salary: candidate.weeklyCompensation,
-      from: candidate.formerCompany,
-      years: candidate.yearsExperience,
-    })),
     starterTitles: titles.length ? titles : DEFAULT_CONFIG.starterTitles,
   };
 };
@@ -233,13 +200,6 @@ export default function StreamingFoundingJourney({
   const [scene, setScene] = useState<FoundingScene>('WALL');
   const [workingPlayer, setWorkingPlayer] = useState(player);
   const [brand, setBrand] = useState<Brand>(() => brandFromPlayer(player));
-  const [marketIds, setMarketIds] = useState<string[]>(() => normalizeStreamingDayOneMarketIds(
-    platform.identity?.dayOneMarketIds || platform.foundingDraft?.dayOneMarketIds || [],
-  ));
-  const [regions, setRegions] = useState<RegionId[]>(() => (
-    getStreamingDayOneRegionIds(platform.identity?.dayOneMarketIds || platform.foundingDraft?.dayOneMarketIds || []) as RegionId[]
-  ));
-  const [executiveIds, setExecutiveIds] = useState<string[]>([]);
   const config = useMemo(() => foundingConfig(workingPlayer), [workingPlayer]);
   const eligibility = useMemo(() => evaluateStreamingEligibility(workingPlayer), [workingPlayer]);
   const incorporated = Boolean(platform.identity && platform.foundingProfile);
@@ -252,7 +212,7 @@ export default function StreamingFoundingJourney({
   const enterFromWall = () => {
     const current = workingPlayer.ownedStreamingPlatform;
     if (current.identity && current.foundingProfile) {
-      onOpenHeadquarters();
+      onOpenHeadquarters('HOME');
       return;
     }
     if (current.lifecycle === 'LOCKED') {
@@ -272,47 +232,25 @@ export default function StreamingFoundingJourney({
       logoKey: VISUAL_TO_LOGO[brand.markId] || 'FRAME_PLAY',
       primaryColor,
       secondaryColor,
-      soundIdentKey: VISUAL_TO_SOUND[brand.identId] || 'PULSE',
+      visualMarkId: brand.markId,
+      customMarkDataUrl: brand.customMark,
+      wordmarkStyleId: brand.lockupId as OwnedStreamingFoundingDraft['wordmarkStyleId'],
+      typefaceId: brand.typeId as OwnedStreamingFoundingDraft['typefaceId'],
       brandPromiseId: VISUAL_TO_PROMISE[brand.promiseId] || 'BALANCED',
       publicManifesto: brand.publicManifesto,
-      dayOneMarketIds: marketIds,
-      launchServerCityId: null,
       updatedAtAbsoluteWeek: 0,
     };
     const withDraft = saveStreamingFoundingDraft(workingPlayer, foundingDraft);
     const result = incorporateOwnedStreamingPlatform(withDraft);
     if (!result.changed) return;
 
-    let nextPlayer = result.player;
-    for (const executiveId of executiveIds) {
-      const hire = hireStreamingExecutive(nextPlayer, executiveId, `founding-${executiveId}`);
-      if (hire.changed) nextPlayer = hire.player;
-    }
-
-    const infrastructureDraft = createDefaultStreamingInfrastructureDraft(nextPlayer);
-    const capacityPackageId = regions.length <= 1
-      ? 'STARTER'
-      : regions.length === 2
-        ? 'ESSENTIAL'
-        : regions.length <= 4
-          ? 'GROWTH'
-          : 'PREMIERE';
-    nextPlayer = saveStreamingInfrastructureDraft(nextPlayer, {
-      ...infrastructureDraft,
-      capacityPackageId,
-      currentStep: 0,
-    });
-    persist(nextPlayer);
-    setScene('ACTIVATION');
+    persist(result.player);
+    onOpenHeadquarters('FINANCE');
   };
 
   const liveBrand = brand.name.trim() ? brand : { ...brand, name: config.defaultName };
   const claimedIdentity = workingPlayer.ownedStreamingPlatform.identity;
   const claimedBrand = claimedIdentity ? brandFromPlayer(workingPlayer) : liveBrand;
-  const activationHires = workingPlayer.ownedStreamingPlatform.leadership.appointments
-    .filter(appointment => appointment.status === 'ACTIVE')
-    .map(appointment => ({ role: appointment.role.replace(/_/g, ' '), name: appointment.nameAtAppointment }));
-
   return (
     <div
       className={cx(shellCss.ep2, 'streaming-complete-foundation')}
@@ -367,46 +305,11 @@ export default function StreamingFoundingJourney({
           cfg={config}
           brand={brand}
           setBrand={setBrand}
-          regions={regions}
-          setRegions={setRegions}
-          marketIds={marketIds}
-          setMarketIds={setMarketIds}
-          execIds={executiveIds}
-          setExecIds={setExecutiveIds}
           onIncorporate={incorporate}
           onBack={() => setScene('WALL')}
         />
       ) : null}
 
-      {scene === 'ACTIVATION' ? (
-        <Activation
-          brand={liveBrand}
-          playerName={workingPlayer.name}
-          regionCount={regions.length}
-          disbursed={formatMoney(STREAMING_INCORPORATION_ECONOMY.setupCostsConsumed)}
-          treasury={formatMoney(STREAMING_INCORPORATION_ECONOMY.openingTreasuryCash)}
-          hires={activationHires}
-          wall={(
-            <WallOfScreens
-              playerName={workingPlayer.name}
-              avatarUrl={workingPlayer.avatar || undefined}
-              rivals={config.rivals}
-              requirements={[]}
-              setupCost=""
-              treasury=""
-              totalCost=""
-              claimed={{
-                mark: <Mark brand={liveBrand} />,
-                name: liveBrand.name,
-                color: brandColor(liveBrand),
-              }}
-              onEnter={() => undefined}
-              onClose={() => undefined}
-            />
-          )}
-          onDone={onOpenHeadquarters}
-        />
-      ) : null}
     </div>
   );
 }

@@ -343,17 +343,28 @@ export const GreenlightConfirmationStep: React.FC<GreenlightConfirmationStepProp
                         <div className="bg-sky-950/30 rounded-lg p-4 flex justify-between items-center border border-sky-500/30 mt-2">
                             <div>
                                 <div className="text-[10px] font-bold text-sky-400 uppercase tracking-widest">
-                                    {lockedStreamingFundingSource === 'OWNED_STREAMING_PLATFORM' ? 'EMPIRE+ Original Commission' : 'Locked Next Season Cap'}
+                                    {lockedStreamingFundingSource === 'AI_PLATFORM_COMMISSION'
+                                        ? 'Platform Commission Budget'
+                                        : lockedStreamingFundingSource === 'OWNED_STREAMING_PLATFORM'
+                                            ? 'EMPIRE+ Original Commission'
+                                            : 'Locked Next Season Cap'}
                                 </div>
                                 <div className="text-xs text-sky-300/70">
-                                    {lockedStreamingPlatformName || 'Streaming platform'} funds this {lockedStreamingFundingSource === 'OWNED_STREAMING_PLATFORM' ? 'production' : 'season'} first. Any unused cap returns to the platform.
+                                    {lockedStreamingPlatformName || 'Streaming platform'} funds this {lockedStreamingFundingSource === 'AI_PLATFORM_COMMISSION' ? 'commissioned production' : lockedStreamingFundingSource === 'OWNED_STREAMING_PLATFORM' ? 'production' : 'season'} first. Any unused cap returns to the platform.
                                 </div>
                             </div>
                             <div className="text-xl font-black font-mono text-sky-300">- {formatMoney(lockedStreamingFundingAmount)}</div>
                         </div>
                     ) : null}
 
-                    <GreenlightInvestorFinancingSection {...investorFinancingProps} />
+                    {lockedStreamingFundingSource === 'AI_PLATFORM_COMMISSION' ? (
+                        <div className="mt-2 rounded-lg border border-violet-500/30 bg-violet-950/30 p-4">
+                            <div className="text-[10px] font-bold uppercase tracking-widest text-violet-300">Fixed Commission Terms</div>
+                            <div className="mt-1 text-xs leading-relaxed text-violet-100/65">Outside investors and studio cash top-ups are unavailable. Bring the package under the platform cap to proceed.</div>
+                        </div>
+                    ) : (
+                        <GreenlightInvestorFinancingSection {...investorFinancingProps} />
+                    )}
                 </div>
 
                 <div className="bg-zinc-950 p-4 border-t border-zinc-800 flex justify-between items-center">

@@ -1,5 +1,5 @@
 /**
- * EMPIRE+ v2 — NETWORK
+ * EMPIRE+ v2 — PLATFORM
  *
  * The second division page. Same principle as the Content Desk: every section
  * borrows something the player has already used.
@@ -13,6 +13,7 @@
  */
 import s from './presentation/screens/NetworkDesk/NetworkDesk.module.css';
 import { cx } from './presentation/cx';
+import { brandVars } from './presentation/brand';
 import React, { useMemo, useState } from 'react';
 import { Brand, Mark, brandColor, brandDeep } from './StreamingBrandVisuals';
 
@@ -83,6 +84,13 @@ export interface NetworkState {
 }
 
 type Tab = 'STATUS' | 'CAPACITY' | 'TECH' | 'PRODUCTS';
+
+const TAB_LABELS: Record<Tab, string> = {
+  STATUS: 'STATUS',
+  CAPACITY: 'DELIVERY',
+  TECH: 'TECHNOLOGY',
+  PRODUCTS: 'PRODUCT',
+};
 
 const money = (n: number) => n >= 1e6 ? `$${(n / 1e6).toFixed(1)}M`
   : n >= 1e3 ? `$${Math.round(n / 1e3)}k` : `$${n}`;
@@ -156,7 +164,7 @@ const BuildSheet: React.FC<{
 /* ============================================================
    THE PAGE
    ============================================================ */
-export const NetworkDesk: React.FC<{
+export const PlatformDesk: React.FC<{
   brand: Brand;
   state: NetworkState;
   onBack: () => void;
@@ -166,7 +174,8 @@ export const NetworkDesk: React.FC<{
   onCancelBuild?: (t: TechTrack) => void;
   treasury?: number;
   onToggleProduct?: (p: PlatformProduct) => void;
-}> = ({ brand, state, onBack, initialTab, onAddCity, onBuild, onCancelBuild, onToggleProduct, treasury = 0 }) => {
+  onOpenChronicle?: () => void;
+}> = ({ brand, state, onBack, initialTab, onAddCity, onBuild, onCancelBuild, onToggleProduct, onOpenChronicle, treasury = 0 }) => {
   const c = brandColor(brand), c2 = brandDeep(brand);
   /* a console chip can open this page straight on the tab it names */
   const [tab, setTab] = useState<Tab>(initialTab ?? 'STATUS');
@@ -184,12 +193,12 @@ export const NetworkDesk: React.FC<{
   const building = state.tech.filter(t => t.building).length;
 
   return (
-    <div className={cx(s.nw, s[overall])} style={{ ['--epx-nw-c' as string]: c }}>
+    <div className={cx(s.nw, s[overall])} data-epx-root style={brandVars(brand)}>
       <div className={s.nwtop}>
         <button className={s.nwback} onClick={onBack} aria-label="Back">←</button>
         <div className={s.nwtitle}>
-          <b>NETWORK</b>
-          <span>SERVERS · TECHNOLOGY · PRODUCTS</span>
+          <b>PLATFORM</b>
+          <span>PRODUCT · TECHNOLOGY · DELIVERY</span>
         </div>
         <span className={s.nwmark}><Mark brand={brand} /></span>
       </div>
@@ -201,14 +210,19 @@ export const NetworkDesk: React.FC<{
         <div><span>TECH DEBT</span><b className={state.technicalDebt >= 50 ? s.bad : state.technicalDebt >= 25 ? s.warn : ''}>{state.technicalDebt}</b></div>
       </div>
 
-      <div className={s.nwtabs}>
+      <div className={cx(s.nwtabs, onOpenChronicle ? s.withrecord : '')}>
         {(['STATUS', 'CAPACITY', 'TECH', 'PRODUCTS'] as Tab[]).map(t => (
           <button key={t} className={tab === t ? s.on : ''} onClick={() => setTab(t)}>
-            {t}
+            {TAB_LABELS[t]}
             {t === 'STATUS' && overall !== 'operational' && <i className={cx(s.tdot, s[overall])} />}
             {t === 'CAPACITY' && hot > 0 && <i className={cx(s.tdot, s.degraded)} />}
           </button>
         ))}
+        {onOpenChronicle ? (
+          <button type="button" className={s.recordtab} onClick={onOpenChronicle} aria-label="Open infrastructure history">
+            HISTORY <i className={s.recorddot} />
+          </button>
+        ) : null}
       </div>
 
       <div className={s.nwscroll}>
@@ -393,6 +407,10 @@ export const NetworkDesk: React.FC<{
     </div>
   );
 };
+
+// Compatibility alias for older prototype imports. The live game presents this
+// operation as Platform while canonical infrastructure models retain Network.
+export const NetworkDesk = PlatformDesk;
 
 /* ============================================================
    STYLES

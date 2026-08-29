@@ -1,6 +1,6 @@
 import { INITIAL_PLAYER, type Business, type Message, type NewsItem, type Player, type PortfolioItem, type Relationship, type ScheduledEvent, type Stock, type StockTakeoverCase } from '../types';
 import { ensureLifestyleActivityState } from './lifestyleActivities';
-import { inferStreamingStartWeekAbsolute } from './legacyLogic';
+import { getAbsoluteWeek, inferStreamingStartWeekAbsolute } from './legacyLogic';
 import { normalizeNewPlayerTutorialState } from './newPlayerTutorial';
 import { createGlobalActorPackNPCs } from './npcLogic';
 import {
@@ -20,6 +20,22 @@ import { migrateLegacyCharacterIdentity } from './characterIdentityMigration';
 import { mergeParentStudioTalentRosters } from './talentRoster';
 import { normalizeBackgroundCastingPlan, normalizeLivingEnsembleState } from './livingEnsemble';
 import { normalizeOwnedStreamingPlatformState } from './ownedStreamingPlatform';
+import { normalizeIndustryProductions } from './industryProductions';
+import { backfillActivePlayerCommitmentTalentBookings } from './talentBookings';
+import { normalizeWorldPlatformAi } from './platformAi/platformAiState';
+import { normalizePlatformAiPlayerCommissionOffers } from './platformAi/platformAiPlayerCommissions';
+import {
+    normalizePlatformAiCatalogueDistressDeals,
+    reconcilePlatformAiCatalogueDistressDealsForMigration,
+} from './platformAi/platformAiDistress';
+import {
+    normalizePlatformAiExternalCommitments,
+    reconcilePlatformAiExternalCommitmentObligations,
+} from './platformAi/platformAiExternalCommitments';
+import { migrateStreamingRightsContractRegistry } from './streamingRightsCore';
+import { normalizeStreamingBiddingSessionRegistry } from './streamingBidding';
+import { normalizeStreamingRoyaltySettlementRegistry } from './streamingContractSettlement';
+import { normalizeStreamingPlatformEcosystem } from './streamingPlatformEcosystem';
 
 const SAVE_MIGRATION_VERSION = 27;
 const RUNAWAY_STOCK_CASH_CEILING = 10_000_000_000_000;
@@ -1026,6 +1042,13 @@ const reverseLegacyImportedAcquisitionDebtCharge = (player: Player): Player => {
 
 export const migratePlayerSave = (input: Partial<Player> | Player): Player => {
     const base: Player = mergeDefaults(INITIAL_PLAYER, input);
+    const protectedPlatformAiExternalMoveIds = new Set<string>();
+    Object.values(base.world?.platforms || {}).forEach(platform => {
+        toArray<{ moveId?: unknown }>(platform?.ai?.externalCommitments).forEach(commitment => {
+            const moveId = typeof commitment?.moveId === 'string' ? commitment.moveId.trim() : '';
+            if (moveId) protectedPlatformAiExternalMoveIds.add(moveId);
+        });
+    });
     const migratedAge = Math.max(1, Math.round(Number(base.age || INITIAL_PLAYER.age)));
     const migratedCurrentWeek = Math.min(52, Math.max(1, Math.round(Number(base.currentWeek || INITIAL_PLAYER.currentWeek))));
     const stocks = migrateStocksForSave(base.stocks as Partial<Stock>[] | undefined);
@@ -1043,7 +1066,22 @@ export const migratePlayerSave = (input: Partial<Player> | Player): Player => {
         money: normalizeMigratedCash(base.money, repairRunawayStockCash),
         world: {
             ...base.world,
+            platformAiCatalogueDistressDeals: normalizePlatformAiCatalogueDistressDeals(
+                base.world?.platformAiCatalogueDistressDeals,
+            ),
             awardHistory: sanitizeMigratedAwardHistory(toObjectSeries<MigratedAwardHistoryEntry>(base.world?.awardHistory)) as any,
+            talentBookings: backfillActivePlayerCommitmentTalentBookings(
+                base.world?.talentBookings,
+                base.commitments,
+            ),
+            industryProductions: normalizeIndustryProductions(
+                base.world?.industryProductions,
+                getAbsoluteWeek(base.age, base.currentWeek),
+            ),
+            platformAiPlayerCommissionOffers: normalizePlatformAiPlayerCommissionOffers(
+                base.world?.platformAiPlayerCommissionOffers,
+                getAbsoluteWeek(base.age, base.currentWeek),
+            ),
         },
         stocks,
         portfolio: migratePortfolio(
@@ -1053,7 +1091,11 @@ export const migratePlayerSave = (input: Partial<Player> | Player): Player => {
         ),
         shareholderVotes: toArray<any>(base.shareholderVotes).filter(vote => stocks.some(stock => stock.id === vote?.stockId)).slice(0, 24),
         stockTakeovers: migrateTakeovers(base.stockTakeovers as Partial<StockTakeoverCase>[] | undefined, stocks, base),
-        ownedStreamingPlatform: normalizeOwnedStreamingPlatformState(base.ownedStreamingPlatform, String(base.id || INITIAL_PLAYER.id)),
+        ownedStreamingPlatform: normalizeOwnedStreamingPlatformState(
+            base.ownedStreamingPlatform,
+            String(base.id || INITIAL_PLAYER.id),
+            protectedPlatformAiExternalMoveIds,
+        ),
         activeReleases: toObjectSeries<any>(base.activeReleases).map(release => (
             migrateActiveRelease(release, migratedAge, migratedCurrentWeek)
         )),
@@ -1097,9 +1139,66 @@ export const migratePlayerSave = (input: Partial<Player> | Player): Player => {
         lifestyleActivities: ensureLifestyleActivityState(base.lifestyleActivities),
         activeHealthConditions: toArray<any>(base.activeHealthConditions).slice(0, 6),
     };
-    const migratedPlayer = {
+    const platformAiAbsoluteWeek = getAbsoluteWeek(playerWithStocks.age, playerWithStocks.currentWeek);
+    const normalizedPlatformAiWorld = normalizeWorldPlatformAi(
+        playerWithStocks,
+        playerWithStocks.world,
+        platformAiAbsoluteWeek,
+    );
+    const authoritativeRivalMoves = Array.isArray(playerWithStocks.ownedStreamingPlatform?.competitiveWorld?.moves)
+        ? playerWithStocks.ownedStreamingPlatform!.competitiveWorld.moves
+        : [];
+    const acquiredPlatformIds = new Set(
+        playerWithStocks.ownedStreamingPlatform?.corporateDevelopment?.acquiredPlatformIds || [],
+    );
+    const externallyValidatedPlatforms = normalizedPlatformAiWorld.platforms
+        ? Object.fromEntries(Object.entries(normalizedPlatformAiWorld.platforms).map(([platformId, platform]) => {
+            if (!platform.ai || acquiredPlatformIds.has(platform.id)) return [platformId, platform];
+            const externalCommitments = normalizePlatformAiExternalCommitments(
+                platform.ai.externalCommitments,
+                platform.id,
+                platform.ai.pendingOneTimeObligations,
+                authoritativeRivalMoves,
+                platformAiAbsoluteWeek,
+            );
+            return [platformId, {
+                ...platform,
+                ai: {
+                    ...platform.ai,
+                    externalCommitments,
+                    pendingOneTimeObligations: reconcilePlatformAiExternalCommitmentObligations(
+                        platform.ai.pendingOneTimeObligations,
+                        externalCommitments,
+                    ),
+                },
+            }];
+        })) as typeof normalizedPlatformAiWorld.platforms
+        : normalizedPlatformAiWorld.platforms;
+    const playerWithNormalizedPlatformAiWorld = reconcilePlatformAiCatalogueDistressDealsForMigration(
+        playerWithStocks,
+        { ...normalizedPlatformAiWorld, platforms: externallyValidatedPlatforms },
+        platformAiAbsoluteWeek,
+    );
+    const playerWithNormalizedPlatformAi: Player = {
         ...playerWithStocks,
-        flags: migrateFlags(base.flags, playerWithStocks),
+        world: {
+            ...playerWithNormalizedPlatformAiWorld,
+            streamingPlatformEcosystem: normalizeStreamingPlatformEcosystem(
+                playerWithNormalizedPlatformAiWorld.streamingPlatformEcosystem,
+                platformAiAbsoluteWeek,
+            ),
+            streamingBiddingSessions: normalizeStreamingBiddingSessionRegistry(
+                playerWithNormalizedPlatformAiWorld.streamingBiddingSessions,
+            ),
+            streamingRoyaltySettlements: normalizeStreamingRoyaltySettlementRegistry(
+                playerWithNormalizedPlatformAiWorld.streamingRoyaltySettlements,
+            ),
+        },
+    };
+    const playerWithStreamingContracts = migrateStreamingRightsContractRegistry(playerWithNormalizedPlatformAi);
+    const migratedPlayer = {
+        ...playerWithStreamingContracts,
+        flags: migrateFlags(base.flags, playerWithStreamingContracts),
     };
     const repairedPlayer = migrateLegacyCharacterIdentity(reverseLegacyImportedAcquisitionDebtCharge(
         repairAcquiredStudioAssetPortfolios(

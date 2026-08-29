@@ -45,6 +45,8 @@ interface Props {
   player: Player;
   onClose: () => void;
   onOpenTitleDossier?: () => void;
+  initialAnalystTab?: AnalystTab;
+  initialMode?: 'CEO' | 'ANALYST';
 }
 
 type AnalystTab = 'AUDIENCE' | 'FINANCE' | 'TECH' | 'CONTENT';
@@ -91,10 +93,16 @@ function MetricCard({
   );
 }
 
-export default function StreamingAnalyticsCenter({ player, onClose, onOpenTitleDossier }: Props) {
+export default function StreamingAnalyticsCenter({
+  player,
+  onClose,
+  onOpenTitleDossier,
+  initialAnalystTab = 'AUDIENCE',
+  initialMode = 'CEO',
+}: Props) {
   const [range, setRange] = useState<StreamingAnalyticsRange>(12);
-  const [mode, setMode] = useState<'CEO' | 'ANALYST'>('CEO');
-  const [analystTab, setAnalystTab] = useState<AnalystTab>('AUDIENCE');
+  const [mode, setMode] = useState<'CEO' | 'ANALYST'>(initialMode);
+  const [analystTab, setAnalystTab] = useState<AnalystTab>(initialAnalystTab);
   const analytics = useMemo(() => getStreamingPlatformAnalytics(player, range), [player, range]);
   const latestSubscriber = analytics.subscriberTimeline.at(-1)?.value ?? analytics.platform.launchCommit?.initialSubscribers ?? 0;
   const combinedCapacity = [...analytics.capacityTimeline, ...analytics.capacityForecast];

@@ -364,7 +364,19 @@ const recoverPlatformRelations = (
 ): Record<string, PlatformFundingRelationship> => Object.fromEntries(
     Object.entries(relations).flatMap(([platformId, relation]) => {
         const remaining = Math.max(0, Math.floor(Number(relation.recoveryWeeksRemaining) || 0) - 1);
-        if (remaining <= 0) return [];
+        if (remaining <= 0) {
+            const hasCommercialHistory = Math.max(0, Number(relation.completedDeals || 0)) > 0
+                || Math.max(0, Number(relation.profitableDeals || 0)) > 0
+                || Math.max(0, Number(relation.loyaltyScore || 0)) > 0
+                || Math.max(0, Number(relation.realizedPartnerValue || 0)) > 0
+                || Number(relation.trustModifier || 0) > 0;
+            if (!hasCommercialHistory) return [];
+            return [[platformId, {
+                ...relation,
+                recoveryWeeksRemaining: 0,
+                trustModifier: Math.max(0, Number(relation.trustModifier || 0)),
+            }]];
+        }
 
         return [[platformId, {
             ...relation,
@@ -436,4 +448,21 @@ export const processStreamingFundingContracts = ({
 
 export const getPlatformFundingRelationshipMultiplier = (
     relation?: PlatformFundingRelationship
-) => clamp(1 + ((Number(relation?.trustModifier) || 0) * 0.02), 0.84, 1);
+) => {
+    const completedDeals = Math.max(0, Math.floor(Number(relation?.completedDeals) || 0));
+    const profitableDeals = Math.max(0, Math.min(completedDeals, Math.floor(Number(relation?.profitableDeals) || 0)));
+    const dealBoost = Math.min(0.04, completedDeals * 0.005);
+    const profitabilityBoost = Math.min(0.04, profitableDeals * 0.007);
+    const loyaltyBoost = Math.min(0.04, Math.max(0, Number(relation?.loyaltyScore) || 0) / 100 * 0.04);
+    const valueBoost = Math.min(0.02, Math.max(0, Number(relation?.realizedPartnerValue) || 0) / 250_000_000 * 0.01);
+    return clamp(
+        1
+        + ((Number(relation?.trustModifier) || 0) * 0.02)
+        + dealBoost
+        + profitabilityBoost
+        + loyaltyBoost
+        + valueBoost,
+        0.84,
+        1.16,
+    );
+};

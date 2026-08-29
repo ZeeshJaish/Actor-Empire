@@ -25,6 +25,7 @@ interface InteractiveRegionMapProps {
     visualTone?: 'release' | 'production';
     compact?: boolean;
     showPreview?: boolean;
+    ariaLabel?: string;
 }
 
 const MAP_ROUTE_ARCS = [
@@ -52,6 +53,7 @@ export const InteractiveRegionMap: React.FC<InteractiveRegionMapProps> = ({
     visualTone = 'release',
     compact = false,
     showPreview = true,
+    ariaLabel = 'Interactive box office release region map',
 }) => {
     // SVG ids are global in the document. Namespace every map instance so Android
     // WebView cannot resolve this map's gradients/clips against another screen's SVG.
@@ -134,7 +136,7 @@ export const InteractiveRegionMap: React.FC<InteractiveRegionMapProps> = ({
                 viewBox="0 0 1000 520"
                 className="w-full overflow-visible"
                 role="img"
-                aria-label="Interactive box office release region map"
+                aria-label={ariaLabel}
             >
                 <defs>
                     <linearGradient id={svgIds.ocean} x1="0%" y1="0%" x2="100%" y2="100%">

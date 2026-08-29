@@ -190,6 +190,15 @@
 .catalog-market-data strong { font-size: .69rem; }
 .catalog-market-grid > button > i { grid-column: 1 / -1; display: flex; align-items: center; gap: 5px; color: #6fe0a4; font-size: .58rem; font-weight: 800; font-style: normal; }
 
+.catalog-owned-opening { margin-top: 12px; padding: 14px; display: grid; gap: 12px; border: 1px solid rgba(102,220,160,.18); border-radius: 14px; background: linear-gradient(135deg, rgba(102,220,160,.065), rgba(255,255,255,.018)); }
+.catalog-owned-opening > div { display: grid; grid-template-columns: 31px minmax(0,1fr); align-items: start; gap: 8px; }
+.catalog-owned-opening > div > svg { color: #67dea0; }
+.catalog-owned-opening span { min-width: 0; display: grid; gap: 4px; }
+.catalog-owned-opening small { color: #68c996; font-size: .48rem; font-weight: 900; letter-spacing: .1em; }
+.catalog-owned-opening strong { font-size: .77rem; }
+.catalog-owned-opening p { margin: 0; color: #777e7b; font-size: .58rem; line-height: 1.45; }
+.catalog-owned-opening > button { width: 100%; }
+
 .catalog-deal-room-brief {
   margin-bottom: 10px; padding: 12px; display: grid; gap: 10px;
   border: 1px solid rgba(213,170,84,.2); border-radius: 7px;

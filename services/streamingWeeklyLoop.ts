@@ -38,6 +38,7 @@ import {
     commitStreamingCompetitiveWorldWeek,
     getStreamingCompetitiveWeeklyEffects,
 } from './streamingCompetitiveWorld';
+import { commitPlatformAiExternalCommitment } from './platformAi/platformAiExternalCommitments';
 import {
     completeDueStreamingAcquisitionIntegrations,
     getStreamingAcquisitionWeeklyEffects,
@@ -48,6 +49,19 @@ import {
     getStreamingCrisisWeeklyEffects,
 } from './streamingCrisisSecurity';
 import { getStreamingEraWeeklyEffects } from './streamingLegacy';
+import { advanceDueStreamingResearchPrograms } from './streamingResearchLifecycle';
+import { completeDueStreamingCampusProjects } from './streamingCampusConstruction';
+import {
+    commitStreamingInfrastructureOperationsWeek,
+    getStreamingInfrastructureOperationsEffects,
+} from './streamingInfrastructureOperations';
+import { commitStreamingInfrastructureProgressionWeek } from './streamingInfrastructureProgression';
+import { calculateStreamingMarketOperatingCosts } from './streamingMarkets';
+import {
+    calculateStreamingPartnerRevenueShareFullCurrency,
+    calculateStreamingRunwayFromTrailingCosts,
+    calculateStreamingSubscriptionRevenueFullCurrency,
+} from './streamingEconomyCore';
 
 const clamp = (value: number, minimum: number, maximum: number): number => (
     Math.min(maximum, Math.max(minimum, Number.isFinite(value) ? value : minimum))
@@ -401,7 +415,9 @@ export const processOwnedStreamingPlatformWeek = (
         return { player, processed: false, snapshot: null };
     }
     const leadershipCompletion = completeDueStreamingExecutiveDevelopment(normalizedPlatform, absoluteWeek);
-    const technologyCompletion = completeDueStreamingTechnologyProjects(leadershipCompletion.platform, absoluteWeek);
+    const researchCompletion = advanceDueStreamingResearchPrograms(leadershipCompletion.platform, absoluteWeek);
+    const campusCompletion = completeDueStreamingCampusProjects(researchCompletion.platform, absoluteWeek);
+    const technologyCompletion = completeDueStreamingTechnologyProjects(campusCompletion.platform, absoluteWeek);
     const productCompletion = completeDueStreamingProductDevelopments(technologyCompletion.platform, absoluteWeek);
     const acquisitionCompletion = completeDueStreamingAcquisitionIntegrations(productCompletion.platform, absoluteWeek);
     const rightsCompliance = evaluateStreamingRightsCompliance(acquisitionCompletion.platform, absoluteWeek);
@@ -410,6 +426,7 @@ export const processOwnedStreamingPlatformWeek = (
     const competitiveEffects = getStreamingCompetitiveWeeklyEffects(platform, absoluteWeek);
     const acquisitionEffects = getStreamingAcquisitionWeeklyEffects(platform);
     const crisisEffects = getStreamingCrisisWeeklyEffects(platform);
+    const infrastructureOperationsEffects = getStreamingInfrastructureOperationsEffects(platform);
     const eraEffects = getStreamingEraWeeklyEffects(platform);
 
     const rng = createDeterministicRng(`${platform.simulationSeed}:weekly:${absoluteWeek}`);
@@ -482,6 +499,7 @@ export const processOwnedStreamingPlatformWeek = (
         + competitiveEffects.acquisitionRateDelta
         + acquisitionEffects.acquisitionRateDelta
         + crisisEffects.acquisitionRateDelta
+        + infrastructureOperationsEffects.acquisitionRateDelta
         + eraEffects.acquisitionRateDelta,
         0.002,
         0.09,
@@ -491,6 +509,7 @@ export const processOwnedStreamingPlatformWeek = (
         + competitiveEffects.acquisitionRateDelta
         + acquisitionEffects.acquisitionRateDelta
         + crisisEffects.acquisitionRateDelta
+        + infrastructureOperationsEffects.acquisitionRateDelta
         + eraEffects.acquisitionRateDelta,
         0.002,
         0.09,
@@ -503,7 +522,7 @@ export const processOwnedStreamingPlatformWeek = (
         0.42,
     );
     const peakConcurrentStreams = Math.max(1, Math.round(previousSubscribers * peakActivityRate));
-    const burstCapacity = Math.max(1, platform.capacity.burstConcurrentStreams);
+    const burstCapacity = Math.max(1, platform.capacity.burstConcurrentStreams * infrastructureOperationsEffects.capacityMultiplier);
     const capacityUtilizationPercent = peakConcurrentStreams / burstCapacity * 100;
     const overloadPenalty = capacityUtilizationPercent > 100
         ? Math.min(12, (capacityUtilizationPercent - 100) * 0.16)
@@ -520,6 +539,7 @@ export const processOwnedStreamingPlatformWeek = (
         + eraEffects.playbackBoost
         - acquisitionEffects.reliabilityRisk * 9
         + crisisEffects.playbackDelta
+        + infrastructureOperationsEffects.playbackDelta
         + (rng() - 0.5) * 0.18,
         75,
         99.98,
@@ -548,6 +568,7 @@ export const processOwnedStreamingPlatformWeek = (
         + competitiveEffects.churnRateDelta
         + acquisitionEffects.churnRateDelta
         + crisisEffects.churnRateDelta
+        + infrastructureOperationsEffects.churnRateDelta
         + eraEffects.churnRateDelta,
         0.004,
         0.09,
@@ -557,6 +578,7 @@ export const processOwnedStreamingPlatformWeek = (
         + competitiveEffects.churnRateDelta
         + acquisitionEffects.churnRateDelta
         + crisisEffects.churnRateDelta
+        + infrastructureOperationsEffects.churnRateDelta
         + eraEffects.churnRateDelta,
         0.004,
         0.09,
@@ -598,6 +620,7 @@ export const processOwnedStreamingPlatformWeek = (
         productAdjustedEngagementRate
         + (growthEffects?.engagementRateDelta || 0)
         + crisisEffects.engagementRateDelta
+        + infrastructureOperationsEffects.engagementRateDelta
         + eraEffects.engagementRateDelta,
         0.3,
         0.94,
@@ -605,30 +628,27 @@ export const processOwnedStreamingPlatformWeek = (
     const counterfactualEngagementRate = clamp(
         productAdjustedEngagementRate
         + crisisEffects.engagementRateDelta
+        + infrastructureOperationsEffects.engagementRateDelta
         + eraEffects.engagementRateDelta,
         0.3,
         0.94,
     );
     const averageActiveSubscribers = (previousSubscribers + subscribers) / 2;
     const organicAverageActiveSubscribers = (previousSubscribers + organicSubscribers) / 2;
-    const subscriptionRevenue = roundMoney(averageActiveSubscribers * weightedArpu / 4.33);
+    const subscriptionRevenue = roundMoney(calculateStreamingSubscriptionRevenueFullCurrency({
+        subscribers: averageActiveSubscribers,
+        monthlyArpu: weightedArpu,
+        paidSubscriberShare: 1,
+    }));
     const productRevenue = roundMoney(
         averageActiveSubscribers * productEffects.weeklyRevenuePerSubscriber,
     );
-    const activeLicenses = platform.catalogLicenses.filter(license => (
-        license.status === 'ACTIVE'
-        && license.startsAtAbsoluteWeek <= absoluteWeek
-        && license.expiresAtAbsoluteWeek > absoluteWeek
-    ));
-    const averageLicensorShare = activeLicenses.length
-        ? activeLicenses.reduce((sum, license) => sum + license.licensorRevenueShare, 0) / activeLicenses.length / 100
-        : 0;
-    const licensedViewingWeight = clamp(
-        activeLicenses.length / Math.max(1, availableEntries.length || platform.catalogProjectIds.length),
-        0,
-        0.45,
-    );
-    const partnerRevenueShareCost = roundMoney(subscriptionRevenue * averageLicensorShare * licensedViewingWeight);
+    const partnerRevenueShareCost = roundMoney(calculateStreamingPartnerRevenueShareFullCurrency({
+        weeklySubscriptionRevenueFullCurrency: subscriptionRevenue,
+        licenses: platform.catalogLicenses,
+        availableTitleCount: availableEntries.length || platform.catalogProjectIds.length,
+        absoluteWeek,
+    }));
     const infrastructureCost = roundMoney(platform.infrastructureSetup?.weeklyOperatingCost || 0);
     const leadershipCost = roundMoney(platform.leadership.appointments
         .filter(appointment => appointment.status === 'ACTIVE')
@@ -648,6 +668,10 @@ export const processOwnedStreamingPlatformWeek = (
     const competitiveOperationsCost = roundMoney(competitiveEffects.weeklyOperatingCost);
     const acquisitionIntegrationCost = roundMoney(acquisitionEffects.weeklyOperatingCost);
     const crisisRecoveryCost = roundMoney(crisisEffects.weeklyRecoveryCost);
+    const infrastructureOperationsCost = roundMoney(infrastructureOperationsEffects.weeklyOperatingCost);
+    const marketCosts = calculateStreamingMarketOperatingCosts(platform, subscriptionRevenue + productRevenue);
+    const marketPolicyCost = roundMoney(marketCosts.marketPolicyCost);
+    const marketOperatingCost = roundMoney(marketCosts.marketOperatingCost);
     const totalCashCost = roundMoney(
         partnerRevenueShareCost
         + infrastructureCost
@@ -661,7 +685,10 @@ export const processOwnedStreamingPlatformWeek = (
         + governanceCost
         + competitiveOperationsCost
         + acquisitionIntegrationCost
-        + crisisRecoveryCost,
+        + crisisRecoveryCost
+        + infrastructureOperationsCost
+        + marketPolicyCost
+        + marketOperatingCost,
     );
     const treasuryAfter = Math.max(0, roundMoney(
         platform.treasuryCash + subscriptionRevenue + productRevenue - totalCashCost,
@@ -672,8 +699,11 @@ export const processOwnedStreamingPlatformWeek = (
         + platform.catalogLicenses.reduce((sum, license) => sum + license.minimumGuarantee, 0)
     ) / 104);
     const accountingContribution = netCashContribution - contentAmortization;
-    const weeklyBurn = Math.max(0, totalCashCost - subscriptionRevenue - productRevenue);
-    const cashRunwayWeeks = weeklyBurn > 0 ? treasuryAfter / weeklyBurn : 5_200;
+    const cashRunwayWeeks = calculateStreamingRunwayFromTrailingCosts({
+        cash: treasuryAfter,
+        trailingWeeklyOperatingCost: totalCashCost,
+        trailingWeeklyNetCashFlow: subscriptionRevenue + productRevenue - totalCashCost,
+    }).lossRunwayWeeks ?? 5_200;
     const technologyHealth = clamp(
         platform.metrics.technologyHealth * 0.58
         + playbackSuccessRate * 0.42
@@ -684,6 +714,11 @@ export const processOwnedStreamingPlatformWeek = (
             ? crisisEffects.activeCrisis.severity === 'CRITICAL' ? 5
                 : crisisEffects.activeCrisis.severity === 'MAJOR' ? 3.5
                     : crisisEffects.activeCrisis.severity === 'SERIOUS' ? 2 : 1
+            : 0)
+        - (infrastructureOperationsEffects.activeIncident
+            ? infrastructureOperationsEffects.activeIncident.severity === 'CRITICAL' ? 5
+                : infrastructureOperationsEffects.activeIncident.severity === 'MAJOR' ? 3.5
+                    : infrastructureOperationsEffects.activeIncident.severity === 'SERIOUS' ? 2 : 1
             : 0),
         0,
         100,
@@ -721,6 +756,12 @@ export const processOwnedStreamingPlatformWeek = (
             detail: `${(subscriptionRevenue + productRevenue).toLocaleString()} total operating revenue produced a ${netCashContribution >= 0 ? 'positive' : 'negative'} ${Math.abs(netCashContribution).toLocaleString()} treasury movement.`,
             impact: netCashContribution >= 0 ? 'POSITIVE' : 'NEGATIVE',
         },
+        ...(marketCosts.activeCountryCount ? [{
+            id: 'living-market-policy',
+            label: `${marketCosts.activeCountryCount} active ${marketCosts.activeCountryCount === 1 ? 'market is' : 'markets are'} shaping the P&L`,
+            detail: `${marketPolicyCost.toLocaleString()} in country taxes and levies plus ${marketOperatingCost.toLocaleString()} in local weekly operations.`,
+            impact: 'NEUTRAL' as const,
+        }] : []),
         {
             id: `era-mandate-${eraEffects.mandate.toLowerCase()}`,
             label: `Era ${platform.legacy.currentEraNumber} is operating under ${eraEffects.mandate.toLowerCase().replaceAll('_', ' ')}`,
@@ -738,6 +779,30 @@ export const processOwnedStreamingPlatformWeek = (
             label: `${project.title} entered live operations`,
             detail: `${project.branch.toLowerCase().replaceAll('_', ' ')} reached level ${project.targetLevel}; its operating cost and engineering benefits are now part of the company.`,
             impact: 'POSITIVE' as const,
+        })),
+        ...campusCompletion.completedStages.map(project => ({
+            id: `campus-stage-${project.id}-${project.stage}`,
+            label: `${project.name} construction advanced`,
+            detail: project.status === 'READY_TO_OPEN'
+                ? 'Commissioning is complete. Opening remains an explicit CEO decision.'
+                : `${project.stage.toLowerCase().replaceAll('_', ' ')} is now the active construction gate.`,
+            impact: project.status === 'DELAYED' ? 'NEGATIVE' as const : 'NEUTRAL' as const,
+        })),
+        ...campusCompletion.openedExpansions.map(project => ({
+            id: `campus-expansion-${project.id}-${project.expansionCount}`,
+            label: `${project.name} opened another data hall`,
+            detail: `Installed capacity is now ${project.installedRacks} racks across ${project.hallCount} halls.`,
+            impact: 'POSITIVE' as const,
+        })),
+        ...researchCompletion.advancedPrograms.map(program => ({
+            id: `research-${program.id}-${program.stage}`,
+            label: `${program.title} advanced to ${program.stage.replaceAll('_', ' ').toLowerCase()}`,
+            detail: program.stage === 'AWAITING_IP'
+                ? 'Testing is complete. Choose Patent or License before any installation can begin.'
+                : program.stage === 'OPERATING'
+                    ? `The installation in ${program.installationTargetLabel || 'live operations'} now applies its gameplay effect.`
+                    : 'Research progress changed the project state without granting an installation benefit.',
+            impact: program.stage === 'OPERATING' ? 'POSITIVE' as const : 'NEUTRAL' as const,
         })),
         ...leadershipCompletion.completedPrograms.map(program => {
             const executive = platform.leadership.appointments.find(item => item.executiveId === program.executiveId);
@@ -792,9 +857,21 @@ export const processOwnedStreamingPlatformWeek = (
                 : 'The incident is awaiting a leadership response and is increasing churn, trust and operating pressure.',
             impact: 'NEGATIVE' as const,
         }] : []),
+        ...(infrastructureOperationsEffects.activeIncident ? [{
+            id: `infrastructure-incident:${infrastructureOperationsEffects.activeIncident.id}`,
+            label: `${infrastructureOperationsEffects.activeIncident.title} is affecting service`,
+            detail: infrastructureOperationsEffects.activeIncident.stage === 'RECOVERING'
+                ? `${infrastructureOperationsCost.toLocaleString()} in operations and insurance cost is supporting recovery.`
+                : `${infrastructureOperationsEffects.activeIncident.capacityLossPercent.toFixed(0)}% of affected capacity is exposed while Incident Command waits for a response.`,
+            impact: 'NEGATIVE' as const,
+        }] : []),
     ];
 
-    const headline = crisisEffects.activeCrisis
+    const headline = infrastructureOperationsEffects.activeIncident
+        ? infrastructureOperationsEffects.activeIncident.stage === 'RECOVERING'
+            ? `Network recovery continues: ${infrastructureOperationsEffects.activeIncident.title}.`
+            : `Infrastructure response required: ${infrastructureOperationsEffects.activeIncident.title}.`
+        : crisisEffects.activeCrisis
         ? crisisEffects.activeCrisis.stage === 'RECOVERING'
             ? `Recovery continues: ${crisisEffects.activeCrisis.title}.`
             : `Leadership response required: ${crisisEffects.activeCrisis.title}.`
@@ -808,7 +885,11 @@ export const processOwnedStreamingPlatformWeek = (
                     ? 'A quiet week still strengthened the company.'
                     : 'The platform held audience but paid for it.';
     const summary = `${netSubscriberMovement >= 0 ? '+' : ''}${netSubscriberMovement.toLocaleString()} net subscribers, ${(churnRate * 100).toFixed(1)}% churn and ${playbackSuccessRate.toFixed(2)}% playback success. ${netCashContribution >= 0 ? 'Treasury gained' : 'Treasury used'} ${Math.abs(netCashContribution).toLocaleString()}.`;
-    const nextWeekHook = crisisEffects.activeCrisis
+    const nextWeekHook = infrastructureOperationsEffects.activeIncident
+        ? infrastructureOperationsEffects.activeIncident.stage === 'RECOVERING'
+            ? `Facility recovery verification is scheduled for game week ${infrastructureOperationsEffects.activeIncident.recoveryReadyAtAbsoluteWeek}.`
+            : 'Incident Command is waiting for an emergency action, rerouting target, insurance claim and compensation decision.'
+        : crisisEffects.activeCrisis
         ? crisisEffects.activeCrisis.stage === 'RECOVERING'
             ? `Recovery verification is scheduled for game week ${crisisEffects.activeCrisis.recoveryReadyAtAbsoluteWeek}.`
             : 'Incident Command is waiting for a response doctrine, compensation decision and public message.'
@@ -831,6 +912,7 @@ export const processOwnedStreamingPlatformWeek = (
         ...(acquisitionEffects.activeIntegrations.length ? ['ACQUISITION_INTEGRATION_ACTIVE'] : []),
         ...(acquisitionCompletion.completedIntegrations.length ? ['ACQUISITION_INTEGRATED'] : []),
         ...(crisisEffects.activeCrisis ? ['CRISIS_RECOVERY_ACTIVE'] : []),
+        ...(infrastructureOperationsEffects.activeIncident ? ['INFRASTRUCTURE_INCIDENT_ACTIVE'] : []),
         `ERA_MANDATE_${eraEffects.mandate}`,
     ];
     const baseTitleWeights = availableEntries.map(entry => {
@@ -981,6 +1063,8 @@ export const processOwnedStreamingPlatformWeek = (
             weeklyPlanCost,
             growthPlanCost,
             rightsComplianceCost,
+            marketPolicyCost,
+            marketOperatingCost,
             technologyCampusCost,
             productSuiteCost,
             productRevenue,
@@ -1091,36 +1175,74 @@ export const processOwnedStreamingPlatformWeek = (
             checkpointLedger,
             metricsLedger,
             ...(growthLedger ? [growthLedger] : []),
+            ...campusCompletion.ledgerEntries,
             ...technologyCompletion.ledgerEntries,
+            ...researchCompletion.ledgerEntries,
             ...productCompletion.ledgerEntries,
             ...leadershipCompletion.ledgerEntries,
             ...rightsCompliance.ledgerEntries,
         ],
         milestoneKeys: Array.from(new Set([...platform.milestoneKeys, 'weekly-ceo-loop-started'])),
     }, player.id);
+    const rivalMoveIdsBeforeCommit = new Set(weeklyCommittedPlatform.competitiveWorld.moves.map(move => move.id));
     const competitiveCommittedPlatform = commitStreamingCompetitiveWorldWeek(
         weeklyCommittedPlatform,
         player,
         absoluteWeek,
     );
+    const newRivalMoves = competitiveCommittedPlatform.competitiveWorld.moves.filter(
+        move => !rivalMoveIdsBeforeCommit.has(move.id),
+    );
+    let platformWarsCommittedPlayer = player;
+    for (const move of newRivalMoves) {
+        const canonicalPlatform = platformWarsCommittedPlayer.world.platforms?.[move.platformId];
+        if (!canonicalPlatform) continue;
+        const committedExternalCost = commitPlatformAiExternalCommitment({
+            player: platformWarsCommittedPlayer,
+            platform: canonicalPlatform,
+            move,
+            absoluteWeek,
+        });
+        if (!committedExternalCost.changed) continue;
+        platformWarsCommittedPlayer = {
+            ...platformWarsCommittedPlayer,
+            world: {
+                ...platformWarsCommittedPlayer.world,
+                platforms: {
+                    ...platformWarsCommittedPlayer.world.platforms,
+                    [move.platformId]: committedExternalCost.platform,
+                },
+            },
+        };
+    }
     const quarterCommittedPlatform = commitStreamingQuarterSeasonCycle(
         competitiveCommittedPlatform,
-        player,
+        platformWarsCommittedPlayer,
+        snapshot,
+    );
+    const infrastructureOperationsCommittedPlatform = commitStreamingInfrastructureOperationsWeek(
+        quarterCommittedPlatform,
+        platformWarsCommittedPlayer,
         snapshot,
     );
     const crisisCommittedPlatform = commitStreamingCrisisSecurityWeek(
-        quarterCommittedPlatform,
-        player,
+        infrastructureOperationsCommittedPlatform,
+        platformWarsCommittedPlayer,
         snapshot,
     );
-    const ownedStreamingPlatform = commitStreamingPublicMarketWeek(
+    const publicMarketCommittedPlatform = commitStreamingPublicMarketWeek(
         crisisCommittedPlatform,
-        player,
+        platformWarsCommittedPlayer,
+        snapshot,
+    );
+    const ownedStreamingPlatform = commitStreamingInfrastructureProgressionWeek(
+        publicMarketCommittedPlatform,
+        platformWarsCommittedPlayer,
         snapshot,
     );
 
     return {
-        player: { ...player, ownedStreamingPlatform },
+        player: { ...platformWarsCommittedPlayer, ownedStreamingPlatform },
         processed: true,
         snapshot,
     };

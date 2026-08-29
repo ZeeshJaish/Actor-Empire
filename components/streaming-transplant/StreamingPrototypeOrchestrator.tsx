@@ -4,7 +4,7 @@
  * Founding → Control Desk. Heavy-graphics redesign.
  *   WALL     — a broadcast monitor wall of rivals with one dead screen (unlock)
  *   CASE     — "the case for you": evidence slams down, verdict stamps
- *   WIZARD   — name · mark · colour · ident · manifesto · layout · regions · team · bill book
+ *   WIZARD   — name · mark · wordmark · typeface · colour · manifesto · incorporation
  *   FOUNDING — registration stamps → licence → channel → YOUR ident boots the dead screen
  *   DESK     — control desk with an OPERATOR / VIEWER toggle, live feed programming,
  *              and a title dossier
@@ -14,24 +14,13 @@
  */
 import css from './presentation/screens/Shell/Shell.module.css';
 import { cx } from './presentation/cx';
+import { brandVars } from './presentation/brand';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Brand, BrandBoard, IDENTS, LAYOUTS, LOCKUPS, MARKS, LETTERFORMS, Mark, PROMISES, TYPEFACES,
-  RegionId, Waveform, brandColor, brandDeep, letterMark, cityById,
+  Brand, BrandBoard, LOCKUPS, PLAYER_LOCKUP_IDS, MARKS, LETTERFORMS, Mark, PROMISES, TYPEFACES,
+  RegionId, brandColor, brandDeep, letterMark, cityById,
 } from './StreamingBrandVisuals';
-import { InteractiveRegionMap } from '../../views/lifestyle/business/components/InteractiveRegionMap';
-import {
-  STREAMING_DAY_ONE_REGION_LABELS,
-  getStreamingDayOneCountryPresentation,
-  getStreamingDayOneLanguageLabel,
-  getStreamingDayOneMarket,
-  getStreamingDayOneMarketsForRegion,
-  getStreamingDayOneRegionIds,
-  getStreamingMarketEntryProfile,
-  summarizeStreamingDayOneMarkets,
-  type StreamingDayOneRegionId,
-} from '../../services/streamingDayOneMarkets';
-import { StreamingCountryFlagArt } from './StreamingCountryFlagArt';
+import { convertStreamingBrandMark } from '../../services/streamingBrandImage';
 import { WallOfScreens } from './StreamingWallExperience';
 import { MachineWakesUp, Activation } from './StreamingCinematicsExperience';
 import { PlatformHQ, HqState, HqStat, SlateItem, ServiceTitle, Division, HqEvent } from './StreamingPlatformCommandDeck';
@@ -145,8 +134,8 @@ export const DEFAULT_CONFIG: EpConfig = {
     { id: 'fame', label: 'Fame', have: 71, need: 65, kind: 'stat' },
     { id: 'rep', label: 'Reputation', have: 58, need: 55, kind: 'stat' },
   ],
-  setupCost: 70_000_000,
-  openingTreasury: 15_000_000,
+  setupCost: 85_000_000,
+  openingTreasury: 0,
   starterTitles: [
     { id: 't1', name: 'DEAD SIGNAL', kind: 'Original · Film', heat: 94 },
     { id: 't2', name: 'The Cheat Code', kind: 'Owned · Thriller', heat: 92 },
@@ -171,27 +160,8 @@ const fmt = (n: number) => {
   if (v >= 1e6) return `$${(v / 1e6).toFixed(1).replace(/\.0$/, '')}M`;
   return `$${Math.round(v / 1e3)}K`;
 };
-const fmtPeople = (n: number) => n >= 1e9 ? `${(n / 1e9).toFixed(2)}B` : n >= 1e6 ? `${Math.round(n / 1e6)}M` : `${n}`;
 /** counts, not money — subscribers read as 1.2M / 340K, never $1.2M */
 const fmtCount = (n: number) => n >= 1e6 ? `${(n / 1e6).toFixed(2)}M` : n >= 1e3 ? `${Math.round(n / 1e3)}K` : `${n}`;
-
-const MARKET_REGION_ACCENTS: Record<StreamingDayOneRegionId, string> = {
-  NORTH_AMERICA: '#60a5fa',
-  SOUTH_AMERICA: '#34d399',
-  EUROPE: '#a78bfa',
-  AFRICA: '#fbbf24',
-  ASIA: '#fb7185',
-  OCEANIA: '#22d3ee',
-};
-
-const STREAMING_RIVAL_COLORS: Record<string, string> = {
-  NETFLIX: '#e50914',
-  AMAZON_PRIME: '#00a8e1',
-  DISNEY_PLUS: '#2563eb',
-  YOUTUBE: '#ff0033',
-  HULU: '#1ce783',
-  APPLE_TV: '#e5e7eb',
-};
 
 function useTimers() {
   const t = useRef<number[]>([]);
@@ -199,61 +169,30 @@ function useTimers() {
   return useCallback((fn: () => void, ms: number) => { const id = window.setTimeout(fn, ms); t.current.push(id); return id; }, []);
 }
 
-const Count: React.FC<{ to: number; ms?: number; fmt?: (n: number) => string }> = ({ to, ms = 1200, fmt: f }) => {
-  const [v, setV] = useState(0);
-  useEffect(() => {
-    const s = Date.now();
-    const iv = window.setInterval(() => {
-      const p = Math.min(1, (Date.now() - s) / ms);
-      setV(Math.round(to * (1 - Math.pow(1 - p, 3))));
-      if (p >= 1) window.clearInterval(iv);
-    }, 40);
-    return () => window.clearInterval(iv);
-  }, [to, ms]);
-  return <>{f ? f(v) : v.toLocaleString()}</>;
-};
-
 /* ============================================================
    SCENE 1 — THE WALL OF SCREENS
    ============================================================ */
 /* ============================================================
    SCENE 3 — THE WIZARD
    ============================================================ */
-/** paid extras, itemised on the deed you sign at the end */
-export const IDENT_FEE = 4_500_000;
-
-/** one chair per position; each has its own pool of candidates */
-export const POSITIONS = ['CTO', 'CFO', 'COO', 'Chief Content Officer'] as const;
-
-const STEPS = ['NAME', 'MARK', 'TYPE', 'COLOUR', 'IDENT', 'MANIFESTO', 'LAYOUT', 'REGIONS', 'TEAM', 'BILL'] as const;
+const STEPS = ['NAME', 'MARK', 'WORDMARK', 'TYPE', 'COLOUR', 'MANIFESTO', 'BILL'] as const;
 type Step = typeof STEPS[number];
 const STEP_META: Record<Step, [string, string]> = {
   NAME: ['Name It', 'What the world will type'],
   MARK: ['The Mark', 'One shape, everywhere, forever'],
+  WORDMARK: ['The Wordmark', 'How your name and mark travel together'],
   TYPE: ['The Typeface', 'The voice your name is set in'],
   COLOUR: ['The Colour', 'Everything you own will wear it'],
-  IDENT: ['The Ident', 'Three seconds before everything you release'],
   MANIFESTO: ['The Manifesto', 'What you promise — and what they will demand'],
-  LAYOUT: ['The Storefront', 'How subscribers meet your catalogue'],
-  REGIONS: ['Day-One Markets', 'Choose where viewers can subscribe first'],
-  TEAM: ['The Table', 'Who else has a chair'],
   BILL: ['Incorporation', 'Sign, pay, exist'],
 };
 
 export const StreamingFoundingWizardScene: React.FC<{
   cfg: EpConfig; brand: Brand; setBrand: React.Dispatch<React.SetStateAction<Brand>>;
-  regions: RegionId[]; setRegions: React.Dispatch<React.SetStateAction<RegionId[]>>;
-  marketIds: string[]; setMarketIds: React.Dispatch<React.SetStateAction<string[]>>;
-  execIds: string[]; setExecIds: React.Dispatch<React.SetStateAction<string[]>>;
   onIncorporate: (total: number) => void; onBack: () => void;
-}> = ({ cfg, brand, setBrand, regions, setRegions, marketIds, setMarketIds, execIds, setExecIds, onIncorporate, onBack }) => {
+}> = ({ cfg, brand, setBrand, onIncorporate, onBack }) => {
   const [i, setI] = useState(0);
-  const [drill, setDrill] = useState<RegionId | null>(null);
-  const [showMarketIntelligence, setShowMarketIntelligence] = useState(false);
-  const [entryRulesMarketId, setEntryRulesMarketId] = useState<string | null>(null);
-  const entryRulesCloseRef = useRef<HTMLButtonElement>(null);
-  const entryRulesSheetRef = useRef<HTMLElement>(null);
-  const entryRulesReturnFocusRef = useRef<HTMLButtonElement | null>(null);
+  const wizardScrollRef = useRef<HTMLDivElement>(null);
   /* Incorporation is the one irreversible act in the flow, so it takes two
      deliberate taps: SIGN inks the signature, then pressing the seal commits.
      Press-and-hold was unreliable across devices; plain taps are not. */
@@ -264,8 +203,10 @@ export const StreamingFoundingWizardScene: React.FC<{
   const step = STEPS[i];
   const [title, sub] = STEP_META[step];
   const c = brandColor(brand);
+  const selectedTypeface = TYPEFACES[brand.typeId] ?? TYPEFACES.GROTESK;
   const fileRef = useRef<HTMLInputElement>(null);
-  const identRef = useRef<HTMLInputElement>(null);
+  const [markUploadStatus, setMarkUploadStatus] = useState<'idle' | 'converting' | 'ready' | 'error'>('idle');
+  const [markUploadMessage, setMarkUploadMessage] = useState('');
   const manifestoRef = useRef<HTMLTextAreaElement>(null);
   const promise = PROMISES.find(p => p.id === brand.promiseId);
   const manifestoText = brand.publicManifesto.trim() || promise?.manifesto || '';
@@ -281,37 +222,9 @@ export const StreamingFoundingWizardScene: React.FC<{
     manifestoRef.current?.setSelectionRange(manifestoRef.current.value.length, manifestoRef.current.value.length);
   }, [editingManifesto]);
 
-  const closeEntryRules = useCallback(() => {
-    setEntryRulesMarketId(null);
-    window.setTimeout(() => entryRulesReturnFocusRef.current?.focus(), 0);
-  }, []);
-
   useEffect(() => {
-    if (!entryRulesMarketId) return;
-    entryRulesCloseRef.current?.focus();
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        closeEntryRules();
-        return;
-      }
-      if (event.key !== 'Tab') return;
-      const focusable = Array.from(
-        entryRulesSheetRef.current?.querySelectorAll<HTMLElement>('button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])') || [],
-      );
-      if (!focusable.length) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-    window.addEventListener('keydown', handleEscape);
-    return () => window.removeEventListener('keydown', handleEscape);
-  }, [closeEntryRules, entryRulesMarketId]);
+    wizardScrollRef.current?.scrollTo({ top: 0, behavior: 'auto' });
+  }, [i]);
 
   const updateManifesto = (value: string) => {
     const next = value.slice(0, 160);
@@ -335,52 +248,19 @@ export const StreamingFoundingWizardScene: React.FC<{
     }));
   };
 
-  const marketSummary = useMemo(() => summarizeStreamingDayOneMarkets(marketIds), [marketIds]);
-  const selectedMarketRegions = useMemo(
-    () => getStreamingDayOneRegionIds(marketIds) as RegionId[],
-    [marketIds],
-  );
-  const activeMarketRegion = (drill || selectedMarketRegions[0] || 'NORTH_AMERICA') as StreamingDayOneRegionId;
-  const activeRegionMarkets = useMemo(
-    () => getStreamingDayOneMarketsForRegion(activeMarketRegion),
-    [activeMarketRegion],
-  );
-  const activeRegionSelectedMarketIds = useMemo(
-    () => activeRegionMarkets.filter(market => marketIds.includes(market.id)).map(market => market.id),
-    [activeRegionMarkets, marketIds],
-  );
-  const activeRegionSummary = useMemo(
-    () => summarizeStreamingDayOneMarkets(activeRegionSelectedMarketIds),
-    [activeRegionSelectedMarketIds],
-  );
-  const activeRegionAllSelected = activeRegionMarkets.length > 0
-    && activeRegionSelectedMarketIds.length === activeRegionMarkets.length;
-  const activeRegionAccent = MARKET_REGION_ACCENTS[activeMarketRegion];
-  const entryRulesMarket = entryRulesMarketId ? getStreamingDayOneMarket(entryRulesMarketId) : null;
-  const entryRulesProfile = entryRulesMarket ? getStreamingMarketEntryProfile(entryRulesMarket.id) : null;
-  const marketScale = marketSummary.regionCount === 0 ? '—'
-    : marketSummary.regionCount === 1 ? 'FOCUSED'
-      : marketSummary.regionCount <= 3 ? 'MULTI-REGION' : 'WORLDWIDE';
-  const hires = cfg.execs.filter(e => execIds.includes(e.id));
-  const signing = hires.reduce((s, e) => s + e.salary, 0);
-  /* every optional upgrade taken in the wizard becomes a line on the deed */
-  const extras: { id: string; label: string; fee: number }[] = [];
-  if (brand.identMode === 'full') {
-    extras.push({ id: 'ident', label: `Ident sting · ${brand.identLen}s, licensed for all originals`, fee: IDENT_FEE });
-  }
-  const extrasCost = extras.reduce((a, e) => a + e.fee, 0);
   const total = cfg.fixedIncorporationTotal
-    ?? cfg.registrationFee + cfg.brandLegalFee + cfg.infraDeposit + signing + extrasCost;
-  const canonicalFoundingTransaction = cfg.fixedIncorporationTotal !== undefined;
+    ?? cfg.registrationFee + cfg.brandLegalFee + cfg.infraDeposit;
+  const deedCompanyName = brand.name.trim() || cfg.defaultName;
+  const deedFilingRef = useMemo(() => {
+    const source = `${cfg.playerName}:${deedCompanyName}`;
+    let hash = 2166136261;
+    for (let index = 0; index < source.length; index += 1) {
+      hash = Math.imul(hash ^ source.charCodeAt(index), 16777619) >>> 0;
+    }
+    return `EP-${String(hash % 1_000_000).padStart(6, '0')}`;
+  }, [cfg.playerName, deedCompanyName]);
 
-  const commitMarketIds = (nextIds: string[]) => {
-    const uniqueIds = Array.from(new Set(nextIds));
-    setMarketIds(uniqueIds);
-    setRegions(getStreamingDayOneRegionIds(uniqueIds) as RegionId[]);
-  };
-
-  const canNext = step === 'NAME' ? brand.name.trim().length >= 2
-    : step === 'REGIONS' ? marketIds.length > 0 : true;
+  const canNext = step === 'NAME' ? brand.name.trim().length >= 2 : true;
 
   const sign = () => {
     if (inked) return;
@@ -399,11 +279,27 @@ export const StreamingFoundingWizardScene: React.FC<{
      the company after the player has already left the wizard. */
   useEffect(() => () => { signTimers.current.forEach(window.clearTimeout); signTimers.current = []; }, []);
 
-  const onUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0]; if (!f) return;
-    const rd = new FileReader();
-    rd.onload = () => setBrand(b => ({ ...b, customMark: String(rd.result) }));
-    rd.readAsDataURL(f);
+  const onUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.currentTarget;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) return;
+    setMarkUploadStatus('converting');
+    setMarkUploadMessage('Optimizing logo…');
+    try {
+      const converted = await convertStreamingBrandMark(file);
+      setBrand(current => ({ ...current, customMark: converted.dataUrl }));
+      setMarkUploadStatus('ready');
+      setMarkUploadMessage(`${converted.outputType === 'image/webp' ? 'WebP' : 'PNG'} optimized · safe area protected`);
+    } catch (error) {
+      setMarkUploadStatus('error');
+      setMarkUploadMessage(error instanceof Error ? error.message : 'That logo could not be processed.');
+    }
+  };
+  const choosePresetMark = (markId: string) => {
+    setMarkUploadStatus('idle');
+    setMarkUploadMessage('');
+    setBrand(current => ({ ...current, markId, customMark: null }));
   };
 
   return (
@@ -428,8 +324,10 @@ export const StreamingFoundingWizardScene: React.FC<{
         <span className={css.tc}>{String(i + 1).padStart(2, '0')} / {String(STEPS.length).padStart(2, '0')}</span>
       </div>
 
-      <div className={css.scroll}>
-        <BrandBoard brand={brand} regionCount={regions.length} />
+      <div className={css.scroll} ref={wizardScrollRef}>
+        {step !== 'BILL' && (
+          <BrandBoard brand={brand} regionCount={0} />
+        )}
 
         {step === 'NAME' && (
           <div className={css.pad}>
@@ -452,7 +350,7 @@ export const StreamingFoundingWizardScene: React.FC<{
                 const id = `LETTER_${s}`;
                 return (
                   <button key={id} className={cx(css.markpick, (brand.markId === id && !brand.customMark ? css.on : ''))}
-                    onClick={() => setBrand(b => ({ ...b, markId: id, customMark: null }))}>
+                    onClick={() => choosePresetMark(id)}>
                     <span style={{ color: c }}><svg viewBox="0 0 48 48">{letterMark((brand.name.trim()[0] || 'E').toUpperCase(), s)}</svg></span>
                   </button>
                 );
@@ -464,7 +362,7 @@ export const StreamingFoundingWizardScene: React.FC<{
                 <div className={css.markgrid}>
                   {Object.entries(MARKS).filter(([, m]) => m.group === group).map(([id, m]) => (
                     <button key={id} className={cx(css.markpick, (brand.markId === id && !brand.customMark ? css.on : ''))}
-                      onClick={() => setBrand(b => ({ ...b, markId: id, customMark: null }))}>
+                      onClick={() => choosePresetMark(id)}>
                       <span style={{ color: c }}><svg viewBox="0 0 48 48">{m.svg}</svg></span>
                     </button>
                   ))}
@@ -472,12 +370,20 @@ export const StreamingFoundingWizardScene: React.FC<{
               </React.Fragment>
             ))}
             <div className={css.seclabel}>YOUR OWN</div>
-            <button className={cx(css.upload, (brand.customMark ? css.on : ''))} onClick={() => fileRef.current?.click()}>
-              {brand.customMark
-                ? <><img src={brand.customMark} alt="" /><span>Custom mark loaded · tap to replace</span></>
-                : <><i>+</i><span>Upload a logo (PNG / SVG)</span></>}
+            <button type="button" className={cx(css.upload, (brand.customMark ? css.on : ''))}
+              disabled={markUploadStatus === 'converting'} onClick={() => fileRef.current?.click()}>
+              {markUploadStatus === 'converting'
+                ? <><i className={css.uploadSpinner} aria-hidden="true" /><span>Optimizing logo…</span></>
+                : brand.customMark
+                  ? <><img src={brand.customMark} alt="" /><span>Custom mark loaded · tap to replace</span></>
+                  : <><i>+</i><span>Upload a logo · PNG, WebP, JPG or SVG</span></>}
             </button>
-            <input ref={fileRef} type="file" accept="image/*" hidden onChange={onUpload} />
+            <input ref={fileRef} type="file" accept="image/*,.heic,.heif" hidden onChange={onUpload} />
+            {markUploadMessage && markUploadStatus !== 'converting' && (
+              <div className={cx(css.uploadStatus, markUploadStatus === 'error' ? css.uploadError : '')} role="status" aria-live="polite">
+                {markUploadMessage}
+              </div>
+            )}
           </div>
         )}
 
@@ -504,6 +410,38 @@ export const StreamingFoundingWizardScene: React.FC<{
           </div>
         )}
 
+        {step === 'WORDMARK' && (
+          <div className={css.pad}>
+            <div className={css.seclabel}>MARK + NAME LOCKUP</div>
+            <div className={css.lockupGrid}>
+              {PLAYER_LOCKUP_IDS.map(id => {
+                const lockup = LOCKUPS[id];
+                return (
+                  <button type="button" key={id} aria-pressed={brand.lockupId === id}
+                    className={cx(css.pick, css.lockupChoice, (brand.lockupId === id ? css.on : ''))}
+                    onClick={() => setBrand(b => ({ ...b, lockupId: id }))}>
+                    <span className={cx(
+                      css.lockupPreview,
+                      id === 'SIDE' ? css.lockupPreviewSide : '',
+                      id === 'STACK' ? css.lockupPreviewStack : '',
+                    )} style={{ background: c }}>
+                      {id !== 'WORDMARK' && <i><Mark brand={brand} /></i>}
+                      <em style={{
+                        fontFamily: selectedTypeface.stack,
+                        fontWeight: selectedTypeface.weight,
+                        letterSpacing: selectedTypeface.spacing,
+                        textTransform: selectedTypeface.transform,
+                      }}>{brand.name.trim() || 'UNNAMED'}</em>
+                    </span>
+                    <b>{lockup.label}</b><span>{lockup.note}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <div className={css.hint}>This is the official lockup filed with your company identity. You can build motion and sound around it after incorporation.</div>
+          </div>
+        )}
+
         {step === 'TYPE' && (
           <div className={css.pad}>
             <div className={css.seclabel}>WORDMARK TYPEFACE</div>
@@ -517,76 +455,6 @@ export const StreamingFoundingWizardScene: React.FC<{
                 <div className={css.tmeta}><b>{t.label}</b><span>{t.note}</span></div>
               </button>
             ))}
-            <div className={css.seclabel}>LOCKUP</div>
-            <div className={css.pickrow}>
-              {Object.entries(LOCKUPS).map(([id, l]) => (
-                <button key={id} className={cx(css.pick, (brand.lockupId === id ? css.on : ''))}
-                  onClick={() => setBrand(b => ({ ...b, lockupId: id }))}>
-                  <b>{l.label}</b><span>{l.note}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {step === 'IDENT' && (
-          <div className={css.pad}>
-            <div className={css.seclabel}>WHAT PLAYS BEFORE YOUR TITLES</div>
-            <div className={css.identmodes}>
-              {([
-                ['none', 'Nothing', 'Titles start instantly', 0],
-                ['badge', 'Corner badge', 'Your mark watermarks the player', 0],
-                ['full', 'Full ident sting', 'Plays before every original', IDENT_FEE],
-              ] as const).map(([mode, label, note, fee]) => (
-                <button key={mode} className={cx(css.imode, (brand.identMode === mode ? css.on : ''))}
-                  onClick={() => setBrand(b => ({ ...b, identMode: mode }))}>
-                  {/* each option previewed inside a real player frame */}
-                  <div className={css.ipreview}>
-                    <i className={css.iscrub} />
-                    {mode === 'none' && <i className={css.iblank} />}
-                    {mode === 'badge' && <span className={css.ibadge}><Mark brand={brand} /></span>}
-                    {mode === 'full' && <span className={css.ifull}><Mark brand={brand} /></span>}
-                  </div>
-                  <div className={css.imeta}><b>{label}</b><span>{note}</span></div>
-                  <em className={fee ? css.paid : ''}>{fee ? `+${fmt(fee)}` : 'FREE'}</em>
-                </button>
-              ))}
-            </div>
-            <div className={css.tradeoff}>
-              {brand.identMode === 'full'
-                ? 'Builds recall — but it is friction before every play, and bingers will feel it.'
-                : brand.identMode === 'badge'
-                  ? 'Invisible friction, weaker recall. What most services settle on.'
-                  : 'Fastest possible start. Nobody will ever learn your mark from the player.'}
-            </div>
-
-            {brand.identMode === 'full' && (
-              <>
-                <div className={css.seclabel}>THE STING</div>
-                {Object.entries(IDENTS).map(([id, d]) => (
-                  <button key={id} className={cx(css.identrow, (brand.identId === id && !brand.customIdent ? css.on : ''))}
-                    onClick={() => setBrand(b => ({ ...b, identId: id, customIdent: null }))}>
-                    <Waveform identId={id} playing={brand.identId === id && !brand.customIdent} color={c} />
-                    <div><b>{d.label}</b><span>{d.note}</span></div>
-                    <em>{brand.identId === id && !brand.customIdent ? 'PLAYING' : 'PLAY'}</em>
-                  </button>
-                ))}
-                <div className={css.seclabel}>LENGTH</div>
-                <div className={css.pickrow}>
-                  {([2, 4] as const).map(len => (
-                    <button key={len} className={cx(css.pick, (brand.identLen === len ? css.on : ''))}
-                      onClick={() => setBrand(b => ({ ...b, identLen: len }))}>
-                      <b>{len} seconds</b><span>{len === 2 ? 'A flash — barely noticed' : 'A statement — impossible to miss'}</span>
-                    </button>
-                  ))}
-                </div>
-                <button className={cx(css.upload, (brand.customIdent ? css.on : ''))} onClick={() => identRef.current?.click()}>
-                  <i>♪</i><span>{brand.customIdent ? `${brand.customIdent} · tap to replace` : 'Upload your own ident (audio)'}</span>
-                </button>
-                <input ref={identRef} type="file" accept="audio/*" hidden
-                  onChange={e => { const f = e.target.files?.[0]; if (f) setBrand(b => ({ ...b, customIdent: f.name })); }} />
-              </>
-            )}
           </div>
         )}
 
@@ -647,398 +515,76 @@ export const StreamingFoundingWizardScene: React.FC<{
           </div>
         )}
 
-        {step === 'LAYOUT' && (
-          <div className={css.pad}>
-            {LAYOUTS.map(l => (
-              <button key={l.id} className={cx(css.layoutrow, (brand.layoutId === l.id ? css.on : ''), (l.lock ? css.locked : ''))}
-                onClick={() => !l.lock && setBrand(b => ({ ...b, layoutId: l.id }))}>
-                <div className={css.thumb}>{layoutThumb(l.id, c)}</div>
-                <div className={css.txt}><b>{l.label}</b><span>{l.note}</span></div>
-                {l.lock && <em className={css.lock}>🔒 {l.lock}</em>}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {step === 'REGIONS' && (
-          <div className={css.pad}>
-            <section className={css.marketIntro} aria-labelledby="day-one-markets-title">
-              <div>
-                <span>OPENING FOOTPRINT</span>
-                <h3 id="day-one-markets-title">Where can people subscribe?</h3>
-              </div>
-              <b>{marketSummary.marketCount || '—'} market{marketSummary.marketCount === 1 ? '' : 's'}</b>
-              <p>Choose countries now. Servers, racks and network spending are designed separately before launch.</p>
-            </section>
-            <div className={css.streamingCanonicalMap}>
-              <InteractiveRegionMap
-                selectedRegionIds={selectedMarketRegions}
-                activeRegionId={activeMarketRegion}
-                visualTone="production"
-                showPreview={false}
-                onSelectRegion={regionId => {
-                  const region = regionId as RegionId;
-                  setDrill(region);
-                }}
-              />
-              <div className={css.marketMapStatus} aria-live="polite">
-                <span>VIEWING</span>
-                <b>{STREAMING_DAY_ONE_REGION_LABELS[activeMarketRegion]}</b>
-                <em>{activeRegionSelectedMarketIds.length}/{activeRegionMarkets.length} selected</em>
-              </div>
-            </div>
-
-            <section className={css.marketRegionPanel} style={{ ['--epx-ep2-c' as string]: activeRegionAccent }}>
-              <div className={css.marketRegionHead}>
-                <div>
-                  <span>MARKET VIEW</span>
-                  <h3>{STREAMING_DAY_ONE_REGION_LABELS[activeMarketRegion]}</h3>
-                </div>
-                <button
-                  type="button"
-                  className={css.marketRegionAction}
-                  onClick={() => {
-                    const ids = activeRegionMarkets.map(market => market.id);
-                    commitMarketIds(activeRegionAllSelected
-                      ? marketIds.filter(id => !ids.includes(id))
-                      : [...marketIds, ...ids]);
-                  }}
-                >
-                  {activeRegionAllSelected ? 'REMOVE ALL' : `ADD ALL ${activeRegionMarkets.length}`}
-                </button>
-              </div>
-              <div className={css.marketRegionGuide}>
-                <p>Swipe through the markets. Add only the countries you want on opening day.</p>
-                <span aria-hidden="true">SWIPE →</span>
-              </div>
-              <div className={css.marketCountryDeck} aria-label={`${STREAMING_DAY_ONE_REGION_LABELS[activeMarketRegion]} markets`}>
-                {activeRegionMarkets.map((market, marketIndex) => {
-                  const selected = marketIds.includes(market.id);
-                  const presentation = getStreamingDayOneCountryPresentation(market.id);
-                  const entryProfile = getStreamingMarketEntryProfile(market.id);
-                  const localNameIsDifferent = presentation.localName
-                    && presentation.localName.toLocaleLowerCase() !== market.country.toLocaleLowerCase();
-                  return (
-                    <article
-                      key={market.id}
-                      className={cx(css.marketCountryCard, selected ? css.on : '')}
-                      style={{ ['--market-card-accent' as string]: activeRegionAccent }}
-                    >
-                      <div className={css.marketCountryHero}>
-                        <StreamingCountryFlagArt marketId={market.id} className={css.marketFlagArt} />
-                        <span className={css.marketCountryCode} aria-hidden="true">{market.id}</span>
-                        <div className={css.marketCountryCardTop}>
-                          <div>
-                            <span>OPENING MARKET · {String(marketIndex + 1).padStart(2, '0')}</span>
-                            <h4>{market.country}</h4>
-                            {localNameIsDifferent ? <em>{presentation.localName}</em> : null}
-                          </div>
-                          <b className={css.marketCountryRisk} data-level={market.competition}>{market.competition}</b>
-                        </div>
-                        <div className={css.marketCountryHeroFooter}>
-                          <span><i aria-hidden="true" /> DAY-ONE TERRITORY</span>
-                        </div>
-                      </div>
-                      <div className={css.marketCountryAudience}>
-                        <div><strong>{fmtPeople(market.streamingAudience)}</strong><span>streaming viewers</span></div>
-                        <div><strong>+{market.annualGrowthPercent}%</strong><span>yearly growth</span></div>
-                      </div>
-                      <p>{market.marketNote}</p>
-                      <div className={css.marketLanguageStrip} aria-label={`Languages: ${market.languages.join(', ')}`}>
-                        {market.languages.map(language => (
-                          <span key={language} title={language}>{getStreamingDayOneLanguageLabel(language)}</span>
-                        ))}
-                      </div>
-                      <div className={css.marketCountryFacts}>
-                        <div><span>RIGHTS</span><b>{fmt(market.openingRightsEstimate)}</b></div>
-                        <div><span>LAUNCH EFFORT</span><b>{market.launchDifficulty === 'HARD' ? 'High' : market.launchDifficulty === 'MODERATE' ? 'Manageable' : 'Light'}</b></div>
-                        <div><span>TOP RIVAL</span><b>{market.rivals[0]?.name || 'Open field'} · {market.rivals[0]?.watchSharePercent || 0}%</b></div>
-                      </div>
-                      <div className={css.marketLocalVersion}><span>LOCAL LAUNCH</span><b>{market.localizationNote}</b></div>
-                      <button
-                        type="button"
-                        className={css.marketEntryRulesButton}
-                        aria-haspopup="dialog"
-                        onClick={event => {
-                          entryRulesReturnFocusRef.current = event.currentTarget;
-                          setEntryRulesMarketId(market.id);
-                        }}
-                      >
-                        <span><b>RULES &amp; TAXES</b><em>{entryProfile.taxLoad.toLowerCase()} tax · {entryProfile.approvalLoad.toLowerCase()} review</em></span>
-                        <i aria-hidden="true">›</i>
-                      </button>
-                      <button
-                        type="button"
-                        className={css.marketCountryToggle}
-                        aria-pressed={selected}
-                        onClick={() => commitMarketIds(selected
-                          ? marketIds.filter(id => id !== market.id)
-                          : [...marketIds, market.id])}
-                      >
-                        <span aria-hidden="true">{selected ? '✓' : '+'}</span>
-                        {selected ? 'INCLUDED ON OPENING DAY' : 'ADD TO OPENING DAY'}
-                      </button>
-                    </article>
-                  );
-                })}
-              </div>
-              <div className={css.marketRegionImpact} aria-live="polite">
-                <div className={css.marketRegionImpactHead}>
-                  <div><span>REGION IMPACT</span><b>{STREAMING_DAY_ONE_REGION_LABELS[activeMarketRegion]} opening</b></div>
-                  <strong>{activeRegionSelectedMarketIds.length}/{activeRegionMarkets.length}</strong>
-                </div>
-                <p>{activeRegionSelectedMarketIds.length
-                  ? `${activeRegionSelectedMarketIds.length} market${activeRegionSelectedMarketIds.length === 1 ? '' : 's'} selected. ${activeRegionSummary.verdict}`
-                  : 'Browse freely. Nothing in this region is part of opening day yet.'}</p>
-                <div className={css.marketRegionImpactStats}>
-                  <div><span>VIEWERS</span><b>{activeRegionSelectedMarketIds.length ? fmtPeople(activeRegionSummary.streamingAudience) : '—'}</b></div>
-                  <div><span>RIGHTS</span><b>{activeRegionSelectedMarketIds.length ? fmt(activeRegionSummary.openingRightsEstimate) : '—'}</b></div>
-                  <div><span>LANGUAGES</span><b>{activeRegionSelectedMarketIds.length ? activeRegionSummary.languageCount : '—'}</b></div>
-                  <div><span>GROWTH</span><b>{activeRegionSelectedMarketIds.length ? `+${activeRegionSummary.averageGrowthPercent.toFixed(1)}%` : '—'}</b></div>
-                </div>
-              </div>
-            </section>
-
-            <section className={css.marketSummary} style={{ ['--epx-ep2-c' as string]: c }}>
-              <div className={css.marketSummaryHead}>
-                <div>
-                  <span>YOUR DAY-ONE FOOTPRINT</span>
-                  <h3>{marketSummary.marketCount ? `${marketSummary.marketCount} markets · ${marketSummary.regionCount} regions` : 'Nothing selected yet'}</h3>
-                </div>
-                <b data-level={marketSummary.launchDifficulty}>{marketSummary.launchDifficulty}</b>
-              </div>
-              <p>{marketSummary.verdict}</p>
-              {marketSummary.marketCount ? <small className={css.marketEstimateNote}>Planning estimates only · no market or server cost is charged during incorporation.</small> : null}
-              <div className={css.marketStats}>
-                <div><span>STREAMING VIEWERS</span><b><Count to={marketSummary.streamingAudience} fmt={fmtPeople} /></b></div>
-                <div><span>YEARLY GROWTH</span><b>{marketSummary.marketCount ? `${marketSummary.averageGrowthPercent.toFixed(1)}%` : '—'}</b></div>
-                <div><span>OPENING RIGHTS</span><b>{marketSummary.marketCount ? fmt(marketSummary.openingRightsEstimate) : '—'}</b></div>
-                <div><span>LANGUAGES</span><b>{marketSummary.languageCount || '—'}</b></div>
-              </div>
-              <button
-                type="button"
-                className={css.marketIntelToggle}
-                onClick={() => setShowMarketIntelligence(value => !value)}
-                aria-expanded={showMarketIntelligence}
-              >
-                {showMarketIntelligence ? 'HIDE MARKET INTELLIGENCE' : 'SEE MARKET INTELLIGENCE'} <span>{showMarketIntelligence ? '−' : '+'}</span>
-              </button>
-              {showMarketIntelligence ? (
-                <div className={css.marketIntel}>
-                  <div className={css.marketIntelTitle}>
-                    <span>WHO ALREADY OWNS ATTENTION</span>
-                    <em>Game-world estimate</em>
-                  </div>
-                  {marketSummary.topRivals.length ? marketSummary.topRivals.map(rivalEntry => (
-                    <div
-                      className={css.marketRival}
-                      key={rivalEntry.id}
-                      style={{ ['--market-rival-color' as string]: STREAMING_RIVAL_COLORS[rivalEntry.id] || c }}
-                    >
-                      <b><span aria-hidden="true" />{rivalEntry.name}</b>
-                      <i><span style={{ width: `${Math.min(100, rivalEntry.weightedShare)}%` }} /></i>
-                      <em>{Math.round(rivalEntry.weightedShare)}%</em>
-                    </div>
-                  )) : <p className={css.marketEmpty}>Select a market to reveal its competitive landscape.</p>}
-                  {marketIds.length ? (
-                    <div className={css.marketWorkload}>
-                      <div><span>COMPETITION</span><b>{marketSummary.competition === 'FIERCE' ? 'Crowded' : marketSummary.competition === 'BUSY' ? 'Competitive' : 'Room to grow'}</b></div>
-                      <div><span>LAUNCH WORK</span><b>{marketSummary.launchDifficulty === 'HARD' ? 'High' : marketSummary.launchDifficulty === 'MODERATE' ? 'Manageable' : 'Light'}</b></div>
-                    </div>
-                  ) : null}
-                </div>
-              ) : null}
-              <div className={css.marketNetworkNote}>
-                <b>NETWORK COMES NEXT</b>
-                <span>The Build screen will recommend server cities for this footprint. You can accept it, move it, or add more locations before rehearsal.</span>
-              </div>
-            </section>
-
-            {entryRulesMarket && entryRulesProfile ? (
-              <div
-                className={css.marketEntryBackdrop}
-                style={{ ['--epx-ep2-c' as string]: c }}
-                onClick={event => {
-                  if (event.target === event.currentTarget) closeEntryRules();
-                }}
-              >
-                <section
-                  ref={entryRulesSheetRef}
-                  className={css.marketEntrySheet}
-                  role="dialog"
-                  aria-modal="true"
-                  aria-labelledby="market-entry-title"
-                  aria-describedby="market-entry-summary"
-                >
-                  <div className={css.marketEntryHandle} aria-hidden="true" />
-                  <div className={css.marketEntryHero} data-level={entryRulesProfile.approvalLoad}>
-                    <StreamingCountryFlagArt marketId={entryRulesMarket.id} className={css.marketEntryFlagArt} />
-                    <span className={css.marketEntryCode} aria-hidden="true">{entryRulesMarket.id}</span>
-                    <div>
-                      <span>{entryRulesMarket.id} · MARKET ENTRY DOSSIER</span>
-                      <h3 id="market-entry-title">{entryRulesMarket.country}</h3>
-                      <p id="market-entry-summary">What opening here asks from your company.</p>
-                    </div>
-                    <button ref={entryRulesCloseRef} type="button" onClick={closeEntryRules} aria-label="Close market entry rules">×</button>
-                    <b className={css.marketEntryStatus}>{entryRulesProfile.approvalWeeks} WEEK REVIEW</b>
-                  </div>
-                  <div className={css.marketEntrySignals}>
-                    <div data-level={entryRulesProfile.taxLoad}><span>TAX LOAD</span><b>{entryRulesProfile.taxLoad === 'BALANCED' ? 'Medium' : entryRulesProfile.taxLoad.toLowerCase()}</b></div>
-                    <div data-level={entryRulesProfile.approvalLoad}><span>OPENING REVIEW</span><b>{entryRulesProfile.approvalLoad.toLowerCase()}</b></div>
-                    <div><span>EXPECTED TIME</span><b>{entryRulesProfile.approvalWeeks} weeks</b></div>
-                  </div>
-                  <div className={css.marketEntrySection}>
-                    <span>WHAT MUST BE CLEARED</span>
-                    <div className={css.marketEntryClearances}>
-                      {entryRulesProfile.clearances.map(clearance => <b key={clearance}>{clearance}</b>)}
-                    </div>
-                  </div>
-                  <div className={css.marketEntryRule}>
-                    <span>LOCAL EXPECTATION</span>
-                    <p>{entryRulesProfile.localRule}</p>
-                  </div>
-                  <div className={css.marketEntryOutcome}>
-                    <div><span>PLANNED OVERHEAD</span><b>{fmt(entryRulesProfile.plannedOverheadEstimate)}</b></div>
-                    <p>{entryRulesProfile.consequence}</p>
-                  </div>
-                  <small>Game-world planning estimate · reviewed again before Build and rehearsal · nothing is charged here.</small>
-                  <button type="button" className={css.marketEntryDone} onClick={closeEntryRules}>GOT IT</button>
-                </section>
-              </div>
-            ) : null}
-          </div>
-        )}
-
-        {step === 'TEAM' && (
-          <div className={css.pad}>
-            {/* the same desk, the same paper as the founding cinematic — a stack of CVs */}
-            <div className={css.cvstack}>
-              <div className={css.cvfolder}>
-                <span>CANDIDATES</span>
-                <em>{execIds.length} of {POSITIONS.length} chairs filled · {execIds.length ? fmt(signing) : 'no salaries yet'}</em>
-              </div>
-              {POSITIONS.map(role => {
-                const pool = cfg.execs.filter(e => e.role === role);
-                const picked = pool.find(e => execIds.includes(e.id));
-                return (
-                  <div className={css.posgroup} key={role}>
-                    <div className={css.poshead}>
-                      <b>{role}</b>
-                      <em>{picked ? picked.name : `${pool.length} candidates · none chosen`}</em>
-                    </div>
-                    <div className={css.poscards}>
-                      {pool.map((e, k) => {
-                        const on = execIds.includes(e.id);
-                        return (
-                          <button key={e.id} className={cx(css.cv, (on ? css.hired : ''), (picked && !on ? css.passed : ''))}
-                            style={{ ['--epx-ep2-r' as string]: `${(k % 2 ? 1 : -1) * 0.5}deg` }}
-                            onClick={() => setExecIds(cur => {
-                              /* one chair per position — choosing swaps, choosing again clears */
-                              const others = cur.filter(x => !pool.some(p => p.id === x));
-                              return on ? others : [...others, e.id];
-                            })}>
-                    <div className={css.cvhead}>
-                      <div className={css.cvphoto}><i className={css.clip2} />
-                        {e.avatarUrl
-                          ? <img className={css.candidateAvatar} src={e.avatarUrl} alt={`${e.name}, ${e.role}`} />
-                          : <PortraitBlock seed={e.id} />}
-                      </div>
-                      <div className={css.cvid}>
-                        <b>{e.name}</b>
-                        <span className={css.cvrole}>{e.role}</span>
-                        <span className={css.cvfrom}>{e.years} yrs at <i>{e.from}</i> — would resign to join you</span>
-                      </div>
-                    </div>
-                    <div className={css.cvrule} />
-                    <div className={css.cvline}><span>UNLOCKS</span><b>{e.unlocks}</b></div>
-                    <div className={css.cvline}><span>TRAIT</span><b>{e.trait}</b></div>
-                    <div className={css.cvline}><span>SKILL</span><b>{e.skill} / 100</b></div>
-                    <div className={css.cvline}><span>SIGNING</span><b>{fmt(e.salary)}</b></div>
-                            <div className={css.cvstamp}>{on ? 'HIRED' : 'TAP TO SIGN'}</div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            <button className={cx(css.solo, (execIds.length === 0 ? css.on : ''))} onClick={() => setExecIds([])}>
-              <b>CLOSE THE FOLDER — GO SOLO</b>
-              <span>No salaries. No advice. Every call is yours — and every mistake.
-                Those chairs in the office stay empty.</span>
-            </button>
-          </div>
-        )}
-
         {step === 'BILL' && (
           <div className={css.pad}>
-            <div className={css.ledger}>
-              <div className={css.lhead}>
-                <div><b>ARTICLES OF INCORPORATION</b><span>{brand.name.trim() || cfg.defaultName}</span></div>
-                <div className={css.lmark} style={{ color: c }}><Mark brand={brand} /></div>
-              </div>
-              <div className={css.lrule} />
-              {[
-                ['Registration, government, rights & legal', cfg.registrationFee],
-                ['Opening company treasury', cfg.infraDeposit],
-                ...(!canonicalFoundingTransaction ? ([
-                  ['Brand, trademark & legal', cfg.brandLegalFee],
-                  ['Opening market rights estimate', marketSummary.openingRightsEstimate],
-                  ['Founding team signing', signing],
-                ] as Array<[string, number]>) : []),
-              ].map(([k, v], n) => (
-                <div key={k as string} className={css.lrow} style={{ animationDelay: `${n * 0.11}s` }}>
-                  <span>{k as string}</span><b>{fmt(v as number)}</b>
+            <article className={cx(css.ledger, css.foundersDeed, sealed ? css.registered : '')}>
+              <div className={css.deedWatermark} style={{ color: c }} aria-hidden="true"><Mark brand={brand} /></div>
+
+              <header className={css.deedRegistry}>
+                <span>REGISTRAR OF ENTERTAINMENT COMPANIES</span>
+                <b>FORM EP-01 · {deedFilingRef}</b>
+              </header>
+
+              <section className={css.deedIdentity} aria-labelledby="deed-company-name">
+                <div className={css.deedMark} style={{ color: c }}><Mark brand={brand} /></div>
+                <p>ARTICLES OF INCORPORATION</p>
+                <h2 id="deed-company-name">{deedCompanyName}</h2>
+                <small>PRIVATELY HELD STREAMING COMPANY</small>
+              </section>
+
+              <div className={css.deedBrandRule} style={{ background: c }} aria-hidden="true" />
+
+              <section className={css.deedCapital} aria-label="Incorporation payment">
+                <span>ONE-TIME INCORPORATION PAYMENT</span>
+                <strong>{fmt(total)}</strong>
+                <div><b>PERSONAL WEALTH</b><em>FUNDS VERIFIED · PAID IN FULL ON FILING</em></div>
+              </section>
+
+              <section className={css.deedRecord} aria-label="Formation record">
+                <div className={css.deedSectionHead}><span>FORMATION RECORD</span><em>FILED BY FOUNDER</em></div>
+                <dl>
+                  <div><dt>FOUNDER</dt><dd>{cfg.playerName}</dd></div>
+                  <div><dt>OWNERSHIP</dt><dd>100% founder-held</dd></div>
+                  <div><dt>STATUS</dt><dd>Private · unlisted</dd></div>
+                  <div><dt>WORDMARK</dt><dd>{LOCKUPS[brand.lockupId]?.label || 'Horizontal'}</dd></div>
+                  <div><dt>TYPEFACE</dt><dd>{TYPEFACES[brand.typeId]?.label || 'Grotesk'}</dd></div>
+                  <div><dt>BRAND PROMISE</dt><dd>{promise?.label || 'Not declared'}</dd></div>
+                </dl>
+              </section>
+
+              <p className={css.deedDeclaration}>
+                Incorporated as a founder-controlled streaming company. Operating capital and leadership appointments begin after filing through Studio Finance and the Boardroom.
+              </p>
+
+              <footer className={css.deedSignoff}>
+                <div className={cx(css.lsign, css.deedSignature)}>
+                  <div className={cx(css.deedSignatureInk, inked ? css.writing : '')}
+                    role="img" aria-label={inked ? `Signed by ${cfg.playerName}` : 'Unsigned founder signature'}>
+                    <span className={cx(css.cursive, (inked ? css.inked : ''))} aria-hidden="true">{cfg.playerName}</span>
+                    <i className={css.deedPen} aria-hidden="true" />
+                  </div>
+                  <div className={css.line} />
+                  <span className={css.cap}>SIGNATURE OF FOUNDER</span>
                 </div>
-              ))}
-              {extras.length > 0 && !canonicalFoundingTransaction && (
-                <>
-                  <div className={css.lsub}>OPTIONAL — CHOSEN BY YOU</div>
-                  {extras.map((x, n) => (
-                    <div key={x.id} className={cx(css.lrow, css.extra)} style={{ animationDelay: `${(5 + n) * 0.11}s` }}>
-                      <span>{x.label}</span><b>{fmt(x.fee)}</b>
-                    </div>
-                  ))}
-                </>
-              )}
-              {canonicalFoundingTransaction && (
-                <div className={css.lsub}>DAY-ONE MARKETS & TEAM · NETWORK SPENDING HAPPENS LATER IN BUILD</div>
-              )}
-              <div className={cx(css.lrule, css.dashed)} />
-              <div className={css.ltotal}><span>TOTAL DUE TODAY</span><b>{fmt(total)}</b></div>
-              <div className={css.lfund}>
-                <span>Funded from personal wealth</span>
-                <b>{fmt(cfg.playerCash)} → {fmt(cfg.playerCash - total)}</b>
-              </div>
-              <div className={css.lterms}>
-                <div><span>FOUNDER · OWNER · CEO</span><b>{cfg.playerName}</b></div>
-                <div><span>DAY-ONE FOOTPRINT</span><b>{marketScale} · {marketSummary.marketCount} market{marketSummary.marketCount === 1 ? '' : 's'}</b></div>
-                <div><span>PROMISE</span><b>{promise?.label}</b></div>
-                <div><span>BOARD</span><b>{hires.length ? hires.map(h => h.role).join(' · ') : 'None — solo founder'}</b></div>
-              </div>
-              <div className={css.lsign}>
-                <span className={cx(css.cursive, (inked ? css.inked : ''))}>{cfg.playerName}</span>
-                <div className={css.line} />
-                <span className={css.cap}>SIGNATURE OF FOUNDER</span>
-              </div>
-              <div className={css.notary}>
-                <button type="button"
-                  className={cx(css.seal, (sealed ? css.pressed : ''), (armed && !sealed ? css.armed : ''))}
-                  style={{ ['--epx-ep2-c' as string]: c }}
-                  onClick={pressSeal} disabled={!armed || sealed}>
-                  <Mark brand={brand} />
-                  <svg viewBox="0 0 100 100" className={css.sealring}>
-                    <defs><path id="sealarc" d="M50,50 m-34,0 a34,34 0 1,1 68,0 a34,34 0 1,1 -68,0" /></defs>
-                    <text><textPath href="#sealarc" startOffset="0%">NOTARISED · REGISTRAR OF COMPANIES · </textPath></text>
-                  </svg>
-                </button>
-                <div className={css.witness}>
-                  <div><i />NOTARY PUBLIC</div>
-                  <div><i />WITNESS</div>
+                <div className={css.deedSealWrap}>
+                  <button type="button"
+                    className={cx(css.seal, css.deedSeal, (sealed ? css.pressed : ''), (armed && !sealed ? css.armed : ''))}
+                    style={{ ['--epx-ep2-c' as string]: c }}
+                    onClick={pressSeal}
+                    disabled={!armed || sealed}
+                    aria-label={sealed ? 'Company seal registered' : armed ? 'Press the company seal to incorporate' : 'Company seal unlocks after signing'}>
+                    <Mark brand={brand} />
+                    <svg viewBox="0 0 100 100" className={css.sealring} aria-hidden="true">
+                      <defs><path id="sealarc" d="M50,50 m-34,0 a34,34 0 1,1 68,0 a34,34 0 1,1 -68,0" /></defs>
+                      <text><textPath href="#sealarc" startOffset="0%">REGISTRAR · CORPORATE SEAL · </textPath></text>
+                    </svg>
+                  </button>
+                  <span>CORPORATE SEAL</span>
                 </div>
-              </div>
-            </div>
+              </footer>
+
+              {sealed ? <div className={css.deedPaidStamp} role="status">REGISTERED · PAID</div> : null}
+            </article>
           </div>
         )}
       </div>
@@ -1046,7 +592,7 @@ export const StreamingFoundingWizardScene: React.FC<{
       <div className={css.foot}>
         {step !== 'BILL' ? (
           <button className={cx(css.btn, css.brand, (canNext ? '' : css.dead))} onClick={() => canNext && setI(i + 1)}>
-            {step === 'REGIONS' && marketIds.length === 0 ? 'Choose at least one market' : 'Continue →'}
+            Continue →
           </button>
         ) : (
           !inked ? (
@@ -1054,39 +600,14 @@ export const StreamingFoundingWizardScene: React.FC<{
               SIGN &amp; PAY {fmt(total)}
             </button>
           ) : (
-            <button key="seal" className={cx(css.btn, css.big, css.sealbtn, (sealed ? css.done : ''), (armed ? css.armed : ''))}
+            <button key="seal" className={cx(css.btn, css.brand, css.big, css.sealAction, (sealed ? css.done : ''), (!armed ? css.waiting : ''))}
               onClick={pressSeal} disabled={!armed || sealed}>
-              {sealed ? 'INCORPORATED' : armed ? 'PRESS THE SEAL TO INCORPORATE' : 'SIGNING…'}
+              {sealed ? 'INCORPORATED' : armed ? 'PRESS THE SEAL TO INCORPORATE' : 'SIGNING YOUR NAME…'}
             </button>
           )
         )}
       </div>
     </div>
-  );
-};
-
-/** A tiny deterministic HD-pixel portrait, same language as the CharacterCreator
- *  avatars — enough to read as a passport photo clipped to a CV. */
-const PortraitBlock: React.FC<{ seed: string }> = ({ seed }) => {
-  const h = useMemo(() => {
-    let n = 0; for (let k = 0; k < seed.length; k++) n = (n * 31 + seed.charCodeAt(k)) >>> 0;
-    return n;
-  }, [seed]);
-  const skin = ['#c98d63', '#8d5a3b', '#e0b394', '#a06b45'][h % 4];
-  const hair = ['#1d1712', '#3d2a1c', '#57402c', '#0f0d0b'][(h >> 3) % 4];
-  const shirt = ['#2b3a52', '#3a2b3f', '#24413a', '#42352a'][(h >> 6) % 4];
-  return (
-    <svg viewBox="0 0 14 16" shapeRendering="crispEdges" className={css.pblock}>
-      <rect x="0" y="0" width="14" height="16" fill="#20242c" />
-      <rect x="1" y="11" width="12" height="5" fill={shirt} />
-      <rect x="4" y="3" width="6" height="7" fill={skin} />
-      <rect x="4" y="9" width="6" height="2" fill={skin} />
-      <rect x="3" y="2" width="8" height="3" fill={hair} />
-      <rect x="3" y="4" width="1" height="3" fill={hair} />
-      <rect x="10" y="4" width="1" height="3" fill={hair} />
-      <rect x="5" y="6" width="1" height="1" fill="#141414" />
-      <rect x="8" y="6" width="1" height="1" fill="#141414" />
-    </svg>
   );
 };
 
@@ -1165,7 +686,7 @@ const buildHqState = (
       ],
     },
     {
-      id: 'NETWORK', label: 'NETWORK', sub: 'SERVERS & PRODUCT',
+      id: 'PLATFORM', label: 'PLATFORM', sub: 'PRODUCT · TECH · DELIVERY',
       statLabel: 'PEAK LOAD', stat: `${net.peak}%`,
       pressure: net.peak >= 92 ? 'urgent' : net.peak >= 82 ? 'watch' : 'calm',
       note: net.peak >= 92
@@ -1725,8 +1246,7 @@ export const EmpirePlusV2: React.FC<Props> = ({ config, onComplete, onClose, deb
     ratingId: 'TEEN', lockupId: 'SIDE', serverCity: null,
   });
   const [regions, setRegions] = useState<RegionId[]>([]);
-  const [marketIds, setMarketIds] = useState<string[]>([]);
-  const [execIds, setExecIds] = useState<string[]>([]);
+  const [execIds] = useState<string[]>([]);
   const [total, setTotal] = useState(0);
   const [hqLive, setHqLive] = useState(false);
   const [dossier, setDossier] = useState<string | null>(null);
@@ -1970,7 +1490,7 @@ export const EmpirePlusV2: React.FC<Props> = ({ config, onComplete, onClose, deb
   const c = brandColor(brand);
 
   return (
-    <div className={css.ep2} style={{ ['--epx-ep2-brand' as string]: c, ['--epx-ep2-brand2' as string]: brandDeep(brand) }}>
+    <div className={css.ep2} data-epx-root style={brandVars(brand)}>
       {debugNav && (
         <div className={css.devnav}>
           {PHASES.map(p => <button key={p} className={phase === p ? css.cur : ''} onClick={() => setPhase(p)}>{p.slice(0, 5)}</button>)}
@@ -2014,9 +1534,7 @@ export const EmpirePlusV2: React.FC<Props> = ({ config, onComplete, onClose, deb
           onDone={() => setPhase('WIZARD')} />
       )}
       {phase === 'WIZARD' && (
-        <StreamingFoundingWizardScene cfg={cfg} brand={brand} setBrand={setBrand} regions={regions} setRegions={setRegions}
-          marketIds={marketIds} setMarketIds={setMarketIds}
-          execIds={execIds} setExecIds={setExecIds}
+        <StreamingFoundingWizardScene cfg={cfg} brand={brand} setBrand={setBrand}
           onIncorporate={t => { setTotal(t); if (!brand.name.trim()) setBrand(b => ({ ...b, name: cfg.defaultName })); setPhase('FOUNDING'); }}
           onBack={() => setPhase('WALL')} />
       )}
@@ -2052,7 +1570,7 @@ export const EmpirePlusV2: React.FC<Props> = ({ config, onComplete, onClose, deb
             if (chip === 'COMMISSION') { setPhase('CONTENT'); setDivTab('SLATE'); return; }
             setDivTab(chip ?? null);
             if (d === 'CONTENT') setPhase('CONTENT');
-            if (d === 'NETWORK') setPhase('NETWORK');
+            if (d === 'PLATFORM') setPhase('NETWORK');
             if (d === 'AUDIENCE') setPhase('AUDIENCE');
             if (d === 'BOARDROOM') setPhase('BOARDROOM');
           }}
@@ -2061,8 +1579,8 @@ export const EmpirePlusV2: React.FC<Props> = ({ config, onComplete, onClose, deb
             if (e.id === 'crisis') { setDivTab('CAPACITY'); setPhase('NETWORK'); return; }
             if (e.id === 'fallout') { setDivTab('ANALYTICS'); setPhase('AUDIENCE'); return; }
             if (e.id.startsWith('div-')) {
-              const d = e.id.slice(4) as 'CONTENT' | 'NETWORK' | 'AUDIENCE' | 'BOARDROOM';
-              setDivTab(null); setPhase(d);
+              const d = e.id.slice(4) as 'CONTENT' | 'PLATFORM' | 'AUDIENCE' | 'BOARDROOM';
+              setDivTab(null); setPhase(d === 'PLATFORM' ? 'NETWORK' : d);
             }
           }}
           onLaunch={() => setPhase(built && !hqLive ? 'PREMIERE' : 'BUILD')}

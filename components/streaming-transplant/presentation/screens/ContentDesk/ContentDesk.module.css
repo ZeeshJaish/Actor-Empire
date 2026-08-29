@@ -42,6 +42,21 @@
 .cd .cdadd{font-size:9px;font-weight:900;letter-spacing:.12em;color:var(--epx-cd-c);
   border:1px solid color-mix(in srgb,var(--epx-cd-c) 45%,transparent);border-radius:99px;padding:7px 11px}
 .cd .empty{padding:22px 0;text-align:center;font-size:11px;color:#6f7686}
+.cd .emptyLibrary{min-height:260px;padding:42px 24px 30px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+.cd .emptyLibraryMark{width:58px;height:58px;border-radius:18px;display:flex;align-items:center;justify-content:center;color:var(--epx-cd-c);background:color-mix(in srgb,var(--epx-cd-c) 14%,#0b0d13);border:1px solid color-mix(in srgb,var(--epx-cd-c) 38%,transparent)}
+.cd .emptyLibrary strong{margin-top:17px;font-size:19px;letter-spacing:-.02em}.cd .emptyLibrary p{max-width:230px;margin-top:6px;color:#7d8698;font-size:11px;line-height:1.5}
+.cd .emptyLibrary button{margin-top:20px;padding:12px 17px;border-radius:11px;display:flex;align-items:center;gap:8px;background:var(--epx-cd-c);color:#050609;font-size:9px;font-weight:950;letter-spacing:.14em}
+
+/* One content door, then explicit business routes. */
+.cd .entryBackdrop{position:absolute;inset:0;z-index:30;display:flex;align-items:flex-end;background:rgba(0,0,0,.72);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.cd .entrySheet{width:100%;max-height:min(680px,88dvh);overflow-y:auto;padding:10px 14px calc(18px + env(safe-area-inset-bottom));border-radius:24px 24px 0 0;background:#10131b;border:1px solid rgba(255,255,255,.1);box-shadow:0 -24px 70px rgba(0,0,0,.48)}
+.cd .entryHandle{width:42px;height:4px;border-radius:99px;margin:0 auto 16px;background:rgba(255,255,255,.2)}
+.cd .entryHead{display:flex;align-items:flex-start;gap:14px;padding:0 2px 15px}.cd .entryHead>div{flex:1}.cd .entryHead span{display:block;color:var(--epx-cd-c);font-size:7px;font-weight:950;letter-spacing:.2em}.cd .entryHead h2{margin-top:5px;font-size:24px;letter-spacing:-.035em}.cd .entryHead p{margin-top:5px;color:#8992a3;font-size:10.5px}.cd .entryHead>button{flex:0 0 auto;width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,.12);color:#aeb6c4}
+.cd .entryList{display:flex;flex-direction:column;gap:7px}.cd .entryList>button{position:relative;width:100%;min-height:82px;padding:13px 39px 13px 12px;display:flex;align-items:center;gap:12px;border-radius:15px;background:#0b0e15;border:1px solid rgba(255,255,255,.09)}
+.cd .entryList>button:not(:disabled):active{background:color-mix(in srgb,var(--epx-cd-c) 10%,#0b0e15);border-color:color-mix(in srgb,var(--epx-cd-c) 45%,rgba(255,255,255,.09))}
+.cd .entryIcon{flex:0 0 auto;width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;color:var(--epx-cd-c);background:color-mix(in srgb,var(--epx-cd-c) 13%,#11141c);border:1px solid color-mix(in srgb,var(--epx-cd-c) 27%,transparent)}
+.cd .entryCopy{flex:1;min-width:0;text-align:left}.cd .entryCopy small{display:block;color:#70798b;font-size:6.5px;font-weight:950;letter-spacing:.16em}.cd .entryCopy strong{display:block;margin-top:3px;font-size:13px}.cd .entryCopy em{display:block;margin-top:3px;color:#7e8798;font-size:9px;font-style:normal;line-height:1.35}
+.cd .entryState{position:absolute;top:11px;right:35px;color:var(--epx-cd-c);font-size:6.5px;font-weight:950;letter-spacing:.13em}.cd .entryArrow{position:absolute;right:13px;color:#737c8d}.cd .entryDisabled{opacity:.5}.cd .entryDisabled .entryState{color:#8b93a5}
 
 /* ── rights rows: the subscription-manager pattern ── */
 .cd .rightrow{padding:12px;border-radius:14px;background:rgba(255,255,255,.035);
@@ -151,3 +166,6 @@
    placed above it loses on source order and the padding silently goes to 0.
    ──────────────────────────────────────────────────────────────────── */
 .cd .chips{display:flex;gap:5px;flex-wrap:wrap;justify-content:center;margin-top:11px}
+.cd .localizationHero{padding:20px 17px;border-radius:16px;background:radial-gradient(circle at 85% 10%,color-mix(in srgb,var(--epx-cd-c) 25%,transparent),transparent 42%),#0e1016;border:1px solid color-mix(in srgb,var(--epx-cd-c) 34%,rgba(255,255,255,.08))}
+.cd .localizationHero>span{display:block;font-size:7px;font-weight:900;letter-spacing:.18em;color:var(--epx-cd-c)}.cd .localizationHero strong{display:inline-block;margin-top:8px;font-size:40px;line-height:1}.cd .localizationHero h3{display:inline;margin-left:7px;font-size:14px}.cd .localizationHero p{margin-top:10px;font-size:10px;line-height:1.5;color:#8790a0}
+.cd .localizationGrid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:9px}.cd .localizationGrid div{padding:12px;border-radius:12px;background:rgba(255,255,255,.028);border:1px solid rgba(255,255,255,.075)}.cd .localizationGrid span{display:block;font-size:7px;font-weight:900;letter-spacing:.12em;color:#6e7788}.cd .localizationGrid b{display:block;margin-top:4px;font-size:18px}.cd .localizationNotice{margin-top:9px;padding:11px 12px;border-radius:11px;background:rgba(255,176,32,.08);border:1px solid rgba(255,176,32,.22);font-size:9px;color:#e8bd72}.cd .localizationAction{width:100%;margin-top:12px;padding:13px;border-radius:12px;background:color-mix(in srgb,var(--epx-cd-c) 18%,#101219);border:1px solid color-mix(in srgb,var(--epx-cd-c) 40%,transparent);color:var(--epx-cd-c);font-size:8px;font-weight:950;letter-spacing:.13em;text-align:center}

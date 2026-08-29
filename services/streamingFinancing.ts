@@ -3,7 +3,6 @@ import type {
   OwnedStreamingCapitalAction,
   OwnedStreamingEquityPosition,
   OwnedStreamingLedgerEntry,
-  OwnedStreamingLoanPosition,
   Player,
 } from '../types';
 import type { Raise } from '../components/streaming-transplant/StreamingRaiseExperience';
@@ -18,7 +17,15 @@ import { contributeStreamingFounderCapital } from './streamingCompany';
 export interface CommitStreamingRaiseResult {
   player: Player;
   changed: boolean;
-  reason: 'COMMITTED' | 'INVALID_STATE' | 'INVALID_TERMS' | 'INSUFFICIENT_CASH' | 'CONTROL_LIMIT' | 'ALREADY_COMMITTED';
+  reason:
+    | 'COMMITTED'
+    | 'INVALID_STATE'
+    | 'INVALID_TERMS'
+    | 'INSUFFICIENT_CASH'
+    | 'CONTROL_LIMIT'
+    | 'ALREADY_COMMITTED'
+    | 'BANK_SYSTEM_ONLY'
+    | 'CFO_REQUIRED';
 }
 
 const cleanKey = (value: string): string => value.replace(/[^a-z0-9:_-]/gi, '-').slice(0, 160);
@@ -54,44 +61,47 @@ export const commitStreamingRaise = (
     };
   }
 
+  // EMPIRE+ does not maintain a second, disconnected loan marketplace. The
+  // existing Bank funds the founder personally; the founder can then inject
+  // that cash into the company through the canonical Finance Room.
+  if (raise.kind === 'DEBT') {
+    return { player, changed: false, reason: 'BANK_SYSTEM_ONLY' };
+  }
+
+  const hasCfo = platform.leadership.appointments.some(appointment => (
+    appointment.status === 'ACTIVE' && appointment.role === 'CFO'
+  ));
+  if (!hasCfo) {
+    return { player, changed: false, reason: 'CFO_REQUIRED' };
+  }
+
   const ownershipBefore = platform.founderOwnershipPercent;
-  const equityPercent = raise.kind === 'EQUITY'
-    ? Math.max(0, Math.min(49, Number(raise.pct) || 0))
-    : 0;
+  const equityPercent = Math.max(0, Math.min(49, Number(raise.pct) || 0));
   const ownershipAfter = Math.max(0, ownershipBefore - equityPercent);
-  if (raise.kind === 'EQUITY' && (equityPercent <= 0 || ownershipAfter < 25)) {
+  if (equityPercent <= 0 || ownershipAfter < 25) {
     return { player, changed: false, reason: 'CONTROL_LIMIT' };
   }
 
   const capitalAction: OwnedStreamingCapitalAction = {
     id: createDeterministicId('streaming_capital', platform.simulationSeed, key),
     idempotencyKey: key,
-    type: raise.kind === 'DEBT' ? 'LOAN_DRAW' : 'EQUITY_ISSUANCE',
+    type: 'EQUITY_ISSUANCE',
     absoluteWeek,
     amount,
     treasuryDelta: amount,
     personalCashDelta: 0,
-    debtDelta: raise.kind === 'DEBT' ? amount : 0,
+    debtDelta: 0,
     ownershipBefore,
     ownershipAfter,
   };
-  const loan: OwnedStreamingLoanPosition | null = raise.kind === 'DEBT' ? {
-    id: createDeterministicId('streaming_loan', platform.simulationSeed, key),
-    lenderName: 'Meridian Commercial Bank',
-    status: 'ACTIVE',
-    principal: amount,
-    outstandingPrincipal: amount,
-    weeklyInterestRate: Math.max(0, (Number(raise.ratePct) || 0) / 100 / 52),
-    openedAtAbsoluteWeek: absoluteWeek,
-  } : null;
-  const equity: OwnedStreamingEquityPosition | null = raise.kind === 'EQUITY' ? {
+  const equity: OwnedStreamingEquityPosition = {
     id: createDeterministicId('streaming_equity', platform.simulationSeed, key),
     holderName: raise.investor || 'Growth investor',
     ownershipPercent: equityPercent,
     investedCapital: amount,
     issuedAtAbsoluteWeek: absoluteWeek,
-  } : null;
-  const director: OwnedStreamingBoardDirector | null = equity ? {
+  };
+  const director: OwnedStreamingBoardDirector = {
     id: createDeterministicId('streaming_board_director', platform.simulationSeed, key),
     candidateId: `${equity.id}:nominee`,
     name: `${equity.holderName} nominee`,
@@ -104,20 +114,16 @@ export const commitStreamingRaise = (
     appointedAtAbsoluteWeek: absoluteWeek,
     endedAtAbsoluteWeek: null,
     linkedInvestorId: equity.id,
-  } : null;
+  };
   const ledger: OwnedStreamingLedgerEntry = {
     id: createDeterministicId('streaming_event', platform.simulationSeed, key),
     idempotencyKey: key,
     absoluteWeek,
-    type: raise.kind === 'DEBT' ? 'LOAN_DRAWN' : 'EQUITY_ISSUED',
-    summary: raise.kind === 'DEBT'
-      ? `${platform.identity.name} drew a bank facility.`
-      : `${equity?.holderName || 'An investor'} invested in ${platform.identity.name}.`,
+    type: 'EQUITY_ISSUED',
+    summary: `${equity.holderName} invested in ${platform.identity.name}.`,
     source: 'PLAYER_ACTION',
     metadata: {
       amount,
-      ratePct: raise.ratePct || 0,
-      termWeeks: raise.weeks || 0,
       ownershipPercent: equityPercent,
       ownershipAfter,
     },
@@ -126,17 +132,17 @@ export const commitStreamingRaise = (
   const nextPlatform = compactOwnedStreamingPlatformForPersistence({
     ...platform,
     treasuryCash: platform.treasuryCash + amount,
-    debtPrincipal: platform.debtPrincipal + (loan ? amount : 0),
+    debtPrincipal: platform.debtPrincipal,
     founderOwnershipPercent: ownershipAfter,
     finance: {
       ...platform.finance,
       capitalActions: [...platform.finance.capitalActions, capitalAction],
-      loans: loan ? [...platform.finance.loans, loan] : platform.finance.loans,
-      equityHolders: equity ? [...platform.finance.equityHolders, equity] : platform.finance.equityHolders,
+      loans: platform.finance.loans,
+      equityHolders: [...platform.finance.equityHolders, equity],
     },
     governance: {
       ...platform.governance,
-      directors: director ? [...platform.governance.directors, director] : platform.governance.directors,
+      directors: [...platform.governance.directors, director],
     },
     eventLedger: [...platform.eventLedger, ledger],
   }, player.id);

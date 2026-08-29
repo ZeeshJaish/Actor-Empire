@@ -122,4 +122,13 @@ assert.equal(validateGreenlightProject({
     hasFranchiseConnection: true,
 }).can, true);
 
+assert.deepEqual(
+    validateGreenlightProject({
+        ...validInput,
+        talentConflictNames: ['Booked Actor', 'Booked Director'],
+    }).errors,
+    ['Talent already booked: Booked Actor, Booked Director'],
+    'Greenlight must block booked talent before charging or appending the project.',
+);
+
 console.log('Greenlight validation audit passed: connected intent and final eligibility retain their rules and player-facing errors.');

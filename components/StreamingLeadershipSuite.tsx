@@ -38,13 +38,11 @@ import type {
 import StreamingVisualScene from './StreamingVisualScene';
 import {
   STREAMING_BOARD_MOTIONS,
-  STREAMING_CELEBRITY_INVESTOR_OFFERS,
   STREAMING_EXECUTIVE_DEVELOPMENT_PROGRAMS,
   STREAMING_EXECUTIVE_ROLE_LABELS,
   STREAMING_EXECUTIVE_ROLE_ORDER,
   STREAMING_INDEPENDENT_DIRECTORS,
   STREAMING_INTERNAL_PROMOTION_CANDIDATES,
-  acceptStreamingCelebrityInvestment,
   appointStreamingExternalExecutive,
   appointStreamingIndependentDirector,
   callStreamingBoardVote,
@@ -84,6 +82,7 @@ interface Props {
   onClose: () => void;
   onOpenTechnology?: () => void;
   onOpenContent?: () => void;
+  onOpenFinance?: () => void;
 }
 
 const formatMoney = (value: number): string => {
@@ -132,6 +131,7 @@ export default function StreamingLeadershipSuite({
   onClose,
   onOpenTechnology,
   onOpenContent,
+  onOpenFinance,
 }: Props) {
   const suite = useMemo(() => getStreamingLeadershipSuite(player), [player]);
   const platform = player.ownedStreamingPlatform;
@@ -141,7 +141,6 @@ export default function StreamingLeadershipSuite({
     selectedExecutiveId: suite.activeExecutives[0]?.executiveId || null,
   });
   const [feedback, setFeedback] = useState('');
-  const [reviewOfferId, setReviewOfferId] = useState<string | null>(null);
   const mandate = platform.leadership.delegation;
   const [rightsBid, setRightsBid] = useState(mandate.maximumRightsBid);
   const [headroom, setHeadroom] = useState(mandate.minimumCapacityHeadroomPercent);
@@ -153,7 +152,6 @@ export default function StreamingLeadershipSuite({
   ));
   const acceptedInvestorForReveal = platform.governance.celebrityInvestors.at(-1);
   const selectedExecutive = suite.activeExecutives.find(item => item.executiveId === ui.selectedExecutiveId) || null;
-  const reviewedOffer = STREAMING_CELEBRITY_INVESTOR_OFFERS.find(item => item.id === reviewOfferId) || null;
 
   useEffect(() => {
     setRightsBid(mandate.maximumRightsBid);
@@ -181,6 +179,7 @@ export default function StreamingLeadershipSuite({
         ALREADY_DECIDED: 'That investment offer already has a permanent decision.',
         COOLDOWN: 'This motion cannot return to the table for four game weeks.',
         NO_EXECUTIVES: 'Appoint at least one executive before creating delegated authority.',
+        CFO_REQUIRED: 'Appoint an active CFO before the company can issue equity.',
       };
       setFeedback(messages[result.reason || ''] || 'That leadership action could not be completed.');
       return;
@@ -213,13 +212,6 @@ export default function StreamingLeadershipSuite({
       renewalMinimumMarginPercent: renewalFloor,
       incidentPolicy,
     }), 'Delegation boundaries are live and recorded in the company ledger.');
-  };
-
-  const acceptInvestment = () => {
-    if (!reviewedOffer) return;
-    const result = acceptStreamingCelebrityInvestment(player, reviewedOffer.id);
-    setReviewOfferId(null);
-    applyResult(result, `${reviewedOffer.name} joined the cap table. The treasury, ownership and governance records changed together.`);
   };
 
   const closeInvestorReveal = (status: 'VIEWED' | 'DISMISSED', enterBoard = false) => {
@@ -496,33 +488,17 @@ export default function StreamingLeadershipSuite({
   const renderInvestors = () => (
     <>
       <header className="leadership-page-heading">
-        <span>CELEBRITY CAPITAL</span>
-        <h2>Attention arrives with a term sheet.</h2>
-        <p>Capital and public heat are immediate. Ownership, participation, influence, and board power remain permanent consequences.</p>
+        <span>CAPITAL GOVERNANCE</span>
+        <h2>Leadership prepares the books. Finance signs the money.</h2>
+        <p>The CFO seat, board structure and delegation rules live here. Every term sheet and capital decision now closes in Studio Finance.</p>
       </header>
       <aside className="leadership-control-warning">
         <Crown size={20} />
-        <div><strong>{platform.founderOwnershipPercent}% founder ownership</strong><p>Every offer is voluntary. Remaining 100% founder-owned forever is fully valid.</p></div>
+        <div><strong>{platform.founderOwnershipPercent}% founder ownership</strong><p>{suite.activeExecutives.some(item => item.role === 'CFO') ? 'CFO sign-off is active. You can review voluntary outside capital in Finance.' : 'Appoint a CFO before the company can issue equity.'}</p></div>
       </aside>
-      <section className="leadership-investor-grid">
-        {STREAMING_CELEBRITY_INVESTOR_OFFERS.map(offer => {
-          const decision = platform.governance.celebrityInvestors.find(item => item.candidateId === offer.id);
-          return (
-            <article key={offer.id} className={decision ? 'is-accepted' : ''}>
-              <div className="leadership-investor-stage" aria-hidden="true"><span>{offer.initials}</span><i /><i /></div>
-              <header><span>{offer.publicIdentity}</span><h3>{offer.name}</h3><p>{offer.attentionEffect}</p></header>
-              <dl>
-                <div><dt>Capital</dt><dd>{formatMoney(offer.investedCapital)}</dd></div>
-                <div><dt>Equity</dt><dd>{offer.ownershipPercent}%</dd></div>
-                <div><dt>Profit participation</dt><dd>{offer.profitParticipationPercent}%</dd></div>
-                <div><dt>Board seat</dt><dd>{offer.boardSeat ? 'Required' : 'No'}</dd></div>
-              </dl>
-              <aside><strong>Influence demand</strong><p>{offer.influenceDemand}</p></aside>
-              <footer><span>{offer.caution}</span><button type="button" disabled={Boolean(decision)} onClick={() => setReviewOfferId(offer.id)}>{decision ? 'On cap table' : 'Review term sheet'}<ChevronRight size={15} /></button></footer>
-            </article>
-          );
-        })}
-      </section>
+      <button type="button" className="leadership-primary-action" disabled={!onOpenFinance} onClick={onOpenFinance}>
+        Open Studio Finance <ChevronRight size={17} />
+      </button>
     </>
   );
 
@@ -581,26 +557,6 @@ export default function StreamingLeadershipSuite({
           {onOpenContent ? <button type="button" onClick={onOpenContent}>Content <ChevronRight size={15} /></button> : null}
         </aside>
       </main>
-
-      {reviewedOffer ? (
-        <div className="leadership-term-backdrop" role="dialog" aria-modal="true" aria-label={`${reviewedOffer.name} investment review`}>
-          <section className="leadership-term-sheet">
-            <button type="button" aria-label="Close term sheet" onClick={() => setReviewOfferId(null)}><X size={18} /></button>
-            <Landmark size={30} />
-            <span>VOLUNTARY EQUITY ROUND</span>
-            <h2>{reviewedOffer.name} wants into the signal.</h2>
-            <p>{reviewedOffer.influenceDemand}</p>
-            <dl>
-              <div><dt>Treasury receives</dt><dd>{formatMoney(reviewedOffer.investedCapital)}</dd></div>
-              <div><dt>Founder ownership</dt><dd>{platform.founderOwnershipPercent}% → {platform.founderOwnershipPercent - reviewedOffer.ownershipPercent}%</dd></div>
-              <div><dt>Board power</dt><dd>{reviewedOffer.boardSeat ? 'Binding nominee vote' : 'Binding governance begins'}</dd></div>
-              <div><dt>Weekly participation</dt><dd>{reviewedOffer.profitParticipationPercent}% of operating revenue</dd></div>
-            </dl>
-            <aside><ShieldCheck size={17} /><p>This does not guarantee subscribers, awards, rights wins, or successful productions.</p></aside>
-            <div><button type="button" onClick={() => setReviewOfferId(null)}>Remain independent</button><button type="button" onClick={acceptInvestment}>Accept capital and dilution</button></div>
-          </section>
-        </div>
-      ) : null}
 
       {pendingInvestorReveal && acceptedInvestorForReveal ? (
         <div className="leadership-investor-reveal" role="dialog" aria-modal="true" aria-label="Celebrity investor reveal">

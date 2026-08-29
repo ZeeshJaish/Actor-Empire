@@ -27,6 +27,7 @@ import {
   STREAMING_STARTER_CATALOG_PACKAGES,
   acceptStreamingCatalogCounter,
   createDefaultStreamingCatalogDraft,
+  establishOwnedStreamingStarterCatalog,
   getEligibleOwnedStreamingTitles,
   getStreamingLicenseOpportunities,
   getStreamingLicenseQuote,
@@ -45,6 +46,7 @@ interface Props {
   player: Player;
   onUpdatePlayer: (player: Player) => void;
   onClose: () => void;
+  initialStep?: 0 | 2;
 }
 
 const STEPS = ['Owned library', 'Opening package', 'License target', 'Deal room', 'Agreement'];
@@ -59,13 +61,17 @@ const titleMeta = (type: string, genre: string, year: number | null) => (
   [type === 'SERIES' ? 'Series' : 'Movie', genre !== 'Unknown' ? genre : null, year].filter(Boolean).join(' • ')
 );
 
-export default function StreamingCatalogSetup({ player, onUpdatePlayer, onClose }: Props) {
+export default function StreamingCatalogSetup({ player, onUpdatePlayer, onClose, initialStep }: Props) {
   const platform = player.ownedStreamingPlatform;
   const [draft, setDraft] = useState<OwnedStreamingCatalogSetupDraft>(
-    platform.catalogSetupDraft || createDefaultStreamingCatalogDraft(player),
+    () => {
+      const saved = platform.catalogSetupDraft || createDefaultStreamingCatalogDraft(player);
+      return initialStep === undefined ? saved : { ...saved, currentStep: initialStep };
+    },
   );
   const [feedback, setFeedback] = useState('');
   const [completed, setCompleted] = useState(false);
+  const [completionMode, setCompletionMode] = useState<'OWNED' | 'LICENSED'>('LICENSED');
   const [signing, setSigning] = useState(false);
   const ownedTitles = useMemo(() => getEligibleOwnedStreamingTitles(player), [player]);
   const opportunities = useMemo(() => getStreamingLicenseOpportunities(player), [player]);
@@ -162,6 +168,26 @@ export default function StreamingCatalogSetup({ player, onUpdatePlayer, onClose 
     }
     onUpdatePlayer(result.player);
     setFeedback('');
+    setCompletionMode('LICENSED');
+    setCompleted(true);
+    setSigning(false);
+    if (navigator.vibrate) navigator.vibrate([18, 35, 25]);
+  };
+
+  const establishOwned = () => {
+    if (signing) return;
+    setSigning(true);
+    const result = establishOwnedStreamingStarterCatalog(player, draft);
+    if (!result.changed) {
+      setSigning(false);
+      setFeedback(result.reason === 'EMPTY_CATALOGUE'
+        ? 'Select at least one released title from a production house you control.'
+        : 'The opening catalogue is already established.');
+      return;
+    }
+    onUpdatePlayer(result.player);
+    setFeedback('');
+    setCompletionMode('OWNED');
     setCompleted(true);
     setSigning(false);
     if (navigator.vibrate) navigator.vibrate([18, 35, 25]);
@@ -253,14 +279,13 @@ export default function StreamingCatalogSetup({ player, onUpdatePlayer, onClose 
             <div className="catalog-completion-signal"><Sparkles size={34} /></div>
             <span>CATALOG ESTABLISHED</span>
             <h1>The shelves have a point of view.</h1>
-            <p>
-              {draft.selectedOwnedProjectIds.length} owned title{draft.selectedOwnedProjectIds.length === 1 ? '' : 's'} linked,
-              {' '}one external anchor signed, and every record remains connected to its original project.
-            </p>
+            <p>{completionMode === 'OWNED'
+              ? `${draft.selectedOwnedProjectIds.length} owned title${draft.selectedOwnedProjectIds.length === 1 ? '' : 's'} linked with no internal fee. External licensing remains available from the Content Room.`
+              : `${draft.selectedOwnedProjectIds.length} owned title${draft.selectedOwnedProjectIds.length === 1 ? '' : 's'} linked, one external anchor signed, and every record remains connected to its original project.`}</p>
             <div className="catalog-completion-facts">
               <div><LibraryBig size={18} /><span>Opening package</span><strong>{selectedPackage.title}</strong></div>
-              <div><FileSignature size={18} /><span>First license</span><strong>{selectedOpportunity?.title || signedOpportunityTitle || 'Signed'}</strong></div>
-              <div><Banknote size={18} /><span>Minimum guarantee</span><strong>{formatMoney(draft.minimumGuarantee)}</strong></div>
+              <div><FileSignature size={18} /><span>External license</span><strong>{completionMode === 'OWNED' ? 'Optional later' : selectedOpportunity?.title || signedOpportunityTitle || 'Signed'}</strong></div>
+              <div><Banknote size={18} /><span>Internal fee</span><strong>{completionMode === 'OWNED' ? '$0' : formatMoney(draft.minimumGuarantee)}</strong></div>
             </div>
             <button type="button" className="catalog-primary-button" onClick={onClose}>Enter Content Room <ChevronRight size={18} /></button>
           </section>
@@ -362,6 +387,12 @@ export default function StreamingCatalogSetup({ player, onUpdatePlayer, onClose 
                 <p>EMPIRE+ will not invent a movie to complete this step. Advance your career until the industry archive contains a released project.</p>
               </div>
             )}
+            {draft.selectedOwnedProjectIds.length ? (
+              <div className="catalog-owned-opening">
+                <div><BadgeCheck size={20} /><span><small>OWNED-LIBRARY ROUTE</small><strong>Open without buying from yourself</strong><p>Establish the catalogue now. You can license an external anchor later from Business Affairs.</p></span></div>
+                <button type="button" className="catalog-primary-button" onClick={establishOwned} disabled={signing}>ESTABLISH WITH OWNED TITLES <ChevronRight size={18} /></button>
+              </div>
+            ) : null}
           </section>
         ) : draft.currentStep === 3 ? (
           <section key="catalog-step-3" className="catalog-stage catalog-stage-transition is-deal-room">

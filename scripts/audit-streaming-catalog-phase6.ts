@@ -129,7 +129,7 @@ const createFixture = (): Player => {
     };
 };
 
-assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 22, 'The current schema should retain the Phase 6 catalog fields.');
+assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 23, 'The current schema should retain the Phase 6 catalog fields.');
 const migrated = normalizeOwnedStreamingPlatformState({ schemaVersion: 4, catalogProjectIds: ['legacy-title'] }, 'legacy-player');
 assert(migrated.schemaVersion === OWNED_STREAMING_PLATFORM_SCHEMA_VERSION, 'Older saves should normalize into the current schema.');
 assert(migrated.catalogSetupDraft === null && migrated.starterCatalog === null, 'Older saves should receive empty Phase 6 setup fields.');
@@ -175,6 +175,10 @@ assert(signedPlatform.treasuryCash === beforeTreasury - countered.draft.minimumG
 assert(signed.player.money === beforePlayerCash, 'Signing a platform license must not charge the player wallet.');
 assert(signed.player.businesses[0].balance === beforeStudioCash, 'Importing an owned title must not create or remove production-house cash.');
 const contract = signedPlatform.catalogLicenses[0];
+assert(
+    signed.player.world.streamingRightsContracts?.[contract.id]?.minimumGuarantee === contract.minimumGuarantee,
+    'The starter license must register the same guarantee in the canonical contract registry.',
+);
 assert(contract.licensorRevenueShare === 100 - contract.platformRevenueShare, 'Revenue shares must always total 100%.');
 assert(contract.expiresAtAbsoluteWeek === contract.startsAtAbsoluteWeek + contract.durationWeeks, 'The contract expiry must use absolute game-week math.');
 assert(getStreamingCatalogLicenseStatus(contract, contract.expiresAtAbsoluteWeek - 1) === 'ACTIVE', 'The license should remain active before expiry.');

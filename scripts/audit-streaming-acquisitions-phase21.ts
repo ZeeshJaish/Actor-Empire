@@ -4,11 +4,20 @@ import {
     INITIAL_PLAYER,
     OWNED_STREAMING_PLATFORM_SCHEMA_VERSION,
     createInitialOwnedStreamingPlatformState,
+    type IndustryProductionCommitment,
+    type IndustryTalentBooking,
+    type PlatformAiContentPlan,
     type Player,
 } from '../types';
 import { getAbsoluteWeek } from '../services/legacyLogic';
 import { normalizeOwnedStreamingPlatformState } from '../services/ownedStreamingPlatform';
-import { commitStreamingCompetitiveWorldWeek, getStreamingCompetitiveWorld } from '../services/streamingCompetitiveWorld';
+import { processOwnedStreamingPlatformWeek } from '../services/streamingWeeklyLoop';
+import {
+    commitStreamingCompetitiveWorldWeek,
+    getStreamingCompetitiveWorld,
+    getStreamingRivalMoveCostMillions,
+} from '../services/streamingCompetitiveWorld';
+import { buildPlatformAiProductionCalendar, normalizeWorldPlatformAi } from '../services/platformAi';
 import {
     STREAMING_ACQUISITION_COMMITMENTS,
     STREAMING_INTEGRATION_MODES,
@@ -99,9 +108,9 @@ const createFixture = (): Player => {
     };
 };
 
-assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 22, 'Phase 24 should advance the owned-streaming schema to v22.');
+assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 23, 'The canonical foundation should advance the owned-streaming schema to v23.');
 const migrated = normalizeOwnedStreamingPlatformState({ schemaVersion: 18 }, 'phase21-migration');
-assert(migrated.schemaVersion === 22, 'Schema v18 saves should migrate to v22.');
+assert(migrated.schemaVersion === 23, 'Schema v18 saves should migrate to the current schema.');
 assert(migrated.corporateDevelopment.acquisitionCases.length === 0, 'Legacy saves must receive a safe empty corporate-development state.');
 assert(STREAMING_ACQUISITION_COMMITMENTS.length === 4, 'The acquisition system should expose four durable seller, board and regulator commitments.');
 assert(STREAMING_INTEGRATION_MODES.length === 8, 'All eight locked integration strategies should be playable.');
@@ -196,6 +205,209 @@ assert(acquisitionCase.financing.founderOwnershipAfter < acquisitionCase.financi
 const treasuryBeforeSigning = player.ownedStreamingPlatform.treasuryCash;
 const subscribersBeforeSigning = player.ownedStreamingPlatform.metrics.subscribers;
 const debtBeforeSigning = player.ownedStreamingPlatform.debtPrincipal;
+
+// Signing is the real ownership boundary: active AI productions must be handed
+// to the player once, with standard calendars and matching talent windows.
+player.world = normalizeWorldPlatformAi(player, structuredClone(player.world), absoluteWeek);
+const handoffPlanId = 'phase21-hulu-handoff-plan';
+const handoffProductionId = 'phase21-hulu-handoff-production';
+const handoffProjectId = 'phase21-hulu-handoff-project';
+const acceleratedCalendar = buildPlatformAiProductionCalendar(15, 0, absoluteWeek - 4);
+acceleratedCalendar.elapsedWeeks = 4;
+const handoffPlan: PlatformAiContentPlan = {
+    id: handoffPlanId,
+    platformId: 'HULU',
+    controllerAtCommitment: 'AI',
+    source: 'COMMISSIONED_ORIGINAL',
+    status: 'IN_PRODUCTION',
+    title: 'Acquisition Handoff',
+    projectType: 'MOVIE',
+    genre: 'DRAMA',
+    targetAudience: 'PG-13',
+    sourceProjectIds: [],
+    rightsContractIds: [],
+    cataloguePackageId: null,
+    commissionId: 'phase21-hulu-commission',
+    sourceStudioId: 'WARNER_BROS',
+    streamingWindow: 'ORIGINAL_STREAMING_PREMIERE',
+    localizationLevel: 'NONE',
+    releaseCountryIds: ['US'],
+    minimumGuaranteeMillions: 0,
+    rightsCostMillions: 0,
+    productionFundingMillions: 80,
+    paidSpendMillions: 4,
+    marketingReserveMillions: 0,
+    contingencyMillions: 0,
+    committedAtAbsoluteWeek: absoluteWeek - 4,
+    rightsReadyAtAbsoluteWeek: null,
+    localizationReadyAtAbsoluteWeek: null,
+    premiereAtAbsoluteWeek: null,
+    releasePattern: null,
+    releaseEntries: [],
+    scheduledAtAbsoluteWeek: null,
+    releasedAtAbsoluteWeek: null,
+    industryProductionId: handoffProductionId,
+    productionHoldStartedAtAbsoluteWeek: null,
+    forecast: { strategic: 80, creative: 80, commercial: 80, prestige: 70, risk: 20 },
+};
+const handoffProduction: IndustryProductionCommitment = {
+    id: handoffProductionId,
+    canonicalProjectId: handoffProjectId,
+    title: handoffPlan.title,
+    projectType: 'MOVIE',
+    genre: 'DRAMA',
+    producerStudioId: 'WARNER_BROS',
+    commissioningPlatformId: 'HULU',
+    platformContentPlanId: handoffPlanId,
+    status: 'PRODUCTION',
+    productionCalendar: acceleratedCalendar,
+    budgetMillions: 80,
+    paidMillions: 4,
+    talentBookingIds: ['phase21-handoff-director'],
+    writerSource: 'IN_HOUSE_TEAM',
+    writerId: null,
+    writerName: 'Handoff Writer',
+    writerSkill: 80,
+    aiExecution: {
+        standardDurationWeeks: 20,
+        effectiveDurationWeeks: 15,
+        qualityForecast: 80,
+        executionRoll: 0.7,
+        delayRoll: 0.7,
+        overrunRoll: 0.7,
+        failureRoll: 0.7,
+        delayWeeks: 0,
+        overrunMillions: 0,
+        leadActorId: null,
+        leadActorName: null,
+        directorId: 'phase21-handoff-director-npc',
+        directorName: 'Handoff Director',
+        writerId: null,
+        writerName: 'Handoff Writer',
+        finalQuality: null,
+        failureDecision: 'NONE',
+        failureResponse: 'NONE',
+        failureResponseAmountMillions: 0,
+        failureResponseAppliedAtAbsoluteWeek: null,
+        paidMilestoneIds: ['COMMISSIONING'],
+        controllerAtLastProgression: 'AI',
+        lastProgressedAbsoluteWeek: absoluteWeek - 1,
+        holdReason: null,
+    },
+    createdAtAbsoluteWeek: absoluteWeek - 4,
+    updatedAtAbsoluteWeek: absoluteWeek - 1,
+};
+const handoffBooking: IndustryTalentBooking = {
+    id: 'phase21-handoff-director',
+    npcId: 'phase21-handoff-director-npc',
+    role: 'DIRECTOR',
+    projectId: handoffProjectId,
+    projectOwner: 'INDUSTRY_PRODUCTION',
+    producerStudioId: 'WARNER_BROS',
+    commissioningPlatformId: 'HULU',
+    startAbsoluteWeek: acceleratedCalendar.startedAbsoluteWeek!,
+    endAbsoluteWeek: acceleratedCalendar.startedAbsoluteWeek! + acceleratedCalendar.totalWeeks - 1,
+    status: 'BOOKED',
+};
+player.world.platforms!.HULU.ai!.slate.push(handoffPlan);
+const acquiredBuyerContractId = 'phase21-acquired-buyer-platform-trade';
+player.world.platforms!.HULU.ai!.rightsContracts.push({
+    id: acquiredBuyerContractId,
+    sourceProjectId: 'phase21-acquired-licensed-title',
+    titleAtSigning: 'Inherited Window',
+    projectType: 'MOVIE',
+    genre: 'DRAMA',
+    licensorName: 'Netflix',
+    territory: 'GLOBAL',
+    countryIds: [],
+    durationWeeks: 104,
+    exclusivity: 'NON_EXCLUSIVE',
+    minimumGuarantee: 25_000_000,
+    platformRevenueShare: 70,
+    licensorRevenueShare: 30,
+    signedAtAbsoluteWeek: absoluteWeek - 8,
+    startsAtAbsoluteWeek: absoluteWeek - 8,
+    expiresAtAbsoluteWeek: absoluteWeek + 96,
+    status: 'ACTIVE',
+    origin: 'PLATFORM_TRADE',
+    buyerPlatformId: 'HULU',
+    platformContentPlanId: 'phase21-acquired-buyer-plan',
+    cataloguePackageId: null,
+    contentSource: 'LICENSED_RELEASED_TITLE',
+    sellerType: 'PLATFORM',
+    sellerPlatformId: 'NETFLIX',
+    windowType: 'SECOND_WINDOW',
+    permanentPurchase: false,
+    marketingGuarantee: 0,
+    viewershipBonusThreshold: 0,
+    viewershipBonusAmount: 0,
+    renewalOption: true,
+    sublicensingAllowed: false,
+    sequelRightsIncluded: false,
+    changeOfControl: 'ASSIGNABLE',
+    cancellationPenalty: 0,
+    renewedFromLicenseId: null,
+});
+const platformWarLiability = getStreamingRivalMoveCostMillions('EXECUTIVE_POACH');
+player.ownedStreamingPlatform.competitiveWorld.moves.push({
+    id: 'phase21-acquisition-liability',
+    idempotencyKey: 'rival-move:HULU:phase21-acquisition-liability',
+    platformId: 'HULU',
+    platformName: 'Hulu',
+    ceoName: 'Mara Voss',
+    type: 'EXECUTIVE_POACH',
+    battlefront: 'LEADERSHIP',
+    targetRegionId: null,
+    targetTechnologyBranch: null,
+    strategyReason: 'Canonical acquisition-liability fixture.',
+    playerImpact: 'The executed move remains payable at change of control.',
+    rivalPriceBefore: null,
+    rivalPriceAfter: null,
+    title: 'Executive recruitment campaign',
+    detail: 'The rival already executed the market action.',
+    status: 'OPEN',
+    pricingVersion: 1,
+    cashCostMillions: platformWarLiability,
+    rivalCashBeforeMillions: platformWarLiability,
+    rivalCashAfterMillions: 0,
+    createdAtAbsoluteWeek: absoluteWeek - 1,
+    pressureStartsAbsoluteWeek: absoluteWeek,
+    expiresAtAbsoluteWeek: absoluteWeek + 3,
+    acquisitionRateDelta: 0,
+    churnRateDelta: 0,
+    prestigeDelta: 0,
+    targetExecutiveId: null,
+    targetExecutiveName: null,
+    responseId: null,
+    responseCost: 0,
+    responseAtAbsoluteWeek: null,
+    outcomeNote: 'The executed move remains open through signing.',
+});
+player.world.platforms!.HULU.cashReserve = platformWarLiability - 3;
+player.world.platforms!.HULU.ai!.debtMillions = 2;
+player.world.platforms!.HULU.ai!.externalCommitments = [{
+    id: 'platform-war:phase21-acquisition-liability',
+    moveId: 'phase21-acquisition-liability',
+    obligationId: 'platform-war:phase21-acquisition-liability',
+                platformId: 'HULU',
+                moveType: 'EXECUTIVE_POACH',
+                pricingVersion: 1,
+                outcome: 'SUCCESS',
+    costMillions: platformWarLiability,
+    createdAtAbsoluteWeek: absoluteWeek - 1,
+    status: 'PENDING_PAYMENT',
+    settledAtAbsoluteWeek: null,
+}];
+player.world.platforms!.HULU.ai!.pendingOneTimeObligations = [{
+    id: 'platform-war:phase21-acquisition-liability',
+    category: 'DISCRETIONARY',
+    amountMillions: platformWarLiability,
+    createdWeek: absoluteWeek - 1,
+    status: 'HELD',
+    settledWeek: null,
+}];
+player.world.industryProductions = { ...(player.world.industryProductions || {}), [handoffProductionId]: handoffProduction };
+player.world.talentBookings = [...(player.world.talentBookings || []), handoffBooking];
 action = signStreamingPlatformAcquisition(player, caseId, 'PRESERVE_BRAND');
 assert(action.changed, 'A fully cleared and financed transaction should sign.');
 player = action.player;
@@ -209,6 +421,24 @@ assert(player.ownedStreamingPlatform.founderOwnershipPercent === financing.found
 assert(player.ownedStreamingPlatform.metrics.subscribers === subscribersBeforeSigning + integration.acquiredSubscriberCount, 'Only retained, regulator-cleared subscribers should transfer.');
 assert(!player.ownedStreamingPlatform.competitiveWorld.rivals.some(rival => rival.platformId === 'HULU'), 'An acquired platform must stop operating as an independent Phase 20 rival.');
 assert(player.ownedStreamingPlatform.corporateDevelopment.acquiredPlatformIds.includes('HULU'), 'Dedicated corporate-development ownership should reserve the acquired platform.');
+const acquiredAi = player.world.platforms!.HULU.ai!;
+assert(player.world.platforms!.HULU.cashReserve === 0 && acquiredAi.debtMillions === 5, 'Signing must crystallize the exact pending Platform Wars liability before AI control ends.');
+assert(acquiredAi.externalCommitments[0]?.status === 'SETTLED' && acquiredAi.pendingOneTimeObligations[0]?.status === 'SETTLED', 'The commitment and its canonical obligation must settle together exactly once.');
+assert(
+    player.ownedStreamingPlatform.catalogLicenses.some(license => license.id === acquiredBuyerContractId),
+    'Signing must transfer an acquired buyer\'s active PLATFORM_TRADE contract into the owned canonical licence ledger.',
+);
+const acquiredBuyerWeek = processOwnedStreamingPlatformWeek(structuredClone(player));
+assert(
+    acquiredBuyerWeek.processed && (acquiredBuyerWeek.snapshot?.operations.partnerRevenueShareCost || 0) > 0,
+    'The owned weekly economy must continue charging an acquired buyer\'s transferred royalty contract.',
+);
+const handedOffProduction = player.world.industryProductions?.[handoffProductionId];
+assert(handedOffProduction?.aiExecution?.controllerAtLastProgression === 'PLAYER', 'Signing must hand active production control to the player.');
+assert(handedOffProduction?.aiExecution?.effectiveDurationWeeks === 20, 'Acquired productions must lose the AI speed advantage immediately.');
+assert(handedOffProduction?.productionCalendar.totalWeeks === 20, 'The canonical calendar must expand to the standard player duration.');
+const handedOffBooking = player.world.talentBookings?.find(booking => booking.id === handoffBooking.id);
+assert(handedOffBooking?.endAbsoluteWeek === acceleratedCalendar.startedAbsoluteWeek! + 19, 'Talent windows must follow the handed-off standard calendar.');
 assert(player.ownedStreamingPlatform.cinematicQueue.filter(event => event.type === 'ACQUISITION_SIGNING').length === 1, 'Signing should queue one fact-backed major cinematic.');
 assert(!signStreamingPlatformAcquisition(player, caseId, 'PRESERVE_BRAND').changed, 'Replaying signing must never charge or transfer subscribers twice.');
 

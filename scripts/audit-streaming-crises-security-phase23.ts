@@ -153,9 +153,9 @@ const createFixture = (): Player => {
     };
 };
 
-assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 22, 'Phase 24 should own streaming schema v22.');
+assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 23, 'The canonical foundation should own streaming schema v23.');
 const migrated = normalizeOwnedStreamingPlatformState({ schemaVersion: 20 }, 'phase23-migration');
-assert(migrated.schemaVersion === 22, 'Schema v20 saves should migrate to v22.');
+assert(migrated.schemaVersion === 23, 'Schema v20 saves should migrate to the current schema.');
 assert(
     migrated.crisisSecurity.publicTrust === 72
     && migrated.crisisSecurity.employeeLoyalty === 75
@@ -283,14 +283,22 @@ assert(action.changed && action.player.ownedStreamingPlatform.crisisSecurity.whi
 const componentSource = readFileSync(resolve(process.cwd(), 'components/StreamingIncidentCommand.tsx'), 'utf8');
 const hqSource = readFileSync(resolve(process.cwd(), 'components/StreamingPlatformHQ.tsx'), 'utf8');
 const cssSource = readFileSync(resolve(process.cwd(), 'styles/streaming-incident-command.css'), 'utf8');
-assert(componentSource.includes("type IncidentTab = 'COMMAND' | 'DEFENCE' | 'SHADOW' | 'EVIDENCE' | 'OVERSIGHT'"), 'The UI should expose all five connected Incident Command rooms.');
+assert(componentSource.includes("type IncidentTab = 'COMMAND' | 'OPERATIONS' | 'DEFENCE' | 'SHADOW' | 'EVIDENCE' | 'OVERSIGHT'"), 'The UI should preserve all five crisis rooms and add connected Live Operations.');
 assert(componentSource.includes('ABSTRACT STRATEGY ONLY') && componentSource.includes('Clean play can win every objective'), 'The shadow experience should be explicitly abstract and clean play should remain equally competitive.');
 assert(!/\b(?:nmap|metasploit|sql injection|reverse shell|credential stuffing)\b/i.test(componentSource), 'The shadow UI must not contain operational attack instructions.');
-assert(hqSource.includes('hq-incident-command-launcher') && hqSource.includes('showIncidentCommand'), 'Technology Campus should contain a real Incident Command launcher and state route.');
+/* The launcher class belonged to the retired Tech room. Incident Command is
+   now reached from the NETWORK division's INCIDENTS chip and from the live
+   INCIDENT event on the Command Deck — both gated on an actual crisis. */
+assert(
+    hqSource.includes('showIncidentCommand')
+    && hqSource.includes("chip === 'INCIDENTS' && incidentCommand.available")
+    && hqSource.includes("event.id === 'INCIDENT' && incidentCommand.available"),
+    'Incident Command must be reachable from the Network division and the live incident event.',
+);
 assert(cssSource.includes('@media (max-width: 640px)') && cssSource.includes('@media (prefers-reduced-motion: reduce)'), 'The war room should ship mobile and reduced-motion layouts.');
 
 console.log('✓ Phase 23 crisis, trust, evidence and oversight records remain safe in schema v22');
 console.log('✓ Funded crisis responses create multi-week recovery routes with weekly audience and cash consequences');
 console.log('✓ Clean defence, abstract shadow operations and delayed evidence are deterministic and equally optional');
 console.log('✓ Regulators and protected disclosures have funded responses instead of instant game-over');
-console.log('✓ Incident Command connects five responsive, accessible rooms to Technology Campus');
+console.log('✓ Incident Command connects five crisis rooms plus Live Operations to Technology Campus');

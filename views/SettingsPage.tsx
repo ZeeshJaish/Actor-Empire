@@ -11,6 +11,7 @@ import { getPlayerLanguage, SUPPORTED_LANGUAGES, t } from '../services/i18n';
 import { buildActiveNewPlayerTutorialState, writeNewPlayerTutorialState } from '../services/newPlayerTutorial';
 import { isAndroidSaveTransferSurface, type SaveTransferResult } from '../services/saveTransfer';
 import { addBreadcrumb, enableManualPushNotifications, getFirebaseAuthStatus, getFirebasePushStatus, markTraceAction, onFirebaseAuthStatusChanged, onFirebasePushStatusChanged, submitPlayerIssueReport, trackGameEvent } from '../services/firebaseService';
+import { CountryFlagSvg } from '../components/studio-finance/components/FlagField';
 
 interface SettingsPageProps {
   player: Player;
@@ -35,7 +36,7 @@ const ISSUE_CATEGORIES = [
 ];
 
 const SUPPORT_DEVICE_ID_KEY = 'actorEmpire.supportDeviceId.v1';
-const SUPPORT_EMAIL = 'support.empirestudioz@gmail.com';
+const SUPPORT_EMAIL = 'zedburystudios@gmail.com';
 
 const createSupportDeviceId = () => {
   const randomId = typeof crypto !== 'undefined' && 'randomUUID' in crypto
@@ -574,7 +575,14 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
               <div className="p-2 bg-zinc-800 rounded-lg text-zinc-300"><Globe size={20}/></div>
               <div className="text-left">
                 <div className="font-bold text-white">{tr('settings.language')}</div>
-                <div className="text-xs text-zinc-400">{selectedLanguageOption ? `${selectedLanguageOption.flagEmoji} ${selectedLanguageOption.nativeLabel}` : language}</div>
+                <div className="mt-0.5 flex items-center gap-1.5 text-xs text-zinc-400">
+                  {selectedLanguageOption && (
+                    <span className="relative h-3.5 w-5 shrink-0 overflow-hidden rounded-[3px] ring-1 ring-white/10" aria-hidden="true">
+                      <CountryFlagSvg code={selectedLanguageOption.flagCode} className="h-full w-full" fit="stretch" />
+                    </span>
+                  )}
+                  <span>{selectedLanguageOption?.nativeLabel || language}</span>
+                </div>
               </div>
             </div>
             <ChevronRight size={18} className="text-zinc-500"/>
@@ -641,10 +649,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex min-w-0 items-start gap-3">
                     <div
-                      className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border text-3xl shadow-inner ${isSelected ? 'border-emerald-300/30 bg-emerald-400/10' : 'border-white/10 bg-black/20'}`}
+                      className={`relative h-12 w-12 shrink-0 overflow-hidden rounded-xl border shadow-inner ${isSelected ? 'border-emerald-300/30 bg-emerald-400/10' : 'border-white/10 bg-black/20'}`}
                       aria-hidden="true"
                     >
-                      {option.flagEmoji}
+                      <CountryFlagSvg code={option.flagCode} className="h-full w-full" fit="stretch" />
+                      <span className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-white/10" />
                     </div>
                     <div className="min-w-0">
                       <div className="text-lg font-black leading-tight text-white">{option.nativeLabel}</div>

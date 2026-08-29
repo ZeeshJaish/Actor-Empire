@@ -5,7 +5,8 @@ import { formatMoney } from '../../services/formatUtils';
 import { getGenderedAvatar, NPC_DATABASE } from '../../services/npcLogic';
 import { getEnabledGlobalCreatorSocialProfiles } from '../../services/youtubeLogic';
 import { STUDIO_CATALOG } from '../../services/studioLogic';
-import { PLATFORMS, PlatformProfile } from '../../services/streamingLogic';
+import { PLATFORMS } from '../../services/streamingLogic';
+import { getForbesStreamingCompanies } from '../../services/streamingPlatformEcosystem';
 import { PROPERTY_CATALOG, CAR_CATALOG, MOTORCYCLE_CATALOG, BOAT_CATALOG, AIRCRAFT_CATALOG, CLOTHING_CATALOG } from '../../services/lifestyleLogic';
 import { getPlayerLanguage, t } from '../../services/i18n';
 import { ArrowLeft, TrendingUp, DollarSign, Crown, Video, Building2, User, ChevronRight, Award, Star, Zap, Share2 } from 'lucide-react';
@@ -43,6 +44,7 @@ import {
     declinePrivateEquityExit,
     requestPrivateEquityExit,
 } from '../../services/privateEquityLogic';
+import StreamingPlatformBrand from '../../components/StreamingPlatformBrand';
 
 interface ForbesAppProps {
   player: Player;
@@ -310,9 +312,14 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePl
   }, [initialStudioId, initialStudioName, player.world.studios, player.businesses]);
 
   // STREAMERS
-  const platformRanking = player.world.platforms
-    ? (Object.values(player.world.platforms) as any[]).sort((a, b) => b.subscribers - a.subscribers)
-    : (Object.values(PLATFORMS) as any[]).sort((a, b) => b.subscribers - a.subscribers);
+  const platformRanking = getForbesStreamingCompanies(player).map(company => ({
+      ...company,
+      subscribers: company.subscribersMillions || 0,
+      valuation: company.valuationBillions || 0,
+      churnRate: company.corePlatformId
+          ? player.world.platforms?.[company.corePlatformId]?.churnRate || PLATFORMS[company.corePlatformId].churnRate
+          : undefined,
+  }));
 
 
   const formatValuation = (val: number) => {
@@ -330,23 +337,6 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePl
       return `${safeVal.toFixed(1)}M`;
   };
 
-  const getPlatformColorHex = (colorClass?: string) => {
-      const colorMap: Record<string, string> = {
-          'text-red-600': '#dc2626',
-          'text-red-500': '#ef4444',
-          'text-zinc-400': '#a1a1aa',
-          'text-blue-500': '#3b82f6',
-          'text-emerald-500': '#10b981',
-          'text-indigo-400': '#818cf8',
-      };
-      return colorMap[colorClass || ''] || '#818cf8';
-  };
-
-  const getPlatformBgClass = (colorClass?: string) => {
-      if (!colorClass) return 'bg-indigo-400';
-      return colorClass.replace('text-', 'bg-');
-  };
-
   const fameReach = `${Math.round(player.stats.fame)}% Global Reach`;
   const totalPlatformSubscribers = Math.max(1, platformRanking.reduce((sum, platform) => sum + Math.max(0, platform.subscribers || 0), 0));
   const getMarketShare = (subscribers: number) => Math.min(100, Math.max(0, (subscribers / totalPlatformSubscribers) * 100));
@@ -355,8 +345,7 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePl
           id: platform.id,
           name: platform.name,
           share: getMarketShare(platform.subscribers),
-          color: getPlatformBgClass(platform.color),
-          colorHex: getPlatformColorHex(platform.color),
+          colorHex: platform.brand.primaryColor,
       }))
       .filter((segment) => segment.share > 0);
   let marketShareCursor = 0;
@@ -733,7 +722,7 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePl
                                     {platformShareSegments.slice(0, 5).map((segment) => (
                                         <div key={segment.id} className="min-w-0">
                                             <div className="mb-1 flex items-center gap-2">
-                                                <span className={`h-2 w-2 shrink-0 rounded-full ${segment.color}`}></span>
+                                                <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: segment.colorHex }}></span>
                                                 <span className="min-w-0 flex-1 truncate text-[8px] uppercase tracking-widest font-black text-zinc-400">{segment.name}</span>
                                                 <span className="font-mono text-[9px] font-black text-white tabular-nums">{segment.share.toFixed(0)}%</span>
                                             </div>
@@ -742,7 +731,8 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePl
                                                     initial={{ width: 0 }}
                                                     animate={{ width: `${segment.share}%` }}
                                                     transition={{ duration: 0.6, ease: "easeOut" }}
-                                                    className={`h-full rounded-full ${segment.color}`}
+                                                    className="h-full rounded-full"
+                                                    style={{ backgroundColor: segment.colorHex }}
                                                 />
                                             </div>
                                         </div>
@@ -753,15 +743,21 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePl
                     </div>
 
                     {platformRanking.map((plat, idx) => (
-                        <div key={plat.id} className="bg-zinc-900/40 backdrop-blur-xl border border-white/5 p-5 rounded-[2.25rem] overflow-hidden relative group hover:bg-zinc-900/60 transition-all duration-700">
-                            <div className={`absolute top-0 left-0 w-1.5 h-full ${plat.color || 'bg-indigo-500'} opacity-20 group-hover:opacity-40 transition-opacity`}></div>
+                        <div
+                            key={plat.id}
+                            className="bg-zinc-900/40 backdrop-blur-xl border p-5 rounded-[2.25rem] overflow-hidden relative group hover:bg-zinc-900/60 transition-all duration-700"
+                            style={{ borderColor: `${plat.brand.primaryColor}24` }}
+                        >
+                            <div className="absolute top-0 left-0 w-1.5 h-full opacity-25 group-hover:opacity-50 transition-opacity" style={{ backgroundColor: plat.brand.primaryColor }}></div>
                             
                             <div className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-3 mb-4">
                                     <div className={`font-serif italic font-black text-2xl leading-none w-6 ${idx < 3 ? 'text-white' : 'text-zinc-800'}`}>
                                         {idx + 1}
                                     </div>
                                     <div className="min-w-0">
-                                        <div className={`text-[clamp(1.25rem,7vw,1.75rem)] font-black uppercase leading-[0.95] mb-2 break-words ${plat.color || 'text-indigo-400'}`}>{plat.name}</div>
+                                        <div className="mb-2 min-w-0 overflow-hidden">
+                                            <StreamingPlatformBrand brand={plat.brand} variant="LOCKUP" size="MD" />
+                                        </div>
                                         <div className="flex flex-wrap items-center gap-2">
                                             <div className="text-[8px] text-zinc-500 font-black uppercase tracking-[0.3em]">{tr('forbes.globalNetwork')}</div>
                                             <div className="bg-white/5 px-2.5 py-1 rounded-full text-[8px] font-black text-zinc-400 border border-white/5 uppercase tracking-widest backdrop-blur-md whitespace-nowrap">

@@ -7,7 +7,7 @@
  * is drenched in the brand they just created.
  *
  * Every step dramatised here is a real step in launching a streaming service:
- * escrow, trademark, CDN capacity, transcode pipeline, music performance
+ * formation settlement, trademark, CDN capacity, transcode pipeline, music performance
  * rights, data-protection agreements, subscription billing — then DRM
  * certification (Widevine / PlayReady / FairPlay) and per-device certification.
  * Nothing broadcast: no channels, no frequencies, no broadcast licence.
@@ -16,6 +16,7 @@
  */
 import css from './presentation/screens/Cinematics/Cinematics.module.css';
 import { cx } from './presentation/cx';
+import { brandVars } from './presentation/brand';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Brand, Mark, brandColor, brandDeep, typeFace } from './StreamingBrandVisuals';
 import { PlaceholderAvatar } from './StreamingWallExperience';
@@ -212,7 +213,7 @@ export const MachineWakesUp: React.FC<{
   }, [i, held]);
 
   return (
-    <div className={cx(css.cine, css.found, (held ? css.rush : ''), (i >= 5 ? css.offdesk : ''))} onClick={tap}>
+    <div className={cx(css.cine, css.found, (held ? css.rush : ''), (i >= 5 ? css.offdesk : ''))} data-epx-root onClick={tap}>
       <div className={css.lamp} />
       <div className={css.desk} />
 
@@ -295,11 +296,11 @@ export const MachineWakesUp: React.FC<{
             <div className={css.bamt}>${' '}<Counter to={85_000_000} ms={2000} /><em>.00 USD</em></div>
             <div>
               <div className={css.brow}><span>DEBIT</span><b>Personal holdings ····4417</b></div>
-              <div className={css.brow}><span>CREDIT</span><b>Escrow — SD·7714 ····0092</b></div>
+              <div className={css.brow}><span>CREDIT</span><b>Corporate formation settlement ····0092</b></div>
               <div className={css.brow}><span>VALUE DATE</span><b>SAME DAY</b></div>
               <div className={css.brow}><span>REFERENCE</span><b>INCORP/PENDING</b></div>
             </div>
-            <div className={cx(css.pstamp, css.red, css.esc)}>FUNDS HELD IN ESCROW<em>RELEASE ON INCORPORATION</em></div>
+            <div className={cx(css.pstamp, css.red, css.esc)}>FUNDS COMMITTED<em>FORMATION COST • NON-REFUNDABLE</em></div>
           </div>
         </div>
       )}
@@ -336,7 +337,7 @@ export const MachineWakesUp: React.FC<{
               <b>STREAMING SERVICE</b>
               <div className={css.frule} />
               <div className={css.fmeta}><span>APPLICANT</span><b>{playerName.toUpperCase()}</b></div>
-              <div className={css.fmeta}><span>ESCROW</span><b>{totalCost}</b></div>
+              <div className={css.fmeta}><span>SETTLEMENT</span><b>{totalCost}</b></div>
             </div>
             <div className={cx(css.pstamp, css.big, css.approve)}>APPROVED<em>PENDING NAME</em></div>
           </div>
@@ -434,7 +435,7 @@ export const Activation: React.FC<{
   wall: React.ReactNode;              // the same room, re-rendered
   onDone: () => void;
 }> = ({ brand, playerName, regionCount, disbursed, treasury, hires, wall, onDone }) => {
-  // escrow · register · certificate · protection · devices · ident · office · wall
+  // settlement · register · certificate · protection · devices · ident · office · wall
   const { i, held, tap, finishAll } = useScene(
     [4000, 3800, 3400, 5200, 8400, 2600, 3400, 2800], 900, onDone);
   const c = brandColor(brand), c2 = brandDeep(brand);
@@ -479,8 +480,8 @@ export const Activation: React.FC<{
   const certified = DEVICES.filter((_, n) => step - OFFSET[n] >= COST[n]).length;
 
   return (
-    <div className={cx(css.cine, css.found, (held ? css.rush : ''))} onClick={tap}
-      style={{ ['--epx-cine-c' as string]: c, ['--epx-cine-c2' as string]: c2 }}>
+    <div className={cx(css.cine, css.found, (held ? css.rush : ''))} data-epx-root onClick={tap}
+      style={brandVars(brand)}>
 
       {/* 1 — the same bank letter comes back, resolved */}
       {i === 0 && (
@@ -491,20 +492,20 @@ export const Activation: React.FC<{
               <div className={css.bname}><b>MERIDIAN TRUST</b><em>Private Client Services</em></div>
             </div>
             <div className={css.brule} />
-            <div className={css.btitle}>ESCROW RELEASE ADVICE</div>
+            <div className={css.btitle}>FOUNDING SETTLEMENT</div>
             <div className={css.bamt}>${' '}<Counter to={85_000_000} ms={900} /><em>.00 USD</em></div>
             <div>
-              <div className={css.brow}><span>DISBURSED</span><b>{disbursed} · registration & rights</b></div>
-              <div className={css.brow}><span>TO TREASURY</span><b>{treasury}</b></div>
+              <div className={css.brow}><span>CONSUMED</span><b>{disbursed} · formation, registration &amp; rights</b></div>
+              <div className={css.brow}><span>OPERATING CASH</span><b>{treasury}</b></div>
               <div className={css.brow}><span>REFERENCE</span><b className={css.newref}>CO. № {regNo}</b></div>
             </div>
-            <div className={cx(css.pstamp, css.red, css.esc, css.struck)}>FUNDS HELD IN ESCROW<em>RELEASE ON INCORPORATION</em><i className={css.strike} /></div>
-            <div className={cx(css.pstamp, css.green, css.rel)}>RELEASED</div>
+            <div className={cx(css.pstamp, css.red, css.esc, css.struck)}>FORMATION PENDING<em>AWAITING INCORPORATION</em><i className={css.strike} /></div>
+            <div className={cx(css.pstamp, css.green, css.rel)}>SETTLED IN FULL</div>
           </div>
           <div className={css.acctline}>
             <span>{brand.name} — OPERATING ACCOUNT</span>
-            <b>${' '}<Counter to={15_000_000} ms={1700} /></b>
-            <em>the first money the company has ever held</em>
+            <b>${' '}<Counter to={0} ms={1700} /></b>
+            <em>opened unfunded — capital decisions move to Finance</em>
           </div>
         </div>
       )}

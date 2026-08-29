@@ -16,6 +16,11 @@ import {
 } from './ownedStreamingPlatform';
 import { resolveStreamingCatalogTitle } from './streamingCatalog';
 import { getStreamingOriginalLiveStatus } from './streamingOriginals';
+import {
+    findStreamingResearchDefinitionForProduct,
+    markStreamingResearchInstallationOperating,
+    markStreamingResearchInstallationStarted,
+} from './streamingResearchLifecycle';
 
 export interface StreamingProductDefinition {
     id: StreamingProductLineId;
@@ -382,6 +387,13 @@ const getProductBlockers = (
     const technology = platform.technologyLevels;
     const active = (id: StreamingProductLineId): boolean => id === 'CORE' || Boolean(activeRecord(platform, id));
     if (definition.id === 'KIDS') {
+        const researchDefinition = findStreamingResearchDefinitionForProduct('KIDS');
+        const researchProgram = researchDefinition
+            ? platform.researchPrograms.find(program => program.definitionId === researchDefinition.id)
+            : null;
+        if (!researchProgram || !['READY_TO_INSTALL', 'INSTALLING', 'OPERATING'].includes(researchProgram.stage)) {
+            blockers.push('Kids Mode research and IP clearance required');
+        }
         if (technology.SECURITY < 10) blockers.push('Security Level 10 required');
         if (technology.CONTENT_OPERATIONS < 10) blockers.push('Content Operations Level 10 required');
         if (platform.catalogProjectIds.length < 3) blockers.push('At least 3 catalog titles required');
@@ -553,15 +565,22 @@ export const startStreamingProductDevelopment = (
             peakLoadPercent: line.peakLoadPercent,
         },
     };
+    const platformWithInstallation = markStreamingResearchInstallationStarted(
+        {
+            ...platform,
+            treasuryCash: platform.treasuryCash - preview.capitalCost,
+            productLines: [...platform.productLines, line],
+            eventLedger: [...platform.eventLedger, ledger],
+        },
+        'PRODUCT_LINE',
+        lineId,
+        `${definition.title} · Product Lab`,
+        line.readyAtAbsoluteWeek,
+    );
     return {
         player: {
             ...player,
-            ownedStreamingPlatform: compactOwnedStreamingPlatformForPersistence({
-                ...platform,
-                treasuryCash: platform.treasuryCash - preview.capitalCost,
-                productLines: [...platform.productLines, line],
-                eventLedger: [...platform.eventLedger, ledger],
-            }, player.id),
+            ownedStreamingPlatform: compactOwnedStreamingPlatformForPersistence(platformWithInstallation, player.id),
         },
         changed: true,
         line,
@@ -628,6 +647,9 @@ export const completeDueStreamingProductDevelopments = (
             ...launchedLines.map(line => `product-line:${line.lineId.toLowerCase()}`),
         ])),
     };
+    launchedLines.forEach(line => {
+        platform = markStreamingResearchInstallationOperating(platform, 'PRODUCT_LINE', line.lineId, absoluteWeek);
+    });
     return { platform, launchedLines, ledgerEntries };
 };
 

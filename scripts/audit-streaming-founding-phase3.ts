@@ -47,7 +47,7 @@ const eligiblePlayer = (id: string, money = 500_000_000): Player => ({
 });
 
 const defaultDraft = createDefaultStreamingFoundingDraft(100);
-const reviewDraft = { ...defaultDraft, currentStep: 2, dayOneMarketIds: ['US', 'CA'] };
+const reviewDraft = { ...defaultDraft, currentStep: 2 };
 const openingMarketSummary = summarizeStreamingDayOneMarkets(['US', 'CA', 'GB']);
 assert(
     openingMarketSummary.marketCount === 3
@@ -59,7 +59,7 @@ assert(
     getRecommendedStreamingCoreCityIds(['IN', 'ZA'], 2).join(',') === 'BOM,CPT',
     'The later Build should receive an editable cross-region city recommendation from the selected markets.',
 );
-assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 22, 'The fixed founding model should survive the current schema migration.');
+assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 23, 'The fixed founding model should survive the current schema migration.');
 assert(STREAMING_FOUNDING_STEP_COUNT === 3, 'Phase 3 should contain identity, promise, and fixed incorporation review.');
 assert(
     !validateStreamingFoundingDraft(defaultDraft, 500_000_000).valid,
@@ -75,9 +75,9 @@ assert(
 const incorporationBreakdown = getStreamingIncorporationBreakdown(100_000_000);
 assert(
     STREAMING_INCORPORATION_ECONOMY.cashRequired === 85_000_000
-        && STREAMING_INCORPORATION_ECONOMY.setupCostsConsumed === 70_000_000
-        && STREAMING_INCORPORATION_ECONOMY.openingTreasuryCash === 15_000_000,
-    'V7 incorporation must use the exact $85M charge, $70M consumed setup, and $15M opening treasury.',
+        && STREAMING_INCORPORATION_ECONOMY.setupCostsConsumed === 85_000_000
+        && STREAMING_INCORPORATION_ECONOMY.openingTreasuryCash === 0,
+    'V8 incorporation must fully consume the exact $85M charge and open treasury at $0.',
 );
 assert(
     incorporationBreakdown.affordable
@@ -92,6 +92,10 @@ const savedDraftPlayer = saveStreamingFoundingDraft(candidate, {
     name: 'Northstar+',
     brandPromiseId: 'EVERYONES_SCREEN',
     publicManifesto: 'One screen. Every generation. No arguments.',
+    visualMarkId: 'ORBIT',
+    wordmarkStyleId: 'STACK',
+    typefaceId: 'SERIF',
+    soundIdentKey: 'ASCENT',
     dayOneMarketIds: ['US', 'CA', 'GB'],
     launchServerCityId: null,
 });
@@ -102,9 +106,16 @@ assert(
     'Public manifesto copy should persist separately without replacing the selected gameplay promise.',
 );
 assert(
-    savedDraftPlayer.ownedStreamingPlatform.foundingDraft?.dayOneMarketIds?.join(',') === 'US,CA,GB'
-        && savedDraftPlayer.ownedStreamingPlatform.foundingDraft?.launchServerCityId === null,
-    'Day-One Markets should survive a resumable draft without buying a server city.',
+    savedDraftPlayer.ownedStreamingPlatform.foundingDraft?.wordmarkStyleId === 'STACK'
+        && savedDraftPlayer.ownedStreamingPlatform.foundingDraft?.typefaceId === 'SERIF'
+        && savedDraftPlayer.ownedStreamingPlatform.foundingDraft?.visualMarkId === 'ORBIT',
+    'The legal mark, wordmark, and typeface should survive a resumable founding draft.',
+);
+assert(
+    savedDraftPlayer.ownedStreamingPlatform.foundingDraft?.soundIdentKey === undefined
+        && savedDraftPlayer.ownedStreamingPlatform.foundingDraft?.dayOneMarketIds === undefined
+        && savedDraftPlayer.ownedStreamingPlatform.foundingDraft?.launchServerCityId === undefined,
+    'Simplified founding must discard ident, market, and server configuration from new drafts.',
 );
 assert(savedDraftPlayer.ownedStreamingPlatform.identity === null, 'Saving a draft must not create the company early.');
 assert(savedDraftPlayer.money === candidate.money, 'Saving draft progress must not charge the player.');
@@ -120,17 +131,24 @@ assert(
     'Incorporation should preserve custom public wording while gameplay remains keyed to brandPromiseId.',
 );
 assert(
-    incorporated.player.ownedStreamingPlatform.identity?.dayOneMarketIds?.join(',') === 'US,CA,GB'
-        && incorporated.player.ownedStreamingPlatform.identity?.launchServerCityId === null,
-    'Incorporation should preserve Day-One Markets while leaving server selection to Build.',
+    incorporated.player.ownedStreamingPlatform.identity?.wordmarkStyleId === 'STACK'
+        && incorporated.player.ownedStreamingPlatform.identity?.typefaceId === 'SERIF'
+        && incorporated.player.ownedStreamingPlatform.identity?.visualMarkId === 'ORBIT',
+    'Incorporation should preserve the complete legal brand identity.',
+);
+assert(
+    incorporated.player.ownedStreamingPlatform.identity?.soundIdentKey === undefined
+        && incorporated.player.ownedStreamingPlatform.identity?.dayOneMarketIds === undefined
+        && incorporated.player.ownedStreamingPlatform.identity?.launchServerCityId === undefined,
+    'Incorporation must not silently configure ident, opening markets, or network placement.',
 );
 assert(incorporated.player.ownedStreamingPlatform.foundingDraft === null, 'The completed draft should be cleared atomically.');
 const foundingProfile = incorporated.player.ownedStreamingPlatform.foundingProfile!;
-assert(foundingProfile.incorporationModel === 'FIXED_V7', 'New companies should use the fixed v7 incorporation model.');
+assert(foundingProfile.incorporationModel === 'FIXED_V8_ZERO_TREASURY', 'New companies should use the fixed v8 zero-treasury incorporation model.');
 assert(
     foundingProfile.founderCashCharged === 85_000_000
-        && foundingProfile.setupCostsConsumed === 70_000_000
-        && foundingProfile.openingTreasuryCash === 15_000_000,
+        && foundingProfile.setupCostsConsumed === 85_000_000
+        && foundingProfile.openingTreasuryCash === 0,
     'The canonical profile should preserve the exact incorporation economics.',
 );
 assert(
@@ -141,9 +159,24 @@ assert(
     'Incorporation should create no debt, dilution, outside capital, or forced executive.',
 );
 assert(incorporated.player.ownedStreamingPlatform.founderOwnershipPercent === 100, 'Fixed incorporation should remain 100% player owned.');
-assert(incorporated.player.ownedStreamingPlatform.treasuryCash === 15_000_000, 'Only the fixed opening treasury should enter company cash.');
+assert(incorporated.player.ownedStreamingPlatform.treasuryCash === 0, 'Operating treasury should open unfunded.');
 assert(incorporated.player.money === beforeCash - 85_000_000, 'Exactly $85M should leave personal cash.');
 assert(incorporated.player.ownedStreamingPlatform.debtPrincipal === 0, 'Fixed incorporation must not create platform debt.');
+assert(
+    incorporated.player.ownedStreamingPlatform.marketOperations.length === 0
+        && incorporated.player.ownedStreamingPlatform.serviceConfiguration.source === 'UNCONFIGURED'
+        && incorporated.player.ownedStreamingPlatform.serviceConfiguration.soundIdentKey === null
+        && incorporated.player.ownedStreamingPlatform.infrastructureSetupDraft === null
+        && incorporated.player.ownedStreamingPlatform.infrastructureSetup === null
+        && incorporated.player.ownedStreamingPlatform.costCommitments.length === 0,
+    'The incorporated company should enter pre-launch headquarters with no operational configuration.',
+);
+assert(
+    incorporated.player.ownedStreamingPlatform.capabilities.installed.length === 0
+        && Object.values(incorporated.player.ownedStreamingPlatform.capabilities.legacyLevelFloors).every(level => level === 0)
+        && Object.values(incorporated.player.ownedStreamingPlatform.technologyLevels).every(level => level === 0),
+    'Technology should begin completely empty after simplified founding.',
+);
 assert(
     incorporated.player.ownedStreamingPlatform.leadership.currentCeo.holderType === 'FOUNDER'
         && incorporated.player.ownedStreamingPlatform.leadership.appointments.length === 0,
@@ -154,7 +187,7 @@ const incorporationAction = incorporated.player.ownedStreamingPlatform.finance.c
 );
 assert(
     incorporationAction?.amount === 85_000_000
-        && incorporationAction.treasuryDelta === 15_000_000
+        && incorporationAction.treasuryDelta === 0
         && incorporationAction.personalCashDelta === -85_000_000
         && incorporationAction.debtDelta === 0,
     'The finance ledger should record the exact atomic incorporation movement.',
@@ -309,11 +342,19 @@ const npcSource = readFileSync('services/npcLogic.ts', 'utf8');
     assert(componentSource.includes(fragment), `Phase 3 UI should include ${fragment}.`);
 });
 assert(entrySource.includes('<StreamingFoundingWizard'), 'The eligible streaming entry should route into the founding wizard.');
-assert(journeySource.includes('getStreamingFoundingExecutiveCandidates(player, 4)'), 'The live founding journey should use the rotating executive market.');
-assert(journeySource.includes('getGenderedAvatar(candidate.gender, candidate.name)'), 'Founding candidates should use the canonical NPC avatar generator.');
-assert(transplantSource.includes('<InteractiveRegionMap'), 'The transplanted map step should use the canonical game world map.');
-assert(transplantSource.includes('Where can people subscribe?'), 'The Map must explain the Day-One Markets decision in plain language.');
-assert(transplantSource.includes('SEE MARKET INTELLIGENCE'), 'Deeper rival data must remain behind progressive disclosure.');
+assert(!journeySource.includes('getStreamingFoundingExecutiveCandidates'), 'Founding must remain a solo-founder flow; executive hiring belongs in the later Boardroom system.');
+assert(!journeySource.includes('getGenderedAvatar(candidate.gender, candidate.name)'), 'The founding journey must not render the retired executive-selection table.');
+assert(
+    transplantSource.includes("const STEPS = ['NAME', 'MARK', 'WORDMARK', 'TYPE', 'COLOUR', 'MANIFESTO', 'BILL']"),
+    'The live wizard should expose only the simplified legal founding sequence.',
+);
+assert(!transplantSource.includes("step === 'IDENT'"), 'Ident configuration must not appear during founding.');
+assert(!transplantSource.includes("step === 'LAYOUT'"), 'Storefront configuration must not appear during founding.');
+assert(!transplantSource.includes("step === 'REGIONS'"), 'Day-One Markets must not appear during founding.');
+assert(!journeySource.includes('createDefaultStreamingInfrastructureDraft'), 'Incorporation must not create an infrastructure draft automatically.');
+assert(!journeySource.includes('saveStreamingInfrastructureDraft'), 'Incorporation must not save infrastructure planning automatically.');
+assert(!journeySource.includes('<Activation'), 'The live founding handoff must not fake configured territories, devices, DRM, or an ident.');
+assert(journeySource.includes("onOpenHeadquarters('FINANCE')"), 'The completed filing should enter the unfunded pre-launch headquarters through Finance.');
 assert(!transplantSource.includes('LAUNCH DATA CENTRE'), 'Founding must not purchase or limit a data-centre location.');
 assert(greenlightSource.includes('PRODUCTION_LOCATIONS_BY_CONTINENT'), 'Greenlight should use the same shared location catalog as streaming.');
 assert(npcSource.includes('STREAMING_EXECUTIVE_NPCS') && npcSource.includes("occupation: 'EXECUTIVE'"), 'Streaming executives should live in the canonical NPC database.');
@@ -328,4 +369,4 @@ assert(!componentSource.includes('real-time'), 'The founding wizard should not i
     assert(!componentSource.includes(fragment), `V7 founding should not ask for the removed ${fragment} choice.`);
 });
 
-console.log('EMPIRE+ Phase 3 founding wizard audit passed.');
+console.log('EMPIRE+ Phase 2 simplified founding audit passed.');

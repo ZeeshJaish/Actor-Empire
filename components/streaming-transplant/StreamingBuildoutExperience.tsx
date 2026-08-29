@@ -21,8 +21,59 @@
  */
 import css from './presentation/screens/Buildout/Buildout.module.css';
 import { cx } from './presentation/cx';
+import { brandVars } from './presentation/brand';
+import {
+  StreamingBuildNetworkMap,
+  type NetworkMapNode,
+} from './StreamingBuildNetworkMap';
+import { StreamingFacilityRoom } from './StreamingFacilityRoom';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import type { StreamingNetworkNodeRole } from '../../types';
+import type {
+  OwnedStreamingFacility,
+  OwnedStreamingRackGroup,
+  StreamingDefineLaunchStepId,
+  StreamingInfrastructureManagementPolicy,
+  StreamingFacilityType,
+  StreamingNetworkNodeRole,
+  StreamingRackDuty,
+} from '../../types';
+import {
+  aggregateStreamingFacilities,
+  getStreamingFacilityCapacity,
+  getStreamingFacilityContract,
+  getStreamingFacilitySetupCost,
+  getStreamingFacilityWeeklyRent,
+  migratePlacementsToStreamingFacilities,
+} from '../../services/streamingFacilities';
+import {
+  createStreamingRackGroupId,
+  getProjectedRackDuty,
+  getStreamingRackDutyRule,
+  normalizeStreamingRackGroups,
+  projectFacilityNetworkRole,
+  STREAMING_RACK_DUTIES,
+} from '../../services/streamingRackGroups';
+import {
+  createStreamingFacilityFromListing,
+  getRecommendedStreamingFacilityListing,
+  getStreamingFacilityMarketplace,
+  type StreamingFacilityMarketplaceListing,
+} from '../../services/streamingFacilityMarketplace';
+import { normalizeStreamingInfrastructureManagementPolicy } from '../../services/streamingInfrastructureManagement';
+import {
+  applyStreamingFacilityRepair,
+  getStreamingFacilityPhysicalView,
+  getStreamingFacilityPhysicalUpgradeCost,
+  type StreamingFacilityRepairAction,
+  type StreamingFacilityPhysicalView,
+} from '../../services/streamingInfrastructurePhysical';
+import {
+  createStreamingLaunchRehearsal,
+  type StreamingLaunchRehearsalResult,
+  type StreamingRehearsalRepairAction,
+  type StreamingRehearsalScenario,
+  type StreamingRehearsalVerdict,
+} from '../../services/streamingLaunchRehearsal';
 import {
   Brand, Mark, City, CITIES, RegionId, REGIONS, brandColor, brandDeep,
   cityById, latencyTo,
@@ -37,29 +88,76 @@ export type ArchId = 'CLOUD' | 'HYBRID' | 'OWNED';
 export type DoctrineId = 'SAFE' | 'STANDARD' | 'RUSHED';
 export type CampId = 'NONE' | 'REGIONAL' | 'NATIONAL';
 export type Scenario = 'QUIET' | 'LIKELY' | 'SURGE';
+type BuildStage = 'SITES' | 'PLANS' | 'MONEY' | 'TEST' | 'LAUNCH';
 
-/** A city campus. Buildings and halls expand automatically as rack count grows. */
+const BUILD_STAGES: Array<{
+  id: BuildStage;
+  title: string;
+  line: string;
+}> = [
+  { id: 'SITES', title: 'Place the network', line: 'Choose the cities and rooms that will carry opening night.' },
+  { id: 'PLANS', title: 'Shape the machine', line: 'Set capacity, ownership and the pace of construction.' },
+  { id: 'MONEY', title: 'Clear the cheque', line: 'Make the network, catalogue and launch fit one treasury.' },
+  { id: 'TEST', title: 'Face the crowd', line: 'See what viewers feel, then push a real opening-night load.' },
+  { id: 'LAUNCH', title: 'Sign the build', line: 'Review the final gates before money moves and steel arrives.' },
+];
+
+/** Compatibility projection used by the launch and market simulation. */
 export interface Placement { cityId: string; racks: number; role: StreamingNetworkNodeRole }
 
 export interface BuildSel {
   placements: Placement[];
+  /** The physical source of truth. Missing only on saves created before Phase 1. */
+  facilities?: OwnedStreamingFacility[];
   arch: ArchId;
   doctrine: DoctrineId;
   campaign: CampId;
+  /** Workflow preference only. It never modifies derive() by itself. */
+  managementPolicy?: StreamingInfrastructureManagementPolicy;
 }
 
 export interface BuildInputs {
+  /** Current game week, used for maintenance history in persistent drafts. */
+  absoluteWeek?: number;
   treasury: number;
   catalogueSpend: number;
   catalogueTitles: number;
+  catalogueRights?: {
+    globalTitleCount: number;
+    primaryMarketId: string | null;
+    licensedTitles: Array<{ territory: 'DOMESTIC' | 'MULTI_REGION' | 'GLOBAL' }>;
+  };
   originalsSpend: number;
   originalsCount: number;
+  /** Paid Define-the-Launch decisions shown again at commissioning so the two
+      wizards read as one launch plan without charging them twice. */
+  defineLaunchPaid?: Array<{ id: string; label: string; amount: number; note?: string }>;
+  /** Canonical confirmations from the companion Define-the-Launch wizard. */
+  defineLaunchChecks?: Array<{
+    id: string;
+    label: string;
+    complete: boolean;
+    detail: string;
+    step: StreamingDefineLaunchStepId;
+  }>;
   premiereTitle: string;
   /** the territories the player took in the wizard */
   regions: RegionId[];
   /** where the app can be opened, even before those places become paid launch markets */
   coverageRegions?: RegionId[];
-  /** the city the player put their headquarters in — every build starts here */
+  /** exact countries chosen in Day-One Markets; regions remain a migration fallback */
+  markets?: Array<{
+    id: string;
+    country: string;
+    region: RegionId;
+    audience: number;
+    annualGrowthPercent: number;
+    recommendedCityId: string;
+    localizationNote: string;
+  }>;
+  /** canonical advisory topology derived from the selected market IDs */
+  recommendedPlacements?: Placement[];
+  /** legacy fallback only; founding no longer chooses a data centre */
   homeCityId: string | null;
   /** how much bigger the crowd is because of the plans on sale (see pricing.tsx) */
   audienceMul: number;
@@ -77,36 +175,132 @@ export interface BuildCommitResult {
 export const PER_RACK_CEILING = 65_000;
 const PER_RACK_CAPEX = 3_750_000;
 const PER_RACK_WEEKLY = 90_000;
-/** A campus can keep growing. The limit only protects the mobile renderer/save. */
-const MAX_RACKS_PER_CAMPUS = 96;
 /** viewers per person of reachable population on a premiere night */
 const DEMAND_RATE = 0.00018;
 
 const ROLE_RULES: Record<StreamingNetworkNodeRole, {
-  name: string; short: string; line: string;
+  name: string; technical: string; short: string; line: string;
   capex: number; weekly: number; ceiling: number; cache: number; latency: number;
 }> = {
   CORE_ORIGIN: {
-    name: 'Core origin', short: 'ORIGIN', line: 'Full catalogue, encoding and company control.',
+    name: 'Main library', technical: 'Core origin', short: 'ORIGIN',
+    line: 'Stores every title and controls the master stream. Your network needs one.',
     capex: 1, weekly: 1, ceiling: 1, cache: 100, latency: 12,
   },
   REGIONAL_HUB: {
-    name: 'Regional hub', short: 'HUB', line: 'Replicates most titles and carries a whole region.',
+    name: 'Region relay', technical: 'Regional hub', short: 'HUB',
+    line: 'Copies the library closer to a region, reducing distance and taking load off the main site.',
     capex: .78, weekly: .84, ceiling: .95, cache: 76, latency: 4,
   },
   EDGE_CACHE: {
-    name: 'Edge cache', short: 'EDGE', line: 'Keeps popular titles close to viewers.',
+    name: 'Fast cache', technical: 'Edge cache', short: 'EDGE',
+    line: 'Keeps popular titles near viewers for faster starts. It still depends on a library or relay.',
     capex: .48, weekly: .62, ceiling: .82, cache: 42, latency: 0,
   },
 };
 
-const campusOf = (racks: number) => racks <= 6
-  ? { label: 'Rented cage', halls: 1 }
-  : racks <= 20
-    ? { label: 'Private server hall', halls: Math.ceil(racks / 12) }
-    : racks <= 48
-      ? { label: 'Data-centre campus', halls: Math.ceil(racks / 18) }
-      : { label: 'Hyperscale campus', halls: Math.ceil(racks / 24) };
+export const facilitiesOf = (sel: Pick<BuildSel, 'placements' | 'facilities'>): OwnedStreamingFacility[] => (
+  sel.facilities?.length
+    ? sel.facilities.map(facility => {
+      const rackGroups = normalizeStreamingRackGroups(
+        facility.rackGroups,
+        facility.id,
+        facility.installedRacks,
+        facility.role,
+      );
+      return {
+        ...facility,
+        role: projectFacilityNetworkRole(rackGroups),
+        lease: facility.lease ? { ...facility.lease } : undefined,
+        rackGroups: rackGroups.map(group => ({
+          ...group,
+          migration: group.migration ? { ...group.migration } : undefined,
+        })),
+      };
+    })
+    : migratePlacementsToStreamingFacilities(sel.placements)
+);
+
+export const selectionWithFacilities = (
+  sel: BuildSel,
+  facilities: OwnedStreamingFacility[],
+): BuildSel => {
+  const normalizedFacilities = facilities.map(facility => {
+    const rackGroups = normalizeStreamingRackGroups(
+      facility.rackGroups,
+      facility.id,
+      facility.installedRacks,
+      facility.role,
+    );
+    return {
+      ...facility,
+      role: projectFacilityNetworkRole(rackGroups),
+      lease: facility.lease ? { ...facility.lease } : undefined,
+      rackGroups: rackGroups.map(group => ({
+        ...group,
+        migration: group.migration ? { ...group.migration } : undefined,
+      })),
+    };
+  });
+  return {
+    ...sel,
+    facilities: normalizedFacilities,
+    placements: aggregateStreamingFacilities(normalizedFacilities),
+  };
+};
+
+const withSyncedRackGroups = (
+  facility: OwnedStreamingFacility,
+  installedRacks = facility.installedRacks,
+): OwnedStreamingFacility => {
+  const rackGroups = normalizeStreamingRackGroups(
+    facility.rackGroups,
+    facility.id,
+    Math.max(1, installedRacks),
+    facility.role,
+  );
+  return {
+    ...facility,
+    installedRacks,
+    rackGroups,
+    role: projectFacilityNetworkRole(rackGroups),
+  };
+};
+
+const withFacilityNetworkRole = (
+  facility: OwnedStreamingFacility,
+  role: StreamingNetworkNodeRole,
+): OwnedStreamingFacility => {
+  const groups = normalizeStreamingRackGroups(facility.rackGroups, facility.id, facility.installedRacks, facility.role);
+  const duty: StreamingRackDuty = role === 'CORE_ORIGIN'
+    ? 'CONTENT_ORIGIN'
+    : role === 'REGIONAL_HUB' ? 'REGIONAL_CACHE' : 'LOCAL_EDGE';
+  groups[0] = {
+    ...groups[0],
+    duty,
+    migration: undefined,
+    name: `${getStreamingRackDutyRule(duty).name} 1`,
+  };
+  return { ...facility, role, rackGroups: groups };
+};
+
+const facilitiesForPlacements = (placements: Placement[]): OwnedStreamingFacility[] => (
+  placements.reduce<OwnedStreamingFacility[]>((facilities, placement) => {
+    const listing = getRecommendedStreamingFacilityListing(placement.cityId, placement.racks, false);
+    if (listing) {
+      facilities.push(createStreamingFacilityFromListing(
+        listing,
+        facilities,
+        placement.role,
+        placement.racks,
+      ));
+      return facilities;
+    }
+    const migrated = migratePlacementsToStreamingFacilities([placement])[0];
+    if (migrated) facilities.push({ ...migrated, id: `FACILITY-${placement.cityId}-${String(facilities.length + 1).padStart(2, '0')}` });
+    return facilities;
+  }, [])
+);
 
 /* ── presets: a starting point, not a cage ─────────────────── */
 interface Pkg { id: PkgId; name: string; sub: string; racks: number; cities: number }
@@ -211,7 +405,7 @@ export const suggestedCities = (regions: RegionId[], want = 1, homeCityId?: stri
  *  quietly vanishing — the chip promises a rack count and must deliver it. */
 export const presetPlacements = (id: PkgId, regions: RegionId[], homeCityId?: string | null): Placement[] => {
   const p = PACKAGES.find(x => x.id === id)!;
-  const need = Math.ceil(p.racks / MAX_RACKS_PER_CAMPUS);
+  const need = Math.ceil(p.racks / 32);
   const cities = suggestedCities(regions, Math.max(p.cities, need), homeCityId);
   if (!cities.length) return [];
   const out: Placement[] = cities.map((c, index) => ({
@@ -221,7 +415,7 @@ export const presetPlacements = (id: PkgId, regions: RegionId[], homeCityId?: st
   }));
   let left = p.racks;
   while (left > 0) {
-    const open = out.filter(x => x.racks < MAX_RACKS_PER_CAMPUS);
+    const open = out.filter(x => x.racks < 32);
     if (!open.length) break;
     for (const slot of open) { if (left <= 0) break; slot.racks++; left--; }
   }
@@ -240,9 +434,24 @@ export const matchedPreset = (sel: BuildSel, regions: RegionId[], homeCityId?: s
    DERIVED — every number on the screen comes out of here, so a
    display can never disagree with the thing it is displaying.
    ============================================================ */
+export interface RackGroupView extends OwnedStreamingRackGroup {
+  projectedDuty: StreamingRackDuty;
+  capacity: number;
+  viewerShare: number;
+  serves: RegionId[];
+}
+
 export interface HallView {
+  facilityId: string; facilityType: StreamingFacilityType;
+  capacityRacks: number; freeRacks: number; facilitySetup: number; facilityWeekly: number;
+  coolingKw: number; provisioningWeeks: number;
+  providerName: string; contractWeeks: number | null; electricityRate: number | null;
+  reliability: number | null; expansionRackPositions: number;
   city: City; racks: number; onPrem: number; remote: number;
   role: StreamingNetworkNodeRole;
+  rackGroups: RackGroupView[];
+  migrationWeeks: number;
+  migrationPressurePercent: number;
   campusLabel: string; facilityCount: number; cacheHit: number;
   ceiling: number; burstCeiling: number;
   capex: number; weekly: number;
@@ -252,6 +461,7 @@ export interface HallView {
   latency: number | null;
   /** % of this hall's own ceiling used by a likely premiere night */
   load: number;
+  physical: StreamingFacilityPhysicalView;
 }
 export interface CoverageRow {
   region: RegionId; label: string; viewers: number;
@@ -259,14 +469,26 @@ export interface CoverageRow {
   latency: number | null; share: number; isLaunchMarket: boolean;
   cacheHit: number; bufferRisk: number; quality: 'EXCELLENT' | 'GOOD' | 'UNSTABLE' | 'POOR';
 }
+export interface CountryServiceRow {
+  marketId: string; country: string; region: RegionId; audience: number;
+  cityId: string | null; cityLabel: string; role: StreamingNetworkNodeRole | null;
+  latency: number | null; cacheHit: number; bufferRisk: number;
+  quality: CoverageRow['quality']; demand: number; loadPct: number;
+  repairCityId: string; repairLabel: string; localizationNote: string;
+  routeFacilityIds: string[]; servingCityLabels: string[];
+  catalogueAvailableTitles: number; catalogueTotalTitles: number;
+}
 export interface Derived {
   capex: number; weekly: number; weeks: number;
   opsReserve: number; campaignCost: number; debtReserve: number;
   committed: number; remaining: number; over: boolean;
   ceiling: number; burstCeiling: number;
   racks: number; debt: number;
+  /** Physical rooms may share a city. Outage safety counts locations, not leases. */
+  uniqueCityCount: number;
   halls: HallView[];
   coverage: CoverageRow[];
+  countryService: CountryServiceRow[];
   /** worst latency anyone in your territories suffers */
   worstLatency: number | null;
   /** territories with no server anywhere */
@@ -275,6 +497,11 @@ export interface Derived {
   averageCacheHit: number;
   bufferingRisk: number;
   deliveryCostPerHour: number;
+  energyKwhWeekly: number;
+  waterLitresWeekly: number;
+  sustainabilityScore: number;
+  publicReputation: number;
+  limitingFactors: string[];
   resilienceLabel: 'FRAGILE' | 'EXPOSED' | 'REDUNDANT';
   plainSummary: string;
   demandTotal: (s: Scenario) => number;
@@ -286,7 +513,9 @@ export function derive(sel: BuildSel, inp: BuildInputs): Derived {
   const marketTerr = territoriesOf(inp.regions);
   const terr = territoriesOf(inp.coverageRegions?.length ? inp.coverageRegions : inp.regions);
 
-  const placed = sel.placements
+  const facilities = facilitiesOf(sel);
+  const placements = aggregateStreamingFacilities(facilities);
+  const placed = placements
     .filter(p => p.racks > 0)
     .map(p => ({ p, city: cityById(p.cityId) }))
     .filter((x): x is { p: Placement; city: City } => !!x.city);
@@ -297,7 +526,18 @@ export function derive(sel: BuildSel, inp: BuildInputs): Derived {
      is not how a delivery network behaves and would make redundancy worthless. */
   const NEARBY_MS = 30;
   const totalViewers = terr.reduce((s, r) => s + regionOf(r).viewers, 0);
-  const marketViewers = marketTerr.reduce((s, r) => s + regionOf(r).viewers, 0);
+  const marketViewers = inp.markets?.length
+    ? inp.markets.reduce((sum, market) => sum + market.audience, 0)
+    : marketTerr.reduce((s, r) => s + regionOf(r).viewers, 0);
+  const marketViewersByRegion = new Map<RegionId, number>();
+  if (inp.markets?.length) {
+    inp.markets.forEach(market => marketViewersByRegion.set(
+      market.region,
+      (marketViewersByRegion.get(market.region) || 0) + market.audience,
+    ));
+  } else {
+    marketTerr.forEach(region => marketViewersByRegion.set(region, regionOf(region).viewers));
+  }
   const cityShare = new Map<string, number>();
   const poolOf = new Map<RegionId, string[]>();
 
@@ -311,7 +551,7 @@ export function derive(sel: BuildSel, inp: BuildInputs): Derived {
 
     const worldwideShare = totalViewers ? regionOf(r).viewers / totalViewers : 0;
     const demandShare = marketTerr.includes(r) && marketViewers
-      ? regionOf(r).viewers / marketViewers
+      ? (marketViewersByRegion.get(r) || 0) / marketViewers
       : 0;
     // Headline experience numbers describe the market the player is actually
     // opening today. The expanded table still previews every future region.
@@ -349,28 +589,91 @@ export function derive(sel: BuildSel, inp: BuildInputs): Derived {
     };
   });
 
-  const halls: HallView[] = placed.map(({ p, city }) => {
+  const halls: HallView[] = facilities.flatMap(facility => {
+    const city = cityById(facility.cityId);
+    if (!city) return [];
+    const p: Placement = { cityId: facility.cityId, racks: facility.installedRacks, role: facility.role };
     const idx = costIndex(city);
-    const role = ROLE_RULES[p.role];
-    const campus = campusOf(p.racks);
+    const contract = getStreamingFacilityContract(facility.type);
+    const physical = getStreamingFacilityPhysicalView(facility, facility.lease?.electricityRatePerKwh);
+    const capacityRacks = getStreamingFacilityCapacity(facility);
+    const facilitySetup = getStreamingFacilitySetupCost(facility) * (facility.lease ? 1 : idx);
+    const facilityWeekly = getStreamingFacilityWeeklyRent(facility) * (facility.lease ? 1 : idx);
     const serves = coverage.filter(x => (poolOf.get(x.region) ?? []).includes(city.id));
     const onPrem = a.onPremFrac >= 1
       ? p.racks
       : Math.max(1, Math.round(p.racks * a.onPremFrac));
-    const ceiling = Math.round(p.racks * PER_RACK_CEILING * d.ceilingMul * role.ceiling * a.capacityMul);
+    const rackGroups = normalizeStreamingRackGroups(
+      facility.rackGroups,
+      facility.id,
+      facility.installedRacks,
+      facility.role,
+    );
+    const migrationPressurePercent = rackGroups.reduce((max, group) => (
+      Math.max(max, group.migration?.pressurePercent || 0)
+    ), 0);
+    const migrationMultiplier = 1 - migrationPressurePercent / 100;
+    const rawGroupCapacity = rackGroups.reduce((sum, group) => {
+      const rule = getStreamingRackDutyRule(getProjectedRackDuty(group));
+      return sum + group.rackCount * PER_RACK_CEILING * rule.capacityMultiplier;
+    }, 0);
+    const ceiling = Math.round(rawGroupCapacity * d.ceilingMul * a.capacityMul * migrationMultiplier * physical.steadyCapacityFactor);
+    const burstCeiling = Math.round(rawGroupCapacity * d.ceilingMul * a.capacityMul * migrationMultiplier
+      * (1 + a.burst) * physical.burstCapacityFactor);
+    const groupCapacityTotal = Math.max(1, rawGroupCapacity);
+    const groupViews: RackGroupView[] = rackGroups.map(group => {
+      const projectedDuty = getProjectedRackDuty(group);
+      const rule = getStreamingRackDutyRule(projectedDuty);
+      const capacity = Math.round(group.rackCount * PER_RACK_CEILING * rule.capacityMultiplier * d.ceilingMul * a.capacityMul * (physical.usableCapacityFactor / 100));
+      return {
+        ...group,
+        projectedDuty,
+        capacity,
+        viewerShare: capacity / groupCapacityTotal,
+        serves: serves.map(row => row.region),
+      };
+    });
+    const weightedCache = Math.round(rackGroups.reduce((sum, group) => (
+      sum + getStreamingRackDutyRule(getProjectedRackDuty(group)).cacheScore * group.rackCount
+    ), 0) / Math.max(1, p.racks));
+    const weightedCapex = rackGroups.reduce((sum, group) => (
+      sum + group.rackCount * getStreamingRackDutyRule(getProjectedRackDuty(group)).capexMultiplier
+    ), 0);
+    const weightedWeekly = rackGroups.reduce((sum, group) => (
+      sum + group.rackCount * getStreamingRackDutyRule(getProjectedRackDuty(group)).weeklyMultiplier
+    ), 0);
     return {
+      facilityId: facility.id,
+      facilityType: facility.type,
+      capacityRacks,
+      freeRacks: Math.max(0, capacityRacks - p.racks),
+      facilitySetup: Math.round(facilitySetup),
+      facilityWeekly: Math.round(facilityWeekly),
+      coolingKw: physical.coolingUsedKw,
+      provisioningWeeks: facility.lease?.provisioningWeeks ?? contract.provisioningWeeks,
+      providerName: facility.lease?.providerName || 'Legacy city contract',
+      contractWeeks: facility.lease?.contractWeeks ?? null,
+      electricityRate: facility.lease?.electricityRatePerKwh ?? null,
+      reliability: physical.reliabilityPercent,
+      expansionRackPositions: facility.lease?.expansionRackPositions || 0,
       city, racks: p.racks, onPrem, remote: p.racks - onPrem,
       role: p.role,
-      campusLabel: campus.label,
-      facilityCount: campus.halls,
-      cacheHit: Math.min(98, role.cache + Math.round(Math.log2(Math.max(1, p.racks)) * 7)),
-      ceiling, burstCeiling: Math.round(ceiling * (1 + a.burst)),
-      capex: Math.round(p.racks * PER_RACK_CAPEX * idx * a.capexMul * d.costMul * role.capex),
-      weekly: Math.round(p.racks * PER_RACK_WEEKLY * idx * a.weeklyMul * role.weekly),
+      rackGroups: groupViews,
+      migrationWeeks: rackGroups.reduce((max, group) => Math.max(max, group.migration?.weeks || 0), 0),
+      migrationPressurePercent,
+      campusLabel: contract.name,
+      facilityCount: 1,
+      cacheHit: Math.min(98, weightedCache + Math.round(Math.log2(Math.max(1, p.racks)) * 7)),
+      ceiling, burstCeiling,
+      capex: Math.round((weightedCapex * PER_RACK_CAPEX * idx + facilitySetup) * a.capexMul * d.costMul)
+        + getStreamingFacilityPhysicalUpgradeCost(facility),
+      weekly: Math.round((weightedWeekly * PER_RACK_WEEKLY * idx + facilityWeekly) * a.weeklyMul)
+        + physical.weeklyOperatingCost,
       serves: serves.map(x => x.region),
       latency: serves.length ? Math.max(...serves.map(x => x.latency ?? 0)) : null,
       load: 0,        // filled once total demand is known, just below
-    };
+      physical,
+    } as HallView;
   }).sort((x, y) => y.racks - x.racks);
 
   const racks = halls.reduce((s, h) => s + h.racks, 0);
@@ -380,7 +683,10 @@ export function derive(sel: BuildSel, inp: BuildInputs): Derived {
   /* a wider build takes longer, and the biggest hall sets the floor */
   const biggest = halls.reduce((m, h) => Math.max(m, h.racks), 0);
   const weeks = racks === 0 ? 0 : Math.max(1, Math.ceil(
-    (2 + biggest * .28 + Math.max(0, halls.length - 1) * .7) * a.weeksMul * d.weeksMul));
+    (2 + biggest * .28 + Math.max(0, halls.length - 1) * .7
+      + halls.reduce((max, hall) => Math.max(max, hall.provisioningWeeks), 0) * .35
+      + halls.reduce((max, hall) => Math.max(max, hall.migrationWeeks), 0)
+    ) * a.weeksMul * d.weeksMul));
 
   const opsReserve = weekly * 6;
   const campaignCost = c.cost;
@@ -392,6 +698,7 @@ export function derive(sel: BuildSel, inp: BuildInputs): Derived {
 
   const ceiling = halls.reduce((s, h) => s + h.ceiling, 0);
   const burstCeiling = halls.reduce((s, h) => s + h.burstCeiling, 0);
+  const uniqueCityCount = new Set(halls.map(hall => hall.city.id)).size;
 
   /* three separate things swell the crowd, and none of them build a rack:
      the size of your territories, what the plans cost, and the campaign */
@@ -401,9 +708,70 @@ export function derive(sel: BuildSel, inp: BuildInputs): Derived {
   const demandOfCity = (cityId: string, s: Scenario) =>
     Math.round(demandTotal(s) * (cityShare.get(cityId) ?? 0));
 
-  for (const h of halls) {
-    h.load = h.ceiling ? Math.round((demandOfCity(h.city.id, 'LIKELY') / h.ceiling) * 100) : 0;
+  /* A city receives one traffic share even when the player leases several
+     separate rooms there. The rooms pool capacity; demand is never duplicated. */
+  const capacityByCity = new Map<string, number>();
+  for (const hall of halls) {
+    capacityByCity.set(hall.city.id, (capacityByCity.get(hall.city.id) || 0) + hall.ceiling);
   }
+  for (const h of halls) {
+    const cityCapacity = capacityByCity.get(h.city.id) || 0;
+    h.load = cityCapacity
+      ? Math.round((demandOfCity(h.city.id, 'LIKELY') / cityCapacity) * 100)
+      : 0;
+  }
+  const countryService: CountryServiceRow[] = (inp.markets || []).map(market => {
+    const regional = coverage.find(row => row.region === market.region);
+    const poolIds = poolOf.get(market.region) || [];
+    const poolHalls = halls.filter(hall => poolIds.includes(hall.city.id));
+    const servingHall = regional?.cityId
+      ? halls.find(hall => hall.city.id === regional.cityId) || poolHalls[0]
+      : null;
+    const regionalDemand = demandTotal('LIKELY')
+      * ((marketViewersByRegion.get(market.region) || 0) / Math.max(1, marketViewers));
+    const regionalCapacity = poolHalls.reduce((sum, hall) => sum + hall.ceiling, 0);
+    const loadPct = regionalCapacity ? Math.round((regionalDemand / regionalCapacity) * 100) : 999;
+    const demand = Math.round(demandTotal('LIKELY') * (market.audience / Math.max(1, marketViewers)));
+    const quality: CoverageRow['quality'] = !regional || regional.latency === null ? 'POOR'
+      : loadPct > 118 ? 'POOR'
+        : loadPct > 90 && regional.quality === 'EXCELLENT' ? 'UNSTABLE'
+          : regional.quality;
+    const repairCity = cityById(market.recommendedCityId);
+    const hasRecommendedCity = placements.some(placement => placement.cityId === market.recommendedCityId);
+    const globalTitles = inp.catalogueRights?.globalTitleCount ?? inp.catalogueTitles;
+    const licensedTitles = inp.catalogueRights?.licensedTitles || [];
+    const licensedAvailable = licensedTitles.filter(title => (
+      title.territory === 'GLOBAL'
+      || title.territory === 'MULTI_REGION'
+      || title.territory === 'DOMESTIC' && market.id === inp.catalogueRights?.primaryMarketId
+    )).length;
+    const catalogueTotalTitles = Math.max(inp.catalogueTitles, globalTitles + licensedTitles.length);
+    const catalogueAvailableTitles = Math.min(catalogueTotalTitles, globalTitles + licensedAvailable);
+    return {
+      marketId: market.id,
+      country: market.country,
+      region: market.region,
+      audience: market.audience,
+      cityId: servingHall?.city.id || null,
+      cityLabel: servingHall?.city.label || 'NO DELIVERY NODE',
+      role: servingHall?.role || null,
+      latency: regional?.latency ?? null,
+      cacheHit: regional?.cacheHit || 0,
+      bufferRisk: Math.min(100, Math.max(regional?.bufferRisk || 100, loadPct > 100 ? 18 + Math.round((loadPct - 100) * .35) : 0)),
+      quality,
+      demand,
+      loadPct,
+      repairCityId: market.recommendedCityId,
+      repairLabel: hasRecommendedCity
+        ? `Add capacity in ${repairCity?.label || market.country}`
+        : `Place a hub in ${repairCity?.label || market.country}`,
+      localizationNote: market.localizationNote,
+      routeFacilityIds: poolHalls.map(hall => hall.facilityId),
+      servingCityLabels: Array.from(new Set(poolHalls.map(hall => hall.city.label))),
+      catalogueAvailableTitles,
+      catalogueTotalTitles,
+    };
+  }).sort((left, right) => right.loadPct - left.loadPct || right.audience - left.audience);
   const served = coverage.filter(x => x.latency !== null);
   const averageLatency = served.length
     ? Math.round(served.reduce((sum, row) => sum + (row.latency || 0) * row.share, 0)
@@ -417,9 +785,20 @@ export function derive(sel: BuildSel, inp: BuildInputs): Derived {
     ? Math.round(served.reduce((sum, row) => sum + row.bufferRisk * row.share, 0)
       / Math.max(.001, served.reduce((sum, row) => sum + row.share, 0)))
     : 100;
+  const energyKwhWeekly = halls.reduce((sum, hall) => sum + hall.physical.energyKwhWeekly, 0);
+  const waterLitresWeekly = halls.reduce((sum, hall) => sum + hall.physical.waterLitresWeekly, 0);
+  const sustainabilityScore = halls.length
+    ? Math.round(halls.reduce((sum, hall) => sum + hall.physical.sustainabilityScore * hall.racks, 0) / Math.max(1, racks))
+    : 0;
+  const publicReputation = halls.length
+    ? Math.round(halls.reduce((sum, hall) => sum + hall.physical.publicReputation * hall.racks, 0) / Math.max(1, racks))
+    : 0;
+  const limitingFactors = Array.from(new Set(halls
+    .filter(hall => hall.physical.limitingFactor !== 'NONE')
+    .map(hall => hall.physical.limitingFactor === 'RACK_SPACE' ? 'Rack space' : hall.physical.limitingFactor === 'POWER' ? 'Electrical power' : hall.physical.limitingFactor === 'COOLING' ? 'Cooling' : hall.physical.limitingFactor === 'BANDWIDTH' ? 'Network bandwidth' : 'Maintenance condition')));
   const deliveryCostPerHour = Math.max(.01, Math.round((weekly / Math.max(1, ceiling) * 4.2) * 100) / 100);
-  const resilienceLabel: Derived['resilienceLabel'] = halls.length >= 3 ? 'REDUNDANT'
-    : halls.length === 2 ? 'EXPOSED' : 'FRAGILE';
+  const resilienceLabel: Derived['resilienceLabel'] = uniqueCityCount >= 3 ? 'REDUNDANT'
+    : uniqueCityCount === 2 ? 'EXPOSED' : 'FRAGILE';
   const weak = [...coverage].filter(row => row.quality === 'POOR' || row.quality === 'UNSTABLE')
     .sort((x, y) => y.bufferRisk - x.bufferRisk);
   const weakLaunchMarket = weak.filter(row => row.isLaunchMarket);
@@ -436,15 +815,271 @@ export function derive(sel: BuildSel, inp: BuildInputs): Derived {
   return {
     capex, weekly, weeks, opsReserve, campaignCost, debtReserve,
     committed, remaining, over: remaining < 0,
-    ceiling, burstCeiling, racks, debt: d.debt,
-    halls, coverage,
+    ceiling, burstCeiling, racks, debt: d.debt, uniqueCityCount,
+    halls, coverage, countryService,
     worstLatency: served.length ? Math.max(...served.map(x => x.latency!)) : null,
     unserved: coverage.filter(x => x.latency === null).map(x => x.region),
     averageLatency, averageCacheHit, bufferingRisk, deliveryCostPerHour,
+    energyKwhWeekly, waterLitresWeekly, sustainabilityScore, publicReputation, limitingFactors,
     resilienceLabel, plainSummary,
     demandTotal, demandOfCity,
   };
 }
+
+export const deriveStreamingLaunchRehearsal = (
+  d: Derived,
+  inp: BuildInputs,
+  sel: BuildSel,
+  scenario: StreamingRehearsalScenario,
+): StreamingLaunchRehearsalResult => {
+  const likelyDemand = Math.max(1, d.demandTotal('LIKELY'));
+  const scenarioMultiplier = d.demandTotal(scenario) / likelyDemand;
+  return createStreamingLaunchRehearsal({
+    scenario,
+    rolloutRiskPercent: Math.round(docOf(sel.doctrine).wobble * 100),
+    countries: d.countryService.map(country => ({
+      marketId: country.marketId,
+      country: country.country,
+      regionId: country.region,
+      regionLabel: regionOf(country.region).label,
+      demand: Math.round(country.demand * scenarioMultiplier),
+      latencyMs: country.latency,
+      cacheHitPercent: country.cacheHit,
+      baseBufferingRiskPercent: country.bufferRisk,
+      routeFacilityIds: [...country.routeFacilityIds],
+      servingCityLabels: [...country.servingCityLabels],
+      recommendedCityId: country.repairCityId,
+      localizationNote: country.localizationNote,
+      catalogueAvailableTitles: country.catalogueAvailableTitles,
+      catalogueTotalTitles: country.catalogueTotalTitles,
+    })),
+    facilities: d.halls.map(hall => ({
+      facilityId: hall.facilityId,
+      cityId: hall.city.id,
+      cityLabel: hall.city.label,
+      regionId: hall.city.region,
+      steadyCapacity: hall.ceiling,
+      burstCapacity: hall.burstCeiling,
+      reliabilityPercent: hall.physical.reliabilityPercent,
+      limitingFactor: hall.physical.limitingFactor,
+      physicalRepairActions: hall.physical.repairActions.map(action => ({
+        id: action.id,
+        label: action.label,
+        cost: action.cost,
+      })),
+    })),
+  });
+};
+
+/** A proposal only. Applying it edits the drawing; commissioning remains the
+ * only place where money moves or infrastructure becomes real. */
+export const recommendedMarketPlacements = (inp: BuildInputs): Placement[] => {
+  if (inp.recommendedPlacements?.length) {
+    return inp.recommendedPlacements.map(placement => ({ ...placement }));
+  }
+  if (!inp.markets?.length) return presetPlacements('STARTER', inp.regions, inp.homeCityId);
+  const lead = [...inp.markets].sort((left, right) => right.audience - left.audience)[0];
+  return lead ? [{ cityId: lead.recommendedCityId, racks: 2, role: 'CORE_ORIGIN' }] : [];
+};
+
+export interface AssistedNetworkPlan {
+  selection: BuildSel;
+  policy: StreamingInfrastructureManagementPolicy;
+  networkBudget: number;
+  addedCommitment: number;
+  requiresApproval: boolean;
+  reasons: string[];
+  warnings: string[];
+}
+
+const assistedPriorityShape: Record<StreamingInfrastructureManagementPolicy['priority'], {
+  cities: number; racks: number; arch: ArchId;
+}> = {
+  ECONOMY: { cities: 1, racks: 2, arch: 'CLOUD' },
+  BALANCED: { cities: 2, racks: 4, arch: 'HYBRID' },
+  RELIABLE: { cities: 3, racks: 7, arch: 'HYBRID' },
+  PREMIUM: { cities: 4, racks: 10, arch: 'OWNED' },
+};
+
+const assistedDoctrine: Record<StreamingInfrastructureManagementPolicy['riskTolerance'], DoctrineId> = {
+  LOW: 'SAFE', MEDIUM: 'STANDARD', HIGH: 'RUSHED',
+};
+
+const uniqueCities = (ids: Array<string | null | undefined>): string[] => Array.from(new Set(
+  ids.filter((id): id is string => !!id && !!cityById(id)),
+));
+
+const draftFacilitiesForAssistedPlan = (
+  cityIds: string[],
+  targetRacks: number,
+  lockedFacilities: OwnedStreamingFacility[],
+  preferCloud = false,
+): OwnedStreamingFacility[] => {
+  const facilities: OwnedStreamingFacility[] = lockedFacilities.map(facility => ({
+    ...facility,
+    lease: facility.lease ? { ...facility.lease } : undefined,
+    rackGroups: facility.rackGroups?.map(group => ({ ...group, migration: group.migration ? { ...group.migration } : undefined })),
+  }));
+  const currentRacks = () => facilities.reduce((sum, facility) => sum + facility.installedRacks, 0);
+  const addFacility = (cityId: string, racks: number, role: StreamingNetworkNodeRole) => {
+    const listing = getRecommendedStreamingFacilityListing(cityId, racks, preferCloud);
+    if (!listing) return;
+    facilities.push(createStreamingFacilityFromListing(listing, facilities, role, racks));
+  };
+
+  const selectedCities = uniqueCities([
+    ...facilities.map(facility => facility.cityId),
+    ...cityIds,
+  ]).slice(0, Math.max(1, Math.min(cityIds.length || 1, targetRacks)));
+  if (!facilities.length && selectedCities.length) {
+    selectedCities.forEach((cityId, index) => addFacility(
+      cityId,
+      1,
+      index === 0 ? 'CORE_ORIGIN' : index === 1 ? 'REGIONAL_HUB' : 'EDGE_CACHE',
+    ));
+  }
+  let cursor = 0;
+  while (currentRacks() < targetRacks && selectedCities.length) {
+    const cityId = selectedCities[cursor % selectedCities.length];
+    const inCity = facilities.filter(facility => facility.cityId === cityId);
+    const expandable = inCity.find(facility => (
+      facility.installedRacks < getStreamingFacilityCapacity(facility)
+    ));
+    if (expandable) {
+      const expanded = withSyncedRackGroups(expandable, expandable.installedRacks + 1);
+      Object.assign(expandable, expanded);
+    }
+    else addFacility(cityId, 1, facilities.some(facility => facility.role === 'CORE_ORIGIN')
+      ? (cursor % 2 ? 'EDGE_CACHE' : 'REGIONAL_HUB')
+      : 'CORE_ORIGIN');
+    cursor += 1;
+  }
+  if (facilities.length && !facilities.some(facility => facility.role === 'CORE_ORIGIN')) {
+    facilities[0] = withFacilityNetworkRole(facilities[0], 'CORE_ORIGIN');
+  }
+  return facilities;
+};
+
+const addMarketplaceCapacity = (
+  source: OwnedStreamingFacility[],
+  cityId: string,
+  requestedRacks: number,
+  fallbackRole: StreamingNetworkNodeRole,
+): OwnedStreamingFacility[] => {
+  const facilities: OwnedStreamingFacility[] = source.map(facility => ({
+    ...facility,
+    lease: facility.lease ? { ...facility.lease } : undefined,
+    rackGroups: facility.rackGroups?.map(group => ({ ...group, migration: group.migration ? { ...group.migration } : undefined })),
+  }));
+  let remaining = Math.max(0, Math.round(requestedRacks));
+  for (const facility of facilities.filter(item => item.cityId === cityId)) {
+    if (remaining <= 0) break;
+    const free = Math.max(0, getStreamingFacilityCapacity(facility) - facility.installedRacks);
+    const added = Math.min(free, remaining);
+    const expanded = withSyncedRackGroups(facility, facility.installedRacks + added);
+    Object.assign(facility, expanded);
+    remaining -= added;
+  }
+  while (remaining > 0) {
+    const wanted = Math.min(32, remaining);
+    const listing = getRecommendedStreamingFacilityListing(cityId, wanted, false)
+      || getRecommendedStreamingFacilityListing(cityId, 1, false);
+    if (!listing) break;
+    const installed = Math.min(listing.rackPositions, remaining);
+    facilities.push(createStreamingFacilityFromListing(
+      listing,
+      facilities,
+      facilities.some(facility => facility.role === 'CORE_ORIGIN') ? fallbackRole : 'CORE_ORIGIN',
+      installed,
+    ));
+    remaining -= installed;
+  }
+  return facilities;
+};
+
+/**
+ * Deterministic assistant: it drafts ordinary Phase 1 facilities and never
+ * touches money. The player must apply the proposal and later commission it.
+ */
+export const createAssistedNetworkPlan = (
+  sel: BuildSel,
+  inp: BuildInputs,
+  rawPolicy: unknown = sel.managementPolicy,
+  lockedFacilities: OwnedStreamingFacility[] = [],
+): AssistedNetworkPlan => {
+  const policy = normalizeStreamingInfrastructureManagementPolicy(rawPolicy);
+  const shape = assistedPriorityShape[policy.priority];
+  const recommendation = recommendedMarketPlacements(inp);
+  const relevantCities = suggestedCities(inp.regions, 10, inp.homeCityId).map(city => city.id);
+  const cityIds = uniqueCities([
+    ...policy.preferredCityIds,
+    ...recommendation.map(placement => placement.cityId),
+    ...relevantCities,
+  ]);
+  const lockedRackCount = lockedFacilities.reduce((sum, facility) => sum + facility.installedRacks, 0);
+  const wantedRacks = Math.max(shape.racks, lockedRackCount || 1);
+  let chosen: BuildSel | null = null;
+  let chosenDerived: Derived | null = null;
+
+  for (let rackTarget = wantedRacks; rackTarget >= Math.max(1, lockedRackCount); rackTarget -= 1) {
+    const wantedCities = Math.max(1, Math.min(shape.cities, rackTarget, cityIds.length || 1));
+    const facilities = draftFacilitiesForAssistedPlan(
+      cityIds.slice(0, wantedCities),
+      rackTarget,
+      lockedFacilities,
+      shape.arch === 'CLOUD',
+    );
+    const candidate = selectionWithFacilities({
+      ...sel,
+      arch: shape.arch,
+      doctrine: assistedDoctrine[policy.riskTolerance],
+      managementPolicy: policy,
+    }, facilities);
+    const candidateDerived = derive(candidate, inp);
+    chosen = candidate;
+    chosenDerived = candidateDerived;
+    if (candidateDerived.capex + candidateDerived.opsReserve <= policy.maximumBudget) break;
+  }
+
+  if (!chosen || !chosenDerived) {
+    const fallbackCity = cityIds[0] || CITIES[0].id;
+    const facilities = draftFacilitiesForAssistedPlan([fallbackCity], 1, lockedFacilities, shape.arch === 'CLOUD');
+    chosen = selectionWithFacilities({ ...sel, managementPolicy: policy }, facilities);
+    chosenDerived = derive(chosen, inp);
+  }
+
+  const currentDerived = derive(sel, inp);
+  const networkBudget = chosenDerived.capex + chosenDerived.opsReserve;
+  const currentNetworkBudget = currentDerived.capex + currentDerived.opsReserve;
+  const addedCommitment = Math.max(0, networkBudget - currentNetworkBudget);
+  const preferredUsed = policy.preferredCityIds.filter(id => chosen!.placements.some(p => p.cityId === id));
+  const warnings: string[] = [];
+  if (networkBudget > policy.maximumBudget) {
+    warnings.push(`Even the smallest safe draft exceeds your ${money(policy.maximumBudget)} network limit.`);
+  }
+  if (chosenDerived.demandTotal('LIKELY') > chosenDerived.ceiling) {
+    warnings.push('Likely opening-night demand is above the steady capacity. Rehearse before committing.');
+  }
+  if (chosenDerived.resilienceLabel === 'FRAGILE') {
+    warnings.push('One city carries the network, so a local outage could interrupt every market.');
+  }
+  return {
+    selection: chosen,
+    policy,
+    networkBudget,
+    addedCommitment,
+    requiresApproval: policy.requireApprovalForExpensiveChanges
+      && addedCommitment >= policy.approvalThreshold,
+    reasons: [
+      `${policy.priority === 'ECONOMY' ? 'Lower opening cost' : policy.priority === 'BALANCED' ? 'Cost and reliability kept in balance' : policy.priority === 'RELIABLE' ? 'More regional resilience' : 'Premium owned capacity'} shaped the footprint.`,
+      `${policy.riskTolerance === 'LOW' ? 'Hardened engineering' : policy.riskTolerance === 'HIGH' ? 'Faster, higher-risk delivery' : 'Standard engineering'} matches your risk choice.`,
+      preferredUsed.length
+        ? `${preferredUsed.map(id => cityById(id)?.label || id).join(' and ')} received priority as requested.`
+        : 'Cities were chosen from your Day-One audience and distance to viewers.',
+    ],
+    warnings,
+  };
+};
 
 /* ============================================================
    FORMATTING
@@ -467,9 +1102,9 @@ const grade = (ms: number) => ms < 60 ? 'good' : ms < 120 ? 'ok' : 'bad';
 /** A rack you own stands in metal. A rented one is the same machine drawn as a
  *  ghost — it exists and it carries traffic, it just is not in this building.
  *  Never an empty dashed slot: those would read as capacity you have not bought. */
-const Rack: React.FC<{ n: number; owned: boolean; planned: boolean }> = ({ n, owned, planned }) => (
+const Rack: React.FC<{ n: number; owned: boolean; planned: boolean; dutyColor?: string }> = ({ n, owned, planned, dutyColor }) => (
   <div className={cx(css.rack, css.on, (owned ? '' : css.rented), (planned ? css.planned : ''))}
-    style={{ ['--epx-bld-i' as string]: n }}>
+    style={{ ['--epx-bld-i' as string]: n, ['--rack-duty' as string]: dutyColor || 'var(--epx-bld-c)' }}>
     <i className={css.rvent} />
     {Array.from({ length: 5 }).map((_, u) => (
       <div className={css.runit} key={u}>
@@ -497,10 +1132,21 @@ const Hall: React.FC<{
   /** racks already paid for and standing; the rest are still a drawing */
   builtRacks: number;
   onSet: (racks: number) => void;
-  onRole: (role: StreamingNetworkNodeRole) => void;
-}> = ({ h, canAdd, builtRacks, onSet, onRole }) => {
+  onInstallGroup: (duty: StreamingRackDuty) => void;
+  onDuty: (groupId: string, duty: StreamingRackDuty) => void;
+  onResizeGroup: (groupId: string, delta: number) => void;
+  onMoveGroup: (groupId: string, targetFacilityId: string) => void;
+  onRepair: (action: StreamingFacilityRepairAction) => void;
+  moveTargets: Array<{ id: string; label: string; freeRacks: number }>;
+  onSpace: () => void;
+}> = ({ h, canAdd, builtRacks, onSet, onInstallGroup, onDuty, onResizeGroup, onMoveGroup, onRepair, moveTargets, onSpace }) => {
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+  const selectedGroup = h.rackGroups.find(group => group.id === selectedGroupId) || null;
   const visibleRacks = Math.min(h.racks, 24);
   const hiddenRacks = Math.max(0, h.racks - visibleRacks);
+  const rackDutyColors = h.rackGroups.flatMap(group => (
+    Array.from({ length: group.rackCount }, () => getStreamingRackDutyRule(group.projectedDuty).color)
+  ));
   return (
   <div className={cx(css.hall, (builtRacks < h.racks ? css.planning : ''), (builtRacks > 0 ? css.hasbuilt : ''))}>
     <div className={css.hallhead}>
@@ -508,10 +1154,10 @@ const Hall: React.FC<{
         <b>{h.city.label}</b>
         {h.city.hub && <i className={css.hubpill}>TIER-1</i>}
         <span>
-          {h.campusLabel} · {h.facilityCount} hall{h.facilityCount === 1 ? '' : 's'}
+          {h.campusLabel} · {h.providerName}
         </span>
         <span>
-          {h.racks} rack{h.racks === 1 ? '' : 's'} · {money(h.capex)} · {money(h.weekly)}/wk
+          {h.racks}/{h.capacityRacks} slots · {h.coolingKw}kW cooling · {money(h.weekly)}/wk
         </span>
       </div>
       <div className={css.stepper}>
@@ -521,14 +1167,83 @@ const Hall: React.FC<{
       </div>
     </div>
 
-    <div className={css.roles} aria-label={`Purpose of the ${h.city.label} campus`}>
-      {(Object.keys(ROLE_RULES) as StreamingNetworkNodeRole[]).map(role => (
-        <button key={role} className={cx(css.role, h.role === role ? css.on : '')}
-          onClick={() => onRole(role)}>
-          <b>{ROLE_RULES[role].name}</b>
-          <span>{ROLE_RULES[role].line}</span>
-        </button>
-      ))}
+    <div className={css.facilitybar}>
+      <div>
+        <span>FIXED SPACE CONTRACT</span>
+        <b>{h.freeRacks > 0 ? `${h.freeRacks} rack slot${h.freeRacks === 1 ? '' : 's'} free` : 'Facility full'}</b>
+      </div>
+      <div className={css.occupancy} aria-label={`${h.racks} of ${h.capacityRacks} rack slots used`}>
+        <i style={{ width: `${Math.round(h.racks / h.capacityRacks * 100)}%` }} />
+      </div>
+      <button onClick={onSpace}>LEASE ANOTHER →</button>
+    </div>
+
+    <div className={css.leaseFacts}>
+      <span><small>UPTIME</small><b>{h.reliability ? `${h.reliability}%` : 'Legacy terms'}</b></span>
+      <span><small>POWER</small><b>{h.electricityRate ? `$${h.electricityRate.toFixed(2)}/kWh` : 'City rate'}</b></span>
+      <span><small>TERM</small><b>{h.contractWeeks ? `${h.contractWeeks} weeks` : 'Existing'}</b></span>
+      <span><small>NEARBY</small><b>{h.expansionRackPositions ? `${h.expansionRackPositions} slots listed` : 'No guarantee'}</b></span>
+    </div>
+
+    <div className={css.physicalpanel}>
+      <div className={css.physicalhead}>
+        <div><span>PHYSICAL LIMITS</span><b>{h.physical.limitingFactor === 'NONE' ? 'All systems have room' : `${h.physical.limitingFactor.replace('_', ' ')} is setting the ceiling`}</b></div>
+        <em className={h.physical.usableCapacityFactor < 70 ? css.physicalbad : h.physical.usableCapacityFactor < 90 ? css.physicalwarn : css.physicalgood}>{Math.round(h.physical.usableCapacityFactor)}% USABLE</em>
+      </div>
+      <div className={css.physicalgrid}>
+        <span><small>POWER</small><b>{Math.round(h.physical.powerUsedKw)} / {h.physical.state.powerContractKw}kW</b></span>
+        <span><small>COOLING</small><b>{Math.round(h.physical.coolingUsedKw)} / {h.physical.state.coolingCapacityKw}kW</b></span>
+        <span><small>BANDWIDTH</small><b>{Math.round(h.physical.bandwidthUsedMbps / 100) / 10} / {Math.round(h.physical.state.bandwidthMbps / 100) / 10}Gbps</b></span>
+        <span><small>CONDITION</small><b>{h.physical.state.maintenanceConditionPercent}% · {h.physical.reliabilityPercent}% uptime</b></span>
+        <span><small>BACKUP POWER</small><b>{h.physical.state.backupPowerMode.replaceAll('_', ' ')} · {h.physical.backupCoveragePercent}% load</b></span>
+        <span><small>PUBLIC IMPACT</small><b>{h.physical.sustainabilityScore} eco · {h.physical.publicReputation} reputation</b></span>
+      </div>
+      {h.physical.repairActions.length > 0 && (
+        <div className={css.repairactions}>
+          {h.physical.repairActions.map(action => (
+            <button key={action.id} onClick={() => onRepair(action.id)}>
+              <b>{action.label}</b><span>{money(action.cost)} · {action.detail}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      <div className={css.physicalfoot}>
+        <span>{h.physical.energyKwhWeekly.toLocaleString()} kWh · {Math.round(h.physical.waterLitresWeekly).toLocaleString()}L water / week</span>
+        <b>{money(h.physical.weeklyOperatingCost)}/wk physical ops</b>
+      </div>
+    </div>
+
+    <div className={css.groupdeck}>
+      <div className={css.grouptitle}>
+        <div><span>RACK FLOOR</span><b>{h.rackGroups.length} workload {h.rackGroups.length === 1 ? 'group' : 'groups'}</b></div>
+        <button onClick={() => setSelectedGroupId(h.rackGroups[0]?.id || null)}>MANAGE →</button>
+      </div>
+      <div className={css.grouptrack} aria-label={`Rack groups inside ${h.city.label}`}>
+        {h.rackGroups.map(group => {
+          const rule = getStreamingRackDutyRule(group.projectedDuty);
+          return (
+            <button key={group.id} className={cx(css.groupcard, group.migration ? css.migrating : '')}
+              style={{ ['--group-color' as string]: rule.color }} onClick={() => setSelectedGroupId(group.id)}>
+              <i className={css.grouppulse} />
+              <span>{rule.shortName}</span>
+              <b>{rule.name}</b>
+              <em>{group.rackCount} rack{group.rackCount === 1 ? '' : 's'} · {conc(group.capacity)}</em>
+              <small>{group.migration ? `REWIRING · ${group.migration.weeks}W` : rule.viewerPromise}</small>
+            </button>
+          );
+        })}
+        {canAdd && (
+          <button className={cx(css.groupcard, css.addgroup)} onClick={() => setSelectedGroupId('NEW')}>
+            <i>+</i><b>New rack group</b><small>{h.freeRacks} slots free</small>
+          </button>
+        )}
+      </div>
+      {h.migrationPressurePercent > 0 && (
+        <div className={css.pressurebar}>
+          <span>WORKLOAD MOVE IN PROGRESS</span>
+          <b>−{h.migrationPressurePercent}% temporary capacity · {h.migrationWeeks} week{h.migrationWeeks === 1 ? '' : 's'}</b>
+        </div>
+      )}
     </div>
 
     {/* the room itself: fixed-width racks that scroll, never squeeze */}
@@ -544,7 +1259,7 @@ const Hall: React.FC<{
               {h.remote > 0 && n === h.onPrem && (
                 <div className={css.wall}><i className={css.wline} /></div>
               )}
-              <Rack n={n} owned={n < h.onPrem} planned={n >= builtRacks} />
+              <Rack n={n} owned={n < h.onPrem} planned={n >= builtRacks} dutyColor={rackDutyColors[n]} />
             </React.Fragment>
           ))}
           {hiddenRacks > 0 && (
@@ -554,9 +1269,14 @@ const Hall: React.FC<{
             </div>
           )}
           {builtRacks > 0 && <Technician />}
-          {h.racks < MAX_RACKS_PER_CAMPUS && (
+          {h.racks < h.capacityRacks && (
             <button className={css.rackadd} onClick={() => onSet(h.racks + 1)}>
               <i>+</i><span>RACK</span>
+            </button>
+          )}
+          {h.racks >= h.capacityRacks && (
+            <button className={cx(css.rackadd, css.spacefull)} onClick={onSpace}>
+              <i>↗</i><span>SPACE<br />FULL</span>
             </button>
           )}
         </div>
@@ -586,6 +1306,79 @@ const Hall: React.FC<{
         <span className={css.idle}>Serves nobody — another city is closer to all of your territories</span>
       )}
     </div>
+
+    {selectedGroupId && (
+      <div className={css.groupsheet} role="dialog" aria-modal="true" aria-label={selectedGroupId === 'NEW' ? 'Install a rack group' : 'Manage rack group'}
+        onClick={() => setSelectedGroupId(null)}>
+        <div className={css.groupbox} onClick={event => event.stopPropagation()}>
+          <div className={css.groupboxhead}>
+            <div>
+              <span>{selectedGroupId === 'NEW' ? 'INSTALL INTO FREE SPACE' : 'RACK GROUP CONTROL'}</span>
+              <b>{selectedGroupId === 'NEW' ? `${h.freeRacks} slots available` : selectedGroup?.name}</b>
+            </div>
+            <button aria-label="Close rack group control" onClick={() => setSelectedGroupId(null)}>×</button>
+          </div>
+          {selectedGroup ? (
+            <>
+              <div className={css.groupstatus}>
+                <span><small>RACKS</small><b>{selectedGroup.rackCount}</b></span>
+                <span><small>CAPACITY</small><b>{conc(selectedGroup.capacity)}</b></span>
+                <span><small>SERVES</small><b>{selectedGroup.serves.length || '—'}</b></span>
+              </div>
+              <div className={css.groupsizing}>
+                <div><span>HARDWARE IN THIS GROUP</span><b>{selectedGroup.rackCount} of {h.capacityRacks} facility slots</b></div>
+                <button disabled={selectedGroup.rackCount <= 1} onClick={() => onResizeGroup(selectedGroup.id, -1)}>−</button>
+                <button disabled={!canAdd} onClick={() => onResizeGroup(selectedGroup.id, 1)}>+</button>
+              </div>
+              <button className={css.retireRack} disabled={selectedGroup.rackCount <= 1}
+                onClick={() => onResizeGroup(selectedGroup.id, -1)}>
+                RETIRE ONE RACK <span>Removes hardware from this draft</span>
+              </button>
+              <span className={css.sheetlabel}>CHOOSE WHAT THESE RACKS DO</span>
+              <div className={css.dutylist}>
+                {STREAMING_RACK_DUTIES.map(rule => (
+                  <button key={rule.id} disabled={!rule.available}
+                    className={selectedGroup.projectedDuty === rule.id ? css.on : ''}
+                    style={{ ['--group-color' as string]: rule.color }}
+                    onClick={() => onDuty(selectedGroup.id, rule.id)}>
+                    <i /><div><b>{rule.name}</b><span>{rule.description}</span></div>
+                    <em>{rule.available ? `${rule.migrationWeeks}W` : 'RESEARCH'}</em>
+                  </button>
+                ))}
+              </div>
+              {moveTargets.length > 0 && (
+                <>
+                  <span className={css.sheetlabel}>MOVE THIS WORKLOAD</span>
+                  <div className={css.movelist}>
+                    {moveTargets.map(target => (
+                      <button key={target.id} disabled={target.freeRacks < selectedGroup.rackCount}
+                        onClick={() => { onMoveGroup(selectedGroup.id, target.id); setSelectedGroupId(null); }}>
+                        <span>{target.label}</span><b>{target.freeRacks} slots free →</b>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+              <p className={css.migrationnote}>Changing or moving a duty takes time. The rehearsal immediately shows the temporary pressure, and commissioning finishes the migration.</p>
+            </>
+          ) : (
+            <>
+              <p className={css.installnote}>Pick a job for one new rack. You can add more racks to its group immediately after installation.</p>
+              <div className={css.dutylist}>
+                {STREAMING_RACK_DUTIES.map(rule => (
+                  <button key={rule.id} disabled={!rule.available || !canAdd}
+                    style={{ ['--group-color' as string]: rule.color }}
+                    onClick={() => { onInstallGroup(rule.id); setSelectedGroupId(null); }}>
+                    <i /><div><b>{rule.name}</b><span>{rule.viewerPromise}</span></div>
+                    <em>{rule.available ? '+1 RACK' : 'RESEARCH'}</em>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    )}
   </div>
   );
 };
@@ -595,9 +1388,12 @@ const Hall: React.FC<{
    ============================================================ */
 const CityPicker: React.FC<{
   sel: BuildSel; inp: BuildInputs; d: Derived;
-  onAdd: (cityId: string) => void; onClose: () => void;
-}> = ({ sel, inp, d, onAdd, onClose }) => {
-  const taken = new Set(sel.placements.filter(p => p.racks > 0).map(p => p.cityId));
+  onCity: (cityId: string) => void; onClose: () => void;
+}> = ({ sel, inp, d, onCity, onClose }) => {
+  const cityFacilityCount = facilitiesOf(sel).reduce<Map<string, number>>((counts, facility) => {
+    counts.set(facility.cityId, (counts.get(facility.cityId) || 0) + 1);
+    return counts;
+  }, new Map());
   const terr = territoriesOf(inp.coverageRegions?.length ? inp.coverageRegions : inp.regions);
 
   /* what one rack here would actually fix, said in milliseconds */
@@ -619,12 +1415,12 @@ const CityPicker: React.FC<{
     <div className={css.picker} onClick={onClose}>
       <div className={css.pickbox} onClick={e => e.stopPropagation()}>
         <div className={css.pickhead}>
-          <b>PLACE A DATA CENTRE</b>
+          <b>CHOOSE A NETWORK CITY</b>
           <button onClick={onClose} aria-label="Close">✕</button>
         </div>
         <div className={css.pickscroll}>
           {terr.map(r => {
-            const inR = CITIES.filter(c => c.region === r && !taken.has(c.id));
+            const inR = CITIES.filter(c => c.region === r);
             if (!inR.length) return null;
             return (
               <div className={css.pickgroup} key={r}>
@@ -632,12 +1428,13 @@ const CityPicker: React.FC<{
                 {inR.map(c => {
                   const g = gain(c);
                   return (
-                    <button className={css.pickcity} key={c.id} onClick={() => onAdd(c.id)}>
+                    <button className={css.pickcity} key={c.id} onClick={() => onCity(c.id)}>
                       <div className={css.pcid}>
                         <b>{c.label}</b>
                         {c.hub && <i className={css.hubpill}>TIER-1</i>}
                         <span>
-                          {money(PER_RACK_CAPEX * costIndex(c))} setup · {money(PER_RACK_WEEKLY * costIndex(c))}/wk
+                          {cityFacilityCount.get(c.id) ? `${cityFacilityCount.get(c.id)} facilit${cityFacilityCount.get(c.id) === 1 ? 'y' : 'ies'} already drafted · ` : ''}
+                          {getStreamingFacilityMarketplace(c.id).length - 1} spaces listed
                           {' · '}{c.quality >= 9 ? 'elite grid' : c.quality >= 7 ? 'stable grid' : 'value grid'}
                         </span>
                       </div>
@@ -655,6 +1452,111 @@ const CityPicker: React.FC<{
             );
           })}
         </div>
+      </div>
+    </div>
+  );
+};
+
+const FacilityMarketplace: React.FC<{
+  cityId: string;
+  onLease: (listing: StreamingFacilityMarketplaceListing) => void;
+  onClose: () => void;
+}> = ({ cityId, onLease, onClose }) => {
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const city = cityById(cityId);
+  const listings = useMemo(() => getStreamingFacilityMarketplace(cityId), [cityId]);
+
+  useEffect(() => {
+    closeRef.current?.focus();
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [onClose]);
+
+  if (!city) return null;
+  return (
+    <div className={css.picker} onClick={onClose}>
+      <div className={cx(css.pickbox, css.facilitysheet)} role="dialog" aria-modal="true"
+        aria-label={`${city.label} facility marketplace`} onClick={event => event.stopPropagation()}>
+        <div className={css.marketHero}>
+          <div className={css.marketGrid} aria-hidden="true" />
+          <div className={css.marketTitle}>
+            <span>LIVE SPACE MARKET · {city.region.replace('_', ' ')}</span>
+            <b>{city.label}</b>
+            <p>{listings.filter(listing => listing.status !== 'RESEARCH_REQUIRED').length} contracts available · each room has a fixed physical limit</p>
+          </div>
+          <div className={css.marketPulse}>
+            <i />
+            <span>{city.quality >= 9 ? 'PRIME FIBRE MARKET' : city.quality >= 7 ? 'STABLE CAPACITY' : 'VALUE MARKET'}</span>
+          </div>
+          <button ref={closeRef} className={css.marketClose} onClick={onClose} aria-label="Close facility marketplace">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+          </button>
+        </div>
+
+        <div className={css.marketRule}>
+          <b>LEASE SPACE, THEN INSTALL RACKS</b>
+          <span>A full room stays full. To grow, lease another listing here or enter a different city.</span>
+        </div>
+
+        <div className={css.facilityoptions}>
+          {listings.map((listing, listingIndex) => {
+            const locked = listing.status === 'RESEARCH_REQUIRED';
+            return (
+              <article key={listing.listingId} className={cx(css.marketListing, locked ? css.locked : '')}>
+                <div className={css.listingTop}>
+                  <div>
+                    <span>LISTING {String(listingIndex + 1).padStart(2, '0')} · {listing.providerName}</span>
+                    <b>{listing.facilityName}</b>
+                  </div>
+                  <em className={css[listing.status.toLowerCase()] || ''}>
+                    {listing.status === 'RESEARCH_REQUIRED' ? 'RESEARCH' : listing.status}
+                  </em>
+                </div>
+
+                <div className={css.listingBody}>
+                  <div className={css.facilityvisual} aria-hidden="true">
+                    <strong>{listing.rackPositions}</strong>
+                    <span>RACK<br />POSITIONS</span>
+                    <div>
+                      {Array.from({ length: Math.min(8, listing.rackPositions) }).map((_, index) => <i key={index} />)}
+                    </div>
+                  </div>
+                  <div className={css.listingDeal}>
+                    <p>{listing.description}</p>
+                    <div className={css.dealMoney}>
+                      <span><small>MOVE-IN</small><b>{money(listing.depositCost + listing.setupCost)}</b></span>
+                      <span><small>RENT</small><b>{money(listing.weeklyRent)}/wk</b></span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className={css.contractFacts}>
+                  <span><small>POWER</small><b>${listing.electricityRatePerKwh.toFixed(2)}/kWh</b></span>
+                  <span><small>TAX</small><b>{listing.taxRatePercent}%</b></span>
+                  <span><small>UPTIME</small><b>{listing.reliabilityPercent}%</b></span>
+                  <span><small>FIBRE</small><b>{listing.fibreGrade === 'GLOBAL_BACKBONE' ? 'Global' : listing.fibreGrade === 'CARRIER' ? 'Carrier' : 'Metro'}</b></span>
+                  <span><small>SECURITY</small><b>{listing.securityGrade === 'REINFORCED' ? 'Reinforced' : listing.securityGrade === 'FORTIFIED' ? 'Fortified' : 'Standard'}</b></span>
+                  <span><small>LIVE IN</small><b>{listing.provisioningWeeks || '<1'} wk</b></span>
+                </div>
+
+                <div className={css.contractBottom}>
+                  <p>{listing.marketNote}</p>
+                  <span>{listing.contractWeeks} wk term · {listing.expansionRackPositions
+                    ? `${listing.expansionRackPositions} nearby slots listed`
+                    : 'no adjacent expansion'}</span>
+                </div>
+
+                <button className={css.leaseButton} disabled={locked} onClick={() => onLease(listing)}>
+                  {locked ? 'RESEARCH CAMPUS CONSTRUCTION' : `LEASE ${listing.shortName.toUpperCase()} →`}
+                </button>
+              </article>
+            );
+          })}
+        </div>
+        <div className={css.facilityfoot}>Draft only. Deposits, setup and rent enter the forecast now; treasury moves only when you commission.</div>
       </div>
     </div>
   );
@@ -696,7 +1598,7 @@ const Commissioning: React.FC<{
 
   const receipts = [
     ...d.halls.map(h => ({
-      k: h.city.id,
+      k: h.facilityId,
       what: `LEASE · ${h.city.label}`,
       detail: `${h.racks} rack${h.racks === 1 ? '' : 's'}`,
       v: h.capex,
@@ -729,7 +1631,7 @@ const Commissioning: React.FC<{
 
       <div className={css.comstage}>
         {d.halls.map((h, hi) => (
-          <div className={css.comhall} key={h.city.id} style={{ ['--epx-bld-hi' as string]: hi }}>
+          <div className={css.comhall} key={h.facilityId} style={{ ['--epx-bld-hi' as string]: hi }}>
             <div className={css.comcity}>
               <b>{h.city.label}</b>
               <em>{h.racks} × {PER_RACK_CEILING / 1000}K</em>
@@ -809,15 +1711,18 @@ const BudgetBar: React.FC<{
     <div className={cx(css.budget, (d.over ? css.over : ''))}>
       <div className={css.bghead}>
         <div>
-          <span>UNCOMMITTED</span>
+          {/* Money you do not have is not "uncommitted" money. Once the plan is
+              over the treasury the label has to change with the sign, or the
+              headline reads as a negative amount of a positive thing. */}
+          <span>{d.over ? 'SHORT BY' : 'UNCOMMITTED'}</span>
           <b className={d.over ? css.bad : d.remaining < inp.treasury * .08 ? css.warn : css.good}>
-            {money(d.remaining)}
+            {money(Math.abs(d.remaining))}
           </b>
         </div>
         <div className={css.right}>
           <span>OF {money(inp.treasury)}</span>
           <em>{money(d.committed)} committed</em>
-          {onRaise && <button className={css.raisebtn} onClick={onRaise}>+ RAISE</button>}
+          {onRaise && <button className={css.raisebtn} onClick={onRaise}>OPEN FINANCE</button>}
         </div>
       </div>
 
@@ -845,7 +1750,7 @@ const BudgetBar: React.FC<{
 
       {d.over && (
         <div className={css.bgover}>
-          You are {money(-d.remaining)} short. Raise it, or something here has to get smaller.
+          You are {money(-d.remaining)} short. Add company capital in Finance, or make this plan smaller.
         </div>
       )}
     </div>
@@ -882,20 +1787,8 @@ const RevisionBar: React.FC<{ spent: number; d: Derived; dBuilt: Derived }> = ({
 /* ============================================================
    THE REHEARSAL — a premiere night that costs nothing
    ============================================================ */
-export type Verdict = 'HELD' | 'BURST' | 'BROKE';
-
-export interface CityResult {
-  cityId: string; label: string;
-  demand: number; ceiling: number; burstCeiling: number;
-  verdict: Verdict; failedPct: number;
-}
-export interface RunResult {
-  verdict: Verdict;
-  peak: number; peakLoad: number;
-  burstRented: number; burstCost: number;
-  failedPct: number; downMins: number;
-  cities: CityResult[];
-}
+export type Verdict = StreamingRehearsalVerdict;
+export type RunResult = StreamingLaunchRehearsalResult;
 
 /** S-curve: nobody at 0, everyone by the time the show starts, then a slow bleed */
 const curveAt = (t: number) => {
@@ -907,15 +1800,22 @@ const curveAt = (t: number) => {
 const Rehearsal: React.FC<{
   brand: Brand; d: Derived; inp: BuildInputs; sel: BuildSel;
   onClose: () => void; onResult: (r: RunResult) => void;
-}> = ({ brand, d, inp, sel, onClose, onResult }) => {
+  onRepair: (next: BuildSel, message: string) => void;
+  onOpenContent?: () => void;
+}> = ({ brand, d, inp, sel, onClose, onResult, onRepair, onOpenContent }) => {
   const [scenario, setScenario] = useState<Scenario>('LIKELY');
   const [running, setRunning] = useState(false);
   const [t, setT] = useState(0);
   const [result, setResult] = useState<RunResult | null>(null);
+  const [viewerMarketId, setViewerMarketId] = useState<string | null>(null);
+  const [viewerViewOpen, setViewerViewOpen] = useState(false);
   const raf = useRef(0);
 
-  const target = d.demandTotal(scenario);
-  const wobble = docOf(sel.doctrine).wobble;
+  const forecast = useMemo(
+    () => deriveStreamingLaunchRehearsal(d, inp, sel, scenario),
+    [d, inp, scenario, sel],
+  );
+  const target = forecast.peakConcurrentStreams;
 
   useEffect(() => {
     if (!running) return;
@@ -937,57 +1837,17 @@ const Rehearsal: React.FC<{
     function finish() {
       if (over) return;
       over = true;
-
-      /* every hall is judged on its own traffic, and the worst one is the night */
-      const cities: CityResult[] = d.halls.map(h => {
-        const dem = d.demandOfCity(h.city.id, scenario);
-        let v: Verdict = 'HELD';
-        let failed = 0;
-        if (dem > h.burstCeiling) {
-          v = 'BROKE';
-          failed = Math.min(82, Math.round(((dem - h.burstCeiling) / dem) * 100) + Math.round(wobble * 40));
-        } else if (dem > h.ceiling) {
-          v = 'BURST';
-          failed = Math.round(wobble * 22);
-        } else if (wobble > .08 && dem > h.ceiling * .82) {
-          v = 'BURST';
-          failed = Math.round(wobble * 14);
-        }
-        return {
-          cityId: h.city.id, label: h.city.label, demand: dem,
-          ceiling: h.ceiling, burstCeiling: h.burstCeiling, verdict: v, failedPct: failed,
-        };
-      });
-
-      const worst: Verdict = cities.some(x => x.verdict === 'BROKE') ? 'BROKE'
-        : cities.some(x => x.verdict === 'BURST') ? 'BURST' : 'HELD';
-      const burstRented = cities.reduce((s, x) =>
-        s + Math.max(0, Math.min(x.demand, x.burstCeiling) - x.ceiling), 0);
-      const failedPct = cities.length
-        ? Math.round(cities.reduce((s, x) => s + x.failedPct * (x.demand || 1), 0)
-          / Math.max(1, cities.reduce((s, x) => s + (x.demand || 1), 0)))
-        : 0;
-
-      const r: RunResult = {
-        verdict: worst,
-        peak: target,
-        peakLoad: d.ceiling ? Math.round((target / d.ceiling) * 100) : 999,
-        burstRented, burstCost: Math.round(burstRented * 4.1),
-        failedPct,
-        downMins: failedPct > 0 ? 6 + Math.round(failedPct * .9) : 0,
-        cities,
-      };
-      setResult(r); setRunning(false); onResult(r);
+      setResult(forecast); setRunning(false); onResult(forecast);
     }
-  }, [running]);
+  }, [forecast, onResult, running]);
 
   const live = Math.round(target * curveAt(t));
-  const loadPct = d.ceiling ? (live / d.ceiling) * 100 : 999;
-  const overNow = live > d.ceiling;
-  const brokeNow = live > d.burstCeiling;
+  const loadPct = forecast.steadyCapacity ? (live / forecast.steadyCapacity) * 100 : 999;
+  const overNow = live > forecast.steadyCapacity;
+  const brokeNow = live > forecast.burstCapacity;
 
   const W = 300, H = 104;
-  const top = Math.max(target, d.burstCeiling) * 1.1 || 1;
+  const top = Math.max(target, forecast.burstCapacity) * 1.1 || 1;
   const pts = useMemo(() => {
     const out: string[] = [];
     for (let i = 0; i <= 64; i++) {
@@ -999,9 +1859,42 @@ const Rehearsal: React.FC<{
     return out.join(' ');
   }, [t, target, top]);
   const yOf = (v: number) => H - (v / top) * H;
+  const commandStep = result ? 5 : running ? Math.min(5, Math.floor(t * 5) + 1) : 0;
+  const viewerCountry = result
+    ? result.countries.find(country => country.marketId === viewerMarketId) || result.countries[0]
+    : null;
+
+  const applyRehearsalRepair = (action: StreamingRehearsalRepairAction) => {
+    if (action.type === 'EXPAND_RIGHTS') {
+      onClose();
+      onOpenContent?.();
+      return;
+    }
+    const facilities = facilitiesOf(sel);
+    if (action.type === 'REPAIR_PHYSICAL') {
+      const facility = facilities.find(item => item.id === action.facilityId);
+      if (!facility) return;
+      const repaired = applyStreamingFacilityRepair(facility, action.physicalAction, inp.absoluteWeek || 0);
+      onRepair(
+        selectionWithFacilities(sel, facilities.map(item => item.id === action.facilityId ? repaired.facility : item)),
+        `${repaired.summary} The rehearsal evidence is now stale; run it again before commissioning.`,
+      );
+      return;
+    }
+    const repaired = addMarketplaceCapacity(
+      facilities,
+      action.cityId,
+      action.racks,
+      action.type === 'ADD_REGIONAL_HUB' ? 'REGIONAL_HUB' : 'EDGE_CACHE',
+    );
+    onRepair(
+      selectionWithFacilities(sel, repaired),
+      `${action.label}: ${action.racks} rack${action.racks === 1 ? '' : 's'} drafted. Run the rehearsal again to verify the viewer consequence.`,
+    );
+  };
 
   return (
-    <div className={cx(css.rh, (brokeNow ? ' broke' : overNow ? css.hot : ''), (result ? css.done : ''))}>
+    <div className={cx(css.rh, (brokeNow ? css.broke : overNow ? css.hot : ''), (result ? css.done : ''))}>
       <div className={css.rhtop}>
         <button className={css.rhx} onClick={onClose} aria-label="Close">✕</button>
         <div className={css.rhtitle}>
@@ -1012,6 +1905,19 @@ const Rehearsal: React.FC<{
       </div>
 
       <div className={css.rhscroll}>
+        <div className={css.rhsequence} aria-label="Launch rehearsal sequence">
+          {[
+            ['AUDIENCE', 'Countries arrive'],
+            ['ROUTE', 'Traffic crosses the network'],
+            ['STRESS', 'Facilities take the load'],
+            ['VIEWERS', 'Consequences appear'],
+            ['DECISION', 'Repair or accept risk'],
+          ].map(([label, detail], index) => (
+            <div key={label} className={cx(commandStep > index ? css.revealed : '', commandStep === index + 1 ? css.active : '')}>
+              <i>{commandStep > index ? '✓' : index + 1}</i><span><b>{label}</b><em>{detail}</em></span>
+            </div>
+          ))}
+        </div>
         {!running && !result && (
           <>
             <p className={css.rhlead}>
@@ -1030,19 +1936,19 @@ const Rehearsal: React.FC<{
             </div>
 
             <div className={css.rhcities}>
-              {d.halls.map(h => {
-                const dem = d.demandOfCity(h.city.id, scenario);
-                const pct = h.ceiling ? Math.round((dem / h.ceiling) * 100) : 0;
+              {forecast.countries.map(country => {
+                const tone = country.verdict === 'BROKE' ? css.bad
+                  : country.bufferingRiskPercent >= 15 || country.outageResistance === 'SINGLE_POINT' ? css.warn : css.good;
                 return (
-                  <div className={css.rhcity} key={h.city.id}>
+                  <div className={css.rhcity} key={country.marketId}>
                     <div className={css.rctop}>
-                      <b>{h.city.label}</b>
-                      <em className={pct > 100 ? css.bad : pct > 82 ? css.warn : css.good}>{pct}%</em>
+                      <b>{country.country}</b>
+                      <em className={tone}>{conc(country.demand)}</em>
                     </div>
                     <div className={css.rcbar}>
-                      <i style={{ width: `${Math.min(100, pct)}%` }} className={pct > 100 ? css.bad : pct > 82 ? css.warn : ''} />
+                      <i style={{ width: `${Math.min(100, Math.max(6, 100 - country.bufferingRiskPercent))}%` }} className={tone} />
                     </div>
-                    <span>{conc(dem)} expected · {conc(h.ceiling)} ceiling</span>
+                    <span>{country.startupTimeMs === null ? 'No delivery path' : `${(country.startupTimeMs / 1000).toFixed(1)}s startup`} · {country.bufferingRiskPercent}% buffer risk · {country.catalogueAvailabilityPercent}% catalogue</span>
                   </div>
                 );
               })}
@@ -1052,28 +1958,40 @@ const Rehearsal: React.FC<{
 
         {(running || result) && (
           <>
-            <div className={css.rhlive}>
+            <div className={css.rhlive} role="status" aria-live="polite">
               <span>CONCURRENT STREAMS</span>
-              <b className={brokeNow ? css.bad : overNow ? css.warn : ''}>{conc(result ? result.peak : live)}</b>
-              <em>{Math.round(result ? result.peakLoad : loadPct)}% of your own capacity</em>
+              <b className={brokeNow ? css.bad : overNow ? css.warn : ''}>{conc(result ? result.peakConcurrentStreams : live)}</b>
+              <em>{Math.round(result ? result.peakLoadPercent : loadPct)}% of your own capacity</em>
             </div>
 
             <svg className={css.rhchart} viewBox={`0 0 ${W} ${H + 16}`} preserveAspectRatio="none">
-              {d.burstCeiling > d.ceiling && (
-                <line className={css.burstline} x1="0" x2={W} y1={yOf(d.burstCeiling)} y2={yOf(d.burstCeiling)} />
+              {forecast.burstCapacity > forecast.steadyCapacity && (
+                <line className={css.burstline} x1="0" x2={W} y1={yOf(forecast.burstCapacity)} y2={yOf(forecast.burstCapacity)} />
               )}
-              <line className={css.ceilline} x1="0" x2={W} y1={yOf(d.ceiling)} y2={yOf(d.ceiling)} />
+              <line className={css.ceilline} x1="0" x2={W} y1={yOf(forecast.steadyCapacity)} y2={yOf(forecast.steadyCapacity)} />
               <polyline className={css.curve} points={pts} />
               {pts && <circle className={css.head} r="3.4" cx={(t * W).toFixed(1)} cy={yOf(live).toFixed(1)} />}
             </svg>
             <div className={css.rhkeys}>
-              <span><i className={css.kc} />your capacity {conc(d.ceiling)}</span>
-              {d.burstCeiling > d.ceiling && <span><i className={css.kb} />rented burst {conc(d.burstCeiling)}</span>}
+              <span><i className={css.kc} />your capacity {conc(forecast.steadyCapacity)}</span>
+              {forecast.burstCapacity > forecast.steadyCapacity && <span><i className={css.kb} />protected burst {conc(forecast.burstCapacity)}</span>}
             </div>
 
             <div className={css.rhbar}>
               <i className={css.fill} style={{ width: `${Math.min(100, loadPct)}%` }} />
             </div>
+
+            {running && commandStep >= 2 && <div className={css.rhcommandfeed} aria-live="polite">
+              {commandStep === 2 && forecast.countries.slice(0, 4).map(country => (
+                <span key={country.marketId}><i />{country.country}<b>{country.servingCityLabels.join(' + ') || 'NO ROUTE'}</b></span>
+              ))}
+              {commandStep === 3 && forecast.facilities.map(facility => (
+                <span key={facility.facilityId} className={css[facility.state.toLowerCase()] || ''}><i />{facility.cityLabel}<b>{facility.loadPercent}% · {facility.state}</b></span>
+              ))}
+              {commandStep === 4 && forecast.countries.slice(0, 4).map(country => (
+                <span key={country.marketId}><i />{country.country}<b>{country.viewerConsequence}</b></span>
+              ))}
+            </div>}
           </>
         )}
 
@@ -1086,38 +2004,58 @@ const Rehearsal: React.FC<{
             </b>
             <p>
               {result.verdict === 'HELD' && (
-                <>Peak {conc(result.peak)} against {conc(d.ceiling)} across {result.cities.length}
-                  {' '}cit{result.cities.length === 1 ? 'y' : 'ies'}. Every territory got through the
-                  night, and you pay for that headroom every week to have it.</>
+                <>Peak {conc(result.peakConcurrentStreams)} against {conc(result.steadyCapacity)} steady capacity.
+                  {' '}{result.spareCapacityPercent}% burst room remains, with country-level rights and delivery checks included.</>
               )}
               {result.verdict === 'BURST' && (
-                <>Peak {conc(result.peak)} went past your own hardware. You rented {conc(result.burstRented)}
-                  {' '}for the night at {money(result.burstCost)}
-                  {result.failedPct > 0 ? `, and ${result.failedPct}% of streams still stuttered.` : '. Nobody watching noticed a thing.'}</>
+                <>Peak {conc(result.peakConcurrentStreams)} crosses steady capacity and uses the protected burst envelope.
+                  {result.failedPercent > 0 ? ` ${result.failedPercent}% of streams are still expected to stutter or fail.` : ' Viewers should remain connected, but the margin is thin.'}</>
               )}
               {result.verdict === 'BROKE' && (() => {
-                const worst = [...result.cities].sort((a, b) => b.failedPct - a.failedPct)[0];
-                const ok = result.cities.filter(x => x.verdict === 'HELD').map(x => x.label);
+                const worst = [...result.countries].sort((a, b) => b.failedPercent - a.failedPercent)[0];
+                const ok = result.countries.filter(x => x.verdict === 'HELD').map(x => x.country);
                 return (
                   <>{ok.length ? `${ok.join(' and ')} held. ` : ''}
-                    <b>{worst.label} failed.</b> {conc(worst.demand)} people came at
-                    {' '}{conc(worst.burstCeiling)} of everything that hall has, rented included,
-                    and {worst.failedPct}% of them got nothing — on the one night your whole
-                    audience was watching.</>
+                    <b>{worst.country} failed.</b> {conc(worst.demand)} viewers arrived through
+                    {' '}{worst.servingCityLabels.join(' + ') || 'no working route'}, and {worst.failedPercent}%
+                    {' '}of attempted streams are expected to fail.</>
                 );
               })()}
             </p>
 
+            <div className={css.rhsummarygrid} aria-label="Launch rehearsal summary">
+              <span><em>PEAK</em><b>{conc(result.peakConcurrentStreams)}</b></span>
+              <span><em>SPARE</em><b className={result.spareCapacityPercent < 10 ? css.bad : ''}>{result.spareCapacityPercent}%</b></span>
+              <span><em>CATALOGUE</em><b className={result.catalogueAvailabilityPercent < 100 ? css.warn : ''}>{result.catalogueAvailabilityPercent}%</b></span>
+              <span><em>REGIONAL SPF</em><b className={result.regionalSinglePointFailures.length ? css.warn : ''}>{result.regionalSinglePointFailures.length}</b></span>
+            </div>
+            <div className={css.rhwarning}>{result.warningSummary}</div>
+
+            <button
+              type="button"
+              className={css.rhvieweropen}
+              onClick={() => {
+                const worstCountry = [...result.countries]
+                  .sort((a, b) => b.failedPercent - a.failedPercent)[0];
+                setViewerMarketId(worstCountry?.marketId || result.countries[0]?.marketId || null);
+                setViewerViewOpen(true);
+              }}
+            >
+              <span><b>SEE WHAT VIEWERS SEE</b><em>Open the stream in every launch market</em></span>
+              <i aria-hidden="true">→</i>
+            </button>
+
             {/* per city, because "which of my own territories did I let down" is
                 a far better question than one global percentage */}
             <div className={css.citygrid}>
-              {result.cities.map(x => (
-                <div className={cx(css.cres, css[x.verdict.toLowerCase()])} key={x.cityId}>
+              {result.countries.map(x => (
+                <div className={cx(css.cres, css[x.verdict.toLowerCase()])} key={x.marketId}>
                   <div className={css.crtop}>
-                    <b>{x.label}</b>
+                    <b>{x.country}</b>
                     <em>{x.verdict === 'HELD' ? 'HELD' : x.verdict === 'BURST' ? 'RENTED' : 'FAILED'}</em>
                   </div>
-                  <span>{conc(x.demand)} vs {conc(x.ceiling)}{x.failedPct > 0 ? ` · ${x.failedPct}% lost` : ''}</span>
+                  <span>{conc(x.demand)} · {x.startupTimeMs === null ? 'no route' : `${(x.startupTimeMs / 1000).toFixed(1)}s start`} · {x.bufferingRiskPercent}% buffer{x.failedPercent > 0 ? ` · ${x.failedPercent}% lost` : ''}</span>
+                  <small>{x.catalogueAvailabilityPercent}% catalogue · {x.outageResistance.replace('_', ' ')}</small>
                 </div>
               ))}
             </div>
@@ -1126,46 +2064,111 @@ const Rehearsal: React.FC<{
             <div className={css.ministatus}>
               <div className={css.mstop}>
                 <b>Streaming delivery</b>
-                <em className={result.verdict === 'BROKE' ? css.outage : result.verdict === 'BURST' && result.failedPct > 0 ? css.degraded : css.operational}>
+                <em className={result.verdict === 'BROKE' ? css.outage : result.verdict === 'BURST' && result.failedPercent > 0 ? css.degraded : css.operational}>
                   {result.verdict === 'BROKE' ? 'Major outage'
-                    : result.verdict === 'BURST' && result.failedPct > 0 ? 'Degraded performance'
+                    : result.verdict === 'BURST' && result.failedPercent > 0 ? 'Degraded performance'
                       : 'Operational'}
                 </em>
               </div>
               <div className={css.mstrip}>
                 {Array.from({ length: 46 }).map((_, n) => {
                   const bad = n >= 42 && result.verdict === 'BROKE';
-                  const deg = n >= 43 && result.verdict === 'BURST' && result.failedPct > 0;
+                  const deg = n >= 43 && result.verdict === 'BURST' && result.failedPercent > 0;
                   return <i key={n} className={bad ? css.down : deg ? css.deg : css.ok} />;
                 })}
               </div>
             </div>
 
             <div className={css.fixes}>
-              <span className={css.fixhead}>WHAT WOULD CHANGE IT</span>
-              {result.cities.filter(x => x.verdict === 'BROKE').map(x => (
-                <div className={css.fix} key={x.cityId}>
-                  {x.label} needs {Math.ceil((x.demand - x.ceiling) / PER_RACK_CEILING)} more
-                  rack{Math.ceil((x.demand - x.ceiling) / PER_RACK_CEILING) === 1 ? '' : 's'} to
-                  carry its own traffic.
-                </div>
+              <span className={css.fixhead}>REPAIR THE PLAN</span>
+              {result.repairActions.map(action => (
+                <button className={css.fixaction} key={action.id} onClick={() => applyRehearsalRepair(action)}>
+                  <span><b>{action.label.toUpperCase()}</b>{action.detail}</span>
+                  <i>{action.type === 'EXPAND_RIGHTS' ? 'OPEN →' : 'FIX →'}</i>
+                </button>
               ))}
               {result.verdict !== 'HELD' && archOf(sel.arch).burst === 0 && (
-                <div className={css.fix}>Owned metal has no burst. Hybrid or cloud lets you rent your way out of a spike.</div>
+                <button className={css.fixaction} onClick={() => onRepair({ ...sel, arch: 'HYBRID' }, 'Hybrid burst enabled. Rehearse again before commissioning.')}>
+                  <span><b>ENABLE HYBRID BURST</b>Rent temporary capacity when a premiere crosses your own ceiling.</span><i>FIX →</i>
+                </button>
               )}
               {sel.doctrine === 'RUSHED' && (
-                <div className={css.fix}>Sprint-built halls run at 90% of their rated ceiling and wobble under load.</div>
+                <button className={css.fixaction} onClick={() => onRepair({ ...sel, doctrine: 'STANDARD' }, 'Construction returned to a standard schedule. Rehearse again to verify it.')}>
+                  <span><b>STOP RUSHING THE BUILD</b>Restore testing time and rated stability.</span><i>FIX →</i>
+                </button>
               )}
               {result.verdict !== 'HELD' && sel.campaign !== 'NONE' && (
-                <div className={css.fix}>A smaller campaign brings fewer people — and fewer people is the cheapest capacity there is.</div>
+                <button className={css.fixaction} onClick={() => onRepair({ ...sel, campaign: 'NONE' }, 'The launch campaign was removed. Demand forecast has been recalculated.')}>
+                  <span><b>REDUCE OPENING HYPE</b>Lower demand instead of buying more capacity.</span><i>CHANGE →</i>
+                </button>
               )}
-              {result.verdict === 'HELD' && (
-                <div className={css.fix}>Nothing needs to change. Consider whether you have bought more room than you need.</div>
+              {result.repairActions.length === 0 && result.verdict === 'HELD' && (
+                <div className={css.fix}>Nothing needs to change. Every opening market clears traffic, rights and resilience checks.</div>
               )}
             </div>
+            {result.verdict !== 'HELD' && (
+              <div className={css.overridecopy}>
+                <b>FOUNDER OVERRIDE AVAILABLE</b>
+                <span>This warning will remain on the launch record, but it will not stop you from commissioning the network.</span>
+              </div>
+            )}
           </div>
         )}
       </div>
+
+      {viewerViewOpen && viewerCountry && (
+        <div className={css.viewerOverlay} role="dialog" aria-modal="true" aria-label="Viewer experience">
+          <header className={css.viewerTop}>
+            <button type="button" onClick={() => setViewerViewOpen(false)} aria-label="Close viewer experience">✕</button>
+            <span><b>VIEWER EXPERIENCE</b><em>{viewerCountry.country}</em></span>
+          </header>
+
+          <div className={css.viewerBody}>
+            <div className={cx(css.viewerScreen, css[viewerCountry.verdict.toLowerCase()])}>
+              <div className={css.viewerSignal} aria-hidden="true" />
+              <span className={css.viewerService}>{brand.name}</span>
+              <div className={css.viewerTitle}>
+                <span>PREMIERE NIGHT</span>
+                <b>{inp.premiereTitle}</b>
+              </div>
+              <div className={css.viewerPlayback}>
+                {viewerCountry.verdict === 'BROKE' ? (
+                  <><i className={css.viewerSpinner} /><b>STREAM UNAVAILABLE</b></>
+                ) : viewerCountry.bufferingRiskPercent >= 15 ? (
+                  <><i className={css.viewerSpinner} /><b>BUFFERING</b></>
+                ) : (
+                  <><i className={css.viewerPlay}><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z" fill="currentColor" /></svg></i><b>PLAYING</b></>
+                )}
+              </div>
+              <div className={css.viewerTimeline}><i style={{ width: viewerCountry.verdict === 'BROKE' ? '12%' : '42%' }} /></div>
+            </div>
+
+            <div className={css.viewerMarkets} aria-label="Choose viewer market">
+              {result.countries.map(country => (
+                <button
+                  type="button"
+                  key={country.marketId}
+                  className={country.marketId === viewerCountry.marketId ? css.on : undefined}
+                  onClick={() => setViewerMarketId(country.marketId)}
+                >
+                  <b>{country.country}</b>
+                  <em>{country.verdict === 'HELD' ? 'Clear' : country.verdict === 'BURST' ? 'At risk' : 'Failed'}</em>
+                </button>
+              ))}
+            </div>
+
+            <section className={css.viewerReport}>
+              <p>{viewerCountry.viewerConsequence}</p>
+              <div>
+                <span><em>STARTUP</em><b>{viewerCountry.startupTimeMs === null ? 'NO ROUTE' : `${(viewerCountry.startupTimeMs / 1000).toFixed(1)}s`}</b></span>
+                <span><em>BUFFER RISK</em><b>{viewerCountry.bufferingRiskPercent}%</b></span>
+                <span><em>STREAMS LOST</em><b>{viewerCountry.failedPercent}%</b></span>
+                <span><em>CATALOGUE</em><b>{viewerCountry.catalogueAvailabilityPercent}%</b></span>
+              </div>
+            </section>
+          </div>
+        </div>
+      )}
 
       <div className={css.rhfoot}>
         {!running && !result && (
@@ -1183,6 +2186,17 @@ const Rehearsal: React.FC<{
   );
 };
 
+/**
+ * Reuses the original rehearsal as a standalone full-screen experience from
+ * the transplanted Build wizard. The `.bld` shell supplies the exact legacy
+ * tokens and fixed mobile frame without duplicating any simulation logic.
+ */
+export const StreamingLoadRehearsalExperience: React.FC<React.ComponentProps<typeof Rehearsal>> = props => (
+  <div className={css.bld} style={brandVars(props.brand)}>
+    <Rehearsal {...props} />
+  </div>
+);
+
 /* ============================================================
    THE SCREEN
    ============================================================ */
@@ -1197,6 +2211,7 @@ export const TheBuild: React.FC<{
   /** what has actually been paid for and stands. null until commissioning —
       everything on screen before that is a drawing, and says so. */
   built?: Placement[] | null;
+  builtFacilities?: OwnedStreamingFacility[] | null;
   /** true only once opening night has actually been played */
   isLive?: boolean;
   onCommit?: (p: Placement[]) => BuildCommitResult | void;
@@ -1207,11 +2222,13 @@ export const TheBuild: React.FC<{
   /** the plans on sale, summarised — the page itself lives in pricing.tsx */
   pricing?: { label: string; arpu: string; reach: string; problems: number; sellable: number };
   onOpenPricing?: () => void;
-  /** where the money came from — see raise.tsx */
+  /** Route catalogue-rights repair actions back to the canonical Content desk. */
+  onOpenContent?: () => void;
+  /** where the money came from — the canonical Finance Room owns new capital */
   funding?: { borrowed: number; soldPct: number; own: number };
   onRaise?: () => void;
-}> = ({ brand, inputs, sel, result, onResult, built, isLive, onCommit, onOpenNight,
-  onChange, onBack, onLaunch, pricing, onOpenPricing, funding, onRaise }) => {
+}> = ({ brand, inputs, sel, result, onResult, built, builtFacilities, isLive, onCommit, onOpenNight,
+  onChange, onBack, onLaunch, pricing, onOpenPricing, onOpenContent, funding, onRaise }) => {
   const c = brandColor(brand), c2 = brandDeep(brand);
   const d = useMemo(() => derive(sel, inputs), [sel, inputs]);
   const [rehearse, setRehearse] = useState(false);
@@ -1219,25 +2236,128 @@ export const TheBuild: React.FC<{
   const [commissioning, setCommissioning] = useState(false);
   const [commitResult, setCommitResult] = useState<BuildCommitResult | null>(null);
   const [commitFeedback, setCommitFeedback] = useState('');
+  const [planFeedback, setPlanFeedback] = useState('');
   const [showNetworkDetail, setShowNetworkDetail] = useState(false);
+  const [marketplaceCityId, setMarketplaceCityId] = useState<string | null>(null);
+  const [assistedPlan, setAssistedPlan] = useState<AssistedNetworkPlan | null>(null);
+  /** Which node the player last tapped on the map. Detail is pulled, not pushed. */
+  const [mapFocusId, setMapFocusId] = useState<string | null>(null);
+  /** The team's standing orders exist, but they are never the first read. */
+  const [showTeamRules, setShowTeamRules] = useState(false);
+  const [activeStage, setActiveStage] = useState<BuildStage>(() => (
+    sel.placements.some(placement => placement.racks > 0) ? 'PLANS' : 'SITES'
+  ));
+  const buildScrollRef = useRef<HTMLDivElement>(null);
   const last = result ?? null;
+  const recommendation = useMemo(() => recommendedMarketPlacements(inputs), [inputs]);
+  const recommendationFacilities = useMemo(
+    () => facilitiesForPlacements(recommendation),
+    [recommendation],
+  );
+  const currentFacilities = useMemo(() => facilitiesOf(sel), [sel.facilities, sel.placements]);
+  const managementPolicy = useMemo(
+    () => normalizeStreamingInfrastructureManagementPolicy(sel.managementPolicy),
+    [sel.managementPolicy],
+  );
+  const plannerCities = useMemo(() => uniqueCities([
+    ...managementPolicy.preferredCityIds,
+    ...recommendation.map(placement => placement.cityId),
+    ...suggestedCities(inputs.regions, 8, inputs.homeCityId).map(city => city.id),
+  ]).slice(0, 8), [managementPolicy.preferredCityIds, recommendation, inputs.regions, inputs.homeCityId]);
+  const placementKey = (placements: Placement[]) => [...placements]
+    .filter(placement => placement.racks > 0)
+    .map(placement => `${placement.cityId}:${placement.racks}:${placement.role}`)
+    .sort().join('|');
+  const recommendationActive = placementKey(recommendation) === placementKey(sel.placements);
   const preset = useMemo(
     () => matchedPreset(sel, inputs.regions, inputs.homeCityId),
     [sel, inputs.regions, inputs.homeCityId]);
 
   const isBuilt = !!built;
-  const builtOf = (cityId: string) => built?.find(p => p.cityId === cityId)?.racks ?? 0;
-  const planned = d.halls.reduce((s, h) => s + Math.max(0, h.racks - builtOf(h.city.id)), 0);
+  const builtFacilityList = useMemo(
+    () => builtFacilities?.length ? builtFacilities : migratePlacementsToStreamingFacilities(built),
+    [built, builtFacilities],
+  );
+  const builtOf = (facilityId: string, cityId: string) => (
+    builtFacilityList.find(facility => facility.id === facilityId)?.installedRacks
+    ?? built?.find(p => p.cityId === cityId)?.racks
+    ?? 0
+  );
+  const planned = d.halls.reduce((s, h) => s + Math.max(0, h.racks - builtOf(h.facilityId, h.city.id)), 0);
+
+  /* ── what the map draws ───────────────────────────────────────────────
+     One node per hall, marked built or merely drawn. The map derives nothing
+     of its own; every number here already came out of derive(). */
+  const mapNodes = useMemo<NetworkMapNode[]>(() => d.halls.map(hall => ({
+    facilityId: hall.facilityId,
+    city: hall.city,
+    racks: hall.racks,
+    role: hall.role,
+    load: hall.load / 100,
+    built: builtOf(hall.facilityId, hall.city.id) > 0,
+  })), [d.halls, builtFacilityList, built]);
+  const focusHall = mapFocusId ? d.halls.find(hall => hall.facilityId === mapFocusId) ?? null : null;
+
+  /* The size slider's position. -1 means the network no longer matches any
+     package, which is the honest reading once a player has hand-placed. */
+  const sizeIndex = preset ? PACKAGES.findIndex(pkg => pkg.id === preset) : -1;
+  const applyPackage = (id: PkgId) => {
+    const placements = presetPlacements(id, inputs.regions, inputs.homeCityId);
+    commit(selectionWithFacilities(sel, facilitiesForPlacements(placements)));
+  };
   /* what the committed build costs, so a revision can be priced as a difference */
   const dBuilt = useMemo(
-    () => derive({ ...sel, placements: built ?? [] }, inputs),
-    [sel.arch, sel.doctrine, sel.campaign, built, inputs]);
+    () => derive({
+      ...sel,
+      placements: built ?? [],
+      facilities: builtFacilityList,
+    }, inputs),
+    [sel.arch, sel.doctrine, sel.campaign, built, builtFacilityList, inputs]);
 
   const commit = (s: BuildSel) => {
+    setAssistedPlan(null);
     setCommitFeedback('');
+    setPlanFeedback('');
     setCommitResult(null);
     onResult?.(null);
-    onChange(s);
+    onChange(s.facilities?.length ? selectionWithFacilities(s, s.facilities) : s);
+  };
+
+  const saveManagementPolicy = (patch: Partial<StreamingInfrastructureManagementPolicy>) => {
+    const nextPolicy = normalizeStreamingInfrastructureManagementPolicy({
+      ...managementPolicy,
+      ...patch,
+    });
+    setAssistedPlan(null);
+    setPlanFeedback('');
+    // Preferences do not invalidate a load test because they are not part of
+    // the network simulation. Only an applied facility draft does that.
+    onChange({ ...sel, managementPolicy: nextPolicy });
+  };
+
+  const togglePreferredCity = (cityId: string) => {
+    const selected = managementPolicy.preferredCityIds.includes(cityId);
+    const preferredCityIds = selected
+      ? managementPolicy.preferredCityIds.filter(id => id !== cityId)
+      : [...managementPolicy.preferredCityIds, cityId].slice(0, 4);
+    saveManagementPolicy({ preferredCityIds });
+  };
+
+  const draftAssistedPlan = () => {
+    setPlanFeedback('');
+    setAssistedPlan(createAssistedNetworkPlan(
+      sel,
+      inputs,
+      managementPolicy,
+      builtFacilityList,
+    ));
+  };
+
+  const applyAssistedPlan = () => {
+    if (!assistedPlan) return;
+    const next = assistedPlan.selection;
+    commit(next);
+    setPlanFeedback(`Assisted draft applied: ${next.placements.length} network ${next.placements.length === 1 ? 'city' : 'cities'} and ${next.placements.reduce((sum, placement) => sum + placement.racks, 0)} racks. Rehearse before commissioning.`);
   };
 
   const beginCommissioning = () => {
@@ -1253,32 +2373,160 @@ export const TheBuild: React.FC<{
     setCommissioning(true);
   };
 
-  const setRacks = (cityId: string, racks: number) => {
-    const n = Math.max(0, Math.min(MAX_RACKS_PER_CAMPUS, racks));
-    const next = sel.placements.some(p => p.cityId === cityId)
-      ? sel.placements.map(p => p.cityId === cityId ? { ...p, racks: n } : p)
-      : [...sel.placements, {
-        cityId,
-        racks: n,
-        role: sel.placements.some(p => p.role === 'CORE_ORIGIN') ? 'EDGE_CACHE' : 'CORE_ORIGIN' as const,
-      }];
-    const active = next.filter(p => p.racks > 0);
-    if (active.length && !active.some(p => p.role === 'CORE_ORIGIN')) active[0] = { ...active[0], role: 'CORE_ORIGIN' };
-    commit({ ...sel, placements: active });
+  const setRacks = (facilityId: string, racks: number) => {
+    const facility = currentFacilities.find(item => item.id === facilityId);
+    if (!facility) return;
+    const capacity = getStreamingFacilityCapacity(facility);
+    const n = Math.max(0, Math.min(capacity, racks));
+    const next = currentFacilities
+      .map(item => item.id === facilityId ? withSyncedRackGroups(item, n) : item)
+      .filter(item => item.installedRacks > 0);
+    if (next.length && !next.some(item => item.role === 'CORE_ORIGIN')) {
+      next[0] = withFacilityNetworkRole(next[0], 'CORE_ORIGIN');
+    }
+    commit(selectionWithFacilities(sel, next));
   };
 
-  const setRole = (cityId: string, role: StreamingNetworkNodeRole) => {
-    const next = sel.placements.map(p => {
-      if (p.cityId === cityId) return { ...p, role };
-      if (role === 'CORE_ORIGIN' && p.role === 'CORE_ORIGIN') return { ...p, role: 'REGIONAL_HUB' as const };
-      return p;
-    });
-    const active = next.filter(p => p.racks > 0);
-    if (active.length && !active.some(p => p.role === 'CORE_ORIGIN')) {
-      const fallback = active.findIndex(p => p.cityId !== cityId);
-      active[Math.max(0, fallback)] = { ...active[Math.max(0, fallback)], role: 'CORE_ORIGIN' };
+  const setFacilityGroups = (facilityId: string, groups: OwnedStreamingRackGroup[]) => {
+    const next = currentFacilities.map(facility => {
+      if (facility.id !== facilityId) return facility;
+      const rackGroups = groups.filter(group => group.rackCount > 0);
+      const installedRacks = rackGroups.reduce((sum, group) => sum + group.rackCount, 0);
+      return {
+        ...facility,
+        installedRacks,
+        rackGroups,
+        role: projectFacilityNetworkRole(rackGroups),
+      };
+    }).filter(facility => facility.installedRacks > 0);
+    if (next.length && !next.some(facility => facility.rackGroups?.some(group => getProjectedRackDuty(group) === 'CONTENT_ORIGIN'))) {
+      const first = next[0];
+      const groups = normalizeStreamingRackGroups(first.rackGroups, first.id, first.installedRacks, first.role);
+      groups[0] = { ...groups[0], duty: 'CONTENT_ORIGIN', migration: undefined, name: 'Content origin 1' };
+      next[0] = { ...first, rackGroups: groups, role: 'CORE_ORIGIN' };
     }
-    commit({ ...sel, placements: active });
+    commit(selectionWithFacilities(sel, next));
+  };
+
+  const installRackGroup = (facilityId: string, duty: StreamingRackDuty) => {
+    const facility = currentFacilities.find(item => item.id === facilityId);
+    if (!facility || facility.installedRacks >= getStreamingFacilityCapacity(facility)) return;
+    const groups = normalizeStreamingRackGroups(facility.rackGroups, facility.id, facility.installedRacks, facility.role);
+    const ordinal = groups.length + 1;
+    setFacilityGroups(facilityId, [...groups, {
+      id: createStreamingRackGroupId(facilityId, ordinal),
+      name: `${getStreamingRackDutyRule(duty).name} ${ordinal}`,
+      rackCount: 1,
+      duty,
+    }]);
+    setPlanFeedback(`${getStreamingRackDutyRule(duty).name} group installed in ${cityById(facility.cityId)?.label || facility.cityId}. Rehearsal demand has been recalculated.`);
+  };
+
+  const changeRackGroupDuty = (facilityId: string, groupId: string, duty: StreamingRackDuty) => {
+    const facility = currentFacilities.find(item => item.id === facilityId);
+    if (!facility) return;
+    const allGroups = currentFacilities.flatMap(item => normalizeStreamingRackGroups(
+      item.rackGroups,
+      item.id,
+      item.installedRacks,
+      item.role,
+    ));
+    const currentGroup = allGroups.find(group => group.id === groupId);
+    const originCount = allGroups.filter(group => getProjectedRackDuty(group) === 'CONTENT_ORIGIN').length;
+    if (currentGroup && getProjectedRackDuty(currentGroup) === 'CONTENT_ORIGIN'
+      && duty !== 'CONTENT_ORIGIN' && originCount <= 1) {
+      setPlanFeedback('Keep one Content Origin online. It is the master library every cache and edge group depends on. Install another origin before changing this duty.');
+      return;
+    }
+    const groups = normalizeStreamingRackGroups(facility.rackGroups, facility.id, facility.installedRacks, facility.role)
+      .map(group => group.id !== groupId || getProjectedRackDuty(group) === duty ? group : {
+        ...group,
+        migration: {
+          fromDuty: group.duty,
+          toDuty: duty,
+          weeks: getStreamingRackDutyRule(duty).migrationWeeks,
+          pressurePercent: getStreamingRackDutyRule(duty).migrationPressurePercent,
+        },
+      });
+    setFacilityGroups(facilityId, groups);
+  };
+
+  const resizeRackGroup = (facilityId: string, groupId: string, delta: number) => {
+    const facility = currentFacilities.find(item => item.id === facilityId);
+    if (!facility) return;
+    const groups = normalizeStreamingRackGroups(facility.rackGroups, facility.id, facility.installedRacks, facility.role);
+    const group = groups.find(item => item.id === groupId);
+    if (!group) return;
+    if (delta > 0 && facility.installedRacks >= getStreamingFacilityCapacity(facility)) return;
+    if (delta < 0 && group.rackCount <= 1) return;
+    setFacilityGroups(facilityId, groups.map(item => item.id === groupId
+      ? { ...item, rackCount: item.rackCount + delta }
+      : item));
+  };
+
+  const moveRackGroup = (facilityId: string, groupId: string, targetFacilityId: string) => {
+    const source = currentFacilities.find(item => item.id === facilityId);
+    const target = currentFacilities.find(item => item.id === targetFacilityId);
+    if (!source || !target) return;
+    const sourceGroups = normalizeStreamingRackGroups(source.rackGroups, source.id, source.installedRacks, source.role);
+    const moving = sourceGroups.find(group => group.id === groupId);
+    if (!moving || moving.rackCount > getStreamingFacilityCapacity(target) - target.installedRacks) return;
+    const targetGroups = normalizeStreamingRackGroups(target.rackGroups, target.id, target.installedRacks, target.role);
+    const movedGroup: OwnedStreamingRackGroup = {
+      ...moving,
+      id: createStreamingRackGroupId(target.id, targetGroups.length + 1),
+      name: `${getStreamingRackDutyRule(getProjectedRackDuty(moving)).name} ${targetGroups.length + 1}`,
+      migration: {
+        fromDuty: moving.duty,
+        toDuty: getProjectedRackDuty(moving),
+        weeks: 2,
+        pressurePercent: 15,
+      },
+    };
+    const next = currentFacilities.map(facility => {
+      if (facility.id === source.id) {
+        const rackGroups = sourceGroups.filter(group => group.id !== groupId);
+        return rackGroups.length
+          ? { ...facility, rackGroups, installedRacks: rackGroups.reduce((sum, group) => sum + group.rackCount, 0), role: projectFacilityNetworkRole(rackGroups) }
+          : null;
+      }
+      if (facility.id === target.id) {
+        const rackGroups = [...targetGroups, movedGroup];
+        return { ...facility, rackGroups, installedRacks: rackGroups.reduce((sum, group) => sum + group.rackCount, 0), role: projectFacilityNetworkRole(rackGroups) };
+      }
+      return facility;
+    }).filter((facility): facility is OwnedStreamingFacility => Boolean(facility));
+    commit(selectionWithFacilities(sel, next));
+    setPlanFeedback(`Rack group move scheduled. Capacity runs under extra pressure for ${movedGroup.migration?.weeks || 2} weeks.`);
+  };
+
+  const repairFacility = (facilityId: string, action: StreamingFacilityRepairAction) => {
+    const facility = currentFacilities.find(item => item.id === facilityId);
+    if (!facility) return;
+    const repaired = applyStreamingFacilityRepair(facility, action, inputs.absoluteWeek || 0);
+    const next = currentFacilities.map(item => item.id === facilityId ? repaired.facility : item);
+    commit(selectionWithFacilities(sel, next));
+    setPlanFeedback(`${repaired.summary} The draft adds ${money(repaired.cost)} to infrastructure capital; treasury moves only at commissioning.`);
+  };
+
+  const openCityMarketplace = (cityId: string) => {
+    setPicking(false);
+    setMarketplaceCityId(cityId);
+  };
+
+  const leaseFacility = (listing: StreamingFacilityMarketplaceListing) => {
+    const role: StreamingNetworkNodeRole = currentFacilities.some(facility => facility.role === 'CORE_ORIGIN')
+      ? currentFacilities.some(facility => facility.cityId === listing.cityId)
+        ? 'EDGE_CACHE'
+        : 'REGIONAL_HUB'
+      : 'CORE_ORIGIN';
+    const next = [
+      ...currentFacilities,
+      createStreamingFacilityFromListing(listing, currentFacilities, role, 1),
+    ];
+    commit(selectionWithFacilities(sel, next));
+    setMarketplaceCityId(null);
+    setPlanFeedback(`${listing.providerName} ${listing.shortName.toLowerCase()} added in ${cityById(listing.cityId)?.label || listing.cityId}. It is a draft contract until commissioning.`);
   };
 
   const set = <K extends keyof BuildSel>(k: K, v: BuildSel[K]) => {
@@ -1286,14 +2534,53 @@ export const TheBuild: React.FC<{
     commit({ ...sel, [k]: v });
   };
 
+  const repairCountry = (row: CountryServiceRow) => {
+    const existing = currentFacilities.find(facility => facility.cityId === row.repairCityId);
+    if (existing) {
+      if (existing.installedRacks < getStreamingFacilityCapacity(existing)) {
+        setRacks(existing.id, existing.installedRacks + 1);
+      } else {
+        setMarketplaceCityId(existing.cityId);
+      }
+      return;
+    }
+    setMarketplaceCityId(row.repairCityId);
+  };
+
   const ready = !d.over && last !== null && d.racks > 0
     && (!pricing || pricing.sellable > 0);
+  const activeStageMeta = BUILD_STAGES.find(stage => stage.id === activeStage) || BUILD_STAGES[0];
+  const stageDone: Record<BuildStage, boolean> = {
+    SITES: d.racks > 0 && d.unserved.length === 0,
+    PLANS: d.racks > 0 && (!pricing || pricing.sellable > 0),
+    MONEY: !d.over,
+    TEST: last !== null,
+    LAUNCH: ready,
+  };
+  const goToStage = (stage: BuildStage) => {
+    setActiveStage(stage);
+    buildScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+  /* "Tight" is the last moment a player can still choose a smaller network
+     instead of being told to raise. Below a tenth of the treasury there is not
+     enough headroom left for the catalogue and the campaign to both land. */
+  const tight = !d.over && d.remaining < inputs.treasury * 0.1;
+  const constrainedHalls = d.halls.filter(hall => hall.physical.limitingFactor !== 'NONE');
+  const physicalFloor = d.halls.length
+    ? Math.round(Math.min(...d.halls.map(hall => hall.physical.usableCapacityFactor)))
+    : 0;
+  const physicalWeekly = d.halls.reduce((sum, hall) => sum + hall.physical.weeklyOperatingCost, 0);
+  const backupCoverage = d.racks
+    ? Math.round(d.halls.reduce((sum, hall) => sum + hall.physical.backupCoveragePercent * hall.racks, 0) / d.racks)
+    : 0;
 
   return (
     /* 'drawing', not 'plan' — pricing.tsx owns a global .plan for its columns
        and both stylesheets are live at once while that sheet is open */
     <div className={css.bld}
-      style={{ ['--epx-bld-c' as string]: c}}>
+      data-epx-root
+      data-active-stage={isBuilt ? undefined : activeStage}
+      style={brandVars(brand)}>
       <div className={css.bldtop}>
         <button className={css.bldback} onClick={onBack} aria-label="Back">←</button>
         <div className={css.bldtitle}>
@@ -1307,25 +2594,51 @@ export const TheBuild: React.FC<{
         <span className={css.bldmark}><Mark brand={brand} /></span>
       </div>
 
-      {/* the spine — four things, and where you are among them */}
+      {/* The spine is now the build itself: five short rooms, not one giant page. */}
       {!isBuilt && (
-        <div className={css.spine}>
-          {([
-            ['SITES', d.racks > 0 && d.unserved.length === 0],
-            ['PLANS', !pricing || pricing.sellable > 0],
-            ['MONEY', !d.over],
-            ['TEST', last !== null],
-            ['LAUNCH', ready],
-          ] as [string, boolean][]).map(([label, done], i) => (
-            <div className={cx(css.sp, (done ? css.done : ''))} key={label}>
-              <i className={css.spdot}>{done ? '✓' : i + 1}</i>
-              <span>{label}</span>
-            </div>
+        <div className={css.spine} role="navigation" aria-label="Build stages">
+          {BUILD_STAGES.map((stage, i) => (
+            <button type="button"
+              className={cx(css.sp, stageDone[stage.id] ? css.done : '', activeStage === stage.id ? css.active : '')}
+              aria-current={activeStage === stage.id ? 'step' : undefined}
+              onClick={() => goToStage(stage.id)}
+              key={stage.id}>
+              <i className={css.spdot}>{stageDone[stage.id] ? '✓' : i + 1}</i>
+              <span>{stage.id}</span>
+            </button>
           ))}
         </div>
       )}
 
-      <div className={css.bldscroll}>
+      {!isBuilt && (
+        <div className={cx(css.budgethud, d.over ? css.over : tight ? css.tight : '')}>
+          <button type="button" className={css.budgethudmain} onClick={() => goToStage('MONEY')}
+            aria-label="Open build money stage">
+            {/* "SHORTFALL −$7.74M" reads as a double negative. The label already
+                carries the sign, so the number states magnitude. */}
+            <span><small>{d.over ? 'SHORTFALL' : 'HEADROOM'}</small><b>{money(Math.abs(d.remaining))}</b></span>
+            <span><small>COMMITTED</small><b>{money(d.committed)}</b></span>
+            <span><small>NETWORK</small><b>{d.racks}R · {d.uniqueCityCount}C</b></span>
+          </button>
+          {/* FUND used to appear only once the plan was ALREADY over the
+              treasury — the player found out they needed money at the moment
+              they could no longer do anything about it. It now appears while
+              there is still room to act. */}
+          {onRaise && (d.over || tight)
+            ? <button type="button" className={css.budgethudaction} onClick={onRaise}>FUND</button>
+            : <button type="button" className={css.budgethudaction} onClick={() => goToStage('MONEY')}>MONEY ›</button>}
+        </div>
+      )}
+
+      <div className={css.bldscroll} ref={buildScrollRef}>
+
+        {!isBuilt && (
+          <div className={css.stagehero}>
+            <span>{BUILD_STAGES.findIndex(stage => stage.id === activeStage) + 1} / {BUILD_STAGES.length} · {activeStage}</span>
+            <b>{activeStageMeta.title}</b>
+            <p>{activeStageMeta.line}</p>
+          </div>
+        )}
 
         {commitFeedback ? (
           <div className={css.commiterror} role="alert">
@@ -1333,13 +2646,295 @@ export const TheBuild: React.FC<{
             <span>{commitFeedback}</span>
           </div>
         ) : null}
+        {planFeedback ? (
+          <div className={css.plannotice} role="status">
+            <b>PLAN UPDATED</b>
+            <span>{planFeedback}</span>
+          </div>
+        ) : null}
 
-        {isBuilt
-          ? <RevisionBar spent={dBuilt.committed} d={d} dBuilt={dBuilt} />
-          : <BudgetBar inp={inputs} d={d} funding={funding} onRaise={onRaise} />}
+        <div data-build-stage="MONEY">
+          {isBuilt
+            ? <RevisionBar spent={dBuilt.committed} d={d} dBuilt={dBuilt} />
+            : <BudgetBar inp={inputs} d={d} funding={funding} onRaise={onRaise} />}
+        </div>
+
+        {/* ══ SITES — one path.
+
+               This stage used to offer four ways to place a network AT THE SAME
+               TIME: an assisted questionnaire, a blueprint auto-fill card, a row
+               of presets, and the facility list. Every one of them was a good
+               feature; together they made the player's first question "which of
+               these am I supposed to use?" rather than "how big should this be?".
+
+               There is now a single spine — see it, size it, accept it — and
+               hand placement is a deliberate step OFF that path instead of a
+               rival to it. The team's own proposal is one line, not a card. ══ */}
+        <section className={cx(css.bsec, css.sites)} data-build-stage="SITES">
+
+          <StreamingBuildNetworkMap
+            nodes={mapNodes}
+            coverage={inputs.coverageRegions?.length ? inputs.coverageRegions : inputs.regions}
+            unserved={d.unserved}
+            selectedFacilityId={mapFocusId}
+            onSelect={id => setMapFocusId(current => current === id ? null : id)}
+            live={Boolean(isBuilt)} />
+
+          {/* What the map is worth, in four numbers and no sentences. */}
+          <div className={css.siteFacts}>
+            <span className={css.fact}>
+              <small>SITES</small>
+              <b>{d.uniqueCityCount}</b>
+              <em>{d.uniqueCityCount === 1 ? 'city' : 'cities'}</em>
+            </span>
+            <span className={css.fact}>
+              <small>MACHINES</small>
+              <b>{d.racks}</b>
+              <em>racks</em>
+            </span>
+            <span className={css.fact}>
+              <small>OUTAGE SAFETY</small>
+              <b className={cx(
+                d.resilienceLabel === 'REDUNDANT' ? css.good : d.resilienceLabel === 'EXPOSED' ? css.warn : css.bad,
+              )}>{d.resilienceLabel === 'REDUNDANT' ? 'SAFE' : d.resilienceLabel}</b>
+              <em>{d.uniqueCityCount > 1 ? 'spread out' : 'single point'}</em>
+            </span>
+            <span className={css.fact}>
+              <small>TO BUILD</small>
+              <b>{money(d.capex)}</b>
+              <em>{d.weeks} wk{d.weeks === 1 ? '' : 's'}</em>
+            </span>
+          </div>
+
+          {focusHall && (
+            <div className={css.siteFocus}>
+              <div>
+                <span>{focusHall.city.label} · {ROLE_RULES[focusHall.role].technical}</span>
+                {/* hall.load is already a percentage out of derive(); only the
+                    map's ring wants it as a 0-1 fraction. */}
+                <b>{focusHall.racks} rack{focusHall.racks === 1 ? '' : 's'} · {Math.round(focusHall.load)}% of its ceiling</b>
+                <p>{ROLE_RULES[focusHall.role].line}</p>
+              </div>
+              <button type="button" onClick={() => setMapFocusId(null)} aria-label="Close site detail">✕</button>
+            </div>
+          )}
+
+          {/* ── the one control that replaces the preset row and the budget dial ── */}
+          {!isBuilt && (
+            <div className={css.sizer}>
+              <div className={css.sizerHead}>
+                <div>
+                  <span>HOW BIG</span>
+                  <b>{sizeIndex < 0 ? 'Custom' : PACKAGES[sizeIndex].name}</b>
+                </div>
+                <em>{sizeIndex < 0
+                  ? 'Hand-placed'
+                  : `${PACKAGES[sizeIndex].racks} racks · ${PACKAGES[sizeIndex].cities} cit${PACKAGES[sizeIndex].cities === 1 ? 'y' : 'ies'}`}</em>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max={PACKAGES.length - 1}
+                step="1"
+                className={css.sizerRange}
+                aria-label="Network size"
+                value={sizeIndex < 0 ? 0 : sizeIndex}
+                onChange={event => applyPackage(PACKAGES[Number(event.target.value)].id)} />
+              <div className={css.sizerTicks} aria-hidden="true">
+                {PACKAGES.map((pkg, index) => (
+                  <span key={pkg.id} className={index === sizeIndex ? css.on : ''}>{pkg.name.split(' ')[0]}</span>
+                ))}
+              </div>
+
+              {/* The blueprint, demoted from a card to a line. */}
+              {recommendation.length > 0 && (
+                <button type="button"
+                  className={cx(css.suggest, recommendationActive ? css.taken : '')}
+                  disabled={recommendationActive}
+                  onClick={() => commit(selectionWithFacilities(sel, recommendationFacilities))}>
+                  <i />
+                  <span>{recommendationActive
+                    ? 'Using your team’s plan'
+                    : `Your team suggests ${recommendation.length} cit${recommendation.length === 1 ? 'y' : 'ies'} · ${recommendation.reduce((sum, placement) => sum + placement.racks, 0)} racks`}</span>
+                  {!recommendationActive && <em>USE IT</em>}
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* ── stepping off the path is a choice, not a competing mode ── */}
+          {!isBuilt && (
+            <div className={css.handoff}>
+              {managementPolicy.mode === 'HANDS_ON' ? (
+                <div className={css.handsonnote}>
+                  <span>HANDS-ON CONTROL ACTIVE</span>
+                  <b>Facilities, rack duties, architecture and build pace are unlocked below.</b>
+                  <button type="button" onClick={() => saveManagementPolicy({ mode: 'ASSISTED' })}>
+                    Hand it back to the team
+                  </button>
+                </div>
+              ) : (
+                <button type="button" className={css.takeover}
+                  onClick={() => saveManagementPolicy({ mode: 'HANDS_ON' })}>
+                  <b>Place the cities myself</b>
+                  <span>Lease specific rooms, set rack duties, pick the architecture</span>
+                  <i>›</i>
+                </button>
+              )}
+
+              <button type="button" className={css.rulesToggle}
+                aria-expanded={showTeamRules}
+                onClick={() => setShowTeamRules(open => !open)}>
+                HOW YOUR NETWORK GETS MANAGED <i>{showTeamRules ? '−' : '+'}</i>
+              </button>
+            </div>
+          )}
+
+          {/* ── the team's standing orders: real, but never the first thing you read ── */}
+          {showTeamRules && !isBuilt && (
+            <div className={css.rules}>
+              <div className={css.ruleblock}>
+                <div className={css.rulelabel}><span>1</span><b>WHAT MATTERS MOST?</b></div>
+                <div className={css.prioritygrid}>
+                  {([
+                    ['ECONOMY', 'Save cash', 'Lean opening'],
+                    ['BALANCED', 'Balanced', 'Smart default'],
+                    ['RELIABLE', 'Stay online', 'More backup'],
+                    ['PREMIUM', 'Premium', 'Own more capacity'],
+                  ] as const).map(([id, title, line]) => (
+                    <button key={id} className={managementPolicy.priority === id ? css.on : ''}
+                      onClick={() => saveManagementPolicy({ priority: id })}>
+                      <b>{title}</b><span>{line}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className={css.ruleblock}>
+                <div className={css.rulelabel}><span>2</span><b>MAX NETWORK BUDGET</b></div>
+                <div className={css.budgetguard}>
+                  <b>{money(managementPolicy.maximumBudget)}</b>
+                  <input type="range" min="4" max="30" step="1"
+                    aria-label="Maximum assisted network budget in millions"
+                    value={Math.round(managementPolicy.maximumBudget / 1_000_000)}
+                    onChange={event => saveManagementPolicy({ maximumBudget: Number(event.target.value) * 1_000_000 })} />
+                  <small>Server spaces, machines and the opening operating reserve.</small>
+                </div>
+                <div className={css.riskrow} role="group" aria-label="Risk tolerance">
+                  {([
+                    ['LOW', 'CAREFUL'], ['MEDIUM', 'NORMAL'], ['HIGH', 'FAST'],
+                  ] as const).map(([id, label]) => (
+                    <button key={id} className={managementPolicy.riskTolerance === id ? css.on : ''}
+                      onClick={() => saveManagementPolicy({ riskTolerance: id })}>{label}</button>
+                  ))}
+                </div>
+              </div>
+
+              <div className={css.ruleblock}>
+                <div className={css.rulelabel}><span>3</span><b>PREFERRED CITIES <em>OPTIONAL · UP TO 4</em></b></div>
+                <div className={css.citychips}>
+                  {plannerCities.map(cityId => (
+                    <button key={cityId}
+                      className={managementPolicy.preferredCityIds.includes(cityId) ? css.on : ''}
+                      onClick={() => togglePreferredCity(cityId)}>
+                      {cityById(cityId)?.label || cityId}
+                    </button>
+                  ))}
+                </div>
+                <label className={css.approvalrow}>
+                  <input type="checkbox" checked={managementPolicy.requireApprovalForExpensiveChanges}
+                    onChange={event => saveManagementPolicy({ requireApprovalForExpensiveChanges: event.target.checked })} />
+                  <span><b>ASK BEFORE A BIG UPGRADE</b><em>Pause when added commitment reaches {money(managementPolicy.approvalThreshold)}.</em></span>
+                </label>
+              </div>
+
+              <button className={css.draftbutton} onClick={draftAssistedPlan}>
+                DRAFT MY NETWORK <span>→</span>
+              </button>
+
+              {assistedPlan && (
+                <div className={css.planreview}>
+                  <div className={css.planreviewtop}>
+                    <div>
+                      <span>YOUR TEAM&rsquo;S DRAFT</span>
+                      <b>{assistedPlan.selection.placements.length} network {assistedPlan.selection.placements.length === 1 ? 'city' : 'cities'} · {assistedPlan.selection.placements.reduce((sum, placement) => sum + placement.racks, 0)} racks</b>
+                    </div>
+                    <em>{assistedPlan.requiresApproval ? 'APPROVAL NEEDED' : 'WITHIN RULES'}</em>
+                  </div>
+                  <div className={css.planfacts}>
+                    <span><b>{money(assistedPlan.networkBudget)}</b>network + reserve</span>
+                    <span><b>{money(assistedPlan.addedCommitment)}</b>added commitment</span>
+                  </div>
+                  <div className={css.planwhy}>
+                    {assistedPlan.reasons.map(reason => <span key={reason}>✓ {reason}</span>)}
+                    {assistedPlan.warnings.map(warning => <span className={css.warn} key={warning}>! {warning}</span>)}
+                  </div>
+                  <button className={css.applyplan} onClick={applyAssistedPlan}>
+                    {assistedPlan.requiresApproval ? 'APPROVE & APPLY DRAFT' : 'APPLY THIS DRAFT'} →
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </section>
+
+
+        {d.halls.length > 0 && <section className={cx(css.bsec, css.utilitysection)} data-build-stage="PLANS">
+          <div className={css.bhead}>
+            <h2>Physical infrastructure</h2>
+            <span>{managementPolicy.mode === 'ASSISTED' ? 'team-monitored · you approve' : 'live engineering envelope'}</span>
+          </div>
+
+          {/* One line, and only when it is not the boring answer. The eight-cell
+              metric grid that used to live here said the same thing in seven
+              numbers nobody read. */}
+          <div className={cx(css.envelope, constrainedHalls.length ? css.strained : '')}>
+            <span>PHYSICAL LIMITS</span>
+            <b>{constrainedHalls.length
+              ? `${constrainedHalls.length} of ${d.halls.length} room${d.halls.length === 1 ? '' : 's'} cannot run every rack you have drawn.`
+              : 'Every room can run every rack you have drawn.'}</b>
+            <em>{physicalFloor}% usable at the tightest site · {backupCoverage}% of load on backup power</em>
+          </div>
+
+          {/* The rooms themselves. Detail belongs to the thing it describes. */}
+          <div className={css.physRooms}>
+            {d.halls.map(hall => (
+              <StreamingFacilityRoom
+                key={hall.facilityId}
+                hall={hall}
+                builtRacks={builtOf(hall.facilityId, hall.city.id)}
+                assisted={managementPolicy.mode === 'ASSISTED'}
+                approvalThreshold={managementPolicy.requireApprovalForExpensiveChanges
+                  ? managementPolicy.approvalThreshold
+                  : null}
+                onRepair={action => repairFacility(hall.facilityId, action)}
+                onLease={() => setMarketplaceCityId(hall.city.id)} />
+            ))}
+          </div>
+
+          {/* What the estate costs to keep running, kept out of the rooms
+              because it is one number about all of them, not about any one. */}
+          <div className={css.estate}>
+            <span className={css.fact}><small>RUNNING COST</small><b>{money(physicalWeekly)}</b><em>per week</em></span>
+            <span className={css.fact}><small>ENERGY / WEEK</small><b>{Math.round(d.energyKwhWeekly / 1000)}k</b><em>kWh</em></span>
+            <span className={css.fact}><small>WATER / WEEK</small><b>{Math.round(d.waterLitresWeekly / 1000)}k</b><em>litres</em></span>
+            <span className={css.fact}><small>REPUTATION</small><b>{d.publicReputation}</b><em>of 100</em></span>
+          </div>
+
+          <button type="button" className={css.estateMove}
+            disabled={d.halls.length < 2}
+            onClick={() => {
+              saveManagementPolicy({ mode: 'HANDS_ON' });
+              setPlanFeedback('Hands-On opened for rack movement. Choose Manage on a workload group, then select its destination facility.');
+            }}>
+            <b>MOVE RACK GROUP</b>
+            <span>{d.halls.length < 2 ? 'Needs a second facility' : 'Rebalance into existing headroom'}</span>
+          </button>
+        </section>}
+
 
         {/* ── coverage: a simple answer first, engineering detail on demand ── */}
-        <section className={css.bsec}>
+        <section className={css.bsec} data-build-stage="TEST">
           <div className={css.bhead}>
             <h2>Viewer experience</h2>
             <span>launch market · {d.racks} rack{d.racks === 1 ? '' : 's'}</span>
@@ -1352,8 +2947,35 @@ export const TheBuild: React.FC<{
             <div><span>STARTUP</span><b>{d.averageLatency === null ? '—' : d.averageLatency < 70 ? 'FAST' : d.averageLatency < 125 ? 'OKAY' : 'SLOW'}</b><em>{d.averageLatency === null ? 'No network' : `${d.averageLatency}ms average`}</em></div>
             <div><span>BUFFERING</span><b>{d.bufferingRisk <= 5 ? 'LOW' : d.bufferingRisk <= 13 ? 'WATCH' : 'HIGH'}</b><em>{d.bufferingRisk}% risk</em></div>
             <div><span>VIDEO READY</span><b>{d.averageCacheHit}%</b><em>on the serving node</em></div>
-            <div><span>OUTAGE SAFETY</span><b>{d.resilienceLabel}</b><em>{d.halls.length} network cit{d.halls.length === 1 ? 'y' : 'ies'}</em></div>
+            <div><span>OUTAGE SAFETY</span><b>{d.resilienceLabel}</b><em>{d.uniqueCityCount} network cit{d.uniqueCityCount === 1 ? 'y' : 'ies'}</em></div>
           </div>
+          {d.countryService.length ? (
+            <div className={css.countryforecast}>
+              <div className={css.forecasthead}>
+                <span>COUNTRY SERVICE FORECAST</span>
+                <em>swipe →</em>
+              </div>
+              <div className={css.forecasttrack}>
+                {d.countryService.map(row => (
+                  <article className={cx(css.forecastcard, css[row.quality.toLowerCase()] || '')} key={row.marketId}>
+                    <div className={css.forecasttitle}>
+                      <div><b>{row.country}</b><span>{row.cityLabel} · {row.role ? ROLE_RULES[row.role].short : 'NO NODE'}</span></div>
+                      <em>{row.quality}</em>
+                    </div>
+                    <div className={css.forecastnumbers}>
+                      <span><b>{row.latency === null ? '—' : `${row.latency}ms`}</b>startup</span>
+                      <span><b>{row.bufferRisk}%</b>buffer risk</span>
+                      <span><b>{conc(row.demand)}</b>peak</span>
+                    </div>
+                    <p>{row.localizationNote}</p>
+                    {(row.quality === 'POOR' || row.quality === 'UNSTABLE' || row.loadPct > 88) ? (
+                      <button onClick={() => repairCountry(row)}>{row.repairLabel} →</button>
+                    ) : <i className={css.forecastclear}>READY FOR OPENING NIGHT</i>}
+                  </article>
+                ))}
+              </div>
+            </div>
+          ) : null}
           <button className={css.detailtoggle} onClick={() => setShowNetworkDetail(value => !value)}
             aria-expanded={showNetworkDetail}>
             {showNetworkDetail ? 'HIDE ENGINEERING DETAIL' : 'SHOW WHY'} <span>{showNetworkDetail ? '−' : '+'}</span>
@@ -1382,56 +3004,46 @@ export const TheBuild: React.FC<{
           )}
         </section>
 
-        {/* ── presets — meaningless once halls are standing, since a preset
-               would have to un-build them ── */}
-        {!isBuilt && (
-        <section className={css.bsec}>
-          <div className={css.bhead}><h2>Start from</h2><span>then change anything</span></div>
-          <div className={css.presets}>
-            {PACKAGES.map(p => (
-              <button key={p.id} className={cx(css.pre, (preset === p.id ? css.on : ''))}
-                onClick={() => commit({ ...sel, placements: presetPlacements(p.id, inputs.regions, inputs.homeCityId) })}>
-                <b>{p.name}</b>
-                <span>{p.racks} racks · {p.cities} cit{p.cities === 1 ? 'y' : 'ies'}</span>
-              </button>
-            ))}
-            <div className={cx(css.pre, css.custom, (preset === null ? css.on : ''))}>
-              <b>Custom</b>
-              <span>{d.halls.length} cit{d.halls.length === 1 ? 'y' : 'ies'} · {d.racks} racks</span>
-            </div>
-          </div>
-        </section>
-        )}
 
-        {/* ── the halls: Y through cities, X through racks ── */}
-        <section className={css.bsec}>
+        {/* ── leased facilities: Y through rooms, X through racks ── */}
+        {managementPolicy.mode === 'HANDS_ON' && <section className={css.bsec} data-build-stage="SITES">
           <div className={css.bhead}>
-            <h2>The halls</h2>
-            <button className={css.addcity} onClick={() => setPicking(true)}>+ ADD CITY</button>
+            <h2>Your facilities</h2>
+            <button className={css.addcity} onClick={() => setPicking(true)}>+ ADD FACILITY</button>
           </div>
 
           {d.halls.length === 0 ? (
             <div className={css.nohalls}>
-              No racks anywhere. Pick a preset above, or place a city yourself.
+              No leased space yet. Pick a starting blueprint, or enter a city marketplace.
             </div>
           ) : (
             <div className={css.halls}>
               {d.halls.map(h => (
-                <Hall key={h.city.id} h={h}
-                  canAdd={h.racks < MAX_RACKS_PER_CAMPUS}
-                  builtRacks={Math.min(h.racks, builtOf(h.city.id))}
+                <Hall key={h.facilityId} h={h}
+                  canAdd={h.racks < h.capacityRacks}
+                  builtRacks={Math.min(h.racks, builtOf(h.facilityId, h.city.id))}
                   /* you cannot un-build a rack that is already standing */
-                  onSet={n => setRacks(h.city.id, Math.max(builtOf(h.city.id), n))}
-                  onRole={role => setRole(h.city.id, role)} />
+                  onSet={n => setRacks(h.facilityId, Math.max(builtOf(h.facilityId, h.city.id), n))}
+                  onInstallGroup={duty => installRackGroup(h.facilityId, duty)}
+                  onDuty={(groupId, duty) => changeRackGroupDuty(h.facilityId, groupId, duty)}
+                  onResizeGroup={(groupId, delta) => resizeRackGroup(h.facilityId, groupId, delta)}
+                  onMoveGroup={(groupId, targetFacilityId) => moveRackGroup(h.facilityId, groupId, targetFacilityId)}
+                  onRepair={action => repairFacility(h.facilityId, action)}
+                  moveTargets={d.halls.filter(target => target.facilityId !== h.facilityId).map(target => ({
+                    id: target.facilityId,
+                    label: `${target.city.label} · ${target.campusLabel}`,
+                    freeRacks: target.freeRacks,
+                  }))}
+                  onSpace={() => setMarketplaceCityId(h.city.id)} />
               ))}
             </div>
           )}
-        </section>
+        </section>}
 
         {/* ── how you get paid — the other half of the same trap as the
                campaign, since a free door fills the halls for nothing ── */}
         {pricing && (
-          <section className={css.bsec}>
+          <section className={css.bsec} data-build-stage="MONEY">
             <div className={css.bhead}><h2>How you get paid</h2></div>
             <button className={cx(css.payrow, (pricing.sellable === 0 ? css.empty : ''))} onClick={onOpenPricing}>
               <div className={css.payid}>
@@ -1455,7 +3067,7 @@ export const TheBuild: React.FC<{
         )}
 
         {/* ── architecture ── */}
-        <section className={css.bsec}>
+        {managementPolicy.mode === 'HANDS_ON' && <section className={css.bsec} data-build-stage="PLANS">
           <div className={css.bhead}><h2>Rent it or own it</h2></div>
           <div className={css.trio}>
             {ARCHS.map(a => (
@@ -1468,10 +3080,10 @@ export const TheBuild: React.FC<{
               </button>
             ))}
           </div>
-        </section>
+        </section>}
 
         {/* ── doctrine ── */}
-        <section className={css.bsec}>
+        {managementPolicy.mode === 'HANDS_ON' && <section className={css.bsec} data-build-stage="PLANS">
           <div className={css.bhead}><h2>How carefully</h2></div>
           <div className={css.trio}>
             {DOCTRINES.map(x => (
@@ -1483,10 +3095,10 @@ export const TheBuild: React.FC<{
               </button>
             ))}
           </div>
-        </section>
+        </section>}
 
         {/* ── campaign — the choice that fights the servers ── */}
-        <section className={css.bsec}>
+        <section className={css.bsec} data-build-stage="MONEY">
           <div className={css.bhead}><h2>Who knows you exist</h2></div>
           {CAMPAIGNS.map(x => (
             <button key={x.id} className={cx(css.opt, (sel.campaign === x.id ? css.on : ''))} onClick={() => set('campaign', x.id)}>
@@ -1510,13 +3122,31 @@ export const TheBuild: React.FC<{
         </section>
 
         {last && (
-          <section className={css.bsec}>
+          <section className={css.bsec} data-build-stage="TEST">
             <div className={cx(css.carry, css[last.verdict.toLowerCase()])}>
               <b>LAST REHEARSAL · {last.verdict === 'HELD' ? 'HELD' : last.verdict === 'BURST' ? 'HELD BY RENTING' : 'BROKE'}</b>
-              <span>Peak {conc(last.peak)} · {last.peakLoad}% of capacity
+              <span>Peak {conc(last.peakConcurrentStreams)} · {last.peakLoadPercent}% of capacity
                 {last.verdict === 'BROKE'
-                  ? ` · ${last.cities.filter(x => x.verdict === 'BROKE').map(x => x.label).join(', ')} failed`
+                  ? ` · ${last.countries.filter(x => x.verdict === 'BROKE').map(x => x.country).join(', ')} failed`
                   : ''}</span>
+            </div>
+          </section>
+        )}
+
+        {!isBuilt && (
+          <section className={cx(css.bsec, css.launchstage)} data-build-stage="LAUNCH">
+            <div className={cx(css.launchhero, ready ? css.ready : css.blocked)}>
+              <span>{ready ? 'OPENING CONTRACT READY' : 'THE SIGNATURE IS WAITING'}</span>
+              <b>{ready
+                ? last?.verdict === 'BROKE' ? 'You can build — with a founder override.' : 'Every launch gate has an answer.'
+                : 'Finish the red gates before steel moves.'}</b>
+              <p>Commissioning is the moment the drawing becomes a paid, persistent network.</p>
+            </div>
+            <div className={css.launchchecks} aria-label="Build launch readiness">
+              <div data-state={d.racks > 0 ? 'clear' : 'blocked'}><i>{d.racks > 0 ? '✓' : '!'}</i><span><b>NETWORK</b><em>{d.racks > 0 ? `${d.racks} racks · ${d.uniqueCityCount} cities` : 'No servers placed'}</em></span></div>
+              <div data-state={!d.over ? 'clear' : 'blocked'}><i>{!d.over ? '✓' : '!'}</i><span><b>MONEY</b><em>{d.over ? `${money(-d.remaining)} short` : `${money(d.remaining)} headroom`}</em></span></div>
+              <div data-state={!pricing || pricing.sellable > 0 ? 'clear' : 'blocked'}><i>{!pricing || pricing.sellable > 0 ? '✓' : '!'}</i><span><b>PLANS</b><em>{!pricing ? 'Pricing handled elsewhere' : pricing.sellable > 0 ? `${pricing.sellable} on sale` : 'Nothing on sale'}</em></span></div>
+              <div data-state={last ? last.verdict === 'BROKE' ? 'warning' : 'clear' : 'blocked'}><i>{last ? last.verdict === 'BROKE' ? '!' : '✓' : '!'}</i><span><b>REHEARSAL</b><em>{last ? last.verdict === 'BROKE' ? 'Broke · override available' : last.verdict : 'Not run yet'}</em></span></div>
             </div>
           </section>
         )}
@@ -1525,42 +3155,78 @@ export const TheBuild: React.FC<{
       </div>
 
       <div className={css.bldfoot}>
-        <button className={css.rehbtn} onClick={() => setRehearse(true)} disabled={d.over || d.racks === 0}>
-          <i className={css.rbdot} />
-          {last ? 'REHEARSE AGAIN' : 'REHEARSE LOAD'}
-        </button>
         {isBuilt ? (
-          planned > 0
-            ? <button className={css.gobtn} onClick={() => setCommissioning(true)}>BUILD THE PLAN →</button>
-            /* commissioned but never opened — the only thing left to do is the
-               night, and without this the player would be stranded here */
-            : !isLive
-              ? <button className={css.gobtn} onClick={onOpenNight}>GO TO OPENING NIGHT →</button>
-              : <button className={css.gobtn} onClick={onBack}>BACK TO HQ →</button>
+          <>
+            <button className={css.rehbtn} onClick={() => setRehearse(true)} disabled={d.over || d.racks === 0}>
+              <i className={css.rbdot} />
+              {last ? 'REHEARSE AGAIN' : 'REHEARSE LOAD'}
+            </button>
+            {planned > 0
+              ? <button className={css.gobtn} onClick={() => setCommissioning(true)}>BUILD THE PLAN →</button>
+              /* commissioned but never opened — the only thing left to do is the
+                 night, and without this the player would be stranded here */
+              : !isLive
+                ? <button className={css.gobtn} onClick={onOpenNight}>GO TO OPENING NIGHT →</button>
+                : <button className={css.gobtn} onClick={onBack}>BACK TO HQ →</button>}
+          </>
+        ) : activeStage === 'SITES' ? (
+          <button className={cx(css.gobtn, d.racks === 0 ? css.off : '')} disabled={d.racks === 0}
+            onClick={() => goToStage('PLANS')}>LOCK SITES &amp; PLAN →</button>
+        ) : activeStage === 'PLANS' ? (
+          <button className={css.gobtn} onClick={() => goToStage('MONEY')}>REVIEW THE MONEY →</button>
+        ) : activeStage === 'MONEY' ? (
+          <button className={cx(css.gobtn, d.over && !onRaise ? css.off : '', d.over ? css.anyway : '')}
+            disabled={d.over && !onRaise}
+            onClick={() => d.over ? onRaise?.() : goToStage('TEST')}>
+            {d.over ? `FUND ${money(-d.remaining)} SHORTFALL →` : 'TEST THE NETWORK →'}
+          </button>
+        ) : activeStage === 'TEST' ? (
+          <>
+            {last && <button className={css.rehbtn} onClick={() => setRehearse(true)} disabled={d.over || d.racks === 0}>
+              <i className={css.rbdot} /> REHEARSE AGAIN
+            </button>}
+            <button className={cx(css.gobtn, d.over || d.racks === 0 ? css.off : '')}
+              disabled={d.over || d.racks === 0}
+              onClick={() => last ? goToStage('LAUNCH') : setRehearse(true)}>
+              {last ? 'REVIEW LAUNCH →' : 'RUN THE REHEARSAL →'}
+            </button>
+          </>
         ) : (
-          /* a failed rehearsal never blocks the launch — it only stops the button
-             from pretending this is a good idea */
-          <button className={cx(css.gobtn, (ready ? '' : css.off), (last?.verdict === 'BROKE' ? css.anyway : ''))}
-            onClick={() => ready && beginCommissioning()}>
+          <button className={cx(css.gobtn, ready ? '' : css.off, last?.verdict === 'BROKE' ? css.anyway : '')}
+            disabled={!ready}
+            onClick={beginCommissioning}>
             {d.racks === 0 ? 'NO SERVERS'
               : pricing && pricing.sellable === 0 ? 'NOTHING ON SALE'
                 : d.over ? 'OVER BUDGET'
                   : !last ? 'REHEARSE FIRST'
-                  : last.verdict === 'BROKE' ? 'BUILD IT ANYWAY →'
-                    : 'COMMISSION THE BUILD →'}
+                    : last.verdict === 'BROKE' ? 'BUILD IT ANYWAY →'
+                      : 'COMMISSION THE BUILD →'}
           </button>
         )}
       </div>
 
       {picking && (
         <CityPicker sel={sel} inp={inputs} d={d}
-          onAdd={id => { setPicking(false); setRacks(id, 1); }}
+          onCity={openCityMarketplace}
           onClose={() => setPicking(false)} />
+      )}
+
+      {marketplaceCityId && (
+        <FacilityMarketplace
+          cityId={marketplaceCityId}
+          onLease={leaseFacility}
+          onClose={() => setMarketplaceCityId(null)} />
       )}
 
       {rehearse && (
         <Rehearsal brand={brand} d={d} inp={inputs} sel={sel}
-          onClose={() => setRehearse(false)} onResult={r => onResult?.(r)} />
+          onClose={() => setRehearse(false)} onResult={r => onResult?.(r)}
+          onOpenContent={onOpenContent}
+          onRepair={(next, message) => {
+            commit(next);
+            setRehearse(false);
+            setPlanFeedback(message);
+          }} />
       )}
 
       {commissioning && (

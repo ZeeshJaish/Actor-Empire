@@ -17,6 +17,7 @@ import {
 import { getStreamingCatalogLicenseStatus } from './streamingCatalog';
 import { getStreamingOriginalLiveStatus } from './streamingOriginals';
 import { resolveOwnedStreamingReach } from './streamingProgression';
+import { getStreamingLaunchDefinitionSignature } from './streamingLaunchProgram';
 
 export type StreamingLaunchReadinessTone = 'READY' | 'WATCH' | 'BLOCKED';
 
@@ -149,6 +150,12 @@ export const getStreamingLaunchReadiness = (player: Player): StreamingLaunchRead
     const setup = platform.infrastructureSetup;
     const slate = platform.launchSlate;
     const items: StreamingLaunchReadinessItem[] = [];
+    const openingMarkets = platform.marketOperations.filter(operation => operation.entryKind === 'OPENING' && operation.status !== 'EXITED');
+    const openingMarketsReady = openingMarkets.length > 0 && openingMarkets.every(operation => ['READY', 'ACTIVE'].includes(operation.status));
+    const definitionReady = Boolean(
+        platform.launchProgram.lastBlueprintSignature
+        && platform.launchProgram.lastBlueprintSignature === getStreamingLaunchDefinitionSignature(player),
+    );
 
     items.push(createItem(
         'company',
@@ -160,6 +167,28 @@ export const getStreamingLaunchReadiness = (player: Player): StreamingLaunchRead
                 : 'Return the company to a launchable founding state.',
         platform.lifecycle === 'FOUNDING' ? 'READY' : 'BLOCKED',
         'COMPANY',
+    ));
+
+    items.push(createItem(
+        'markets',
+        'Opening markets',
+        openingMarketsReady
+            ? `${openingMarkets.length} opening countr${openingMarkets.length === 1 ? 'y is' : 'ies are'} cleared.`
+            : openingMarkets.length
+                ? 'Government clearance is still running in one or more opening countries.'
+                : 'No opening countries have been selected.',
+        openingMarketsReady ? 'READY' : 'BLOCKED',
+        'MARKET',
+    ));
+
+    items.push(createItem(
+        'launch-definition',
+        'Launch blueprint',
+        definitionReady
+            ? 'Markets, service identity, storefront, pricing and content match the saved blueprint.'
+            : 'Save or refresh the Launch Blueprint before final rehearsal.',
+        definitionReady ? 'READY' : 'BLOCKED',
+        'HOME',
     ));
 
     if (!setup) {
@@ -385,6 +414,16 @@ export const commitOwnedStreamingLaunch = (
     const withLaunchFacts = compactOwnedStreamingPlatformForPersistence({
         ...platform,
         launchCommit,
+        launchProgram: {
+            ...platform.launchProgram,
+            status: 'LAUNCHED',
+            completedAtAbsoluteWeek: absoluteWeek,
+        },
+        marketOperations: platform.marketOperations.map(operation => (
+            operation.entryKind === 'OPENING' && operation.status === 'READY'
+                ? { ...operation, status: 'ACTIVE' as const, activatedAtAbsoluteWeek: absoluteWeek }
+                : operation
+        )),
         treasuryCash: platform.treasuryCash - option.cost,
         metrics: {
             ...platform.metrics,

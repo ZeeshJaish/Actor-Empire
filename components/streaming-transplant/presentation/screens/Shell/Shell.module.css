@@ -1,6 +1,10 @@
 .ep2{position:fixed;inset:0;max-width:520px;margin:0 auto;background:#050609;overflow:hidden;color:#eef0f5;
   font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-  --epx-panel:rgba(255,255,255,.045);--epx-line:rgba(255,255,255,.09);--epx-dim:#8c93a3}
+  /* --epx-line is deliberately NOT redeclared here: tokens.css already defines
+     it at :root with the same weight, and a local copy is how the founding
+     screens drifted away from the rest of the app in the first place. The two
+     names tokens.css does not own yet keep their literals. */
+  --epx-panel:rgba(255,255,255,.045);--epx-dim:#8c93a3}
 .ep2 :where(*){margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;min-width:0}
 .ep2 :where(button){font-family:inherit;border:none;background:none;color:inherit;cursor:pointer;text-align:inherit}
 .ep2 :where(input){font-family:inherit;color:inherit}
@@ -118,11 +122,17 @@
 /* editorial masthead */
 .ep2 .deckWordmark{grid-column:1/8;grid-row:2/4;justify-content:flex-start;padding:12px 13px;
   background:var(--epx-deck-primary);color:#08100e}
-.ep2 .deckWordmarkLockup{min-width:0}
+.ep2 .deckWordmarkLockup{min-width:0;max-width:100%;display:flex;align-items:center;justify-content:flex-start;gap:8px}
+.ep2 .deckWordmarkCopy{min-width:0;max-width:100%}
+.ep2 .deckWordmarkMark{display:block;flex:0 0 auto;width:29px;height:29px;color:#08100e}
+.ep2 .deckWordmarkSide{flex-direction:row}
+.ep2 .deckWordmarkStack{flex-direction:column;align-items:flex-start;gap:3px}
+.ep2 .deckWordmarkStack .deckWordmarkMark{width:23px;height:23px}
+.ep2 .deckWordmarkIcon .deckWordmarkMark{width:40px;height:40px}
 .ep2 .deckWordmarkText{position:relative;max-width:100%;font-size:clamp(20px,7vw,31px);line-height:.9;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ep2 .deckWordmarkText i{font-style:normal;font-size:.28em;vertical-align:super;letter-spacing:0;margin-left:2px}
-.ep2 .deckWordmarkLockup span{display:block;margin-top:8px;font-size:5.5px;font-weight:950;letter-spacing:.22em;opacity:.7}
+.ep2 .deckWordmarkTagline{display:block;margin-top:8px;font-size:5.5px;font-weight:950;letter-spacing:.22em;opacity:.7}
 
 /* app icon and oversized mark */
 .ep2 .deckIconTile{grid-column:8/10;grid-row:2/4;background:#dde0e3}
@@ -136,6 +146,7 @@
 .ep2 .deckCrop::after{content:"";position:absolute;inset:0;background:linear-gradient(135deg,transparent,rgba(0,0,0,.2))}
 .ep2 .deckCropMark{position:absolute;width:130%;height:130%;right:-38%;bottom:-31%;color:var(--epx-deck-primary);
   transform:rotate(-12deg);opacity:.95}
+.ep2 .deckCropSafe .deckCropMark{width:66%;height:66%;right:17%;bottom:17%;transform:none;opacity:1}
 
 /* seal and web address */
 .ep2 .deckSeal{grid-column:1/5;grid-row:4/6;background:var(--epx-deck-deep)}
@@ -208,7 +219,7 @@
 
 @media (max-width:360px){
   .ep2 .bboard{gap:4px;padding:5px;grid-auto-rows:31px}
-  .ep2 .deckWordmark{padding:10px}.ep2 .deckWordmarkLockup span{letter-spacing:.12em}
+  .ep2 .deckWordmark{padding:10px}.ep2 .deckWordmarkTagline{letter-spacing:.12em}
   .ep2 .deckRound{width:58px;height:58px}.ep2 .deckAppIcon{width:40px;height:40px}
   .ep2 .deckPromise span{font-size:8px}.ep2 .deckPush{left:3px;right:3px;padding:4px}
 }
@@ -242,6 +253,18 @@
 .ep2 .cv.passed{opacity:.42;filter:saturate(.6)}
 
 .ep2 .cvstack{display:flex;flex-direction:column;gap:9px}
+.ep2 .teamTableStatus{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:9px;padding:13px 14px;border:1px solid color-mix(in srgb,var(--epx-ep2-brand) 34%,var(--epx-line));border-radius:15px;background:radial-gradient(circle at 92% 0,color-mix(in srgb,var(--epx-ep2-brand) 18%,transparent),transparent 45%),linear-gradient(145deg,#11141d,#090b10)}
+.ep2 .teamTableStatus span{display:block;font-size:6.7px;font-weight:950;letter-spacing:.18em;color:var(--epx-ep2-brand)}
+.ep2 .teamTableStatus b{display:block;margin-top:4px;font-size:15px}.ep2 .teamTableStatus>em{flex:0 0 auto;font-style:normal;font-family:ui-monospace,Menlo,monospace;font-size:9px;color:#aab3c1}
+.ep2 .teamSeatRail{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(84px,1fr);gap:6px;margin:0 -15px 10px;padding:0 15px 3px;overflow-x:auto;scroll-snap-type:x proximity;scrollbar-width:none}
+.ep2 .teamSeatRail::-webkit-scrollbar{display:none}
+.ep2 .teamSeatRail>button{display:flex;align-items:center;gap:7px;min-height:58px;padding:8px;border:1px solid var(--epx-line);border-radius:12px;background:#0b0e14;text-align:left;scroll-snap-align:start}
+.ep2 .teamSeatRail>button>i{flex:0 0 auto;display:grid;place-items:center;width:22px;height:22px;border-radius:7px;background:#151923;border:1px solid rgba(255,255,255,.09);font-style:normal;font-size:8px;font-weight:950;color:#727c8d}
+.ep2 .teamSeatRail>button>span{min-width:0}.ep2 .teamSeatRail b,.ep2 .teamSeatRail em{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ep2 .teamSeatRail b{font-size:7px;letter-spacing:.1em;color:#aeb6c4}.ep2 .teamSeatRail em{margin-top:3px;font-style:normal;font-size:7.5px;color:#687183}
+.ep2 .teamSeatRail>button.filled>i{background:#163322;color:#63e694}.ep2 .teamSeatRail>button.filled em{color:#63e694}
+.ep2 .teamSeatRail>button.on{border-color:var(--epx-ep2-brand);background:color-mix(in srgb,var(--epx-ep2-brand) 12%,#0b0e14);box-shadow:0 0 18px color-mix(in srgb,var(--epx-ep2-brand) 12%,transparent)}
+.ep2 .teamSeatRail>button.on>i{border-color:var(--epx-ep2-brand);color:var(--epx-ep2-brand)}
+.ep2 .teamSeatRail>button:focus-visible{outline:2px solid #fff;outline-offset:2px}
 .ep2 .cvfolder{display:flex;justify-content:space-between;align-items:baseline;gap:8px;
   padding:10px 13px;border-radius:11px 11px 3px 3px;background:linear-gradient(#d3b276,#c09a58);color:#3b2c10}
 .ep2 .cvfolder span{font-size:8.5px;font-weight:900;letter-spacing:.22em}
@@ -250,6 +273,12 @@
   border-radius:3px;background:#efe9da;color:#1a1610;border:none;
   transform:rotate(var(--epx-ep2-r,0deg));box-shadow:0 12px 26px rgba(0,0,0,.6)}
 .ep2 .cv.hired{background:#f3efe3;box-shadow:0 12px 26px rgba(0,0,0,.6),0 0 0 2px #1d6b3f}
+.ep2 .poscards.teamCandidateDeck{display:grid;grid-auto-flow:column;grid-auto-columns:calc(100% - 24px);gap:10px;margin:0 -15px;padding:3px 15px 17px;overflow-x:auto;scroll-snap-type:x mandatory;scroll-padding-inline:15px;overscroll-behavior-inline:contain;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.ep2 .teamCandidateDeck::-webkit-scrollbar{display:none}.ep2 .teamCandidateDeck .cv{scroll-snap-align:start;scroll-snap-stop:always;transform:rotate(var(--epx-ep2-r,0deg))}.ep2 .teamCandidateDeck .cv.passed{opacity:.72;filter:saturate(.75)}
+.ep2 .teamRoleActions{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.ep2 .teamRoleActions button{min-height:44px;padding:9px;border:1px solid var(--epx-line);border-radius:11px;background:#0b0e14;text-align:center;font-size:7.5px;font-weight:950;letter-spacing:.1em;color:#8b94a5}
+.ep2 .teamRoleActions button:last-child{border-color:color-mix(in srgb,var(--epx-ep2-brand) 48%,var(--epx-line));background:color-mix(in srgb,var(--epx-ep2-brand) 10%,#0b0e14);color:var(--epx-ep2-brand)}
+.ep2 .teamRoleActions button:disabled{opacity:.38}.ep2 .teamRoleActions button:focus-visible,.ep2 .teamCandidateDeck .cv:focus-visible{outline:2px solid #fff;outline-offset:2px}
 .ep2 .cvhead{display:flex;gap:11px;align-items:flex-start}
 .ep2 .cvphoto{position:relative;flex:0 0 46px;height:54px;border:1px solid #b6ac93;background:#20242c}
 .ep2 .cvphoto .pblock{width:100%;height:100%;display:block}
@@ -382,7 +411,8 @@
 .ep2 .marketCountryHero{position:relative;z-index:1;min-height:132px;margin:0 -15px;padding:17px 16px 27px;overflow:hidden;border-bottom:1px solid rgba(255,255,255,.12);background:#111722}
 .ep2 .marketCountryHero::before{content:"";position:absolute;inset:0;z-index:1;background:linear-gradient(90deg,rgba(4,7,12,.96) 0%,rgba(4,7,12,.78) 38%,rgba(4,7,12,.18) 75%,rgba(4,7,12,.34) 100%),linear-gradient(0deg,rgba(5,8,13,.78),transparent 62%);pointer-events:none}
 .ep2 .marketCountryHero::after{content:"";position:absolute;left:16px;right:16px;bottom:0;height:1px;background:linear-gradient(90deg,var(--market-card-accent),transparent 68%);box-shadow:0 0 16px var(--market-card-accent);opacity:.7}
-.ep2 .marketFlagArt{position:absolute;z-index:0;inset:-8% -3% -8% 30%;width:76%;height:116%;opacity:.88;filter:saturate(1.05) contrast(1.04);transform:skewX(-5deg) scale(1.05);pointer-events:none;mask-image:linear-gradient(90deg,transparent 0,#000 18%);-webkit-mask-image:linear-gradient(90deg,transparent 0,#000 18%)}
+.ep2 .marketFlagArt{position:absolute;z-index:0;display:block;inset:-8% -3% -8% 30%;width:76%;height:116%;overflow:hidden;opacity:.92;transform:skewX(-5deg) scale(1.05);pointer-events:none;mask-image:linear-gradient(90deg,transparent 0,#000 18%);-webkit-mask-image:linear-gradient(90deg,transparent 0,#000 18%)}
+.ep2 .marketFlagArt :global(.sf-flag){position:absolute;inset:0;width:100%;height:100%;filter:saturate(.88) brightness(.66) contrast(1.04)}
 .ep2 .marketCountryCode{position:absolute;z-index:1;right:12px;bottom:12px;color:rgba(255,255,255,.14);font-size:43px;font-weight:950;line-height:.8;letter-spacing:-.07em;text-shadow:0 10px 24px #0008}
 .ep2 .marketCountryCardTop{position:relative;z-index:2;display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
 .ep2 .marketCountryCardTop>div{min-width:0}
@@ -417,17 +447,11 @@
 .ep2 .marketCountryToggle{position:relative;z-index:1;width:100%;display:flex;align-items:center;justify-content:center;gap:8px;min-height:46px;margin-top:7px;padding:9px;border:1px solid color-mix(in srgb,var(--market-card-accent) 62%,transparent);border-radius:12px;background:color-mix(in srgb,var(--market-card-accent) 11%,#090c12);color:var(--market-card-accent);font-size:9.5px;font-weight:950;letter-spacing:.09em;transition:background .2s ease,color .2s ease,border-color .2s ease}
 .ep2 .marketCountryToggle span{display:flex;align-items:center;justify-content:center;width:18px;height:18px;border:1px solid currentColor;border-radius:6px;font-size:11px}
 .ep2 .marketCountryCard.on .marketCountryToggle{background:var(--market-card-accent);border-color:var(--market-card-accent);color:#06080c;box-shadow:0 0 20px color-mix(in srgb,var(--market-card-accent) 25%,transparent)}
-.ep2 .marketRegionImpact{margin-top:4px;padding:11px;border:1px solid color-mix(in srgb,var(--epx-ep2-c) 35%,#232a35);border-radius:13px;background:linear-gradient(140deg,color-mix(in srgb,var(--epx-ep2-c) 10%,#0c1017),#090c11)}
-.ep2 .marketRegionImpactHead{display:flex;align-items:flex-end;justify-content:space-between;gap:10px}
-.ep2 .marketRegionImpactHead span{display:block;color:var(--epx-ep2-c);font-size:6.5px;font-weight:950;letter-spacing:.17em}
-.ep2 .marketRegionImpactHead b{display:block;margin-top:4px;font-size:11px}
-.ep2 .marketRegionImpactHead strong{font-family:ui-monospace,Menlo,monospace;font-size:18px;color:#fff}
-.ep2 .marketRegionImpact>p{margin:8px 0;color:#9da7b7;font-size:8.5px;line-height:1.45}
-.ep2 .marketRegionImpactStats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
-.ep2 .marketRegionImpactStats>div{padding:8px;border:1px solid #222936;border-radius:9px;background:#080b10}
-.ep2 .marketRegionImpactStats span{display:block;color:#657083;font-size:6px;font-weight:950;letter-spacing:.12em}
-.ep2 .marketRegionImpactStats b{display:block;margin-top:4px;font-family:ui-monospace,Menlo,monospace;font-size:11px;color:#f4f7fb}
+.ep2 .marketRegionPulse{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:4px;padding:9px 10px;border:1px solid color-mix(in srgb,var(--epx-ep2-c) 30%,#232a35);border-radius:12px;background:linear-gradient(140deg,color-mix(in srgb,var(--epx-ep2-c) 8%,#0c1017),#090c11)}
+.ep2 .marketRegionPulse>div:first-child{min-width:0}.ep2 .marketRegionPulse>div:first-child span{display:block;color:var(--epx-ep2-c);font-size:6px;font-weight:950;letter-spacing:.16em}.ep2 .marketRegionPulse>div:first-child b{display:block;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:9.5px}
+.ep2 .marketRegionPulseStats{flex:0 0 auto;display:flex;gap:5px}.ep2 .marketRegionPulseStats>span{min-width:64px;padding:6px 8px;border-radius:9px;background:#080b10;border:1px solid #222936;text-align:right}.ep2 .marketRegionPulseStats b,.ep2 .marketRegionPulseStats em{display:block}.ep2 .marketRegionPulseStats b{font-family:ui-monospace,Menlo,monospace;font-size:9px;color:#f4f7fb}.ep2 .marketRegionPulseStats em{margin-top:2px;font-style:normal;font-size:5.5px;font-weight:900;letter-spacing:.12em;color:#657083;text-transform:uppercase}
 .ep2 .marketSummary{border-color:color-mix(in srgb,var(--epx-ep2-c) 40%,var(--epx-line));box-shadow:0 18px 40px #0005}
+.ep2 .marketSummaryCompact{padding:11px 12px;box-shadow:0 12px 28px #0004}
 .ep2 .marketSummaryHead> b{font-size:7px;letter-spacing:.14em;border-radius:999px;padding:6px 8px;color:#7fe4b3;background:#113428}
 .ep2 .marketSummaryHead> b[data-level='MODERATE']{color:#f3c66e;background:#382c13}
 .ep2 .marketSummaryHead> b[data-level='HARD']{color:#ff9292;background:#3e171c}
@@ -437,10 +461,13 @@
 .ep2 .marketStats div{min-width:0;border:1px solid #202530;border-radius:11px;padding:9px;background:#090c12}
 .ep2 .marketStats span{display:block;color:#687184;font-size:6.5px;font-weight:900;letter-spacing:.13em}
 .ep2 .marketStats b{display:block;margin-top:5px;font-size:13px;font-family:ui-monospace,Menlo,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ep2 .marketFootprintStrip{display:grid;grid-template-columns:1.25fr 1fr .72fr;gap:1px;margin-top:9px;overflow:hidden;border:1px solid #202530;border-radius:11px;background:#202530}
+.ep2 .marketFootprintStrip>div{min-width:0;padding:9px 8px;background:#090c12}.ep2 .marketFootprintStrip span{display:block;font-size:5.8px;font-weight:950;letter-spacing:.12em;color:#687184}.ep2 .marketFootprintStrip b{display:block;margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:ui-monospace,Menlo,monospace;font-size:11px;color:#eef2f7}
 .ep2 .marketIntelToggle{width:100%;display:flex;align-items:center;justify-content:space-between;margin-top:9px;padding:10px 11px;border:1px solid #2b3140;border-radius:11px;background:#10141d;color:#dce2ec;font-size:8px;font-weight:900;letter-spacing:.12em;text-align:left}
 .ep2 .marketIntelToggle span{font-size:15px;line-height:1;color:var(--epx-ep2-c)}
 .ep2 .marketIntel{margin-top:8px;padding:10px;border-radius:12px;background:#080a0f;border:1px solid #1f2430}
 .ep2 .marketIntelTitle{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:9px}
+.ep2 .marketIntelVerdict{margin:0 0 8px!important;padding:0 0 8px;border-bottom:1px solid #1f2430;color:#a9b1c0!important;font-size:9px!important;line-height:1.45!important}
 .ep2 .marketIntelTitle em{font-style:normal;color:#60697a;font-size:7px}
 .ep2 .marketRival{display:grid;grid-template-columns:72px minmax(0,1fr) 27px;align-items:center;gap:7px;margin:7px 0}
 .ep2 .marketRival b{display:flex;align-items:center;gap:5px;font-size:9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -456,6 +483,9 @@
 .ep2 .marketNetworkNote{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px;align-items:start;margin-top:10px;padding:10px;border-radius:11px;background:linear-gradient(135deg,color-mix(in srgb,var(--epx-ep2-c) 14%,#0a0d13),#0a0d13);border-left:2px solid var(--epx-ep2-c)}
 .ep2 .marketNetworkNote b{white-space:nowrap;margin-top:2px}
 .ep2 .marketNetworkNote span{font-size:8.5px;line-height:1.45;color:#8e98aa}
+@media (max-width:360px){
+  .ep2 .marketRegionPulse{align-items:stretch;flex-direction:column}.ep2 .marketRegionPulseStats{display:grid;grid-template-columns:1fr 1fr}.ep2 .marketRegionPulseStats>span{text-align:left}
+}
 .ep2 .marketEntryBackdrop{position:fixed;inset:0;z-index:220;display:flex;align-items:flex-end;justify-content:center;padding-top:52px;background:rgba(1,3,8,.78);backdrop-filter:blur(10px);animation:marketBackdropIn .2s ease-out}
 .ep2:has(.marketEntryBackdrop) .foot{opacity:0;pointer-events:none}
 .ep2 .marketEntrySheet{position:relative;width:min(100%,430px);max-height:min(91dvh,760px);overflow-y:auto;padding:9px 15px calc(16px + env(safe-area-inset-bottom));border:1px solid #3b4554;border-bottom:0;border-radius:27px 27px 0 0;background:radial-gradient(circle at 85% 0,color-mix(in srgb,var(--epx-ep2-c) 22%,transparent),transparent 36%),linear-gradient(160deg,#171d29,#080b10 70%);box-shadow:0 -28px 70px #000d;overscroll-behavior:contain;animation:marketSheetIn .25s cubic-bezier(.22,.85,.28,1)}
@@ -546,6 +576,11 @@
 .ep2 .upload img{width:34px;height:34px;object-fit:contain}
 .ep2 .upload span{font-size:11px;color:var(--epx-dim)}
 .ep2 .upload.on{border-style:solid;border-color:var(--epx-ep2-brand)}
+.ep2 .upload:disabled{cursor:wait;opacity:.72}
+.ep2 .uploadSpinner{border:2px solid rgba(255,255,255,.16);border-top-color:var(--epx-ep2-brand);animation:epx-upload-spin .75s linear infinite}
+@keyframes epx-upload-spin{to{transform:rotate(360deg)}}
+.ep2 .uploadStatus{margin:7px 3px 0;color:#62d89a;font-size:8.5px;font-weight:800;letter-spacing:.04em;line-height:1.45}
+.ep2 .uploadError{color:#ff8c91}
 .ep2 .huepreview{height:90px;border-radius:16px;display:flex;align-items:flex-end;padding:11px;box-shadow:0 12px 30px rgba(0,0,0,.5)}
 .ep2 .huepreview b{font-family:ui-monospace,Menlo,monospace;font-size:11px;background:rgba(0,0,0,.35);padding:5px 9px;border-radius:6px}
 .ep2 .hueslider,.ep2 .satslider{width:100%;height:26px;-webkit-appearance:none;appearance:none;background:transparent;outline:none}
@@ -871,3 +906,108 @@
 .ep2 .lfund{display:flex;justify-content:space-between;align-items:baseline;border-top:1px solid #cfc6ae;padding-top:9px;margin-top:6px;font-size:9.5px;color:#5d5647}
 .ep2 .lterms{margin-top:12px;display:flex;flex-direction:column;gap:5px}
 .ep2 .lsign{margin-top:18px;text-align:center}
+
+/* ── 09/09: founder's deed ──────────────────────────────────
+   A single ceremonial record, not a finance table. The company starts with
+   no artificial treasury line; the only transaction shown is incorporation. */
+.ep2 .foundersDeed{position:relative;isolation:isolate;overflow:hidden;padding:14px 14px 15px;
+  border:1px solid #a9a08b;border-radius:5px;background:
+  radial-gradient(circle at 12% 9%,rgba(255,255,255,.7),transparent 26%),
+  repeating-linear-gradient(0deg,rgba(55,45,28,.018) 0,rgba(55,45,28,.018) 1px,transparent 1px,transparent 4px),
+  #eee8d9;color:#1b1a18;box-shadow:0 24px 58px rgba(0,0,0,.68),0 0 0 1px rgba(255,255,255,.12)}
+.ep2 .foundersDeed::before{position:absolute;z-index:-1;inset:5px;border:1px solid rgba(82,73,56,.22);content:"";pointer-events:none}
+.ep2 .foundersDeed.registered{border-color:color-mix(in srgb,var(--epx-ep2-c) 52%,#a9a08b);
+  box-shadow:0 24px 58px rgba(0,0,0,.68),0 0 30px color-mix(in srgb,var(--epx-ep2-c) 18%,transparent)}
+.ep2 .deedWatermark{position:absolute;z-index:-1;top:42%;left:50%;width:168px;height:168px;
+  opacity:.035;transform:translate(-50%,-50%) rotate(-8deg);pointer-events:none}
+.ep2 .deedWatermark svg{width:100%;height:100%}
+.ep2 .deedRegistry{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:1px 1px 9px;
+  border-bottom:1px solid rgba(73,66,53,.38);color:#625c50;font-family:ui-monospace,Menlo,monospace;font-size:6.5px;font-weight:800;letter-spacing:.1em;line-height:1.35}
+.ep2 .deedRegistry span{max-width:54%}.ep2 .deedRegistry b{max-width:46%;color:#292620;text-align:right;font-weight:900}
+.ep2 .deedIdentity{display:grid;justify-items:center;padding:12px 4px 10px;text-align:center}
+.ep2 .deedMark{width:31px;height:31px;margin-bottom:6px;filter:drop-shadow(0 4px 8px rgba(0,0,0,.14))}
+.ep2 .deedIdentity p{margin:0;color:#625c50;font-family:Georgia,serif;font-size:7px;font-weight:900;letter-spacing:.21em}
+.ep2 .deedIdentity h2{max-width:100%;margin:3px 0 2px;overflow-wrap:anywhere;font-size:clamp(21px,8vw,28px);font-weight:950;letter-spacing:.045em;line-height:1}
+.ep2 .deedIdentity small{color:#6d6658;font-size:6.5px;font-weight:900;letter-spacing:.17em}
+.ep2 .deedBrandRule{width:46px;height:2px;margin:0 auto 10px;border-radius:2px;box-shadow:0 0 10px currentColor}
+.ep2 .deedCapital{display:grid;justify-items:center;padding:10px 8px 9px;border:1px solid rgba(79,71,55,.34);
+  background:rgba(255,255,255,.28);text-align:center}
+.ep2 .deedCapital>span{color:#655f52;font-size:6.5px;font-weight:950;letter-spacing:.19em}
+.ep2 .deedCapital>strong{margin:1px 0 5px;font-family:Georgia,serif;font-size:31px;font-weight:900;letter-spacing:-.04em;line-height:1}
+.ep2 .deedCapital>div{display:flex;max-width:100%;align-items:center;justify-content:center;gap:7px;padding-top:6px;border-top:1px solid rgba(79,71,55,.22)}
+.ep2 .deedCapital b{font-size:6.5px;letter-spacing:.13em}.ep2 .deedCapital em{color:#615b4e;font-size:6.3px;font-style:normal;font-weight:750;letter-spacing:.04em}
+.ep2 .deedExtras{display:flex;flex-direction:column;gap:3px;padding:7px 2px 0;color:#5e574a;font-size:7px;font-style:italic;text-align:center}
+.ep2 .deedRecord{margin-top:11px}
+.ep2 .deedSectionHead{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:5px;color:#5f584b;font-size:6.5px;font-weight:950;letter-spacing:.16em}
+.ep2 .deedSectionHead em{font-style:normal;font-weight:750;letter-spacing:.08em}
+.ep2 .deedRecord dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));margin:0;overflow:hidden;border:1px solid rgba(79,71,55,.34)}
+.ep2 .deedRecord dl>div{display:grid;min-width:0;min-height:46px;align-content:center;gap:3px;padding:7px 8px;border-bottom:1px solid rgba(79,71,55,.25)}
+.ep2 .deedRecord dl>div:nth-child(odd){border-right:1px solid rgba(79,71,55,.25)}
+.ep2 .deedRecord dl>div:nth-last-child(-n+2){border-bottom:0}
+.ep2 .deedRecord dt{color:#776f60;font-size:6.2px;font-weight:950;letter-spacing:.13em;line-height:1.25}
+.ep2 .deedRecord dd{min-width:0;margin:0;overflow-wrap:anywhere;color:#211f1b;font-size:9px;font-weight:850;line-height:1.22}
+.ep2 .deedDeclaration{margin:10px 0 0;padding:8px 9px;border-left:2px solid color-mix(in srgb,var(--epx-ep2-c) 62%,#6c6558);
+  background:rgba(255,255,255,.24);color:#4f4a40;font-family:Georgia,serif;font-size:8px;line-height:1.42}
+.ep2 .deedSignoff{display:grid;grid-template-columns:minmax(0,1fr) 72px;align-items:end;gap:11px;margin-top:10px;padding-top:9px;border-top:1px solid rgba(73,66,53,.38)}
+.ep2 .deedSignature{min-width:0;margin:0;padding-bottom:4px}
+.ep2 .deedSignatureInk{position:relative;min-height:30px;overflow:hidden}
+.ep2 .deedSignature .cursive{min-height:30px;font-size:24px;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  opacity:0;-webkit-mask-image:none;mask-image:none;clip-path:inset(0 100% 0 0)}
+.ep2 .deedSignatureInk.writing .cursive{opacity:1;-webkit-mask-image:none;mask-image:none;
+  animation:epx-deedwrite .9s cubic-bezier(.22,.72,.22,1) both}
+.ep2 .deedPen{position:absolute;left:3%;bottom:6px;width:11px;height:4px;border-radius:4px 1px 1px 4px;
+  background:#24211c;box-shadow:0 2px 3px rgba(34,29,22,.24);opacity:0;transform:rotate(-33deg);transform-origin:right center}
+.ep2 .deedPen::after{position:absolute;right:-4px;top:0;border-top:2px solid transparent;border-bottom:2px solid transparent;border-left:5px solid #24211c;content:""}
+.ep2 .deedSignatureInk.writing .deedPen{animation:epx-deedpen .9s cubic-bezier(.22,.72,.22,1) both}
+@keyframes epx-deedwrite{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0 0 0 0)}}
+@keyframes epx-deedpen{0%{left:3%;opacity:0}8%{opacity:1}88%{left:88%;opacity:1}100%{left:92%;opacity:0}}
+.ep2 .deedSignature .line{margin:0 4px 4px}.ep2 .deedSignature .cap{font-size:6.2px;letter-spacing:.15em}
+.ep2 .deedSealWrap{display:grid;justify-items:center;gap:4px}
+.ep2 .deedSealWrap>span{color:#716959;font-size:6px;font-weight:950;letter-spacing:.15em;text-align:center}
+.ep2 .deedSeal{width:62px;height:62px;padding:0;background:rgba(255,255,255,.18)}
+.ep2 .deedSeal:focus-visible{outline:2px solid #1b1a18;outline-offset:3px}
+.ep2 .deedSeal:disabled{cursor:default}
+.ep2 .deedPaidStamp{position:absolute;z-index:5;top:55%;right:12px;padding:5px 8px;border:2px solid #24633e;border-radius:3px;
+  color:#24633e;font-family:ui-monospace,Menlo,monospace;font-size:10px;font-weight:950;letter-spacing:.12em;transform:rotate(-8deg);animation:epx-deedstamp .34s cubic-bezier(.2,1.5,.4,1) both}
+@keyframes epx-deedstamp{from{opacity:0;transform:rotate(-8deg) scale(1.65)}to{opacity:1;transform:rotate(-8deg) scale(1)}}
+.ep2 .sealAction{border:0;background:linear-gradient(150deg,var(--epx-ep2-brand),var(--epx-ep2-brand2));color:#fff;
+  box-shadow:0 12px 32px color-mix(in srgb,var(--epx-ep2-brand) 30%,transparent);transition:opacity .2s,transform .12s,filter .2s}
+.ep2 .sealAction.waiting{opacity:.68;filter:saturate(.72)}
+.ep2 .sealAction.done{background:#1d6b3f;box-shadow:0 0 34px rgba(29,107,63,.45)}
+.ep2 .sealAction:focus-visible{outline:2px solid #fff;outline-offset:2px}
+
+@media(max-width:340px){
+  .ep2 .foundersDeed{padding:12px 12px 14px}.ep2 .deedIdentity{padding-top:10px}
+  .ep2 .deedCapital>strong{font-size:28px}.ep2 .deedRecord dl>div{min-height:43px;padding:6px 7px}
+  .ep2 .deedDeclaration{font-size:7.5px}.ep2 .deedSignoff{grid-template-columns:minmax(0,1fr) 66px;gap:8px}
+  .ep2 .deedSeal{width:58px;height:58px}.ep2 .deedSignature .cursive{font-size:21px}
+}
+@media(prefers-reduced-motion:reduce){
+  .ep2 .foundersDeed,.ep2 .deedPaidStamp,.ep2 .deedSeal{animation:none!important;transition:none!important}
+  .ep2 .deedSignatureInk.writing .cursive{opacity:1;-webkit-mask-image:none;mask-image:none;clip-path:none;animation:none!important}
+  .ep2 .deedSignatureInk.writing .deedPen{display:none;animation:none!important}
+}
+
+/* Founding brand polish — visual lockups, upload feedback, and mobile-safe progress. */
+.ep2 .lockupGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+.ep2 .pick.lockupChoice{min-width:0;padding:7px;text-align:left}
+.ep2 .lockupChoice>b{margin:8px 3px 1px}
+.ep2 .lockupChoice>span:last-child{display:block;margin:0 3px 3px}
+.ep2 .lockupPreview{height:68px;padding:9px;border-radius:8px;display:flex;align-items:center;justify-content:center;gap:6px;
+  overflow:hidden;color:#08100e;box-shadow:inset 0 0 0 1px rgba(255,255,255,.12)}
+.ep2 .lockupPreview i{display:block;flex:0 0 auto;width:23px;height:23px;color:#08100e;font-style:normal}
+.ep2 .lockupPreview em{display:block;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  color:#08100e;font-size:8px;font-style:normal;line-height:1}
+.ep2 .lockupPreviewSide{justify-content:flex-start}
+.ep2 .lockupPreviewStack{flex-direction:column;gap:4px}
+.ep2 .lockupPreviewStack i{width:20px;height:20px}
+.ep2 .scrub{width:100%;min-width:0;box-sizing:border-box;
+  padding:2px calc(14px + env(safe-area-inset-right)) 4px calc(14px + env(safe-area-inset-left))}
+.ep2 .scrub .track{min-width:0;margin:0}
+.ep2 .scrub .tc{min-width:44px;text-align:right;white-space:nowrap;padding-right:1px}
+
+@media(max-width:340px){
+  .ep2 .lockupGrid{grid-template-columns:1fr}
+  .ep2 .lockupPreview{height:58px}
+}
+@media(prefers-reduced-motion:reduce){.ep2 .uploadSpinner{animation:none!important}}

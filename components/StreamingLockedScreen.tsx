@@ -49,6 +49,8 @@ interface Props {
   entitlementStatus?: StreamingEntitlementStatus;
   onRetryAccess?: () => void;
   onOpenOriginalProduction?: (target: { studioId: string; scriptId: string; commissionId: string }) => void;
+  onOpenBank?: () => void;
+  initialDestination?: 'HOME' | 'FINANCE';
 }
 
 const formatCompactMoney = (value: number): string => {
@@ -178,6 +180,8 @@ export default function StreamingLockedScreen({
   entitlementStatus = 'GRANTED',
   onRetryAccess,
   onOpenOriginalProduction,
+  onOpenBank,
+  initialDestination = 'HOME',
 }: Props) {
   const readinessRef = useRef<HTMLElement>(null);
   const [showLaunchMoment, setShowLaunchMoment] = useState(false);
@@ -185,6 +189,7 @@ export default function StreamingLockedScreen({
     player.ownedStreamingPlatform.identity
     && player.ownedStreamingPlatform.foundingProfile,
   ));
+  const [headquartersDestination, setHeadquartersDestination] = useState<'HOME' | 'FINANCE'>(initialDestination);
   const [feedback, setFeedback] = useState('');
   const eligibility = useMemo(() => evaluateStreamingEligibility(player), [player]);
   const platform = player.ownedStreamingPlatform;
@@ -252,7 +257,10 @@ export default function StreamingLockedScreen({
         player={player}
         onUpdatePlayer={onUpdatePlayer}
         onBack={onBack}
-        onOpenHeadquarters={() => setShowHeadquarters(true)}
+        onOpenHeadquarters={(destination = 'HOME') => {
+          setHeadquartersDestination(destination);
+          setShowHeadquarters(true);
+        }}
       />
     );
   }
@@ -269,22 +277,8 @@ export default function StreamingLockedScreen({
         onBack={onBack}
         onReturnToGame={onReturnToGame}
         onOpenOriginalProduction={onOpenOriginalProduction}
-      />
-    );
-  }
-
-  if (
-    ['FOUNDING', 'ACTIVE', 'SUSPENDED'].includes(platform.lifecycle)
-    && platform.identity
-    && platform.foundingProfile
-  ) {
-    return (
-      <StreamingPlatformHQ
-        player={player}
-        onUpdatePlayer={onUpdatePlayer}
-        onBack={onBack}
-        onReturnToGame={onReturnToGame}
-        onOpenOriginalProduction={onOpenOriginalProduction}
+        onOpenBank={onOpenBank}
+        initialDestination={headquartersDestination}
       />
     );
   }
@@ -412,7 +406,7 @@ export default function StreamingLockedScreen({
             <p>
               <strong>The $85M rule is exact.</strong>
               Qualification only opens registration. Incorporation later charges $85M once:
-              $70M establishes the legal, regulatory, licensing and platform foundation; $15M becomes company treasury.
+              all $85M establishes the legal, regulatory, licensing and platform foundation. Company treasury opens at $0 and must be funded separately.
             </p>
           </div>
 

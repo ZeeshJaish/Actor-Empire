@@ -16,8 +16,15 @@
  */
 import css from './presentation/screens/AudienceDesk/AudienceDesk.module.css';
 import { cx } from './presentation/cx';
+import { brandVars } from './presentation/brand';
 import React, { useMemo, useRef, useState } from 'react';
-import { Brand, Mark, brandColor, brandDeep } from './StreamingBrandVisuals';
+import { Brand, Mark, brandColor } from './StreamingBrandVisuals';
+import type { OwnedStreamingMarketOperation } from '../../types';
+import type {
+  StreamingAudienceCountryView,
+  StreamingAudienceMarketView,
+  StreamingAudiencePlatformView,
+} from '../../services/streamingAudienceMarket';
 
 /* ============================================================
    MODEL
@@ -68,19 +75,25 @@ export interface AudienceState {
   campaigns: Campaign[];
   objective: RecObjective;
   regions: RegionRow[];
+  /** The deterministic game-world market behind this ZIP presentation. */
+  market?: StreamingAudienceMarketView;
 }
 
-type Tab = 'ANALYTICS' | 'TOP 10' | 'CAMPAIGNS' | 'REGIONS';
+type Tab = 'ANALYTICS' | 'TOP 10' | 'CAMPAIGNS' | 'REGIONS' | 'MARKETS';
 type Range = '7D' | '28D' | '90D';
+type AnalyticsScope = 'PLATFORM' | 'MARKET';
+type MarketView = 'OVERVIEW' | 'PEOPLE' | 'SWITCHING' | 'RIVALS';
 
 /* ============================================================
    HELPERS
    ============================================================ */
 const money = (n: number) => n >= 1e6 ? `$${(n / 1e6).toFixed(1)}M`
   : n >= 1e3 ? `$${Math.round(n / 1e3)}k` : `$${n}`;
-const count = (n: number) => n >= 1e6 ? `${(n / 1e6).toFixed(2)}M`
+const count = (n: number) => n >= 1e9 ? `${(n / 1e9).toFixed(2)}B`
+  : n >= 1e6 ? `${(n / 1e6).toFixed(2)}M`
   : n >= 1e3 ? `${(n / 1e3).toFixed(0)}K` : `${n}`;
 const pct = (n: number) => `${n > 0 ? '+' : n < 0 ? '−' : ''}${Math.abs(n).toFixed(1)}%`;
+const plainPct = (n: number) => `${n.toFixed(n < 10 ? 1 : 0)}%`;
 
 /** A sparkline: 2px line, no axes, no markers. */
 const Spark: React.FC<{ data: number[]; good: boolean }> = ({ data, good }) => {
@@ -100,6 +113,83 @@ const Spark: React.FC<{ data: number[]; good: boolean }> = ({ data, good }) => {
   );
 };
 
+const MarketLine: React.FC<{ data: number[]; color: string; label: string }> = ({ data, color, label }) => {
+  const w = 320, h = 104, pad = 8;
+  const safe = data.length > 1 ? data : [0, data[0] ?? 0];
+  const min = Math.min(...safe), max = Math.max(...safe), span = max - min || 1;
+  const points = safe.map((value, index) => {
+    const x = pad + (index / Math.max(1, safe.length - 1)) * (w - pad * 2);
+    const y = h - pad - ((value - min) / span) * (h - pad * 2);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+  return (
+    <svg className={css.marketLine} viewBox={`0 0 ${w} ${h}`} role="img" aria-label={label} preserveAspectRatio="none">
+      {[.25, .55, .85].map(row => <line key={row} x1={pad} x2={w - pad} y1={h * row} y2={h * row} />)}
+      <polygon points={`${pad},${h - pad} ${points} ${w - pad},${h - pad}`} style={{ fill: color }} />
+      <polyline points={points} style={{ stroke: color }} />
+      <circle cx={w - pad} cy={Number(points.split(' ').at(-1)?.split(',')[1] ?? h / 2)} r="4" style={{ fill: color }} />
+    </svg>
+  );
+};
+
+const ShareBoard: React.FC<{ shares: StreamingAudienceMarketView['globalWatchShare'] }> = ({ shares }) => (
+  <div className={css.shareBoard}>
+    <div className={css.shareTrack} role="img" aria-label={shares.map(item => `${item.name} ${plainPct(item.sharePercent)}`).join(', ')}>
+      {shares.filter(item => item.sharePercent >= .25).map(item => (
+        <i key={item.id} style={{ width: `${item.sharePercent}%`, background: item.color }} />
+      ))}
+    </div>
+    <div className={css.shareKeys}>
+      {shares.slice(0, 7).map(item => (
+        <div key={item.id}><i style={{ background: item.color }} /><span>{item.name}</span><b>{plainPct(item.sharePercent)}</b></div>
+      ))}
+    </div>
+  </div>
+);
+
+const RivalMarketCard: React.FC<{ platform: StreamingAudiencePlatformView }> = ({ platform }) => (
+  <article className={css.marketRival} style={{ ['--epx-rival' as string]: platform.color }}>
+    <header>
+      <i>{platform.shortName.slice(0, 2)}</i>
+      <div><span>{platform.id === 'PLAYER' ? 'YOUR POSITION' : 'GLOBAL RIVAL'}</span><b>{platform.name}</b></div>
+      <em>{platform.momentum}</em>
+    </header>
+    <div className={css.rivalNumbers}>
+      <div><span>STRENGTH</span><b>{platform.globalStrength}</b></div>
+      <div><span>WATCH TIME</span><b>{plainPct(platform.watchSharePercent)}</b></div>
+      <div><span>PAID REACH</span><b>{plainPct(platform.householdReachPercent)}</b></div>
+    </div>
+    <p>{platform.strengthLine}</p>
+    <div className={css.rivalMeters}>
+      {[
+        ['Catalogue', platform.catalogStrength],
+        ['Value', platform.valueStrength],
+        ['Technology', platform.technologyStrength],
+        ['Local fit', platform.localStrength],
+      ].map(([label, value]) => (
+        <div key={label as string}><span>{label}</span><i><b style={{ width: `${value}%` }} /></i></div>
+      ))}
+    </div>
+    <div className={css.rivalReason}><b>Why viewers stay</b><span>{platform.audienceReason}</span></div>
+    <div className={css.rivalWeak}><b>Where they can lose</b><span>{platform.weakSpot}</span></div>
+  </article>
+);
+
+const CountryMarketCard: React.FC<{ country: StreamingAudienceCountryView; color: string }> = ({ country, color }) => (
+  <article className={cx(css.countryMarket, country.selectedForLaunch ? css.openMarket : '')}>
+    <header><div><span>{country.regionName}</span><b>{country.country}</b></div><em>{country.selectedForLaunch ? 'OPEN' : 'MARKET'}</em></header>
+    <div className={css.countryNumbers}>
+      <div><span>VIEWERS</span><b>{count(country.activeViewers)}</b></div>
+      <div><span>ADOPTION</span><b>{plainPct(country.streamingAdoptionPercent)}</b></div>
+      <div><span>GROWTH</span><b>+{country.annualGrowthPercent}%</b></div>
+    </div>
+    <MarketLine data={country.trend.map(point => point.value)} color={color} label={`${country.country} active viewer trend`} />
+    <div className={css.countryLeader}><span>WATCH-TIME LEADER</span><b>{country.topPlatformName} · {plainPct(country.topPlatformSharePercent)}</b></div>
+    <p>{country.audienceReason}</p>
+    <details><summary>Market behavior <span>＋</span></summary><div>{country.subscriptionsPerHousehold} paid services per home · {plainPct(country.switchingPercent)} switch in a typical active week.<br />Local pressure: {country.regionalServices.join(' · ')}.</div></details>
+  </article>
+);
+
 /* ============================================================
    THE PAGE
    ============================================================ */
@@ -111,14 +201,23 @@ export const AudienceDesk: React.FC<{
   onNewCampaign?: () => void;
   onObjective?: (o: RecObjective) => void;
   onOpenRegion?: (r: RegionRow) => void;
-  onOpenMarketCommand?: () => void;
-}> = ({ brand, state, onBack, initialTab, onNewCampaign, onObjective, onOpenRegion, onOpenMarketCommand }) => {
-  const c = brandColor(brand), c2 = brandDeep(brand);
+  marketOperations?: OwnedStreamingMarketOperation[];
+  onManageMarkets?: () => void;
+}> = ({ brand, state, onBack, initialTab, onNewCampaign, onObjective, onOpenRegion, marketOperations = [], onManageMarkets }) => {
+  const c = brandColor(brand);
   /* a console chip can open this page straight on the tab it names */
   const [tab, setTab] = useState<Tab>(initialTab ?? 'ANALYTICS');
   const [range, setRange] = useState<Range>('28D');
   const [hover, setHover] = useState<number | null>(null);
+  const [analyticsScope, setAnalyticsScope] = useState<AnalyticsScope>(state.live ? 'PLATFORM' : 'MARKET');
+  const [marketView, setMarketView] = useState<MarketView>('OVERVIEW');
+  const [countryRegion, setCountryRegion] = useState<string>('ALL');
   const svgRef = useRef<SVGSVGElement>(null);
+  const countryMarketOperations = useMemo(() => marketOperations.filter(operation => operation.scope === 'COUNTRY' && operation.status !== 'EXITED'), [marketOperations]);
+  const plannedAudience = countryMarketOperations.reduce((sum, operation) => sum + (operation.countryProfile?.audienceSize || 0), 0);
+  const averagePolicyRate = countryMarketOperations.length
+    ? countryMarketOperations.reduce((sum, operation) => sum + (operation.policySnapshot?.effectiveTaxPercent || operation.countryProfile?.taxBaselinePercent || 0) + (operation.policySnapshot?.streamingLevyPercent || operation.countryProfile?.streamingLevyBaselinePercent || 0), 0) / countryMarketOperations.length
+    : 0;
 
   /* the visible window of the trend, driven by the range chips */
   const shown = useMemo(() => {
@@ -149,9 +248,18 @@ export const AudienceDesk: React.FC<{
 
   const totalAttr = state.attribution.reduce((a, x) => a + x.value, 0) || 1;
   const climbing = state.chart.filter(r => r.mine).length;
+  const market = state.market;
+  const countries = useMemo(() => {
+    if (!market) return [];
+    return countryRegion === 'ALL' ? market.countries : market.countries.filter(country => country.regionId === countryRegion);
+  }, [market, countryRegion]);
+  const countryRegions = useMemo(() => market
+    ? Array.from(new Map(market.countries.map(country => [country.regionId, country.regionName])).entries())
+    : [], [market]);
+  const marketTrend = market?.globalTrend.map(point => point.activeViewers) ?? [];
 
   return (
-    <div className={css.ad} style={{ ['--epx-ad-c' as string]: c}}>
+    <div className={css.ad} data-epx-root style={brandVars(brand)}>
       <div className={css.adtop}>
         <button className={css.adback} onClick={onBack} aria-label="Back">←</button>
         <div className={css.adtitle}>
@@ -169,7 +277,7 @@ export const AudienceDesk: React.FC<{
       </div>
 
       <div className={css.adtabs}>
-        {(['ANALYTICS', 'TOP 10', 'CAMPAIGNS', 'REGIONS'] as Tab[]).map(t => (
+        {(['ANALYTICS', 'TOP 10', 'CAMPAIGNS', 'REGIONS', 'MARKETS'] as Tab[]).map(t => (
           <button key={t} className={tab === t ? css.on : ''} onClick={() => setTab(t)}>{t}</button>
         ))}
       </div>
@@ -179,20 +287,22 @@ export const AudienceDesk: React.FC<{
         {/* ── ANALYTICS ── */}
         {tab === 'ANALYTICS' && (
           <>
-            {onOpenMarketCommand ? (
-              <section className={css.adsec}>
-                <div className={css.adhead}>
-                  <h2>World intelligence</h2>
-                  <button className={css.adadd} type="button" onClick={onOpenMarketCommand}>OPEN →</button>
-                </div>
-              </section>
-            ) : null}
-            {!state.live ? (
+            <div className={css.analyticsScope} aria-label="Analytics scope">
+              <button className={analyticsScope === 'PLATFORM' ? css.on : ''} onClick={() => setAnalyticsScope('PLATFORM')} disabled={!state.live}>
+                <span>YOUR PLATFORM</span><small>{state.live ? 'Performance' : 'After launch'}</small>
+              </button>
+              <button className={analyticsScope === 'MARKET' ? css.on : ''} onClick={() => setAnalyticsScope('MARKET')}>
+                <span>STREAMING MARKET</span><small>Industry</small>
+              </button>
+            </div>
+
+            {analyticsScope === 'PLATFORM' && !state.live ? (
               <div className={css.adpending}>
                 <b>No audience data yet</b>
-                <span>Charts appear once the platform is live and real subscribers exist.</span>
+                <span>Your performance appears after launch. The Streaming Market is already available for planning.</span>
+                <button type="button" onClick={() => setAnalyticsScope('MARKET')}>SEE THE STREAMING MARKET →</button>
               </div>
-            ) : (
+            ) : analyticsScope === 'PLATFORM' ? (
               <>
                 {/* filters in one row, above the charts */}
                 <div className={css.ranges}>
@@ -286,6 +396,105 @@ export const AudienceDesk: React.FC<{
                   ))}
                 </section>
               </>
+            ) : market ? (
+              <>
+                <div className={css.marketTabs} aria-label="Streaming market views">
+                  {([
+                    ['OVERVIEW', 'Overview'],
+                    ['PEOPLE', 'People'],
+                    ['SWITCHING', 'Switching'],
+                    ['RIVALS', 'Rivals'],
+                  ] as [MarketView, string][]).map(([id, label]) => (
+                    <button key={id} className={marketView === id ? css.on : ''} onClick={() => setMarketView(id)}>{label}</button>
+                  ))}
+                </div>
+
+                {marketView === 'OVERVIEW' && (
+                  <>
+                    <section className={css.marketHero}>
+                      <span>THE LIVING MARKET · WK {market.generatedAtAbsoluteWeek}</span>
+                      <strong>{count(market.activeViewers)}</strong>
+                      <h2>active streaming viewers</h2>
+                      <p>{count(market.globalPopulation)} people · {plainPct(market.streamingAdoptionPercent)} adoption</p>
+                    </section>
+                    <div className={css.marketKpis}>
+                      <div><span>PAYING HOMES</span><b>{count(market.payingHouseholds)}</b></div>
+                      <div><span>PAID SUBSCRIPTIONS</span><b>{count(market.paidSubscriptions)}</b></div>
+                      <div><span>SUBS / HOME</span><b>{market.subscriptionsPerHousehold}</b></div>
+                      <div><span>WATCH HOURS / WK</span><b>{count(market.weeklyWatchHours)}</b></div>
+                    </div>
+                    <section className={css.adsec}>
+                      <div className={css.adhead}><h2>Streaming adoption</h2><span>last 52 game weeks</span></div>
+                      <MarketLine data={marketTrend} color={c} label="Global active streaming viewers over the last 52 game weeks" />
+                      <div className={css.marketAxis}><span>52 weeks ago</span><span>{count(market.activeViewers)} now</span></div>
+                    </section>
+                    <section className={css.adsec}>
+                      <div className={css.adhead}><h2>Who owns watch time?</h2><span>all services</span></div>
+                      <p className={css.marketExplain}>Viewing time is different from subscriber count. Free and local services can win attention without owning the household bill.</p>
+                      <ShareBoard shares={market.globalWatchShare} />
+                    </section>
+                    <section className={css.adsec}>
+                      <div className={css.adhead}><h2>One home, many subscriptions</h2><span>subscriber overlap</span></div>
+                      <div className={css.overlapGrid}>
+                        <div><strong>{plainPct(market.subscriberOverlap.oneServicePercent)}</strong><span>one service</span></div>
+                        <div><strong>{plainPct(market.subscriberOverlap.twoServicesPercent)}</strong><span>two services</span></div>
+                        <div><strong>{plainPct(market.subscriberOverlap.threePlusPercent)}</strong><span>three or more</span></div>
+                      </div>
+                      <p className={css.marketCallout}>You do not always need to replace Netflix. Winning the second subscription slot can be the first victory.</p>
+                    </section>
+                  </>
+                )}
+
+                {marketView === 'PEOPLE' && (
+                  <section className={css.adsec}>
+                    <div className={css.adhead}><h2>Why people subscribe</h2><span>audience personas</span></div>
+                    <p className={css.marketExplain}>Each group reacts differently to price, originals, localization and release gaps.</p>
+                    <div className={css.personaList}>
+                      {market.personas.map((persona, index) => (
+                        <article key={persona.id} style={{ ['--epx-persona' as string]: persona.color }}>
+                          <div className={css.personaTop}><i>0{index + 1}</i><div><span>{plainPct(persona.sharePercent)} · {count(persona.activeViewers)} viewers</span><b>{persona.name}</b></div><em>{persona.switchSensitivity} RISK</em></div>
+                          <p>{persona.need}</p>
+                          <div className={css.personaFacts}><span>{persona.weeklyHours}h / week</span><span>{persona.subscriptionsPerHousehold} services</span><span>Best fit: {persona.bestFitPlatform}</span></div>
+                          <div className={css.personaLeave}><b>Leaves when</b><span>{persona.leavesWhen}</span></div>
+                        </article>
+                      ))}
+                    </div>
+                  </section>
+                )}
+
+                {marketView === 'SWITCHING' && (
+                  <>
+                    <section className={css.switchHero}>
+                      <span>THIS WEEK</span><strong>{count(market.switching.globalSwitchPool)}</strong><h2>viewers are willing to move</h2>
+                    </section>
+                    <div className={css.switchNumbers}>
+                      <div className={css.positive}><span>JOINED</span><b>{state.live ? `+${count(market.switching.joinedThisWeek)}` : 'PRE-LAUNCH'}</b></div>
+                      <div className={css.negative}><span>CANCELLED</span><b>{state.live ? `−${count(market.switching.cancelledThisWeek)}` : 'PRE-LAUNCH'}</b></div>
+                      <div><span>RETURNED</span><b>{state.live ? count(market.switching.reactivatedThisWeek) : 'PRE-LAUNCH'}</b></div>
+                    </div>
+                    <section className={css.adsec}>
+                      <div className={css.adhead}><h2>Why homes move</h2><span>{state.live ? `${plainPct(market.switching.playerChurnPercent)} player churn` : 'market pressure'}</span></div>
+                      {market.switching.reasons.map(reason => (
+                        <div className={css.switchReason} key={reason.id}>
+                          <div><b>{reason.label}</b><em>{plainPct(reason.sharePercent)}</em></div>
+                          <span><i style={{ width: `${reason.sharePercent}%` }} /></span>
+                          <p>{reason.detail}</p>
+                        </div>
+                      ))}
+                    </section>
+                  </>
+                )}
+
+                {marketView === 'RIVALS' && (
+                  <section className={css.adsec}>
+                    <div className={css.adhead}><h2>Rival strength</h2><span>more than subscribers</span></div>
+                    <p className={css.marketExplain}>Catalogue, value, technology and local fit explain why each platform wins—and where it can lose.</p>
+                    <div className={css.marketRivalList}>{market.platforms.map(platform => <RivalMarketCard key={platform.id} platform={platform} />)}</div>
+                  </section>
+                )}
+              </>
+            ) : (
+              <div className={css.adpending}><b>Market data unavailable</b><span>The living-market simulation will appear when this save is ready.</span></div>
             )}
           </>
         )}
@@ -381,30 +590,74 @@ export const AudienceDesk: React.FC<{
 
         {/* ── REGIONS ── */}
         {tab === 'REGIONS' && (
-          <section className={css.adsec}>
-            <div className={css.adhead}><h2>Territories</h2><span>sorted by subscribers</span></div>
-            {state.regions.map(r => (
-              <button className={css.reg} key={r.id} onClick={() => onOpenRegion?.(r)}>
-                <div className={css.regtop}>
-                  <b>{r.label}</b>
-                  <em className={r.growthPct >= 0 ? css.up : css.down}>{pct(r.growthPct)}</em>
-                </div>
-                {/* magnitude: one hue, length carries the value */}
-                <div className={css.regbar}><i style={{ width: `${Math.max(2, r.sharePct * 6)}%` }} /></div>
-                <div className={css.regfoot}>
-                  <div><span>SUBSCRIBERS</span><em>{count(r.subs)}</em></div>
-                  <div><span>SHARE</span><em>{r.sharePct.toFixed(1)}%</em></div>
-                  <div className={css.right}>
-                    <span>LATENCY</span>
-                    <em className={r.latencyMs > 120 ? css.bad : r.latencyMs > 60 ? css.warn : css.good}>{r.latencyMs}ms</em>
+          <>
+            <section className={css.adsec}>
+              <div className={css.adhead}><h2>Territories</h2><span>{state.live ? 'your platform' : 'opening footprint'}</span></div>
+              {state.regions.map(r => (
+                <button className={css.reg} key={r.id} onClick={() => onOpenRegion?.(r)}>
+                  <div className={css.regtop}><b>{r.label}</b><em className={r.growthPct >= 0 ? css.up : css.down}>{pct(r.growthPct)}</em></div>
+                  <div className={css.regbar}><i style={{ width: `${Math.max(2, r.sharePct * 6)}%` }} /></div>
+                  <div className={css.regfoot}>
+                    <div><span>SUBSCRIBERS</span><em>{count(r.subs)}</em></div>
+                    <div><span>SHARE</span><em>{r.sharePct.toFixed(1)}%</em></div>
+                    <div className={css.right}><span>LATENCY</span><em className={r.latencyMs > 120 ? css.bad : r.latencyMs > 60 ? css.warn : css.good}>{r.latencyMs}ms</em></div>
                   </div>
+                  {r.rivals.length > 0 && <div className={css.regrivals}>Contested by {r.rivals.join(', ')}</div>}
+                </button>
+              ))}
+            </section>
+            {market && (
+              <section className={css.adsec}>
+                <div className={css.adhead}><h2>Country markets</h2><span>living industry data</span></div>
+                <div className={css.countryFilters}>
+                  <button className={countryRegion === 'ALL' ? css.on : ''} onClick={() => setCountryRegion('ALL')}>World</button>
+                  {countryRegions.map(([id, label]) => <button key={id} className={countryRegion === id ? css.on : ''} onClick={() => setCountryRegion(id)}>{label}</button>)}
                 </div>
-                {r.rivals.length > 0 && (
-                  <div className={css.regrivals}>Contested by {r.rivals.join(', ')}</div>
-                )}
-              </button>
-            ))}
-          </section>
+                <div className={css.countryMarketList}>{countries.map(country => <CountryMarketCard key={country.id} country={country} color={c} />)}</div>
+              </section>
+            )}
+          </>
+        )}
+
+        {/* Markets owns territory entry and expansion. Regions remains analytics. */}
+        {tab === 'MARKETS' && (
+          <>
+            <section className={css.marketOpsHero}>
+              <span>MARKET OPERATIONS</span>
+              <strong>{countryMarketOperations.filter(operation => operation.status === 'ACTIVE').length}</strong>
+              <h2>countries live</h2>
+              <p>{countryMarketOperations.filter(operation => ['PLANNED', 'AWAITING_FUNDING', 'CLEARANCE', 'INFRASTRUCTURE_PREPARATION', 'READY'].includes(operation.status)).length} entries moving toward launch</p>
+              <div className={css.marketOpsPulse}>
+                <div><small>REACH IN PLAY</small><b>{count(plannedAudience)}</b></div>
+                <div><small>AVG TAX + LEVY</small><b>{averagePolicyRate.toFixed(1)}%</b></div>
+                <div><small>OPEN FILES</small><b>{countryMarketOperations.filter(operation => operation.status === 'CLEARANCE' || operation.status === 'AWAITING_FUNDING').length}</b></div>
+              </div>
+              <button type="button" onClick={onManageMarkets}>ENTER A NEW MARKET →</button>
+            </section>
+            <section className={css.adsec}>
+              <div className={css.adhead}><h2>Country portfolio</h2><span>one living record per market</span></div>
+              <div className={css.marketOpsList}>
+                {countryMarketOperations.length ? countryMarketOperations.map(operation => (
+                  <details key={operation.id} className={css.marketOpsFile}>
+                    <summary>
+                      <span><b>{operation.countryProfile?.country || operation.countryId || operation.scopeId}</b><small>{operation.entryKind === 'OPENING' ? 'Opening territory' : 'Expansion'} · {count(operation.countryProfile?.audienceSize || 0)} viewers</small></span>
+                      <em className={css[`status${operation.status}`] || ''}>{operation.status.replaceAll('_', ' ')}</em>
+                    </summary>
+                    <div className={css.marketOpsDetail}>
+                      {operation.clearance && <div className={css.marketOpsReview}><span><small>REVIEW STAGE</small><b>{operation.clearance.stage.replaceAll('_', ' ')}</b></span><strong>{Math.round(operation.clearance.progressPercent)}%</strong><i><b style={{ width: `${operation.clearance.progressPercent}%` }} /></i></div>}
+                      <div className={css.marketOpsTerms}>
+                        <span><small>TAX</small><b>{operation.policySnapshot?.effectiveTaxPercent ?? operation.countryProfile?.taxBaselinePercent ?? 0}%</b></span>
+                        <span><small>LEVY</small><b>{operation.policySnapshot?.streamingLevyPercent ?? operation.countryProfile?.streamingLevyBaselinePercent ?? 0}%</b></span>
+                        <span><small>LOCAL</small><b>{operation.policySnapshot?.localContentObligationPercent ?? operation.countryProfile?.localContentObligationPercent ?? 0}%</b></span>
+                      </div>
+                      <p>{operation.clearance?.condition || `${operation.countryProfile?.localizationPreference.replaceAll('_', ' ').toLowerCase() || 'mixed'} audience preference · ${operation.countryProfile?.privacyComplianceLevel || 'standard'} privacy review.`}</p>
+                      {operation.policySnapshot && <small className={css.marketOpsElection}>NEXT POLICY CYCLE · WEEK {operation.policySnapshot.nextElectionAtAbsoluteWeek}</small>}
+                    </div>
+                  </details>
+                )) : <div className={css.adpending}><b>No market entries yet</b><span>Evaluate countries and create your first expansion plan.</span></div>}
+              </div>
+            </section>
+          </>
         )}
 
         <div className={css.adfoot} />

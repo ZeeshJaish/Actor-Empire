@@ -780,7 +780,7 @@ export const resolveStreamingHostileTakeover = (
     const consequence = status === 'DEFENDED'
         ? 'The bid is defeated. Independence survives, with the board demanding a credible next quarter.'
         : 'A strategic settlement prevents game-over: the founder remains CEO, but loses voting control under a binding recovery mandate.';
-    const ledger = publicLedger(platform, absoluteWeek, `takeover-defence:${takeover.id}`, 'HOSTILE_TAKEOVER_DEFENDED', consequence, { defence, status });
+    const ledger = publicLedger(platform, absoluteWeek, `takeover-defence:${takeover.id}`, 'HOSTILE_TAKEOVER_DEFENDED', consequence, { defence, status, cost });
     let nextPlatform = compactOwnedStreamingPlatformForPersistence({
         ...platform,
         treasuryCash: platform.treasuryCash - cost,

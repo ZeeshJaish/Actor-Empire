@@ -496,7 +496,8 @@ export const commitStreamingCrisisSecurityWeek = (
         ledger.push(ledgerEntry(platform, snapshot.absoluteWeek, 'WHISTLEBLOWER_REPORT_OPENED', key, 'A protected internal disclosure reached the board.', { reportId }));
     }
 
-    const unresolved = nextState.crises.some(item => item.stage !== 'RESOLVED');
+    const unresolved = nextState.crises.some(item => item.stage !== 'RESOLVED')
+        || nextState.infrastructureOperations.incidents.some(item => item.stage !== 'RESOLVED');
     const lastCrisisWeek = nextState.crises.at(-1)?.detectedAtAbsoluteWeek ?? -100;
     const operations = snapshot.operations;
     const technicalDebt = platform.infrastructureSetup?.technicalDebt || 0;

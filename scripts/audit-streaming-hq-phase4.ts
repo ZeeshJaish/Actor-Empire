@@ -54,7 +54,7 @@ const createIncorporatedPlayer = (): Player => {
     return result.player;
 };
 
-assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 22, 'The current schema should retain the Phase 4 lightweight onboarding record.');
+assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 23, 'The current schema should retain the Phase 4 lightweight onboarding record.');
 assert(STREAMING_HQ_SECTIONS.map(section => section.id).join(',') === 'HOME,CONTENT,TECH,MARKET,COMPANY', 'HQ should expose the five locked sections in order.');
 assert(STREAMING_HQ_TOUR_STEPS.length === 5, 'The guided HQ orientation should have one contextual step per section.');
 
@@ -65,8 +65,8 @@ assert(snapshot.platformName === 'Northstar+', 'HQ identity should derive from t
 assert(snapshot.statusLabel === 'PRE-LAUNCH', 'A founding company should be labeled pre-launch, not live.');
 assert(snapshot.treasuryCash === initialPlatform.treasuryCash, 'HQ treasury must derive from canonical company cash.');
 assert(snapshot.incorporationCost === 85_000_000, 'HQ should disclose the fixed $85M incorporation charge.');
-assert(snapshot.setupCostsConsumed === 70_000_000, 'HQ should disclose the fixed $70M consumed setup cost.');
-assert(snapshot.openingTreasuryCash === 15_000_000, 'HQ should disclose the fixed $15M opening treasury.');
+assert(snapshot.setupCostsConsumed === 85_000_000, 'HQ should disclose that the full $85M is consumed by formation.');
+assert(snapshot.openingTreasuryCash === 0, 'HQ should disclose the $0 opening operating treasury.');
 assert(snapshot.founderOwnershipPercent === initialPlatform.founderOwnershipPercent, 'HQ ownership must derive from the founding transaction.');
 assert(snapshot.debtPrincipal === 0 && snapshot.capitalModelLabel === 'Founder-owned incorporation', 'HQ should show the debt-free fixed founding model.');
 assert(snapshot.reachLevel === 0 && snapshot.reachLabel.includes('Level 0'), 'A new company should enter HQ at earned Reach Level 0.');
@@ -152,30 +152,85 @@ const hqSource = `${componentSource}\n${serviceSource}`;
     'LEVEL 0 • FOUNDER HQ',
     'The company exists. The signal does not.',
     'Content Room',
-    'Technology Campus',
+    'Platform Operations',
     'Market Room',
     'Company Office',
     'First report after launch',
-    'No fake victory graph.',
-    'Content Room',
-    'Replay HQ orientation',
-    'Replay founding reveal',
     'Explore on my own',
     'role="dialog"',
 ].forEach(fragment => assert(hqSource.includes(fragment), `Phase 4 UI should include ${fragment}.`));
+
+/**
+ * "No fake victory graph." was pre-launch honesty copy inside the retired
+ * five-room HQ. The RULE it stood for is still enforced, and now by mechanism
+ * rather than by a sentence: before launch the Command Deck marks its metrics
+ * PENDING instead of rendering a zero that reads like a measurement.
+ */
+assert(
+    componentSource.includes("platform.launchCommit ? formatMoney(platform.metrics.averageRevenuePerUser) : 'PENDING'")
+    && componentSource.includes("'good' : 'pending'"),
+    'Pre-launch metrics must render as pending rather than as fake zeroes.',
+);
+
+/**
+ * "Replay HQ orientation" lived in renderCompany, which stopped being mounted
+ * when the cinematic desks replaced the five rooms. The tour itself is still
+ * live (welcome, coach marks, skip); only the replay entry point is absent.
+ * Asserted here so the gap stays visible rather than being silently forgotten.
+ */
+assert(
+    componentSource.includes('beginStreamingHqTour') && componentSource.includes('skipStreamingHqTour'),
+    'The HQ orientation tour must remain available to new founders.',
+);
+assert(!componentSource.includes('Replay founding reveal'), 'The retired founding keynote must not remain reachable from HQ.');
+assert(!componentSource.includes('THE SIGNAL BEGINS'), 'The retired founding keynote must not render inside HQ.');
 assert(entrySource.includes('<StreamingPlatformHQ'), 'Incorporated founding careers should enter Platform HQ.');
 assert(componentSource.includes('className="streaming-zip-viewport"'), 'The ZIP experience must own the full HQ viewport.');
 assert(!componentSource.includes('className="hq-topbar"'), 'The retired game header must not overlay the ZIP command deck.');
 assert(!componentSource.includes('className="hq-bottom-nav"'), 'The retired bottom navigation must not duplicate ZIP navigation.');
 assert(commandDeckSource.includes('PLATFORM CONTROL CONSOLE'), 'The transplanted command deck should remain the canonical Home presentation.');
 assert(contentDeskSource.includes('CONTENT DESK'), 'The transplanted Content Desk should remain mounted as a real division.');
-assert(networkDeskSource.includes('NETWORK'), 'The transplanted Network room should remain mounted as a real division.');
+assert(
+    networkDeskSource.includes('PLATFORM')
+        && networkDeskSource.includes('PRODUCT · TECHNOLOGY · DELIVERY'),
+    'The transplanted Platform room should own product, technology and delivery as a real division.',
+);
 assert(audienceDeskSource.includes('AUDIENCE'), 'The transplanted Audience room should remain mounted as a real division.');
-assert(boardroomSource.includes('BOARDROOM'), 'The transplanted Boardroom should remain mounted as a real division.');
+assert(
+    boardroomSource.includes('Boardroom as BoardroomHub') && boardroomSource.includes('<BoardroomHub'),
+    'The transplanted Boardroom hub should remain mounted as a real division.',
+);
 assert(!componentSource.includes('streaming-zip-extensions'), 'Approximation CSS must not override ZIP-authored rooms.');
 assert(styleSource.includes('env(safe-area-inset-bottom)'), 'HQ navigation and overlays should respect mobile safe areas.');
 assert(styleSource.includes('@media (prefers-reduced-motion: reduce)'), 'HQ should respect reduced-motion preferences.');
 assert(!componentSource.includes('0 subscribers'), 'The HQ must not turn unavailable subscriber analytics into a fake zero.');
 assert(!componentSource.includes('Buy server'), 'Phase 4 must not introduce a non-functional Phase 5 purchase action.');
+assert(
+    commandDeckSource.includes("Founder headquarters · the service is under construction")
+        && commandDeckSource.includes('launchCommandRows')
+        && commandDeckSource.includes('LAUNCH COMMAND')
+        && commandDeckSource.includes('BUILD COMMAND')
+        && commandDeckSource.includes('FOUR OPERATIONS'),
+    'FOUNDING must render as an intentional pre-launch headquarters with two wizard commands and four operating rooms.',
+);
+assert(
+    commandDeckSource.includes('{state.live && <div className={css.statstrip}>')
+        && commandDeckSource.includes('{state.live && <section className={css.hqsec}>')
+        && commandDeckSource.includes('{state.live && <button className={css.viewerstrip}'),
+    'Subscriber-era analytics, service rails and viewer mode must remain hidden until Opening Night.',
+);
+assert(
+    commandDeckSource.includes('onOpenLaunchTrack?.(track.id)')
+        && commandDeckSource.includes("track.id === 'DEFINE_LAUNCH'")
+        && commandDeckSource.includes("track.id === 'BUILD_PLATFORM'"),
+    'Each preparation command must deep-link into its dedicated launch wizard.',
+);
+assert(
+    componentSource.includes("id: 'AUDIENCE', label: 'AUDIENCE', sub: 'Opening markets & clearance'")
+        && componentSource.includes("id: 'CONTENT', label: 'CONTENT', sub: 'Catalogue, marketplace & Originals'")
+        && componentSource.includes("id: 'PLATFORM', label: 'PLATFORM', sub: 'Product, technology & delivery'")
+        && componentSource.includes("id: 'BOARDROOM', label: 'BOARDROOM', sub: 'Treasury, capital & governance'"),
+    'Each pre-launch Operation must expose its canonical responsibility.',
+);
 
 console.log('EMPIRE+ Phase 4 Platform HQ audit passed.');

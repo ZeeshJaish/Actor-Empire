@@ -1,10 +1,32 @@
-import type { Player } from '../types';
+import { PLATFORM_AI_RUNTIME_SCHEMA_VERSION, type Player } from '../types';
 import { getAbsoluteWeek } from './legacyLogic';
 import {
   externalizeCustomPostersInPlayer,
   stripEmbeddedPosterImageDataForPersistence,
 } from './customPosterMedia';
 import { compactOwnedStreamingPlatformForPersistence } from './ownedStreamingPlatform';
+import {
+  filterPlatformAiRightsContractsByRenewalState,
+  normalizePlatformAiAudienceSettlements,
+  normalizePlatformAiDistressEpisodes,
+  normalizePlatformAiLocalizationJobs,
+  normalizePlatformAiPendingOneTimeObligations,
+  normalizePlatformAiRightsContracts,
+  normalizePlatformAiRightsRenewals,
+  reconcilePlatformAiLocalizationObligations,
+  reconcilePlatformAiRightsRenewalObligations,
+  reconcilePlatformAiRightsRenewalStatuses,
+} from './platformAi/platformAiState';
+import {
+  normalizePlatformAiExternalCommitments,
+  reconcilePlatformAiExternalCommitmentObligations,
+} from './platformAi/platformAiExternalCommitments';
+import { normalizePlatformAiCatalogueDistressDeals } from './platformAi/platformAiDistress';
+import { getPlatformAiRightsMarketProjectUniverse } from './platformAi/platformAiContentSourcing';
+import { normalizeStreamingRightsContractRegistry } from './streamingRightsCore';
+import { normalizeStreamingBiddingSessionRegistry } from './streamingBidding';
+import { normalizeStreamingRoyaltySettlementRegistry } from './streamingContractSettlement';
+import { normalizeStreamingPlatformEcosystem } from './streamingPlatformEcosystem';
 
 export const FULL_LOCAL_MIRROR_BUDGET_BYTES = 3_500_000;
 
@@ -27,6 +49,14 @@ const STUDIO_NOTICE_MAX_ITEMS = 80;
 const STUDIO_DECISION_MAX_ITEMS = 120;
 const WORLD_PROJECT_MAX_ITEMS = 900;
 const EXTRA_NPC_RECENT_MAX_ITEMS = 360;
+const PLATFORM_AI_TERMINAL_SLATE_MAX_ITEMS = 104;
+const PLATFORM_AI_TERMINAL_RIGHTS_MAX_ITEMS = 104;
+const PLATFORM_AI_TERMINAL_PRODUCTION_MAX_ITEMS = 104;
+const PLATFORM_AI_TERMINAL_TALENT_MAX_ITEMS = 208;
+const AWARD_HISTORY_MAX_ITEMS = 104;
+const STREAMING_RIGHTS_TERMINAL_MAX_ITEMS = 240;
+const STREAMING_BIDDING_TERMINAL_MAX_ITEMS = 60;
+const STREAMING_ROYALTY_SETTLEMENT_MAX_ITEMS = 520;
 
 type CompactTimelineEntry = {
   id: string;
@@ -233,6 +263,9 @@ const getReferencedNpcIds = (player: any): Set<string> => {
   });
   (player.commitments || []).forEach((commitment: any) => getProjectReferencedNpcIds(commitment?.projectDetails, referencedIds));
   (player.activeReleases || []).forEach((release: any) => getProjectReferencedNpcIds(release?.projectDetails, referencedIds));
+  (player.world?.talentBookings || []).forEach((booking: any) => {
+    if (booking?.npcId) referencedIds.add(String(booking.npcId));
+  });
   Object.values(player.world?.universes || {}).forEach((universe: any) => {
     (universe?.roster || []).forEach((character: any) => {
       [character?.actorId, character?.id].forEach(id => {
@@ -257,11 +290,512 @@ const compactExtraNPCs = (player: any) => {
   return Array.from(compactedById.values());
 };
 
-const compactWorld = (world: any) => {
+const getUsableWorldProjectId = (id: unknown): string | null => (
+  typeof id === 'string' && id.trim() ? id.trim() : null
+);
+
+const getReferencedWorldProjectIds = (player: any, absoluteWeek: number): Set<string> => {
+  const referencedIds = new Set<string>();
+  const add = (id: unknown) => {
+    const usableId = getUsableWorldProjectId(id);
+    if (usableId) referencedIds.add(usableId);
+  };
+  const playerStudioIds = new Set<string>([
+    'PLAYER_STUDIO',
+    ...(player.businesses || [])
+      .filter((business: any) => business?.type === 'PRODUCTION_HOUSE')
+      .flatMap((business: any) => [
+        business.id,
+        business.studioState?.acquisitionPortfolio?.sourceStudioId,
+      ])
+      .filter((studioId: unknown) => typeof studioId === 'string' && studioId)
+      .map((studioId: string) => String(studioId)),
+  ]);
+  (player.world?.projects || []).forEach((project: any) => {
+    const hasLiveWindow = (Array.isArray(project?.streamingWindows) ? project.streamingWindows : [])
+      .some((window: any) => (
+        !Number.isFinite(Number(window?.expiresAtAbsoluteWeek))
+        || Number(window.expiresAtAbsoluteWeek) >= absoluteWeek
+      ));
+    if (playerStudioIds.has(String(project?.studioId || '')) || hasLiveWindow) add(project?.id);
+  });
+  Object.values(player.world?.platforms || {}).forEach((platform: any) => {
+    const ai = platform?.ai;
+    (ai?.slate || []).forEach((plan: any) => {
+      (plan?.sourceProjectIds || []).forEach(add);
+      (plan?.releaseEntries || []).forEach((entry: any) => {
+        add(entry?.sourceProjectId);
+        add(entry?.canonicalProjectId);
+      });
+    });
+    (ai?.releaseMemory || []).forEach((memory: any) => add(memory?.projectId));
+    (ai?.rightsContracts || []).forEach((contract: any) => add(contract?.sourceProjectId));
+  });
+  normalizePlatformAiCatalogueDistressDeals(player.world?.platformAiCatalogueDistressDeals)
+    .filter(deal => deal.status === 'PENDING_PAYMENT')
+    .forEach(deal => add(deal.sourceProjectId));
+  Object.values(player.world?.industryProductions || {}).forEach((production: any) => add(production?.canonicalProjectId));
+  (player.world?.awardHistory || []).forEach((season: any) => {
+    (season?.winners || []).forEach((winner: any) => add(winner?.projectId));
+  });
+  return referencedIds;
+};
+
+const compactWorldProjects = (player: any): any[] => {
+  const projects = Array.isArray(player.world?.projects) ? player.world.projects : [];
+  const absoluteWeek = getApproxAbsoluteWeek(Number(player?.age), Number(player?.currentWeek));
+  const referencedIds = getReferencedWorldProjectIds(player, absoluteWeek);
+  const seenProjectIds = new Set<string>();
+  const canonicalProjects = projects.filter((project: any) => {
+    const projectId = getUsableWorldProjectId(project?.id);
+    if (!projectId) return true;
+    if (seenProjectIds.has(projectId)) return false;
+    seenProjectIds.add(projectId);
+    return true;
+  });
+  const referenced = canonicalProjects.filter((project: any) => {
+    const projectId = getUsableWorldProjectId(project?.id);
+    return projectId !== null && referencedIds.has(projectId);
+  });
+  // Referential integrity wins over the ordinary history budget. With stale
+  // windows removed from protection, only genuinely live/material state can
+  // trigger this exceptional overflow.
+  if (referenced.length >= WORLD_PROJECT_MAX_ITEMS) return referenced;
+  const referencedToKeep = referenced;
+  const retainedProjects = new Set<any>(referencedToKeep);
+  const retainedIds = new Set(referencedToKeep
+    .map((project: any) => getUsableWorldProjectId(project?.id))
+    .filter((id: string | null): id is string => id !== null));
+  const remainingCapacity = WORLD_PROJECT_MAX_ITEMS - referencedToKeep.length;
+  getPlatformAiRightsMarketProjectUniverse(canonicalProjects, absoluteWeek)
+    .filter((project: any) => !retainedIds.has(project.id))
+    .slice(0, remainingCapacity)
+    .forEach((project: any) => {
+      retainedIds.add(project.id);
+      retainedProjects.add(project);
+    });
+  const fillerCapacity = WORLD_PROJECT_MAX_ITEMS - retainedProjects.size;
+  if (fillerCapacity > 0) {
+    canonicalProjects
+      .map((project: any, index: number) => ({ project, index }))
+      .filter(({ project }: { project: any }) => {
+        const projectId = getUsableWorldProjectId(project?.id);
+        return !retainedProjects.has(project) && (projectId === null || !retainedIds.has(projectId));
+      })
+      .sort((left: any, right: any) => (
+        getApproxAbsoluteWeek(Number(right.project?.year), Number(right.project?.weekReleased))
+        - getApproxAbsoluteWeek(Number(left.project?.year), Number(left.project?.weekReleased))
+        || String(left.project?.id || '').localeCompare(String(right.project?.id || ''))
+        || right.index - left.index
+      ))
+      .slice(0, fillerCapacity)
+      .forEach(({ project }: { project: any }) => retainedProjects.add(project));
+  }
+  return canonicalProjects.filter((project: any) => retainedProjects.has(project));
+};
+
+const stableHistoryId = (value: unknown): string => String(value || '').trim();
+
+const retainBoundedHistory = <T,>(input: {
+  items: T[];
+  idOf: (item: T) => string;
+  isProtected: (item: T) => boolean;
+  activityWeekOf: (item: T) => number;
+  terminalLimit: number;
+}): T[] => {
+  const protectedIds = new Set(input.items.filter(input.isProtected).map(input.idOf).filter(Boolean));
+  const terminalIds = input.items
+    .filter(item => !input.isProtected(item))
+    .map(item => ({ item, id: input.idOf(item), week: input.activityWeekOf(item) }))
+    .filter(entry => Boolean(entry.id))
+    .sort((left, right) => right.week - left.week || left.id.localeCompare(right.id))
+    .slice(0, input.terminalLimit)
+    .map(entry => entry.id);
+  const retainedIds = new Set([...protectedIds, ...terminalIds]);
+  const seenIds = new Set<string>();
+  return input.items.filter(item => {
+    const id = input.idOf(item);
+    if (!id || seenIds.has(id) || !retainedIds.has(id)) return false;
+    seenIds.add(id);
+    return true;
+  });
+};
+
+const compactAwardHistory = (value: unknown): any[] => {
+  const entries = Array.isArray(value) ? value : [];
+  return entries
+    .map((entry: any, index: number) => ({ entry, index }))
+    .sort((left, right) => (
+      Number(right.entry?.year || 0) - Number(left.entry?.year || 0)
+      || String(left.entry?.type || '').localeCompare(String(right.entry?.type || ''))
+      || left.index - right.index
+    ))
+    .slice(0, AWARD_HISTORY_MAX_ITEMS)
+    .map(item => item.entry)
+    .sort((left: any, right: any) => (
+      Number(left?.year || 0) - Number(right?.year || 0)
+      || String(left?.type || '').localeCompare(String(right?.type || ''))
+    ));
+};
+
+const awardLinkedProjectIds = (awardHistory: any[]): Set<string> => new Set(awardHistory
+  .flatMap((season: any) => Array.isArray(season?.winners) ? season.winners : [])
+  .map((winner: any) => stableHistoryId(winner?.projectId))
+  .filter(Boolean));
+
+const activeStreamingWindowPlanIds = (world: any, absoluteWeek: number): Set<string> => {
+  const planIds = new Set<string>();
+  (Array.isArray(world?.projects) ? world.projects : []).forEach((project: any) => {
+    (Array.isArray(project?.streamingWindows) ? project.streamingWindows : []).forEach((window: any) => {
+      const planId = stableHistoryId(window?.platformContentPlanId);
+      if (planId && Number(window?.expiresAtAbsoluteWeek ?? Number.MAX_SAFE_INTEGER) >= absoluteWeek) planIds.add(planId);
+    });
+  });
+  return planIds;
+};
+
+const compactPlatformAiSlate = (
+  platform: any,
+  world: any,
+  catalogueDistressDeals: any[],
+  retainedAwardProjectIds: Set<string>,
+  absoluteWeek: number,
+): any[] => {
+  const ai = platform?.ai;
+  const slate = Array.isArray(ai?.slate) ? ai.slate : [];
+  const protectedPlanIds = activeStreamingWindowPlanIds(world, absoluteWeek);
+  (Array.isArray(ai?.pendingAudienceSettlements) ? ai.pendingAudienceSettlements : [])
+    .filter((settlement: any) => settlement?.status === 'PENDING')
+    .forEach((settlement: any) => protectedPlanIds.add(stableHistoryId(settlement?.planId)));
+  (Array.isArray(ai?.localizationJobs) ? ai.localizationJobs : [])
+    .filter((job: any) => job?.status !== 'CANCELLED')
+    .forEach((job: any) => protectedPlanIds.add(stableHistoryId(job?.contentPlanId)));
+  (Array.isArray(ai?.rightsContracts) ? ai.rightsContracts : [])
+    .filter((contract: any) => contract?.status === 'ACTIVE')
+    .forEach((contract: any) => protectedPlanIds.add(stableHistoryId(contract?.platformContentPlanId)));
+  (Array.isArray(ai?.rightsRenewals) ? ai.rightsRenewals : [])
+    .filter((renewal: any) => renewal?.status !== 'CONTRACTED')
+    .forEach((renewal: any) => protectedPlanIds.add(stableHistoryId(renewal?.platformContentPlanId)));
+  Object.values(world?.industryProductions || {})
+    .filter((production: any) => !['DELIVERED', 'CANCELLED'].includes(String(production?.status || '')))
+    .forEach((production: any) => protectedPlanIds.add(stableHistoryId(production?.platformContentPlanId)));
+  catalogueDistressDeals
+    .filter((deal: any) => deal?.status === 'PENDING_PAYMENT' && deal?.buyerPlatformId === platform?.id)
+    .forEach((deal: any) => protectedPlanIds.add(stableHistoryId(deal?.buyerPlanId)));
+
+  const planTouchesAwards = (plan: any): boolean => (
+    (Array.isArray(plan?.sourceProjectIds) ? plan.sourceProjectIds : []).some((id: unknown) => retainedAwardProjectIds.has(stableHistoryId(id)))
+    || (Array.isArray(plan?.releaseEntries) ? plan.releaseEntries : []).some((entry: any) => (
+      retainedAwardProjectIds.has(stableHistoryId(entry?.sourceProjectId))
+      || retainedAwardProjectIds.has(stableHistoryId(entry?.canonicalProjectId))
+    ))
+    || Object.values(world?.industryProductions || {}).some((production: any) => (
+      production?.id === plan?.industryProductionId
+      && retainedAwardProjectIds.has(stableHistoryId(production?.canonicalProjectId))
+    ))
+  );
+  const terminalStatuses = new Set(['RELEASED', 'CANCELLED', 'SOLD']);
+  return retainBoundedHistory({
+    items: slate,
+    idOf: (plan: any) => stableHistoryId(plan?.id),
+    isProtected: (plan: any) => (
+      !terminalStatuses.has(String(plan?.status || ''))
+      || protectedPlanIds.has(stableHistoryId(plan?.id))
+      || planTouchesAwards(plan)
+    ),
+    activityWeekOf: (plan: any) => Math.max(
+      Number(plan?.releasedAtAbsoluteWeek || 0),
+      Number(plan?.scheduledAtAbsoluteWeek || 0),
+      Number(plan?.committedAtAbsoluteWeek || 0),
+    ),
+    terminalLimit: PLATFORM_AI_TERMINAL_SLATE_MAX_ITEMS,
+  });
+};
+
+const compactPlatformAiRightsContracts = (contracts: any[], slate: any[], renewals: any[]): any[] => {
+  const referencedIds = new Set<string>();
+  slate.forEach((plan: any) => {
+    (Array.isArray(plan?.rightsContractIds) ? plan.rightsContractIds : [])
+      .forEach((id: unknown) => referencedIds.add(stableHistoryId(id)));
+    (Array.isArray(plan?.releaseEntries) ? plan.releaseEntries : [])
+      .forEach((entry: any) => referencedIds.add(stableHistoryId(entry?.rightsContractId)));
+  });
+  renewals.forEach((renewal: any) => {
+    referencedIds.add(stableHistoryId(renewal?.previousLicenseId));
+    referencedIds.add(stableHistoryId(renewal?.renewalLicenseId));
+  });
+  return retainBoundedHistory({
+    items: contracts,
+    idOf: (contract: any) => stableHistoryId(contract?.id),
+    isProtected: (contract: any) => contract?.status === 'ACTIVE' || referencedIds.has(stableHistoryId(contract?.id)),
+    activityWeekOf: (contract: any) => Math.max(
+      Number(contract?.expiresAtAbsoluteWeek || 0),
+      Number(contract?.startsAtAbsoluteWeek || 0),
+      Number(contract?.signedAtAbsoluteWeek || 0),
+    ),
+    terminalLimit: PLATFORM_AI_TERMINAL_RIGHTS_MAX_ITEMS,
+  });
+};
+
+const compactIndustryProductions = (
+  value: unknown,
+  platforms: any,
+  retainedAwardProjectIds: Set<string>,
+): Record<string, any> => {
+  const productions = Object.values(value && typeof value === 'object' ? value as Record<string, any> : {});
+  const referencedIds = new Set<string>();
+  Object.values(platforms || {}).forEach((platform: any) => {
+    (Array.isArray(platform?.ai?.slate) ? platform.ai.slate : [])
+      .forEach((plan: any) => referencedIds.add(stableHistoryId(plan?.industryProductionId)));
+  });
+  const kept = retainBoundedHistory({
+    items: productions,
+    idOf: (production: any) => stableHistoryId(production?.id),
+    isProtected: (production: any) => (
+      !['DELIVERED', 'CANCELLED'].includes(String(production?.status || ''))
+      || referencedIds.has(stableHistoryId(production?.id))
+      || retainedAwardProjectIds.has(stableHistoryId(production?.canonicalProjectId))
+    ),
+    activityWeekOf: (production: any) => Math.max(
+      Number(production?.updatedAtAbsoluteWeek || 0),
+      Number(production?.createdAtAbsoluteWeek || 0),
+    ),
+    terminalLimit: PLATFORM_AI_TERMINAL_PRODUCTION_MAX_ITEMS,
+  });
+  return Object.fromEntries(kept.map((production: any) => [production.id, production]));
+};
+
+const compactTalentBookingHistory = (value: unknown, platforms: any, productions: Record<string, any>): any[] => {
+  const bookings = Array.isArray(value) ? value : [];
+  const referencedIds = new Set<string>();
+  Object.values(platforms || {}).forEach((platform: any) => {
+    (Array.isArray(platform?.ai?.talentBookingRefs) ? platform.ai.talentBookingRefs : [])
+      .forEach((id: unknown) => referencedIds.add(stableHistoryId(id)));
+  });
+  Object.values(productions).forEach((production: any) => {
+    (Array.isArray(production?.talentBookingIds) ? production.talentBookingIds : [])
+      .forEach((id: unknown) => referencedIds.add(stableHistoryId(id)));
+  });
+  return retainBoundedHistory({
+    items: bookings,
+    idOf: (booking: any) => stableHistoryId(booking?.id),
+    isProtected: (booking: any) => booking?.status === 'BOOKED' || referencedIds.has(stableHistoryId(booking?.id)),
+    activityWeekOf: (booking: any) => Math.max(
+      Number(booking?.releasedAtAbsoluteWeek || 0),
+      Number(booking?.cancelledAtAbsoluteWeek || 0),
+      Number(booking?.endAbsoluteWeek || 0),
+    ),
+    terminalLimit: PLATFORM_AI_TERMINAL_TALENT_MAX_ITEMS,
+  });
+};
+
+const compactStreamingRightsContracts = (player: any): Record<string, any> => {
+  const registry = normalizeStreamingRightsContractRegistry(player?.world?.streamingRightsContracts);
+  const referencedIds = new Set<string>();
+  (Array.isArray(player?.activeReleases) ? player.activeReleases : []).forEach((release: any) => {
+    const contractId = stableHistoryId(release?.streamingContractId || release?.streaming?.contractId);
+    if (contractId) referencedIds.add(contractId);
+  });
+  (Array.isArray(player?.pastProjects) ? player.pastProjects : []).forEach((project: any) => {
+    const contractId = stableHistoryId(project?.streamingContractId);
+    if (contractId) referencedIds.add(contractId);
+  });
+  (Array.isArray(player?.ownedStreamingPlatform?.catalogLicenses) ? player.ownedStreamingPlatform.catalogLicenses : [])
+    .forEach((license: any) => referencedIds.add(stableHistoryId(license?.id)));
+  Object.values(player?.world?.platforms || {}).forEach((platform: any) => {
+    (Array.isArray(platform?.ai?.rightsContracts) ? platform.ai.rightsContracts : [])
+      .forEach((license: any) => referencedIds.add(stableHistoryId(license?.id)));
+  });
+  const contracts = Object.values(registry);
+  const protectedContracts = contracts.filter(contract => (
+    contract.status === 'ACTIVE' || referencedIds.has(contract.id)
+  ));
+  const protectedIds = new Set(protectedContracts.map(contract => contract.id));
+  const terminalContracts = contracts
+    .filter(contract => !protectedIds.has(contract.id))
+    .sort((left, right) => (
+      Math.max(right.expiresAtAbsoluteWeek, right.startsAtAbsoluteWeek, right.signedAtAbsoluteWeek)
+      - Math.max(left.expiresAtAbsoluteWeek, left.startsAtAbsoluteWeek, left.signedAtAbsoluteWeek)
+      || left.id.localeCompare(right.id)
+    ))
+    .slice(0, STREAMING_RIGHTS_TERMINAL_MAX_ITEMS);
+  return Object.fromEntries([...protectedContracts, ...terminalContracts].map(contract => [contract.id, contract]));
+};
+
+const compactStreamingBiddingSessions = (value: unknown): Record<string, any> => {
+  const sessions = Object.values(normalizeStreamingBiddingSessionRegistry(value));
+  const active = sessions.filter(session => session.status === 'LIVE' || session.status === 'CLOSING');
+  const activeIds = new Set(active.map(session => session.id));
+  const terminal = sessions
+    .filter(session => !activeIds.has(session.id))
+    .sort((left, right) => right.absoluteWeek - left.absoluteWeek || left.id.localeCompare(right.id))
+    .slice(0, STREAMING_BIDDING_TERMINAL_MAX_ITEMS);
+  return Object.fromEntries([...active, ...terminal].map(session => [session.id, session]));
+};
+
+const compactWorld = (player: any) => {
+  const world = player?.world;
   if (!world || typeof world !== 'object') return world;
-  return {
+  const acquiredPlatformIds = new Set<string>(
+    Array.isArray(player?.ownedStreamingPlatform?.corporateDevelopment?.acquiredPlatformIds)
+      ? player.ownedStreamingPlatform.corporateDevelopment.acquiredPlatformIds
+      : [],
+  );
+  const authoritativeRivalMoves = Array.isArray(player?.ownedStreamingPlatform?.competitiveWorld?.moves)
+      ? player.ownedStreamingPlatform.competitiveWorld.moves
+      : [];
+  const absoluteWeek = getApproxAbsoluteWeek(Number(player?.age), Number(player?.currentWeek));
+  const catalogueDistressDeals = normalizePlatformAiCatalogueDistressDeals(world.platformAiCatalogueDistressDeals);
+  const awardHistory = compactAwardHistory(world.awardHistory);
+  const retainedAwardProjectIds = awardLinkedProjectIds(awardHistory);
+  const platforms = world.platforms && typeof world.platforms === 'object'
+    ? Object.fromEntries(Object.entries(world.platforms).map(([platformId, platformValue]) => {
+        const platform = platformValue as any;
+        if (!platform?.ai) return [platformId, platform];
+        if (acquiredPlatformIds.has(platformId)) return [platformId, platform];
+        const externalCommitments = Number(platform.ai.schemaVersion) >= 7
+          ? normalizePlatformAiExternalCommitments(
+              platform.ai.externalCommitments,
+              platform.id || platformId,
+              platform.ai.pendingOneTimeObligations,
+              authoritativeRivalMoves,
+              absoluteWeek,
+            )
+          : [];
+        const protectedDistressObligationIds = new Set(catalogueDistressDeals
+          .filter(deal => deal.status === 'PENDING_PAYMENT' && deal.buyerPlatformId === (platform.id || platformId))
+          .map(deal => deal.buyerObligationId));
+        const normalizedRightsContracts = normalizePlatformAiRightsContracts(
+          platform.ai.rightsContracts,
+        );
+        let rightsRenewals = normalizePlatformAiRightsRenewals(
+          platform.ai.rightsRenewals,
+          platform.id || platformId,
+          normalizedRightsContracts,
+        );
+        const rawLocalizationObligationIds = new Set<string>(
+          (Array.isArray(platform.ai.localizationJobs) ? platform.ai.localizationJobs : [])
+            .map((job: any) => String(job?.obligationId || '').trim())
+            .filter(Boolean),
+        );
+        let pendingOneTimeObligations = reconcilePlatformAiRightsRenewalObligations(
+          platform.ai.pendingOneTimeObligations,
+          rightsRenewals,
+          rawLocalizationObligationIds,
+        );
+        rightsRenewals = reconcilePlatformAiRightsRenewalStatuses(rightsRenewals, pendingOneTimeObligations);
+        pendingOneTimeObligations = reconcilePlatformAiRightsRenewalObligations(
+          pendingOneTimeObligations,
+          rightsRenewals,
+          rawLocalizationObligationIds,
+        );
+        const rightsContracts = filterPlatformAiRightsContractsByRenewalState(
+          normalizedRightsContracts,
+          rightsRenewals,
+        );
+        const slate = compactPlatformAiSlate(
+          platform,
+          world,
+          catalogueDistressDeals,
+          retainedAwardProjectIds,
+          absoluteWeek,
+        );
+        const compactedRightsContracts = compactPlatformAiRightsContracts(
+          rightsContracts,
+          slate,
+          rightsRenewals,
+        );
+        const localizationJobs = normalizePlatformAiLocalizationJobs(
+          platform.ai.localizationJobs,
+          platform.id || platformId,
+          pendingOneTimeObligations,
+          new Set((Array.isArray(platform.ai.slate) ? platform.ai.slate : [])
+            .filter((plan: any) => plan && ['RIGHTS_READY', 'DELIVERED', 'LOCALIZED'].includes(plan.status))
+            .map((plan: any) => String(plan.id || ''))
+            .filter(Boolean)),
+          Array.isArray(platform.ai.slate) ? platform.ai.slate : [],
+          platform.ai.languageCapabilities,
+        );
+        pendingOneTimeObligations = reconcilePlatformAiLocalizationObligations(
+          pendingOneTimeObligations,
+          localizationJobs,
+        );
+        pendingOneTimeObligations = normalizePlatformAiPendingOneTimeObligations(
+          reconcilePlatformAiExternalCommitmentObligations(
+            pendingOneTimeObligations,
+            externalCommitments,
+          ),
+          new Set([
+            ...externalCommitments.map(commitment => commitment.obligationId),
+            ...protectedDistressObligationIds,
+          ]),
+        );
+        return [platformId, {
+          ...platform,
+          ai: {
+            ...platform.ai,
+            schemaVersion: PLATFORM_AI_RUNTIME_SCHEMA_VERSION,
+            distressEpisodes: normalizePlatformAiDistressEpisodes(
+              platform.ai.distressEpisodes,
+              platform.id || platformId,
+              getAbsoluteWeek(player.age, player.currentWeek),
+              platform.ai.status,
+            ),
+            externalCommitments,
+            slate,
+            rightsContracts: compactedRightsContracts,
+            localizationJobs,
+            rightsRenewals,
+            pendingOneTimeObligations,
+            pendingAudienceSettlements: normalizePlatformAiAudienceSettlements(platform.ai.pendingAudienceSettlements),
+          },
+        }];
+      }))
+    : world.platforms;
+  const industryProductions = compactIndustryProductions(
+    world.industryProductions,
+    platforms,
+    retainedAwardProjectIds,
+  );
+  const talentBookings = compactTalentBookingHistory(world.talentBookings, platforms, industryProductions);
+  const streamingRightsContracts = compactStreamingRightsContracts({ ...player, world: { ...world, platforms } });
+  const streamingBiddingSessions = compactStreamingBiddingSessions(world.streamingBiddingSessions);
+  const streamingRoyaltySettlements = Object.fromEntries(
+    Object.values(normalizeStreamingRoyaltySettlementRegistry(world.streamingRoyaltySettlements))
+      .sort((left, right) => right.absoluteWeek - left.absoluteWeek || left.id.localeCompare(right.id))
+      .slice(0, STREAMING_ROYALTY_SETTLEMENT_MAX_ITEMS)
+      .map(settlement => [settlement.id, settlement]),
+  );
+  const streamingPlatformEcosystem = normalizeStreamingPlatformEcosystem(
+    world.streamingPlatformEcosystem,
+    absoluteWeek,
+  );
+  const retainedTalentBookingIds = new Set(talentBookings.map((booking: any) => stableHistoryId(booking?.id)));
+  const platformsWithRetainedTalentRefs = platforms && typeof platforms === 'object'
+    ? Object.fromEntries(Object.entries(platforms).map(([platformId, platformValue]) => {
+        const platform = platformValue as any;
+        if (!platform?.ai || acquiredPlatformIds.has(platformId)) return [platformId, platform];
+        return [platformId, {
+          ...platform,
+          ai: {
+            ...platform.ai,
+            talentBookingRefs: (Array.isArray(platform.ai.talentBookingRefs) ? platform.ai.talentBookingRefs : [])
+              .filter((id: unknown) => retainedTalentBookingIds.has(stableHistoryId(id))),
+          },
+        }];
+      }))
+    : platforms;
+  const compactedWorld = {
     ...world,
-    projects: trimHead(world.projects, WORLD_PROJECT_MAX_ITEMS) || [],
+    platforms: platformsWithRetainedTalentRefs,
+    platformAiCatalogueDistressDeals: catalogueDistressDeals,
+    streamingRightsContracts,
+    streamingBiddingSessions,
+    streamingRoyaltySettlements,
+    streamingPlatformEcosystem,
+    awardHistory,
+    industryProductions,
+    talentBookings,
     upcomingRivals: Array.isArray(world.upcomingRivals) ? world.upcomingRivals.slice(0, 32) : [],
     musicIndustry: world.musicIndustry && typeof world.musicIndustry === 'object'
       ? {
@@ -272,6 +806,10 @@ const compactWorld = (world: any) => {
           rivalries: trimHead(world.musicIndustry.rivalries, 80),
         }
       : world.musicIndustry,
+  };
+  return {
+    ...compactedWorld,
+    projects: compactWorldProjects({ ...player, world: compactedWorld }),
   };
 };
 
@@ -319,14 +857,26 @@ export const compactPlayerForPersistence = (nextPlayer: Player): Player => {
   const legacyHighlights = Array.from(highlightById.values())
     .sort((a, b) => b.absoluteWeek - a.absoluteWeek)
     .slice(0, LEGACY_HIGHLIGHT_MAX_ITEMS);
+  const protectedRivalMoveIds = new Set<string>();
+  Object.values(nextPlayer.world?.platforms || {}).forEach((platform: any) => {
+    (Array.isArray(platform?.ai?.externalCommitments) ? platform.ai.externalCommitments : [])
+      .forEach((commitment: any) => {
+        const moveId = stableHistoryId(commitment?.moveId);
+        if (moveId) protectedRivalMoveIds.add(moveId);
+      });
+  });
   const safePlayer: any = stripEmbeddedPosterImageDataForPersistence({
     ...nextPlayer,
     commitments: Array.isArray(nextPlayer.commitments) ? nextPlayer.commitments.map(compactCommitment) : [],
     activeReleases: Array.isArray(nextPlayer.activeReleases) ? nextPlayer.activeReleases.map(compactRelease) : [],
     pastProjects: Array.isArray(nextPlayer.pastProjects) ? nextPlayer.pastProjects.map(compactPastProject) : [],
     businesses: Array.isArray(nextPlayer.businesses) ? nextPlayer.businesses.map(compactBusiness) : [],
-    world: compactWorld(nextPlayer.world),
-    ownedStreamingPlatform: compactOwnedStreamingPlatformForPersistence(nextPlayer.ownedStreamingPlatform, nextPlayer.id),
+    world: compactWorld(nextPlayer),
+    ownedStreamingPlatform: compactOwnedStreamingPlatformForPersistence(
+      nextPlayer.ownedStreamingPlatform,
+      nextPlayer.id,
+      protectedRivalMoveIds,
+    ),
     scheduledEvents: compactEventQueue(nextPlayer.scheduledEvents),
     pendingEvents: compactEventQueue(nextPlayer.pendingEvents),
     logs: Array.isArray(nextPlayer.logs) ? nextPlayer.logs.slice(-50) : [],

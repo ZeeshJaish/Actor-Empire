@@ -1,4 +1,12 @@
 import { PRODUCTION_LOCATION_CATALOG } from './productionLocations';
+import type {
+    OwnedStreamingCountryLanguageShare,
+    OwnedStreamingCountryMarketProfile,
+    OwnedStreamingMarketCostBreakdown,
+    StreamingMarketLocalizationPreference,
+    StreamingMarketPrivacyComplianceLevel,
+    StreamingMarketRightsAvailability,
+} from '../types';
 
 export type StreamingDayOneRegionId =
     | 'NORTH_AMERICA'
@@ -236,6 +244,97 @@ export const normalizeStreamingDayOneMarketIds = (value: unknown, limit = 40): s
 export const getStreamingDayOneMarket = (id: string): StreamingDayOneMarket | null => (
     MARKET_BY_ID.get(String(id || '').trim().toUpperCase()) || null
 );
+
+const COUNTRY_LOCAL_CONTENT: Record<string, number> = {
+    CA: 20, MX: 10, BR: 12, GB: 10, DE: 15, FR: 30, ES: 20, IT: 15,
+    ZA: 10, NG: 12, EG: 10, IN: 20, JP: 10, KR: 20, ID: 10, AU: 10, NZ: 10,
+};
+
+const COUNTRY_LEVY: Record<string, number> = {
+    US: 1, CA: 3, MX: 2, BR: 3, AR: 2.5, CO: 2, CL: 1.5,
+    GB: 3, DE: 4, FR: 5, ES: 4, IT: 3.5,
+    ZA: 2, NG: 2, EG: 2.5, KE: 1, IN: 3, JP: 2.5, KR: 3,
+    ID: 2, TH: 2, PH: 1.5, AU: 3, NZ: 2,
+};
+
+const languageDistributionFor = (languages: string[]): OwnedStreamingCountryLanguageShare[] => {
+    if (languages.length <= 1) return languages.map(language => ({ language, audiencePercent: 100 }));
+    const primary = languages.length >= 5 ? 46 : languages.length === 4 ? 55 : languages.length === 3 ? 66 : 76;
+    const remaining = 100 - primary;
+    const base = Math.floor(remaining / (languages.length - 1));
+    return languages.map((language, index) => ({
+        language,
+        audiencePercent: index === 0
+            ? primary
+            : base + (index === languages.length - 1 ? remaining - base * (languages.length - 1) : 0),
+    }));
+};
+
+const localizationPreferenceFor = (market: StreamingDayOneMarket): StreamingMarketLocalizationPreference => {
+    const note = market.localizationNote.toLowerCase();
+    if (note.includes('dubbing is essential') || note.includes('dubbing required') || note.includes('dubbing is a day-one')) return 'DUB_FIRST';
+    if (note.includes('subtitles are essential') || note.includes('subtitles are required')) return 'SUBTITLE_FIRST';
+    if (note.includes('no dubbing needed') || market.languages.length === 1 && market.languages[0] === 'English') return 'ORIGINAL_AUDIO';
+    return 'MIXED';
+};
+
+const rightsAvailabilityFor = (competition: StreamingMarketCompetition): StreamingMarketRightsAvailability => (
+    competition === 'FIERCE' ? 'TIGHT' : competition === 'BUSY' ? 'LIMITED' : 'OPEN'
+);
+
+const privacyLevelFor = (profile: StreamingMarketEntryProfile): StreamingMarketPrivacyComplianceLevel => {
+    const requirements = `${profile.clearances.join(' ')} ${profile.localRule}`.toLowerCase();
+    if (requirements.includes('privacy') || requirements.includes('data review') || profile.approvalLoad === 'STRICT') return 'STRICT';
+    return profile.approvalLoad === 'STANDARD' ? 'ENHANCED' : 'STANDARD';
+};
+
+const entryCostsFor = (market: StreamingDayOneMarket, profile: StreamingMarketEntryProfile): OwnedStreamingMarketCostBreakdown => {
+    const rights = Math.max(0, Math.round(market.openingRightsEstimate));
+    const compliance = Math.max(0, Math.round(profile.plannedOverheadEstimate));
+    return { rights, compliance, localization: 0, infrastructure: 0, other: 0, total: rights + compliance };
+};
+
+/**
+ * Canonical, deterministic country dossier used by both opening launch and all
+ * later expansion. Localization here describes audience preference only; the
+ * platform still has to build or outsource the capability separately.
+ */
+export const getStreamingCountryMarketProfile = (id: string): OwnedStreamingCountryMarketProfile | null => {
+    const market = getStreamingDayOneMarket(id);
+    if (!market) return null;
+    const entry = getStreamingMarketEntryProfile(market.id);
+    const taxBaselinePercent = entry.taxLoad === 'HIGH' ? 24 : entry.taxLoad === 'LOW' ? 12 : 18;
+    const audienceMillions = market.streamingAudience / 1_000_000;
+    const edgeSites = Math.max(1, Math.min(8, Math.ceil(audienceMillions / 55)));
+    const peakConcurrentStreams = Math.max(45_000, Math.round(market.streamingAudience * 0.012));
+    const bandwidthGbps = Math.max(180, Math.round(peakConcurrentStreams * 0.0045));
+    const approval = Math.max(4, Math.min(6, entry.approvalWeeks));
+    return {
+        countryId: market.id,
+        country: market.country,
+        regionId: market.regionId,
+        audienceSize: market.streamingAudience,
+        annualGrowthPercent: market.annualGrowthPercent,
+        languageDistribution: languageDistributionFor(market.languages),
+        localizationPreference: localizationPreferenceFor(market),
+        competitors: market.rivals.map(rivalEntry => ({ ...rivalEntry })),
+        rightsAvailability: rightsAvailabilityFor(market.competition),
+        entryCosts: entryCostsFor(market, entry),
+        approvalPeriodWeeks: { minimum: Math.max(4, approval - 1), maximum: Math.min(6, approval + 1) },
+        taxBaselinePercent,
+        streamingLevyBaselinePercent: COUNTRY_LEVY[market.id] ?? 2,
+        localContentObligationPercent: COUNTRY_LOCAL_CONTENT[market.id] ?? 5,
+        privacyComplianceLevel: privacyLevelFor(entry),
+        complianceRequirements: [...entry.clearances],
+        recommendedNetworkFootprint: {
+            recommendedCityId: market.recommendedCityId,
+            edgeSites,
+            originCapacitySharePercent: Math.max(5, Math.min(45, Math.round(audienceMillions / 8))),
+            peakConcurrentStreams,
+            bandwidthGbps,
+        },
+    };
+};
 
 export const getStreamingDayOneMarketsForRegion = (
     regionId: StreamingDayOneRegionId,

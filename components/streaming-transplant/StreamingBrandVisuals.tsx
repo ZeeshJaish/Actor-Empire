@@ -3,6 +3,11 @@
  * Logo marks, idents, layout formats, the dot-matrix world map, and the
  * six-card Brand Deck that shows how the world will see the platform.
  */
+/* The design system is installed here rather than at a route entry because
+   almost every streaming screen already depends on this module. Importing it
+   from the dependency root guarantees tokens are defined before any screen
+   module's rules are evaluated, whichever screen the player lands on first. */
+import './presentation';
 /* Waveform, WorldMap and BrandBoard are rendered only by the shell, and their
    rules have always lived in the shell's stylesheet — so they read from the
    shell's module rather than owning one. */
@@ -13,6 +18,12 @@ import {
   PRODUCTION_LOCATION_CATALOG,
   getStreamingDataCenterCost,
 } from '../../services/productionLocations';
+import {
+  STREAMING_BRAND_LETTERFORMS,
+  STREAMING_BRAND_MARKS,
+  StreamingBrandMarkGlyph,
+  renderStreamingBrandLetterMark,
+} from '../streaming-brand/StreamingBrandMarkPrimitives';
 
 /* ============================================================
    BRAND PRIMITIVES
@@ -77,10 +88,12 @@ export const typeFace = (b: Pick<Brand, 'typeId'>) => TYPEFACES[b.typeId] ?? TYP
 
 /** How the mark and the wordmark sit together. */
 export const LOCKUPS: Record<string, { label: string; note: string }> = {
+  WORDMARK: { label: 'Wordmark', note: 'Name only — clean and editorial' },
   SIDE: { label: 'Horizontal', note: 'Mark left, wordmark right' },
   STACK: { label: 'Stacked', note: 'Mark above, wordmark below' },
-  ICON: { label: 'Icon only', note: 'No wordmark — you are the shape' },
+  ICON: { label: 'Icon only', note: 'Legacy icon-only identity' },
 };
+export const PLAYER_LOCKUP_IDS = ['WORDMARK', 'SIDE', 'STACK'] as const;
 
 /** Content-rating ceiling. A real decision: it caps what you may license. */
 export const RATINGS: Record<string, { label: string; note: string; caps: string }> = {
@@ -103,78 +116,17 @@ export const hslHex = (h: number, sPct: number, lPct: number) => {
 export const brandDeep = (b: Pick<Brand, 'hue' | 'sat'>) => `hsl(${b.hue} ${Math.round(b.sat * 0.85)}% 26%)`;
 export const brandGlow = (b: Pick<Brand, 'hue' | 'sat'>, a = 0.5) => `hsl(${b.hue} ${b.sat}% 58% / ${a})`;
 
-/* --- logo marks: drawn with currentColor so they wear the brand --- */
-export const MARKS: Record<string, { label: string; group: string; svg: React.ReactNode }> = {
-  BOLT: {
-    label: 'Strike', group: 'Geometric',
-    svg: <path d="M27 4 10 27h11l-2 17 19-25H26l1-15z" fill="currentColor" />,
-  },
-  ORBIT: {
-    label: 'Orbit', group: 'Geometric',
-    svg: <g fill="none" stroke="currentColor" strokeWidth="3.4"><circle cx="24" cy="24" r="9.5" /><ellipse cx="24" cy="24" rx="20" ry="7.5" transform="rotate(-24 24 24)" /></g>,
-  },
-  PRISM: {
-    label: 'Prism', group: 'Geometric',
-    svg: <g fill="none" stroke="currentColor" strokeWidth="3.4" strokeLinejoin="round"><path d="M24 5 43 39H5Z" /><path d="M24 5v34" opacity=".5" /></g>,
-  },
-  PULSE: {
-    label: 'Pulse', group: 'Geometric',
-    svg: <path d="M4 24h8l4-12 8 24 5-16 3 4h12" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />,
-  },
-  APERTURE: {
-    label: 'Aperture', group: 'Emblem',
-    svg: <g fill="none" stroke="currentColor" strokeWidth="3"><circle cx="24" cy="24" r="17" />
-      <path d="M24 7 33 22M41 24 24 24M33 39 24 24M15 39 24 24M7 24 24 24M15 9 24 24" opacity=".85" /></g>,
-  },
-  SIGNALTOWER: {
-    label: 'Tower', group: 'Emblem',
-    svg: <g fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
-      <circle cx="24" cy="17" r="4" fill="currentColor" stroke="none" />
-      <path d="M16 9a11 11 0 0 0 0 16M32 9a11 11 0 0 1 0 16M10 3a19 19 0 0 0 0 28M38 3a19 19 0 0 1 0 28" />
-      <path d="M24 21 20 44h8L24 21z" fill="currentColor" stroke="none" /></g>,
-  },
-  CROWN: {
-    label: 'Crown', group: 'Emblem',
-    svg: <path d="M6 34 5 13l10 8 9-14 9 14 10-8-1 21z" fill="currentColor" />,
-  },
-  MONOLITH: {
-    label: 'Monolith', group: 'Abstract',
-    svg: <g fill="currentColor"><rect x="14" y="6" width="8" height="36" rx="2" /><rect x="26" y="14" width="8" height="28" rx="2" opacity=".6" /></g>,
-  },
-  RIFT: {
-    label: 'Rift', group: 'Abstract',
-    svg: <g fill="currentColor"><path d="M18 4 30 4 24 22 34 22 18 44 22 26 12 26z" /></g>,
-  },
-  ECLIPSE: {
-    label: 'Eclipse', group: 'Abstract',
-    svg: <g><circle cx="24" cy="24" r="18" fill="currentColor" /><circle cx="32" cy="18" r="14" fill="#07070c" /></g>,
-  },
-};
+/* --- logo marks are shared with rival and generated platform identity. --- */
+export const MARKS = STREAMING_BRAND_MARKS;
+export const LETTERFORMS = STREAMING_BRAND_LETTERFORMS;
+export const letterMark = renderStreamingBrandLetterMark;
 
-/** letterform marks generated from the platform's initial */
-export const LETTERFORMS = ['SOLID', 'OUTLINE', 'SLAB'] as const;
-export const letterMark = (initial: string, style: string) => {
-  if (style === 'OUTLINE') return (
-    <g><rect x="4" y="4" width="40" height="40" rx="11" fill="none" stroke="currentColor" strokeWidth="3.2" />
-      <text x="24" y="34" textAnchor="middle" fontSize="24" fontWeight="900" fill="currentColor" fontFamily="Inter,Helvetica,Arial">{initial}</text></g>
-  );
-  if (style === 'SLAB') return (
-    <g><rect x="4" y="10" width="40" height="28" rx="4" fill="currentColor" />
-      <text x="24" y="33" textAnchor="middle" fontSize="21" fontWeight="900" fill="#07070c" fontFamily="Georgia,serif">{initial}</text></g>
-  );
-  return (
-    <g><rect x="4" y="4" width="40" height="40" rx="12" fill="currentColor" />
-      <text x="24" y="34" textAnchor="middle" fontSize="25" fontWeight="900" fill="#07070c" fontFamily="Inter,Helvetica,Arial">{initial}</text></g>
-  );
-};
-
-export const Mark: React.FC<{ brand: Brand; className?: string }> = ({ brand, className }) => {
+export const Mark: React.FC<{
+  brand: Pick<Brand, 'name' | 'markId' | 'customMark'>;
+  className?: string;
+}> = ({ brand, className }) => {
   if (brand.customMark) return <img className={className} src={brand.customMark} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />;
-  const initial = (brand.name.trim()[0] || 'E').toUpperCase();
-  const inner = brand.markId.startsWith('LETTER_')
-    ? letterMark(initial, brand.markId.replace('LETTER_', ''))
-    : MARKS[brand.markId]?.svg ?? MARKS.BOLT.svg;
-  return <svg className={className} viewBox="0 0 48 48" style={{ width: '100%', height: '100%' }}>{inner}</svg>;
+  return <StreamingBrandMarkGlyph className={className} name={brand.name} markId={brand.markId} />;
 };
 
 /* --- sound idents as waveforms --- */
@@ -314,7 +266,7 @@ export interface RegionInfo {
 }
 /** Real cities you can put your one data centre in. `hub` marks the
  *  best-connected option — cheaper latency, higher rent. */
-export interface City { id: string; label: string; region: RegionId; x: number; y: number; hub?: boolean; cost: number; }
+export interface City { id: string; label: string; region: RegionId; x: number; y: number; hub?: boolean; cost: number; quality: number; }
 export const CITIES: City[] = PRODUCTION_LOCATION_CATALOG.map(item => ({
   id: item.id,
   label: item.name,
@@ -325,6 +277,7 @@ export const CITIES: City[] = PRODUCTION_LOCATION_CATALOG.map(item => ({
   y: item.y * 0.26,
   hub: item.quality >= 9,
   cost: getStreamingDataCenterCost(item),
+  quality: item.quality,
 }));
 export const cityById = (id: string | null) => CITIES.find(c => c.id === id) ?? null;
 
@@ -463,9 +416,14 @@ export const BrandBoard: React.FC<{ brand: Brand; regionCount?: number }> = ({ b
     fontFamily: tf.stack, fontWeight: tf.weight, letterSpacing: tf.spacing,
     textTransform: tf.transform,
   };
+  const lockupMode = brand.lockupId === 'ICON' ? 'ICON' : PLAYER_LOCKUP_IDS.includes(brand.lockupId as typeof PLAYER_LOCKUP_IDS[number])
+    ? brand.lockupId
+    : 'SIDE';
+  const protectedMark = Boolean(brand.customMark) || brand.markId.startsWith('LETTER_');
 
   /* a sheen sweeps the whole board whenever anything changes */
-  const sig = `${name}|${brand.markId}|${brand.hue}|${brand.sat}|${brand.accentHue}|${brand.typeId}|${brand.promiseId}|${brand.publicManifesto}|${brand.lockupId}|${brand.customMark ? 1 : 0}`;
+  const customMarkSignature = brand.customMark ? `${brand.customMark.length}:${brand.customMark.slice(-32)}` : 'preset';
+  const sig = `${name}|${brand.markId}|${brand.hue}|${brand.sat}|${brand.accentHue}|${brand.typeId}|${brand.promiseId}|${brand.publicManifesto}|${brand.lockupId}|${customMarkSignature}`;
   const [flash, setFlash] = useState(0);
   const prev = useRef(sig);
   useEffect(() => {
@@ -489,9 +447,19 @@ export const BrandBoard: React.FC<{ brand: Brand; regionCount?: number }> = ({ b
       </div>
 
       <div className={cx(css.bt, css.deckWordmark)}>
-        <div className={css.deckWordmarkLockup}>
-          {brand.lockupId !== 'ICON' && <div className={css.deckWordmarkText} style={wordmark}>{name}<i>™</i></div>}
-          <span>ORIGINALS · FILMS · SERIES</span>
+        <div className={cx(
+          css.deckWordmarkLockup,
+          lockupMode === 'SIDE' ? css.deckWordmarkSide : '',
+          lockupMode === 'STACK' ? css.deckWordmarkStack : '',
+          lockupMode === 'ICON' ? css.deckWordmarkIcon : '',
+        )}>
+          {lockupMode !== 'WORDMARK' && <span className={css.deckWordmarkMark}><Mark brand={brand} /></span>}
+          {lockupMode !== 'ICON' && (
+            <div className={css.deckWordmarkCopy}>
+              <div className={css.deckWordmarkText} style={wordmark}>{name}<i>™</i></div>
+              <span className={css.deckWordmarkTagline}>ORIGINALS · FILMS · SERIES</span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -499,7 +467,7 @@ export const BrandBoard: React.FC<{ brand: Brand; regionCount?: number }> = ({ b
         <div className={css.deckAppIcon}><span><Mark brand={brand} /></span><em>3</em></div>
       </div>
 
-      <div className={cx(css.bt, css.deckCrop)} aria-hidden="true">
+      <div className={cx(css.bt, css.deckCrop, protectedMark ? css.deckCropSafe : '')} aria-hidden="true">
         <span className={css.deckCropMark}><Mark brand={brand} /></span>
       </div>
 

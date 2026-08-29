@@ -30,6 +30,7 @@ import { applyOpportunityIdentityToProject } from '../../services/characterIdent
 import { PHASE_ONE_ENERGY_COSTS } from '../../services/energyCosts';
 import { resolveShareholderVote } from '../../services/shareholderVoting';
 import { addBreadcrumb, markTraceAction, setCrashContext, setCurrentGameScreen } from '../../services/firebaseService';
+import { acceptPlatformAiPlayerCommission, declinePlatformAiPlayerCommission } from '../../services/platformAi';
 
 type MobileAppMode = 'HOME' | 'CASTLINK' | 'IMDB' | 'BOXOFFICE' | 'INSTAGRAM' | 'X' | 'YOUTUBE' | 'NEWS' | 'TEAM' | 'MESSAGES' | 'FORBES' | 'STOCKS' | 'DATING_FOLDER' | 'SOCIAL_FOLDER' | 'TINDER' | 'LUXE' | 'BANK' | 'GUIDE';
 
@@ -70,6 +71,7 @@ interface MobilePageProps {
   onUpdatePlayer?: (player: Player) => void; 
   onOpenRightsMarket?: (opportunityId?: string) => void;
   onOpenStudioContinuation?: (studioId?: string, scriptId?: string) => void;
+  onOpenPlatformCommission?: (studioId: string, offerId: string) => void;
   onNavVisibilityChange?: (visible: boolean) => void;
   onFullBleedChange?: (enabled: boolean) => void;
   initialForbesStudioId?: string;
@@ -229,6 +231,31 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
 
       if (msg.type === 'OFFER_OUTSIDE_PRODUCER_INVESTMENT' && props.onAcceptMessage) {
           props.onAcceptMessage(msg);
+          return;
+      }
+
+      if (msg.type === 'OFFER_PLATFORM_COMMISSION') {
+          const offerId = String(msg.data?.offerId || '');
+          const studio = props.player!.businesses
+              .filter(candidate => candidate.type === 'PRODUCTION_HOUSE' && candidate.isActive && candidate.studioState)
+              .sort((left, right) => (right.stats.brandHealth + right.stats.customerSatisfaction) - (left.stats.brandHealth + left.stats.customerSatisfaction))[0];
+          if (!offerId || !studio) {
+              showToast('No active Production House can take this commission.', 'bg-rose-500');
+              return;
+          }
+          const accepted = acceptPlatformAiPlayerCommission({
+              player: props.player!,
+              offerId,
+              studioId: studio.id,
+              absoluteWeek: getAbsoluteWeek(props.player!.age, props.player!.currentWeek),
+          });
+          if (!accepted.changed) {
+              showToast(accepted.reason === 'INSUFFICIENT_PLATFORM_CASH' ? 'The platform withdrew: funding is no longer available.' : 'This offer is no longer available.', 'bg-rose-500');
+              return;
+          }
+          handleUpdatePlayer(accepted.player);
+          showToast(`${accepted.offer!.platformName} commission added to ${studio.name}.`, 'bg-emerald-500');
+          props.onOpenPlatformCommission?.(studio.id, offerId);
           return;
       }
 
@@ -583,6 +610,20 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
       showToast(msg.type === 'OFFER_AUDITION' ? tr('mobile.toast.auditionAccepted') : tr('mobile.toast.offerAccepted'));
   };
 
+  const handleDeclinePlatformCommission = (offerId: string) => {
+      const declined = declinePlatformAiPlayerCommission({
+          player: props.player!,
+          offerId,
+          absoluteWeek: getAbsoluteWeek(props.player!.age, props.player!.currentWeek),
+      });
+      if (!declined.changed) {
+          showToast('This offer is no longer available.', 'bg-slate-600');
+          return;
+      }
+      handleUpdatePlayer(declined.player);
+      showToast('Commission declined.', 'bg-slate-600');
+  };
+
   // --- HANDLER: Perform Sponsorship ---
   const handlePerformSponsorship = (sponId: string, action: SponsorshipActionType) => {
       const sponIndex = props.player!.activeSponsorships.findIndex(s => s.id === sponId);
@@ -888,6 +929,7 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
                         onMarkRead={handleMarkMessageRead}
                         onOpenRightsMarket={props.onOpenRightsMarket}
                         onOpenStudioContinuation={props.onOpenStudioContinuation}
+                        onDeclinePlatformCommission={handleDeclinePlatformCommission}
                         onOpenStudioAcquisition={(studioId, studioName) => {
                             setForbesStudioTargetId(studioId || null);
                             setForbesStudioTargetName(studioName || null);

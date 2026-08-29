@@ -2,6 +2,7 @@ import { INITIAL_PLAYER, createInitialOwnedStreamingPlatformState, type Player }
 import { getAbsoluteWeek } from '../services/legacyLogic';
 import { getStreamingAudienceMarket } from '../services/streamingAudienceMarket';
 import { createCanonicalAudienceState } from '../components/streaming-transplant/createCanonicalStreamingPresentation';
+import { resolveStreamingPlatformBrandById } from '../services/streamingPlatformBrandRegistry';
 
 const assert = (condition: unknown, message: string) => {
     if (!condition) throw new Error(message);
@@ -125,11 +126,18 @@ assert(Math.abs(first.globalWatchShare.reduce((total, item) => total + item.shar
 assert(first.platforms.some(platform => platform.id === 'AMAZON_PRIME'), 'Prime Video-style bundle strength must exist in the rival market.');
 assert(first.platforms.some(platform => platform.id === 'REGIONAL'), 'Regional services and broadcasters must have a modeled market position.');
 assert(first.platforms.some(platform => platform.id === 'PLAYER'), 'The player platform must appear on the same canonical rival board.');
+for (const platformId of ['NETFLIX', 'DISNEY_PLUS', 'AMAZON_PRIME', 'YOUTUBE', 'APPLE_TV', 'HULU'] as const) {
+    const platformView = first.platforms.find(platform => platform.id === platformId);
+    const brand = resolveStreamingPlatformBrandById(platformId);
+    assert(platformView?.name === brand.displayName, `${platformId} must use the canonical registry name.`);
+    assert(platformView?.color === brand.primaryColor, `${platformId} must use the canonical registry colour.`);
+}
 assert(first.personas.length === 6 && first.personas.reduce((total, persona) => total + persona.sharePercent, 0) === 100, 'Audience personas must cover the full active-viewer market.');
 assert(first.switching.joinedThisWeek === 64_000 && first.switching.cancelledThisWeek === 31_000, 'Market Command must read weekly joins and cancellations from the canonical CEO loop.');
 assert(first.switching.reactivatedThisWeek === 5_400, 'Market Command must read canonical reactivations rather than estimating over saved operations.');
 assert(first.switching.reasons.reduce((total, reason) => total + reason.sharePercent, 0) === 100, 'Platform-switching reasons must resolve to 100%.');
 assert(audienceDesk.live, 'The ZIP Audience desk adapter must open its live analytics state for a launched platform.');
+assert(JSON.stringify(audienceDesk.market) === JSON.stringify(first), 'The ZIP Audience desk must receive the same canonical living-market values used by every later system.');
 assert(audienceDesk.regions.length === 2, 'The ZIP Audience desk must aggregate the selected Day-One countries into canonical launch regions.');
 assert(audienceDesk.regions.every(region => region.rivals.length > 0), 'Audience territory cards must read leading rivals from the living market.');
 

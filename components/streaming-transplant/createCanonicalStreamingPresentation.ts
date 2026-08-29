@@ -112,7 +112,7 @@ export const createCanonicalNetworkState = (player: Player): NetworkState => {
     return {
       id: placement.cityId,
       city: location?.name || placement.cityId.replaceAll('_', ' '),
-      region: location?.region || 'NETWORK',
+      region: location?.regionId || 'NETWORK',
       loadPct: peakLoad,
       latencyMs: Math.max(12, 48 - (location?.quality || 6) * 2
         + (placement.role === 'CORE_ORIGIN' ? 8 : placement.role === 'REGIONAL_HUB' ? 3 : 0)),
@@ -269,12 +269,15 @@ export const createCanonicalAudienceState = (player: Player): AudienceState => {
       rivals: topRivals,
     };
   }).sort((left, right) => right.subs - left.subs);
-  return { live: platform.lifecycle === 'ACTIVE', metrics, trend, trendLabel: 'SUBSCRIBERS', chart, attribution, campaigns, objective, regions };
+  return { live: platform.lifecycle === 'ACTIVE', metrics, trend, trendLabel: 'SUBSCRIBERS', chart, attribution, campaigns, objective, regions, market: livingMarket };
 };
 
 export const createCanonicalBoardroomState = (player: Player): BoardroomState => {
   const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
+  const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
+  const foundedAt = platform.identity?.foundedAtAbsoluteWeek ?? absoluteWeek;
   const latest = platform.weeklyHistory.at(-1)?.operations;
+  const previous = platform.weeklyHistory.at(-2)?.operations;
   const publicMarkets = getStreamingPublicMarkets(player);
   const listing = platform.publicCompany.listing;
   const latestQuote = platform.publicCompany.quoteHistory.at(-1);
@@ -315,7 +318,13 @@ export const createCanonicalBoardroomState = (player: Player): BoardroomState =>
   if (listing) holders.push({ id: 'PUBLIC', name: 'Public float', pct: Math.max(0, 100 - holders.reduce((sum, holder) => sum + holder.pct, 0)), since: `WK ${listing.listedAtAbsoluteWeek}` });
   return {
     live: platform.lifecycle === 'ACTIVE',
+    absoluteWeek,
+    companyYear: Math.max(1, Math.floor(Math.max(0, absoluteWeek - foundedAt) / 52) + 1),
     treasury: platform.treasuryCash,
+    treasuryDelta: latest?.netCashContribution,
+    weeklyNetDelta: latest && previous
+      ? latest.netCashContribution - previous.netCashContribution
+      : undefined,
     weeklyRevenue,
     weeklyCosts,
     execs,
@@ -375,7 +384,7 @@ export const createCanonicalViewerState = (player: Player): AppState => {
     : 36;
   return {
     live: platform.lifecycle === 'ACTIVE',
-    layoutId: 'CINEMA',
+    layoutId: platform.serviceConfiguration.storefrontLayoutId || 'cinema',
     titles,
     watchingNow: Math.max(0, Math.round((latest?.operations?.peakConcurrentStreams ?? 0) * .72)),
     network: { peakLoad, tier, latencyMs },

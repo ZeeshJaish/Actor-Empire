@@ -172,7 +172,7 @@ const createFixture = (): Player => {
     };
 };
 
-assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 22, 'Phase 24 should retain canonical Phase 13 title-week telemetry in schema v22.');
+assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 23, 'The canonical foundation should retain Phase 13 title telemetry in schema v23.');
 
 const preTelemetry = getStreamingTitleAnalytics(createFixture(), 'original-project');
 assert(preTelemetry.selected?.measuredWeeks === 0, 'A live title without committed title telemetry should remain unmeasured.');

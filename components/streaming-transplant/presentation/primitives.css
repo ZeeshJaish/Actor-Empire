@@ -1,0 +1,618 @@
+/* ============================================================================
+   EMPIRE+ — PRIMITIVES
+   ----------------------------------------------------------------------------
+   The small number of shapes every streaming screen actually needs, built once
+   from tokens.css.
+
+   These are GLOBAL classes, prefixed `epx-`, and they are opt-in: a screen uses
+   them where the shape matches and keeps its own module CSS for anything that
+   is genuinely bespoke. The point is that the Build screen's stat cell and the
+   Boardroom's stat cell stop being two different inventions.
+
+   Rule of thumb: if you find yourself writing the same block of CSS in a second
+   screen module, it belongs here instead.
+   ========================================================================== */
+
+/* ============================================================================
+   FRAME — every streaming screen is composed inside the same phone frame.
+   ========================================================================== */
+.epx-screen {
+  position: fixed;
+  inset: 0;
+  max-width: var(--epx-frame-max);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--epx-s-canvas);
+  color: var(--epx-fg);
+  font-family: var(--epx-font-ui);
+  font-size: var(--epx-t-body);
+  line-height: var(--epx-lh-body);
+}
+
+.epx-screen :where(*) {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  min-width: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Existing cinematic modules opt into the same interaction contract while
+   they migrate to the shared structural primitives screen by screen. */
+[data-epx-root] {
+  color-scheme: dark;
+}
+
+[data-epx-root] :where(button, a, input, select, textarea, [tabindex]) {
+  touch-action: manipulation;
+}
+
+[data-epx-root] :where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--epx-fg-max);
+  outline-offset: 2px;
+  border-radius: var(--epx-r-xs);
+}
+
+[data-epx-root] :where(button, [role='button']) {
+  cursor: pointer;
+}
+
+.epx-screen :where(button) {
+  font-family: inherit;
+  font-size: inherit;
+  border: none;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  text-align: inherit;
+}
+
+.epx-screen :where(input, textarea, select) {
+  font-family: inherit;
+  color: inherit;
+}
+
+/* Keyboard focus is never removed, only restyled. */
+.epx-screen :where(button, a, input, select, [tabindex]):focus-visible {
+  outline: 2px solid var(--epx-fg-max);
+  outline-offset: 2px;
+  border-radius: var(--epx-r-xs);
+}
+
+/* The three bands of a screen: fixed header, scrolling body, fixed action bar. */
+.epx-top {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--epx-sp-3);
+  padding: max(var(--epx-sp-4), env(safe-area-inset-top)) var(--epx-gutter) var(--epx-sp-3);
+  background: linear-gradient(var(--epx-s-surface), var(--epx-s-canvas));
+  border-bottom: 1px solid var(--epx-line-hairline);
+}
+
+.epx-body {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding: 0 var(--epx-gutter);
+  /* Room so the last card is never trapped under the action bar. */
+  padding-bottom: var(--epx-sp-6);
+}
+
+.epx-foot {
+  flex: 0 0 auto;
+  display: flex;
+  gap: var(--epx-sp-2);
+  padding: var(--epx-sp-3) var(--epx-gutter) max(var(--epx-sp-5), env(safe-area-inset-bottom));
+  background: linear-gradient(transparent, var(--epx-s-canvas) 42%);
+  border-top: 1px solid var(--epx-line-hairline);
+}
+
+/* ============================================================================
+   TEXT ROLES — the eight type steps, named by job rather than by size, so a
+   screen asks for "an eyebrow" and cannot accidentally ask for 6.5px.
+   ========================================================================== */
+.epx-eyebrow {
+  display: block;
+  font-size: var(--epx-t-micro);
+  font-weight: var(--epx-fw-black);
+  letter-spacing: var(--epx-track-caps);
+  text-transform: uppercase;
+  color: var(--epx-fg-4);
+}
+.epx-eyebrow[data-tone='brand'] { color: var(--epx-brand) }
+.epx-eyebrow[data-tone='good']  { color: var(--epx-good) }
+.epx-eyebrow[data-tone='warn']  { color: var(--epx-warn) }
+.epx-eyebrow[data-tone='bad']   { color: var(--epx-bad) }
+
+.epx-caption {
+  font-size: var(--epx-t-caption);
+  line-height: var(--epx-lh-snug);
+  color: var(--epx-fg-4);
+}
+
+.epx-copy {
+  font-size: var(--epx-t-body);
+  line-height: var(--epx-lh-body);
+  color: var(--epx-fg-3);
+  /* Prose stops at a comfortable measure even in a wide frame. */
+  max-width: 46ch;
+}
+
+.epx-title {
+  font-size: var(--epx-t-title);
+  font-weight: var(--epx-fw-bold);
+  line-height: var(--epx-lh-tight);
+  letter-spacing: var(--epx-track-tight);
+  color: var(--epx-fg);
+}
+
+.epx-hero {
+  font-size: var(--epx-t-hero);
+  font-weight: var(--epx-fw-black);
+  line-height: var(--epx-lh-flat);
+  letter-spacing: var(--epx-track-tight);
+  color: var(--epx-fg-max);
+}
+
+.epx-num {
+  font-family: var(--epx-font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--epx-track-none);
+}
+
+/* ============================================================================
+   SURFACE — cards.
+   ========================================================================== */
+.epx-card {
+  position: relative;
+  padding: var(--epx-sp-4);
+  border-radius: var(--epx-r-lg);
+  background: var(--epx-s-surface);
+  border: 1px solid var(--epx-line-hairline);
+}
+.epx-card[data-raised]      { background: var(--epx-s-raised); box-shadow: var(--epx-e-2) }
+.epx-card[data-tone='brand']{ border-color: var(--epx-brand-line); background:
+  radial-gradient(circle at 100% 0, var(--epx-brand-wash), transparent 46%), var(--epx-s-surface) }
+.epx-card[data-tone='good'] { border-color: var(--epx-good-line); background: linear-gradient(var(--epx-good-wash), var(--epx-s-surface)) }
+.epx-card[data-tone='warn'] { border-color: var(--epx-warn-line); background: linear-gradient(var(--epx-warn-wash), var(--epx-s-surface)) }
+.epx-card[data-tone='bad']  { border-color: var(--epx-bad-line);  background: linear-gradient(var(--epx-bad-wash),  var(--epx-s-surface)) }
+
+/* A card that leads a section: accent rail on the left edge. */
+.epx-card[data-rail]::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: var(--epx-sp-3);
+  bottom: var(--epx-sp-3);
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--epx-brand);
+  box-shadow: var(--epx-brand-glow);
+}
+
+/* ============================================================================
+   STAT — the single most repeated shape in the app. One label, one value, one
+   optional note. Replaces a dozen hand-built grids.
+   ========================================================================== */
+.epx-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.epx-stat > .epx-stat-k {
+  font-size: var(--epx-t-micro);
+  font-weight: var(--epx-fw-black);
+  letter-spacing: var(--epx-track-caps);
+  text-transform: uppercase;
+  color: var(--epx-fg-4);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.epx-stat > .epx-stat-v {
+  font-size: var(--epx-t-value);
+  font-weight: var(--epx-fw-bold);
+  font-family: var(--epx-font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--epx-fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.epx-stat > .epx-stat-n {
+  font-size: var(--epx-t-caption);
+  color: var(--epx-fg-5);
+}
+.epx-stat[data-tone='good']    > .epx-stat-v { color: var(--epx-good) }
+.epx-stat[data-tone='warn']    > .epx-stat-v { color: var(--epx-warn) }
+.epx-stat[data-tone='bad']     > .epx-stat-v { color: var(--epx-bad) }
+.epx-stat[data-tone='brand']   > .epx-stat-v { color: var(--epx-brand) }
+.epx-stat[data-tone='pending'] > .epx-stat-v { color: var(--epx-pending) }
+
+/* Stats side by side. Two columns on a phone — three only for short values. */
+.epx-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--epx-sp-4) var(--epx-sp-3);
+}
+.epx-stats[data-cols='3'] { grid-template-columns: repeat(3, minmax(0, 1fr)) }
+.epx-stats[data-cols='1'] { grid-template-columns: 1fr }
+
+/* ============================================================================
+   METER — a number you can see rather than read. This is the shape that turns
+   "88% usable capacity" from a table cell into something felt.
+   ========================================================================== */
+.epx-meter {
+  --epx-fill: 0%;
+  --epx-meter-color: var(--epx-brand);
+  position: relative;
+  height: 6px;
+  border-radius: var(--epx-r-pill);
+  background: rgba(255, 255, 255, 0.07);
+  overflow: hidden;
+}
+.epx-meter::after {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--epx-fill);
+  border-radius: inherit;
+  background: var(--epx-meter-color);
+  box-shadow: 0 0 10px var(--epx-meter-color);
+  transition: width var(--epx-d-slow) var(--epx-ease-out);
+}
+.epx-meter[data-tone='good'] { --epx-meter-color: var(--epx-good) }
+.epx-meter[data-tone='warn'] { --epx-meter-color: var(--epx-warn) }
+.epx-meter[data-tone='bad']  { --epx-meter-color: var(--epx-bad) }
+
+/* A ceiling marker — "this is where you run out". */
+.epx-meter[data-limit]::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  left: var(--epx-limit, 100%);
+  width: 2px;
+  background: var(--epx-fg-2);
+  z-index: 1;
+}
+
+/* Segmented bar — a budget split across categories. */
+.epx-segbar {
+  display: flex;
+  gap: 2px;
+  height: 10px;
+  border-radius: var(--epx-r-pill);
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.05);
+}
+.epx-segbar > i {
+  display: block;
+  min-width: 2px;
+  background: var(--epx-seg, var(--epx-brand));
+  transition: width var(--epx-d-base) var(--epx-ease-out);
+}
+
+/* ============================================================================
+   CHIP — a small piece of state or a small choice.
+   ========================================================================== */
+.epx-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--epx-sp-1);
+  padding: 6px var(--epx-sp-3);
+  border-radius: var(--epx-r-pill);
+  font-size: var(--epx-t-micro);
+  font-weight: var(--epx-fw-black);
+  letter-spacing: var(--epx-track-caps);
+  text-transform: uppercase;
+  color: var(--epx-fg-3);
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid var(--epx-line);
+  white-space: nowrap;
+  transition: background var(--epx-d-fast) var(--epx-ease-out),
+              color      var(--epx-d-fast) var(--epx-ease-out),
+              transform  var(--epx-d-instant) var(--epx-ease-spring);
+}
+.epx-chip:active            { transform: scale(0.95) }
+.epx-chip[data-on]          { color: var(--epx-brand-ink); background: var(--epx-brand); border-color: transparent }
+.epx-chip[data-tone='good'] { color: var(--epx-good); background: var(--epx-good-wash); border-color: var(--epx-good-line) }
+.epx-chip[data-tone='warn'] { color: var(--epx-warn); background: var(--epx-warn-wash); border-color: var(--epx-warn-line) }
+.epx-chip[data-tone='bad']  { color: var(--epx-bad);  background: var(--epx-bad-wash);  border-color: var(--epx-bad-line) }
+
+/* An alert dot on a chip that needs attention. */
+.epx-chip[data-alert]::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--epx-bad);
+  box-shadow: 0 0 8px var(--epx-bad);
+  animation: epx-breathe 2s var(--epx-ease-in-out) infinite;
+}
+
+/* ============================================================================
+   BUTTON — three jobs: primary (do the thing), quiet (a secondary path),
+   ghost (leave). Nothing else is needed.
+   ========================================================================== */
+.epx-btn {
+  flex: 1;
+  min-height: var(--epx-tap-min);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--epx-sp-2);
+  padding: var(--epx-sp-3) var(--epx-sp-4);
+  border-radius: var(--epx-r-md);
+  font-size: var(--epx-t-body);
+  font-weight: var(--epx-fw-black);
+  letter-spacing: 0.04em;
+  color: var(--epx-fg);
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid var(--epx-line);
+  transition: transform var(--epx-d-instant) var(--epx-ease-spring),
+              opacity   var(--epx-d-fast) var(--epx-ease-out);
+}
+.epx-btn:active { transform: scale(0.97) }
+
+.epx-btn[data-kind='primary'] {
+  background: var(--epx-brand-grad);
+  border-color: transparent;
+  color: var(--epx-brand-ink);
+  box-shadow: var(--epx-e-brand);
+}
+.epx-btn[data-kind='ghost'] {
+  background: transparent;
+  border-color: transparent;
+  color: var(--epx-fg-4);
+}
+.epx-btn[data-kind='danger'] {
+  background: var(--epx-bad-wash);
+  border-color: var(--epx-bad-line);
+  color: var(--epx-bad-tint);
+}
+.epx-btn:disabled,
+.epx-btn[data-off] {
+  opacity: 0.32;
+  pointer-events: none;
+  box-shadow: none;
+}
+
+/* A back affordance sized for a thumb. */
+.epx-back {
+  flex: 0 0 auto;
+  width: var(--epx-tap-min);
+  height: var(--epx-tap-min);
+  margin-left: calc(var(--epx-sp-2) * -1);
+  display: grid;
+  place-items: center;
+  border-radius: var(--epx-r-sm);
+  font-size: var(--epx-t-title);
+  color: var(--epx-fg-3);
+}
+.epx-back:active { background: rgba(255, 255, 255, 0.07) }
+
+/* ============================================================================
+   CHOICE — a full-width option in a list of options. Replaces the many
+   near-identical "pick one of these" rows scattered across screens.
+   ========================================================================== */
+.epx-choice {
+  width: 100%;
+  min-height: var(--epx-tap-min);
+  display: flex;
+  align-items: center;
+  gap: var(--epx-sp-3);
+  padding: var(--epx-sp-3) var(--epx-sp-4);
+  border-radius: var(--epx-r-md);
+  background: var(--epx-s-surface);
+  border: 1px solid var(--epx-line-hairline);
+  text-align: left;
+  transition: border-color var(--epx-d-fast) var(--epx-ease-out),
+              background   var(--epx-d-fast) var(--epx-ease-out),
+              transform    var(--epx-d-instant) var(--epx-ease-spring);
+}
+.epx-choice:active   { transform: scale(0.985) }
+.epx-choice[data-on] { border-color: var(--epx-brand-line); background:
+  linear-gradient(90deg, var(--epx-brand-wash), var(--epx-s-surface) 60%) }
+
+.epx-choice-id   { flex: 1; min-width: 0 }
+.epx-choice-id b { display: block; font-size: var(--epx-t-body); font-weight: var(--epx-fw-bold); color: var(--epx-fg) }
+.epx-choice-id span { display: block; margin-top: 2px; font-size: var(--epx-t-caption); color: var(--epx-fg-4) }
+.epx-choice-num  { flex: 0 0 auto; text-align: right }
+.epx-choice-num em   { display: block; font-style: normal; font-family: var(--epx-font-mono);
+                        font-size: var(--epx-t-body); font-weight: var(--epx-fw-bold); color: var(--epx-fg-2) }
+.epx-choice-num span { display: block; margin-top: 2px; font-size: var(--epx-t-micro); color: var(--epx-fg-5) }
+
+/* ============================================================================
+   MOTION HELPERS — attach entrance behaviour without writing keyframes again.
+   `--epx-i` is the item's index, which is what produces a staggered reveal.
+   ========================================================================== */
+.epx-in       { animation: epx-rise var(--epx-d-base) var(--epx-ease-out) both }
+.epx-in-sm    { animation: epx-rise-sm var(--epx-d-fast) var(--epx-ease-out) both }
+.epx-in-fade  { animation: epx-fade var(--epx-d-base) var(--epx-ease-out) both }
+.epx-in-pop   { animation: epx-pop var(--epx-d-base) var(--epx-ease-spring) both }
+.epx-in-stagger > * { animation: epx-rise-sm var(--epx-d-base) var(--epx-ease-out) both;
+                      animation-delay: calc(var(--epx-i, 0) * var(--epx-stagger)) }
+
+/* A value that just changed. */
+.epx-changed { animation: epx-tick var(--epx-d-slow) var(--epx-ease-out) }
+
+/* A surface that is doing something. */
+.epx-working {
+  position: relative;
+  overflow: hidden;
+}
+.epx-working::after {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, var(--epx-brand-veil), transparent);
+  animation: epx-sweep 1.6s var(--epx-ease-in-out) infinite;
+  pointer-events: none;
+}
+
+/* A live indicator. */
+.epx-live {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--epx-good);
+  box-shadow: 0 0 8px var(--epx-good);
+  animation: epx-breathe 1.8s var(--epx-ease-in-out) infinite;
+}
+
+/* ============================================================================
+   CINEMATIC — the shared furniture for cutscenes, so a new one is a scene
+   description rather than a new stylesheet.
+   ========================================================================== */
+.epx-cine {
+  position: fixed;
+  inset: 0;
+  z-index: var(--epx-z-cinematic);
+  max-width: var(--epx-frame-max);
+  margin: 0 auto;
+  background: var(--epx-s-void);
+  color: var(--epx-fg);
+  overflow: hidden;
+}
+
+/* Black bars that close in when a moment becomes A Moment. */
+.epx-cine::before,
+.epx-cine::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 7vh;
+  background: #000;
+  z-index: 2;
+  pointer-events: none;
+  animation: epx-letterbox var(--epx-d-slow) var(--epx-ease-out) both;
+}
+.epx-cine::before { top: 0;    transform-origin: top }
+.epx-cine::after  { bottom: 0; transform-origin: bottom }
+
+/* Film grain / CRT scanlines, opt-in. */
+.epx-scanlines {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.2) 0 2px, transparent 2px 4px);
+}
+
+/* A cinematic beat: one line of text that arrives, holds, and is replaced. */
+.epx-beat {
+  font-size: var(--epx-t-display);
+  font-weight: var(--epx-fw-black);
+  line-height: var(--epx-lh-tight);
+  letter-spacing: var(--epx-track-tight);
+  color: var(--epx-fg-max);
+  animation: epx-rise var(--epx-d-cine) var(--epx-ease-out) both;
+}
+.epx-beat-kicker {
+  display: block;
+  margin-bottom: var(--epx-sp-2);
+  font-size: var(--epx-t-micro);
+  font-weight: var(--epx-fw-black);
+  letter-spacing: var(--epx-track-wide);
+  text-transform: uppercase;
+  color: var(--epx-brand);
+}
+
+.epx-skiphint {
+  position: absolute;
+  bottom: var(--epx-sp-6);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 4;
+  font-size: var(--epx-t-micro);
+  letter-spacing: var(--epx-track-wide);
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.35);
+  animation: epx-blink 2s infinite;
+  pointer-events: none;
+}
+
+/* ============================================================================
+   DOCUMENT — term sheets, contracts, letters. Deliberately not the rest of the
+   UI: paper, serif, and ink.
+   ========================================================================== */
+.epx-doc {
+  padding: var(--epx-sp-6) var(--epx-sp-5);
+  border-radius: var(--epx-r-xs);
+  background: var(--epx-doc-paper);
+  color: var(--epx-doc-ink);
+  font-family: var(--epx-font-doc);
+  font-size: var(--epx-t-body);
+  line-height: var(--epx-lh-body);
+  box-shadow: var(--epx-e-3);
+}
+.epx-doc-head {
+  padding-bottom: var(--epx-sp-3);
+  border-bottom: 2px solid var(--epx-doc-ink);
+  margin-bottom: var(--epx-sp-4);
+}
+.epx-doc-rule  { height: 1px; background: var(--epx-doc-rule); margin: var(--epx-sp-4) 0 }
+.epx-doc-faint { color: var(--epx-doc-faint) }
+.epx-doc-seal  { color: var(--epx-doc-seal); animation: epx-stamp var(--epx-d-slow) var(--epx-ease-spring) both }
+
+/* ============================================================================
+   UTILITY — a deliberately tiny set. Anything longer belongs in a module.
+   ========================================================================== */
+.epx-row    { display: flex; align-items: center; gap: var(--epx-sp-3) }
+.epx-row-sb { display: flex; align-items: center; justify-content: space-between; gap: var(--epx-sp-3) }
+.epx-col    { display: flex; flex-direction: column; gap: var(--epx-sp-2) }
+.epx-grow   { flex: 1; min-width: 0 }
+.epx-hr     { height: 1px; background: var(--epx-line-hairline); border: 0 }
+
+/* Wide content scrolls inside itself; the page never scrolls sideways. */
+.epx-scroll-x {
+  display: flex;
+  gap: var(--epx-sp-3);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  /* Bleed to the screen edge so the track reads as continuing. */
+  margin: 0 calc(var(--epx-gutter) * -1);
+  padding: 0 var(--epx-gutter);
+}
+.epx-scroll-x::-webkit-scrollbar { display: none }
+.epx-scroll-x > * { scroll-snap-align: start; flex: 0 0 auto }
+
+/* Mouse feedback is deliberately separate from touch feedback so a hover
+   treatment never becomes a sticky state on mobile WebViews. */
+@media (hover: hover) and (pointer: fine) {
+  .epx-btn:hover:not(:disabled):not([data-off]) {
+    border-color: var(--epx-line-strong);
+    filter: brightness(1.08);
+  }
+  .epx-chip:hover,
+  .epx-choice:hover {
+    border-color: var(--epx-line-strong);
+    background-color: var(--epx-s-raised);
+  }
+  .epx-back:hover {
+    color: var(--epx-fg);
+    background: rgba(255, 255, 255, 0.07);
+  }
+}
+
+.epx-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

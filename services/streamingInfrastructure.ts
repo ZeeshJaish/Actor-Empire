@@ -1,7 +1,9 @@
 import type {
     OwnedStreamingInfrastructureSetupDraft,
+    OwnedStreamingFacility,
     OwnedStreamingLedgerEntry,
     OwnedStreamingNetworkPlacement,
+    OwnedStreamingPlatformState,
     Player,
     StreamingCapacityPackageId,
     StreamingInfrastructureRolloutPace,
@@ -24,10 +26,35 @@ import {
     getStreamingReachConfigurationKey,
     resolveOwnedStreamingReach,
 } from './streamingProgression';
-import { getRecommendedStreamingCoreCityIds } from './streamingDayOneMarkets';
+import {
+    getRecommendedStreamingCoreCityIds,
+    getStreamingDayOneRegionIds,
+    summarizeStreamingDayOneMarkets,
+} from './streamingDayOneMarkets';
+import {
+    aggregateStreamingFacilities,
+    getStreamingFacilityContract,
+    getStreamingFacilitySetupCost,
+    getStreamingFacilityWeeklyRent,
+    migratePlacementsToStreamingFacilities,
+    normalizeStreamingFacilityLease,
+    normalizeStreamingFacilityPhysical,
+} from './streamingFacilities';
+import { normalizeStreamingInfrastructureManagementPolicy } from './streamingInfrastructureManagement';
+import {
+    getStreamingFacilityPhysicalView,
+    getStreamingNetworkPhysicalSummary,
+} from './streamingInfrastructurePhysical';
+import {
+    finalizeStreamingRackGroupMigrations,
+    getStreamingRackDutyRule,
+    getProjectedRackDuty,
+    normalizeStreamingRackGroups,
+    projectFacilityNetworkRole,
+} from './streamingRackGroups';
 
 type ConfigurableInfrastructureStrategy = Exclude<StreamingInfrastructureStrategy, 'UNDECIDED'>;
-export const STREAMING_INFRASTRUCTURE_SIGNATURE_MODEL = 'streaming-infrastructure-v7';
+export const STREAMING_INFRASTRUCTURE_SIGNATURE_MODEL = 'streaming-infrastructure-v9-physical-envelope';
 
 const NETWORK_ROLE_RULES = {
     CORE_ORIGIN: { capacity: 1, storage: 1, capex: 1, weekly: 1, label: 'Core origin' },
@@ -72,6 +99,92 @@ const networkSignature = (placements: OwnedStreamingNetworkPlacement[]): string 
         .sort()
         .join(',') || 'NO-NODES'
 );
+
+const sanitizeFacilities = (
+    facilities: OwnedStreamingFacility[] | null | undefined,
+    fallbackPlacements: OwnedStreamingNetworkPlacement[],
+): OwnedStreamingFacility[] => {
+    const facilitiesMatchPlacements = Boolean(facilities?.length) && (
+        fallbackPlacements.length === 0
+        || networkSignature(aggregateStreamingFacilities(facilities)) === networkSignature(fallbackPlacements)
+    );
+    // Facilities are canonical in current saves. When a legacy caller edits
+    // only networkPlacements, rebuild deterministic rooms from that topology
+    // instead of silently forecasting the stale facility list.
+    const source = facilitiesMatchPlacements
+        ? facilities!
+        : migratePlacementsToStreamingFacilities(fallbackPlacements);
+    const seen = new Set<string>();
+    return source.flatMap((facility, index) => {
+        const contract = getStreamingFacilityContract(facility.type);
+        const lease = normalizeStreamingFacilityLease(facility.lease, facility.type);
+        const cityId = String(facility.cityId || '').trim().toUpperCase();
+        const id = String(facility.id || `FACILITY-${cityId}-${index + 1}`).trim();
+        if (!cityId || !id || seen.has(id)) return [];
+        seen.add(id);
+        const installedRacks = Math.max(1, Math.min(
+            lease?.rackPositions || contract.capacityRacks,
+            Math.round(facility.installedRacks || 1),
+        ));
+        const rackGroups = normalizeStreamingRackGroups(
+            facility.rackGroups,
+            id,
+            installedRacks,
+            facility.role,
+        );
+        return [{
+            ...facility,
+            id,
+            cityId,
+            lease,
+            installedRacks,
+            role: projectFacilityNetworkRole(rackGroups),
+            rackGroups,
+            physical: normalizeStreamingFacilityPhysical(facility.physical, facility.type, installedRacks, lease),
+        }];
+    });
+};
+
+const facilitySignature = (
+    facilities: OwnedStreamingFacility[] | null | undefined,
+    placements: OwnedStreamingNetworkPlacement[],
+): string => {
+    const canonical = sanitizeFacilities(facilities, placements)
+        .map(facility => {
+            const physical = normalizeStreamingFacilityPhysical(
+                facility.physical,
+                facility.type,
+                facility.installedRacks,
+                facility.lease,
+            );
+            return [
+                facility.id,
+                facility.cityId,
+                facility.type,
+                facility.installedRacks,
+                facility.role,
+                facility.lease?.listingId || 'LEGACY',
+                (facility.rackGroups || []).map(group => `${group.id}:${group.rackCount}:${getProjectedRackDuty(group)}:${group.migration?.weeks || 0}`).sort().join('~'),
+                physical.powerContractKw,
+                physical.backupPowerKw,
+                physical.backupPowerMode,
+                physical.coolingCapacityKw,
+                physical.coolingMode,
+                physical.bandwidthMbps,
+                physical.burstBandwidthMbps,
+                physical.maintenanceConditionPercent,
+                physical.powerUpgradeCount,
+                physical.coolingUpgradeCount,
+                physical.bandwidthUpgradeCount,
+                physical.equipmentReplacementCount,
+            ].join('.');
+        })
+        .sort()
+        .join(',');
+    // Signatures are persisted in old saves with a bounded text field. Hash the
+    // canonical physical layout so even very large networks remain reload-safe.
+    return createDeterministicId('streaming_facilities', canonical || 'NO-FACILITIES');
+};
 
 export const STREAMING_CAPACITY_PACKAGES: Array<{
     id: StreamingCapacityPackageId;
@@ -322,6 +435,15 @@ export interface StreamingInfrastructureForecast {
     upfrontCost: number;
     transactionCost: number;
     weeklyOperatingCost: number;
+    physicalWeeklyOperatingCost: number;
+    physicalUpgradeCapitalCost: number;
+    energyKwhWeekly: number;
+    waterLitresWeekly: number;
+    sustainabilityScore: number;
+    publicReputation: number;
+    physicalReliabilityPercent: number;
+    backupCoveragePercent: number;
+    physicalLimitingFactors: string[];
     staffRequired: number;
     buildWeeks: number;
     technicalDebt: number;
@@ -344,7 +466,7 @@ export interface StreamingInfrastructureValidationIssue {
 }
 
 export const getStreamingInfrastructureSignature = (
-    draft: Pick<OwnedStreamingInfrastructureSetupDraft, 'strategy' | 'capacityPackageId' | 'rolloutPace' | 'networkPlacements'>,
+    draft: Pick<OwnedStreamingInfrastructureSetupDraft, 'strategy' | 'capacityPackageId' | 'rolloutPace' | 'networkPlacements' | 'facilities'>,
     reachConfigurationKey = 'reach-model-v1:LEVEL_0',
     demandRange: { low: number; likely: number; high: number } = {
         low: 130_000,
@@ -361,7 +483,48 @@ export const getStreamingInfrastructureSignature = (
     draft.capacityPackageId,
     draft.rolloutPace,
     networkSignature(draft.networkPlacements),
+    facilitySignature(draft.facilities, draft.networkPlacements),
 ].join(':');
+
+/**
+ * The founding journey chooses markets, never machines. This is the single
+ * deterministic hand-off from those markets into Network Build: it proposes a
+ * useful opening topology without committing, purchasing or duplicating any
+ * infrastructure decision.
+ */
+export const getSuggestedStreamingNetworkPlacements = (
+    marketIds: string[],
+    audienceMultiplier = 1,
+): OwnedStreamingNetworkPlacement[] => {
+    const summary = summarizeStreamingDayOneMarkets(marketIds);
+    const regionCount = getStreamingDayOneRegionIds(marketIds).length;
+    const cityIds = getRecommendedStreamingCoreCityIds(marketIds, 6);
+    const likelyOpeningDemand = summary.streamingAudience * 0.00018 * Math.max(0.25, audienceMultiplier || 1);
+    const targetRacks = clamp(
+        Math.ceil((likelyOpeningDemand * 1.25) / NETWORK_RACK_BASELINE_STREAMS),
+        2,
+        10,
+    );
+    const wantedCities = Math.min(
+        cityIds.length,
+        Math.max(1, Math.min(regionCount || 1, Math.max(regionCount > 1 ? 2 : 1, Math.ceil(targetRacks / 3)))),
+    );
+    const placements: OwnedStreamingNetworkPlacement[] = cityIds
+        .slice(0, wantedCities)
+        .map((cityId, index) => ({
+            cityId,
+            racks: 1,
+            role: index === 0 ? 'CORE_ORIGIN' : 'REGIONAL_HUB',
+        }));
+    let racksLeft = targetRacks - placements.length;
+    let cursor = 0;
+    while (racksLeft > 0 && placements.length) {
+        placements[cursor % placements.length].racks += 1;
+        cursor += 1;
+        racksLeft -= 1;
+    }
+    return sanitizeNetworkPlacements(placements);
+};
 
 export const createDefaultStreamingInfrastructureDraft = (
     player: Player,
@@ -376,10 +539,14 @@ export const createDefaultStreamingInfrastructureDraft = (
     const racks = capacityPackageId === 'STARTER' ? 2
         : capacityPackageId === 'ESSENTIAL' ? 4
             : capacityPackageId === 'GROWTH' ? 7 : 10;
-    const suggestedCityId = getRecommendedStreamingCoreCityIds(
-        platform.identity?.dayOneMarketIds || [],
-        1,
-    )[0];
+    const canonicalOpeningMarketIds = platform.marketOperations
+        .filter(operation => operation.entryKind === 'OPENING' && operation.countryId && operation.status !== 'EXITED')
+        .map(operation => operation.countryId!);
+    const dayOneMarketIds = canonicalOpeningMarketIds.length
+        ? canonicalOpeningMarketIds
+        : platform.identity?.dayOneMarketIds || [];
+    const suggestedPlacements = getSuggestedStreamingNetworkPlacements(dayOneMarketIds);
+    const suggestedCityId = suggestedPlacements[0]?.cityId;
     const launchCityId = current?.networkPlacements?.[0]?.cityId
         || platform.identity?.launchServerCityId
         || suggestedCityId
@@ -392,8 +559,27 @@ export const createDefaultStreamingInfrastructureDraft = (
         subscriptionPrices: { ...platform.subscriptionPrices },
         networkPlacements: current?.networkPlacements?.length
             ? current.networkPlacements.map(item => ({ ...item }))
-            : [{ cityId: launchCityId, racks, role: 'CORE_ORIGIN' }],
+            : dayOneMarketIds.length
+                ? suggestedPlacements
+                : [{ cityId: launchCityId, racks, role: 'CORE_ORIGIN' }],
+        facilities: current?.facilities?.map(facility => ({
+            ...facility,
+            lease: facility.lease ? { ...facility.lease } : undefined,
+            rackGroups: facility.rackGroups?.map(group => ({
+                ...group,
+                migration: group.migration ? { ...group.migration } : undefined,
+            })),
+        })),
+        managementPolicy: normalizeStreamingInfrastructureManagementPolicy(current?.managementPolicy),
         lastLoadTestSignature: current?.loadTest.configurationSignature || null,
+        lastLaunchRehearsal: current?.loadTest.launchRehearsal
+            ? {
+                ...current.loadTest.launchRehearsal,
+                regionalSinglePointFailures: [...current.loadTest.launchRehearsal.regionalSinglePointFailures],
+                countries: current.loadTest.launchRehearsal.countries.map(country => ({ ...country })),
+                facilities: current.loadTest.launchRehearsal.facilities.map(facility => ({ ...facility })),
+            }
+            : undefined,
         updatedAtAbsoluteWeek: getAbsoluteWeek(player.age, player.currentWeek),
     };
 };
@@ -423,12 +609,45 @@ const getConfigurationValues = (
         || STREAMING_CAPACITY_PACKAGES[0];
     const strategy = STRATEGY_MODIFIERS[draft.strategy];
     const rollout = ROLLOUT_MODIFIERS[draft.rolloutPace];
-    const network = sanitizeNetworkPlacements(draft.networkPlacements);
+    const facilities = sanitizeFacilities(draft.facilities, draft.networkPlacements);
+    const network = facilities.length
+        ? sanitizeNetworkPlacements(aggregateStreamingFacilities(facilities))
+        : sanitizeNetworkPlacements(draft.networkPlacements);
     if (network.length) {
-        const rackCount = network.reduce((sum, item) => sum + item.racks, 0);
-        const baseCapacity = network.reduce((sum, item) => (
-            sum + item.racks * NETWORK_RACK_BASELINE_STREAMS * NETWORK_ROLE_RULES[item.role].capacity
-        ), 0);
+        const dutyGroups = facilities.flatMap(facility => normalizeStreamingRackGroups(
+            facility.rackGroups,
+            facility.id,
+            facility.installedRacks,
+            facility.role,
+        ).map(group => {
+            const rule = getStreamingRackDutyRule(getProjectedRackDuty(group));
+            const migrationMultiplier = 1 - (group.migration?.pressurePercent || 0) / 100;
+            return { facility, group, rule, migrationMultiplier };
+        }));
+        const physicalViews = new Map(facilities.map(facility => [
+            facility.id,
+            getStreamingFacilityPhysicalView(facility, facility.lease?.electricityRatePerKwh),
+        ]));
+        const physicalSummary = getStreamingNetworkPhysicalSummary(facilities);
+        const rackCount = dutyGroups.length
+            ? dutyGroups.reduce((sum, item) => sum + item.group.rackCount, 0)
+            : network.reduce((sum, item) => sum + item.racks, 0);
+        const baseCapacity = dutyGroups.length
+            ? dutyGroups.reduce((sum, item) => (
+                sum + item.group.rackCount * NETWORK_RACK_BASELINE_STREAMS
+                    * item.rule.capacityMultiplier * item.migrationMultiplier
+                    * (physicalViews.get(item.facility.id)?.steadyCapacityFactor ?? 1)
+            ), 0)
+            : network.reduce((sum, item) => (
+                sum + item.racks * NETWORK_RACK_BASELINE_STREAMS * NETWORK_ROLE_RULES[item.role].capacity
+            ), 0);
+        const burstBaseCapacity = dutyGroups.length
+            ? dutyGroups.reduce((sum, item) => (
+                sum + item.group.rackCount * NETWORK_RACK_BASELINE_STREAMS
+                    * item.rule.capacityMultiplier * item.migrationMultiplier
+                    * (physicalViews.get(item.facility.id)?.burstCapacityFactor ?? 1)
+            ), 0)
+            : baseCapacity;
         const baselineConcurrentStreams = roundCapacity(baseCapacity * strategy.baseline);
         const burstMultiplier = draft.strategy === 'CLOUD_FIRST' ? 1.45
             : draft.strategy === 'HYBRID' ? 1.2 : 1;
@@ -436,12 +655,32 @@ const getConfigurationValues = (
             const city = getProductionLocation(cityId);
             return city ? getStreamingDataCenterCost(city) / 10_000_000 : 1;
         };
-        const upfrontCost = roundMoney(network.reduce((sum, item) => (
-            sum + item.racks * NETWORK_RACK_CAPEX * cityCost(item.cityId) * NETWORK_ROLE_RULES[item.role].capex
-        ), 0) * strategy.upfront * rollout.upfront);
-        const weeklyOperatingCost = roundMoney(network.reduce((sum, item) => (
-            sum + item.racks * NETWORK_RACK_WEEKLY * cityCost(item.cityId) * NETWORK_ROLE_RULES[item.role].weekly
-        ), 0) * strategy.weekly);
+        const facilitySetup = facilities.reduce((sum, facility) => (
+            sum + getStreamingFacilitySetupCost(facility) * (facility.lease ? 1 : cityCost(facility.cityId))
+        ), 0);
+        const facilityWeekly = facilities.reduce((sum, facility) => (
+            sum + getStreamingFacilityWeeklyRent(facility) * (facility.lease ? 1 : cityCost(facility.cityId))
+        ), 0);
+        const rackCapex = dutyGroups.length
+            ? dutyGroups.reduce((sum, item) => sum + item.group.rackCount * NETWORK_RACK_CAPEX
+                * cityCost(item.facility.cityId) * item.rule.capexMultiplier, 0)
+            : network.reduce((sum, item) => (
+                sum + item.racks * NETWORK_RACK_CAPEX * cityCost(item.cityId) * NETWORK_ROLE_RULES[item.role].capex
+            ), 0);
+        const rackWeekly = dutyGroups.length
+            ? dutyGroups.reduce((sum, item) => sum + item.group.rackCount * NETWORK_RACK_WEEKLY
+                * cityCost(item.facility.cityId) * item.rule.weeklyMultiplier, 0)
+            : network.reduce((sum, item) => (
+                sum + item.racks * NETWORK_RACK_WEEKLY * cityCost(item.cityId) * NETWORK_ROLE_RULES[item.role].weekly
+            ), 0);
+        const upfrontCost = roundMoney(
+            (rackCapex + facilitySetup) * strategy.upfront * rollout.upfront
+            + physicalSummary.upgradeCapitalCost,
+        );
+        const weeklyOperatingCost = roundMoney(
+            (rackWeekly + facilityWeekly) * strategy.weekly
+            + physicalSummary.weeklyOperatingCost,
+        );
         const distributionBonus = Math.min(0.24, Math.max(0, network.length - 1) * 0.04);
         const biggestCampus = network.reduce((max, item) => Math.max(max, item.racks), 0);
         return {
@@ -449,19 +688,35 @@ const getConfigurationValues = (
             capacityPackageId: draft.capacityPackageId,
             rolloutPace: draft.rolloutPace,
             baselineConcurrentStreams,
-            burstConcurrentStreams: roundCapacity(baselineConcurrentStreams * burstMultiplier),
-            storageCapacityHours: Math.round(network.reduce((sum, item) => (
-                sum + item.racks * NETWORK_RACK_STORAGE_HOURS * NETWORK_ROLE_RULES[item.role].storage
-            ), 0)),
+            burstConcurrentStreams: roundCapacity(burstBaseCapacity * strategy.baseline * burstMultiplier),
+            storageCapacityHours: Math.round(dutyGroups.length
+                ? dutyGroups.reduce((sum, item) => sum + item.group.rackCount * NETWORK_RACK_STORAGE_HOURS
+                    * Math.max(.16, item.rule.cacheScore / 100), 0)
+                : network.reduce((sum, item) => (
+                    sum + item.racks * NETWORK_RACK_STORAGE_HOURS * NETWORK_ROLE_RULES[item.role].storage
+                ), 0)),
             reliabilityTarget: Math.round(clamp(
-                99.62 + strategy.reliability + rollout.reliability + distributionBonus,
-                98,
+                physicalSummary.reliabilityPercent + strategy.reliability + rollout.reliability + distributionBonus,
+                90,
                 99.999,
             ) * 1_000) / 1_000,
             upfrontCost,
             weeklyOperatingCost,
+            physicalWeeklyOperatingCost: physicalSummary.weeklyOperatingCost,
+            physicalUpgradeCapitalCost: physicalSummary.upgradeCapitalCost,
+            energyKwhWeekly: physicalSummary.energyKwhWeekly,
+            waterLitresWeekly: physicalSummary.waterLitresWeekly,
+            sustainabilityScore: physicalSummary.sustainabilityScore,
+            publicReputation: physicalSummary.publicReputation,
+            physicalReliabilityPercent: physicalSummary.reliabilityPercent,
+            backupCoveragePercent: physicalSummary.backupCoveragePercent,
+            physicalLimitingFactors: physicalSummary.limitingFactors,
             staffRequired: Math.max(2, Math.ceil(rackCount * 1.15 + network.length * 1.5)),
-            buildWeeks: Math.max(1, Math.ceil((2 + biggestCampus * 0.28 + Math.max(0, network.length - 1) * 0.7) * strategy.build * rollout.build)),
+            buildWeeks: Math.max(1, Math.ceil((2 + biggestCampus * 0.28
+                + Math.max(0, network.length - 1) * 0.7
+                + facilities.reduce((max, facility) => Math.max(max, getStreamingFacilityContract(facility.type).provisioningWeeks), 0) * .35
+                + dutyGroups.reduce((max, item) => Math.max(max, item.group.migration?.weeks || 0), 0)
+            ) * strategy.build * rollout.build)),
             technicalDebt: rollout.technicalDebt,
         };
     }
@@ -479,9 +734,53 @@ const getConfigurationValues = (
         ) * 1_000) / 1_000,
         upfrontCost: roundMoney(capacityPackage.upfrontCost * strategy.upfront * rollout.upfront),
         weeklyOperatingCost: roundMoney(capacityPackage.weeklyOperatingCost * strategy.weekly),
+        physicalWeeklyOperatingCost: 0,
+        physicalUpgradeCapitalCost: 0,
+        energyKwhWeekly: 0,
+        waterLitresWeekly: 0,
+        sustainabilityScore: 100,
+        publicReputation: 100,
+        physicalReliabilityPercent: 99.5,
+        backupCoveragePercent: 0,
+        physicalLimitingFactors: [],
         staffRequired: Math.max(1, Math.ceil(capacityPackage.staffRequired * strategy.staff)),
         buildWeeks: Math.max(1, Math.ceil(capacityPackage.baseBuildWeeks * strategy.build * rollout.build)),
         technicalDebt: rollout.technicalDebt,
+    };
+};
+
+/** Reuses the founding network model so later owned-campus racks change the same canonical capacity. */
+export const getStreamingFacilityNetworkSnapshot = (
+    platform: OwnedStreamingPlatformState,
+    facilities: OwnedStreamingFacility[],
+): Pick<StreamingInfrastructureForecast, 'baselineConcurrentStreams' | 'burstConcurrentStreams' | 'storageCapacityHours' | 'reliabilityTarget' | 'staffRequired'> => {
+    const setup = platform.infrastructureSetup;
+    if (!setup) return {
+        baselineConcurrentStreams: platform.capacity.baselineConcurrentStreams,
+        burstConcurrentStreams: platform.capacity.burstConcurrentStreams,
+        storageCapacityHours: 0,
+        reliabilityTarget: 99,
+        staffRequired: 0,
+    };
+    const configuration = getConfigurationValues({
+        currentStep: 0,
+        strategy: platform.infrastructureStrategy === 'UNDECIDED' ? 'HYBRID' : platform.infrastructureStrategy,
+        capacityPackageId: setup.capacityPackageId,
+        rolloutPace: setup.rolloutPace,
+        subscriptionPrices: platform.subscriptionPrices,
+        networkPlacements: aggregateStreamingFacilities(facilities),
+        facilities,
+        managementPolicy: setup.managementPolicy,
+        lastLoadTestSignature: setup.loadTest.configurationSignature,
+        lastLaunchRehearsal: setup.loadTest.launchRehearsal,
+        updatedAtAbsoluteWeek: setup.committedAtAbsoluteWeek,
+    });
+    return {
+        baselineConcurrentStreams: configuration.baselineConcurrentStreams,
+        burstConcurrentStreams: configuration.burstConcurrentStreams,
+        storageCapacityHours: configuration.storageCapacityHours,
+        reliabilityTarget: configuration.reliabilityTarget,
+        staffRequired: configuration.staffRequired,
     };
 };
 
@@ -533,9 +832,16 @@ export const getStreamingInfrastructureForecast = (
         },
     });
     const reachConfigurationKey = getStreamingReachConfigurationKey(reach);
-    const forecastLowConcurrentStreams = roundCapacity(reach.demandRange.low);
-    const forecastLikelyConcurrentStreams = roundCapacity(reach.demandRange.likely);
-    const forecastHighConcurrentStreams = roundCapacity(reach.demandRange.high);
+    const rehearsalDemand = draft.openingDemandForecast;
+    const demandRange = rehearsalDemand
+        && rehearsalDemand.low >= 0
+        && rehearsalDemand.likely >= rehearsalDemand.low
+        && rehearsalDemand.high >= rehearsalDemand.likely
+        ? rehearsalDemand
+        : reach.demandRange;
+    const forecastLowConcurrentStreams = roundCapacity(demandRange.low);
+    const forecastLikelyConcurrentStreams = roundCapacity(demandRange.likely);
+    const forecastHighConcurrentStreams = roundCapacity(demandRange.high);
     const headroomPercent = forecastHighConcurrentStreams > 0
         ? Math.round(((configuration.burstConcurrentStreams - forecastHighConcurrentStreams) / forecastHighConcurrentStreams) * 1_000) / 10
         : 100;
@@ -570,6 +876,8 @@ export const getStreamingInfrastructureForecast = (
         && existing.capacityPackageId === draft.capacityPackageId
         && existing.rolloutPace === draft.rolloutPace
         && networkSignature(existing.networkPlacements) === networkSignature(draft.networkPlacements)
+        && facilitySignature(existing.facilities, existing.networkPlacements)
+            === facilitySignature(draft.facilities, draft.networkPlacements)
     );
     const currentConfiguration = existing ? getConfigurationValues({
         ...draft,
@@ -577,6 +885,7 @@ export const getStreamingInfrastructureForecast = (
         capacityPackageId: existing.capacityPackageId,
         rolloutPace: existing.rolloutPace,
         networkPlacements: existing.networkPlacements,
+        facilities: existing.facilities,
     }) : null;
     const transactionCost = !existing
         ? configuration.upfrontCost
@@ -591,7 +900,7 @@ export const getStreamingInfrastructureForecast = (
         configurationSignature: getStreamingInfrastructureSignature(
             draft,
             reachConfigurationKey,
-            reach.demandRange,
+            demandRange,
         ),
         reachConfigurationKey,
         reachLevel: reach.level,
@@ -608,8 +917,10 @@ export const getStreamingInfrastructureForecast = (
         loadTestSummary,
         demandDrivers: [
             {
-                label: reach.label,
-                detail: `${reach.description} The modeled range is ${forecastLowConcurrentStreams.toLocaleString()}–${forecastHighConcurrentStreams.toLocaleString()} simultaneous viewers.`,
+                label: rehearsalDemand ? 'Day-One market demand' : reach.label,
+                detail: rehearsalDemand
+                    ? `The selected opening countries and launch campaign create a modeled range of ${forecastLowConcurrentStreams.toLocaleString()}–${forecastHighConcurrentStreams.toLocaleString()} simultaneous viewers.`
+                    : `${reach.description} The modeled range is ${forecastLowConcurrentStreams.toLocaleString()}–${forecastHighConcurrentStreams.toLocaleString()} simultaneous viewers.`,
             },
             {
                 label: 'Current operating evidence',
@@ -625,6 +936,12 @@ export const getStreamingInfrastructureForecast = (
             {
                 label: 'Burst architecture',
                 detail: `${STREAMING_INFRASTRUCTURE_STRATEGIES.find(item => item.id === draft.strategy)?.title || 'Selected architecture'} supplies ${configuration.burstConcurrentStreams.toLocaleString()} modeled peak streams.`,
+            },
+            {
+                label: configuration.physicalLimitingFactors.length ? 'Physical constraint' : 'Physical envelope',
+                detail: configuration.physicalLimitingFactors.length
+                    ? `${configuration.physicalLimitingFactors.join(' • ')}. The forecast is already reduced to the capacity the utilities can actually support.`
+                    : `Power, cooling and fibre clear the planned workload with ${configuration.backupCoveragePercent}% backup-power coverage.`,
             },
             {
                 label: `${sanitizeNetworkPlacements(draft.networkPlacements).length} network ${sanitizeNetworkPlacements(draft.networkPlacements).length === 1 ? 'city' : 'cities'}`,
@@ -654,6 +971,8 @@ export const validateStreamingInfrastructureDraft = (
         && platform.infrastructureSetup.capacityPackageId === draft.capacityPackageId
         && platform.infrastructureSetup.rolloutPace === draft.rolloutPace
         && networkSignature(platform.infrastructureSetup.networkPlacements) === networkSignature(draft.networkPlacements)
+        && facilitySignature(platform.infrastructureSetup.facilities, platform.infrastructureSetup.networkPlacements)
+            === facilitySignature(draft.facilities, draft.networkPlacements)
     );
     if (!['FOUNDING', 'ACTIVE'].includes(platform.lifecycle) || !platform.identity || !platform.foundingProfile) {
         issues.push({ step: 0, code: 'INVALID_STATE', message: 'Infrastructure setup is available after incorporation.' });
@@ -719,7 +1038,24 @@ export const saveStreamingInfrastructureDraft = (
             roundPrice(Number(inputDraft.subscriptionPrices[tier.id])),
         ])) as Record<StreamingSubscriptionTierId, number>,
         networkPlacements: sanitizeNetworkPlacements(inputDraft.networkPlacements),
+        facilities: sanitizeFacilities(inputDraft.facilities, inputDraft.networkPlacements),
+        managementPolicy: normalizeStreamingInfrastructureManagementPolicy(inputDraft.managementPolicy),
+        openingDemandForecast: inputDraft.openingDemandForecast
+            ? {
+                low: roundCapacity(Number(inputDraft.openingDemandForecast.low) || 0),
+                likely: roundCapacity(Number(inputDraft.openingDemandForecast.likely) || 0),
+                high: roundCapacity(Number(inputDraft.openingDemandForecast.high) || 0),
+            }
+            : undefined,
         lastLoadTestSignature: inputDraft.lastLoadTestSignature || null,
+        lastLaunchRehearsal: inputDraft.lastLaunchRehearsal
+            ? {
+                ...inputDraft.lastLaunchRehearsal,
+                regionalSinglePointFailures: [...inputDraft.lastLaunchRehearsal.regionalSinglePointFailures],
+                countries: inputDraft.lastLaunchRehearsal.countries.map(country => ({ ...country })),
+                facilities: inputDraft.lastLaunchRehearsal.facilities.map(facility => ({ ...facility })),
+            }
+            : undefined,
         updatedAtAbsoluteWeek: absoluteWeek,
     };
     return {
@@ -740,13 +1076,25 @@ export const runStreamingInfrastructureLoadTest = (
     const forecast = getStreamingInfrastructureForecast(player, draft);
     if (!['FOUNDING', 'ACTIVE'].includes(platform.lifecycle)) return { changed: false, player, forecast };
     if (draft.lastLoadTestSignature === forecast.configurationSignature) return { changed: false, player, forecast };
+    const savedPlayer = saveStreamingInfrastructureDraft(player, {
+        ...draft,
+        lastLoadTestSignature: forecast.configurationSignature,
+    });
+    // Saving normalizes legacy facilities into explicit rack groups. Re-read
+    // that canonical draft so the persisted signature and the returned
+    // rehearsal can never disagree after migration.
+    const normalizedDraft = savedPlayer.ownedStreamingPlatform.infrastructureSetupDraft || draft;
+    const normalizedForecast = getStreamingInfrastructureForecast(savedPlayer, normalizedDraft);
+    const canonicalPlayer = normalizedForecast.configurationSignature === normalizedDraft.lastLoadTestSignature
+        ? savedPlayer
+        : saveStreamingInfrastructureDraft(savedPlayer, {
+            ...normalizedDraft,
+            lastLoadTestSignature: normalizedForecast.configurationSignature,
+        });
     return {
         changed: true,
-        player: saveStreamingInfrastructureDraft(player, {
-            ...draft,
-            lastLoadTestSignature: forecast.configurationSignature,
-        }),
-        forecast,
+        player: canonicalPlayer,
+        forecast: normalizedForecast,
     };
 };
 
@@ -773,9 +1121,16 @@ export const commitStreamingInfrastructureSetup = (
         && platform.infrastructureSetup.capacityPackageId === draft.capacityPackageId
         && platform.infrastructureSetup.rolloutPace === draft.rolloutPace
         && networkSignature(platform.infrastructureSetup.networkPlacements) === networkSignature(draft.networkPlacements)
+        && facilitySignature(platform.infrastructureSetup.facilities, platform.infrastructureSetup.networkPlacements)
+            === facilitySignature(draft.facilities, draft.networkPlacements)
     );
-    if (sameInfrastructure && samePrices) {
-        const forecast = getStreamingInfrastructureForecast(player, draft);
+    const currentForecast = getStreamingInfrastructureForecast(player, draft);
+    const sameRehearsal = Boolean(
+        platform.infrastructureSetup
+        && platform.infrastructureSetup.loadTest.configurationSignature === currentForecast.configurationSignature
+    );
+    if (sameInfrastructure && samePrices && sameRehearsal) {
+        const forecast = currentForecast;
         return { changed: false, reason: 'ALREADY_CONFIGURED', player, issues: [], forecast };
     }
     const validation = validateStreamingInfrastructureDraft(player, draft);
@@ -796,7 +1151,7 @@ export const commitStreamingInfrastructureSetup = (
     const readyAtAbsoluteWeek = sameInfrastructure && existingSetup
         ? existingSetup.readyAtAbsoluteWeek
         : absoluteWeek + forecast.buildWeeks;
-    const loadTest = sameInfrastructure && existingSetup
+    const loadTest = sameInfrastructure && existingSetup && sameRehearsal
         ? existingSetup.loadTest
         : {
             configurationSignature: forecast.configurationSignature,
@@ -807,6 +1162,9 @@ export const commitStreamingInfrastructureSetup = (
             headroomPercent: forecast.headroomPercent,
             status: forecast.loadTestStatus,
             driverKeys: forecast.demandDrivers.map(driver => driver.label),
+            launchRehearsal: draft.lastLaunchRehearsal?.configurationSignature === forecast.configurationSignature
+                ? draft.lastLaunchRehearsal
+                : undefined,
             completedAtAbsoluteWeek: absoluteWeek,
         };
     const revision = (existingSetup?.revision || 0) + 1;
@@ -842,6 +1200,8 @@ export const commitStreamingInfrastructureSetup = (
         forecast.baselineConcurrentStreams,
         forecast.reliabilityTarget,
     );
+    const committedFacilities = sanitizeFacilities(draft.facilities, draft.networkPlacements)
+        .map(finalizeStreamingRackGroupMigrations);
     const nextPlatform = compactOwnedStreamingPlatformForPersistence({
         ...platform,
         infrastructureStrategy: draft.strategy,
@@ -857,7 +1217,19 @@ export const commitStreamingInfrastructureSetup = (
             technicalDebt: sameInfrastructure && existingSetup
                 ? existingSetup.technicalDebt
                 : (existingSetup?.technicalDebt || 0) + forecast.technicalDebt,
-            networkPlacements: sanitizeNetworkPlacements(draft.networkPlacements),
+            networkPlacements: aggregateStreamingFacilities(committedFacilities),
+            facilities: committedFacilities,
+            managementPolicy: normalizeStreamingInfrastructureManagementPolicy(draft.managementPolicy),
+            physicalSummary: {
+                energyKwhWeekly: forecast.energyKwhWeekly,
+                waterLitresWeekly: forecast.waterLitresWeekly,
+                physicalWeeklyOperatingCost: forecast.physicalWeeklyOperatingCost,
+                sustainabilityScore: forecast.sustainabilityScore,
+                publicReputation: forecast.publicReputation,
+                reliabilityPercent: forecast.physicalReliabilityPercent,
+                backupCoveragePercent: forecast.backupCoveragePercent,
+                limitingFactors: [...forecast.physicalLimitingFactors],
+            },
             readyAtAbsoluteWeek,
             revision,
             committedAtAbsoluteWeek: absoluteWeek,

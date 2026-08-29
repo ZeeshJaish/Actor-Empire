@@ -163,7 +163,7 @@ const createFixture = (): Player => {
     };
 };
 
-assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 22, 'Phase 24 legacy should advance the owned-streaming schema to v22.');
+assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 23, 'The canonical foundation should advance the owned-streaming schema to v23.');
 
 const player = createFixture();
 const before = JSON.stringify(player.ownedStreamingPlatform);

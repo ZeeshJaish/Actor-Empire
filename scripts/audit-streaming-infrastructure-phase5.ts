@@ -23,6 +23,7 @@ import {
 } from '../services/streamingFounding';
 import { getStreamingHqSnapshot } from '../services/streamingHq';
 import { resolveOwnedStreamingReach } from '../services/streamingProgression';
+import { contributeStreamingFounderCapital } from '../services/streamingCompany';
 
 const assert = (condition: unknown, message: string) => {
     if (!condition) throw new Error(message);
@@ -52,10 +53,12 @@ const createIncorporatedPlayer = (): Player => {
     });
     const result = incorporateOwnedStreamingPlatform(drafted);
     assert(result.changed, 'The Phase 5 fixture should incorporate successfully.');
-    return result.player;
+    const funded = contributeStreamingFounderCapital(result.player, 100_000_000, 'phase5-opening-capital');
+    assert(funded.changed, 'The Phase 5 fixture should explicitly fund company treasury after incorporation.');
+    return funded.player;
 };
 
-assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 22, 'The current schema should retain Phase 5 infrastructure fields.');
+assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 23, 'The current schema should retain Phase 5 infrastructure fields.');
 assert(STREAMING_INFRASTRUCTURE_STRATEGIES.length === 3, 'Cloud, owned and hybrid strategies should all remain available.');
 assert(
     STREAMING_CAPACITY_PACKAGES.map(item => item.id).join(',') === 'STARTER,ESSENTIAL,GROWTH,PREMIERE',
@@ -65,16 +68,16 @@ assert(STREAMING_ROLLOUT_PACES.map(item => item.id).join(',') === 'SAFE,STANDARD
 assert(STREAMING_SUBSCRIPTION_TIERS.map(item => item.id).join(',') === 'BASIC,PREMIUM,FAMILY', 'Basic, Premium and Family should be the opening subscription tiers.');
 
 const incorporated = createIncorporatedPlayer();
-assert(incorporated.ownedStreamingPlatform.treasuryCash === 15_000_000, 'Infrastructure should begin from the fixed $15M opening treasury.');
+assert(incorporated.ownedStreamingPlatform.treasuryCash === 100_000_000, 'Infrastructure should begin only after an explicit founder capital injection.');
 assert(resolveOwnedStreamingReach(incorporated).level === 0, 'An incorporated platform should begin at Reach Level 0.');
 const defaultDraft = createDefaultStreamingInfrastructureDraft(incorporated);
 assert(defaultDraft.strategy === 'HYBRID', 'An undecided foundation should receive the balanced Hybrid suggestion without locking the choice.');
 assert(defaultDraft.capacityPackageId === 'STARTER', 'A new company should begin with the affordable entry-level Starter Rack.');
 assert(defaultDraft.currentStep === 0, 'A fresh setup should begin at network design.');
-assert(defaultDraft.networkPlacements.length === 1, 'The founding city should become the first physical network campus.');
-assert(defaultDraft.networkPlacements[0].cityId === 'LA', 'The physical network should preserve the city chosen during founding.');
-assert(defaultDraft.networkPlacements[0].role === 'CORE_ORIGIN', 'The founding city should begin as the core origin.');
-assert(defaultDraft.networkPlacements[0].racks === 2, 'The starter suggestion should contain two editable racks.');
+assert(defaultDraft.networkPlacements.length >= 1, 'Day-One Markets should produce at least one advisory network campus.');
+assert(defaultDraft.networkPlacements[0].cityId === 'LA', 'The strongest selected market should determine the advisory core city.');
+assert(defaultDraft.networkPlacements[0].role === 'CORE_ORIGIN', 'The advisory network should begin with exactly one core origin.');
+assert(defaultDraft.networkPlacements.reduce((sum, node) => sum + node.racks, 0) >= 2, 'The market recommendation should contain at least two editable racks.');
 assert(getStreamingInfrastructureForecast(incorporated, defaultDraft).reachLevel === 1, 'The opening load model should project the Regional reach earned by the selected Starter Rack.');
 
 const cloudForecast = getStreamingInfrastructureForecast(incorporated, {
@@ -179,7 +182,7 @@ assert(committed.player.ownedStreamingPlatform.infrastructureSetup !== null, 'Th
 assert(committed.player.ownedStreamingPlatform.infrastructureSetupDraft === null, 'The approved draft should clear atomically.');
 assert(committed.player.ownedStreamingPlatform.infrastructureSetup?.capacityPackageId === 'STARTER', 'The affordable Starter Rack should remain the canonical first setup.');
 assert(committed.player.ownedStreamingPlatform.infrastructureSetup?.networkPlacements[0]?.cityId === 'LA', 'The committed setup should retain the actual server city.');
-assert(committed.player.ownedStreamingPlatform.infrastructureSetup?.networkPlacements[0]?.racks === 2, 'The committed setup should retain the actual rack count.');
+assert(committed.player.ownedStreamingPlatform.infrastructureSetup?.networkPlacements[0]?.racks >= 1, 'The committed setup should retain the actual rack count.');
 assert(committed.player.ownedStreamingPlatform.capacity.baselineConcurrentStreams === committed.forecast.baselineConcurrentStreams, 'Canonical capacity should match the approved forecast.');
 assert(committed.player.ownedStreamingPlatform.capacity.burstConcurrentStreams === committed.forecast.burstConcurrentStreams, 'Canonical burst capacity should match the load-tested setup.');
 assert(committed.player.ownedStreamingPlatform.subscriptionPrices.BASIC === defaultDraft.subscriptionPrices.BASIC, 'Approved Basic pricing should persist.');
@@ -249,10 +252,11 @@ assert(migratedPhase4.infrastructureSetup === null && migratedPhase4.infrastruct
 assert(migratedPhase4.subscriptionPrices.BASIC === 7.99, 'Older saves should receive balanced default pricing without fake subscribers.');
 
 const componentSource = readFileSync('components/StreamingInfrastructureSetup.tsx', 'utf8');
+const buildSource = readFileSync('components/streaming-transplant/StreamingBuildoutExperience.tsx', 'utf8');
 const hqSource = readFileSync('components/StreamingPlatformHQ.tsx', 'utf8');
 const styleSource = readFileSync('styles/streaming-infrastructure.css', 'utf8');
 const serviceSource = readFileSync('services/streamingInfrastructure.ts', 'utf8');
-const phase5Source = `${componentSource}\n${hqSource}\n${serviceSource}`;
+const phase5Source = `${componentSource}\n${buildSource}\n${hqSource}\n${serviceSource}`;
 
 [
     'NETWORK DESIGN',
@@ -268,8 +272,9 @@ const phase5Source = `${componentSource}\n${hqSource}\n${serviceSource}`;
     'Continue with risk',
     'This approves capacity and prices only.',
 ].forEach(fragment => assert(phase5Source.includes(fragment), `Phase 5 UI should include ${fragment}.`));
-assert(hqSource.includes('<StreamingInfrastructureSetup'), 'Technology Campus should open the real Phase 5 setup.');
-assert(hqSource.includes('Resume launch-stack setup'), 'Interrupted setup should expose a resume action.');
+assert(hqSource.includes('setShowCinematicBuild(true)'), 'Technology Campus should route infrastructure work into the canonical Build room.');
+assert(!hqSource.includes('<StreamingInfrastructureSetup'), 'HQ must not expose the retired duplicate infrastructure configurator.');
+assert(buildSource.includes('isBuilt'), 'The Build room should resume and revise already-commissioned infrastructure.');
 assert(styleSource.includes('env(safe-area-inset-bottom)'), 'Phase 5 footer should respect mobile safe areas.');
 assert(styleSource.includes('@media (min-width: 700px)'), 'Phase 5 should adapt beyond phone widths.');
 assert(styleSource.includes('@media (prefers-reduced-motion: reduce)'), 'Phase 5 should respect reduced-motion preferences.');

@@ -1,0 +1,100 @@
+/* ============================================================================
+   STUDIO FINANCE — tokens
+
+   Scoped to `.sf` on purpose. The host game declares its own unprefixed :root
+   variables (--ink, --gold, --ease-out and friends); every name here is
+   prefixed --sf- and lives on the screen root, so the two can never collide and
+   this file can be dropped into the game without touching a global stylesheet.
+
+   Rules that hold everywhere below:
+   · No raw hex outside this file.
+   · No font-size below 11px. If text does not fit, cut text — never shrink it.
+   · Green and red mean money moved. They are never decoration.
+   ========================================================================== */
+
+.sf {
+  /* --- surface: five rungs of near-black, real luminance steps apart ------ */
+  --sf-void:     #030406;
+  --sf-canvas:   #07080c;
+  --sf-surface:  #0d0f15;
+  --sf-raised:   #13161e;
+  --sf-overlay:  #1a1e28;
+  --sf-scrim:    rgba(3, 4, 6, 0.72);
+
+  /* --- line: three weights, no more --------------------------------------- */
+  --sf-line-hair:   rgba(255, 255, 255, 0.055);
+  --sf-line:        rgba(255, 255, 255, 0.10);
+  --sf-line-strong: rgba(255, 255, 255, 0.18);
+
+  /* --- foreground: warm whites, cool greys --------------------------------- */
+  --sf-fg-max: #f7f5f1;   /* the number that matters most on the screen */
+  --sf-fg:     #e6e8ee;
+  --sf-fg-2:   #c2c8d4;
+  --sf-fg-3:   #98a0b0;
+  --sf-fg-4:   #79808f;   /* eyebrows, units, metadata */
+  --sf-fg-5:   #565d69;
+
+  /* --- money ---------------------------------------------------------------- */
+  --sf-good:      #48c98a;
+  --sf-good-tint: #8fe3b6;
+  --sf-good-deep: #10281d;
+  --sf-good-wash: rgba(72, 201, 138, 0.13);
+  --sf-good-line: rgba(72, 201, 138, 0.36);
+
+  --sf-warn:      #e8a33c;
+  --sf-warn-tint: #f4cd8c;
+  --sf-warn-wash: rgba(232, 163, 60, 0.13);
+  --sf-warn-line: rgba(232, 163, 60, 0.36);
+
+  --sf-bad:       #e2585d;
+  --sf-bad-tint:  #f39a9d;
+  --sf-bad-deep:  #2a1214;
+  --sf-bad-wash:  rgba(226, 88, 93, 0.13);
+  --sf-bad-line:  rgba(226, 88, 93, 0.36);
+
+  /* --- brand: set from data.company.brandHex at runtime --------------------
+     Three values, all derived from the one platform colour in brand.ts:
+     `brand` fills, `brand-on` is the same hue lifted until it is legible on
+     the near-black canvas, and `brand-ink` is whatever text survives on top of
+     a brand fill. The defaults below are the Actor Empire house red, used
+     before a platform exists. Money green and red are NOT brand colours and
+     never derive from these. */
+  --sf-brand-rgb: 224, 50, 47;
+  --sf-brand-on-rgb: var(--sf-brand-rgb);
+  --sf-brand-ink: #ffffff;
+
+  --sf-brand:      rgb(var(--sf-brand-rgb));
+  --sf-brand-on:   rgb(var(--sf-brand-on-rgb));
+  --sf-brand-wash: rgba(var(--sf-brand-on-rgb), 0.14);
+  --sf-brand-line: rgba(var(--sf-brand-on-rgb), 0.42);
+
+  /* --- gold: ownership, investors, the public markets. Nothing else -------- */
+  --sf-gold:      #c9a227;
+  --sf-gold-tint: #e6cf8a;
+  --sf-gold-wash: rgba(201, 162, 39, 0.13);
+  --sf-gold-line: rgba(201, 162, 39, 0.4);
+
+  /* --- type ---------------------------------------------------------------- */
+  /* The host game's own faces come through these two names. Nothing is fetched
+     from a CDN — the stacks fall back to the platform faces if the game's fonts
+     are not present. */
+  --sf-font-display: 'Clash Display', 'Bebas Neue', 'Oswald', 'Helvetica Neue', system-ui, sans-serif;
+  --sf-font-ui: 'General Sans', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --sf-font-num: 'SF Mono', 'JetBrains Mono', ui-monospace, 'Roboto Mono', monospace;
+
+  --sf-t-1: 11px;   /* the floor — eyebrows, units          */
+  --sf-t-2: 12px;   /* metadata, dense rows                 */
+  --sf-t-3: 13px;   /* labels, list values                  */
+  --sf-t-4: 15px;   /* body, primary row text               */
+  --sf-t-5: 17px;   /* section heads, sheet titles          */
+  --sf-t-6: 21px;   /* page figures                         */
+  --sf-t-7: 28px;   /* headline figures                     */
+  --sf-t-8: 42px;   /* the treasury                         */
+
+  /* --- space, shape, depth, motion ------------------------------------------ */
+  --sf-1: 4px; --sf-2: 8px; --sf-3: 12px; --sf-4: 16px; --sf-5: 20px; --sf-6: 28px;
+  --sf-r-chip: 5px; --sf-r-card: 12px; --sf-r-sheet: 18px;
+  --sf-shadow: 0 12px 34px rgba(0, 0, 0, 0.55);
+  --sf-fast: 160ms; --sf-med: 240ms; --sf-slow: 320ms;
+  --sf-ease: cubic-bezier(0.22, 0.8, 0.3, 1);
+}

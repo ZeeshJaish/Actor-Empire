@@ -5,8 +5,8 @@
  */
 export const STREAMING_INCORPORATION_ECONOMY = Object.freeze({
     cashRequired: 85_000_000,
-    setupCostsConsumed: 70_000_000,
-    openingTreasuryCash: 15_000_000,
+    setupCostsConsumed: 85_000_000,
+    openingTreasuryCash: 0,
 });
 
 export interface StreamingIncorporationBreakdown {

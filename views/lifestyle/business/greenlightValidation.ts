@@ -66,6 +66,7 @@ export interface GreenlightValidationInput {
     hasFranchiseConnection: boolean;
     unresolvedReturningTalentNames: readonly string[];
     unresolvedReturningTalentCount: number;
+    talentConflictNames?: readonly string[];
     effectiveStudioFundingPool: number;
     netGreenlightCashRequirement: number;
 }
@@ -90,6 +91,7 @@ export const validateGreenlightProject = ({
     hasFranchiseConnection,
     unresolvedReturningTalentNames,
     unresolvedReturningTalentCount,
+    talentConflictNames = [],
     effectiveStudioFundingPool,
     netGreenlightCashRequirement,
 }: GreenlightValidationInput): GreenlightValidationResult => {
@@ -126,6 +128,13 @@ export const validateGreenlightProject = ({
         const names = unresolvedReturningTalentNames.slice(0, 3);
         const suffix = unresolvedReturningTalentCount > 3 ? ` +${unresolvedReturningTalentCount - 3} more` : '';
         errors.push(`Returning talent negotiations pending: ${names.join(', ')}${suffix}`);
+    }
+
+    const bookedTalent = [...new Set(talentConflictNames.filter(Boolean))];
+    if (bookedTalent.length > 0) {
+        const names = bookedTalent.slice(0, 3);
+        const suffix = bookedTalent.length > 3 ? ` +${bookedTalent.length - 3} more` : '';
+        errors.push(`Talent already booked: ${names.join(', ')}${suffix}`);
     }
 
     if (effectiveStudioFundingPool < netGreenlightCashRequirement) {

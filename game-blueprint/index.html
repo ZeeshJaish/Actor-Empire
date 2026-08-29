@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#07090d">
+  <meta name="description" content="Interactive architecture and gameplay map for Actor Empire.">
+  <title>Actor Empire Blueprint</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Fira+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <a class="brand" href="#" aria-label="Actor Empire Blueprint home">
+        <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
+        <span>
+          <strong>ACTOR EMPIRE</strong>
+          <small>Living game blueprint</small>
+        </span>
+      </a>
+
+      <div class="topbar-center" role="search">
+        <label class="search-field" for="global-search">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+          <input id="global-search" type="search" autocomplete="off" placeholder="Find a system, flow, state, or source file…">
+          <kbd>/</kbd>
+        </label>
+        <div id="search-results" class="search-results" role="listbox" aria-label="Search results" hidden></div>
+      </div>
+
+      <div class="topbar-actions">
+        <button class="icon-button mobile-only" id="toggle-explorer" type="button" aria-label="Toggle explorer" aria-expanded="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"></path></svg>
+        </button>
+        <button class="status-chip" id="fit-map-top" type="button">
+          <span class="status-dot" aria-hidden="true"></span>
+          <span><strong id="source-count-top">—</strong> source files mapped</span>
+        </button>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <aside class="explorer" id="explorer" aria-label="Blueprint explorer">
+        <div class="explorer-scroll">
+          <section class="side-section">
+            <div class="section-heading">
+              <span>Perspective</span>
+              <button class="text-button" id="clear-focus" type="button">Reset</button>
+            </div>
+            <div class="segmented" role="group" aria-label="Map perspective">
+              <button type="button" data-perspective="all" aria-pressed="true">All</button>
+              <button type="button" data-perspective="player" aria-pressed="false">Player</button>
+              <button type="button" data-perspective="code" aria-pressed="false">Code</button>
+            </div>
+          </section>
+
+          <section class="side-section">
+            <div class="section-heading"><span>Player journeys</span><span id="journey-count">0</span></div>
+            <div id="journey-list" class="journey-list"></div>
+          </section>
+
+          <section class="side-section">
+            <div class="section-heading"><span>System layers</span><span id="visible-count">0</span></div>
+            <div id="category-list" class="category-list"></div>
+          </section>
+
+          <section class="side-section repo-summary" aria-label="Repository summary">
+            <div class="section-heading"><span>Source audit</span><span id="scan-date">—</span></div>
+            <dl>
+              <div><dt>TypeScript</dt><dd id="typescript-count">—</dd></div>
+              <div><dt>Services</dt><dd id="services-count">—</dd></div>
+              <div><dt>UI surfaces</dt><dd id="ui-count">—</dd></div>
+              <div><dt>Audit scripts</dt><dd id="audit-count">—</dd></div>
+            </dl>
+            <p>Generated from the current checkout. Re-run the included scanner after major changes.</p>
+          </section>
+        </div>
+      </aside>
+
+      <section class="map-stage" aria-label="Interactive game architecture map">
+        <div class="stage-toolbar">
+          <div class="stage-context">
+            <span class="eyebrow">Current view</span>
+            <strong id="current-view">Entire game</strong>
+            <span id="current-view-note">Select a node to trace what feeds it and what it affects.</span>
+          </div>
+          <div class="map-controls" role="group" aria-label="Map controls">
+            <button type="button" id="zoom-out" aria-label="Zoom out">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"></path></svg>
+            </button>
+            <output id="zoom-level" aria-live="polite">100%</output>
+            <button type="button" id="zoom-in" aria-label="Zoom in">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+            </button>
+            <button type="button" id="fit-map" class="fit-button">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"></path></svg>
+              Fit
+            </button>
+          </div>
+        </div>
+
+        <div class="canvas-wrap" id="canvas-wrap">
+          <svg id="blueprint-map" role="img" aria-labelledby="map-title map-description">
+            <title id="map-title">Actor Empire connected systems map</title>
+            <desc id="map-description">A pannable and zoomable map showing the player experience, game logic, world simulation, businesses, streaming empire, and persistence systems.</desc>
+            <defs>
+              <pattern id="small-grid" width="24" height="24" patternUnits="userSpaceOnUse">
+                <path d="M 24 0 L 0 0 0 24" fill="none" class="grid-line"></path>
+              </pattern>
+              <pattern id="large-grid" width="120" height="120" patternUnits="userSpaceOnUse">
+                <rect width="120" height="120" fill="url(#small-grid)"></rect>
+                <path d="M 120 0 L 0 0 0 120" fill="none" class="grid-line-major"></path>
+              </pattern>
+              <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z"></path>
+              </marker>
+              <filter id="node-glow" x="-40%" y="-40%" width="180%" height="180%">
+                <feGaussianBlur stdDeviation="5" result="blur"></feGaussianBlur>
+                <feMerge><feMergeNode in="blur"></feMergeNode><feMergeNode in="SourceGraphic"></feMergeNode></feMerge>
+              </filter>
+            </defs>
+            <g id="viewport">
+              <rect class="map-grid" x="0" y="0" width="2600" height="1600"></rect>
+              <g id="zones-layer"></g>
+              <g id="edges-layer"></g>
+              <g id="nodes-layer"></g>
+            </g>
+          </svg>
+          <div class="map-hint" id="map-hint">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 11V7a2 2 0 0 1 4 0v4-1a2 2 0 0 1 4 0v2-1a2 2 0 0 1 4 0v4c0 4-2 6-6 6h-2c-2.5 0-4.3-1.2-5.6-3.2L4 14.3A2 2 0 0 1 7.2 12L8 13"></path></svg>
+            Drag to pan · scroll to zoom · click a system to trace it
+          </div>
+          <div class="map-overview" aria-hidden="true">
+            <div><span id="node-total">0</span><small>systems</small></div>
+            <div><span id="edge-total">0</span><small>connections</small></div>
+            <div><span id="flow-total">0</span><small>journeys</small></div>
+          </div>
+        </div>
+      </section>
+
+      <aside class="inspector" id="inspector" aria-label="System details">
+        <div id="inspector-empty" class="inspector-empty">
+          <div class="empty-orbit" aria-hidden="true"><span></span><i></i></div>
+          <span class="eyebrow">Trace the empire</span>
+          <h1>Everything is connected.</h1>
+          <p>Pick any system on the map. You’ll see what powers it, what it changes, the player-facing flow, and the real source files behind it.</p>
+          <button type="button" class="primary-button" id="start-tour">Start with the weekly loop</button>
+        </div>
+
+        <article id="inspector-content" class="inspector-content" hidden aria-live="polite">
+          <div class="inspector-hero">
+            <div class="node-code" id="detail-code">AE-00</div>
+            <button class="icon-button" id="close-inspector" type="button" aria-label="Close details">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"></path></svg>
+            </button>
+            <span class="detail-category" id="detail-category">Core</span>
+            <h2 id="detail-title">System</h2>
+            <p id="detail-summary"></p>
+          </div>
+
+          <div class="detail-actions">
+            <button type="button" id="trace-inputs" aria-pressed="false">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h15M14 7l5 5-5 5"></path></svg>
+              Inputs
+            </button>
+            <button type="button" id="trace-outputs" aria-pressed="false">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12H5M10 7l-5 5 5 5"></path></svg>
+              Outputs
+            </button>
+            <button type="button" id="trace-both" aria-pressed="true">Full trace</button>
+          </div>
+
+          <section class="detail-section">
+            <h3>How it works</h3>
+            <ol id="detail-how" class="flow-steps"></ol>
+          </section>
+
+          <section class="detail-section two-column-detail">
+            <div>
+              <h3>Reads</h3>
+              <ul id="detail-inputs" class="compact-list"></ul>
+            </div>
+            <div>
+              <h3>Changes</h3>
+              <ul id="detail-outputs" class="compact-list"></ul>
+            </div>
+          </section>
+
+          <section class="detail-section">
+            <h3>Stored state</h3>
+            <div id="detail-state" class="state-chips"></div>
+          </section>
+
+          <section class="detail-section">
+            <h3>Connected systems</h3>
+            <div id="detail-connections" class="connection-list"></div>
+          </section>
+
+          <section class="detail-section source-section">
+            <h3>Source of truth</h3>
+            <div id="detail-files" class="source-list"></div>
+          </section>
+        </article>
+      </aside>
+    </main>
+
+    <footer class="mobile-footer">
+      <button type="button" id="mobile-explore">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"></path></svg>
+        Explore
+      </button>
+      <button type="button" id="mobile-fit">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"></path></svg>
+        Fit map
+      </button>
+      <button type="button" id="mobile-details">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v5M12 8h.01"></path></svg>
+        Details
+      </button>
+    </footer>
+  </div>
+
+  <script src="./source-index.js"></script>
+  <script src="./graph-data.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>

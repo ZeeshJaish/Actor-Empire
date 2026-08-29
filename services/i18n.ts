@@ -14,6 +14,7 @@ export type GameLanguageStatus = 'AVAILABLE' | 'IN_PROGRESS';
 export const SUPPORTED_LANGUAGES: Array<{
     id: GameLanguage;
     flagEmoji: string;
+    flagCode: string;
     label: string;
     nativeLabel: string;
     status: GameLanguageStatus;
@@ -23,6 +24,7 @@ export const SUPPORTED_LANGUAGES: Array<{
     {
         id: 'en',
         flagEmoji: '🇺🇸',
+        flagCode: 'US',
         label: 'English',
         nativeLabel: 'English',
         status: 'AVAILABLE',
@@ -32,6 +34,7 @@ export const SUPPORTED_LANGUAGES: Array<{
     {
         id: 'pt-BR',
         flagEmoji: '🇧🇷',
+        flagCode: 'BR',
         label: 'Portuguese (Brazil)',
         nativeLabel: 'Português (Brasil)',
         status: 'IN_PROGRESS',
@@ -41,6 +44,7 @@ export const SUPPORTED_LANGUAGES: Array<{
     {
         id: 'fr',
         flagEmoji: '🇫🇷',
+        flagCode: 'FR',
         label: 'French',
         nativeLabel: 'Français',
         status: 'IN_PROGRESS',
@@ -50,6 +54,7 @@ export const SUPPORTED_LANGUAGES: Array<{
     {
         id: 'es',
         flagEmoji: '🇪🇸',
+        flagCode: 'ES',
         label: 'Spanish',
         nativeLabel: 'Español',
         status: 'IN_PROGRESS',
@@ -59,6 +64,7 @@ export const SUPPORTED_LANGUAGES: Array<{
     {
         id: 'tr',
         flagEmoji: '🇹🇷',
+        flagCode: 'TR',
         label: 'Turkish',
         nativeLabel: 'Türkçe',
         status: 'IN_PROGRESS',
@@ -68,6 +74,7 @@ export const SUPPORTED_LANGUAGES: Array<{
     {
         id: 'de',
         flagEmoji: '🇩🇪',
+        flagCode: 'DE',
         label: 'German',
         nativeLabel: 'Deutsch',
         status: 'IN_PROGRESS',

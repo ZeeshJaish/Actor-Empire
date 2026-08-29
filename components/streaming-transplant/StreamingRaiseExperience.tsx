@@ -19,6 +19,7 @@
  */
 import css from './presentation/screens/CapitalRaise/CapitalRaise.module.css';
 import { cx } from './presentation/cx';
+import { brandVars } from './presentation/brand';
 import React, { useMemo, useState } from 'react';
 import { Brand, Mark, brandColor, brandDeep } from './StreamingBrandVisuals';
 
@@ -172,7 +173,7 @@ export const RaiseDesk: React.FC<{
   const yourStake = Math.max(0, 100 - t.equityGiven);
 
   return (
-    <div className={css.rs} style={{ ['--epx-rs-c' as string]: c}}>
+    <div className={css.rs} data-epx-root style={brandVars(brand)}>
       <div className={css.rstop}>
         <button className={css.rsx} onClick={onClose} aria-label="Close">✕</button>
         <div className={css.rstitle}>

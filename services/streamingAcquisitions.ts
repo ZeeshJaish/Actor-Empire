@@ -25,6 +25,10 @@ import {
     STREAMING_RIVAL_TEMPLATES,
     getStreamingCompetitiveWorld,
 } from './streamingCompetitiveWorld';
+import { handoffAcquiredPlatformProductions } from './platformAi/platformAiProduction';
+import { settlePendingPlatformAiExternalCommitmentsForAcquisition } from './platformAi/platformAiExternalCommitments';
+import { cancelPendingPlatformAiCatalogueDistressDealsForAcquisition } from './platformAi/platformAiDistress';
+import { isStreamingLicenseActiveAt } from './streamingRightsCore';
 
 const clamp = (value: number, minimum: number, maximum: number): number => (
     Math.min(maximum, Math.max(minimum, Number.isFinite(value) ? value : minimum))
@@ -210,7 +214,13 @@ const strategicFitFor = (rival: OwnedStreamingRivalProfile, platform: OwnedStrea
 
 const estimateTargetValue = (player: Player, rival: OwnedStreamingRivalProfile): number => {
     const world = player.world.platforms?.[rival.platformId];
-    const worldValue = Math.max(0, world?.valuation || 0) * 1_000_000_000;
+    const persistedStandaloneValue = Number(world?.ai?.standaloneValuationBillions);
+    const worldValue = Math.max(
+        0,
+        Number.isFinite(persistedStandaloneValue) && persistedStandaloneValue > 0
+            ? persistedStandaloneValue
+            : world?.valuation || 0,
+    ) * 1_000_000_000;
     const operatingValue = rival.subscribersMillions * 92_000_000
         + rival.catalogPower * 150_000_000
         + rival.technology * 90_000_000
@@ -877,6 +887,7 @@ export const signStreamingPlatformAcquisition = (
         {
             targetPlatformId: acquisitionCase.targetPlatformId,
             purchasePrice: acquisitionCase.financing.totalConsideration,
+            treasuryPaid: totalTreasuryAtClose,
             integrationMode,
             acquiredSubscriberCount,
             catalogAssetCount,
@@ -896,6 +907,13 @@ export const signStreamingPlatformAcquisition = (
     const loanId = createDeterministicId('streaming_loan', platform.simulationSeed, signingKey);
     const equityId = createDeterministicId('streaming_equity', platform.simulationSeed, signingKey);
     const financing = acquisitionCase.financing;
+    const targetPlatformBeforeHandoff = player.world.platforms?.[acquisitionCase.targetPlatformId];
+    const inheritedTargetLicenses = (targetPlatformBeforeHandoff?.ai?.rightsContracts || [])
+        .filter(license => license.status === 'ACTIVE' && isStreamingLicenseActiveAt(license, absoluteWeek));
+    const inheritedLicensesById = new Map([
+        ...platform.catalogLicenses,
+        ...inheritedTargetLicenses,
+    ].map(license => [license.id, license]));
     const nextFinance = {
         capitalActions: [
             ...platform.finance.capitalActions,
@@ -949,6 +967,11 @@ export const signStreamingPlatformAcquisition = (
     };
     const nextPlatform: OwnedStreamingPlatformState = {
         ...platform,
+        catalogLicenses: Array.from(inheritedLicensesById.values()),
+        catalogProjectIds: Array.from(new Set([
+            ...platform.catalogProjectIds,
+            ...inheritedTargetLicenses.map(license => license.sourceProjectId),
+        ])),
         treasuryCash: platform.treasuryCash - totalTreasuryAtClose,
         debtPrincipal: platform.debtPrincipal + financing.debtPrincipal,
         founderOwnershipPercent: financing.founderOwnershipAfter,
@@ -977,7 +1000,40 @@ export const signStreamingPlatformAcquisition = (
         cinematicQueue: [...platform.cinematicQueue, cinematic],
         milestoneKeys: Array.from(new Set([...platform.milestoneKeys, 'first-streaming-platform-acquisition'])),
     };
-    return { player: persistPlayer(player, nextPlatform), changed: true, caseId };
+    // Crystallize AI-authored liabilities while the target is still AI-controlled,
+    // then cancel incomplete catalogue transfers before ownership changes.
+    const targetPlatform = targetPlatformBeforeHandoff;
+    const liabilitySettledTarget = targetPlatform
+        ? settlePendingPlatformAiExternalCommitmentsForAcquisition(
+            targetPlatform,
+            absoluteWeek,
+            platform.competitiveWorld.moves,
+        )
+        : null;
+    const liabilitySettledWorld = liabilitySettledTarget
+        ? {
+            ...player.world,
+            platforms: {
+                ...player.world.platforms,
+                [acquisitionCase.targetPlatformId]: liabilitySettledTarget,
+            },
+        }
+        : player.world;
+    const preHandoffWorld = cancelPendingPlatformAiCatalogueDistressDealsForAcquisition({
+        player: { ...player, world: liabilitySettledWorld },
+        world: liabilitySettledWorld,
+        platformId: acquisitionCase.targetPlatformId,
+        absoluteWeek,
+    });
+    const preHandoffPlayer = { ...player, world: preHandoffWorld };
+    const persistedPlayer = persistPlayer(preHandoffPlayer, nextPlatform);
+    const handedOffWorld = handoffAcquiredPlatformProductions({
+        player: persistedPlayer,
+        world: persistedPlayer.world,
+        platformId: acquisitionCase.targetPlatformId,
+        absoluteWeek,
+    });
+    return { player: { ...persistedPlayer, world: handedOffWorld }, changed: true, caseId };
 };
 
 export const getStreamingAcquisitionWeeklyEffects = (

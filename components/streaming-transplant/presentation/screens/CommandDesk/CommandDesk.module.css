@@ -6,6 +6,30 @@
 .hq .hqscroll{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding-bottom:26px}
 .hq .hqfootspace{height:14px}
 
+/* Pre-launch keeps the original command-desk rhythm: two compact doors into
+   the detailed wizards. Progress stays visible without turning HQ into one. */
+.hq .launchCommandRows{display:grid;gap:8px;margin-top:15px}
+.hq .launchCommandRow{position:relative;width:100%;min-height:62px;display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:14px;text-align:left;overflow:hidden;background:linear-gradient(100deg,color-mix(in srgb,var(--epx-hq-c) 13%,#0b0d12),#090b10);border:1px solid color-mix(in srgb,var(--epx-hq-c) 42%,rgba(255,255,255,.08));transition:border-color .2s,background-color .2s}
+.hq .launchCommandRow:hover{border-color:color-mix(in srgb,var(--epx-hq-c) 72%,white 8%)}
+.hq .launchCommandRow:active{background:color-mix(in srgb,var(--epx-hq-c) 18%,#090b10)}
+.hq .launchCommandRow.buildCommandRow{background:linear-gradient(100deg,rgba(52,211,153,.1),#090b10);border-color:rgba(52,211,153,.34)}
+.hq .launchCommandRow.buildCommandRow:hover{border-color:rgba(79,224,172,.67)}
+.hq .commandSignal{flex:0 0 auto;width:31px;height:31px;display:grid;place-items:center;border-radius:50%;background:color-mix(in srgb,var(--epx-hq-c) 12%,transparent);border:1px solid color-mix(in srgb,var(--epx-hq-c) 30%,transparent)}
+.hq .commandSignal i{width:8px;height:8px;border-radius:50%;background:var(--epx-hq-c);box-shadow:0 0 11px var(--epx-hq-c);animation:epx-hqpulse 1.7s ease-in-out infinite}
+.hq .buildCommandRow .commandSignal{background:rgba(52,211,153,.1);border-color:rgba(79,224,172,.28)}
+.hq .buildCommandRow .commandSignal i{background:#4fe0ac;box-shadow:0 0 11px rgba(79,224,172,.8)}
+.hq .commandCopy{flex:1;min-width:0}
+.hq .commandCopy small{display:block;font-size:6.5px;font-weight:950;letter-spacing:.19em;color:var(--epx-hq-c)}
+.hq .buildCommandRow .commandCopy small{color:#4fe0ac}
+.hq .commandCopy b{display:block;margin-top:2px;font-size:12px;font-weight:900;letter-spacing:.07em;text-transform:uppercase}
+.hq .commandCopy em{display:block;margin-top:2px;overflow:hidden;color:#8b93a5;font-size:9px;font-style:normal;white-space:nowrap;text-overflow:ellipsis}
+.hq .launchCommandRow>strong{flex:0 0 auto;font:850 12px ui-monospace,Menlo,monospace;color:#c8ceda}
+.hq .commandChevron{flex:0 0 auto;color:var(--epx-hq-c);font-size:22px;font-style:normal;line-height:1}
+.hq .buildCommandRow .commandChevron{color:#4fe0ac}
+.hq .commandCleared{border-color:rgba(74,222,128,.42)}
+.hq .commandCleared .commandSignal i{background:#4ade80;box-shadow:0 0 11px rgba(74,222,128,.8)}
+.hq .launchCommandRow:focus-visible{outline:2px solid var(--epx-hq-c);outline-offset:2px}
+
 /* ── header ── */
 .hq .hqhead{position:relative;padding:max(16px,env(safe-area-inset-top)) 16px 14px;
   background:
@@ -107,6 +131,7 @@
 
 /* ── sections & rails ── */
 .hq .hqsec{padding:20px 0 0}
+.hq .consoleBrief{padding:0 16px 12px;max-width:390px;font-size:10px;line-height:1.45;color:#747d8d}
 .hq .sechead{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:0 16px 11px}
 .hq .sechead h2{font-size:19px;font-weight:900;letter-spacing:-.01em}
 .hq .seemore{display:flex;align-items:center;gap:5px;font-size:9.5px;font-weight:900;letter-spacing:.14em;
@@ -200,7 +225,7 @@
   background:rgba(255,255,255,.04)}
 .hq .chip:active{background:rgba(255,255,255,.1)}
 .hq .divwrap.content .chip{color:#7ab0ff}
-.hq .divwrap.network .chip{color:#4fe0ac}
+.hq .divwrap.platform .chip{color:#4fe0ac}
 .hq .divwrap.audience .chip{color:#cfa4ff}
 .hq .divwrap.boardroom .chip{color:#ffcc5c}
 .hq .chip.alert{color:#ffb020;background:rgba(255,176,32,.13);padding-right:13px}
@@ -211,14 +236,14 @@
   display:flex;flex-direction:column;gap:9px}
 .hq .divcard:active{transform:scale(.985)}
 .hq .divcard.content{border-color:rgba(90,150,255,.3);background:linear-gradient(160deg,rgba(90,150,255,.09),#0b0d13 62%)}
-.hq .divcard.network{border-color:rgba(52,211,153,.3);background:linear-gradient(160deg,rgba(52,211,153,.09),#0b0d13 62%)}
+.hq .divcard.platform{border-color:rgba(52,211,153,.3);background:linear-gradient(160deg,rgba(52,211,153,.09),#0b0d13 62%)}
 .hq .divcard.audience{border-color:rgba(192,132,252,.3);background:linear-gradient(160deg,rgba(192,132,252,.09),#0b0d13 62%)}
 .hq .divcard.boardroom{border-color:rgba(240,178,48,.3);background:linear-gradient(160deg,rgba(240,178,48,.09),#0b0d13 62%)}
 .hq .divicon{width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;
   background:rgba(255,255,255,.06);flex:0 0 auto}
 .hq .divicon svg{width:19px;height:19px}
 .hq .divcard.content .divicon{color:#7ab0ff;background:rgba(90,150,255,.14)}
-.hq .divcard.network .divicon{color:#4fe0ac;background:rgba(52,211,153,.14)}
+.hq .divcard.platform .divicon{color:#4fe0ac;background:rgba(52,211,153,.14)}
 .hq .divcard.audience .divicon{color:#cfa4ff;background:rgba(192,132,252,.14)}
 .hq .divcard.boardroom .divicon{color:#ffcc5c;background:rgba(240,178,48,.14)}
 .hq .divtxt{flex:1;min-width:0}
@@ -228,7 +253,7 @@
 .hq .divstat{display:block;font-style:normal;font-size:14px;font-weight:800;margin-top:2px;
   font-family:ui-monospace,Menlo,monospace}
 .hq .divcard.content .divstat{color:#7ab0ff}
-.hq .divcard.network .divstat{color:#4fe0ac}
+.hq .divcard.platform .divstat{color:#4fe0ac}
 .hq .divcard.audience .divstat{color:#cfa4ff}
 .hq .divcard.boardroom .divstat{color:#ffcc5c}
 .hq .divcard .chev{position:absolute;right:10px;bottom:9px}
@@ -237,7 +262,7 @@
   background:#3d4552}
 .hq .plight.calm{background:currentColor;opacity:.55}
 .hq .divcard.content .plight.calm{background:#5a96ff}
-.hq .divcard.network .plight.calm{background:#34d399}
+.hq .divcard.platform .plight.calm{background:#34d399}
 .hq .divcard.audience .plight.calm{background:#c084fc}
 .hq .divcard.boardroom .plight.calm{background:#f0b230}
 .hq .plight.watch{background:#ffb020;box-shadow:0 0 9px rgba(255,176,32,.75);animation:epx-hqpulse 2s ease-in-out infinite}
@@ -249,3 +274,10 @@
 @media (prefers-reduced-motion:reduce){
   .hq *{animation:none!important;transition:none!important}
 }
+
+/* Treasury reads like the original hero figure. The entire number is still a
+   quiet, keyboard-accessible route into Studio Finance. */
+.hq .heroTap{display:flex;flex-direction:column;align-items:flex-end;text-align:right;border-radius:8px;padding:3px 0;transition:opacity .2s}
+.hq .heroTap:hover{opacity:.78}
+.hq .heroTap:active{opacity:.62}
+.hq .heroTap:focus-visible{outline:2px solid var(--epx-hq-c);outline-offset:5px}

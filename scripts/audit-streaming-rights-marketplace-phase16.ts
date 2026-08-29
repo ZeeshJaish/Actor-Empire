@@ -99,7 +99,7 @@ const driveToSignature = (player: Player, negotiationId: string): Player => {
     return current;
 };
 
-assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 22, 'Phase 24 should preserve the Phase 16 rights market in schema v22.');
+assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 23, 'The canonical foundation should preserve the Phase 16 rights market in schema v23.');
 const migrated = normalizeOwnedStreamingPlatformState({ schemaVersion: 13 }, 'phase16-migration');
 assert(migrated.rightsNegotiations.length === 0, 'Older saves should migrate without fabricated negotiations.');
 assert(migrated.sublicenseDeals.length === 0, 'Older saves should migrate without fabricated sublicenses.');
@@ -123,6 +123,11 @@ assert(signed.changed, 'A funded acquisition should sign.');
 fixture = signed.player;
 const acquiredLicense = fixture.ownedStreamingPlatform.catalogLicenses.find(item => item.sourceProjectId === 'market-title')!;
 assert(acquiredLicense?.origin === 'STUDIO_MARKET', 'Studio deals should retain their acquisition origin.');
+const canonicalAcquiredContract = fixture.world.streamingRightsContracts?.[acquiredLicense.id];
+assert(canonicalAcquiredContract, 'A signed owned-platform licence should register one world-level canonical contract.');
+assert(canonicalAcquiredContract?.sourceProjectId === acquiredLicense.sourceProjectId, 'The projection and canonical contract should reference the same project.');
+assert(canonicalAcquiredContract?.minimumGuarantee === acquiredLicense.minimumGuarantee, 'The projection and canonical contract should retain the same guarantee.');
+assert(canonicalAcquiredContract?.buyer.type === 'PLAYER_PLATFORM', 'The canonical buyer should be the player-owned streaming platform.');
 assert(acquiredLicense.sublicensingAllowed, 'Negotiated sublicensing rights should persist in the contract.');
 assert(fixture.ownedStreamingPlatform.treasuryCash === treasuryBeforeAcquisition - acquisition.minimumGuarantee, 'The guarantee should debit platform treasury exactly once.');
 assert(fixture.ownedStreamingPlatform.rightsObligations.length === 2, 'Marketing and viewership promises should become tracked obligations.');
@@ -141,6 +146,11 @@ const sublicensed = signStreamingRightsDeal(fixture, outgoingReady.id);
 assert(sublicensed.changed, 'A ready outgoing sublicense should sign.');
 fixture = sublicensed.player;
 assert(fixture.ownedStreamingPlatform.sublicenseDeals.length === 1, 'The outgoing platform trade should persist separately from inbound rights.');
+const signedSublicense = fixture.ownedStreamingPlatform.sublicenseDeals[0]!;
+assert(
+    fixture.world.streamingRightsContracts?.[signedSublicense.id]?.buyer.platformId === signedSublicense.buyerPlatformId,
+    'An outgoing sublicense must register the rival platform as the canonical buyer.',
+);
 assert(fixture.ownedStreamingPlatform.treasuryCash === treasuryBeforeSublicense + outgoingReady.minimumGuarantee, 'Sublicense cash should credit treasury exactly once.');
 
 const renewal = openStreamingRightsRenewal(fixture, acquiredLicense.id);
@@ -177,6 +187,14 @@ const hq = readFileSync(resolve(process.cwd(), 'components/StreamingPlatformHQ.t
 assert(component.includes('Every title has a price. Every clause has a consequence.'), 'The exchange should open with a cinematic rights-floor thesis.');
 assert(component.includes('Contract vault') && component.includes('PERFORMANCE OBLIGATIONS'), 'The UI should expose contract and compliance evidence.');
 assert(styles.includes('@media (max-width: 560px)') && styles.includes('prefers-reduced-motion'), 'The exchange should have explicit mobile and motion-safe treatment.');
-assert(hq.includes('showRightsExchange') && hq.includes('Rights Exchange'), 'Content and Market rooms should both launch the exchange.');
+/* The launcher moved from the retired Content/Market rooms to the Command
+   Deck's CONTENT chips and the Content Desk's renew/lapse actions. Asserting
+   the live route rather than the old button's label. */
+assert(
+    hq.includes('showRightsExchange')
+    && hq.includes("chip === 'RIGHTS'")
+    && hq.includes('onRenew={() => setShowRightsExchange(true)}'),
+    'The rights exchange must be reachable from the Content division and the Content Desk.',
+);
 
 console.log('EMPIRE+ Phase 16 Rights Marketplace audit passed.');

@@ -75,7 +75,7 @@ Skipping directly from `LOCKED` to `ACTIVE` remains invalid.
 - Minimum 44px touch targets for actions
 - Lucide icons only
 - Dialog semantics for the clearance moment
-- Explicit `$85M = $70M consumed + $15M treasury` explanation
+- Explicit `$85M fully consumed + $0 opening treasury` explanation
 - Dynamic viewport sizing and reduced-motion support
 - No fake owned catalog, invisible errors, or qualification shortcut
 

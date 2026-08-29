@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Player, PendingEvent, ScreeningStrategy, ProjectHiddenStats, NextSeasonFundingTier, CampaignPositioning, CampaignTimeline, MarketingChannelAllocations, MarketingChannelId, BoxOfficeRegionId, CinemaChainId, CinemaChain, CinemaChainRegionalTerms, ReleasePlanningDraft } from '../../../types';
+import { Player, PendingEvent, ScreeningStrategy, ProjectHiddenStats, NextSeasonFundingTier, CampaignPositioning, CampaignTimeline, MarketingChannelAllocations, MarketingChannelId, BoxOfficeRegionId, CinemaChainId, CinemaChain, CinemaChainRegionalTerms, ReleasePlanningDraft, StreamingBiddingSession, StreamingOfferVersion, PlatformId } from '../../../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { ArrowLeft, Film, Tv, Calendar, TrendingUp, CheckCircle2, Camera, Star, Globe, Youtube, Share2, Megaphone, Music2, Zap, ShieldCheck } from 'lucide-react';
 import { FESTIVALS, CALENDAR_EVENTS } from '../../../services/worldLogic';
@@ -19,6 +19,13 @@ import { spendPlayerEnergy } from '../../../services/premiumLogic';
 import { PHASE_ONE_ENERGY_COSTS } from '../../../services/energyCosts';
 import { getProjectFundingEconomics } from '../../../services/projectFundingEconomics';
 import { calculateCampaignReachProfile } from '../../../services/studioProductionEconomy';
+import { registerProductionStreamingRightsContract, registerProductionStreamingRightsContractFromOffer } from '../../../services/streamingRightsCore';
+import { acceptStreamingBiddingOffer, createStreamingBiddingSession, getRestorableStreamingBiddingSession, getStreamingOfferFundingAllocation, leaveStreamingBiddingSession, upsertStreamingBiddingSession } from '../../../services/streamingBidding';
+import { StreamingBiddingRoom } from './components/StreamingBiddingRoom';
+import { createDeterministicId, createDeterministicRng } from '../../../services/deterministicRandom';
+import { resolveCapabilityBackedLocalizationPromise } from '../../../services/platformAi/platformAiLocalizationCore';
+import { resolveStreamingPlatformBrandById } from '../../../services/streamingPlatformBrandRegistry';
+import { getPlatformAiSpendingRestrictions } from '../../../services/platformAi/platformAiFinancing';
 
 interface ReleaseWizardProps {
     player: Player;
@@ -84,13 +91,27 @@ const MARKETING_CHANNEL_ICONS: Record<MarketingChannelId, React.ReactNode> = {
     FAN_EVENTS: <Film size={16} />
 };
 
-const PLATFORMS = [
-    { id: 'NETFLIX', name: 'Netflix', baseBid: 12000000, qualityReq: 72, color: '#E50914', maxBudget: 420000000 },
-    { id: 'APPLE_TV', name: 'Apple TV+', baseBid: 17000000, qualityReq: 82, color: '#FFFFFF', maxBudget: 560000000 },
-    { id: 'DISNEY_PLUS', name: 'Disney+', baseBid: 11000000, qualityReq: 70, color: '#113CCF', maxBudget: 520000000 },
-    { id: 'HULU', name: 'Hulu', baseBid: 7500000, qualityReq: 58, color: '#1CE783', maxBudget: 180000000 },
-    { id: 'YOUTUBE', name: 'YouTube Premium', baseBid: 3000000, qualityReq: 38, color: '#FF0000', maxBudget: 80000000 }
+const PLATFORM_ECONOMICS: Array<{
+    id: PlatformId;
+    baseBid: number;
+    qualityReq: number;
+    maxBudget: number;
+}> = [
+    { id: 'NETFLIX', baseBid: 12000000, qualityReq: 72, maxBudget: 420000000 },
+    { id: 'APPLE_TV', baseBid: 17000000, qualityReq: 82, maxBudget: 560000000 },
+    { id: 'DISNEY_PLUS', baseBid: 11000000, qualityReq: 70, maxBudget: 520000000 },
+    { id: 'HULU', baseBid: 7500000, qualityReq: 58, maxBudget: 180000000 },
+    { id: 'YOUTUBE', baseBid: 3000000, qualityReq: 38, maxBudget: 80000000 },
 ];
+
+const PLATFORMS = PLATFORM_ECONOMICS.map(economics => {
+    const brand = resolveStreamingPlatformBrandById(economics.id);
+    return {
+        ...economics,
+        name: brand.displayName,
+        color: brand.primaryColor,
+    };
+});
 
 const normalizeDistributionChainSelectionRecord = (rawSelections: unknown): Partial<Record<BoxOfficeRegionId, CinemaChainId[]>> => {
     if (!rawSelections || typeof rawSelections !== 'object') return {};
@@ -240,6 +261,15 @@ export const calculateStreamingAuctionOffer = (
     fundingContext: FundingPerformanceContext = {},
     relationshipMultiplier = 1
 ): Bid | null => {
+    const seed = [
+        'legacy-streaming-auction', platform.id, projectBudget, packageScore, isSeries,
+        currentHighestBidValue, previousBestBidValue || 0, Boolean(isPostTheatricalBidding),
+        theatricalGross, hasProvenIp, relationshipMultiplier,
+        hiddenStats.rawHype || 0, hiddenStats.qualityScore || 0,
+        fundingContext.genre || '', fundingContext.rating || 0,
+        fundingContext.seasonOneViews || 0, fundingContext.streamingRevenue || 0,
+    ].join(':');
+    const rng = createDeterministicRng(seed);
     const runStrength = projectBudget > 0 && theatricalGross > 0 ? theatricalGross / projectBudget : 0;
     const bidProfile = getStreamingBidProfile(packageScore, isSeries, isPostTheatricalBidding, runStrength);
     const safetyPremium = bidProfile.safetyPremium;
@@ -247,20 +277,20 @@ export const calculateStreamingAuctionOffer = (
     const baseFloorOffer = projectBudget > 0 ? projectBudget * bidProfile.floor : platform.baseBid;
     const topPlatformBudget = Math.max(...PLATFORMS.map(p => p.maxBudget));
     const platformMuscle = topPlatformBudget > 0 ? platform.maxBudget / topPlatformBudget : 0.5;
-    const floorVariance = 0.96 + (Math.random() * 0.1) + (platformMuscle * 0.05);
+    const floorVariance = 0.96 + (rng() * 0.1) + (platformMuscle * 0.05);
     const safeMinimum = projectBudget > 0
         ? Math.max(baseFloorOffer, packageScore < 45 ? projectBudget * 0.8 : 0)
         : baseFloorOffer;
     const floorOffer = Math.floor(Math.max(safeMinimum, baseFloorOffer * floorVariance));
     const qualityRange = projectBudget > 0
-        ? projectBudget * (bidProfile.floor + ((bidProfile.ceiling - bidProfile.floor) * (0.24 + Math.random() * 0.62)))
-        : platform.baseBid * (0.95 + Math.random() * 0.35) * safetyPremium;
-    const platformAppetite = platform.baseBid * (packageScore / 52) * (1 + Math.random() * 0.32) * safetyPremium * qualityEscalator;
+        ? projectBudget * (bidProfile.floor + ((bidProfile.ceiling - bidProfile.floor) * (0.24 + rng() * 0.62)))
+        : platform.baseBid * (0.95 + rng() * 0.35) * safetyPremium;
+    const platformAppetite = platform.baseBid * (packageScore / 52) * (1 + rng() * 0.32) * safetyPremium * qualityEscalator;
     const theatricalProof = theatricalGross > 0
-        ? theatricalGross * (0.42 + Math.min(0.34, packageScore / 290) + Math.random() * 0.12)
+        ? theatricalGross * (0.42 + Math.min(0.34, packageScore / 290) + rng() * 0.12)
         : 0;
     const straightToStreamingUpside = !isPostTheatricalBidding && projectBudget > 0
-        ? projectBudget * Math.pow(Math.max(0.35, packageScore / 100), 2.35) * (packageScore >= 92 ? 9.5 : packageScore >= 84 ? 6.6 : packageScore >= 72 ? 3.9 : 1.8) * (0.9 + Math.random() * 0.38)
+        ? projectBudget * Math.pow(Math.max(0.35, packageScore / 100), 2.35) * (packageScore >= 92 ? 9.5 : packageScore >= 84 ? 6.6 : packageScore >= 72 ? 3.9 : 1.8) * (0.9 + rng() * 0.38)
         : 0;
     const hardCeiling = projectBudget > 0 ? projectBudget * bidProfile.ceiling : Number.MAX_SAFE_INTEGER;
     const marketProofCap = getStreamingMarketProofCap(projectBudget, packageScore, hiddenStats, isSeries, isPostTheatricalBidding, theatricalGross, hasProvenIp);
@@ -271,14 +301,14 @@ export const calculateStreamingAuctionOffer = (
             hardCeiling,
             platformSoftCap,
             marketProofCap,
-            Math.max(floorOffer * (1.04 + Math.random() * 0.12), platformAppetite, qualityRange, theatricalProof, straightToStreamingUpside)
+            Math.max(floorOffer * (1.04 + rng() * 0.12), platformAppetite, qualityRange, theatricalProof, straightToStreamingUpside)
         )
     );
     
     // Re-bidding should discourage fishing for better bids, but never break the safe-floor rule.
     if (previousBestBidValue) {
-        if (Math.random() > 0.05) {
-            maxOffer = Math.max(floorOffer, Math.min(maxOffer, previousBestBidValue * (0.7 + Math.random() * 0.25)));
+        if (rng() > 0.05) {
+            maxOffer = Math.max(floorOffer, Math.min(maxOffer, previousBestBidValue * (0.7 + rng() * 0.25)));
         }
     }
 
@@ -290,15 +320,15 @@ export const calculateStreamingAuctionOffer = (
             Math.min(
                 maxOffer,
                 Math.max(
-                    floorOffer * (0.96 + Math.random() * 0.18),
-                    platform.baseBid * (0.95 + Math.random() * 0.3) * safetyPremium,
-                    maxOffer * (packageScore >= 84 ? 0.42 + Math.random() * 0.2 : 0.3 + Math.random() * 0.18)
+                    floorOffer * (0.96 + rng() * 0.18),
+                    platform.baseBid * (0.95 + rng() * 0.3) * safetyPremium,
+                    maxOffer * (packageScore >= 84 ? 0.42 + rng() * 0.2 : 0.3 + rng() * 0.18)
                 )
             )
         ))
-        : Math.floor(Math.max(floorOffer, Math.min(maxOffer, currentHighestBidValue * (1.045 + Math.random() * 0.07))));
+        : Math.floor(Math.max(floorOffer, Math.min(maxOffer, currentHighestBidValue * (1.045 + rng() * 0.07))));
     
-    const rand = Math.random();
+    const rand = rng();
     let type: BidType = 'UPFRONT_ONLY';
     let fundingAmount = 0;
     let backendPct = 0;
@@ -339,16 +369,16 @@ export const calculateStreamingAuctionOffer = (
     } else if (rand > 0.84) {
         type = 'BACKEND_POINTS';
         upfrontAmount = Math.min(newAmount, Math.floor(Math.max(floorOffer, newAmount * (isPostTheatricalBidding ? 0.7 : 0.8))));
-        backendPct = Math.floor(Math.random() * (isPostTheatricalBidding ? 6 : 8)) + (isPostTheatricalBidding ? 4 : 6);
+        backendPct = Math.floor(rng() * (isPostTheatricalBidding ? 6 : 8)) + (isPostTheatricalBidding ? 4 : 6);
     }
 
-    const safeRelationshipMultiplier = Math.max(0.84, Math.min(1, Number(relationshipMultiplier) || 1));
+    const safeRelationshipMultiplier = Math.max(0.84, Math.min(1.16, Number(relationshipMultiplier) || 1));
     upfrontAmount = Math.floor(upfrontAmount * safeRelationshipMultiplier);
     fundingAmount = Math.floor(fundingAmount * safeRelationshipMultiplier);
     const bidValue = type === 'GREENLIGHT_DEAL' ? upfrontAmount + fundingAmount : upfrontAmount;
     
     return {
-        id: Math.random().toString(),
+        id: createDeterministicId('legacy_streaming_offer', seed, type, upfrontAmount, fundingAmount, backendPct),
         platformId: platform.id,
         amount: upfrontAmount,
         type,
@@ -357,7 +387,7 @@ export const calculateStreamingAuctionOffer = (
         fundingTier,
         fundingReason,
         bidValue,
-        timestamp: Date.now()
+        timestamp: 0
     };
 };
 
@@ -491,7 +521,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
             fundingTier: lockedPremiereFundingTier,
             fundingReason: lockedPremiereFundingReason,
             bidValue: 0,
-            timestamp: Date.now()
+            timestamp: 0
         }
         : null;
     const lockedPremiereFundingApplied = lockedPremiereEconomics.platformFunding;
@@ -518,15 +548,6 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
         ])) as Record<BoxOfficeRegionId, typeof BOX_OFFICE_REGIONS[number]>
     ), [language]);
     
-    // Bidding State
-    const [auctionState, setAuctionState] = useState<'IDLE' | 'ACTIVE' | 'FINISHED'>('IDLE');
-    const [timeLeft, setTimeLeft] = useState(100);
-    const [currentBids, setCurrentBids] = useState<Bid[]>([]);
-    const [highestBid, setHighestBid] = useState<Bid | null>(null);
-    const [activePlatforms, setActivePlatforms] = useState<string[]>(PLATFORMS.map(p => p.id));
-    const lastAuctionBidAtRef = React.useRef(0);
-    const auctionTimeLeftRef = React.useRef(100);
-
     const isSeries = project.projectDetails?.type === 'SERIES';
     const getProjectAuctionContext = () => {
         const hiddenStats = project.projectDetails?.hiddenStats || {};
@@ -551,216 +572,119 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
         };
         return { hiddenStats, packageScore, projectBudget, theatricalGross, hasProvenIp, fundingContext };
     };
+    const biddingAbsoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
+    const biddingSellerStudioId = studio?.id || project.projectDetails?.studioId || 'player-rights-holder';
+    const [biddingSession, setBiddingSession] = useState<StreamingBiddingSession | null>(() => (
+        getRestorableStreamingBiddingSession(
+            player.world.streamingBiddingSessions,
+            project.id,
+            biddingSellerStudioId,
+            biddingAbsoluteWeek,
+        )
+    ));
 
-    const createOpeningBids = () => {
-        const { hiddenStats, packageScore, projectBudget, theatricalGross, hasProvenIp, fundingContext } = getProjectAuctionContext();
-        const independentBids = PLATFORMS
-            .map(platform => {
-                const fitGap = Math.max(0, platform.qualityReq - packageScore);
-                const effectiveScore = Math.max(32, packageScore - (fitGap * 0.28));
-                const relationshipMultiplier = getPlatformFundingRelationshipMultiplier(
-                    studio?.studioState?.platformRelations?.[platform.id]
-                );
-                return calculateStreamingAuctionOffer(
-                    platform,
-                    projectBudget,
-                    effectiveScore,
-                    isSeries,
-                    0,
-                    project.previousBestBidValue,
-                    isPostTheatricalBidding,
-                    theatricalGross,
-                    hiddenStats,
-                    hasProvenIp,
-                    fundingContext,
-                    relationshipMultiplier
-                );
-            })
-            .filter((bid): bid is Bid => !!bid)
-            .sort((a, b) => b.bidValue - a.bidValue);
-
-        if (independentBids.length === 0) return [];
-
-        const leaderValue = independentBids[0].bidValue;
-        const targetCount = Math.min(4, independentBids.length);
-        return independentBids.slice(0, targetCount).map((bid, index) => {
-            if (index === 0) return bid;
-            const competitiveFloor = leaderValue * (0.5 + (Math.random() * 0.22));
-            const adjustedAmount = Math.floor(Math.max(bid.amount, Math.min(leaderValue * 0.94, competitiveFloor)));
-            return {
-                ...bid,
-                amount: adjustedAmount,
-                bidValue: bid.type === 'GREENLIGHT_DEAL' ? adjustedAmount + (bid.fundingAmount || 0) : adjustedAmount,
-                id: Math.random().toString(),
-                timestamp: Date.now() + index,
-            };
-        }).sort((a, b) => b.bidValue - a.bidValue);
+    const persistBiddingSession = (session: StreamingBiddingSession) => {
+        setBiddingSession(session);
+        onUpdatePlayer({
+            ...player,
+            world: {
+                ...player.world,
+                streamingBiddingSessions: upsertStreamingBiddingSession(player.world.streamingBiddingSessions, session),
+            },
+        });
     };
 
     const startAuction = () => {
-        const openingBids = createOpeningBids();
-        if (openingBids.length > 0) {
-            const openingFloorBid = openingBids[openingBids.length - 1];
-            setCurrentBids([openingFloorBid]);
-            setHighestBid(openingFloorBid);
-            setActivePlatforms(PLATFORMS.map(p => p.id));
-        }
-        lastAuctionBidAtRef.current = Date.now();
-        auctionTimeLeftRef.current = 100;
-        setTimeLeft(100);
-        setAuctionState('ACTIVE');
+        const { packageScore, projectBudget, theatricalGross } = getProjectAuctionContext();
+        const session = createStreamingBiddingSession({
+            projectId: project.id,
+            title: project.name || project.title || 'Untitled project',
+            sellerStudioId: biddingSellerStudioId,
+            sellerStudioName: studio?.name || project.projectDetails?.studioName || 'Player rights holder',
+            absoluteWeek: biddingAbsoluteWeek,
+            projectType: isSeries ? 'SERIES' : 'MOVIE',
+            genre: project.projectDetails?.genre || project.genre,
+            projectBudget,
+            packageScore,
+            theatricalGross,
+            platforms: PLATFORMS.map(platform => {
+                const worldPlatform = player.world.platforms?.[platform.id as keyof typeof player.world.platforms];
+                const localizationPromise = worldPlatform?.ai
+                    ? resolveCapabilityBackedLocalizationPromise({
+                        platform: worldPlatform,
+                        countryIds: worldPlatform.ai.capabilities.activeCountryIds,
+                        originalLanguageId: project.originalLanguageId || project.projectDetails?.originalLanguageId || 'english',
+                        requestedLevel: 'DUBS_AND_SUBTITLES',
+                    })
+                    : { localizationLevel: 'NONE' as const, requirements: [] };
+                return {
+                    id: platform.id as any,
+                    name: platform.name,
+                    color: platform.color,
+                    cashAvailable: Math.max(0, Number(worldPlatform?.cashReserve || 0)) * 1_000_000,
+                    baseBid: platform.baseBid,
+                    acquisitionCeiling: platform.maxBudget,
+                    qualityPreference: platform.qualityReq,
+                    relationshipMultiplier: getPlatformFundingRelationshipMultiplier(studio?.studioState?.platformRelations?.[platform.id]),
+                    canStartNewBids: worldPlatform
+                        ? !getPlatformAiSpendingRestrictions(worldPlatform, biddingAbsoluteWeek).blocksNewBids
+                        : true,
+                    localizationLevelCap: localizationPromise.localizationLevel,
+                    localizationRequirements: localizationPromise.requirements,
+                };
+            }),
+        });
+        persistBiddingSession(session);
     };
 
-    React.useEffect(() => {
-        if (auctionState !== 'ACTIVE') return;
+    const leaveAuction = () => {
+        if (!biddingSession) return;
+        persistBiddingSession(leaveStreamingBiddingSession(biddingSession));
+    };
 
-        const interval = setInterval(() => {
-            setTimeLeft(prev => {
-                if (prev <= 0) {
-                    auctionTimeLeftRef.current = 0;
-                    setAuctionState('FINISHED');
-                    
-                    // Update player state with the best bid value to prevent re-bidding exploits
-                    if (highestBid) {
-                        const updatedPlayer = { ...player };
-                        let found = false;
-                        
-                        // Check commitments
-                        const cIdx = updatedPlayer.commitments.findIndex(c => c.id === project.id);
-                        if (cIdx !== -1) {
-                            updatedPlayer.commitments[cIdx].previousBestBidValue = highestBid.bidValue;
-                            found = true;
-                        }
-                        
-                        // Check active releases
-                        if (!found) {
-                            const rIdx = updatedPlayer.activeReleases.findIndex(r => r.id === project.id);
-                            if (rIdx !== -1) {
-                                updatedPlayer.activeReleases[rIdx].previousBestBidValue = highestBid.bidValue;
-                                found = true;
-                            }
-                        }
-                        
-                        if (found) {
-                            onUpdatePlayer(updatedPlayer);
-                        }
-                    }
-                    
-                    // Fallback bid if no one bid
-                    if (!highestBid) {
-                        const projectBudget = project.projectDetails?.estimatedBudget || 0;
-                        const hiddenStats = project.projectDetails?.hiddenStats || {};
-                        const packageScore = ((hiddenStats.qualityScore || 50) * 0.4) + ((hiddenStats.scriptQuality || 50) * 0.2) + ((hiddenStats.directorQuality || 50) * 0.15) + ((hiddenStats.castingStrength || 50) * 0.15) + ((hiddenStats.rawHype || 50) * 0.1);
-                        const theatricalGross = project.totalGross || project.gross || 0;
-                        const runStrength = projectBudget > 0 && theatricalGross > 0 ? theatricalGross / projectBudget : 0;
-                        const bidProfile = getStreamingBidProfile(packageScore, isSeries, isPostTheatricalBidding, runStrength);
-                        const fallbackBase = Math.max(
-                            5000000,
-                            Math.floor(Math.max(projectBudget * bidProfile.floor, theatricalGross * 0.48))
-                        );
-                        const fallbackBid: Bid = {
-                            id: Math.random().toString(),
-                            platformId: 'NETFLIX',
-                            amount: fallbackBase,
-                            type: 'UPFRONT_ONLY',
-                            bidValue: fallbackBase,
-                            timestamp: Date.now()
-                        };
-                        setHighestBid(fallbackBid);
-                        setCurrentBids([fallbackBid]);
-                    }
-                    
-                    return 0;
-                }
-                const nextTime = prev - 1;
-                auctionTimeLeftRef.current = nextTime;
-                return nextTime; // Decreases by 1% every tick
-            });
-
-            // AI Bidding Logic
-            const { hiddenStats, packageScore, projectBudget, theatricalGross, hasProvenIp, fundingContext } = getProjectAuctionContext();
-            const eligiblePlatforms = PLATFORMS.filter(p => activePlatforms.includes(p.id));
-
-            const lastBidderId = currentBids.length > 0 ? currentBids[0].platformId : null;
-            const biddingPool = eligiblePlatforms.filter(platform => platform.id !== highestBid?.platformId && platform.id !== lastBidderId);
-            const now = Date.now();
-            const liveTimeLeft = auctionTimeLeftRef.current;
-            const phaseConfig = liveTimeLeft > 82
-                ? { minGap: 1450, bidChance: 0.16 }
-                : liveTimeLeft > 45
-                    ? { minGap: 950, bidChance: 0.34 }
-                    : liveTimeLeft > 18
-                        ? { minGap: 700, bidChance: 0.5 }
-                        : { minGap: 380, bidChance: 0.78 };
-            const canBidAgain = now - lastAuctionBidAtRef.current >= phaseConfig.minGap;
-
-            if (biddingPool.length > 0 && canBidAgain && Math.random() < phaseConfig.bidChance) {
-                const platform = biddingPool[Math.floor(Math.random() * biddingPool.length)];
-                
-                const currentHighest = highestBid ? highestBid.bidValue : 0;
-                const fitGap = Math.max(0, platform.qualityReq - packageScore);
-                const effectivePackageScore = Math.max(32, packageScore - (fitGap * 0.28));
-                const relationshipMultiplier = getPlatformFundingRelationshipMultiplier(
-                    studio?.studioState?.platformRelations?.[platform.id]
-                );
-                const newBid = calculateStreamingAuctionOffer(
-                    platform,
-                    projectBudget,
-                    effectivePackageScore,
-                    isSeries,
-                    currentHighest,
-                    project.previousBestBidValue,
-                    isPostTheatricalBidding,
-                    theatricalGross,
-                    hiddenStats,
-                    hasProvenIp,
-                    fundingContext,
-                    relationshipMultiplier
-                );
-                
-                if (newBid) {
-                    setCurrentBids(prev => [newBid, ...prev].slice(0, 10));
-                    setHighestBid(newBid);
-                    lastAuctionBidAtRef.current = now;
-                    const bidCountAfterThis = currentBids.length + 1;
-                    setTimeLeft(prev => {
-                        const minimumTimeAfterBid = bidCountAfterThis < 3 ? 76 : bidCountAfterThis < 6 ? 48 : 18;
-                        const nextTime = Math.max(prev, minimumTimeAfterBid);
-                        auctionTimeLeftRef.current = nextTime;
-                        return nextTime;
-                    }); // early bids extend the room, later bids become last-minute snipes.
-                } else {
-                    // Platform drops out
-                    if (activePlatforms.length > 3 && Math.random() > 0.72) {
-                        setActivePlatforms(prev => prev.filter(id => id !== platform.id));
-                    }
-                }
-            }
-        }, 150); // Tick every 150ms
-
-        return () => clearInterval(interval);
-    }, [auctionState, highestBid, activePlatforms, project.projectDetails?.hiddenStats?.qualityScore]);
-
-    const handleAcceptBid = (bid: Bid | null) => {
+    const handleAcceptBid = (
+        bid: Bid | null,
+        structuredAcceptance?: { session: StreamingBiddingSession; offer: StreamingOfferVersion },
+    ) => {
         if (!bid) return;
         if (!hasStreamingDealEnergy) return;
 
-        const updatedPlayer = { ...player };
+        const updatedPlayer = structuredAcceptance
+            ? {
+                ...player,
+                world: {
+                    ...player.world,
+                    streamingBiddingSessions: upsertStreamingBiddingSession(
+                        player.world.streamingBiddingSessions,
+                        structuredAcceptance.session,
+                    ),
+                },
+            }
+            : { ...player };
         const platformName = PLATFORMS.find(p => p.id === bid.platformId)?.name || 'Platform';
         const isFundedPremiereConfirmation = bid.id.startsWith('locked_premiere_');
         const isSeriesDeal = (project.projectDetails?.type || project.type) === 'SERIES';
+        const fundingAllocation = structuredAcceptance
+            ? getStreamingOfferFundingAllocation(structuredAcceptance.offer)
+            : {
+                productionFund: isSeriesDeal ? 0 : Math.max(0, Number(bid.fundingAmount || 0)),
+                lockedFutureSeasonFund: isSeriesDeal ? Math.max(0, Number(bid.fundingAmount || 0)) : 0,
+                totalFunding: Math.max(0, Number(bid.fundingAmount || 0)),
+            };
         const investorPlan = project.investorPlan || project.projectDetails?.investorPlan;
         const investorStreamingDealPayout = calculateInvestorPayout(investorPlan, bid.amount);
         const netStreamingDealAmount = Math.max(0, bid.amount - investorStreamingDealPayout);
         const nextInvestorPayouts = investorPlan
             ? appendInvestorPayoutSummary(project.investorPayouts || project.projectDetails?.investorPayouts, investorStreamingDealPayout)
             : project.investorPayouts || project.projectDetails?.investorPayouts;
-        const lockedFunding = isSeriesDeal && bid.fundingAmount
+        const lockedFunding = isSeriesDeal && fundingAllocation.lockedFutureSeasonFund > 0
             ? {
-                id: `stream_fund_${project.id}_${bid.platformId}_${Date.now()}`,
+                id: structuredAcceptance
+                    ? `stream_fund_${structuredAcceptance.offer.id}`
+                    : `stream_fund_${project.id}_${bid.platformId}_${Date.now()}`,
                 platformId: bid.platformId,
                 platformName,
-                amount: bid.fundingAmount,
+                amount: fundingAllocation.lockedFutureSeasonFund,
                 sourceProjectId: project.id,
                 sourceTitle: project.name || project.title || 'Series',
                 franchiseId: project.projectDetails?.franchiseId || project.franchiseId || project.id,
@@ -781,6 +705,23 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                 b.stats.weeklyProfit += netStreamingDealAmount;
                 b.stats.lifetimeRevenue += netStreamingDealAmount;
                 if (!b.studioState) b.studioState = {} as any;
+                if (structuredAcceptance) {
+                    const relations = b.studioState.platformRelations || {};
+                    const currentRelation = relations[bid.platformId];
+                    b.studioState.platformRelations = {
+                        ...relations,
+                        [bid.platformId]: {
+                            trustModifier: Math.max(-8, Math.min(8, Number(currentRelation?.trustModifier || 0) + 1)),
+                            recoveryWeeksRemaining: Math.max(0, Number(currentRelation?.recoveryWeeksRemaining || 0)),
+                            completedDeals: Math.max(0, Number(currentRelation?.completedDeals || 0)) + 1,
+                            profitableDeals: Math.max(0, Number(currentRelation?.profitableDeals || 0)),
+                            loyaltyScore: Math.min(100, Math.max(0, Number(currentRelation?.loyaltyScore || 0)) + 8),
+                            realizedPartnerValue: Math.max(0, Number(currentRelation?.realizedPartnerValue || 0)),
+                            lastBreachWeek: currentRelation?.lastBreachWeek,
+                            lastBreachYear: currentRelation?.lastBreachYear,
+                        },
+                    };
+                }
                 const ledger = Array.isArray(b.studioState.financeLedger) ? b.studioState.financeLedger : [];
 	                b.studioState.financeLedger = [
                     ...(!isFundedPremiereConfirmation ? [{
@@ -823,15 +764,16 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
 	                // Series renewal funding is locked to the next season. Other greenlight money remains a generic production fund.
                 if (lockedFunding) {
                     b.studioState.lockedStreamingFunds = [lockedFunding, ...(b.studioState.lockedStreamingFunds || [])].slice(0, 20);
-                } else if (bid.fundingAmount) {
-                    b.studioState.productionFund = (b.studioState.productionFund || 0) + bid.fundingAmount;
+                }
+                if (fundingAllocation.productionFund > 0) {
+                    b.studioState.productionFund = (b.studioState.productionFund || 0) + fundingAllocation.productionFund;
                 }
             }
         } else {
             // Add upfront cash to player's money if no studio
             updatedPlayer.money += netStreamingDealAmount;
             if (!isFundedPremiereConfirmation) updatedPlayer.finance.history.unshift({
-                id: Math.random().toString(),
+                id: structuredAcceptance ? `finance_streaming_${structuredAcceptance.offer.id}` : Math.random().toString(),
                 week: updatedPlayer.currentWeek,
                 year: updatedPlayer.age,
                 amount: netStreamingDealAmount,
@@ -844,9 +786,9 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
 
         // Update platform cash reserve
         if (updatedPlayer.world.platforms && updatedPlayer.world.platforms[bid.platformId as any]) {
-            const totalCost = bid.amount + (bid.fundingAmount || 0);
+            const totalCost = structuredAcceptance?.offer.fixedExposure ?? (bid.amount + (bid.fundingAmount || 0));
             const platformState = updatedPlayer.world.platforms[bid.platformId as any];
-            platformState.cashReserve = Math.max(0, platformState.cashReserve - totalCost);
+            platformState.cashReserve = Math.max(0, platformState.cashReserve - (totalCost / 1_000_000));
             platformState.recentHits += 1;
         }
 
@@ -911,7 +853,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                         release.streamingRoyaltyRevenue
                         ?? Math.max(0, Number(release.streamingRevenue || 0) - Number(release.streamingUpfrontFee ?? release.projectDetails?.streamingRevenue ?? 0))
                     )),
-                    streamingFundingAmount: Math.max(0, Number(release.streamingFundingAmount || 0)) + Math.max(0, Number(bid.fundingAmount || 0)),
+                    streamingFundingAmount: Math.max(0, Number(release.streamingFundingAmount || 0)) + fundingAllocation.totalFunding,
                     investorPayouts: nextInvestorPayouts,
                     streaming: {
                         platformId: bid.platformId as any,
@@ -947,8 +889,37 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
             }
         }
 
-        spendPlayerEnergy(updatedPlayer, streamingDealEnergyCost, `Streaming deal: ${project.name}`);
-        onUpdatePlayer(updatedPlayer);
+        const signedAtAbsoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
+        const signedRelease = updatedPlayer.activeReleases?.find(release => release.id === project.id);
+        const startsAtAbsoluteWeek = signedRelease?.streaming?.startWeekAbsolute
+            ?? (commitmentIndex !== -1 ? signedAtAbsoluteWeek + 1 : signedAtAbsoluteWeek);
+        const registeredSigning = structuredAcceptance
+            ? registerProductionStreamingRightsContractFromOffer(updatedPlayer, {
+                session: structuredAcceptance.session,
+                offer: structuredAcceptance.offer,
+                signedAtAbsoluteWeek,
+                startsAtAbsoluteWeek,
+            })
+            : registerProductionStreamingRightsContract(updatedPlayer, {
+            sourceProjectId: project.id,
+            title: project.name || project.title || 'Untitled project',
+            projectType: isSeriesDeal ? 'SERIES' : 'MOVIE',
+            genre: project.projectDetails?.genre || project.genre,
+            sellerStudioId: studio?.id || project.projectDetails?.studioId || 'player-rights-holder',
+            sellerStudioName: studio?.name || project.projectDetails?.studioName || 'Player rights holder',
+            sellerPartyType: 'PLAYER_STUDIO',
+            buyerPlatformId: bid.platformId as any,
+            minimumGuarantee: bid.amount,
+            platformRevenueShare: 100 - Math.max(0, Math.min(100, bid.backendPct || 0)),
+            productionFunding: fundingAllocation.productionFund,
+            futureSeasonFunding: fundingAllocation.lockedFutureSeasonFund,
+            signedAtAbsoluteWeek,
+            startsAtAbsoluteWeek,
+            durationWeeks: 52,
+            });
+        spendPlayerEnergy(registeredSigning.player, streamingDealEnergyCost, `Streaming deal: ${project.name}`);
+        if (structuredAcceptance) setBiddingSession(structuredAcceptance.session);
+        onUpdatePlayer(registeredSigning.player);
         
         if (isPostTheatricalBidding) {
             releaseDraftClearedRef.current = true;
@@ -956,6 +927,23 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
         } else {
             setStep(3); // Move to Campaign step
         }
+    };
+
+    const handleAcceptStreamingOffer = (offer: StreamingOfferVersion) => {
+        if (!biddingSession) return;
+        const acceptedSession = acceptStreamingBiddingOffer(biddingSession, offer.id);
+        if (acceptedSession === biddingSession || acceptedSession.acceptedOfferId !== offer.id) return;
+        const fundingAmount = offer.productionFunding + offer.futureSeasonFunding;
+        handleAcceptBid({
+            id: offer.id,
+            platformId: offer.platformId,
+            amount: offer.minimumGuarantee,
+            type: fundingAmount > 0 ? 'GREENLIGHT_DEAL' : offer.licensorRevenueShare > 0 ? 'BACKEND_POINTS' : 'UPFRONT_ONLY',
+            fundingAmount,
+            backendPct: offer.licensorRevenueShare,
+            bidValue: offer.expectedTotalCost,
+            timestamp: offer.createdAtActiveSecond,
+        }, { session: acceptedSession, offer });
     };
 
     const reservedMarketingBudget = Math.max(0, Number(project.projectDetails?.reservedMarketingBudget || 0));
@@ -1437,22 +1425,6 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
         const draft = buildReleasePlanningDraft();
         const updatedPlayer = writeReleasePlanningDraft(player, draft);
         lastPersistedDraftRef.current = JSON.stringify({ ...draft, updatedAt: 0 });
-        if (highestBid) {
-            // Save bid progress to prevent exploits
-            let found = false;
-            const cIdx = updatedPlayer.commitments.findIndex(c => c.id === project.id);
-            if (cIdx !== -1) {
-                updatedPlayer.commitments[cIdx].previousBestBidValue = highestBid.bidValue;
-                found = true;
-            }
-            if (!found) {
-                const rIdx = updatedPlayer.activeReleases?.findIndex(r => r.id === project.id);
-                if (rIdx !== undefined && rIdx !== -1 && updatedPlayer.activeReleases) {
-                    updatedPlayer.activeReleases[rIdx].previousBestBidValue = highestBid.bidValue;
-                    found = true;
-                }
-            }
-        }
         onUpdatePlayer(updatedPlayer);
         onBack();
     };
@@ -1748,162 +1720,35 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                                     </p>
                                 </div>
 
-                                {auctionState === 'IDLE' && (
-                                    <div className={`flex flex-col items-center justify-center space-y-6 ${lockedPremiereBid ? 'py-0 sm:py-6' : 'py-20'}`}>
-                                        <div className="text-center max-w-md">
-                                            {lockedPremiereBid ? (
-                                                <>
-                                                    <div className="border-y border-sky-300/25 bg-gradient-to-r from-sky-400/[0.04] via-sky-400/[0.11] to-transparent px-2 py-5 text-left sm:py-7">
-                                                        <div className="flex items-center gap-3">
-                                                            <ShieldCheck size={22} className="text-sky-300" />
-                                                            <div className="text-[10px] font-black uppercase tracking-[0.35em] text-sky-300">Commissioned season</div>
-                                                        </div>
-                                                        <div className="mt-3 text-2xl font-serif italic text-white sm:mt-4 sm:text-3xl">
-                                                            {lockedPremierePlatform?.name} premiere secured
-                                                        </div>
-                                                        <p className="mt-2 text-sm leading-relaxed text-white/65 sm:mt-3">
-                                                            {lockedPremierePlatform?.name} already contributed {formatContractMoney(lockedPremiereFundingApplied)} to make this season. Confirming the premiere does not create a second upfront payment.
-                                                        </p>
-                                                        <div className="mt-4 grid grid-cols-3 border-y border-white/10 py-3 sm:mt-6 sm:py-4">
-                                                            <div className="pr-3">
-                                                                <div className="text-[8px] font-black uppercase tracking-[0.22em] text-zinc-500">Platform covered</div>
-                                                                <div className="mt-1 font-mono text-sm font-black text-sky-200">{formatContractMoney(lockedPremiereFundingApplied)}</div>
-                                                            </div>
-                                                            <div className="border-x border-white/10 px-3">
-                                                                <div className="text-[8px] font-black uppercase tracking-[0.22em] text-zinc-500">Studio at risk</div>
-                                                                <div className="mt-1 font-mono text-sm font-black text-white">{formatContractMoney(lockedPremiereStudioCashAtRisk)}</div>
-                                                            </div>
-                                                            <div className="pl-3">
-                                                                <div className="text-[8px] font-black uppercase tracking-[0.22em] text-zinc-500">New rights fee</div>
-                                                                <div className="mt-1 text-sm font-black text-emerald-300">Included</div>
-                                                            </div>
-                                                        </div>
-                                                        <p className="mt-3 text-xs leading-relaxed text-zinc-400 sm:mt-4">
-                                                            The season’s success will be judged using its funded cost, ratings and audience performance—not as an unpaid full-budget release.
-                                                        </p>
-                                                    </div>
-                                                    <button
-                                                        onClick={() => handleAcceptBid(lockedPremiereBid)}
-                                                        disabled={!hasStreamingDealEnergy}
-                                                        className={`px-12 py-4 rounded-full font-bold tracking-widest uppercase text-xs transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 ${
-                                                            hasStreamingDealEnergy
-                                                                ? 'bg-sky-400 text-black hover:bg-sky-300 shadow-[0_0_30px_rgba(56,189,248,0.3)] cursor-pointer'
-                                                                : 'bg-white/10 text-white/35 cursor-not-allowed'
-                                                        }`}
-                                                    >
-                                                        {hasStreamingDealEnergy ? `Confirm ${lockedPremierePlatform?.name} Premiere · ${streamingDealEnergyCost}E` : `Need ${streamingDealEnergyCost}E`}
-                                                    </button>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <p className="text-white/70 mb-6">Open the floor to streaming platforms. They will bid based on the estimated quality and genre of your project.</p>
-                                                    <button onClick={startAuction} className="px-12 py-4 bg-blue-500 text-white rounded-full font-bold tracking-widest uppercase text-xs hover:scale-105 transition-all shadow-[0_0_30px_rgba(59,130,246,0.3)]">
-                                                        Start Bidding War
-                                                    </button>
-                                                </>
-                                            )}
+                                {lockedPremiereBid ? (
+                                    <div className="mx-auto flex max-w-md flex-col items-center gap-6 py-4 text-center sm:py-6">
+                                        <div className="border-y border-sky-300/25 bg-gradient-to-r from-sky-400/[0.04] via-sky-400/[0.11] to-transparent px-2 py-5 text-left sm:py-7">
+                                            <div className="flex items-center gap-3">
+                                                <ShieldCheck size={22} className="text-sky-300" />
+                                                <div className="text-[10px] font-black uppercase tracking-[0.35em] text-sky-300">Commissioned season</div>
+                                            </div>
+                                            <div className="mt-3 text-2xl font-serif italic text-white sm:text-3xl">{lockedPremierePlatform?.name} premiere secured</div>
+                                            <p className="mt-2 text-sm leading-relaxed text-white/65">{lockedPremierePlatform?.name} already contributed {formatContractMoney(lockedPremiereFundingApplied)}. Confirming the premiere creates no second rights fee.</p>
+                                            <div className="mt-4 grid grid-cols-2 border-y border-white/10 py-3">
+                                                <div className="pr-3"><div className="text-[8px] font-black uppercase tracking-[0.22em] text-zinc-500">Platform covered</div><div className="mt-1 font-mono text-sm font-black text-sky-200">{formatContractMoney(lockedPremiereFundingApplied)}</div></div>
+                                                <div className="border-l border-white/10 pl-3"><div className="text-[8px] font-black uppercase tracking-[0.22em] text-zinc-500">Studio at risk</div><div className="mt-1 font-mono text-sm font-black text-white">{formatContractMoney(lockedPremiereStudioCashAtRisk)}</div></div>
+                                            </div>
                                         </div>
+                                        <button onClick={() => handleAcceptBid(lockedPremiereBid)} disabled={!hasStreamingDealEnergy} className="rounded-full bg-sky-400 px-12 py-4 text-xs font-bold uppercase tracking-widest text-black disabled:cursor-not-allowed disabled:opacity-35">
+                                            {hasStreamingDealEnergy ? `Confirm premiere · ${streamingDealEnergyCost}E` : `Need ${streamingDealEnergyCost}E`}
+                                        </button>
                                     </div>
-                                )}
-
-                                {!lockedPremiereBid && auctionState !== 'IDLE' && (
-                                    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                                        {/* Left: Platforms */}
-                                        <div className="bg-white/5 border border-white/10 rounded-3xl p-6 backdrop-blur-md flex flex-col gap-4">
-                                            <h3 className="text-xs font-bold uppercase tracking-widest text-white/50 mb-2">Bidders</h3>
-                                            {PLATFORMS.map(p => {
-                                                const isActive = activePlatforms.includes(p.id);
-                                                const isHighest = highestBid?.platformId === p.id;
-                                                return (
-                                                    <div key={p.id} className={`flex items-center gap-3 p-2 rounded-xl transition-all ${isActive ? 'bg-white/5' : 'opacity-30 grayscale'}`}>
-                                                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: p.color, boxShadow: isHighest ? `0 0 10px ${p.color}` : 'none' }} />
-                                                        <span className="font-serif text-sm">{p.name}</span>
-                                                        {isHighest && <span className="ml-auto text-[8px] font-bold text-amber-400 uppercase tracking-widest">Leading</span>}
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-
-                                        {/* Center: Highest Bid */}
-                                        <div className="lg:col-span-2 flex flex-col gap-6">
-                                            <div className="bg-white/5 border border-white/10 rounded-3xl p-8 backdrop-blur-md relative overflow-hidden flex-1 flex flex-col justify-center items-center text-center min-h-[300px]">
-                                                {/* Tension Timer Background */}
-                                                <div className="absolute bottom-0 left-0 h-1 bg-blue-500 transition-all duration-150" style={{ width: `${timeLeft}%` }} />
-                                                
-                                                <h3 className="text-xs font-bold uppercase tracking-widest text-white/50 mb-6">Current Highest Bid</h3>
-                                                
-                                                {highestBid ? (
-                                                    <motion.div key={highestBid.id} initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="space-y-4">
-                                                        <div className="text-5xl md:text-7xl font-mono font-light text-emerald-400">
-                                                            ${(highestBid.amount / 1000000).toFixed(1)}M
-                                                        </div>
-                                                        <div className="text-lg font-serif text-white/90">
-                                                            from <span style={{ color: PLATFORMS.find(p => p.id === highestBid.platformId)?.color }}>{PLATFORMS.find(p => p.id === highestBid.platformId)?.name}</span>
-                                                        </div>
-                                                        
-                                                        {highestBid.type === 'GREENLIGHT_DEAL' && (
-                                                            <div className="mt-4 space-y-2">
-                                                                <div className="inline-block px-4 py-2 bg-emerald-500/20 border border-emerald-500/30 rounded-full text-emerald-300 text-[10px] font-bold uppercase tracking-widest">
-                                                                    + ${(highestBid.fundingAmount! / 1000000).toFixed(1)}M {isSeries ? `${highestBid.fundingTier ? `${highestBid.fundingTier.replace('_', ' ')} ` : ''}Next Season Cap` : 'Production Fund'}
-                                                                </div>
-                                                                {isSeries && highestBid.fundingReason && (
-                                                                    <p className="mx-auto max-w-sm text-xs leading-relaxed text-emerald-100/65">
-                                                                        {highestBid.fundingReason}
-                                                                    </p>
-                                                                )}
-                                                            </div>
-                                                        )}
-                                                        {highestBid.type === 'BACKEND_POINTS' && (
-                                                            <div className="inline-block mt-4 px-4 py-2 bg-purple-500/20 border border-purple-500/30 rounded-full text-purple-300 text-[10px] font-bold uppercase tracking-widest">
-                                                                + {highestBid.backendPct}% Backend Points
-                                                            </div>
-                                                        )}
-                                                    </motion.div>
-                                                ) : (
-                                                    <div className="text-xl font-serif text-white/30 italic">Awaiting first bid...</div>
-                                                )}
-                                            </div>
-
-                                            {/* Action Bar */}
-                                            <div className="flex justify-between items-center">
-                                                <button onClick={prevStep} className="px-8 py-4 text-white/50 hover:text-white transition-colors text-xs font-bold tracking-widest uppercase">Back</button>
-                                                
-                                                <button
-                                                    disabled={!highestBid || !hasStreamingDealEnergy}
-                                                    onClick={() => handleAcceptBid(highestBid)} 
-                                                    className={`px-12 py-4 rounded-full font-bold tracking-widest uppercase text-xs transition-all ${
-                                                        highestBid && hasStreamingDealEnergy
-                                                            ? 'bg-amber-500 text-black hover:scale-105 shadow-[0_0_30px_rgba(245,158,11,0.3)]'
-                                                            : 'bg-white/10 text-white/30 cursor-not-allowed'
-                                                    }`}
-                                                >
-                                                    {!hasStreamingDealEnergy ? `Need ${streamingDealEnergyCost}E` : `${auctionState === 'FINISHED' ? 'Accept Winning Bid' : 'Slam the Gavel'} · ${streamingDealEnergyCost}E`}
-                                                </button>
-                                            </div>
-                                        </div>
-
-                                        {/* Right: Live Feed */}
-                                        <div className="bg-white/5 border border-white/10 rounded-3xl p-6 backdrop-blur-md flex flex-col gap-4 overflow-hidden max-h-[400px]">
-                                            <h3 className="text-xs font-bold uppercase tracking-widest text-white/50 mb-2">Live Feed</h3>
-                                            <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col gap-3 pr-2">
-                                                <AnimatePresence>
-                                                    {currentBids.map(bid => {
-                                                        const p = PLATFORMS.find(pl => pl.id === bid.platformId);
-                                                        return (
-                                                            <motion.div key={bid.id} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="p-3 rounded-xl bg-black/40 border border-white/5 text-sm">
-                                                                <div className="flex justify-between items-center mb-1">
-                                                                    <span className="font-serif" style={{ color: p?.color }}>{p?.name}</span>
-                                                                    <span className="font-mono text-emerald-400">${(bid.amount / 1000000).toFixed(1)}M</span>
-                                                                </div>
-                                                                {bid.type === 'GREENLIGHT_DEAL' && <div className="text-[9px] text-emerald-500/80 uppercase tracking-widest">+ {bid.fundingTier ? bid.fundingTier.replace('_', ' ') : 'Fund'}</div>}
-                                                                {bid.type === 'BACKEND_POINTS' && <div className="text-[9px] text-purple-500/80 uppercase tracking-widest">+ Backend</div>}
-                                                            </motion.div>
-                                                        );
-                                                    })}
-                                                </AnimatePresence>
-                                            </div>
-                                        </div>
-                                    </div>
+                                ) : (
+                                    <StreamingBiddingRoom
+                                        session={biddingSession}
+                                        canAccept={hasStreamingDealEnergy}
+                                        energyCost={streamingDealEnergyCost}
+                                        onStart={startAuction}
+                                        onSessionChange={persistBiddingSession}
+                                        onAccept={handleAcceptStreamingOffer}
+                                        onLeave={leaveAuction}
+                                        onBack={prevStep}
+                                    />
                                 )}
                             </motion.div>
                         )}

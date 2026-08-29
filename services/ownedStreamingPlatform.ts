@@ -35,6 +35,7 @@ import {
     type OwnedStreamingAcquisitionFinancing,
     type OwnedStreamingRivalProfile,
     type OwnedStreamingRivalMove,
+    type OwnedStreamingRivalWeeklySnapshot,
     type OwnedStreamingRegionalLaunch,
     type OwnedStreamingMarketShareSnapshot,
     type OwnedStreamingAwardSeason,
@@ -51,12 +52,21 @@ import {
     type OwnedStreamingCatalogSetupDraft,
     type OwnedStreamingInfrastructureSetup,
     type OwnedStreamingInfrastructureSetupDraft,
+    type OwnedStreamingInfrastructurePhysicalSummary,
+    type OwnedStreamingFacility,
     type OwnedStreamingNetworkPlacement,
     type OwnedStreamingTechnologyProject,
+    type OwnedStreamingResearchProgram,
+    type OwnedStreamingCampusProject,
+    type OwnedStreamingCampusEvent,
+    type OwnedStreamingInfrastructureIncident,
+    type OwnedStreamingInfrastructurePerformancePoint,
+    type OwnedStreamingInfrastructureAward,
     type OwnedStreamingProductLine,
     type OwnedStreamingLaunchCommit,
     type OwnedStreamingLaunchSlate,
     type OwnedStreamingLoadTestSnapshot,
+    type OwnedStreamingLaunchRehearsalSnapshot,
     type OwnedStreamingLedgerEntry,
     type OwnedStreamingLedgerEventType,
     type OwnedStreamingPlatformLifecycle,
@@ -82,6 +92,8 @@ import {
     type StreamingLaunchOutcomeTier,
     type StreamingLogoKey,
     type StreamingSoundIdentKey,
+    type StreamingTypefaceId,
+    type StreamingWordmarkStyleId,
     type StreamingHqSection,
     type StreamingHqTourStatus,
     type StreamingCapacityPackageId,
@@ -90,6 +102,13 @@ import {
     type StreamingTechnologyBuildMode,
     type StreamingTechnologyProjectStatus,
     type StreamingTechnologyRisk,
+    type StreamingResearchCategory,
+    type StreamingResearchLifecycleStage,
+    type StreamingResearchIpStrategy,
+    type StreamingResearchInstallTargetType,
+    type StreamingCampusScale,
+    type StreamingCampusConstructionStage,
+    type StreamingCampusProjectStatus,
     type StreamingProductLineId,
     type StreamingProductLaunchMode,
     type StreamingProductLineStatus,
@@ -123,6 +142,7 @@ import {
     type StreamingRivalStrategy,
     type StreamingRivalMoveType,
     type StreamingRivalResponseId,
+    type StreamingWarBattlefront,
     type StreamingRegionId,
     type StreamingRegionalLaunchApproach,
     type StreamingAwardCategoryId,
@@ -140,9 +160,25 @@ import {
     type StreamingEraMandate,
     type StreamingFounderOfficeRole,
 } from '../types';
+import { normalizeStreamingInfrastructureManagementPolicy } from './streamingInfrastructureManagement';
+import { normalizeStreamingCanonicalFoundation } from './streamingCanonicalState';
 import { createDeterministicId } from './deterministicRandom';
 import { STREAMING_INCORPORATION_ECONOMY } from './streamingEconomy';
+import { cleanStreamingBrandMarkDataUrl } from './streamingBrandImage';
 import { normalizeStreamingDayOneMarketIds } from './streamingDayOneMarkets';
+import {
+    aggregateStreamingFacilities,
+    getStreamingFacilityContract,
+    migratePlacementsToStreamingFacilities,
+    normalizeStreamingFacilityLease,
+    normalizeStreamingFacilityPhysical,
+    normalizeStreamingFacilityRole,
+    STREAMING_FACILITY_CONTRACTS,
+} from './streamingFacilities';
+import {
+    normalizeStreamingRackGroups,
+    projectFacilityNetworkRole,
+} from './streamingRackGroups';
 
 export { OWNED_STREAMING_PLATFORM_SCHEMA_VERSION };
 export const OWNED_STREAMING_WEEKLY_HISTORY_LIMIT = 104;
@@ -169,6 +205,10 @@ export const OWNED_STREAMING_AWARD_SEASON_LIMIT = 12;
 export const OWNED_STREAMING_ACQUISITION_CASE_LIMIT = 20;
 export const OWNED_STREAMING_INTEGRATION_LIMIT = 20;
 export const OWNED_STREAMING_CRISIS_LIMIT = 24;
+export const OWNED_STREAMING_INFRASTRUCTURE_INCIDENT_LIMIT = 32;
+export const OWNED_STREAMING_INFRASTRUCTURE_PERFORMANCE_LIMIT = 104;
+export const OWNED_STREAMING_INFRASTRUCTURE_AWARD_LIMIT = 24;
+export const OWNED_STREAMING_INFRASTRUCTURE_CINEMATIC_FACT_LIMIT = 120;
 export const OWNED_STREAMING_SHADOW_OPERATION_LIMIT = 24;
 export const OWNED_STREAMING_TRUST_INITIATIVE_LIMIT = 24;
 export const OWNED_STREAMING_OVERSIGHT_CASE_LIMIT = 16;
@@ -178,7 +218,12 @@ export const OWNED_STREAMING_LEGACY_MONTAGE_LIMIT = 12;
 const LIFECYCLES: OwnedStreamingPlatformLifecycle[] = ['LOCKED', 'ELIGIBLE', 'FOUNDING', 'ACTIVE', 'SUSPENDED'];
 const INFRASTRUCTURE_STRATEGIES: StreamingInfrastructureStrategy[] = ['UNDECIDED', 'CLOUD_FIRST', 'OWNED_INFRASTRUCTURE', 'HYBRID'];
 const LOGO_KEYS: StreamingLogoKey[] = ['FRAME_PLAY', 'SIGNAL_RING', 'SPOTLIGHT', 'WORDMARK'];
-const SOUND_IDENT_KEYS: StreamingSoundIdentKey[] = ['PULSE', 'ASCENT', 'PREMIERE', 'SILENT'];
+const SOUND_IDENT_KEYS: StreamingSoundIdentKey[] = [
+    'PULSE', 'ASCENT', 'PREMIERE', 'SILENT', 'CHOIR', 'MACHINE',
+    'SPARK', 'IMPACT', 'ORBIT', 'BLOOM', 'PRISM', 'EMBER', 'SIGNAL', 'HORIZON', 'ANALOG',
+];
+const WORDMARK_STYLE_IDS: StreamingWordmarkStyleId[] = ['WORDMARK', 'SIDE', 'STACK', 'ICON'];
+const TYPEFACE_IDS: StreamingTypefaceId[] = ['GROTESK', 'GEOMETRIC', 'SERIF', 'CONDENSED', 'MONO', 'SLAB'];
 const BRAND_PROMISE_IDS: StreamingBrandPromiseId[] = [
     'EVENT_HOUSE',
     'BINGE_MACHINE',
@@ -223,7 +268,8 @@ const BOARD_MOTION_IDS: StreamingBoardMotionId[] = [
     'TRUST_CHARTER',
 ];
 const RIVAL_STRATEGIES: StreamingRivalStrategy[] = ['SCALE_DOMINANCE', 'PRESTIGE_FIRST', 'FRANCHISE_FORTRESS', 'AGILE_CURATOR', 'ATTENTION_ECOSYSTEM'];
-const RIVAL_MOVE_TYPES: StreamingRivalMoveType[] = ['COUNTER_PROGRAM', 'RIGHTS_OVERBID', 'EXECUTIVE_POACH', 'PRICE_CUT', 'BUNDLE_LAUNCH', 'RESCUE_CANCELLED_SHOW', 'ALLIANCE_SIGNAL'];
+const RIVAL_MOVE_TYPES: StreamingRivalMoveType[] = ['COUNTER_PROGRAM', 'RIGHTS_OVERBID', 'EXECUTIVE_POACH', 'PRICE_CUT', 'BUNDLE_LAUNCH', 'RESCUE_CANCELLED_SHOW', 'ALLIANCE_SIGNAL', 'REGIONAL_ORIGINAL', 'MARKETING_BLITZ', 'TECH_COPY', 'SABOTAGE_ATTEMPT', 'OUTAGE_EXPLOITATION', 'REGION_EXPANSION', 'REGION_WITHDRAWAL'];
+const WAR_BATTLEFRONTS: StreamingWarBattlefront[] = ['PRICE', 'CONTENT', 'RIGHTS', 'DISTRIBUTION', 'MARKETING', 'TECHNOLOGY', 'OPERATIONS', 'TALENT', 'TERRITORY'];
 const RIVAL_RESPONSE_IDS: StreamingRivalResponseId[] = ['STAY_COURSE', 'DEFEND_POSITION', 'COUNTER_PROGRAM', 'BACKCHANNEL', 'MATCH_PACKAGE', 'EXPAND_MANDATE', 'LET_DEPART'];
 const REGION_IDS: StreamingRegionId[] = ['HOME_MARKET', 'NORTH_AMERICA', 'LATIN_AMERICA', 'EUROPE', 'SOUTH_ASIA', 'EAST_ASIA', 'MIDDLE_EAST_AFRICA'];
 const REGIONAL_LAUNCH_APPROACHES: StreamingRegionalLaunchApproach[] = ['LOCAL_PARTNERSHIP', 'PREMIUM_ENTRY', 'MASS_MARKET'];
@@ -255,6 +301,36 @@ const CAPACITY_PACKAGE_IDS: StreamingCapacityPackageId[] = ['STARTER', 'ESSENTIA
 const INFRASTRUCTURE_ROLLOUT_PACES: StreamingInfrastructureRolloutPace[] = ['SAFE', 'STANDARD', 'RUSHED'];
 const TECHNOLOGY_CAMPUS_BRANCHES: StreamingTechnologyCampusBranch[] = ['DELIVERY_CAPACITY', 'PLAYBACK_QUALITY', 'RELIABILITY', 'DATA_RECOMMENDATIONS', 'SECURITY', 'CONTENT_OPERATIONS'];
 const TECHNOLOGY_BUILD_MODES: StreamingTechnologyBuildMode[] = ['HARDENED', 'BALANCED', 'SPRINT'];
+const RESEARCH_CATEGORIES: StreamingResearchCategory[] = [
+    'NETWORK_INFRASTRUCTURE',
+    'SERVERS_DELIVERY',
+    'COOLING_ENERGY',
+    'STREAMING_EXPERIENCE',
+    'PLATFORM_PRODUCTS',
+    'SECURITY_RELIABILITY',
+    'EXPERIMENTAL_TECHNOLOGY',
+];
+const RESEARCH_STAGES: StreamingResearchLifecycleStage[] = [
+    'RESEARCHING',
+    'PROTOTYPING',
+    'TESTING',
+    'AWAITING_IP',
+    'READY_TO_INSTALL',
+    'INSTALLING',
+    'OPERATING',
+];
+const RESEARCH_IP_STRATEGIES: StreamingResearchIpStrategy[] = ['PATENT', 'LICENSE'];
+const RESEARCH_INSTALL_TARGET_TYPES: StreamingResearchInstallTargetType[] = [
+    'TECHNOLOGY_PROJECT',
+    'FACILITY',
+    'RACK_GROUP',
+    'PRODUCT_LINE',
+    'CONSTRUCTION_PROGRAM',
+];
+const CAMPUS_SCALES: StreamingCampusScale[] = ['OWNED_DATA_CENTRE', 'GIGA_CAMPUS'];
+const CAMPUS_STAGES: StreamingCampusConstructionStage[] = ['PERMITS', 'UTILITIES', 'DESIGN', 'SYSTEMS', 'DATA_HALLS', 'RACK_INSTALLATION', 'COMMISSIONING'];
+const CAMPUS_PROJECT_STATUSES: StreamingCampusProjectStatus[] = ['AWAITING_DECISION', 'IN_PROGRESS', 'DELAYED', 'READY_TO_OPEN', 'OPEN'];
+const CAMPUS_EVENT_TYPES: OwnedStreamingCampusEvent['type'][] = ['PERMIT_DELAY', 'CONTRACTOR_OVERRUN', 'GRID_SHORTAGE', 'WATER_RESTRICTION', 'LOCAL_OPPOSITION', 'FIBRE_DISPUTE', 'COOLING_DEFECT', 'INDUSTRIAL_ESPIONAGE'];
 const TECHNOLOGY_PROJECT_STATUSES: StreamingTechnologyProjectStatus[] = ['UNDER_CONSTRUCTION', 'COMPLETED'];
 const TECHNOLOGY_RISKS: StreamingTechnologyRisk[] = ['LOW', 'MODERATE', 'HIGH'];
 const PRODUCT_LINE_IDS: Exclude<StreamingProductLineId, 'CORE'>[] = ['KIDS', 'FREE', 'LIVE', 'FAN', 'STORE', 'INTERACTIVE'];
@@ -356,6 +432,11 @@ const LEDGER_EVENT_TYPES: OwnedStreamingLedgerEventType[] = [
     'RIVAL_MOVE_RESPONDED',
     'REGIONAL_LAUNCH_STARTED',
     'REGIONAL_LAUNCH_COMPLETED',
+    'MARKET_CLEARANCE_STARTED',
+    'MARKET_CLEARANCE_UPDATED',
+    'MARKET_CLEARANCE_COMPLETED',
+    'MARKET_REQUIREMENT_RESOLVED',
+    'MARKET_POLICY_CHANGED',
     'MARKET_SHARE_COMMITTED',
     'STREAMING_AWARDS_RESOLVED',
     'ACQUISITION_SCOUTED',
@@ -386,6 +467,11 @@ const LEDGER_EVENT_TYPES: OwnedStreamingLedgerEventType[] = [
     'REGULATORY_CASE_RESOLVED',
     'WHISTLEBLOWER_REPORT_OPENED',
     'WHISTLEBLOWER_REPORT_RESOLVED',
+    'INFRASTRUCTURE_INCIDENT_DETECTED',
+    'INFRASTRUCTURE_RESPONSE_LOCKED',
+    'INFRASTRUCTURE_INCIDENT_RECOVERED',
+    'INFRASTRUCTURE_MAINTENANCE_COMPLETED',
+    'INFRASTRUCTURE_OPERATIONS_POLICY_UPDATED',
     'SUCCESSION_PLAN_UPDATED',
     'SUCCESSOR_APPOINTED',
     'FOUNDER_ROLE_CHANGED',
@@ -396,6 +482,9 @@ const LEDGER_EVENT_TYPES: OwnedStreamingLedgerEventType[] = [
     'INFRASTRUCTURE_COMMITTED',
     'TECHNOLOGY_PROJECT_STARTED',
     'TECHNOLOGY_PROJECT_COMPLETED',
+    'CAMPUS_PROJECT_STARTED',
+    'CAMPUS_STAGE_COMPLETED',
+    'CAMPUS_OPENED',
     'PRODUCT_DEVELOPMENT_STARTED',
     'PRODUCT_LAUNCHED',
     'PRODUCT_STATUS_CHANGED',
@@ -426,6 +515,8 @@ const CINEMATIC_TYPES: OwnedStreamingCinematicType[] = [
     'BOARD_REVIEW',
     'CELEBRITY_INVESTOR_REVEAL',
     'PLATFORM_WAR_DECLARATION',
+    'MARKET_SHARE_BREAKTHROUGH',
+    'GLOBAL_DOMINANCE',
     'STREAMING_AWARDS_CEREMONY',
     'ACQUISITION_SIGNING',
     'IPO_LISTING',
@@ -438,6 +529,15 @@ const CINEMATIC_TYPES: OwnedStreamingCinematicType[] = [
     'SUCCESSION_CEREMONY',
     'NEW_ERA_KEYNOTE',
     'FIRST_ORIGINAL_ANNOUNCEMENT',
+    'FACILITY_OPENING',
+    'SERVER_HALL_EVOLUTION',
+    'GIGA_CAMPUS_CONSTRUCTION',
+    'OPENING_NIGHT_CONTROL_ROOM',
+    'INFRASTRUCTURE_RECOVERY',
+    'PATENT_ANNOUNCEMENT',
+    'RIVAL_ESPIONAGE_STORY',
+    'INFRASTRUCTURE_AWARDS',
+    'GLOBAL_RELIABILITY_MILESTONE',
     'MILESTONE',
 ];
 
@@ -456,6 +556,7 @@ const cleanText = (value: unknown, fallback = '', maxLength = 160): string => (
         ? value.replace(/\s+/g, ' ').trim().slice(0, maxLength)
         : fallback
 );
+const cleanCustomMarkDataUrl = cleanStreamingBrandMarkDataUrl;
 const uniqueStrings = (value: unknown, limit: number): string[] => Array.from(new Set(
     asArray<unknown>(value)
         .map(item => cleanText(item, '', 180))
@@ -480,19 +581,28 @@ const normalizeFoundingDraft = (
                 ? 1
                 : 2;
     const brandPromiseId = isOneOf(source.brandPromiseId, BRAND_PROMISE_IDS, 'BALANCED');
-    return {
+    const legacyMarketIds = normalizeStreamingDayOneMarketIds(source.dayOneMarketIds);
+    const legacyServerCityId = cleanText(source.launchServerCityId, '', 24) || null;
+    const draft: OwnedStreamingFoundingDraft = {
         currentStep,
         name: cleanText(source.name, 'EMPIRE+', 32),
         logoKey: isOneOf(source.logoKey, LOGO_KEYS, 'FRAME_PLAY'),
         primaryColor: cleanText(source.primaryColor, '#6D5DFB', 20),
         secondaryColor: cleanText(source.secondaryColor, '#111225', 20),
-        soundIdentKey: isOneOf(source.soundIdentKey, SOUND_IDENT_KEYS, 'PULSE'),
+        visualMarkId: cleanText(source.visualMarkId, 'BOLT', 40).toUpperCase(),
+        customMarkDataUrl: cleanCustomMarkDataUrl(source.customMarkDataUrl),
+        wordmarkStyleId: isOneOf(source.wordmarkStyleId, WORDMARK_STYLE_IDS, 'SIDE'),
+        typefaceId: isOneOf(source.typefaceId, TYPEFACE_IDS, 'GROTESK'),
         brandPromiseId,
         publicManifesto: cleanText(source.publicManifesto, '', 160),
-        dayOneMarketIds: normalizeStreamingDayOneMarketIds(source.dayOneMarketIds),
-        launchServerCityId: cleanText(source.launchServerCityId, '', 24) || null,
         updatedAtAbsoluteWeek: Math.max(0, Math.round(clamp(source.updatedAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
     };
+    if (SOUND_IDENT_KEYS.includes(source.soundIdentKey as StreamingSoundIdentKey)) {
+        draft.soundIdentKey = source.soundIdentKey as StreamingSoundIdentKey;
+    }
+    if (legacyMarketIds.length) draft.dayOneMarketIds = legacyMarketIds;
+    if (legacyServerCityId) draft.launchServerCityId = legacyServerCityId;
+    return draft;
 };
 
 const normalizeFoundingProfile = (
@@ -503,10 +613,10 @@ const normalizeFoundingProfile = (
     const source = asRecord(value);
     const incorporationModel = isOneOf(
         source.incorporationModel,
-        ['FIXED_V7', 'LEGACY_PRE_V7'] as const,
+        ['FIXED_V8_ZERO_TREASURY', 'FIXED_V7', 'LEGACY_PRE_V7'] as const,
         source.founderCashCharged !== undefined ? 'FIXED_V7' : 'LEGACY_PRE_V7',
     );
-    if (incorporationModel === 'FIXED_V7') {
+    if (incorporationModel === 'FIXED_V8_ZERO_TREASURY') {
         return {
             incorporationModel,
             founderCashCharged: STREAMING_INCORPORATION_ECONOMY.cashRequired,
@@ -515,6 +625,21 @@ const normalizeFoundingProfile = (
             outsideCapitalRaisedAtIncorporation: 0,
             debtPrincipalAtIncorporation: 0,
             founderOwnershipPercentAtIncorporation: 100,
+            founderWasCeoAtIncorporation: true,
+            incorporatedAtAbsoluteWeek: Math.max(0, Math.round(clamp(source.incorporatedAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
+        };
+    }
+    if (incorporationModel === 'FIXED_V7') {
+        // Preserve the historical 85 / 70 / 15 settlement for existing saves.
+        // Only newly incorporated companies adopt the V8 zero-treasury model.
+        return {
+            incorporationModel,
+            founderCashCharged: Math.round(clamp(source.founderCashCharged ?? 85_000_000, 0, Number.MAX_SAFE_INTEGER)),
+            setupCostsConsumed: Math.round(clamp(source.setupCostsConsumed ?? 70_000_000, 0, Number.MAX_SAFE_INTEGER)),
+            openingTreasuryCash: Math.round(clamp(source.openingTreasuryCash ?? 15_000_000, 0, Number.MAX_SAFE_INTEGER)),
+            outsideCapitalRaisedAtIncorporation: Math.round(clamp(source.outsideCapitalRaisedAtIncorporation, 0, Number.MAX_SAFE_INTEGER)),
+            debtPrincipalAtIncorporation: Math.round(clamp(source.debtPrincipalAtIncorporation, 0, Number.MAX_SAFE_INTEGER)),
+            founderOwnershipPercentAtIncorporation: clamp(source.founderOwnershipPercentAtIncorporation, 0, 100) || 100,
             founderWasCeoAtIncorporation: true,
             incorporatedAtAbsoluteWeek: Math.max(0, Math.round(clamp(source.incorporatedAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
         };
@@ -992,6 +1117,12 @@ const normalizeRivalProfile = (value: unknown): OwnedStreamingRivalProfile | nul
     const platformId = isOneOf(source.platformId, PLATFORM_IDS, 'NETFLIX');
     if (!cleanText(source.platformName, '', 100)) return null;
     const memory = asRecord(source.memory);
+    const preferredRegions = asArray<unknown>(source.preferredRegions)
+        .filter((item): item is StreamingRegionId => REGION_IDS.includes(item as StreamingRegionId))
+        .slice(0, 4);
+    const persistedRegions = asArray<unknown>(source.activeRegionIds)
+        .filter((item): item is StreamingRegionId => REGION_IDS.includes(item as StreamingRegionId))
+        .slice(0, REGION_IDS.length);
     return {
         platformId,
         platformName: cleanText(source.platformName, 'Rival platform', 100),
@@ -1000,14 +1131,21 @@ const normalizeRivalProfile = (value: unknown): OwnedStreamingRivalProfile | nul
         strategy: isOneOf(source.strategy, RIVAL_STRATEGIES, 'SCALE_DOMINANCE'),
         cashReserveMillions: clamp(source.cashReserveMillions, 0, 1_000_000),
         subscribersMillions: clamp(source.subscribersMillions, 0, 10_000),
+        standaloneValuationBillions: clamp(source.standaloneValuationBillions, 0, 1_000_000),
         technology: Math.round(clamp(source.technology, 0, 100, 60)),
         catalogPower: Math.round(clamp(source.catalogPower, 0, 100, 60)),
         prestige: Math.round(clamp(source.prestige, 0, 100, 60)),
         aggression: Math.round(clamp(source.aggression, 0, 100, 60)),
+        baseMonthlyPrice: clamp(source.baseMonthlyPrice, 0, 200, 12.99),
+        perceivedValue: Math.round(clamp(source.perceivedValue, 0, 100, 65)),
+        activeRegionIds: persistedRegions.length
+            ? persistedRegions
+            : Array.from(new Set<StreamingRegionId>(['HOME_MARKET', ...preferredRegions.slice(0, 2)])),
+        copiedTechnologyBranches: asArray<unknown>(source.copiedTechnologyBranches)
+            .filter((item): item is StreamingTechnologyBranch => TECHNOLOGY_BRANCHES.includes(item as StreamingTechnologyBranch))
+            .slice(0, TECHNOLOGY_BRANCHES.length),
         preferredGenres: uniqueStrings(source.preferredGenres, 6),
-        preferredRegions: asArray<unknown>(source.preferredRegions)
-            .filter((item): item is StreamingRegionId => REGION_IDS.includes(item as StreamingRegionId))
-            .slice(0, 4),
+        preferredRegions,
         cooldownUntilAbsoluteWeek: Math.max(0, Math.round(clamp(source.cooldownUntilAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
         lastMoveAbsoluteWeek: source.lastMoveAbsoluteWeek === null || source.lastMoveAbsoluteWeek === undefined
             ? null
@@ -1039,6 +1177,13 @@ const normalizeRivalMove = (value: unknown): OwnedStreamingRivalMove | null => {
         platformName: cleanText(source.platformName, 'Rival platform', 100),
         ceoName: cleanText(source.ceoName, 'Rival CEO', 100),
         type: isOneOf(source.type, RIVAL_MOVE_TYPES, 'COUNTER_PROGRAM'),
+        battlefront: isOneOf(source.battlefront, WAR_BATTLEFRONTS, 'CONTENT'),
+        targetRegionId: REGION_IDS.includes(source.targetRegionId as StreamingRegionId) ? source.targetRegionId as StreamingRegionId : null,
+        targetTechnologyBranch: TECHNOLOGY_BRANCHES.includes(source.targetTechnologyBranch as StreamingTechnologyBranch) ? source.targetTechnologyBranch as StreamingTechnologyBranch : null,
+        strategyReason: cleanText(source.strategyReason, 'The rival saw an opening in your current position.', 280),
+        playerImpact: cleanText(source.playerImpact, 'Audience pressure remains active while the move is unresolved.', 280),
+        rivalPriceBefore: source.rivalPriceBefore === null || source.rivalPriceBefore === undefined ? null : clamp(source.rivalPriceBefore, 0, 200),
+        rivalPriceAfter: source.rivalPriceAfter === null || source.rivalPriceAfter === undefined ? null : clamp(source.rivalPriceAfter, 0, 200),
         title: cleanText(source.title, 'A rival entered the market window.', 160),
         detail: cleanText(source.detail, 'The move used real rival resources and created a visible market consequence.', 300),
         status: isOneOf(source.status, ['OPEN', 'MISFIRED', 'DEFENDED', 'ACCEPTED_PRESSURE', 'EXPIRED'] as const, 'OPEN'),
@@ -1061,6 +1206,23 @@ const normalizeRivalMove = (value: unknown): OwnedStreamingRivalMove | null => {
             ? null
             : Math.max(createdAtAbsoluteWeek, Math.round(clamp(source.responseAtAbsoluteWeek, createdAtAbsoluteWeek, Number.MAX_SAFE_INTEGER))),
         outcomeNote: cleanText(source.outcomeNote, 'Awaiting the next market response.', 260),
+    };
+};
+
+const normalizeRivalWeeklySnapshot = (value: unknown): OwnedStreamingRivalWeeklySnapshot | null => {
+    const source = asRecord(value);
+    const absoluteWeek = Math.max(0, Math.round(clamp(source.absoluteWeek, 0, Number.MAX_SAFE_INTEGER)));
+    const platformName = cleanText(source.platformName, '', 100);
+    if (!platformName) return null;
+    return {
+        id: cleanText(source.id, createDeterministicId('streaming_rival_week', source.platformId, absoluteWeek), 120),
+        absoluteWeek,
+        platformId: isOneOf(source.platformId, PLATFORM_IDS, 'NETFLIX'),
+        platformName,
+        subscribersBeforeMillions: clamp(source.subscribersBeforeMillions, 0, 10_000),
+        subscribersAfterMillions: clamp(source.subscribersAfterMillions, 0, 10_000),
+        netMovementMillions: clamp(source.netMovementMillions, -1_000, 1_000),
+        driver: cleanText(source.driver, 'Audience movement followed the platform position.', 220),
     };
 };
 
@@ -1156,8 +1318,19 @@ const normalizeAwardSeason = (value: unknown): OwnedStreamingAwardSeason | null 
     };
 };
 
-const normalizeCompetitiveWorld = (value: unknown): OwnedStreamingCompetitiveWorldState => {
+const normalizeCompetitiveWorld = (
+    value: unknown,
+    protectedRivalMoveIds: ReadonlySet<string> = new Set(),
+): OwnedStreamingCompetitiveWorldState => {
     const source = asRecord(value);
+    const normalizedMoves = dedupeByKey(
+        asArray<unknown>(source.moves).map(normalizeRivalMove).filter((item): item is OwnedStreamingRivalMove => Boolean(item)),
+        item => item.idempotencyKey,
+    );
+    const retainedMoveIds = new Set([
+        ...normalizedMoves.slice(-OWNED_STREAMING_RIVAL_MOVE_LIMIT).map(move => move.id),
+        ...protectedRivalMoveIds,
+    ]);
     return {
         initializedAtAbsoluteWeek: source.initializedAtAbsoluteWeek === null || source.initializedAtAbsoluteWeek === undefined
             ? null
@@ -1171,10 +1344,11 @@ const normalizeCompetitiveWorld = (value: unknown): OwnedStreamingCompetitiveWor
             asArray<unknown>(source.rivals).map(normalizeRivalProfile).filter((item): item is OwnedStreamingRivalProfile => Boolean(item)),
             item => item.platformId,
         ).slice(0, PLATFORM_IDS.length),
-        moves: dedupeByKey(
-            asArray<unknown>(source.moves).map(normalizeRivalMove).filter((item): item is OwnedStreamingRivalMove => Boolean(item)),
-            item => item.idempotencyKey,
-        ).slice(-OWNED_STREAMING_RIVAL_MOVE_LIMIT),
+        moves: normalizedMoves.filter(move => retainedMoveIds.has(move.id)),
+        weeklyRivalHistory: dedupeByKey(
+            asArray<unknown>(source.weeklyRivalHistory).map(normalizeRivalWeeklySnapshot).filter((item): item is OwnedStreamingRivalWeeklySnapshot => Boolean(item)),
+            item => item.id,
+        ).sort((a, b) => a.absoluteWeek - b.absoluteWeek).slice(-OWNED_STREAMING_WEEKLY_HISTORY_LIMIT * PLATFORM_IDS.length),
         regionalLaunches: dedupeByKey(
             asArray<unknown>(source.regionalLaunches).map(normalizeRegionalLaunch).filter((item): item is OwnedStreamingRegionalLaunch => Boolean(item)),
             item => item.regionId,
@@ -1547,6 +1721,89 @@ const normalizeCrisisSecurity = (value: unknown): OwnedStreamingCrisisSecuritySt
         } satisfies OwnedStreamingWhistleblowerReport;
     }).filter((item): item is OwnedStreamingWhistleblowerReport => Boolean(item)).slice(-OWNED_STREAMING_OVERSIGHT_CASE_LIMIT);
 
+    const operationsSource = asRecord(source.infrastructureOperations);
+    const infrastructureIncidents = asArray<unknown>(operationsSource.incidents).map(value => {
+        const item = asRecord(value);
+        const idempotencyKey = cleanText(item.idempotencyKey, '', 180);
+        const facilityId = cleanText(item.facilityId, '', 140);
+        const cityId = cleanText(item.cityId, '', 80);
+        if (!idempotencyKey || !facilityId || !cityId) return null;
+        const detectedAtAbsoluteWeek = Math.max(0, Math.round(clamp(item.detectedAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER)));
+        const stage = isOneOf(item.stage, ['DETECTED', 'RECOVERING', 'RESOLVED'] as const, 'DETECTED');
+        return {
+            id: cleanText(item.id, createDeterministicId('streaming_infrastructure_incident', idempotencyKey), 120),
+            idempotencyKey,
+            type: isOneOf(item.type, ['POWER_FAILURE', 'COOLING_INCIDENT', 'FIBRE_CUT', 'TRAFFIC_SPIKE', 'REGIONAL_OUTAGE', 'CYBERATTACK', 'DDOS_ATTACK', 'RIVAL_SABOTAGE'] as const, 'REGIONAL_OUTAGE'),
+            severity: isOneOf(item.severity, ['MINOR', 'SERIOUS', 'MAJOR', 'CRITICAL'] as const, 'SERIOUS'),
+            stage,
+            title: cleanText(item.title, 'Infrastructure incident', 140),
+            detail: cleanText(item.detail, 'A facility operating signal requires a response.', 360),
+            cause: cleanText(item.cause, 'Infrastructure pressure', 220),
+            facilityId,
+            cityId,
+            detectedAtAbsoluteWeek,
+            affectedSubscribers: Math.round(clamp(item.affectedSubscribers, 0, Number.MAX_SAFE_INTEGER)),
+            capacityLossPercent: clamp(item.capacityLossPercent, 0, 100),
+            conditionLossPercent: clamp(item.conditionLossPercent, 0, 100),
+            responseAction: item.responseAction === null || item.responseAction === undefined
+                ? null
+                : isOneOf(item.responseAction, ['FAILOVER_BACKUP', 'REROUTE_TRAFFIC', 'ISOLATE_AND_REPAIR', 'EMERGENCY_CAPACITY'] as const, 'ISOLATE_AND_REPAIR'),
+            rerouteFacilityId: cleanText(item.rerouteFacilityId, '', 140) || null,
+            compensation: item.compensation === null || item.compensation === undefined
+                ? null
+                : isOneOf(item.compensation, ['NONE', 'TARGETED', 'FULL'] as const, 'TARGETED'),
+            insuranceClaimed: Boolean(item.insuranceClaimed),
+            responseCost: Math.round(clamp(item.responseCost, 0, Number.MAX_SAFE_INTEGER)),
+            insuranceRecovery: Math.round(clamp(item.insuranceRecovery, 0, Number.MAX_SAFE_INTEGER)),
+            recoveryReadyAtAbsoluteWeek: item.recoveryReadyAtAbsoluteWeek === null || item.recoveryReadyAtAbsoluteWeek === undefined
+                ? null
+                : Math.max(detectedAtAbsoluteWeek, Math.round(clamp(item.recoveryReadyAtAbsoluteWeek, detectedAtAbsoluteWeek, Number.MAX_SAFE_INTEGER))),
+            resolvedAtAbsoluteWeek: stage === 'RESOLVED'
+                ? Math.max(detectedAtAbsoluteWeek, Math.round(clamp(item.resolvedAtAbsoluteWeek, detectedAtAbsoluteWeek, Number.MAX_SAFE_INTEGER, detectedAtAbsoluteWeek)))
+                : null,
+            assistedHandled: Boolean(item.assistedHandled),
+            publicReaction: cleanText(item.publicReaction, 'The public is monitoring recovery.', 240),
+            subscriberReaction: cleanText(item.subscriberReaction, 'Affected subscribers expect stable service.', 240),
+            outcomeNote: item.outcomeNote === null || item.outcomeNote === undefined ? null : cleanText(item.outcomeNote, '', 320),
+        } satisfies OwnedStreamingInfrastructureIncident;
+    }).filter((item): item is OwnedStreamingInfrastructureIncident => Boolean(item)).slice(-OWNED_STREAMING_INFRASTRUCTURE_INCIDENT_LIMIT);
+
+    const progressionTiers = ['RENTED_CABINET', 'PRIVATE_CAGE', 'DEDICATED_HALL', 'OWNED_DATA_CENTRE', 'GLOBAL_HYPERSCALE_CAMPUS'] as const;
+    const infrastructurePerformanceHistory = asArray<unknown>(operationsSource.performanceHistory).map(value => {
+        const item = asRecord(value);
+        const absoluteWeek = Math.max(0, Math.round(clamp(item.absoluteWeek, 0, Number.MAX_SAFE_INTEGER)));
+        return {
+            absoluteWeek,
+            tier: isOneOf(item.tier, progressionTiers, 'RENTED_CABINET'),
+            facilityCount: Math.round(clamp(item.facilityCount, 0, 1_000)),
+            installedRacks: Math.round(clamp(item.installedRacks, 0, 100_000)),
+            averageConditionPercent: clamp(item.averageConditionPercent, 0, 100, 100),
+            reliabilityPercent: clamp(item.reliabilityPercent, 0, 100, 99),
+            playbackSuccessRate: clamp(item.playbackSuccessRate, 0, 100, 99),
+            capacityUtilizationPercent: clamp(item.capacityUtilizationPercent, 0, 1_000),
+            energyKwhWeekly: Math.round(clamp(item.energyKwhWeekly, 0, Number.MAX_SAFE_INTEGER)),
+            waterLitresWeekly: Math.round(clamp(item.waterLitresWeekly, 0, Number.MAX_SAFE_INTEGER)),
+            weeklyOperatingCost: Math.round(clamp(item.weeklyOperatingCost, 0, Number.MAX_SAFE_INTEGER)),
+            activeIncidentCount: Math.round(clamp(item.activeIncidentCount, 0, 100)),
+        } satisfies OwnedStreamingInfrastructurePerformancePoint;
+    }).slice(-OWNED_STREAMING_INFRASTRUCTURE_PERFORMANCE_LIMIT);
+    const infrastructureAwards = asArray<unknown>(operationsSource.awards).map(value => {
+        const item = asRecord(value);
+        const idempotencyKey = cleanText(item.idempotencyKey, '', 180);
+        const factId = cleanText(item.factId, '', 120);
+        if (!idempotencyKey || !factId) return null;
+        return {
+            id: cleanText(item.id, createDeterministicId('streaming_infrastructure_award', idempotencyKey), 120),
+            idempotencyKey,
+            category: isOneOf(item.category, ['RELIABILITY_LEADERSHIP', 'RECOVERY_EXCELLENCE', 'SUSTAINABLE_SCALE', 'GLOBAL_BACKBONE'] as const, 'RELIABILITY_LEADERSHIP'),
+            title: cleanText(item.title, 'Infrastructure distinction', 120),
+            evidence: cleanText(item.evidence, 'Verified operating evidence.', 300),
+            score: clamp(item.score, 0, 100),
+            awardedAtAbsoluteWeek: Math.max(0, Math.round(clamp(item.awardedAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
+            factId,
+        } satisfies OwnedStreamingInfrastructureAward;
+    }).filter((item): item is OwnedStreamingInfrastructureAward => Boolean(item)).slice(-OWNED_STREAMING_INFRASTRUCTURE_AWARD_LIMIT);
+
     return {
         publicTrust: clamp(source.publicTrust, 0, 100, 72),
         regulatoryScrutiny: clamp(source.regulatoryScrutiny, 0, 100),
@@ -1561,6 +1818,23 @@ const normalizeCrisisSecurity = (value: unknown): OwnedStreamingCrisisSecuritySt
         trustInitiatives,
         regulatoryCases,
         whistleblowerReports,
+        infrastructureOperations: {
+            maintenanceCadence: isOneOf(operationsSource.maintenanceCadence, ['REACTIVE', 'BALANCED', 'PREVENTIVE'] as const, 'BALANCED'),
+            insuranceTier: isOneOf(operationsSource.insuranceTier, ['NONE', 'STANDARD', 'PREMIUM'] as const, 'NONE'),
+            lastProcessedAbsoluteWeek: operationsSource.lastProcessedAbsoluteWeek === null || operationsSource.lastProcessedAbsoluteWeek === undefined
+                ? null
+                : Math.max(0, Math.round(clamp(operationsSource.lastProcessedAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
+            incidents: infrastructureIncidents,
+            totalMaintenanceSpend: Math.round(clamp(operationsSource.totalMaintenanceSpend, 0, Number.MAX_SAFE_INTEGER)),
+            totalCompensationPaid: Math.round(clamp(operationsSource.totalCompensationPaid, 0, Number.MAX_SAFE_INTEGER)),
+            totalInsuranceRecovered: Math.round(clamp(operationsSource.totalInsuranceRecovered, 0, Number.MAX_SAFE_INTEGER)),
+            assistedResponseCount: Math.round(clamp(operationsSource.assistedResponseCount, 0, Number.MAX_SAFE_INTEGER)),
+            reliabilityStreakWeeks: Math.round(clamp(operationsSource.reliabilityStreakWeeks, 0, Number.MAX_SAFE_INTEGER)),
+            lastProgressionTier: isOneOf(operationsSource.lastProgressionTier, progressionTiers, 'RENTED_CABINET'),
+            performanceHistory: infrastructurePerformanceHistory,
+            awards: infrastructureAwards,
+            orchestratedFactIds: uniqueStrings(operationsSource.orchestratedFactIds, OWNED_STREAMING_INFRASTRUCTURE_CINEMATIC_FACT_LIMIT),
+        },
     };
 };
 
@@ -1921,11 +2195,121 @@ const normalizeNetworkPlacements = (value: unknown): OwnedStreamingNetworkPlacem
     return placements;
 };
 
+const STREAMING_FACILITY_TYPES = STREAMING_FACILITY_CONTRACTS.map(contract => contract.type);
+const normalizeStreamingFacilities = (
+    value: unknown,
+    legacyPlacements: OwnedStreamingNetworkPlacement[],
+): OwnedStreamingFacility[] => {
+    const seen = new Set<string>();
+    const facilities = asArray<unknown>(value).flatMap((item, index) => {
+        const source = asRecord(item);
+        const cityId = cleanText(source.cityId, '', 24).toUpperCase();
+        const id = cleanText(source.id, cityId ? `FACILITY-${cityId}-${String(index + 1).padStart(2, '0')}` : '', 120);
+        if (!id || !cityId || seen.has(id)) return [];
+        seen.add(id);
+        const type = isOneOf(source.type, STREAMING_FACILITY_TYPES, 'RENTED_CABINET');
+        const contract = getStreamingFacilityContract(type);
+        const lease = normalizeStreamingFacilityLease(source.lease, type);
+        const installedRacks = Math.max(1, Math.round(clamp(
+            source.installedRacks,
+            1,
+            lease?.rackPositions || contract.capacityRacks,
+            1,
+        )));
+        const legacyRole = normalizeStreamingFacilityRole(source.role, index === 0 ? 'CORE_ORIGIN' : 'EDGE_CACHE');
+        const rackGroups = normalizeStreamingRackGroups(source.rackGroups, id, installedRacks, legacyRole);
+        return [{
+            id,
+            cityId,
+            type,
+            installedRacks,
+            role: projectFacilityNetworkRole(rackGroups),
+            rackGroups,
+            lease,
+            physical: normalizeStreamingFacilityPhysical(source.physical, type, installedRacks, lease),
+        } satisfies OwnedStreamingFacility];
+    }).slice(0, 48);
+    const migrated = facilities.length ? facilities : migratePlacementsToStreamingFacilities(legacyPlacements);
+    if (migrated.length && !migrated.some(facility => facility.role === 'CORE_ORIGIN')) {
+        migrated[0] = { ...migrated[0], role: 'CORE_ORIGIN' };
+    }
+    return migrated;
+};
+
+const normalizeLaunchRehearsalSnapshot = (
+    value: unknown,
+): OwnedStreamingLaunchRehearsalSnapshot | undefined => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+    const source = asRecord(value);
+    const configurationSignature = cleanText(source.configurationSignature, '', 640);
+    if (!configurationSignature) return undefined;
+    return {
+        configurationSignature,
+        scenario: isOneOf(source.scenario, ['QUIET', 'LIKELY', 'SURGE'] as const, 'LIKELY'),
+        verdict: isOneOf(source.verdict, ['HELD', 'BURST', 'BROKE'] as const, 'BROKE'),
+        peakConcurrentStreams: Math.round(clamp(source.peakConcurrentStreams, 0, Number.MAX_SAFE_INTEGER)),
+        steadyCapacity: Math.round(clamp(source.steadyCapacity, 0, Number.MAX_SAFE_INTEGER)),
+        burstCapacity: Math.round(clamp(source.burstCapacity, 0, Number.MAX_SAFE_INTEGER)),
+        peakLoadPercent: Math.round(clamp(source.peakLoadPercent, 0, 10_000)),
+        spareCapacityPercent: Math.round(clamp(source.spareCapacityPercent, -100, 10_000)),
+        failedPercent: Math.round(clamp(source.failedPercent, 0, 100)),
+        estimatedDowntimeMinutes: Math.round(clamp(source.estimatedDowntimeMinutes, 0, 100_000)),
+        catalogueAvailabilityPercent: Math.round(clamp(source.catalogueAvailabilityPercent, 0, 100)),
+        regionalSinglePointFailures: uniqueStrings(source.regionalSinglePointFailures, 12),
+        warningSummary: cleanText(source.warningSummary, 'Rehearsal evidence recorded.', 360),
+        countries: asArray<unknown>(source.countries).flatMap(item => {
+            const country = asRecord(item);
+            const marketId = cleanText(country.marketId, '', 24);
+            if (!marketId) return [];
+            const startupValue = Number(country.startupTimeMs);
+            return [{
+                marketId,
+                country: cleanText(country.country, marketId, 80),
+                demand: Math.round(clamp(country.demand, 0, Number.MAX_SAFE_INTEGER)),
+                startupTimeMs: Number.isFinite(startupValue) ? Math.round(clamp(startupValue, 0, 100_000)) : null,
+                bufferingRiskPercent: Math.round(clamp(country.bufferingRiskPercent, 0, 100)),
+                catalogueAvailabilityPercent: Math.round(clamp(country.catalogueAvailabilityPercent, 0, 100)),
+                outageResistance: isOneOf(country.outageResistance, ['REDUNDANT', 'EXPOSED', 'SINGLE_POINT', 'UNSERVED'] as const, 'UNSERVED'),
+                verdict: isOneOf(country.verdict, ['HELD', 'BURST', 'BROKE'] as const, 'BROKE'),
+                failedPercent: Math.round(clamp(country.failedPercent, 0, 100)),
+                viewerConsequence: cleanText(country.viewerConsequence, 'Viewer consequence unavailable.', 300),
+            }];
+        }).slice(0, 40),
+        facilities: asArray<unknown>(source.facilities).flatMap(item => {
+            const facility = asRecord(item);
+            const facilityId = cleanText(facility.facilityId, '', 120);
+            const cityId = cleanText(facility.cityId, '', 24);
+            if (!facilityId || !cityId) return [];
+            return [{
+                facilityId,
+                cityId,
+                demand: Math.round(clamp(facility.demand, 0, Number.MAX_SAFE_INTEGER)),
+                loadPercent: Math.round(clamp(facility.loadPercent, 0, 10_000)),
+                state: isOneOf(facility.state, ['CLEAR', 'STRESSED', 'BURSTING', 'FAILED'] as const, 'STRESSED'),
+                verdict: isOneOf(facility.verdict, ['HELD', 'BURST', 'BROKE'] as const, 'BROKE'),
+                failedPercent: Math.round(clamp(facility.failedPercent, 0, 100)),
+                limitingFactor: cleanText(facility.limitingFactor, 'NONE', 40),
+            }];
+        }).slice(0, 48),
+        completedAtAbsoluteWeek: Math.max(0, Math.round(clamp(source.completedAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
+    };
+};
+
 const normalizeInfrastructureSetupDraft = (
     value: unknown,
 ): OwnedStreamingInfrastructureSetupDraft | null => {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
     const source = asRecord(value);
+    const openingDemandSource = asRecord(source.openingDemandForecast);
+    const networkPlacements = normalizeNetworkPlacements(source.networkPlacements);
+    const facilities = normalizeStreamingFacilities(source.facilities, networkPlacements);
+    const openingDemandForecast = Object.keys(openingDemandSource).length > 0
+        ? {
+            low: Math.round(clamp(openingDemandSource.low, 0, Number.MAX_SAFE_INTEGER)),
+            likely: Math.round(clamp(openingDemandSource.likely, 0, Number.MAX_SAFE_INTEGER)),
+            high: Math.round(clamp(openingDemandSource.high, 0, Number.MAX_SAFE_INTEGER)),
+        }
+        : undefined;
     return {
         currentStep: Math.round(clamp(source.currentStep, 0, 4)),
         strategy: isOneOf(
@@ -1936,10 +2320,14 @@ const normalizeInfrastructureSetupDraft = (
         capacityPackageId: isOneOf(source.capacityPackageId, CAPACITY_PACKAGE_IDS, 'GROWTH'),
         rolloutPace: isOneOf(source.rolloutPace, INFRASTRUCTURE_ROLLOUT_PACES, 'STANDARD'),
         subscriptionPrices: normalizeSubscriptionPrices(source.subscriptionPrices),
-        networkPlacements: normalizeNetworkPlacements(source.networkPlacements),
+        networkPlacements: facilities.length ? aggregateStreamingFacilities(facilities) : networkPlacements,
+        facilities,
+        managementPolicy: normalizeStreamingInfrastructureManagementPolicy(source.managementPolicy),
+        openingDemandForecast,
         lastLoadTestSignature: source.lastLoadTestSignature === null || source.lastLoadTestSignature === undefined
             ? null
-            : cleanText(source.lastLoadTestSignature, '', 160) || null,
+            : cleanText(source.lastLoadTestSignature, '', 640) || null,
+        lastLaunchRehearsal: normalizeLaunchRehearsalSnapshot(source.lastLaunchRehearsal),
         updatedAtAbsoluteWeek: Math.max(0, Math.round(clamp(source.updatedAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
     };
 };
@@ -1947,7 +2335,7 @@ const normalizeInfrastructureSetupDraft = (
 const normalizeLoadTestSnapshot = (value: unknown): OwnedStreamingLoadTestSnapshot | null => {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
     const source = asRecord(value);
-    const configurationSignature = cleanText(source.configurationSignature, '', 160);
+    const configurationSignature = cleanText(source.configurationSignature, '', 640);
     if (!configurationSignature) return null;
     return {
         configurationSignature,
@@ -1958,6 +2346,7 @@ const normalizeLoadTestSnapshot = (value: unknown): OwnedStreamingLoadTestSnapsh
         headroomPercent: Math.round(clamp(source.headroomPercent, -100, 10_000, 0) * 10) / 10,
         status: isOneOf(source.status, LOAD_TEST_STATUSES, 'CONDITIONAL'),
         driverKeys: uniqueStrings(source.driverKeys, 12),
+        launchRehearsal: normalizeLaunchRehearsalSnapshot(source.launchRehearsal),
         completedAtAbsoluteWeek: Math.max(0, Math.round(clamp(source.completedAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
     };
 };
@@ -1969,6 +2358,21 @@ const normalizeInfrastructureSetup = (
     const source = asRecord(value);
     const loadTest = normalizeLoadTestSnapshot(source.loadTest);
     if (!loadTest) return null;
+    const networkPlacements = normalizeNetworkPlacements(source.networkPlacements);
+    const facilities = normalizeStreamingFacilities(source.facilities, networkPlacements);
+    const physicalSource = asRecord(source.physicalSummary);
+    const physicalSummary: OwnedStreamingInfrastructurePhysicalSummary | undefined = Object.keys(physicalSource).length
+        ? {
+            energyKwhWeekly: Math.round(clamp(physicalSource.energyKwhWeekly, 0, Number.MAX_SAFE_INTEGER)),
+            waterLitresWeekly: Math.round(clamp(physicalSource.waterLitresWeekly, 0, Number.MAX_SAFE_INTEGER)),
+            physicalWeeklyOperatingCost: Math.round(clamp(physicalSource.physicalWeeklyOperatingCost, 0, Number.MAX_SAFE_INTEGER)),
+            sustainabilityScore: Math.round(clamp(physicalSource.sustainabilityScore, 0, 100, 100)),
+            publicReputation: Math.round(clamp(physicalSource.publicReputation, 0, 100, 100)),
+            reliabilityPercent: Math.round(clamp(physicalSource.reliabilityPercent, 90, 99.999, 99.5) * 1_000) / 1_000,
+            backupCoveragePercent: Math.round(clamp(physicalSource.backupCoveragePercent, 0, 100) * 10) / 10,
+            limitingFactors: uniqueStrings(physicalSource.limitingFactors, 24),
+        }
+        : undefined;
     return {
         capacityPackageId: isOneOf(source.capacityPackageId, CAPACITY_PACKAGE_IDS, 'GROWTH'),
         rolloutPace: isOneOf(source.rolloutPace, INFRASTRUCTURE_ROLLOUT_PACES, 'STANDARD'),
@@ -1978,7 +2382,10 @@ const normalizeInfrastructureSetup = (
         staffRequired: Math.round(clamp(source.staffRequired, 0, 100_000)),
         capitalInvested: Math.round(clamp(source.capitalInvested, 0, Number.MAX_SAFE_INTEGER)),
         technicalDebt: Math.round(clamp(source.technicalDebt, 0, 10_000)),
-        networkPlacements: normalizeNetworkPlacements(source.networkPlacements),
+        networkPlacements: facilities.length ? aggregateStreamingFacilities(facilities) : networkPlacements,
+        facilities,
+        managementPolicy: normalizeStreamingInfrastructureManagementPolicy(source.managementPolicy),
+        physicalSummary,
         readyAtAbsoluteWeek: Math.max(0, Math.round(clamp(source.readyAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
         revision: Math.max(1, Math.round(clamp(source.revision, 1, 10_000, 1))),
         committedAtAbsoluteWeek: Math.max(0, Math.round(clamp(source.committedAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
@@ -2025,6 +2432,116 @@ const normalizeTechnologyProject = (value: unknown): OwnedStreamingTechnologyPro
         completedAtAbsoluteWeek: source.completedAtAbsoluteWeek == null
             ? null
             : Math.max(startedAtAbsoluteWeek, Math.round(clamp(source.completedAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
+    };
+};
+
+const normalizeResearchProgram = (value: unknown): OwnedStreamingResearchProgram | null => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    const source = asRecord(value);
+    const id = cleanText(source.id, '', 120);
+    const definitionId = cleanText(source.definitionId, '', 120);
+    if (!id || !definitionId) return null;
+    const startedAtAbsoluteWeek = Math.max(0, Math.round(clamp(source.startedAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER)));
+    const stageStartedAtAbsoluteWeek = Math.max(startedAtAbsoluteWeek, Math.round(clamp(
+        source.stageStartedAtAbsoluteWeek,
+        startedAtAbsoluteWeek,
+        Number.MAX_SAFE_INTEGER,
+        startedAtAbsoluteWeek,
+    )));
+    const stage = isOneOf(source.stage, RESEARCH_STAGES, 'RESEARCHING');
+    return {
+        id,
+        idempotencyKey: cleanText(source.idempotencyKey, id, 180),
+        definitionId,
+        title: cleanText(source.title, 'Research program', 140),
+        category: isOneOf(source.category, RESEARCH_CATEGORIES, 'EXPERIMENTAL_TECHNOLOGY'),
+        stage,
+        buildMode: isOneOf(source.buildMode, TECHNOLOGY_BUILD_MODES, 'BALANCED'),
+        ipStrategy: source.ipStrategy == null ? null : isOneOf(source.ipStrategy, RESEARCH_IP_STRATEGIES, 'LICENSE'),
+        researchCost: Math.round(clamp(source.researchCost, 0, Number.MAX_SAFE_INTEGER)),
+        patentCost: Math.round(clamp(source.patentCost, 0, Number.MAX_SAFE_INTEGER)),
+        installationCost: Math.round(clamp(source.installationCost, 0, Number.MAX_SAFE_INTEGER)),
+        weeklyOperatingCost: Math.round(clamp(source.weeklyOperatingCost, 0, Number.MAX_SAFE_INTEGER)),
+        licenseWeeklyCost: Math.round(clamp(source.licenseWeeklyCost, 0, Number.MAX_SAFE_INTEGER)),
+        staffRequired: Math.round(clamp(source.staffRequired, 1, 100_000, 1)),
+        researchWeeks: Math.round(clamp(source.researchWeeks, 1, 52, 1)),
+        prototypeWeeks: Math.round(clamp(source.prototypeWeeks, 1, 52, 1)),
+        testWeeks: Math.round(clamp(source.testWeeks, 1, 52, 1)),
+        installationWeeks: Math.round(clamp(source.installationWeeks, 0, 52, 1)),
+        startedAtAbsoluteWeek,
+        stageStartedAtAbsoluteWeek,
+        stageReadyAtAbsoluteWeek: Math.max(stageStartedAtAbsoluteWeek, Math.round(clamp(
+            source.stageReadyAtAbsoluteWeek,
+            stageStartedAtAbsoluteWeek,
+            Number.MAX_SAFE_INTEGER,
+            stageStartedAtAbsoluteWeek + 1,
+        ))),
+        installationTargetType: isOneOf(source.installationTargetType, RESEARCH_INSTALL_TARGET_TYPES, 'TECHNOLOGY_PROJECT'),
+        installationTargetId: source.installationTargetId == null ? null : cleanText(source.installationTargetId, '', 160) || null,
+        installationTargetLabel: source.installationTargetLabel == null ? null : cleanText(source.installationTargetLabel, '', 160) || null,
+        rivalInterestPercent: Math.round(clamp(source.rivalInterestPercent, 0, 100)),
+        completedAtAbsoluteWeek: stage !== 'OPERATING' || source.completedAtAbsoluteWeek == null
+            ? null
+            : Math.max(stageStartedAtAbsoluteWeek, Math.round(clamp(source.completedAtAbsoluteWeek, stageStartedAtAbsoluteWeek, Number.MAX_SAFE_INTEGER))),
+    };
+};
+
+const normalizeCampusEvent = (value: unknown): OwnedStreamingCampusEvent | null => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    const source = asRecord(value);
+    const id = cleanText(source.id, '', 140);
+    if (!id) return null;
+    return {
+        id,
+        stage: isOneOf(source.stage, CAMPUS_STAGES, 'PERMITS'),
+        type: isOneOf(source.type, CAMPUS_EVENT_TYPES, 'CONTRACTOR_OVERRUN'),
+        title: cleanText(source.title, 'Construction issue', 140),
+        detail: cleanText(source.detail, 'The construction schedule changed.', 300),
+        delayWeeks: Math.round(clamp(source.delayWeeks, 0, 12)),
+        cost: Math.round(clamp(source.cost, 0, Number.MAX_SAFE_INTEGER)),
+        occurredAtAbsoluteWeek: Math.max(0, Math.round(clamp(source.occurredAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
+    };
+};
+
+const normalizeCampusProject = (value: unknown): OwnedStreamingCampusProject | null => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    const source = asRecord(value);
+    const id = cleanText(source.id, '', 140);
+    const cityId = cleanText(source.cityId, '', 24).toUpperCase();
+    if (!id || !cityId) return null;
+    const startedAtAbsoluteWeek = Math.max(0, Math.round(clamp(source.startedAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER)));
+    const stageStartedAtAbsoluteWeek = Math.max(startedAtAbsoluteWeek, Math.round(clamp(source.stageStartedAtAbsoluteWeek, startedAtAbsoluteWeek, Number.MAX_SAFE_INTEGER, startedAtAbsoluteWeek)));
+    return {
+        id,
+        idempotencyKey: cleanText(source.idempotencyKey, id, 180),
+        name: cleanText(source.name, 'EMPIRE+ Data Campus', 100),
+        cityId,
+        scale: isOneOf(source.scale, CAMPUS_SCALES, 'OWNED_DATA_CENTRE'),
+        status: isOneOf(source.status, CAMPUS_PROJECT_STATUSES, 'AWAITING_DECISION'),
+        stage: isOneOf(source.stage, CAMPUS_STAGES, 'PERMITS'),
+        currentStageOptionId: source.currentStageOptionId == null ? null : cleanText(source.currentStageOptionId, '', 100) || null,
+        campusDesignId: source.campusDesignId == null ? null : cleanText(source.campusDesignId, '', 100) || null,
+        utilitiesPackageId: source.utilitiesPackageId == null ? null : cleanText(source.utilitiesPackageId, '', 100) || null,
+        systemsPackageId: source.systemsPackageId == null ? null : cleanText(source.systemsPackageId, '', 100) || null,
+        rackPackageId: source.rackPackageId == null ? null : cleanText(source.rackPackageId, '', 100) || null,
+        hallCount: Math.round(clamp(source.hallCount, 0, 12)),
+        rackCapacity: Math.round(clamp(source.rackCapacity, 0, 384)),
+        installedRacks: Math.round(clamp(source.installedRacks, 0, 384)),
+        landCost: Math.round(clamp(source.landCost, 0, Number.MAX_SAFE_INTEGER)),
+        capitalCommitted: Math.round(clamp(source.capitalCommitted, 0, Number.MAX_SAFE_INTEGER)),
+        weeklyOperatingCost: Math.round(clamp(source.weeklyOperatingCost, 0, Number.MAX_SAFE_INTEGER)),
+        staffRequired: Math.round(clamp(source.staffRequired, 0, 100_000)),
+        startedAtAbsoluteWeek,
+        stageStartedAtAbsoluteWeek,
+        stageReadyAtAbsoluteWeek: Math.max(stageStartedAtAbsoluteWeek, Math.round(clamp(source.stageReadyAtAbsoluteWeek, stageStartedAtAbsoluteWeek, Number.MAX_SAFE_INTEGER, stageStartedAtAbsoluteWeek))),
+        openedAtAbsoluteWeek: source.openedAtAbsoluteWeek == null ? null : Math.max(startedAtAbsoluteWeek, Math.round(clamp(source.openedAtAbsoluteWeek, startedAtAbsoluteWeek, Number.MAX_SAFE_INTEGER))),
+        facilityId: source.facilityId == null ? null : cleanText(source.facilityId, '', 140) || null,
+        events: dedupeByKey(
+            asArray<unknown>(source.events).map(normalizeCampusEvent).filter((event): event is OwnedStreamingCampusEvent => Boolean(event)),
+            event => event.id,
+        ).slice(-40),
+        expansionCount: Math.round(clamp(source.expansionCount, 0, 10)),
+        expansionReadyAtAbsoluteWeek: source.expansionReadyAtAbsoluteWeek == null ? null : Math.max(startedAtAbsoluteWeek, Math.round(clamp(source.expansionReadyAtAbsoluteWeek, startedAtAbsoluteWeek, Number.MAX_SAFE_INTEGER))),
     };
 };
 
@@ -2143,6 +2660,7 @@ const normalizeCatalogLicense = (value: unknown): OwnedStreamingCatalogLicense |
         genre: cleanText(source.genre, 'Licensed', 80),
         licensorName: cleanText(source.licensorName, 'Rights holder', 140),
         territory: isOneOf(source.territory, LICENSE_TERRITORIES, 'MULTI_REGION'),
+        countryIds: uniqueStrings(source.countryIds, 80),
         durationWeeks,
         exclusivity: isOneOf(source.exclusivity, LICENSE_EXCLUSIVITY, 'NON_EXCLUSIVE'),
         minimumGuarantee: Math.round(clamp(source.minimumGuarantee, 0, Number.MAX_SAFE_INTEGER)),
@@ -2506,6 +3024,8 @@ const normalizeWeeklyOperations = (value: unknown): OwnedStreamingWeeklyOperatio
         weeklyPlanCost: Math.round(clamp(source.weeklyPlanCost, 0, Number.MAX_SAFE_INTEGER)),
         growthPlanCost: Math.round(clamp(source.growthPlanCost, 0, Number.MAX_SAFE_INTEGER)),
         rightsComplianceCost: Math.round(clamp(source.rightsComplianceCost, 0, Number.MAX_SAFE_INTEGER)),
+        marketPolicyCost: Math.round(clamp(source.marketPolicyCost, 0, Number.MAX_SAFE_INTEGER)),
+        marketOperatingCost: Math.round(clamp(source.marketOperatingCost, 0, Number.MAX_SAFE_INTEGER)),
         technologyCampusCost: Math.round(clamp(source.technologyCampusCost, 0, Number.MAX_SAFE_INTEGER)),
         productSuiteCost: Math.round(clamp(source.productSuiteCost, 0, Number.MAX_SAFE_INTEGER)),
         productRevenue: Math.round(clamp(source.productRevenue, 0, Number.MAX_SAFE_INTEGER)),
@@ -2796,6 +3316,7 @@ const dedupeByKey = <T,>(items: T[], getKey: (item: T) => string): T[] => {
 export const normalizeOwnedStreamingPlatformState = (
     value: unknown,
     playerId = 'player',
+    protectedRivalMoveIds: ReadonlySet<string> = new Set(),
 ): OwnedStreamingPlatformState => {
     const defaults = createOwnedStreamingPlatformState(playerId);
     const source = asRecord(value);
@@ -2839,30 +3360,40 @@ export const normalizeOwnedStreamingPlatformState = (
         ...ledgerCandidates.filter(entry => requestedFactIds.has(entry.id)),
     ], entry => entry.idempotencyKey).slice(-OWNED_STREAMING_EVENT_LEDGER_LIMIT);
     const validFactIds = new Set(eventLedger.map(entry => entry.id));
+    const canonicalFoundation = normalizeStreamingCanonicalFoundation(source);
+    const normalizedIdentity: OwnedStreamingPlatformState['identity'] = identityName
+        ? {
+            name: identityName,
+            slug: cleanText(identitySource.slug, identityName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''), 70),
+            primaryColor: cleanText(identitySource.primaryColor, '#7C3AED', 20),
+            secondaryColor: cleanText(identitySource.secondaryColor, '#111827', 20),
+            logoKey: isOneOf(identitySource.logoKey, LOGO_KEYS, 'FRAME_PLAY'),
+            visualMarkId: cleanText(identitySource.visualMarkId, 'BOLT', 40).toUpperCase(),
+            customMarkDataUrl: cleanCustomMarkDataUrl(identitySource.customMarkDataUrl),
+            wordmarkStyleId: isOneOf(identitySource.wordmarkStyleId, WORDMARK_STYLE_IDS, 'SIDE'),
+            typefaceId: isOneOf(identitySource.typefaceId, TYPEFACE_IDS, 'GROTESK'),
+            brandPromiseId: isOneOf(identitySource.brandPromiseId, BRAND_PROMISE_IDS, 'BALANCED'),
+            publicManifesto: cleanText(identitySource.publicManifesto, '', 160),
+            foundedAtAbsoluteWeek: Math.max(0, Math.round(clamp(identitySource.foundedAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
+        }
+        : null;
+    if (normalizedIdentity && SOUND_IDENT_KEYS.includes(identitySource.soundIdentKey as StreamingSoundIdentKey)) {
+        normalizedIdentity.soundIdentKey = identitySource.soundIdentKey as StreamingSoundIdentKey;
+    }
+    const legacyDayOneMarketIds = normalizeStreamingDayOneMarketIds(identitySource.dayOneMarketIds);
+    if (normalizedIdentity && legacyDayOneMarketIds.length) normalizedIdentity.dayOneMarketIds = legacyDayOneMarketIds;
+    const legacyLaunchServerCityId = cleanText(identitySource.launchServerCityId, '', 24) || null;
+    if (normalizedIdentity && legacyLaunchServerCityId) normalizedIdentity.launchServerCityId = legacyLaunchServerCityId;
 
     return {
         schemaVersion: OWNED_STREAMING_PLATFORM_SCHEMA_VERSION,
         lifecycle: isOneOf(source.lifecycle, LIFECYCLES, defaults.lifecycle),
-        identity: identityName
-            ? {
-                name: identityName,
-                slug: cleanText(identitySource.slug, identityName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''), 70),
-                primaryColor: cleanText(identitySource.primaryColor, '#7C3AED', 20),
-                secondaryColor: cleanText(identitySource.secondaryColor, '#111827', 20),
-                logoKey: isOneOf(identitySource.logoKey, LOGO_KEYS, 'FRAME_PLAY'),
-                soundIdentKey: isOneOf(identitySource.soundIdentKey, SOUND_IDENT_KEYS, 'PULSE'),
-                brandPromiseId: isOneOf(identitySource.brandPromiseId, BRAND_PROMISE_IDS, 'BALANCED'),
-                publicManifesto: cleanText(identitySource.publicManifesto, '', 160),
-                dayOneMarketIds: normalizeStreamingDayOneMarketIds(identitySource.dayOneMarketIds),
-                launchServerCityId: cleanText(identitySource.launchServerCityId, '', 24) || null,
-                foundedAtAbsoluteWeek: Math.max(0, Math.round(clamp(identitySource.foundedAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
-            }
-            : null,
+        identity: normalizedIdentity,
         foundingDraft: normalizeFoundingDraft(source.foundingDraft, sourceVersion),
         foundingProfile,
         leadership,
         governance: normalizeGovernance(source.governance),
-        competitiveWorld: normalizeCompetitiveWorld(source.competitiveWorld),
+        competitiveWorld: normalizeCompetitiveWorld(source.competitiveWorld, protectedRivalMoveIds),
         corporateDevelopment: normalizeCorporateDevelopment(source.corporateDevelopment),
         publicCompany: normalizePublicCompany(source.publicCompany),
         crisisSecurity: normalizeCrisisSecurity(source.crisisSecurity),
@@ -2871,6 +3402,7 @@ export const normalizeOwnedStreamingPlatformState = (
             Math.max(0, Math.round(clamp(identitySource.foundedAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
         ),
         finance,
+        ...canonicalFoundation,
         hqOnboarding: normalizeHqOnboarding(source.hqOnboarding),
         infrastructureSetupDraft: normalizeInfrastructureSetupDraft(source.infrastructureSetupDraft),
         infrastructureSetup: normalizeInfrastructureSetup(source.infrastructureSetup),
@@ -2880,6 +3412,18 @@ export const normalizeOwnedStreamingPlatformState = (
                 .filter((project): project is OwnedStreamingTechnologyProject => Boolean(project)),
             project => project.id,
         ).slice(-120),
+        researchPrograms: dedupeByKey(
+            asArray<unknown>(source.researchPrograms)
+                .map(normalizeResearchProgram)
+                .filter((program): program is OwnedStreamingResearchProgram => Boolean(program)),
+            program => program.definitionId,
+        ).slice(-40),
+        campusProjects: dedupeByKey(
+            asArray<unknown>(source.campusProjects)
+                .map(normalizeCampusProject)
+                .filter((project): project is OwnedStreamingCampusProject => Boolean(project)),
+            project => project.id,
+        ).slice(-12),
         productLines: dedupeByKey(
             asArray<unknown>(source.productLines)
                 .map(normalizeProductLine)
@@ -2988,8 +3532,9 @@ export const normalizeOwnedStreamingPlatformState = (
 export const compactOwnedStreamingPlatformForPersistence = (
     value: unknown,
     playerId = 'player',
+    protectedRivalMoveIds: ReadonlySet<string> = new Set(),
 ): OwnedStreamingPlatformState => {
-    const normalized = normalizeOwnedStreamingPlatformState(value, playerId);
+    const normalized = normalizeOwnedStreamingPlatformState(value, playerId, protectedRivalMoveIds);
     const referencedFactIds = new Set(normalized.cinematicQueue.flatMap(event => event.factIds));
     const retainedLedger = dedupeByKey([
         ...normalized.eventLedger.slice(-OWNED_STREAMING_EVENT_LEDGER_LIMIT),
@@ -3011,7 +3556,12 @@ export const compactOwnedStreamingPlatformForPersistence = (
         competitiveWorld: {
             ...normalized.competitiveWorld,
             rivals: normalized.competitiveWorld.rivals.slice(0, PLATFORM_IDS.length),
-            moves: normalized.competitiveWorld.moves.slice(-OWNED_STREAMING_RIVAL_MOVE_LIMIT),
+            // normalizeCompetitiveWorld already applies the regular history bound while
+            // retaining any older moves referenced by authoritative Platform AI
+            // commitments. Slicing again here would silently orphan those commitments
+            // on the next save round trip.
+            moves: normalized.competitiveWorld.moves,
+            weeklyRivalHistory: normalized.competitiveWorld.weeklyRivalHistory.slice(-OWNED_STREAMING_WEEKLY_HISTORY_LIMIT * PLATFORM_IDS.length),
             regionalLaunches: normalized.competitiveWorld.regionalLaunches.slice(0, REGION_IDS.length),
             marketShareHistory: normalized.competitiveWorld.marketShareHistory.slice(-OWNED_STREAMING_MARKET_SHARE_HISTORY_LIMIT),
             awardSeasons: normalized.competitiveWorld.awardSeasons.slice(-OWNED_STREAMING_AWARD_SEASON_LIMIT),
@@ -3037,6 +3587,10 @@ export const compactOwnedStreamingPlatformForPersistence = (
             trustInitiatives: normalized.crisisSecurity.trustInitiatives.slice(-OWNED_STREAMING_TRUST_INITIATIVE_LIMIT),
             regulatoryCases: normalized.crisisSecurity.regulatoryCases.slice(-OWNED_STREAMING_OVERSIGHT_CASE_LIMIT),
             whistleblowerReports: normalized.crisisSecurity.whistleblowerReports.slice(-OWNED_STREAMING_OVERSIGHT_CASE_LIMIT),
+            infrastructureOperations: {
+                ...normalized.crisisSecurity.infrastructureOperations,
+                incidents: normalized.crisisSecurity.infrastructureOperations.incidents.slice(-OWNED_STREAMING_INFRASTRUCTURE_INCIDENT_LIMIT),
+            },
         },
         legacy: {
             ...normalized.legacy,

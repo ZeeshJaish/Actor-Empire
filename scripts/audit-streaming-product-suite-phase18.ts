@@ -91,14 +91,42 @@ const createFixture = (): Player => {
                 PRODUCT_EXPERIENCE: 6,
             },
             catalogProjectIds,
+            researchPrograms: [{
+                id: 'phase18-kids-research',
+                idempotencyKey: 'research-program:kids-mode',
+                definitionId: 'kids-mode',
+                title: 'Kids Mode',
+                category: 'PLATFORM_PRODUCTS',
+                stage: 'READY_TO_INSTALL',
+                buildMode: 'BALANCED',
+                ipStrategy: 'PATENT',
+                researchCost: 5_000_000,
+                patentCost: 3_500_000,
+                installationCost: 18_000_000,
+                weeklyOperatingCost: 0,
+                licenseWeeklyCost: 85_000,
+                staffRequired: 6,
+                researchWeeks: 2,
+                prototypeWeeks: 1,
+                testWeeks: 1,
+                installationWeeks: 3,
+                startedAtAbsoluteWeek: absoluteWeek - 8,
+                stageStartedAtAbsoluteWeek: absoluteWeek - 1,
+                stageReadyAtAbsoluteWeek: absoluteWeek - 1,
+                installationTargetType: 'PRODUCT_LINE',
+                installationTargetId: null,
+                installationTargetLabel: null,
+                rivalInterestPercent: 32,
+                completedAtAbsoluteWeek: null,
+            }],
             treasuryCash: 500_000_000,
         },
     };
 };
 
-assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 22, 'Phase 24 should preserve Product Lab in schema v22.');
+assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 23, 'The canonical foundation should preserve Product Lab in schema v23.');
 const migrated = normalizeOwnedStreamingPlatformState({ schemaVersion: 15 }, 'phase18-migration');
-assert(migrated.schemaVersion === 22 && migrated.productLines.length === 0, 'Schema v15 saves should migrate with a safe empty product portfolio.');
+assert(migrated.schemaVersion === 23 && migrated.productLines.length === 0, 'Schema v15 saves should migrate with a safe empty product portfolio.');
 assert(STREAMING_PRODUCT_DEFINITIONS.length === 7, 'The product suite should expose exactly Core, Kids, Free, Live, Fan, Store and Interactive.');
 
 let fixture = createFixture();
@@ -174,7 +202,14 @@ assert(component.includes('One platform. Seven reasons to return.') && component
 assert(component.includes('VALIDATED') && component.includes('FIRST_TO_MARKET'), 'Product approval should expose delivery strategy instead of a cosmetic unlock button.');
 assert(component.includes('no real-world timers or paid skips'), 'Product development should use canonical game weeks without monetized skips.');
 assert(styles.includes('@media (max-width: 640px)') && styles.includes('prefers-reduced-motion'), 'Product Lab should include explicit mobile and motion-safe treatment.');
-assert(hq.includes('showProductLab') && hq.includes('Enter Product Lab'), 'Platform HQ should launch the playable Product Lab.');
+/* Reached from the NETWORK division's PRODUCTS chip and the Network Desk's
+   product toggle. */
+assert(
+    hq.includes('showProductLab')
+    && hq.includes("chip === 'PRODUCTS'")
+    && hq.includes('onToggleProduct={() => setShowProductLab(true)}'),
+    'The Product Lab must be reachable from the Network division and the Network Desk.',
+);
 assert(viewer.includes('stream-viewer-product-dock') && viewer.includes('productSuite.activeProductIds'), 'Viewer Mode should expose only genuinely active product lines.');
 assert(weeklyLoop.includes('completeDueStreamingProductDevelopments') && weeklyLoop.includes('productSuiteCost') && weeklyLoop.includes('productRevenue'), 'The canonical weekly processor should launch products and apply their costs and revenue.');
 

@@ -7,9 +7,13 @@ import type {
     StreamingBrandPromiseId,
     StreamingLogoKey,
     StreamingSoundIdentKey,
+    StreamingTypefaceId,
+    StreamingWordmarkStyleId,
 } from '../types';
+import { createInitialOwnedStreamingPlatformState } from '../types';
 import { createDeterministicId } from './deterministicRandom';
 import { getAbsoluteWeek } from './legacyLogic';
+import { cleanStreamingBrandMarkDataUrl } from './streamingBrandImage';
 import {
     compactOwnedStreamingPlatformForPersistence,
     normalizeOwnedStreamingPlatformState,
@@ -20,7 +24,6 @@ import {
     getStreamingIncorporationBreakdown,
     STREAMING_INCORPORATION_ECONOMY,
 } from './streamingEconomy';
-import { normalizeStreamingDayOneMarketIds } from './streamingDayOneMarkets';
 
 export {
     getStreamingIncorporationBreakdown,
@@ -118,8 +121,9 @@ export const STREAMING_COLOR_PALETTES = [
 ] as const;
 
 const LOGO_KEYS = new Set<StreamingLogoKey>(STREAMING_LOGO_OPTIONS.map(option => option.id));
-const SOUND_IDENT_KEYS = new Set<StreamingSoundIdentKey>(STREAMING_SOUND_IDENTS.map(option => option.id));
 const BRAND_PROMISE_IDS = new Set<StreamingBrandPromiseId>(STREAMING_BRAND_PROMISES.map(option => option.id));
+const WORDMARK_STYLE_IDS = new Set<StreamingWordmarkStyleId>(['WORDMARK', 'SIDE', 'STACK', 'ICON']);
+const TYPEFACE_IDS = new Set<StreamingTypefaceId>(['GROTESK', 'GEOMETRIC', 'SERIF', 'CONDENSED', 'MONO', 'SLAB']);
 const HEX_COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
 const DEFAULT_PUBLIC_MANIFESTO: Record<StreamingBrandPromiseId, string> = {
     EVENT_HOUSE: 'Every premiere will feel like a holiday.',
@@ -151,6 +155,13 @@ const sanitizeColor = (value: string, fallback: string): string => (
         : fallback
 );
 
+const sanitizeVisualMarkId = (value: unknown): string => {
+    const markId = String(value || '').trim().toUpperCase();
+    return /^[A-Z0-9_]{1,40}$/.test(markId) ? markId : 'BOLT';
+};
+
+const sanitizeCustomMarkDataUrl = cleanStreamingBrandMarkDataUrl;
+
 export const createDefaultStreamingFoundingDraft = (
     absoluteWeek = 0,
 ): OwnedStreamingFoundingDraft => ({
@@ -159,11 +170,12 @@ export const createDefaultStreamingFoundingDraft = (
     logoKey: 'FRAME_PLAY',
     primaryColor: '#6D5DFB',
     secondaryColor: '#111225',
-    soundIdentKey: 'PULSE',
+    visualMarkId: 'BOLT',
+    customMarkDataUrl: null,
+    wordmarkStyleId: 'SIDE',
+    typefaceId: 'GROTESK',
     brandPromiseId: 'BALANCED',
     publicManifesto: DEFAULT_PUBLIC_MANIFESTO.BALANCED,
-    dayOneMarketIds: [],
-    launchServerCityId: null,
     updatedAtAbsoluteWeek: Math.max(0, Math.round(Number(absoluteWeek) || 0)),
 });
 
@@ -184,17 +196,17 @@ export const validateStreamingFoundingDraft = (
     if (!LOGO_KEYS.has(draft.logoKey)) {
         issues.push({ step: 0, message: 'Choose a valid platform mark.' });
     }
-    if (!SOUND_IDENT_KEYS.has(draft.soundIdentKey)) {
-        issues.push({ step: 0, message: 'Choose a valid sonic ident.' });
+    if (!WORDMARK_STYLE_IDS.has(draft.wordmarkStyleId || 'SIDE')) {
+        issues.push({ step: 0, message: 'Choose a valid wordmark style.' });
+    }
+    if (!TYPEFACE_IDS.has(draft.typefaceId || 'GROTESK')) {
+        issues.push({ step: 0, message: 'Choose a valid wordmark typeface.' });
     }
     if (!HEX_COLOR_PATTERN.test(draft.primaryColor) || !HEX_COLOR_PATTERN.test(draft.secondaryColor)) {
         issues.push({ step: 0, message: 'Choose a valid platform color palette.' });
     }
     if (!BRAND_PROMISE_IDS.has(draft.brandPromiseId)) {
         issues.push({ step: 1, message: 'Choose a starting brand promise.' });
-    }
-    if (normalizeStreamingDayOneMarketIds(draft.dayOneMarketIds).length === 0) {
-        issues.push({ step: 2, message: 'Choose at least one Day-One Market.' });
     }
     if (Math.round(Number(draft.currentStep) || 0) < STREAMING_FOUNDING_STEP_COUNT - 1) {
         issues.push({ step: 2, message: 'Review the incorporation terms before founding the company.' });
@@ -228,13 +240,16 @@ export const saveStreamingFoundingDraft = (
         logoKey: LOGO_KEYS.has(draft.logoKey) ? draft.logoKey : fallback.logoKey,
         primaryColor: sanitizeColor(draft.primaryColor, fallback.primaryColor),
         secondaryColor: sanitizeColor(draft.secondaryColor, fallback.secondaryColor),
-        soundIdentKey: SOUND_IDENT_KEYS.has(draft.soundIdentKey)
-            ? draft.soundIdentKey
-            : fallback.soundIdentKey,
+        visualMarkId: sanitizeVisualMarkId(draft.visualMarkId),
+        customMarkDataUrl: sanitizeCustomMarkDataUrl(draft.customMarkDataUrl),
+        wordmarkStyleId: WORDMARK_STYLE_IDS.has(draft.wordmarkStyleId || 'SIDE')
+            ? draft.wordmarkStyleId || 'SIDE'
+            : fallback.wordmarkStyleId || 'SIDE',
+        typefaceId: TYPEFACE_IDS.has(draft.typefaceId || 'GROTESK')
+            ? draft.typefaceId || 'GROTESK'
+            : fallback.typefaceId || 'GROTESK',
         brandPromiseId: safePromiseId,
         publicManifesto: sanitizePublicManifesto(draft.publicManifesto, safePromiseId),
-        dayOneMarketIds: normalizeStreamingDayOneMarketIds(draft.dayOneMarketIds),
-        launchServerCityId: null,
         updatedAtAbsoluteWeek: absoluteWeek,
     };
     return {
@@ -325,6 +340,7 @@ export const incorporateOwnedStreamingPlatform = (
         ownershipBefore: 100,
         ownershipAfter: 100,
     };
+    const emptyOperations = createInitialOwnedStreamingPlatformState(player.id);
 
     const preparedPlatform: OwnedStreamingPlatformState = {
         ...current,
@@ -334,16 +350,31 @@ export const incorporateOwnedStreamingPlatform = (
             primaryColor: draft.primaryColor,
             secondaryColor: draft.secondaryColor,
             logoKey: draft.logoKey,
-            soundIdentKey: draft.soundIdentKey,
+            visualMarkId: sanitizeVisualMarkId(draft.visualMarkId),
+            customMarkDataUrl: sanitizeCustomMarkDataUrl(draft.customMarkDataUrl),
+            wordmarkStyleId: draft.wordmarkStyleId || 'SIDE',
+            typefaceId: draft.typefaceId || 'GROTESK',
             brandPromiseId: draft.brandPromiseId,
             publicManifesto: sanitizePublicManifesto(draft.publicManifesto, draft.brandPromiseId),
-            dayOneMarketIds: normalizeStreamingDayOneMarketIds(draft.dayOneMarketIds),
-            launchServerCityId: null,
             foundedAtAbsoluteWeek: absoluteWeek,
         },
         foundingDraft: null,
+        launchProgram: emptyOperations.launchProgram,
+        marketOperations: [],
+        serviceConfiguration: emptyOperations.serviceConfiguration,
+        capabilities: emptyOperations.capabilities,
+        localizationOperations: emptyOperations.localizationOperations,
+        costCommitments: [],
+        infrastructureSetupDraft: null,
+        infrastructureSetup: null,
+        infrastructureStrategy: 'UNDECIDED',
+        capacity: emptyOperations.capacity,
+        technologyLevels: emptyOperations.technologyLevels,
+        technologyProjects: [],
+        researchPrograms: [],
+        campusProjects: [],
         foundingProfile: {
-            incorporationModel: 'FIXED_V7',
+            incorporationModel: 'FIXED_V8_ZERO_TREASURY',
             founderCashCharged: STREAMING_INCORPORATION_ECONOMY.cashRequired,
             setupCostsConsumed: STREAMING_INCORPORATION_ECONOMY.setupCostsConsumed,
             openingTreasuryCash: STREAMING_INCORPORATION_ECONOMY.openingTreasuryCash,
@@ -375,7 +406,6 @@ export const incorporateOwnedStreamingPlatform = (
         founderOwnershipPercent: 100,
         treasuryCash: current.treasuryCash + STREAMING_INCORPORATION_ECONOMY.openingTreasuryCash,
         debtPrincipal: 0,
-        infrastructureStrategy: 'UNDECIDED',
         eventLedger: [...current.eventLedger, foundationFact],
         milestoneKeys: [...current.milestoneKeys, 'platform-incorporated'],
     };

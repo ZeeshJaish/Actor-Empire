@@ -75,9 +75,9 @@ const createFixture = (): Player => {
     };
 };
 
-assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 22, 'Phase 24 should move owned streaming saves to schema v22.');
+assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 23, 'Phase 1 canonical foundation should move owned streaming saves to schema v23.');
 const migrated = normalizeOwnedStreamingPlatformState({ schemaVersion: 16 }, 'phase19-migration');
-assert(migrated.schemaVersion === 22, 'Schema v16 streaming saves should migrate to the current schema.');
+assert(migrated.schemaVersion === 23, 'Schema v16 streaming saves should migrate to the current schema.');
 assert(migrated.leadership.developmentPrograms.length === 0, 'Legacy saves should receive an empty executive-development portfolio.');
 assert(migrated.leadership.delegation.maximumRightsBid > 0, 'Legacy saves should receive a safe default delegation mandate.');
 assert(migrated.governance.directors.length === 0 && migrated.governance.boardConfidence > 0, 'Legacy saves should receive safe governance defaults.');
@@ -113,6 +113,9 @@ const internalAppointment = fixture.ownedStreamingPlatform.leadership.appointmen
 assert(internalAppointment.origin === 'INTERNAL_PROMOTION', 'Internal talent should persist its promotion origin.');
 assert(internalAppointment.loyalty > externalAppointment.loyalty, 'Internal promotion should carry the designed loyalty advantage.');
 assert(internalAppointment.weeklyCompensation < externalAppointment.weeklyCompensation, 'Internal promotion should carry a lower compensation profile.');
+const financeAppointment = promoteStreamingInternalExecutive(fixture, 'internal-cfo');
+assert(financeAppointment.changed, 'Equity preparation should have a playable CFO appointment route.');
+fixture = financeAppointment.player;
 
 const treasuryBeforeDevelopment = fixture.ownedStreamingPlatform.treasuryCash;
 const development = startStreamingExecutiveDevelopment(fixture, 'marcus-vale', 'ROLE_MASTERY');
@@ -173,6 +176,8 @@ assert(!advisoryMotion.binding && advisoryMotion.status === 'APPROVED', 'At 100%
 assert(fixture.ownedStreamingPlatform.leadership.delegation.minimumCapacityHeadroomPercent >= 30, 'An approved motion should change the canonical mandate.');
 
 const cashBeforeInvestment = fixture.ownedStreamingPlatform.treasuryCash;
+const ungatedAttempt = acceptStreamingCelebrityInvestment(createFixture(), 'investor-sofia-laurent');
+assert(!ungatedAttempt.changed && ungatedAttempt.reason === 'CFO_REQUIRED', 'Outside equity must remain blocked until an active CFO signs off.');
 const investment = acceptStreamingCelebrityInvestment(fixture, 'investor-sofia-laurent');
 assert(investment.changed, 'Celebrity investment should be a playable voluntary equity decision.');
 fixture = investment.player;
@@ -186,6 +191,7 @@ suite = getStreamingLeadershipSuite(fixture);
 assert(suite.boardBinding && suite.outsideOwnershipPercent === 14, 'Voluntary dilution should be the only point where board governance becomes binding.');
 
 let vetoFixture = createFixture();
+vetoFixture = promoteStreamingInternalExecutive(vetoFixture, 'internal-cfo').player;
 vetoFixture = acceptStreamingCelebrityInvestment(vetoFixture, 'investor-sofia-laurent').player;
 const bindingVote = callStreamingBoardVote(vetoFixture, 'TRUST_CHARTER');
 assert(bindingVote.changed, 'A diluted company should be able to call a binding board vote.');
@@ -196,6 +202,7 @@ assert(vetoFixture.ownedStreamingPlatform.leadership.delegation.incidentPolicy !
 assert(getStreamingGovernanceWeeklyCost(fixture.ownedStreamingPlatform, 20_000_000) >= 500_000, 'Director fees and negotiated participation should create real weekly cost.');
 
 let controlFixture = createFixture();
+controlFixture = promoteStreamingInternalExecutive(controlFixture, 'internal-cfo').player;
 controlFixture = {
     ...controlFixture,
     ownedStreamingPlatform: {
@@ -212,10 +219,17 @@ const hq = readFileSync(resolve(process.cwd(), 'components/StreamingPlatformHQ.t
 const weekly = readFileSync(resolve(process.cwd(), 'services/streamingWeeklyLoop.ts'), 'utf8');
 assert(component.includes('Organization') && component.includes('Delegation') && component.includes('Investor Salon'), 'The Leadership Suite should expose all Phase 19 rooms.');
 assert(component.includes('Internal promotions') && component.includes('External market'), 'Talent should visibly support both promotion and outside hiring.');
-assert(component.includes('Remain independent') && component.includes('Accept capital and dilution'), 'Celebrity capital must be an informed voluntary decision.');
+assert(component.includes('Open Studio Finance') && component.includes('CFO sign-off'), 'Leadership should prepare equity governance and hand the actual term sheet to Finance.');
 assert(component.includes('Voluntary dilution activated genuine governance'), 'The UI should explain when veto power begins.');
 assert(styles.includes('@media (max-width: 520px)') && styles.includes('prefers-reduced-motion'), 'Leadership UI should include explicit mobile and reduced-motion treatment.');
-assert(hq.includes('showLeadershipSuite') && hq.includes('Enter Leadership Suite'), 'Company HQ should launch the full Leadership Suite.');
+/* Reached from the BOARDROOM division's LEADERSHIP chip and the Boardroom's
+   hire action, which replaced the retired Company Office. */
+assert(
+    hq.includes('showLeadershipSuite')
+    && hq.includes("chip === 'LEADERSHIP'")
+    && hq.includes('onHire={() => setShowLeadershipSuite(true)}'),
+    'The Leadership Suite must be reachable from the Boardroom division and its hire action.',
+);
 assert(weekly.includes('completeDueStreamingExecutiveDevelopment') && weekly.includes('governanceCost'), 'The canonical weekly loop should complete development and reconcile governance costs.');
 assert(!component.includes('IPO') && !component.includes('Acquire rival'), 'Phase 19 must not leak future IPO or M&A phases.');
 

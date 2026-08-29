@@ -82,7 +82,7 @@ export const MarketDesk: React.FC<{ seg: Segment; onDone: () => void }> = ({ seg
   const speaker = cut >= 0 ? seg.feeds[Math.min(cut, seg.feeds.length - 1)] : null;
 
   return (
-    <div className={cx(css.nd, css['t-' + (seg.tone)])} onClick={onDone}>
+    <div className={cx(css.nd, css['t-' + (seg.tone)])} data-epx-root onClick={onDone}>
       <div className={css.ndgrain} />
 
       {/* ── the title card, before anybody speaks ── */}

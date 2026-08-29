@@ -40,6 +40,11 @@ import { createHomeProductionQaActions } from './home/homeProductionQaActions';
 import { createHomeBoxOfficeQaActions } from './home/homeBoxOfficeQaActions';
 import { createHomeStudioOwnershipQaActions } from './home/homeStudioOwnershipQaActions';
 import { createHomeStudioProductionQaActions } from './home/homeStudioProductionQaActions';
+import {
+  buildPlatformAiPhase4QaFixture,
+  createPlatformAiPlayerCommissionQaFixture,
+  getPlatformAiPhase4QaSnapshot,
+} from '../services/platformAi';
 
 interface HomePageProps {
   player: Player;
@@ -48,6 +53,7 @@ interface HomePageProps {
   onUpdatePlayer?: (player: Player) => void;
   setPage?: (page: Page) => void;
   onOpenProductionHouseCheat?: () => void;
+  onOpenPlatformCommissionCheat?: () => void;
   onOpenStudioAcquisitionCheat?: (studioId: string) => void;
   onOpenBoxOfficeCheat?: () => void;
   onQueueBabyNamingCheat?: () => void;
@@ -118,7 +124,7 @@ const cheatWeekFromAbsolute = (absoluteWeek: number): { year: number; week: numb
   week: Math.max(1, Math.max(1, absoluteWeek) % 52 || 52)
 });
 
-export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProcessing, onUpdatePlayer, setPage, onOpenProductionHouseCheat, onOpenStudioAcquisitionCheat, onOpenBoxOfficeCheat, onQueueBabyNamingCheat, onOpenDeathSummaryPreview, onShowWhatsNewCheat }) => {
+export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProcessing, onUpdatePlayer, setPage, onOpenProductionHouseCheat, onOpenPlatformCommissionCheat, onOpenStudioAcquisitionCheat, onOpenBoxOfficeCheat, onQueueBabyNamingCheat, onOpenDeathSummaryPreview, onShowWhatsNewCheat }) => {
   const logContainerRef = useRef<HTMLDivElement>(null);
   const language = getPlayerLanguage(player);
   const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
@@ -349,6 +355,20 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
   const updateMoney = (e: React.ChangeEvent<HTMLInputElement>) => {
       if (!onUpdatePlayer) return;
       onUpdatePlayer({ ...player, money: parseInt(e.target.value) || 0 });
+  };
+
+  const prepareStreamingFounderQa = () => {
+      if (!onUpdatePlayer) return;
+      onUpdatePlayer({
+          ...player,
+          money: Math.max(player.money, 200_000_000),
+          stats: {
+              ...player.stats,
+              fame: Math.max(player.stats.fame, 80),
+              reputation: Math.max(player.stats.reputation, 80),
+          },
+      });
+      setActiveCheatMenu('NONE');
   };
 
   const updateEnergy = (value: number) => {
@@ -757,6 +777,40 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
       onUpdatePlayer(updatedPlayer);
       setActiveCheatMenu('NONE');
       onOpenProductionHouseCheat?.();
+  };
+
+  const triggerPlatformCommissionQa = () => {
+      if (!onUpdatePlayer) return;
+      const { updatedPlayer, studio } = ensureCheatStudio();
+      const fixture = createPlatformAiPlayerCommissionQaFixture({
+          player: updatedPlayer,
+          studioId: studio.id,
+          absoluteWeek: getAbsoluteWeek(updatedPlayer.age, updatedPlayer.currentWeek),
+      });
+      if (!fixture.changed || !fixture.offer) {
+          alert('Could not create the platform commission test offer.');
+          return;
+      }
+      onUpdatePlayer(fixture.player);
+      setActiveCheatMenu('NONE');
+      onOpenPlatformCommissionCheat?.();
+  };
+
+  const triggerPlatformAiPhase4Qa = () => {
+      if (!onUpdatePlayer) return;
+      const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
+      const updatedPlayer = buildPlatformAiPhase4QaFixture(player, absoluteWeek);
+      const snapshot = getPlatformAiPhase4QaSnapshot(updatedPlayer, absoluteWeek);
+      onUpdatePlayer(updatedPlayer);
+      setActiveCheatMenu('NONE');
+      alert([
+          `Phase 4 rival: ${snapshot.platformId}`,
+          `Research: ${snapshot.activeResearchPrograms}/${snapshot.researchCapacity} active; ${snapshot.affordableCandidateSlots} slot available`,
+          `Markets: ${snapshot.activeCountries} active; ${snapshot.expandingCountries.join(', ') || 'expansion queued by AI when affordable'}`,
+          `Languages: ${snapshot.subtitleOnlyLanguages.length} subtitle-only; ${snapshot.dubbingLanguages.length} dub-capable`,
+          `Localization: ${snapshot.waitingLocalizationJobs} waiting; ${snapshot.readyLocalizationJobs} ready`,
+          `Reach check: ${snapshot.comprehension.localizedReach.toFixed(2)} localized vs ${snapshot.comprehension.unlocalizedReach.toFixed(2)} unlocalized`,
+      ].join('\n'));
   };
 
   const triggerEnergyFeatureCareerQa = (mode: 'FULL' | 'LOW') => {
@@ -3352,6 +3406,12 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                                   <button onClick={triggerStudioBootstrapAndOpen} className="col-span-2 bg-yellow-500/10 hover:bg-yellow-500/20 border border-yellow-400/40 text-xs font-bold py-3 rounded-lg text-yellow-300">
                                       Open Production House Now
                                   </button>
+                                  <button onClick={triggerPlatformCommissionQa} className="col-span-2 bg-violet-950/50 hover:bg-violet-900/60 border border-violet-400/50 text-xs font-bold py-3 rounded-lg text-violet-200 flex items-center justify-center gap-2">
+                                      <Clapperboard size={14}/> Platform Commission Full Flow
+                                  </button>
+                                  <button onClick={triggerPlatformAiPhase4Qa} className="col-span-2 bg-cyan-950/50 hover:bg-cyan-900/60 border border-cyan-400/50 text-xs font-bold py-3 rounded-lg text-cyan-200 flex items-center justify-center gap-2">
+                                      <Globe size={14}/> Platform AI Phase 4 QA
+                                  </button>
                                   <button onClick={triggerFullStudioSlateQa} className="col-span-2 bg-emerald-900/30 hover:bg-emerald-900/50 border border-emerald-400/40 text-xs font-bold py-3 rounded-lg text-emerald-300">
                                       Fill Full Studio Slate
                                   </button>
@@ -3828,6 +3888,12 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                       {/* DEV ONLY: Money & Energy */}
                       {activeCheatMenu === 'DEV' && (
                           <>
+                              <button
+                                onClick={prepareStreamingFounderQa}
+                                className="w-full rounded-xl border border-cyan-400/40 bg-cyan-950/40 px-4 py-3 text-xs font-black uppercase tracking-[0.14em] text-cyan-200 hover:bg-cyan-900/50"
+                              >
+                                  Streaming Founder Ready
+                              </button>
                               <div>
                                   <label className="text-xs font-bold text-zinc-500 uppercase block mb-1">Bank Balance ($)</label>
                                   <input 

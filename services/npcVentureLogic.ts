@@ -3,11 +3,12 @@ import { NPC_DATABASE, calculateProjectFameMultiplier } from './npcLogic';
 import { calculateProjectPay, generateProjectDetails, generateProjectTitle, getEstimatedBudget } from './roleLogic';
 import { getEnabledGlobalCreatorSocialProfiles } from './youtubeLogic';
 import { getPlayerLanguage, t } from './i18n';
+import { createDeterministicId, createDeterministicRng } from './deterministicRandom';
 
-const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
+const pick = <T>(arr: T[], rng: () => number = Math.random): T => arr[Math.floor(rng() * arr.length)];
 const VENTURE_VARIANT_SEPARATOR = ' || ';
-const pickVentureVariant = (language: GameLanguage, key: string, vars: Record<string, string | number> = {}) =>
-    pick(t(language, key, vars).split(VENTURE_VARIANT_SEPARATOR));
+const pickVentureVariant = (language: GameLanguage, key: string, vars: Record<string, string | number> = {}, rng: () => number = Math.random) =>
+    pick(t(language, key, vars).split(VENTURE_VARIANT_SEPARATOR), rng);
 const absWeek = (year: number, week: number) => (year * 52) + week;
 
 const MAX_ACTIVE_VENTURES = 12;
@@ -62,16 +63,16 @@ const getTalentPool = (player: Player) => {
         }));
 };
 
-const uniqueCompanyName = (world: WorldState, archetype: NpcVentureArchetype): string => {
+const uniqueCompanyName = (world: WorldState, archetype: NpcVentureArchetype, rng: () => number): string => {
     const existing = new Set(Object.values(world.npcVentures || {}).map(v => v.name));
     const prefixes = archetype === 'CREATOR_MEDIA' ? CREATOR_PREFIXES : archetype === 'GENRE_HOUSE' ? GENRE_PREFIXES : PREFIXES;
 
     for (let i = 0; i < 20; i++) {
-        const name = `${pick(prefixes)} ${pick(SUFFIXES)}`;
+        const name = `${pick(prefixes, rng)} ${pick(SUFFIXES, rng)}`;
         if (!existing.has(name)) return name;
     }
 
-    return `${pick(prefixes)} ${pick(SUFFIXES)} ${Math.floor(Math.random() * 90 + 10)}`;
+    return `${pick(prefixes, rng)} ${pick(SUFFIXES, rng)} ${Math.floor(rng() * 90 + 10)}`;
 };
 
 const getFounderPool = (player: Player, world: WorldState) => {
@@ -89,9 +90,10 @@ const makeNews = (
     headline: string,
     player: Player,
     impactLevel: 'LOW' | 'MEDIUM' | 'HIGH' = 'MEDIUM',
-    subtext?: string
+    subtext?: string,
+    eventKey = headline,
 ): NewsItem => ({
-    id: `news_npc_venture_${Date.now()}_${Math.random()}`,
+    id: createDeterministicId('news_npc_venture', player.id, absWeek(player.age, player.currentWeek), eventKey),
     headline,
     subtext,
     category: impactLevel === 'HIGH' ? 'TOP_STORY' : 'INDUSTRY',
@@ -107,7 +109,7 @@ const fill = (template: string, venture: NpcVentureState, language: GameLanguage
         .replace(/{Archetype}/g, getArchetypeLabel(language, venture.archetype))
         .replace(/{Title}/g, extra.Title || '');
 
-export const createNpcVenture = (player: Player, world: WorldState): { venture: NpcVentureState; news: NewsItem } | null => {
+export const createNpcVenture = (player: Player, world: WorldState, suppliedRng?: () => number): { venture: NpcVentureState; news: NewsItem } | null => {
     const language = getPlayerLanguage(player);
     if (!world.npcVentures) world.npcVentures = {};
     const activeCount = Object.values(world.npcVentures).filter(v => v.status === 'ACTIVE').length;
@@ -116,17 +118,19 @@ export const createNpcVenture = (player: Player, world: WorldState): { venture: 
     const pool = getFounderPool(player, world);
     if (pool.length === 0) return null;
 
-    const owner = pick(pool);
+    const currentAbsoluteWeek = absWeek(player.age, player.currentWeek);
+    const rng = suppliedRng || createDeterministicRng(`${player.id}:npc-venture:${currentAbsoluteWeek}:launch:${Object.keys(world.npcVentures).length}`);
+    const owner = pick(pool, rng);
     const fame = owner.stats?.fame || 50;
     const wealthM = Math.max(5, (owner.netWorth || 0) / 1_000_000);
     const archetypes: NpcVentureArchetype[] = owner.occupation === 'DIRECTOR'
             ? ['PRESTIGE_LABEL', 'AWARDS_BOUTIQUE', 'GENRE_HOUSE']
             : ['COMMERCIAL_STUDIO', 'PRESTIGE_LABEL', 'GENRE_HOUSE'];
-    const archetype = pick(archetypes);
-    const name = uniqueCompanyName(world, archetype);
-    const seedMoney = Math.max(18, Math.min(280, wealthM * (0.08 + Math.random() * 0.18)));
+    const archetype = pick(archetypes, rng);
+    const name = uniqueCompanyName(world, archetype, rng);
+    const seedMoney = Math.max(18, Math.min(280, wealthM * (0.08 + rng() * 0.18)));
     const venture: NpcVentureState = {
-        id: `npc_venture_${owner.id}_${Date.now()}`,
+        id: createDeterministicId('npc_venture', player.id, currentAbsoluteWeek, owner.id, Object.keys(world.npcVentures).length),
         name,
         ownerNpcId: owner.id,
         ownerName: owner.name,
@@ -134,14 +138,14 @@ export const createNpcVenture = (player: Player, world: WorldState): { venture: 
         status: 'ACTIVE',
         valuation: Math.max(0.05, seedMoney / 1000),
         cashReserve: seedMoney,
-        hype: Math.max(25, Math.min(95, fame * 0.72 + Math.random() * 22)),
-        reputation: Math.max(25, Math.min(92, fame * 0.58 + Math.random() * 25)),
-        creativeQuality: Math.max(35, Math.min(95, (owner.stats?.talent || 55) * 0.65 + Math.random() * 30)),
-        risk: Math.max(15, Math.min(90, 32 + Math.random() * 38 + (owner.tier === 'ICON' ? -8 : 0))),
+        hype: Math.max(25, Math.min(95, fame * 0.72 + rng() * 22)),
+        reputation: Math.max(25, Math.min(92, fame * 0.58 + rng() * 25)),
+        creativeQuality: Math.max(35, Math.min(95, (owner.stats?.talent || 55) * 0.65 + rng() * 30)),
+        risk: Math.max(15, Math.min(90, 32 + rng() * 38 + (owner.tier === 'ICON' ? -8 : 0))),
         foundedWeek: player.currentWeek,
         foundedYear: player.age,
         lastProjectWeek: 0,
-        nextProjectWeek: player.currentWeek + 6 + Math.floor(Math.random() * 16),
+        nextProjectWeek: player.currentWeek + 6 + Math.floor(rng() * 16),
         projectsReleased: 0,
         hits: 0,
         flops: 0,
@@ -152,36 +156,37 @@ export const createNpcVenture = (player: Player, world: WorldState): { venture: 
     return {
         venture,
         news: makeNews(
-            fill(pickVentureVariant(language, 'services.npcVenture.launch.headline'), venture, language),
+            fill(pickVentureVariant(language, 'services.npcVenture.launch.headline', {}, rng), venture, language),
             player,
             fame > 80 ? 'HIGH' : 'MEDIUM',
             t(language, 'services.npcVenture.launch.subtext', {
                 ventureName: venture.name,
                 capital: venture.cashReserve.toFixed(0),
-            })
+            }),
+            `launch:${venture.id}`,
         ),
     };
 };
 
-const getVentureBudgetTier = (venture: NpcVentureState): BudgetTier => {
+const getVentureBudgetTier = (venture: NpcVentureState, rng: () => number = createDeterministicRng(`${venture.id}:budget:${venture.projectsReleased}`)): BudgetTier => {
     const options = ARCHETYPE_BUDGETS[venture.archetype];
-    let tier = pick(options);
+    let tier = pick(options, rng);
     if (venture.cashReserve < 35) tier = 'LOW';
     else if (venture.cashReserve < 120 && tier === 'HIGH') tier = 'MID';
-    else if (venture.hype > 78 && venture.cashReserve > 180 && Math.random() < 0.2) tier = 'HIGH';
+    else if (venture.hype > 78 && venture.cashReserve > 180 && rng() < 0.2) tier = 'HIGH';
     return tier;
 };
 
-const createVentureProject = (player: Player, venture: NpcVentureState): IndustryProject => {
-    const budgetTier = getVentureBudgetTier(venture);
-    const budget = getEstimatedBudget(budgetTier);
-    const genre = pick(ARCHETYPE_GENRES[venture.archetype]);
+const createVentureProject = (player: Player, venture: NpcVentureState, rng: () => number): IndustryProject => {
+    const budgetTier = getVentureBudgetTier(venture, rng);
+    const budget = getEstimatedBudget(budgetTier, rng);
+    const genre = pick(ARCHETYPE_GENRES[venture.archetype], rng);
     const talentPool = getTalentPool(player);
     const actorPool = talentPool.filter(n => n.occupation === 'ACTOR');
     const owner = talentPool.find(n => n.id === venture.ownerNpcId);
-    const lead = owner?.occupation === 'ACTOR' && Math.random() < 0.38 ? owner : pick(actorPool);
+    const lead = owner?.occupation === 'ACTOR' && rng() < 0.38 ? owner : pick(actorPool, rng);
     const directorPool = talentPool.filter(n => n.occupation === 'DIRECTOR');
-    const director = owner?.occupation === 'DIRECTOR' && Math.random() < 0.45 ? owner : pick(directorPool);
+    const director = owner?.occupation === 'DIRECTOR' && rng() < 0.45 ? owner : pick(directorPool, rng);
     const leadTalent = lead?.stats?.talent || 55;
     const directorTalent = director?.stats?.talent || (director?.tier === 'A_LIST' ? 82 : 65);
     const quality = Math.max(12, Math.min(100, Math.round(
@@ -189,17 +194,17 @@ const createVentureProject = (player: Player, venture: NpcVentureState): Industr
         (venture.reputation * 0.18) +
         (leadTalent * 0.18) +
         (directorTalent * 0.16) +
-        (Math.random() * 24 - venture.risk * 0.08)
+        (rng() * 24 - venture.risk * 0.08)
     )));
     const fameMultiplier = calculateProjectFameMultiplier(lead ? [lead.id] : [], director?.name || 'Unknown Director', 0);
     const hypeMultiplier = 0.75 + (venture.hype / 120);
     const qualityMultiplier = Math.max(0.28, quality / 56);
-    const volatility = 0.48 + Math.random() * 1.35;
+    const volatility = 0.48 + rng() * 1.35;
     const boxOffice = Math.floor(budget * fameMultiplier * hypeMultiplier * qualityMultiplier * volatility);
 
     return {
-        id: `npc_venture_project_${venture.id}_${Date.now()}_${Math.random()}`,
-        title: generateProjectTitle([]),
+        id: createDeterministicId('npc_venture_project', player.id, venture.id, absWeek(player.age, player.currentWeek), venture.projectsReleased),
+        title: generateProjectTitle([], rng),
         genre,
         studioId: venture.id,
         budgetTier,
@@ -247,13 +252,18 @@ export const processNpcVentures = (player: Player, world: WorldState): { world: 
     const news: NewsItem[] = [];
     const logs: string[] = [];
     const currentAbs = absWeek(player.age, player.currentWeek);
+    if ((world.npcVentureLastProcessedAbsoluteWeek ?? -1) >= currentAbs) {
+        return { world: syncNpcVenturesToStudios(world), news, logs };
+    }
+
     const activeVentures = Object.values(world.npcVentures).filter(v => v.status === 'ACTIVE');
 
     const newestLaunchAbs = Math.max(0, ...Object.values(world.npcVentures).map(v => absWeek(v.foundedYear, v.foundedWeek)));
     const launchCooldownPassed = currentAbs - newestLaunchAbs >= 10;
     const launchChance = player.age < 20 ? 0.015 : 0.045;
-    if (launchCooldownPassed && activeVentures.length < MAX_ACTIVE_VENTURES && Math.random() < launchChance) {
-        const created = createNpcVenture(player, world);
+    const launchOpportunityRng = createDeterministicRng(`${player.id}:npc-venture:${currentAbs}:launch-opportunity`);
+    if (launchCooldownPassed && activeVentures.length < MAX_ACTIVE_VENTURES && launchOpportunityRng() < launchChance) {
+        const created = createNpcVenture(player, world, createDeterministicRng(`${player.id}:npc-venture:${currentAbs}:launch`));
         if (created) {
             news.push(created.news);
             logs.push(t(language, 'services.npcVenture.log.launch', {
@@ -265,23 +275,24 @@ export const processNpcVentures = (player: Player, world: WorldState): { world: 
 
     Object.values(world.npcVentures).forEach(venture => {
         if (venture.status !== 'ACTIVE') return;
+        const rng = createDeterministicRng(`${player.id}:npc-venture:${currentAbs}:${venture.id}:progress:${venture.projectsReleased}`);
 
         const pressure = venture.cashReserve < 45 ? 0.12 : 0;
-        venture.hype = Math.max(5, Math.min(100, venture.hype + (Math.random() * 3.4 - 1.6) - pressure));
-        venture.reputation = Math.max(5, Math.min(100, venture.reputation + (Math.random() * 2.2 - 0.9)));
-        venture.valuation = Math.max(0.01, venture.valuation * (1 + (Math.random() * 0.024 - 0.009)));
+        venture.hype = Math.max(5, Math.min(100, venture.hype + (rng() * 3.4 - 1.6) - pressure));
+        venture.reputation = Math.max(5, Math.min(100, venture.reputation + (rng() * 2.2 - 0.9)));
+        venture.valuation = Math.max(0.01, venture.valuation * (1 + (rng() * 0.024 - 0.009)));
         venture.cashReserve = Math.max(-30, venture.cashReserve + (venture.valuation * 0.3));
 
         if (player.currentWeek >= venture.nextProjectWeek || (venture.nextProjectWeek > 52 && player.currentWeek + 52 >= venture.nextProjectWeek)) {
-            const project = createVentureProject(player, venture);
-            const budget = getEstimatedBudget(project.budgetTier);
+            const project = createVentureProject(player, venture, rng);
+            const budget = getEstimatedBudget(project.budgetTier, rng);
             const profit = project.boxOffice - budget;
             const profitM = profit / 1_000_000;
             const outcome: 'HIT' | 'SOLID' | 'FLOP' = profit > budget * 0.8 || project.quality >= 80 ? 'HIT' : profit < -budget * 0.25 || project.quality < 40 ? 'FLOP' : 'SOLID';
 
             venture.projectsReleased += 1;
             venture.lastProjectWeek = player.currentWeek;
-            venture.nextProjectWeek = player.currentWeek + 10 + Math.floor(Math.random() * 18);
+            venture.nextProjectWeek = player.currentWeek + 10 + Math.floor(rng() * 18);
             venture.cashReserve += profitM;
             venture.valuation = Math.max(0.01, venture.valuation + (profitM / 850) + (outcome === 'HIT' ? 0.05 : outcome === 'FLOP' ? -0.04 : 0.01));
             venture.hype = Math.max(0, Math.min(100, venture.hype + (outcome === 'HIT' ? 12 : outcome === 'FLOP' ? -13 : 3)));
@@ -303,27 +314,30 @@ export const processNpcVentures = (player: Player, world: WorldState): { world: 
 
             if (outcome === 'HIT') {
                 news.push(makeNews(
-                    fill(pickVentureVariant(language, 'services.npcVenture.hit.headline'), venture, language, { Title: project.title }),
+                    fill(pickVentureVariant(language, 'services.npcVenture.hit.headline', {}, rng), venture, language, { Title: project.title }),
                     player,
                     'HIGH',
                     t(language, 'services.npcVenture.hit.subtext', {
                         leadActorName: project.leadActorName,
                         directorName: project.directorName,
-                    })
+                    }),
+                    `hit:${venture.id}:${project.id}`,
                 ));
             } else if (outcome === 'FLOP') {
                 news.push(makeNews(
-                    fill(pickVentureVariant(language, 'services.npcVenture.flop.headline'), venture, language, { Title: project.title }),
+                    fill(pickVentureVariant(language, 'services.npcVenture.flop.headline', {}, rng), venture, language, { Title: project.title }),
                     player,
                     'MEDIUM',
-                    t(language, 'services.npcVenture.flop.subtext', { ventureName: venture.name })
+                    t(language, 'services.npcVenture.flop.subtext', { ventureName: venture.name }),
+                    `flop:${venture.id}:${project.id}`,
                 ));
-            } else if (Math.random() < 0.35) {
+            } else if (rng() < 0.35) {
                 news.push(makeNews(
-                    fill(pickVentureVariant(language, 'services.npcVenture.development.headline'), venture, language, { Title: project.title }),
+                    fill(pickVentureVariant(language, 'services.npcVenture.development.headline', {}, rng), venture, language, { Title: project.title }),
                     player,
                     'LOW',
-                    t(language, 'services.npcVenture.development.subtext', { ventureName: venture.name })
+                    t(language, 'services.npcVenture.development.subtext', { ventureName: venture.name }),
+                    `development:${venture.id}:${project.id}`,
                 ));
             }
         }
@@ -333,10 +347,11 @@ export const processNpcVentures = (player: Player, world: WorldState): { world: 
             venture.status = 'CLOSED';
             venture.closureReason = t(language, venture.cashReserve < 0 ? 'services.npcVenture.closure.reason.cash' : 'services.npcVenture.closure.reason.slate');
             news.push(makeNews(
-                fill(pickVentureVariant(language, 'services.npcVenture.closure.headline'), venture, language),
+                fill(pickVentureVariant(language, 'services.npcVenture.closure.headline', {}, rng), venture, language),
                 player,
                 'HIGH',
-                venture.closureReason
+                venture.closureReason,
+                `closure:${venture.id}:${venture.projectsReleased}`,
             ));
             logs.push(t(language, 'services.npcVenture.log.closure', {
                 ventureName: venture.name,
@@ -356,6 +371,7 @@ export const processNpcVentures = (player: Player, world: WorldState): { world: 
             }, {});
     }
 
+    world.npcVentureLastProcessedAbsoluteWeek = currentAbs;
     return { world: syncNpcVenturesToStudios(world), news, logs };
 };
 

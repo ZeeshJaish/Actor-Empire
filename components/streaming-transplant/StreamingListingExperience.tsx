@@ -1961,14 +1961,14 @@ export const Listing: React.FC<{
 
   if (seg) {
     return (
-      <div className={css.ls} style={{}}>
+      <div className={css.ls} data-epx-root>
         <MarketDesk seg={seg} onDone={() => { setSeg(null); setScene(after.current); }} />
       </div>
     );
   }
 
   return (
-    <div className={css.ls}>
+    <div className={css.ls} data-epx-root>
       <div className={css.lstop}>
         {onBack && scene === 'RESOLUTION' && <button className={css.lsback} onClick={onBack}>←</button>}
         <ChapterRail scene={scene} />

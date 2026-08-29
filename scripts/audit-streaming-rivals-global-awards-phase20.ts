@@ -10,6 +10,8 @@ import {
 import { getAbsoluteWeek } from '../services/legacyLogic';
 import { normalizeOwnedStreamingPlatformState } from '../services/ownedStreamingPlatform';
 import { appointStreamingExternalExecutive } from '../services/streamingLeadershipGovernance';
+import { normalizeWorldPlatformAi } from '../services/platformAi/platformAiState';
+import { processOwnedStreamingPlatformWeek } from '../services/streamingWeeklyLoop';
 import {
     STREAMING_REGION_DEFINITIONS,
     STREAMING_RIVAL_TEMPLATES,
@@ -47,6 +49,7 @@ const createFixture = (weeksLive = 8): Player => {
                 soundIdentKey: 'ASCENT',
                 brandPromiseId: 'EVENT_HOUSE',
                 foundedAtAbsoluteWeek: absoluteWeek - 80,
+                publicManifesto: 'Northstar backs event television with dependable worldwide playback.',
             },
             foundingProfile: {
                 incorporationModel: 'FIXED_V7',
@@ -96,12 +99,37 @@ const createFixture = (weeksLive = 8): Player => {
     };
 };
 
-assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 22, 'Phase 24 should advance owned streaming saves to schema v22.');
+assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 23, 'The canonical foundation should advance owned streaming saves to schema v23.');
 const migrated = normalizeOwnedStreamingPlatformState({ schemaVersion: 17 }, 'phase20-migration');
-assert(migrated.schemaVersion === 22, 'Schema v17 streaming saves should migrate to v22.');
+assert(migrated.schemaVersion === 23, 'Schema v17 streaming saves should migrate to the current schema.');
 assert(migrated.competitiveWorld.rivals.length === 0 && migrated.competitiveWorld.awardSeasons.length === 0, 'Legacy saves should receive safe empty competitive collections.');
 assert(Object.keys(STREAMING_RIVAL_TEMPLATES).length === 5, 'The competitive world should contain five named rival CEO templates.');
 assert(STREAMING_REGION_DEFINITIONS.length === 7, 'The global map should contain the home market plus six expansion regions.');
+
+const weeklyIntegrationFixture = createFixture();
+const weeklyIntegrationWeek = getAbsoluteWeek(
+    weeklyIntegrationFixture.age,
+    weeklyIntegrationFixture.currentWeek,
+);
+weeklyIntegrationFixture.world = normalizeWorldPlatformAi(
+    weeklyIntegrationFixture,
+    weeklyIntegrationFixture.world,
+    weeklyIntegrationWeek,
+);
+const weeklyIntegration = processOwnedStreamingPlatformWeek(weeklyIntegrationFixture);
+assert(weeklyIntegration.processed, 'The Platform Wars integration fixture should process one owned-streaming week.');
+const weeklyMove = weeklyIntegration.player.ownedStreamingPlatform.competitiveWorld.moves.at(-1);
+assert(Boolean(weeklyMove), 'The boundary week should create one integrated rival move.');
+const weeklyCommitments = weeklyIntegration.player.world.platforms?.[weeklyMove!.platformId].ai?.externalCommitments || [];
+assert(
+    weeklyCommitments.some(commitment => commitment.moveId === weeklyMove!.id),
+    'The weekly-loop boundary must ingest each newly created rival move into canonical Platform AI commitments.',
+);
+const weeklyObligations = weeklyIntegration.player.world.platforms?.[weeklyMove!.platformId].ai?.pendingOneTimeObligations || [];
+assert(
+    weeklyObligations.some(obligation => obligation.id === `platform-war:${weeklyMove!.id}`),
+    'The integrated rival move must persist one matching canonical obligation.',
+);
 
 let fixture = createFixture();
 const absoluteWeek = getAbsoluteWeek(fixture.age, fixture.currentWeek);
@@ -111,10 +139,17 @@ let world = getStreamingCompetitiveWorld(fixture);
 assert(world.rivals.length === 5, 'The first competitive simulation should persist all five rivals.');
 assert(world.rivals.every(rival => rival.ceoName && rival.ceoPersonality && rival.strategy), 'Every rival should have a named CEO, personality and strategy.');
 assert(world.rivals.every(rival => rival.cashReserveMillions > 0 && rival.subscribersMillions > 0), 'Rivals should enter with real modeled cash and subscribers.');
+assert(world.rivals.every(rival => rival.activeRegionIds.length > 0 && rival.baseMonthlyPrice > 0), 'Every rival should retain a real regional footprint and price position.');
 assert(world.latestMoves.length === 1, 'A four-week boundary should create at most one rival move.');
 const firstMove = world.latestMoves[0];
-assert(firstMove.rivalCashAfterMillions === firstMove.rivalCashBeforeMillions - firstMove.cashCostMillions, 'A rival move must debit the exact recorded rival cash.');
+assert(Boolean(firstMove.strategyReason && firstMove.playerImpact && firstMove.battlefront), 'Every rival move should explain its cause, player impact and battlefront.');
+assert(committed.competitiveWorld.weeklyRivalHistory.length === 5, 'Every processed live week should persist one subscriber movement snapshot per rival.');
+assert(firstMove.rivalCashAfterMillions === firstMove.rivalCashBeforeMillions - firstMove.cashCostMillions, 'Rival cash disclosure must show the exact canonical move cost.');
 const actingRival = world.rivals.find(rival => rival.platformId === firstMove.platformId)!;
+assert(
+    actingRival.cashReserveMillions === fixture.world.platforms?.[firstMove.platformId].cashReserve,
+    'The projected rival cash is disclosure-only and must remain a projection of canonical world cash.',
+);
 assert(actingRival.cooldownUntilAbsoluteWeek > absoluteWeek, 'A rival move should create a real cooldown.');
 assert(committed.cinematicQueue.filter(event => event.type === 'PLATFORM_WAR_DECLARATION').length === 1, 'The first funded move should queue one declaration cinematic.');
 const committedAgain = commitStreamingCompetitiveWorldWeek(committed, fixture, absoluteWeek);
@@ -153,6 +188,13 @@ const poach: OwnedStreamingRivalMove = {
     platformName: 'Apple TV+',
     ceoName: STREAMING_RIVAL_TEMPLATES.APPLE_TV.ceoName,
     type: 'EXECUTIVE_POACH',
+    battlefront: 'TALENT',
+    targetRegionId: null,
+    targetTechnologyBranch: null,
+    strategyReason: 'Apple TV+ is testing Northstar leadership retention.',
+    playerImpact: 'The targeted executive may leave without a founder response.',
+    rivalPriceBefore: null,
+    rivalPriceAfter: null,
     title: `${STREAMING_RIVAL_TEMPLATES.APPLE_TV.ceoName} calls ${executive.nameAtAppointment}`,
     detail: 'A real executive received an outside mandate.',
     status: 'OPEN',
@@ -189,6 +231,35 @@ fixture = response.player;
 assert(fixture.ownedStreamingPlatform.treasuryCash === treasuryBeforeResponse - 2_000_000, 'The expanded-mandate response should debit its disclosed cost.');
 assert(fixture.ownedStreamingPlatform.leadership.appointments.find(item => item.executiveId === executive.executiveId)?.status === 'ACTIVE', 'A defended executive should remain in the real leadership table.');
 assert(!respondToStreamingRivalMove(fixture, poach.id, 'EXPAND_MANDATE').changed, 'The same rival response must not charge twice.');
+
+const technologyFixture = createFixture();
+const technologyWeek = getAbsoluteWeek(technologyFixture.age, technologyFixture.currentWeek);
+technologyFixture.ownedStreamingPlatform.technologyLevels = {
+    ...Object.fromEntries(Object.keys(technologyFixture.ownedStreamingPlatform.technologyLevels).map(branch => [branch, 0])),
+    PLAYBACK_QUALITY: 100,
+} as typeof technologyFixture.ownedStreamingPlatform.technologyLevels;
+let technologyPlatform = commitStreamingCompetitiveWorldWeek(
+    technologyFixture.ownedStreamingPlatform,
+    technologyFixture,
+    technologyWeek - 1,
+);
+technologyPlatform = {
+    ...technologyPlatform,
+    competitiveWorld: {
+        ...technologyPlatform.competitiveWorld,
+        rivals: technologyPlatform.competitiveWorld.rivals.map(rival => ({
+            ...rival,
+            cooldownUntilAbsoluteWeek: rival.platformId === 'HULU' ? 0 : technologyWeek + 100,
+        })),
+    },
+};
+const technologyCommitted = commitStreamingCompetitiveWorldWeek(technologyPlatform, technologyFixture, technologyWeek);
+const technologyMove = technologyCommitted.competitiveWorld.moves.at(-1)!;
+assert(technologyMove.type === 'TECH_COPY', 'A dominant real technology lead must make TECH_COPY win candidate scoring.');
+assert(technologyMove.targetTechnologyBranch === 'PLAYBACK_QUALITY', 'TECH_COPY must resolve the strongest canonical technology branch.');
+assert(technologyMove.cashCostMillions === 58, 'TECH_COPY must expose its real 58M rival cost.');
+assert(technologyMove.rivalCashBeforeMillions - technologyMove.rivalCashAfterMillions === 58, 'TECH_COPY must debit its disclosed cost exactly once.');
+assert(technologyMove.strategyReason.includes('playback quality'), 'TECH_COPY scoring must explain the canonical branch that made it competitive.');
 
 let awardsFixture = createFixture(52);
 const awardsWeek = getAbsoluteWeek(awardsFixture.age, awardsFixture.currentWeek);
@@ -274,11 +345,12 @@ const share = awardsCommitted.competitiveWorld.marketShareHistory.at(-1)!;
 assert(Math.abs(share.entries.reduce((sum, entry) => sum + entry.sharePercent, 0) - 100) < 0.1, 'Canonical market-share entries should reconcile to 100%.');
 
 const component = readFileSync(resolve(process.cwd(), 'components/StreamingPlatformWars.tsx'), 'utf8');
-const styles = readFileSync(resolve(process.cwd(), 'styles/streaming-platform-wars.css'), 'utf8');
+const styles = readFileSync(resolve(process.cwd(), 'styles/streaming-platform-wars-v2.css'), 'utf8');
 const hq = readFileSync(resolve(process.cwd(), 'components/StreamingPlatformHQ.tsx'), 'utf8');
 const analytics = readFileSync(resolve(process.cwd(), 'services/streamingAnalytics.ts'), 'utf8');
 const weekly = readFileSync(resolve(process.cwd(), 'services/streamingWeeklyLoop.ts'), 'utf8');
-assert(component.includes('Platform Wars') && component.includes('CEO memory') && component.includes('GLOBAL DELIVERY MAP'), 'The playable surface should include the war room, persistent CEO dossiers and global map.');
+assert(component.includes('PLATFORM WAR') && component.includes('CEO INTELLIGENCE') && component.includes('GLOBAL FOOTPRINT'), 'The playable surface should include the war room, persistent CEO dossiers and global map.');
+assert(component.includes('TECHNOLOGY') && component.includes('onOpenTechnology'), 'Technology-copy and sabotage pressure should route into the canonical Technology Campus.');
 assert(component.includes('There is no spend button') && !component.includes('Buy award'), 'Awards must explicitly remain evidence-only and unpurchasable.');
 assert(component.includes('fictional characters') && component.includes('Rivals cannot create actions without enough cash'), 'The UI should disclose fictional CEO identity and resource fairness.');
 assert(styles.includes('@media (max-width: 600px)') && styles.includes('prefers-reduced-motion'), 'Platform Wars should include explicit mobile and reduced-motion treatment.');

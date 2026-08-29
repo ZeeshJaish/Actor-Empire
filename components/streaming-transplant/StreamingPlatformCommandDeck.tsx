@@ -12,8 +12,14 @@
  */
 import css from './presentation/screens/CommandDesk/CommandDesk.module.css';
 import { cx } from './presentation/cx';
+import { brandVars } from './presentation/brand';
 import React, { useMemo, useState } from 'react';
-import { Brand, Mark, RegionId, brandColor, brandDeep, typeFace } from './StreamingBrandVisuals';
+import { Brand, Mark, RegionId, typeFace } from './StreamingBrandVisuals';
+import type {
+  StreamingLaunchDestination,
+  StreamingLaunchProgramView,
+  StreamingLaunchTrackId,
+} from '../../services/streamingLaunchProgram';
 
 /* ============================================================
    MODEL
@@ -50,7 +56,7 @@ export interface ServiceTitle {
   hue: number;
 }
 
-export type DivisionId = 'CONTENT' | 'NETWORK' | 'AUDIENCE' | 'BOARDROOM';
+export type DivisionId = 'CONTENT' | 'PLATFORM' | 'AUDIENCE' | 'BOARDROOM';
 export type Pressure = 'calm' | 'watch' | 'urgent';
 
 /** A card's table of contents. Text only, one line, in the division's own
@@ -110,6 +116,8 @@ export interface HqState {
   divisions: Division[];
   /** anything time-sensitive; the desk shows the most urgent one and no more */
   events?: HqEvent[];
+  /** Canonical pre-launch campaign. It guides the desk without replacing it. */
+  launchProgram?: StreamingLaunchProgramView;
 }
 
 /* ============================================================
@@ -135,7 +143,7 @@ const DIV_ICON: Record<DivisionId, React.ReactNode> = {
       <rect x="3" y="4" width="18" height="16" rx="2.5" /><path d="M3 9h18M8 4v16" />
     </svg>
   ),
-  NETWORK: (
+  PLATFORM: (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
       <rect x="3" y="4" width="18" height="6" rx="1.6" /><rect x="3" y="14" width="18" height="6" rx="1.6" />
       <path d="M7 7h.01M7 17h.01" strokeLinecap="round" />
@@ -164,11 +172,14 @@ export const PlatformHQ: React.FC<{
   onOpenDivision?: (d: DivisionId, chip?: string) => void;
   onEvent?: (e: HqEvent) => void;
   onOpenViewer?: () => void;
+  /** the treasury is a door, not a readout — see the note at its render site */
+  onOpenFinance?: () => void;
   onOpenTitle?: (t: ServiceTitle) => void;
   onSeeAll?: () => void;
   onLaunch?: () => void;
-}> = ({ brand, state, onBack, onCommission, onOpenDivision, onEvent, onOpenViewer, onOpenTitle, onSeeAll, onLaunch }) => {
-  const c = brandColor(brand), c2 = brandDeep(brand);
+  onOpenLaunchTrack?: (track: StreamingLaunchTrackId) => void;
+  onOpenLaunchDestination?: (destination: StreamingLaunchDestination) => void;
+}> = ({ brand, state, onBack, onCommission, onOpenDivision, onEvent, onOpenViewer, onOpenFinance, onOpenTitle, onSeeAll, onOpenLaunchTrack }) => {
   const tf = typeFace(brand);
   const [pulse, setPulse] = useState(0);
 
@@ -182,7 +193,7 @@ export const PlatformHQ: React.FC<{
     [state.divisions]);
 
   return (
-    <div className={css.hq} style={{ ['--epx-hq-c' as string]: c, ['--epx-hq-c2' as string]: c2 }}>
+    <div className={css.hq} data-epx-root style={brandVars(brand)}>
       <div className={css.hqscroll}>
 
         {/* ── header ── */}
@@ -200,7 +211,7 @@ export const PlatformHQ: React.FC<{
             <i className={css.pin} />
             {state.live
               ? `${state.territories} territor${state.territories === 1 ? 'y' : 'ies'} · Level ${state.reachLevel}`
-              : 'Not yet live — no subscribers exist'}
+              : 'Founder headquarters · the service is under construction'}
           </div>
 
           <div className={css.hqheroes}>
@@ -220,10 +231,22 @@ export const PlatformHQ: React.FC<{
                 </>
               )}
             </div>
-            <div className={css.hero}>
-              <span className={css.hlabel}>TREASURY</span>
-              <b className={cx(css.hval, css.green)}>{money(state.treasury)}</b>
-            </div>
+            {/* Money was the hardest thing in the game to find: the only way to
+                fund the company was a button that appeared on the Build screen
+                once you were ALREADY over budget, or a chip three taps into the
+                Boardroom. The number you look at every week is now the door. */}
+            {onOpenFinance ? (
+              <button type="button" className={cx(css.hero, css.heroTap)} onClick={onOpenFinance}
+                aria-label={`Treasury ${money(state.treasury)}. Open financing.`}>
+                <span className={css.hlabel}>TREASURY</span>
+                <b className={cx(css.hval, css.green)}>{money(state.treasury)}</b>
+              </button>
+            ) : (
+              <div className={css.hero}>
+                <span className={css.hlabel}>TREASURY</span>
+                <b className={cx(css.hval, css.green)}>{money(state.treasury)}</b>
+              </div>
+            )}
           </div>
 
           {/* the one thing a production house cannot show: the service, running */}
@@ -242,7 +265,7 @@ export const PlatformHQ: React.FC<{
           )}
 
           {/* ── the event slot: at most one, highest priority, or nothing ── */}
-          {event && (
+          {event && (state.live || !state.launchProgram) && (
             <button className={cx(css.eventbar, css[event.tone], (event.hero ? css.hero : ''))}
               onClick={() => onEvent?.(event)}>
               <span className={css.evdot} />
@@ -254,20 +277,47 @@ export const PlatformHQ: React.FC<{
               <i className={css.chev}>›</i>
             </button>
           )}
+
+          {!state.live && state.launchProgram && (
+            <nav className={css.launchCommandRows} aria-label="Pre-launch wizards">
+              {state.launchProgram.tracks.map(track => {
+                const next = track.milestones.find(item => !item.complete);
+                const cleared = track.completedCount === track.totalCount;
+                return (
+                  <button
+                    type="button"
+                    key={track.id}
+                    className={cx(css.launchCommandRow, track.id === 'BUILD_PLATFORM' ? css.buildCommandRow : '', cleared ? css.commandCleared : '')}
+                    onClick={() => onOpenLaunchTrack?.(track.id)}
+                    aria-label={`${track.label}. ${track.completedCount} of ${track.totalCount} checks cleared.${next ? ` Next: ${next.shortLabel}.` : ''}`}
+                  >
+                    <span className={css.commandSignal} aria-hidden="true"><i /></span>
+                    <span className={css.commandCopy}>
+                      <small>{track.id === 'DEFINE_LAUNCH' ? 'LAUNCH COMMAND' : 'BUILD COMMAND'}</small>
+                      <b>{track.label}</b>
+                      <em>{next ? `Next · ${next.shortLabel}` : 'Wizard cleared'}</em>
+                    </span>
+                    <strong>{track.completedCount}/{track.totalCount}</strong>
+                    <i className={css.commandChevron} aria-hidden="true">›</i>
+                  </button>
+                );
+              })}
+            </nav>
+          )}
         </header>
 
         {/* ── scrollable stat strip ── */}
-        <div className={css.statstrip}>
+        {state.live && <div className={css.statstrip}>
           {state.stats.map(s => (
             <div className={css.stat} key={s.id}>
               <span>{s.label}</span>
               <b className={s.tone ? css[s.tone] ?? '' : ''}>{s.value}</b>
             </div>
           ))}
-        </div>
+        </div>}
 
         {/* ── row 1 · the slate ── */}
-        <section className={css.hqsec}>
+        {state.live && <section className={css.hqsec}>
           <div className={css.sechead}><h2>The Slate</h2></div>
           <div className={css.rail}>
             <button className={cx(css.card, css.newcard)} onClick={onCommission}>
@@ -290,10 +340,10 @@ export const PlatformHQ: React.FC<{
               </div>
             ))}
           </div>
-        </section>
+        </section>}
 
         {/* ── row 2 · what is live and still earning ── */}
-        <section className={css.hqsec}>
+        {state.live && <section className={css.hqsec}>
           <div className={css.sechead}>
             <h2>{state.live ? 'On the Service' : 'Staged Catalogue'}</h2>
             <button className={css.seemore} onClick={onSeeAll}>SEE MORE <i>›</i></button>
@@ -335,18 +385,20 @@ export const PlatformHQ: React.FC<{
               </button>
             ))}
           </div>
-        </section>
+        </section>}
 
         {/* ── row 3 · the operations console ── */}
         <section className={cx(css.hqsec, css.console)}>
-          <span className={css.kicker}>PLATFORM CONTROL CONSOLE</span>
+          <span className={css.kicker}>{state.live ? 'PLATFORM CONTROL CONSOLE' : 'PRE-LAUNCH HEADQUARTERS'}</span>
           <div className={css.consolehead}>
-            <h2 className={css.bighead}>OPERATIONS</h2>
+            <h2 className={css.bighead}>{state.live ? 'OPERATIONS' : 'FOUR OPERATIONS'}</h2>
             {needing > 0 && <span className={css.needing}>{needing} NEED YOU</span>}
           </div>
 
+          {!state.live && <p className={css.consoleBrief}>Every room owns one part of the opening. Enter a room when its light calls for you.</p>}
+
           {/* not a division — the same company seen from the outside */}
-          <button className={css.viewerstrip} onClick={onOpenViewer}>
+          {state.live && <button className={css.viewerstrip} onClick={onOpenViewer}>
             <span className={css.vsicon}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
                 <rect x="2" y="4" width="20" height="13" rx="2.2" /><path d="M8 21h8M12 17v4" strokeLinecap="round" />
@@ -357,7 +409,7 @@ export const PlatformHQ: React.FC<{
               <span>Viewer mode · phone, web, TV</span>
             </div>
             <i className={css.chev}>›</i>
-          </button>
+          </button>}
 
           <div className={css.consolebox}>
             <div className={css.divgrid}>

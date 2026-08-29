@@ -102,9 +102,9 @@ const createFixture = (): Player => {
     };
 };
 
-assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 22, 'The current schema should retain the Phase 7 Original and slate records.');
+assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 23, 'The current schema should retain the Phase 7 Original and slate records.');
 const migrated = normalizeOwnedStreamingPlatformState({ schemaVersion: 5 }, 'legacy-phase7');
-assert(migrated.schemaVersion === 22, 'Phase 5 saves should normalize to the current schema.');
+assert(migrated.schemaVersion === 23, 'Phase 5 saves should normalize to the current schema.');
 assert(migrated.originalCommissionDraft === null && migrated.originalCommissions.length === 0, 'Older saves should receive safe empty Original records.');
 assert(migrated.launchSlateDraft === null && migrated.launchSlate === null, 'Older saves should receive safe empty slate records.');
 

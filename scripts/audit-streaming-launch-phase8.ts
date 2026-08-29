@@ -11,6 +11,7 @@ import {
     getStreamingLaunchReadiness,
 } from '../services/streamingLaunch';
 import { normalizeOwnedStreamingPlatformState } from '../services/ownedStreamingPlatform';
+import { getStreamingLaunchDefinitionSignature } from '../services/streamingLaunchProgram';
 
 const assert = (condition: unknown, message: string) => {
     if (!condition) throw new Error(message);
@@ -44,6 +45,20 @@ const createFixture = (): Player => {
             incorporatedAtAbsoluteWeek: 2_100,
         },
         infrastructureStrategy: 'HYBRID',
+        marketOperations: [{
+            id: 'market-us', idempotencyKey: 'market:opening:us', scope: 'COUNTRY', scopeId: 'US', countryId: 'US',
+            regionId: 'NORTH_AMERICA', entryKind: 'OPENING', status: 'READY',
+            plannedCosts: { rights: 48_000_000, compliance: 5_000_000, localization: 0, infrastructure: 0, other: 0, total: 53_000_000 },
+            committedCosts: { rights: 48_000_000, compliance: 5_000_000, localization: 0, infrastructure: 0, other: 0, total: 53_000_000 },
+            weeklyOperatingCost: 0, policySnapshot: null, plannedAtAbsoluteWeek: 2_100, committedAtAbsoluteWeek: 2_101,
+            approvalReadyAtAbsoluteWeek: 2_105, activatedAtAbsoluteWeek: null, suspendedAtAbsoluteWeek: null, exitedAtAbsoluteWeek: null, source: 'PLAYER_ACTION',
+        }],
+        serviceConfiguration: {
+            source: 'PLAYER_ACTION', soundIdentKey: 'PULSE', identPackageId: 'STANDARD', identDurationSeconds: 3,
+            storefrontLayoutId: 'CINEMA', pricingApproach: 'PREMIUM',
+            pricing: createInitialOwnedStreamingPlatformState().serviceConfiguration.pricing,
+            committedCost: 0, committedAtAbsoluteWeek: 2_101, revision: 1,
+        },
         infrastructureSetup: {
             capacityPackageId: 'GROWTH',
             rolloutPace: 'STANDARD',
@@ -151,7 +166,7 @@ const createFixture = (): Player => {
             'launch-slate-programmed',
         ],
     };
-    return {
+    const player: Player = {
         ...base,
         id: 'phase8-player',
         name: 'Launch Founder',
@@ -177,10 +192,33 @@ const createFixture = (): Player => {
         }],
         ownedStreamingPlatform: platform,
     };
+    const blueprintSignature = getStreamingLaunchDefinitionSignature(player);
+    const withBlueprint: Player = {
+        ...player,
+        ownedStreamingPlatform: {
+            ...player.ownedStreamingPlatform,
+            launchProgram: {
+                ...player.ownedStreamingPlatform.launchProgram,
+                status: 'PLANNING',
+                lastBlueprintSignature: blueprintSignature,
+                blueprintSavedAtAbsoluteWeek: 2_104,
+            },
+        },
+    };
+    return {
+        ...withBlueprint,
+        ownedStreamingPlatform: {
+            ...withBlueprint.ownedStreamingPlatform,
+            launchProgram: {
+                ...withBlueprint.ownedStreamingPlatform.launchProgram,
+                lastBlueprintSignature: getStreamingLaunchDefinitionSignature(withBlueprint),
+            },
+        },
+    };
 };
 
 const migrated = normalizeOwnedStreamingPlatformState({ schemaVersion: 7 }, 'phase8-migration');
-assert(migrated.schemaVersion === 22 && migrated.launchCommit === null, 'Schema v7 saves should migrate with a safe empty launch commit.');
+assert(migrated.schemaVersion === 23 && migrated.launchCommit === null, 'Schema v7 saves should migrate with a safe empty launch commit.');
 
 const productionBlocked: Player = {
     ...createFixture(),

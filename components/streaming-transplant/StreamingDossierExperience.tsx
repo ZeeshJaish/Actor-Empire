@@ -12,6 +12,7 @@
  */
 import css from './presentation/screens/TitleDossier/TitleDossier.module.css';
 import { cx } from './presentation/cx';
+import { brandVars } from './presentation/brand';
 import React, { useMemo } from 'react';
 import { Brand, Mark, brandColor, brandDeep, typeFace } from './StreamingBrandVisuals';
 
@@ -78,7 +79,7 @@ export const TitleDossier: React.FC<{
   const settled = t.maturity.have >= t.maturity.need;
 
   return (
-    <div className={css.dos} style={{ ['--epx-dos-c' as string]: c, ['--epx-dos-h' as string]: `${t.hue}` }}>
+    <div className={css.dos} data-epx-root style={brandVars(brand, { ['--epx-dos-h' as string]: `${t.hue}` } as React.CSSProperties)}>
       <button className={css.dosx} onClick={onClose} aria-label="Close">✕</button>
 
       <div className={css.dosscroll}>

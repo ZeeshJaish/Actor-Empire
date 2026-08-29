@@ -21,6 +21,7 @@
  */
 import css from './presentation/screens/PremiereNight/PremiereNight.module.css';
 import { cx } from './presentation/cx';
+import { brandVars } from './presentation/brand';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Brand, Mark, brandColor, brandDeep, typeFace } from './StreamingBrandVisuals';
 
@@ -455,7 +456,8 @@ export const PremiereNight: React.FC<{
 
   return (
     <div className={cx(css.pn, css[beat.toLowerCase()], (over ? css.hot : ''), (failedNow >= 18 ? css.broke : ''))}
-      style={{ ['--epx-pn-c' as string]: c}}>
+      data-epx-root
+      style={brandVars(brand)}>
 
       {/* ══ GATE ══════════════════════════════════════════ */}
       {beat === 'GATE' && (

@@ -96,7 +96,7 @@ export const StockBug: React.FC<{
 
   const up = quote.pct >= 0;
   return (
-    <button className={cx(css.stbug, up ? css.u : css.d, flash ? css['f' + flash] : '')} onClick={onOpen}>
+    <button className={cx(css.stbug, up ? css.u : css.d, flash ? css['f' + flash] : '')} data-epx-root onClick={onOpen}>
       <span>{ticker}</span>
       <b>${quote.price.toFixed(2)}</b>
       <em>{up ? '▲' : '▼'}{Math.abs(quote.pct).toFixed(1)}%</em>
@@ -110,7 +110,7 @@ export const StockBug: React.FC<{
 export const StockPanel: React.FC<{
   ticker: string; quote: Quote; closePrice: number; onClose: () => void;
 }> = ({ ticker, quote, closePrice, onClose }) => (
-  <div className={css.stwrap} onClick={onClose}>
+  <div className={css.stwrap} data-epx-root onClick={onClose}>
     <div className={css.stcard} onClick={e => e.stopPropagation()}>
       <div className={css.sthead}>
         <div><b>{ticker}</b><span>ORDINARY SHARES</span></div>

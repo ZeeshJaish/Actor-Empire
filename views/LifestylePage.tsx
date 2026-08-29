@@ -29,12 +29,15 @@ interface LifestylePageProps {
   onPremiumPurchase: (productId: PremiumProductId) => void;
   onReturnHome?: () => void;
   onNavVisibilityChange?: (visible: boolean) => void;
-  initialView?: 'MAIN' | 'ASSETS' | 'ACTIVITIES' | 'BUSINESS' | 'PRODUCTION_WIZARD' | 'PRODUCTION_GAME' | 'STREAMING_PLATFORM' | 'CINEMA_CHAIN';
+  initialView?: 'MAIN' | 'ASSETS' | 'ACTIVITIES' | 'BUSINESS' | 'PRODUCTION_WIZARD' | 'PRODUCTION_GAME' | 'STREAMING_PLATFORM' | 'STREAMING_FINANCE' | 'CINEMA_CHAIN';
   onInitialViewConsumed?: () => void;
+  onOpenBank?: () => void;
   initialRightsMarketOpportunityId?: string;
   onRightsMarketTargetConsumed?: () => void;
   initialStudioContinuation?: { studioId: string; scriptId: string };
   onStudioContinuationConsumed?: () => void;
+  initialPlatformCommission?: { studioId: string; offerId: string };
+  onPlatformCommissionConsumed?: () => void;
 }
 
 const CustomizationHeroImage: React.FC<{ item: Property | Vehicle }> = ({ item }) => {
@@ -56,12 +59,13 @@ const CustomizationHeroImage: React.FC<{ item: Property | Vehicle }> = ({ item }
   );
 };
 
-export const LifestylePage: React.FC<LifestylePageProps> = ({ player, onBuyItem, onSellItem, onSetResidence, onUpdatePlayer, onPremiumPurchase, onReturnHome, onNavVisibilityChange, initialView, onInitialViewConsumed, initialRightsMarketOpportunityId, onRightsMarketTargetConsumed, initialStudioContinuation, onStudioContinuationConsumed }) => {
+export const LifestylePage: React.FC<LifestylePageProps> = ({ player, onBuyItem, onSellItem, onSetResidence, onUpdatePlayer, onPremiumPurchase, onReturnHome, onNavVisibilityChange, initialView, onInitialViewConsumed, onOpenBank, initialRightsMarketOpportunityId, onRightsMarketTargetConsumed, initialStudioContinuation, onStudioContinuationConsumed, initialPlatformCommission, onPlatformCommissionConsumed }) => {
   const [view, setView] = useState<'MAIN' | 'ASSETS' | 'ACTIVITIES' | 'BUSINESS' | 'PRODUCTION_WIZARD' | 'PRODUCTION_GAME' | 'STREAMING_PLATFORM' | 'CINEMA_CHAIN'>('MAIN');
   const [customizationItem, setCustomizationItem] = useState<Property | Vehicle | null>(null);
   const [selectedCustomizations, setSelectedCustomizations] = useState<CustomizationOption[]>([]);
   const [purchaseCelebrationAsset, setPurchaseCelebrationAsset] = useState<ShareableAsset | null>(null);
   const [streamingOriginalTarget, setStreamingOriginalTarget] = useState<{ studioId: string; scriptId: string; commissionId: string } | null>(null);
+  const [streamingDestination, setStreamingDestination] = useState<'HOME' | 'FINANCE'>('HOME');
   const language = getPlayerLanguage(player);
   const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
   const trFallback = (key: string, fallback: string) => {
@@ -82,11 +86,21 @@ export const LifestylePage: React.FC<LifestylePageProps> = ({ player, onBuyItem,
   }, [view, customizationItem, onNavVisibilityChange]);
 
   useEffect(() => {
-      if (initialView && initialView !== view) {
-          setView(initialView);
-          onInitialViewConsumed?.();
+      if (!initialView) return;
+      if (initialView === 'STREAMING_FINANCE') {
+          setStreamingDestination('FINANCE');
+          setView('STREAMING_PLATFORM');
+      } else {
+          if (initialView === 'STREAMING_PLATFORM') setStreamingDestination('HOME');
+          if (initialView !== view) setView(initialView);
       }
+      onInitialViewConsumed?.();
   }, [initialView, view, onInitialViewConsumed]);
+
+  const openStreamingPlatform = (destination: 'HOME' | 'FINANCE' = 'HOME') => {
+      setStreamingDestination(destination);
+      setView('STREAMING_PLATFORM');
+  };
 
   // Check if player owns a Production House
   const productionStudio = player.businesses.find(b => b.type === 'PRODUCTION_HOUSE');
@@ -289,7 +303,7 @@ export const LifestylePage: React.FC<LifestylePageProps> = ({ player, onBuyItem,
 
   if (view === 'PRODUCTION_WIZARD') return <ProductionWizard player={player} onCancel={() => setView('MAIN')} onUpdatePlayer={onUpdatePlayer!} onComplete={() => setView('PRODUCTION_GAME')} />;
 
-  if (view === 'PRODUCTION_GAME') return <ProductionHouseGame player={player} onBack={() => setView('MAIN')} onUpdatePlayer={onUpdatePlayer!} initialRightsMarketOpportunityId={initialRightsMarketOpportunityId} onRightsMarketTargetConsumed={onRightsMarketTargetConsumed} initialStudioContinuation={initialStudioContinuation} onStudioContinuationConsumed={onStudioContinuationConsumed} initialStreamingOriginal={streamingOriginalTarget || undefined} onStreamingOriginalConsumed={() => setStreamingOriginalTarget(null)} onStreamingOriginalGreenlightComplete={() => setView('STREAMING_PLATFORM')} onOpenOwnedStreamingDelivery={() => setView('STREAMING_PLATFORM')} />;
+  if (view === 'PRODUCTION_GAME') return <ProductionHouseGame player={player} onBack={() => setView('MAIN')} onUpdatePlayer={onUpdatePlayer!} initialRightsMarketOpportunityId={initialRightsMarketOpportunityId} onRightsMarketTargetConsumed={onRightsMarketTargetConsumed} initialStudioContinuation={initialStudioContinuation} onStudioContinuationConsumed={onStudioContinuationConsumed} initialPlatformCommission={initialPlatformCommission} onPlatformCommissionConsumed={onPlatformCommissionConsumed} initialStreamingOriginal={streamingOriginalTarget || undefined} onStreamingOriginalConsumed={() => setStreamingOriginalTarget(null)} onStreamingOriginalGreenlightComplete={() => openStreamingPlatform()} onOpenOwnedStreamingDelivery={() => openStreamingPlatform()} />;
 
   if (view === 'STREAMING_PLATFORM') return (
       <StreamingLockedScreen
@@ -297,6 +311,8 @@ export const LifestylePage: React.FC<LifestylePageProps> = ({ player, onBuyItem,
           onUpdatePlayer={onUpdatePlayer}
           onBack={() => setView('MAIN')}
           onReturnToGame={onReturnHome || (() => setView('MAIN'))}
+          onOpenBank={onOpenBank}
+          initialDestination={streamingDestination}
           onOpenOriginalProduction={target => {
               setStreamingOriginalTarget(target);
               setView('PRODUCTION_GAME');
@@ -367,7 +383,7 @@ export const LifestylePage: React.FC<LifestylePageProps> = ({ player, onBuyItem,
             </button>
 
             {/* Streaming Platform */}
-            <button onClick={() => setView('STREAMING_PLATFORM')} className="glass-card p-6 rounded-3xl text-left hover:bg-purple-500/10 transition-all group relative">
+            <button onClick={() => openStreamingPlatform()} className="glass-card p-6 rounded-3xl text-left hover:bg-purple-500/10 transition-all group relative">
                 <div className="flex items-center gap-4">
                     <div className="p-3 rounded-2xl bg-purple-500/10 text-purple-400"><Tv size={24}/></div>
                     <div className="min-w-0 flex-1 pr-2">

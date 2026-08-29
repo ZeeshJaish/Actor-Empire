@@ -395,6 +395,10 @@ export const deriveOwnedProductionCareerItems = (
                 const progress = getOwnedProductionActionProgress(commitment, actionId, focus);
                 return {
                     ...action,
+                    ...(actionId === 'PRODUCER_RELEASE_POSITIONING' && details.hiddenStats?.playerPlatformCommissionOfferId ? {
+                        label: 'Platform Delivery Preparation',
+                        shortLabel: 'Delivery Prep',
+                    } : {}),
                     progress,
                     isMaxed: progress >= 100,
                 };

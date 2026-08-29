@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
-import { Player, BudgetTier, Genre, ProjectDetails, ActiveRelease, Business, LocationDetails, Universe, UniverseId, ProjectMusicStrategy, MusicCreditRole, MusicArtist, ProjectInvestorFundingMode, StudioContract, RoleType, BackgroundCastingPlan } from '../../../types';
+import { Player, BudgetTier, Genre, ProjectDetails, ActiveRelease, Business, LocationDetails, Universe, UniverseId, ProjectMusicStrategy, MusicCreditRole, MusicArtist, ProjectInvestorFundingMode, StudioContract, RoleType, BackgroundCastingPlan, PlatformAiPlayerCommissionOffer, LockedStreamingFunding } from '../../../types';
 import { ArrowLeft, Film, DollarSign, TrendingUp, Calendar, Star, Award, Briefcase, LayoutGrid, MapPin, PenTool, Camera, ChevronRight, Lock, BarChart3, LogOut, Sparkles, BookOpen, Video, Clock, Palette, Lightbulb, Box, XCircle, Loader2 } from 'lucide-react';
 import { NPC_DATABASE, getAvailableTalent, isCastableActor } from '../../../services/npcLogic';
 import { getConnectedDirectorCandidates, getDirectorConnectionDiscount } from '../../../services/directorConnectionLogic';
@@ -13,6 +13,7 @@ import { getPlayerLanguage, t } from '../../../services/i18n';
 import { resolveProjectType } from '../../../services/businessLogic';
 import { addBreadcrumb, markGameCheckpoint, markTraceAction, setCrashContext, startPerformanceTrace, stopPerformanceTrace, trackGameEvent } from '../../../services/firebaseService';
 import { finalizeOwnedStreamingOriginalGreenlight } from '../../../services/streamingOriginals';
+import { buildPlatformCommissionBudgetPresentation, finalizePlatformAiPlayerCommissionGreenlight } from '../../../services/platformAi';
 import {
     calculateProjectMusicImpact,
     buildProjectMusicPlanFromArtists,
@@ -116,6 +117,10 @@ import {
 } from './greenlightUtils';
 import { BackgroundCastingPanel } from './components/BackgroundCastingPanel';
 import { buildBackgroundCastingPlan, normalizeBackgroundCastingPlan } from '../../../services/livingEnsemble';
+import { createProductionCalendar } from '../../../services/productionCalendar';
+import {
+    reserveProjectTalentBookings,
+} from '../../../services/talentBookings';
 import {
     PRODUCTION_LOCATIONS_BY_CONTINENT,
     getProductionLocation,
@@ -138,11 +143,13 @@ export interface GreenlightWizardProps {
     initialConcept?: any;
     onBack: () => void;
     onOpenScriptMarket?: () => void;
+    onOpenScriptDevelopment?: () => void;
     onUpdatePlayer: (p: Player) => void;
     onComplete: () => void;
+    platformCommissionOffer?: PlatformAiPlayerCommissionOffer;
 }
 
-export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, studio, initialConcept, onBack, onOpenScriptMarket, onUpdatePlayer, onComplete }) => {
+export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, studio, initialConcept, onBack, onOpenScriptMarket, onOpenScriptDevelopment, onUpdatePlayer, onComplete, platformCommissionOffer }) => {
     const language = getPlayerLanguage(player);
     const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
     const [selectedScriptId, setSelectedScriptId] = useState<string | null>(initialConcept?.scriptId || null);
@@ -173,6 +180,15 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
     const [musicRoleSortOptions, setMusicRoleSortOptions] = useState<Record<string, MusicArtistSortOption>>({});
     const [investorRaiseAmount, setInvestorRaiseAmount] = useState<number>(Math.max(0, Math.round(Number(initialConcept?.investorRaiseAmount || initialConcept?.investorPlan?.targetRaise || 0))));
     const [investorFundingMode, setInvestorFundingMode] = useState<ProjectInvestorFundingMode>(initialConcept?.investorFundingMode || initialConcept?.investorPlan?.fundingMode || 'SYNDICATE');
+    const isPlayerPlatformCommission = Boolean(platformCommissionOffer);
+
+    useEffect(() => {
+        if (!isPlayerPlatformCommission) return;
+        setReservedMarketingBudget(0);
+        setMarketingBudgetPreset('CUSTOM');
+        setInvestorRaiseAmount(0);
+        setSelectedInvestorIds([]);
+    }, [isPlayerPlatformCommission]);
     const [selectedInvestorIds, setSelectedInvestorIds] = useState<string[]>(
         Array.isArray(initialConcept?.selectedInvestorIds)
             ? initialConcept.selectedInvestorIds
@@ -198,6 +214,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         { id: 'lead_1', role: 'Lead Actor', roleType: 'LEAD', actorId: null, identitySource: 'AUTO' },
         { id: 'supp_1', role: 'Supporting Actor', roleType: 'SUPPORTING', actorId: null, identitySource: 'AUTO' }
     ]);
+    const [exactTalentConflictNames, setExactTalentConflictNames] = useState<string[]>([]);
     const [backgroundCastingPlan, setBackgroundCastingPlan] = useState<BackgroundCastingPlan>(() => (
         normalizeBackgroundCastingPlan(initialConcept?.backgroundCastingPlan, {})
     ));
@@ -454,9 +471,15 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                 if (s.status !== 'READY') return false;
                 const hasExistingConcept = existingConceptScriptIds.has(s.id);
                 const isResumableScript = s.sourceMaterial === 'SEQUEL' || s.sourceMaterial === 'SPINOFF';
-                return !hasExistingConcept || isResumableScript || s.id === initialConcept?.scriptId || s.id === selectedScriptId;
+                const isAvailable = !hasExistingConcept || isResumableScript || s.id === initialConcept?.scriptId || s.id === selectedScriptId;
+                if (!isAvailable) return false;
+                if (!platformCommissionOffer) return true;
+                const scriptType = resolveProjectType(s.projectType, s.type, s.projectDetails?.type);
+                return scriptType === platformCommissionOffer.projectType
+                    && Array.isArray(s.genres)
+                    && s.genres.includes(platformCommissionOffer.genre);
             });
-    }, [studio.studioState?.scripts, studio.studioState?.concepts, initialConcept?.scriptId, selectedScriptId, contractedTalentIds]);
+    }, [studio.studioState?.scripts, studio.studioState?.concepts, initialConcept?.scriptId, selectedScriptId, contractedTalentIds, platformCommissionOffer]);
 
     const selectedScript = useMemo(() => {
         return scripts.find(s => s.id === selectedScriptId)
@@ -495,8 +518,20 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
     }, [selectedScript, step]);
 
     const lockedStreamingFunding = useMemo(() => {
+        if (platformCommissionOffer) return {
+            id: `funding_${platformCommissionOffer.id}`,
+            platformId: platformCommissionOffer.platformId,
+            platformName: platformCommissionOffer.platformName,
+            amount: platformCommissionOffer.productionBudget,
+            sourceProjectId: platformCommissionOffer.id,
+            sourceTitle: platformCommissionOffer.title,
+            projectType: platformCommissionOffer.projectType,
+            fundingSource: 'AI_PLATFORM_COMMISSION',
+            playerPlatformCommissionOfferId: platformCommissionOffer.id,
+            fixedBudgetCap: true,
+        } satisfies LockedStreamingFunding;
         return selectedScript?.lockedStreamingFunding || initialConcept?.lockedStreamingFunding || null;
-    }, [selectedScript?.lockedStreamingFunding, initialConcept?.lockedStreamingFunding]);
+    }, [selectedScript?.lockedStreamingFunding, initialConcept?.lockedStreamingFunding, platformCommissionOffer]);
 
     const lockedStreamingFundingAmount = useMemo(() => {
         return Math.max(0, Math.floor(Number(lockedStreamingFunding?.amount || 0)));
@@ -1088,6 +1123,24 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
     const crewMarketAbsoluteWeek = getCrewMarketAbsoluteWeek(player.age, player.currentWeek);
     const crewMarketCycle = getCrewMarketCycle(player.age, player.currentWeek);
     const crewMarketRefreshIn = getCrewMarketRefreshInWeeks(player.age, player.currentWeek);
+    const talentBookingPreviewCalendar = useMemo(() => createProductionCalendar({
+        preProductionWeeks: 7,
+        productionWeeks: 10,
+        postProductionWeeks: 12,
+        age: player.age,
+        week: player.currentWeek,
+    }), [player.age, player.currentWeek]);
+    const directorBookingPreviewWindow = useMemo(() => ({
+        startAbsoluteWeek: talentBookingPreviewCalendar.startedAbsoluteWeek!,
+        endAbsoluteWeek: talentBookingPreviewCalendar.startedAbsoluteWeek! + talentBookingPreviewCalendar.totalWeeks - 1,
+    }), [talentBookingPreviewCalendar]);
+    const actorBookingPreviewWindow = useMemo(() => ({
+        startAbsoluteWeek: talentBookingPreviewCalendar.startedAbsoluteWeek! + talentBookingPreviewCalendar.preProductionWeeks,
+        endAbsoluteWeek: talentBookingPreviewCalendar.startedAbsoluteWeek!
+            + talentBookingPreviewCalendar.preProductionWeeks
+            + talentBookingPreviewCalendar.productionWeeks
+            - 1,
+    }), [talentBookingPreviewCalendar]);
 
     const connectedDirectorCandidates = useMemo(() => (
         getConnectedDirectorCandidates(player.relationships || [], directorCandidatePool)
@@ -1125,7 +1178,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             }
         }
 
-        return talent.map(t => {
+        const pricedTalent = talent.map(t => {
             // Deterministic salary based on ID hash
             const seed = t.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
             const rand = (seed % 100) / 100; // 0.00 to 0.99
@@ -1159,7 +1212,8 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                 stats: { ...t.stats, fame: currentFame, talent: currentTalent }
             };
         });
-    }, [crewMarketCycle, crewMarketAbsoluteWeek, player.flags.extraNPCs, player.relationships, connectedDirectorCandidates, selectedCrew.director, previousFranchiseInstallments, currentReturningTalent]);
+        return pricedTalent.map(candidate => ({ ...candidate, isBookingUnavailable: false }));
+    }, [crewMarketCycle, crewMarketAbsoluteWeek, player.flags.extraNPCs, player.relationships, player.world.talentBookings, connectedDirectorCandidates, selectedCrew.director, previousFranchiseInstallments, currentReturningTalent, directorBookingPreviewWindow]);
 
     const actorCandidatePool = useMemo(() => [
         ...NPC_DATABASE,
@@ -1208,7 +1262,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             if (selectedNPC && isCastableActor(selectedNPC)) talent.unshift(selectedNPC);
         });
 
-        return talent.map(t => {
+        const pricedTalent = talent.map(t => {
             const seed = t.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
             const rand = (seed % 100) / 100;
 
@@ -1228,13 +1282,29 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
 
             return { ...t, salary, stats: { ...t.stats, fame: currentFame, talent: currentTalent } };
         });
-    }, [crewMarketCycle, crewMarketAbsoluteWeek, castList, studioTalentRoster, player.flags.extraNPCs, player.relationships, actorCandidatePool, currentReturningTalent, linkedCharacterOptions, previousCharacterOptions, legacyCharacterOptions, activeUniverseCharacterOptions]);
+        return pricedTalent.map(candidate => ({ ...candidate, isBookingUnavailable: false }));
+    }, [crewMarketCycle, crewMarketAbsoluteWeek, castList, studioTalentRoster, player.flags.extraNPCs, player.relationships, player.world.talentBookings, actorCandidatePool, currentReturningTalent, linkedCharacterOptions, previousCharacterOptions, legacyCharacterOptions, activeUniverseCharacterOptions, actorBookingPreviewWindow]);
 
     const contractedActors = useMemo(() => {
         return Array.from(contractedTalentIds)
             .map(id => availableActors.find(actor => actor.id === id))
             .filter(Boolean) as any[];
     }, [contractedTalentIds, availableActors]);
+
+    const selectedTalentConflictNames = useMemo(() => {
+        const names = new Set(exactTalentConflictNames);
+        const selectedDirector = availableDirectors.find(director => director.id === selectedCrew.director);
+        if (selectedDirector?.isBookingUnavailable) names.add(selectedDirector.name);
+        castList.forEach(role => {
+            const actor = availableActors.find(candidate => candidate.id === role.actorId);
+            if (actor?.isBookingUnavailable) names.add(actor.name);
+        });
+        return [...names];
+    }, [availableActors, availableDirectors, castList, exactTalentConflictNames, selectedCrew.director]);
+
+    useEffect(() => {
+        setExactTalentConflictNames([]);
+    }, [selectedCrew.director, castList.map(role => role.actorId || '').join('|')]);
 
     const requiresReturningTalentNegotiation = (talent: any) => {
         if (!talent || talent.accepted || (talent.attemptsLeft ?? 0) <= 0) return false;
@@ -2097,12 +2167,12 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
     };
 
     const availableGreenlightFunds = useMemo(() => (
-        calculateAvailableGreenlightFunds(
+        isPlayerPlatformCommission ? lockedStreamingFundingAmount : calculateAvailableGreenlightFunds(
             studio.balance,
             studio.studioState?.productionFund || 0,
             lockedStreamingFundingAmount,
         )
-    ), [studio.balance, studio.studioState?.productionFund, lockedStreamingFundingAmount]);
+    ), [studio.balance, studio.studioState?.productionFund, lockedStreamingFundingAmount, isPlayerPlatformCommission]);
 
     const maxMarketingBudget = useMemo(() => (
         calculateMaxGreenlightMarketingBudget(
@@ -2127,10 +2197,13 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             reservedMarketingBudget,
         )
     ), [budgetBreakdown.total, musicBudget, reservedMarketingBudget]);
+    const platformCommissionBudget = useMemo(() => (
+        platformCommissionOffer ? buildPlatformCommissionBudgetPresentation(packageBudget, platformCommissionOffer) : undefined
+    ), [packageBudget, platformCommissionOffer]);
 
     const maxInvestorRaise = useMemo(() => (
-        getMaxInvestorRaise(packageBudget, lockedStreamingFundingAmount)
-    ), [packageBudget, lockedStreamingFundingAmount]);
+        isPlayerPlatformCommission ? 0 : getMaxInvestorRaise(packageBudget, lockedStreamingFundingAmount)
+    ), [packageBudget, lockedStreamingFundingAmount, isPlayerPlatformCommission]);
 
     const normalizedInvestorRaise = useMemo(() => (
         normalizeInvestorRaiseAmount(investorRaiseAmount, packageBudget, lockedStreamingFundingAmount)
@@ -2182,7 +2255,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
     }, [investorFundingMode]);
 
     const selectedInvestorPlan = useMemo(() => (
-        buildProjectInvestorPlan({
+        isPlayerPlatformCommission ? null : buildProjectInvestorPlan({
             offers: investorOffers,
             selectedInvestorIds,
             targetRaise: normalizedInvestorRaise,
@@ -2194,7 +2267,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             week: player.currentWeek,
             year: player.age
         })
-    ), [investorOffers, selectedInvestorIds, normalizedInvestorRaise, packageBudget, lockedStreamingFundingAmount, investorFundingMode, selectedScript?.id, selectedScript?.title, player.currentWeek, player.age]);
+    ), [investorOffers, selectedInvestorIds, normalizedInvestorRaise, packageBudget, lockedStreamingFundingAmount, investorFundingMode, selectedScript?.id, selectedScript?.title, player.currentWeek, player.age, isPlayerPlatformCommission]);
 
     const investorRaisedAmount = selectedInvestorPlan?.totalRaised || 0;
     const {
@@ -2367,11 +2440,16 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             .map(talent => getReturningTalentDisplay(talent).name)
             .filter(Boolean),
         unresolvedReturningTalentCount: unresolvedReturningTalent.length,
+        talentConflictNames: selectedTalentConflictNames,
         effectiveStudioFundingPool,
         netGreenlightCashRequirement,
-    }), [selectedScript, selectedLocations, crewModes, selectedCrew, castList, effectiveStudioFundingPool, netGreenlightCashRequirement, unresolvedReturningTalent, effectiveConnectedIntent, linkedUniverseCastCount, selectedUniverseId, selectedFranchiseId, player.energy.current, greenlightEnergyCost]);
+    }), [selectedScript, selectedLocations, crewModes, selectedCrew, castList, effectiveStudioFundingPool, netGreenlightCashRequirement, unresolvedReturningTalent, selectedTalentConflictNames, effectiveConnectedIntent, linkedUniverseCastCount, selectedUniverseId, selectedFranchiseId, player.energy.current, greenlightEnergyCost]);
 
-    const canGreenlight = greenlightStatus.can;
+    const commissionBudgetError = isPlayerPlatformCommission && packageBudget > lockedStreamingFundingAmount
+        ? `Package exceeds the ${platformCommissionOffer!.platformName} production cap by ${formatMoney(packageBudget - lockedStreamingFundingAmount)}. Reduce cast, crew, music, equipment, or locations.`
+        : null;
+    const greenlightErrors = commissionBudgetError ? [...greenlightStatus.errors, commissionBudgetError] : greenlightStatus.errors;
+    const canGreenlight = greenlightStatus.can && !commissionBudgetError;
     const confirmationUniverseName = selectedUniverseId === 'NEW'
         ? newUniverseName
         : selectedUniverseId
@@ -2555,6 +2633,17 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             getCastableActorById,
         });
 
+        const talentReservation = reserveProjectTalentBookings({
+            bookings: player.world.talentBookings,
+            projectId: newCommitment.id,
+            projectOwner: 'PLAYER_COMMITMENT',
+            producerStudioId: studio.id,
+            productionCalendar: newCommitment.productionCalendar!,
+            actorIds: finalizedCastList.map(member => member.actorId),
+            directorIds: [newCommitment.projectDetails?.directorId || newCommitment.projectDetails?.director?.id],
+            allowOverlaps: true,
+        });
+
         const { generatedBuzz, newsItem, characterNewsItems } = buildGreenlightBuzz({
             player,
             studio,
@@ -2621,7 +2710,8 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             world: {
                 ...player.world,
                 universes: updatedWorldUniverses,
-                platforms: updatedWorldPlatforms
+                platforms: updatedWorldPlatforms,
+                talentBookings: talentReservation.bookings,
             },
             studio: {
                 ...player.studio,
@@ -2670,7 +2760,31 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             })
         };
         spendPlayerEnergy(updatedPlayerAfterGreenlight, greenlightEnergyCost, `Greenlight: ${newCommitment.name}`);
-        onUpdatePlayer(finalizeOwnedStreamingOriginalGreenlight(updatedPlayerAfterGreenlight));
+        const finalizedOwnedOriginal = finalizeOwnedStreamingOriginalGreenlight(updatedPlayerAfterGreenlight);
+        if (platformCommissionOffer && newCommitment.productionCalendar && selectedScript) {
+            const finalizedCommission = finalizePlatformAiPlayerCommissionGreenlight({
+                player: finalizedOwnedOriginal,
+                offerId: platformCommissionOffer.id,
+                studioId: studio.id,
+                commitmentId: newCommitment.id,
+                projectTitle: newCommitment.name,
+                projectType: resolveProjectType(selectedScript.projectType, (selectedScript as any).type, (selectedScript as any).projectDetails?.type),
+                genre: selectedScript.genres[0],
+                scriptId: selectedScript.id,
+                packageBudget: greenlightPackageBudget,
+                productionCalendar: newCommitment.productionCalendar,
+                finalQualityScore: newCommitment.projectDetails?.hiddenStats?.qualityScore || currentEstimatedQuality,
+                absoluteWeek: (player.age * 52) + player.currentWeek,
+                fundingAlreadyApplied: true,
+            });
+            if (!finalizedCommission.changed) {
+                setStep('CONFIRM');
+                return;
+            }
+            onUpdatePlayer(finalizedCommission.player);
+        } else {
+            onUpdatePlayer(finalizedOwnedOriginal);
+        }
         addBreadcrumb('greenlight:success', {
             title: newCommitment.name,
             commitmentId: newCommitment.id,
@@ -2990,7 +3104,8 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                 musicBudget={musicBudget}
                 reservedMarketingBudget={reservedMarketingBudget}
                 packageBudget={packageBudget}
-                availableFunding={studio.balance + (studio.studioState?.productionFund || 0) + lockedStreamingFundingAmount}
+                availableFunding={isPlayerPlatformCommission ? lockedStreamingFundingAmount : studio.balance + (studio.studioState?.productionFund || 0) + lockedStreamingFundingAmount}
+                platformCommissionBudget={platformCommissionBudget}
                 formatMoney={formatMoney}
                 translate={tr}
             />
@@ -3000,14 +3115,26 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                 style={{ WebkitOverflowScrolling: 'touch' }}
             >
                 {step === 'SELECT_SCRIPT' && (
-                    <GreenlightScriptStep
-                        scripts={scripts}
-                        selectedScriptId={selectedScriptId}
-                        onSelectScript={setSelectedScriptId}
-                        onOpenScriptMarket={onOpenScriptMarket || onBack}
-                        onCancel={onBack}
-                        onNext={() => selectedScriptId && setStep('DIRECTOR')}
-                    />
+                    <div>
+                        {platformCommissionOffer && (
+                            <div className="mx-auto mt-5 max-w-5xl px-4">
+                                <div className="rounded-2xl border border-violet-400/30 bg-violet-950/35 p-4">
+                                    <div className="text-[10px] font-black uppercase tracking-[0.2em] text-violet-300">{platformCommissionOffer.briefReference}</div>
+                                    <div className="mt-1 text-lg font-black">Choose a {platformCommissionOffer.genre} {platformCommissionOffer.projectType.toLowerCase()} script</div>
+                                    <div className="mt-2 text-xs font-semibold text-violet-100/65">Fixed cap {formatMoney(platformCommissionOffer.productionBudget)} • Producer fee {formatMoney(platformCommissionOffer.producerFee)} • Minimum expectation {platformCommissionOffer.minimumImdbRating.toFixed(1)} IMDb</div>
+                                </div>
+                            </div>
+                        )}
+                        <GreenlightScriptStep
+                            scripts={scripts}
+                            selectedScriptId={selectedScriptId}
+                            onSelectScript={setSelectedScriptId}
+                            onOpenScriptMarket={onOpenScriptMarket || onBack}
+                            onOpenDevelopmentLab={onOpenScriptDevelopment}
+                            onCancel={onBack}
+                            onNext={() => selectedScriptId && setStep('DIRECTOR')}
+                        />
+                    </div>
                 )}
 
                 {step === 'DIRECTOR' && (
@@ -3216,16 +3343,23 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                 onAssignArtist={assignMusicArtistToRole}
                             />
 
-                            <GreenlightMarketingBudgetSection
-                                marketingBudgetPreset={marketingBudgetPreset}
-                                reservedMarketingBudget={reservedMarketingBudget}
-                                productionBudget={budgetBreakdown.total}
-                                maxMarketingBudget={maxMarketingBudget}
-                                onPresetChange={setMarketingBudgetPreset}
-                                onReservedBudgetChange={setReservedMarketingBudget}
-                                formatMoney={formatMoney}
-                                translate={tr}
-                            />
+                            {isPlayerPlatformCommission ? (
+                                <div className="rounded-2xl border border-violet-400/25 bg-violet-950/25 p-5">
+                                    <div className="text-[10px] font-black uppercase tracking-[0.18em] text-violet-300">Platform Release Campaign</div>
+                                    <p className="mt-2 text-sm font-semibold leading-relaxed text-violet-100/65">{platformCommissionOffer!.platformName} controls and funds release marketing after delivery. No studio marketing reserve is charged to this production cap.</p>
+                                </div>
+                            ) : (
+                                <GreenlightMarketingBudgetSection
+                                    marketingBudgetPreset={marketingBudgetPreset}
+                                    reservedMarketingBudget={reservedMarketingBudget}
+                                    productionBudget={budgetBreakdown.total}
+                                    maxMarketingBudget={maxMarketingBudget}
+                                    onPresetChange={setMarketingBudgetPreset}
+                                    onReservedBudgetChange={setReservedMarketingBudget}
+                                    formatMoney={formatMoney}
+                                    translate={tr}
+                                />
+                            )}
                             <GreenlightStoryConnectionSection
                                 connectedProjectIntent={connectedProjectIntent}
                                 effectiveConnectedIntent={effectiveConnectedIntent}
@@ -3323,7 +3457,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                         }}
                         authorizedBy={player.name}
                         canGreenlight={canGreenlight}
-                        greenlightErrors={greenlightStatus.errors}
+                        greenlightErrors={greenlightErrors}
                         playerEnergy={player.energy.current}
                         greenlightEnergyCost={greenlightEnergyCost}
                         formatMoney={formatMoney}

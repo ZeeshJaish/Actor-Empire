@@ -12,8 +12,10 @@
  */
 import css from './presentation/screens/ViewerApp/ViewerApp.module.css';
 import { cx } from './presentation/cx';
+import { brandVars } from './presentation/brand';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Brand, Mark, brandColor, brandDeep, typeFace } from './StreamingBrandVisuals';
+import { getStreamingStorefrontRuntimeMode } from '../../services/streamingStorefront';
 
 /* ============================================================
    MODEL
@@ -67,6 +69,7 @@ export const ViewerApp: React.FC<{
   const [screen, setScreen] = useState<Screen>('BROWSE');
   const [open, setOpen] = useState<AppTitle | null>(null);
   const [playing, setPlaying] = useState<AppTitle | null>(null);
+  const layoutMode = getStreamingStorefrontRuntimeMode(state.layoutId);
 
   const rows = useMemo(() => {
     const out: { id: string; label: string; items: AppTitle[] }[] = [];
@@ -76,26 +79,25 @@ export const ViewerApp: React.FC<{
     const fresh = state.titles.filter(t => t.newThisWeek);
     const leaving = state.titles.filter(t => t.leavingInWeeks !== undefined)
       .sort((a, b) => a.leavingInWeeks! - b.leavingInWeeks!);
-    if (state.layoutId === 'RESUME' && resume.length) out.push({ id: 'r', label: 'Continue Watching', items: resume });
+    if (layoutMode === 'RESUME' && resume.length) out.push({ id: 'r', label: 'Continue Watching', items: resume });
     if (chart.length) out.push({ id: 't', label: 'Top 10 Today', items: chart });
-    if (state.layoutId !== 'RESUME' && resume.length) out.push({ id: 'r', label: 'Continue Watching', items: resume });
+    if (layoutMode !== 'RESUME' && resume.length) out.push({ id: 'r', label: 'Continue Watching', items: resume });
     if (originals.length) out.push({ id: 'o', label: `${brand.name || 'EMPIRE+'} Originals`, items: originals });
     if (fresh.length) out.push({ id: 'n', label: 'New This Week', items: fresh });
     if (leaving.length) out.push({ id: 'l', label: 'Leaving Soon', items: leaving });
     return out;
-  }, [state.titles, state.layoutId, brand.name]);
+  }, [state.titles, layoutMode, brand.name]);
 
   const hero = state.titles.find(t => t.rank === 1) ?? state.titles[0];
-  const showHero = state.layoutId !== 'ROWS' && state.layoutId !== 'GRID' && !!hero;
-  const grid = state.layoutId === 'GRID';
+  const showHero = layoutMode === 'HERO' && !!hero;
+  const grid = layoutMode === 'GRID';
 
   const openTitle = (t: AppTitle) => { setOpen(t); setScreen('TITLE'); };
 
   return (
-    <div className={css.va} style={{
+    <div className={css.va} data-epx-root data-layout={state.layoutId} style={brandVars(brand, {
       ['--epx-va-line' as string]: 'var(--line, rgba(255,255,255,.09))',
-      ['--epx-va-c' as string]: c,
-    }}>
+    } as React.CSSProperties)}>
       {/* the only operator control on the whole screen */}
       {!playing && (
         <button className={css.exitpill} onClick={() => screen === 'TITLE' ? setScreen('BROWSE') : onBack()}>

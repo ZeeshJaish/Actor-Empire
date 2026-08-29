@@ -116,6 +116,17 @@ const playSoundIdent = (sound: StreamingSoundIdentKey) => {
       PULSE: [[196, 0, 0.15], [293.66, 0.17, 0.25]],
       ASCENT: [[220, 0, 0.12], [329.63, 0.12, 0.14], [493.88, 0.26, 0.25]],
       PREMIERE: [[110, 0, 0.22], [440, 0.08, 0.32]],
+      CHOIR: [[220, 0, 0.35], [330, 0.04, 0.35]],
+      MACHINE: [[180, 0, 0.08], [120, 0.12, 0.08], [240, 0.24, 0.12]],
+      SPARK: [[659.25, 0, 0.12], [987.77, 0.1, 0.2]],
+      IMPACT: [[65.41, 0, 0.4], [98, 0.04, 0.32]],
+      ORBIT: [[220, 0, 0.18], [329.63, 0.16, 0.2], [493.88, 0.34, 0.3]],
+      BLOOM: [[174.61, 0, 0.48], [261.63, 0.08, 0.55]],
+      PRISM: [[523.25, 0, 0.12], [783.99, 0.1, 0.16], [1046.5, 0.22, 0.22]],
+      EMBER: [[110, 0, 0.3], [164.81, 0.14, 0.4]],
+      SIGNAL: [[440, 0, 0.08], [440, 0.15, 0.08], [659.25, 0.3, 0.18]],
+      HORIZON: [[146.83, 0, 0.62], [220, 0.1, 0.64], [329.63, 0.22, 0.58]],
+      ANALOG: [[196, 0, 0.16], [185, 0.18, 0.18], [293.66, 0.38, 0.24]],
     };
     sequences[sound].forEach(([frequency, delay, duration]) => {
       const oscillator = context.createOscillator();
@@ -460,7 +471,7 @@ export default function StreamingFoundingWizard({ player, onUpdatePlayer, onBack
         <div className="founding-charter-heading">
           <span>FIXED INCORPORATION CHARTER</span>
           <h2 id="founding-charter-title">Your first $85M has one job.</h2>
-          <p>It legally creates the company and leaves a disciplined opening treasury. Infrastructure, staff and launch reach are built later from inside HQ.</p>
+          <p>It legally creates the company and is fully consumed by formation. The operating treasury opens at $0; infrastructure, staff and launch reach require fresh company capital.</p>
         </div>
 
         <div className="founding-money-flow" aria-label="Incorporation cash flow">
@@ -475,7 +486,7 @@ export default function StreamingFoundingWizard({ player, onUpdatePlayer, onBack
           </div>
           <ChevronRight size={20} aria-hidden="true" />
           <div>
-            <small>Opening treasury</small>
+            <small>Operating treasury</small>
             <strong>{formatMoney(STREAMING_INCORPORATION_ECONOMY.openingTreasuryCash)}</strong>
           </div>
         </div>
@@ -695,7 +706,7 @@ export default function StreamingFoundingWizard({ player, onUpdatePlayer, onBack
                   {formatMoney(
                     platform.foundingProfile?.openingTreasuryCash
                     || STREAMING_INCORPORATION_ECONOMY.openingTreasuryCash,
-                  )} opening treasury
+                  )} operating treasury
                 </span>
               </div>
               <button

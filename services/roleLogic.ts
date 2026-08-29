@@ -57,7 +57,7 @@ export const GENRE_SYNERGIES: Record<Genre, Genre[]> = {
     DOCUMENTARY: ['BIOPIC', 'DRAMA']
 };
 
-const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
+const pick = <T>(arr: T[], rng: () => number = Math.random): T => arr[Math.floor(rng() * arr.length)];
 const splitLocalizedList = (language: GameLanguage, key: string, vars: Record<string, string | number> = {}): string[] => {
     const localized = t(language, key, vars);
     if (!localized || localized === key) return [];
@@ -678,11 +678,11 @@ export const calculateProjectPay = (roleType: RoleType, budgetTier: BudgetTier, 
     return Math.floor(base * multiplier * (0.8 + Math.random() * 0.4));
 };
 
-export const getEstimatedBudget = (tier: BudgetTier): number => {
+export const getEstimatedBudget = (tier: BudgetTier, rng: () => number = Math.random): number => {
     switch(tier) {
-        case 'LOW': return Math.floor(500000 + Math.random() * 4500000); 
-        case 'MID': return Math.floor(20000000 + Math.random() * 60000000); 
-        case 'HIGH': return Math.floor(120000000 + Math.random() * 180000000); 
+        case 'LOW': return Math.floor(500000 + rng() * 4500000);
+        case 'MID': return Math.floor(20000000 + rng() * 60000000);
+        case 'HIGH': return Math.floor(120000000 + rng() * 180000000);
     }
 };
 
@@ -725,16 +725,16 @@ const TITLES_VERB = [
     'Running', 'Walking', 'Sleeping', 'Dreaming', 'Waking', 'Calling', 'Answering', 'Asking', 'Knowing'
 ];
 
-export const generateProjectTitle = (existingTitles: string[]): string => {
+export const generateProjectTitle = (existingTitles: string[], rng: () => number = Math.random): string => {
     let title = "";
     let attempts = 0;
     do {
-        const structure = Math.floor(Math.random() * 5); // Increased variations
-        if (structure === 0) title = `${pick(TITLES_FIRST)} ${pick(TITLES_NOUN)}`;
-        else if (structure === 1) title = `${pick(TITLES_FIRST)} ${pick(TITLES_ADJ)} ${pick(TITLES_NOUN)}`;
-        else if (structure === 2) title = `${pick(TITLES_ADJ)} ${pick(TITLES_NOUN)}`;
-        else if (structure === 3) title = `The ${pick(TITLES_NOUN)} of ${pick(TITLES_NOUN)}`;
-        else title = `${pick(TITLES_NOUN)} ${pick(TITLES_VERB)}`;
+        const structure = Math.floor(rng() * 5); // Increased variations
+        if (structure === 0) title = `${pick(TITLES_FIRST, rng)} ${pick(TITLES_NOUN, rng)}`;
+        else if (structure === 1) title = `${pick(TITLES_FIRST, rng)} ${pick(TITLES_ADJ, rng)} ${pick(TITLES_NOUN, rng)}`;
+        else if (structure === 2) title = `${pick(TITLES_ADJ, rng)} ${pick(TITLES_NOUN, rng)}`;
+        else if (structure === 3) title = `The ${pick(TITLES_NOUN, rng)} of ${pick(TITLES_NOUN, rng)}`;
+        else title = `${pick(TITLES_NOUN, rng)} ${pick(TITLES_VERB, rng)}`;
         
         attempts++;
     } while (existingTitles.includes(title) && attempts < 20);

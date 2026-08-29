@@ -1,10 +1,10 @@
 
 import { GameLanguage, Player, AwardType, PastProject, Award, PendingEvent, PressInteraction, IndustryProject, AwardHistoryEntry, ProjectType } from '../types';
 import { NPC_DATABASE } from './npcLogic';
-import { generateProjectTitle } from './roleLogic';
 import { calculateProjectMusicImpact } from './musicIndustry';
 import { t } from './i18n';
 import { getProjectReleaseTiming } from './releaseTiming';
+import { createDeterministicId, createDeterministicRng } from './deterministicRandom';
 
 const resolveAwardMediaType = (...candidates: unknown[]): ProjectType => {
     for (const candidate of candidates) {
@@ -174,8 +174,23 @@ export interface AwardResolvedWinner {
     category: string;
     winnerName: string;
     projectName: string;
+    projectId?: string;
     isPlayer: boolean;
 }
+
+export const createCanonicalAwardNominationId = (
+    awardType: AwardType,
+    awardYear: number,
+    category: string,
+    projectId: string,
+): string => createDeterministicId('award_nom', awardType, awardYear, category, projectId);
+
+export const createCanonicalAwardRecordId = (
+    awardType: AwardType,
+    awardYear: number,
+    category: string,
+    projectId: string,
+): string => createDeterministicId('award_record', awardType, awardYear, category, projectId);
 
 const isMusicAwardCategory = (category: string): boolean => (
     /song|score|music composition|music and lyrics/i.test(category)
@@ -500,7 +515,7 @@ const clampAwardScore = (value: number) => Math.max(0, Math.min(100, value));
 export const calculateActorAwardNominationScore = (
     project: ActorAwardNominationInput,
     ceremonyWeek: number,
-    luck = Math.random() * 15
+    luck?: number
 ): number => {
     const qualityScore = clampAwardScore(Number.isFinite(Number(project.quality)) ? Number(project.quality) : 50);
     const imdbScore = clampAwardScore(
@@ -522,7 +537,18 @@ export const calculateActorAwardNominationScore = (
     if (ceremonyWeek === 10 && rolePerformance > 90) score += 5;
     if (project.roleType === 'SUPPORTING' && rolePerformance >= 88) score += 3;
 
-    return score + Math.max(0, Math.min(15, Number.isFinite(luck) ? luck : 0));
+    const resolvedLuck = Number.isFinite(luck)
+        ? Number(luck)
+        : createDeterministicRng([
+            'actor-award-nomination',
+            ceremonyWeek,
+            qualityScore,
+            imdbScore,
+            rolePerformance,
+            project.roleType || '',
+            project.genre || '',
+        ].join(':'))() * 15;
+    return score + Math.max(0, Math.min(15, resolvedLuck));
 };
 
 export const checkAwardEligibility = (player: Player, week: number, awardYear = player.age): Nomination[] => {
@@ -632,7 +658,9 @@ export const checkAwardEligibility = (player: Player, week: number, awardYear = 
                 || project.hiddenStats?.musicAwardChanceLift
                 || 0
             );
-            const musicLuck = Math.random() * 4;
+            const musicLuck = createDeterministicRng(
+                `award-nomination:${awardType}:${awardYear}:music:${project.id}`
+            )() * 4;
             const prestigeGenreBoost = ['DRAMA', 'BIOPIC', 'MUSICAL', 'ANIMATION', 'FANTASY'].includes(project.genre) ? 4 : 0;
             const songCredits = credits.filter((credit: any) => ['LEAD_SINGLE', 'END_CREDIT_SONG'].includes(credit.role));
             const hasOriginalScore = (
@@ -701,7 +729,9 @@ export const checkAwardEligibility = (player: Player, week: number, awardYear = 
             const writerScore = getAverageStat(player.writerStats as any);
             const directorScore = getAverageStat(player.directorStats as any);
             const producerHeat = Math.min(18, Math.log10(Math.max(1, (project.gross || 0) + (project.streamingRevenue || 0))) * 2.1);
-            const creativeLuck = Math.random() * 8;
+            const creativeLuck = createDeterministicRng(
+                `award-nomination:${awardType}:${awardYear}:creative:${project.id}`
+            )() * 8;
 
             if (playerCreativeCredits.WRITER) {
                 addPlayerCreativeNomination(
@@ -736,7 +766,11 @@ export const checkAwardEligibility = (player: Player, week: number, awardYear = 
         // Minor, cameo, and ensemble roles should not be treated as supporting award contenders.
         if (!isLeadRole && !isSupportingRole) return;
 
-        const nomScore = calculateActorAwardNominationScore(project, week);
+        const nomScore = calculateActorAwardNominationScore(
+            project,
+            week,
+            createDeterministicRng(`award-nomination:${awardType || 'UNKNOWN'}:${awardYear}:actor:${project.id}`)() * 15,
+        );
 
         // LOWERED THRESHOLDS for accessibility
         const threshold = week === 10 ? 85 : week === 38 ? 80 : 75; // Oscars 85, Emmys 80, Others 75
@@ -881,7 +915,7 @@ export const generateFullBallot = (
         // 1. Add Player if they are nominated in this category
         const pNom = playerNoms
             .filter(n => n.category === cat)
-            .sort((a, b) => b.score - a.score)[0];
+            .sort((a, b) => b.score - a.score || a.project.id.localeCompare(b.project.id))[0];
         if (pNom) {
             categoryNoms.push(pNom);
         }
@@ -925,7 +959,10 @@ export const generateFullBallot = (
             }
 
             candidates = candidates
-                .sort((a, b) => getWorldAwardCategoryScore(b, cat) - getWorldAwardCategoryScore(a, cat))
+                .sort((a, b) => (
+                    getWorldAwardCategoryScore(b, cat) - getWorldAwardCategoryScore(a, cat)
+                    || a.id.localeCompare(b.id)
+                ))
                 .slice(0, spotsLeft);
             
             candidates.forEach(p => {
@@ -952,8 +989,10 @@ export const generateFullBallot = (
 
             // Fallback if world DB is empty or filtered out
             while (categoryNoms.length < 5) {
-                const randomSalt = Math.floor(Math.random() * 10000);
-                const fakeTitle = generateProjectTitle([`Fake_${randomSalt}`]);
+                const slot = categoryNoms.length;
+                const rng = createDeterministicRng(`award-ballot:${awardType}:${awardYear}:${cat}:${slot}`);
+                const fallbackProjectId = createDeterministicId('award_fallback_project', awardType, awardYear, cat, slot);
+                const fakeTitle = `Season Selection ${Math.floor(rng() * 900) + 100}`;
                 
                 // Pick random NPC of correct gender
                 const pool = NPC_DATABASE.filter(n => {
@@ -963,12 +1002,12 @@ export const generateFullBallot = (
                     return true;
                 });
                 
-                const randomNPC = pool.length > 0 ? pool[Math.floor(Math.random() * pool.length)] : null;
+                const randomNPC = pool.length > 0 ? pool[Math.floor(rng() * pool.length)] : null;
                 const randomName = randomNPC ? randomNPC.name : (isMusicAward ? 'Music Team' : isActress ? "Emma Stone" : "Timothée Chalamet");
 
                 categoryNoms.push({
-                    project: { id: `fake_${Math.random()}`, name: fakeTitle },
-                    score: 76 + (Math.random() * 22),
+                    project: { id: fallbackProjectId, name: fakeTitle },
+                    score: 76 + (rng() * 8),
                     category: cat,
                     isPlayer: false,
                     nomineeName: reallyIsProjectAward ? "Producers" : randomName
@@ -976,7 +1015,9 @@ export const generateFullBallot = (
             }
         }
         
-        ballot[cat] = categoryNoms.sort((a,b) => b.score - a.score); // Sorted internally for now
+        ballot[cat] = categoryNoms.sort((a,b) => (
+            b.score - a.score || a.project.id.localeCompare(b.project.id)
+        ));
     });
 
     return ballot;
@@ -990,7 +1031,11 @@ export const determineWinners = (
 
     nominations.forEach(nom => {
         const existing = playerBestByCategory.get(nom.category);
-        if (!existing || nom.score > existing.score) {
+        if (
+            !existing
+            || nom.score > existing.score
+            || (nom.score === existing.score && nom.project.id.localeCompare(existing.project.id) < 0)
+        ) {
             playerBestByCategory.set(nom.category, nom);
         }
     });
@@ -1002,13 +1047,17 @@ export const determineWinners = (
         }
 
         if (fullBallot && fullBallot[nom.category]?.length) {
-            const sortedBallot = [...fullBallot[nom.category]].sort((a, b) => b.score - a.score);
+            const sortedBallot = [...fullBallot[nom.category]].sort((a, b) => (
+                b.score - a.score || a.project.id.localeCompare(b.project.id)
+            ));
             const topNominee = sortedBallot[0];
             const playerWins = topNominee.isPlayer && topNominee.project.id === nom.project.id;
             return { won: playerWins, nomination: nom };
         }
 
-        const worldWinnerScore = 90 + Math.random() * 15;
+        const worldWinnerScore = 90 + createDeterministicRng(
+            `award-winner-threshold:${nom.category}:${nom.project.id}`
+        )() * 15;
         return {
             won: nom.score > worldWinnerScore,
             nomination: nom
@@ -1027,11 +1076,12 @@ export const createAwardHistoryFromBallot = (
         category: winner.category,
         winnerName: winner.winnerName,
         projectName: winner.projectName,
+        ...(winner.projectId ? { projectId: winner.projectId } : {}),
         isPlayer: winner.isPlayer
     }))
 });
 
-export const generateSeasonWinners = (
+export const resolveCanonicalAwardSeason = (
     player: Player,
     awardType: AwardType,
     awardYear = player.age,
@@ -1077,6 +1127,7 @@ export const generateSeasonWinners = (
                     ? getNomineeNameForMusicCategory(playerProject, cat, player.name)
                     : player.name,
                 projectName: playerWin.projectName,
+                projectId: playerWin.projectId,
                 isPlayer: true
             });
         } else {
@@ -1104,8 +1155,11 @@ export const generateSeasonWinners = (
             
             possibleWinners.sort((a,b) => (
                 getWorldAwardCategoryScore(b, cat) - getWorldAwardCategoryScore(a, cat)
+                || a.id.localeCompare(b.id)
             ));
             const winnerProj = possibleWinners[0] || null;
+            const winnerProjectId = winnerProj?.id
+                || createDeterministicId('award_fallback_winner', awardType, year, cat);
 
             let winnerName = "Unknown";
             let projName = "Untitled Project";
@@ -1123,9 +1177,9 @@ export const generateSeasonWinners = (
                 else if (isProjectAward) winnerName = "Producers";
                 else winnerName = winnerProj.leadActorName; 
             } else {
-                // FALLBACK GENERATION (Correct Gender)
-                const randomSalt = Math.floor(Math.random() * 1000);
-                projName = generateProjectTitle([`Fake_${randomSalt}`]); 
+                // Deterministic fallback generation (correct gender).
+                const rng = createDeterministicRng(`award-season:${awardType}:${year}:${cat}:winner`);
+                projName = `Season Selection ${Math.floor(rng() * 900) + 100}`;
                 
                 // Fallback random actor of CORRECT gender
                 const pool = NPC_DATABASE.filter(n => {
@@ -1136,7 +1190,7 @@ export const generateSeasonWinners = (
                 });
                 
                 // Ensure pool isn't empty (safety check)
-                const randomActor = pool.length > 0 ? pool[Math.floor(Math.random() * pool.length)] : null;
+                const randomActor = pool.length > 0 ? pool[Math.floor(rng() * pool.length)] : null;
                 
                 if (randomActor) {
                     winnerName = randomActor.name;
@@ -1153,6 +1207,7 @@ export const generateSeasonWinners = (
                 category: cat,
                 winnerName: winnerName,
                 projectName: projName,
+                projectId: winnerProjectId,
                 isPlayer: false
             });
         }
@@ -1160,6 +1215,13 @@ export const generateSeasonWinners = (
 
     return historyEntry;
 };
+
+export const generateSeasonWinners = (
+    player: Player,
+    awardType: AwardType,
+    awardYear = player.age,
+    resolvedWinners?: AwardResolvedWinner[]
+): AwardHistoryEntry => resolveCanonicalAwardSeason(player, awardType, awardYear, resolvedWinners);
 
 export const generatePressInteractions = (count: number, language: GameLanguage = 'en'): PressInteraction[] => {
     // Basic placeholder generator if needed by RedCarpetEvent, typically populated via roleLogic in gameLoop

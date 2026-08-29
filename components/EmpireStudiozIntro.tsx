@@ -2,7 +2,7 @@ import { logoDataUri } from '../assets/logo';
 import type { ActState } from './types';
 import '../styles/intro.css';
 
-const STUDIO_NAME = 'EMPIRE STUDIOZ';
+const STUDIO_NAME = 'ZEDBURY STUDIOS';
 
 interface Props {
   /** '' hidden · 'on' playing · 'on exit' lifting away */
@@ -11,12 +11,12 @@ interface Props {
   onSkip?: () => void;
 }
 
-/** ACT I — "EMPIRE STUDIOZ PRESENTS" studio ident. */
+/** ACT I — "ZEDBURY STUDIOS PRESENTS" studio ident. */
 export default function EmpireStudiozIntro({ state = 'on', onSkip }: Props) {
   return (
     <section className={`phase ${state}`.trim()} id="act1" onPointerDown={onSkip}>
       <div className="ident-mark">
-        <img src={logoDataUri} alt="Empire Studioz" />
+        <img src={logoDataUri} alt="Zedbury Studios" />
       </div>
       <div className="ident-studio kicker">
         {[...STUDIO_NAME].map((ch, i) => (

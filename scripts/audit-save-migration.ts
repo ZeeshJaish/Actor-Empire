@@ -3,6 +3,8 @@ import { migratePlayerSave } from '../services/saveMigration';
 import { getStockOutstandingShares, getStockOwnershipPercent, getStockPriceCeiling } from '../services/stockLogic';
 import { grantMigrationCarePackageIfEligible, MIGRATION_CARE_PACKAGE_CASH, MIGRATION_CARE_PACKAGE_ENERGY } from '../services/migrationCarePackage';
 import { processAcquisitionDebtService } from '../services/acquisitionDebt';
+import { normalizePlatformAiState } from '../services/platformAi/platformAiState';
+import { createPlatformAiFixture } from './helpers/platformAiFixture';
 
 const assert = (condition: unknown, message: string) => {
     if (!condition) throw new Error(message);
@@ -52,6 +54,15 @@ assert(fresh.stocks.length >= 10, 'Fresh/new games should start with a populated
 assert(fresh.stocks.some(stock => stock.sector === 'MEDIA' && stock.relatedStudioId), 'Fresh stock market should include entertainment/studio stocks immediately.');
 assert(fresh.stocks.every(stock => (stock.priceHistory || []).length >= 12), 'Migrated stocks should have price history for week-1 UI charts.');
 assert(fresh.stocks.every(stock => getStockOutstandingShares(stock) === stock.outstandingShares), 'Migrated stocks should have explicit outstanding shares.');
+assert(
+    Array.isArray(fresh.world.platforms!.NETFLIX.ai!.externalRecapitalizations)
+        && fresh.world.platforms!.NETFLIX.ai!.externalRecapitalizations.length === 0,
+    'Fresh migration must preserve the canonical empty Platform AI recapitalization ledger.',
+);
+assert(
+    fresh.world.platforms!.NETFLIX.ai!.administration === null,
+    'Fresh migration must preserve the explicit empty Platform AI administration state.',
+);
 
 const legacyMessy = migratePlayerSave({
     ...INITIAL_PLAYER,
@@ -569,5 +580,176 @@ const legacySeriesArchive = migratePlayerSave({
 } as any);
 assert(legacySeriesArchive.pastProjects[0].projectType === 'SERIES', 'Legacy archive entries with episode evidence must stay classified as series.');
 assert(legacySeriesArchive.pastProjects[0].episodeRatings?.length === 1, 'Series migration must preserve the existing episode scorecard.');
+
+const protectedMoveSave = createPlatformAiFixture();
+const protectedMoveAbsoluteWeek = (protectedMoveSave.age - 1) * 52 + protectedMoveSave.currentWeek;
+const protectedMoveId = 'migration-protected-old-rival-move';
+const migrationRivalMove = (id: string, createdAtAbsoluteWeek: number) => ({
+    id,
+    idempotencyKey: `rival-move:NETFLIX:${id}`,
+    platformId: 'NETFLIX' as const,
+    platformName: 'Netflix',
+    ceoName: 'Mara Voss',
+    type: 'COUNTER_PROGRAM' as const,
+    battlefront: 'CONTENT' as const,
+    targetRegionId: null,
+    targetTechnologyBranch: null,
+    strategyReason: 'Canonical migration audit move.',
+    playerImpact: 'Canonical migration audit pressure.',
+    rivalPriceBefore: null,
+    rivalPriceAfter: null,
+    title: 'Canonical migration audit move',
+    detail: 'The market action already executed.',
+    status: 'OPEN' as const,
+    pricingVersion: 1,
+    cashCostMillions: 38,
+    rivalCashBeforeMillions: 1_000,
+    rivalCashAfterMillions: 962,
+    createdAtAbsoluteWeek,
+    pressureStartsAbsoluteWeek: createdAtAbsoluteWeek + 1,
+    expiresAtAbsoluteWeek: createdAtAbsoluteWeek + 4,
+    acquisitionRateDelta: -0.003,
+    churnRateDelta: 0.001,
+    prestigeDelta: 0,
+    targetExecutiveId: null,
+    targetExecutiveName: null,
+    responseId: null,
+    responseCost: 0,
+    responseAtAbsoluteWeek: null,
+    outcomeNote: 'The market action is active.',
+});
+protectedMoveSave.ownedStreamingPlatform!.competitiveWorld.moves = Array.from({ length: 81 }, (_, index) => (
+    migrationRivalMove(
+        index === 0 ? protectedMoveId : `migration-recent-rival-move-${index}`,
+        protectedMoveAbsoluteWeek - 100 + index,
+    )
+));
+const protectedMovePlatform = normalizePlatformAiState(
+    structuredClone(protectedMoveSave.world.platforms!.NETFLIX),
+    protectedMoveSave.id,
+    protectedMoveAbsoluteWeek,
+);
+protectedMovePlatform.ai!.externalCommitments = [{
+    id: `platform-war:${protectedMoveId}`,
+    moveId: protectedMoveId,
+    obligationId: `platform-war:${protectedMoveId}`,
+    platformId: 'NETFLIX',
+    moveType: 'COUNTER_PROGRAM',
+    pricingVersion: 1,
+    outcome: 'SUCCESS',
+    costMillions: 38,
+    createdAtAbsoluteWeek: protectedMoveAbsoluteWeek - 100,
+    status: 'PENDING_PAYMENT',
+    settledAtAbsoluteWeek: null,
+}];
+protectedMovePlatform.ai!.pendingOneTimeObligations = [{
+    id: `platform-war:${protectedMoveId}`,
+    category: 'DISCRETIONARY',
+    amountMillions: 38,
+    createdWeek: protectedMoveAbsoluteWeek - 100,
+    status: 'HELD',
+    settledWeek: null,
+}];
+protectedMoveSave.world.platforms!.NETFLIX = protectedMovePlatform;
+const protectedMoveMigrated = migratePlayerSave(protectedMoveSave);
+assert(
+    protectedMoveMigrated.ownedStreamingPlatform!.competitiveWorld.moves.some(move => move.id === protectedMoveId),
+    'Migration must preserve an old rival move referenced by a raw Platform AI external commitment.',
+);
+assert(
+    protectedMoveMigrated.world.platforms!.NETFLIX.ai!.externalCommitments.some(commitment => (
+        commitment.moveId === protectedMoveId && commitment.status === 'PENDING_PAYMENT'
+    )),
+    'Migration must preserve a valid pending commitment whose authoritative move is older than normal history.',
+);
+
+const futureDealSave = createPlatformAiFixture();
+const futureDealAbsoluteWeek = (futureDealSave.age - 1) * 52 + (futureDealSave.currentWeek - 1);
+const futureDealCreatedWeek = futureDealAbsoluteWeek + 10;
+const futureDealId = 'future-pending-catalogue-deal';
+const futureDealEpisodeId = 'future-pending-catalogue-episode';
+const futureDealObligationId = 'future-pending-catalogue-obligation';
+const futureDealSeller = normalizePlatformAiState(
+    structuredClone(futureDealSave.world.platforms!.NETFLIX),
+    futureDealSave.id,
+    futureDealAbsoluteWeek,
+);
+futureDealSeller.ai!.status = 'DISTRESSED';
+futureDealSeller.ai!.distressEpisodes = [{
+    id: futureDealEpisodeId,
+    platformId: 'NETFLIX',
+    status: 'ACTIVE',
+    startedAtAbsoluteWeek: futureDealAbsoluteWeek - 3,
+    completedAtAbsoluteWeek: null,
+    currentStageIndex: 3,
+    lastAdvancedAtAbsoluteWeek: futureDealAbsoluteWeek,
+    stageResults: [
+        { stage: 'FREEZE_GREENLIGHTS', outcome: 'APPLIED', enteredAtAbsoluteWeek: futureDealAbsoluteWeek - 3, resolvedAtAbsoluteWeek: futureDealAbsoluteWeek - 3, reason: 'Applied.', referenceId: null },
+        { stage: 'PAUSE_RESEARCH', outcome: 'APPLIED', enteredAtAbsoluteWeek: futureDealAbsoluteWeek - 2, resolvedAtAbsoluteWeek: futureDealAbsoluteWeek - 2, reason: 'Applied.', referenceId: null },
+        { stage: 'HOLD_COMMISSION', outcome: 'UNAVAILABLE', enteredAtAbsoluteWeek: futureDealAbsoluteWeek - 1, resolvedAtAbsoluteWeek: futureDealAbsoluteWeek - 1, reason: 'Unavailable.', referenceId: null },
+        { stage: 'LICENSE_CATALOGUE', outcome: 'PENDING', enteredAtAbsoluteWeek: futureDealAbsoluteWeek, resolvedAtAbsoluteWeek: null, reason: 'Pending.', referenceId: futureDealId },
+    ],
+}];
+const futureDealBuyer = normalizePlatformAiState(
+    structuredClone(futureDealSave.world.platforms!.APPLE_TV),
+    futureDealSave.id,
+    futureDealAbsoluteWeek,
+);
+futureDealBuyer.ai!.pendingOneTimeObligations = [{
+    id: futureDealObligationId,
+    category: 'CONTRACTUAL',
+    amountMillions: 10,
+    createdWeek: futureDealCreatedWeek,
+    status: 'HELD',
+    settledWeek: null,
+}];
+futureDealSave.world.platforms!.NETFLIX = futureDealSeller;
+futureDealSave.world.platforms!.APPLE_TV = futureDealBuyer;
+futureDealSave.world.platformAiCatalogueDistressDeals = [{
+    id: futureDealId,
+    episodeId: futureDealEpisodeId,
+    sellerPlatformId: 'NETFLIX',
+    buyerPlatformId: 'APPLE_TV',
+    sourceProjectId: 'future-project',
+    sellerEntitlementId: 'future-entitlement',
+    sellerEntitlementExpiresAtAbsoluteWeek: futureDealCreatedWeek + 200,
+    priceMillions: 10,
+    buyerObligationId: futureDealObligationId,
+    buyerPlanId: 'future-plan',
+    buyerContractId: 'future-contract',
+    durationWeeks: 104,
+    startsAtAbsoluteWeek: futureDealCreatedWeek + 1,
+    expiresAtAbsoluteWeek: futureDealCreatedWeek + 105,
+    status: 'PENDING_PAYMENT',
+    paymentDisposition: 'HELD',
+    createdAtAbsoluteWeek: futureDealCreatedWeek,
+    paymentSettledAtAbsoluteWeek: null,
+    refundedAtAbsoluteWeek: null,
+    refundedAmountMillions: 0,
+    transferredAtAbsoluteWeek: null,
+    cancelledAtAbsoluteWeek: null,
+    cancellationReason: null,
+}];
+const futureDealMigrated = migratePlayerSave(futureDealSave);
+const cancelledFutureDeal = futureDealMigrated.world.platformAiCatalogueDistressDeals!
+    .find(deal => deal.id === futureDealId)!;
+assert(
+    cancelledFutureDeal?.status === 'CANCELLED',
+    'Save migration must cancel a pending catalogue deal created after the current absolute week.',
+);
+assert(
+    cancelledFutureDeal.paymentDisposition === 'VOIDED' && cancelledFutureDeal.refundedAmountMillions === 0,
+    'A future held deal must be voided without creating a migration refund.',
+);
+assert(
+    !futureDealMigrated.world.platforms!.APPLE_TV.ai!.pendingOneTimeObligations
+        .some(obligation => obligation.id === futureDealObligationId),
+    'Migration must remove the voided held obligation so distress cannot remain frozen.',
+);
+assert(
+    futureDealMigrated.world.platforms!.NETFLIX.ai!.distressEpisodes[0].stageResults
+        .find(result => result.referenceId === futureDealId)?.outcome === 'UNAVAILABLE',
+    'Migration must resolve the pending seller stage when it cancels an impossible deal.',
+);
 
 console.log('Save migration audit passed.');

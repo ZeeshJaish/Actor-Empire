@@ -56,7 +56,15 @@ import { generateLifeEvent, generateLuxeLifeEvent, hasEligibleLuxeEventTarget } 
 import { generateWeeklyFeed, NPC_DATABASE, calculateProjectFameMultiplier, generateNewUnknowns, updateNPCLives, createNPCFromMusicArtist } from './npcLogic';
 import { generateAgentOffers, generateManagerOffer, generateDirectOffer, getRandomAgents, getRandomManagers, getRandomTrainers, getRandomStylists, getRandomTherapists, getRandomPublicists, getRandomWellness, sanitizeTeamPools } from './teamLogic';
 import { processStockMarket, calculatePortfolioValue, getDividendPayout, initializeStocks } from './stockLogic';
-import { AWARD_CALENDAR, checkAwardEligibility, AwardDefinition, generateSeasonWinners, generateFullBallot, getAwardCeremonyYear, sanitizeAwardCeremonyEvent, sanitizeAwardHistoryEntries, sanitizeAwardRecords } from './awardLogic';
+import { AWARD_CALENDAR, checkAwardEligibility, AwardDefinition, createCanonicalAwardNominationId, resolveCanonicalAwardSeason, generateFullBallot, getAwardCeremonyYear, sanitizeAwardCeremonyEvent, sanitizeAwardHistoryEntries, sanitizeAwardRecords } from './awardLogic';
+import { createDeterministicId } from './deterministicRandom';
+import { PLATFORM_AI_PROFILES } from './platformAi/platformAiProfiles';
+import {
+    generatePlatformAiPlayerCommissionOffers,
+    syncPlatformAiPlayerCommissionProductions,
+} from './platformAi';
+import { calculateStreamingAdvertisingRevenueFullCurrency, calculateStreamingSubscriptionRevenueFullCurrency } from './streamingEconomyCore';
+import { attributeStreamingTitleRevenue, settleStreamingContractRoyaltyForPlayer } from './streamingContractSettlement';
 import { processWorldTurn, generateIndustryProject } from './worldLogic'; 
 import { generateFamousMovieOpportunity, generateCameoOffer } from './famousMovieLogic'; 
 import { calculateYoutubeCreatorScore, generateMusicVideoFeatureOffer, generateYoutubeBrandDeal, generateYoutubeCollabOffer, getYoutubePublicImageLabel, processYoutubeChannel } from './youtubeLogic';
@@ -127,6 +135,12 @@ import { calculateStudioSlateFatigue } from './studioSlateFatigue';
 import { getContinuationPerformanceGross, shouldResolveContinuationDecision } from './releaseContinuationLogic';
 import { processLivingEnsembleWeek } from './livingEnsemble';
 import { processOwnedStreamingPlatformWeek } from './streamingWeeklyLoop';
+import { advanceStreamingMarketClearances } from './streamingMarkets';
+import { advanceStreamingTitleLocalization } from './streamingOpeningCatalogue';
+import {
+    migrateStreamingRightsContractRegistry,
+    registerProductionStreamingRightsContract,
+} from './streamingRightsCore';
 
 // --- CONSTANTS ---
 const ANNUAL_TAX_FREE_ALLOWANCE = 25000;
@@ -479,20 +493,25 @@ const adjustPlatformFundingRelationship = (
 
     const trustModifier = Math.max(-8, Math.min(0, current.trustModifier + modifierDelta));
     const recoveryWeeksRemaining = Math.max(0, Math.min(36, current.recoveryWeeksRemaining + recoveryDelta));
+    const hasCommercialHistory = Math.max(0, Number(current.completedDeals || 0)) > 0
+        || Math.max(0, Number(current.profitableDeals || 0)) > 0
+        || Math.max(0, Number(current.loyaltyScore || 0)) > 0
+        || Math.max(0, Number(current.realizedPartnerValue || 0)) > 0;
+    const shouldRetainRelationship = hasCommercialHistory || (trustModifier !== 0 && recoveryWeeksRemaining !== 0);
     business.studioState.platformRelations = {
         ...relations,
-        ...(trustModifier === 0 || recoveryWeeksRemaining === 0
-            ? {}
-            : {
+        ...(shouldRetainRelationship
+            ? {
                 [platformId]: {
                     ...current,
                     trustModifier,
                     recoveryWeeksRemaining
                 }
-            })
+            }
+            : {})
     };
 
-    if (trustModifier === 0 || recoveryWeeksRemaining === 0) {
+    if (!shouldRetainRelationship) {
         delete business.studioState.platformRelations[platformId];
     }
 };
@@ -1354,6 +1373,7 @@ const createPastProjectArchiveSnapshot = (
         futurePotential: release.futurePotential || defaultFuturePotential(),
         studioId: projectDetails.studioId,
         streamingPlatform: release.streaming?.platformId,
+        streamingContractId: release.streamingContractId || release.streaming?.contractId,
         totalViews: ensureFiniteNumber(options.totalViews ?? release.streaming?.totalViews),
         weeklyViews,
         streamingRevenue,
@@ -2051,6 +2071,17 @@ export const processGameWeek = async (
         emitLoopStage('world_turn_start');
         const worldResult = processWorldTurn(nextPlayer);
         nextPlayer.world = worldResult.world;
+        const playerCommissionGeneration = generatePlatformAiPlayerCommissionOffers(
+            nextPlayer,
+            getAbsoluteWeek(nextPlayer.age, nextPlayer.currentWeek),
+        );
+        nextPlayer = playerCommissionGeneration.player;
+        if (playerCommissionGeneration.offer) {
+            logsToAdd.push({
+                msg: `📩 ${playerCommissionGeneration.offer.platformName} sent a production commission to your studio.`,
+                type: 'positive',
+            });
+        }
         nextPlayer.news = [...worldResult.news, ...nextPlayer.news].slice(0, 50);
         if (worldResult.logs?.length) {
             worldResult.logs.forEach(message => logsToAdd.push({ msg: `🏢 ${message}`, type: 'neutral' }));
@@ -4449,6 +4480,10 @@ export const processGameWeek = async (
 });
 
     nextPlayer.commitments = [...nextCommitments, ...newAuditionCommitments];
+    nextPlayer = syncPlatformAiPlayerCommissionProductions(
+        nextPlayer,
+        getAbsoluteWeek(nextPlayer.age, nextPlayer.currentWeek),
+    );
 
     // --- 9. ACTIVE RELEASES LOGIC ---
     let processedReleases: ActiveRelease[] = [];
@@ -4523,7 +4558,7 @@ export const processGameWeek = async (
             type: 'positive',
         });
 
-        return {
+        const signedRelease: ActiveRelease = {
             ...release,
             distributionPhase: 'STREAMING',
             status: 'FINISHED',
@@ -4548,6 +4583,29 @@ export const processGameWeek = async (
                 },
             },
         };
+        const registration = registerProductionStreamingRightsContract(nextPlayer, {
+            sourceProjectId: release.id,
+            title: release.name,
+            projectType: release.type === 'SERIES' ? 'SERIES' : 'MOVIE',
+            genre: release.projectDetails.genre,
+            sellerStudioId: studio.id,
+            sellerStudioName: studio.name,
+            sellerPartyType: 'PLAYER_STUDIO',
+            buyerPlatformId: winningBid.platformId,
+            minimumGuarantee: upfront,
+            platformRevenueShare: 100 - Math.max(0, Math.min(100, Number(winningBid.royalty || 0))),
+            productionFunding: winningBid.fundingAmount,
+            signedAtAbsoluteWeek: getAbsoluteWeek(nextPlayer.age, nextPlayer.currentWeek),
+            startsAtAbsoluteWeek: getAbsoluteWeek(nextPlayer.age, nextPlayer.currentWeek),
+            durationWeeks: winningBid.duration,
+        });
+        nextPlayer = registration.player;
+        const contractId = registration.contract?.id;
+        return contractId ? {
+            ...signedRelease,
+            streamingContractId: contractId,
+            streaming: signedRelease.streaming ? { ...signedRelease.streaming, contractId } : signedRelease.streaming,
+        } : signedRelease;
     };
 
     const processPostReleaseReality = (rel: ActiveRelease): ActiveRelease => {
@@ -4602,6 +4660,104 @@ export const processGameWeek = async (
             }
         };
     };
+
+    const phaseTwoAttributionByProject = new Map<string, ReturnType<typeof attributeStreamingTitleRevenue>[number]>();
+    const settlementAbsoluteWeek = getAbsoluteWeek(nextPlayer.age, nextPlayer.currentWeek);
+    const phaseTwoContracts = Object.values(nextPlayer.world.streamingRightsContracts || {}).filter(contract => (
+        contract.status === 'ACTIVE'
+        && Boolean(contract.biddingSessionId)
+        && Boolean(contract.sourceOfferId)
+        && settlementAbsoluteWeek >= contract.startsAtAbsoluteWeek
+        && settlementAbsoluteWeek < contract.expiresAtAbsoluteWeek
+    ));
+    const phaseTwoPlatformIds = Array.from(new Set(phaseTwoContracts
+        .map(contract => contract.buyer.platformId)
+        .filter((platformId): platformId is PlatformId => Boolean(platformId))));
+    phaseTwoPlatformIds.forEach(platformId => {
+        const platform = nextPlayer.world.platforms?.[platformId];
+        const profile = PLATFORM_AI_PROFILES[platformId];
+        if (!platform || !profile) return;
+        const playerRows = allRunning.flatMap(release => {
+            const contract = phaseTwoContracts.find(candidate => (
+                candidate.sourceProjectId === release.id
+                && candidate.buyer.platformId === platformId
+            ));
+            if (!contract || release.distributionPhase !== 'STREAMING' || !release.streaming) return [];
+            const priorViews = Math.max(0, Number(release.streaming.weeklyViews.at(-1) || 0));
+            const quality = Math.max(0, Math.min(100, Number(release.projectDetails.hiddenStats.qualityScore || 50)));
+            return [{
+                projectId: release.id,
+                viewingAccounts: priorViews,
+                watchHours: priorViews * (release.type === 'SERIES' ? 2.1 : 1.7),
+                subscriberAcquisition: priorViews * Math.max(0.005, (quality - 42) / 1_000),
+                subscriberRetention: priorViews * (0.035 + quality / 2_000),
+                advertisingRevenue: 0,
+                transactionalRevenue: 0,
+                taxesRefundsAndStorefrontFees: 0,
+            }];
+        });
+        if (!playerRows.length) return;
+        const playerProjectIds = new Set(playerRows.map(row => row.projectId));
+        const industryRows = (nextPlayer.world.projects || []).flatMap(project => {
+            if (playerProjectIds.has(project.id)) return [];
+            const activeWindow = (project.streamingWindows || []).find(window => (
+                window.platformId === platformId
+                && settlementAbsoluteWeek >= window.startsAtAbsoluteWeek
+                && settlementAbsoluteWeek < window.expiresAtAbsoluteWeek
+            ));
+            const performance = activeWindow?.performance || project.streamingPerformance;
+            if (!activeWindow || !performance) return [];
+            const ageWeeks = Math.max(0, settlementAbsoluteWeek - activeWindow.startsAtAbsoluteWeek);
+            const decay = Math.max(0.16, Math.pow(0.9, ageWeeks));
+            const views = Math.max(0, performance.viewsMillions * 1_000_000 * decay);
+            return [{
+                projectId: project.id,
+                viewingAccounts: views,
+                watchHours: views * (project.mediaType === 'SERIES' ? 2.1 : 1.7),
+                subscriberAcquisition: Math.max(0, performance.subscriberImpactMillions) * 1_000_000 * decay,
+                subscriberRetention: views * Math.max(0.02, performance.commercialScore / 1_500),
+                advertisingRevenue: 0,
+                transactionalRevenue: 0,
+                taxesRefundsAndStorefrontFees: 0,
+            }];
+        });
+        const subscribers = Math.max(0, Number(platform.subscribers || 0)) * 1_000_000;
+        const catalogueBaseline = {
+            projectId: `platform-catalogue:${platformId}`,
+            viewingAccounts: subscribers * 0.32,
+            watchHours: subscribers * 0.54,
+            subscriberAcquisition: subscribers * 0.002,
+            subscriberRetention: subscribers * 0.045,
+            advertisingRevenue: 0,
+            transactionalRevenue: 0,
+            taxesRefundsAndStorefrontFees: 0,
+        };
+        const signals = [...playerRows, ...industryRows, catalogueBaseline];
+        const advertisingRevenue = calculateStreamingAdvertisingRevenueFullCurrency({
+            subscribers,
+            adSupportedShare: profile.adSupportedShare,
+            weeklyAdRevenuePerSubscriber: profile.weeklyAdRevenuePerSubscriber,
+        });
+        const totalViewingAccounts = signals.reduce((sum, row) => sum + Math.max(0, row.viewingAccounts), 0);
+        let allocatedAdvertising = 0;
+        const signalsWithAdvertising = signals.map((row, index) => {
+            const directAdvertising = index === signals.length - 1
+                ? Math.max(0, Math.round(advertisingRevenue) - allocatedAdvertising)
+                : Math.max(0, Math.round(advertisingRevenue * row.viewingAccounts / Math.max(1, totalViewingAccounts)));
+            allocatedAdvertising += directAdvertising;
+            return { ...row, advertisingRevenue: directAdvertising };
+        });
+        attributeStreamingTitleRevenue({
+            subscriptionRevenue: calculateStreamingSubscriptionRevenueFullCurrency({
+                subscribers,
+                monthlyArpu: profile.monthlyArpu,
+                paidSubscriberShare: profile.paidSubscriberShare,
+            }),
+            titles: signalsWithAdvertising,
+        }).forEach(row => {
+            if (playerProjectIds.has(row.projectId)) phaseTwoAttributionByProject.set(row.projectId, row);
+        });
+    });
 
     allRunning.forEach(initialRelease => {
         let rel = processPostReleaseReality(initialRelease);
@@ -5456,18 +5612,47 @@ export const processGameWeek = async (
                 } else {
                     // NPC studio, just auto-assign
                     const platformId = determineStreamingAcquisition(rel.projectDetails);
+                    const cost = Math.floor(rel.budget * 0.4 * PLATFORMS[platformId].payoutMult);
                     logsToAdd.push({ msg: `📉 "${rel.name}" left theaters. Acquired by ${PLATFORMS[platformId].name}.`, type: 'neutral' });
                     
                     // Update platform state
                     if (nextPlayer.world.platforms && nextPlayer.world.platforms[platformId]) {
                         const platform = nextPlayer.world.platforms[platformId];
-                        // Estimate acquisition cost
-                        const cost = Math.floor(rel.budget * 0.4 * PLATFORMS[platformId].payoutMult);
                         platform.cashReserve = Math.max(0, platform.cashReserve - cost);
                         platform.recentHits += 1;
                     }
 
-                    processedReleases.push({ ...rel, ...theatricalDistributionState, distributionPhase: 'STREAMING', status: 'FINISHED', streaming: { platformId, weekOnPlatform: 1, totalViews: 0, weeklyViews: [], isLeaving: false } });
+                    const signedNpcRelease: ActiveRelease = {
+                        ...rel,
+                        ...theatricalDistributionState,
+                        distributionPhase: 'STREAMING',
+                        status: 'FINISHED',
+                        streamingUpfrontFee: Math.max(0, Number(rel.streamingUpfrontFee || 0)) + cost,
+                        streamingRevenue: Math.max(0, Number(rel.streamingRevenue || 0)) + cost,
+                        streaming: { platformId, weekOnPlatform: 1, totalViews: 0, weeklyViews: [], isLeaving: false },
+                    };
+                    const npcRegistration = registerProductionStreamingRightsContract(nextPlayer, {
+                        sourceProjectId: rel.id,
+                        title: rel.name,
+                        projectType: rel.type === 'SERIES' ? 'SERIES' : 'MOVIE',
+                        genre: rel.projectDetails.genre,
+                        sellerStudioId: rel.projectDetails.studioId || 'npc-studio',
+                        sellerStudioName: rel.projectDetails.studioId || 'NPC studio',
+                        sellerPartyType: 'NPC_STUDIO',
+                        buyerPlatformId: platformId,
+                        minimumGuarantee: cost,
+                        platformRevenueShare: 100,
+                        signedAtAbsoluteWeek: getAbsoluteWeek(nextPlayer.age, nextPlayer.currentWeek),
+                        startsAtAbsoluteWeek: getAbsoluteWeek(nextPlayer.age, nextPlayer.currentWeek),
+                        durationWeeks: 52,
+                    });
+                    nextPlayer = npcRegistration.player;
+                    const npcContractId = npcRegistration.contract?.id;
+                    processedReleases.push(npcContractId ? {
+                        ...signedNpcRelease,
+                        streamingContractId: npcContractId,
+                        streaming: { ...signedNpcRelease.streaming!, contractId: npcContractId },
+                    } : signedNpcRelease);
                 }
             } else {
                 processedReleases.push({ ...rel, ...theatricalDistributionState, weekNum: rel.weekNum + 1 });
@@ -5506,7 +5691,7 @@ export const processGameWeek = async (
                 processedReleases.push(rel);
                 return;
             }
-            const streamingStudio = nextPlayer.businesses?.find(b => b.id === rel.projectDetails.studioId && b.type === 'PRODUCTION_HOUSE');
+            let streamingStudio = nextPlayer.businesses?.find(b => b.id === rel.projectDetails.studioId && b.type === 'PRODUCTION_HOUSE');
             const streamingDemand = getProjectMarketDemand(rel.projectDetails, nextPlayer.currentWeek, streamingStudio?.studioState?.marketTrends);
             const streamingProductionRisk = calculateProductionRiskProfile(rel.projectDetails, {
                 budget: rel.budget,
@@ -5568,30 +5753,54 @@ export const processGameWeek = async (
             }
             let weeklyStreamingRevenue = 0;
             let investorStreamingPayout = 0;
-            if (rel.studioRoyaltyPercentage) {
-                // Assume $0.10 per view
+            const canonicalStreamingContract = rel.streamingContractId
+                ? nextPlayer.world.streamingRightsContracts?.[rel.streamingContractId]
+                : undefined;
+            const phaseTwoAttribution = canonicalStreamingContract?.biddingSessionId
+                ? phaseTwoAttributionByProject.get(rel.id)
+                : undefined;
+            let phaseTwoSettlementApplied = false;
+            if (canonicalStreamingContract && phaseTwoAttribution) {
+                const settlement = settleStreamingContractRoyaltyForPlayer(nextPlayer, {
+                    contractId: canonicalStreamingContract.id,
+                    attribution: phaseTwoAttribution,
+                    absoluteWeek: settlementAbsoluteWeek,
+                });
+                nextPlayer = settlement.player;
+                weeklyStreamingRevenue = settlement.royaltyPaid;
+                phaseTwoSettlementApplied = settlement.changed || Boolean(settlement.settlementId);
+                streamingStudio = nextPlayer.businesses?.find(b => b.id === rel.projectDetails.studioId && b.type === 'PRODUCTION_HOUSE');
+            } else if (rel.studioRoyaltyPercentage) {
+                // Legacy contracts retain the historical view proxy. Phase 2 contracts settle from attributable adjusted gross.
                 weeklyStreamingRevenue = Math.floor(newViews * 0.10 * (rel.studioRoyaltyPercentage / 100));
+            }
+            if (rel.studioRoyaltyPercentage || canonicalStreamingContract?.licensorRevenueShare) {
                 const studioId = rel.projectDetails.studioId;
                 const playerStudio = nextPlayer.businesses?.find(b => b.id === studioId);
                 if (playerStudio && weeklyStreamingRevenue > 0) {
                     const activeInvestorPlan = rel.investorPlan || rel.projectDetails.investorPlan;
                     investorStreamingPayout = calculateInvestorPayout(activeInvestorPlan, weeklyStreamingRevenue);
                     const netStreamingRevenue = Math.max(0, weeklyStreamingRevenue - investorStreamingPayout);
-                    playerStudio.balance += netStreamingRevenue;
-                    playerStudio.stats.weeklyRevenue += netStreamingRevenue;
-                    playerStudio.stats.weeklyProfit += netStreamingRevenue;
-                    playerStudio.stats.lifetimeRevenue += netStreamingRevenue;
-                    appendStudioLedgerEntry(playerStudio, {
-                        id: `studio_ledger_streaming_${rel.id}_${nextPlayer.age}_${nextPlayer.currentWeek}`,
-                        week: nextPlayer.currentWeek,
-                        year: nextPlayer.age,
-                        amount: netStreamingRevenue,
-                        type: 'STREAMING_ROYALTY',
-                        label: investorStreamingPayout > 0
-                            ? `${rel.name} streaming royalties after investor split`
-                            : `${rel.name} streaming royalties`,
-                        projectId: rel.id
-                    });
+                    if (!phaseTwoSettlementApplied) {
+                        playerStudio.balance += netStreamingRevenue;
+                        playerStudio.stats.weeklyRevenue += netStreamingRevenue;
+                        playerStudio.stats.weeklyProfit += netStreamingRevenue;
+                        playerStudio.stats.lifetimeRevenue += netStreamingRevenue;
+                        appendStudioLedgerEntry(playerStudio, {
+                            id: `studio_ledger_streaming_${rel.id}_${nextPlayer.age}_${nextPlayer.currentWeek}`,
+                            week: nextPlayer.currentWeek,
+                            year: nextPlayer.age,
+                            amount: netStreamingRevenue,
+                            type: 'STREAMING_ROYALTY',
+                            label: investorStreamingPayout > 0
+                                ? `${rel.name} streaming royalties after investor split`
+                                : `${rel.name} streaming royalties`,
+                            projectId: rel.id
+                        });
+                    } else if (investorStreamingPayout > 0) {
+                        playerStudio.balance = Math.max(0, playerStudio.balance - investorStreamingPayout);
+                        playerStudio.stats.weeklyProfit -= investorStreamingPayout;
+                    }
                     if (investorStreamingPayout > 0) {
                         appendStudioLedgerEntry(playerStudio, {
                             id: `studio_ledger_investor_payout_streaming_${rel.id}_${nextPlayer.age}_${nextPlayer.currentWeek}`,
@@ -5829,6 +6038,7 @@ export const processGameWeek = async (
     });
 
     nextPlayer.activeReleases = processedReleases;
+    nextPlayer = migrateStreamingRightsContractRegistry(nextPlayer);
     nextPlayer.news = newNews;
     nextPlayer.inbox = newInbox;
     emitLoopStage('commitments_releases_done', {
@@ -5864,7 +6074,7 @@ export const processGameWeek = async (
                         a.category === n.category
                     ))
                     .map(n => ({
-                        id: `award_nom_${Date.now()}_${Math.random()}`,
+                        id: createCanonicalAwardNominationId(def.type, awardYear, n.category, n.project.id),
                         name: def.name,
                         category: n.category,
                         year: awardYear,
@@ -5878,7 +6088,7 @@ export const processGameWeek = async (
                     nextPlayer.awards.push(...awardEntries);
                     nextPlayer.awards = sanitizeAwardRecords(nextPlayer.awards);
                     nextPlayer.inbox.unshift({
-                        id: `msg_award_invite_${def.type}_${Date.now()}`,
+                        id: createDeterministicId('msg_award_invite', def.type, awardYear),
                         sender: t(language, 'services.gameLoop.awards.inbox.sender'),
                         subject: t(language, 'services.gameLoop.awards.inbox.subject', { awardName: def.name }),
                         text: t(language, 'services.gameLoop.awards.inbox.text', { count: awardEntries.length.toLocaleString() }),
@@ -5903,11 +6113,11 @@ export const processGameWeek = async (
         const existingEntry = nextPlayer.world.awardHistory.find(h => h.year === nextPlayer.age && h.type === awardShow.type);
         const ceremonyPendingForPlayer = nextPlayer.pendingEvent?.type === 'AWARD_CEREMONY' && nextPlayer.pendingEvent.data?.awardDef?.type === awardShow.type;
         if (!existingEntry && !ceremonyPendingForPlayer) {
-            const historyEntry = generateSeasonWinners(nextPlayer, awardShow.type, nextPlayer.age);
+            const historyEntry = resolveCanonicalAwardSeason(nextPlayer, awardShow.type, nextPlayer.age);
             nextPlayer.world.awardHistory.push(historyEntry);
             nextPlayer.world.awardHistory = sanitizeAwardHistoryEntries(nextPlayer.world.awardHistory);
             const bestPic = historyEntry.winners.find(w => w.category.includes('Picture') || w.category.includes('Series'));
-            if (bestPic) { nextPlayer.news.unshift({ id: `news_award_${Date.now()}`, headline: t(language, 'services.gameLoop.awards.news.winner', { projectName: bestPic.projectName, awardName: awardShow.name }), category: 'INDUSTRY', week: nextPlayer.currentWeek, year: nextPlayer.age, impactLevel: 'MEDIUM' }); }
+            if (bestPic) { nextPlayer.news.unshift({ id: createDeterministicId('news_award', awardShow.type, nextPlayer.age), headline: t(language, 'services.gameLoop.awards.news.winner', { projectName: bestPic.projectName, awardName: awardShow.name }), category: 'INDUSTRY', week: nextPlayer.currentWeek, year: nextPlayer.age, impactLevel: 'MEDIUM' }); }
         }
     }
     emitLoopStage('awards_done', {
@@ -6163,6 +6373,8 @@ export const processGameWeek = async (
     }
 
     emitLoopStage('owned_streaming_start');
+    nextPlayer = advanceStreamingMarketClearances(nextPlayer).player;
+    nextPlayer = advanceStreamingTitleLocalization(nextPlayer).player;
     const ownedStreamingResult = processOwnedStreamingPlatformWeek(nextPlayer);
     nextPlayer = ownedStreamingResult.player;
     if (ownedStreamingResult.snapshot?.operations) {

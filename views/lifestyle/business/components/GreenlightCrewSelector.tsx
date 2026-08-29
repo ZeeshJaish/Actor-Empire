@@ -108,14 +108,22 @@ export const GreenlightCrewSelector: React.FC<GreenlightCrewSelectorProps> = ({
                                 const standardSalary = npc.standardSalary || salary;
                                 const discount = npc.connectionDiscount || 0;
                                 const isSelected = selectedId === npc.id;
+                                const isBookingUnavailable = Boolean(npc.isBookingUnavailable);
 
                                 return (
                                     <button
                                         type="button"
                                         key={rel.id}
-                                        onClick={() => onSelect(npc.id)}
+                                        onClick={() => {
+                                            if (isBookingUnavailable) return;
+                                            onSelect(npc.id);
+                                        }}
+                                        disabled={isBookingUnavailable}
+                                        title={isBookingUnavailable ? npc.bookingConflictLabel : undefined}
                                         className={`w-full p-4 rounded-xl border flex justify-between items-center transition-all duration-300 group relative overflow-hidden ${
-                                            isSelected
+                                            isBookingUnavailable
+                                                ? 'bg-red-900/10 border-red-900/30 opacity-55 cursor-not-allowed text-zinc-500'
+                                                : isSelected
                                                 ? 'bg-purple-900/20 border-purple-500 text-white shadow-[0_0_20px_rgba(168,85,247,0.3)]'
                                                 : 'bg-zinc-900/80 border-purple-900/30 text-zinc-400 hover:bg-zinc-800 hover:border-purple-500/50'
                                         }`}
@@ -127,7 +135,7 @@ export const GreenlightCrewSelector: React.FC<GreenlightCrewSelectorProps> = ({
                                                     {npc.name}
                                                 </div>
                                                 <div className="text-[9px] text-purple-400 font-bold uppercase tracking-wider">
-                                                    Trusted connection • {Math.round(rel.closeness)} closeness
+                                                    {isBookingUnavailable ? npc.bookingConflictLabel : `Trusted connection • ${Math.round(rel.closeness)} closeness`}
                                                 </div>
                                             </div>
                                         </div>
@@ -191,17 +199,22 @@ export const GreenlightCrewSelector: React.FC<GreenlightCrewSelectorProps> = ({
                             }
 
                             const isSelected = selectedId === candidate.id;
+                            const isBookingUnavailable = Boolean(candidate.isBookingUnavailable);
 
                             return (
                                 <button
                                     type="button"
                                     key={candidate.id}
                                     onClick={() => {
-                                        if (isReturning && !returningData?.accepted && returningData?.attemptsLeft === 0) return;
+                                        if (isBookingUnavailable || (isReturning && !returningData?.accepted && returningData?.attemptsLeft === 0)) return;
                                         onSelect(candidate.id);
                                     }}
+                                    disabled={isBookingUnavailable}
+                                    title={isBookingUnavailable ? candidate.bookingConflictLabel : undefined}
                                     className={`w-full p-4 rounded-xl border flex justify-between items-center transition-all duration-300 group relative overflow-hidden ${
-                                        isSelected
+                                        isBookingUnavailable
+                                            ? 'bg-red-900/10 border-red-900/30 opacity-55 cursor-not-allowed text-zinc-500'
+                                            : isSelected
                                             ? 'bg-zinc-800 border-emerald-500 text-white shadow-[0_0_20px_rgba(16,185,129,0.3)]'
                                             : isReturning && !returningData?.accepted && returningData?.attemptsLeft === 0
                                                 ? 'bg-red-900/10 border-red-900/30 opacity-50 cursor-not-allowed'
@@ -225,6 +238,11 @@ export const GreenlightCrewSelector: React.FC<GreenlightCrewSelectorProps> = ({
                                                 {candidate.isHeldForProject && (
                                                     <span className="text-[8px] px-1.5 py-0.5 bg-emerald-500/15 text-emerald-300 rounded-full border border-emerald-500/25">
                                                         Held
+                                                    </span>
+                                                )}
+                                                {isBookingUnavailable && (
+                                                    <span className="text-[8px] px-1.5 py-0.5 bg-red-500/15 text-red-300 rounded-full border border-red-500/25">
+                                                        Booked
                                                     </span>
                                                 )}
                                             </div>
@@ -253,7 +271,9 @@ export const GreenlightCrewSelector: React.FC<GreenlightCrewSelectorProps> = ({
                                     </div>
                                     <div className="text-right relative z-10">
                                         <div className={`text-sm font-mono font-bold ${isSelected ? 'text-white' : 'text-emerald-400'}`}>
-                                            {isReturning && !returningData?.accepted && returningData?.attemptsLeft > 0 && onNegotiate ? (
+                                            {isBookingUnavailable ? (
+                                                <span className="text-red-400 text-[10px] uppercase tracking-wider">Unavailable</span>
+                                            ) : isReturning && !returningData?.accepted && returningData?.attemptsLeft > 0 && onNegotiate ? (
                                                 <button
                                                     type="button"
                                                     onClick={event => {

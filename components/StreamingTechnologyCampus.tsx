@@ -1,4 +1,4 @@
-import { useMemo, useReducer, type CSSProperties, type Key } from 'react';
+import { useMemo, useReducer, useState, type CSSProperties, type Key } from 'react';
 import {
   AlertTriangle,
   ArrowLeft,
@@ -12,15 +12,18 @@ import {
   Cpu,
   DatabaseZap,
   Gauge,
+  FlaskConical,
   HardHat,
   Layers3,
   LockKeyhole,
+  Microscope,
   Network,
   RadioTower,
   Rocket,
   ServerCog,
   ShieldCheck,
   Sparkles,
+  Scale,
   TimerReset,
   UsersRound,
   WalletCards,
@@ -40,6 +43,16 @@ import {
   type StreamingTechnologyFacilityView,
   type StreamingTechnologyNode,
 } from '../services/streamingTechnologyCampus';
+import {
+  STREAMING_RESEARCH_LIFECYCLE_LABELS,
+  chooseStreamingResearchIpStrategy,
+  getImmersionCoolingCompatibleFacilities,
+  getStreamingResearchPortfolio,
+  installStreamingLocalizationCapability,
+  installStreamingResearchInFacility,
+  startStreamingResearchProgram,
+  type StreamingResearchProgramView,
+} from '../services/streamingResearchLifecycle';
 import StreamingVisualScene from './StreamingVisualScene';
 import '../styles/streaming-technology-campus.css';
 
@@ -49,9 +62,11 @@ interface Props {
   onClose: () => void;
   onOpenCompany?: () => void;
   onOpenInfrastructure?: () => void;
+  onOpenProduct?: () => void;
+  onOpenCampusConstruction?: () => void;
 }
 
-type CampusView = 'CAMPUS' | 'LAB' | 'CONSTRUCTION' | 'LEDGER';
+type CampusView = 'RESEARCH' | 'CAMPUS' | 'LAB' | 'CONSTRUCTION' | 'LEDGER';
 
 interface CampusUiState {
   view: CampusView;
@@ -63,6 +78,7 @@ interface CampusUiState {
 
 type CampusUiAction =
   | { type: 'OPEN_CAMPUS' }
+  | { type: 'OPEN_RESEARCH' }
   | { type: 'OPEN_BRANCH'; branch: StreamingTechnologyCampusBranch }
   | { type: 'OPEN_CONSTRUCTION' }
   | { type: 'OPEN_LEDGER' }
@@ -72,6 +88,7 @@ type CampusUiAction =
 
 const reducer = (state: CampusUiState, action: CampusUiAction): CampusUiState => {
   if (action.type === 'OPEN_CAMPUS') return { ...state, view: 'CAMPUS', feedback: '' };
+  if (action.type === 'OPEN_RESEARCH') return { ...state, view: 'RESEARCH', feedback: '' };
   if (action.type === 'OPEN_BRANCH') return { ...state, view: 'LAB', branch: action.branch, selectedDefinitionId: null, feedback: '' };
   if (action.type === 'OPEN_CONSTRUCTION') return { ...state, view: 'CONSTRUCTION', feedback: '' };
   if (action.type === 'OPEN_LEDGER') return { ...state, view: 'LEDGER', feedback: '' };
@@ -156,17 +173,24 @@ export default function StreamingTechnologyCampus({
   onClose,
   onOpenCompany,
   onOpenInfrastructure,
+  onOpenProduct,
+  onOpenCampusConstruction,
 }: Props) {
   const campus = useMemo(() => getStreamingTechnologyCampus(player), [player]);
+  const researchPortfolio = useMemo(() => getStreamingResearchPortfolio(player), [player]);
   const defaultBranch = campus.facilities.find(facility => facility.nextNode?.status === 'AVAILABLE')?.definition.id
     || 'DELIVERY_CAPACITY';
   const [ui, dispatch] = useReducer(reducer, {
-    view: campus.activeProject ? 'CONSTRUCTION' : 'CAMPUS',
+    view: campus.activeProject ? 'CONSTRUCTION' : 'RESEARCH',
     branch: defaultBranch,
     selectedDefinitionId: null,
     buildMode: 'BALANCED',
     feedback: '',
   });
+  const [selectedResearchId, setSelectedResearchId] = useState(
+    researchPortfolio.activeProgram?.definitionId || researchPortfolio.programs[0]?.definition.id || '',
+  );
+  const [facilityTargetId, setFacilityTargetId] = useState('');
   const selectedFacility = campus.facilities.find(facility => facility.definition.id === ui.branch) || campus.facilities[0];
   const selectedNode = selectedFacility?.nodes.find(node => node.definition.id === ui.selectedDefinitionId)
     || selectedFacility?.nextNode
@@ -174,6 +198,13 @@ export default function StreamingTechnologyCampus({
   const preview = selectedNode ? previewStreamingTechnologyProject(selectedNode.definition, ui.buildMode) : null;
   const activeProject = campus.activeProject;
   const weeksRemaining = activeProject ? Math.max(0, activeProject.readyAtAbsoluteWeek - campus.absoluteWeek) : 0;
+  const selectedResearch = researchPortfolio.programs.find(item => item.definition.id === selectedResearchId)
+    || researchPortfolio.programs[0]
+    || null;
+  const compatibleFacilities = useMemo(
+    () => getImmersionCoolingCompatibleFacilities(player.ownedStreamingPlatform),
+    [player.ownedStreamingPlatform],
+  );
 
   const startProject = () => {
     if (!selectedNode) return;
@@ -193,6 +224,190 @@ export default function StreamingTechnologyCampus({
     }
     onUpdatePlayer(result.player);
     dispatch({ type: 'OPEN_CONSTRUCTION' });
+  };
+
+  const startResearch = () => {
+    if (!selectedResearch) return;
+    const result = startStreamingResearchProgram(player, selectedResearch.definition.id, ui.buildMode);
+    if (!result.changed) {
+      dispatch({ type: 'FEEDBACK', feedback: result.reason || 'This research program cannot begin yet.' });
+      return;
+    }
+    onUpdatePlayer(result.player);
+  };
+
+  const chooseIp = (strategy: 'PATENT' | 'LICENSE') => {
+    if (!selectedResearch) return;
+    const result = chooseStreamingResearchIpStrategy(player, selectedResearch.definition.id, strategy);
+    if (!result.changed) {
+      dispatch({ type: 'FEEDBACK', feedback: result.reason || 'IP clearance is not available yet.' });
+      return;
+    }
+    onUpdatePlayer(result.player);
+  };
+
+  const installInFacility = () => {
+    if (!selectedResearch) return;
+    const targetId = facilityTargetId || compatibleFacilities[0]?.id;
+    if (!targetId) {
+      dispatch({ type: 'FEEDBACK', feedback: 'Commission a compatible private facility before installing immersion cooling.' });
+      return;
+    }
+    const result = installStreamingResearchInFacility(player, selectedResearch.definition.id, targetId);
+    if (!result.changed) {
+      dispatch({ type: 'FEEDBACK', feedback: result.reason || 'This installation cannot begin yet.' });
+      return;
+    }
+    onUpdatePlayer(result.player);
+  };
+
+  const installLocalizationCapability = () => {
+    if (!selectedResearch) return;
+    const result = installStreamingLocalizationCapability(player, selectedResearch.definition.id);
+    if (!result.changed) {
+      dispatch({ type: 'FEEDBACK', feedback: result.reason || 'This localization installation cannot begin yet.' });
+      return;
+    }
+    onUpdatePlayer(result.player);
+  };
+
+  const openResearchInstallation = (item: StreamingResearchProgramView) => {
+    if (item.definition.mappedTechnologyId) {
+      const target = campus.facilities.flatMap(facility => facility.nodes.map(node => ({ facility, node })))
+        .find(candidate => candidate.node.definition.id === item.definition.mappedTechnologyId);
+      if (target) {
+        dispatch({ type: 'OPEN_BRANCH', branch: target.facility.definition.id });
+        dispatch({ type: 'SELECT_PROJECT', definitionId: target.node.definition.id });
+      }
+      return;
+    }
+    if (item.definition.mappedProductLineId) onOpenProduct?.();
+  };
+
+  const researchStageIndex = (stage: StreamingResearchProgramView['status']): number => {
+    if (stage === 'RESEARCHING') return 0;
+    if (stage === 'PROTOTYPING') return 1;
+    if (stage === 'TESTING') return 2;
+    if (stage === 'AWAITING_IP') return 3;
+    if (stage === 'READY_TO_INSTALL' || stage === 'INSTALLING') return 4;
+    if (stage === 'OPERATING') return 5;
+    return -1;
+  };
+
+  const renderResearch = () => {
+    if (!selectedResearch) return null;
+    const { definition, program, status, blockers } = selectedResearch;
+    const currentStageIndex = researchStageIndex(status);
+    const waitingForIp = program?.stage === 'AWAITING_IP';
+    const readyToInstall = program?.stage === 'READY_TO_INSTALL';
+    const canStart = status === 'AVAILABLE';
+    const weeksToStage = program && ['RESEARCHING', 'PROTOTYPING', 'TESTING', 'INSTALLING'].includes(program.stage)
+      ? Math.max(0, program.stageReadyAtAbsoluteWeek - campus.absoluteWeek)
+      : null;
+    return (
+      <section className="tech-research-lab">
+        <header>
+          <div><span>R&D PORTFOLIO</span><h2>Seven disciplines. Six accountable stages.</h2></div>
+          <p>Research creates a tested possibility. IP clearance, installation capital and an exact operating target remain separate decisions.</p>
+        </header>
+        <div className="tech-research-layout">
+          <div className="tech-research-catalog" aria-label="Research categories">
+            {researchPortfolio.programs.map(item => (
+              <button
+                type="button"
+                key={item.definition.id}
+                className={`${selectedResearch.definition.id === item.definition.id ? 'is-selected' : ''} is-${String(item.status).toLowerCase()}`}
+                style={{ '--research-accent': item.definition.accent } as CSSProperties}
+                onClick={() => { setSelectedResearchId(item.definition.id); dispatch({ type: 'FEEDBACK', feedback: '' }); }}
+              >
+                <span><FlaskConical size={16} /> {item.definition.categoryLabel}</span>
+                <strong>{item.definition.title}</strong>
+                <small>{item.program ? item.program.stage.replaceAll('_', ' ') : item.status === 'AVAILABLE' ? 'Ready for research' : 'Pipeline occupied'}</small>
+              </button>
+            ))}
+          </div>
+          <article className="tech-research-brief" style={{ '--research-accent': definition.accent } as CSSProperties}>
+            <header>
+              <div><span>{definition.codename} · {definition.categoryLabel}</span><h3>{definition.title}</h3><p>{definition.description}</p></div>
+              <Microscope size={31} />
+            </header>
+            <ol className="tech-research-lifecycle" aria-label="Research lifecycle">
+              {STREAMING_RESEARCH_LIFECYCLE_LABELS.map((label, index) => (
+                <li key={label} className={index < currentStageIndex ? 'is-complete' : index === currentStageIndex ? 'is-current' : ''}>
+                  <i>{index < currentStageIndex ? <BadgeCheck size={14} /> : index + 1}</i><span>{label}</span>
+                </li>
+              ))}
+            </ol>
+            <div className="tech-research-outcomes">
+              <div><span>UNLOCKS</span><strong>{definition.unlockSummary}</strong></div>
+              <div><span>INSTALLED IN</span><strong>{program?.installationTargetLabel || definition.installationLocation}</strong></div>
+              <div><span>GAMEPLAY CHANGE</span><strong>{definition.gameplayChange}</strong></div>
+            </div>
+            {!program ? (
+              <>
+                <div className="tech-build-modes tech-research-modes">
+                  <span>RESEARCH DOCTRINE</span>
+                  {([
+                    ['HARDENED', 'Hardened', 'Slower verification, lower rival heat'],
+                    ['BALANCED', 'Balanced', 'Designed cost, schedule and exposure'],
+                    ['SPRINT', 'Sprint', 'Faster start, higher cost and attention'],
+                  ] as const).map(([id, label, copy]) => (
+                    <button type="button" key={id} className={ui.buildMode === id ? 'is-selected' : ''} onClick={() => dispatch({ type: 'SET_BUILD_MODE', buildMode: id })}>
+                      <strong>{label}</strong><small>{copy}</small>
+                    </button>
+                  ))}
+                </div>
+                <div className="tech-research-costs">
+                  <span>Research only <strong>{formatMoney(definition.researchCost)}</strong></span>
+                  <span>Later installation <strong>{definition.installationCost ? formatMoney(definition.installationCost) : 'Phase 8 budget'}</strong></span>
+                </div>
+                <button type="button" className="tech-research-primary" disabled={!canStart} onClick={startResearch}><FlaskConical size={17} /> Start research</button>
+              </>
+            ) : waitingForIp ? (
+              <div className="tech-ip-choice">
+                <div><Scale size={19} /><span>Testing passed. Choose how the company controls this knowledge.</span></div>
+                <button type="button" onClick={() => chooseIp('PATENT')}><strong>Patent</strong><small>{formatMoney(program.patentCost)} · stronger advantage · more rival interest</small></button>
+                <button type="button" onClick={() => chooseIp('LICENSE')}><strong>License</strong><small>{formatMoney(Math.round(program.patentCost * .25))} now · {formatMoney(program.licenseWeeklyCost)}/wk after operation</small></button>
+              </div>
+            ) : readyToInstall ? (
+              <div className="tech-install-handoff">
+                <strong>Research complete. Installation has not happened.</strong>
+                {definition.installTargetType === 'FACILITY' ? (
+                  <>
+                    <label htmlFor="research-facility-target">Commissioned facility</label>
+                    <select id="research-facility-target" value={facilityTargetId || compatibleFacilities[0]?.id || ''} onChange={event => setFacilityTargetId(event.target.value)}>
+                      {!compatibleFacilities.length ? <option value="">No compatible private facility</option> : null}
+                      {compatibleFacilities.map(facility => <option key={facility.id} value={facility.id}>{facility.cityId} · {facility.type.replaceAll('_', ' ')}</option>)}
+                    </select>
+                    <button type="button" className="tech-research-primary" disabled={Boolean(blockers.length)} onClick={installInFacility}><Wrench size={17} /> Install for {formatMoney(program.installationCost)}</button>
+                  </>
+                ) : definition.installTargetType === 'LOCALIZATION_CAPABILITY' ? (
+                  <button type="button" className="tech-research-primary" disabled={Boolean(blockers.length)} onClick={installLocalizationCapability}>
+                    <Wrench size={17} /> Install for {formatMoney(program.installationCost)}
+                  </button>
+                ) : definition.installTargetType === 'CONSTRUCTION_PROGRAM' ? (
+                  <button type="button" className="tech-research-primary" onClick={onOpenCampusConstruction}>
+                    <HardHat size={17} /> Open Giga Campus construction <ChevronRight size={17} />
+                  </button>
+                ) : (
+                  <button type="button" className="tech-research-primary" disabled={Boolean(blockers.length)} onClick={() => openResearchInstallation(selectedResearch)}>
+                    {definition.mappedProductLineId ? 'Open Product Lab' : 'Open installation blueprint'} <ChevronRight size={17} />
+                  </button>
+                )}
+                {blockers.map(blocker => <span className="tech-install-blocker" key={blocker}><LockKeyhole size={14} /> {blocker}</span>)}
+              </div>
+            ) : (
+              <div className="tech-research-status" role="status">
+                <strong>{program.stage.replaceAll('_', ' ')}</strong>
+                <span>{weeksToStage === null ? 'This program is now part of live operations.' : `${weeksToStage} game week${weeksToStage === 1 ? '' : 's'} to the next accountable stage.`}</span>
+                {program.ipStrategy ? <small>{program.ipStrategy} strategy · {program.rivalInterestPercent}% rival interest</small> : null}
+              </div>
+            )}
+            {ui.feedback ? <div className="tech-campus-feedback" role="alert">{ui.feedback}</div> : null}
+          </article>
+        </div>
+      </section>
+    );
   };
 
   const renderCampus = () => (
@@ -354,24 +569,26 @@ export default function StreamingTechnologyCampus({
           sceneId="noc"
           className="tech-campus-scene"
           eyebrow="TECHNOLOGY CAMPUS"
-          title={activeProject ? `${activeProject.title} is under construction.` : 'Build the systems viewers never see—but always feel.'}
-          description="Capacity, quality, reliability, intelligence, security and content operations evolve through physical projects."
+          title={researchPortfolio.activeProgram ? `${researchPortfolio.activeProgram.title} is in ${researchPortfolio.activeProgram.stage.replaceAll('_', ' ').toLowerCase()}.` : activeProject ? `${activeProject.title} is under construction.` : 'Research the possibility. Install the real system.'}
+          description="Build the systems viewers never see—but always feel. Seven R&D disciplines feed canonical facilities, rack groups, platform products and future construction—with no free upgrades."
           status={{
             label: activeProject ? `${weeksRemaining} game weeks remaining` : `${campus.completedProjectCount} projects installed`,
             detail: `${campus.availableEngineeringStaff} engineering staff • ${campus.technicalDebt} technical debt`,
             tone: activeProject ? 'warning' : campus.technicalDebt >= 20 ? 'critical' : 'active',
           }}
           hotspots={[
-            { id: 'campus', label: 'Campus Map', status: 'Six facilities', x: 20, y: 43, tone: 'active', icon: <Network size={16} /> },
+            { id: 'research', label: 'Research Pipeline', status: researchPortfolio.activeProgram ? researchPortfolio.activeProgram.stage.replaceAll('_', ' ') : 'Available', x: 16, y: 43, tone: researchPortfolio.activeProgram ? 'warning' : 'active', icon: <FlaskConical size={16} /> },
+            { id: 'campus', label: 'Campus Map', status: 'Six facilities', x: 37, y: 31, tone: 'active', icon: <Network size={16} /> },
             { id: 'construction', label: 'Construction Bay', status: activeProject ? `${weeksRemaining} weeks left` : 'Available', x: 51, y: 29, tone: activeProject ? 'warning' : 'success', icon: <HardHat size={16} /> },
             { id: 'ledger', label: 'Engineering Ledger', status: `${campus.completedProjectCount} installed`, x: 81, y: 44, tone: 'neutral', icon: <CircuitBoard size={16} /> },
           ]}
-          onHotspotSelect={hotspot => dispatch(hotspot.id === 'campus' ? { type: 'OPEN_CAMPUS' } : hotspot.id === 'construction' ? { type: 'OPEN_CONSTRUCTION' } : { type: 'OPEN_LEDGER' })}
+          onHotspotSelect={hotspot => dispatch(hotspot.id === 'research' ? { type: 'OPEN_RESEARCH' } : hotspot.id === 'campus' ? { type: 'OPEN_CAMPUS' } : hotspot.id === 'construction' ? { type: 'OPEN_CONSTRUCTION' } : { type: 'OPEN_LEDGER' })}
         />
 
         <nav className="tech-campus-tabs" aria-label="Technology Campus sections">
+          <button type="button" className={ui.view === 'RESEARCH' ? 'is-active' : ''} onClick={() => dispatch({ type: 'OPEN_RESEARCH' })}><FlaskConical size={17} /><span>Research<small>Seven R&D disciplines</small></span></button>
           <button type="button" className={ui.view === 'CAMPUS' || ui.view === 'LAB' ? 'is-active' : ''} onClick={() => dispatch({ type: 'OPEN_CAMPUS' })}><CloudCog size={17} /><span>Campus Map<small>Six engineering facilities</small></span></button>
-          <button type="button" className={ui.view === 'CONSTRUCTION' ? 'is-active' : ''} onClick={() => dispatch({ type: 'OPEN_CONSTRUCTION' })}><HardHat size={17} /><span>Construction<small>{activeProject ? `${weeksRemaining} weeks remaining` : 'Bay available'}</small></span></button>
+          <button type="button" className={ui.view === 'CONSTRUCTION' ? 'is-active' : ''} onClick={() => dispatch({ type: 'OPEN_CONSTRUCTION' })}><HardHat size={17} /><span>Install & Operate<small>{activeProject ? `${weeksRemaining} weeks remaining` : 'Bay available'}</small></span></button>
           <button type="button" className={ui.view === 'LEDGER' ? 'is-active' : ''} onClick={() => dispatch({ type: 'OPEN_LEDGER' })}><CircuitBoard size={17} /><span>Engineering Ledger<small>{campus.completedProjectCount} installed</small></span></button>
         </nav>
 
@@ -383,7 +600,7 @@ export default function StreamingTechnologyCampus({
             <p>Complete the existing infrastructure build in game weeks. Technology Campus does not bypass construction readiness.</p>
             <button type="button" onClick={onOpenInfrastructure}>Open infrastructure control</button>
           </section>
-        ) : ui.view === 'CAMPUS' ? renderCampus() : ui.view === 'LAB' ? renderLab() : ui.view === 'CONSTRUCTION' ? renderConstruction() : renderLedger()}
+        ) : ui.view === 'RESEARCH' ? renderResearch() : ui.view === 'CAMPUS' ? renderCampus() : ui.view === 'LAB' ? renderLab() : ui.view === 'CONSTRUCTION' ? renderConstruction() : renderLedger()}
 
         {campus.available && !campus.ctoActive ? (
           <aside className="tech-campus-cto-note">

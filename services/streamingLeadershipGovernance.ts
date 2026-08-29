@@ -569,6 +569,9 @@ export const acceptStreamingCelebrityInvestment = (
     if (platform.governance.celebrityInvestors.some(item => item.candidateId === offerId)) {
         return { player, changed: false, reason: 'ALREADY_DECIDED' };
     }
+    if (!activeExecutives(platform).some(item => item.role === 'CFO')) {
+        return { player, changed: false, reason: 'CFO_REQUIRED' };
+    }
     if (platform.founderOwnershipPercent - offer.ownershipPercent < 51) {
         return { player, changed: false, reason: 'CONTROL_LIMIT' };
     }

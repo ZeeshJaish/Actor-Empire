@@ -14,6 +14,7 @@ import { CustomPosterImage } from '../../../../components/CustomPosterImage';
 import { getProjectFundingEconomics, getProjectMarketOutcomeRevenue, getStudioReturnPercent } from '../../../../services/projectFundingEconomics';
 import { resolveProjectType } from '../../../../services/businessLogic';
 import { getProjectAlumniStories } from '../../../../services/livingEnsemble';
+import { resolveStreamingPlatformBrandById } from '../../../../services/streamingPlatformBrandRegistry';
 
 const formatMoney = (val: number) => {
     if (val === 0) return '$0';
@@ -37,13 +38,27 @@ const PHASES = [
     { id: 'STREAMING', icon: <Tv size={14} /> }
 ];
 
-const PLATFORMS = [
-    { id: 'NETFLIX', name: 'Netflix', baseBid: 15000000, qualityReq: 75, color: '#E50914', maxBudget: 150000000 },
-    { id: 'APPLE_TV', name: 'Apple TV+', baseBid: 20000000, qualityReq: 85, color: '#FFFFFF', maxBudget: 200000000 },
-    { id: 'DISNEY_PLUS', name: 'Disney+', baseBid: 12000000, qualityReq: 70, color: '#113CCF', maxBudget: 120000000 },
-    { id: 'HULU', name: 'Hulu', baseBid: 8000000, qualityReq: 60, color: '#1CE783', maxBudget: 80000000 },
-    { id: 'YOUTUBE', name: 'YouTube Premium', baseBid: 3000000, qualityReq: 40, color: '#FF0000', maxBudget: 30000000 }
+const PLATFORM_ECONOMICS: Array<{
+    id: PlatformId;
+    baseBid: number;
+    qualityReq: number;
+    maxBudget: number;
+}> = [
+    { id: 'NETFLIX', baseBid: 15000000, qualityReq: 75, maxBudget: 150000000 },
+    { id: 'APPLE_TV', baseBid: 20000000, qualityReq: 85, maxBudget: 200000000 },
+    { id: 'DISNEY_PLUS', baseBid: 12000000, qualityReq: 70, maxBudget: 120000000 },
+    { id: 'HULU', baseBid: 8000000, qualityReq: 60, maxBudget: 80000000 },
+    { id: 'YOUTUBE', baseBid: 3000000, qualityReq: 40, maxBudget: 30000000 },
 ];
+
+const PLATFORMS = PLATFORM_ECONOMICS.map(economics => {
+    const brand = resolveStreamingPlatformBrandById(economics.id);
+    return {
+        ...economics,
+        name: brand.displayName,
+        color: brand.primaryColor,
+    };
+});
 
 const getSeriesScorecardTone = (rating: number) => {
     if (rating >= 9.2) return 'bg-emerald-400 text-emerald-950';

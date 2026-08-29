@@ -12,6 +12,7 @@ import {
     STREAMING_INFRASTRUCTURE_STRATEGIES,
 } from './streamingInfrastructure';
 import { resolveOwnedStreamingReach } from './streamingProgression';
+import { getStreamingLaunchProgramView } from './streamingLaunchProgram';
 
 export const STREAMING_HQ_SECTIONS: Array<{
     id: StreamingHqSection;
@@ -20,7 +21,7 @@ export const STREAMING_HQ_SECTIONS: Array<{
 }> = [
     { id: 'HOME', label: 'Home', title: 'Command Centre' },
     { id: 'CONTENT', label: 'Content', title: 'Content Room' },
-    { id: 'TECH', label: 'Tech', title: 'Technology Campus' },
+    { id: 'TECH', label: 'Platform', title: 'Platform Operations' },
     { id: 'MARKET', label: 'Market', title: 'Market Room' },
     { id: 'COMPANY', label: 'Company', title: 'Company Office' },
 ];
@@ -49,9 +50,9 @@ export const STREAMING_HQ_TOUR_STEPS: Array<{
     {
         section: 'TECH',
         kicker: 'TOUR 3 OF 5',
-        title: 'Capacity is a business decision.',
-        description: 'Servers, reliability, playback and product infrastructure will be configured here.',
-        focus: 'Your founding philosophy is visible now; real purchases arrive in Phase 5.',
+        title: 'Build the service viewers actually use.',
+        description: 'Product features, playback, technology, infrastructure and delivery reliability live in Platform.',
+        focus: 'Research creates capability; Platform turns it into a dependable viewer experience.',
     },
     {
         section: 'MARKET',
@@ -225,7 +226,8 @@ export const getStreamingHqSnapshot = (player: Player): StreamingHqSnapshot => {
         reachLabel: `Level ${reach.level} • ${reach.label}`,
         reachDescription: reach.description,
         reachLimitingFactors: reach.limitingFactors,
-        capitalModelLabel: founding?.incorporationModel === 'FIXED_V7'
+        capitalModelLabel: founding?.incorporationModel === 'FIXED_V8_ZERO_TREASURY'
+            || founding?.incorporationModel === 'FIXED_V7'
             ? 'Founder-owned incorporation'
             : 'Legacy incorporation record',
         currentCeoLabel: currentCeoAppointment?.nameAtAppointment || player.name,
@@ -368,3 +370,108 @@ export const replayStreamingHqTour = (player: Player): Player => updateHqOnboard
         completedAtAbsoluteWeek: null,
     }),
 );
+
+/* ============================================================================
+   THE DASHBOARD CARD
+   ----------------------------------------------------------------------------
+   The streaming platform had no presence at all on the main Empire dashboard.
+   It lived four taps deep behind Lifestyle, so a player could run out of money
+   inside a company they never saw on the screen they actually live on.
+
+   This derives the one-glance summary that surface needs. It is a projection of
+   canonical state — it creates no money, no subscribers and no outcomes — and
+   it deliberately answers only three questions: what is it, how is it doing,
+   and is there something I have to deal with.
+   ========================================================================== */
+
+export type StreamingDashboardTone = 'calm' | 'watch' | 'urgent';
+
+export interface StreamingDashboardCard {
+    /** false when the player has not incorporated; the card is not rendered */
+    owned: boolean;
+    platformName: string;
+    statusLabel: StreamingHqSnapshot['statusLabel'];
+    live: boolean;
+    treasuryCash: number;
+    /** null before launch, when a runway figure would be invented rather than measured */
+    runwayWeeks: number | null;
+    subscribers: number;
+    subscriberDelta: number;
+    /** pre-launch progress toward opening night */
+    readiness: { done: number; total: number } | null;
+    tone: StreamingDashboardTone;
+    /** the single thing worth saying, or null on a quiet week */
+    headline: string | null;
+    /** what tapping the card should be understood to do */
+    actionLabel: string;
+}
+
+/** Below this the company cannot absorb another bad quarter without raising. */
+const RUNWAY_URGENT_WEEKS = 12;
+const RUNWAY_WATCH_WEEKS = 26;
+
+export const getStreamingDashboardCard = (player: Player): StreamingDashboardCard => {
+    const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
+    const empty: StreamingDashboardCard = {
+        owned: false, platformName: '', statusLabel: 'PRE-LAUNCH', live: false,
+        treasuryCash: 0, runwayWeeks: null, subscribers: 0, subscriberDelta: 0,
+        readiness: null, tone: 'calm', headline: null, actionLabel: '',
+    };
+    if (!platform.identity || !platform.foundingProfile) return empty;
+
+    const snapshot = getStreamingHqSnapshot(player);
+    const live = Boolean(platform.launchCommit);
+    const launchProgram = live ? null : getStreamingLaunchProgramView(player);
+    const readiness = live
+        ? null
+        : { done: launchProgram!.completedCount, total: launchProgram!.totalCount };
+
+    /* Runway is only honest once the service is trading. Before launch there is
+       no revenue to divide into, so the number would be a guess wearing a
+       decimal point. */
+    const runwayWeeks = live && platform.metrics.cashRunwayWeeks > 0
+        ? Math.round(platform.metrics.cashRunwayWeeks)
+        : null;
+
+    let tone: StreamingDashboardTone = 'calm';
+    let headline: string | null = null;
+
+    if (live && runwayWeeks !== null && runwayWeeks <= RUNWAY_URGENT_WEEKS) {
+        tone = 'urgent';
+        headline = `${runwayWeeks} weeks of cash left. Raise or cut a cost line.`;
+    } else if (!live && launchProgram!.budget.shortfall > 0) {
+        tone = 'urgent';
+        headline = `The launch plan is $${launchProgram!.budget.shortfall.toLocaleString()} short. Adjust it or fund the company.`;
+    } else if (!live && platform.treasuryCash <= 0) {
+        tone = 'urgent';
+        headline = 'The company is ready to plan, but spending remains locked until it is funded.';
+    } else if (!live && launchProgram!.recommendedNextAction) {
+        tone = 'watch';
+        headline = launchProgram!.recommendedNextAction!.description;
+    } else if (live && runwayWeeks !== null && runwayWeeks <= RUNWAY_WATCH_WEEKS) {
+        tone = 'watch';
+        headline = `${runwayWeeks} weeks of runway at this burn.`;
+    } else if (!live && readiness && readiness.done >= readiness.total && readiness.total > 0) {
+        tone = 'watch';
+        headline = 'Every gate is clear. Opening night is waiting on you.';
+    }
+
+    return {
+        owned: true,
+        platformName: platform.identity.name || snapshot.platformName,
+        statusLabel: snapshot.statusLabel,
+        live,
+        treasuryCash: platform.treasuryCash,
+        runwayWeeks,
+        subscribers: platform.metrics.subscribers,
+        subscriberDelta: platform.metrics.netSubscriberMovement,
+        readiness,
+        tone,
+        headline,
+        actionLabel: live
+            ? 'Open the platform'
+            : launchProgram?.recommendedNextAction
+                ? `Continue: ${launchProgram.recommendedNextAction.label}`
+                : 'Open launch command',
+    };
+};

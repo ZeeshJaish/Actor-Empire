@@ -7,6 +7,7 @@ import {
     type StreamingDayOneMarket,
     type StreamingDayOneRegionId,
 } from './streamingDayOneMarkets';
+import { resolveStreamingPlatformBrandById } from './streamingPlatformBrandRegistry';
 
 export type StreamingAudiencePlatformId = PlatformId | 'AMAZON_PRIME' | 'REGIONAL' | 'PLAYER';
 export type StreamingAudiencePersonaId =
@@ -134,9 +135,9 @@ const round1 = (value: number): number => Math.round(value * 10) / 10;
 const sum = (values: number[]): number => values.reduce((total, value) => total + value, 0);
 
 const PLATFORM_META: Record<StreamingAudiencePlatformId, {
-    name: string;
     shortName: string;
-    color: string;
+    fallbackName?: string;
+    fallbackColor?: string;
     catalog: number;
     value: number;
     technology: number;
@@ -145,14 +146,35 @@ const PLATFORM_META: Record<StreamingAudiencePlatformId, {
     audienceReason: string;
     weakSpot: string;
 }> = {
-    NETFLIX: { name: 'Netflix', shortName: 'NETFLIX', color: '#e50914', catalog: 94, value: 78, technology: 88, local: 84, strengthLine: 'Scale, constant discovery and a deep global catalogue.', audienceReason: 'There is nearly always something familiar or newly talked about.', weakSpot: 'Price pressure and hit-to-hit fatigue can make casual homes rotate out.' },
-    DISNEY_PLUS: { name: 'Disney+', shortName: 'DISNEY+', color: '#4f7cff', catalog: 87, value: 76, technology: 82, local: 58, strengthLine: 'Franchises and family loyalty create a powerful household moat.', audienceReason: 'Families keep it for trusted brands, children and event franchises.', weakSpot: 'A narrower adult catalogue can leave gaps between major releases.' },
-    AMAZON_PRIME: { name: 'Prime Video', shortName: 'PRIME', color: '#00a8e1', catalog: 85, value: 96, technology: 87, local: 75, strengthLine: 'Bundle value keeps it inside households even between premieres.', audienceReason: 'Viewers see the service as part of a wider membership, not one bill.', weakSpot: 'A busy storefront can weaken discovery and premium identity.' },
-    APPLE_TV: { name: 'Apple TV+', shortName: 'APPLE TV+', color: '#d9dde7', catalog: 62, value: 72, technology: 96, local: 45, strengthLine: 'Premium technology and prestige originals punch above catalogue size.', audienceReason: 'Quality-focused viewers trust the polish and selective original slate.', weakSpot: 'A smaller library creates easy cancellation windows.' },
-    HULU: { name: 'Hulu', shortName: 'HULU', color: '#1ce783', catalog: 77, value: 73, technology: 72, local: 40, strengthLine: 'Fast curation and television habit keep mature markets engaged.', audienceReason: 'Recent television and familiar comfort viewing make it habitual.', weakSpot: 'Its global footprint is far weaker than the largest services.' },
-    YOUTUBE: { name: 'YouTube', shortName: 'YOUTUBE', color: '#ff3b30', catalog: 68, value: 98, technology: 95, local: 96, strengthLine: 'Free reach, creators and live culture dominate daily attention.', audienceReason: 'It is free, personal, local and already part of everyday viewing.', weakSpot: 'Long-form premium identity and paid conversion remain inconsistent.' },
-    REGIONAL: { name: 'Local & regional', shortName: 'LOCAL', color: '#ffb020', catalog: 74, value: 84, technology: 62, local: 100, strengthLine: 'Language, broadcasters and local stars protect regional loyalty.', audienceReason: 'Local news, sport, drama and language feel made for the viewer.', weakSpot: 'Technology, capital and international catalogue depth vary widely.' },
-    PLAYER: { name: 'Your platform', shortName: 'YOU', color: '#8b5cf6', catalog: 20, value: 65, technology: 50, local: 35, strengthLine: 'Your promise, releases and operations decide what this becomes.', audienceReason: 'Early viewers are following the launch promise and opening slate.', weakSpot: 'A young service must prove it has a next watch after the first hit.' },
+    NETFLIX: { shortName: 'NETFLIX', catalog: 94, value: 78, technology: 88, local: 84, strengthLine: 'Scale, constant discovery and a deep global catalogue.', audienceReason: 'There is nearly always something familiar or newly talked about.', weakSpot: 'Price pressure and hit-to-hit fatigue can make casual homes rotate out.' },
+    DISNEY_PLUS: { shortName: 'DISNEY+', catalog: 87, value: 76, technology: 82, local: 58, strengthLine: 'Franchises and family loyalty create a powerful household moat.', audienceReason: 'Families keep it for trusted brands, children and event franchises.', weakSpot: 'A narrower adult catalogue can leave gaps between major releases.' },
+    AMAZON_PRIME: { shortName: 'PRIME', catalog: 85, value: 96, technology: 87, local: 75, strengthLine: 'Bundle value keeps it inside households even between premieres.', audienceReason: 'Viewers see the service as part of a wider membership, not one bill.', weakSpot: 'A busy storefront can weaken discovery and premium identity.' },
+    APPLE_TV: { shortName: 'APPLE TV+', catalog: 62, value: 72, technology: 96, local: 45, strengthLine: 'Premium technology and prestige originals punch above catalogue size.', audienceReason: 'Quality-focused viewers trust the polish and selective original slate.', weakSpot: 'A smaller library creates easy cancellation windows.' },
+    HULU: { shortName: 'HULU', catalog: 77, value: 73, technology: 72, local: 40, strengthLine: 'Fast curation and television habit keep mature markets engaged.', audienceReason: 'Recent television and familiar comfort viewing make it habitual.', weakSpot: 'Its global footprint is far weaker than the largest services.' },
+    YOUTUBE: { shortName: 'YOUTUBE', catalog: 68, value: 98, technology: 95, local: 96, strengthLine: 'Free reach, creators and live culture dominate daily attention.', audienceReason: 'It is free, personal, local and already part of everyday viewing.', weakSpot: 'Long-form premium identity and paid conversion remain inconsistent.' },
+    REGIONAL: { fallbackName: 'Local & regional', fallbackColor: '#FFB020', shortName: 'LOCAL', catalog: 74, value: 84, technology: 62, local: 100, strengthLine: 'Language, broadcasters and local stars protect regional loyalty.', audienceReason: 'Local news, sport, drama and language feel made for the viewer.', weakSpot: 'Technology, capital and international catalogue depth vary widely.' },
+    PLAYER: { fallbackName: 'Your platform', fallbackColor: '#8B5CF6', shortName: 'YOU', catalog: 20, value: 65, technology: 50, local: 35, strengthLine: 'Your promise, releases and operations decide what this becomes.', audienceReason: 'Early viewers are following the launch promise and opening slate.', weakSpot: 'A young service must prove it has a next watch after the first hit.' },
+};
+
+interface AudiencePlatformPresentation {
+    name: string;
+    color: string;
+}
+
+const getAudiencePlatformPresentation = (
+    id: StreamingAudiencePlatformId,
+    playerPresentation?: AudiencePlatformPresentation,
+): AudiencePlatformPresentation => {
+    if (id === 'PLAYER' && playerPresentation) return playerPresentation;
+    const meta = PLATFORM_META[id];
+    if (id === 'PLAYER' || id === 'REGIONAL') {
+        return {
+            name: meta.fallbackName || 'Streaming platform',
+            color: meta.fallbackColor || '#858B96',
+        };
+    }
+    const brand = resolveStreamingPlatformBrandById(id);
+    return { name: brand.displayName, color: brand.primaryColor };
 };
 
 const REGION_ADOPTION: Record<StreamingDayOneRegionId, number> = {
@@ -200,21 +222,27 @@ const getCountryShares = (
     market: StreamingDayOneMarket,
     selectedForLaunch: boolean,
     playerSubscribers: number,
+    playerPresentation: AudiencePlatformPresentation,
 ): StreamingAudienceShareEntry[] => {
     const playerShare = selectedForLaunch
         ? clamp(0.35 + Math.log10(Math.max(1, playerSubscribers + 1)) * 0.28, 0.35, 8.5)
         : 0;
-    const known = market.rivals.map(rival => ({
-        id: rival.id as StreamingAudiencePlatformId,
-        name: PLATFORM_META[rival.id as StreamingAudiencePlatformId].name,
-        color: PLATFORM_META[rival.id as StreamingAudiencePlatformId].color,
-        sharePercent: rival.watchSharePercent,
-    }));
+    const known = market.rivals.map(rival => {
+        const id = rival.id as StreamingAudiencePlatformId;
+        const presentation = getAudiencePlatformPresentation(id);
+        return {
+            id,
+            name: presentation.name,
+            color: presentation.color,
+            sharePercent: rival.watchSharePercent,
+        };
+    });
     const residual = Math.max(8, 100 - sum(known.map(item => item.sharePercent)) - playerShare);
+    const regional = getAudiencePlatformPresentation('REGIONAL');
     return normaliseShares([
         ...known,
-        { id: 'REGIONAL', name: PLATFORM_META.REGIONAL.name, color: PLATFORM_META.REGIONAL.color, sharePercent: residual },
-        ...(playerShare > 0 ? [{ id: 'PLAYER' as const, name: PLATFORM_META.PLAYER.name, color: PLATFORM_META.PLAYER.color, sharePercent: playerShare }] : []),
+        { id: 'REGIONAL', name: regional.name, color: regional.color, sharePercent: residual },
+        ...(playerShare > 0 ? [{ id: 'PLAYER' as const, name: playerPresentation.name, color: playerPresentation.color, sharePercent: playerShare }] : []),
     ]);
 };
 
@@ -223,6 +251,7 @@ const buildCountry = (
     selectedMarketIds: Set<string>,
     playerSubscribers: number,
     weeksSinceFounding: number,
+    playerPresentation: AudiencePlatformPresentation,
 ): StreamingAudienceCountryView => {
     const selectedForLaunch = selectedMarketIds.has(market.id);
     const adoption = clamp(
@@ -235,7 +264,7 @@ const buildCountry = (
     const estimatedPopulation = round(market.streamingAudience / (adoption / 100));
     const subscriptionsPerHousehold = round1(clamp(1.38 + adoption / 100 * 0.9 + (market.competition === 'FIERCE' ? 0.18 : 0), 1.3, 2.55));
     const payingHouseholds = round(market.streamingAudience / (1.88 + adoption / 100 * 0.35));
-    const watchShare = getCountryShares(market, selectedForLaunch, playerSubscribers);
+    const watchShare = getCountryShares(market, selectedForLaunch, playerSubscribers, playerPresentation);
     const top = watchShare[0];
     const playerShare = watchShare.find(item => item.id === 'PLAYER')?.sharePercent || 0;
     const baseChurn = market.competition === 'FIERCE' ? 2.9 : market.competition === 'BUSY' ? 2.4 : 1.9;
@@ -315,12 +344,12 @@ const buildGlobalTrend = (
 
 const buildPersonas = (activeViewers: number): StreamingAudiencePersonaView[] => {
     const definitions: Array<Omit<StreamingAudiencePersonaView, 'activeViewers'>> = [
-        { id: 'FAMILY_HOUSEHOLDS', name: 'Family households', sharePercent: 23, weeklyHours: 14.8, subscriptionsPerHousehold: 2.3, switchSensitivity: 'MEDIUM', color: '#4f7cff', need: 'Safe profiles, familiar brands and something for every age.', leavesWhen: 'The children outgrow the catalogue or price rises without new family hits.', bestFitPlatform: 'Disney+' },
-        { id: 'VALUE_SEEKERS', name: 'Value seekers', sharePercent: 19, weeklyHours: 10.4, subscriptionsPerHousehold: 1.5, switchSensitivity: 'HIGH', color: '#00a8e1', need: 'A clear price, bundle value and enough popular entertainment.', leavesWhen: 'A rival bundle is cheaper or the service goes quiet for a month.', bestFitPlatform: 'Prime Video' },
+        { id: 'FAMILY_HOUSEHOLDS', name: 'Family households', sharePercent: 23, weeklyHours: 14.8, subscriptionsPerHousehold: 2.3, switchSensitivity: 'MEDIUM', color: resolveStreamingPlatformBrandById('DISNEY_PLUS').primaryColor, need: 'Safe profiles, familiar brands and something for every age.', leavesWhen: 'The children outgrow the catalogue or price rises without new family hits.', bestFitPlatform: 'Disney+' },
+        { id: 'VALUE_SEEKERS', name: 'Value seekers', sharePercent: 19, weeklyHours: 10.4, subscriptionsPerHousehold: 1.5, switchSensitivity: 'HIGH', color: resolveStreamingPlatformBrandById('AMAZON_PRIME').primaryColor, need: 'A clear price, bundle value and enough popular entertainment.', leavesWhen: 'A rival bundle is cheaper or the service goes quiet for a month.', bestFitPlatform: 'Prime Video' },
         { id: 'FANDOM_LOYALISTS', name: 'Fandom loyalists', sharePercent: 16, weeklyHours: 17.1, subscriptionsPerHousehold: 2.1, switchSensitivity: 'LOW', color: '#ff4d7d', need: 'Universes, weekly conversation and a reason to stay between chapters.', leavesWhen: 'A franchise stalls or loses the characters they follow.', bestFitPlatform: 'Disney+' },
-        { id: 'PRESTIGE_EXPLORERS', name: 'Prestige explorers', sharePercent: 12, weeklyHours: 8.8, subscriptionsPerHousehold: 2.4, switchSensitivity: 'HIGH', color: '#d9dde7', need: 'Acclaimed originals, bold creators and a premium experience.', leavesWhen: 'They finish the one title they joined for.', bestFitPlatform: 'Apple TV+' },
+        { id: 'PRESTIGE_EXPLORERS', name: 'Prestige explorers', sharePercent: 12, weeklyHours: 8.8, subscriptionsPerHousehold: 2.4, switchSensitivity: 'HIGH', color: resolveStreamingPlatformBrandById('APPLE_TV').primaryColor, need: 'Acclaimed originals, bold creators and a premium experience.', leavesWhen: 'They finish the one title they joined for.', bestFitPlatform: 'Apple TV+' },
         { id: 'LOCAL_FIRST', name: 'Local-first viewers', sharePercent: 17, weeklyHours: 13.6, subscriptionsPerHousehold: 1.7, switchSensitivity: 'MEDIUM', color: '#ffb020', need: 'Their language, local stars, sport and culturally precise discovery.', leavesWhen: 'The home page feels imported or localization is careless.', bestFitPlatform: 'Local & regional' },
-        { id: 'HABIT_STREAMERS', name: 'Habit streamers', sharePercent: 13, weeklyHours: 21.2, subscriptionsPerHousehold: 2.7, switchSensitivity: 'LOW', color: '#e50914', need: 'A constant next watch and recommendations that reduce effort.', leavesWhen: 'Discovery becomes repetitive or playback trust breaks.', bestFitPlatform: 'Netflix' },
+        { id: 'HABIT_STREAMERS', name: 'Habit streamers', sharePercent: 13, weeklyHours: 21.2, subscriptionsPerHousehold: 2.7, switchSensitivity: 'LOW', color: resolveStreamingPlatformBrandById('NETFLIX').primaryColor, need: 'A constant next watch and recommendations that reduce effort.', leavesWhen: 'Discovery becomes repetitive or playback trust breaks.', bestFitPlatform: 'Netflix' },
     ];
     return definitions.map(item => ({ ...item, activeViewers: round(activeViewers * item.sharePercent / 100) }));
 };
@@ -337,6 +366,10 @@ const buildPlatformViews = (
     const worldSubscribers = player.world.platforms;
     return platformIds.map(id => {
         const meta = PLATFORM_META[id];
+        const presentation = getAudiencePlatformPresentation(id, {
+            name: platform.identity?.name || PLATFORM_META.PLAYER.fallbackName || 'Your platform',
+            color: platform.identity?.primaryColor || PLATFORM_META.PLAYER.fallbackColor || '#8B5CF6',
+        });
         const rival = getRivalProfile(rivals, id);
         const world = id === 'AMAZON_PRIME' || id === 'REGIONAL' || id === 'PLAYER'
             ? null
@@ -360,9 +393,9 @@ const buildPlatformViews = (
             : id === 'PLAYER' && platform.metrics.netSubscriberMovement > 0 ? 'RISING' as const : 'STEADY' as const;
         return {
             id,
-            name: id === 'PLAYER' ? platform.identity?.name || meta.name : meta.name,
+            name: presentation.name,
             shortName: id === 'PLAYER' ? 'YOU' : meta.shortName,
-            color: id === 'PLAYER' ? platform.identity?.primaryColor || meta.color : meta.color,
+            color: presentation.color,
             subscribers,
             watchSharePercent: share,
             householdReachPercent: round1(clamp(subscribers / Math.max(1, payingHouseholds) * 100, 0, 100)),
@@ -385,11 +418,16 @@ export const getStreamingAudienceMarket = (player: Player): StreamingAudienceMar
     const foundedAt = platform.identity?.foundedAtAbsoluteWeek ?? absoluteWeek;
     const weeksSinceFounding = Math.max(0, absoluteWeek - foundedAt);
     const selectedMarketIds = new Set(platform.identity?.dayOneMarketIds || platform.foundingDraft?.dayOneMarketIds || []);
+    const playerPresentation = getAudiencePlatformPresentation('PLAYER', {
+        name: platform.identity?.name || PLATFORM_META.PLAYER.fallbackName || 'Your platform',
+        color: platform.identity?.primaryColor || PLATFORM_META.PLAYER.fallbackColor || '#8B5CF6',
+    });
     const countries = STREAMING_DAY_ONE_MARKETS.map(market => buildCountry(
         market,
         selectedMarketIds,
         platform.metrics.subscribers,
         weeksSinceFounding,
+        playerPresentation,
     ));
     const population = round(8_120_000_000 * Math.pow(1.0085, weeksSinceFounding / 52));
     const adoption = round1(clamp(48.6 + weeksSinceFounding / 52 * 1.65, 35, 78));
@@ -444,4 +482,3 @@ export const getStreamingAudienceMarket = (player: Player): StreamingAudienceMar
         },
     };
 };
-

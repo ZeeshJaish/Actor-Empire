@@ -127,7 +127,7 @@ const GrainAndVignette: React.FC = () => (
 );
 
 const StudioLetters: React.FC = () => {
-  const letters = 'EMPIRE STUDIOZ'.split('');
+  const letters = 'ZEDBURY STUDIOS'.split('');
   return (
     <div className="mt-11 flex gap-[0.38em] text-[13px] font-black uppercase text-[#e8b64c]">
       {letters.map((letter, index) => (
@@ -155,7 +155,7 @@ export const EmpireStudioBumper: React.FC = () => (
         style={{ animation: 'aeIntroMarkIn 1.1s cubic-bezier(.16,1,.3,1) .15s forwards' }}
       >
         <div className="ae-intro-motion absolute inset-[-34px] -z-10 rounded-full bg-[radial-gradient(circle,rgba(232,182,76,0.20),transparent_66%)]" style={{ animation: 'aeIntroHalo 3.2s ease-in-out infinite' }} />
-        <img src={ACTOR_EMPIRE_INTRO_LOGO} alt="Empire Studioz" className="h-full w-full rounded-[26px] object-cover" />
+        <img src={ACTOR_EMPIRE_INTRO_LOGO} alt="Zedbury Studios" className="h-full w-full rounded-[26px] object-cover" />
       </div>
       <StudioLetters />
       <div className="ae-intro-motion mt-3.5 flex translate-y-[18px] items-center gap-5 opacity-0" style={{ animation: 'aeIntroRiseIn .9s cubic-bezier(.16,1,.3,1) 1.05s forwards' }}>

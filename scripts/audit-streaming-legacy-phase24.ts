@@ -154,10 +154,10 @@ const createFixture = (): Player => {
     };
 };
 
-assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 22, 'Phase 24 should own streaming schema v22.');
+assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 23, 'The canonical foundation should own streaming schema v23.');
 const migrated = normalizeOwnedStreamingPlatformState({ schemaVersion: 21 }, 'phase24-migration');
 assert(
-    migrated.schemaVersion === 22
+    migrated.schemaVersion === 23
     && migrated.legacy.currentEraNumber === 1
     && migrated.legacy.founderOfficeRole === 'FOUNDER_CEO'
     && migrated.legacy.closedEras.length === 0,

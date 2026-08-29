@@ -9,10 +9,13 @@ import type {
     OwnedStreamingRegionalLaunch,
     OwnedStreamingRivalMove,
     OwnedStreamingRivalProfile,
+    OwnedStreamingRivalWeeklySnapshot,
     PlatformId,
     Player,
     StreamingAwardCategoryId,
     StreamingRegionId,
+    StreamingTechnologyBranch,
+    StreamingWarBattlefront,
     StreamingRegionalLaunchApproach,
     StreamingRivalMoveType,
     StreamingRivalResponseId,
@@ -25,6 +28,8 @@ import {
     normalizeOwnedStreamingPlatformState,
 } from './ownedStreamingPlatform';
 import { resolveOwnedStreamingReach } from './streamingProgression';
+import { getStreamingCountryMarketProfile } from './streamingDayOneMarkets';
+import { isStreamingLicenseActiveAt } from './streamingRightsCore';
 
 const clamp = (value: number, minimum: number, maximum: number): number => (
     Math.min(maximum, Math.max(minimum, Number.isFinite(value) ? value : minimum))
@@ -174,52 +179,204 @@ export const STREAMING_REGION_DEFINITIONS: StreamingRegionDefinition[] = [
     { id: 'MIDDLE_EAST_AFRICA', name: 'Middle East & Africa', code: 'MEA', mapX: 55, mapY: 66, capitalCost: 48_000_000, weeklyOperatingCost: 1_600_000, developmentWeeks: 7, addressableAudienceMillions: 135, acquisitionRateDelta: 0.0043, peakLoadPercent: 11, requiredReachLevel: 3, contentOperationsRequired: 18, securityRequired: 16, culturalNote: 'Fast-growing connected audiences reward local trust and flexible delivery.' },
 ];
 
+const STREAMING_RIVAL_MOVE_COST_MILLIONS_V1: Readonly<Record<StreamingRivalMoveType, number>> = Object.freeze({
+    COUNTER_PROGRAM: 38,
+    RIGHTS_OVERBID: 52,
+    EXECUTIVE_POACH: 18,
+    PRICE_CUT: 64,
+    BUNDLE_LAUNCH: 46,
+    RESCUE_CANCELLED_SHOW: 34,
+    ALLIANCE_SIGNAL: 28,
+    REGIONAL_ORIGINAL: 44,
+    MARKETING_BLITZ: 31,
+    TECH_COPY: 58,
+    SABOTAGE_ATTEMPT: 26,
+    OUTAGE_EXPLOITATION: 22,
+    REGION_EXPANSION: 67,
+    REGION_WITHDRAWAL: 4,
+});
+
+export const STREAMING_RIVAL_MOVE_COST_VERSION = 1 as const;
+export const STREAMING_RIVAL_MOVE_COSTS_BY_VERSION: Readonly<Record<number, Readonly<Record<StreamingRivalMoveType, number>>>> = Object.freeze({
+    1: STREAMING_RIVAL_MOVE_COST_MILLIONS_V1,
+});
+export const STREAMING_RIVAL_MOVE_COST_MILLIONS = STREAMING_RIVAL_MOVE_COST_MILLIONS_V1;
+
+export const getStreamingRivalMoveCostMillions = (
+    type: StreamingRivalMoveType,
+): number => STREAMING_RIVAL_MOVE_COST_MILLIONS[type];
+
+export const getStreamingRivalMoveCostMillionsForVersion = (
+    type: StreamingRivalMoveType,
+    pricingVersion: number,
+): number | null => STREAMING_RIVAL_MOVE_COSTS_BY_VERSION[pricingVersion]?.[type] ?? null;
+
 const MOVE_DEFINITIONS: Record<StreamingRivalMoveType, {
     title: (rival: OwnedStreamingRivalProfile, target: string | null) => string;
     detail: string;
-    cashCostMillions: number;
     acquisitionRateDelta: number;
     churnRateDelta: number;
     prestigeDelta: number;
     cooldownWeeks: number;
+    battlefront: StreamingWarBattlefront;
+    playerImpact: string;
 }> = {
-    COUNTER_PROGRAM: { title: rival => `${rival.platformName} schedules a collision`, detail: 'A rival premiere is landing against the strongest visible programming window.', cashCostMillions: 38, acquisitionRateDelta: -0.003, churnRateDelta: 0.001, prestigeDelta: 0, cooldownWeeks: 7 },
-    RIGHTS_OVERBID: { title: rival => `${rival.platformName} raises the rights table`, detail: 'The rival spent into the same content lane, increasing scarcity and audience noise.', cashCostMillions: 52, acquisitionRateDelta: -0.002, churnRateDelta: 0.0007, prestigeDelta: -1, cooldownWeeks: 8 },
-    EXECUTIVE_POACH: { title: (rival, target) => `${rival.ceoName} calls ${target || 'your leadership team'}`, detail: 'A real executive received an outside mandate. Loyalty and the founder relationship now matter.', cashCostMillions: 18, acquisitionRateDelta: 0, churnRateDelta: 0, prestigeDelta: -1, cooldownWeeks: 10 },
-    PRICE_CUT: { title: rival => `${rival.platformName} cuts the opening price`, detail: 'A resource-backed price move is pressuring acquisition and value perception for four weeks.', cashCostMillions: 64, acquisitionRateDelta: -0.004, churnRateDelta: 0.0012, prestigeDelta: 0, cooldownWeeks: 12 },
-    BUNDLE_LAUNCH: { title: rival => `${rival.platformName} launches a bundle`, detail: 'The rival is using ecosystem strength to reduce churn and crowd the household decision.', cashCostMillions: 46, acquisitionRateDelta: -0.0032, churnRateDelta: 0.0008, prestigeDelta: 1, cooldownWeeks: 10 },
-    RESCUE_CANCELLED_SHOW: { title: rival => `${rival.platformName} rescues a cancelled show`, detail: 'A discarded audience promise has become a rival retention story instead.', cashCostMillions: 34, acquisitionRateDelta: -0.0015, churnRateDelta: 0.0014, prestigeDelta: -2, cooldownWeeks: 9 },
-    ALLIANCE_SIGNAL: { title: rival => `${rival.ceoName} forms a distribution alliance`, detail: 'The rival traded independence for broader reach and a stronger regional position.', cashCostMillions: 28, acquisitionRateDelta: -0.0022, churnRateDelta: 0.0005, prestigeDelta: 1, cooldownWeeks: 8 },
+    COUNTER_PROGRAM: { title: rival => `${rival.platformName} schedules a collision`, detail: 'A rival premiere is landing against the strongest visible programming window.', acquisitionRateDelta: -0.003, churnRateDelta: 0.001, prestigeDelta: 0, cooldownWeeks: 7, battlefront: 'CONTENT', playerImpact: 'Discovery is split during your strongest release window.' },
+    RIGHTS_OVERBID: { title: rival => `${rival.platformName} raises the rights table`, detail: 'The rival spent into the same content lane, increasing scarcity and audience noise.', acquisitionRateDelta: -0.002, churnRateDelta: 0.0007, prestigeDelta: -1, cooldownWeeks: 8, battlefront: 'RIGHTS', playerImpact: 'Comparable rights become more expensive and harder to close.' },
+    EXECUTIVE_POACH: { title: (rival, target) => `${rival.ceoName} calls ${target || 'your leadership team'}`, detail: 'A real executive received an outside mandate. Loyalty and the founder relationship now matter.', acquisitionRateDelta: 0, churnRateDelta: 0, prestigeDelta: -1, cooldownWeeks: 10, battlefront: 'TALENT', playerImpact: 'An important company seat may leave if the offer is ignored.' },
+    PRICE_CUT: { title: rival => `${rival.platformName} cuts its entry price`, detail: 'A funded price move is testing whether households see enough value in both subscriptions.', acquisitionRateDelta: -0.004, churnRateDelta: 0.0012, prestigeDelta: 0, cooldownWeeks: 12, battlefront: 'PRICE', playerImpact: 'Value-sensitive households hesitate or switch for four weeks.' },
+    BUNDLE_LAUNCH: { title: rival => `${rival.platformName} signs a telecom bundle`, detail: 'The rival is using ecosystem reach and a carrier partner to enter more household bills.', acquisitionRateDelta: -0.0032, churnRateDelta: 0.0008, prestigeDelta: 1, cooldownWeeks: 10, battlefront: 'DISTRIBUTION', playerImpact: 'The rival becomes easier to buy and harder to cancel.' },
+    RESCUE_CANCELLED_SHOW: { title: rival => `${rival.platformName} rescues a cancelled show`, detail: 'A discarded audience promise has become a rival retention story instead.', acquisitionRateDelta: -0.0015, churnRateDelta: 0.0014, prestigeDelta: -2, cooldownWeeks: 9, battlefront: 'CONTENT', playerImpact: 'A vocal fandom now treats the rival as its new home.' },
+    ALLIANCE_SIGNAL: { title: rival => `${rival.ceoName} forms a distribution alliance`, detail: 'The rival traded independence for broader reach and a stronger regional position.', acquisitionRateDelta: -0.0022, churnRateDelta: 0.0005, prestigeDelta: 1, cooldownWeeks: 8, battlefront: 'DISTRIBUTION', playerImpact: 'Local access improves while your acquisition costs rise.' },
+    REGIONAL_ORIGINAL: { title: rival => `${rival.platformName} orders a regional Original`, detail: 'A local-language commission is built around a market where audience loyalty is still movable.', acquisitionRateDelta: -0.0026, churnRateDelta: 0.001, prestigeDelta: -1, cooldownWeeks: 9, battlefront: 'CONTENT', playerImpact: 'Local viewers gain a culturally specific reason to choose the rival.' },
+    MARKETING_BLITZ: { title: rival => `${rival.platformName} floods the launch window`, detail: 'Trailers, outdoor media, creators and home-screen placements are converging on one message.', acquisitionRateDelta: -0.0028, churnRateDelta: 0.0004, prestigeDelta: 0, cooldownWeeks: 6, battlefront: 'MARKETING', playerImpact: 'Your titles lose attention unless the campaign is answered.' },
+    TECH_COPY: { title: rival => `${rival.platformName} reverse-engineers your advantage`, detail: 'A rival engineering group is attempting a legal fast-follow of a visible product capability.', acquisitionRateDelta: -0.0012, churnRateDelta: 0.0006, prestigeDelta: -1, cooldownWeeks: 14, battlefront: 'TECHNOLOGY', playerImpact: 'An exclusive technology advantage may stop differentiating the platform.' },
+    SABOTAGE_ATTEMPT: { title: rival => `A proxy campaign targets ${rival.platformName}'s challenger`, detail: 'A suspicious outside operation is probing confidence around your launch. Attribution is uncertain; the operational risk is real.', acquisitionRateDelta: -0.0015, churnRateDelta: 0.0017, prestigeDelta: -2, cooldownWeeks: 16, battlefront: 'OPERATIONS', playerImpact: 'Trust and service confidence weaken if security is not visibly defended.' },
+    OUTAGE_EXPLOITATION: { title: rival => `${rival.platformName} turns your outage into an advert`, detail: 'The rival is promising dependable viewing while your reliability story is vulnerable.', acquisitionRateDelta: -0.0024, churnRateDelta: 0.0018, prestigeDelta: -2, cooldownWeeks: 7, battlefront: 'OPERATIONS', playerImpact: 'Reputation damage now converts directly into switching pressure.' },
+    REGION_EXPANSION: { title: rival => `${rival.platformName} enters a new market`, detail: 'Local distribution, compliance and programming are being funded in a region you also need.', acquisitionRateDelta: -0.002, churnRateDelta: 0.0007, prestigeDelta: 0, cooldownWeeks: 12, battlefront: 'TERRITORY', playerImpact: 'The regional audience becomes more contested before your next expansion.' },
+    REGION_WITHDRAWAL: { title: rival => `${rival.platformName} retreats from a market`, detail: 'Weak economics forced a rival withdrawal. Its audience is now available, but confidence in the region has fallen.', acquisitionRateDelta: 0.0012, churnRateDelta: -0.0004, prestigeDelta: 1, cooldownWeeks: 8, battlefront: 'TERRITORY', playerImpact: 'A rare opening appears, with a warning about local economics.' },
 };
 
-const getWorldPlatform = (player: Player, platformId: PlatformId) => player.world.platforms?.[platformId];
+const DEFAULT_RIVAL_PRICES: Record<PlatformId, number> = {
+    NETFLIX: 17.99,
+    APPLE_TV: 9.99,
+    DISNEY_PLUS: 15.99,
+    HULU: 11.99,
+    YOUTUBE: 13.99,
+};
+
+const TECHNOLOGY_BRANCHES: StreamingTechnologyBranch[] = [
+    'DELIVERY_CAPACITY',
+    'PLAYBACK_QUALITY',
+    'RELIABILITY',
+    'DATA_RECOMMENDATIONS',
+    'SECURITY',
+    'CONTENT_OPERATIONS',
+    'ADVERTISING_COMMERCE',
+    'PRODUCT_EXPERIENCE',
+];
+
+const canonicalRegionForCountry = (countryId: string): StreamingRegionId | null => {
+    const regionId = getStreamingCountryMarketProfile(countryId)?.regionId;
+    if (regionId === 'NORTH_AMERICA') return 'NORTH_AMERICA';
+    if (regionId === 'SOUTH_AMERICA') return 'LATIN_AMERICA';
+    if (regionId === 'EUROPE') return 'EUROPE';
+    if (regionId === 'AFRICA') return 'MIDDLE_EAST_AFRICA';
+    if (regionId === 'ASIA') return countryId === 'IN' ? 'SOUTH_ASIA' : 'EAST_ASIA';
+    if (regionId === 'OCEANIA') return 'EAST_ASIA';
+    return null;
+};
+
+const canonicalTechnology = (player: Player, platformId: PlatformId): number => {
+    const ai = player.world.platforms?.[platformId]?.ai;
+    if (!ai) return STREAMING_RIVAL_TEMPLATES[platformId].technology;
+    const levels = Object.values(ai.capabilities.technologyLevels);
+    const averageLevel = levels.length ? levels.reduce((sum, value) => sum + value, 0) / levels.length : 0;
+    return Math.round(clamp(ai.competence.technology * 7 + averageLevel * 0.4, 0, 100));
+};
+
+const canonicalCataloguePower = (
+    player: Player,
+    platformId: PlatformId,
+    observedAbsoluteWeek: number,
+): number => {
+    const ai = player.world.platforms?.[platformId]?.ai;
+    if (!ai) return STREAMING_RIVAL_TEMPLATES[platformId].catalogPower;
+    const projectsById = new Map(player.world.projects.map(project => [project.id, project]));
+    const validWindowIds = new Set<string>();
+    for (const plan of ai.slate) {
+        for (const entry of plan.releaseEntries) {
+            if (entry.status !== 'RELEASED' || (entry.releasedAtAbsoluteWeek ?? Number.MAX_SAFE_INTEGER) > observedAbsoluteWeek) continue;
+            if (plan.source !== 'COMMISSIONED_ORIGINAL') {
+                const contract = entry.rightsContractId
+                    ? ai.rightsContracts.find(candidate => candidate.id === entry.rightsContractId)
+                    : null;
+                if (
+                    !contract
+                    || contract.status !== 'ACTIVE'
+                    || !isStreamingLicenseActiveAt(contract, observedAbsoluteWeek)
+                    || contract.sourceProjectId !== entry.canonicalProjectId
+                    || contract.platformContentPlanId !== plan.id
+                ) continue;
+            }
+            const project = projectsById.get(entry.canonicalProjectId);
+            const window = project?.streamingWindows?.find(candidate => (
+                candidate.id === entry.streamingWindowId
+                && candidate.platformId === platformId
+                && candidate.platformContentPlanId === plan.id
+                && candidate.startsAtAbsoluteWeek <= observedAbsoluteWeek
+                && candidate.expiresAtAbsoluteWeek >= observedAbsoluteWeek
+            ));
+            if (window) validWindowIds.add(window.id);
+        }
+    }
+    const averageCommercialScore = ai.releaseMemory.length
+        ? ai.releaseMemory.reduce((sum, memory) => sum + memory.commercialScore, 0) / ai.releaseMemory.length
+        : 50;
+    return Math.round(clamp(20 + validWindowIds.size * 4 + averageCommercialScore * 0.45, 0, 100));
+};
+
+const canonicalPrestige = (player: Player, platformId: PlatformId): number => {
+    const platform = player.world.platforms?.[platformId];
+    if (!platform?.ai?.releaseMemory.length) return Math.round(clamp(platform?.reputation ?? STREAMING_RIVAL_TEMPLATES[platformId].prestige, 0, 100));
+    const averagePrestige = platform.ai.releaseMemory.reduce((sum, memory) => sum + memory.prestigeScore, 0)
+        / platform.ai.releaseMemory.length;
+    return Math.round(clamp(platform.reputation * 0.7 + averagePrestige * 0.3, 0, 100));
+};
+
+export const projectStreamingRivalsFromCanonicalWorld = (
+    player: Player,
+    existingRivals: OwnedStreamingRivalProfile[] = [],
+    observedAbsoluteWeek = getAbsoluteWeek(player.age, player.currentWeek),
+): OwnedStreamingRivalProfile[] => {
+    const existingById = new Map(existingRivals.map(rival => [rival.platformId, rival]));
+    return (Object.keys(STREAMING_RIVAL_TEMPLATES) as PlatformId[])
+        .filter(platformId => !player.ownedStreamingPlatform.corporateDevelopment?.acquiredPlatformIds?.includes(platformId))
+        .map(platformId => {
+            const template = STREAMING_RIVAL_TEMPLATES[platformId];
+            const previous = existingById.get(platformId);
+            const worldPlatform = player.world.platforms?.[platformId];
+            const ai = worldPlatform?.ai;
+            const technology = canonicalTechnology(player, platformId);
+            const catalogPower = canonicalCataloguePower(player, platformId, observedAbsoluteWeek);
+            const prestige = canonicalPrestige(player, platformId);
+            const canonicalRegions = ai
+                ? ai.capabilities.activeCountryIds.flatMap(countryId => {
+                    const region = canonicalRegionForCountry(countryId);
+                    return region ? [region] : [];
+                })
+                : template.preferredRegions.slice(0, 2);
+            return {
+                platformId,
+                platformName: worldPlatform?.name ?? platformId.replaceAll('_', ' '),
+                ceoName: previous?.ceoName ?? template.ceoName,
+                ceoPersonality: previous?.ceoPersonality ?? template.ceoPersonality,
+                strategy: previous?.strategy ?? template.strategy,
+                cashReserveMillions: Math.max(0, worldPlatform?.cashReserve ?? 0),
+                subscribersMillions: Math.max(0, worldPlatform?.subscribers ?? 0),
+                standaloneValuationBillions: Math.max(0, ai?.standaloneValuationBillions ?? worldPlatform?.valuation ?? 0),
+                technology,
+                catalogPower,
+                prestige,
+                aggression: previous?.aggression ?? template.aggression,
+                baseMonthlyPrice: previous?.baseMonthlyPrice ?? DEFAULT_RIVAL_PRICES[platformId],
+                perceivedValue: Math.round(clamp((catalogPower + technology + prestige) / 3, 0, 100)),
+                activeRegionIds: Array.from(new Set<StreamingRegionId>(['HOME_MARKET', ...canonicalRegions])),
+                copiedTechnologyBranches: [...(previous?.copiedTechnologyBranches ?? [])],
+                preferredGenres: [...(previous?.preferredGenres ?? template.preferredGenres)],
+                preferredRegions: [...(previous?.preferredRegions ?? template.preferredRegions)],
+                cooldownUntilAbsoluteWeek: previous?.cooldownUntilAbsoluteWeek ?? 0,
+                lastMoveAbsoluteWeek: previous?.lastMoveAbsoluteWeek ?? null,
+                mistakes: previous?.mistakes ?? 0,
+                memory: {
+                    ...(previous?.memory ?? { respect: 35, resentment: 20, encounters: 0, rivalWins: 0, playerDefences: 0, lastMoveType: null }),
+                },
+            };
+        });
+};
 
 const buildRivals = (player: Player): OwnedStreamingRivalProfile[] => (
-    (Object.keys(STREAMING_RIVAL_TEMPLATES) as PlatformId[])
-    .filter(platformId => !player.ownedStreamingPlatform.corporateDevelopment?.acquiredPlatformIds?.includes(platformId))
-    .map(platformId => {
-        const template = STREAMING_RIVAL_TEMPLATES[platformId];
-        const worldPlatform = getWorldPlatform(player, platformId);
-        return {
-            platformId,
-            platformName: worldPlatform?.name || platformId.replaceAll('_', ' '),
-            ceoName: template.ceoName,
-            ceoPersonality: template.ceoPersonality,
-            strategy: template.strategy,
-            cashReserveMillions: Math.max(0, worldPlatform?.cashReserve || 1_000),
-            subscribersMillions: Math.max(0, worldPlatform?.subscribers || 1),
-            technology: template.technology,
-            catalogPower: template.catalogPower,
-            prestige: Math.round(clamp((template.prestige + (worldPlatform?.reputation || template.prestige)) / 2, 0, 100)),
-            aggression: template.aggression,
-            preferredGenres: template.preferredGenres,
-            preferredRegions: template.preferredRegions,
-            cooldownUntilAbsoluteWeek: 0,
-            lastMoveAbsoluteWeek: null,
-            mistakes: 0,
-            memory: { respect: 35, resentment: 20, encounters: 0, rivalWins: 0, playerDefences: 0, lastMoveType: null },
-        };
-    })
+    projectStreamingRivalsFromCanonicalWorld(player)
 );
 
 const createHomeRegion = (absoluteWeek: number, seed: string): OwnedStreamingRegionalLaunch => ({
@@ -484,24 +641,67 @@ export const respondToStreamingRivalMove = (
     return { changed: true, player: { ...player, ownedStreamingPlatform: platform } };
 };
 
+interface RivalMoveSelection {
+    type: StreamingRivalMoveType;
+    reason: string;
+    targetRegionId: StreamingRegionId | null;
+    targetTechnologyBranch: StreamingTechnologyBranch | null;
+}
+
 const selectMoveType = (
     rival: OwnedStreamingRivalProfile,
     platform: OwnedStreamingPlatformState,
     absoluteWeek: number,
-): StreamingRivalMoveType => {
+): RivalMoveSelection => {
     const activeExecutives = platform.leadership.appointments.filter(item => item.status === 'ACTIVE');
-    const pool: StreamingRivalMoveType[] = rival.strategy === 'PRESTIGE_FIRST'
-        ? ['RIGHTS_OVERBID', 'EXECUTIVE_POACH', 'COUNTER_PROGRAM', 'RESCUE_CANCELLED_SHOW']
-        : rival.strategy === 'FRANCHISE_FORTRESS'
-            ? ['COUNTER_PROGRAM', 'BUNDLE_LAUNCH', 'RIGHTS_OVERBID', 'ALLIANCE_SIGNAL']
-            : rival.strategy === 'ATTENTION_ECOSYSTEM'
-                ? ['PRICE_CUT', 'BUNDLE_LAUNCH', 'COUNTER_PROGRAM', 'ALLIANCE_SIGNAL']
-                : rival.strategy === 'AGILE_CURATOR'
-                    ? ['RESCUE_CANCELLED_SHOW', 'RIGHTS_OVERBID', 'EXECUTIVE_POACH', 'COUNTER_PROGRAM']
-                    : ['PRICE_CUT', 'COUNTER_PROGRAM', 'RIGHTS_OVERBID', 'BUNDLE_LAUNCH'];
-    const validPool = activeExecutives.length ? pool : pool.filter(item => item !== 'EXECUTIVE_POACH');
+    const paidPrices = Object.values(platform.subscriptionPrices).filter(price => price > 0);
+    const playerEntryPrice = paidPrices.length ? Math.min(...paidPrices) : 9.99;
+    const latestWeek = platform.weeklyHistory.at(-1);
+    const playback = latestWeek?.operations?.playbackSuccessRate ?? platform.metrics.technologyHealth;
+    const activeOriginals = platform.originalCommissions.filter(item => ['GREENLIT', 'IN_PRODUCTION', 'RELEASED'].includes(item.status)).length;
+    const rightsHeat = platform.rightsNegotiations.filter(item => ['OFFER_SENT', 'COUNTER_RECEIVED', 'SIGNED'].includes(item.status)).length;
+    const strongestTechnology = TECHNOLOGY_BRANCHES
+        .map(branch => ({ branch, value: platform.technologyLevels[branch] }))
+        .sort((left, right) => right.value - left.value)[0];
+    const expansionRegionId = rival.preferredRegions.find(region => !rival.activeRegionIds.includes(region))
+        || rival.preferredRegions[0]
+        || null;
+    const withdrawalRegionId = rival.activeRegionIds.find(region => region !== 'HOME_MARKET') || null;
+    const scores = new Map<StreamingRivalMoveType, { score: number; reason: string }>();
+    const offer = (type: StreamingRivalMoveType, score: number, reason: string) => scores.set(type, { score, reason });
+
+    offer('MARKETING_BLITZ', 42 + rival.aggression * 0.25, 'Your platform is still fighting for habitual attention, so the rival is buying visibility instead of changing the product.');
+    offer('REGIONAL_ORIGINAL', 35 + activeOriginals * 5 + (expansionRegionId ? 12 : 0), `Your Original slate is creating demand; ${rival.platformName} wants a local-language answer in ${STREAMING_REGION_DEFINITIONS.find(item => item.id === expansionRegionId)?.name || 'a contested market'}.`);
+    offer('COUNTER_PROGRAM', 36 + activeOriginals * 7, 'Your release calendar has become visible enough to counter-program directly.');
+    offer('RIGHTS_OVERBID', 34 + rightsHeat * 9 + rival.cashReserveMillions / 1_000, 'You are active at the rights table, so the rival is raising scarcity in the same buying window.');
+    offer('BUNDLE_LAUNCH', 39 + (playerEntryPrice <= 7 ? 28 : 8) + (rival.strategy === 'ATTENTION_ECOSYSTEM' ? 22 : 0), playerEntryPrice <= 7
+        ? `Your $${playerEntryPrice.toFixed(2)} entry tier is already very cheap. ${rival.platformName} will defend convenience and bundled value instead of chasing it downward.`
+        : 'Households are holding multiple subscriptions, so the rival is using a telecom bundle to become harder to cancel.');
+    offer('PRICE_CUT', 28 + (playerEntryPrice > rival.baseMonthlyPrice * 0.82 ? 30 : -18) + (rival.strategy === 'SCALE_DOMINANCE' ? 18 : 0), playerEntryPrice <= 7
+        ? `Your $${playerEntryPrice.toFixed(2)} price is below the rival's sustainable floor; a direct match would damage its value story.`
+        : `Your entry tier is vulnerable at $${playerEntryPrice.toFixed(2)}, so the rival can afford a temporary price attack.`);
+    offer('TECH_COPY', 26 + Math.max(0, strongestTechnology.value - rival.technology) * 2.4, `Your ${strongestTechnology.branch.toLowerCase().replaceAll('_', ' ')} capability is visibly ahead, making a fast-follow worth funding.`);
+    offer('OUTAGE_EXPLOITATION', playback < 98 ? 86 + (98 - playback) * 4 : 4, `Playback reliability fell to ${playback.toFixed(1)}%, giving the rival a credible dependability message.`);
+    offer('SABOTAGE_ATTEMPT', 8 + rival.aggression * 0.18 + rival.memory.resentment * 0.32 - platform.technologyLevels.SECURITY * 0.15, 'High rivalry heat and a visible security gap make an unattributed disruption campaign tempting.');
+    offer('REGION_EXPANSION', expansionRegionId ? 38 + rival.cashReserveMillions / 1_200 : 0, `${STREAMING_REGION_DEFINITIONS.find(item => item.id === expansionRegionId)?.name || 'A growth market'} is still open enough for the rival to build a local position.`);
+    offer('REGION_WITHDRAWAL', withdrawalRegionId && rival.cashReserveMillions < 120 ? 78 : 0, 'Weak local economics are forcing the rival to concentrate its capital elsewhere.');
+    offer('RESCUE_CANCELLED_SHOW', 24 + (rival.strategy === 'AGILE_CURATOR' ? 25 : 0), 'A vocal abandoned fandom offers a cheaper retention story than creating a new franchise.');
+    offer('ALLIANCE_SIGNAL', 30 + (rival.strategy === 'ATTENTION_ECOSYSTEM' ? 18 : 0), 'A distribution partner can widen reach without forcing an unsustainable price cut.');
+    if (activeExecutives.length) offer('EXECUTIVE_POACH', 20 + rival.memory.resentment * 0.28, 'Your leadership team has proven valuable enough to become a competitive target.');
+
     const rng = createDeterministicRng(`${platform.simulationSeed}:rival-move-type:${rival.platformId}:${absoluteWeek}`);
-    return validPool[Math.floor(rng() * validPool.length)] || 'COUNTER_PROGRAM';
+    const ranked = [...scores.entries()]
+        .map(([type, signal]) => ({ type, reason: signal.reason, score: signal.score + rng() * 9 }))
+        .sort((left, right) => right.score - left.score || left.type.localeCompare(right.type));
+    const selected = ranked[0] || { type: 'COUNTER_PROGRAM' as const, reason: 'A visible programming window invited a direct competitive response.' };
+    return {
+        type: selected.type,
+        reason: selected.reason,
+        targetRegionId: selected.type === 'REGION_WITHDRAWAL'
+            ? withdrawalRegionId
+            : ['REGIONAL_ORIGINAL', 'REGION_EXPANSION'].includes(selected.type) ? expansionRegionId : null,
+        targetTechnologyBranch: selected.type === 'TECH_COPY' ? strongestTechnology.branch : null,
+    };
 };
 
 const createRivalMove = (
@@ -509,9 +709,11 @@ const createRivalMove = (
     rival: OwnedStreamingRivalProfile,
     absoluteWeek: number,
 ): { move: OwnedStreamingRivalMove; rival: OwnedStreamingRivalProfile; ledger: OwnedStreamingLedgerEntry } | null => {
-    const type = selectMoveType(rival, platform, absoluteWeek);
+    const selection = selectMoveType(rival, platform, absoluteWeek);
+    const type = selection.type;
     const definition = MOVE_DEFINITIONS[type];
-    if (rival.cashReserveMillions < definition.cashCostMillions) return null;
+    const cashCostMillions = getStreamingRivalMoveCostMillions(type);
+    if (rival.cashReserveMillions < cashCostMillions) return null;
     const rng = createDeterministicRng(`${platform.simulationSeed}:rival-move:${rival.platformId}:${type}:${absoluteWeek}`);
     const executives = platform.leadership.appointments
         .filter(item => item.status === 'ACTIVE')
@@ -520,7 +722,7 @@ const createRivalMove = (
     const mistakeChance = clamp(0.08 + (100 - rival.technology) / 300 + (100 - rival.catalogPower) / 500, 0.08, 0.34);
     const misfired = rng() < mistakeChance;
     const idempotencyKey = `rival-move:${rival.platformId}:${absoluteWeek}`;
-    const cashAfter = Math.max(0, rival.cashReserveMillions - definition.cashCostMillions);
+    const cashAfter = Math.max(0, rival.cashReserveMillions - cashCostMillions);
     const move: OwnedStreamingRivalMove = {
         id: createDeterministicId('streaming_rival_move', platform.simulationSeed, idempotencyKey),
         idempotencyKey,
@@ -528,10 +730,18 @@ const createRivalMove = (
         platformName: rival.platformName,
         ceoName: rival.ceoName,
         type,
+        battlefront: definition.battlefront,
+        targetRegionId: selection.targetRegionId,
+        targetTechnologyBranch: selection.targetTechnologyBranch,
+        strategyReason: selection.reason,
+        playerImpact: definition.playerImpact,
+        rivalPriceBefore: type === 'PRICE_CUT' ? rival.baseMonthlyPrice : null,
+        rivalPriceAfter: type === 'PRICE_CUT' ? Math.round(Math.max(2.99, rival.baseMonthlyPrice * 0.86) * 100) / 100 : null,
         title: misfired ? `${definition.title(rival, target?.nameAtAppointment || null)} — and misses` : definition.title(rival, target?.nameAtAppointment || null),
         detail: definition.detail,
         status: misfired ? 'MISFIRED' : 'OPEN',
-        cashCostMillions: definition.cashCostMillions,
+        pricingVersion: STREAMING_RIVAL_MOVE_COST_VERSION,
+        cashCostMillions,
         rivalCashBeforeMillions: rival.cashReserveMillions,
         rivalCashAfterMillions: cashAfter,
         createdAtAbsoluteWeek: absoluteWeek,
@@ -553,7 +763,11 @@ const createRivalMove = (
     };
     const updatedRival: OwnedStreamingRivalProfile = {
         ...rival,
-        cashReserveMillions: cashAfter,
+        // Rival economics are authoritative in world.platforms. The move keeps
+        // its disclosed cost, while this read model remains a canonical projection.
+        cashReserveMillions: rival.cashReserveMillions,
+        baseMonthlyPrice: type === 'PRICE_CUT' ? move.rivalPriceAfter || rival.baseMonthlyPrice : rival.baseMonthlyPrice,
+        perceivedValue: clamp(rival.perceivedValue + (type === 'BUNDLE_LAUNCH' ? 3 : type === 'REGIONAL_ORIGINAL' ? 2 : type === 'PRICE_CUT' ? 1 : 0), 0, 100),
         cooldownUntilAbsoluteWeek: absoluteWeek + definition.cooldownWeeks,
         lastMoveAbsoluteWeek: absoluteWeek,
         mistakes: rival.mistakes + (misfired ? 1 : 0),
@@ -575,7 +789,7 @@ const createRivalMove = (
         metadata: {
             platformId: rival.platformId,
             moveType: type,
-            cashCostMillions: definition.cashCostMillions,
+            cashCostMillions,
             misfired,
             targetExecutiveId: target?.executiveId || null,
         },
@@ -588,8 +802,31 @@ const settleExpiredMoves = (
     absoluteWeek: number,
 ): OwnedStreamingPlatformState => {
     let appointments = platform.leadership.appointments;
+    let rivals = platform.competitiveWorld.rivals;
     const moves = platform.competitiveWorld.moves.map(move => {
         if (!['OPEN', 'ACCEPTED_PRESSURE'].includes(move.status) || move.expiresAtAbsoluteWeek >= absoluteWeek) return move;
+        if (move.type === 'TECH_COPY' && move.targetTechnologyBranch) {
+            rivals = rivals.map(rival => rival.platformId === move.platformId ? {
+                ...rival,
+                technology: clamp(rival.technology + 2, 0, 100),
+                copiedTechnologyBranches: Array.from(new Set([...rival.copiedTechnologyBranches, move.targetTechnologyBranch!])),
+            } : rival);
+            return { ...move, status: 'EXPIRED' as const, outcomeNote: `${move.platformName} shipped a credible fast-follow of ${move.targetTechnologyBranch.toLowerCase().replaceAll('_', ' ')}.` };
+        }
+        if (move.type === 'REGION_EXPANSION' && move.targetRegionId) {
+            rivals = rivals.map(rival => rival.platformId === move.platformId ? {
+                ...rival,
+                activeRegionIds: Array.from(new Set([...rival.activeRegionIds, move.targetRegionId!])),
+            } : rival);
+            return { ...move, status: 'EXPIRED' as const, outcomeNote: `${move.platformName} completed its ${STREAMING_REGION_DEFINITIONS.find(item => item.id === move.targetRegionId)?.name || 'regional'} entry.` };
+        }
+        if (move.type === 'REGION_WITHDRAWAL' && move.targetRegionId) {
+            rivals = rivals.map(rival => rival.platformId === move.platformId ? {
+                ...rival,
+                activeRegionIds: rival.activeRegionIds.filter(regionId => regionId !== move.targetRegionId),
+            } : rival);
+            return { ...move, status: 'EXPIRED' as const, outcomeNote: `${move.platformName} exited ${STREAMING_REGION_DEFINITIONS.find(item => item.id === move.targetRegionId)?.name || 'the market'} after weak economics.` };
+        }
         if (move.type !== 'EXECUTIVE_POACH' || !move.targetExecutiveId) return {
             ...move,
             status: 'EXPIRED' as const,
@@ -617,7 +854,7 @@ const settleExpiredMoves = (
     return {
         ...platform,
         leadership: { ...platform.leadership, appointments },
-        competitiveWorld: { ...platform.competitiveWorld, moves },
+        competitiveWorld: { ...platform.competitiveWorld, rivals, moves },
     };
 };
 
@@ -781,17 +1018,23 @@ export const commitStreamingCompetitiveWorldWeek = (
         absoluteWeek,
     );
     if (platform.competitiveWorld.lastSimulatedAbsoluteWeek === absoluteWeek) return platform;
+    const previousRivals = platform.competitiveWorld.rivals;
     platform = settleExpiredMoves(platform, absoluteWeek);
     const completed = completeDueRegions(platform, absoluteWeek);
     platform = completed.platform;
-    const rng = createDeterministicRng(`${platform.simulationSeed}:rival-economy:${absoluteWeek}`);
-    let rivals = platform.competitiveWorld.rivals.map((rival, index) => {
-        const weeklyCashGeneration = rival.subscribersMillions * (0.18 + rival.catalogPower / 1_000);
-        const subscriberDrift = ((rival.catalogPower + rival.technology + rival.prestige) / 300 - 0.5) * 0.0035 + (rng() - 0.5) * 0.002;
+    let rivals = projectStreamingRivalsFromCanonicalWorld(player, platform.competitiveWorld.rivals, absoluteWeek);
+    const weeklyRivalHistory: OwnedStreamingRivalWeeklySnapshot[] = rivals.map(rival => {
+        const previous = previousRivals.find(candidate => candidate.platformId === rival.platformId);
+        const subscribersBeforeMillions = previous?.subscribersMillions ?? rival.subscribersMillions;
         return {
-            ...rival,
-            cashReserveMillions: Math.round((rival.cashReserveMillions + weeklyCashGeneration) * 10) / 10,
-            subscribersMillions: Math.round(Math.max(0.1, rival.subscribersMillions * (1 + subscriberDrift + index * 0.00003)) * 100) / 100,
+            id: createDeterministicId('streaming_rival_week', platform.simulationSeed, rival.platformId, absoluteWeek),
+            absoluteWeek,
+            platformId: rival.platformId,
+            platformName: rival.platformName,
+            subscribersBeforeMillions,
+            subscribersAfterMillions: rival.subscribersMillions,
+            netMovementMillions: Math.round((rival.subscribersMillions - subscribersBeforeMillions) * 100) / 100,
+            driver: 'Canonical rival platform operations determined the weekly audience movement.',
         };
     });
     const launchWeek = platform.launchCommit?.committedAtAbsoluteWeek || absoluteWeek;
@@ -808,7 +1051,7 @@ export const commitStreamingCompetitiveWorldWeek = (
                 || left.platformId.localeCompare(right.platformId)
             ));
         if (eligible.length) {
-            const selected = eligible[Math.floor(rng() * Math.min(3, eligible.length))];
+            const selected = eligible[0];
             const created = createRivalMove(platform, selected, absoluteWeek);
             if (created) {
                 rivals = rivals.map(item => item.platformId === selected.platformId ? created.rival : item);
@@ -829,6 +1072,7 @@ export const commitStreamingCompetitiveWorldWeek = (
             }
         }
     }
+    rivals = projectStreamingRivalsFromCanonicalWorld(player, rivals, absoluteWeek);
     platform = {
         ...platform,
         competitiveWorld: {
@@ -837,9 +1081,12 @@ export const commitStreamingCompetitiveWorldWeek = (
             rivalryHeat: clamp(platform.competitiveWorld.rivalryHeat + (ledger.some(item => item.type === 'RIVAL_MOVE_COMMITTED') ? 4 : -1), 0, 100),
             rivals,
             moves,
+            weeklyRivalHistory: [...platform.competitiveWorld.weeklyRivalHistory, ...weeklyRivalHistory],
         },
     };
     const marketShare = buildMarketShareSnapshot(platform, absoluteWeek);
+    const playerEntry = marketShare.entries.find(item => item.id === 'PLAYER');
+    const playerRank = marketShare.entries.findIndex(item => item.id === 'PLAYER') + 1;
     const marketKey = `streaming-market-share:${absoluteWeek}`;
     ledger.push({
         id: createDeterministicId('streaming_event', platform.simulationSeed, marketKey),
@@ -850,6 +1097,36 @@ export const commitStreamingCompetitiveWorldWeek = (
         source: 'WEEK_PROCESSOR',
         metadata: { playerShare: marketShare.entries.find(item => item.id === 'PLAYER')?.sharePercent || 0 },
     });
+    const shareMilestone = playerEntry && playerEntry.sharePercent >= 1 && !platform.milestoneKeys.includes('streaming-share-1');
+    const podiumMilestone = playerRank > 0 && playerRank <= 3 && !platform.milestoneKeys.includes('streaming-world-podium');
+    const dominanceMilestone = playerRank === 1 && !platform.milestoneKeys.includes('streaming-global-dominance');
+    if (shareMilestone || podiumMilestone || dominanceMilestone) {
+        const key = dominanceMilestone ? 'streaming-global-dominance' : podiumMilestone ? 'streaming-world-podium' : 'streaming-share-1';
+        const milestoneLedger: OwnedStreamingLedgerEntry = {
+            id: createDeterministicId('streaming_event', platform.simulationSeed, key),
+            idempotencyKey: key,
+            absoluteWeek,
+            type: 'MILESTONE_REACHED',
+            summary: dominanceMilestone
+                ? `${platform.identity?.name || 'EMPIRE+'} became the modeled world streaming leader.`
+                : podiumMilestone
+                    ? `${platform.identity?.name || 'EMPIRE+'} entered the global top three.`
+                    : `${platform.identity?.name || 'EMPIRE+'} crossed one percent modeled world share.`,
+            source: 'WEEK_PROCESSOR',
+            metadata: { playerShare: playerEntry?.sharePercent || 0, playerRank },
+        };
+        ledger.push(milestoneLedger);
+        cinematics.push({
+            id: createDeterministicId('streaming_scene', platform.simulationSeed, key),
+            idempotencyKey: key,
+            type: dominanceMilestone ? 'GLOBAL_DOMINANCE' : 'MARKET_SHARE_BREAKTHROUGH',
+            status: 'QUEUED',
+            priority: 'MAJOR',
+            availableAtAbsoluteWeek: absoluteWeek,
+            title: milestoneLedger.summary,
+            factIds: [milestoneLedger.id],
+        });
+    }
     let awardSeasons = platform.competitiveWorld.awardSeasons;
     const seasonNumber = Math.floor(weeksLive / 52);
     if (seasonNumber >= 1 && !awardSeasons.some(item => item.seasonNumber === seasonNumber)) {
@@ -896,6 +1173,9 @@ export const commitStreamingCompetitiveWorldWeek = (
             ...platform.milestoneKeys,
             ...(ledger.some(item => item.type === 'RIVAL_MOVE_COMMITTED') ? ['first-platform-war'] : []),
             ...(awardSeasons.length ? ['streaming-awards-entered'] : []),
+            ...(shareMilestone ? ['streaming-share-1'] : []),
+            ...(podiumMilestone ? ['streaming-world-podium'] : []),
+            ...(dominanceMilestone ? ['streaming-global-dominance'] : []),
         ])),
     }, player.id);
 };

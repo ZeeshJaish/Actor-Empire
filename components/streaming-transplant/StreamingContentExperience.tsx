@@ -1,7 +1,7 @@
 /**
  * EMPIRE+ v2 — CONTENT DESK
  *
- * The first division page. Everything here borrows an interface the player has
+ * The permanent content-business headquarters. Everything here borrows an interface the player has
  * already used, so none of it needs teaching:
  *   LIBRARY  → a creator-dashboard content list (YouTube Studio / App Store Connect)
  *   RIGHTS   → the phone's subscription manager, with renewal countdowns
@@ -12,7 +12,9 @@
  */
 import s from './presentation/screens/ContentDesk/ContentDesk.module.css';
 import { cx } from './presentation/cx';
+import { brandVars } from './presentation/brand';
 import React, { useMemo, useState } from 'react';
+import { Archive, ChevronRight, Film, LibraryBig, LockKeyhole, Sparkles, X } from 'lucide-react';
 import { Brand, Mark, brandColor, brandDeep, typeFace } from './StreamingBrandVisuals';
 
 /* ============================================================
@@ -61,7 +63,19 @@ export interface ContentDeskState {
   slate: SlateWeek[];
 }
 
-type Tab = 'LIBRARY' | 'RIGHTS' | 'SLATE';
+export type ContentEntryRouteId = 'LICENSE' | 'ORIGINAL' | 'OWNED' | 'CATALOGUE';
+
+export interface ContentEntryRoute {
+  id: ContentEntryRouteId;
+  eyebrow: string;
+  title: string;
+  description: string;
+  status: string;
+  disabled?: boolean;
+  onSelect?: () => void;
+}
+
+type Tab = 'LIBRARY' | 'RIGHTS' | 'SLATE' | 'LOCALIZATION';
 
 /* ============================================================
    HELPERS
@@ -71,6 +85,13 @@ const money = (n: number) => n >= 1e9 ? `$${(n / 1e9).toFixed(1)}B`
     : n >= 1e3 ? `$${Math.round(n / 1e3)}k` : `$${n}`;
 const count = (n: number) => n >= 1e6 ? `${(n / 1e6).toFixed(1)}M`
   : n >= 1e3 ? `${(n / 1e3).toFixed(0)}K` : `${n}`;
+
+const ENTRY_ICON = {
+  LICENSE: Film,
+  ORIGINAL: Sparkles,
+  OWNED: LibraryBig,
+  CATALOGUE: Archive,
+} satisfies Record<ContentEntryRouteId, React.ComponentType<{ size?: number }>>;
 
 /** Slate warnings, derived rather than authored — the same checks the doc lists. */
 const slateWarnings = (slate: SlateWeek[], titles: CatalogueTitle[]) => {
@@ -121,15 +142,18 @@ export const ContentDesk: React.FC<{
   onBack: () => void;
   initialTab?: Tab;
   onOpenTitle?: (t: CatalogueTitle) => void;
-  onCommission?: () => void;
+  entryRoutes?: ContentEntryRoute[];
   onRenew?: (t: CatalogueTitle) => void;
   onLapse?: (t: CatalogueTitle) => void;
-}> = ({ brand, state, onBack, initialTab, onOpenTitle, onCommission, onRenew, onLapse }) => {
+  localization?: { providers: number; facilities: number; planned: number; inProgress: number; ready: number; assets: number };
+  onOpenLocalization?: () => void;
+}> = ({ brand, state, onBack, initialTab, onOpenTitle, entryRoutes = [], onRenew, onLapse, localization, onOpenLocalization }) => {
   const c = brandColor(brand), c2 = brandDeep(brand);
   const tf = typeFace(brand);
   /* a console chip can open this page straight on the tab it names */
   const [tab, setTab] = useState<Tab>(initialTab ?? 'LIBRARY');
   const [filter, setFilter] = useState<'ALL' | 'ORIGINAL' | 'LICENSED' | 'EXPIRING'>('ALL');
+  const [showEntryRoutes, setShowEntryRoutes] = useState(false);
 
   const licensed = useMemo(() => state.titles.filter(t => t.rights), [state.titles]);
   const expiring = useMemo(
@@ -153,12 +177,12 @@ export const ContentDesk: React.FC<{
   };
 
   return (
-    <div className={s.cd} style={{ ['--epx-cd-c' as string]: c}}>
+    <div className={s.cd} data-epx-root style={brandVars(brand)}>
       <div className={s.cdtop}>
         <button className={s.cdback} onClick={onBack} aria-label="Back">←</button>
         <div className={s.cdtitle}>
           <b>CONTENT DESK</b>
-          <span>CATALOGUE · RIGHTS · SLATE</span>
+          <span>CATALOGUE · ORIGINALS · RIGHTS · MORE</span>
         </div>
         <span className={s.cdmark}><Mark brand={brand} /></span>
       </div>
@@ -171,7 +195,7 @@ export const ContentDesk: React.FC<{
       </div>
 
       <div className={s.cdtabs}>
-        {(['LIBRARY', 'RIGHTS', 'SLATE'] as Tab[]).map(t => (
+        {(['LIBRARY', 'RIGHTS', 'SLATE', 'LOCALIZATION'] as Tab[]).map(t => (
           <button key={t} className={tab === t ? s.on : ''} onClick={() => setTab(t)}>
             {t}
             {t === 'RIGHTS' && counts.expiring > 0 && <i className={s.tdot} />}
@@ -221,7 +245,7 @@ export const ContentDesk: React.FC<{
           <section className={s.cdsec}>
             <div className={s.cdhead}>
               <h2>Library</h2>
-              <button className={s.cdadd} onClick={onCommission}>+ COMMISSION</button>
+              <button className={s.cdadd} onClick={() => setShowEntryRoutes(true)}>+ ADD CONTENT</button>
             </div>
             <div className={s.chips}>
               {(['ALL', 'ORIGINAL', 'LICENSED', 'EXPIRING'] as const).map(f => (
@@ -231,7 +255,14 @@ export const ContentDesk: React.FC<{
               ))}
             </div>
 
-            {shown.length === 0 && <div className={s.empty}>Nothing matches that filter.</div>}
+            {shown.length === 0 && state.titles.length === 0 ? (
+              <div className={s.emptyLibrary}>
+                <span className={s.emptyLibraryMark}><Film size={25} /></span>
+                <strong>Your shelves are empty.</strong>
+                <p>Choose how the first title enters the service.</p>
+                <button type="button" onClick={() => setShowEntryRoutes(true)}>ADD CONTENT <ChevronRight size={15} /></button>
+              </div>
+            ) : shown.length === 0 ? <div className={s.empty}>Nothing matches that filter.</div> : null}
 
             {shown.map(t => (
               <button className={s.trow} key={t.id} onClick={() => onOpenTitle?.(t)}>
@@ -356,8 +387,72 @@ export const ContentDesk: React.FC<{
           </section>
         )}
 
+        {tab === 'LOCALIZATION' && (
+          <section className={s.cdsec}>
+            <div className={s.cdhead}><h2>Language operations</h2><span>title by title</span></div>
+            <div className={s.localizationHero}>
+              <span>CONTENT CAPABILITY</span><strong>{localization?.assets || 0}</strong><h3>language assets ready</h3>
+              <p>Subtitles and dubbing belong to individual titles. Build in-house facilities or contract providers as the company grows.</p>
+            </div>
+            <div className={s.localizationGrid}>
+              <div><span>PROVIDERS</span><b>{localization?.providers || 0}</b></div><div><span>IN-HOUSE ROOMS</span><b>{localization?.facilities || 0}</b></div><div><span>IN PROGRESS</span><b>{localization?.inProgress || 0}</b></div><div><span>READY JOBS</span><b>{localization?.ready || 0}</b></div>
+            </div>
+            {(localization?.planned || 0) > 0 && <div className={s.localizationNotice}>{localization?.planned} planned language jobs still need a provider or facility.</div>}
+            <button type="button" className={s.localizationAction} onClick={onOpenLocalization}>OPEN LANGUAGE CAPABILITIES →</button>
+          </section>
+        )}
+
         <div className={s.cdfoot} />
       </div>
+
+      {showEntryRoutes ? (
+        <div className={s.entryBackdrop} onClick={() => setShowEntryRoutes(false)}>
+          <section
+            className={s.entrySheet}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="content-entry-title"
+            onClick={event => event.stopPropagation()}
+          >
+            <div className={s.entryHandle} />
+            <header className={s.entryHead}>
+              <div>
+                <span>CONTENT DESK</span>
+                <h2 id="content-entry-title">Add content</h2>
+                <p>Choose how this title enters your service.</p>
+              </div>
+              <button type="button" onClick={() => setShowEntryRoutes(false)} aria-label="Close content routes"><X size={20} /></button>
+            </header>
+
+            <div className={s.entryList}>
+              {entryRoutes.map(route => {
+                const Icon = ENTRY_ICON[route.id];
+                return (
+                  <button
+                    type="button"
+                    key={route.id}
+                    className={route.disabled ? s.entryDisabled : ''}
+                    disabled={route.disabled}
+                    onClick={() => {
+                      setShowEntryRoutes(false);
+                      route.onSelect?.();
+                    }}
+                  >
+                    <span className={s.entryIcon}><Icon size={20} /></span>
+                    <span className={s.entryCopy}>
+                      <small>{route.eyebrow}</small>
+                      <strong>{route.title}</strong>
+                      <em>{route.description}</em>
+                    </span>
+                    <span className={s.entryState}>{route.status}</span>
+                    {route.disabled ? <LockKeyhole className={s.entryArrow} size={16} /> : <ChevronRight className={s.entryArrow} size={17} />}
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        </div>
+      ) : null}
     </div>
   );
 };

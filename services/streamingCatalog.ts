@@ -15,6 +15,10 @@ import {
     compactOwnedStreamingPlatformForPersistence,
     normalizeOwnedStreamingPlatformState,
 } from './ownedStreamingPlatform';
+import {
+    createStreamingRightsContractFromLicense,
+    registerStreamingRightsContract,
+} from './streamingRightsCore';
 
 export interface StreamingCatalogTitle {
     id: string;
@@ -93,6 +97,23 @@ const resolveProjectType = (value: unknown): 'MOVIE' | 'SERIES' => value === 'SE
 const asNumberOrNull = (value: unknown): number | null => {
     const numeric = Number(value);
     return Number.isFinite(numeric) && numeric > 0 ? numeric : null;
+};
+
+const getOpeningLicenseCountryIds = (
+    player: Player,
+    territory: StreamingLicenseTerritory,
+): string[] => {
+    if (territory === 'GLOBAL') return [];
+    const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
+    const openingCountryIds = platform.marketOperations
+        .filter(operation => (
+            operation.scope === 'COUNTRY'
+            && operation.entryKind === 'OPENING'
+            && operation.status !== 'EXITED'
+            && operation.countryId
+        ))
+        .map(operation => operation.countryId!);
+    return territory === 'DOMESTIC' ? openingCountryIds.slice(0, 1) : openingCountryIds;
 };
 
 const getOwnedStudioNames = (player: Player): Map<string, string> => new Map(
@@ -309,7 +330,7 @@ export const saveStreamingCatalogDraft = (
     inputDraft: OwnedStreamingCatalogSetupDraft,
 ): Player => {
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
-    if (platform.lifecycle !== 'FOUNDING' || !platform.infrastructureSetup || platform.starterCatalog) return player;
+    if (platform.lifecycle !== 'FOUNDING' || platform.starterCatalog) return player;
     const defaults = createDefaultStreamingCatalogDraft(player);
     const eligibleIds = new Set(getEligibleOwnedStreamingTitles(player).map(title => title.id));
     const opportunityIds = new Set(getStreamingLicenseOpportunities(player).map(title => title.id));
@@ -466,6 +487,61 @@ export const getStreamingCatalogLicenseStatus = (
         : 'ACTIVE'
 );
 
+/**
+ * Establishes the opening catalogue from production-house releases the player
+ * already controls. This creates references only: no internal sale, expense or
+ * production-house revenue is fabricated.
+ */
+export const establishOwnedStreamingStarterCatalog = (
+    player: Player,
+    inputDraft?: OwnedStreamingCatalogSetupDraft,
+): { player: Player; changed: boolean; reason?: 'INVALID_STATE' | 'EMPTY_CATALOGUE' } => {
+    const savedPlayer = inputDraft ? saveStreamingCatalogDraft(player, inputDraft) : player;
+    const platform = normalizeOwnedStreamingPlatformState(savedPlayer.ownedStreamingPlatform, savedPlayer.id);
+    const draft = platform.catalogSetupDraft || createDefaultStreamingCatalogDraft(savedPlayer);
+    if (platform.lifecycle !== 'FOUNDING' || platform.starterCatalog) {
+        return { player: savedPlayer, changed: false, reason: 'INVALID_STATE' };
+    }
+    const eligibleOwnedIds = new Set(getEligibleOwnedStreamingTitles(savedPlayer).map(title => title.id));
+    const ownedProjectIds = Array.from(new Set(draft.selectedOwnedProjectIds.filter(id => eligibleOwnedIds.has(id))));
+    if (!ownedProjectIds.length) return { player: savedPlayer, changed: false, reason: 'EMPTY_CATALOGUE' };
+
+    const absoluteWeek = getAbsoluteWeek(savedPlayer.age, savedPlayer.currentWeek);
+    const importKey = `starter-catalog-owned:${ownedProjectIds.slice().sort().join(',')}`;
+    if (platform.eventLedger.some(entry => entry.idempotencyKey === importKey)) {
+        return { player: savedPlayer, changed: false, reason: 'INVALID_STATE' };
+    }
+    const importLedger: OwnedStreamingLedgerEntry = {
+        id: createDeterministicId('streaming_event', platform.simulationSeed, importKey),
+        idempotencyKey: importKey,
+        absoluteWeek,
+        type: 'CATALOG_IMPORTED',
+        summary: `${ownedProjectIds.length} owned title${ownedProjectIds.length === 1 ? '' : 's'} linked to the opening catalogue at no internal fee.`,
+        source: 'PLAYER_ACTION',
+        metadata: { packageId: draft.packageId, ownedTitleCount: ownedProjectIds.length, internalFee: 0 },
+    };
+    const nextPlatform = compactOwnedStreamingPlatformForPersistence({
+        ...platform,
+        catalogSetupDraft: null,
+        starterCatalog: {
+            packageId: draft.packageId,
+            ownedProjectIds,
+            licensedProjectIds: [],
+            establishedAtAbsoluteWeek: absoluteWeek,
+        },
+        catalogProjectIds: Array.from(new Set([...platform.catalogProjectIds, ...ownedProjectIds])),
+        milestoneKeys: Array.from(new Set([...platform.milestoneKeys, 'starter-catalog-established'])),
+        eventLedger: [...platform.eventLedger, importLedger],
+        launchProgram: {
+            ...platform.launchProgram,
+            status: 'PLANNING',
+            defineCurrentStep: 'BLUEPRINT',
+            configurationRevision: platform.launchProgram.configurationRevision + 1,
+        },
+    }, savedPlayer.id);
+    return { player: { ...savedPlayer, ownedStreamingPlatform: nextPlatform }, changed: true };
+};
+
 export const signStreamingStarterCatalog = (
     player: Player,
 ): { player: Player; changed: boolean; reason?: 'INVALID_STATE' | 'NOT_READY' | 'MISSING_TITLE' | 'INSUFFICIENT_TREASURY' } => {
@@ -473,7 +549,6 @@ export const signStreamingStarterCatalog = (
     const draft = platform.catalogSetupDraft;
     if (
         platform.lifecycle !== 'FOUNDING'
-        || !platform.infrastructureSetup
         || !draft
         || platform.starterCatalog
     ) return { player, changed: false, reason: 'INVALID_STATE' };
@@ -495,6 +570,7 @@ export const signStreamingStarterCatalog = (
         genre: opportunity.genre,
         licensorName: opportunity.studioName,
         territory: draft.territory,
+        countryIds: getOpeningLicenseCountryIds(player, draft.territory),
         durationWeeks: draft.durationWeeks,
         exclusivity: draft.exclusivity,
         minimumGuarantee: draft.minimumGuarantee,
@@ -504,6 +580,7 @@ export const signStreamingStarterCatalog = (
         startsAtAbsoluteWeek: absoluteWeek,
         expiresAtAbsoluteWeek: absoluteWeek + draft.durationWeeks,
         status: 'ACTIVE',
+        origin: 'STARTER',
     };
     const importKey = `starter-catalog-import:${absoluteWeek}`;
     const importLedger: OwnedStreamingLedgerEntry = {
@@ -569,8 +646,32 @@ export const signStreamingStarterCatalog = (
             factIds: [importLedger.id, licenseLedger.id],
         }],
     }, player.id);
+    const canonicalRegistration = registerStreamingRightsContract(
+        player.world.streamingRightsContracts,
+        createStreamingRightsContractFromLicense({
+            license,
+            seller: {
+                type: 'NPC_STUDIO',
+                id: opportunity.studioId,
+                name: opportunity.studioName,
+                platformId: null,
+            },
+            buyer: {
+                type: 'PLAYER_PLATFORM',
+                id: platform.identity?.slug || `player-platform:${player.id}`,
+                name: platform.identity?.name || 'Player streaming platform',
+                platformId: null,
+            },
+            guaranteeDisposition: 'PAID',
+            settledAtAbsoluteWeek: absoluteWeek,
+        }),
+    );
     return {
-        player: { ...player, ownedStreamingPlatform: nextPlatform },
+        player: {
+            ...player,
+            ownedStreamingPlatform: nextPlatform,
+            world: { ...player.world, streamingRightsContracts: canonicalRegistration.registry },
+        },
         changed: true,
     };
 };

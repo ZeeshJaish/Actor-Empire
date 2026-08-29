@@ -1,8 +1,8 @@
 # EMPIRE+ Phase 3 — Founding Wizard
 
-Status: complete on the v7 contract
-Player-facing scope: identity, audience promise, fixed review, atomic
-incorporation, and cinematic handoff
+Status: complete on the simplified founding contract
+Player-facing scope: legal brand identity, founding manifesto, articles,
+atomic incorporation, and pre-launch headquarters handoff
 
 See [Streaming Empire v7 — Authoritative Handoff](./README.md) for the connected
 system overview.
@@ -17,31 +17,21 @@ ownedStreamingPlatform.lifecycle = ELIGIBLE
 
 The player must still hold at least $85M when they confirm incorporation.
 
-## Three-screen founding flow
+## Simplified founding flow
 
-1. **Brand Studio**
-   - platform name
-   - logo direction
-   - colour identity
-   - sound ident with optional preview
-2. **Audience Promise**
-   - Event House
-   - Binge Machine
-   - Fandom Forever
-   - World Stage
-   - Everyone’s Screen
-   - Technology First
-   - Balanced
-3. **Fixed Incorporation Review**
-   - editable identity and promise summary
-   - exact personal-cash charge
-   - consumed setup amount and opening treasury
-   - founder ownership, CEO, debt, and outside-capital terms
-   - one final incorporation action
+1. Start Platform cinematic
+2. Platform name
+3. Mark or uploaded logo
+4. Wordmark lockup
+5. Typeface
+6. Brand colours
+7. Founding manifesto and audience promise
+8. Articles of Incorporation and animated signature
+9. Corporate seal and fixed $85M payment
 
 The promise is an opening creative direction, not a permanent gameplay class.
-Founding has no launch-scale, funding-plan, server, executive, or partnership
-choice.
+Founding has no ident, storefront, opening-market, infrastructure, server,
+executive, launch-scale, funding-plan, or partnership choice.
 
 ## Resume and save behaviour
 
@@ -51,13 +41,15 @@ Wizard progress is stored at:
 player.ownedStreamingPlatform.foundingDraft
 ```
 
-The draft contains only the current screen, brand identity, audience promise,
-and update week. Saving it does not:
+The draft contains only the current screen, legal brand identity, audience
+promise, manifesto, and update week. Saving it does not:
 
 - create the company
 - deduct cash
 - create debt, equity, or outside capital
 - grant technology, infrastructure, or reach
+- select an ident, storefront, opening market, or server city
+- create an infrastructure draft or spending commitment
 - hire executives
 - add subscribers, catalog titles, or rights
 
@@ -68,23 +60,27 @@ Returning to an eligible career resumes the stored step and selections.
 | Movement | Amount |
 |---|---:|
 | Personal cash charged | $85M |
-| Legal, registration, foundational licensing, and platform setup consumed | $70M |
-| Opening company treasury | $15M |
+| Legal, registration, foundational licensing, and platform setup consumed | $85M |
+| Opening company treasury | $0 |
 
-Every new v7 company starts with:
+Every new v8 company starts with:
 
-- `incorporationModel = FIXED_V7`
+- `incorporationModel = FIXED_V8_ZERO_TREASURY`
 - 100% founder ownership
 - founder as CEO
 - $0 outside capital
 - $0 debt
 - no automatically appointed executives
 - `infrastructureStrategy = UNDECIDED`
+- unconfigured service identity and storefront
+- no market operations or infrastructure draft
+- no installed technology capabilities or technology levels
 - Reach Level 0
 
-The $70M consumed setup amount is not treasury and cannot be spent again.
-Infrastructure, additional founder capital, and optional leadership are
-deliberate company actions inside HQ.
+The entire $85M formation payment is consumed and cannot be spent again.
+Infrastructure, founder capital, and optional leadership are deliberate
+company actions inside HQ. Finance opens first so the operating account can be
+funded explicitly.
 
 ## Atomic incorporation
 
@@ -93,8 +89,8 @@ update then:
 
 - deducts exactly $85M from personal cash
 - creates the canonical platform identity
-- stores the immutable v7 founding profile
-- places exactly $15M in company treasury
+- stores the immutable v8 founding profile
+- opens company treasury at exactly $0
 - records the debt-free, undiluted incorporation capital action
 - installs the founder as current CEO with an empty appointment roster
 - clears the temporary draft
@@ -115,17 +111,19 @@ status; skipping cannot reverse incorporation.
 
 ## Save schema
 
-The current owned-platform schema is v7. Founding state includes:
+The current owned-platform schema is v23. Founding state includes:
 
 - compact `foundingDraft`
-- `FIXED_V7` `foundingProfile`
+- `FIXED_V8_ZERO_TREASURY` `foundingProfile` for new companies, with historical `FIXED_V7` records preserved
 - founder-led `leadership`
 - incorporation entry in `finance.capitalActions`
 - `treasuryCash` and `debtPrincipal`
-- typed identity logo, sound ident, colours, and promise
+- exact visual mark or uploaded logo, wordmark lockup, typeface, colours,
+  manifesto, and gameplay promise
 
-Normalization retains legacy pre-v7 founding terms only for save migration.
-New drafts and new companies never write those choices.
+Normalization retains old sound ident, Day-One Market, and server fields only
+for incorporated legacy companies. New drafts and new companies never write
+those operational choices.
 
 ## Validation
 
@@ -133,7 +131,9 @@ Run:
 
 ```bash
 npm run audit:streaming-founding-phase3
+npm run audit:streaming-simplified-founding-phase2
+npm run audit:streaming-canonical-foundation-phase1
 npm run audit:streaming-access-phase2
 npm run audit:owned-streaming-foundation
-npm run lint
+npm run build
 ```

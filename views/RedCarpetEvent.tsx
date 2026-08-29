@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { Player, PendingEvent, ClothingItem, Vehicle, Award } from '../types';
 import { CLOTHING_CATALOG, CAR_CATALOG, MOTORCYCLE_CATALOG, BOAT_CATALOG, AIRCRAFT_CATALOG } from '../services/lifestyleLogic';
-import { determineWinners, generateSeasonWinners, AwardResolvedWinner, Nomination, sanitizeAwardCeremonyEvent, sanitizeAwardHistoryEntries, sanitizeAwardRecords } from '../services/awardLogic';
+import { createCanonicalAwardRecordId, determineWinners, generateSeasonWinners, AwardResolvedWinner, Nomination, sanitizeAwardCeremonyEvent, sanitizeAwardHistoryEntries, sanitizeAwardRecords } from '../services/awardLogic';
 import { NPC_DATABASE } from '../services/npcLogic';
 import {
   AwardNightConfig,
@@ -312,7 +312,7 @@ const getResolvedWinnerEntry = (
   currentResults: { won: boolean; nomination: Nomination }[]
 ): Nomination | null => {
   const nominees = fullBallot?.[category];
-  if (nominees?.length) return [...nominees].sort((a, b) => b.score - a.score)[0];
+  if (nominees?.length) return [...nominees].sort((a, b) => b.score - a.score || a.project.id.localeCompare(b.project.id))[0];
   const result = currentResults.find(item => item.nomination.category === category);
   return result?.won ? result.nomination : null;
 };
@@ -344,7 +344,7 @@ const buildFillers = (
   const otherCategories = Object.keys(fullBallot).filter(category => !playerCategories.has(category));
   const toFiller = (category: string): FillerCategory => {
     const nominees = fullBallot[category] || [];
-    const winner = [...nominees].sort((a, b) => b.score - a.score)[0] || nominees[0];
+    const winner = [...nominees].sort((a, b) => b.score - a.score || a.project.id.localeCompare(b.project.id))[0] || nominees[0];
     return {
       cat: category,
       noms: nominees.slice(0, 4).map(nomination => toAwardNomineeDisplay(nomination, playerName)),
@@ -460,12 +460,13 @@ const buildCeremonyResolvedWinners = (
 ): AwardResolvedWinner[] => {
   if (fullBallot) {
     return Object.entries(fullBallot).flatMap(([category, nominees]) => {
-      const winnerEntry = [...nominees].sort((a, b) => b.score - a.score)[0];
+      const winnerEntry = [...nominees].sort((a, b) => b.score - a.score || a.project.id.localeCompare(b.project.id))[0];
       if (!winnerEntry) return [];
       return [{
         category,
         winnerName: getNomineeDisplayName(winnerEntry, player.name),
         projectName: winnerEntry.project.name,
+        projectId: winnerEntry.project.id,
         isPlayer: winnerEntry.isPlayer
       }];
     });
@@ -476,6 +477,7 @@ const buildCeremonyResolvedWinners = (
       category: result.nomination.category,
       winnerName: winnerEntry ? getNomineeDisplayName(winnerEntry, player.name) : buildFallbackOpponentNames(result.nomination.category, player.name)[0],
       projectName: winnerEntry?.project.name || result.nomination.project.name,
+      ...(winnerEntry ? { projectId: winnerEntry.project.id } : {}),
       isPlayer: Boolean(winnerEntry?.isPlayer)
     };
   });
@@ -552,7 +554,12 @@ export const RedCarpetEvent: React.FC<RedCarpetEventProps> = ({ player, event: r
       currentResults.forEach(res => {
         const playerWon = isPlayerResolvedWinner(res, fullBallot, currentResults);
         const awardEntry: Award = {
-          id: `award_${Date.now()}_${Math.random()}`,
+          id: createCanonicalAwardRecordId(
+            event.data.awardDef.type,
+            awardYear,
+            res.nomination.category,
+            res.nomination.project.id,
+          ),
           name: event.title,
           category: res.nomination.category,
           year: awardYear,

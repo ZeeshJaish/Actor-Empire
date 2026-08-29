@@ -78,8 +78,13 @@ export const GreenlightTalentPickerModal: React.FC<GreenlightTalentPickerModalPr
                                     <button
                                         type="button"
                                         key={actor.id}
-                                        onClick={() => onSelectActor(actor.id, actor.name, 0)}
-                                        className="w-full p-3 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 rounded-xl text-left flex justify-between items-center transition-all group"
+                                        onClick={() => {
+                                            if (actor.isBookingUnavailable) return;
+                                            onSelectActor(actor.id, actor.name, 0);
+                                        }}
+                                        disabled={actor.isBookingUnavailable}
+                                        title={actor.isBookingUnavailable ? actor.bookingConflictLabel : undefined}
+                                        className={`w-full p-3 border rounded-xl text-left flex justify-between items-center transition-all group ${actor.isBookingUnavailable ? 'bg-red-900/10 border-red-900/30 opacity-55 cursor-not-allowed' : 'bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/30'}`}
                                     >
                                         <div className="flex items-center gap-3">
                                             <div className="w-12 h-12 rounded-full bg-zinc-800 overflow-hidden border border-emerald-500/50">
@@ -87,7 +92,7 @@ export const GreenlightTalentPickerModal: React.FC<GreenlightTalentPickerModalPr
                                             </div>
                                             <div>
                                                 <div className="font-bold text-white group-hover:text-emerald-400 transition-colors">{actor.name}</div>
-                                                <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">{actor.tier} • Talent: {Math.round(actor.stats?.talent || 0)}</div>
+                                                <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">{actor.isBookingUnavailable ? actor.bookingConflictLabel : `${actor.tier} • Talent: ${Math.round(actor.stats?.talent || 0)}`}</div>
                                             </div>
                                         </div>
                                         <div className="text-right"><div className="font-mono font-bold text-emerald-400">Contracted</div></div>
@@ -111,6 +116,7 @@ export const GreenlightTalentPickerModal: React.FC<GreenlightTalentPickerModalPr
                                     const returningData = getReturningActor(returningTalent, actorId);
                                     const isReturning = Boolean(returningData);
                                     const walkedAway = isReturning && !returningData?.accepted && returningData?.attemptsLeft === 0;
+                                    const isBookingUnavailable = Boolean(connectedActor?.isBookingUnavailable);
                                     const salary = connectedActor ? calculateActorSalary(connectedActor, roleType, relationship.closeness) : 0;
 
                                     return (
@@ -118,10 +124,12 @@ export const GreenlightTalentPickerModal: React.FC<GreenlightTalentPickerModalPr
                                             type="button"
                                             key={relationship.id}
                                             onClick={() => {
-                                                if (walkedAway) return;
+                                                if (walkedAway || isBookingUnavailable) return;
                                                 onSelectActor(actorId, relationship.name, salary);
                                             }}
-                                            className={`w-full p-3 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 rounded-xl text-left flex justify-between items-center transition-all group ${walkedAway ? 'opacity-50 cursor-not-allowed bg-red-900/10 border-red-900/30' : ''}`}
+                                            disabled={isBookingUnavailable}
+                                            title={isBookingUnavailable ? connectedActor?.bookingConflictLabel : undefined}
+                                            className={`w-full p-3 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 rounded-xl text-left flex justify-between items-center transition-all group ${walkedAway || isBookingUnavailable ? 'opacity-50 cursor-not-allowed bg-red-900/10 border-red-900/30' : ''}`}
                                         >
                                             <div className="flex items-center gap-3">
                                                 <div className="w-12 h-12 rounded-full bg-zinc-800 overflow-hidden border border-purple-500/50">
@@ -133,13 +141,16 @@ export const GreenlightTalentPickerModal: React.FC<GreenlightTalentPickerModalPr
                                                         {isReturning && <span className="text-[8px] px-1.5 py-0.5 bg-purple-500/20 text-purple-300 rounded-full border border-purple-500/30">Returning</span>}
                                                     </div>
                                                     <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">
-                                                        {relationship.relation} • Closeness: {relationship.closeness}
-                                                        {connectedActor && ` • Talent: ${Math.round(connectedActor.stats?.talent || 0)}`}
+                                                        {isBookingUnavailable
+                                                            ? connectedActor?.bookingConflictLabel
+                                                            : `${relationship.relation} • Closeness: ${relationship.closeness}${connectedActor ? ` • Talent: ${Math.round(connectedActor.stats?.talent || 0)}` : ''}`}
                                                     </div>
                                                 </div>
                                             </div>
                                             <div className="text-right">
-                                                {isReturning && !returningData?.accepted && returningData?.attemptsLeft > 0 ? (
+                                                {isBookingUnavailable ? (
+                                                    <span className="text-red-400 text-xs uppercase tracking-wider">Unavailable</span>
+                                                ) : isReturning && !returningData?.accepted && returningData?.attemptsLeft > 0 ? (
                                                     <button
                                                         type="button"
                                                         onClick={event => {
@@ -171,16 +182,19 @@ export const GreenlightTalentPickerModal: React.FC<GreenlightTalentPickerModalPr
                                 const returningData = getReturningActor(returningTalent, actor.id);
                                 const isReturning = Boolean(returningData);
                                 const walkedAway = isReturning && !returningData?.accepted && returningData?.attemptsLeft === 0;
+                                const isBookingUnavailable = Boolean(actor.isBookingUnavailable);
 
                                 return (
                                     <button
                                         type="button"
                                         key={actor.id}
                                         onClick={() => {
-                                            if (walkedAway) return;
+                                            if (walkedAway || isBookingUnavailable) return;
                                             onSelectActor(actor.id, actor.name, salary);
                                         }}
-                                        className={`w-full p-3 bg-black/20 hover:bg-zinc-800 border border-zinc-800 rounded-xl text-left flex justify-between items-center transition-all group ${walkedAway ? 'opacity-50 cursor-not-allowed bg-red-900/10 border-red-900/30' : 'hover:border-emerald-500/30'}`}
+                                        disabled={isBookingUnavailable}
+                                        title={isBookingUnavailable ? actor.bookingConflictLabel : undefined}
+                                        className={`w-full p-3 bg-black/20 hover:bg-zinc-800 border border-zinc-800 rounded-xl text-left flex justify-between items-center transition-all group ${walkedAway || isBookingUnavailable ? 'opacity-50 cursor-not-allowed bg-red-900/10 border-red-900/30' : 'hover:border-emerald-500/30'}`}
                                     >
                                         <div className="flex items-center gap-3">
                                             <div className="w-12 h-12 rounded-full bg-zinc-800 overflow-hidden border border-zinc-700 group-hover:border-emerald-500/50 transition-colors">
@@ -192,12 +206,14 @@ export const GreenlightTalentPickerModal: React.FC<GreenlightTalentPickerModalPr
                                                     {returningTalent.some(talent => talent.id === actor.id) && <span className="text-[8px] px-1.5 py-0.5 bg-purple-500/20 text-purple-300 rounded-full border border-purple-500/30">Returning</span>}
                                                 </div>
                                                 <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">
-                                                    {actor.tier.replace('_', ' ')} • Fame: {Math.round(actor.stats?.fame || 0)} • Talent: {Math.round(actor.stats?.talent || 0)}
+                                                    {isBookingUnavailable ? actor.bookingConflictLabel : `${actor.tier.replace('_', ' ')} • Fame: ${Math.round(actor.stats?.fame || 0)} • Talent: ${Math.round(actor.stats?.talent || 0)}`}
                                                 </div>
                                             </div>
                                         </div>
                                         <div className="text-emerald-400 font-mono text-sm font-bold">
-                                            {isReturning && !returningData?.accepted && returningData?.attemptsLeft > 0 ? (
+                                            {isBookingUnavailable ? (
+                                                <span className="text-red-400 text-xs uppercase tracking-wider">Unavailable</span>
+                                            ) : isReturning && !returningData?.accepted && returningData?.attemptsLeft > 0 ? (
                                                 <button
                                                     type="button"
                                                     onClick={event => {

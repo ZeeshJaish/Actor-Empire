@@ -33,6 +33,13 @@ interface GreenlightHeaderProps {
     reservedMarketingBudget: number;
     packageBudget: number;
     availableFunding: number;
+    platformCommissionBudget?: {
+        packageBudget: number;
+        productionCap: number;
+        remainingBudget: number;
+        producerFee: number;
+        overBudget: boolean;
+    };
     formatMoney: (value: number) => string;
     translate: (key: any) => string;
 }
@@ -49,6 +56,7 @@ export const GreenlightHeader: React.FC<GreenlightHeaderProps> = ({
     reservedMarketingBudget,
     packageBudget,
     availableFunding,
+    platformCommissionBudget,
     formatMoney,
     translate,
 }) => {
@@ -92,7 +100,7 @@ export const GreenlightHeader: React.FC<GreenlightHeaderProps> = ({
                         <div className="bg-black/60 px-3 py-2 sm:px-5 sm:py-3 rounded-2xl border border-emerald-500/20 backdrop-blur-xl flex flex-col items-end shadow-2xl min-w-[110px] sm:min-w-[160px]">
                             <div className="flex flex-col items-end mb-1 sm:mb-2">
                                 <div className="flex items-center gap-1 group/budget relative">
-                                    <span className="text-[7px] sm:text-[8px] font-black uppercase tracking-[0.2em] text-zinc-500">Est. Budget</span>
+                                    <span className="text-[7px] sm:text-[8px] font-black uppercase tracking-[0.2em] text-zinc-500">{platformCommissionBudget ? 'Production Package' : 'Est. Budget'}</span>
                                     <Info size={8} className="text-zinc-600 cursor-help" />
 
                                     <div className="absolute top-full right-0 mt-2 w-48 bg-zinc-950 border border-zinc-800 rounded-xl p-3 shadow-2xl z-50 opacity-0 group-hover/budget:opacity-100 pointer-events-none transition-opacity">
@@ -107,8 +115,15 @@ export const GreenlightHeader: React.FC<GreenlightHeaderProps> = ({
                                     </div>
                                 </div>
                                 <span className={`text-sm sm:text-xl font-mono font-black tracking-tighter ${packageBudget > availableFunding ? 'text-rose-500' : 'text-emerald-400'}`}>
-                                    {formatMoney(packageBudget)}
+                                    {platformCommissionBudget
+                                        ? `${formatMoney(platformCommissionBudget.packageBudget)} / ${formatMoney(platformCommissionBudget.productionCap)}`
+                                        : formatMoney(packageBudget)}
                                 </span>
+                                {platformCommissionBudget && (
+                                    <span className="mt-0.5 text-[7px] font-bold text-violet-200/70">
+                                        {formatMoney(platformCommissionBudget.remainingBudget)} left • Fee {formatMoney(platformCommissionBudget.producerFee)} separate
+                                    </span>
+                                )}
                             </div>
                             <div className="flex items-center gap-2 w-full justify-end border-t border-white/5 pt-1 sm:pt-2">
                                 <span className="text-[7px] sm:text-[8px] font-black uppercase tracking-widest text-zinc-600">Est. Quality</span>

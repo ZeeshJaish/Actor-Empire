@@ -107,17 +107,18 @@ executive choices:
 | Movement | Amount |
 |---|---:|
 | Personal cash charged once | $85M |
-| Legal, registration, foundational licensing, and platform setup consumed | $70M |
-| Opening company treasury | $15M |
+| Legal, registration, foundational licensing, and platform setup consumed | $85M |
+| Opening company treasury | $0 |
 
 The founder starts with 100% ownership, remains CEO, raises $0 outside capital,
-and creates $0 debt. Incorporation stores a `FIXED_V7` founding profile,
+and creates $0 debt. Incorporation stores a `FIXED_V8_ZERO_TREASURY` founding profile,
 records the capital action and `FOUNDATION_CREATED` fact, clears the draft,
 transitions `ELIGIBLE -> FOUNDING`, and queues the replayable
 `FOUNDING_KEYNOTE`. Repeating the action cannot charge twice.
 
-Infrastructure, extra founder capital, executives, rights, and expansion are
-post-incorporation company decisions.
+Infrastructure, founder capital, executives, rights, and expansion are
+post-incorporation company decisions. The founder must fund the operating
+account from the canonical Finance Room before committing company spend.
 
 ## Level 0 and earned reach
 

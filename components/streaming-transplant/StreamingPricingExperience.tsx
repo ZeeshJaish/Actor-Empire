@@ -20,6 +20,7 @@
  */
 import css from './presentation/screens/Pricing/Pricing.module.css';
 import { cx } from './presentation/cx';
+import { brandVars } from './presentation/brand';
 import React, { useMemo, useState } from 'react';
 import { Brand, Mark, brandColor, brandDeep } from './StreamingBrandVisuals';
 
@@ -219,7 +220,7 @@ export const PricingDesk: React.FC<{
   };
 
   return (
-    <div className={css.pr} style={{ ['--epx-pr-c' as string]: c}}>
+    <div className={css.pr} data-epx-root style={brandVars(brand)}>
       <div className={css.prtop}>
         <button className={css.prx} onClick={onClose} aria-label="Close">✕</button>
         <div className={css.prtitle}>

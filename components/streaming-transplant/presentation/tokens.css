@@ -1,0 +1,336 @@
+/* ============================================================================
+   EMPIRE+ — DESIGN TOKENS
+   ----------------------------------------------------------------------------
+   One source of truth for colour, type, space, shape, depth and motion across
+   every streaming screen.
+
+   WHY THIS EXISTS
+   Before this file the streaming UI carried 61 distinct font sizes (54% of them
+   below 11px, i.e. below the threshold a person can actually read on a phone)
+   and 177 unique hex values on the Build screen alone. Every screen invented
+   its own brand variable — eight names for one idea. Nothing was shared, so
+   nothing felt connected.
+
+   HOW TO USE IT
+   - Never write a raw hex, px font-size, or easing curve in a screen module.
+     Reach for a token. If no token fits, the design needs a decision, not a
+     new magic number.
+   - Brand colour is per-platform and set at runtime. A screen root spreads
+     brandVars() from presentation/brand.ts, which sets --epx-brand-h and
+     --epx-brand-s; every brand token below derives from those two numbers.
+   - Legacy per-screen variables (--epx-bld-c and friends) still work.
+     brandVars() emits them alongside the canonical pair, so screens migrate
+     one at a time instead of in a big-bang rewrite.
+   - Every name here is prefixed --epx-. The host game declares its own
+     unprefixed :root tokens (--ink, --ease-out, --gold and ~60 more in
+     styles/intro.css); the prefix is what keeps the two from silently
+     overwriting each other.
+
+   This file is GLOBAL on purpose. It is imported once, from
+   presentation/index.ts, and must never be renamed to *.module.css.
+   ========================================================================== */
+
+:root {
+  /* ==========================================================================
+     1 · SURFACE — the near-black blues the game is built on.
+
+     Fourteen hand-mixed blacks collapsed into five rungs. They are separated by
+     real luminance steps so a card genuinely reads as sitting ON the canvas
+     rather than being a slightly different guess at the same colour.
+     ====================================================================== */
+  --epx-s-void:      #030407;   /* letterbox, cinematic bars, behind everything   */
+  --epx-s-canvas:    #05070b;   /* the screen itself                              */
+  --epx-s-surface:   #0a0c12;   /* cards, panels, list rows                       */
+  --epx-s-raised:    #10131b;   /* raised card, selected row, input wells         */
+  --epx-s-overlay:   #161a24;   /* sheets, popovers, menus                        */
+
+  /* Scrims for anything that floats over content. */
+  --epx-scrim:       rgba(3, 4, 8, 0.78);
+  --epx-scrim-heavy: rgba(2, 3, 7, 0.9);
+
+  /* ==========================================================================
+     2 · LINE — three weights, no more. Hairline separates, line encloses,
+     strong asks for attention.
+     ====================================================================== */
+  --epx-line-hairline: rgba(255, 255, 255, 0.06);
+  --epx-line:          rgba(255, 255, 255, 0.10);
+  --epx-line-strong:   rgba(255, 255, 255, 0.18);
+
+  /* ==========================================================================
+     3 · FOREGROUND — five text weights, high to low.
+
+     fg-4 is the exact grey the codebase already used 82 times for labels; it
+     was the one honest note in the old palette and it is kept as-is.
+
+     Named `fg` rather than `ink` because Shell.module.css already registers
+     `--epx-ink` via @property as a <percentage> for the signature ink-flow
+     animation. A registered custom property rejects values outside its syntax,
+     so a colour declared under that name silently resolves to 0% everywhere.
+     ====================================================================== */
+  --epx-fg-max: #ffffff;   /* the number that matters most on the screen        */
+  --epx-fg:     #eef0f5;   /* primary text                                      */
+  --epx-fg-2:   #c6ccda;   /* secondary — values, active labels                 */
+  --epx-fg-3:   #9aa3b5;   /* tertiary — supporting copy                        */
+  --epx-fg-4:   #7d8698;   /* muted — eyebrows, units, metadata                 */
+  --epx-fg-5:   #5f6875;   /* disabled, ghost, placeholder                      */
+
+  /* ==========================================================================
+     4 · SEMANTIC — good / warn / bad.
+
+     The hues are the ones already in use (they were the best thing in the old
+     palette). Each has a bright face, a soft tint for text on dark, and a wash
+     for backgrounds, so a state never needs a bespoke rgba() again.
+     ====================================================================== */
+  --epx-good:       #4ade80;
+  --epx-good-tint:  #93efb8;
+  --epx-good-deep:  #1d6b3f;
+  --epx-good-wash:  rgba(74, 222, 128, 0.12);
+  --epx-good-line:  rgba(74, 222, 128, 0.38);
+
+  --epx-warn:       #ffb020;
+  --epx-warn-tint:  #ffd58a;
+  --epx-warn-deep:  #6b4a10;
+  --epx-warn-wash:  rgba(255, 176, 32, 0.12);
+  --epx-warn-line:  rgba(255, 176, 32, 0.38);
+
+  --epx-bad:        #ff5a5f;
+  --epx-bad-tint:   #ff9498;
+  --epx-bad-deep:   #6b1f22;
+  --epx-bad-wash:   rgba(255, 90, 95, 0.12);
+  --epx-bad-line:   rgba(255, 90, 95, 0.40);
+
+  /* Neutral "pending / not yet true" — for pre-launch numbers that would be a
+     lie if they were rendered in a live colour. */
+  --epx-pending:      #6d7a8e;
+  --epx-pending-wash: rgba(109, 122, 142, 0.12);
+
+  /* ==========================================================================
+     5 · BRAND — derived from two numbers.
+
+     A screen root sets only --epx-brand-h and --epx-brand-s. Everything else follows,
+     which is why the whole UI re-themes when the player picks their colour and
+     why no screen ever needs its own brand variable again.
+
+     The fallbacks here are the EMPIRE+ house colour, used before a platform
+     exists (locked screen, eligibility, founding chapter one).
+     ====================================================================== */
+  --epx-brand-h: 210;
+  --epx-brand-s: 88%;
+  --epx-brand-s-deep: 75%;
+
+  --epx-brand:       hsl(var(--epx-brand-h) var(--epx-brand-s) 58%);
+  --epx-brand-lift:  hsl(var(--epx-brand-h) var(--epx-brand-s) 70%);   /* hover / active   */
+  --epx-brand-deep:  hsl(var(--epx-brand-h) var(--epx-brand-s-deep) 26%);
+  --epx-brand-ink:   #05070b;                                   /* text ON brand   */
+  --epx-brand-wash:  hsl(var(--epx-brand-h) var(--epx-brand-s) 58% / 0.12);
+  --epx-brand-veil:  hsl(var(--epx-brand-h) var(--epx-brand-s) 58% / 0.05);
+  --epx-brand-line:  hsl(var(--epx-brand-h) var(--epx-brand-s) 58% / 0.38);
+  --epx-brand-glow:  0 0 12px hsl(var(--epx-brand-h) var(--epx-brand-s) 58% / 0.55);
+  --epx-brand-grad:  linear-gradient(150deg, var(--epx-brand), var(--epx-brand-deep));
+
+  /* ==========================================================================
+     6 · DOCUMENT — the paper palette.
+
+     Term sheets, formation settlements, contracts and the listing prospectus are the
+     game's most convincing moments precisely because they do NOT look like the
+     rest of the UI. That divergence is deliberate, so it gets tokens too rather
+     than being re-mixed by hand in every cinematic.
+     ====================================================================== */
+  --epx-doc-paper:  #efe9da;
+  --epx-doc-aged:   #b6ac93;
+  --epx-doc-ink:    #1a1610;
+  --epx-doc-faint:  #6d675a;
+  --epx-doc-rule:   rgba(26, 22, 16, 0.22);
+  --epx-doc-seal:   #8e2118;
+  --epx-doc-gold:   #8a7a52;
+
+  /* ==========================================================================
+     7 · TYPE — eight steps, floor of 11px.
+
+     The old UI had 61 sizes because labels were shrunk until they fit. That is
+     backwards: if the text does not fit, there is too much text. The floor is
+     11px because that is the smallest size a person reads on a phone without
+     leaning in, and a game should never make you lean in.
+
+     Each token notes the range of old sizes it replaces, so migration is a
+     lookup rather than a judgement call.
+     ====================================================================== */
+  --epx-t-micro:   11px;  /* replaces 3.8–8px    · eyebrows, units, chips        */
+  --epx-t-caption: 12px;  /* replaces 8.5–9.5px  · metadata under a value        */
+  --epx-t-body:    14px;  /* replaces 10–12.5px  · body copy, list rows          */
+  --epx-t-value:   17px;  /* replaces 13–15px    · stat values, card titles      */
+  --epx-t-title:   21px;  /* replaces 16–19px    · section + hero titles         */
+  --epx-t-hero:    27px;  /* replaces 20–26px    · the one number on the screen  */
+  --epx-t-display: 36px;  /* replaces 27–37px    · premiere, reveals             */
+  --epx-t-mega:    52px;  /* replaces 38–62px    · full-screen cinematic         */
+
+  --epx-lh-flat:  1;
+  --epx-lh-tight: 1.15;
+  --epx-lh-snug:  1.3;
+  --epx-lh-body:  1.5;
+
+  --epx-fw-reg:   500;
+  --epx-fw-med:   600;
+  --epx-fw-bold:  800;
+  --epx-fw-black: 900;
+
+  --epx-track-caps:  0.16em;   /* all-caps eyebrows need air                     */
+  --epx-track-wide:  0.3em;    /* cinematic single words                         */
+  --epx-track-none:  0;
+  --epx-track-tight: -0.02em;  /* big numbers close up                           */
+
+  --epx-font-ui:   'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --epx-font-mono: ui-monospace, Menlo, 'SF Mono', 'Courier New', monospace;
+  --epx-font-doc:  Georgia, 'Times New Roman', serif;
+
+  /* ==========================================================================
+     8 · SPACE — 4px base. Nine rungs cover every gap in the app.
+     ====================================================================== */
+  --epx-sp-1:  4px;
+  --epx-sp-2:  8px;
+  --epx-sp-3:  12px;
+  --epx-sp-4:  16px;
+  --epx-sp-5:  20px;
+  --epx-sp-6:  24px;
+  --epx-sp-8:  32px;
+  --epx-sp-10: 40px;
+  --epx-sp-12: 48px;
+
+  /* The gutter every screen uses, and the phone-frame width the whole
+     streaming UI is composed inside. */
+  --epx-gutter:    16px;
+  --epx-frame-max: 520px;
+
+  /* Nothing tappable is ever smaller than this. */
+  --epx-tap-min: 44px;
+
+  /* ==========================================================================
+     9 · SHAPE
+     ====================================================================== */
+  --epx-r-xs:   6px;
+  --epx-r-sm:   10px;
+  --epx-r-md:   14px;
+  --epx-r-lg:   18px;
+  --epx-r-xl:   24px;
+  --epx-r-pill: 999px;
+
+  /* ==========================================================================
+     10 · DEPTH — shadow says "above", never "decorated".
+     ====================================================================== */
+  --epx-e-1:     0 1px 2px rgba(0, 0, 0, 0.4);
+  --epx-e-2:     0 4px 14px rgba(0, 0, 0, 0.45);
+  --epx-e-3:     0 12px 32px rgba(0, 0, 0, 0.55);
+  --epx-e-4:     0 24px 60px rgba(0, 0, 0, 0.65);
+  --epx-e-brand: 0 12px 32px hsl(var(--epx-brand-h) var(--epx-brand-s) 58% / 0.3);
+  --epx-e-inset: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+
+  /* ==========================================================================
+     11 · MOTION — the part that makes the game feel alive.
+
+     Three curves, five durations. --epx-ease-out is the workhorse: it starts fast
+     and settles, which is what makes an entrance feel physical rather than
+     mechanical. --epx-ease-spring overshoots and is reserved for things that should
+     feel satisfying to touch (a rack landing, a chip locking in, a seal
+     stamping). --epx-d-cine is only for cutscene beats.
+     ====================================================================== */
+  --epx-ease-out:    cubic-bezier(0.22, 1, 0.36, 1);
+  --epx-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --epx-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  --epx-d-instant: 90ms;
+  --epx-d-fast:    160ms;
+  --epx-d-base:    240ms;
+  --epx-d-slow:    420ms;
+  --epx-d-cine:    900ms;
+
+  /* Stagger step for lists that reveal one item at a time. */
+  --epx-stagger: 45ms;
+
+  /* ==========================================================================
+     12 · LAYERS — one ladder, so nothing ever fights again.
+     ====================================================================== */
+  --epx-z-base:      0;
+  --epx-z-raised:    10;
+  --epx-z-sticky:    20;
+  --epx-z-hud:       30;
+  --epx-z-nav:       40;
+  --epx-z-sheet:     70;
+  --epx-z-modal:     90;
+  --epx-z-cinematic: 100;
+  --epx-z-toast:     120;
+}
+
+/* ============================================================================
+   MOTION PRIMITIVES
+   ----------------------------------------------------------------------------
+   Global keyframes, so a cutscene or a reveal never has to define its own. Any
+   screen module can reference these by name.
+   ========================================================================== */
+
+@keyframes epx-rise      { from { opacity: 0; transform: translateY(16px) } to { opacity: 1; transform: none } }
+@keyframes epx-rise-sm   { from { opacity: 0; transform: translateY(7px) }  to { opacity: 1; transform: none } }
+@keyframes epx-fade      { from { opacity: 0 }                              to { opacity: 1 } }
+@keyframes epx-pop       { from { opacity: 0; transform: scale(0.86) }      to { opacity: 1; transform: scale(1) } }
+@keyframes epx-drop      { from { opacity: 0; transform: translateY(-12px) } to { opacity: 1; transform: none } }
+@keyframes epx-blink     { 50% { opacity: 0.25 } }
+@keyframes epx-breathe   { 0%, 100% { opacity: 1 } 50% { opacity: 0.55 } }
+
+/* A light travelling across a surface — loading, "live", processing. */
+@keyframes epx-sweep     { from { transform: translateX(-100%) } to { transform: translateX(220%) } }
+@keyframes epx-shimmer   { from { background-position: -240px 0 } to { background-position: 240px 0 } }
+
+/* Something coming online: a rack, a node, a market lighting up. */
+@keyframes epx-ignite {
+  0%   { opacity: 0; transform: scaleY(0.3); filter: brightness(2.4) }
+  60%  { opacity: 1; transform: scaleY(1.06); filter: brightness(1.5) }
+  100% { opacity: 1; transform: scaleY(1); filter: brightness(1) }
+}
+
+/* A pulse leaving a source — traffic, signal, a market being reached. */
+@keyframes epx-ping {
+  from { opacity: 0.9; transform: scale(0.4) }
+  to   { opacity: 0;   transform: scale(2.6) }
+}
+
+/* A value that just changed, so the eye is told where to look. */
+@keyframes epx-tick {
+  0%   { transform: translateY(0) }
+  40%  { transform: translateY(-5px); opacity: 0.35 }
+  41%  { transform: translateY(5px) }
+  100% { transform: translateY(0); opacity: 1 }
+}
+
+/* Cinematic furniture. */
+@keyframes epx-stamp {
+  0%   { opacity: 0; transform: scale(2.2) rotate(-14deg) }
+  70%  { opacity: 1; transform: scale(0.94) rotate(-7deg) }
+  100% { opacity: 1; transform: scale(1) rotate(-7deg) }
+}
+@keyframes epx-letterbox { from { transform: scaleY(0) } to { transform: scaleY(1) } }
+@keyframes epx-glow      { 0%, 100% { box-shadow: 0 0 0 hsl(var(--epx-brand-h) var(--epx-brand-s) 58% / 0) }
+                           50%      { box-shadow: 0 0 22px hsl(var(--epx-brand-h) var(--epx-brand-s) 58% / 0.45) } }
+
+/* ============================================================================
+   ACCESSIBILITY
+   ----------------------------------------------------------------------------
+   One switch that honours the OS setting. Cutscenes still resolve — they just
+   arrive rather than travel — so nothing becomes unreachable.
+   ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --epx-d-instant: 1ms;
+    --epx-d-fast:    1ms;
+    --epx-d-base:    1ms;
+    --epx-d-slow:    1ms;
+    --epx-d-cine:    1ms;
+    --epx-stagger:   0ms;
+  }
+  [data-epx-root] *,
+  [data-epx-root] *::before,
+  [data-epx-root] *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
+}

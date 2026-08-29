@@ -436,12 +436,13 @@ class GameErrorBoundary extends React.Component<GameErrorBoundaryProps, GameErro
 export const App: React.FC = () => {
   const [player, setPlayer] = useState<Player>(() => migratePlayerSave(INITIAL_PLAYER));
   const [activePage, setActivePage] = useState<Page>(Page.HOME);
-  const [lifestyleInitialView, setLifestyleInitialView] = useState<'MAIN' | 'ASSETS' | 'ACTIVITIES' | 'BUSINESS' | 'PRODUCTION_WIZARD' | 'PRODUCTION_GAME' | 'STREAMING_PLATFORM' | null>(null);
+  const [lifestyleInitialView, setLifestyleInitialView] = useState<'MAIN' | 'ASSETS' | 'ACTIVITIES' | 'BUSINESS' | 'PRODUCTION_WIZARD' | 'PRODUCTION_GAME' | 'STREAMING_PLATFORM' | 'STREAMING_FINANCE' | null>(null);
   const [rightsMarketOpportunityId, setRightsMarketOpportunityId] = useState<string | null>(null);
   const [studioContinuationTarget, setStudioContinuationTarget] = useState<{ studioId: string; scriptId: string } | null>(null);
+  const [platformCommissionTarget, setPlatformCommissionTarget] = useState<{ studioId: string; offerId: string } | null>(null);
   const [initialForbesStudioId, setInitialForbesStudioId] = useState<string | null>(null);
   const [initialMobileStockId, setInitialMobileStockId] = useState<string | null>(null);
-  const [initialMobileAppMode, setInitialMobileAppMode] = useState<'BOXOFFICE' | 'MESSAGES' | null>(null);
+  const [initialMobileAppMode, setInitialMobileAppMode] = useState<'BOXOFFICE' | 'MESSAGES' | 'BANK' | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const weekProcessingLockRef = useRef(false);
   const activeWeekRunIdRef = useRef<string | null>(null);
@@ -3258,11 +3259,11 @@ export const App: React.FC = () => {
         {gameStatus === 'PLAYING' && (
             <>
                 <div className={`${isFullBleedMobileSurface ? 'flex-1 overflow-hidden p-0' : `flex-1 px-5 pt-5 pb-nav-safe overflow-y-auto custom-scrollbar ${player.money < 0 ? 'pt-8' : ''}`}`}>
-                    {activePage === Page.HOME && (<HomePage player={player} onNextWeek={handleNextWeek} isProcessing={isProcessing} onUpdatePlayer={handleUpdatePlayer} setPage={setActivePage} onOpenProductionHouseCheat={() => { setLifestyleInitialView('PRODUCTION_GAME'); setActivePage(Page.LIFESTYLE); }} onOpenStudioAcquisitionCheat={(studioId) => { setInitialForbesStudioId(studioId); setActivePage(Page.MOBILE); }} onOpenBoxOfficeCheat={() => { setInitialMobileAppMode('BOXOFFICE'); setActivePage(Page.MOBILE); }} onQueueBabyNamingCheat={handleQueueBabyNamingCheat} onOpenDeathSummaryPreview={handleOpenDeathSummaryPreview} onShowWhatsNewCheat={handleShowWhatsNewCheat} />)}
+                    {activePage === Page.HOME && (<HomePage player={player} onNextWeek={handleNextWeek} isProcessing={isProcessing} onUpdatePlayer={handleUpdatePlayer} setPage={setActivePage} onOpenProductionHouseCheat={() => { setLifestyleInitialView('PRODUCTION_GAME'); setActivePage(Page.LIFESTYLE); }} onOpenPlatformCommissionCheat={() => { setInitialMobileAppMode('MESSAGES'); setActivePage(Page.MOBILE); }} onOpenStudioAcquisitionCheat={(studioId) => { setInitialForbesStudioId(studioId); setActivePage(Page.MOBILE); }} onOpenBoxOfficeCheat={() => { setInitialMobileAppMode('BOXOFFICE'); setActivePage(Page.MOBILE); }} onQueueBabyNamingCheat={handleQueueBabyNamingCheat} onOpenDeathSummaryPreview={handleOpenDeathSummaryPreview} onShowWhatsNewCheat={handleShowWhatsNewCheat} />)}
                     {activePage === Page.CAREER && (<CareerPage player={player} onQuitJob={handleQuitJob} onRehearse={handleRehearse} onOwnedProductionFocus={handleOwnedProductionFocus} />)}
                     {activePage === Page.IMPROVE && (<ImprovePage player={player} onTrain={()=>{}} onEnroll={(c)=>handleGenericUpdate(p=>{ const previousCommitments = p.commitments; const next: Player = { ...p, money: p.money- (c.upfrontCost||0), commitments: [...p.commitments, {...c, id: `c_${Date.now()}`, weeksCompleted:0}] }; syncWeeklyEnergyForCommitments(next, previousCommitments); return next; })} onCancel={(id)=>handleGenericUpdate(p=>{ const previousCommitments = p.commitments; const next: Player = { ...p, commitments: p.commitments.filter(c=>c.id!==id)}; syncWeeklyEnergyForCommitments(next, previousCommitments); return next; })} onPerformAction={handleImproveAction} />)}
                     {activePage === Page.SOCIAL && (<SocialPage player={player} onInteract={handleSocialInteract} onContinueAsChild={handleContinueAsChild} />)}
-                    {activePage === Page.LIFESTYLE && (<LifestylePage player={player} onBuyItem={handleBuyLifestyleItem} onSellItem={handleSellLifestyleItem} onSetResidence={(id)=>handleGenericUpdate(p=>({ ...p, residenceId: id }))} onStartBusiness={()=>{}} onShutdownBusiness={()=>{}} onUpdatePlayer={handleUpdatePlayer} onPremiumPurchase={handlePremiumPurchase} onReturnHome={() => setActivePage(Page.HOME)} onNavVisibilityChange={setIsBottomNavVisible} initialView={lifestyleInitialView ?? undefined} onInitialViewConsumed={() => setLifestyleInitialView(null)} initialRightsMarketOpportunityId={rightsMarketOpportunityId ?? undefined} onRightsMarketTargetConsumed={() => setRightsMarketOpportunityId(null)} initialStudioContinuation={studioContinuationTarget ?? undefined} onStudioContinuationConsumed={() => setStudioContinuationTarget(null)} />)}
+                    {activePage === Page.LIFESTYLE && (<LifestylePage player={player} onBuyItem={handleBuyLifestyleItem} onSellItem={handleSellLifestyleItem} onSetResidence={(id)=>handleGenericUpdate(p=>({ ...p, residenceId: id }))} onStartBusiness={()=>{}} onShutdownBusiness={()=>{}} onUpdatePlayer={handleUpdatePlayer} onPremiumPurchase={handlePremiumPurchase} onReturnHome={() => setActivePage(Page.HOME)} onNavVisibilityChange={setIsBottomNavVisible} initialView={lifestyleInitialView ?? undefined} onInitialViewConsumed={() => setLifestyleInitialView(null)} onOpenBank={() => { setInitialMobileAppMode('BANK'); setActivePage(Page.MOBILE); }} initialRightsMarketOpportunityId={rightsMarketOpportunityId ?? undefined} onRightsMarketTargetConsumed={() => setRightsMarketOpportunityId(null)} initialStudioContinuation={studioContinuationTarget ?? undefined} onStudioContinuationConsumed={() => setStudioContinuationTarget(null)} initialPlatformCommission={platformCommissionTarget ?? undefined} onPlatformCommissionConsumed={() => setPlatformCommissionTarget(null)} />)}
                     {activePage === Page.MOBILE && (
                         <MobilePage 
                             player={player} 
@@ -3284,6 +3285,11 @@ export const App: React.FC = () => {
                             onOpenStudioContinuation={(studioId, scriptId) => {
                                 if (!studioId || !scriptId) return;
                                 setStudioContinuationTarget({ studioId, scriptId });
+                                setLifestyleInitialView('PRODUCTION_GAME');
+                                setActivePage(Page.LIFESTYLE);
+                            }}
+                            onOpenPlatformCommission={(studioId, offerId) => {
+                                setPlatformCommissionTarget({ studioId, offerId });
                                 setLifestyleInitialView('PRODUCTION_GAME');
                                 setActivePage(Page.LIFESTYLE);
                             }}

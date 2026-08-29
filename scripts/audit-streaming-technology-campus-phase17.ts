@@ -83,9 +83,9 @@ const createFixture = (): Player => {
     };
 };
 
-assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 22, 'Phase 24 should preserve Technology Campus in schema v22.');
+assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 23, 'The canonical foundation should preserve Technology Campus in schema v23.');
 const migrated = normalizeOwnedStreamingPlatformState({ schemaVersion: 14 }, 'phase17-migration');
-assert(migrated.schemaVersion === 22 && migrated.technologyProjects.length === 0, 'Schema v14 saves should migrate with an empty technology-project history.');
+assert(migrated.schemaVersion === 23 && migrated.technologyProjects.length === 0, 'Schema v14 saves should migrate with an empty technology-project history.');
 
 let fixture = createFixture();
 let campus = getStreamingTechnologyCampus(fixture);
@@ -167,7 +167,15 @@ assert(component.includes('Build the systems viewers never see—but always feel
 assert(component.includes('Six facilities. One operating platform.') && component.includes('CONSTRUCTION DOCTRINE'), 'The UI should expose physical facilities and construction strategy.');
 assert(component.includes('There are no real-world timers and no paid skips.'), 'The construction bay should explain the game-week timing contract.');
 assert(styles.includes('@media (max-width: 640px)') && styles.includes('prefers-reduced-motion'), 'Technology Campus should include explicit mobile and motion-safe treatment.');
-assert(hq.includes('showTechnologyCampus') && hq.includes('Enter Technology Campus'), 'Platform HQ should launch the playable campus.');
+/* Reached from the NETWORK division's TECH chip and the Network Desk's build
+   actions since the cinematic transplant; the old 'Enter Technology Campus'
+   button belonged to a render path that is no longer mounted. */
+assert(
+    hq.includes('showTechnologyCampus')
+    && hq.includes("chip === 'TECH'")
+    && hq.includes('onBuild={() => setShowTechnologyCampus(true)}'),
+    'The playable campus must be reachable from the Network division and the Network Desk.',
+);
 assert(weeklyLoop.includes('technologyCampusCost') && weeklyLoop.includes('completeDueStreamingTechnologyProjects'), 'The canonical weekly loop should complete projects and charge their run rate.');
 
 console.log('EMPIRE+ Phase 17 Technology Campus audit passed.');

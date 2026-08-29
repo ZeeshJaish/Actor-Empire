@@ -204,7 +204,7 @@ const createFixture = (): Player => {
 };
 
 const migrated = normalizeOwnedStreamingPlatformState({ schemaVersion: 8 }, 'phase10-migration');
-assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 22, 'Phase 10 records should survive the owned-streaming schema v22 migration.');
+assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 23, 'Phase 10 records should survive the owned-streaming schema v23 migration.');
 assert(migrated.weeklyDecisions.length === 0, 'Older saves should migrate with an empty weekly decision history.');
 assert(migrated.lastAcknowledgedWeeklyReportAbsoluteWeek === null, 'Older saves should not fabricate an acknowledged report.');
 
@@ -235,6 +235,16 @@ assert(realGameWeek.player.currentWeek === 9, 'The real game loop should advance
 assert(
     JSON.stringify(realGameWeek.player.ownedStreamingPlatform.weeklyHistory[0]) === JSON.stringify(deterministicA.snapshot),
     'The real game-week processor should commit the same deterministic owned-platform result.',
+);
+assert(
+    realGameWeek.player.ownedStreamingPlatform.weeklyHistory[0]?.operations?.marketPolicyCost
+        === deterministicA.snapshot?.operations?.marketPolicyCost,
+    'Persistence must retain the exact country tax and levy cost.',
+);
+assert(
+    realGameWeek.player.ownedStreamingPlatform.weeklyHistory[0]?.operations?.marketOperatingCost
+        === deterministicA.snapshot?.operations?.marketOperatingCost,
+    'Persistence must retain the exact local market operating cost.',
 );
 
 const result = deterministicA.snapshot!;

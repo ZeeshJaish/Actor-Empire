@@ -145,8 +145,8 @@ const createFixture = (): Player => {
 };
 
 const migrated = normalizeOwnedStreamingPlatformState({ schemaVersion: 9 }, 'phase11-migration');
-assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 22, 'Phase 24 should advance owned-streaming schema to v22.');
-assert(migrated.schemaVersion === 22 && migrated.cycleReviews.length === 0, 'Older saves should migrate with a safe empty cycle-review history.');
+assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 23, 'The canonical foundation should advance owned-streaming schema to v23.');
+assert(migrated.schemaVersion === 23 && migrated.cycleReviews.length === 0, 'Older saves should migrate with a safe empty cycle-review history.');
 
 let player = createFixture();
 for (let week = 2; week <= 13; week += 1) {

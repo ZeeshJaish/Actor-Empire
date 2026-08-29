@@ -41,6 +41,7 @@ import {
   type StreamingProductLineView,
 } from '../services/streamingProductSuite';
 import StreamingVisualScene from './StreamingVisualScene';
+import { getStreamingResearchPortfolio } from '../services/streamingResearchLifecycle';
 import '../styles/streaming-product-lab.css';
 
 interface Props {
@@ -145,6 +146,7 @@ export default function StreamingProductLab({
   onOpenViewerMode,
 }: Props) {
   const suite = useMemo(() => getStreamingProductSuite(player), [player]);
+  const researchPortfolio = useMemo(() => getStreamingResearchPortfolio(player), [player]);
   const defaultLine = suite.lines.find(line => line.status === 'AVAILABLE')?.definition.id || 'CORE';
   const [ui, dispatch] = useReducer(reducer, {
     view: suite.activeDevelopment ? 'DEVELOPMENT' : 'PORTFOLIO',
@@ -288,6 +290,16 @@ export default function StreamingProductLab({
               </div>
             ) : (
               <>
+                {selectedLine.definition.id === 'KIDS' ? (() => {
+                  const kidsResearch = researchPortfolio.programs.find(item => item.definition.id === 'kids-mode');
+                  return (
+                    <div className={`product-lab-research-handoff is-${String(kidsResearch?.status || 'locked').toLowerCase()}`}>
+                      <FlaskConical size={18} />
+                      <div><strong>Kids Mode research</strong><p>{kidsResearch?.program ? `${kidsResearch.program.stage.replaceAll('_', ' ')} · research and product development remain separate records.` : 'Complete research, prototype, test and IP clearance in Technology Campus first.'}</p></div>
+                      {!kidsResearch?.program || !['READY_TO_INSTALL', 'INSTALLING', 'OPERATING'].includes(kidsResearch.program.stage) ? <button type="button" onClick={onOpenTechnology}>Open Research</button> : <BadgeCheck size={18} />}
+                    </div>
+                  );
+                })() : null}
                 <div className="product-lab-launch-metrics">
                   <div><WalletCards size={16} /><span>Capital</span><strong>{formatMoney(preview.capitalCost)}</strong></div>
                   <div><Clock3 size={16} /><span>Development</span><strong>{preview.developmentWeeks} weeks</strong></div>

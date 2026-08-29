@@ -8,6 +8,8 @@ import { processNpcVentures, syncNpcVenturesToStudios } from './npcVentureLogic'
 import { ALL_GENRES } from './genreCatalog';
 import { applyPassiveStudioEcosystemTurn, applyStudioProjectOutcome, ensureStudioEcosystem } from './studioEcosystem';
 import { getPlayerLanguage, t } from './i18n';
+import { processPlatformAiWorldTurn } from './platformAi';
+import { processStreamingPlatformEcosystemTurn } from './streamingPlatformEcosystemTurn';
 
 // Helpers
 const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
@@ -203,6 +205,14 @@ export const processWorldTurn = (player: Player): { world: WorldState, news: New
     // Ensure we have at least 12 weeks of upcoming rivals
     if (!newWorld.upcomingRivals) newWorld.upcomingRivals = [];
     const currentAbsoluteWeek = getWorldAbsoluteWeek(player.age, player.currentWeek);
+    const platformAiResult = processPlatformAiWorldTurn(player, newWorld, currentAbsoluteWeek);
+    newWorld = platformAiResult.world;
+    news.push(...platformAiResult.news);
+    logs.push(...platformAiResult.logs);
+    const streamingEcosystemResult = processStreamingPlatformEcosystemTurn(player, newWorld, currentAbsoluteWeek);
+    newWorld = streamingEcosystemResult.world;
+    news.push(...streamingEcosystemResult.news);
+    logs.push(...streamingEcosystemResult.logs);
     newWorld.upcomingRivals = newWorld.upcomingRivals
         .map(normalizeScheduledIndustryProject)
         .filter(project => getWorldAbsoluteWeek(project.year, project.weekReleased) >= currentAbsoluteWeek);
@@ -299,29 +309,6 @@ export const processWorldTurn = (player: Player): { world: WorldState, news: New
         const change = Math.floor(npc.netWorth * percentChange);
         npc.netWorth += change;
     });
-
-    // --- D. EVOLVE PLATFORMS & STUDIOS ---
-    if (newWorld.platforms) {
-        Object.values(newWorld.platforms).forEach(platform => {
-            // Subscribers grow or shrink slightly based on reputation and recent hits
-            const hitBonus = platform.recentHits * 0.5; // 0.5M subs per recent hit
-            const churnPenalty = platform.churnRate === 'FAST' ? 0.3 : platform.churnRate === 'MEDIUM' ? 0.1 : 0;
-            const subChange = (Math.random() * 2 - 0.8) + hitBonus - churnPenalty; // -0.8M to +1.2M base
-            platform.subscribers = Math.max(1, platform.subscribers + subChange);
-            
-            // Valuation fluctuates based on subscribers
-            const valChange = (platform.subscribers * 0.05) * (Math.random() * 0.1 - 0.04);
-            platform.valuation = Math.max(1, platform.valuation + valChange);
-            
-            // Cash reserve grows slowly, drops if they buy something (handled elsewhere)
-            platform.cashReserve += Math.floor(platform.subscribers * 0.1); 
-            
-            // Decay recent hits slowly
-            if (Math.random() < 0.1 && platform.recentHits > 0) {
-                platform.recentHits--;
-            }
-        });
-    }
 
     newWorld = applyPassiveStudioEcosystemTurn(newWorld, player.currentWeek, player.age).world;
 
