@@ -14,6 +14,7 @@ import { createDeterministicId } from '../deterministicRandom';
 import {
     createStreamingLicenseContract,
     createStreamingRightsContractFromLicense,
+    getStreamingRightsContract,
     isStreamingLicenseActiveAt,
     millionsToFullCurrency,
     registerStreamingRightsContract,
@@ -116,8 +117,18 @@ export const queuePlatformAiRightsRenewal = (
     const sourcePlatform = input.world.platforms?.[input.platformId];
     if (!sourcePlatform) return { world: input.world, changed: false, record: null, reason: 'PLATFORM_NOT_FOUND' };
     const platform = normalizePlatformAiState(sourcePlatform, input.player.id, input.absoluteWeek);
-    const previous = platform.ai!.rightsContracts.find(contract => contract.id === input.licenseId);
-    if (!previous) return { world: input.world, changed: false, record: null, reason: 'LICENSE_NOT_FOUND' };
+    const projectedPrevious = platform.ai!.rightsContracts.find(contract => contract.id === input.licenseId);
+    const previous = projectedPrevious
+        ? getStreamingRightsContract(input.world.streamingRightsContracts, projectedPrevious.id)
+        : null;
+    if (!previous || previous.buyerPlatformId !== input.platformId) {
+        return { world: input.world, changed: false, record: null, reason: 'LICENSE_NOT_FOUND' };
+    }
+    const hasCanonicalA4Case = Object.values(input.world.streamingRightsCalendar?.renewalCases || {})
+        .some(renewalCase => renewalCase.sourceContractId === previous.id);
+    if (hasCanonicalA4Case) {
+        return { world: input.world, changed: false, record: null, reason: 'DUPLICATE' };
+    }
     if (
         !previous.renewalOption
         || previous.permanentPurchase
@@ -141,10 +152,13 @@ export const queuePlatformAiRightsRenewal = (
         world: updatePlatform(input.world, input.platformId, platform),
         sourceProjectId: previous.sourceProjectId,
         buyerPlatformId: input.platformId,
+        territory: previous.territory,
+        countryIds: previous.countryIds || [],
+        windowType: previous.windowType || 'SECOND_WINDOW',
         exclusivity: previous.exclusivity,
         startsAtAbsoluteWeek: nextStartsAtAbsoluteWeek,
         expiresAtAbsoluteWeek: nextStartsAtAbsoluteWeek + durationWeeks,
-        excludeLicenseIds: [renewalLicenseId],
+        excludeLicenseIds: [previous.id],
     });
     if (!availability.available) {
         return { world: input.world, changed: false, record: null, reason: 'RIGHTS_CONFLICT' };
@@ -222,10 +236,14 @@ const scheduleWindowIsValid = (
 };
 
 const resetInvalidSchedules = (
+    world: WorldState,
     platform: PlatformState,
     absoluteWeek: number,
 ): { platform: PlatformState; resetPlanIds: string[] } => {
-    const contractsById = new Map(platform.ai!.rightsContracts.map(contract => [contract.id, contract]));
+    const contractsById = new Map(platform.ai!.rightsContracts.flatMap(projected => {
+        const canonical = getStreamingRightsContract(world.streamingRightsContracts, projected.id);
+        return canonical ? [[canonical.id, canonical] as const] : [];
+    }));
     const resetPlanIds: string[] = [];
     const decisions: PlatformAiDecisionRecord[] = [];
     const slate = platform.ai!.slate.map(plan => {
@@ -295,7 +313,10 @@ const activateSettledRenewals = (
     for (const recordId of candidateIds) {
         const record = nextPlatform.ai!.rightsRenewals.find(candidate => candidate.id === recordId);
         if (!record) continue;
-        const previous = nextPlatform.ai!.rightsContracts.find(contract => contract.id === record.previousLicenseId);
+        const previousProjection = nextPlatform.ai!.rightsContracts.find(contract => contract.id === record.previousLicenseId);
+        const previous = previousProjection
+            ? getStreamingRightsContract(input.world.streamingRightsContracts, previousProjection.id)
+            : null;
         const sourceProject = input.world.projects.find(project => project.id === record.sourceProjectId);
         if (!previous || !sourceProject) continue;
         const renewalLicenseId = getPlatformAiRightsRenewalContractId(
@@ -310,10 +331,13 @@ const activateSettledRenewals = (
             world: worldWithCurrentPlatform,
             sourceProjectId: record.sourceProjectId,
             buyerPlatformId: input.platformId,
+            territory: previous.territory,
+            countryIds: previous.countryIds || [],
+            windowType: previous.windowType || 'SECOND_WINDOW',
             exclusivity: previous.exclusivity,
             startsAtAbsoluteWeek: record.nextStartsAtAbsoluteWeek,
             expiresAtAbsoluteWeek: renewalContractExpiry(record),
-            excludeLicenseIds: [renewalLicenseId],
+            excludeLicenseIds: [previous.id],
         });
         if (!availability.available) continue;
         const renewal = createStreamingLicenseContract({
@@ -421,12 +445,23 @@ export const progressPlatformAiRightsLifecycle = (
     if (expiredLicenseIds.length) {
         platform = { ...platform, ai: { ...platform.ai!, rightsContracts } };
     }
-    const reset = resetInvalidSchedules(platform, input.absoluteWeek);
+    const expiredCanonicalRegistry = expiredLicenseIds.reduce((registry, contractId) => {
+        const canonical = registry?.[contractId];
+        if (!canonical || canonical.status !== 'ACTIVE') return registry;
+        return { ...registry, [contractId]: { ...canonical, status: 'EXPIRED' as const } };
+    }, input.world.streamingRightsContracts);
+    let world = updatePlatform(
+        { ...input.world, streamingRightsContracts: expiredCanonicalRegistry },
+        input.platformId,
+        platform,
+    );
+    const reset = resetInvalidSchedules(world, platform, input.absoluteWeek);
     platform = reset.platform;
     platform = promoteObservedRenewalPayments(platform);
-    const activated = activateSettledRenewals(input, platform);
+    world = updatePlatform(world, input.platformId, platform);
+    const activated = activateSettledRenewals({ ...input, world }, platform);
     platform = activated.platform;
-    let world = updatePlatform(input.world, input.platformId, platform);
+    world = updatePlatform(world, input.platformId, platform);
     for (const contractId of activated.activatedRenewalLicenseIds) {
         const contract = platform.ai!.rightsContracts.find(candidate => candidate.id === contractId);
         if (!contract) continue;
@@ -447,11 +482,15 @@ export const progressPlatformAiRightsLifecycle = (
         world = { ...world, streamingRightsContracts: registration.registry };
     }
     const queuedRenewalIds: string[] = [];
+    const alreadyQueuedLicenseIds = new Set(platform.ai!.rightsRenewals.map(record => record.previousLicenseId));
     const dueLicenseIds = platform.ai!.rightsContracts
         .filter(contract => (
             contract.renewalOption
             && !contract.permanentPurchase
             && input.absoluteWeek >= contract.expiresAtAbsoluteWeek
+            && !alreadyQueuedLicenseIds.has(contract.id)
+            && !Object.values(world.streamingRightsCalendar?.renewalCases || {})
+                .some(renewalCase => renewalCase.sourceContractId === contract.id)
         ))
         .map(contract => contract.id)
         .sort();

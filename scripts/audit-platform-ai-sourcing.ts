@@ -17,6 +17,7 @@ import {
 import {
     createStreamingLicenseContract,
     fullCurrencyToMillions,
+    migrateStreamingRightsContractRegistry,
     millionsToFullCurrency,
     validateStreamingRightsAvailability,
 } from '../services/streamingRightsCore';
@@ -64,6 +65,10 @@ const createWorld = (player: Player): WorldState => normalizeWorldPlatformAi(
     ABSOLUTE_WEEK,
 );
 
+const withCanonicalRights = (player: Player, world: WorldState): WorldState => (
+    migrateStreamingRightsContractRegistry({ ...player, world }).world
+);
+
 const candidateFor = <T extends PlatformAiContentSource>(
     candidates: ReturnType<typeof buildPlatformContentCandidates>,
     source: T,
@@ -96,6 +101,7 @@ assert.ok(netflixCandidatesA.filter(item => item.source === 'COMMISSIONED_ORIGIN
 )));
 assert.ok(netflixCandidatesA.filter(item => item.source !== 'COMMISSIONED_ORIGINAL').every(item => (
     item.sourceProjectIds.length > 0
+    && item.countryIds.length > 0
 )));
 
 const recentMarketProjects = Array.from({ length: 600 }, (_, index) => ({
@@ -246,6 +252,25 @@ assert.deepEqual(
     catalogueContracts.map(contract => contract.sourceProjectId).sort(),
     catalogue.sourceProjectIds.slice().sort(),
 );
+assert.ok(
+    new Set(catalogueContracts.map(contract => contract.minimumGuarantee)).size > 1,
+    'Platform AI catalogue acquisitions must use title value and bidder fit instead of an equal split',
+);
+assert.equal(
+    catalogueContracts.reduce((sum, contract) => sum + contract.minimumGuarantee, 0),
+    millionsToFullCurrency(catalogue.rightsCostMillions),
+    'the title cost bases must reconcile exactly to the package commitment',
+);
+const aiCataloguePackage = catalogueCommit.world.streamingCataloguePackages?.[catalogueCommit.plan!.cataloguePackageId!];
+assert.equal(aiCataloguePackage?.lifecycle, 'SIGNED');
+assert.deepEqual(
+    aiCataloguePackage?.components.map(component => component.sourceProjectId).sort(),
+    catalogue.sourceProjectIds.slice().sort(),
+);
+assert.deepEqual(
+    aiCataloguePackage?.componentContractIds.slice().sort(),
+    catalogueContracts.map(contract => contract.id).sort(),
+);
 assert.equal(catalogueCommit.world.projects.length, world.projects.length);
 
 const transferCommit = commitPlatformContentCandidate({
@@ -281,8 +306,9 @@ const exclusiveContract = createStreamingLicenseContract({
     sellerPlatformId: null,
     windowType: 'FIRST_WINDOW',
 });
-const exclusiveWorld = structuredClone(world);
-exclusiveWorld.platforms!.NETFLIX.ai!.rightsContracts.push(exclusiveContract);
+const exclusiveProjectionWorld = structuredClone(world);
+exclusiveProjectionWorld.platforms!.NETFLIX.ai!.rightsContracts.push(exclusiveContract);
+const exclusiveWorld = withCanonicalRights(fixture, exclusiveProjectionWorld);
 
 const blockedAvailability = validateStreamingRightsAvailability({
     player: fixture,
@@ -323,6 +349,7 @@ const readyNegotiation: OwnedStreamingRightsNegotiation = {
     buyerPlatformId: null,
     buyerName: null,
     territory: 'GLOBAL',
+    countryIds: [],
     durationWeeks: 104,
     exclusivity: 'NON_EXCLUSIVE',
     windowType: 'FIRST_WINDOW',
@@ -355,14 +382,15 @@ playerWithReadyDeal.ownedStreamingPlatform = {
 };
 const blockedPlayerSigning = signStreamingRightsDeal(playerWithReadyDeal, readyNegotiation.id);
 assert.equal(blockedPlayerSigning.changed, false);
-assert.equal(blockedPlayerSigning.reason, 'INVALID_TERMS');
+assert.equal(blockedPlayerSigning.reason, 'RIGHTS_UNAVAILABLE');
 
-const nonExclusiveWorld = structuredClone(world);
-nonExclusiveWorld.platforms!.NETFLIX.ai!.rightsContracts.push({
+const nonExclusiveProjectionWorld = structuredClone(world);
+nonExclusiveProjectionWorld.platforms!.NETFLIX.ai!.rightsContracts.push({
     ...exclusiveContract,
     id: 'shared-netflix-universal-1',
     exclusivity: 'NON_EXCLUSIVE',
 });
+const nonExclusiveWorld = withCanonicalRights(fixture, nonExclusiveProjectionWorld);
 const allowedShared = validateStreamingRightsAvailability({
     player: fixture,
     world: nonExclusiveWorld,

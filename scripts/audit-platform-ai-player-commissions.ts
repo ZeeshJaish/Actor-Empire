@@ -119,8 +119,8 @@ assert.deepEqual(normalizePlatformAiPlayerCommissionOffers({ broken: { id: '' } 
 const restrictedPlayer = makePlayer();
 const restrictedPlatform = normalizePlatformAiState(
     restrictedPlayer.world.platforms!.NETFLIX,
-    ABSOLUTE_WEEK,
     restrictedPlayer.id,
+    ABSOLUTE_WEEK,
 );
 restrictedPlatform.ai!.spendingRestrictions = {
     source: 'EXTERNAL_RECAPITALIZATION',

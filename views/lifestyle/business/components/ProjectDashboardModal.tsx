@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Film, Tv, Users, DollarSign, Star, TrendingUp, Calendar, Check, Activity, Layers, Zap, Info, ChevronRight, Play, Settings, Camera, Award, BarChart3, Globe, BookOpen, Edit3, Sparkles, ShieldCheck } from 'lucide-react';
 import { Player, Studio, CustomPoster, PlatformId, SeasonEpisodeRatings } from '../../../../types';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
-import { getStreamingWeeksUntilStart } from '../../../../services/legacyLogic';
+import { getAbsoluteWeek, getStreamingWeeksUntilStart } from '../../../../services/legacyLogic';
 import { canRenameProjectTitle } from '../../../../services/projectNaming';
 import { WorkingTitleDialog } from './WorkingTitleDialog';
 import { getContinuationEligibility } from '../../../../services/sequelFlow';
@@ -15,6 +15,7 @@ import { getProjectFundingEconomics, getProjectMarketOutcomeRevenue, getStudioRe
 import { resolveProjectType } from '../../../../services/businessLogic';
 import { getProjectAlumniStories } from '../../../../services/livingEnsemble';
 import { resolveStreamingPlatformBrandById } from '../../../../services/streamingPlatformBrandRegistry';
+import { getStreamingRightsProjectLine } from '../../../../components/StreamingRightsCalendar';
 
 const formatMoney = (val: number) => {
     if (val === 0) return '$0';
@@ -219,6 +220,11 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
     const language = getPlayerLanguage(player);
     const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
     const displayTitle = project.name || project.title || project.projectDetails?.title || tr('projectDashboard.untitledProject');
+    const projectRightsLine = getStreamingRightsProjectLine(
+        player,
+        String(project.id || project.projectId || project.projectDetails?.id || ''),
+        getAbsoluteWeek(player.age, player.currentWeek),
+    );
     const canRenameTitle = !!onRenameProject && canRenameProjectTitle(project.phase);
     const isReleaseHistoryPhase = ['RELEASED', 'STREAMING', 'IN THEATERS', 'BIDDING'].includes(project.phase) || Boolean(project.gross || project.totalGross || project.streamingRevenue);
     const releaseFallback = isReleaseHistoryPhase ? { currentAge: player.age, currentWeek: player.currentWeek } : {};
@@ -770,6 +776,11 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                         <span className="w-1 h-1 bg-zinc-600 rounded-full"></span>
                                         <span>{resolvedProjectGenre}</span>
                                     </div>
+                                    {projectRightsLine ? (
+                                        <p className="mt-3 max-w-[92%] text-[10px] font-bold leading-relaxed tracking-wide text-cyan-200/85">
+                                            {projectRightsLine}
+                                        </p>
+                                    ) : null}
                                     {canRenameTitle && (
                                         <button
                                             type="button"
@@ -807,6 +818,11 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                         </>
                                     )}
                                 </div>
+                                {projectRightsLine ? (
+                                    <p className="mt-4 text-xs font-bold tracking-[0.08em] text-cyan-200/75">
+                                        {projectRightsLine}
+                                    </p>
+                                ) : null}
                                 {canRenameTitle && (
                                     <button
                                         type="button"

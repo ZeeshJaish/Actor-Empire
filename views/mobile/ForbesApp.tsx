@@ -337,6 +337,12 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePl
       return `${safeVal.toFixed(1)}M`;
   };
 
+  const formatPlatformCash = (val: number) => {
+      const sign = val < 0 ? '-' : '';
+      const safeVal = Math.abs(Number.isFinite(val) ? val : 0);
+      return safeVal >= 1000 ? `${sign}$${(safeVal / 1000).toFixed(1)}B` : `${sign}$${safeVal.toFixed(0)}M`;
+  };
+
   const fameReach = `${Math.round(player.stats.fame)}% Global Reach`;
   const totalPlatformSubscribers = Math.max(1, platformRanking.reduce((sum, platform) => sum + Math.max(0, platform.subscribers || 0), 0));
   const getMarketShare = (subscribers: number) => Math.min(100, Math.max(0, (subscribers / totalPlatformSubscribers) * 100));
@@ -763,6 +769,12 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePl
                                             <div className="bg-white/5 px-2.5 py-1 rounded-full text-[8px] font-black text-zinc-400 border border-white/5 uppercase tracking-widest backdrop-blur-md whitespace-nowrap">
                                                 {plat.churnRate ? tr('forbes.churn', { value: plat.churnRate }) : tr('forbes.churnNA')}
                                             </div>
+                                            <div className="text-[8px] font-black uppercase tracking-widest" style={{ color: plat.lifecycle === 'DISTRESSED' ? '#fb7185' : plat.brand.primaryColor }}>
+                                                {plat.lifecycle || 'ACTIVE'}
+                                            </div>
+                                            <div className="text-[8px] font-black uppercase tracking-widest text-zinc-600">
+                                                {plat.activeCountryIds?.length || 0} markets
+                                            </div>
                                         </div>
                                     </div>
                             </div>
@@ -776,6 +788,13 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePl
                                     <div className="text-[7px] text-zinc-600 uppercase font-black tracking-[0.2em] mb-1.5">{tr('forbes.valuation')}</div>
                                     <div className="font-mono text-xl text-emerald-400 font-black leading-none tabular-nums truncate">{formatValuation(plat.valuation)}</div>
                                 </div>
+                            </div>
+
+                            <div className="relative z-10 mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-white/5 pt-3 text-[8px] font-black uppercase tracking-[0.16em] text-zinc-600">
+                                <span>Cash <b className="ml-1 text-zinc-300">{formatPlatformCash(plat.cashMillions || 0)}</b></span>
+                                <span>Tech <b className="ml-1 text-zinc-300">{Math.round(plat.technology || 0)}</b></span>
+                                <span>Catalogue <b className="ml-1 text-zinc-300">{Math.round(plat.cataloguePower || 0)}</b></span>
+                                <span className="ml-auto">W{Math.max(0, plat.lastProcessedAbsoluteWeek || 0)}</span>
                             </div>
 
                         </div>

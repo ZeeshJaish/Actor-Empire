@@ -87,6 +87,9 @@ const TECHNOLOGY_BRANCHES: StreamingTechnologyBranch[] = [
 ];
 
 const clampPercent = (value: unknown): number => Math.max(0, Math.min(100, Math.round(Number(value) || 0)));
+const clampPrecisePercent = (value: unknown): number => Math.round(
+    Math.max(0, Math.min(100, Number(value) || 0)) * 100,
+) / 100;
 const finiteNonNegative = (value: unknown, fallback = 0): number => {
     const numeric = Number(value);
     return Number.isFinite(numeric) ? Math.max(0, numeric) : fallback;
@@ -881,7 +884,7 @@ const normalizeFinanceHistory = (value: unknown, fallbackDebtMillions: number): 
             partnerRevenueShareCostMillions: finiteNonNegative(raw.partnerRevenueShareCostMillions),
             administrationCostMillions: finiteNonNegative(raw.administrationCostMillions),
             recurringEfficiency: {
-                controller: raw.recurringEfficiency?.controller === 'PLAYER' ? 'PLAYER' : 'AI',
+                controller: raw.recurringEfficiency?.controller === 'PLAYER' ? 'PLAYER' as const : 'AI' as const,
                 policyVersion: Math.max(1, normalizeNonNegativeInteger(raw.recurringEfficiency?.policyVersion, 1)),
                 costMultiplier: Math.max(0.88, Math.min(1, Number(raw.recurringEfficiency?.costMultiplier) || 1)),
                 standardEligibleCostMillions: finiteNonNegative(raw.recurringEfficiency?.standardEligibleCostMillions),
@@ -1526,7 +1529,7 @@ const normalizeReleaseMemory = (value: unknown): PlatformAiReleaseMemory[] => (A
                 appreciationMultiplier: Math.max(0, Math.min(1, Number(row.appreciationMultiplier) || 0)),
                 completionMultiplier: Math.max(0, Math.min(1, Number(row.completionMultiplier) || 0)),
                 viewsMillions: finiteNonNegative(row.viewsMillions),
-                commercialScore: clampPercent(row.commercialScore),
+                commercialScore: clampPrecisePercent(row.commercialScore),
                 subscriberImpactMillions: Number.isFinite(Number(row.subscriberImpactMillions))
                     ? Number(row.subscriberImpactMillions)
                     : 0,
@@ -1539,9 +1542,9 @@ const normalizeReleaseMemory = (value: unknown): PlatformAiReleaseMemory[] => (A
             targetAudience: raw.targetAudience,
             leadActorId: typeof raw.leadActorId === 'string' && raw.leadActorId ? raw.leadActorId : null,
             directorId: typeof raw.directorId === 'string' && raw.directorId ? raw.directorId : null,
-            quality: clampPercent(raw.quality),
-            commercialScore: clampPercent(raw.commercialScore),
-            prestigeScore: clampPercent(raw.prestigeScore),
+            quality: clampPrecisePercent(raw.quality),
+            commercialScore: clampPrecisePercent(raw.commercialScore),
+            prestigeScore: clampPrecisePercent(raw.prestigeScore),
             subscriberImpactMillions: Number.isFinite(Number(raw.subscriberImpactMillions ?? raw.subscriberImpact))
                 ? Number(raw.subscriberImpactMillions ?? raw.subscriberImpact)
                 : 0,

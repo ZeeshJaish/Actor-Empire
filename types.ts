@@ -280,6 +280,8 @@ export interface StreamingEcosystemOperator {
     belowVisibilityWeeks: Record<string, number>;
     consecutiveStressWeeks: number;
     lastMaterialChangeAtAbsoluteWeek: number;
+    /** Optional only at legacy-save and fixture boundaries; normalization materializes it. */
+    lastProcessedAbsoluteWeek?: number;
 }
 
 export interface StreamingEcosystemMarketShare {
@@ -327,6 +329,15 @@ export interface StreamingCompanySummary {
     momentum?: number;
     lifecycle?: StreamingEcosystemLifecycle;
     corePlatformId?: PlatformId;
+    cashMillions?: number;
+    technology?: number;
+    cataloguePower?: number;
+    localization?: number;
+    prestige?: number;
+    activeCountryIds?: string[];
+    activeProjectCount?: number;
+    activeResearchProgramCount?: number;
+    lastProcessedAbsoluteWeek?: number;
 }
 export type ReleaseScale = 'GLOBAL' | 'MASS' | 'LIMITED';
 export type ReleaseStrategy = 'THEATRICAL' | 'STREAMING_ONLY';
@@ -4036,12 +4047,152 @@ export interface StreamingRightsContract extends OwnedStreamingCatalogLicense {
 
 export type StreamingRightsContractRegistry = Record<string, StreamingRightsContract>;
 
+export const STREAMING_RIGHTS_CALENDAR_SCHEMA_VERSION = 1 as const;
+export type StreamingRightsControlMode = 'STRATEGY' | 'CUSTOM' | 'FULL';
+export type StreamingRightsRenewalPreference =
+    | 'BALANCED'
+    | 'RENEW_WINNERS'
+    | 'RETEST_MARKET'
+    | 'UPFRONT_SECURITY'
+    | 'BACKEND_UPSIDE'
+    | 'RELATIONSHIP_FIRST';
+export type StreamingRightsRenewalCaseStatus =
+    | 'WATCHING'
+    | 'OFFER_AVAILABLE'
+    | 'ACTION_REQUIRED'
+    | 'RENEWAL_SECURED'
+    | 'RETURNING_TO_MARKET'
+    | 'LETTING_EXPIRE'
+    | 'NO_OFFER'
+    | 'EXPIRED';
+export type StreamingRightsRenewalOutcome =
+    | 'PENDING'
+    | 'ACCEPTED'
+    | 'DELEGATED_ACCEPTED'
+    | 'RETURN_TO_MARKET'
+    | 'LET_EXPIRE'
+    | 'NO_OFFER';
+export type StreamingRightsRenewalOfferDisposition = 'PENDING' | 'OFFERED' | 'DECLINED';
+
+export interface StreamingRightsRenewalPolicy {
+    noticeWeeks: number;
+    preference: StreamingRightsRenewalPreference;
+    autoRenewMinimumScore: number;
+    letWeakContractsExpireBelowScore: number;
+    maximumAutomaticGuarantee: number;
+    maximumAutomaticDurationWeeks: number;
+    protectGlobalExclusives: boolean;
+    protectFranchises: boolean;
+}
+
+export interface StreamingRightsManagementState {
+    schemaVersion: typeof STREAMING_RIGHTS_CALENDAR_SCHEMA_VERSION;
+    controlMode: StreamingRightsControlMode;
+    policy: StreamingRightsRenewalPolicy;
+    packagePolicy?: StreamingCataloguePackagePolicy;
+    protectedProjectIds: string[];
+    manualContractIds: string[];
+    updatedAtAbsoluteWeek: number;
+}
+
+export interface StreamingRightsRenewalPerformanceSnapshot {
+    attributedRevenue: number;
+    viewingAccounts: number;
+    watchHours: number;
+    subscriberAcquisition: number;
+    subscriberRetention: number;
+    royaltiesPaid: number;
+    rating: number;
+    awards: number;
+    performanceScore: number;
+    marketDemandScore: number;
+    relationshipScore: number;
+    rivalInterestScore: number;
+    affordabilityScore: number;
+}
+
+export interface StreamingRightsRenewalEconomics {
+    minimumGuarantee: number;
+    platformRevenueShare: number;
+    licensorRevenueShare: number;
+    durationWeeks: number;
+    offerExpiresAtAbsoluteWeek: number;
+}
+
+export interface StreamingRightsRenewalCase {
+    id: string;
+    idempotencyKey: string;
+    sourceContractId: string;
+    sourceProjectId: string;
+    title: string;
+    projectType: 'MOVIE' | 'SERIES';
+    genre: string;
+    territory: StreamingLicenseTerritory;
+    countryIds: string[];
+    exclusivity: StreamingLicenseExclusivity;
+    windowType: StreamingRightsWindowType;
+    seller: StreamingRightsContractParty;
+    incumbentBuyer: StreamingRightsContractParty;
+    sourceExpiresAtAbsoluteWeek: number;
+    renewalStartsAtAbsoluteWeek: number;
+    openedAtAbsoluteWeek: number;
+    decisionDeadlineAbsoluteWeek: number;
+    renewalOption: boolean;
+    status: StreamingRightsRenewalCaseStatus;
+    offerDisposition: StreamingRightsRenewalOfferDisposition;
+    performance: StreamingRightsRenewalPerformanceSnapshot | null;
+    proposedEconomics: StreamingRightsRenewalEconomics | null;
+    controlModeAtOpen: StreamingRightsControlMode;
+    policyPreferenceAtOpen: StreamingRightsRenewalPreference;
+    protectionReasons: string[];
+    delegatedReason: string | null;
+    outcome: StreamingRightsRenewalOutcome;
+    replacementContractId: string | null;
+    resolvedAtAbsoluteWeek: number | null;
+    lastProcessedAbsoluteWeek: number;
+}
+
+export type StreamingRightsRenewalCaseRegistry = Record<string, StreamingRightsRenewalCase>;
+
+export interface StreamingRightsCalendarDigest {
+    id: string;
+    absoluteWeek: number;
+    actionRequired: number;
+    approachingExpiry: number;
+    delegatedRenewals: number;
+    returnedToMarket: number;
+    expired: number;
+    summary: string;
+}
+
+export interface StreamingRightsCalendarState {
+    schemaVersion: typeof STREAMING_RIGHTS_CALENDAR_SCHEMA_VERSION;
+    renewalCases: StreamingRightsRenewalCaseRegistry;
+    digests: StreamingRightsCalendarDigest[];
+    urgentNoticeKeys: string[];
+    lastProcessedAbsoluteWeek: number;
+}
+
 export type StreamingBiddingSessionStatus = 'LIVE' | 'CLOSING' | 'ACCEPTED' | 'LEFT';
 export type StreamingBiddingPlatformStatus = 'WAITING' | 'RESPONDING' | 'FINAL' | 'WITHDRAWN';
 export type StreamingOfferStatus = 'ACTIVE' | 'FINAL' | 'REPLACED' | 'WITHDRAWN' | 'ACCEPTED';
 export type StreamingGuaranteeRecoupment = 'NON_RECOUPABLE' | 'RECOUPABLE';
 export type StreamingBackendBasis = 'ADJUSTED_GROSS_RECEIPTS';
 export type StreamingBiddingEventType = 'OPENED' | 'PITCHED' | 'REVISED' | 'FINAL' | 'WITHDREW' | 'CLOSED' | 'ACCEPTED' | 'LEFT';
+
+/** Immutable rights scope shared by every offer in one bidding room. */
+export interface StreamingBiddingRightsLot {
+    id: string;
+    sourceProjectId: string;
+    territory: StreamingLicenseTerritory;
+    /** Exact canonical country snapshot, including for a worldwide lot. */
+    countryIds: string[];
+    excludedCountryIds: string[];
+    startsAtAbsoluteWeek: number;
+    maximumDurationWeeks: number;
+    windowType: StreamingRightsWindowType;
+    notice: string | null;
+}
 
 export interface StreamingBiddingPlatformInput {
     id: PlatformId;
@@ -4059,6 +4210,11 @@ export interface StreamingBiddingPlatformInput {
     localizationLevelCap?: StreamingRightsLocalizationTerms;
     /** Exact language scope behind the public three-value term. */
     localizationRequirements?: StreamingLocalizationPromise[];
+    /** Markets this platform values strategically for this title. */
+    strategicCountryIds?: string[];
+    /** Optional deterministic strategy inputs; 1 is neutral. */
+    catalogueGapMultiplier?: number;
+    subscriberOpportunityMultiplier?: number;
 }
 
 export interface StreamingOfferVersion {
@@ -4081,6 +4237,8 @@ export interface StreamingOfferVersion {
     backendCap: number | null;
     durationWeeks: number;
     territory: StreamingLicenseTerritory;
+    countryIds: string[];
+    windowType: StreamingRightsWindowType;
     exclusivity: StreamingLicenseExclusivity;
     localization: StreamingRightsLocalizationTerms;
     localizationRequirements?: StreamingLocalizationPromise[];
@@ -4090,6 +4248,8 @@ export interface StreamingOfferVersion {
     expectedTotalCost: number;
     expectedPlatformValue: number;
     createdAtActiveSecond: number;
+    cataloguePackageId?: string | null;
+    componentTerms?: StreamingCataloguePackageOfferRow[];
 }
 
 export interface StreamingBiddingPlatformState {
@@ -4105,8 +4265,10 @@ export interface StreamingBiddingPlatformState {
     fixedExposureCeiling: number;
     expectedTitleGross: number;
     relationshipMultiplier: number;
+    rightsLotValueMultiplier: number;
     localizationLevelCap?: StreamingRightsLocalizationTerms;
     localizationRequirements?: StreamingLocalizationPromise[];
+    catalogueComponentValues?: Record<string, number>;
 }
 
 export interface StreamingBiddingEvent {
@@ -4127,6 +4289,7 @@ export interface StreamingBiddingSession {
     absoluteWeek: number;
     projectType: 'MOVIE' | 'SERIES';
     genre: string;
+    rightsLot: StreamingBiddingRightsLot;
     status: StreamingBiddingSessionStatus;
     roomSecondsRemaining: number;
     activeSecondsElapsed: number;
@@ -4136,9 +4299,126 @@ export interface StreamingBiddingSession {
     events: StreamingBiddingEvent[];
     acceptedOfferId: string | null;
     closedAtActiveSecond: number | null;
+    subjectKind?: 'TITLE' | 'CATALOGUE_PACKAGE';
+    cataloguePackageId?: string | null;
+    componentLots?: StreamingBiddingRightsLot[];
+    catalogueComponents?: StreamingCataloguePackageComponent[];
 }
 
 export type StreamingBiddingSessionRegistry = Record<string, StreamingBiddingSession>;
+
+export const STREAMING_CATALOGUE_PACKAGE_SCHEMA_VERSION = 1 as const;
+export type StreamingCataloguePackageLifecycle =
+    | 'DRAFT'
+    | 'READY'
+    | 'LIVE'
+    | 'SIGNED'
+    | 'WITHDRAWN'
+    | 'INVALIDATED';
+export type StreamingCataloguePackageSource =
+    | 'PLAYER_CURATED'
+    | 'RIGHTS_DESK_PROPOSAL'
+    | 'PLATFORM_AI_SOURCING'
+    | 'OWNED_PLATFORM_MARKET';
+export type StreamingCataloguePackageAutomation = 'SUGGEST_ONLY' | 'ROUTINE_AUTOMATIC';
+
+export interface StreamingCataloguePackagePolicy {
+    automation: StreamingCataloguePackageAutomation;
+    preferredSize: { min: number; max: number };
+    maximumAutomaticSize: number;
+    maximumAutomaticDurationWeeks: number;
+    allowAutomaticExclusive: boolean;
+    allowAutomaticGlobal: boolean;
+    minimumGuaranteeRatio: number;
+}
+
+export interface StreamingCataloguePackageExclusion {
+    projectId: string;
+    title: string;
+    code: string;
+    detail: string;
+}
+
+export interface StreamingCataloguePackageComponent {
+    sourceProjectId: string;
+    title: string;
+    projectType: 'MOVIE' | 'SERIES';
+    genre: string;
+    originalLanguageId: string;
+    sellerStudioId: string;
+    quality: number;
+    audience: number;
+    budget: number;
+    theatricalGross: number;
+    streamingRevenue: number;
+    franchiseProtected: boolean;
+    rightsLot: StreamingBiddingRightsLot;
+    referenceValue: number;
+    referenceWeight: number;
+}
+
+export interface StreamingCataloguePackageOfferRow {
+    componentProjectId: string;
+    componentLotId: string;
+    minimumGuarantee: number;
+    licensorRevenueShare: number;
+    platformRevenueShare: number;
+    backendBasis: StreamingBackendBasis;
+    guaranteeRecoupment: StreamingGuaranteeRecoupment;
+    backendCap: number | null;
+    territory: StreamingLicenseTerritory;
+    countryIds: string[];
+    windowType: StreamingRightsWindowType;
+    durationWeeks: number;
+    exclusivity: StreamingLicenseExclusivity;
+    localization: StreamingRightsLocalizationTerms;
+    localizationRequirements?: StreamingLocalizationPromise[];
+    expectedRoyaltyCost: number;
+    expectedTotalCost: number;
+    referenceAllocation: number;
+    bidderWeight: number;
+}
+
+export interface StreamingCataloguePackageDigest {
+    id: string;
+    absoluteWeek: number;
+    proposed: number;
+    signed: number;
+    skipped: number;
+    summary: string;
+}
+
+export interface StreamingCataloguePackage {
+    schemaVersion: typeof STREAMING_CATALOGUE_PACKAGE_SCHEMA_VERSION;
+    id: string;
+    idempotencyKey: string;
+    source: StreamingCataloguePackageSource;
+    lifecycle: StreamingCataloguePackageLifecycle;
+    name: string;
+    seller: StreamingRightsContractParty;
+    createdAtAbsoluteWeek: number;
+    startsAtAbsoluteWeek: number;
+    requestedWindowType: StreamingRightsWindowType;
+    requestedExclusivity: StreamingLicenseExclusivity;
+    requestedCountryIds: string[];
+    maximumDurationWeeks: number;
+    components: StreamingCataloguePackageComponent[];
+    excluded: StreamingCataloguePackageExclusion[];
+    controlModeAtCreation: StreamingRightsControlMode;
+    protectionReasons: string[];
+    delegatedReason: string | null;
+    manualApprovalRequired: boolean;
+    biddingSessionId: string | null;
+    acceptedOfferId: string | null;
+    signedAtAbsoluteWeek: number | null;
+    totalGuarantee: number;
+    totalExpectedExposure: number;
+    acceptedTerms: StreamingCataloguePackageOfferRow[];
+    componentContractIds: string[];
+    digestId: string | null;
+}
+
+export type StreamingCataloguePackageRegistry = Record<string, StreamingCataloguePackage>;
 
 export interface StreamingTitleRevenueSignal {
     projectId: string;
@@ -4193,6 +4473,8 @@ export interface OwnedStreamingRightsNegotiation {
     buyerPlatformId: PlatformId | null;
     buyerName: string | null;
     territory: StreamingLicenseTerritory;
+    /** Exact bounded scope captured when the term sheet opens. GLOBAL uses []. */
+    countryIds: string[];
     durationWeeks: number;
     exclusivity: StreamingLicenseExclusivity;
     windowType: StreamingRightsWindowType;
@@ -4227,6 +4509,8 @@ export interface OwnedStreamingSublicenseDeal {
     buyerPlatformId: PlatformId;
     buyerName: string;
     territory: StreamingLicenseTerritory;
+    countryIds: string[];
+    windowType: StreamingRightsWindowType;
     durationWeeks: number;
     exclusivity: StreamingLicenseExclusivity;
     upfrontFee: number;
@@ -6947,7 +7231,13 @@ export interface PlatformAiCatalogueDistressDeal {
     buyerPlatformId: PlatformId;
     sourceProjectId: string;
     sellerEntitlementId: string;
+    /** Canonical parent grant for a sublicense; null when the seller owns the original. */
+    sourceContractId: string | null;
     sellerEntitlementExpiresAtAbsoluteWeek: number;
+    territory: StreamingLicenseTerritory;
+    /** Exact immutable buyer-market scope negotiated at queue time. */
+    countryIds: string[];
+    windowType: StreamingRightsWindowType;
     priceMillions: number;
     buyerObligationId: string;
     buyerPlanId: string;
@@ -7181,7 +7471,11 @@ export interface WorldState {
     platformAiPlayerCommissionOffers?: Record<string, PlatformAiPlayerCommissionOffer>;
     platformAiCatalogueDistressDeals?: PlatformAiCatalogueDistressDeal[];
     streamingRightsContracts?: StreamingRightsContractRegistry;
+    streamingRightsCalendar?: StreamingRightsCalendarState;
     streamingBiddingSessions?: StreamingBiddingSessionRegistry;
+    streamingCataloguePackages?: StreamingCataloguePackageRegistry;
+    streamingCataloguePackageDigests?: StreamingCataloguePackageDigest[];
+    streamingCataloguePackagesLastProcessedWeek?: number;
     streamingRoyaltySettlements?: StreamingRoyaltySettlementRegistry;
     streamingPlatformEcosystem?: StreamingPlatformEcosystemState;
     npcVentures?: Record<string, NpcVentureState>;
@@ -7615,6 +7909,7 @@ export interface Player {
     stockTakeovers: StockTakeoverCase[];
     world: WorldState;
     ownedStreamingPlatform: OwnedStreamingPlatformState;
+    streamingRightsManagement?: StreamingRightsManagementState;
     flags: Record<string, any>;
     weeklyOpportunities: {
         auditions: AuditionOpportunity[];
@@ -7729,6 +8024,32 @@ export const INITIAL_PLAYER: Player = {
     shareholderVotes: [],
     stockTakeovers: [],
     ownedStreamingPlatform: createInitialOwnedStreamingPlatformState(),
+    streamingRightsManagement: {
+        schemaVersion: STREAMING_RIGHTS_CALENDAR_SCHEMA_VERSION,
+        controlMode: 'CUSTOM',
+        policy: {
+            noticeWeeks: 8,
+            preference: 'BALANCED',
+            autoRenewMinimumScore: 62,
+            letWeakContractsExpireBelowScore: 35,
+            maximumAutomaticGuarantee: 150_000_000,
+            maximumAutomaticDurationWeeks: 104,
+            protectGlobalExclusives: true,
+            protectFranchises: true,
+        },
+        packagePolicy: {
+            automation: 'SUGGEST_ONLY',
+            preferredSize: { min: 3, max: 6 },
+            maximumAutomaticSize: 7,
+            maximumAutomaticDurationWeeks: 104,
+            allowAutomaticExclusive: false,
+            allowAutomaticGlobal: false,
+            minimumGuaranteeRatio: 0.85,
+        },
+        protectedProjectIds: [],
+        manualContractIds: [],
+        updatedAtAbsoluteWeek: 0,
+    },
     world: { 
         projects: [], 
         trendingGenre: 'ACTION', 
@@ -7785,7 +8106,17 @@ export const INITIAL_PLAYER: Player = {
         talentBookings: [],
         industryProductions: {},
         streamingRightsContracts: {},
+        streamingRightsCalendar: {
+            schemaVersion: STREAMING_RIGHTS_CALENDAR_SCHEMA_VERSION,
+            renewalCases: {},
+            digests: [],
+            urgentNoticeKeys: [],
+            lastProcessedAbsoluteWeek: -1,
+        },
         streamingBiddingSessions: {},
+        streamingCataloguePackages: {},
+        streamingCataloguePackageDigests: [],
+        streamingCataloguePackagesLastProcessedWeek: -1,
         streamingRoyaltySettlements: {},
         platforms: {
             NETFLIX: { id: 'NETFLIX', name: 'Netflix', subscribers: 260, valuation: 260, reputation: 80, cashReserve: 5000, recentHits: 0, color: 'text-red-600', churnRate: 'FAST' },

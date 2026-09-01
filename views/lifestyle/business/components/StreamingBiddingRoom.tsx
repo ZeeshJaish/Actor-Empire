@@ -1,12 +1,13 @@
 import React from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Clock3, FileSignature, Radio, X } from 'lucide-react';
-import type { StreamingBiddingSession, StreamingOfferVersion } from '../../../../types';
+import type { StreamingBiddingSession, StreamingCataloguePackageComponent, StreamingOfferVersion } from '../../../../types';
 import {
     advanceStreamingBiddingSession,
     getStreamingBiddingClosingOffers,
 } from '../../../../services/streamingBidding';
 import { resolveStreamingPlatformBrandById } from '../../../../services/streamingPlatformBrandRegistry';
+import { formatStreamingBiddingRightsLotScope } from '../../../../services/streamingRightsCompatibility';
 import StreamingPlatformBrand from '../../../../components/StreamingPlatformBrand';
 import '../../../../styles/streaming-bidding-room.css';
 
@@ -19,6 +20,8 @@ interface StreamingBiddingRoomProps {
     onAccept: (offer: StreamingOfferVersion) => void;
     onLeave: () => void;
     onBack: () => void;
+    preflightMessage?: string | null;
+    canStart?: boolean;
 }
 
 const formatMoney = (value: number): string => {
@@ -38,8 +41,14 @@ const OfferSlip: React.FC<{
     canAccept: boolean;
     energyCost: number;
     onAccept: (offer: StreamingOfferVersion) => void;
-}> = ({ offer, canAccept, energyCost, onAccept }) => {
+    rightsScope: string;
+    packageComponents?: StreamingCataloguePackageComponent[];
+}> = ({ offer, canAccept, energyCost, onAccept, rightsScope, packageComponents }) => {
     const brand = resolveStreamingPlatformBrandById(offer.platformId, offer.platformName);
+    const packageRows = offer.componentTerms || [];
+    const backendRange = packageRows.length
+        ? `${Math.min(...packageRows.map(row => row.licensorRevenueShare))}-${Math.max(...packageRows.map(row => row.licensorRevenueShare))}%`
+        : null;
     return (
     <motion.article
         layout
@@ -54,7 +63,7 @@ const OfferSlip: React.FC<{
                 <span className="streaming-bid-slip__eyebrow"><StreamingPlatformBrand brand={brand} variant="WORDMARK" size="XS" /> · Revision {offer.revision}</span>
                 <h3>{formatMoney(offer.minimumGuarantee)}</h3>
             </div>
-            <div className="streaming-bid-slip__structure">{formatDealStructure(offer)}</div>
+            <div className="streaming-bid-slip__structure">{packageRows.length ? `${packageRows.length} titles · ${backendRange} backend` : formatDealStructure(offer)}</div>
         </header>
 
         <div className="streaming-bid-slip__terms" aria-label={`${offer.platformName} contract terms`}>
@@ -63,10 +72,20 @@ const OfferSlip: React.FC<{
             <div><span>Guarantee</span><strong>{offer.guaranteeRecoupment === 'RECOUPABLE' ? 'Recoupable' : 'Non-recoupable'}</strong></div>
             <div><span>Backend cap</span><strong>{offer.backendCap === null ? 'Uncapped' : formatMoney(offer.backendCap)}</strong></div>
             <div><span>Term</span><strong>{offer.durationWeeks} weeks</strong></div>
-            <div><span>Rights</span><strong>{offer.exclusivity === 'EXCLUSIVE' ? 'Global exclusive' : 'Global shared'}</strong></div>
+            <div><span>Rights</span><strong>{rightsScope} · {offer.exclusivity === 'EXCLUSIVE' ? 'exclusive' : 'shared'}</strong></div>
             <div><span>Localization</span><strong>{offer.localization === 'DUBS_AND_SUBTITLES' ? 'Dubs + subtitles' : offer.localization === 'SUBTITLES' ? 'Subtitles' : 'Not included'}</strong></div>
             <div><span>Renewal</span><strong>{offer.renewalOption ? 'First option' : 'Open market'}</strong></div>
         </div>
+
+        {packageRows.length ? <details className="streaming-bid-slip__schedule">
+            <summary><span>Title schedule</span><small>Guarantee · backend · recoupment</small></summary>
+            <div>
+                {packageRows.map((row, index) => {
+                    const component = packageComponents?.find(candidate => candidate.sourceProjectId === row.componentProjectId);
+                    return <p key={row.componentProjectId}><i>{String(index + 1).padStart(2, '0')}</i><span><strong>{component?.title || row.componentProjectId}</strong><small>{row.countryIds.length} markets · {row.durationWeeks}w</small></span><b>{formatMoney(row.minimumGuarantee)}</b><em>{row.licensorRevenueShare}%</em><u>{row.guaranteeRecoupment === 'RECOUPABLE' ? 'Recoupable' : 'Non-recoupable'}{row.backendCap === null ? ' · uncapped' : ` · ${formatMoney(row.backendCap)} cap`}</u></p>;
+                })}
+            </div>
+        </details> : null}
 
         {(offer.productionFunding > 0 || offer.futureSeasonFunding > 0) && (
             <div className="streaming-bid-slip__funding">
@@ -108,6 +127,8 @@ export const StreamingBiddingRoom: React.FC<StreamingBiddingRoomProps> = ({
     onAccept,
     onLeave,
     onBack,
+    preflightMessage,
+    canStart = true,
 }) => {
     const latestSessionRef = React.useRef(session);
     const onSessionChangeRef = React.useRef(onSessionChange);
@@ -131,10 +152,10 @@ export const StreamingBiddingRoom: React.FC<StreamingBiddingRoomProps> = ({
                 <div className="streaming-bidding-room__opening-mark"><Radio size={30} aria-hidden="true" /></div>
                 <p className="streaming-bidding-room__kicker">Rights floor ready</p>
                 <h3>Open the contract table</h3>
-                <p>Platforms will compete against one another. You can accept a standing contract, or let the room close and walk away.</p>
+                <p>{preflightMessage || 'Worldwide rights available. Platforms will compete against one another; you can accept a standing contract or let the room close.'}</p>
                 <div className="streaming-bidding-room__idle-actions">
                     <button type="button" className="streaming-bidding-room__back" onClick={onBack}>Back</button>
-                    <button type="button" className="streaming-bidding-room__start" onClick={onStart}>Start bidding war</button>
+                    <button type="button" className="streaming-bidding-room__start" disabled={!canStart} onClick={onStart}>{canStart ? 'Start bidding war' : 'No eligible market'}</button>
                 </div>
             </section>
         );
@@ -143,10 +164,13 @@ export const StreamingBiddingRoom: React.FC<StreamingBiddingRoomProps> = ({
     const offers = getStreamingBiddingClosingOffers(session);
     const closing = session.status === 'CLOSING' || session.status === 'LEFT';
     const progress = Math.max(0, Math.min(100, session.roomSecondsRemaining / 15 * 100));
+    const rightsScope = formatStreamingBiddingRightsLotScope(session.rightsLot);
+    const isPackage = session.subjectKind === 'CATALOGUE_PACKAGE';
 
     return (
         <section className={`streaming-bidding-room ${closing ? 'streaming-bidding-room--closing' : ''}`}>
             <header className="streaming-bidding-room__clock" aria-live="polite">
+                {isPackage ? <div className="streaming-bidding-room__package-line"><span>CATALOGUE LOT</span><strong>{session.title}</strong><small>{session.catalogueComponents?.length || session.componentLots?.length || 0} titles · all-or-nothing decision</small></div> : null}
                 <div className="streaming-bidding-room__clock-copy">
                     <span><Clock3 size={15} aria-hidden="true" /> Room clock</span>
                     <strong>{closing ? 'Closing table' : `${session.roomSecondsRemaining}s`}</strong>
@@ -155,6 +179,7 @@ export const StreamingBiddingRoom: React.FC<StreamingBiddingRoomProps> = ({
                     <motion.div animate={{ width: `${closing ? 0 : progress}%` }} transition={{ duration: 0.35 }} />
                 </div>
                 <p>{closing ? 'Live revisions have stopped. Choose any standing contract or leave it unsigned.' : 'A new pitch can extend this shared clock. Every platform waits the same six seconds before acting again.'}</p>
+                {session.rightsLot.notice && <p className="streaming-bidding-room__scope-notice">{session.rightsLot.notice}</p>}
             </header>
 
             <div className="streaming-bidding-room__layout">
@@ -165,7 +190,7 @@ export const StreamingBiddingRoom: React.FC<StreamingBiddingRoomProps> = ({
                     </div>
                     <AnimatePresence mode="popLayout">
                         {offers.map(offer => (
-                            <OfferSlip key={offer.id} offer={offer} canAccept={canAccept && session.status !== 'LEFT'} energyCost={energyCost} onAccept={onAccept} />
+                            <OfferSlip key={offer.id} offer={offer} canAccept={canAccept && session.status !== 'LEFT'} energyCost={energyCost} onAccept={onAccept} rightsScope={rightsScope} packageComponents={session.catalogueComponents} />
                         ))}
                     </AnimatePresence>
                 </main>

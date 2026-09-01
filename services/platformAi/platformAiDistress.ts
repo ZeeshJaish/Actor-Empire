@@ -11,17 +11,21 @@ import type {
     PlatformId,
     PlatformState,
     Player,
+    StreamingLicenseTerritory,
+    StreamingRightsWindowType,
     WorldState,
 } from '../../types';
 import { createDeterministicId } from '../deterministicRandom';
 import {
     createStreamingRightsContractFromLicense,
     createStreamingLicenseContract,
+    getStreamingRightsContract,
     isStreamingLicenseActiveAt,
     millionsToFullCurrency,
     registerStreamingRightsContract,
     validateStreamingRightsAvailability,
 } from '../streamingRightsCore';
+import { normalizeStreamingDayOneMarketIds, STREAMING_DAY_ONE_MARKETS } from '../streamingDayOneMarkets';
 import { calculatePlatformAiRightsValueMillions } from './platformAiContentSourcing';
 import { PLATFORM_AI_PROFILES } from './platformAiProfiles';
 import { resolvePlatformLocalizationLevel } from './platformAiResearch';
@@ -47,6 +51,22 @@ const CATALOGUE_DISTRESS_DISCOUNT = 0.7;
 const RESTRUCTURED_INTEREST_MULTIPLIER = 0.5;
 
 const roundMillions = (value: number): number => Math.round(value * 1_000_000) / 1_000_000;
+
+const territoryForCountryIds = (countryIds: readonly string[]): StreamingLicenseTerritory => (
+    countryIds.length === STREAMING_DAY_ONE_MARKETS.length
+        ? 'GLOBAL'
+        : countryIds.length === 1 ? 'DOMESTIC' : 'MULTI_REGION'
+);
+
+const exactContractCountryIds = (contract: OwnedStreamingCatalogLicense): string[] => (
+    contract.territory === 'GLOBAL'
+        ? STREAMING_DAY_ONE_MARKETS.map(market => market.id).sort()
+        : normalizeStreamingDayOneMarketIds(contract.countryIds).sort()
+);
+
+const sameCountryIds = (left: readonly string[], right: readonly string[]): boolean => (
+    left.length === right.length && left.every((countryId, index) => countryId === right[index])
+);
 
 const average = (values: number[]): number => values.length
     ? values.reduce((sum, value) => sum + value, 0) / values.length
@@ -116,6 +136,16 @@ type SellerEntitlement = {
     project: IndustryProject;
     expiresAtAbsoluteWeek: number;
     sourceContractId: string | null;
+    territory: StreamingLicenseTerritory;
+    countryIds: string[];
+    windowType: StreamingRightsWindowType;
+};
+
+type CatalogueBuyerSelection = {
+    buyer: PlatformState;
+    territory: StreamingLicenseTerritory;
+    countryIds: string[];
+    windowType: StreamingRightsWindowType;
 };
 
 export interface PlatformAiPartnerRevenueShareCalculation {
@@ -298,6 +328,16 @@ export const normalizePlatformAiCatalogueDistressDeals = (
         const buyerObligationId = String(raw.buyerObligationId || '').trim();
         const buyerPlanId = String(raw.buyerPlanId || '').trim();
         const buyerContractId = String(raw.buyerContractId || '').trim();
+        const sourceContractId = typeof raw.sourceContractId === 'string' && raw.sourceContractId.trim()
+            ? raw.sourceContractId.trim()
+            : null;
+        const countryIds = normalizeStreamingDayOneMarketIds(raw.countryIds).sort();
+        const territory: StreamingLicenseTerritory = ['DOMESTIC', 'MULTI_REGION', 'GLOBAL'].includes(String(raw.territory))
+            ? raw.territory as StreamingLicenseTerritory
+            : territoryForCountryIds(countryIds);
+        const windowType: StreamingRightsWindowType = ['FIRST_WINDOW', 'SECOND_WINDOW', 'PERMANENT'].includes(String(raw.windowType))
+            ? raw.windowType as StreamingRightsWindowType
+            : 'FIRST_WINDOW';
         const status = String(raw.status) as PlatformAiCatalogueDistressDeal['status'];
         const numericFields = [
             raw.sellerEntitlementExpiresAtAbsoluteWeek,
@@ -327,7 +367,11 @@ export const normalizePlatformAiCatalogueDistressDeals = (
             buyerPlatformId,
             sourceProjectId,
             sellerEntitlementId,
+            sourceContractId,
             sellerEntitlementExpiresAtAbsoluteWeek: Math.round(numericFields[0]),
+            territory,
+            countryIds,
+            windowType,
             priceMillions: roundMillions(numericFields[1]),
             buyerObligationId,
             buyerPlanId,
@@ -386,18 +430,27 @@ const sellerEntitlements = (
         .filter(plan => plan.source === 'COMMISSIONED_ORIGINAL' && plan.status === 'RELEASED')
         .flatMap(plan => plan.releaseEntries.flatMap(entry => {
             const project = projectsById.get(entry.canonicalProjectId);
-            if (!project || entry.status !== 'RELEASED') return [];
+            const countryIds = normalizeStreamingDayOneMarketIds(
+                entry.countryIds.length ? entry.countryIds : plan.releaseCountryIds,
+            ).sort();
+            if (!project || entry.status !== 'RELEASED' || !countryIds.length) return [];
             return [{
                 id: `original:${plan.id}`,
                 project,
                 expiresAtAbsoluteWeek: Number.MAX_SAFE_INTEGER,
                 sourceContractId: null,
+                territory: territoryForCountryIds(countryIds),
+                countryIds,
+                windowType: 'FIRST_WINDOW' as const,
             }];
         }));
-    const sublicences = seller.ai!.rightsContracts.flatMap(contract => {
-        const project = projectsById.get(contract.sourceProjectId);
+    const sublicences = seller.ai!.rightsContracts.flatMap(projectedContract => {
+        const contract = getStreamingRightsContract(world.streamingRightsContracts, projectedContract.id);
+        const project = contract ? projectsById.get(contract.sourceProjectId) : null;
+        const countryIds = contract ? exactContractCountryIds(contract) : [];
         if (
-            !project || !contract.sublicensingAllowed
+            !project || !contract || contract.buyerPlatformId !== seller.id
+            || !contract.sublicensingAllowed || !countryIds.length
             || !isStreamingLicenseActiveAt(contract, absoluteWeek)
             || contract.expiresAtAbsoluteWeek < absoluteWeek + 1 + CATALOGUE_DEAL_DURATION_WEEKS
         ) return [];
@@ -406,6 +459,9 @@ const sellerEntitlements = (
             project,
             expiresAtAbsoluteWeek: contract.expiresAtAbsoluteWeek,
             sourceContractId: contract.id,
+            territory: contract.territory,
+            countryIds,
+            windowType: contract.windowType || 'FIRST_WINDOW',
         }];
     });
     return [...originals, ...sublicences]
@@ -449,35 +505,55 @@ const selectBuyer = (
     entitlement: SellerEntitlement,
     priceMillions: number,
     absoluteWeek: number,
-): PlatformState | null => Object.values(world.platforms || {})
-    .filter(candidate => (
-        candidate.id !== seller.id
-        && candidate.ai?.status === 'ACTIVE'
-        && resolvePlatformController(player, candidate.id) === 'AI'
-        && candidate.cashReserve - priceMillions >= PLATFORM_AI_PROFILES[candidate.id].baseWeeklyOperationsMillions * 8
-        && !candidate.ai.rightsContracts.some(contract => (
-            contract.sourceProjectId === entitlement.project.id
-            && isStreamingLicenseActiveAt(contract, absoluteWeek + 1)
-        ))
-        && validateStreamingRightsAvailability({
+): CatalogueBuyerSelection | null => Object.values(world.platforms || {})
+    .flatMap((candidate): CatalogueBuyerSelection[] => {
+        const eligibleCountryIds = normalizeStreamingDayOneMarketIds(
+            candidate.ai?.capabilities.activeCountryIds,
+        ).filter(countryId => entitlement.countryIds.includes(countryId)).sort();
+        if (
+            candidate.id === seller.id
+            || candidate.ai?.status !== 'ACTIVE'
+            || resolvePlatformController(player, candidate.id) !== 'AI'
+            || candidate.cashReserve - priceMillions < PLATFORM_AI_PROFILES[candidate.id].baseWeeklyOperationsMillions * 8
+            || !eligibleCountryIds.length
+            || Object.values(world.streamingRightsContracts || {}).some(contract => (
+                contract.buyerPlatformId === candidate.id
+                && contract.sourceProjectId === entitlement.project.id
+                && isStreamingLicenseActiveAt(contract, absoluteWeek + 1)
+            ))
+        ) return [];
+        const territory = territoryForCountryIds(eligibleCountryIds);
+        const availability = validateStreamingRightsAvailability({
             player,
             world,
             sourceProjectId: entitlement.project.id,
             buyerPlatformId: candidate.id,
+            sellerPartyId: seller.id,
+            territory,
+            countryIds: territory === 'GLOBAL' ? [] : eligibleCountryIds,
+            windowType: entitlement.windowType,
             exclusivity: 'NON_EXCLUSIVE',
             startsAtAbsoluteWeek: absoluteWeek + 1,
             expiresAtAbsoluteWeek: absoluteWeek + 1 + CATALOGUE_DEAL_DURATION_WEEKS,
-            excludeLicenseIds: entitlement.sourceContractId ? [entitlement.sourceContractId] : [],
-        }).available
-    ))
+            action: entitlement.sourceContractId ? 'SUBLICENSE' : 'LICENSE',
+            sourceContractId: entitlement.sourceContractId,
+        });
+        return availability.available ? [{
+            buyer: candidate,
+            territory,
+            countryIds: eligibleCountryIds,
+            windowType: entitlement.windowType,
+        }] : [];
+    })
     .sort((left, right) => {
-        const score = (platform: PlatformState): number => {
+        const score = (selection: CatalogueBuyerSelection): number => {
+            const platform = selection.buyer;
             const profile = PLATFORM_AI_PROFILES[platform.id];
             const catalogueGap = Math.max(0, 20 - platform.ai!.rightsContracts.length) * 2;
             const genreAffinity = profile.preferredGenres.includes(entitlement.project.genre) ? 20 : 0;
             return catalogueGap + genreAffinity + profile.competence.negotiation * 4 + Math.min(30, platform.cashReserve / 50);
         };
-        return score(right) - score(left) || left.id.localeCompare(right.id);
+        return score(right) - score(left) || left.buyer.id.localeCompare(right.buyer.id);
     })[0] || null;
 
 const updateEpisode = (
@@ -535,13 +611,13 @@ const queueCatalogueDeal = (
     const deals = normalizePlatformAiCatalogueDistressDeals(world.platformAiCatalogueDistressDeals);
     const pendingKeys = new Set(deals.filter(deal => deal.status === 'PENDING_PAYMENT')
         .map(deal => `${deal.sellerPlatformId}:${deal.sourceProjectId}`));
-    let selected: { entitlement: SellerEntitlement; buyer: PlatformState; priceMillions: number } | null = null;
+    let selected: ({ entitlement: SellerEntitlement; priceMillions: number } & CatalogueBuyerSelection) | null = null;
     for (const entitlement of sellerEntitlements(world, seller, absoluteWeek)) {
         if (pendingKeys.has(`${seller.id}:${entitlement.project.id}`)) continue;
         const priceMillions = canonicalPriceMillions(entitlement.project);
-        const buyer = selectBuyer({ ...player, world }, world, seller, entitlement, priceMillions, absoluteWeek);
-        if (buyer) {
-            selected = { entitlement, buyer, priceMillions };
+        const buyerSelection = selectBuyer({ ...player, world }, world, seller, entitlement, priceMillions, absoluteWeek);
+        if (buyerSelection) {
+            selected = { entitlement, priceMillions, ...buyerSelection };
             break;
         }
     }
@@ -569,7 +645,11 @@ const queueCatalogueDeal = (
         buyerPlatformId: selected.buyer.id,
         sourceProjectId: selected.entitlement.project.id,
         sellerEntitlementId: selected.entitlement.id,
+        sourceContractId: selected.entitlement.sourceContractId,
         sellerEntitlementExpiresAtAbsoluteWeek: selected.entitlement.expiresAtAbsoluteWeek,
+        territory: selected.territory,
+        countryIds: selected.countryIds,
+        windowType: selected.windowType,
         priceMillions: selected.priceMillions,
         durationWeeks: CATALOGUE_DEAL_DURATION_WEEKS,
         startsAtAbsoluteWeek,
@@ -631,6 +711,7 @@ const findEntitlementForDeal = (
     .find(entitlement => (
         entitlement.id === deal.sellerEntitlementId
         && entitlement.project.id === deal.sourceProjectId
+        && entitlement.sourceContractId === deal.sourceContractId
         && entitlement.expiresAtAbsoluteWeek === deal.sellerEntitlementExpiresAtAbsoluteWeek
     )) || null;
 
@@ -656,6 +737,10 @@ const dealIsCanonical = (
         && deal.startsAtAbsoluteWeek === deal.createdAtAbsoluteWeek + 1
         && deal.expiresAtAbsoluteWeek === deal.startsAtAbsoluteWeek + CATALOGUE_DEAL_DURATION_WEEKS
         && deal.sellerEntitlementExpiresAtAbsoluteWeek >= deal.expiresAtAbsoluteWeek
+        && deal.countryIds.length > 0
+        && deal.countryIds.every(countryId => entitlement.countryIds.includes(countryId))
+        && deal.territory === territoryForCountryIds(deal.countryIds)
+        && deal.windowType === entitlement.windowType
         && deal.priceMillions === canonicalPriceMillions(project);
 };
 
@@ -682,7 +767,10 @@ const dealHasCanonicalImmutableRefundTerms = (
         && deal.createdAtAbsoluteWeek >= episode.startedAtAbsoluteWeek
         && deal.startsAtAbsoluteWeek === deal.createdAtAbsoluteWeek + 1
         && deal.expiresAtAbsoluteWeek === deal.startsAtAbsoluteWeek + CATALOGUE_DEAL_DURATION_WEEKS
-        && deal.sellerEntitlementExpiresAtAbsoluteWeek >= deal.expiresAtAbsoluteWeek;
+        && deal.sellerEntitlementExpiresAtAbsoluteWeek >= deal.expiresAtAbsoluteWeek
+        && deal.countryIds.length > 0
+        && deal.territory === territoryForCountryIds(deal.countryIds)
+        && (deal.sourceContractId === null || deal.sourceContractId === deal.sellerEntitlementId);
 };
 
 const adjustCurrentFinanceCash = (
@@ -963,7 +1051,7 @@ const buildBuyerPlan = (
     sourceStudioId: project.studioId,
     streamingWindow: project.boxOffice > 0 ? 'POST_THEATRICAL_WINDOW' : 'CATALOGUE_WINDOW',
     localizationLevel: resolvePlatformLocalizationLevel(buyer.ai!.capabilities),
-    releaseCountryIds: [...buyer.ai!.capabilities.activeCountryIds],
+    releaseCountryIds: [...deal.countryIds],
     minimumGuaranteeMillions: deal.priceMillions,
     rightsCostMillions: deal.priceMillions,
     productionFundingMillions: 0,
@@ -1006,10 +1094,15 @@ const transferPendingDeal = (
         world,
         sourceProjectId: project.id,
         buyerPlatformId: buyer.id,
+        sellerPartyId: seller.id,
+        territory: deal.territory,
+        countryIds: deal.territory === 'GLOBAL' ? [] : deal.countryIds,
+        windowType: deal.windowType,
         exclusivity: 'NON_EXCLUSIVE',
         startsAtAbsoluteWeek: deal.startsAtAbsoluteWeek,
         expiresAtAbsoluteWeek: deal.expiresAtAbsoluteWeek,
-        excludeLicenseIds: entitlement.sourceContractId ? [entitlement.sourceContractId] : [],
+        action: deal.sourceContractId ? 'SUBLICENSE' : 'LICENSE',
+        sourceContractId: deal.sourceContractId,
     });
     if (
         !availability.available
@@ -1028,8 +1121,8 @@ const transferPendingDeal = (
         cataloguePackageId: null,
         contentSource: 'LICENSED_RELEASED_TITLE',
         licensorName: seller.name,
-        territory: 'GLOBAL',
-        countryIds: [],
+        territory: deal.territory,
+        countryIds: deal.territory === 'GLOBAL' ? [] : deal.countryIds,
         durationWeeks: deal.durationWeeks,
         exclusivity: 'NON_EXCLUSIVE',
         minimumGuarantee: millionsToFullCurrency(deal.priceMillions),
@@ -1040,7 +1133,7 @@ const transferPendingDeal = (
         origin: 'PLATFORM_TRADE',
         sellerType: 'PLATFORM',
         sellerPlatformId: seller.id,
-        windowType: project.boxOffice > 0 ? 'SECOND_WINDOW' : 'FIRST_WINDOW',
+        windowType: deal.windowType,
         permanentPurchase: false,
         renewalOption: false,
         sublicensingAllowed: false,

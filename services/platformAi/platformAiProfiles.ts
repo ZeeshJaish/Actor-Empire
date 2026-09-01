@@ -45,7 +45,7 @@ export const PLATFORM_AI_PROFILES: Record<PlatformId, PlatformAiProfile> = {
         ownedStudioIds: [],
         riskTolerance: 0.82,
         releaseVolume: 5,
-        planningCadenceWeeks: 4,
+        planningCadenceWeeks: 6,
         maxConcurrentProductions: 6,
         maxActiveRightsPlans: 14,
         parentBacking: 'NONE',

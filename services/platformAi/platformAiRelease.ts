@@ -17,6 +17,7 @@ import type {
 import { createDeterministicId, createDeterministicRng } from '../deterministicRandom';
 import {
     doesStreamingLicenseCoverCountry,
+    getStreamingRightsContract,
     isStreamingLicenseActiveAt,
 } from '../streamingRightsCore';
 import { PLATFORM_AI_PROFILES } from './platformAiProfiles';
@@ -40,6 +41,18 @@ const round = (value: number, precision = 100): number => Math.round(value * pre
 /** Disclosed long-run balance thresholds, measured on the canonical 0-100 commercial score. */
 export const PLATFORM_AI_HIT_COMMERCIAL_SCORE = 85;
 export const PLATFORM_AI_FLOP_COMMERCIAL_SCORE = 74;
+/**
+ * A hit is measured against the audience scale and brand promise of the service
+ * that released it. These public thresholds classify the same canonical
+ * commercial score; they do not add quality, subscribers, or revenue.
+ */
+export const PLATFORM_AI_OUTCOME_THRESHOLDS: Record<PlatformId, { hit: number; flop: number }> = {
+    NETFLIX: { hit: PLATFORM_AI_HIT_COMMERCIAL_SCORE, flop: PLATFORM_AI_FLOP_COMMERCIAL_SCORE },
+    APPLE_TV: { hit: 85, flop: 81 },
+    DISNEY_PLUS: { hit: 88.5, flop: 85 },
+    HULU: { hit: 86, flop: 81.5 },
+    YOUTUBE: { hit: 89, flop: 85.5 },
+};
 
 const activeCountryOperations = (platform: PlatformState): Map<string, NonNullable<PlatformState['ai']>['marketOperations'][number]> => (
     new Map(platform.ai!.marketOperations
@@ -83,22 +96,23 @@ const findPlan = (platform: PlatformState, planId: string): PlatformAiContentPla
 );
 
 const findContractForProject = (
-    platform: PlatformState,
+    world: WorldState,
     plan: PlatformAiContentPlan,
     projectId: string,
     absoluteWeek: number,
 ): OwnedStreamingCatalogLicense | null => (
-    platform.ai!.rightsContracts
+    plan.rightsContractIds
+        .map(contractId => getStreamingRightsContract(world.streamingRightsContracts, contractId))
         .filter(contract => (
-            plan.rightsContractIds.includes(contract.id)
+            contract
             && contract.sourceProjectId === projectId
             && contract.buyerPlatformId === plan.platformId
+            && contract.platformContentPlanId === plan.id
             && contract.status === 'ACTIVE'
             && isStreamingLicenseActiveAt(contract, absoluteWeek)
-        ))
-        .sort((left, right) => right.startsAtAbsoluteWeek - left.startsAtAbsoluteWeek || left.id.localeCompare(right.id))[0]
-        || null
-);
+        )) as OwnedStreamingCatalogLicense[]
+).sort((left, right) => right.startsAtAbsoluteWeek - left.startsAtAbsoluteWeek || left.id.localeCompare(right.id))[0]
+    || null;
 
 const hasSufficientLocalization = (
     platform: PlatformState,
@@ -123,9 +137,10 @@ export const getReadyPlatformAiLocalizationJobs = (
     projectIds: string[],
     absoluteWeek: number,
     world?: WorldState,
+    projectIndex?: ReadonlyMap<string, IndustryProject>,
 ) => {
     return projectIds.flatMap(projectId => {
-        const project = world?.projects.find(item => item.id === projectId);
+        const project = projectIndex?.get(projectId) || world?.projects.find(item => item.id === projectId);
         const requirements = getPlatformAiLocalizationRequirements(platform, plan, project)
             .filter(requirement => requirement.mandatory);
         return requirements.map(requirement => platform.ai!.localizationJobs.find(job => (
@@ -201,6 +216,12 @@ export interface SchedulePlatformStreamingWindowInput {
     premiereAtAbsoluteWeek: number;
     localizationReadyAtAbsoluteWeek?: number;
     releasePattern?: PlatformAiReleasePattern;
+    /** Optional turn-local index; callers may reuse it across premiere previews. */
+    projectIndex?: ReadonlyMap<string, IndustryProject>;
+    /** Optional turn-local capacity count for this exact premiere week. */
+    scheduledTitleCountAtPremiere?: number;
+    /** Runs every legal/readiness check without cloning committed platform state. */
+    previewOnly?: boolean;
 }
 
 const unchanged = (
@@ -252,7 +273,14 @@ export const schedulePlatformStreamingWindow = (
     if (!hasSufficientLocalization(platform, plan)) {
         return unchanged(input.world, plan, 'LOCALIZATION_INSUFFICIENT');
     }
-    const localizationJobs = getReadyPlatformAiLocalizationJobs(platform, plan, sourceProjectIds, input.absoluteWeek, input.world);
+    const localizationJobs = getReadyPlatformAiLocalizationJobs(
+        platform,
+        plan,
+        sourceProjectIds,
+        input.absoluteWeek,
+        input.world,
+        input.projectIndex,
+    );
     if (localizationJobs.some(job => !job)) {
         return unchanged(input.world, plan, 'LOCALIZATION_NOT_READY');
     }
@@ -264,7 +292,7 @@ export const schedulePlatformStreamingWindow = (
     const contracts = new Map<string, OwnedStreamingCatalogLicense>();
     if (plan.source !== 'COMMISSIONED_ORIGINAL') {
         for (const projectId of sourceProjectIds) {
-            const contract = findContractForProject(platform, plan, projectId, input.premiereAtAbsoluteWeek);
+            const contract = findContractForProject(input.world, plan, projectId, input.premiereAtAbsoluteWeek);
             if (
                 !contract
                 || contract.status !== 'ACTIVE'
@@ -279,12 +307,13 @@ export const schedulePlatformStreamingWindow = (
         }
     }
 
-    const existingAtPremiere = scheduledTitleCountAt(platform, input.premiereAtAbsoluteWeek, plan.id);
+    const existingAtPremiere = input.scheduledTitleCountAtPremiere
+        ?? scheduledTitleCountAt(platform, input.premiereAtAbsoluteWeek, plan.id);
     if (existingAtPremiere + sourceProjectIds.length > releaseCapacityFor(input.platformId)) {
         return unchanged(input.world, plan, 'RELEASE_CAPACITY_EXCEEDED');
     }
 
-    const sourceProjectsById = new Map(input.world.projects.map(project => [project.id, project]));
+    const sourceProjectsById = input.projectIndex || new Map(input.world.projects.map(project => [project.id, project]));
     const releaseEntries: PlatformAiReleaseEntry[] = sourceProjectIds.map(projectId => {
         const mediaType = plan.source === 'COMMISSIONED_ORIGINAL'
             ? production!.projectType
@@ -333,6 +362,14 @@ export const schedulePlatformStreamingWindow = (
         }),
         scheduledAtAbsoluteWeek: input.absoluteWeek,
     };
+    if (input.previewOnly) {
+        return {
+            world: input.world,
+            changed: true,
+            plan: scheduledPlan,
+            projects: [],
+        };
+    }
     const nextPlatform: PlatformState = {
         ...platform,
         ai: {
@@ -457,9 +494,10 @@ export const calculatePlatformAiStreamingPerformance = (
         -2,
         5,
     ), 100);
-    const outcome = commercialScore >= PLATFORM_AI_HIT_COMMERCIAL_SCORE
+    const outcomeThresholds = PLATFORM_AI_OUTCOME_THRESHOLDS[input.platformId];
+    const outcome = commercialScore >= outcomeThresholds.hit
         ? 'HIT'
-        : commercialScore < PLATFORM_AI_FLOP_COMMERCIAL_SCORE ? 'FLOP' : 'SOLID';
+        : commercialScore < outcomeThresholds.flop ? 'FLOP' : 'SOLID';
     return {
         calculatedAtAbsoluteWeek: input.absoluteWeek,
         viewsMillions,
@@ -643,7 +681,7 @@ const validateReleaseEntitlements = (
     if (plan.source === 'COMMISSIONED_ORIGINAL') return null;
     for (const entry of plan.releaseEntries) {
         const contract = entry.rightsContractId
-            ? platform.ai!.rightsContracts.find(candidate => candidate.id === entry.rightsContractId) || null
+            ? getStreamingRightsContract(world.streamingRightsContracts, entry.rightsContractId)
             : null;
         if (
             !contract
@@ -720,7 +758,7 @@ export const releasePlatformContentPlan = (
     for (const entry of plan.releaseEntries) {
         const existingProject = projectsById.get(entry.canonicalProjectId)!;
         const contract = entry.rightsContractId
-            ? platform.ai!.rightsContracts.find(candidate => candidate.id === entry.rightsContractId) || null
+            ? getStreamingRightsContract(input.world.streamingRightsContracts, entry.rightsContractId)
             : null;
         const windowId = createDeterministicId('platform_ai_streaming_window', input.platformId, plan.id, entry.canonicalProjectId);
         const performance = input.performanceByProjectId?.[entry.canonicalProjectId]

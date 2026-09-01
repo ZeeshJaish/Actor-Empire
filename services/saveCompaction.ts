@@ -27,6 +27,13 @@ import { normalizeStreamingRightsContractRegistry } from './streamingRightsCore'
 import { normalizeStreamingBiddingSessionRegistry } from './streamingBidding';
 import { normalizeStreamingRoyaltySettlementRegistry } from './streamingContractSettlement';
 import { normalizeStreamingPlatformEcosystem } from './streamingPlatformEcosystem';
+import {
+  normalizeStreamingRightsCalendarState,
+  normalizeStreamingRightsManagementState,
+} from './streamingRightsCalendar';
+import {
+  reconstructSignedStreamingCataloguePackages,
+} from './streamingCataloguePackages';
 
 export const FULL_LOCAL_MIRROR_BUDGET_BYTES = 3_500_000;
 
@@ -57,6 +64,7 @@ const AWARD_HISTORY_MAX_ITEMS = 104;
 const STREAMING_RIGHTS_TERMINAL_MAX_ITEMS = 240;
 const STREAMING_BIDDING_TERMINAL_MAX_ITEMS = 60;
 const STREAMING_ROYALTY_SETTLEMENT_MAX_ITEMS = 520;
+const STREAMING_CATALOGUE_PACKAGE_TERMINAL_MAX_ITEMS = 80;
 
 type CompactTimelineEntry = {
   id: string;
@@ -633,6 +641,32 @@ const compactStreamingBiddingSessions = (value: unknown): Record<string, any> =>
   return Object.fromEntries([...active, ...terminal].map(session => [session.id, session]));
 };
 
+const compactStreamingCataloguePackages = (
+  packageValue: unknown,
+  contractValue: unknown,
+): Record<string, any> => {
+  const packages = Object.values(reconstructSignedStreamingCataloguePackages(packageValue, contractValue));
+  const contracts = Object.values(normalizeStreamingRightsContractRegistry(contractValue));
+  const referencedPackageIds = new Set(contracts
+    .filter(contract => contract.status === 'ACTIVE' || contract.status === 'EXPIRED')
+    .map(contract => contract.cataloguePackageId)
+    .filter((id): id is string => Boolean(id)));
+  const protectedPackages = packages.filter(cataloguePackage => (
+    ['DRAFT', 'READY', 'LIVE'].includes(cataloguePackage.lifecycle)
+    || referencedPackageIds.has(cataloguePackage.id)
+  ));
+  const protectedIds = new Set(protectedPackages.map(cataloguePackage => cataloguePackage.id));
+  const terminal = packages
+    .filter(cataloguePackage => !protectedIds.has(cataloguePackage.id))
+    .sort((left, right) => (
+      (right.signedAtAbsoluteWeek ?? right.createdAtAbsoluteWeek)
+      - (left.signedAtAbsoluteWeek ?? left.createdAtAbsoluteWeek)
+      || left.id.localeCompare(right.id)
+    ))
+    .slice(0, STREAMING_CATALOGUE_PACKAGE_TERMINAL_MAX_ITEMS);
+  return Object.fromEntries([...protectedPackages, ...terminal].map(cataloguePackage => [cataloguePackage.id, cataloguePackage]));
+};
+
 const compactWorld = (player: any) => {
   const world = player?.world;
   if (!world || typeof world !== 'object') return world;
@@ -760,6 +794,10 @@ const compactWorld = (player: any) => {
   const talentBookings = compactTalentBookingHistory(world.talentBookings, platforms, industryProductions);
   const streamingRightsContracts = compactStreamingRightsContracts({ ...player, world: { ...world, platforms } });
   const streamingBiddingSessions = compactStreamingBiddingSessions(world.streamingBiddingSessions);
+  const streamingCataloguePackages = compactStreamingCataloguePackages(
+    world.streamingCataloguePackages,
+    streamingRightsContracts,
+  );
   const streamingRoyaltySettlements = Object.fromEntries(
     Object.values(normalizeStreamingRoyaltySettlementRegistry(world.streamingRoyaltySettlements))
       .sort((left, right) => right.absoluteWeek - left.absoluteWeek || left.id.localeCompare(right.id))
@@ -770,6 +808,7 @@ const compactWorld = (player: any) => {
     world.streamingPlatformEcosystem,
     absoluteWeek,
   );
+  const streamingRightsCalendar = normalizeStreamingRightsCalendarState(world.streamingRightsCalendar);
   const retainedTalentBookingIds = new Set(talentBookings.map((booking: any) => stableHistoryId(booking?.id)));
   const platformsWithRetainedTalentRefs = platforms && typeof platforms === 'object'
     ? Object.fromEntries(Object.entries(platforms).map(([platformId, platformValue]) => {
@@ -791,7 +830,12 @@ const compactWorld = (player: any) => {
     platformAiCatalogueDistressDeals: catalogueDistressDeals,
     streamingRightsContracts,
     streamingBiddingSessions,
+    streamingCataloguePackages,
+    streamingCataloguePackageDigests: Array.isArray(world.streamingCataloguePackageDigests)
+      ? world.streamingCataloguePackageDigests.slice(0, 52)
+      : [],
     streamingRoyaltySettlements,
+    streamingRightsCalendar,
     streamingPlatformEcosystem,
     awardHistory,
     industryProductions,
@@ -876,6 +920,9 @@ export const compactPlayerForPersistence = (nextPlayer: Player): Player => {
       nextPlayer.ownedStreamingPlatform,
       nextPlayer.id,
       protectedRivalMoveIds,
+    ),
+    streamingRightsManagement: normalizeStreamingRightsManagementState(
+      nextPlayer.streamingRightsManagement,
     ),
     scheduledEvents: compactEventQueue(nextPlayer.scheduledEvents),
     pendingEvents: compactEventQueue(nextPlayer.pendingEvents),

@@ -1,5 +1,9 @@
 export { PLATFORM_AI_PROFILES, type PlatformAiProfile } from './platformAiProfiles';
 export {
+    processStreamingIndustryWorldWeek,
+    type StreamingIndustryWeeklyTurnResult,
+} from './platformAiWeeklyIntegration';
+export {
     PLATFORM_AI_OPERATING_PROFILES,
     clampPlatformAiEfficiencyPolicy,
     getPlatformAiOperatingProfile,
@@ -189,6 +193,7 @@ export {
     calculatePlatformAiStreamingPerformance,
     PLATFORM_AI_FLOP_COMMERCIAL_SCORE,
     PLATFORM_AI_HIT_COMMERCIAL_SCORE,
+    PLATFORM_AI_OUTCOME_THRESHOLDS,
     releasePlatformContentPlan,
     schedulePlatformStreamingWindow,
     type CalculatePlatformAiStreamingPerformanceInput,

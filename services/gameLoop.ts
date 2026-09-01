@@ -61,10 +61,14 @@ import { createDeterministicId } from './deterministicRandom';
 import { PLATFORM_AI_PROFILES } from './platformAi/platformAiProfiles';
 import {
     generatePlatformAiPlayerCommissionOffers,
+    processStreamingIndustryWorldWeek,
     syncPlatformAiPlayerCommissionProductions,
 } from './platformAi';
 import { calculateStreamingAdvertisingRevenueFullCurrency, calculateStreamingSubscriptionRevenueFullCurrency } from './streamingEconomyCore';
 import { attributeStreamingTitleRevenue, settleStreamingContractRoyaltyForPlayer } from './streamingContractSettlement';
+import { processStreamingRightsCalendarWeek } from './streamingRightsCalendar';
+import { processStreamingCataloguePackagesWeek } from './streamingCataloguePackages';
+import { processStreamingCataloguePackageStrategyAutomation } from './streamingCataloguePackageAutomation';
 import { processWorldTurn, generateIndustryProject } from './worldLogic'; 
 import { generateFamousMovieOpportunity, generateCameoOffer } from './famousMovieLogic'; 
 import { calculateYoutubeCreatorScore, generateMusicVideoFeatureOffer, generateYoutubeBrandDeal, generateYoutubeCollabOffer, getYoutubePublicImageLabel, processYoutubeChannel } from './youtubeLogic';
@@ -2071,17 +2075,6 @@ export const processGameWeek = async (
         emitLoopStage('world_turn_start');
         const worldResult = processWorldTurn(nextPlayer);
         nextPlayer.world = worldResult.world;
-        const playerCommissionGeneration = generatePlatformAiPlayerCommissionOffers(
-            nextPlayer,
-            getAbsoluteWeek(nextPlayer.age, nextPlayer.currentWeek),
-        );
-        nextPlayer = playerCommissionGeneration.player;
-        if (playerCommissionGeneration.offer) {
-            logsToAdd.push({
-                msg: `📩 ${playerCommissionGeneration.offer.platformName} sent a production commission to your studio.`,
-                type: 'positive',
-            });
-        }
         nextPlayer.news = [...worldResult.news, ...nextPlayer.news].slice(0, 50);
         if (worldResult.logs?.length) {
             worldResult.logs.forEach(message => logsToAdd.push({ msg: `🏢 ${message}`, type: 'neutral' }));
@@ -6371,6 +6364,76 @@ export const processGameWeek = async (
             });
         }
     }
+
+    const enteredStreamingAbsoluteWeek = getAbsoluteWeek(nextPlayer.age, nextPlayer.currentWeek);
+    emitLoopStage('streaming_rights_calendar_start', { absolute_week: enteredStreamingAbsoluteWeek });
+    const streamingRightsCalendarResult = processStreamingRightsCalendarWeek(
+        nextPlayer,
+        enteredStreamingAbsoluteWeek,
+    );
+    nextPlayer = streamingRightsCalendarResult.player;
+    if (streamingRightsCalendarResult.digest) {
+        logsToAdd.push({
+            msg: `📅 ${streamingRightsCalendarResult.digest.summary}`,
+            type: streamingRightsCalendarResult.digest.actionRequired > 0 ? 'negative' : 'neutral',
+        });
+    }
+    emitLoopStage('streaming_rights_calendar_done', {
+        absolute_week: enteredStreamingAbsoluteWeek,
+        created_cases: streamingRightsCalendarResult.createdCaseIds.length,
+        expired_contracts: streamingRightsCalendarResult.expiredContractIds.length,
+    });
+
+    emitLoopStage('streaming_catalogue_packages_start', { absolute_week: enteredStreamingAbsoluteWeek });
+    const streamingCataloguePackagesResult = processStreamingCataloguePackagesWeek(
+        nextPlayer,
+        enteredStreamingAbsoluteWeek,
+    );
+    nextPlayer = streamingCataloguePackagesResult.player;
+    const streamingCataloguePackageAutomationResult = processStreamingCataloguePackageStrategyAutomation(
+        nextPlayer,
+        enteredStreamingAbsoluteWeek,
+    );
+    nextPlayer = streamingCataloguePackageAutomationResult.player;
+    const cataloguePackageDigest = nextPlayer.world.streamingCataloguePackageDigests
+        ?.find(digest => digest.absoluteWeek === enteredStreamingAbsoluteWeek)
+        || streamingCataloguePackagesResult.digest;
+    if (cataloguePackageDigest) {
+        logsToAdd.push({
+            msg: `📚 ${cataloguePackageDigest.summary}`,
+            type: 'neutral',
+        });
+    }
+    emitLoopStage('streaming_catalogue_packages_done', {
+        absolute_week: enteredStreamingAbsoluteWeek,
+        proposed_packages: streamingCataloguePackagesResult.createdPackageIds.length,
+        signed_packages: streamingCataloguePackageAutomationResult.signedPackageIds.length,
+    });
+
+    emitLoopStage('streaming_industry_start');
+    const streamingIndustryResult = processStreamingIndustryWorldWeek(
+        nextPlayer,
+        nextPlayer.world,
+        enteredStreamingAbsoluteWeek,
+    );
+    nextPlayer.world = streamingIndustryResult.world;
+    nextPlayer.news = [...streamingIndustryResult.news, ...nextPlayer.news].slice(0, 50);
+    streamingIndustryResult.logs.forEach(message => logsToAdd.push({ msg: `🏢 ${message}`, type: 'neutral' }));
+    const playerCommissionGeneration = generatePlatformAiPlayerCommissionOffers(
+        nextPlayer,
+        enteredStreamingAbsoluteWeek,
+    );
+    nextPlayer = playerCommissionGeneration.player;
+    if (playerCommissionGeneration.offer) {
+        logsToAdd.push({
+            msg: `📩 ${playerCommissionGeneration.offer.platformName} sent a production commission to your studio.`,
+            type: 'positive',
+        });
+    }
+    emitLoopStage('streaming_industry_done', {
+        absolute_week: enteredStreamingAbsoluteWeek,
+        world_news: streamingIndustryResult.news.length,
+    });
 
     emitLoopStage('owned_streaming_start');
     nextPlayer = advanceStreamingMarketClearances(nextPlayer).player;

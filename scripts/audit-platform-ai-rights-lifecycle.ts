@@ -34,6 +34,7 @@ import { getAbsoluteWeek } from '../services/legacyLogic';
 import {
     createStreamingLicenseContract,
     isStreamingLicenseActiveAt,
+    migrateStreamingRightsContractRegistry,
     millionsToFullCurrency,
 } from '../services/streamingRightsCore';
 import { createPlatformAiFixture } from './helpers/platformAiFixture';
@@ -113,7 +114,9 @@ const makeContract = (input: {
     durationWeeks?: number;
     exclusivity?: OwnedStreamingCatalogLicense['exclusivity'];
     renewalOption?: boolean;
-}): OwnedStreamingCatalogLicense => createStreamingLicenseContract({
+}): OwnedStreamingCatalogLicense => {
+    const startsAtAbsoluteWeek = input.startsAtAbsoluteWeek ?? EXPIRY_WEEK - 8;
+    return createStreamingLicenseContract({
     id: input.id || `contract-${input.platformId}-${input.project.id}`,
     sourceProject: input.project,
     buyerPlatformId: input.platformId,
@@ -127,8 +130,8 @@ const makeContract = (input: {
     exclusivity: input.exclusivity ?? 'NON_EXCLUSIVE',
     minimumGuarantee: millionsToFullCurrency(RENEWAL_MG_MILLIONS),
     platformRevenueShare: 70,
-    signedAtAbsoluteWeek: BASE_WEEK,
-    startsAtAbsoluteWeek: input.startsAtAbsoluteWeek ?? EXPIRY_WEEK - 8,
+    signedAtAbsoluteWeek: Math.min(BASE_WEEK, startsAtAbsoluteWeek),
+    startsAtAbsoluteWeek,
     origin: 'STUDIO_MARKET',
     sellerType: 'STUDIO',
     sellerPlatformId: null,
@@ -138,7 +141,8 @@ const makeContract = (input: {
     sequelRightsIncluded: false,
     changeOfControl: 'NOTICE',
     cancellationPenalty: millionsToFullCurrency(2),
-});
+    });
+};
 
 const normalizedPlatform = (player: Player, platformId: PlatformId, absoluteWeek = BASE_WEEK): PlatformState => {
     const platform = normalizePlatformAiState(
@@ -159,11 +163,15 @@ const worldWith = (
     player: Player,
     platform: PlatformState,
     projects: IndustryProject[],
-): WorldState => ({
-    ...structuredClone(player.world),
-    projects,
-    platforms: { ...structuredClone(player.world.platforms!), [platform.id]: platform },
-});
+): WorldState => {
+    const projectedWorld: WorldState = {
+        ...structuredClone(player.world),
+        streamingRightsContracts: {},
+        projects,
+        platforms: { ...structuredClone(player.world.platforms!), [platform.id]: platform },
+    };
+    return migrateStreamingRightsContractRegistry({ ...player, world: projectedWorld }).world;
+};
 
 // Exact expiry week is inclusive; transition occurs once the absolute week is greater.
 const boundaryPlayer = createPlatformAiFixture();
@@ -335,6 +343,23 @@ assert.equal(
     true,
     `Clearing an invalid scheduled window must free release capacity (reason: ${capacityScheduled.reason || 'none'}).`,
 );
+const canonicalScopeWorld = structuredClone(capacityReadyWorld);
+canonicalScopeWorld.streamingRightsContracts![readyContract.id] = {
+    ...canonicalScopeWorld.streamingRightsContracts![readyContract.id],
+    territory: 'DOMESTIC',
+    countryIds: ['US'],
+};
+const canonicalScopeBlocked = schedulePlatformStreamingWindow({
+    player: capacityPlayer,
+    world: canonicalScopeWorld,
+    platformId: 'APPLE_TV',
+    planId: readyPlan.id,
+    absoluteWeek: EXPIRY_WEEK,
+    premiereAtAbsoluteWeek: releaseWeek,
+    localizationReadyAtAbsoluteWeek: BASE_WEEK,
+});
+assert.equal(canonicalScopeBlocked.changed, false);
+assert.equal(canonicalScopeBlocked.reason, 'RIGHTS_NOT_COVERED');
 
 // Renewal persists a record and stable CONTRACTUAL obligation before the real economy can settle it.
 const renewalPlayer = createPlatformAiFixture();
@@ -488,15 +513,20 @@ assert.equal(
 );
 
 // Shared availability blocks an overlapping exclusive continuation before it can queue payment.
-const conflictWorld = structuredClone(renewalWorld);
+const conflictProjectionWorld = structuredClone(renewalWorld);
+conflictProjectionWorld.streamingRightsContracts = {};
 const conflictPlatform = normalizedPlatform(renewalPlayer, 'HULU');
 const conflictContract = makeContract({
     platformId: 'HULU', planId: 'conflict-plan', project: renewalProject, id: 'conflict-contract',
     startsAtAbsoluteWeek: EXPIRY_WEEK + 1, durationWeeks: 40, exclusivity: 'EXCLUSIVE',
 });
 conflictPlatform.ai!.rightsContracts = [conflictContract];
-conflictWorld.platforms!.HULU = conflictPlatform;
-conflictWorld.platforms!.NETFLIX.ai!.rightsContracts[0].exclusivity = 'EXCLUSIVE';
+conflictProjectionWorld.platforms!.HULU = conflictPlatform;
+conflictProjectionWorld.platforms!.NETFLIX.ai!.rightsContracts[0].exclusivity = 'EXCLUSIVE';
+const conflictWorld = migrateStreamingRightsContractRegistry({
+    ...renewalPlayer,
+    world: conflictProjectionWorld,
+}).world;
 const conflictingRenewal = queuePlatformAiRightsRenewal({
     player: { ...renewalPlayer, world: conflictWorld },
     world: conflictWorld,

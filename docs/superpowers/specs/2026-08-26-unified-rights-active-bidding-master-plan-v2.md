@@ -1,5 +1,10 @@
 # Unified Rights and Active Bidding Master Plan v2
 
+> **Supporting detail:** Current phase status, sequencing, and the approved
+> Strategy/Custom/Full Control model are maintained in
+> `actor-empire-post-platform-master-roadmap.md`. This v2 document remains the
+> historical detailed authority for the A1/A2 implementation and original A3–A8 scope.
+
 ## Status and scope
 
 This is the revised detailed plan for **Next Project A — Unified Rights and Active Bidding System** from the Portable Platform AI Master Plan. It does not reopen or reorder the completed eight Platform AI phases.
@@ -75,14 +80,13 @@ Planned work:
 
 Completion gate: every active contract reaches a deterministic renewal, expiry, termination, or permanent state and all catalogue views agree.
 
-## Phase 5 — Catalogue packages and output deals
+## Phase 5 — Catalogue packages and portfolio licensing
 
 Purpose: expand from one-title sales to portfolio decisions while keeping every underlying title auditable.
 
 Planned work:
 
 - Real-project catalogue packages with package-level presentation and title-level rights records.
-- Output deals for future eligible productions with bounded duration, volume, territory, and funding commitments.
 - Package bidding based on portfolio fit, catalogue gaps, financial capacity, and overlap conflicts.
 - Mixed strong/weak-title economics, breakout upside, and package-specific guarantees.
 - Bulk renewal preparation and approval, with per-title exception handling.
@@ -141,9 +145,11 @@ Phase 2 is the commercial source of truth for everything downstream:
 1. An immutable offer becomes one schema-v2 canonical contract.
 2. Phase 3 enforces that contract's territories, windows, and exclusivity.
 3. Phase 4 advances its dates, options, expiry, and renewal lineage.
-4. Phase 5 groups compatible contracts into packages and output commitments.
+4. Phase 5 groups compatible title rights into catalogue packages while preserving component contracts.
 5. Phase 6 lets all buyer and seller actors transact through the same authority.
 6. Phase 7 explains the saved relationship and settlement history.
 7. Phase 8 tunes and verifies the complete long-run market.
 
 No later phase should recreate bidding payouts, backend math, or a parallel rights registry.
+
+Future-output and multi-picture deals were removed from Project A's required scope on 2026-09-01. Platforms continue to request new work through the existing single-project commissioned-original system. Longer multi-picture partnerships are deferred until the relationship and legal-contract layers can support them without duplicating commissions.

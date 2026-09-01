@@ -166,7 +166,7 @@ const distressMultiplierFor = (platform: PlatformState): number => {
             default: return 1;
         }
     })();
-    const administrationMultiplier = platform.ai?.administration?.status === 'PENDING' ? 0.34 : 1;
+    const administrationMultiplier = platform.ai?.administration?.outcome === 'PENDING' ? 0.34 : 1;
     const latestFunding = platform.ai?.externalRecapitalizations
         .filter(record => record.status === 'SETTLED')
         .slice()

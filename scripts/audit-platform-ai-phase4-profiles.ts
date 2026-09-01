@@ -49,6 +49,16 @@ for (const platformId of platformIds) {
 }
 
 const netflix = (getOperatingProfile as (id: PlatformId) => any)('NETFLIX');
+assert.equal(
+    PlatformAi.PLATFORM_AI_PROFILES.NETFLIX.maxActiveRightsPlans,
+    14,
+    'Netflix retains its mature rights-operation capacity.',
+);
+assert.equal(
+    PlatformAi.PLATFORM_AI_PROFILES.NETFLIX.planningCadenceWeeks,
+    6,
+    'Netflix may lead release cadence without concentrating more than half of long-run releases.',
+);
 assert.ok(netflix.startingCountryIds.includes('US'));
 assert.ok(netflix.startingCountryIds.includes('IN'));
 assert.ok(netflix.startingCountryIds.includes('JP'));

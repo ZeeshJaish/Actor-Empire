@@ -859,12 +859,24 @@ rescueCandidate.ai!.financeHistory = [{
     verifiedContractIncomeMillions: 0,
     rescueIncomeMillions: 0,
     rescueDebtReductionMillions: 0,
+    externalInvestmentIncomeMillions: 0,
+    externalInvestmentDebtReductionMillions: 0,
+    externalInvestmentArrearsReductionMillions: 0,
     revenueMillions: 100,
     deliveryCostMillions: 0,
     baseOperationsCostMillions: 100,
     marketOperatingCostMillions: 0,
     marketPolicyCostMillions: 0,
     partnerRevenueShareCostMillions: 0,
+    administrationCostMillions: 0,
+    recurringEfficiency: {
+        controller: 'AI',
+        policyVersion: 1,
+        costMultiplier: 1,
+        standardEligibleCostMillions: 0,
+        appliedEligibleCostMillions: 0,
+        savingMillions: 0,
+    },
     contentCostMillions: 0,
     researchCostMillions: 0,
     technologyCostMillions: 0,
@@ -975,13 +987,11 @@ assert.ok(
 );
 const administeredValuationPlatform = structuredClone(valuationPlatform);
 administeredValuationPlatform.ai!.administration = {
-    status: 'PENDING',
     enteredAtAbsoluteWeek: ABSOLUTE_WEEK,
-    resolvedAtAbsoluteWeek: null,
     episodeId: 'admin-valuation-episode',
-    outcome: null,
-    outcomeReferenceId: null,
-    reason: 'Audit administration',
+    outcome: 'PENDING',
+    resolvedAtAbsoluteWeek: null,
+    referenceId: null,
 };
 assert.ok(
     calculatePlatformAiValuationBillions({ player: fixture, platform: administeredValuationPlatform, absoluteWeek: ABSOLUTE_WEEK })

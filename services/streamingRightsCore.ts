@@ -27,6 +27,7 @@ import { createDeterministicId } from './deterministicRandom';
 import { getAbsoluteWeek } from './legacyLogic';
 import { normalizeStreamingDayOneMarketIds } from './streamingDayOneMarkets';
 import { normalizeStreamingLanguageId } from './streamingLocalizationCapabilities';
+import { resolveStreamingRightsCompatibility as resolveCompatibility } from './streamingRightsCompatibility';
 
 const FULL_CURRENCY_PER_MILLION = 1_000_000;
 const CONTRACT_PARTY_TYPES = new Set<StreamingRightsContractPartyType>([
@@ -566,6 +567,7 @@ export interface ProductionStreamingRightsContractInput {
     signedAtAbsoluteWeek: number;
     startsAtAbsoluteWeek: number;
     durationWeeks?: number;
+    windowType?: StreamingRightsWindowType;
 }
 
 /**
@@ -623,7 +625,7 @@ export const registerProductionStreamingRightsContract = (
         origin: 'STUDIO_MARKET',
         sellerType: 'STUDIO',
         sellerPlatformId: null,
-        windowType: 'FIRST_WINDOW',
+        windowType: input.windowType || 'FIRST_WINDOW',
         permanentPurchase: false,
         renewalOption: input.renewalOption || false,
         sublicensingAllowed: false,
@@ -689,6 +691,33 @@ export const registerProductionStreamingRightsContractFromOffer = (
         || input.offer.sessionId !== input.session.id
         || input.offer.status !== 'ACTIVE' && input.offer.status !== 'FINAL' && input.offer.status !== 'ACCEPTED'
     ) return { player, contract: null, changed: false };
+    const existing = Object.values(player.world.streamingRightsContracts || {}).find(contract => (
+        contract.sourceOfferId === input.offer.id
+        || contract.idempotencyKey === `streaming-offer:${input.offer.id}`
+    ));
+    if (existing) return { player, contract: existing, changed: false };
+    const lot = input.session.rightsLot;
+    const exactScopeMatches = (
+        input.offer.territory === lot.territory
+        && input.offer.windowType === lot.windowType
+        && input.offer.durationWeeks <= lot.maximumDurationWeeks
+        && input.offer.countryIds.length === lot.countryIds.length
+        && input.offer.countryIds.every((countryId, index) => countryId === lot.countryIds[index])
+    );
+    if (!exactScopeMatches) return { player, contract: null, changed: false };
+    const compatibility = resolveCompatibility({
+        world: player.world,
+        sourceProjectId: input.session.projectId,
+        buyerPlatformId: input.offer.platformId,
+        sellerPartyId: input.session.sellerStudioId,
+        territory: lot.territory,
+        countryIds: lot.countryIds,
+        startsAtAbsoluteWeek: input.startsAtAbsoluteWeek,
+        expiresAtAbsoluteWeek: input.startsAtAbsoluteWeek + input.offer.durationWeeks,
+        windowType: lot.windowType,
+        exclusivity: input.offer.exclusivity,
+    });
+    if (!compatibility.available) return { player, contract: null, changed: false };
     const result = registerProductionStreamingRightsContract(player, {
         sourceProjectId: input.session.projectId,
         title: input.session.title,
@@ -704,7 +733,8 @@ export const registerProductionStreamingRightsContractFromOffer = (
         futureSeasonFunding: input.offer.futureSeasonFunding,
         guaranteeRecoupment: input.offer.guaranteeRecoupment,
         backendCap: input.offer.backendCap,
-        territory: input.offer.territory,
+        territory: lot.territory,
+        countryIds: lot.countryIds,
         exclusivity: input.offer.exclusivity,
         localization: input.offer.localization,
         localizationRequirements: input.offer.localizationRequirements,
@@ -712,6 +742,7 @@ export const registerProductionStreamingRightsContractFromOffer = (
         signedAtAbsoluteWeek: input.signedAtAbsoluteWeek,
         startsAtAbsoluteWeek: input.startsAtAbsoluteWeek,
         durationWeeks: input.offer.durationWeeks,
+        windowType: lot.windowType,
     });
     if (!result.contract) return result;
     const contract = normalizeStreamingRightsContract({
@@ -753,52 +784,18 @@ export const doesStreamingLicenseCoverCountry = (
     || (contract.countryIds || []).includes(countryId)
 );
 
-export interface StreamingRightsAvailabilityInput {
-    player: Player;
-    world: WorldState;
-    sourceProjectId: string;
-    buyerPlatformId: PlatformId | null;
-    exclusivity: StreamingLicenseExclusivity;
-    startsAtAbsoluteWeek: number;
-    expiresAtAbsoluteWeek: number;
-    excludeLicenseIds?: string[];
-}
-
-export interface StreamingRightsAvailabilityResult {
-    available: boolean;
-    conflictLicenseIds: string[];
-}
-
-const windowsOverlap = (
-    leftStart: number,
-    leftEnd: number,
-    rightStart: number,
-    rightEnd: number,
-): boolean => leftStart <= rightEnd && rightStart <= leftEnd;
-
-export const validateStreamingRightsAvailability = (
-    input: StreamingRightsAvailabilityInput,
-): StreamingRightsAvailabilityResult => {
-    const excluded = new Set(input.excludeLicenseIds || []);
-    const playerContracts = input.player.ownedStreamingPlatform?.catalogLicenses || [];
-    const aiContracts = Object.values(input.world.platforms || {}).flatMap(platform => (
-        platform.ai?.rightsContracts || []
-    ));
-    const conflictLicenseIds = [...playerContracts, ...aiContracts]
-        .filter(contract => (
-            !excluded.has(contract.id)
-            && contract.status === 'ACTIVE'
-            && contract.sourceProjectId === input.sourceProjectId
-            && windowsOverlap(
-                input.startsAtAbsoluteWeek,
-                input.expiresAtAbsoluteWeek,
-                contract.startsAtAbsoluteWeek,
-                contract.expiresAtAbsoluteWeek,
-            )
-            && (input.exclusivity === 'EXCLUSIVE' || contract.exclusivity === 'EXCLUSIVE')
-        ))
-        .map(contract => contract.id)
-        .sort();
-
-    return { available: conflictLicenseIds.length === 0, conflictLicenseIds };
-};
+export {
+    formatStreamingRightsCompatibilitySummary,
+    resolveStreamingRightsCompatibility,
+    validateStreamingRightsAvailability,
+} from './streamingRightsCompatibility';
+export type {
+    StreamingRightsAvailabilityInput,
+    StreamingRightsAvailabilityResult,
+    StreamingRightsCompatibilityAction,
+    StreamingRightsCompatibilityInput,
+    StreamingRightsCompatibilityResult,
+    StreamingRightsCompatibilityStatus,
+    StreamingRightsConflict,
+    StreamingRightsConflictCode,
+} from './streamingRightsCompatibility';

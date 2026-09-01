@@ -212,7 +212,7 @@ export const settleStreamingContractRoyaltyForPlayer = (
         return { player, changed: false, royaltyPaid: 0, settlementId: null };
     }
     const absoluteWeek = Math.max(0, Math.floor(Number(input.absoluteWeek) || 0));
-    if (absoluteWeek < contract.startsAtAbsoluteWeek || absoluteWeek >= contract.expiresAtAbsoluteWeek) {
+    if (absoluteWeek < contract.startsAtAbsoluteWeek || absoluteWeek > contract.expiresAtAbsoluteWeek) {
         return { player, changed: false, royaltyPaid: 0, settlementId: null };
     }
     const idempotencyKey = `streaming-royalty:${contract.id}:${absoluteWeek}`;

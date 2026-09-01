@@ -36,8 +36,13 @@ import { migrateStreamingRightsContractRegistry } from './streamingRightsCore';
 import { normalizeStreamingBiddingSessionRegistry } from './streamingBidding';
 import { normalizeStreamingRoyaltySettlementRegistry } from './streamingContractSettlement';
 import { normalizeStreamingPlatformEcosystem } from './streamingPlatformEcosystem';
+import {
+    normalizeStreamingRightsCalendarState,
+    normalizeStreamingRightsManagementState,
+} from './streamingRightsCalendar';
+import { reconstructSignedStreamingCataloguePackages } from './streamingCataloguePackages';
 
-const SAVE_MIGRATION_VERSION = 27;
+const SAVE_MIGRATION_VERSION = 28;
 const RUNAWAY_STOCK_CASH_CEILING = 10_000_000_000_000;
 const ACQUISITION_RIVAL_BID_MAX_ROUNDS = 3;
 
@@ -1196,9 +1201,31 @@ export const migratePlayerSave = (input: Partial<Player> | Player): Player => {
         },
     };
     const playerWithStreamingContracts = migrateStreamingRightsContractRegistry(playerWithNormalizedPlatformAi);
-    const migratedPlayer = {
+    const playerWithStreamingRightsCalendar: Player = {
         ...playerWithStreamingContracts,
-        flags: migrateFlags(base.flags, playerWithStreamingContracts),
+        streamingRightsManagement: normalizeStreamingRightsManagementState(
+            playerWithStreamingContracts.streamingRightsManagement,
+        ),
+        world: {
+            ...playerWithStreamingContracts.world,
+            streamingCataloguePackages: reconstructSignedStreamingCataloguePackages(
+                playerWithStreamingContracts.world.streamingCataloguePackages,
+                playerWithStreamingContracts.world.streamingRightsContracts,
+            ),
+            streamingCataloguePackageDigests: Array.isArray(playerWithStreamingContracts.world.streamingCataloguePackageDigests)
+                ? playerWithStreamingContracts.world.streamingCataloguePackageDigests.slice(0, 52)
+                : [],
+            streamingCataloguePackagesLastProcessedWeek: Number.isFinite(Number(playerWithStreamingContracts.world.streamingCataloguePackagesLastProcessedWeek))
+                ? Math.round(Number(playerWithStreamingContracts.world.streamingCataloguePackagesLastProcessedWeek))
+                : -1,
+            streamingRightsCalendar: normalizeStreamingRightsCalendarState(
+                playerWithStreamingContracts.world.streamingRightsCalendar,
+            ),
+        },
+    };
+    const migratedPlayer = {
+        ...playerWithStreamingRightsCalendar,
+        flags: migrateFlags(base.flags, playerWithStreamingRightsCalendar),
     };
     const repairedPlayer = migrateLegacyCharacterIdentity(reverseLegacyImportedAcquisitionDebtCharge(
         repairAcquiredStudioAssetPortfolios(

@@ -20,12 +20,16 @@ import {
     normalizePlatformAiState,
     PLATFORM_AI_FLOP_COMMERCIAL_SCORE,
     PLATFORM_AI_HIT_COMMERCIAL_SCORE,
+    PLATFORM_AI_OUTCOME_THRESHOLDS,
     recordPlatformAiReleaseMemory,
     releasePlatformContentPlan,
     schedulePlatformStreamingWindow,
     updatePlatformAiMemory,
 } from '../services/platformAi';
-import { createStreamingLicenseContract } from '../services/streamingRightsCore';
+import {
+    createStreamingLicenseContract,
+    migrateStreamingRightsContractRegistry,
+} from '../services/streamingRightsCore';
 import { createDeterministicId } from '../services/deterministicRandom';
 import {
     getPlatformAiLocalizationJobId,
@@ -48,6 +52,13 @@ const fixture = createPlatformAiFixture();
 
 assert.equal(PLATFORM_AI_HIT_COMMERCIAL_SCORE, 85, 'Long-run HIT threshold must remain disclosed and auditable.');
 assert.equal(PLATFORM_AI_FLOP_COMMERCIAL_SCORE, 74, 'Long-run FLOP threshold must remain disclosed and auditable.');
+assert.deepEqual(PLATFORM_AI_OUTCOME_THRESHOLDS, {
+    NETFLIX: { hit: 85, flop: 74 },
+    APPLE_TV: { hit: 85, flop: 81 },
+    DISNEY_PLUS: { hit: 88.5, flop: 85 },
+    HULU: { hit: 86, flop: 81.5 },
+    YOUTUBE: { hit: 89, flop: 85.5 },
+}, 'Each company must expose its audience-expectation thresholds for long-run balance review.');
 
 const project = (
     id: string,
@@ -221,10 +232,11 @@ const installPlan = (
         ...researchBackedPlatform.ai!.rightsContracts.filter(item => !contracts.some(candidate => candidate.id === item.id)),
         ...contracts,
     ];
-    return {
+    const projectedWorld: WorldState = {
         ...world,
         platforms: { ...world.platforms!, [platformId]: researchBackedPlatform },
     };
+    return migrateStreamingRightsContractRegistry({ ...player, world: projectedWorld }).world;
 };
 
 const installLocalizationJobs = (
@@ -397,6 +409,11 @@ const expiredContract = contract('expired-right', 'HULU', 'expired-plan', licens
 expiredContract.expiresAtAbsoluteWeek = PREMIERE_WEEK - 1;
 const expiredPlan = basePlan('HULU', 'expired-plan', 'LICENSED_RELEASED_TITLE', [licensed.id], [expiredContract.id]);
 world = installPlan(fixture, world, 'HULU', expiredPlan, [expiredContract]);
+world.streamingRightsContracts![expiredContract.id] = {
+    ...world.streamingRightsContracts![expiredContract.id],
+    durationWeeks: PREMIERE_WEEK - 1 - expiredContract.startsAtAbsoluteWeek,
+    expiresAtAbsoluteWeek: PREMIERE_WEEK - 1,
+};
 assert.equal(schedule(fixture, world, 'HULU', expiredPlan.id).reason, 'RIGHTS_NOT_ACTIVE');
 
 const inactiveCountryContract = contract('inactive-country-right', 'HULU', 'inactive-country-plan', licensed, 'LICENSED_RELEASED_TITLE');
@@ -801,8 +818,7 @@ const expectMalformedContractRejected = (
 ): void => {
     const malformedWorld = structuredClone(licensedScheduled.world);
     const malformedPlan = malformedWorld.platforms!.HULU.ai!.slate.find(item => item.id === licensedPlan.id)!;
-    const malformedContract = malformedWorld.platforms!.HULU.ai!.rightsContracts
-        .find(item => item.id === licensedContract.id)!;
+    const malformedContract = malformedWorld.streamingRightsContracts![licensedContract.id];
     mutate(malformedPlan, malformedContract);
     const before = structuredClone(malformedWorld);
     const result = releasePlatformContentPlan({

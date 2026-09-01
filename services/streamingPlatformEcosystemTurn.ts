@@ -179,6 +179,7 @@ export const createDynamicStreamingOperator = (
         marketMomentum: Object.fromEntries(activeCountryIds.map(idValue => [idValue, roundTwo(2 + rng() * 6)])),
         visibilityQualifyingWeeks: {}, belowVisibilityWeeks: {}, consecutiveStressWeeks: 0,
         lastMaterialChangeAtAbsoluteWeek: input.absoluteWeek,
+        lastProcessedAbsoluteWeek: input.absoluteWeek,
     };
 };
 
@@ -221,6 +222,7 @@ const progressOperator = (
     absoluteWeek: number,
 ): void => {
     if (operator.kind === 'CORE_GLOBAL' || operator.lifecycle === 'CLOSED' || operator.lifecycle === 'ACQUIRED') return;
+    if ((operator.lastProcessedAbsoluteWeek ?? -1) >= absoluteWeek) return;
     const rng = createDeterministicRng(`${player.id}:streaming-ecosystem-turn:${absoluteWeek}:${operator.id}`);
     const weeklyRevenue = operator.subscriberMillions * (0.42 + operator.brandPower / 400);
     const weeklyCost = 0.8 + operator.activeCountryIds.length * 0.42 + operator.cataloguePower / 38 + operator.technology / 90;
@@ -269,6 +271,7 @@ const progressOperator = (
         state.markets[countryId] = { ...market, ...repaired, lastRebalancedAtAbsoluteWeek: absoluteWeek };
     }
     updateMarketVisibilityStreaks(operator, state);
+    operator.lastProcessedAbsoluteWeek = absoluteWeek;
 };
 
 const maybeLaunchOperator = (

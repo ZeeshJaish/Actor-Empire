@@ -163,6 +163,7 @@ const normalizeOperator = (
         belowVisibilityWeeks: normalizeWeekMap(source.belowVisibilityWeeks),
         consecutiveStressWeeks: Math.max(0, Math.round(finite(source.consecutiveStressWeeks))),
         lastMaterialChangeAtAbsoluteWeek: Math.max(0, Math.round(finite(source.lastMaterialChangeAtAbsoluteWeek))),
+        lastProcessedAbsoluteWeek: Math.max(-1, Math.round(finite(source.lastProcessedAbsoluteWeek, -1))),
     };
 };
 
@@ -313,6 +314,18 @@ const toCompanySummary = (
     sharePercent?: number,
 ): StreamingCompanySummary => {
     const authoritative = operator.corePlatformId ? player.world.platforms?.[operator.corePlatformId] : null;
+    const ai = authoritative?.ai;
+    const technologyLevels = ai ? Object.values(ai.capabilities.technologyLevels) : [];
+    const canonicalTechnology = technologyLevels.length
+        ? technologyLevels.reduce((sum, level) => sum + level, 0) / technologyLevels.length
+        : operator.technology;
+    const canonicalLifecycle: StreamingCompanySummary['lifecycle'] = ai?.playerAcquisitionHandoffAtAbsoluteWeek !== null && ai?.playerAcquisitionHandoffAtAbsoluteWeek !== undefined
+        ? 'ACQUIRED'
+        : ai?.status === 'DISTRESSED' || ai?.status === 'RESTRUCTURING'
+            ? 'DISTRESSED'
+            : ai?.status === 'DORMANT' ? 'CLOSED' : operator.lifecycle;
+    const activeProjectCount = ai?.slate.filter(plan => !['RELEASED', 'CANCELLED', 'SOLD'].includes(plan.status)).length;
+    const activeResearchProgramCount = ai?.researchQueue.filter(item => item.stage !== 'OPERATING').length;
     return {
         id: operator.id,
         name: authoritative?.name || operator.name,
@@ -324,7 +337,18 @@ const toCompanySummary = (
         subscribersMillions: authoritative?.subscribers ?? operator.subscriberMillions,
         valuationBillions: authoritative?.valuation ?? operator.valuationBillions,
         momentum: countryId ? operator.marketMomentum[countryId] || 0 : Math.max(0, ...Object.values(operator.marketMomentum)),
-        lifecycle: operator.lifecycle,
+        lifecycle: canonicalLifecycle,
+        cashMillions: authoritative?.cashReserve ?? operator.cashMillions,
+        technology: Math.round(canonicalTechnology * 100) / 100,
+        cataloguePower: ai?.audienceHealth.catalogueStrengthIndex ?? operator.cataloguePower,
+        localization: ai
+            ? Math.round(((ai.capabilities.subtitleCoveragePercent + ai.capabilities.dubCoveragePercent) / 2) * 100) / 100
+            : operator.localization,
+        prestige: authoritative?.reputation ?? operator.prestige,
+        activeCountryIds: [...(ai?.capabilities.activeCountryIds || operator.activeCountryIds)],
+        activeProjectCount: activeProjectCount ?? 0,
+        activeResearchProgramCount: activeResearchProgramCount ?? 0,
+        lastProcessedAbsoluteWeek: ai?.lastProcessedAbsoluteWeek ?? operator.lastProcessedAbsoluteWeek ?? -1,
         ...(operator.corePlatformId ? { corePlatformId: operator.corePlatformId } : {}),
     };
 };

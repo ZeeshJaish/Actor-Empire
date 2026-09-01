@@ -65,7 +65,7 @@ The War Room uses a production-floor auction aesthetic: cool slate surfaces, con
 
 ## Deferred work
 
-Catalogue packages, output deals, Rights Calendar, bulk renewal, full renewal negotiation, platform-to-platform resale, advanced cinematics, cheat shortcuts, and long-run balance tuning remain in later phases. Phase 2 stores the clauses and canonical records those systems will consume.
+Catalogue packages, Rights Calendar, bulk renewal, full renewal negotiation, platform-to-platform resale, advanced cinematics, cheat shortcuts, and long-run balance tuning remain in later phases. Phase 2 stores the clauses and canonical records those systems will consume. Future-output deals were separately deferred by the 2026-09-01 roadmap correction.
 
 ## Verification
 

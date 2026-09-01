@@ -10,20 +10,33 @@ import type {
     ProjectType,
     StreamingLicenseExclusivity,
     StreamingLicenseTerritory,
+    StreamingCataloguePackage,
+    StreamingCataloguePackageComponent,
+    StreamingRightsWindowType,
     StudioId,
     TargetAudience,
     WorldState,
 } from '../../types';
+import { STREAMING_CATALOGUE_PACKAGE_SCHEMA_VERSION } from '../../types';
 import { createDeterministicId, createDeterministicRng } from '../deterministicRandom';
 import { getAbsoluteWeek } from '../legacyLogic';
 import {
     createStreamingLicenseContract,
     createStreamingRightsContractFromLicense,
+    fullCurrencyToMillions,
+    getStreamingRightsContract,
     isStreamingLicenseActiveAt,
     millionsToFullCurrency,
     registerStreamingRightsContract,
     validateStreamingRightsAvailability,
 } from '../streamingRightsCore';
+import { normalizeStreamingDayOneMarketIds, STREAMING_DAY_ONE_MARKETS } from '../streamingDayOneMarkets';
+import {
+    allocateStreamingCatalogueGuarantee,
+    calculateStreamingCatalogueReferenceValue,
+    normalizeStreamingCataloguePackageRegistry,
+} from '../streamingCataloguePackages';
+import { buildStreamingBiddingRightsLot } from '../streamingRightsCompatibility';
 import { STUDIO_CATALOG } from '../studioLogic';
 import { PLATFORM_AI_PROFILES, type PlatformAiProfile } from './platformAiProfiles';
 import { clampPlatformContentPlanSupport, resolvePlatformLocalizationLevel } from './platformAiResearch';
@@ -47,6 +60,8 @@ export interface PlatformAiContentCandidate {
     producerStudioId: StudioId | null;
     streamingWindow: PlatformAiStreamingWindow;
     territory: StreamingLicenseTerritory;
+    /** Exact market snapshot evaluated when this candidate is built. */
+    countryIds: string[];
     exclusivity: StreamingLicenseExclusivity;
     durationWeeks: number;
     rightsCostMillions: number;
@@ -178,6 +193,29 @@ const isNonPlatformStudio = (studioId: StudioId): boolean => (
     Boolean(STUDIO_CATALOG[studioId]) && STUDIO_CATALOG[studioId].archetype !== 'PLATFORM'
 );
 
+const territoryForCountries = (countryIds: readonly string[]): StreamingLicenseTerritory => (
+    countryIds.length === STREAMING_DAY_ONE_MARKETS.length
+        ? 'GLOBAL'
+        : countryIds.length === 1 ? 'DOMESTIC' : 'MULTI_REGION'
+);
+
+const rightsScopeForPlatform = (platform: PlatformState): {
+    territory: StreamingLicenseTerritory;
+    countryIds: string[];
+} => {
+    const countryIds = normalizeStreamingDayOneMarketIds(
+        platform.ai?.capabilities.activeCountryIds,
+    ).sort();
+    return { territory: territoryForCountries(countryIds), countryIds };
+};
+
+const rightsWindowForProject = (
+    project: IndustryProject,
+    permanent: boolean,
+): StreamingRightsWindowType => permanent
+    ? 'PERMANENT'
+    : project.boxOffice > 0 ? 'SECOND_WINDOW' : 'FIRST_WINDOW';
+
 const selectProducerStudio = (
     playerId: string,
     platformId: PlatformId,
@@ -206,11 +244,17 @@ const canUseReleasedProject = (
     project: IndustryProject,
     exclusivity: StreamingLicenseExclusivity,
     durationWeeks: number,
+    territory: StreamingLicenseTerritory,
+    countryIds: string[],
+    windowType: StreamingRightsWindowType,
 ): boolean => validateStreamingRightsAvailability({
     player: input.player,
     world: input.world,
     sourceProjectId: project.id,
     buyerPlatformId: input.platformId,
+    territory,
+    countryIds: territory === 'GLOBAL' ? [] : countryIds,
+    windowType,
     exclusivity,
     startsAtAbsoluteWeek: input.absoluteWeek,
     expiresAtAbsoluteWeek: input.absoluteWeek + durationWeeks,
@@ -234,16 +278,21 @@ export const buildPlatformContentCandidates = (
     const ai = platform.ai!;
     if (ai.status !== 'ACTIVE' || getPlatformAiSpendingRestrictions(platform, input.absoluteWeek).blocksNewGreenlights) return [];
     const profile = PLATFORM_AI_PROFILES[input.platformId];
+    const rightsScope = rightsScopeForPlatform(platform);
     const runwayFloor = getRunwayFloor(platform.cashReserve, profile.baseWeeklyOperationsMillions);
     const activePlans = ai.slate.filter(plan => (
         ACTIVE_PLAN_STATUSES.has(plan.status)
         && (plan.source === 'COMMISSIONED_ORIGINAL' || plan.sourceProjectIds.every(projectId => (
-            ai.rightsContracts.some(contract => (
-                plan.rightsContractIds.includes(contract.id)
-                && contract.sourceProjectId === projectId
-                && contract.status === 'ACTIVE'
-                && isStreamingLicenseActiveAt(contract, input.absoluteWeek)
-            ))
+            plan.rightsContractIds.some(contractId => {
+                const contract = getStreamingRightsContract(input.world.streamingRightsContracts, contractId);
+                return Boolean(
+                    contract
+                    && contract.sourceProjectId === projectId
+                    && contract.buyerPlatformId === input.platformId
+                    && contract.status === 'ACTIVE'
+                    && isStreamingLicenseActiveAt(contract, input.absoluteWeek),
+                );
+            })
         )))
     ));
     const originalLimit = Math.max(1, Math.floor((
@@ -254,8 +303,9 @@ export const buildPlatformContentCandidates = (
     )));
     const activeOriginals = activePlans.filter(plan => plan.source === 'COMMISSIONED_ORIGINAL').length;
     const activeRights = activePlans.length - activeOriginals;
-    const alreadyCovered = new Set(ai.rightsContracts.filter(contract => (
-        contract.status === 'ACTIVE'
+    const alreadyCovered = new Set(Object.values(input.world.streamingRightsContracts || {}).filter(contract => (
+        contract.buyerPlatformId === input.platformId
+        && contract.status === 'ACTIVE'
         && isStreamingLicenseActiveAt(contract, input.absoluteWeek)
     )).map(contract => contract.sourceProjectId));
     const released = getPlatformAiRightsMarketProjectUniverse(input.world.projects, input.absoluteWeek)
@@ -286,7 +336,8 @@ export const buildPlatformContentCandidates = (
                     sourceProjectIds: [],
                     producerStudioId,
                     streamingWindow: 'ORIGINAL_STREAMING_PREMIERE',
-                    territory: 'GLOBAL',
+                    territory: rightsScope.territory,
+                    countryIds: rightsScope.countryIds,
                     exclusivity: 'EXCLUSIVE',
                     durationWeeks: 260,
                     rightsCostMillions: 0,
@@ -301,7 +352,16 @@ export const buildPlatformContentCandidates = (
     if (activeRights < rightsLimit) {
         const ownedProject = released.find(project => (
             profile.ownedStudioIds.includes(project.studioId)
-            && canUseReleasedProject(input, project, 'NON_EXCLUSIVE', 520)
+            && rightsScope.countryIds.length > 0
+            && canUseReleasedProject(
+                input,
+                project,
+                'NON_EXCLUSIVE',
+                520,
+                rightsScope.territory,
+                rightsScope.countryIds,
+                'PERMANENT',
+            )
         ));
         if (ownedProject) {
             candidates.push({
@@ -314,7 +374,8 @@ export const buildPlatformContentCandidates = (
                 sourceProjectIds: [ownedProject.id],
                 producerStudioId: null,
                 streamingWindow: 'OWNED_STUDIO_STREAMING_WINDOW',
-                territory: 'GLOBAL',
+                territory: rightsScope.territory,
+                countryIds: rightsScope.countryIds,
                 exclusivity: 'NON_EXCLUSIVE',
                 durationWeeks: 520,
                 rightsCostMillions: 0,
@@ -327,7 +388,16 @@ export const buildPlatformContentCandidates = (
         const licensable = released.filter(project => (
             !profile.ownedStudioIds.includes(project.studioId)
             && isNonPlatformStudio(project.studioId)
-            && canUseReleasedProject(input, project, 'NON_EXCLUSIVE', 104)
+            && rightsScope.countryIds.length > 0
+            && canUseReleasedProject(
+                input,
+                project,
+                'NON_EXCLUSIVE',
+                104,
+                rightsScope.territory,
+                rightsScope.countryIds,
+                rightsWindowForProject(project, false),
+            )
         ));
         for (const project of licensable.slice(0, 2)) {
             const rightsCostMillions = calculatePlatformAiRightsValueMillions(project);
@@ -342,7 +412,8 @@ export const buildPlatformContentCandidates = (
                 sourceProjectIds: [project.id],
                 producerStudioId: null,
                 streamingWindow: project.boxOffice > 0 ? 'POST_THEATRICAL_WINDOW' : 'CATALOGUE_WINDOW',
-                territory: 'GLOBAL',
+                territory: rightsScope.territory,
+                countryIds: rightsScope.countryIds,
                 exclusivity: 'NON_EXCLUSIVE',
                 durationWeeks: 104,
                 rightsCostMillions,
@@ -377,7 +448,8 @@ export const buildPlatformContentCandidates = (
                     sourceProjectIds: group.projects.map(project => project.id).sort(),
                     producerStudioId: null,
                     streamingWindow: 'CATALOGUE_WINDOW',
-                    territory: 'GLOBAL',
+                    territory: rightsScope.territory,
+                    countryIds: rightsScope.countryIds,
                     exclusivity: 'NON_EXCLUSIVE',
                     durationWeeks: 156,
                     rightsCostMillions: groupedCost,
@@ -514,24 +586,131 @@ export const commitPlatformContentCandidate = (
         ? createDeterministicId('platform_ai_catalogue_package', input.platformId, ...input.candidate.sourceProjectIds.slice().sort())
         : null;
     const plan = buildPlan(input, platform, planId, cataloguePackageId);
+    const requestedCountryIds = normalizeStreamingDayOneMarketIds(
+        input.candidate.countryIds?.length
+            ? input.candidate.countryIds
+            : platform.ai!.capabilities.activeCountryIds,
+    ).sort();
+    const requestedTerritory = territoryForCountries(requestedCountryIds);
+    let cataloguePackage: StreamingCataloguePackage | null = null;
+    const catalogueAllocations = new Map<string, ReturnType<typeof allocateStreamingCatalogueGuarantee>['rows'][number]>();
+    if (input.candidate.source === 'CATALOGUE_ACQUISITION' && cataloguePackageId) {
+        const rawComponents = sourceProjects.flatMap(project => {
+            if (!project) return [];
+            const windowType = rightsWindowForProject(project, false);
+            const lotBuild = buildStreamingBiddingRightsLot({
+                world: input.world,
+                sourceProjectId: project.id,
+                sellerPartyId: project.studioId,
+                startsAtAbsoluteWeek: input.absoluteWeek,
+                maximumDurationWeeks: input.candidate.durationWeeks,
+                windowType,
+                desiredCountryIds: requestedCountryIds,
+            });
+            if (!lotBuild.lot) return [];
+            const component: StreamingCataloguePackageComponent = {
+                sourceProjectId: project.id,
+                title: project.title,
+                projectType: project.mediaType || 'MOVIE',
+                genre: project.genre,
+                originalLanguageId: project.originalLanguageId || 'english',
+                sellerStudioId: project.studioId,
+                quality: project.quality,
+                audience: 0,
+                budget: millionsToFullCurrency(budgetMillions(project)),
+                theatricalGross: Math.max(0, project.boxOffice || 0),
+                streamingRevenue: 0,
+                franchiseProtected: Boolean((project as any).franchiseId || project.universeId),
+                rightsLot: lotBuild.lot,
+                referenceValue: 0,
+                referenceWeight: 0,
+            };
+            return [component];
+        }).sort((left, right) => left.sourceProjectId.localeCompare(right.sourceProjectId));
+        if (rawComponents.length !== sourceProjects.length || rawComponents.length < 2) {
+            return { world: input.world, changed: false, plan: null, reason: 'RIGHTS_CONFLICT' };
+        }
+        const referenceValues = rawComponents.map(component => calculateStreamingCatalogueReferenceValue(component));
+        const referenceTotal = referenceValues.reduce((sum, value) => sum + value, 0);
+        const components = rawComponents.map((component, index) => ({
+            ...component,
+            referenceValue: referenceValues[index],
+            referenceWeight: referenceTotal > 0 ? referenceValues[index] / referenceTotal : 1 / rawComponents.length,
+        }));
+        const bidderValues = Object.fromEntries(sourceProjects.map(project => [
+            project!.id,
+            millionsToFullCurrency(calculatePlatformAiRightsValueMillions(project!))
+                * (PLATFORM_AI_PROFILES[input.platformId].preferredGenres.includes(project!.genre) ? 1.12 : 0.94),
+        ]));
+        const allocation = allocateStreamingCatalogueGuarantee({
+            totalGuarantee: millionsToFullCurrency(input.candidate.rightsCostMillions),
+            components,
+            platformId: input.platformId,
+            bidderValues,
+            durationWeeks: input.candidate.durationWeeks,
+            exclusivity: input.candidate.exclusivity,
+            localization: plan.localizationLevel,
+            localizationRequirements: plan.localizationRequirements || [],
+        });
+        if (!allocation.valid || allocation.rows.length !== components.length) {
+            return { world: input.world, changed: false, plan: null, reason: 'RIGHTS_CONFLICT' };
+        }
+        allocation.rows.forEach(row => catalogueAllocations.set(row.componentProjectId, row));
+        const sellerStudioId = sourceProjects[0]!.studioId;
+        const sellerName = STUDIO_CATALOG[sellerStudioId]?.name || sellerStudioId;
+        cataloguePackage = {
+            schemaVersion: STREAMING_CATALOGUE_PACKAGE_SCHEMA_VERSION,
+            id: cataloguePackageId,
+            idempotencyKey: `platform-ai-catalogue-package:${cataloguePackageId}`,
+            source: 'PLATFORM_AI_SOURCING',
+            lifecycle: 'SIGNED',
+            name: input.candidate.title,
+            seller: { type: 'NPC_STUDIO', id: sellerStudioId, name: sellerName, platformId: null },
+            createdAtAbsoluteWeek: input.absoluteWeek,
+            startsAtAbsoluteWeek: input.absoluteWeek,
+            requestedWindowType: components[0].rightsLot.windowType,
+            requestedExclusivity: input.candidate.exclusivity,
+            requestedCountryIds,
+            maximumDurationWeeks: input.candidate.durationWeeks,
+            components,
+            excluded: [],
+            controlModeAtCreation: 'STRATEGY',
+            protectionReasons: [],
+            delegatedReason: `${platform.name} filled a persisted catalogue gap within runway and rights constraints.`,
+            manualApprovalRequired: false,
+            biddingSessionId: null,
+            acceptedOfferId: createDeterministicId('platform_ai_catalogue_offer', cataloguePackageId, input.platformId),
+            signedAtAbsoluteWeek: input.absoluteWeek,
+            totalGuarantee: millionsToFullCurrency(input.candidate.rightsCostMillions),
+            totalExpectedExposure: allocation.rows.reduce((sum, row) => sum + row.expectedTotalCost, 0),
+            acceptedTerms: allocation.rows,
+            componentContractIds: [],
+            digestId: null,
+        };
+    }
     const contracts = sourceProjects.flatMap((project, index) => {
         if (!project || input.candidate.source === 'COMMISSIONED_ORIGINAL') return [];
         const permanent = input.candidate.source === 'OWNED_STUDIO_TRANSFER';
         const expiresAtAbsoluteWeek = permanent
             ? Number.MAX_SAFE_INTEGER
             : input.absoluteWeek + input.candidate.durationWeeks;
+        const windowType = rightsWindowForProject(project, permanent);
         const availability = validateStreamingRightsAvailability({
             player: input.player,
             world: input.world,
             sourceProjectId: project.id,
             buyerPlatformId: input.platformId,
+            territory: requestedTerritory,
+            countryIds: requestedTerritory === 'GLOBAL' ? [] : requestedCountryIds,
+            windowType,
             exclusivity: input.candidate.exclusivity,
             startsAtAbsoluteWeek: input.absoluteWeek,
             expiresAtAbsoluteWeek,
         });
         if (!availability.available) return [];
-        const perProjectCost = input.candidate.source === 'CATALOGUE_ACQUISITION'
-            ? input.candidate.rightsCostMillions / Math.max(1, sourceProjects.length)
+        const catalogueRow = catalogueAllocations.get(project.id);
+        const perProjectCost = catalogueRow
+            ? fullCurrencyToMillions(catalogueRow.minimumGuarantee)
             : input.candidate.rightsCostMillions;
         return [createStreamingLicenseContract({
             id: createDeterministicId('platform_ai_rights_contract', planId, project.id, index),
@@ -541,12 +720,14 @@ export const commitPlatformContentCandidate = (
             cataloguePackageId,
             contentSource: input.candidate.source,
             licensorName: STUDIO_CATALOG[project.studioId]?.name || project.studioId,
-            territory: input.candidate.territory,
-            countryIds: [],
-            durationWeeks: input.candidate.durationWeeks,
-            exclusivity: input.candidate.exclusivity,
+            territory: catalogueRow?.territory || requestedTerritory,
+            countryIds: catalogueRow?.countryIds || (requestedTerritory === 'GLOBAL' ? [] : requestedCountryIds),
+            durationWeeks: catalogueRow?.durationWeeks || input.candidate.durationWeeks,
+            exclusivity: catalogueRow?.exclusivity || input.candidate.exclusivity,
             minimumGuarantee: millionsToFullCurrency(perProjectCost),
-            platformRevenueShare: input.candidate.source === 'OWNED_STUDIO_TRANSFER' ? 100 : 70,
+            platformRevenueShare: input.candidate.source === 'OWNED_STUDIO_TRANSFER'
+                ? 100
+                : catalogueRow?.platformRevenueShare || 70,
             signedAtAbsoluteWeek: input.absoluteWeek,
             startsAtAbsoluteWeek: input.absoluteWeek,
             origin: input.candidate.source === 'OWNED_STUDIO_TRANSFER'
@@ -556,7 +737,7 @@ export const commitPlatformContentCandidate = (
                     : 'STUDIO_MARKET',
             sellerType: 'STUDIO',
             sellerPlatformId: null,
-            windowType: permanent ? 'PERMANENT' : project.boxOffice > 0 ? 'SECOND_WINDOW' : 'FIRST_WINDOW',
+            windowType: catalogueRow?.windowType || windowType,
             permanentPurchase: permanent,
             renewalOption: !permanent,
             sublicensingAllowed: input.candidate.exclusivity === 'NON_EXCLUSIVE',
@@ -592,6 +773,9 @@ export const commitPlatformContentCandidate = (
                 settledAtAbsoluteWeek: input.absoluteWeek,
                 localization: plan.localizationLevel,
                 localizationRequirements: plan.localizationRequirements,
+                guaranteeRecoupment: catalogueAllocations.get(project.id)?.guaranteeRecoupment,
+                backendCap: catalogueAllocations.get(project.id)?.backendCap,
+                sourceOfferId: cataloguePackage?.acceptedOfferId,
             }),
         );
         streamingRightsContracts = registration.registry;
@@ -600,6 +784,7 @@ export const commitPlatformContentCandidate = (
         ...plan,
         rightsContractIds: contracts.map(contract => contract.id),
     };
+    if (cataloguePackage) cataloguePackage = { ...cataloguePackage, componentContractIds: [...committedPlan.rightsContractIds].sort() };
     const decision = {
         id: createDeterministicId('platform_ai_decision', input.platformId, planId, 'CONTENT_COMMITMENT'),
         absoluteWeek: input.absoluteWeek,
@@ -622,6 +807,10 @@ export const commitPlatformContentCandidate = (
         world: {
             ...input.world,
             streamingRightsContracts,
+            streamingCataloguePackages: cataloguePackage ? {
+                ...normalizeStreamingCataloguePackageRegistry(input.world.streamingCataloguePackages),
+                [cataloguePackage.id]: cataloguePackage,
+            } : input.world.streamingCataloguePackages,
             platforms: { ...input.world.platforms, [input.platformId]: nextPlatform },
         },
         changed: true,

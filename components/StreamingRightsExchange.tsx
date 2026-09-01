@@ -4,6 +4,7 @@ import {
   BadgeCheck,
   Banknote,
   Building2,
+  CalendarClock,
   CheckCircle2,
   ChevronRight,
   CircleDollarSign,
@@ -12,6 +13,7 @@ import {
   Gavel,
   Globe2,
   HandCoins,
+  Layers3,
   RefreshCcw,
   Scale,
   ShieldCheck,
@@ -28,21 +30,26 @@ import type {
   StreamingLicenseExclusivity,
   StreamingLicenseTerritory,
   StreamingRightsChangeOfControl,
+  StreamingRightsRenewalCase,
   StreamingRightsWindowType,
 } from '../types';
 import { getAbsoluteWeek } from '../services/legacyLogic';
 import {
   acceptStreamingRightsCounter,
   createDefaultStreamingRightsTerms,
+  getStreamingCataloguePackageOpportunities,
   getStreamingRightsOpportunities,
   openStreamingRightsNegotiation,
   openStreamingRightsRenewal,
   reviseStreamingRightsNegotiation,
   signStreamingRightsDeal,
+  signOwnedStreamingCataloguePackage,
   submitStreamingRightsOffer,
   type StreamingRightsTermsInput,
 } from '../services/streamingRightsMarketplace';
 import StreamingVisualScene from './StreamingVisualScene';
+import StreamingRightsCalendar, { getStreamingRightsTimingLabel } from './StreamingRightsCalendar';
+import { getStreamingRightsCalendar, normalizeStreamingRightsManagementState } from '../services/streamingRightsCalendar';
 import '../styles/streaming-rights-exchange.css';
 
 interface Props {
@@ -53,7 +60,7 @@ interface Props {
   onOpenTitleDossier?: (projectId: string) => void;
 }
 
-type ExchangeTab = 'MARKET' | 'DEALS' | 'VAULT';
+type ExchangeTab = 'MARKET' | 'DEALS' | 'CALENDAR' | 'VAULT';
 
 const formatMoney = (value: number): string => {
   if (value >= 1_000_000_000) return `$${(value / 1_000_000_000).toFixed(1).replace(/\.0$/, '')}B`;
@@ -96,6 +103,18 @@ export default function StreamingRightsExchange({
   const [selectedNegotiationId, setSelectedNegotiationId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState('');
   const opportunities = useMemo(() => getStreamingRightsOpportunities(player), [player]);
+  const cataloguePackages = useMemo(() => getStreamingCataloguePackageOpportunities(player), [player]);
+  const calendar = useMemo(() => getStreamingRightsCalendar(player, absoluteWeek), [player, absoluteWeek]);
+  const management = normalizeStreamingRightsManagementState(player.streamingRightsManagement);
+  const platformCalendarItems = [
+    ...calendar.groups.actionRequired,
+    ...calendar.groups.expiringSoon,
+    ...calendar.groups.renewalNegotiations,
+    ...calendar.groups.returningToMarket,
+    ...calendar.groups.recentlyCompleted,
+  ]
+    .filter(item => item.incumbentBuyer.type === 'PLAYER_PLATFORM');
+  const platformCalendarActions = platformCalendarItems.filter(item => item.status === 'ACTION_REQUIRED').length;
   const selectedNegotiation = platform.rightsNegotiations.find(item => item.id === selectedNegotiationId)
     || [...platform.rightsNegotiations].reverse().find(item => ['OPEN', 'COUNTERED', 'READY_TO_SIGN'].includes(item.status))
     || null;
@@ -124,6 +143,18 @@ export default function StreamingRightsExchange({
     setTerms(termsFromNegotiation(result.negotiation));
     setFeedback('');
     setTab('DEALS');
+  };
+
+  const acquireCataloguePackage = (opportunityId: string) => {
+    const result = signOwnedStreamingCataloguePackage(player, opportunityId);
+    if (!result.changed) {
+      setFeedback(result.reason === 'INSUFFICIENT_TREASURY'
+        ? 'The platform treasury cannot cover this complete package.'
+        : result.detail || 'This package is no longer available.');
+      return;
+    }
+    onUpdatePlayer(result.player);
+    setFeedback(`${result.package?.name || 'Catalogue package'} added through ${result.contracts.length} title contracts.`);
   };
 
   const submitOffer = () => {
@@ -155,9 +186,9 @@ export default function StreamingRightsExchange({
     if (!selectedNegotiation) return;
     const result = signStreamingRightsDeal(player, selectedNegotiation.id);
     if (!result.changed) {
-      setFeedback(result.reason === 'INSUFFICIENT_TREASURY'
+      setFeedback(result.detail || (result.reason === 'INSUFFICIENT_TREASURY'
         ? 'The platform treasury cannot fund this minimum guarantee.'
-        : 'This term sheet is not ready to sign.');
+        : 'This term sheet is not ready to sign.'));
       return;
     }
     onUpdatePlayer(result.player);
@@ -219,6 +250,9 @@ export default function StreamingRightsExchange({
           <button type="button" className={tab === 'DEALS' ? 'is-active' : ''} onClick={() => setTab('DEALS')}>
             <Gavel size={17} /><span>Deal Room<small>{activeNegotiations.length} live tables</small></span>
           </button>
+          <button type="button" className={tab === 'CALENDAR' ? 'is-active' : ''} onClick={() => setTab('CALENDAR')}>
+            <CalendarClock size={17} /><span>Calendar<small>{platformCalendarActions} decisions</small></span>
+          </button>
           <button type="button" className={tab === 'VAULT' ? 'is-active' : ''} onClick={() => setTab('VAULT')}>
             <FileKey2 size={17} /><span>Contract Vault<small>{obligations.length} actions due</small></span>
           </button>
@@ -232,6 +266,18 @@ export default function StreamingRightsExchange({
               <div><span>GLOBAL RIGHTS BOARD</span><h2>Titles moving now</h2></div>
               <p>Listings refresh by deterministic four-week market cycle. A rival bid is real pressure, not a guaranteed loss.</p>
             </header>
+            {cataloguePackages.length ? <section className="rights-catalogue-package-board">
+              <header><div><Layers3 size={18} /><span>Catalogue packages</span></div><p>One treasury decision. Exact value and rights stay attached to every title.</p></header>
+              {cataloguePackages.map(opportunity => <article key={opportunity.id}>
+                <div className="rights-package-lead"><span>{opportunity.marketHeat} · {opportunity.package.components.length} TITLES</span><h3>{opportunity.package.name}</h3><p>{opportunity.sellerName} · {opportunity.package.maximumDurationWeeks} weeks · shared first window</p></div>
+                <strong>{formatMoney(opportunity.totalGuarantee)}</strong>
+                <details><summary>Title schedule</summary>{opportunity.rows.map(row => {
+                  const component = opportunity.package.components.find(candidate => candidate.sourceProjectId === row.componentProjectId);
+                  return <div key={row.componentProjectId}><span>{component?.title || row.componentProjectId}<small>{row.countryIds.length} markets · {row.licensorRevenueShare}% backend</small></span><b>{formatMoney(row.minimumGuarantee)}</b></div>;
+                })}</details>
+                <button type="button" disabled={platform.treasuryCash < opportunity.totalGuarantee} onClick={() => acquireCataloguePackage(opportunity.id)}><HandCoins size={16} />Acquire complete package</button>
+              </article>)}
+            </section> : null}
             <div className="rights-listing-grid">
               {opportunities.map(opportunity => (
                 <article
@@ -351,6 +397,17 @@ export default function StreamingRightsExchange({
           </section>
         ) : null}
 
+        {tab === 'CALENDAR' ? (
+          <section className="rights-calendar-section">
+            <StreamingRightsCalendar
+              player={player}
+              context="PLATFORM"
+              onUpdatePlayer={onUpdatePlayer}
+              embedded
+            />
+          </section>
+        ) : null}
+
         {tab === 'VAULT' ? (
           <section className="rights-contract-vault">
             <header className="rights-section-heading">
@@ -377,6 +434,19 @@ export default function StreamingRightsExchange({
             <div className="rights-vault-grid">
               {platform.catalogLicenses.map(license => {
                 const weeksLeft = license.permanentPurchase ? null : Math.max(0, license.expiresAtAbsoluteWeek - absoluteWeek);
+                const renewalCase = (Object.values(player.world.streamingRightsCalendar?.renewalCases || {}) as StreamingRightsRenewalCase[])
+                  .find(candidate => candidate.sourceContractId === license.id);
+                const renewalOpensAt = Math.max(
+                  license.startsAtAbsoluteWeek,
+                  license.expiresAtAbsoluteWeek - management.policy.noticeWeeks,
+                );
+                const renewalIsActionable = Boolean(
+                  license.renewalOption
+                  && license.status === 'ACTIVE'
+                  && absoluteWeek >= renewalOpensAt
+                  && (!renewalCase || renewalCase.outcome === 'PENDING'),
+                );
+                const timingLabel = getStreamingRightsTimingLabel(license as any, absoluteWeek, renewalCase);
                 return (
                   <article key={license.id} className={`rights-contract-card is-${license.status.toLowerCase()}`}>
                     <header><div><span>{license.origin?.replace('_', ' ') || 'STARTER AGREEMENT'}</span><h3>{license.titleAtSigning}</h3><p>{license.licensorName}</p></div><FileKey2 size={24} /></header>
@@ -388,8 +458,17 @@ export default function StreamingRightsExchange({
                     </dl>
                     <footer>
                       <span className={`is-${license.status.toLowerCase()}`}>{license.status}</span>
-                      <strong>{weeksLeft == null ? 'Permanent' : `${weeksLeft} weeks remain`}</strong>
-                      {license.renewalOption ? <button type="button" onClick={() => startRenewal(license.id)}><RefreshCcw size={15} /> Renew</button> : null}
+                      <strong>{timingLabel || (weeksLeft == null ? 'Permanent' : `${weeksLeft} weeks remain`)}</strong>
+                      {license.renewalOption ? (
+                        <button
+                          type="button"
+                          disabled={!renewalIsActionable}
+                          title={renewalIsActionable ? 'Open renewal negotiation' : `Renewal opens in Week ${renewalOpensAt}`}
+                          onClick={() => renewalIsActionable && startRenewal(license.id)}
+                        >
+                          <RefreshCcw size={15} /> {renewalIsActionable ? 'Renew' : `Week ${renewalOpensAt}`}
+                        </button>
+                      ) : null}
                     </footer>
                   </article>
                 );

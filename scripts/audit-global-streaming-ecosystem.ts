@@ -15,7 +15,7 @@ import {
     calculateStreamingCompetitionHealth,
     chooseStreamingEcosystemLaunchClass,
 } from '../services/streamingPlatformCompetitionHealth';
-import { processWorldTurn } from '../services/worldLogic';
+import { processStreamingIndustryWorldWeek } from '../services/platformAi';
 import { getAbsoluteWeek } from '../services/legacyLogic';
 import { migratePlayerSave } from '../services/saveMigration';
 import { compactPlayerForPersistence } from '../services/saveCompaction';
@@ -286,11 +286,15 @@ for (const market of Object.values(firstTurn.world.streamingPlatformEcosystem!.m
 const integratedPlayer = structuredClone(player);
 const integratedWeek = getAbsoluteWeek(integratedPlayer.age, integratedPlayer.currentWeek);
 integratedPlayer.world.streamingPlatformEcosystem!.lastProcessedAbsoluteWeek = integratedWeek - 1;
-const integratedWorld = processWorldTurn(integratedPlayer).world;
+const integratedWorld = processStreamingIndustryWorldWeek(
+    integratedPlayer,
+    integratedPlayer.world,
+    integratedWeek,
+).world;
 assert.equal(
     integratedWorld.streamingPlatformEcosystem?.lastProcessedAbsoluteWeek,
     integratedWeek,
-    'The canonical weekly world turn must process the ecosystem after Platform AI.',
+    'The canonical streaming-industry coordinator must process the ecosystem after Platform AI.',
 );
 
 const legacyPlayer = structuredClone(INITIAL_PLAYER);

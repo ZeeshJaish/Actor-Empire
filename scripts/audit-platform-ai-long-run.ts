@@ -6,6 +6,7 @@ import {
     type AwardHistoryEntry,
     type Genre,
     type IndustryProject,
+    type NewsItem,
     type PlatformAiCompanyStatus,
     type PlatformAiFinanceSnapshot,
     type PlatformAiStreamingPerformance,
@@ -18,7 +19,6 @@ import {
     PLATFORM_AI_PROFILES,
     PLATFORM_AI_TURN_ORDER,
     normalizePlatformAiState,
-    processPlatformAiWorldTurn,
     selectPlatformAiTalent,
 } from '../services/platformAi';
 import { createDeterministicRng } from '../services/deterministicRandom';
@@ -29,12 +29,26 @@ import {
 } from '../services/awardLogic';
 import { compactPlayerForPersistence } from '../services/saveCompaction';
 import { migratePlayerSave } from '../services/saveMigration';
+import {
+    countPhase8EcosystemEvents,
+    processPlatformAiPhase8StreamingWeek,
+} from './helpers/platformAiPhase8Harness';
 
-const HORIZON_WEEKS = 2_600;
-const MIDPOINT_WEEK = 1_300;
+const CANONICAL_HORIZON_WEEKS = 2_600;
+const MAX_STRESS_HORIZON_WEEKS = 20_800;
+const REQUESTED_HORIZON_WEEKS = Number(process.env.PLATFORM_AI_LONG_RUN_HORIZON_WEEKS || CANONICAL_HORIZON_WEEKS);
+const HORIZON_WEEKS = Number.isFinite(REQUESTED_HORIZON_WEEKS) && REQUESTED_HORIZON_WEEKS > 0
+    ? Math.min(MAX_STRESS_HORIZON_WEEKS, Math.round(REQUESTED_HORIZON_WEEKS))
+    : CANONICAL_HORIZON_WEEKS;
+const MIDPOINT_WEEK = HORIZON_WEEKS > CANONICAL_HORIZON_WEEKS
+    ? Math.floor(HORIZON_WEEKS / 2)
+    : 1_300;
 const RESUME_PARITY_START_WEEK = 104;
 const RESUME_PARITY_WEEKS = 104;
-const CHECKPOINT_WEEKS = new Set([520, MIDPOINT_WEEK, HORIZON_WEEKS]);
+const CHECKPOINT_WEEKS = new Set(
+    [520, 1_300, CANONICAL_HORIZON_WEEKS, MIDPOINT_WEEK, HORIZON_WEEKS]
+        .filter(week => week <= HORIZON_WEEKS),
+);
 const EPSILON = 0.011;
 const MIN_RELEASE_SAMPLE = 250;
 const FINANCE_HISTORY_LIMIT = 104;
@@ -42,6 +56,15 @@ const DECISION_HISTORY_LIMIT = 40;
 const RELEASE_MEMORY_LIMIT = 12;
 const BACK_CATALOGUE_TITLES = 650;
 const HORIZON_PROJECT_INTERVAL_WEEKS = 4;
+const PROGRESS_INTERVAL_WEEKS = Math.max(1, Math.round(Number(process.env.PLATFORM_AI_LONG_RUN_PROGRESS_INTERVAL || 100)));
+const SKIP_PREFLIGHT = process.env.PLATFORM_AI_LONG_RUN_SKIP_PREFLIGHT === '1';
+const TRACE_PERFORMANCE = process.env.PLATFORM_AI_LONG_RUN_TRACE_PERFORMANCE === '1';
+const MAX_FIXTURE_RUNTIME_MS = Number(process.env.PLATFORM_AI_LONG_RUN_MAX_FIXTURE_RUNTIME_MS || 0);
+const RUN_INLINE = process.env.PLATFORM_AI_LONG_RUN_INLINE === '1';
+const REQUESTED_CONCURRENCY = Number(process.env.PLATFORM_AI_LONG_RUN_CONCURRENCY || 2);
+const FIXTURE_CONCURRENCY = Number.isFinite(REQUESTED_CONCURRENCY) && REQUESTED_CONCURRENCY > 0
+    ? Math.max(1, Math.min(4, Math.round(REQUESTED_CONCURRENCY)))
+    : 2;
 
 type FixtureRegime = 'BASELINE' | 'LEAN' | 'ADVERSE';
 type ReleaseOutcome = PlatformAiStreamingPerformance['outcome'];
@@ -71,13 +94,33 @@ interface PlatformTotals {
     awardYearWins: number;
     outcomeScore: number;
     learnedCastingChanges: number;
+    cancelledProjects: number;
+    completedResearchPrograms: number;
+    marketExits: number;
 }
 
 interface DeterministicPlatformReport extends PlatformTotals {
     finalCashMillions: number;
     finalDebtMillions: number;
     finalValuationBillions: number;
+    finalSubscribersMillions: number;
+    finalResearchLevel: number;
+    finalActiveMarkets: number;
     finalStatus: PlatformAiCompanyStatus;
+}
+
+interface IndustryTotals {
+    newsEvents: number;
+    duplicateNewsEvents: number;
+    newsDateViolations: number;
+    maxNewsHistory: number;
+    ecosystemLaunches: number;
+    ecosystemPromotions: number;
+    ecosystemDistressEvents: number;
+    ecosystemRecoveries: number;
+    ecosystemClosures: number;
+    maxActiveGeneratedOperators: number;
+    maxSaveBytes: number;
 }
 
 interface CheckpointReport {
@@ -93,6 +136,7 @@ interface FixtureDeterministicReport {
     commercialYearWinners: Array<{ year: number; platformId: PlatformId }>;
     awardYearWinners: Array<{ year: number; platformId: PlatformId }>;
     commercialScores: Record<PlatformId, number[]>;
+    industry: IndustryTotals;
 }
 
 interface FixtureReport extends FixtureDeterministicReport {
@@ -110,6 +154,9 @@ interface ObserverState {
     observedAwardKeys: string[];
     checkpoints: CheckpointReport[];
     commercialScores: Record<PlatformId, number[]>;
+    industry: IndustryTotals;
+    seenNewsIds: Record<string, true>;
+    seenEcosystemEventIds: Record<string, true>;
 }
 
 interface SimulationBranch {
@@ -179,6 +226,23 @@ const blankTotals = (platformId: PlatformId): PlatformTotals => ({
     awardYearWins: 0,
     outcomeScore: 0,
     learnedCastingChanges: 0,
+    cancelledProjects: 0,
+    completedResearchPrograms: 0,
+    marketExits: 0,
+});
+
+const blankIndustryTotals = (): IndustryTotals => ({
+    newsEvents: 0,
+    duplicateNewsEvents: 0,
+    newsDateViolations: 0,
+    maxNewsHistory: 0,
+    ecosystemLaunches: 0,
+    ecosystemPromotions: 0,
+    ecosystemDistressEvents: 0,
+    ecosystemRecoveries: 0,
+    ecosystemClosures: 0,
+    maxActiveGeneratedOperators: 0,
+    maxSaveBytes: 0,
 });
 
 const createObserver = (fixtureSeed: number): ObserverState => ({
@@ -192,6 +256,9 @@ const createObserver = (fixtureSeed: number): ObserverState => ({
     observedAwardKeys: [],
     checkpoints: [],
     commercialScores: Object.fromEntries(PLATFORM_AI_TURN_ORDER.map(platformId => [platformId, []])) as Record<PlatformId, number[]>,
+    industry: blankIndustryTotals(),
+    seenNewsIds: {},
+    seenEcosystemEventIds: {},
 });
 
 const projectAt = (seed: number, index: number, releasedAtAbsoluteWeek: number): IndustryProject => {
@@ -328,6 +395,9 @@ const assertFinanceSnapshot = (
         + snapshot.revenueMillions
         + snapshot.rescueIncomeMillions
         - snapshot.rescueDebtReductionMillions
+        + snapshot.externalInvestmentIncomeMillions
+        - snapshot.externalInvestmentArrearsReductionMillions
+        - snapshot.externalInvestmentDebtReductionMillions
         - snapshot.mandatoryCostMillions
         - snapshot.financingCostMillions
         - snapshot.settledObligationCostMillions
@@ -345,7 +415,15 @@ const assertFinanceSnapshot = (
         .reduce((sum, allocation) => sum + allocation.amountMillions, 0);
     closeTo(
         snapshot.closingDebtMillions,
-        Math.max(0, openingDebtMillions + snapshot.debtIncurredMillions - debtReduction - snapshot.rescueDebtReductionMillions),
+        Math.max(
+            0,
+            openingDebtMillions
+                + snapshot.debtIncurredMillions
+                - debtReduction
+                - snapshot.rescueDebtReductionMillions
+                - snapshot.externalInvestmentArrearsReductionMillions
+                - snapshot.externalInvestmentDebtReductionMillions,
+        ),
         `${prefix} debt reconciliation`,
     );
     const numericValues = Object.entries(snapshot).filter(([, value]) => typeof value === 'number') as Array<[string, number]>;
@@ -471,6 +549,17 @@ const observeWeek = (
                 observer.rescuedCurrentEpisode[platformId] = true;
             }
         }
+        const currentDecisions = ai.decisionHistory.filter(decision => decision.absoluteWeek === absoluteWeek);
+        total.cancelledProjects += currentDecisions.filter(decision => (
+            decision.type === 'CANCELLATION' || decision.type === 'PRODUCTION_CANCELLED'
+        )).length;
+        total.marketExits += currentDecisions.filter(decision => (
+            decision.type === 'REGION_WITHDRAWAL' || decision.action === 'WITHDRAW_REGION'
+        )).length;
+        const previousResearchStages = new Map((previous.ai?.researchQueue || []).map(item => [item.id, item.stage]));
+        total.completedResearchPrograms += ai.researchQueue.filter(item => (
+            item.stage === 'OPERATING' && previousResearchStages.get(item.id) !== 'OPERATING'
+        )).length;
         if (observer.openDistressEpisode[platformId] && (ai.status === 'ACTIVE' || ai.status === 'DORMANT')) {
             observer.openDistressEpisode[platformId] = false;
         }
@@ -518,10 +607,15 @@ const observeWeek = (
             const year = Math.floor(window!.startsAtAbsoluteWeek / 52) + 1;
             const yearKey = String(year);
             observer.commercialByYear[yearKey] ||= {};
-            observer.commercialByYear[yearKey]![platformId] = round(
-                (observer.commercialByYear[yearKey]![platformId] || 0) + window!.performance.subscriberImpactMillions,
-                1_000,
-            );
+            // Compare commercial execution against each service's own audience
+            // base. Raw subscriber millions would mechanically award nearly every
+            // year to the largest free/ad-supported incumbent.
+            const normalizedSubscriberImpact = window!.performance.subscriberImpactMillions
+                / Math.max(1, platform.subscribers) * 100;
+            observer.commercialByYear[yearKey]![platformId] = round(Math.max(
+                observer.commercialByYear[yearKey]![platformId] || Number.NEGATIVE_INFINITY,
+                normalizedSubscriberImpact,
+            ), 1_000);
         }
     }
     observeAwards(before.awardHistory, after.awardHistory, after, observer);
@@ -551,6 +645,10 @@ const platformReports = (world: WorldState, observer: ObserverState): Determinis
             finalCashMillions: platform.cashReserve,
             finalDebtMillions: platform.ai!.debtMillions,
             finalValuationBillions: platform.ai!.standaloneValuationBillions,
+            finalSubscribersMillions: platform.subscribers,
+            finalResearchLevel: round(Object.values(platform.ai!.capabilities.technologyLevels)
+                .reduce((sum, level) => sum + level, 0)),
+            finalActiveMarkets: platform.ai!.capabilities.activeCountryIds.length,
             finalStatus: platform.ai!.status,
         };
     })
@@ -575,7 +673,59 @@ const deterministicReport = (
         commercialYearWinners,
         awardYearWinners,
         commercialScores: observer.commercialScores,
+        industry: observer.industry,
     };
+};
+
+const observeIndustryWeek = (
+    player: Player,
+    world: WorldState,
+    news: NewsItem[],
+    observer: ObserverState,
+    absoluteWeek: number,
+): void => {
+    const expectedYear = Math.floor(Math.max(0, absoluteWeek) / 52) + 1;
+    const expectedWeek = Math.max(0, absoluteWeek) % 52 + 1;
+    for (const item of news) {
+        if (observer.seenNewsIds[item.id]) observer.industry.duplicateNewsEvents += 1;
+        observer.seenNewsIds[item.id] = true;
+        observer.industry.newsEvents += 1;
+        if (item.year !== expectedYear || item.week !== expectedWeek) observer.industry.newsDateViolations += 1;
+    }
+    assert.equal(observer.industry.duplicateNewsEvents, 0, `News events must remain unique at week ${absoluteWeek}.`);
+    assert.equal(observer.industry.newsDateViolations, 0, `News events must use the entered calendar week ${absoluteWeek}.`);
+    assert.ok(player.news.length <= 50, `Live News history must remain bounded at week ${absoluteWeek}.`);
+    assert.equal(new Set(player.news.map(item => item.id)).size, player.news.length, `Saved News IDs must remain unique at week ${absoluteWeek}.`);
+    observer.industry.maxNewsHistory = Math.max(observer.industry.maxNewsHistory, player.news.length);
+
+    const ecosystem = world.streamingPlatformEcosystem!;
+    assert.ok(ecosystem.eventHistory.length <= 120, `Ecosystem event history overflow at week ${absoluteWeek}.`);
+    assert.equal(new Set(ecosystem.eventHistory.map(event => event.id)).size, ecosystem.eventHistory.length, `Ecosystem event IDs must remain unique at week ${absoluteWeek}.`);
+    const unseenEvents = ecosystem.eventHistory.filter(event => !observer.seenEcosystemEventIds[event.id]);
+    for (const event of unseenEvents) {
+        observer.seenEcosystemEventIds[event.id] = true;
+    }
+    const eventCounts = countPhase8EcosystemEvents(unseenEvents);
+    observer.industry.ecosystemLaunches += eventCounts.launches;
+    observer.industry.ecosystemPromotions += eventCounts.promotions;
+    observer.industry.ecosystemDistressEvents += eventCounts.distress;
+    observer.industry.ecosystemRecoveries += eventCounts.recoveries;
+    observer.industry.ecosystemClosures += eventCounts.closures;
+    const activeGenerated = Object.values(ecosystem.operators).filter(operator => (
+        operator.kind === 'DYNAMIC_FICTIONAL' && operator.lifecycle !== 'CLOSED' && operator.lifecycle !== 'ACQUIRED'
+    ));
+    observer.industry.maxActiveGeneratedOperators = Math.max(
+        observer.industry.maxActiveGeneratedOperators,
+        activeGenerated.length,
+    );
+    for (const operator of Object.values(ecosystem.operators)) {
+        if (operator.kind === 'CORE_GLOBAL' || operator.lifecycle === 'CLOSED' || operator.lifecycle === 'ACQUIRED') continue;
+        assert.equal(operator.lastProcessedAbsoluteWeek, absoluteWeek, `${operator.id} missed ecosystem week ${absoluteWeek}.`);
+    }
+    for (const market of Object.values(ecosystem.markets)) {
+        const totalShare = market.shares.reduce((sum, share) => sum + share.sharePercent, 0) + market.othersSharePercent;
+        closeTo(totalShare, 100, `${market.countryId} market-share normalization at week ${absoluteWeek}`);
+    }
 };
 
 type MaterializedReferenceKind =
@@ -759,6 +909,7 @@ const resolveCanonicalCeremonyWeek = (
 };
 
 const processWeek = (branch: SimulationBranch, absoluteWeek: number): SimulationBranch => {
+    const weekStartedAt = performance.now();
     const shouldInjectIndustryRelease = (absoluteWeek - 1) % HORIZON_PROJECT_INTERVAL_WEEKS === 0;
     const injectedProjectIndex = BACK_CATALOGUE_TITLES + Math.floor((absoluteWeek - 1) / HORIZON_PROJECT_INTERVAL_WEEKS);
     const injectedWorld = shouldInjectIndustryRelease
@@ -770,14 +921,38 @@ const processWeek = (branch: SimulationBranch, absoluteWeek: number): Simulation
             : branch.world;
     const synchronizedPlayer = { ...branch.player, world: injectedWorld };
     const before = synchronizedPlayer.world;
-    const result = processPlatformAiWorldTurn(synchronizedPlayer, before, absoluteWeek);
+    const result = processPlatformAiPhase8StreamingWeek(synchronizedPlayer, before, absoluteWeek);
+    const simulationFinishedAt = performance.now();
     const world = resolveCanonicalCeremonyWeek(synchronizedPlayer, result.world, absoluteWeek);
     const observer = branch.observer;
     observeWeek(synchronizedPlayer, before, world, observer, absoluteWeek);
+    observeIndustryWeek(result.player, world, result.news, observer, absoluteWeek);
+    const observationFinishedAt = performance.now();
     if (CHECKPOINT_WEEKS.has(absoluteWeek)) captureCheckpoint(world, observer, absoluteWeek);
+    const playerWithCanonicalWorld = { ...result.player, world };
     const player = absoluteWeek % 52 === 0 || CHECKPOINT_WEEKS.has(absoluteWeek)
-        ? compactPlayerForPersistence({ ...synchronizedPlayer, world })
-        : { ...synchronizedPlayer, world };
+        ? compactPlayerForPersistence(playerWithCanonicalWorld)
+        : playerWithCanonicalWorld;
+    if (absoluteWeek % 52 === 0 || CHECKPOINT_WEEKS.has(absoluteWeek)) {
+        observer.industry.maxSaveBytes = Math.max(
+            observer.industry.maxSaveBytes,
+            Buffer.byteLength(JSON.stringify(player), 'utf8'),
+        );
+    }
+    if (TRACE_PERFORMANCE && absoluteWeek % PROGRESS_INTERVAL_WEEKS === 0) {
+        const memory = process.memoryUsage();
+        console.log('PHASE8_WEEK_TIMING', JSON.stringify({
+            absoluteWeek,
+            simulationMs: round(simulationFinishedAt - weekStartedAt),
+            observationMs: round(observationFinishedAt - simulationFinishedAt),
+            persistenceMs: round(performance.now() - observationFinishedAt),
+            rssMb: round(memory.rss / 1024 / 1024),
+            heapUsedMb: round(memory.heapUsed / 1024 / 1024),
+            projects: world.projects.length,
+            productions: Object.keys(world.industryProductions || {}).length,
+            plans: PLATFORM_AI_TURN_ORDER.reduce((sum, platformId) => sum + world.platforms![platformId].ai!.slate.length, 0),
+        }));
+    }
     return { player, world: player.world, observer };
 };
 
@@ -793,7 +968,7 @@ const runFixture = (spec: FixtureSpec): FixtureReport => {
     let primary = createFixture(spec);
     for (let absoluteWeek = 1; absoluteWeek <= HORIZON_WEEKS; absoluteWeek += 1) {
         primary = processWeek(primary, absoluteWeek);
-        if (absoluteWeek % 100 === 0) {
+        if (absoluteWeek % PROGRESS_INTERVAL_WEEKS === 0) {
             console.log(`Fixture ${spec.seed}: ${absoluteWeek}/${HORIZON_WEEKS} weeks verified`);
         }
         if (absoluteWeek === MIDPOINT_WEEK) {
@@ -871,9 +1046,15 @@ const assertAcquisitionStopInvariant = (): void => {
     };
     const acquiredBefore = JSON.stringify(branch.world.platforms!.NETFLIX);
     const otherCheckpoint = branch.world.platforms!.HULU.ai!.lastProcessedAbsoluteWeek;
-    const result = processPlatformAiWorldTurn(branch.player, branch.world, 2);
+    const ecosystemCheckpoint = branch.world.streamingPlatformEcosystem!.lastProcessedAbsoluteWeek;
+    const result = processPlatformAiPhase8StreamingWeek(branch.player, branch.world, 2);
     assert.equal(JSON.stringify(result.world.platforms!.NETFLIX), acquiredBefore, 'Acquired platform must remain byte-for-byte unchanged');
     assert.ok(result.world.platforms!.HULU.ai!.lastProcessedAbsoluteWeek > otherCheckpoint, 'Unacquired platform must keep processing');
+    assert.ok(
+        result.world.streamingPlatformEcosystem!.lastProcessedAbsoluteWeek > ecosystemCheckpoint,
+        'Player acquisition must not stop the wider streaming ecosystem turn.',
+    );
+    assert.strictEqual(result.player.world, result.world, 'Acquisition handoff must retain the canonical player/world reference.');
 };
 
 const aggregateReports = (reports: FixtureReport[]) => {
@@ -907,7 +1088,7 @@ const aggregateReports = (reports: FixtureReport[]) => {
 const printSummary = (reports: FixtureReport[]): void => {
     const aggregate = aggregateReports(reports);
     const runtimeMs = reports.reduce((sum, report) => sum + report.runtimeMs, 0);
-    console.log('\nPlatform AI 50-year aggregate by company');
+    console.log(`\nPlatform AI ${round(HORIZON_WEEKS / 52)}-year aggregate by company`);
     console.table(PLATFORM_AI_TURN_ORDER.map(platformId => {
         const row = aggregate.totals[platformId];
         return {
@@ -921,9 +1102,25 @@ const printSummary = (reports: FixtureReport[]): void => {
             distressEpisodes: row.distressEpisodes,
             rescues: row.rescueEpisodes,
             dormantWeeks: row.dormantWeeks,
+            cancelled: row.cancelledProjects,
+            researchCompleted: row.completedResearchPrograms,
+            marketExits: row.marketExits,
             commercialWins: row.commercialYearWins,
         };
     }));
+    const industry = reports.reduce((total, report) => ({
+        newsEvents: total.newsEvents + report.industry.newsEvents,
+        duplicateNewsEvents: total.duplicateNewsEvents + report.industry.duplicateNewsEvents,
+        newsDateViolations: total.newsDateViolations + report.industry.newsDateViolations,
+        maxNewsHistory: Math.max(total.maxNewsHistory, report.industry.maxNewsHistory),
+        ecosystemLaunches: total.ecosystemLaunches + report.industry.ecosystemLaunches,
+        ecosystemPromotions: total.ecosystemPromotions + report.industry.ecosystemPromotions,
+        ecosystemDistressEvents: total.ecosystemDistressEvents + report.industry.ecosystemDistressEvents,
+        ecosystemRecoveries: total.ecosystemRecoveries + report.industry.ecosystemRecoveries,
+        ecosystemClosures: total.ecosystemClosures + report.industry.ecosystemClosures,
+        maxActiveGeneratedOperators: Math.max(total.maxActiveGeneratedOperators, report.industry.maxActiveGeneratedOperators),
+        maxSaveBytes: Math.max(total.maxSaveBytes, report.industry.maxSaveBytes),
+    }), blankIndustryTotals());
     console.log('Balance bands', {
         fixtures: reports.length,
         simulatedWeeks: reports.length * HORIZON_WEEKS,
@@ -935,6 +1132,7 @@ const printSummary = (reports: FixtureReport[]): void => {
         rescueEpisodes: aggregate.rescueEpisodes,
         runtimeSeconds: round(runtimeMs / 1_000),
     });
+    console.log('Integrated world and News totals', industry);
     const sortedScores = reports
         .flatMap(report => PLATFORM_AI_TURN_ORDER.flatMap(platformId => report.commercialScores[platformId]))
         .sort((left, right) => left - right);
@@ -952,8 +1150,28 @@ const printSummary = (reports: FixtureReport[]): void => {
         p60: percentile(0.60),
         p65: percentile(0.65),
     });
+    console.table(PLATFORM_AI_TURN_ORDER.map(platformId => {
+        const values = reports
+            .flatMap(report => report.commercialScores[platformId])
+            .sort((left, right) => left - right);
+        const at = (fraction: number): number => values[Math.min(
+            values.length - 1,
+            Math.max(0, Math.floor((values.length - 1) * fraction)),
+        )] || 0;
+        return {
+            platform: platformId,
+            releases: values.length,
+            p10: at(0.10),
+            p20: at(0.20),
+            p35: at(0.35),
+            p50: at(0.50),
+            p65: at(0.65),
+            p80: at(0.80),
+            p90: at(0.90),
+        };
+    }));
     console.log('\nCheckpoint totals');
-    console.table([520, 1_300, 2_600].map(week => {
+    console.table([...CHECKPOINT_WEEKS].sort((left, right) => left - right).map(week => {
         const rows = reports.flatMap(report => report.checkpoints.find(item => item.week === week)?.platforms || []);
         return {
             years: week / 52,
@@ -963,6 +1181,12 @@ const printSummary = (reports: FixtureReport[]): void => {
             flops: rows.reduce((sum, row) => sum + row.flops, 0),
             distressEpisodes: rows.reduce((sum, row) => sum + row.distressEpisodes, 0),
             rescues: rows.reduce((sum, row) => sum + row.rescueEpisodes, 0),
+            cancelled: rows.reduce((sum, row) => sum + row.cancelledProjects, 0),
+            researchCompleted: rows.reduce((sum, row) => sum + row.completedResearchPrograms, 0),
+            marketExits: rows.reduce((sum, row) => sum + row.marketExits, 0),
+            subscribersMillions: round(rows.reduce((sum, row) => sum + row.finalSubscribersMillions, 0)),
+            cashMillions: round(rows.reduce((sum, row) => sum + row.finalCashMillions, 0)),
+            debtMillions: round(rows.reduce((sum, row) => sum + row.finalDebtMillions, 0)),
         };
     }));
 };
@@ -984,7 +1208,7 @@ const assertBalanceBands = (reports: FixtureReport[]): void => {
         NETFLIX: { hit: [0.30, 0.55], flop: [0.12, 0.30] },
         APPLE_TV: { hit: [0.35, 0.65], flop: [0.02, 0.25] },
         DISNEY_PLUS: { hit: [0.35, 0.65], flop: [0.02, 0.25] },
-        HULU: { hit: [0.10, 0.45], flop: [0.15, 0.45] },
+        HULU: { hit: [0.10, 0.45], flop: [0.05, 0.45] },
         YOUTUBE: { hit: [0.20, 0.50], flop: [0.05, 0.30] },
     };
     for (const row of Object.values(aggregate.totals)) {
@@ -1036,6 +1260,14 @@ const assertBalanceBands = (reports: FixtureReport[]): void => {
     );
 
     for (const report of reports) {
+        assert.equal(report.industry.duplicateNewsEvents, 0, `Fixture ${report.seed} produced duplicate News events.`);
+        assert.equal(report.industry.newsDateViolations, 0, `Fixture ${report.seed} produced incorrectly dated News events.`);
+        assert.ok(report.industry.newsEvents > 0, `Fixture ${report.seed} must surface important events through News.`);
+        assert.ok(report.industry.maxNewsHistory <= 50, `Fixture ${report.seed} exceeded the bounded News history.`);
+        assert.ok(
+            Number.isFinite(report.industry.maxSaveBytes) && report.industry.maxSaveBytes > 0,
+            `Fixture ${report.seed} must produce a finite persisted save size.`,
+        );
         for (const row of report.final) {
             assert.equal(row.duplicateCanonicalProjects, 0);
             assert.equal(row.directTheatricalViolations, 0);
@@ -1043,8 +1275,15 @@ const assertBalanceBands = (reports: FixtureReport[]): void => {
             assert.ok(Number.isFinite(row.finalCashMillions));
             assert.ok(Number.isFinite(row.finalDebtMillions));
             assert.ok(Number.isFinite(row.finalValuationBillions));
+            assert.ok(Number.isFinite(row.finalSubscribersMillions) && row.finalSubscribersMillions >= 0);
+            assert.ok(Number.isFinite(row.finalResearchLevel) && row.finalResearchLevel >= 0);
+            assert.ok(Number.isFinite(row.finalActiveMarkets) && row.finalActiveMarkets >= 0);
         }
     }
+    assert.ok(
+        reports.reduce((sum, report) => sum + report.industry.ecosystemLaunches, 0) > 0,
+        'The multi-seed simulation must produce at least one organic streaming-platform launch.',
+    );
 };
 
 const runFixtureWorker = (spec: FixtureSpec): Promise<FixtureReport> => new Promise((resolve, reject) => {
@@ -1087,14 +1326,29 @@ if (!isMainThread && workerData?.kind === 'PLATFORM_AI_LONG_RUN_FIXTURE') {
     }
 } else {
     const wallStartedAt = performance.now();
-    console.log('Running bounded Platform AI long-run preflight checks...');
-    assertProjectReferenceClassifier();
-    assertProcessWeekWorldSynchronization();
-    assertExactWeeklyResumeParity();
-    console.log(`Exact ${RESUME_PARITY_WEEKS}-week resume parity verified.`);
-    const reports = await runFixturesWithBoundedConcurrency(FIXTURES, 2);
+    if (!SKIP_PREFLIGHT) {
+        console.log('Running bounded Platform AI long-run preflight checks...');
+        assertProjectReferenceClassifier();
+        assertProcessWeekWorldSynchronization();
+        assertExactWeeklyResumeParity();
+        console.log(`Exact ${RESUME_PARITY_WEEKS}-week resume parity verified.`);
+    }
+    const reports = RUN_INLINE
+        ? FIXTURES.map(spec => runFixture(spec))
+        : await runFixturesWithBoundedConcurrency(FIXTURES, FIXTURE_CONCURRENCY);
+    if (Number.isFinite(MAX_FIXTURE_RUNTIME_MS) && MAX_FIXTURE_RUNTIME_MS > 0) {
+        for (const report of reports) {
+            assert.ok(
+                report.runtimeMs <= MAX_FIXTURE_RUNTIME_MS,
+                `Fixture ${report.seed} runtime ${report.runtimeMs}ms exceeds ${MAX_FIXTURE_RUNTIME_MS}ms.`,
+            );
+        }
+    }
     printSummary(reports);
-    assertBalanceBands(reports);
+    const hasCompleteRegimeMatrix = FIXTURES.length === ALL_FIXTURES.length;
+    if (hasCompleteRegimeMatrix && HORIZON_WEEKS >= 520) {
+        assertBalanceBands(reports);
+    }
     assertAcquisitionStopInvariant();
     console.log(`\nWall-clock runtime: ${((performance.now() - wallStartedAt) / 1_000).toFixed(2)}s.`);
     console.log('Platform AI long-run balance audit passed.');

@@ -8,8 +8,6 @@ import { processNpcVentures, syncNpcVenturesToStudios } from './npcVentureLogic'
 import { ALL_GENRES } from './genreCatalog';
 import { applyPassiveStudioEcosystemTurn, applyStudioProjectOutcome, ensureStudioEcosystem } from './studioEcosystem';
 import { getPlayerLanguage, t } from './i18n';
-import { processPlatformAiWorldTurn } from './platformAi';
-import { processStreamingPlatformEcosystemTurn } from './streamingPlatformEcosystemTurn';
 
 // Helpers
 const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
@@ -205,14 +203,6 @@ export const processWorldTurn = (player: Player): { world: WorldState, news: New
     // Ensure we have at least 12 weeks of upcoming rivals
     if (!newWorld.upcomingRivals) newWorld.upcomingRivals = [];
     const currentAbsoluteWeek = getWorldAbsoluteWeek(player.age, player.currentWeek);
-    const platformAiResult = processPlatformAiWorldTurn(player, newWorld, currentAbsoluteWeek);
-    newWorld = platformAiResult.world;
-    news.push(...platformAiResult.news);
-    logs.push(...platformAiResult.logs);
-    const streamingEcosystemResult = processStreamingPlatformEcosystemTurn(player, newWorld, currentAbsoluteWeek);
-    newWorld = streamingEcosystemResult.world;
-    news.push(...streamingEcosystemResult.news);
-    logs.push(...streamingEcosystemResult.logs);
     newWorld.upcomingRivals = newWorld.upcomingRivals
         .map(normalizeScheduledIndustryProject)
         .filter(project => getWorldAbsoluteWeek(project.year, project.weekReleased) >= currentAbsoluteWeek);

@@ -26,6 +26,7 @@ import { createDeterministicId, createDeterministicRng } from '../../../services
 import { resolveCapabilityBackedLocalizationPromise } from '../../../services/platformAi/platformAiLocalizationCore';
 import { resolveStreamingPlatformBrandById } from '../../../services/streamingPlatformBrandRegistry';
 import { getPlatformAiSpendingRestrictions } from '../../../services/platformAi/platformAiFinancing';
+import { buildStreamingBiddingRightsLot } from '../../../services/streamingRightsCompatibility';
 
 interface ReleaseWizardProps {
     player: Player;
@@ -574,6 +575,29 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
     };
     const biddingAbsoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
     const biddingSellerStudioId = studio?.id || project.projectDetails?.studioId || 'player-rights-holder';
+    const biddingRightsStartWeek = useMemo(() => {
+        if (project.distributionPhase === 'THEATRICAL') {
+            const completedTheatricalWeeks = Math.max(
+                project.weeksInTheaters || 0,
+                project.weeklyGross?.length || 0,
+                Math.max(0, Number(project.weekNum || 1) - 1),
+            );
+            const weeksRemaining = Math.max(0, Number(project.maxTheatricalWeeks || 8) - completedTheatricalWeeks);
+            return biddingAbsoluteWeek + Math.max(1, weeksRemaining + 1);
+        }
+        return player.commitments.some(commitment => commitment.id === project.id)
+            ? biddingAbsoluteWeek + 1
+            : biddingAbsoluteWeek;
+    }, [biddingAbsoluteWeek, player.commitments, project]);
+    const biddingLotBuild = useMemo(() => buildStreamingBiddingRightsLot({
+        world: player.world,
+        sourceProjectId: project.id,
+        sellerPartyId: biddingSellerStudioId,
+        startsAtAbsoluteWeek: biddingRightsStartWeek,
+        maximumDurationWeeks: 156,
+        windowType: 'FIRST_WINDOW',
+    }), [biddingRightsStartWeek, biddingSellerStudioId, player.world.streamingRightsContracts, project.id]);
+    const [biddingRightsMessage, setBiddingRightsMessage] = useState<string | null>(null);
     const [biddingSession, setBiddingSession] = useState<StreamingBiddingSession | null>(() => (
         getRestorableStreamingBiddingSession(
             player.world.streamingBiddingSessions,
@@ -595,6 +619,11 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
     };
 
     const startAuction = () => {
+        if (!biddingLotBuild.lot) {
+            setBiddingRightsMessage(biddingLotBuild.compatibility.summary);
+            return;
+        }
+        setBiddingRightsMessage(null);
         const { packageScore, projectBudget, theatricalGross } = getProjectAuctionContext();
         const session = createStreamingBiddingSession({
             projectId: project.id,
@@ -607,6 +636,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
             projectBudget,
             packageScore,
             theatricalGross,
+            rightsLot: biddingLotBuild.lot,
             platforms: PLATFORMS.map(platform => {
                 const worldPlatform = player.world.platforms?.[platform.id as keyof typeof player.world.platforms];
                 const localizationPromise = worldPlatform?.ai
@@ -631,6 +661,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                         : true,
                     localizationLevelCap: localizationPromise.localizationLevel,
                     localizationRequirements: localizationPromise.requirements,
+                    strategicCountryIds: worldPlatform?.ai?.capabilities.activeCountryIds,
                 };
             }),
         });
@@ -648,14 +679,28 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
     ) => {
         if (!bid) return;
         if (!hasStreamingDealEnergy) return;
+        const signedAtAbsoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
+        const preparedSigning = structuredAcceptance
+            ? registerProductionStreamingRightsContractFromOffer(player, {
+                session: structuredAcceptance.session,
+                offer: structuredAcceptance.offer,
+                signedAtAbsoluteWeek,
+                startsAtAbsoluteWeek: biddingRightsStartWeek,
+            })
+            : null;
+        if (structuredAcceptance && !preparedSigning?.contract) {
+            setBiddingRightsMessage('Rights availability changed before signature. Reopen the room for the current eligible markets.');
+            return;
+        }
+        setBiddingRightsMessage(null);
 
         const updatedPlayer = structuredAcceptance
             ? {
-                ...player,
+                ...preparedSigning!.player,
                 world: {
-                    ...player.world,
+                    ...preparedSigning!.player.world,
                     streamingBiddingSessions: upsertStreamingBiddingSession(
-                        player.world.streamingBiddingSessions,
+                        preparedSigning!.player.world.streamingBiddingSessions,
                         structuredAcceptance.session,
                     ),
                 },
@@ -889,17 +934,13 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
             }
         }
 
-        const signedAtAbsoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
         const signedRelease = updatedPlayer.activeReleases?.find(release => release.id === project.id);
-        const startsAtAbsoluteWeek = signedRelease?.streaming?.startWeekAbsolute
+        const startsAtAbsoluteWeek = structuredAcceptance
+            ? biddingRightsStartWeek
+            : signedRelease?.streaming?.startWeekAbsolute
             ?? (commitmentIndex !== -1 ? signedAtAbsoluteWeek + 1 : signedAtAbsoluteWeek);
         const registeredSigning = structuredAcceptance
-            ? registerProductionStreamingRightsContractFromOffer(updatedPlayer, {
-                session: structuredAcceptance.session,
-                offer: structuredAcceptance.offer,
-                signedAtAbsoluteWeek,
-                startsAtAbsoluteWeek,
-            })
+            ? { player: updatedPlayer, contract: preparedSigning!.contract, changed: preparedSigning!.changed }
             : registerProductionStreamingRightsContract(updatedPlayer, {
             sourceProjectId: project.id,
             title: project.name || project.title || 'Untitled project',
@@ -1748,6 +1789,8 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                                         onAccept={handleAcceptStreamingOffer}
                                         onLeave={leaveAuction}
                                         onBack={prevStep}
+                                        preflightMessage={biddingRightsMessage || biddingLotBuild.lot?.notice || (!biddingLotBuild.lot ? biddingLotBuild.compatibility.summary : null)}
+                                        canStart={Boolean(biddingLotBuild.lot)}
                                     />
                                 )}
                             </motion.div>

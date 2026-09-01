@@ -12,12 +12,18 @@ import {
     acceptStreamingRightsCounter,
     applyStreamingRightsChangeOfControl,
     evaluateStreamingRightsCompliance,
+    getStreamingCataloguePackageOpportunities,
     getStreamingRightsOpportunities,
     openStreamingRightsNegotiation,
     openStreamingRightsRenewal,
     signStreamingRightsDeal,
+    signOwnedStreamingCataloguePackage,
     submitStreamingRightsOffer,
 } from '../services/streamingRightsMarketplace';
+import {
+    createStreamingLicenseContract,
+    createStreamingRightsContractFromLicense,
+} from '../services/streamingRightsCore';
 
 const assert = (condition: unknown, message: string) => {
     if (!condition) throw new Error(message);
@@ -55,6 +61,12 @@ const createFixture = (): Player => {
                 year: 2025,
                 boxOffice: 280_000_000,
                 studioId,
+            } as any, {
+                id: 'market-title-2', title: 'The Long Weekend', mediaType: 'MOVIE', genre: 'DRAMA', rating: 7.4,
+                year: 2025, boxOffice: 120_000_000, studioId,
+            } as any, {
+                id: 'market-title-3', title: 'Cobalt Run', mediaType: 'MOVIE', genre: 'ACTION', rating: 6.9,
+                year: 2024, boxOffice: 75_000_000, studioId,
             } as any],
         },
         ownedStreamingPlatform: {
@@ -68,6 +80,7 @@ const createFixture = (): Player => {
                 logoKey: 'SIGNAL_RING',
                 soundIdentKey: 'ASCENT',
                 brandPromiseId: 'EVENT_HOUSE',
+                publicManifesto: 'Northstar backs bold event stories for every market.',
                 foundedAtAbsoluteWeek: absoluteWeek - 20,
             },
             starterCatalog: {
@@ -106,6 +119,20 @@ assert(migrated.sublicenseDeals.length === 0, 'Older saves should migrate withou
 assert(migrated.rightsObligations.length === 0, 'Older saves should migrate without fabricated contract obligations.');
 
 let fixture = createFixture();
+const packageOpportunities = getStreamingCataloguePackageOpportunities(fixture);
+assert(packageOpportunities.length > 0, 'The owned platform market should expose real same-studio catalogue packages.');
+const packageOpportunity = packageOpportunities[0];
+assert(packageOpportunity.package.components.length >= 3, 'A listed package must contain the real source titles.');
+assert(new Set(packageOpportunity.rows.map(row => row.minimumGuarantee)).size > 1, 'The owned platform sees a value-based title schedule rather than an equal split.');
+assert(packageOpportunity.rows.reduce((sum, row) => sum + row.minimumGuarantee, 0) === packageOpportunity.totalGuarantee, 'The seller schedule must reconcile to the package headline.');
+const packageTreasuryBefore = fixture.ownedStreamingPlatform.treasuryCash;
+const boughtPackage = signOwnedStreamingCataloguePackage(fixture, packageOpportunity.id);
+assert(boughtPackage.changed, 'A funded owned platform should be able to acquire the complete package.');
+assert(boughtPackage.contracts.length === packageOpportunity.package.components.length, 'The package purchase must create one canonical contract per title.');
+assert(boughtPackage.player.ownedStreamingPlatform.treasuryCash === packageTreasuryBefore - packageOpportunity.totalGuarantee, 'The owned platform pays the package once.');
+assert(boughtPackage.player.world.streamingCataloguePackages?.[packageOpportunity.package.id]?.lifecycle === 'SIGNED', 'The package history must link the child contracts.');
+const packageReplay = signOwnedStreamingCataloguePackage(boughtPackage.player, packageOpportunity.id);
+assert(!packageReplay.changed, 'An owned platform package purchase must be idempotent.');
 const opportunities = getStreamingRightsOpportunities(fixture);
 const studioOpportunity = opportunities.find(item => item.kind === 'STUDIO_ACQUISITION');
 assert(studioOpportunity, 'The rights floor should expose studio-to-platform acquisition opportunities.');
@@ -117,6 +144,53 @@ assert(opened.changed && opened.negotiation?.status === 'OPEN', 'A market listin
 fixture = driveToSignature(opened.player, opened.negotiation!.id);
 let acquisition = fixture.ownedStreamingPlatform.rightsNegotiations.find(item => item.id === opened.negotiation!.id)!;
 assert(acquisition.status === 'READY_TO_SIGN', 'A viable negotiated or accepted counteroffer should reach signature.');
+const acquisitionAbsoluteWeek = getAbsoluteWeek(fixture.age, fixture.currentWeek);
+const hotstarIndiaContract = createStreamingRightsContractFromLicense({
+    license: createStreamingLicenseContract({
+        id: 'hotstar-india-exclusive',
+        sourceProject: { id: acquisition.sourceProjectId, title: acquisition.title, mediaType: acquisition.projectType, genre: acquisition.genre },
+        buyerPlatformId: null,
+        platformContentPlanId: null,
+        cataloguePackageId: null,
+        licensorName: acquisition.sellerName,
+        territory: 'DOMESTIC',
+        countryIds: ['IN'],
+        durationWeeks: 80,
+        exclusivity: 'EXCLUSIVE',
+        minimumGuarantee: 30_000_000,
+        platformRevenueShare: 90,
+        signedAtAbsoluteWeek: acquisitionAbsoluteWeek - 1,
+        startsAtAbsoluteWeek: acquisitionAbsoluteWeek - 1,
+        status: 'ACTIVE',
+        origin: 'STUDIO_MARKET',
+        sellerType: 'STUDIO',
+        sellerPlatformId: null,
+        windowType: 'FIRST_WINDOW',
+    }),
+    seller: { type: 'NPC_STUDIO', id: acquisition.sellerId, name: acquisition.sellerName, platformId: null },
+    buyer: { type: 'AI_PLATFORM', id: 'hotstar', name: 'Hotstar', platformId: null },
+    guaranteeDisposition: 'PAID',
+    settledAtAbsoluteWeek: acquisitionAbsoluteWeek - 1,
+});
+const blockedAcquisitionPlayer: Player = {
+    ...fixture,
+    world: {
+        ...fixture.world,
+        streamingRightsContracts: {
+            ...fixture.world.streamingRightsContracts,
+            [hotstarIndiaContract.id]: hotstarIndiaContract,
+        },
+    },
+};
+const blockedTreasury = blockedAcquisitionPlayer.ownedStreamingPlatform.treasuryCash;
+const blockedAcquisition = signStreamingRightsDeal(blockedAcquisitionPlayer, acquisition.id);
+assert(!blockedAcquisition.changed, 'A player platform cannot acquire a global scope already granted in India.');
+assert(blockedAcquisition.reason === 'RIGHTS_UNAVAILABLE', 'Compatibility failure should have a rights-specific reason.');
+assert(
+    blockedAcquisition.detail === `India is exclusively licensed to Hotstar until Week ${hotstarIndiaContract.expiresAtAbsoluteWeek}.`,
+    'The player should receive a short factual controlling-contract explanation.',
+);
+assert(blockedAcquisition.player.ownedStreamingPlatform.treasuryCash === blockedTreasury, 'A rejected rights deal must not debit treasury.');
 const treasuryBeforeAcquisition = fixture.ownedStreamingPlatform.treasuryCash;
 const signed = signStreamingRightsDeal(fixture, acquisition.id);
 assert(signed.changed, 'A funded acquisition should sign.');
@@ -141,20 +215,53 @@ assert(outgoingOpened.changed && outgoingOpened.negotiation?.buyerPlatformId, 'A
 fixture = driveToSignature(outgoingOpened.player, outgoingOpened.negotiation!.id);
 const outgoingReady = fixture.ownedStreamingPlatform.rightsNegotiations.find(item => item.id === outgoingOpened.negotiation!.id)!;
 assert(outgoingReady.status === 'READY_TO_SIGN', 'Outgoing negotiations should use the same competitive deal loop.');
+const disallowedSublicensePlayer: Player = {
+    ...fixture,
+    world: {
+        ...fixture.world,
+        streamingRightsContracts: {
+            ...fixture.world.streamingRightsContracts,
+            [acquiredLicense.id]: {
+                ...fixture.world.streamingRightsContracts[acquiredLicense.id],
+                sublicensingAllowed: false,
+            },
+        },
+    },
+    ownedStreamingPlatform: {
+        ...fixture.ownedStreamingPlatform,
+        catalogLicenses: fixture.ownedStreamingPlatform.catalogLicenses.map(license => (
+            license.id === acquiredLicense.id ? { ...license, sublicensingAllowed: false } : license
+        )),
+    },
+};
+const disallowedSublicense = signStreamingRightsDeal(disallowedSublicensePlayer, outgoingReady.id);
+assert(!disallowedSublicense.changed, 'A source contract without sublicense permission must stop before signing.');
+assert(disallowedSublicense.reason === 'RIGHTS_RESTRICTED', 'Disallowed sublicensing should return the rights-restricted reason.');
+assert(disallowedSublicense.detail === 'The source contract does not permit sublicensing.', 'Disallowed sublicensing should explain the source-contract restriction.');
 const treasuryBeforeSublicense = fixture.ownedStreamingPlatform.treasuryCash;
 const sublicensed = signStreamingRightsDeal(fixture, outgoingReady.id);
 assert(sublicensed.changed, 'A ready outgoing sublicense should sign.');
 fixture = sublicensed.player;
 assert(fixture.ownedStreamingPlatform.sublicenseDeals.length === 1, 'The outgoing platform trade should persist separately from inbound rights.');
 const signedSublicense = fixture.ownedStreamingPlatform.sublicenseDeals[0]!;
+assert(Array.isArray(signedSublicense.countryIds) && signedSublicense.countryIds.length === 1, 'A domestic sublicense must persist one exact country.');
+assert(signedSublicense.windowType === outgoingReady.windowType, 'A sublicense must persist its exact streaming window.');
 assert(
     fixture.world.streamingRightsContracts?.[signedSublicense.id]?.buyer.platformId === signedSublicense.buyerPlatformId,
     'An outgoing sublicense must register the rival platform as the canonical buyer.',
 );
 assert(fixture.ownedStreamingPlatform.treasuryCash === treasuryBeforeSublicense + outgoingReady.minimumGuarantee, 'Sublicense cash should credit treasury exactly once.');
 
-const renewal = openStreamingRightsRenewal(fixture, acquiredLicense.id);
-assert(renewal.changed && renewal.negotiation?.kind === 'RENEW', 'Renewal options should open a future-window negotiation.');
+const earlyRenewal = openStreamingRightsRenewal(fixture, acquiredLicense.id);
+assert(!earlyRenewal.changed && earlyRenewal.reason === 'NOT_READY', 'A4 should keep a renewal closed before its saved notice window.');
+const renewalOpenAbsoluteWeek = acquiredLicense.expiresAtAbsoluteWeek - 8;
+const renewalFixture: Player = {
+    ...fixture,
+    age: Math.floor(renewalOpenAbsoluteWeek / 52) + 1,
+    currentWeek: (renewalOpenAbsoluteWeek % 52) + 1,
+};
+const renewal = openStreamingRightsRenewal(renewalFixture, acquiredLicense.id);
+assert(renewal.changed && renewal.negotiation?.kind === 'RENEW', 'Renewal options should open a future-window negotiation inside the A4 notice window.');
 
 const complianceWeek = Math.max(...fixture.ownedStreamingPlatform.rightsObligations.map(item => item.dueAtAbsoluteWeek)) + 1;
 const compliance = evaluateStreamingRightsCompliance(fixture.ownedStreamingPlatform, complianceWeek);
@@ -186,6 +293,7 @@ const styles = readFileSync(resolve(process.cwd(), 'styles/streaming-rights-exch
 const hq = readFileSync(resolve(process.cwd(), 'components/StreamingPlatformHQ.tsx'), 'utf8');
 assert(component.includes('Every title has a price. Every clause has a consequence.'), 'The exchange should open with a cinematic rights-floor thesis.');
 assert(component.includes('Contract vault') && component.includes('PERFORMANCE OBLIGATIONS'), 'The UI should expose contract and compliance evidence.');
+assert(component.includes('Catalogue packages') && component.includes('Acquire complete package'), 'The Market Floor should expose portfolio-scale buying without hiding title schedules.');
 assert(styles.includes('@media (max-width: 560px)') && styles.includes('prefers-reduced-motion'), 'The exchange should have explicit mobile and motion-safe treatment.');
 /* The launcher moved from the retired Content/Market rooms to the Command
    Deck's CONTENT chips and the Content Desk's renew/lapse actions. Asserting

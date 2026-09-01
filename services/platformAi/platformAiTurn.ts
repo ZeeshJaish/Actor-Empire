@@ -30,7 +30,6 @@ import {
     resolvePlatformController,
 } from './platformAiState';
 import { getStreamingCountryMarketProfile } from '../streamingDayOneMarkets';
-import { doesStreamingLicenseCoverCountry, isStreamingLicenseActiveAt } from '../streamingRightsCore';
 import { progressPlatformAiDistressWorld } from './platformAiDistress';
 import { hasEligiblePlayerProductionStudio, hasOpenPlayerCommissionForPlan } from './platformAiPlayerCommissions';
 import { getPlatformAiLocalizationRequirements } from './platformAiLocalizationCore';
@@ -85,7 +84,7 @@ const preparePlanForScheduling = (
     platformId: PlatformId,
     planId: string,
     absoluteWeek: number,
-    premiereAtAbsoluteWeek: number,
+    projectIndex?: ReadonlyMap<string, WorldState['projects'][number]>,
 ): { world: WorldState; localizationReadyAtAbsoluteWeek: number } | null => {
     const platform = world.platforms?.[platformId];
     const plan = platform?.ai?.slate.find(item => item.id === planId);
@@ -97,25 +96,8 @@ const preparePlanForScheduling = (
     if (!plannedCountries.length) return null;
     if (plannedCountries.some(countryId => !activeCountryIds.has(countryId))) return null;
 
-    const contracts = plan.source === 'COMMISSIONED_ORIGINAL'
-        ? []
-        : plan.sourceProjectIds.map(projectId => platform.ai!.rightsContracts.find(contract => (
-            plan.rightsContractIds.includes(contract.id)
-            && contract.sourceProjectId === projectId
-            && contract.buyerPlatformId === platformId
-            && contract.platformContentPlanId === plan.id
-            && contract.status === 'ACTIVE'
-            && isStreamingLicenseActiveAt(contract, premiereAtAbsoluteWeek)
-        )) || null);
-    if (contracts.some(contract => !contract)) return null;
-    if (contracts.some(contract => (
-        contract!.status !== 'ACTIVE'
-        || !isStreamingLicenseActiveAt(contract!, premiereAtAbsoluteWeek)
-    ))) return null;
-
     const allCountriesEligible = plannedCountries.every(countryId => (
         countrySupportsLocalization(platform, plan, countryId)
-        && contracts.every(contract => doesStreamingLicenseCoverCountry(contract!, countryId))
     ));
     if (!allCountriesEligible) return null;
     const production = plan.industryProductionId
@@ -125,13 +107,19 @@ const preparePlanForScheduling = (
         ? production && production.status === 'DELIVERED' ? [production.canonicalProjectId] : []
         : plan.sourceProjectIds;
     if (!projectIds.length) return null;
-    const localizationJobs = getReadyPlatformAiLocalizationJobs(platform, plan, projectIds, absoluteWeek, world);
+    const localizationJobs = getReadyPlatformAiLocalizationJobs(
+        platform,
+        plan,
+        projectIds,
+        absoluteWeek,
+        world,
+        projectIndex,
+    );
     if (localizationJobs.some(job => !job)) return null;
     const localizationReadyAtAbsoluteWeek = Math.max(
         absoluteWeek,
         ...localizationJobs.map(job => job!.readyAtAbsoluteWeek!),
     );
-    if (localizationReadyAtAbsoluteWeek > premiereAtAbsoluteWeek) return null;
 
     const preparedPlan: PlatformAiContentPlan = {
         ...plan,
@@ -156,6 +144,7 @@ const ensureLocalizationJobs = (
     absoluteWeek: number,
 ): WorldState => {
     let nextWorld = world;
+    const projectIndex = new Map(world.projects.map(project => [project.id, project]));
     const plans = (nextWorld.platforms?.[platformId].ai?.slate || [])
         .filter(plan => plan.status === 'RIGHTS_READY' || plan.status === 'DELIVERED')
         .sort((left, right) => left.id.localeCompare(right.id));
@@ -170,7 +159,7 @@ const ensureLocalizationJobs = (
             ? production && production.status === 'DELIVERED' ? [production.canonicalProjectId] : []
             : plan.sourceProjectIds;
         for (const projectId of [...projectIds].sort()) {
-            const project = nextWorld.projects.find(item => item.id === projectId);
+            const project = projectIndex.get(projectId);
             const requirements = getPlatformAiLocalizationRequirements(currentPlatform, plan, project);
             for (const requirement of requirements.filter(item => item.mandatory && item.supported)) {
                 markCurrentPlatformCanonical(nextWorld, platformId, player.id, absoluteWeek);
@@ -199,6 +188,7 @@ const scheduleReadyPlans = (
     absoluteWeek: number,
 ): WorldState => {
     let nextWorld = world;
+    const projectIndex = new Map(world.projects.map(project => [project.id, project]));
     const readyPlanIds = (nextWorld.platforms?.[platformId].ai?.slate || [])
         .filter(plan => plan.status === 'RIGHTS_READY' || plan.status === 'DELIVERED')
         .map(plan => plan.id)
@@ -207,8 +197,39 @@ const scheduleReadyPlans = (
         const sourcePlan = nextWorld.platforms?.[platformId].ai?.slate.find(plan => plan.id === planId);
         const sourceAi = nextWorld.platforms?.[platformId].ai;
         if (!sourcePlan || !sourceAi) continue;
+        const prepared = preparePlanForScheduling(
+            nextWorld,
+            platformId,
+            planId,
+            absoluteWeek,
+            projectIndex,
+        );
+        if (!prepared) continue;
+        const competingByWeek = new Map<number, {
+            premiereTitleCount: number;
+            scheduledTitleCount: number;
+            sameGenreCount: number;
+            sameAudienceCount: number;
+        }>();
+        for (const plan of sourceAi.slate) {
+            if (plan.id === sourcePlan.id) continue;
+            const premiereWeeks = new Set(plan.releaseEntries.map(entry => entry.premiereAtAbsoluteWeek));
+            for (const premiereWeek of premiereWeeks) {
+                const previous = competingByWeek.get(premiereWeek) || {
+                    premiereTitleCount: 0,
+                    scheduledTitleCount: 0,
+                    sameGenreCount: 0,
+                    sameAudienceCount: 0,
+                };
+                previous.premiereTitleCount += plan.releaseEntries
+                    .filter(entry => entry.premiereAtAbsoluteWeek === premiereWeek).length;
+                previous.scheduledTitleCount += plan.releaseEntries.length;
+                if (plan.genre === sourcePlan.genre) previous.sameGenreCount += 1;
+                if (plan.targetAudience === sourcePlan.targetAudience) previous.sameAudienceCount += 1;
+                competingByWeek.set(premiereWeek, previous);
+            }
+        }
         const legalCandidates: Array<{
-            result: ReturnType<typeof schedulePlatformStreamingWindow>;
             premiereAtAbsoluteWeek: number;
             latestRequiredAbsoluteWeek: number;
             rightsExpireAtAbsoluteWeek: number;
@@ -218,15 +239,8 @@ const scheduleReadyPlans = (
         }> = [];
         for (let offset = 1; offset <= MAX_PREMIERE_SEARCH_WEEKS; offset += 1) {
             const premiereAtAbsoluteWeek = absoluteWeek + offset;
-            const prepared = preparePlanForScheduling(
-                nextWorld,
-                platformId,
-                planId,
-                absoluteWeek,
-                premiereAtAbsoluteWeek,
-            );
-            if (!prepared) continue;
             markCurrentPlatformCanonical(prepared.world, platformId, player.id, absoluteWeek);
+            const competition = competingByWeek.get(premiereAtAbsoluteWeek);
             const scheduled = schedulePlatformStreamingWindow({
                 // The prepared plan is assembled from canonical turn state.
                 player,
@@ -236,6 +250,9 @@ const scheduleReadyPlans = (
                 absoluteWeek,
                 premiereAtAbsoluteWeek,
                 localizationReadyAtAbsoluteWeek: prepared.localizationReadyAtAbsoluteWeek,
+                projectIndex,
+                scheduledTitleCountAtPremiere: competition?.premiereTitleCount || 0,
+                previewOnly: true,
             });
             if (scheduled.changed) {
                 const scheduledPlan = scheduled.plan!;
@@ -245,20 +262,15 @@ const scheduleReadyPlans = (
                     const contract = sourceAi.rightsContracts.find(item => item.id === entry.rightsContractId);
                     return contract ? [contract.expiresAtAbsoluteWeek] : [];
                 });
-                const competingPlans = sourceAi.slate.filter(plan => (
-                    plan.id !== sourcePlan.id
-                    && plan.releaseEntries.some(entry => entry.premiereAtAbsoluteWeek === premiereAtAbsoluteWeek)
-                ));
                 legalCandidates.push({
-                    result: scheduled,
                     premiereAtAbsoluteWeek,
                     latestRequiredAbsoluteWeek: readiness.latestRequiredAbsoluteWeek,
                     rightsExpireAtAbsoluteWeek: contractExpiries.length
                         ? Math.min(...contractExpiries)
                         : Number.MAX_SAFE_INTEGER,
-                    scheduledTitleCount: competingPlans.reduce((sum, plan) => sum + plan.releaseEntries.length, 0),
-                    sameGenreCount: competingPlans.filter(plan => plan.genre === sourcePlan.genre).length,
-                    sameAudienceCount: competingPlans.filter(plan => plan.targetAudience === sourcePlan.targetAudience).length,
+                    scheduledTitleCount: competition?.scheduledTitleCount || 0,
+                    sameGenreCount: competition?.sameGenreCount || 0,
+                    sameAudienceCount: competition?.sameAudienceCount || 0,
                 });
                 continue;
             }
@@ -275,15 +287,28 @@ const scheduleReadyPlans = (
             commercialForecast: sourcePlan.forecast.commercial,
             prestigeForecast: sourcePlan.forecast.prestige,
             marketingReserveMillions: sourcePlan.marketingReserveMillions,
-            candidates: legalCandidates.map(({ result: _result, ...candidate }) => candidate),
+            candidates: legalCandidates,
         });
         if (!choice) continue;
         const chosen = legalCandidates.find(candidate => (
             candidate.premiereAtAbsoluteWeek === choice.premiereAtAbsoluteWeek
         ));
         if (chosen) {
-            const chosenPlatform = chosen.result.world.platforms![platformId];
-            nextWorld = updatePlatform(chosen.result.world, platformId, {
+            markCurrentPlatformCanonical(prepared.world, platformId, player.id, absoluteWeek);
+            const committed = schedulePlatformStreamingWindow({
+                player,
+                world: prepared.world,
+                platformId,
+                planId,
+                absoluteWeek,
+                premiereAtAbsoluteWeek: choice.premiereAtAbsoluteWeek,
+                localizationReadyAtAbsoluteWeek: prepared.localizationReadyAtAbsoluteWeek,
+                projectIndex,
+                scheduledTitleCountAtPremiere: competingByWeek.get(choice.premiereAtAbsoluteWeek)?.premiereTitleCount || 0,
+            });
+            if (!committed.changed) continue;
+            const chosenPlatform = committed.world.platforms![platformId];
+            nextWorld = updatePlatform(committed.world, platformId, {
                 ...chosenPlatform,
                 ai: {
                     ...chosenPlatform.ai!,
@@ -496,6 +521,7 @@ export const processPlatformAiWorldTurn = (
         : { ...world, platforms: structuredClone(fallbackPlatforms) };
     const news: NewsItem[] = [];
     const logs: string[] = [];
+    const knownPresentationEventIds = new Map<PlatformId, Set<string>>();
 
     for (const platformId of PLATFORM_TURN_ORDER) {
         // Ownership is intentionally resolved before normalization so an acquired
@@ -518,6 +544,7 @@ export const processPlatformAiWorldTurn = (
             };
         if (normalized.ai!.lastProcessedAbsoluteWeek >= absoluteWeek) continue;
         const knownEventIds = new Set(getPlatformAiPresentationEvents(normalized).map(event => event.id));
+        knownPresentationEventIds.set(platformId, knownEventIds);
         nextWorld = updatePlatform(nextWorld, platformId, normalized);
 
         // Rights expiry, schedule repair, renewal queuing and paid-renewal activation
@@ -585,9 +612,6 @@ export const processPlatformAiWorldTurn = (
             },
         };
         nextWorld = updatePlatform(nextWorld, platformId, checkpointed);
-        const presentation = presentationNews(platformId, checkpointed, knownEventIds, absoluteWeek);
-        news.push(...presentation.news);
-        logs.push(...presentation.logs);
     }
 
     for (const platformId of PLATFORM_TURN_ORDER) {
@@ -600,6 +624,18 @@ export const processPlatformAiWorldTurn = (
         world: nextWorld,
         absoluteWeek,
     }).world;
+
+    // Distress and rescue decisions are resolved after each platform's economy.
+    // Build presentation from the final turn state so those major moves are not
+    // silently swallowed between this week's checkpoint and the next one.
+    for (const platformId of PLATFORM_TURN_ORDER) {
+        const knownEventIds = knownPresentationEventIds.get(platformId);
+        const platform = nextWorld.platforms?.[platformId];
+        if (!knownEventIds || !platform) continue;
+        const presentation = presentationNews(platformId, platform, knownEventIds, absoluteWeek);
+        news.push(...presentation.news);
+        logs.push(...presentation.logs);
+    }
 
     return { world: nextWorld, news, logs };
 };

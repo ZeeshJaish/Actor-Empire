@@ -15,7 +15,10 @@ import {
     progressPlatformAiDistressWorld,
 } from '../services/platformAi/platformAiDistress';
 import { settlePlatformAiEconomy } from '../services/platformAi/platformAiEconomy';
-import { createStreamingLicenseContract } from '../services/streamingRightsCore';
+import {
+    createStreamingLicenseContract,
+    migrateStreamingRightsContractRegistry,
+} from '../services/streamingRightsCore';
 import { compactPlayerForPersistence } from '../services/saveCompaction';
 import { migratePlayerSave } from '../services/saveMigration';
 import { processPlatformAiWorldTurn } from '../services/platformAi/platformAiTurn';
@@ -178,7 +181,11 @@ pressurePlatform.ai.distressEpisodes = [
     },
 ];
 const pressureNormalized = normalizePlatformAiState(pressurePlatform, fixture.id, 600);
-assert.equal(pressureNormalized.ai!.schemaVersion, 10, 'Phase 5 finance state must normalize to schema 10.');
+assert.equal(
+    pressureNormalized.ai!.schemaVersion,
+    PLATFORM_AI_RUNTIME_SCHEMA_VERSION,
+    'Phase 5 finance state must normalize to the current canonical Platform AI schema.',
+);
 assert.deepEqual(
     (pressureNormalized.ai as any).externalRecapitalizations,
     [],
@@ -530,7 +537,7 @@ const catalogueDealFixture = (week: number): Player => {
             },
         }));
     }
-    return { ...base, world };
+    return migrateStreamingRightsContractRegistry({ ...base, world });
 };
 
 const queueWeek = START_WEEK + 20;
@@ -547,6 +554,13 @@ const queuedBuyer = queued.world.platforms![queuedDeal.buyerPlatformId];
 assert.equal(queuedDeal.status, 'PENDING_PAYMENT');
 assert.equal(queuedDeal.durationWeeks, 104);
 assert.equal(queuedDeal.expiresAtAbsoluteWeek, queuedDeal.startsAtAbsoluteWeek + 104);
+assert.equal(queuedDeal.sourceContractId, 'distress-source-entitlement');
+assert.equal(queuedDeal.windowType, 'SECOND_WINDOW');
+assert.deepEqual(
+    queuedDeal.countryIds,
+    [...queuedBuyer.ai!.capabilities.activeCountryIds].sort(),
+    'A distress sublicense must freeze only the buyer markets covered by the seller entitlement.',
+);
 assert.equal(queued.world.platforms!.NETFLIX.cashReserve, sellerCashBeforeQueue, 'Queueing may not credit the seller.');
 assert.equal(queuedBuyer.cashReserve, catalogueFixture.world.platforms![queuedDeal.buyerPlatformId].cashReserve, 'Queueing may not charge the buyer.');
 assert.equal(queuedBuyer.ai!.rightsContracts.length, 0, 'Queueing may not grant rights before payment.');
@@ -987,6 +1001,7 @@ conflictWorld = withPlatform(conflictWorld, blockerId, platform => ({
         })],
     },
 }));
+conflictWorld = migrateStreamingRightsContractRegistry({ ...conflictFixture, world: conflictWorld }).world;
 const buyerCashAfterConflictPayment = conflictWorld.platforms![conflictDeal.buyerPlatformId].cashReserve;
 const sellerCashBeforeRejectedTransfer = conflictWorld.platforms![conflictDeal.sellerPlatformId].cashReserve;
 const conflictRejected = progressPlatformAiDistressWorld({
@@ -1039,7 +1054,7 @@ assert.deepEqual(
 );
 
 const expiringFixture = catalogueDealFixture(queueWeek + 300);
-const expiringWorld = withPlatform(expiringFixture.world, 'NETFLIX', platform => ({
+let expiringWorld = withPlatform(expiringFixture.world, 'NETFLIX', platform => ({
     ...platform,
     ai: {
         ...platform.ai!,
@@ -1050,6 +1065,16 @@ const expiringWorld = withPlatform(expiringFixture.world, 'NETFLIX', platform =>
         })),
     },
 }));
+expiringWorld = {
+    ...expiringWorld,
+    streamingRightsContracts: {
+        ...expiringWorld.streamingRightsContracts,
+        'distress-source-entitlement': {
+            ...expiringWorld.streamingRightsContracts!['distress-source-entitlement'],
+            expiresAtAbsoluteWeek: queueWeek + 340,
+        },
+    },
+};
 const expiringRejected = progressPlatformAiDistressWorld({
     player: { ...expiringFixture, world: expiringWorld },
     world: expiringWorld,
@@ -1059,6 +1084,39 @@ assert.equal(expiringRejected.world.platformAiCatalogueDistressDeals?.length, 0,
 assert.equal(
     expiringRejected.world.platforms!.NETFLIX.ai!.distressEpisodes[0].stageResults.at(-1)?.outcome,
     'UNAVAILABLE',
+);
+
+const disallowedFixture = catalogueDealFixture(queueWeek + 325);
+const disallowedWorld: WorldState = {
+    ...disallowedFixture.world,
+    platforms: {
+        ...disallowedFixture.world.platforms!,
+        NETFLIX: {
+            ...disallowedFixture.world.platforms!.NETFLIX,
+            ai: {
+                ...disallowedFixture.world.platforms!.NETFLIX.ai!,
+                slate: [],
+            },
+        },
+    },
+    streamingRightsContracts: {
+        ...disallowedFixture.world.streamingRightsContracts,
+        'distress-source-entitlement': {
+            ...disallowedFixture.world.streamingRightsContracts!['distress-source-entitlement'],
+            sublicensingAllowed: false,
+        },
+    },
+};
+const disallowedResult = progressPlatformAiDistressWorld({
+    player: { ...disallowedFixture, world: disallowedWorld },
+    world: disallowedWorld,
+    absoluteWeek: queueWeek + 325,
+});
+assert.equal(disallowedResult.world.platformAiCatalogueDistressDeals?.length || 0, 0);
+assert.equal(
+    disallowedResult.world.platforms!.NETFLIX.ai!.distressEpisodes[0].stageResults.at(-1)?.outcome,
+    'UNAVAILABLE',
+    'A projection cannot sublicense when the canonical source contract forbids it.',
 );
 
 const acquisitionCancelled = cancelPendingPlatformAiCatalogueDistressDealsForAcquisition({

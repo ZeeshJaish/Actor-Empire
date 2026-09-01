@@ -7,7 +7,7 @@ import { liquidateBusiness, resolveProjectType } from '../../../services/busines
 import { NPCActor, NPCTier } from '../../../types';
 import { getDirectorTalent } from '../../../services/roleLogic';
 import { getPlayerLanguage, t } from '../../../services/i18n';
-import { getInheritedStudioProjects } from '../../../services/legacyLogic';
+import { getAbsoluteWeek, getInheritedStudioProjects } from '../../../services/legacyLogic';
 
 
 import { DevelopmentLab, DevelopmentLabInitialTab } from './DevelopmentLab';
@@ -30,6 +30,8 @@ import { CustomPosterImage } from '../../../components/CustomPosterImage';
 import { StudioSaleEntryCard, StudioSaleRoom } from './components/StudioSaleDeckPanel';
 import { getProjectFundingEconomics, getProjectMarketOutcomeRevenue } from '../../../services/projectFundingEconomics';
 import { StudioDivisionCard } from './components/StudioDivisionCard';
+import StreamingRightsCalendar from '../../../components/StreamingRightsCalendar';
+import { getStreamingRightsCalendar } from '../../../services/streamingRightsCalendar';
 import {
     buildPlatformCommissionActiveCardPresentation,
     buildPlatformCommissionFilmography,
@@ -52,7 +54,7 @@ interface ProductionHouseGameProps {
     onPlatformCommissionConsumed?: () => void;
 }
 
-type StudioView = 'DASHBOARD' | 'STUDIO_GROUP' | 'DEVELOPMENT' | 'PRE_PROD' | 'PRODUCTION' | 'RELEASE' | 'RELEASES' | 'OFFICE' | 'FINANCE' | 'GREENLIGHT' | 'TALENT' | 'FILMOGRAPHY';
+type StudioView = 'DASHBOARD' | 'STUDIO_GROUP' | 'DEVELOPMENT' | 'PRE_PROD' | 'PRODUCTION' | 'RELEASE' | 'RELEASES' | 'OFFICE' | 'FINANCE' | 'GREENLIGHT' | 'TALENT' | 'FILMOGRAPHY' | 'RIGHTS';
 
 // --- HELPERS ---
 const formatMoney = (val: number) => {
@@ -228,6 +230,17 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
     // Prestige Score (0-100): rewards quality, awards, consistency, and credible hits.
     const prestigeScore = Math.min(100, Math.floor((avgRating * 6) + (awardsWon * 2.5) + (evaluationLibrary.length * 0.8) + (breakoutCount * 1.2) + consistencyBonus));
     const groupValuation = getStudioGroupValuation(player).parentCompanyValue;
+    const streamingRightsCalendar = getStreamingRightsCalendar(
+        player,
+        getAbsoluteWeek(player.age, player.currentWeek),
+    );
+    const studioRightsItems = Object.values(streamingRightsCalendar.groups)
+        .flat()
+        .filter(item => item.seller.type === 'PLAYER_STUDIO');
+    const studioRightsActionCount = studioRightsItems.filter(item => item.status === 'ACTION_REQUIRED').length;
+    const studioRightsApproachingCount = studioRightsItems.filter(item => (
+        item.outcome === 'PENDING' && item.status !== 'ACTION_REQUIRED'
+    )).length;
     const getStudioSubtypeLabel = (subtype?: string) => subtype === 'MAJOR_STUDIO'
         ? tr('services.business.productionDashboard.studioType.major')
         : tr('services.business.productionDashboard.studioType.indie');
@@ -927,6 +940,20 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
         return <StudioPage player={player} studioId={studio.id} onUpdatePlayer={onUpdatePlayer} onBack={closeStudioTool} />;
     }
 
+    if (view === 'RIGHTS') {
+        return (
+            <div className="fixed inset-0 z-[60] overflow-y-auto bg-[#070706]">
+                <StreamingRightsCalendar
+                    player={player}
+                    context="STUDIO"
+                    studioId={studio.id}
+                    onUpdatePlayer={onUpdatePlayer}
+                    onClose={closeStudioTool}
+                />
+            </div>
+        );
+    }
+
     if (view === 'RELEASE' && currentProject) {
         return (
             <ReleaseWizard 
@@ -1252,6 +1279,20 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
                                 { label: tr('services.business.productionDashboard.division.capital'), value: formatMoney(studio.balance) }
                             ]}
                             onClick={() => setView('FINANCE')}
+                        />
+
+                        <StudioDivisionCard
+                            wide
+                            eyebrow="CONTRACT WINDOWS"
+                            title="Rights Calendar"
+                            subtitle="Renewals, expiries and exact market returns"
+                            icon={<Calendar size={22}/>}
+                            accent="GOLD"
+                            stats={[
+                                { label: 'Decisions', value: studioRightsActionCount.toString() },
+                                { label: 'Approaching', value: studioRightsApproachingCount.toString() }
+                            ]}
+                            onClick={() => setView('RIGHTS')}
                         />
 
                         <StudioDivisionCard
